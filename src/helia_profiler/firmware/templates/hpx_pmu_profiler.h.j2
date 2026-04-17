@@ -1,0 +1,42 @@
+{# hpx_pmu_profiler.h — PMU profiler header #}
+/**
+ * @file hpx_pmu_profiler.h
+ * @brief Lightweight PMU-based per-layer profiler for heliaPROFILER.
+ *
+ * Auto-generated — do not edit.
+ */
+#pragma once
+
+#include <cstdint>
+#include <cstdio>
+
+#include "tensorflow/lite/micro/micro_profiler_interface.h"
+#include "tensorflow/lite/micro/compatibility.h"
+
+extern "C" {
+#include "nsx_pmu.h"
+}
+
+struct PmuEvent {
+    const char *tag;
+    uint32_t cycles;
+    uint32_t counter0;
+    uint32_t counter1;
+    uint32_t counter2;
+    uint32_t counter3;
+};
+
+class HpxPmuProfiler : public tflite::MicroProfilerInterface {
+  public:
+    void Init(nsx_pmu_preset_t preset);
+    uint32_t BeginEvent(const char *tag) override;
+    void EndEvent(uint32_t handle) override;
+    void ClearEvents();
+    void PrintCsv() const;
+
+  private:
+    static constexpr int kMaxEvents = 1024;
+    PmuEvent events_[kMaxEvents];
+    int count_ = 0;
+    nsx_pmu_counters_t snap_;
+};

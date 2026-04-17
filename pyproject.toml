@@ -38,7 +38,7 @@ where = ["src"]
 include = ["helia_profiler", "helia_profiler.*"]
 
 [tool.setuptools.package-data]
-helia_profiler = ["firmware/templates/**/*"]
+helia_profiler = ["firmware/templates/**/*", "engines/templates/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

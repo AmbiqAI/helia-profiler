@@ -1,0 +1,21 @@
+{# nsx.yml — NSX project manifest for the profiler app #}
+schema_version: 1
+project:
+  name: hpx_profiler
+target:
+  board: {{ board }}
+  soc: {{ soc }}
+toolchain: {{ toolchain }}
+channel: stable
+profile: {{ board }}_minimal
+profile_status: active
+modules:
+{% for m in modules %}
+- name: {{ m }}
+  revision: main
+  project: {{ m }}
+{% endfor %}
+features: {}
+module_registry:
+  projects: {}
+  modules: {}

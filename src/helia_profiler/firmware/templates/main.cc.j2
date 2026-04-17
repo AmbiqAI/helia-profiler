@@ -1,0 +1,189 @@
+{# main.cc — heliaPROFILER firmware entry point #}
+/**
+ * @file main.cc
+ * @brief heliaPROFILER firmware — auto-generated, do not edit.
+ *
+ * Runs inference with per-layer PMU profiling and emits CSV results
+ * over SWO/UART for the host-side capture stage to parse.
+ *
+ * When external power measurement is enabled, a GPIO sync pin is toggled
+ * HIGH during inference and LOW otherwise so the host instrument can
+ * identify the measurement window.
+ */
+
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+#include "{{ engine_header }}"
+#include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
+#include "tensorflow/lite/micro/system_setup.h"
+#include "tensorflow/lite/micro/tflite_bridge/micro_error_reporter.h"
+#include "tensorflow/lite/schema/schema_generated.h"
+
+#include "hpx_pmu_profiler.h"
+
+extern "C" {
+#include "ns_core.h"
+#include "ns_ambiqsuite_harness.h"
+#include "nsx_mem.h"
+#include "nsx_system.h"
+#include "am_hal_gpio.h"
+}
+
+// DWT cycle counter
+static inline void dwt_init(void) {
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+
+// --- GPIO sync for external power measurement ---
+static constexpr bool kPowerSyncEnabled = {{ power_sync_enabled | lower }};
+static constexpr uint32_t kSyncGpioPin = {{ sync_gpio_pin }};
+
+static inline void sync_gpio_init(void) {
+    if constexpr (kPowerSyncEnabled) {
+        am_hal_gpio_pinconfig(kSyncGpioPin, am_hal_gpio_pincfg_output);
+        am_hal_gpio_output_clear(kSyncGpioPin);
+    }
+}
+
+static inline void sync_gpio_high(void) {
+    if constexpr (kPowerSyncEnabled) {
+        am_hal_gpio_output_set(kSyncGpioPin);
+    }
+}
+
+static inline void sync_gpio_low(void) {
+    if constexpr (kPowerSyncEnabled) {
+        am_hal_gpio_output_clear(kSyncGpioPin);
+    }
+}
+
+// Model data (xxd-style include)
+#include "model_data.h"
+
+static constexpr int kArenaSize = {{ arena_size }};
+static constexpr int kMaxOps = 128;
+
+NSX_MEM_FAST_BSS alignas(16) static uint8_t g_arena[kArenaSize];
+static HpxPmuProfiler g_profiler;
+
+// Register all common TFLM builtin ops for broad model compatibility.
+static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
+    static tflite::MicroMutableOpResolver<kMaxOps> r;
+    static bool init = false;
+    if (!init) {
+        r.AddAbs();           r.AddAdd();
+        r.AddAddN();          r.AddArgMax();
+        r.AddArgMin();        r.AddAveragePool2D();
+        r.AddBatchMatMul();   r.AddBatchToSpaceNd();
+        r.AddBroadcastArgs(); r.AddBroadcastTo();
+        r.AddCast();          r.AddCeil();
+        r.AddConcatenation(); r.AddConv2D();
+        r.AddCumSum();        r.AddDepthToSpace();
+        r.AddDepthwiseConv2D(); r.AddDequantize();
+        r.AddDiv();           r.AddElu();
+        r.AddEmbeddingLookup(); r.AddEqual();
+        r.AddExp();           r.AddExpandDims();
+        r.AddFill();          r.AddFloor();
+        r.AddFloorDiv();      r.AddFloorMod();
+        r.AddFullyConnected(); r.AddGather();
+        r.AddGatherNd();      r.AddGreater();
+        r.AddGreaterEqual();  r.AddHardSwish();
+        r.AddL2Normalization(); r.AddL2Pool2D();
+        r.AddLeakyRelu();     r.AddLess();
+        r.AddLessEqual();     r.AddLog();
+        r.AddLogSoftmax();    r.AddLogicalAnd();
+        r.AddLogicalNot();    r.AddLogicalOr();
+        r.AddLogistic();      r.AddMaxPool2D();
+        r.AddMaximum();       r.AddMean();
+        r.AddMinimum();       r.AddMirrorPad();
+        r.AddMul();           r.AddNeg();
+        r.AddNotEqual();      r.AddPack();
+        r.AddPad();           r.AddPadV2();
+        r.AddPrelu();         r.AddQuantize();
+        r.AddReduceMax();     r.AddRelu();
+        r.AddRelu6();         r.AddReshape();
+        r.AddResizeBilinear(); r.AddResizeNearestNeighbor();
+        r.AddRound();         r.AddRsqrt();
+        r.AddSelectV2();      r.AddShape();
+        r.AddSlice();         r.AddSoftmax();
+        r.AddSpaceToBatchNd(); r.AddSpaceToDepth();
+        r.AddSplit();         r.AddSplitV();
+        r.AddSqrt();          r.AddSquare();
+        r.AddSquaredDifference(); r.AddSqueeze();
+        r.AddStridedSlice();  r.AddSub();
+        r.AddSum();           r.AddSvdf();
+        r.AddTanh();          r.AddTranspose();
+        r.AddTransposeConv(); r.AddUnidirectionalSequenceLSTM();
+        r.AddUnpack();        r.AddZerosLike();
+        init = true;
+    }
+    return r;
+}
+
+int main(void) {
+    nsx_system_config_t sys_cfg = nsx_system_development;
+    sys_cfg.skip_bsp_init = true;
+    NS_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
+    dwt_init();
+    sync_gpio_init();
+
+    ns_printf("\n--- HPX_START ---\n");
+    ns_printf("HPX_MODEL_SIZE=%u\n", model_data_len);
+    ns_printf("HPX_ARENA_SIZE=%d\n", kArenaSize);
+    ns_printf("HPX_ITERATIONS={{ iterations }}\n");
+    ns_printf("HPX_WARMUP={{ warmup }}\n");
+    ns_printf("HPX_POWER_SYNC=%s\n", kPowerSyncEnabled ? "gpio" : "none");
+    if constexpr (kPowerSyncEnabled) {
+        ns_printf("HPX_SYNC_GPIO=%lu\n", (unsigned long)kSyncGpioPin);
+    }
+
+    tflite::InitializeTarget();
+
+    const tflite::Model *model = tflite::GetModel(model_data);
+    if (model->version() != TFLITE_SCHEMA_VERSION) {
+        ns_printf("HPX_ERROR=schema_mismatch:%lu_vs_%d\n",
+                  model->version(), TFLITE_SCHEMA_VERSION);
+        while (1) {}
+    }
+
+    g_profiler.Init({{ pmu_preset }});
+
+    auto &resolver = get_resolver();
+    tflite::MicroInterpreter interpreter(model, resolver, g_arena, kArenaSize,
+                                         nullptr, &g_profiler);
+    if (interpreter.AllocateTensors() != kTfLiteOk) {
+        ns_printf("HPX_ERROR=alloc_tensors_failed\n");
+        while (1) {}
+    }
+
+    TfLiteTensor *input = interpreter.input(0);
+    ns_printf("HPX_INPUT_SIZE=%d\n", (int)input->bytes);
+    ns_printf("HPX_ALLOCATED_ARENA=%zu\n", interpreter.arena_used_bytes());
+
+    // Warmup iterations (profiler disabled, no GPIO sync)
+    for (int w = 0; w < {{ warmup }}; w++) {
+        memset(input->data.raw, 0, input->bytes);
+        interpreter.Invoke();
+    }
+
+    // Profiled iterations — GPIO sync brackets each inference
+    for (int iter = 0; iter < {{ iterations }}; iter++) {
+        memset(input->data.raw, 0, input->bytes);
+        g_profiler.ClearEvents();
+
+        sync_gpio_high();   // Signal: inference start
+        interpreter.Invoke();
+        sync_gpio_low();    // Signal: inference end
+
+        ns_printf("\n--- HPX_ITER %d ---\n", iter);
+        g_profiler.PrintCsv();
+    }
+
+    ns_printf("\n--- HPX_END ---\n");
+    while (1) {}
+    return 0;
+}

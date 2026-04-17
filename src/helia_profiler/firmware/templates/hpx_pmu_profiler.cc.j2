@@ -1,0 +1,55 @@
+{# hpx_pmu_profiler.cc — PMU profiler implementation #}
+/**
+ * @file hpx_pmu_profiler.cc
+ * @brief HpxPmuProfiler implementation for heliaPROFILER.
+ *
+ * Auto-generated — do not edit.
+ */
+#include "hpx_pmu_profiler.h"
+#include <cstdio>
+#include <cstring>
+
+extern "C" {
+#include "nsx_pmu.h"
+}
+
+void HpxPmuProfiler::Init(nsx_pmu_preset_t preset) {
+    count_ = 0;
+    nsx_pmu_init(preset);
+}
+
+uint32_t HpxPmuProfiler::BeginEvent(const char *tag) {
+    if (count_ >= kMaxEvents) return 0;
+    events_[count_].tag = tag;
+    nsx_pmu_start();
+    nsx_pmu_read(&snap_);  // snapshot start counters
+    return static_cast<uint32_t>(count_);
+}
+
+void HpxPmuProfiler::EndEvent(uint32_t handle) {
+    nsx_pmu_counters_t end;
+    nsx_pmu_stop();
+    nsx_pmu_read(&end);
+    auto &ev = events_[handle];
+    ev.cycles   = end.cycle - snap_.cycle;
+    ev.counter0 = end.counter[0] - snap_.counter[0];
+    ev.counter1 = end.counter[1] - snap_.counter[1];
+    ev.counter2 = end.counter[2] - snap_.counter[2];
+    ev.counter3 = end.counter[3] - snap_.counter[3];
+    count_++;
+}
+
+void HpxPmuProfiler::ClearEvents() { count_ = 0; }
+
+void HpxPmuProfiler::PrintCsv() const {
+    ns_printf("op,tag,cycles,cnt0,cnt1,cnt2,cnt3\n");
+    for (int i = 0; i < count_; i++) {
+        const auto &ev = events_[i];
+        ns_printf("%d,%s,%lu,%lu,%lu,%lu,%lu\n", i, ev.tag,
+                  (unsigned long)ev.cycles,
+                  (unsigned long)ev.counter0,
+                  (unsigned long)ev.counter1,
+                  (unsigned long)ev.counter2,
+                  (unsigned long)ev.counter3);
+    }
+}
