@@ -1,106 +1,65 @@
-"""Top-level profiling orchestrator."""
+"""Top-level profiling orchestrator.
+
+Composes the pipeline stages and delegates to ``PipelineRunner``.
+"""
 
 from __future__ import annotations
 
-import shutil
-import tempfile
-from pathlib import Path
+import logging
 
 from .config import ProfileConfig
-from .engines import EngineType
-from .engines.base import EngineAdapter
-from .platform import PmuTier, get_soc_for_board
+from .pipeline import PipelineContext, PipelineRunner
+from .stages import (
+    BuildFirmwareStage,
+    CapturePmuStage,
+    CapturePowerStage,
+    FlashFirmwareStage,
+    GenerateFirmwareStage,
+    GenerateReportStage,
+    PrepareEngineStage,
+    ResolvePlatformStage,
+)
+
+log = logging.getLogger("hpx")
 
 
-def _get_adapter(engine_type: EngineType) -> EngineAdapter:
-    """Return the engine adapter for the given type."""
-    if engine_type is EngineType.TFLM:
-        from .engines.tflm import TFLMAdapter
-
-        return TFLMAdapter()
-    elif engine_type is EngineType.HELIA_RT:
-        from .engines.helia_rt import HeliaRTAdapter
-
-        return HeliaRTAdapter()
-    elif engine_type is EngineType.HELIA_AOT:
-        from .engines.helia_aot import HeliaAOTAdapter
-
-        return HeliaAOTAdapter()
-    else:
-        raise ValueError(f"Unknown engine type: {engine_type}")
+def build_default_pipeline() -> PipelineRunner:
+    """Create the standard profiling pipeline with all stages."""
+    return PipelineRunner([
+        ResolvePlatformStage(),
+        PrepareEngineStage(),
+        GenerateFirmwareStage(),
+        BuildFirmwareStage(),
+        FlashFirmwareStage(),
+        CapturePmuStage(),
+        CapturePowerStage(),
+        GenerateReportStage(),
+    ])
 
 
-def run_profile(config: ProfileConfig) -> None:
+def run_profile(config: ProfileConfig) -> PipelineContext:
     """Execute the full profiling pipeline.
 
-    Steps:
-    1. Resolve working directory.
-    2. Run engine adapter to prepare engine-specific artifacts.
-    3. Generate profiler firmware as an NSX app.
-    4. Build and flash firmware via NSX pipeline.
-    5. Capture PMU data from target.
-    6. Optionally capture power data via Joulescope.
-    7. Generate report.
-    8. Clean up working directory (unless --keep-work-dir).
+    Returns the final ``PipelineContext`` with all captured data and report
+    paths.  Raises ``HpxError`` (or a subclass) on failure — errors are never
+    swallowed silently.
     """
-    work_dir: Path
-    should_cleanup = False
-
-    if config.work_dir is not None:
-        work_dir = config.work_dir.resolve()
-        work_dir.mkdir(parents=True, exist_ok=True)
-    else:
-        work_dir = Path(tempfile.mkdtemp(prefix="hpx_"))
-        should_cleanup = not config.keep_work_dir
-
-    try:
-        _log(config, f"Working directory: {work_dir}")
-
-        # 0. Resolve platform
-        soc = get_soc_for_board(config.target.board)
-        _log(config, f"Board: {config.target.board}  SoC: {soc.name} ({soc.core.value})")
-
-        if soc.pmu_tier is PmuTier.DWT_ONLY:
-            _log(
-                config,
-                f"Warning: {soc.name} has DWT-only profiling (no Armv8-M PMU). "
-                "Per-layer PMU breakdowns will be limited to cycle counts.",
-            )
-
-        # 1. Engine preparation
-        adapter = _get_adapter(config.engine.type)
-        _log(config, f"Engine: {adapter.name}")
-        artifacts = adapter.prepare(config, work_dir)  # noqa: F841 — used once firmware gen is wired
-
-        # 2. Generate firmware
-        _log(config, "Generating profiler firmware...")
-        # TODO: firmware.app_gen.generate(config, artifacts, work_dir)
-
-        # 3. Build and flash
-        _log(config, "Building firmware...")
-        # TODO: call nsx configure + build + flash
-
-        # 4. Capture PMU data
-        _log(config, "Capturing PMU data...")
-        # TODO: capture.serial + capture.pmu
-
-        # 5. Power capture (optional)
-        if config.power.enabled:
-            _log(config, "Capturing power data...")
-            # TODO: capture.power
-
-        # 6. Generate report
-        _log(config, "Generating report...")
-        # TODO: report generation
-
-        _log(config, "Done.")
-
-    finally:
-        if should_cleanup:
-            shutil.rmtree(work_dir, ignore_errors=True)
+    _setup_logging(config.verbose)
+    pipeline = build_default_pipeline()
+    return pipeline.run(config)
 
 
-def _log(config: ProfileConfig, msg: str) -> None:
-    """Print a message if verbosity allows."""
-    if config.verbose >= 0:
-        print(f"[hpx] {msg}")
+def _setup_logging(verbosity: int) -> None:
+    """Configure the ``hpx`` logger based on CLI verbosity."""
+    level = logging.WARNING
+    if verbosity >= 2:
+        level = logging.DEBUG
+    elif verbosity >= 1:
+        level = logging.INFO
+
+    logger = logging.getLogger("hpx")
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("[hpx] %(message)s"))
+        logger.addHandler(handler)
+    logger.setLevel(level)

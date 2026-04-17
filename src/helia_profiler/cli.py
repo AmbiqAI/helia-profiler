@@ -81,6 +81,7 @@ def main(argv: list[str] | None = None) -> None:
 def _cmd_profile(args: argparse.Namespace) -> None:
     """Run the profiling pipeline."""
     from .config import load_config
+    from .errors import HpxError
 
     # Build CLI overrides dict from parsed args
     cli: dict = {}
@@ -129,7 +130,11 @@ def _cmd_profile(args: argparse.Namespace) -> None:
 
     from .profiler import run_profile
 
-    run_profile(config)
+    try:
+        run_profile(config)
+    except HpxError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
 
 def _cmd_doctor() -> None:
