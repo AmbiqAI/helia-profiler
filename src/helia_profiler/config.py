@@ -67,8 +67,9 @@ class PowerConfig:
 class OutputConfig:
     """Report output settings."""
 
-    format: str = "csv"
+    format: str = "csv"  # csv | json | model-explorer
     dir: Path = Path("./results")
+    model_explorer: bool = True  # always emit ME overlay alongside primary format
 
 
 @dataclass(frozen=True)
@@ -164,6 +165,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
         output=OutputConfig(
             format=output_d.get("format", "csv"),
             dir=Path(output_d.get("dir", "./results")),
+            model_explorer=output_d.get("model_explorer", True),
         ),
         work_dir=Path(d["work_dir"]) if d.get("work_dir") else None,
         keep_work_dir=d.get("keep_work_dir", False),

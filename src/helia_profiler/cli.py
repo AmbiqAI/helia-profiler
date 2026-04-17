@@ -44,6 +44,11 @@ def main(argv: list[str] | None = None) -> None:
     p_profile.add_argument("--power-duration", type=int, help="Power capture seconds (default: 30)")
     p_profile.add_argument("--output-dir", type=Path, help="Results output directory")
     p_profile.add_argument("--output-format", choices=["csv", "json"], help="Output format")
+    p_profile.add_argument(
+        "--no-model-explorer",
+        action="store_true",
+        help="Skip Model Explorer overlay generation",
+    )
     p_profile.add_argument("--work-dir", type=Path, help="Working directory for generated firmware")
     p_profile.add_argument("--keep-work-dir", action="store_true", help="Keep working directory")
     p_profile.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
@@ -111,6 +116,8 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli.setdefault("output", {})["dir"] = str(args.output_dir)
     if args.output_format is not None:
         cli.setdefault("output", {})["format"] = args.output_format
+    if args.no_model_explorer:
+        cli.setdefault("output", {})["model_explorer"] = False
 
     if args.work_dir is not None:
         cli["work_dir"] = str(args.work_dir)

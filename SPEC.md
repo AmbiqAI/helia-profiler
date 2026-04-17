@@ -215,6 +215,7 @@ power:
 output:
   format: csv                   # csv | json
   dir: ./results
+  model_explorer: true          # emit Model Explorer overlay JSONs (default: true)
 ```
 
 **Key rule:** The config is resolved once at startup into a frozen
@@ -280,6 +281,39 @@ Results are written as:
   instruction counts, cache stats, and (if enabled) power/energy.
 - **CSV:** One row per layer per PMU preset, suitable for spreadsheet analysis.
 - **JSON:** Structured output for programmatic consumption.
+- **Model Explorer overlay:** Per-metric JSON files compatible with Google's
+  [Model Explorer](https://github.com/google-ai-edge/model-explorer) custom
+  node data format. Load alongside the source `.tflite` to color-code nodes by
+  cycles, instructions, cache misses, MVE operations, etc.
+
+Model Explorer overlays are emitted **by default** (one file per PMU metric)
+alongside the primary report format. Use `--no-model-explorer` to skip them.
+
+#### Model Explorer overlay format
+
+Each overlay file follows Model Explorer's `ModelNodeData` schema:
+
+```json
+{
+  "main": {
+    "name": "cycles",
+    "results": {
+      "output_tensor_0": {"value": 12450},
+      "output_tensor_1": {"value": 8320},
+      "output_tensor_2": {"value": 45600}
+    },
+    "gradient": [
+      {"stop": 0, "bgColor": "#22c55e"},
+      {"stop": 0.5, "bgColor": "#eab308"},
+      {"stop": 1, "bgColor": "#ef4444"}
+    ]
+  }
+}
+```
+
+Node keys use output tensor names (stable across builds) when available,
+falling back to node IDs. The default gradient is green → yellow → red for
+cost metrics (higher = hotter).
 
 Power/current/energy numbers in reports should be clearly labeled as
 measurements from the user's specific setup, not published reference values.
@@ -314,6 +348,7 @@ hpx version
 | `--power-duration` | int | Power capture seconds (default: 30) |
 | `--output-dir` | path | Results output directory |
 | `--output-format` | choice | `csv`, `json` |
+| `--no-model-explorer` | flag | Skip Model Explorer overlay generation (default: on) |
 | `--work-dir` | path | Working directory for generated firmware (default: temp) |
 | `--keep-work-dir` | flag | Don't delete working directory after profiling |
 | `--verbose` / `-v` | count | Increase verbosity |

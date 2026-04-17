@@ -14,7 +14,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-
 # ---------------------------------------------------------------------------
 # SoC family (determines core, PMU tier, and MVE availability)
 # ---------------------------------------------------------------------------
