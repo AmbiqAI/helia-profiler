@@ -11,7 +11,6 @@ log = logging.getLogger("hpx")
 
 
 class CapturePowerStage:
-
     @property
     def name(self) -> str:
         return "capture_power"
@@ -27,8 +26,7 @@ class CapturePowerStage:
         except ImportError as exc:
             raise PowerError(
                 f"Joulescope package not installed: {exc}",
-                hint="Install with: pip install 'helia-profiler[power]' or "
-                     "pip install joulescope",
+                hint="Install with: pip install 'helia-profiler[power]' or pip install joulescope",
             ) from exc
         except PowerError:
             raise

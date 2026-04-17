@@ -12,7 +12,6 @@ log = logging.getLogger("hpx")
 
 
 class ResolvePlatformStage:
-
     @property
     def name(self) -> str:
         return "resolve_platform"

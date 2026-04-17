@@ -11,7 +11,6 @@ log = logging.getLogger("hpx")
 
 
 class CapturePmuStage:
-
     @property
     def name(self) -> str:
         return "capture_pmu"

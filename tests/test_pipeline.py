@@ -104,11 +104,14 @@ def _make_config(tmp_path: Path):
     """Build a minimal ProfileConfig for testing."""
     model_file = tmp_path / "test.tflite"
     model_file.write_bytes(b"\x00")  # dummy
-    return load_config(None, {
-        "model": {"path": str(model_file)},
-        "engine": {"type": "tflm"},
-        "work_dir": str(tmp_path / "work"),
-    })
+    return load_config(
+        None,
+        {
+            "model": {"path": str(model_file)},
+            "engine": {"type": "tflm"},
+            "work_dir": str(tmp_path / "work"),
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

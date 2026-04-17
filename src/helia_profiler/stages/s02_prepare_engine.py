@@ -15,19 +15,21 @@ def _get_adapter(engine_type: EngineType):
     """Import and instantiate the engine adapter for the given type."""
     if engine_type is EngineType.TFLM:
         from ..engines.tflm import TFLMAdapter
+
         return TFLMAdapter()
     elif engine_type is EngineType.HELIA_RT:
         from ..engines.helia_rt import HeliaRTAdapter
+
         return HeliaRTAdapter()
     elif engine_type is EngineType.HELIA_AOT:
         from ..engines.helia_aot import HeliaAOTAdapter
+
         return HeliaAOTAdapter()
     else:
         raise EngineError(f"Unknown engine type: {engine_type}")
 
 
 class PrepareEngineStage:
-
     @property
     def name(self) -> str:
         return "prepare_engine"
@@ -57,7 +59,7 @@ class PrepareEngineStage:
             raise EngineError(
                 f"Engine '{adapter.name}' preparation failed: {exc}",
                 hint="Check engine-specific config and that required tools are installed "
-                     "(run 'hpx doctor').",
+                "(run 'hpx doctor').",
             ) from exc
 
         ctx.engine_adapter = adapter

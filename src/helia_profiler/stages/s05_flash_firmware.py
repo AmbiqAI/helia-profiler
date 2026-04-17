@@ -12,7 +12,6 @@ log = logging.getLogger("hpx")
 
 
 class FlashFirmwareStage:
-
     @property
     def name(self) -> str:
         return "flash_firmware"
@@ -29,13 +28,14 @@ class FlashFirmwareStage:
         try:
             flash_app(ctx)
         except subprocess.CalledProcessError as exc:
-            stderr_text = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+            stderr_text = (
+                exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+            )
             raise BuildError(
                 f"Flash failed (exit code {exc.returncode}).",
                 returncode=exc.returncode,
                 stderr=stderr_text,
-                hint="Check that the board is connected and JLink is available "
-                     "(run 'hpx doctor').",
+                hint="Check that the board is connected and JLink is available (run 'hpx doctor').",
             ) from exc
         except BuildError:
             raise

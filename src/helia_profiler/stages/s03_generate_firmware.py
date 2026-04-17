@@ -11,7 +11,6 @@ log = logging.getLogger("hpx")
 
 
 class GenerateFirmwareStage:
-
     @property
     def name(self) -> str:
         return "generate_firmware"

@@ -32,6 +32,7 @@ Num = Union[float, int]
 # Data classes (mirror Model Explorer's node_data_builder.py)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class GradientItem:
     """A gradient stop mapping a normalized position [0,1] to a color."""
@@ -83,22 +84,23 @@ class ModelNodeData:
 
 #: Cool-to-hot gradient (green → yellow → red) for cost metrics.
 GRADIENT_COST: list[GradientItem] = [
-    GradientItem(stop=0, bgColor="#22c55e"),    # green-500
+    GradientItem(stop=0, bgColor="#22c55e"),  # green-500
     GradientItem(stop=0.5, bgColor="#eab308"),  # yellow-500
-    GradientItem(stop=1, bgColor="#ef4444"),     # red-500
+    GradientItem(stop=1, bgColor="#ef4444"),  # red-500
 ]
 
 #: Inverted gradient (red → green) for efficiency metrics.
 GRADIENT_EFFICIENCY: list[GradientItem] = [
-    GradientItem(stop=0, bgColor="#ef4444"),     # red-500
+    GradientItem(stop=0, bgColor="#ef4444"),  # red-500
     GradientItem(stop=0.5, bgColor="#eab308"),  # yellow-500
-    GradientItem(stop=1, bgColor="#22c55e"),     # green-500
+    GradientItem(stop=1, bgColor="#22c55e"),  # green-500
 ]
 
 
 # ---------------------------------------------------------------------------
 # Builder helpers
 # ---------------------------------------------------------------------------
+
 
 def build_overlay(
     layer_values: dict[str, Num],
@@ -161,6 +163,7 @@ def build_multi_metric_overlays(
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
+
 
 def _strip_none(d: dict) -> dict:
     """Recursively remove None values from a dict (mirrors ME's remove_none)."""

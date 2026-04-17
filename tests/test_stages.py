@@ -54,10 +54,13 @@ class TestResolvePlatformStage:
             stage.run(ctx)
 
     def test_missing_model_raises_config_error(self, tmp_path: Path):
-        config = load_config(None, {
-            "model": {"path": str(tmp_path / "missing.tflite")},
-            "engine": {"type": "tflm"},
-        })
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(tmp_path / "missing.tflite")},
+                "engine": {"type": "tflm"},
+            },
+        )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         stage = ResolvePlatformStage()
         with pytest.raises(ConfigError, match="Model file not found"):

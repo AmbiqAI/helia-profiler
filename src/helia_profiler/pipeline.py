@@ -26,6 +26,7 @@ log = logging.getLogger("hpx")
 # Pipeline context — mutable accumulator passed through every stage
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PipelineContext:
     """Mutable state bag that flows through all pipeline stages.
@@ -64,6 +65,7 @@ class PipelineContext:
 # Stage protocol — each pipeline step implements this
 # ---------------------------------------------------------------------------
 
+
 @runtime_checkable
 class Stage(Protocol):
     """Interface for a single pipeline stage."""
@@ -88,6 +90,7 @@ class Stage(Protocol):
 # ---------------------------------------------------------------------------
 # Pipeline runner — lightweight sequential executor
 # ---------------------------------------------------------------------------
+
 
 class PipelineRunner:
     """Executes a sequence of ``Stage`` objects against a ``PipelineContext``."""
@@ -115,7 +118,7 @@ class PipelineRunner:
                     raise HpxError(
                         f"Unexpected error in stage '{stage.name}': {exc}",
                         hint="This is likely a bug in heliaPROFILER. "
-                             "Please file an issue with the full traceback.",
+                        "Please file an issue with the full traceback.",
                     ) from exc
                 log.info("[done]  %s", stage.name)
 
@@ -129,6 +132,7 @@ class PipelineRunner:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
     """Return (work_dir, should_cleanup)."""

@@ -37,7 +37,9 @@ def main(argv: list[str] | None = None) -> None:
         nargs="+",
         help="PMU preset names to capture (default: basic_cpu)",
     )
-    p_profile.add_argument("--per-layer", action="store_true", default=None, help="Per-layer breakdown (default)")
+    p_profile.add_argument(
+        "--per-layer", action="store_true", default=None, help="Per-layer breakdown (default)"
+    )
     p_profile.add_argument("--no-per-layer", action="store_false", dest="per_layer")
     p_profile.add_argument("--iterations", type=int, help="Inference iterations (default: 100)")
     p_profile.add_argument("--power", action="store_true", help="Enable Joulescope power capture")
@@ -161,4 +163,6 @@ def _cmd_boards() -> None:
         soc = get_soc(board.soc)
         pmu = "full" if soc.has_full_pmu else "dwt"
         mve = "yes" if soc.has_mve else "no"
-        print(f"{board.name:<24} {soc.name:<14} {soc.core.value:<14} {pmu:<6} {mve:<5} {board.channel}")
+        print(
+            f"{board.name:<24} {soc.name:<14} {soc.core.value:<14} {pmu:<6} {mve:<5} {board.channel}"
+        )

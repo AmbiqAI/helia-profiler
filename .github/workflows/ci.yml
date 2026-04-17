@@ -34,8 +34,11 @@ jobs:
       - name: Install lint dependencies
         run: uv sync --group lint
 
-      - name: Run ruff
+      - name: Run ruff lint
         run: uv run --group lint ruff check .
+
+      - name: Run ruff format check
+        run: uv run --group lint ruff format --check .
 
   # ---------------------------------------------------------------
   # Unit tests — run on all three platforms

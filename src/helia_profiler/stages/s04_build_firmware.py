@@ -12,7 +12,6 @@ log = logging.getLogger("hpx")
 
 
 class BuildFirmwareStage:
-
     @property
     def name(self) -> str:
         return "build_firmware"
@@ -29,13 +28,14 @@ class BuildFirmwareStage:
         try:
             build_dir, binary_path = build_app(ctx)
         except subprocess.CalledProcessError as exc:
-            stderr_text = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+            stderr_text = (
+                exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+            )
             raise BuildError(
                 f"NSX build failed (exit code {exc.returncode}).",
                 returncode=exc.returncode,
                 stderr=stderr_text,
-                hint="Run 'hpx doctor' to verify toolchain. "
-                     "Use --verbose for full build output.",
+                hint="Run 'hpx doctor' to verify toolchain. Use --verbose for full build output.",
             ) from exc
         except BuildError:
             raise

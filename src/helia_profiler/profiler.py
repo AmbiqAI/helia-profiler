@@ -25,16 +25,18 @@ log = logging.getLogger("hpx")
 
 def build_default_pipeline() -> PipelineRunner:
     """Create the standard profiling pipeline with all stages."""
-    return PipelineRunner([
-        ResolvePlatformStage(),
-        PrepareEngineStage(),
-        GenerateFirmwareStage(),
-        BuildFirmwareStage(),
-        FlashFirmwareStage(),
-        CapturePmuStage(),
-        CapturePowerStage(),
-        GenerateReportStage(),
-    ])
+    return PipelineRunner(
+        [
+            ResolvePlatformStage(),
+            PrepareEngineStage(),
+            GenerateFirmwareStage(),
+            BuildFirmwareStage(),
+            FlashFirmwareStage(),
+            CapturePmuStage(),
+            CapturePowerStage(),
+            GenerateReportStage(),
+        ]
+    )
 
 
 def run_profile(config: ProfileConfig) -> PipelineContext:

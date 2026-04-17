@@ -18,12 +18,13 @@ from enum import Enum
 # SoC family (determines core, PMU tier, and MVE availability)
 # ---------------------------------------------------------------------------
 
+
 class SocFamily(Enum):
     """Ambiq SoC generation families."""
 
-    AP3 = "ap3"   # Apollo3 / Apollo3P — Cortex-M4F, DWT only
-    AP4 = "ap4"   # Apollo4 / Apollo4P / Apollo4L — Cortex-M4F, DWT only
-    AP5 = "ap5"   # Apollo5 / Apollo510 / Apollo330P — Cortex-M55, full PMU + MVE
+    AP3 = "ap3"  # Apollo3 / Apollo3P — Cortex-M4F, DWT only
+    AP4 = "ap4"  # Apollo4 / Apollo4P / Apollo4L — Cortex-M4F, DWT only
+    AP5 = "ap5"  # Apollo5 / Apollo510 / Apollo330P — Cortex-M55, full PMU + MVE
 
 
 class CoreArch(Enum):
@@ -36,13 +37,14 @@ class CoreArch(Enum):
 class PmuTier(Enum):
     """PMU capability tiers."""
 
-    DWT_ONLY = "dwt"     # Cortex-M4: DWT cycle counter, limited event support
-    ARMV8M_PMU = "pmu"   # Cortex-M55: Full Armv8-M PMU, 70+ events, 8 counters
+    DWT_ONLY = "dwt"  # Cortex-M4: DWT cycle counter, limited event support
+    ARMV8M_PMU = "pmu"  # Cortex-M55: Full Armv8-M PMU, 70+ events, 8 counters
 
 
 # ---------------------------------------------------------------------------
 # SoC definition
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class MemoryLayout:
@@ -68,15 +70,15 @@ class ClockConfig:
 class SocDef:
     """Definition of an Ambiq SoC relevant to profiling."""
 
-    name: str                # e.g. "apollo510"
+    name: str  # e.g. "apollo510"
     family: SocFamily
     core: CoreArch
     pmu_tier: PmuTier
-    has_mve: bool            # Helium / MVE vector extensions
+    has_mve: bool  # Helium / MVE vector extensions
     memory: MemoryLayout
     clock: ClockConfig
-    sdk_tier: str            # "r3", "r4", or "r5" — maps to nsx-ambiqsuite-r*
-    c_define: str            # e.g. "AM_PART_APOLLO510"
+    sdk_tier: str  # "r3", "r4", or "r5" — maps to nsx-ambiqsuite-r*
+    c_define: str  # e.g. "AM_PART_APOLLO510"
     pmu_max_ops: int = 2048  # Max PMU accumulator operations (layers)
 
     @property
@@ -88,13 +90,14 @@ class SocDef:
 # Board definition
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class BoardDef:
     """Definition of an evaluation board."""
 
-    name: str          # e.g. "apollo510_evb"
-    soc: str           # SoC name key (matches SocDef.name)
-    channel: str       # "stable" or "preview"
+    name: str  # e.g. "apollo510_evb"
+    soc: str  # SoC name key (matches SocDef.name)
+    channel: str  # "stable" or "preview"
     description: str = ""
 
 
@@ -118,127 +121,159 @@ def _register_board(board: BoardDef) -> BoardDef:
 
 # --- AP3 family (Cortex-M4F) ------------------------------------------------
 
-_register_soc(SocDef(
-    name="apollo3p",
-    family=SocFamily.AP3,
-    core=CoreArch.CORTEX_M4,
-    pmu_tier=PmuTier.DWT_ONLY,
-    has_mve=False,
-    memory=MemoryLayout(mram_kb=1024, sram_kb=384, dtcm_kb=64),
-    clock=ClockConfig(lp_mhz=96),
-    sdk_tier="r3",
-    c_define="AM_PART_APOLLO3P",
-))
+_register_soc(
+    SocDef(
+        name="apollo3p",
+        family=SocFamily.AP3,
+        core=CoreArch.CORTEX_M4,
+        pmu_tier=PmuTier.DWT_ONLY,
+        has_mve=False,
+        memory=MemoryLayout(mram_kb=1024, sram_kb=384, dtcm_kb=64),
+        clock=ClockConfig(lp_mhz=96),
+        sdk_tier="r3",
+        c_define="AM_PART_APOLLO3P",
+    )
+)
 
 _register_board(BoardDef("apollo3p_evb", soc="apollo3p", channel="stable"))
 
 # --- AP4 family (Cortex-M4F) ------------------------------------------------
 
-_register_soc(SocDef(
-    name="apollo4p",
-    family=SocFamily.AP4,
-    core=CoreArch.CORTEX_M4,
-    pmu_tier=PmuTier.DWT_ONLY,
-    has_mve=False,
-    memory=MemoryLayout(mram_kb=2000, sram_kb=1024, dtcm_kb=384),
-    clock=ClockConfig(lp_mhz=96, hp_mhz=192),
-    sdk_tier="r4",
-    c_define="AM_PART_APOLLO4P",
-))
+_register_soc(
+    SocDef(
+        name="apollo4p",
+        family=SocFamily.AP4,
+        core=CoreArch.CORTEX_M4,
+        pmu_tier=PmuTier.DWT_ONLY,
+        has_mve=False,
+        memory=MemoryLayout(mram_kb=2000, sram_kb=1024, dtcm_kb=384),
+        clock=ClockConfig(lp_mhz=96, hp_mhz=192),
+        sdk_tier="r4",
+        c_define="AM_PART_APOLLO4P",
+    )
+)
 
-_register_soc(SocDef(
-    name="apollo4l",
-    family=SocFamily.AP4,
-    core=CoreArch.CORTEX_M4,
-    pmu_tier=PmuTier.DWT_ONLY,
-    has_mve=False,
-    memory=MemoryLayout(mram_kb=2000, sram_kb=1024, dtcm_kb=384),
-    clock=ClockConfig(lp_mhz=96, hp_mhz=192),
-    sdk_tier="r4",
-    c_define="AM_PART_APOLLO4L",
-))
+_register_soc(
+    SocDef(
+        name="apollo4l",
+        family=SocFamily.AP4,
+        core=CoreArch.CORTEX_M4,
+        pmu_tier=PmuTier.DWT_ONLY,
+        has_mve=False,
+        memory=MemoryLayout(mram_kb=2000, sram_kb=1024, dtcm_kb=384),
+        clock=ClockConfig(lp_mhz=96, hp_mhz=192),
+        sdk_tier="r4",
+        c_define="AM_PART_APOLLO4L",
+    )
+)
 
 _register_board(BoardDef("apollo4p_evb", soc="apollo4p", channel="preview"))
 
 # --- AP5 family (Cortex-M55, full PMU + MVE) --------------------------------
 
-_register_soc(SocDef(
-    name="apollo510",
-    family=SocFamily.AP5,
-    core=CoreArch.CORTEX_M55,
-    pmu_tier=PmuTier.ARMV8M_PMU,
-    has_mve=True,
-    memory=MemoryLayout(
-        mram_kb=4096, sram_kb=3072, dtcm_kb=512, itcm_kb=256,
-        psram_kb=32168, nvm_kb=8192,
-    ),
-    clock=ClockConfig(lp_mhz=96, hp_mhz=250),
-    sdk_tier="r5",
-    c_define="AM_PART_APOLLO510",
-    pmu_max_ops=4096,
-))
+_register_soc(
+    SocDef(
+        name="apollo510",
+        family=SocFamily.AP5,
+        core=CoreArch.CORTEX_M55,
+        pmu_tier=PmuTier.ARMV8M_PMU,
+        has_mve=True,
+        memory=MemoryLayout(
+            mram_kb=4096,
+            sram_kb=3072,
+            dtcm_kb=512,
+            itcm_kb=256,
+            psram_kb=32168,
+            nvm_kb=8192,
+        ),
+        clock=ClockConfig(lp_mhz=96, hp_mhz=250),
+        sdk_tier="r5",
+        c_define="AM_PART_APOLLO510",
+        pmu_max_ops=4096,
+    )
+)
 
-_register_soc(SocDef(
-    name="apollo510b",
-    family=SocFamily.AP5,
-    core=CoreArch.CORTEX_M55,
-    pmu_tier=PmuTier.ARMV8M_PMU,
-    has_mve=True,
-    memory=MemoryLayout(
-        mram_kb=4096, sram_kb=3072, dtcm_kb=512, itcm_kb=256,
-        psram_kb=32168,
-    ),
-    clock=ClockConfig(lp_mhz=96, hp_mhz=250),
-    sdk_tier="r5",
-    c_define="AM_PART_APOLLO510B",
-    pmu_max_ops=4096,
-))
+_register_soc(
+    SocDef(
+        name="apollo510b",
+        family=SocFamily.AP5,
+        core=CoreArch.CORTEX_M55,
+        pmu_tier=PmuTier.ARMV8M_PMU,
+        has_mve=True,
+        memory=MemoryLayout(
+            mram_kb=4096,
+            sram_kb=3072,
+            dtcm_kb=512,
+            itcm_kb=256,
+            psram_kb=32168,
+        ),
+        clock=ClockConfig(lp_mhz=96, hp_mhz=250),
+        sdk_tier="r5",
+        c_define="AM_PART_APOLLO510B",
+        pmu_max_ops=4096,
+    )
+)
 
-_register_soc(SocDef(
-    name="apollo5b",
-    family=SocFamily.AP5,
-    core=CoreArch.CORTEX_M55,
-    pmu_tier=PmuTier.ARMV8M_PMU,
-    has_mve=True,
-    memory=MemoryLayout(
-        mram_kb=4096, sram_kb=3072, dtcm_kb=512, itcm_kb=256,
-        psram_kb=32168,
-    ),
-    clock=ClockConfig(lp_mhz=96, hp_mhz=250),
-    sdk_tier="r5",
-    c_define="AM_PART_APOLLO5B",
-    pmu_max_ops=4096,
-))
+_register_soc(
+    SocDef(
+        name="apollo5b",
+        family=SocFamily.AP5,
+        core=CoreArch.CORTEX_M55,
+        pmu_tier=PmuTier.ARMV8M_PMU,
+        has_mve=True,
+        memory=MemoryLayout(
+            mram_kb=4096,
+            sram_kb=3072,
+            dtcm_kb=512,
+            itcm_kb=256,
+            psram_kb=32168,
+        ),
+        clock=ClockConfig(lp_mhz=96, hp_mhz=250),
+        sdk_tier="r5",
+        c_define="AM_PART_APOLLO5B",
+        pmu_max_ops=4096,
+    )
+)
 
 # AP330 — Cortex-M55, belongs to AP5 family despite the "3" in the name
-_register_soc(SocDef(
-    name="apollo330P",
-    family=SocFamily.AP5,
-    core=CoreArch.CORTEX_M55,
-    pmu_tier=PmuTier.ARMV8M_PMU,
-    has_mve=True,
-    memory=MemoryLayout(
-        mram_kb=4096, sram_kb=3072, dtcm_kb=512, itcm_kb=256,
-        psram_kb=32168,
-    ),
-    clock=ClockConfig(lp_mhz=96, hp_mhz=250),
-    sdk_tier="r5",
-    c_define="AM_PART_APOLLO330P",
-    pmu_max_ops=4096,
-))
+_register_soc(
+    SocDef(
+        name="apollo330P",
+        family=SocFamily.AP5,
+        core=CoreArch.CORTEX_M55,
+        pmu_tier=PmuTier.ARMV8M_PMU,
+        has_mve=True,
+        memory=MemoryLayout(
+            mram_kb=4096,
+            sram_kb=3072,
+            dtcm_kb=512,
+            itcm_kb=256,
+            psram_kb=32168,
+        ),
+        clock=ClockConfig(lp_mhz=96, hp_mhz=250),
+        sdk_tier="r5",
+        c_define="AM_PART_APOLLO330P",
+        pmu_max_ops=4096,
+    )
+)
 
 _register_board(BoardDef("apollo510_evb", soc="apollo510", channel="stable"))
 _register_board(BoardDef("apollo510b_evb", soc="apollo510b", channel="preview"))
 _register_board(BoardDef("apollo5b_evb", soc="apollo5b", channel="preview"))
-_register_board(BoardDef(
-    "apollo330mP_evb", soc="apollo330P", channel="preview",
-    description="Apollo330 — Cortex-M55 (AP5 family)",
-))
+_register_board(
+    BoardDef(
+        "apollo330mP_evb",
+        soc="apollo330P",
+        channel="preview",
+        description="Apollo330 — Cortex-M55 (AP5 family)",
+    )
+)
 
 
 # ---------------------------------------------------------------------------
 # Public lookup API
 # ---------------------------------------------------------------------------
+
 
 def get_soc(name: str) -> SocDef:
     """Look up a SoC definition by name."""
