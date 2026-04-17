@@ -2,6 +2,79 @@
    heliaPROFILER — minimal custom styles (stock material otherwise)
    ═══════════════════════════════════════════════════════════════════ */
 
+/* ── Navbar ───────────────────────────────────────────────────────── */
+[data-md-color-scheme="default"] {
+  --hpx-header-bg: #ffffff;
+  --hpx-header-fg: #111827;
+  --hpx-header-muted: #4b5563;
+  --hpx-header-border: rgba(17, 24, 39, 0.08);
+  --hpx-header-search-bg: rgba(17, 24, 39, 0.04);
+  --hpx-header-search-bg-hover: rgba(17, 24, 39, 0.08);
+}
+
+[data-md-color-scheme="slate"] {
+  --hpx-header-bg: #050816;
+  --hpx-header-fg: #f8fafc;
+  --hpx-header-muted: #cbd5e1;
+  --hpx-header-border: rgba(248, 250, 252, 0.08);
+  --hpx-header-search-bg: rgba(248, 250, 252, 0.08);
+  --hpx-header-search-bg-hover: rgba(248, 250, 252, 0.12);
+}
+
+.md-header,
+.md-tabs {
+  background: var(--hpx-header-bg);
+  color: var(--hpx-header-fg);
+}
+
+.md-header {
+  border-bottom: 1px solid var(--hpx-header-border);
+  box-shadow: none;
+}
+
+.md-tabs {
+  border-bottom: 1px solid var(--hpx-header-border);
+}
+
+.md-header__button,
+.md-header__title,
+.md-header__topic,
+.md-tabs__link,
+.md-search__icon,
+.md-source,
+.md-source__icon,
+.md-source__repository {
+  color: var(--hpx-header-fg);
+}
+
+.md-tabs__link {
+  opacity: 0.8;
+}
+
+.md-tabs__link--active,
+.md-tabs__link:is(:hover, :focus),
+.md-header__button:is(:hover, :focus),
+.md-header__title:is(:hover, :focus),
+.md-source:is(:hover, :focus) {
+  color: var(--md-accent-fg-color);
+  opacity: 1;
+}
+
+.md-search__form {
+  background: var(--hpx-header-search-bg);
+  box-shadow: inset 0 0 0 1px var(--hpx-header-border);
+}
+
+.md-search__form:hover,
+.md-search__form:focus-within {
+  background: var(--hpx-header-search-bg-hover);
+}
+
+.md-search__input,
+.md-search__input::placeholder {
+  color: var(--hpx-header-muted);
+}
+
 /* ── Layout ───────────────────────────────────────────────────────── */
 .md-grid { max-width: 1840px; }
 
@@ -22,6 +95,7 @@
 
 /* Hero */
 .landing .hero { text-align: center; margin: 3rem 0 0; }
+.hero-logo { max-width: min(460px, 80%); height: auto; }
 .landing .hero h1 {
   font-size: 2rem;
   font-weight: 700;

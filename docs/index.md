@@ -8,9 +8,10 @@ hide:
 
 <div class="hero" markdown>
 
-# :material-chart-timeline-variant-shimmer: heliaPROFILER
+![heliaPROFILER](./assets/heliaprofiler-logo-light.png#only-light){ .hero-logo }
+![heliaPROFILER](./assets/heliaprofiler-logo-dark.png#only-dark){ .hero-logo }
 
-## Profile LiteRT models on Ambiq Apollo hardware.
+# Profile LiteRT models on Ambiq Apollo hardware.
 
 One command to build, flash, capture PMU counters, and generate reports —
 across TFLM, heliaRT, and heliaAOT engines.

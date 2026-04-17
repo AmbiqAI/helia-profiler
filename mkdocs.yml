@@ -3,18 +3,20 @@ site_description: Profile LiteRT models on Ambiq Apollo hardware
 repo_url: https://github.com/AmbiqAI/helia-profiler
 theme:
   name: material
+  favicon: assets/heliaprofiler-icon.png
+  logo: assets/heliaprofiler-icon.png
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: deep purple
-      accent: deep purple
+      primary: green
+      accent: green
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: deep purple
-      accent: deep purple
+      primary: green
+      accent: green
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
