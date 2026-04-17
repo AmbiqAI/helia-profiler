@@ -1,0 +1,198 @@
+"""Tests for the heliaRT engine adapter and NSX wrapper generation."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from helia_profiler.config import load_config
+from helia_profiler.engines.helia_rt import (
+    HELIART_VERSION,
+    HeliaRTAdapter,
+    _write_wrapper,
+)
+from helia_profiler.errors import EngineError
+
+
+@pytest.fixture()
+def fake_dist(tmp_path: Path) -> Path:
+    """Create a minimal fake heliaRT distribution directory."""
+    dist = tmp_path / "heliart_dist"
+    dist.mkdir()
+    (dist / "lib").mkdir()
+    (dist / "lib" / "libtensorflow-microlite-cm55-gcc-release-with-logs.a").write_bytes(b"\x00")
+    (dist / "tensorflow").mkdir()
+    (dist / "tensorflow" / "lite").mkdir()
+    (dist / "third_party").mkdir()
+    (dist / "third_party" / "flatbuffers").mkdir()
+    return dist
+
+
+def _make_config(tmp_path: Path, engine_overrides: dict | None = None):
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    base = {
+        "model": {"path": str(model)},
+        "engine": {"type": "helia-rt"},
+    }
+    if engine_overrides:
+        base["engine"].update(engine_overrides)
+    return load_config(None, base)
+
+
+class TestWriteWrapper:
+    def test_generates_nsx_module_yaml(self, tmp_path: Path):
+        _write_wrapper(tmp_path, variant="release-with-logs")
+        yaml_path = tmp_path / "nsx-module.yaml"
+        assert yaml_path.exists()
+        content = yaml_path.read_text()
+        assert "nsx-heliart" in content
+        assert HELIART_VERSION in content
+        assert "schema_version: 1" in content
+
+    def test_generates_cmakelists(self, tmp_path: Path):
+        _write_wrapper(tmp_path, variant="release-with-logs")
+        cmake_path = tmp_path / "CMakeLists.txt"
+        assert cmake_path.exists()
+        content = cmake_path.read_text()
+        assert "nsx_heliart" in content
+        assert "nsx::heliart" in content
+        assert "NSX_BOARD_FLAGS_TARGET" in content
+        assert "TF_LITE_STATIC_MEMORY" in content
+
+    def test_variant_in_cmakelists(self, tmp_path: Path):
+        _write_wrapper(tmp_path, variant="debug")
+        content = (tmp_path / "CMakeLists.txt").read_text()
+        assert '"debug"' in content
+
+    def test_version_in_both_files(self, tmp_path: Path):
+        _write_wrapper(tmp_path, variant="release")
+        yaml_content = (tmp_path / "nsx-module.yaml").read_text()
+        cmake_content = (tmp_path / "CMakeLists.txt").read_text()
+        assert HELIART_VERSION in yaml_content
+        assert HELIART_VERSION in cmake_content
+
+
+class TestHeliaRTAdapter:
+    def test_name(self):
+        adapter = HeliaRTAdapter()
+        assert adapter.name == "heliaRT"
+
+    def test_prepare_creates_module_dir(self, tmp_path: Path, fake_dist: Path):
+        config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
+        adapter = HeliaRTAdapter()
+        adapter.prepare(config, tmp_path)
+        module_dir = tmp_path / "modules" / "nsx-heliart"
+        assert module_dir.is_dir()
+        assert (module_dir / "nsx-module.yaml").exists()
+        assert (module_dir / "CMakeLists.txt").exists()
+
+    def test_prepare_links_distribution(self, tmp_path: Path, fake_dist: Path):
+        config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
+        adapter = HeliaRTAdapter()
+        adapter.prepare(config, tmp_path)
+        module_dir = tmp_path / "modules" / "nsx-heliart"
+        assert (module_dir / "lib").is_symlink()
+        assert (module_dir / "tensorflow").is_symlink()
+        assert (module_dir / "third_party").is_symlink()
+
+    def test_prepare_returns_extra_module(self, tmp_path: Path, fake_dist: Path):
+        config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
+        adapter = HeliaRTAdapter()
+        artifacts = adapter.prepare(config, tmp_path)
+        assert len(artifacts.extra_modules) == 1
+        mod = artifacts.extra_modules[0]
+        assert mod["name"] == "nsx-heliart"
+        assert mod["version"] == HELIART_VERSION
+        assert Path(mod["path"]).is_dir()
+
+    def test_prepare_template_vars(self, tmp_path: Path, fake_dist: Path):
+        config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
+        adapter = HeliaRTAdapter()
+        artifacts = adapter.prepare(config, tmp_path)
+        assert artifacts.template_vars["engine_type"] == "helia_rt"
+        assert (
+            artifacts.template_vars["engine_header"] == "tensorflow/lite/micro/micro_interpreter.h"
+        )
+        assert artifacts.template_vars["heliart_version"] == HELIART_VERSION
+        assert artifacts.template_vars["heliart_variant"] == "release-with-logs"
+
+    def test_prepare_default_backend(self, tmp_path: Path, fake_dist: Path):
+        config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
+        adapter = HeliaRTAdapter()
+        artifacts = adapter.prepare(config, tmp_path)
+        assert artifacts.template_vars["engine_backend"] == "helia"
+
+    def test_prepare_custom_backend(self, tmp_path: Path, fake_dist: Path):
+        config = _make_config(
+            tmp_path, {"backend": "cmsis-nn", "config": {"dist_path": str(fake_dist)}}
+        )
+        adapter = HeliaRTAdapter()
+        artifacts = adapter.prepare(config, tmp_path)
+        assert artifacts.template_vars["engine_backend"] == "cmsis-nn"
+
+    def test_prepare_custom_variant(self, tmp_path: Path, fake_dist: Path):
+        config = _make_config(
+            tmp_path, {"config": {"variant": "debug", "dist_path": str(fake_dist)}}
+        )
+        adapter = HeliaRTAdapter()
+        artifacts = adapter.prepare(config, tmp_path)
+        assert artifacts.template_vars["heliart_variant"] == "debug"
+
+    def test_prepare_invalid_variant_raises(self, tmp_path: Path, fake_dist: Path):
+        config = _make_config(
+            tmp_path, {"config": {"variant": "bogus", "dist_path": str(fake_dist)}}
+        )
+        adapter = HeliaRTAdapter()
+        with pytest.raises(EngineError, match="Invalid heliaRT variant"):
+            adapter.prepare(config, tmp_path)
+
+    def test_prepare_idempotent(self, tmp_path: Path, fake_dist: Path):
+        config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
+        adapter = HeliaRTAdapter()
+        artifacts1 = adapter.prepare(config, tmp_path)
+        artifacts2 = adapter.prepare(config, tmp_path)
+        assert artifacts1.extra_modules[0]["name"] == artifacts2.extra_modules[0]["name"]
+
+    def test_prepare_no_dist_path_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.delenv("HELIART_DIST_PATH", raising=False)
+        config = _make_config(tmp_path)
+        adapter = HeliaRTAdapter()
+        with pytest.raises(EngineError, match="distribution path not provided"):
+            adapter.prepare(config, tmp_path)
+
+    def test_prepare_via_env_var(
+        self, tmp_path: Path, fake_dist: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setenv("HELIART_DIST_PATH", str(fake_dist))
+        config = _make_config(tmp_path)
+        adapter = HeliaRTAdapter()
+        artifacts = adapter.prepare(config, tmp_path)
+        assert len(artifacts.extra_modules) == 1
+
+    def test_prepare_via_stage(self, tmp_path: Path, fake_dist: Path):
+        """Integration: verify the stage dispatches to HeliaRTAdapter."""
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.stages.s01_resolve_platform import ResolvePlatformStage
+        from helia_profiler.stages.s02_prepare_engine import PrepareEngineStage
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        assert ctx.engine_artifacts is not None
+        assert len(ctx.engine_artifacts.extra_modules) == 1
+        assert (work_dir / "modules" / "nsx-heliart" / "nsx-module.yaml").exists()
+        assert (work_dir / "modules" / "nsx-heliart" / "lib").is_symlink()

@@ -83,7 +83,21 @@ class TestPrepareEngineStage:
         assert ctx.engine_artifacts is not None
 
     def test_helia_rt_adapter(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-rt"}})
+        # Create fake heliaRT distribution
+        dist = tmp_path / "heliart_dist"
+        dist.mkdir()
+        (dist / "lib").mkdir()
+        (dist / "tensorflow").mkdir()
+        (dist / "third_party").mkdir()
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "engine": {
+                    "type": "helia-rt",
+                    "config": {"dist_path": str(dist)},
+                },
+            },
+        )
         ResolvePlatformStage().run(ctx)
         stage = PrepareEngineStage()
         stage.run(ctx)
