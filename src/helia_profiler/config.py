@@ -15,6 +15,9 @@ DEFAULT_WARMUP = 5
 DEFAULT_PMU_PRESETS = ("basic_cpu",)
 DEFAULT_POWER_DURATION_S = 30
 DEFAULT_IO_VOLTAGE = 1.8
+DEFAULT_POWER_DRIVER = "joulescope"
+DEFAULT_POWER_MODE = "external"
+DEFAULT_SYNC_GPIO_PIN = 10  # EVB-friendly default
 
 
 @dataclass(frozen=True)
@@ -58,9 +61,11 @@ class PowerConfig:
     """Power measurement settings."""
 
     enabled: bool = False
-    backend: str = "joulescope"
+    driver: str = DEFAULT_POWER_DRIVER
+    mode: str = DEFAULT_POWER_MODE  # "external" | "internal"
     duration_s: int = DEFAULT_POWER_DURATION_S
     io_voltage: float = DEFAULT_IO_VOLTAGE
+    sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN  # GPIO for external sync
 
 
 @dataclass(frozen=True)
@@ -158,9 +163,11 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
         ),
         power=PowerConfig(
             enabled=power_d.get("enabled", False),
-            backend=power_d.get("backend", "joulescope"),
+            driver=power_d.get("driver", DEFAULT_POWER_DRIVER),
+            mode=power_d.get("mode", DEFAULT_POWER_MODE),
             duration_s=power_d.get("duration_s", DEFAULT_POWER_DURATION_S),
             io_voltage=power_d.get("io_voltage", DEFAULT_IO_VOLTAGE),
+            sync_gpio_pin=power_d.get("sync_gpio_pin", DEFAULT_SYNC_GPIO_PIN),
         ),
         output=OutputConfig(
             format=output_d.get("format", "csv"),

@@ -27,7 +27,7 @@ def run_doctor() -> None:
 
     # Optional dependencies
     optional = [
-        ("joulescope", "Joulescope (optional, for --power)"),
+        ("joulescope", "Joulescope (optional, for --power --power-driver joulescope)"),
     ]
     for pkg_name, label in optional:
         try:

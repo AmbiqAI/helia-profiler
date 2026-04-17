@@ -15,20 +15,6 @@ from helia_profiler.engines.helia_rt import (
 from helia_profiler.errors import EngineError
 
 
-@pytest.fixture()
-def fake_dist(tmp_path: Path) -> Path:
-    """Create a minimal fake heliaRT distribution directory."""
-    dist = tmp_path / "heliart_dist"
-    dist.mkdir()
-    (dist / "lib").mkdir()
-    (dist / "lib" / "libtensorflow-microlite-cm55-gcc-release-with-logs.a").write_bytes(b"\x00")
-    (dist / "tensorflow").mkdir()
-    (dist / "tensorflow" / "lite").mkdir()
-    (dist / "third_party").mkdir()
-    (dist / "third_party" / "flatbuffers").mkdir()
-    return dist
-
-
 def _make_config(tmp_path: Path, engine_overrides: dict | None = None):
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")

@@ -1,4 +1,4 @@
-"""Stage 7 — Capture power data via Joulescope (optional)."""
+"""Stage 7 — Capture power data via configured power driver (optional)."""
 
 from __future__ import annotations
 
@@ -21,20 +21,24 @@ class CapturePowerStage:
     def run(self, ctx: PipelineContext) -> None:
         from ..capture import capture_power
 
+        driver_name = ctx.config.power.driver
+        mode = ctx.config.power.mode
+        log.info("Power driver: %s (mode: %s)", driver_name, mode)
+
         try:
             power_raw = capture_power(ctx)
-        except ImportError as exc:
-            raise PowerError(
-                f"Joulescope package not installed: {exc}",
-                hint="Install with: pip install 'helia-profiler[power]' or pip install joulescope",
-            ) from exc
         except PowerError:
             raise
         except Exception as exc:
             raise PowerError(
                 f"Power capture failed: {exc}",
-                hint="Check that the Joulescope is connected and powered on.",
+                hint=(f"Check that the {driver_name} is connected and powered on. Mode: {mode}."),
             ) from exc
 
         ctx.power_raw = power_raw
-        log.info("Captured power data (%.1fs)", ctx.config.power.duration_s)
+        log.info(
+            "Captured power data (%.1fs, driver=%s, mode=%s)",
+            ctx.config.power.duration_s,
+            driver_name,
+            mode,
+        )

@@ -18,20 +18,6 @@ from helia_profiler.stages.s01_resolve_platform import ResolvePlatformStage
 from helia_profiler.stages.s02_prepare_engine import PrepareEngineStage
 
 
-@pytest.fixture()
-def fake_dist(tmp_path: Path) -> Path:
-    """Create a minimal fake heliaRT distribution directory."""
-    dist = tmp_path / "heliart_dist"
-    dist.mkdir()
-    (dist / "lib").mkdir()
-    (dist / "lib" / "libtensorflow-microlite-cm55-gcc-release-with-logs.a").write_bytes(b"\x00")
-    (dist / "tensorflow").mkdir()
-    (dist / "tensorflow" / "lite").mkdir()
-    (dist / "third_party").mkdir()
-    (dist / "third_party" / "flatbuffers").mkdir()
-    return dist
-
-
 def _make_ctx(
     tmp_path: Path,
     fake_dist: Path,
@@ -192,3 +178,97 @@ class TestGenerateApp:
         model_h = (app_dir / "src" / "model_data.h").read_text()
         assert "model_data[]" in model_h
         assert "model_data_len" in model_h
+
+    def test_gpio_sync_disabled_by_default(self, tmp_path: Path, fake_dist: Path):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        main_cc = (app_dir / "src" / "main.cc").read_text()
+        assert "kPowerSyncEnabled = false" in main_cc
+
+    def test_gpio_sync_enabled_with_power(self, tmp_path: Path, fake_dist: Path):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb"},
+                "power": {"enabled": True, "mode": "external", "sync_gpio_pin": 42},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        main_cc = (app_dir / "src" / "main.cc").read_text()
+        assert "kPowerSyncEnabled = true" in main_cc
+        assert "kSyncGpioPin = 42" in main_cc
+        assert "sync_gpio_high" in main_cc
+        assert "sync_gpio_low" in main_cc
+
+    def test_gpio_sync_not_enabled_for_internal(self, tmp_path: Path, fake_dist: Path):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb"},
+                "power": {"enabled": True, "mode": "internal"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        main_cc = (app_dir / "src" / "main.cc").read_text()
+        assert "kPowerSyncEnabled = false" in main_cc
+
+
+class TestKwsModel:
+    """Tests using the real KWS reference model."""
+
+    def test_kws_model_to_header(self, kws_model: Path):
+        header = _model_to_header(kws_model)
+        assert "model_data[]" in header
+        assert "model_data_len = 53936" in header
+        assert "kws_ref_model.tflite" in header
+
+    def test_kws_firmware_generation(self, tmp_path: Path, kws_model: Path, fake_dist: Path):
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(kws_model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        assert (app_dir / "src" / "model_data.h").exists()
+        model_h = (app_dir / "src" / "model_data.h").read_text()
+        assert "model_data_len = 53936" in model_h
+
+        # Verify main.cc references the profiler
+        main_cc = (app_dir / "src" / "main.cc").read_text()
+        assert "MicroMutableOpResolver" in main_cc
+        assert "get_resolver" in main_cc

@@ -42,8 +42,23 @@ def main(argv: list[str] | None = None) -> None:
     )
     p_profile.add_argument("--no-per-layer", action="store_false", dest="per_layer")
     p_profile.add_argument("--iterations", type=int, help="Inference iterations (default: 100)")
-    p_profile.add_argument("--power", action="store_true", help="Enable Joulescope power capture")
+    p_profile.add_argument("--power", action="store_true", help="Enable power capture")
+    p_profile.add_argument(
+        "--power-driver",
+        type=str,
+        choices=["joulescope", "ondevice"],
+        help="Power measurement driver (default: joulescope)",
+    )
+    p_profile.add_argument(
+        "--power-mode",
+        type=str,
+        choices=["external", "internal"],
+        help="Power measurement mode (default: external)",
+    )
     p_profile.add_argument("--power-duration", type=int, help="Power capture seconds (default: 30)")
+    p_profile.add_argument(
+        "--sync-gpio", type=int, help="GPIO pin for external power sync (default: 10)"
+    )
     p_profile.add_argument("--output-dir", type=Path, help="Results output directory")
     p_profile.add_argument("--output-format", choices=["csv", "json"], help="Output format")
     p_profile.add_argument(
@@ -112,8 +127,14 @@ def _cmd_profile(args: argparse.Namespace) -> None:
 
     if args.power:
         cli.setdefault("power", {})["enabled"] = True
+    if args.power_driver is not None:
+        cli.setdefault("power", {})["driver"] = args.power_driver
+    if args.power_mode is not None:
+        cli.setdefault("power", {})["mode"] = args.power_mode
     if args.power_duration is not None:
         cli.setdefault("power", {})["duration_s"] = args.power_duration
+    if args.sync_gpio is not None:
+        cli.setdefault("power", {})["sync_gpio_pin"] = args.sync_gpio
 
     if args.output_dir is not None:
         cli.setdefault("output", {})["dir"] = str(args.output_dir)

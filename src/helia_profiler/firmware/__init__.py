@@ -176,6 +176,10 @@ _MAIN_CC_TEMPLATE = """\
  *
  * Runs inference with per-layer PMU profiling and emits CSV results
  * over SWO/UART for the host-side capture stage to parse.
+ *
+ * When external power measurement is enabled, a GPIO sync pin is toggled
+ * HIGH during inference and LOW otherwise so the host instrument can
+ * identify the measurement window.
  */
 
 #include <cstdint>
@@ -195,6 +199,7 @@ extern "C" {{
 #include "ns_ambiqsuite_harness.h"
 #include "nsx_mem.h"
 #include "nsx_system.h"
+#include "am_hal_gpio.h"
 }}
 
 // DWT cycle counter
@@ -202,6 +207,29 @@ static inline void dwt_init(void) {{
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
     DWT->CYCCNT = 0;
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}}
+
+// --- GPIO sync for external power measurement ---
+static constexpr bool kPowerSyncEnabled = {power_sync_enabled};
+static constexpr uint32_t kSyncGpioPin = {sync_gpio_pin};
+
+static inline void sync_gpio_init(void) {{
+    if constexpr (kPowerSyncEnabled) {{
+        am_hal_gpio_pinconfig(kSyncGpioPin, am_hal_gpio_pincfg_output);
+        am_hal_gpio_output_clear(kSyncGpioPin);
+    }}
+}}
+
+static inline void sync_gpio_high(void) {{
+    if constexpr (kPowerSyncEnabled) {{
+        am_hal_gpio_output_set(kSyncGpioPin);
+    }}
+}}
+
+static inline void sync_gpio_low(void) {{
+    if constexpr (kPowerSyncEnabled) {{
+        am_hal_gpio_output_clear(kSyncGpioPin);
+    }}
 }}
 
 // Model data (xxd-style include)
@@ -272,12 +300,17 @@ int main(void) {{
     sys_cfg.skip_bsp_init = true;
     NS_TRY(nsx_system_init(&sys_cfg), "System init failed\\n");
     dwt_init();
+    sync_gpio_init();
 
     ns_printf("\\n--- HPX_START ---\\n");
     ns_printf("HPX_MODEL_SIZE=%u\\n", model_data_len);
     ns_printf("HPX_ARENA_SIZE=%d\\n", kArenaSize);
     ns_printf("HPX_ITERATIONS={iterations}\\n");
     ns_printf("HPX_WARMUP={warmup}\\n");
+    ns_printf("HPX_POWER_SYNC=%s\\n", kPowerSyncEnabled ? "gpio" : "none");
+    if constexpr (kPowerSyncEnabled) {{
+        ns_printf("HPX_SYNC_GPIO=%lu\\n", (unsigned long)kSyncGpioPin);
+    }}
 
     tflite::InitializeTarget();
 
@@ -302,17 +335,20 @@ int main(void) {{
     ns_printf("HPX_INPUT_SIZE=%d\\n", (int)input->bytes);
     ns_printf("HPX_ALLOCATED_ARENA=%zu\\n", interpreter.arena_used_bytes());
 
-    // Warmup iterations (profiler disabled)
+    // Warmup iterations (profiler disabled, no GPIO sync)
     for (int w = 0; w < {warmup}; w++) {{
         memset(input->data.raw, 0, input->bytes);
         interpreter.Invoke();
     }}
 
-    // Profiled iterations
+    // Profiled iterations — GPIO sync brackets each inference
     for (int iter = 0; iter < {iterations}; iter++) {{
         memset(input->data.raw, 0, input->bytes);
         g_profiler.ClearEvents();
+
+        sync_gpio_high();   // Signal: inference start
         interpreter.Invoke();
+        sync_gpio_low();    // Signal: inference end
 
         ns_printf("\\n--- HPX_ITER %d ---\\n", iter);
         g_profiler.PrintCsv();
@@ -511,6 +547,10 @@ def generate_app(ctx: PipelineContext) -> Path:
     # Arena size: use configured value or default 256KB
     arena_size = config.model.arena_size or (256 * 1024)
 
+    # External power sync
+    power_sync_enabled = config.power.enabled and config.power.mode == "external"
+    sync_gpio_pin = config.power.sync_gpio_pin
+
     # main.cc
     engine_header = tvars.get("engine_header", "tensorflow/lite/micro/micro_interpreter.h")
     (src_dir / "main.cc").write_text(
@@ -520,6 +560,8 @@ def generate_app(ctx: PipelineContext) -> Path:
             iterations=config.profiling.iterations,
             warmup=config.profiling.warmup,
             pmu_preset=pmu_preset_c,
+            power_sync_enabled="true" if power_sync_enabled else "false",
+            sync_gpio_pin=sync_gpio_pin,
         )
     )
 

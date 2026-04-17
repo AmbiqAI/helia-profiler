@@ -3,7 +3,8 @@
 Provides two capture interfaces:
 - ``capture_pmu``: Read PMU / DWT counters and per-layer breakdown from the
   target via serial (USB-CDC) or SWO.
-- ``capture_power``: Record current/voltage traces via Joulescope.
+- ``capture_power``: Record current/voltage traces via the configured power
+  driver (external Joulescope, on-device, etc.).
 """
 
 from __future__ import annotations
@@ -38,26 +39,36 @@ def capture_pmu(ctx: PipelineContext) -> dict[str, Any]:
 
 
 def capture_power(ctx: PipelineContext) -> dict[str, Any]:
-    """Record a power trace via Joulescope for the configured duration.
+    """Record a power trace using the configured power driver.
 
     Returns a dict with:
-    - ``"samples"``: list or array of (timestamp_s, current_a, voltage_v) tuples
-    - ``"summary"``: dict with avg_current_a, avg_power_w, energy_j, duration_s
+    - ``"result"``: :class:`PowerResult` from the driver
+    - ``"driver"``: driver name
+    - ``"mode"``:   "external" or "internal"
     """
-    try:
-        import joulescope  # noqa: F401
-    except ImportError as exc:
-        raise PowerError(
-            "Joulescope package not installed.",
-            hint="Install with: pip install joulescope",
-        ) from exc
+    from ..power import get_driver
 
-    # TODO: Open Joulescope device
-    # TODO: Configure sampling rate and voltage
-    # TODO: Record for ctx.config.power.duration_s seconds
-    # TODO: Compute summary statistics
+    driver_name = ctx.config.power.driver
+    driver = get_driver(driver_name)
 
-    raise PowerError(
-        "Power capture not yet implemented.",
-        hint="This feature is under development.",
+    # Verify driver is usable
+    driver.check_available()
+
+    result = driver.capture(
+        duration_s=ctx.config.power.duration_s,
+        io_voltage=ctx.config.power.io_voltage,
     )
+
+    return {
+        "result": result,
+        "driver": driver.name,
+        "mode": driver.mode.value,
+        "summary": {
+            "avg_current_a": result.summary.avg_current_a,
+            "avg_power_w": result.summary.avg_power_w,
+            "peak_current_a": result.summary.peak_current_a,
+            "energy_j": result.summary.energy_j,
+            "duration_s": result.summary.duration_s,
+            "sample_count": result.summary.sample_count,
+        },
+    }
