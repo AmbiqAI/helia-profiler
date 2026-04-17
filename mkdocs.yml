@@ -1,0 +1,98 @@
+site_name: heliaPROFILER
+site_description: Profile LiteRT models on Ambiq Apollo hardware
+repo_url: https://github.com/AmbiqAI/helia-profiler
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - navigation.expand
+    - navigation.indexes
+    - navigation.instant
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.suggest
+    - toc.follow
+extra_css:
+  - stylesheets/extra.css
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+plugins:
+  - search
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Overview: getting-started/index.md
+      - Installation: getting-started/install.md
+      - Quick Start: getting-started/quickstart.md
+  - User Guide:
+      - Configuration: guide/configuration.md
+      - Engines: guide/engines.md
+      - Boards & Platforms: guide/boards.md
+      - Power Measurement: guide/power.md
+      - Model Explorer Overlays: guide/model-explorer.md
+  - Examples:
+      - Overview: examples/index.md
+      - Basic Profiling: examples/basic-profiling.md
+      - Per-Layer Breakdown: examples/per-layer.md
+      - Engine Comparison: examples/engine-comparison.md
+      - Power Profiling: examples/power-profiling.md
+  - CLI Reference:
+      - Overview: reference/index.md
+      - hpx profile: reference/profile.md
+      - hpx doctor: reference/doctor.md
+      - hpx boards: reference/boards.md
+      - hpx engines: reference/engines.md
