@@ -32,16 +32,60 @@ data, and reports results.
 | Global mutable Params object | Immutable frozen dataclass config resolved once at startup. |
 | RPC-based model transfer and validation | SWO/USB serial for structured output. No RPC framework dependency. |
 
-## 3. Supported Inference Engines
+## 3. Platform Model
+
+### 3.1 Two-Level Hierarchy: Board → SoC
+
+Every profiling run targets a **board** (e.g. `apollo510_evb`). The board
+resolves to a **SoC** (e.g. `apollo510`), which determines the core
+architecture, PMU capabilities, memory layout, and clock modes.
+
+**Initial scope:** EVBs only. Custom boards are out of scope but the
+architecture is extensible — adding a board is adding one `BoardDef` entry
+and (if new) one `SocDef` entry.
+
+### 3.2 SoC Families
+
+| Family | Core | PMU | MVE | SDK Tier | SoCs |
+| --- | --- | --- | --- | --- | --- |
+| **AP3** | Cortex-M4 | DWT only | No | r3 | apollo3p |
+| **AP4** | Cortex-M4 | DWT only | No | r4 | apollo4p, apollo4l |
+| **AP5** | Cortex-M55 | Full Armv8-M (70+ events) | Yes | r5 | apollo510, apollo510b, apollo5b, **apollo330P** |
+
+**Important:** Apollo330 (`apollo330P`) is Cortex-M55 and belongs to the AP5
+family despite the "3" in its name. It has full PMU and MVE support.
+
+### 3.3 PMU Tiers
+
+| Tier | Architecture | Capabilities |
+| --- | --- | --- |
+| `DWT_ONLY` | Cortex-M4 | Cycle counter. Limited event coverage. No per-layer PMU event breakdown. |
+| `ARMV8M_PMU` | Cortex-M55 | 8 configurable counters, 70+ events (cycles, instructions, cache, MVE, stalls). Full per-layer breakdown. |
+
+When targeting a DWT-only SoC, `hpx` warns the user and falls back to
+cycle-count-only profiling. PMU preset selection is ignored on DWT targets.
+
+### 3.4 Supported EVBs
+
+| Board | SoC | Family | Channel |
+| --- | --- | --- | --- |
+| `apollo3p_evb` | apollo3p | AP3 | stable |
+| `apollo4p_evb` | apollo4p | AP4 | preview |
+| `apollo510_evb` | apollo510 | AP5 | stable |
+| `apollo510b_evb` | apollo510b | AP5 | preview |
+| `apollo5b_evb` | apollo5b | AP5 | preview |
+| `apollo330mP_evb` | apollo330P | AP5 | preview |
+
+## 4. Supported Inference Engines
 
 Each engine is a self-contained adapter. Only one runs per invocation.
 
-### 3.1 Stock TFLM (`tflm`)
+### 4.1 Stock TFLM (`tflm`)
 
 Standard upstream TensorFlow Lite for Microcontrollers with CMSIS-NN kernels.
 Uses pre-built static libraries or source builds via NSX modules.
 
-### 3.2 heliaRT (`helia-rt`)
+### 4.2 heliaRT (`helia-rt`)
 
 Ambiq's optimized TFLM fork (github.com/AmbiqAI/helia-rt). Three kernel
 backends: reference, CMSIS-NN, and HELIA (Ambiq-optimized MVE/DSP).
@@ -50,16 +94,16 @@ Current heliaRT static libraries target legacy neuralSPOT. Until an NSX-native
 heliaRT module exists, `hpx` ships a local wrapper module that integrates the
 heliaRT static library into the NSX build system.
 
-### 3.3 heliaAOT (`helia-aot`)
+### 4.3 heliaAOT (`helia-aot`)
 
 Ambiq's ahead-of-time compiler. Generates a C module for a specific model.
 The generated code is wrapped as an NSX-compatible local module for the
 profiler firmware build. Accepts an engine-specific YAML config for
 fine-grained control (memory placement, quantization settings, etc.).
 
-## 4. Architecture
+## 5. Architecture
 
-### 4.1 High-Level Flow
+### 5.1 High-Level Flow
 
 ```
 User config (CLI + YAML)
@@ -99,13 +143,14 @@ User config (CLI + YAML)
 └─────────────────┘
 ```
 
-### 4.2 Module Layout
+### 5.2 Module Layout
 
 ```
 src/helia_profiler/
 ├── __init__.py
 ├── cli.py                  # argparse CLI, thin delegation
 ├── config.py               # ProfileConfig dataclass + YAML/CLI merge
+├── platform.py             # SoC families, board registry, capabilities
 ├── profiler.py             # Top-level orchestrator
 ├── engines/                # One adapter per inference engine
 │   ├── __init__.py
@@ -134,7 +179,7 @@ src/helia_profiler/
 └── _version.py             # Single version source
 ```
 
-### 4.3 Configuration Model
+### 5.3 Configuration Model
 
 A single `hpx.yml` file (or equivalent CLI flags) provides everything:
 
@@ -175,7 +220,7 @@ output:
 **Key rule:** The config is resolved once at startup into a frozen
 `ProfileConfig` dataclass. No field is mutated after construction.
 
-### 4.4 Engine Adapter Interface
+### 5.4 Engine Adapter Interface
 
 ```python
 class EngineAdapter(Protocol):
@@ -197,7 +242,7 @@ class EngineAdapter(Protocol):
 Each adapter is fully isolated. If an engine tool fails, the error propagates
 naturally — no monkey-patching or global state recovery.
 
-### 4.5 Firmware App Generation
+### 5.5 Firmware App Generation
 
 The profiler firmware is a purpose-built NSX app rendered from Jinja templates.
 It is generated into a temporary (or user-specified) directory and built with
@@ -214,7 +259,7 @@ The firmware:
 4. Emits structured results over SWO (or USB serial) in a parseable format.
 5. Optionally enters a power measurement loop with GPIO phase signaling.
 
-### 4.6 Data Capture
+### 5.6 Data Capture
 
 **PMU data** is emitted by the firmware as structured text (CSV lines or tagged
 records) over SWO/ITM or USB serial. The host-side capture module reads the
@@ -227,7 +272,7 @@ per-phase statistics (active, idle, total).
 No RPC framework is used. The firmware pushes data; the host listens and
 parses.
 
-### 4.7 Report Generation
+### 5.7 Report Generation
 
 Results are written as:
 
@@ -239,7 +284,7 @@ Results are written as:
 Power/current/energy numbers in reports should be clearly labeled as
 measurements from the user's specific setup, not published reference values.
 
-## 5. CLI Interface
+## 6. CLI Interface
 
 ```
 hpx profile [OPTIONS] MODEL_PATH
@@ -247,6 +292,7 @@ hpx profile --config hpx.yml
 
 hpx doctor                          # check toolchain, nsx, joulescope
 hpx engines                         # list available inference engines
+hpx boards                          # list supported boards and SoC capabilities
 hpx version
 ```
 
@@ -274,7 +320,7 @@ hpx version
 
 CLI flags override YAML values. YAML provides defaults for reproducible runs.
 
-## 6. Dependencies
+## 7. Dependencies
 
 ### Runtime (installed with `hpx`)
 
@@ -296,7 +342,7 @@ CLI flags override YAML values. YAML provides defaults for reproducible runs.
 - `JLinkExe` / `JLinkSWOViewerCL` (SEGGER J-Link)
 - `nsx` CLI (neuralspotx)
 
-## 7. Cross-Platform Requirements
+## 8. Cross-Platform Requirements
 
 | Concern | Approach |
 | --- | --- |
@@ -306,7 +352,7 @@ CLI flags override YAML values. YAML provides defaults for reproducible runs.
 | Temp directories | `tempfile.mkdtemp()` with proper cleanup |
 | Console output | No ANSI codes unless terminal supports it (or use `rich` optional) |
 
-## 8. What This Tool Does NOT Do
+## 9. What This Tool Does NOT Do
 
 - Generate exportable AmbiqSuite examples or static libraries
 - Run multiple inference engines in one invocation
@@ -316,7 +362,7 @@ CLI flags override YAML values. YAML provides defaults for reproducible runs.
 - Validate model numerical accuracy (host vs device comparison)
 - Provide a GUI (future scope)
 
-## 9. Future Considerations
+## 10. Future Considerations
 
 - **On-board power monitor:** A click-module or I2C power monitor (e.g. INA226)
   readable directly from instrumented firmware code, eliminating desktop-side

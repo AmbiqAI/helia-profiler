@@ -9,6 +9,7 @@ from pathlib import Path
 from .config import ProfileConfig
 from .engines import EngineType
 from .engines.base import EngineAdapter
+from .platform import PmuTier, get_soc_for_board
 
 
 def _get_adapter(engine_type: EngineType) -> EngineAdapter:
@@ -54,6 +55,17 @@ def run_profile(config: ProfileConfig) -> None:
 
     try:
         _log(config, f"Working directory: {work_dir}")
+
+        # 0. Resolve platform
+        soc = get_soc_for_board(config.target.board)
+        _log(config, f"Board: {config.target.board}  SoC: {soc.name} ({soc.core.value})")
+
+        if soc.pmu_tier is PmuTier.DWT_ONLY:
+            _log(
+                config,
+                f"Warning: {soc.name} has DWT-only profiling (no Armv8-M PMU). "
+                "Per-layer PMU breakdowns will be limited to cycle counts.",
+            )
 
         # 1. Engine preparation
         adapter = _get_adapter(config.engine.type)

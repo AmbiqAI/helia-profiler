@@ -54,6 +54,9 @@ def main(argv: list[str] | None = None) -> None:
     # --- hpx engines ---
     sub.add_parser("engines", help="List available inference engines")
 
+    # --- hpx boards ---
+    sub.add_parser("boards", help="List supported boards and SoC capabilities")
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -66,6 +69,8 @@ def main(argv: list[str] | None = None) -> None:
         _cmd_doctor()
     elif args.command == "engines":
         _cmd_engines()
+    elif args.command == "boards":
+        _cmd_boards()
 
 
 def _cmd_profile(args: argparse.Namespace) -> None:
@@ -131,3 +136,17 @@ def _cmd_engines() -> None:
     """List available inference engines."""
     for engine in EngineType:
         print(f"  {engine.value}")
+
+
+def _cmd_boards() -> None:
+    """List supported boards and their SoC capabilities."""
+    from .platform import get_soc, list_boards
+
+    boards = list_boards()
+    print(f"{'Board':<24} {'SoC':<14} {'Core':<14} {'PMU':<6} {'MVE':<5} {'Channel'}")
+    print("-" * 80)
+    for board in boards:
+        soc = get_soc(board.soc)
+        pmu = "full" if soc.has_full_pmu else "dwt"
+        mve = "yes" if soc.has_mve else "no"
+        print(f"{board.name:<24} {soc.name:<14} {soc.core.value:<14} {pmu:<6} {mve:<5} {board.channel}")
