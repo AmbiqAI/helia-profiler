@@ -2,16 +2,19 @@
 name = "helia-profiler"
 version = "0.1.0"
 description = "Profile LiteRT models on Ambiq Apollo hardware"
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.13"
 license = {text = "Apache-2.0"}
 dependencies = [
     "Jinja2>=3.1",
     "PyYAML>=6.0",
-    "pyserial>=3.5",
+    "rich>=13.0",
 ]
 
 [project.optional-dependencies]
+aot = ["helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@feat/nsx-module-type"]
 power = ["joulescope>=1.0"]
+power-js220 = ["pyjoulescope_driver>=1.0"]
+power-all = ["joulescope>=1.0", "pyjoulescope_driver>=1.0"]
 
 [project.scripts]
 hpx = "helia_profiler.cli:main"

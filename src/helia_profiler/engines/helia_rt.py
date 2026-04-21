@@ -15,6 +15,7 @@ import jinja2
 from ..config import ProfileConfig
 from ..errors import EngineError
 from ..platform import CoreArch, get_soc
+from ..results import NsxModuleRef
 from .base import EngineArtifacts
 
 log = logging.getLogger("hpx")
@@ -99,11 +100,11 @@ class HeliaRTAdapter:
 
         return EngineArtifacts(
             extra_modules=[
-                {
-                    "name": "nsx-heliart",
-                    "path": str(module_dir),
-                    "version": HELIART_VERSION,
-                },
+                NsxModuleRef(
+                    name="nsx-heliart",
+                    path=module_dir,
+                    version=HELIART_VERSION,
+                ),
             ],
             template_vars={
                 "engine_type": "helia_rt",
@@ -135,7 +136,7 @@ def _write_wrapper(module_dir: Path, *, variant: str) -> None:
 # ---------------------------------------------------------------------------
 
 # Directories from the heliaRT release that must be present in the wrapper.
-_DIST_DIRS = ("lib", "tensorflow", "third_party")
+_DIST_DIRS = ("lib", "tensorflow", "third_party", "signal")
 
 
 def _resolve_dist_path(config: ProfileConfig) -> Path:
@@ -186,20 +187,18 @@ def _validate_dist(dist: Path) -> None:
 
 
 def _link_distribution(module_dir: Path, dist_path: Path) -> None:
-    """Symlink heliaRT distribution directories into the wrapper module.
+    """Copy heliaRT distribution directories into the wrapper module.
 
-    Creates symlinks for lib/, tensorflow/, and third_party/ so the CMake
-    build can find them via ``CMAKE_CURRENT_LIST_DIR``.
+    Copies lib/, tensorflow/, and third_party/ so the CMake build can find
+    them via ``CMAKE_CURRENT_LIST_DIR``.  Uses copies instead of symlinks
+    for Windows compatibility.
     """
+    import shutil
+
     for d in _DIST_DIRS:
         target = module_dir / d
         source = dist_path / d
-        if target.is_symlink():
-            target.unlink()
-        elif target.is_dir():
-            # Real directory from a prior run — remove it
-            import shutil
-
+        if target.is_dir():
             shutil.rmtree(target)
-        target.symlink_to(source, target_is_directory=True)
-        log.debug("Linked %s → %s", target, source)
+        shutil.copytree(source, target)
+        log.debug("Copied %s → %s", target, source)

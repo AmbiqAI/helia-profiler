@@ -5,6 +5,10 @@ project(hpx_profiler LANGUAGES C CXX ASM)
 
 set(NSX_BOARD "{{ board }}" CACHE STRING "Target board")
 
+{% for var_name, var_value in cmake_vars.items() %}
+set({{ var_name }} "{{ var_value }}")
+{% endfor %}
+
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/nsx/modules.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/nsx/nsx_app_bootstrap.cmake)
 
@@ -14,13 +18,24 @@ nsx_bootstrap_app(
     MODULES ${NSX_APP_MODULES}
 )
 
-# --- heliaRT (engine module injected by heliaPROFILER) ---
-add_subdirectory(
-    "${CMAKE_CURRENT_LIST_DIR}/modules/nsx-heliart"
-    "${CMAKE_CURRENT_BINARY_DIR}/_nsx/nsx_heliart"
+# --- Profiler application ---
+{% if engine_type == "helia_aot" %}
+add_executable(hpx_profiler
+    src/main.cc
 )
 
-# --- Profiler application ---
+target_include_directories(hpx_profiler PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/src
+)
+
+target_link_libraries(hpx_profiler PRIVATE
+    nsx::board
+    nsx::runtime_core
+    nsx::power
+    nsx::pmu_armv8m
+    {{ aot_cmake_target }}
+)
+{% else %}
 add_executable(hpx_profiler
     src/main.cc
     src/hpx_pmu_profiler.cc
@@ -37,5 +52,6 @@ target_link_libraries(hpx_profiler PRIVATE
     nsx::pmu_armv8m
     nsx::heliart
 )
+{% endif %}
 
 nsx_finalize_app(hpx_profiler)

@@ -10,12 +10,18 @@ from __future__ import annotations
 import glob
 import logging
 import shutil
-import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import jinja2
 
+from .. import nsx as nsx_cli
+from ..counters import (
+    CounterPass,
+    plan_passes,
+    resolve_counters,
+    resolve_legacy_presets,
+)
 from ..errors import BuildError, FirmwareError
 
 if TYPE_CHECKING:
@@ -88,7 +94,7 @@ def _resolve_module_list(board: str, sdk_tier: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# PMU preset mapping (hpx preset name → C enum)
+# PMU preset mapping (legacy — used only for backward-compat Init() path)
 # ---------------------------------------------------------------------------
 _PMU_PRESET_MAP: dict[str, str] = {
     "basic_cpu": "NS_PMU_PRESET_BASIC_CPU",
@@ -96,6 +102,62 @@ _PMU_PRESET_MAP: dict[str, str] = {
     "mve": "NS_PMU_PRESET_MVE",
     "ml_default": "NS_PMU_PRESET_ML_DEFAULT",
 }
+
+
+def _resolve_pmu_passes(config: Any) -> list[dict[str, Any]]:
+    """Resolve profiling config into firmware pass descriptors.
+
+    If the new ``pmu_counters`` field is set, resolve and plan passes from
+    the counter registry.  Otherwise fall back to legacy preset behaviour.
+
+    Each returned dict has:
+      - ``name``          — pass name for the SWO protocol
+      - ``custom``        — True if using explicit event IDs
+      - ``event_ids``     — list of hex-literal strings (custom only)
+      - ``num_counters``  — number of counters (custom only)
+      - ``c_enum``        — C preset enum name (legacy only)
+      - ``group``         — compute-unit group name
+    """
+    profiling = config.profiling
+
+    # --- New path: explicit counter selection ---
+    if profiling.pmu_counters is not None:
+        counters = resolve_counters(profiling.pmu_counters)
+        passes = plan_passes(counters)
+        return [
+            {
+                "name": p.name,
+                "custom": True,
+                "event_ids": [f"0x{c.event_id:04X}" for c in p.counters],
+                "num_counters": len(p.counters),
+                "c_enum": None,
+                "group": p.group,
+            }
+            for p in passes
+        ]
+
+    # --- Legacy path: named presets ---
+    result: list[dict[str, Any]] = []
+    for preset_name in profiling.pmu_presets:
+        c_enum = _PMU_PRESET_MAP.get(preset_name, "NS_PMU_PRESET_ML_DEFAULT")
+        result.append({
+            "name": preset_name,
+            "custom": False,
+            "event_ids": [],
+            "num_counters": 4,
+            "c_enum": c_enum,
+            "group": preset_name,
+        })
+    if not result:
+        result = [{
+            "name": "ml_default",
+            "custom": False,
+            "event_ids": [],
+            "num_counters": 4,
+            "c_enum": "NS_PMU_PRESET_ML_DEFAULT",
+            "group": "ml_default",
+        }]
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -150,8 +212,19 @@ def generate_app(ctx: PipelineContext) -> Path:
     tvars = artifacts.template_vars
 
     # --- Resolve module list ---
-    modules = _resolve_module_list(board.name, soc.sdk_tier)
-    log.info("NSX modules: %s", ", ".join(modules))
+    mod_names = _resolve_module_list(board.name, soc.sdk_tier)
+
+    # Build module descriptors (name + local flag)
+    modules: list[dict[str, object]] = [{"name": m, "local": False} for m in mod_names]
+
+    # Append engine-provided modules (e.g. nsx-heliart) as local
+    for extra_mod in artifacts.extra_modules:
+        if extra_mod.name not in mod_names:
+            modules.append({"name": extra_mod.name, "local": True})
+
+    log.info("NSX modules: %s", ", ".join(m["name"] for m in modules))  # type: ignore[arg-type]
+
+    engine_type = tvars.get("engine_type", "tflm")
 
     # --- nsx.yml ---
     (app_dir / "nsx.yml").write_text(
@@ -170,22 +243,26 @@ def generate_app(ctx: PipelineContext) -> Path:
         _jinja_env.get_template("modules.cmake.j2").render(modules=modules)
     )
 
-    # --- CMakeLists.txt ---
+    # --- CMakeLists.txt (engine-aware) ---
     (app_dir / "CMakeLists.txt").write_text(
-        _jinja_env.get_template("CMakeLists.txt.j2").render(board=board.name)
+        _jinja_env.get_template("CMakeLists.txt.j2").render(
+            board=board.name,
+            engine_type=engine_type,
+            cmake_vars=artifacts.cmake_vars,
+            aot_cmake_target=tvars.get("aot_cmake_target", ""),
+        )
     )
 
     # --- Source files ---
     src_dir = app_dir / "src"
     src_dir.mkdir(parents=True, exist_ok=True)
 
-    # Model data header
-    model_header = _model_to_header(config.model.path)
-    (src_dir / "model_data.h").write_text(model_header)
-
     # PMU preset
     first_preset = config.profiling.pmu_presets[0] if config.profiling.pmu_presets else "ml_default"
     pmu_preset_c = _PMU_PRESET_MAP.get(first_preset, "NS_PMU_PRESET_ML_DEFAULT")
+
+    # Build pass list for multi-pass firmware loop
+    pmu_passes = _resolve_pmu_passes(config)
 
     # Arena size: use configured value or default 256KB
     arena_size = config.model.arena_size or (256 * 1024)
@@ -194,38 +271,57 @@ def generate_app(ctx: PipelineContext) -> Path:
     power_sync_enabled = config.power.enabled and config.power.mode == "external"
     sync_gpio_pin = config.power.sync_gpio_pin
 
-    # main.cc
-    engine_header = tvars.get("engine_header", "tensorflow/lite/micro/micro_interpreter.h")
-    (src_dir / "main.cc").write_text(
-        _jinja_env.get_template("main.cc.j2").render(
-            engine_header=engine_header,
-            arena_size=arena_size,
-            iterations=config.profiling.iterations,
-            warmup=config.profiling.warmup,
-            pmu_preset=pmu_preset_c,
-            power_sync_enabled=power_sync_enabled,
-            sync_gpio_pin=sync_gpio_pin,
+    if engine_type == "helia_aot":
+        # --- AOT engine: use AOT-specific main template, no model embedding ---
+        aot_prefix = tvars["aot_prefix"]
+        (src_dir / "main.cc").write_text(
+            _jinja_env.get_template("main_aot.cc.j2").render(
+                aot_prefix=aot_prefix,
+                aot_op_manifest=tvars.get("aot_op_manifest", []),
+                iterations=config.profiling.iterations,
+                warmup=config.profiling.warmup,
+                pmu_passes=pmu_passes,
+                pmu_pass_names=[p["name"] for p in pmu_passes],
+                power_sync_enabled=power_sync_enabled,
+                sync_gpio_pin=sync_gpio_pin,
+            )
         )
-    )
+    else:
+        # --- TFLM / heliaRT: embed model as byte array, use TFLM profiler ---
+        model_header = _model_to_header(config.model.path)
+        (src_dir / "model_data.h").write_text(model_header)
 
-    # PMU profiler
-    (src_dir / "hpx_pmu_profiler.h").write_text(
-        _jinja_env.get_template("hpx_pmu_profiler.h.j2").render()
-    )
-    (src_dir / "hpx_pmu_profiler.cc").write_text(
-        _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render()
-    )
+        engine_header = tvars.get("engine_header", "tensorflow/lite/micro/micro_interpreter.h")
+        (src_dir / "main.cc").write_text(
+            _jinja_env.get_template("main.cc.j2").render(
+                engine_header=engine_header,
+                arena_size=arena_size,
+                iterations=config.profiling.iterations,
+                warmup=config.profiling.warmup,
+                pmu_passes=pmu_passes,
+                pmu_pass_names=[p["name"] for p in pmu_passes],
+                power_sync_enabled=power_sync_enabled,
+                sync_gpio_pin=sync_gpio_pin,
+            )
+        )
+
+        # PMU profiler (TFLM-specific C++ class)
+        (src_dir / "hpx_pmu_profiler.h").write_text(
+            _jinja_env.get_template("hpx_pmu_profiler.h.j2").render()
+        )
+        (src_dir / "hpx_pmu_profiler.cc").write_text(
+            _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render()
+        )
 
     # --- Engine wrapper module ---
     for extra_mod in artifacts.extra_modules:
-        mod_name = extra_mod["name"]
-        mod_src = Path(extra_mod["path"])
-        mod_dst = app_dir / "modules" / mod_name
+        mod_src = extra_mod.path
+        mod_dst = app_dir / "modules" / extra_mod.name
         if mod_src != mod_dst:
             if mod_dst.exists():
                 shutil.rmtree(mod_dst)
             shutil.copytree(mod_src, mod_dst)
-        log.info("Engine module: %s → %s", mod_name, mod_dst)
+        log.info("Engine module: %s → %s", extra_mod.name, mod_dst)
 
     log.info("Generated profiler app at %s", app_dir)
     return app_dir
@@ -242,47 +338,8 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     app_dir = ctx.firmware_dir
     board = ctx.board.name
 
-    # --- nsx configure ---
-    log.info("Running: nsx configure --app-dir %s", app_dir)
-    try:
-        result = subprocess.run(
-            ["nsx", "configure", "--app-dir", str(app_dir)],
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        raise BuildError(
-            "nsx CLI not found",
-            hint="Install neuralspotx: pip install neuralspotx  (or ensure 'nsx' is in PATH)",
-        )
-    if result.returncode != 0:
-        raise BuildError(
-            "nsx configure failed",
-            returncode=result.returncode,
-            stderr=result.stderr,
-        )
-    log.info("Configure stdout:\n%s", result.stdout)
-
-    # --- nsx build ---
-    log.info("Running: nsx build --app-dir %s", app_dir)
-    try:
-        result = subprocess.run(
-            ["nsx", "build", "--app-dir", str(app_dir)],
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        raise BuildError(
-            "nsx CLI not found",
-            hint="Install neuralspotx: pip install neuralspotx  (or ensure 'nsx' is in PATH)",
-        )
-    if result.returncode != 0:
-        raise BuildError(
-            "nsx build failed",
-            returncode=result.returncode,
-            stderr=result.stderr,
-        )
-    log.info("Build stdout:\n%s", result.stdout)
+    nsx_cli.configure(app_dir)
+    nsx_cli.build(app_dir)
 
     # Locate build output
     build_dir = app_dir / "build" / board
@@ -316,25 +373,7 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
 def flash_app(ctx: PipelineContext) -> None:
     """Invoke ``nsx flash`` to deploy the binary to the target."""
     assert ctx.firmware_dir is not None
-
-    app_dir = ctx.firmware_dir
-
-    log.info("Running: nsx flash --app-dir %s", app_dir)
-    try:
-        result = subprocess.run(
-            ["nsx", "flash", "--app-dir", str(app_dir)],
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        raise BuildError(
-            "nsx CLI not found",
-            hint="Install neuralspotx: pip install neuralspotx  (or ensure 'nsx' is in PATH)",
-        )
-    if result.returncode != 0:
-        raise BuildError(
-            "nsx flash failed",
-            returncode=result.returncode,
-            stderr=result.stderr,
-        )
-    log.info("Flash complete.")
+    nsx_cli.flash(
+        ctx.firmware_dir,
+        jlink_serial=ctx.config.target.jlink_serial,
+    )

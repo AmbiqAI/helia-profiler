@@ -79,9 +79,9 @@ class TestHeliaRTAdapter:
         adapter = HeliaRTAdapter()
         adapter.prepare(config, tmp_path)
         module_dir = tmp_path / "modules" / "nsx-heliart"
-        assert (module_dir / "lib").is_symlink()
-        assert (module_dir / "tensorflow").is_symlink()
-        assert (module_dir / "third_party").is_symlink()
+        assert (module_dir / "lib").is_dir()
+        assert (module_dir / "tensorflow").is_dir()
+        assert (module_dir / "third_party").is_dir()
 
     def test_prepare_returns_extra_module(self, tmp_path: Path, fake_dist: Path):
         config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
@@ -89,9 +89,9 @@ class TestHeliaRTAdapter:
         artifacts = adapter.prepare(config, tmp_path)
         assert len(artifacts.extra_modules) == 1
         mod = artifacts.extra_modules[0]
-        assert mod["name"] == "nsx-heliart"
-        assert mod["version"] == HELIART_VERSION
-        assert Path(mod["path"]).is_dir()
+        assert mod.name == "nsx-heliart"
+        assert mod.version == HELIART_VERSION
+        assert mod.path.is_dir()
 
     def test_prepare_template_vars(self, tmp_path: Path, fake_dist: Path):
         config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
@@ -139,7 +139,7 @@ class TestHeliaRTAdapter:
         adapter = HeliaRTAdapter()
         artifacts1 = adapter.prepare(config, tmp_path)
         artifacts2 = adapter.prepare(config, tmp_path)
-        assert artifacts1.extra_modules[0]["name"] == artifacts2.extra_modules[0]["name"]
+        assert artifacts1.extra_modules[0].name == artifacts2.extra_modules[0].name
 
     def test_prepare_no_dist_path_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv("HELIART_DIST_PATH", raising=False)
@@ -181,4 +181,4 @@ class TestHeliaRTAdapter:
         assert ctx.engine_artifacts is not None
         assert len(ctx.engine_artifacts.extra_modules) == 1
         assert (work_dir / "modules" / "nsx-heliart" / "nsx-module.yaml").exists()
-        assert (work_dir / "modules" / "nsx-heliart" / "lib").is_symlink()
+        assert (work_dir / "modules" / "nsx-heliart" / "lib").is_dir()
