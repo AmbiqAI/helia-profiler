@@ -154,6 +154,11 @@ class HeliaAOTAdapter:
             aot_platform,
         )
 
+        # Forward CMSIS-NN build options from engine config
+        cmsis_nn_cmake: dict[str, str] = {}
+        if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
+            cmsis_nn_cmake["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
+
         return EngineArtifacts(
             extra_modules=[
                 NsxModuleRef(name="nsx-cmsis-nn", path=cmsis_nn_mod_dir),
@@ -161,6 +166,7 @@ class HeliaAOTAdapter:
             ],
             cmake_vars={
                 attr_var: str(attr_header),
+                **cmsis_nn_cmake,
             },
             template_vars={
                 "engine_type": "helia_aot",
