@@ -8,11 +8,19 @@ Two measurement modes:
 - **internal**: On-device measurement via SoC power registers or PMU events.
   Can potentially capture per-layer power.  (Future / experimental.)
 
+Driver names:
+
+- ``joulescope``:       Auto-detect — tries JS110 first, then JS220.
+- ``joulescope-js110``: Force Joulescope JS110 (``joulescope`` package).
+- ``joulescope-js220``: Force Joulescope JS220 (``pyjoulescope_driver``).
+- ``ondevice``:         On-device measurement (experimental).
+
 Use :func:`get_driver` to resolve a driver by name.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from ..errors import PowerError
@@ -20,6 +28,8 @@ from .base import PowerDriver, PowerMode, PowerResult, PowerSample, PowerSummary
 
 if TYPE_CHECKING:
     pass
+
+log = logging.getLogger("hpx")
 
 __all__ = [
     "PowerDriver",
@@ -44,23 +54,60 @@ def _register_builtins() -> None:
         return
 
     from .joulescope_driver import JoulescopeDriver
+    from .joulescope_js220 import JoulescopeJS220Driver
     from .ondevice_driver import OnDeviceDriver
 
-    _DRIVERS["joulescope"] = JoulescopeDriver
+    _DRIVERS["joulescope-js110"] = JoulescopeDriver
+    _DRIVERS["joulescope-js220"] = JoulescopeJS220Driver
     _DRIVERS["ondevice"] = OnDeviceDriver
+
+
+def _auto_detect_joulescope() -> PowerDriver:
+    """Try JS110 first, then JS220.  Return the first usable driver."""
+    _register_builtins()
+
+    # Prefer JS110 (more widely deployed, simpler blocking API)
+    js110_cls = _DRIVERS["joulescope-js110"]
+    js110 = js110_cls()
+    try:
+        js110.check_available()
+        log.info("Auto-detected Joulescope JS110")
+        return js110
+    except PowerError:
+        pass
+
+    # Fall back to JS220
+    js220_cls = _DRIVERS["joulescope-js220"]
+    js220 = js220_cls()
+    try:
+        js220.check_available()
+        log.info("Auto-detected Joulescope JS220")
+        return js220
+    except PowerError:
+        pass
+
+    raise PowerError(
+        "No Joulescope driver available",
+        hint="Install 'joulescope' (JS110) or 'pyjoulescope_driver' (JS220).  "
+        "Or specify driver explicitly: --power-driver joulescope-js110",
+    )
 
 
 def get_driver(name: str) -> PowerDriver:
     """Instantiate and return the named power driver.
 
+    The special name ``"joulescope"`` auto-detects JS110 vs JS220.
     Raises :class:`PowerError` if the name is unknown.
     """
+    if name == "joulescope":
+        return _auto_detect_joulescope()
+
     _register_builtins()
     cls = _DRIVERS.get(name)
     if cls is None:
         raise PowerError(
             f"Unknown power driver '{name}'",
-            hint=f"Available drivers: {', '.join(_DRIVERS)}",
+            hint=f"Available drivers: joulescope, {', '.join(_DRIVERS)}",
         )
     return cls()
 
@@ -68,4 +115,4 @@ def get_driver(name: str) -> PowerDriver:
 def list_drivers() -> list[str]:
     """Return the names of all registered power drivers."""
     _register_builtins()
-    return list(_DRIVERS)
+    return ["joulescope"] + list(_DRIVERS)

@@ -1,135 +1,232 @@
 /* ═══════════════════════════════════════════════════════════════════
-   heliaPROFILER — minimal custom styles (stock material otherwise)
+   heliaPROFILER — Apple-inspired minimal theme
+   Relies on MkDocs Material's built-in variables and features.
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ── Navbar ───────────────────────────────────────────────────────── */
+/* ── Color tokens ─────────────────────────────────────────────────── */
 [data-md-color-scheme="default"] {
-  --hpx-header-bg: #ffffff;
-  --hpx-header-fg: #111827;
-  --hpx-header-muted: #4b5563;
-  --hpx-header-border: rgba(17, 24, 39, 0.08);
-  --hpx-header-search-bg: rgba(17, 24, 39, 0.04);
-  --hpx-header-search-bg-hover: rgba(17, 24, 39, 0.08);
+  --md-primary-fg-color:        #fff;
+  --md-primary-bg-color:        #1d1d1f;
+  --md-accent-fg-color:         #0071e3;
+  --md-default-fg-color:        #1d1d1f;
+  --md-default-fg-color--light: #6e6e73;
+  --md-code-bg-color:           #f5f5f7;
+  --md-typeset-a-color:         #0071e3;
+  --md-admonition-bg-color:     #f5f5f700;
 }
 
 [data-md-color-scheme="slate"] {
-  --hpx-header-bg: #050816;
-  --hpx-header-fg: #f8fafc;
-  --hpx-header-muted: #cbd5e1;
-  --hpx-header-border: rgba(248, 250, 252, 0.08);
-  --hpx-header-search-bg: rgba(248, 250, 252, 0.08);
-  --hpx-header-search-bg-hover: rgba(248, 250, 252, 0.12);
+  --md-primary-fg-color:        #161617;
+  --md-primary-bg-color:        #f5f5f7;
+  --md-accent-fg-color:         #2997ff;
+  --md-default-bg-color:        #111113;
+  --md-default-fg-color:        #f5f5f7;
+  --md-default-fg-color--light: #a1a1a6;
+  --md-code-bg-color:           #1c1c1e;
+  --md-typeset-a-color:         #2997ff;
+  --md-admonition-bg-color:     #1c1c1e00;
 }
 
-.md-header,
-.md-tabs {
-  background: var(--hpx-header-bg);
-  color: var(--hpx-header-fg);
+/* ── Typography ───────────────────────────────────────────────────── */
+.md-typeset {
+  font-size: 0.82rem;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+.md-typeset h1 {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin-bottom: 0.5em;
+}
+.md-typeset h2 {
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin-top: 2em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+.md-typeset h3 { font-weight: 600; }
+
+/* ── Header & tabs — clean, borderless ────────────────────────────── */
 .md-header {
-  border-bottom: 1px solid var(--hpx-header-border);
   box-shadow: none;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
 }
-
 .md-tabs {
-  border-bottom: 1px solid var(--hpx-header-border);
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
 }
 
-.md-header__button,
-.md-header__title,
-.md-header__topic,
-.md-tabs__link,
-.md-search__icon,
-.md-source,
-.md-source__icon,
-.md-source__repository {
-  color: var(--hpx-header-fg);
-}
-
-.md-tabs__link {
-  opacity: 0.8;
-}
-
-.md-tabs__link--active,
-.md-tabs__link:is(:hover, :focus),
-.md-header__button:is(:hover, :focus),
-.md-header__title:is(:hover, :focus),
-.md-source:is(:hover, :focus) {
-  color: var(--md-accent-fg-color);
-  opacity: 1;
-}
-
-.md-search__form {
-  background: var(--hpx-header-search-bg);
-  box-shadow: inset 0 0 0 1px var(--hpx-header-border);
-}
-
-.md-search__form:hover,
-.md-search__form:focus-within {
-  background: var(--hpx-header-search-bg-hover);
-}
-
-.md-search__input,
-.md-search__input::placeholder {
-  color: var(--hpx-header-muted);
-}
-
-/* ── Layout ───────────────────────────────────────────────────────── */
+/* ── Content width ────────────────────────────────────────────────── */
 .md-grid { max-width: 1840px; }
 
-/* ── Landing page ─────────────────────────────────────────────────── */
+/* ── Code blocks — rounded, soft ──────────────────────────────────── */
+.md-typeset pre > code {
+  border-radius: 0.75rem;
+  font-size: 0.78rem;
+}
+.md-typeset code {
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+  font-size: 0.82em;
+}
+
+/* ── Admonitions — minimal, flat ──────────────────────────────────── */
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 0.75rem;
+  border-left-width: 3px;
+  box-shadow: none;
+  font-size: 0.82rem;
+}
+
+/* ── Tables — clean lines ─────────────────────────────────────────── */
+.md-typeset table:not([class]) {
+  font-size: 0.8rem;
+  border: none;
+}
+.md-typeset table:not([class]) th {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--md-default-fg-color--light);
+}
+.md-typeset table:not([class]) td,
+.md-typeset table:not([class]) th {
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  padding: 0.65em 1em;
+}
+
+/* ── Buttons — Apple pill style ───────────────────────────────────── */
+.md-typeset .md-button {
+  border-radius: 980px;
+  font-weight: 500;
+  font-size: 0.82rem;
+  padding: 0.55em 1.5em;
+  letter-spacing: 0;
+  transition: all 0.2s ease;
+}
+.md-typeset .md-button--primary {
+  background: var(--md-accent-fg-color);
+  border-color: var(--md-accent-fg-color);
+  color: #fff;
+}
+.md-typeset .md-button--primary:hover {
+  background: color-mix(in srgb, var(--md-accent-fg-color) 85%, #000);
+  border-color: color-mix(in srgb, var(--md-accent-fg-color) 85%, #000);
+}
+.md-typeset .md-button:not(.md-button--primary) {
+  border: 1px solid var(--md-default-fg-color--lighter);
+  color: var(--md-accent-fg-color);
+}
+.md-typeset .md-button:not(.md-button--primary):hover {
+  border-color: var(--md-accent-fg-color);
+  background: transparent;
+}
+
+/* ── Grid cards — softer ──────────────────────────────────────────── */
+.md-typeset .grid.cards > ul > li {
+  border-radius: 1rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  box-shadow: none;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--md-accent-fg-color);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* ── Tabs — understated ───────────────────────────────────────────── */
+.md-typeset .tabbed-labels > label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* ── Navigation sidebar — lighter ─────────────────────────────────── */
+.md-nav__link {
+  font-size: 0.78rem;
+}
+.md-nav__item .md-nav__link--active {
+  font-weight: 600;
+}
+
+/* ── Footer — quieter ─────────────────────────────────────────────── */
+.md-footer {
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+}
+
+/* ── Mermaid — match theme ────────────────────────────────────────── */
+.mermaid {
+  margin: 1.5em 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Landing page
+   ═══════════════════════════════════════════════════════════════════ */
 .landing {
-  max-width: 1120px;
+  max-width: 980px;
   margin: 0 auto;
 }
 .landing h2 {
   text-align: center;
   margin-top: 0.5rem;
+  font-size: 1.6rem;
+  letter-spacing: -0.02em;
 }
 .landing hr {
   border: none;
   border-top: 1px solid var(--md-default-fg-color--lightest);
-  margin: 3rem 0;
+  margin: 3.5rem 0;
 }
 
 /* Hero */
-.landing .hero { text-align: center; margin: 3rem 0 0; }
-.hero-logo { max-width: min(460px, 80%); height: auto; }
-.landing .hero h1 {
-  font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin: 0 0 0.25rem;
+.landing .hero {
+  text-align: center;
+  margin: 4rem 0 0;
+  padding: 0 1rem;
 }
-.landing .hero h2 {
-  font-size: 1.3rem;
-  font-weight: 500;
-  margin: 0 0 0.5rem;
+.hero-logo {
+  max-width: min(400px, 70%);
+  height: auto;
+}
+.landing .hero h1 {
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin: 0 auto 0.35rem;
+  max-width: 720px;
 }
 .hero-sub {
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   color: var(--md-default-fg-color--light);
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
+  line-height: 1.5;
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-/* Subtitle paragraphs */
 .section-sub {
   text-align: center;
   color: var(--md-default-fg-color--light);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
-/* Material grid cards on the home page */
-.landing .grid.cards > ul > li > p {
-  font-size: 0.9rem;
-  line-height: 1.55;
-}
-
+/* Feature cards on landing */
 .landing .feature-cards > ul > li {
-  padding: 0.7rem 0.8rem;
+  padding: 1.2rem 1.3rem;
+}
+.landing .feature-cards > ul > li > hr {
+  margin: 0.6rem 0;
 }
 .landing .feature-cards > ul > li > p {
-  font-size: 0.84rem;
-  line-height: 1.45;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--md-default-fg-color--light);
 }

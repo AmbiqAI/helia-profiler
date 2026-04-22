@@ -1,0 +1,222 @@
+# Output & Results
+
+heliaPROFILER produces a structured set of output files organized for
+progressive disclosure — high-level summaries by default, detailed breakdowns
+on request.
+
+## Output directory structure
+
+### Default output (always generated)
+
+```
+results/
+├── summary.json            # Machine-readable high-level summary
+├── profile_results.csv     # Merged per-layer PMU breakdown (all counters)
+├── run_metadata.json       # Config, toolchain, platform, model info
+└── model_explorer/         # Model Explorer overlay JSONs
+    ├── me_overlay_ARM_PMU_CPU_CYCLES.json
+    ├── me_overlay_ARM_PMU_INST_RETIRED.json
+    └── ...
+```
+
+### Detailed output (with `--detailed`)
+
+```
+results/
+├── summary.json
+├── profile_results.csv
+├── run_metadata.json
+├── model_explorer/
+│   └── ...
+└── detailed/
+    ├── memory.json                # Memory breakdown (binary, arena, per-layer cache)
+    ├── profile_cpu.csv            # Merged CPU group results
+    ├── profile_memory.csv         # Merged memory group results
+    ├── profile_mve.csv            # Merged MVE group results
+    ├── profile_cpu_0.csv          # Per-pass CPU breakdowns
+    ├── profile_cpu_1.csv
+    ├── profile_memory_0.csv
+    ├── profile_mve_0.csv
+    └── ...
+```
+
+## File reference
+
+### summary.json
+
+The top-level summary — start here for a quick overview.
+
+```json
+{
+  "engine": "helia-rt",
+  "layers": 13,
+  "total_cycles": 2016376,
+  "overflow_detected": false,
+  "top_layers": [
+    {"op": "CONV_2D", "cycles": 338176, "pct": 16.8},
+    {"op": "CONV_2D", "cycles": 207749, "pct": 10.3}
+  ],
+  "memory": {
+    "arena_size": 131072,
+    "allocated_arena": 29780,
+    "model_size": 53936,
+    "num_tensors": 35,
+    "input_size": 490,
+    "output_size": 12
+  },
+  "binary": {
+    "text": 573968,
+    "data": 14952,
+    "bss": 163516,
+    "total": 752436
+  },
+  "cache": {
+    "ARM_PMU_L1D_CACHE": 230224,
+    "ARM_PMU_L1D_CACHE_RD": 230203,
+    "ARM_PMU_L1D_CACHE_REFILL": 0,
+    "ARM_PMU_L1D_CACHE_MISS_RD": 0,
+    "ARM_PMU_DTCM_ACCESS": 1338037,
+    "ARM_PMU_MEM_ACCESS": 1568463,
+    "l1d_hit_rate_pct": 100.0
+  }
+}
+```
+
+| Section | Contents |
+|---|---|
+| Top-level | Engine, layer count, total cycles, overflow flag |
+| `top_layers` | Top 5 layers by cycle count with percentages |
+| `memory` | Arena allocation, model size, tensor counts |
+| `binary` | ELF section sizes (text, data, bss) from `arm-none-eabi-size` |
+| `cache` | Aggregated cache/memory PMU counters + derived L1D hit rate |
+| `power` | Power summary (when Joulescope capture is enabled) |
+
+### profile_results.csv
+
+The primary data file — one row per layer with all measured PMU counters.
+
+```csv
+id,op,ARM_PMU_CPU_CYCLES,ARM_PMU_INST_RETIRED,...,cycles,overflow
+0,CONV_2D,338176,270137,...,338176,False
+1,DEPTHWISE_CONV_2D,206245,152970,...,206245,False
+```
+
+- `id` — sequential layer index (TFLM) or original TFLite op index (AOT)
+- `op` — operator type (e.g. `CONV_2D`, `DEPTHWISE_CONV_2D:1` for AOT)
+- Counter columns — averaged across iterations
+- `cycles` — dedicated cycle counter value
+- `overflow` — `True` if any counter overflowed (2³² saturation)
+
+### run_metadata.json
+
+Full provenance for the run:
+
+```json
+{
+  "hpx_version": "0.1.0",
+  "run_id": "a1b2c3d4",
+  "timestamp": "2025-04-21T10:30:00",
+  "config": { ... },
+  "platform": {
+    "board": "apollo510_evb",
+    "soc": "apollo510",
+    "core": "cortex-m55"
+  },
+  "model": {
+    "name": "kws_ref_model.tflite",
+    "size": 53936,
+    "sha256": "abc123..."
+  },
+  "toolchain": {
+    "compiler": "arm-none-eabi-gcc",
+    "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 14.3.Rel1) 14.3.1",
+    "cmake_version": "cmake version 3.31.6"
+  },
+  "firmware": {
+    "arena_size": 131072,
+    "allocated_arena": 29780,
+    "model_size": 53936
+  }
+}
+```
+
+### detailed/memory.json
+
+Deep memory breakdown (only with `--detailed`):
+
+```json
+{
+  "binary_sections": {
+    "text": 573968,
+    "data": 14952,
+    "bss": 163516,
+    "total": 752436
+  },
+  "arena": {
+    "arena_size": 131072,
+    "allocated_arena": 29780,
+    "num_tensors": 35,
+    "num_inputs": 1,
+    "num_outputs": 1,
+    "model_size": 53936
+  },
+  "per_layer_memory": [
+    {
+      "op": "CONV_2D",
+      "counters": {
+        "ARM_PMU_L1D_CACHE": 28728,
+        "ARM_PMU_L1D_CACHE_RD": 28727,
+        "ARM_PMU_DTCM_ACCESS": 178393,
+        "ARM_PMU_MEM_ACCESS": 207151
+      }
+    }
+  ],
+  "cache_totals": {
+    "ARM_PMU_L1D_CACHE": 230224,
+    "ARM_PMU_L1D_CACHE_MISS_RD": 0,
+    "ARM_PMU_DTCM_ACCESS": 1338037,
+    "l1d_hit_rate_pct": 100.0
+  }
+}
+```
+
+## Terminal summary
+
+Every run prints a summary to the terminal:
+
+```
+============================================================
+heliaPROFILER Results
+============================================================
+  arena_size: 131072
+  allocated_arena: 29780
+  model_size: 53936
+  layers: 13
+  total_cycles: 2,016,376
+
+  Top layers by cycles:
+    CONV_2D                           338,176 ( 16.8%)
+    CONV_2D                           207,749 ( 10.3%)
+    CONV_2D                           207,749 ( 10.3%)
+
+  Memory: 29,780 / 131,072 bytes arena (22.7%)
+  Model:  53,936 bytes
+  Binary: text=573,968 data=14,952 bss=163,516 total=752,436
+
+  Cache/Memory:
+    L1D_CACHE                          230,224
+    L1D_CACHE_RD                       230,203
+    DTCM_ACCESS                      1,338,037
+    MEM_ACCESS                       1,568,463
+============================================================
+```
+
+## Controlling output
+
+| Flag | Effect |
+|---|---|
+| `--output-dir PATH` | Change output directory (default: `./results`) |
+| `--output-format csv` | CSV output (default) |
+| `--output-format json` | JSON output |
+| `--no-model-explorer` | Skip Model Explorer overlays |
+| `--detailed` | Emit per-preset CSVs and memory.json in `detailed/` |

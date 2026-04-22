@@ -5,35 +5,61 @@ from __future__ import annotations
 import shutil
 
 
-def run_doctor() -> None:
-    """Check that required host tools are available."""
-    checks = [
-        ("arm-none-eabi-gcc", "ARM GCC toolchain"),
-        ("cmake", "CMake (>= 3.24)"),
-        ("ninja", "Ninja build system"),
-        ("JLinkExe", "SEGGER J-Link commander"),
-        ("JLinkSWOViewerCL", "SEGGER SWO viewer"),
-        ("nsx", "neuralspotx CLI"),
+def collect_checks() -> tuple[
+    list[tuple[str, str, str | None]],
+    list[tuple[str, str, bool]],
+]:
+    """Check required host tools and return structured results.
+
+    Returns a tuple of ``(checks, optional)`` where:
+    - *checks*: ``[(label, binary_name, path_or_none), ...]``
+    - *optional*: ``[(label, package_name, available), ...]``
+    """
+    tool_specs = [
+        ("ARM GCC toolchain", "arm-none-eabi-gcc"),
+        ("CMake (>= 3.24)", "cmake"),
+        ("Ninja build system", "ninja"),
+        ("SEGGER J-Link commander", "JLinkExe"),
+        ("SEGGER SWO viewer", "JLinkSWOViewerCL"),
+        ("neuralspotx CLI", "nsx"),
     ]
 
-    all_ok = True
-    for binary, label in checks:
+    checks: list[tuple[str, str, str | None]] = []
+    for label, binary in tool_specs:
         path = shutil.which(binary)
+        checks.append((label, binary, path))
+
+    optional_specs = [
+        ("Joulescope (power measurement)", "joulescope"),
+    ]
+    optional: list[tuple[str, str, bool]] = []
+    for label, pkg_name in optional_specs:
+        try:
+            __import__(pkg_name)
+            available = True
+        except ImportError:
+            available = False
+        optional.append((label, pkg_name, available))
+
+    return checks, optional
+
+
+def run_doctor() -> None:
+    """Legacy entry point — prints doctor results to stdout."""
+    checks, optional = collect_checks()
+
+    all_ok = True
+    for label, _binary, path in checks:
         if path:
             print(f"  ✓ {label}: {path}")
         else:
-            print(f"  ✗ {label}: {binary} not found")
+            print(f"  ✗ {label}: not found")
             all_ok = False
 
-    # Optional dependencies
-    optional = [
-        ("joulescope", "Joulescope (optional, for --power --power-driver joulescope)"),
-    ]
-    for pkg_name, label in optional:
-        try:
-            __import__(pkg_name)
+    for label, _pkg, available in optional:
+        if available:
             print(f"  ✓ {label}: available")
-        except ImportError:
+        else:
             print(f"  - {label}: not installed")
 
     if all_ok:

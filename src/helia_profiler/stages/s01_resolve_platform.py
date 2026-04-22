@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 
 from ..errors import ConfigError, PlatformError
 from ..pipeline import PipelineContext
 from ..platform import PmuTier, get_board, get_soc
+from ..results import ModelInfo, PlatformInfo
 
 log = logging.getLogger("hpx")
 
@@ -58,6 +60,18 @@ class ResolvePlatformStage:
                 soc.name,
             )
 
+        # Populate platform metadata
+        ctx.run_metadata.platform = PlatformInfo(
+            board=board.name,
+            soc=soc.name,
+            core=soc.core.value,
+            pmu_tier=soc.pmu_tier.value,
+            has_mve=soc.has_mve,
+            clock_lp_mhz=soc.clock.lp_mhz,
+            clock_hp_mhz=soc.clock.hp_mhz,
+            sdk_tier=soc.sdk_tier,
+        )
+
         # Validate model path exists early
         model_path = ctx.config.model.path
         if not model_path.exists():
@@ -65,3 +79,11 @@ class ResolvePlatformStage:
                 f"Model file not found: {model_path}",
                 hint="Check the 'model.path' in your config or positional argument.",
             )
+
+        # Record model file metadata
+        model_bytes = model_path.read_bytes()
+        ctx.run_metadata.model = ModelInfo(
+            name=model_path.name,
+            size_bytes=len(model_bytes),
+            sha256=hashlib.sha256(model_bytes).hexdigest(),
+        )

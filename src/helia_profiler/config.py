@@ -44,13 +44,26 @@ class TargetConfig:
 
     board: str = DEFAULT_BOARD
     toolchain: str = DEFAULT_TOOLCHAIN
+    jlink_serial: str | None = None  # select J-Link by S/N (None = auto)
 
 
 @dataclass(frozen=True)
 class ProfilingConfig:
-    """PMU capture settings."""
+    """PMU capture settings.
+
+    Counter selection is specified via *pmu_counters* — a mapping of
+    compute-unit group (``cpu``, ``mve``, ``memory``) to a selection:
+
+    * ``"default"`` — curated set of the most useful counters.
+    * ``"all"``     — every counter in the group (multi-pass).
+    * ``["NAME", …]`` — explicit counter names.
+
+    The legacy *pmu_presets* field is still accepted for backward
+    compatibility and is converted internally.
+    """
 
     pmu_presets: tuple[str, ...] = DEFAULT_PMU_PRESETS
+    pmu_counters: dict[str, str | list[str]] | None = None
     per_layer: bool = True
     iterations: int = DEFAULT_ITERATIONS
     warmup: int = DEFAULT_WARMUP
@@ -75,6 +88,7 @@ class OutputConfig:
     format: str = "csv"  # csv | json | model-explorer
     dir: Path = Path("./results")
     model_explorer: bool = True  # always emit ME overlay alongside primary format
+    detailed: bool = False  # emit per-preset/group CSVs and memory breakdown
 
 
 @dataclass(frozen=True)
@@ -148,15 +162,27 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
     if isinstance(pmu_presets, list):
         pmu_presets = tuple(pmu_presets)
 
+    pmu_counters_raw = profiling_d.get("pmu_counters")
+    pmu_counters: dict[str, str | list[str]] | None = None
+    if isinstance(pmu_counters_raw, dict):
+        pmu_counters = {}
+        for grp, sel in pmu_counters_raw.items():
+            if isinstance(sel, list):
+                pmu_counters[grp] = sel
+            else:
+                pmu_counters[grp] = str(sel)
+
     return ProfileConfig(
         model=model,
         engine=engine,
         target=TargetConfig(
             board=target_d.get("board", DEFAULT_BOARD),
             toolchain=target_d.get("toolchain", DEFAULT_TOOLCHAIN),
+            jlink_serial=target_d.get("jlink_serial"),
         ),
         profiling=ProfilingConfig(
             pmu_presets=pmu_presets,
+            pmu_counters=pmu_counters,
             per_layer=profiling_d.get("per_layer", True),
             iterations=profiling_d.get("iterations", DEFAULT_ITERATIONS),
             warmup=profiling_d.get("warmup", DEFAULT_WARMUP),
@@ -173,6 +199,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             format=output_d.get("format", "csv"),
             dir=Path(output_d.get("dir", "./results")),
             model_explorer=output_d.get("model_explorer", True),
+            detailed=output_d.get("detailed", False),
         ),
         work_dir=Path(d["work_dir"]) if d.get("work_dir") else None,
         keep_work_dir=d.get("keep_work_dir", False),

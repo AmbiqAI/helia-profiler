@@ -11,9 +11,13 @@ profile: {{ board }}_minimal
 profile_status: active
 modules:
 {% for m in modules %}
-- name: {{ m }}
+- name: {{ m.name }}
+{% if m.local %}
+  local: true
+{% else %}
   revision: main
-  project: {{ m }}
+  project: {{ m.name }}
+{% endif %}
 {% endfor %}
 features: {}
 module_registry:

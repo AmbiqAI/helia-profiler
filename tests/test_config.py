@@ -18,7 +18,19 @@ def test_load_config_from_cli_overrides():
     assert config.model.arena_size == 32768
     assert config.engine.type.value == "tflm"
     assert config.target.board == "apollo510_evb"
+    assert config.target.jlink_serial is None
     assert config.profiling.iterations == 100
+
+
+def test_jlink_serial_from_cli():
+    """jlink_serial should be settable via CLI overrides."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "target": {"jlink_serial": "1160002255"},
+    }
+    config = load_config(None, cli)
+    assert config.target.jlink_serial == "1160002255"
 
 
 def test_config_is_frozen():

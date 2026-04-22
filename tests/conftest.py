@@ -34,4 +34,5 @@ def fake_dist(tmp_path: Path) -> Path:
     (dist / "tensorflow" / "lite").mkdir()
     (dist / "third_party").mkdir()
     (dist / "third_party" / "flatbuffers").mkdir()
+    (dist / "signal").mkdir()
     return dist

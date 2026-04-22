@@ -72,3 +72,10 @@ class OnDeviceDriver:
             "On-device power output parsing not implemented",
             hint="This feature is under development.",
         )
+
+    def power_cycle(self, *, off_time_s: float = 0.5, settle_time_s: float = 1.0) -> None:
+        """Not supported for on-device driver."""
+        raise PowerError(
+            "On-device driver cannot power-cycle the target",
+            hint="Use an external Joulescope driver for power-cycle reset.",
+        )

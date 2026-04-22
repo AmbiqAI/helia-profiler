@@ -23,13 +23,12 @@
 
 #include "hpx_pmu_profiler.h"
 
-extern "C" {
+// arm_mve.h pre-included via hpx_pmu_profiler.h
 #include "ns_core.h"
 #include "ns_ambiqsuite_harness.h"
 #include "nsx_mem.h"
 #include "nsx_system.h"
 #include "am_hal_gpio.h"
-}
 
 // DWT cycle counter
 static inline void dwt_init(void) {
@@ -126,16 +125,22 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
 
 int main(void) {
     nsx_system_config_t sys_cfg = nsx_system_development;
-    sys_cfg.skip_bsp_init = true;
     NS_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
     dwt_init();
     sync_gpio_init();
+
+    // Delay to allow the host SWO viewer to attach after reset.
+    // The board boots immediately after flash/reset; without this pause
+    // the profiler output would be emitted before the viewer connects.
+    am_util_delay_ms(5000);
 
     ns_printf("\n--- HPX_START ---\n");
     ns_printf("HPX_MODEL_SIZE=%u\n", model_data_len);
     ns_printf("HPX_ARENA_SIZE=%d\n", kArenaSize);
     ns_printf("HPX_ITERATIONS={{ iterations }}\n");
     ns_printf("HPX_WARMUP={{ warmup }}\n");
+    ns_printf("HPX_NUM_PRESETS=%d\n", {{ pmu_passes | length }});
+    ns_printf("HPX_PRESETS={{ pmu_pass_names | join(',') }}\n");
     ns_printf("HPX_POWER_SYNC=%s\n", kPowerSyncEnabled ? "gpio" : "none");
     if constexpr (kPowerSyncEnabled) {
         ns_printf("HPX_SYNC_GPIO=%lu\n", (unsigned long)kSyncGpioPin);
@@ -150,7 +155,15 @@ int main(void) {
         while (1) {}
     }
 
-    g_profiler.Init({{ pmu_preset }});
+    // Use the first pass to allocate (all passes use the same model/arena)
+{% if pmu_passes[0].custom %}
+    {
+        static const uint32_t _init_ids[] = { {{ pmu_passes[0].event_ids | join(', ') }} };
+        g_profiler.InitCustom(_init_ids, {{ pmu_passes[0].num_counters }});
+    }
+{% else %}
+    g_profiler.Init({{ pmu_passes[0].c_enum }});
+{% endif %}
 
     auto &resolver = get_resolver();
     tflite::MicroInterpreter interpreter(model, resolver, g_arena, kArenaSize,
@@ -160,11 +173,34 @@ int main(void) {
         while (1) {}
     }
 
+    // --- Memory usage metadata ---
     TfLiteTensor *input = interpreter.input(0);
+    TfLiteTensor *output = interpreter.output(0);
     ns_printf("HPX_INPUT_SIZE=%d\n", (int)input->bytes);
-    ns_printf("HPX_ALLOCATED_ARENA=%zu\n", interpreter.arena_used_bytes());
+    ns_printf("HPX_OUTPUT_SIZE=%d\n", (int)output->bytes);
+    ns_printf("HPX_ALLOCATED_ARENA=%lu\n", (unsigned long)interpreter.arena_used_bytes());
+    ns_printf("HPX_NUM_TENSORS=%d\n", (int)model->subgraphs()->Get(0)->tensors()->size());
+    ns_printf("HPX_NUM_INPUTS=%d\n", (int)interpreter.inputs_size());
+    ns_printf("HPX_NUM_OUTPUTS=%d\n", (int)interpreter.outputs_size());
 
-    // Warmup iterations (profiler disabled, no GPIO sync)
+    // --- Multi-pass PMU profiling ---
+    // Each pass configures a specific set of PMU counters.  When the user
+    // requests more counters than fit in a single pass (4 with 32-bit
+    // chaining), the profiler runs multiple passes and the host merges
+    // the results.  Warmup iterations are repeated per-pass to ensure
+    // stable cache / pipeline state.
+{% for pass in pmu_passes %}
+    ns_printf("\n--- HPX_PRESET {{ pass.name }} ---\n");
+{% if pass.custom %}
+    {
+        static const uint32_t _pass{{ loop.index0 }}_ids[] = { {{ pass.event_ids | join(', ') }} };
+        g_profiler.InitCustom(_pass{{ loop.index0 }}_ids, {{ pass.num_counters }});
+    }
+{% else %}
+    g_profiler.Init({{ pass.c_enum }});
+{% endif %}
+
+    // Warmup for this pass (profiler disabled, no GPIO sync)
     for (int w = 0; w < {{ warmup }}; w++) {
         memset(input->data.raw, 0, input->bytes);
         interpreter.Invoke();
@@ -175,13 +211,14 @@ int main(void) {
         memset(input->data.raw, 0, input->bytes);
         g_profiler.ClearEvents();
 
-        sync_gpio_high();   // Signal: inference start
+        sync_gpio_high();
         interpreter.Invoke();
-        sync_gpio_low();    // Signal: inference end
+        sync_gpio_low();
 
         ns_printf("\n--- HPX_ITER %d ---\n", iter);
         g_profiler.PrintCsv();
     }
+{% endfor %}
 
     ns_printf("\n--- HPX_END ---\n");
     while (1) {}

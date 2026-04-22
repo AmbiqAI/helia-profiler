@@ -1,53 +1,77 @@
 site_name: heliaPROFILER
 site_description: Profile LiteRT models on Ambiq Apollo hardware
 repo_url: https://github.com/AmbiqAI/helia-profiler
+repo_name: AmbiqAI/helia-profiler
+
 theme:
   name: material
   favicon: assets/heliaprofiler-icon.png
   logo: assets/heliaprofiler-icon.png
+  icon:
+    repo: fontawesome/brands/github
+    admonition:
+      tip: material/lightbulb-outline
+      info: material/information-outline
+      warning: material/alert-outline
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: green
-      accent: green
+      primary: white
+      accent: blue
       toggle:
-        icon: material/brightness-7
+        icon: material/weather-sunny
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: green
-      accent: green
+      primary: black
+      accent: blue
       toggle:
-        icon: material/brightness-4
+        icon: material/weather-night
         name: Switch to light mode
   font:
     text: Inter
-    code: JetBrains Mono
+    code: SF Mono, JetBrains Mono
   features:
+    - announce.dismiss
     - content.code.annotate
     - content.code.copy
     - content.tabs.link
-    - navigation.expand
+    - content.tooltips
+    - navigation.footer
     - navigation.indexes
     - navigation.instant
+    - navigation.instant.progress
+    - navigation.path
     - navigation.sections
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.top
     - navigation.tracking
     - search.highlight
+    - search.share
     - search.suggest
     - toc.follow
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/AmbiqAI/helia-profiler
+  generator: false
+
 extra_css:
   - stylesheets/extra.css
+
 markdown_extensions:
+  - abbr
   - admonition
   - attr_list
   - def_list
+  - footnotes
   - md_in_html
   - tables
   - toc:
-      permalink: true
+      permalink: "#"
+      toc_depth: 3
   - pymdownx.betterem
   - pymdownx.caret
   - pymdownx.details
@@ -58,10 +82,12 @@ markdown_extensions:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
+      use_pygments: true
   - pymdownx.inlinehilite
   - pymdownx.keys
   - pymdownx.mark
   - pymdownx.smartsymbols
+  - pymdownx.snippets
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -69,11 +95,17 @@ markdown_extensions:
           format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
+
 plugins:
-  - search
+  - search:
+      separator: '[\s\-\.]+'
+  - tags
 nav:
   - Home: index.md
   - Getting Started:
@@ -84,14 +116,23 @@ nav:
       - Configuration: guide/configuration.md
       - Engines: guide/engines.md
       - Boards & Platforms: guide/boards.md
+      - PMU Counters: guide/pmu-counters.md
       - Power Measurement: guide/power.md
       - Model Explorer Overlays: guide/model-explorer.md
+      - Output & Results: guide/output.md
   - Examples:
       - Overview: examples/index.md
       - Basic Profiling: examples/basic-profiling.md
       - Per-Layer Breakdown: examples/per-layer.md
       - Engine Comparison: examples/engine-comparison.md
       - Power Profiling: examples/power-profiling.md
+  - Architecture:
+      - Overview: architecture/index.md
+      - Pipeline & Stages: architecture/pipeline.md
+      - Engine Adapters: architecture/engine-adapters.md
+      - Firmware Generation: architecture/firmware.md
+      - Data Capture: architecture/capture.md
+      - Contributing an Engine: architecture/adding-an-engine.md
   - CLI Reference:
       - Overview: reference/index.md
       - hpx profile: reference/profile.md

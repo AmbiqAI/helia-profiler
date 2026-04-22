@@ -31,6 +31,9 @@ htmlcov/
 # Generated firmware working directories
 hpx_*/
 
+# Profiling results (local runs)
+results/
+
 # uv
 uv.lock
 site/

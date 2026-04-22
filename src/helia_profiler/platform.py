@@ -79,6 +79,7 @@ class SocDef:
     clock: ClockConfig
     sdk_tier: str  # "r3", "r4", or "r5" — maps to nsx-ambiqsuite-r*
     c_define: str  # e.g. "AM_PART_APOLLO510"
+    jlink_device: str = ""  # J-Link device string (e.g. "AP510NFA-CBR")
     pmu_max_ops: int = 2048  # Max PMU accumulator operations (layers)
 
     @property
@@ -132,6 +133,7 @@ _register_soc(
         clock=ClockConfig(lp_mhz=96),
         sdk_tier="r3",
         c_define="AM_PART_APOLLO3P",
+        jlink_device="AMA3B2KK-KBR",
     )
 )
 
@@ -150,6 +152,7 @@ _register_soc(
         clock=ClockConfig(lp_mhz=96, hp_mhz=192),
         sdk_tier="r4",
         c_define="AM_PART_APOLLO4P",
+        jlink_device="AMAP42KP-KBR",
     )
 )
 
@@ -164,6 +167,7 @@ _register_soc(
         clock=ClockConfig(lp_mhz=96, hp_mhz=192),
         sdk_tier="r4",
         c_define="AM_PART_APOLLO4L",
+        jlink_device="AMAP42KL-KBR",
     )
 )
 
@@ -189,6 +193,7 @@ _register_soc(
         clock=ClockConfig(lp_mhz=96, hp_mhz=250),
         sdk_tier="r5",
         c_define="AM_PART_APOLLO510",
+        jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
     )
 )
@@ -210,6 +215,7 @@ _register_soc(
         clock=ClockConfig(lp_mhz=96, hp_mhz=250),
         sdk_tier="r5",
         c_define="AM_PART_APOLLO510B",
+        jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
     )
 )
@@ -231,6 +237,7 @@ _register_soc(
         clock=ClockConfig(lp_mhz=96, hp_mhz=250),
         sdk_tier="r5",
         c_define="AM_PART_APOLLO5B",
+        jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
     )
 )
@@ -253,6 +260,7 @@ _register_soc(
         clock=ClockConfig(lp_mhz=96, hp_mhz=250),
         sdk_tier="r5",
         c_define="AM_PART_APOLLO330P",
+        jlink_device="AP330NFA-CBR",
         pmu_max_ops=4096,
     )
 )

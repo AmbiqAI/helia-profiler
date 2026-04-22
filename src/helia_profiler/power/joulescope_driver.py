@@ -8,6 +8,7 @@ whole-inference capture (not per-layer).
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from ..errors import PowerError
@@ -82,26 +83,30 @@ class JoulescopeDriver:
                 device.parameter_set("sampling_frequency", sampling_frequency)
                 device.parameter_set("i_range", "auto")
 
-                # Collect samples for the specified duration
-                data = device.read(
-                    duration=duration_s,
-                    fields=["current", "voltage"],
-                )
+                # read() returns an ndarray of shape (N, 2): col 0 = current, col 1 = voltage
+                data = device.read(duration=duration_s)
+                import numpy as np
 
-                current_data = data["signals"]["current"]["value"]
-                voltage_data = data["signals"]["voltage"]["value"]
-                sample_rate = data["signals"]["current"]["sample_frequency"]
-                dt = 1.0 / sample_rate
+                current_data = data[:, 0]  # amps
+                voltage_data = data[:, 1]  # volts
+                n = len(current_data)
+                dt = duration_s / n
 
-                for i in range(len(current_data)):
+                power_data = current_data * voltage_data
+                avg_current = float(np.nanmean(current_data))
+                avg_power = float(np.nanmean(power_data))
+                peak_current = float(np.nanmax(current_data))
+                energy = float(np.nansum(power_data)) * dt
+
+                # Build sparse samples list (subsample for memory)
+                step = max(1, n // 10000)
+                for i in range(0, n, step):
                     t = i * dt
-                    c = float(current_data[i])
-                    v = float(voltage_data[i])
-                    samples.append(PowerSample(timestamp_s=t, current_a=c, voltage_v=v))
-                    total_current += c
-                    total_power += c * v
-                    if c > peak_current:
-                        peak_current = c
+                    samples.append(PowerSample(
+                        timestamp_s=t,
+                        current_a=float(current_data[i]),
+                        voltage_v=float(voltage_data[i]),
+                    ))
 
         except PowerError:
             raise
@@ -118,17 +123,13 @@ class JoulescopeDriver:
                 hint="Joulescope returned empty data — check the connection.",
             )
 
-        avg_current = total_current / n
-        avg_power = total_power / n
-        energy = total_power * (duration_s / n)  # sum * dt
-
         summary = PowerSummary(
             avg_current_a=avg_current,
             avg_power_w=avg_power,
             peak_current_a=peak_current,
             energy_j=energy,
             duration_s=duration_s,
-            sample_count=n,
+            sample_count=int(current_data.shape[0]) if 'current_data' in dir() else n,
         )
 
         log.info(
@@ -148,3 +149,45 @@ class JoulescopeDriver:
                 "io_voltage": io_voltage,
             },
         )
+
+    def power_cycle(self, *, off_time_s: float = 0.5, settle_time_s: float = 1.0) -> None:
+        """Cut and restore target power via the Joulescope current shunt.
+
+        Setting ``i_range`` to ``off`` opens the relay on the Joulescope,
+        disconnecting the target from its power supply.  Restoring to
+        ``auto`` re-enables it, giving a clean hardware reset with no
+        debug-domain overhead.
+        """
+        import joulescope
+
+        log.info(
+            "Power-cycle reset via Joulescope (off=%.1fs, settle=%.1fs)",
+            off_time_s,
+            settle_time_s,
+        )
+
+        try:
+            device = joulescope.scan_require_one(name="Joulescope")
+        except Exception as exc:
+            raise PowerError(
+                f"Failed to find Joulescope for power cycle: {exc}",
+                hint="Ensure the Joulescope is connected via USB.",
+            ) from exc
+
+        try:
+            with device:
+                device.parameter_set("i_range", "off")
+                log.info("Target power OFF")
+                time.sleep(off_time_s)
+                device.parameter_set("i_range", "auto")
+                log.info("Target power ON — waiting %.1fs for boot", settle_time_s)
+                time.sleep(settle_time_s)
+        except PowerError:
+            raise
+        except Exception as exc:
+            raise PowerError(
+                f"Joulescope power cycle failed: {exc}",
+                hint="Check USB connection.",
+            ) from exc
+
+        log.info("Power-cycle reset complete")

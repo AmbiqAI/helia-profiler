@@ -19,7 +19,7 @@ class GenerateReportStage:
         return False
 
     def run(self, ctx: PipelineContext) -> None:
-        if ctx.pmu_raw is None:
+        if ctx.pmu_result is None:
             raise ReportError("No PMU data available — capture stage did not run.")
 
         from ..report import write_report

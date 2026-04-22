@@ -85,3 +85,19 @@ class PowerDriver(Protocol):
         Raises :class:`PowerError` on failure.
         """
         ...
+
+    def power_cycle(self, *, off_time_s: float = 0.5, settle_time_s: float = 1.0) -> None:
+        """Cut and restore target power for a clean hardware reset.
+
+        Only meaningful for external instruments that sit on the power rail
+        (e.g. Joulescope).  Drivers that cannot power-cycle should raise
+        :class:`PowerError`.
+
+        Parameters
+        ----------
+        off_time_s : float
+            How long to keep power off (seconds).
+        settle_time_s : float
+            How long to wait after restoring power for the target to boot.
+        """
+        ...

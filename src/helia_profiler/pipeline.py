@@ -10,14 +10,19 @@ from __future__ import annotations
 import logging
 import shutil
 import tempfile
+import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
+from ._version import __version__
 from .config import ProfileConfig
 from .engines.base import EngineAdapter, EngineArtifacts
 from .errors import HpxError
 from .platform import BoardDef, SocDef
+from .power.base import PowerResult
+from .results import PmuResult, RunMetadata, BinarySections
 
 log = logging.getLogger("hpx")
 
@@ -52,10 +57,14 @@ class PipelineContext:
     # Build (stage: build_firmware)
     build_dir: Path | None = None
     binary_path: Path | None = None
+    binary_sections: BinarySections | None = None
 
     # Capture (stage: capture_pmu / capture_power)
-    pmu_raw: dict[str, Any] | None = None
-    power_raw: dict[str, Any] | None = None
+    pmu_result: PmuResult | None = None
+    power_result: PowerResult | None = None
+
+    # Run metadata — enriched by stages, written to report
+    run_metadata: RunMetadata = field(default_factory=RunMetadata)
 
     # Report (stage: generate_report)
     report_paths: list[Path] = field(default_factory=list)
@@ -95,21 +104,36 @@ class Stage(Protocol):
 class PipelineRunner:
     """Executes a sequence of ``Stage`` objects against a ``PipelineContext``."""
 
-    def __init__(self, stages: list[Stage]) -> None:
+    def __init__(
+        self,
+        stages: list[Stage],
+        console: Any | None = None,
+    ) -> None:
         self._stages = list(stages)
+        self._console = console  # Optional HpxConsole — avoids circular import
 
     def run(self, config: ProfileConfig) -> PipelineContext:
         """Set up the working directory, run all stages, and clean up."""
         work_dir, should_cleanup = _resolve_work_dir(config)
         ctx = PipelineContext(config=config, work_dir=work_dir)
 
+        # Seed run metadata with immutable fields
+        ctx.run_metadata.hpx_version = __version__
+        ctx.run_metadata.run_id = str(uuid.uuid4())
+        ctx.run_metadata.timestamp = datetime.now(timezone.utc).isoformat()
+        ctx.run_metadata.config_snapshot = _serialize_config(config)
+
         try:
             for stage in self._stages:
                 if stage.should_skip(ctx):
                     log.info("[skip] %s", stage.name)
+                    if self._console is not None:
+                        self._console.stage_skip(stage.name)
                     continue
 
                 log.info("[start] %s", stage.name)
+                if self._console is not None:
+                    self._console.stage_start(stage.name)
                 try:
                     stage.run(ctx)
                 except HpxError:
@@ -121,6 +145,8 @@ class PipelineRunner:
                         "Please file an issue with the full traceback.",
                     ) from exc
                 log.info("[done]  %s", stage.name)
+                if self._console is not None:
+                    self._console.stage_done(stage.name)
 
         finally:
             if should_cleanup:
@@ -143,3 +169,39 @@ def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
 
     wd = Path(tempfile.mkdtemp(prefix="hpx_"))
     return wd, not config.keep_work_dir
+
+
+def _serialize_config(config: ProfileConfig) -> dict[str, Any]:
+    """Produce a JSON-safe snapshot of the active configuration."""
+    return {
+        "model": {
+            "path": str(config.model.path),
+            "arena_size": config.model.arena_size,
+        },
+        "engine": {
+            "type": config.engine.type.value,
+            "backend": config.engine.backend,
+            "config": config.engine.config,
+        },
+        "target": {
+            "board": config.target.board,
+            "toolchain": config.target.toolchain,
+        },
+        "profiling": {
+            "pmu_presets": list(config.profiling.pmu_presets),
+            "per_layer": config.profiling.per_layer,
+            "iterations": config.profiling.iterations,
+            "warmup": config.profiling.warmup,
+        },
+        "power": {
+            "enabled": config.power.enabled,
+            "driver": config.power.driver,
+            "mode": config.power.mode,
+            "duration_s": config.power.duration_s,
+        },
+        "output": {
+            "format": config.output.format,
+            "dir": str(config.output.dir),
+            "model_explorer": config.output.model_explorer,
+        },
+    }

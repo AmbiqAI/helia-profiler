@@ -196,12 +196,14 @@ class TestPipelineContext:
         assert ctx.firmware_dir is None
         assert ctx.build_dir is None
         assert ctx.binary_path is None
-        assert ctx.pmu_raw is None
-        assert ctx.power_raw is None
+        assert ctx.pmu_result is None
+        assert ctx.power_result is None
         assert ctx.report_paths == []
 
     def test_context_is_mutable(self, tmp_path: Path):
         config = _make_config(tmp_path)
         ctx = PipelineContext(config=config, work_dir=tmp_path)
-        ctx.pmu_raw = {"layers": []}
-        assert ctx.pmu_raw == {"layers": []}
+        from helia_profiler.results import FirmwareMeta, PmuResult
+        ctx.pmu_result = PmuResult(meta=FirmwareMeta(), layers=[])
+        assert ctx.pmu_result is not None
+        assert ctx.pmu_result.layers == []
