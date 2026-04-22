@@ -1,7 +1,15 @@
 """heliaRT engine adapter.
 
 Generates a local NSX wrapper module for heliaRT prebuilt static libraries.
-The wrapper is a temporary shim until heliaRT ships a native nsx-module.yaml.
+
+The wrapper is a temporary shim: heliaRT now ships a native
+``nsx/nsx-module.yaml`` + ``nsx/CMakeLists.txt`` (branch
+``feat/nsx-module-type``), but the native module is INTERFACE-only and
+relies on ``MicroPrintf`` being baked into the prebuilt ``.a``.  The
+current dist libs leave ``MicroPrintf`` undefined, so we still compile
+``micro_log.cc`` via this wrapper.  Once heliaRT releases with
+``MicroPrintf`` included in the static library, this wrapper can be
+replaced by a direct reference to the native module.
 """
 
 from __future__ import annotations
@@ -61,8 +69,11 @@ class HeliaRTAdapter:
     appear as ``nsx::heliart`` to the profiler firmware's CMake build.  The
     wrapper is placed inside ``work_dir/modules/nsx-heliart/``.
 
-    Once heliaRT ships a native ``nsx-module.yaml``, this adapter can simply
-    declare a module dependency and skip wrapper generation entirely.
+    heliaRT ships a native ``nsx/`` module (``feat/nsx-module-type`` branch)
+    but the prebuilt ``.a`` leaves ``MicroPrintf`` undefined, so the wrapper
+    is still needed to compile the platform glue (``micro_log.cc``).  Once
+    a release bundles ``MicroPrintf`` into the library, switch to the native
+    module and drop the wrapper templates.
     """
 
     @property

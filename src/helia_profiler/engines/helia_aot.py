@@ -4,6 +4,10 @@ Invokes the heliaAOT compiler to produce an NSX module from a .tflite model,
 generates a memory-placement attribute header, and wraps ns-cmsis-nn as a
 local NSX module for the profiler firmware build.
 
+When ns-cmsis-nn contains a native ``nsx/`` directory (``feat/nsx-module-type``
+branch or later), the upstream NSX manifest and CMakeLists.txt are used
+directly instead of the generated Jinja2 wrapper templates.
+
 Uses the heliaAOT Python API (``AotConverter``) programmatically so we can
 extract the post-transform operator graph directly from ``CodeGenContext``
 rather than parsing generated C source.
@@ -495,22 +499,54 @@ def _validate_cmsis_nn(path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# NSX wrapper generation — CMSIS-NN
+# NSX module generation — CMSIS-NN
 # ---------------------------------------------------------------------------
 
 
 def _write_cmsis_nn_wrapper(module_dir: Path, cmsis_nn_path: Path) -> None:
-    """Write the NSX wrapper module for ns-cmsis-nn."""
+    """Write the NSX module for ns-cmsis-nn.
+
+    If the repo contains a native ``nsx/`` directory (i.e. the
+    ``feat/nsx-module-type`` branch or later), use the upstream NSX
+    manifest and CMakeLists.txt directly.  A thin root shim delegates
+    to ``nsx/CMakeLists.txt`` so that its ``../Source`` relative paths
+    resolve correctly against the copied Source/ tree.
+
+    Otherwise falls back to generated Jinja2 wrapper templates.
+    """
     module_dir.mkdir(parents=True, exist_ok=True)
 
-    (module_dir / "nsx-module.yaml").write_text(
-        _jinja_env.get_template("cmsisnn_nsx_module.yaml.j2").render()
-    )
-    (module_dir / "CMakeLists.txt").write_text(
-        _jinja_env.get_template("cmsisnn_CMakeLists.txt.j2").render()
-    )
+    native_nsx = cmsis_nn_path / "nsx"
+    if (native_nsx / "CMakeLists.txt").is_file() and (
+        native_nsx / "nsx-module.yaml"
+    ).is_file():
+        log.info("Using native nsx/ module from %s", cmsis_nn_path)
 
-    # Copy the CMSIS-NN source tree into the wrapper (no symlinks — Windows-safe)
+        # Copy the native manifest to the module root
+        shutil.copy2(native_nsx / "nsx-module.yaml", module_dir / "nsx-module.yaml")
+
+        # Place the native CMakeLists.txt in a subdirectory so its
+        # relative paths (../Source, ../Include) resolve against the
+        # copied Source/ and Include/ trees at the module root.
+        nsx_subdir = module_dir / "nsx"
+        nsx_subdir.mkdir(exist_ok=True)
+        shutil.copy2(native_nsx / "CMakeLists.txt", nsx_subdir / "CMakeLists.txt")
+
+        # Root shim delegates to the native build
+        (module_dir / "CMakeLists.txt").write_text(
+            "# Shim — delegates to the native ns-cmsis-nn NSX build.\n"
+            "add_subdirectory(nsx)\n"
+        )
+    else:
+        log.info("No native nsx/ in %s — using generated wrapper", cmsis_nn_path)
+        (module_dir / "nsx-module.yaml").write_text(
+            _jinja_env.get_template("cmsisnn_nsx_module.yaml.j2").render()
+        )
+        (module_dir / "CMakeLists.txt").write_text(
+            _jinja_env.get_template("cmsisnn_CMakeLists.txt.j2").render()
+        )
+
+    # Copy the CMSIS-NN source tree into the module (no symlinks — Windows-safe)
     for d in ("Include", "Source"):
         target = module_dir / d
         source = cmsis_nn_path / d
