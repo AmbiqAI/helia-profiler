@@ -18,11 +18,12 @@ from .errors import BuildError
 
 log = logging.getLogger("hpx")
 
-# Conservative timeouts — cmake configure is fast, builds can be slow,
-# flash involves J-Link probe negotiation.
-_CONFIGURE_TIMEOUT_S = 120
-_BUILD_TIMEOUT_S = 300
-_FLASH_TIMEOUT_S = 120
+# Conservative default timeouts — cmake configure is fast, builds can be
+# slow, flash involves J-Link probe negotiation.  These are *defaults*; the
+# profiler pipeline passes explicit values from ``ProfileConfig.timeouts``.
+_DEFAULT_CONFIGURE_TIMEOUT_S = 120
+_DEFAULT_BUILD_TIMEOUT_S = 300
+_DEFAULT_FLASH_TIMEOUT_S = 120
 
 
 def _require_nsx() -> str:
@@ -86,6 +87,9 @@ def _run_nsx(
         ) from exc
 
     if result.returncode != 0:
+        log.error("%s failed (rc=%s)", label, result.returncode)
+        log.error("%s stdout:\n%s", label, result.stdout)
+        log.error("%s stderr:\n%s", label, result.stderr)
         raise BuildError(
             f"{label} failed",
             returncode=result.returncode,
@@ -99,34 +103,42 @@ def _run_nsx(
 # ------------------------------------------------------------------
 
 
-def configure(app_dir: Path) -> str:
+def configure(
+    app_dir: Path,
+    *,
+    toolchain: str | None = None,
+    timeout_s: int = _DEFAULT_CONFIGURE_TIMEOUT_S,
+) -> str:
     """Run ``nsx configure`` on the given app directory.
 
     Returns the stdout output from the configure step.
     """
     _require_nsx()
-    log.info("Running: nsx configure --app-dir %s", app_dir)
-    result = _run_nsx(
-        ["nsx", "configure", "--app-dir", str(app_dir)],
-        timeout=_CONFIGURE_TIMEOUT_S,
-        label="nsx configure",
-    )
+    cmd = ["nsx", "configure", "--app-dir", str(app_dir)]
+    if toolchain:
+        cmd += ["--toolchain", toolchain]
+    log.info("Running: %s", " ".join(cmd))
+    result = _run_nsx(cmd, timeout=timeout_s, label="nsx configure")
     log.info("Configure stdout:\n%s", result.stdout)
     return result.stdout
 
 
-def build(app_dir: Path) -> str:
+def build(
+    app_dir: Path,
+    *,
+    toolchain: str | None = None,
+    timeout_s: int = _DEFAULT_BUILD_TIMEOUT_S,
+) -> str:
     """Run ``nsx build`` on the given app directory.
 
     Returns the stdout output from the build step.
     """
     _require_nsx()
-    log.info("Running: nsx build --app-dir %s", app_dir)
-    result = _run_nsx(
-        ["nsx", "build", "--app-dir", str(app_dir)],
-        timeout=_BUILD_TIMEOUT_S,
-        label="nsx build",
-    )
+    cmd = ["nsx", "build", "--app-dir", str(app_dir)]
+    if toolchain:
+        cmd += ["--toolchain", toolchain]
+    log.info("Running: %s", " ".join(cmd))
+    result = _run_nsx(cmd, timeout=timeout_s, label="nsx build")
     log.info("Build stdout:\n%s", result.stdout)
     return result.stdout
 
@@ -134,7 +146,9 @@ def build(app_dir: Path) -> str:
 def flash(
     app_dir: Path,
     *,
+    toolchain: str | None = None,
     jlink_serial: str | None = None,
+    timeout_s: int = _DEFAULT_FLASH_TIMEOUT_S,
 ) -> str:
     """Run ``nsx flash`` on the given app directory.
 
@@ -145,18 +159,16 @@ def flash(
     Returns the stdout output from the flash step.
     """
     _require_nsx()
-    log.info("Running: nsx flash --app-dir %s", app_dir)
+    cmd = ["nsx", "-v", "flash", "--app-dir", str(app_dir)]
+    if toolchain:
+        cmd += ["--toolchain", toolchain]
+    log.info("Running: %s", " ".join(cmd))
 
     env = None
     if jlink_serial:
         env = {**os.environ, "SEGGER_SNCODE": jlink_serial}
         log.info("  J-Link serial: %s", jlink_serial)
 
-    result = _run_nsx(
-        ["nsx", "flash", "--app-dir", str(app_dir)],
-        timeout=_FLASH_TIMEOUT_S,
-        label="nsx flash",
-        env=env,
-    )
+    result = _run_nsx(cmd, timeout=timeout_s, label="nsx flash", env=env)
     log.info("Flash complete.")
     return result.stdout

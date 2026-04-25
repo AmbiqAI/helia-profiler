@@ -4,7 +4,7 @@
  * @brief heliaPROFILER firmware — auto-generated, do not edit.
  *
  * Runs inference with per-layer PMU profiling and emits CSV results
- * over SWO/UART for the host-side capture stage to parse.
+ * over {{ transport | upper }} for the host-side capture stage to parse.
  *
  * When external power measurement is enabled, a GPIO sync pin is toggled
  * HIGH during inference and LOW otherwise so the host instrument can
@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstdarg>
 #include <cstring>
 
 #include "{{ engine_header }}"
@@ -20,53 +21,43 @@
 #include "tensorflow/lite/micro/system_setup.h"
 #include "tensorflow/lite/micro/tflite_bridge/micro_error_reporter.h"
 #include "tensorflow/lite/schema/schema_generated.h"
+#include "tensorflow/compiler/mlir/lite/schema/schema_utils.h"
 
 #include "hpx_pmu_profiler.h"
 
 // arm_mve.h pre-included via hpx_pmu_profiler.h
-#include "ns_core.h"
-#include "ns_ambiqsuite_harness.h"
-#include "nsx_mem.h"
-#include "nsx_system.h"
-#include "am_hal_gpio.h"
+{% include "_system_includes.j2" %}
 
-// DWT cycle counter
-static inline void dwt_init(void) {
-    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-    DWT->CYCCNT = 0;
-    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
-}
+{% include "_dwt_init.j2" %}
 
-// --- GPIO sync for external power measurement ---
-static constexpr bool kPowerSyncEnabled = {{ power_sync_enabled | lower }};
-static constexpr uint32_t kSyncGpioPin = {{ sync_gpio_pin }};
+{% include "_gpio_sync.j2" %}
 
-static inline void sync_gpio_init(void) {
-    if constexpr (kPowerSyncEnabled) {
-        am_hal_gpio_pinconfig(kSyncGpioPin, am_hal_gpio_pincfg_output);
-        am_hal_gpio_output_clear(kSyncGpioPin);
-    }
-}
+{% if transport == "usb_cdc" %}
+{% include "_usb_timer.j2" %}
+{% endif %}
 
-static inline void sync_gpio_high(void) {
-    if constexpr (kPowerSyncEnabled) {
-        am_hal_gpio_output_set(kSyncGpioPin);
-    }
-}
 
-static inline void sync_gpio_low(void) {
-    if constexpr (kPowerSyncEnabled) {
-        am_hal_gpio_output_clear(kSyncGpioPin);
-    }
-}
-
+{% if model_location == "psram" %}
+// PSRAM model loading — model data is written by J-Link at runtime
+#include "ns_peripherals_psram.h"
+static const unsigned char *model_data = nullptr;
+static unsigned int model_data_len = {{ model_size }};
+{% else %}
 // Model data (xxd-style include)
 #include "model_data.h"
+{% endif %}
+
+{% include "_hpx_printf.j2" %}
 
 static constexpr int kArenaSize = {{ arena_size }};
 static constexpr int kMaxOps = 128;
 
+{% if model_location == "psram" %}
+// Arena in SRAM — TCM is too small for large-model workloads.
+NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_arena[kArenaSize];
+{% else %}
 NSX_MEM_FAST_BSS alignas(16) static uint8_t g_arena[kArenaSize];
+{% endif %}
 static HpxPmuProfiler g_profiler;
 
 // Register all common TFLM builtin ops for broad model compatibility.
@@ -128,31 +119,113 @@ int main(void) {
     NS_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
     dwt_init();
     sync_gpio_init();
+{% if transport == "usb_cdc" %}
+
+    // Initialize USB CDC and wait for host to connect (DTR)
+    nsx_usb_init(&g_usb_cfg);
+    while (!nsx_usb_connected(&g_usb_cfg)) {
+        am_util_delay_ms(10);
+    }
+    // Brief settling delay after host connects
+    am_util_delay_ms(200);
+{% elif transport == "rtt" %}
+
+    // Set trim mode on buffer 0 (non-blocking — silently drops excess data).
+    // BUFFER_SIZE_UP=32768 is set via CMake so _DoInit() already allocates
+    // a 32 KB buffer.  ConfigUpBuffer(0) can only change flags, not the
+    // buffer pointer/size (SEGGER RTT design for the default terminal).
+    SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,
+                              SEGGER_RTT_MODE_NO_BLOCK_TRIM);
+{% if model_location == "psram" %}
+
+    // Flush RTT control block to SRAM before PSRAM init.
+    // ns_psram_platform_init() calls am_hal_cachectrl_dcache_invalidate(NULL, true)
+    // which discards all dirty D-cache lines.  Without this flush the RTT CB
+    // written above stays only in cache and J-Link (SWD) cannot find it.
+    SCB_CleanDCache();
+
+    // --- PSRAM init and model load via J-Link ---
+    ns_psram_config_t psram_cfg = {
+        .api = &ns_psram_V0_0_1,
+        .psram_enable = true,
+        .psram_type = PSRAM_TYPE_OCT,
+        .psram_block = 0,
+        .psram_size = 0,
+        .psram_base_address = 0,
+    };
+    if (ns_psram_init(&psram_cfg) != 0) {
+        hpx_printf("HPX_ERROR=psram_init_failed\n");
+        SCB_CleanDCache();
+        while (1) { __WFI(); }
+    }
+    model_data = (const unsigned char *)psram_cfg.psram_base_address;
+    hpx_printf("HPX_PSRAM_READY=0x%08lx,%u\n",
+               (unsigned long)psram_cfg.psram_base_address, model_data_len);
+    SCB_CleanDCache();
+
+    // Wait for host to write model data and send "GO" via RTT down-channel.
+    {
+        char go_buf[16] = {0};
+        unsigned go_pos = 0;
+        while (1) {
+            unsigned n = SEGGER_RTT_Read(0, go_buf + go_pos,
+                                         sizeof(go_buf) - 1 - go_pos);
+            if (n > 0) {
+                go_pos += n;
+                go_buf[go_pos] = '\0';
+                if (go_pos >= 6) break; // "HPX_GO" is 6 chars
+            }
+        }
+        // Invalidate D-cache for PSRAM region so CPU reads fresh J-Link data.
+        SCB_InvalidateDCache_by_Addr((void *)psram_cfg.psram_base_address,
+                                     (int32_t)model_data_len);
+    }
+{% endif %}
+{% else %}
 
     // Delay to allow the host SWO viewer to attach after reset.
     // The board boots immediately after flash/reset; without this pause
     // the profiler output would be emitted before the viewer connects.
     am_util_delay_ms(5000);
+{% endif %}
 
-    ns_printf("\n--- HPX_START ---\n");
-    ns_printf("HPX_MODEL_SIZE=%u\n", model_data_len);
-    ns_printf("HPX_ARENA_SIZE=%d\n", kArenaSize);
-    ns_printf("HPX_ITERATIONS={{ iterations }}\n");
-    ns_printf("HPX_WARMUP={{ warmup }}\n");
-    ns_printf("HPX_NUM_PRESETS=%d\n", {{ pmu_passes | length }});
-    ns_printf("HPX_PRESETS={{ pmu_pass_names | join(',') }}\n");
-    ns_printf("HPX_POWER_SYNC=%s\n", kPowerSyncEnabled ? "gpio" : "none");
+    hpx_printf("\n--- HPX_START ---\n");
+    hpx_printf("HPX_VERSION=1\n");
+    hpx_printf("HPX_MODEL_SIZE=%u\n", model_data_len);
+    hpx_printf("HPX_ARENA_SIZE=%d\n", kArenaSize);
+    hpx_printf("HPX_ITERATIONS={{ iterations }}\n");
+    hpx_printf("HPX_WARMUP={{ warmup }}\n");
+    hpx_printf("HPX_NUM_PRESETS=%d\n", {{ pmu_passes | length }});
+    hpx_printf("HPX_PRESETS={{ pmu_pass_names | join(',') }}\n");
+    hpx_printf("HPX_POWER_SYNC=%s\n", kPowerSyncEnabled ? "gpio" : "none");
     if constexpr (kPowerSyncEnabled) {
-        ns_printf("HPX_SYNC_GPIO=%lu\n", (unsigned long)kSyncGpioPin);
+        hpx_printf("HPX_SYNC_GPIO=%lu\n", (unsigned long)kSyncGpioPin);
     }
+
+    // --- Heartbeat config (emitted so the host knows what to expect) -----
+    static constexpr bool     kHbEnabled    = {{ heartbeat_enabled | lower }};
+    static constexpr int      kHbEveryNOps  = {{ heartbeat_every_n_ops }};
+    static constexpr uint32_t kHbEveryMs    = {{ heartbeat_every_ms }};
+    hpx_printf("HPX_HEARTBEAT_ENABLED=%d\n", (int)kHbEnabled);
+    hpx_printf("HPX_HEARTBEAT_EVERY_N_OPS=%d\n", kHbEveryNOps);
+    hpx_printf("HPX_HEARTBEAT_EVERY_MS=%lu\n", (unsigned long)kHbEveryMs);
+
+    // Convert ms → DWT cycles for the profiler's cheap rollover-safe compare.
+    // SystemCoreClock is in Hz; cycles_per_ms = SystemCoreClock / 1000.
+    const uint32_t hb_every_cyc = kHbEnabled && kHbEveryMs > 0
+        ? (uint32_t)((uint64_t)SystemCoreClock / 1000U * kHbEveryMs)
+        : 0U;
+    const int hb_every_ops = kHbEnabled ? kHbEveryNOps : 0;
+
+    hpx_printf("HPX_HEARTBEAT phase=init t=0\n");
 
     tflite::InitializeTarget();
 
     const tflite::Model *model = tflite::GetModel(model_data);
     if (model->version() != TFLITE_SCHEMA_VERSION) {
-        ns_printf("HPX_ERROR=schema_mismatch:%lu_vs_%d\n",
+        hpx_printf("HPX_ERROR=schema_mismatch:%lu_vs_%d\n",
                   model->version(), TFLITE_SCHEMA_VERSION);
-        while (1) {}
+        while (1) { __WFI(); }
     }
 
     // Use the first pass to allocate (all passes use the same model/arena)
@@ -164,24 +237,99 @@ int main(void) {
 {% else %}
     g_profiler.Init({{ pmu_passes[0].c_enum }});
 {% endif %}
+    g_profiler.SetHeartbeat(hb_every_cyc, hb_every_ops);
 
+    hpx_printf("HPX_HEARTBEAT phase=allocate\n");
     auto &resolver = get_resolver();
+
+    // --- Preflight: classify likely failure modes BEFORE AllocateTensors --
+    // Walk operator codes; any unregistered op would make AllocateTensors
+    // fail with a generic error the user commonly misreads as "arena too
+    // small".  Emit a distinct HPX_ERROR so the real cause is obvious.
+    {
+        const auto *opcodes = model->operator_codes();
+        const auto *subs = model->subgraphs();
+        int missing = 0;
+        if (opcodes != nullptr) {
+            for (unsigned i = 0; i < opcodes->size(); ++i) {
+                const tflite::OperatorCode *oc = opcodes->Get(i);
+                const TFLMRegistration *reg = nullptr;
+                tflite::BuiltinOperator b = tflite::GetBuiltinCode(oc);
+                if (b == tflite::BuiltinOperator_CUSTOM) {
+                    const char *cname = oc->custom_code() ? oc->custom_code()->c_str() : "";
+                    reg = resolver.FindOp(cname);
+                    if (reg == nullptr) {
+                        hpx_printf("HPX_ERROR=unsupported_op kind=custom name=%s index=%u\n",
+                                   cname[0] ? cname : "?", i);
+                        ++missing;
+                    }
+                } else {
+                    reg = resolver.FindOp(b);
+                    if (reg == nullptr) {
+                        hpx_printf("HPX_ERROR=unsupported_op kind=builtin "
+                                   "builtin=%d name=%s index=%u\n",
+                                   (int)b, tflite::EnumNameBuiltinOperator(b), i);
+                        ++missing;
+                    }
+                }
+            }
+        }
+        // Walk tensors for dtypes that commonly surprise users.
+        if (subs != nullptr && subs->size() > 0) {
+            const auto *tensors = subs->Get(0)->tensors();
+            if (tensors != nullptr) {
+                for (unsigned t = 0; t < tensors->size(); ++t) {
+                    auto ty = tensors->Get(t)->type();
+                    // Warn on anything outside the common integer-quant + float32 set.
+                    switch (ty) {
+                        case tflite::TensorType_FLOAT32:
+                        case tflite::TensorType_INT8:
+                        case tflite::TensorType_INT16:
+                        case tflite::TensorType_INT32:
+                        case tflite::TensorType_INT64:
+                        case tflite::TensorType_UINT8:
+                        case tflite::TensorType_BOOL:
+                            break;
+                        default:
+                            hpx_printf("HPX_WARN=unusual_dtype tensor=%u dtype=%d name=%s\n",
+                                       t, (int)ty, tflite::EnumNameTensorType(ty));
+                            break;
+                    }
+                }
+            }
+        }
+        if (missing > 0) {
+            hpx_printf("HPX_ERROR=missing_ops count=%d hint=rebuild_with_op_registration\n",
+                       missing);
+            while (1) { __WFI(); }
+        }
+    }
+
     tflite::MicroInterpreter interpreter(model, resolver, g_arena, kArenaSize,
                                          nullptr, &g_profiler);
-    if (interpreter.AllocateTensors() != kTfLiteOk) {
-        ns_printf("HPX_ERROR=alloc_tensors_failed\n");
-        while (1) {}
+    const TfLiteStatus alloc_status = interpreter.AllocateTensors();
+    if (alloc_status != kTfLiteOk) {
+        // At this point ops are known-registered, so the most likely causes
+        // are (a) arena too small, or (b) a kernel Init/Prepare rejected
+        // the op (shape/dtype/parameter mismatch).  We cannot cheaply
+        // distinguish these from inside TFLM, so we report both options.
+        hpx_printf("HPX_ERROR=alloc_tensors_failed arena=%d status=%d "
+                   "hint=arena_too_small_or_kernel_prepare_failed\n",
+                   kArenaSize, (int)alloc_status);
+        while (1) { __WFI(); }
     }
+    hpx_printf("HPX_HEARTBEAT phase=allocated arena_used=%lu\n",
+               (unsigned long)interpreter.arena_used_bytes());
 
     // --- Memory usage metadata ---
     TfLiteTensor *input = interpreter.input(0);
     TfLiteTensor *output = interpreter.output(0);
-    ns_printf("HPX_INPUT_SIZE=%d\n", (int)input->bytes);
-    ns_printf("HPX_OUTPUT_SIZE=%d\n", (int)output->bytes);
-    ns_printf("HPX_ALLOCATED_ARENA=%lu\n", (unsigned long)interpreter.arena_used_bytes());
-    ns_printf("HPX_NUM_TENSORS=%d\n", (int)model->subgraphs()->Get(0)->tensors()->size());
-    ns_printf("HPX_NUM_INPUTS=%d\n", (int)interpreter.inputs_size());
-    ns_printf("HPX_NUM_OUTPUTS=%d\n", (int)interpreter.outputs_size());
+    hpx_printf("HPX_INPUT_SIZE=%d\n", (int)input->bytes);
+    hpx_printf("HPX_OUTPUT_SIZE=%d\n", (int)output->bytes);
+    hpx_printf("HPX_ALLOCATED_ARENA=%lu\n", (unsigned long)interpreter.arena_used_bytes());
+    hpx_printf("HPX_NUM_TENSORS=%d\n", (int)model->subgraphs()->Get(0)->tensors()->size());
+    hpx_printf("HPX_NUM_INPUTS=%d\n", (int)interpreter.inputs_size());
+    hpx_printf("HPX_NUM_OUTPUTS=%d\n", (int)interpreter.outputs_size());
 
     // --- Multi-pass PMU profiling ---
     // Each pass configures a specific set of PMU counters.  When the user
@@ -190,7 +338,7 @@ int main(void) {
     // the results.  Warmup iterations are repeated per-pass to ensure
     // stable cache / pipeline state.
 {% for pass in pmu_passes %}
-    ns_printf("\n--- HPX_PRESET {{ pass.name }} ---\n");
+    hpx_printf("\n--- HPX_PRESET {{ pass.name }} ---\n");
 {% if pass.custom %}
     {
         static const uint32_t _pass{{ loop.index0 }}_ids[] = { {{ pass.event_ids | join(', ') }} };
@@ -199,28 +347,59 @@ int main(void) {
 {% else %}
     g_profiler.Init({{ pass.c_enum }});
 {% endif %}
+    // Init resets PMU state; re-arm heartbeat thresholds.
+    g_profiler.SetHeartbeat(hb_every_cyc, hb_every_ops);
+
+{% if transport == "usb_cdc" %}
+    usb_timer_pause();
+{% endif %}
 
     // Warmup for this pass (profiler disabled, no GPIO sync)
     for (int w = 0; w < {{ warmup }}; w++) {
         memset(input->data.raw, 0, input->bytes);
         interpreter.Invoke();
     }
+    hpx_printf("HPX_HEARTBEAT phase=warmup_done pass={{ loop.index0 }}\n");
 
     // Profiled iterations — GPIO sync brackets each inference
     for (int iter = 0; iter < {{ iterations }}; iter++) {
         memset(input->data.raw, 0, input->bytes);
         g_profiler.ClearEvents();
+        g_profiler.SetIterationContext({{ loop.index0 }}, iter);
 
         sync_gpio_high();
         interpreter.Invoke();
         sync_gpio_low();
 
-        ns_printf("\n--- HPX_ITER %d ---\n", iter);
+{% if transport == "usb_cdc" %}
+        usb_timer_resume();
+{% endif %}
+        hpx_printf("\n--- HPX_ITER %d ---\n", iter);
         g_profiler.PrintCsv();
+{% if transport == "usb_cdc" %}
+        usb_timer_pause();
+{% endif %}
     }
+
+{% if transport == "usb_cdc" %}
+    usb_timer_resume();
+{% endif %}
 {% endfor %}
 
-    ns_printf("\n--- HPX_END ---\n");
-    while (1) {}
+{% if transport == "rtt" %}
+    // Before emitting the sentinel, flush cache and wait for the RTT up
+    // buffer to drain — otherwise the trailing CSV burst may be full and
+    // NO_BLOCK_TRIM would silently drop HPX_END.  Also emit a phase
+    // heartbeat so the host inactivity timer refreshes while we drain.
+    hpx_printf("HPX_HEARTBEAT phase=flushing\n");
+    SCB_CleanDCache();
+    hpx_rtt_drain(500 /* ms */);
+{% endif %}
+    hpx_printf("\n--- HPX_END ---\n");
+{% if transport == "rtt" %}
+    SCB_CleanDCache();
+    hpx_rtt_drain(500 /* ms */);
+{% endif %}
+    while (1) { __WFI(); }
     return 0;
 }

@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from helia_profiler.engines.helia_rt import HELIART_VERSION
+
 # Path to the test fixtures directory
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 KWS_MODEL_PATH = FIXTURES_DIR / "kws_ref_model.tflite"
@@ -28,10 +30,24 @@ def fake_dist(tmp_path: Path) -> Path:
     dist = tmp_path / "heliart_dist"
     dist.mkdir()
     (dist / "lib").mkdir()
-    (dist / "lib" / "libtensorflow-microlite-cm55-gcc-release-with-logs.a").write_bytes(b"\x00")
-    (dist / "lib" / "libtensorflow-microlite-cm4-gcc-release-with-logs.a").write_bytes(b"\x00")
-    (dist / "tensorflow").mkdir()
-    (dist / "tensorflow" / "lite").mkdir()
+    # Cover every (core, toolchain, variant) combo the test suite touches so
+    # that the adapter's prebuilt-archive verification check passes.
+    for core in ("cm4", "cm55"):
+        for tc in ("gcc", "armclang"):
+            for variant in ("release", "release-with-logs", "debug"):
+                (
+                    dist / "lib" / f"libhelia-rt-{core}-{tc}-{variant}.a"
+                ).write_bytes(b"\x00")
+    tf_dir = dist / "tensorflow" / "lite" / "micro"
+    tf_dir.mkdir(parents=True)
+    (tf_dir / "heliart_version.h").write_text(
+        f'#define HELIART_VERSION "v{HELIART_VERSION}"\n'
+    )
+    # Stub source files referenced by CMakeLists.txt
+    (tf_dir / "micro_log.cc").write_text("// stub\n")
+    cortex_dir = tf_dir / "cortex_m_generic"
+    cortex_dir.mkdir()
+    (cortex_dir / "debug_log.cc").write_text("// stub\n")
     (dist / "third_party").mkdir()
     (dist / "third_party" / "flatbuffers").mkdir()
     (dist / "signal").mkdir()

@@ -79,3 +79,14 @@ class OnDeviceDriver:
             "On-device driver cannot power-cycle the target",
             hint="Use an external Joulescope driver for power-cycle reset.",
         )
+
+    def enable_passthrough(self) -> None:
+        """Not applicable for on-device driver."""
+        raise PowerError(
+            "On-device driver has no external relay to control",
+            hint="Use a Joulescope driver for passthrough control.",
+        )
+
+    def disable_passthrough(self) -> None:
+        """Not applicable for on-device driver."""
+        pass

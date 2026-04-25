@@ -8,10 +8,13 @@ dependencies = [
     "Jinja2>=3.1",
     "PyYAML>=6.0",
     "rich>=13.0",
+    "pyserial>=3.5",
+    "pylink-square>=0.14.0",
 ]
 
 [project.optional-dependencies]
 aot = ["helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@feat/nsx-module-type"]
+analysis = ["ai-edge-litert>=1.0", "flatbuffers>=24.0"]
 power = ["joulescope>=1.0"]
 power-js220 = ["pyjoulescope_driver>=1.0"]
 power-all = ["joulescope>=1.0", "pyjoulescope_driver>=1.0"]
@@ -45,6 +48,10 @@ helia_profiler = ["firmware/templates/**/*", "engines/templates/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not hardware'"
+markers = [
+    "hardware: requires physical target hardware (EVB + J-Link, optional Joulescope). Excluded by default; run via `hpx validate` or `pytest -m hardware`.",
+]
 
 [tool.ruff]
 line-length = 100

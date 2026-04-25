@@ -21,8 +21,9 @@ from .config import ProfileConfig
 from .engines.base import EngineAdapter, EngineArtifacts
 from .errors import HpxError
 from .platform import BoardDef, SocDef
+from .model_analysis import ModelAnalysis
 from .power.base import PowerResult
-from .results import PmuResult, RunMetadata, BinarySections
+from .results import MemoryPlan, PmuResult, RunMetadata, BinarySections
 
 log = logging.getLogger("hpx")
 
@@ -58,6 +59,12 @@ class PipelineContext:
     build_dir: Path | None = None
     binary_path: Path | None = None
     binary_sections: BinarySections | None = None
+
+    # Model analysis (stage: analyze_model — optional)
+    model_analysis: ModelAnalysis | None = None
+
+    # Memory plan (stage: plan_memory)
+    memory_plan: MemoryPlan | None = None
 
     # Capture (stage: capture_pmu / capture_power)
     pmu_result: PmuResult | None = None
@@ -137,8 +144,12 @@ class PipelineRunner:
                 try:
                     stage.run(ctx)
                 except HpxError:
+                    if self._console is not None:
+                        self._console._stop_spinner()
                     raise  # already typed — propagate as-is
                 except Exception as exc:
+                    if self._console is not None:
+                        self._console._stop_spinner()
                     raise HpxError(
                         f"Unexpected error in stage '{stage.name}': {exc}",
                         hint="This is likely a bug in heliaPROFILER. "
@@ -147,6 +158,10 @@ class PipelineRunner:
                 log.info("[done]  %s", stage.name)
                 if self._console is not None:
                     self._console.stage_done(stage.name)
+
+            # Signal end of pipeline — clears any live spinner.
+            if self._console is not None:
+                self._console.pipeline_done()
 
         finally:
             if should_cleanup:
@@ -177,6 +192,7 @@ def _serialize_config(config: ProfileConfig) -> dict[str, Any]:
         "model": {
             "path": str(config.model.path),
             "arena_size": config.model.arena_size,
+            "model_location": config.model.model_location,
         },
         "engine": {
             "type": config.engine.type.value,

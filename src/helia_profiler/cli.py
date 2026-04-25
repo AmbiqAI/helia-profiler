@@ -46,6 +46,17 @@ def main(argv: list[str] | None = None) -> None:
     )
     g_engine.add_argument("--engine-config", type=Path, help="Engine-specific YAML config")
     g_engine.add_argument("--arena-size", type=int, help="Tensor arena size in bytes")
+    g_engine.add_argument(
+        "--model-location",
+        type=str,
+        choices=["mram", "psram"],
+        help=(
+            "Where to place model weights. "
+            "'mram' embeds in flash (default). "
+            "'psram' loads at runtime via J-Link into PSRAM "
+            "(requires PSRAM-equipped board, e.g. apollo510_evb)."
+        ),
+    )
 
     # -- Target hardware --
     g_target = p_profile.add_argument_group("target hardware")
@@ -56,6 +67,12 @@ def main(argv: list[str] | None = None) -> None:
     g_target.add_argument(
         "--jlink-serial", type=str,
         help="J-Link probe serial number (default: auto-detect)",
+    )
+    g_target.add_argument(
+        "--transport",
+        type=str,
+        choices=["rtt", "usb_cdc", "swo"],
+        help="Data transport (default: rtt). RTT is recommended for lossless capture.",
     )
 
     # -- PMU profiling --
@@ -82,6 +99,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     g_pmu.add_argument("--no-per-layer", action="store_false", dest="per_layer")
     g_pmu.add_argument("--iterations", type=int, help="Inference iterations (default: 100)")
+    g_pmu.add_argument("--warmup", type=int, help="Warmup iterations (default: 5)")
 
     # -- Power measurement --
     g_power = p_profile.add_argument_group("power measurement")
@@ -130,11 +148,148 @@ def main(argv: list[str] | None = None) -> None:
     # --- hpx doctor ---
     sub.add_parser("doctor", help="Check toolchain and dependencies")
 
+    # --- hpx analyze ---
+    p_analyze = sub.add_parser(
+        "analyze",
+        help="Analyze model compute/parameter breakdown (no hardware needed)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Analyze a .tflite model without hardware:\n"
+            "  hpx analyze model.tflite\n"
+            "  hpx analyze model.tflite --engine helia-aot --board apollo510_evb\n"
+            "  hpx analyze model.tflite --format csv --output analysis.csv\n"
+            "  hpx analyze model.tflite --engine helia-aot --compare\n"
+        ),
+    )
+    p_analyze.add_argument("model", type=Path, help="Path to .tflite model file")
+    p_analyze.add_argument(
+        "--engine",
+        type=str,
+        choices=[e.value for e in EngineType],
+        default=None,
+        help=(
+            "Analyze as this engine would execute it. "
+            "Default (no flag) uses the raw tflite graph. "
+            "'helia-aot' runs AOT compilation and analyzes the transformed graph. "
+            "'helia-rt' / 'tflm' analyze the original tflite (same graph)."
+        ),
+    )
+    p_analyze.add_argument(
+        "--compare",
+        action="store_true",
+        help="Show side-by-side comparison of original vs engine-transformed graph",
+    )
+    p_analyze.add_argument(
+        "--format",
+        choices=["table", "csv", "json"],
+        default="table",
+        help="Output format (default: table)",
+    )
+    p_analyze.add_argument("--output", "-o", type=Path, help="Write output to file")
+    p_analyze.add_argument(
+        "--board",
+        type=str,
+        default="apollo510_evb",
+        help="Target board for AOT compilation (default: apollo510_evb)",
+    )
+
     # --- hpx engines ---
     sub.add_parser("engines", help="List available inference engines")
 
     # --- hpx boards ---
     sub.add_parser("boards", help="List supported boards and SoC capabilities")
+
+    # --- hpx power-on ---
+    p_power = sub.add_parser(
+        "power-on",
+        help="Enable Joulescope current passthrough (keeps board powered)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Opens the Joulescope and enables current passthrough so the\n"
+            "target board stays powered.  Holds the connection open until\n"
+            "Ctrl-C.  Useful when the Joulescope app is not running and the\n"
+            "board would otherwise be unpowered.\n"
+        ),
+    )
+    p_power.add_argument(
+        "--driver",
+        type=str,
+        choices=["joulescope", "joulescope-js110", "joulescope-js220"],
+        default="joulescope",
+        help="Joulescope driver (default: auto-detect)",
+    )
+
+    # --- hpx validate ---
+    p_validate = sub.add_parser(
+        "validate",
+        help="Run hardware-in-the-loop validation suite (MLPerf Tiny models)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Hardware validation — runs canonical MLPerf Tiny models end-to-end\n"
+            "against a real EVB + J-Link (and optional Joulescope).\n\n"
+            "Examples:\n"
+            "  hpx validate                         # full matrix (4 models × 2 engines × 2 power)\n"
+            "  hpx validate --list                  # preview what would run\n"
+            "  hpx validate --models kws,ic         # subset by model\n"
+            "  hpx validate --engines aot           # subset by engine\n"
+            "  hpx validate --power off             # skip Joulescope\n"
+            "  hpx validate -k kws-aot              # pytest keyword filter\n"
+        ),
+    )
+    p_validate.add_argument(
+        "--models",
+        type=str,
+        default="",
+        help="Comma-separated model IDs (default: all). See `hpx validate --list`.",
+    )
+    p_validate.add_argument(
+        "--engines",
+        type=str,
+        default="",
+        help="Comma-separated engines: rt,aot,helia-rt,helia-aot (default: both).",
+    )
+    p_validate.add_argument(
+        "--power",
+        choices=("both", "on", "off"),
+        default="both",
+        help="Power matrix: both (default) | on (only Joulescope runs) | off.",
+    )
+    p_validate.add_argument(
+        "--boards",
+        type=str,
+        default="apollo510_evb",
+        help="Comma-separated board IDs (default: apollo510_evb).",
+    )
+    p_validate.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("validation_results"),
+        help="Where to write per-case artifacts + summary report (default: ./validation_results).",
+    )
+    p_validate.add_argument(
+        "--timeout",
+        type=float,
+        default=900.0,
+        help="Per-case timeout in seconds (default: 900).",
+    )
+    p_validate.add_argument(
+        "-k",
+        dest="keyword",
+        type=str,
+        default="",
+        help="Pytest keyword expression — filter cases by substring match (e.g. 'kws-aot').",
+    )
+    p_validate.add_argument(
+        "--junit-xml",
+        type=Path,
+        help="Emit JUnit-XML report at this path (for CI consumption).",
+    )
+    p_validate.add_argument(
+        "--list",
+        action="store_true",
+        help="List matching cases and exit without running.",
+    )
+    p_validate.add_argument("-v", "--verbose", action="count", default=0)
 
     args = parser.parse_args(argv)
 
@@ -144,12 +299,18 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "profile":
         _cmd_profile(args)
+    elif args.command == "analyze":
+        _cmd_analyze(args)
     elif args.command == "doctor":
         _cmd_doctor()
     elif args.command == "engines":
         _cmd_engines()
     elif args.command == "boards":
         _cmd_boards()
+    elif args.command == "power-on":
+        _cmd_power_on(args)
+    elif args.command == "validate":
+        _cmd_validate(args)
 
 
 def _cmd_profile(args: argparse.Namespace) -> None:
@@ -164,6 +325,8 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli.setdefault("model", {})["path"] = str(args.model)
     if args.arena_size is not None:
         cli.setdefault("model", {})["arena_size"] = args.arena_size
+    if args.model_location is not None:
+        cli.setdefault("model", {})["model_location"] = args.model_location
 
     if args.engine is not None:
         cli.setdefault("engine", {})["type"] = args.engine
@@ -176,6 +339,8 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli.setdefault("target", {})["toolchain"] = args.toolchain
     if args.jlink_serial is not None:
         cli.setdefault("target", {})["jlink_serial"] = args.jlink_serial
+    if args.transport is not None:
+        cli.setdefault("target", {})["transport"] = args.transport
 
     if args.pmu_presets is not None:
         cli.setdefault("profiling", {})["pmu_presets"] = args.pmu_presets
@@ -200,6 +365,8 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli.setdefault("profiling", {})["per_layer"] = args.per_layer
     if args.iterations is not None:
         cli.setdefault("profiling", {})["iterations"] = args.iterations
+    if args.warmup is not None:
+        cli.setdefault("profiling", {})["warmup"] = args.warmup
 
     if args.power:
         cli.setdefault("power", {})["enabled"] = True
@@ -241,6 +408,180 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def _cmd_analyze(args: argparse.Namespace) -> None:
+    """Analyze model compute/parameter breakdown without hardware."""
+    from .model_analysis import (
+        ModelAnalysis,
+        analyze_air_model,
+        analyze_model,
+        is_aot_available,
+        is_available,
+    )
+    from .console import HpxConsole
+
+    console = HpxConsole(verbosity=1)  # always show output
+
+    if not args.model.exists():
+        print(f"Error: model file not found: {args.model}", file=sys.stderr)
+        sys.exit(1)
+
+    if not is_available():
+        print(
+            "Error: ai-edge-litert is not installed.\n"
+            "  Install with: pip install 'helia-profiler[analysis]'",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    engine = args.engine  # None, "helia-aot", "helia-rt", "tflm"
+    is_aot = engine == "helia-aot"
+
+    # --- Original tflite analysis (always needed as baseline) ---
+    original = analyze_model(str(args.model))
+    if original is None:
+        print("Error: failed to analyze model.", file=sys.stderr)
+        sys.exit(1)
+
+    # --- Engine-specific analysis ---
+    engine_result: ModelAnalysis | None = None
+    if is_aot:
+        if not is_aot_available():
+            print(
+                "Error: helia-aot is not installed.\n"
+                "  Install with: pip install 'helia-profiler[aot]'",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        engine_result = _run_aot_analysis(args.model, args.board)
+
+    # Determine which analysis is "primary" (what the engine actually runs)
+    # and whether to show comparison
+    if engine_result is not None:
+        primary = engine_result
+        reference = original if args.compare else None
+    else:
+        primary = original
+        reference = None
+
+    # --- Output ---
+    if args.format == "table":
+        console.print_analysis(primary, args.model.name, reference)
+    elif args.format in ("csv", "json"):
+        _write_analysis_file(primary, args.format, args.output, reference)
+    else:
+        console.print_analysis(primary, args.model.name, reference)
+
+
+def _run_aot_analysis(model_path: Path, board: str) -> "ModelAnalysis | None":
+    """Run heliaAOT compilation and return analysis of the transformed graph."""
+    import tempfile
+
+    from .model_analysis import analyze_air_model
+
+    try:
+        from helia_aot.converter import AotConverter  # type: ignore[import-untyped]
+        from helia_aot.cli.defines import ConvertArgs  # type: ignore[import-untyped]
+        from helia_aot.defines import ModuleType  # type: ignore[import-untyped]
+    except ImportError:
+        print("Error: helia-aot import failed.", file=sys.stderr)
+        return None
+
+    with tempfile.TemporaryDirectory(prefix="hpx_aot_") as tmp:
+        convert_args = ConvertArgs(
+            model={"path": str(model_path)},
+            module={"path": tmp, "type": ModuleType.nsx.value},
+            platform={"name": board},
+        )
+        try:
+            ctx = AotConverter(config=convert_args).convert()
+        except Exception as exc:
+            print(f"Warning: AOT compilation failed: {exc}", file=sys.stderr)
+            return None
+
+        return analyze_air_model(ctx.model)
+
+
+def _write_analysis_file(
+    analysis: "ModelAnalysis",
+    fmt: str,
+    output: Path | None,
+    aot: "ModelAnalysis | None" = None,
+) -> None:
+    """Write analysis results to CSV or JSON."""
+    import csv
+    import json
+
+    if fmt == "csv":
+        rows = []
+        for la in analysis.layers:
+            row = {
+                "id": la.id,
+                "op": la.op,
+                "macs": la.macs,
+                "ops": la.ops,
+                "input_shapes": str(la.input_shapes),
+                "output_shapes": str(la.output_shapes),
+            }
+            row.update(la.params)
+            rows.append(row)
+
+        if output:
+            dest = output
+        else:
+            dest = Path("model_analysis.csv")
+
+        fieldnames = list(rows[0].keys()) if rows else []
+        with open(dest, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
+        print(f"Wrote {dest}")
+
+    elif fmt == "json":
+        data: dict = {
+            "original": {
+                "total_macs": analysis.total_macs,
+                "total_ops": analysis.total_ops,
+                "num_parameters": analysis.num_parameters,
+                "layers": [
+                    {
+                        "id": la.id,
+                        "op": la.op,
+                        "macs": la.macs,
+                        "ops": la.ops,
+                        "input_shapes": la.input_shapes,
+                        "output_shapes": la.output_shapes,
+                        "params": la.params,
+                    }
+                    for la in analysis.layers
+                ],
+            }
+        }
+        if aot is not None:
+            data["aot_transformed"] = {
+                "total_macs": aot.total_macs,
+                "total_ops": aot.total_ops,
+                "num_parameters": aot.num_parameters,
+                "layers": [
+                    {
+                        "id": la.id,
+                        "op": la.op,
+                        "macs": la.macs,
+                        "ops": la.ops,
+                        "input_shapes": la.input_shapes,
+                        "output_shapes": la.output_shapes,
+                        "params": la.params,
+                    }
+                    for la in aot.layers
+                ],
+            }
+
+        dest = output or Path("model_analysis.json")
+        dest.write_text(json.dumps(data, indent=2, default=str))
+        print(f"Wrote {dest}")
+
+
 def _cmd_doctor() -> None:
     """Check toolchain and dependencies."""
     from .doctor import collect_checks
@@ -274,3 +615,170 @@ def _cmd_boards() -> None:
 
     console = HpxConsole()
     console.print_boards(rows)
+
+
+def _cmd_power_on(args: argparse.Namespace) -> None:
+    """Enable Joulescope current passthrough and hold open until Ctrl-C."""
+    from .power import get_driver
+    from .errors import PowerError
+
+    driver_name = args.driver
+
+    try:
+        driver = get_driver(driver_name)
+    except PowerError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        if exc.hint:
+            print(f"  Hint: {exc.hint}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Enabling current passthrough via {driver.name}...")
+
+    try:
+        driver.enable_passthrough()
+    except PowerError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        if exc.hint:
+            print(f"  Hint: {exc.hint}", file=sys.stderr)
+        sys.exit(1)
+
+    print("Board powered — press Ctrl-C to release.")
+    try:
+        import signal
+        signal.pause()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            driver.disable_passthrough()
+        except Exception:
+            pass
+        print("\nJoulescope released.")
+
+
+# ---------------------------------------------------------------------------
+# hpx validate — hardware-in-the-loop validation suite
+# ---------------------------------------------------------------------------
+
+
+_ENGINE_ALIASES = {
+    "rt": "helia-rt",
+    "aot": "helia-aot",
+    "helia-rt": "helia-rt",
+    "helia-aot": "helia-aot",
+}
+
+
+def _normalise_engines(raw: str) -> str:
+    """Translate short engine aliases (rt, aot) to canonical names."""
+    if not raw.strip():
+        return ""
+    out: list[str] = []
+    for token in [t.strip() for t in raw.split(",") if t.strip()]:
+        if token not in _ENGINE_ALIASES:
+            print(
+                f"Error: unknown engine '{token}'. "
+                f"Known: rt, aot, helia-rt, helia-aot.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        out.append(_ENGINE_ALIASES[token])
+    return ",".join(out)
+
+
+def _cmd_validate(args: argparse.Namespace) -> None:
+    """Drive the hardware validation suite via pytest."""
+    from .validation import MODELS, BOARDS, build_matrix
+
+    engines_csv = _normalise_engines(args.engines)
+
+    # --list mode — preview the matrix, don't touch hardware.
+    if args.list:
+        try:
+            cases = build_matrix(
+                models=[m.strip() for m in args.models.split(",") if m.strip()] or None,
+                engines=[e.strip() for e in engines_csv.split(",") if e.strip()] or None,
+                power=args.power,
+                boards=[b.strip() for b in args.boards.split(",") if b.strip()] or None,
+            )
+        except ValueError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(2)
+
+        print(f"Registered models: {', '.join(sorted(MODELS))}")
+        print(f"Registered boards: {', '.join(sorted(BOARDS))}")
+        print(f"\n{len(cases)} case(s) would run:\n")
+        for c in cases:
+            power = "power" if c.power else "     "
+            print(f"  {c.case_id:<48}  {c.engine:<10}  {power}")
+        return
+
+    # Locate the validation test directory inside the installed package /
+    # repo checkout.  We support both the editable/repo layout
+    # (``helia-profiler/tests/validation``) and any future packaged layout.
+    repo_root = _find_repo_root()
+    tests_dir = repo_root / "tests" / "validation"
+    if not tests_dir.exists():
+        print(
+            f"Error: validation tests not found at {tests_dir}.\n"
+            "  `hpx validate` must be run from a heliaPROFILER checkout.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    try:
+        import pytest  # noqa: F401  (imported to fail fast with a clear msg)
+    except ImportError:
+        print(
+            "Error: pytest is required for `hpx validate`. "
+            "Install it with `pip install pytest`.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    pytest_args: list[str] = [
+        str(tests_dir),
+        "-m", "hardware",
+        "--mlperf-power", args.power,
+        "--mlperf-output", str(args.output_dir.resolve()),
+        "--mlperf-timeout", str(args.timeout),
+    ]
+    if args.models.strip():
+        pytest_args += ["--mlperf-models", args.models.strip()]
+    if engines_csv:
+        pytest_args += ["--mlperf-engines", engines_csv]
+    if args.boards.strip():
+        pytest_args += ["--mlperf-boards", args.boards.strip()]
+    if args.keyword:
+        pytest_args += ["-k", args.keyword]
+    if args.junit_xml:
+        pytest_args += [f"--junitxml={args.junit_xml.resolve()}"]
+    if args.verbose:
+        pytest_args.append("-" + "v" * args.verbose)
+    else:
+        pytest_args.append("-v")
+
+    import pytest
+    print(f"Running: pytest {' '.join(pytest_args)}\n")
+    rc = pytest.main(pytest_args)
+
+    report_md = args.output_dir.resolve() / "validation_report.md"
+    report_json = args.output_dir.resolve() / "validation_report.json"
+    if report_md.exists():
+        print(f"\nMarkdown report: {report_md}")
+    if report_json.exists():
+        print(f"JSON report:     {report_json}")
+    sys.exit(int(rc))
+
+
+def _find_repo_root() -> Path:
+    """Locate the helia-profiler checkout root.
+
+    Walks up from this file until a directory containing ``pyproject.toml``
+    is found.  Falls back to the current working directory.
+    """
+    here = Path(__file__).resolve()
+    for parent in (here, *here.parents):
+        if (parent / "pyproject.toml").is_file() and (parent / "tests").is_dir():
+            return parent
+    return Path.cwd()

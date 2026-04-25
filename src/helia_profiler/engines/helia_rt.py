@@ -1,7 +1,7 @@
 """heliaRT engine adapter.
 
-Resolves a heliaRT distribution (prebuilt ``.a`` + TFLM headers) and wraps
-it as a local NSX module for the profiler firmware build.
+Resolves a heliaRT distribution (prebuilt ``.a`` + TFLM headers) and
+installs it as a local NSX module for the profiler firmware build.
 
 Distribution resolution (first match wins):
 
@@ -24,12 +24,11 @@ import json
 import logging
 import os
 import re
+import shutil
 import zipfile
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-
-import jinja2
 
 from ..config import ProfileConfig
 from ..errors import EngineError
@@ -42,7 +41,7 @@ log = logging.getLogger("hpx")
 # ---------------------------------------------------------------------------
 # Pinned heliaRT release — bump this when a new release is adopted.
 # ---------------------------------------------------------------------------
-HELIART_VERSION = "1.7.0"
+HELIART_VERSION = "1.11.2"
 HELIART_GH_REPO = "AmbiqAI/helia-rt"
 HELIART_RELEASE_TAG = f"HeliaRT-v{HELIART_VERSION}"
 
@@ -50,14 +49,9 @@ HELIART_RELEASE_TAG = f"HeliaRT-v{HELIART_VERSION}"
 _CACHE_DIR = Path.home() / ".cache" / "helia-profiler" / "heliart"
 
 # ---------------------------------------------------------------------------
-# Jinja2 template environment
+# Static NSX module files (based on heliaRT's native nsx/ module)
 # ---------------------------------------------------------------------------
-
-_jinja_env = jinja2.Environment(
-    loader=jinja2.PackageLoader("helia_profiler.engines", "templates"),
-    keep_trailing_newline=True,
-    undefined=jinja2.StrictUndefined,
-)
+_MODULE_DIR = Path(__file__).resolve().parent / "nsx_heliart"
 
 
 def _core_tag(board: str) -> str:
@@ -80,12 +74,11 @@ class HeliaRTAdapter:
 
     Resolves a heliaRT distribution via three modes (local path, GitHub
     source, or default pinned version), validates version compatibility,
-    then generates a local NSX wrapper module at
-    ``work_dir/modules/nsx-heliart/``.
+    then installs a local NSX module at ``work_dir/modules/nsx-heliart/``.
 
-    The wrapper compiles platform glue (``micro_log.cc``) because current
-    prebuilt ``.a`` files leave ``MicroPrintf`` undefined.  Once a future
-    release bundles it, switch to the native ``nsx/`` module.
+    The module uses heliaRT's native ``nsx/`` CMake integration when the
+    distribution includes it.  Otherwise, embedded static module files
+    (based on the native module) are used.
     """
 
     @property
@@ -104,23 +97,35 @@ class HeliaRTAdapter:
                 hint=f"Valid variants: {', '.join(valid_variants)}",
             )
 
+        toolchain_tag = _toolchain_tag(config.target.toolchain)
+
         # Resolve the heliaRT distribution
         dist_path, resolved_version = _resolve_distribution(config)
 
         # Version compatibility check
         _check_version_compatibility(dist_path, resolved_version)
 
-        # Generate the NSX wrapper module
+        # Set up the NSX module directory
         module_dir = work_dir / "modules" / "nsx-heliart"
         module_dir.mkdir(parents=True, exist_ok=True)
 
         version = resolved_version or HELIART_VERSION
-        _write_wrapper(module_dir, variant=variant, version=version)
-        _link_distribution(module_dir, dist_path)
+
+        # Verify the archive exists in the distribution.
+        _verify_prebuilt_archive(
+            dist_path,
+            board=config.target.board,
+            toolchain_tag=toolchain_tag,
+            variant=variant,
+        )
+
+        # Install NSX module files + distribution content
+        _install_nsx_module(module_dir, dist_path, variant=variant)
 
         log.info(
-            "heliaRT %s (variant=%s, dist=%s)",
+            "heliaRT %s (toolchain=%s, variant=%s, dist=%s)",
             version,
+            toolchain_tag,
             variant,
             dist_path,
         )
@@ -139,23 +144,89 @@ class HeliaRTAdapter:
                 "engine_header": "tensorflow/lite/micro/micro_interpreter.h",
                 "heliart_version": version,
                 "heliart_variant": variant,
+                "heliart_toolchain_tag": toolchain_tag,
             },
         )
 
 
-def _write_wrapper(module_dir: Path, *, variant: str, version: str) -> None:
-    """Write the NSX wrapper files into *module_dir*."""
-    (module_dir / "nsx-module.yaml").write_text(
-        _jinja_env.get_template("heliart_nsx_module.yaml.j2").render(
-            version=version,
-        ),
+def _toolchain_tag(toolchain: str) -> str:
+    """Map a profiler ``target.toolchain`` to a heliaRT archive tag.
+
+    heliaRT release artifacts are named ``...-<gcc|armclang>-<variant>.a``.
+    """
+    tc = (toolchain or "").lower()
+    if tc in ("armclang",):
+        return "armclang"
+    if tc in ("arm-none-eabi-gcc", "gcc"):
+        return "gcc"
+    log.warning(
+        "heliaRT: no prebuilt archive for toolchain '%s'; falling back to gcc variant",
+        toolchain,
     )
-    (module_dir / "CMakeLists.txt").write_text(
-        _jinja_env.get_template("heliart_CMakeLists.txt.j2").render(
-            version=version,
-            variant=variant,
-        ),
-    )
+    return "gcc"
+
+
+def _verify_prebuilt_archive(
+    dist_path: Path, *, board: str, toolchain_tag: str, variant: str
+) -> None:
+    """Fail fast if the required ``.a`` is missing from the distribution."""
+    core = _core_tag(board)
+    name = f"libhelia-rt-{core}-{toolchain_tag}-{variant}.a"
+    if not (dist_path / "lib" / name).is_file():
+        available = sorted(p.name for p in (dist_path / "lib").glob("*.a"))
+        raise EngineError(
+            f"heliaRT: required prebuilt archive not found: {name}",
+            hint=(
+                f"Looked in {dist_path / 'lib'}.  Available archives: "
+                f"{', '.join(available) if available else '(none)'}"
+            ),
+        )
+
+
+def _install_nsx_module(
+    module_dir: Path, dist_path: Path, *, variant: str
+) -> None:
+    """Install the NSX module files and distribution content into *module_dir*.
+
+    If the distribution includes a native ``nsx/`` module (v1.12+), those
+    files are used directly.  Otherwise, embedded static module files
+    (shipped with heliaPROFILER) are copied.
+
+    The ``HELIART_VARIANT`` default is patched to match the user's
+    requested *variant*.
+    """
+    # --- Copy NSX module files (CMakeLists.txt + nsx-module.yaml) ---
+    nsx_dir = dist_path / "nsx"
+    if (nsx_dir / "CMakeLists.txt").is_file():
+        log.info("Using native nsx/ module from distribution")
+        src_cmake = nsx_dir / "CMakeLists.txt"
+        src_yaml = nsx_dir / "nsx-module.yaml"
+    else:
+        log.info("Distribution lacks nsx/ — using embedded module files")
+        src_cmake = _MODULE_DIR / "CMakeLists.txt"
+        src_yaml = _MODULE_DIR / "nsx-module.yaml"
+
+    # Copy nsx-module.yaml as-is
+    shutil.copy2(src_yaml, module_dir / "nsx-module.yaml")
+
+    # Copy CMakeLists.txt, patching the variant default if needed
+    cmake_text = src_cmake.read_text()
+    if variant != "release-with-logs":
+        cmake_text = cmake_text.replace(
+            'set(HELIART_VARIANT "release-with-logs"',
+            f'set(HELIART_VARIANT "{variant}"',
+        )
+    (module_dir / "CMakeLists.txt").write_text(cmake_text)
+
+    # --- Copy distribution content (lib/, tensorflow/, third_party/, …) ---
+    for d in _DIST_DIRS:
+        target = module_dir / d
+        source = dist_path / d
+        if target.is_dir():
+            shutil.rmtree(target)
+        if source.is_dir():
+            shutil.copytree(source, target)
+            log.debug("Copied %s → %s", source, target)
 
 
 # ---------------------------------------------------------------------------
@@ -165,12 +236,8 @@ def _write_wrapper(module_dir: Path, *, variant: str, version: str) -> None:
 # Directories required in a valid heliaRT distribution.
 _DIST_DIRS = ("lib", "tensorflow", "third_party", "signal")
 
-# GitHub release asset naming conventions.
-# Two bundles exist per release:
-#   neuralspot-helios-rt-{TAG}.zip  — legacy neuralSPOT bundle
-#   nsx-heliart-{TAG}.zip           — NSX module bundle (preferred)
-_NSX_ASSET_FMT = "nsx-heliart-{tag}.zip"
-_LEGACY_ASSET_FMT = "neuralspot-helios-rt-{tag}.zip"
+# GitHub release asset naming: helia-rt-{TAG}.zip
+_ASSET_FMT = "helia-rt-{tag}.zip"
 
 
 def _resolve_distribution(config: ProfileConfig) -> tuple[Path, str | None]:
@@ -202,10 +269,12 @@ def _resolve_distribution(config: ProfileConfig) -> tuple[Path, str | None]:
 
     # --- 3. Source config (repo + ref) ---
     source = config.engine.config.get("source")
+    api_s = config.timeouts.download_api_s
+    asset_s = config.timeouts.download_asset_s
     if source and isinstance(source, dict):
         repo = source.get("repo", HELIART_GH_REPO)
         ref = source.get("ref", HELIART_RELEASE_TAG)
-        return _fetch_github_release(repo, ref)
+        return _fetch_github_release(repo, ref, api_s=api_s, asset_s=asset_s)
 
     # --- 4. Default: pinned version from default repo ---
     log.info(
@@ -214,7 +283,9 @@ def _resolve_distribution(config: ProfileConfig) -> tuple[Path, str | None]:
         HELIART_RELEASE_TAG,
         HELIART_GH_REPO,
     )
-    return _fetch_github_release(HELIART_GH_REPO, HELIART_RELEASE_TAG)
+    return _fetch_github_release(
+        HELIART_GH_REPO, HELIART_RELEASE_TAG, api_s=api_s, asset_s=asset_s,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -222,7 +293,13 @@ def _resolve_distribution(config: ProfileConfig) -> tuple[Path, str | None]:
 # ---------------------------------------------------------------------------
 
 
-def _fetch_github_release(repo: str, ref: str) -> tuple[Path, str | None]:
+def _fetch_github_release(
+    repo: str,
+    ref: str,
+    *,
+    api_s: float = 30,
+    asset_s: float = 300,
+) -> tuple[Path, str | None]:
     """Download a heliaRT release from GitHub.
 
     Checks the local cache first.  On a cache miss, queries the GitHub
@@ -242,7 +319,7 @@ def _fetch_github_release(repo: str, ref: str) -> tuple[Path, str | None]:
     # Resolve the release tag.
     # If ref looks like a tag (HeliaRT-v*, v*), use it directly.
     # Otherwise treat it as a branch and find the latest release.
-    tag = _resolve_release_tag(repo, ref)
+    tag = _resolve_release_tag(repo, ref, api_s=api_s)
     if tag is None:
         raise EngineError(
             f"No GitHub release found for {repo}@{ref}",
@@ -253,7 +330,7 @@ def _fetch_github_release(repo: str, ref: str) -> tuple[Path, str | None]:
         )
 
     # Try downloading: NSX bundle first, legacy bundle as fallback
-    asset_url = _find_release_asset(repo, tag)
+    asset_url = _find_release_asset(repo, tag, api_s=api_s)
     if asset_url is None:
         raise EngineError(
             f"No downloadable asset found for {repo} release {tag}",
@@ -262,13 +339,13 @@ def _fetch_github_release(repo: str, ref: str) -> tuple[Path, str | None]:
 
     log.info("Downloading heliaRT from %s ...", asset_url)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    _download_and_extract(asset_url, cache_dir)
+    _download_and_extract(asset_url, cache_dir, timeout_s=asset_s)
 
     _validate_dist(cache_dir)
     return cache_dir, _detect_version(cache_dir)
 
 
-def _resolve_release_tag(repo: str, ref: str) -> str | None:
+def _resolve_release_tag(repo: str, ref: str, *, api_s: float = 30) -> str | None:
     """Resolve *ref* to a GitHub release tag.
 
     If *ref* already looks like a release tag, verify it exists.
@@ -276,20 +353,20 @@ def _resolve_release_tag(repo: str, ref: str) -> str | None:
     """
     # Direct tag reference — verify it exists
     api = f"https://api.github.com/repos/{repo}/releases/tags/{ref}"
-    data = _github_api_get(api)
+    data = _github_api_get(api, timeout_s=api_s)
     if data is not None:
         return ref
 
     # Maybe ref is just a version like "1.7.0" — try common tag formats
     for fmt in (f"HeliaRT-v{ref}", f"v{ref}"):
         api = f"https://api.github.com/repos/{repo}/releases/tags/{fmt}"
-        data = _github_api_get(api)
+        data = _github_api_get(api, timeout_s=api_s)
         if data is not None:
             return fmt
 
     # Branch or other ref — try latest release from the repo
     api = f"https://api.github.com/repos/{repo}/releases/latest"
-    data = _github_api_get(api)
+    data = _github_api_get(api, timeout_s=api_s)
     if data is not None:
         tag = data.get("tag_name")
         log.warning(
@@ -302,21 +379,20 @@ def _resolve_release_tag(repo: str, ref: str) -> str | None:
     return None
 
 
-def _find_release_asset(repo: str, tag: str) -> str | None:
+def _find_release_asset(repo: str, tag: str, *, api_s: float = 30) -> str | None:
     """Find the download URL for the best release asset."""
     api = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
-    data = _github_api_get(api)
+    data = _github_api_get(api, timeout_s=api_s)
     if data is None:
         return None
 
     assets = data.get("assets", [])
     asset_names = {a["name"]: a["browser_download_url"] for a in assets}
 
-    # Prefer NSX bundle, fall back to legacy neuralSPOT bundle
-    for fmt in (_NSX_ASSET_FMT, _LEGACY_ASSET_FMT):
-        name = fmt.format(tag=tag)
-        if name in asset_names:
-            return asset_names[name]
+    # Try the standard naming convention
+    name = _ASSET_FMT.format(tag=tag)
+    if name in asset_names:
+        return asset_names[name]
 
     # If exact naming doesn't match, try partial matching
     for name, url in asset_names.items():
@@ -327,7 +403,7 @@ def _find_release_asset(repo: str, tag: str) -> str | None:
     return None
 
 
-def _github_api_get(url: str) -> dict | None:
+def _github_api_get(url: str, *, timeout_s: float = 30) -> dict | None:
     """Make a GET request to the GitHub API.  Returns None on 404."""
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     headers = {"Accept": "application/vnd.github+json"}
@@ -336,7 +412,7 @@ def _github_api_get(url: str) -> dict | None:
 
     req = Request(url, headers=headers)
     try:
-        with urlopen(req, timeout=30) as resp:
+        with urlopen(req, timeout=timeout_s) as resp:
             return json.loads(resp.read())
     except HTTPError as exc:
         if exc.code == 404:
@@ -348,7 +424,7 @@ def _github_api_get(url: str) -> dict | None:
         return None
 
 
-def _download_and_extract(url: str, dest: Path) -> None:
+def _download_and_extract(url: str, dest: Path, *, timeout_s: float = 300) -> None:
     """Download a zip from *url* and extract into *dest*.
 
     If the zip contains a single top-level directory, its contents are
@@ -361,7 +437,7 @@ def _download_and_extract(url: str, dest: Path) -> None:
 
     req = Request(url, headers=headers)
     try:
-        with urlopen(req, timeout=300) as resp:
+        with urlopen(req, timeout=timeout_s) as resp:
             data = resp.read()
     except (URLError, OSError) as exc:
         raise EngineError(
@@ -497,21 +573,3 @@ def _check_version_compatibility(
             detected_version,
             HELIART_VERSION,
         )
-
-
-def _link_distribution(module_dir: Path, dist_path: Path) -> None:
-    """Copy heliaRT distribution directories into the wrapper module.
-
-    Copies lib/, tensorflow/, and third_party/ so the CMake build can find
-    them via ``CMAKE_CURRENT_LIST_DIR``.  Uses copies instead of symlinks
-    for Windows compatibility.
-    """
-    import shutil
-
-    for d in _DIST_DIRS:
-        target = module_dir / d
-        source = dist_path / d
-        if target.is_dir():
-            shutil.rmtree(target)
-        shutil.copytree(source, target)
-        log.debug("Copied %s → %s", target, source)

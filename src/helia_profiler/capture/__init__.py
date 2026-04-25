@@ -1,9 +1,13 @@
 """Data capture from target hardware.
 
-- ``capture_pmu``: Read PMU / DWT counters and per-layer breakdown from the
-  target via SWO.
-- ``capture_power``: Record current/voltage traces via the configured power
-  driver (external Joulescope, on-device, etc.).
+Supports three transports for reading profiling data from the target:
+
+- **RTT** (recommended): Lossless, flow-controlled via SEGGER RTT over SWD.
+- **USB CDC**: CRC-protected USB serial, requires USB connection.
+- **SWO**: ITM debug output, minimal setup but no flow control.
+
+- ``capture_pmu``: Read PMU / DWT counters and per-layer breakdown.
+- ``capture_power``: Record current/voltage traces via power driver.
 """
 
 from __future__ import annotations
@@ -12,6 +16,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from ..errors import CaptureError
+from .transport import HPX_END, HPX_START
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -28,12 +33,13 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     and merged per-layer results.
     """
     from .parser import parse_firmware_output
-    from .serial_reader import capture_swo_output
 
-    # Use build_dir from context (set by stage 4) — no re-derivation
-    build_dir = ctx.build_dir
+    transport = ctx.config.target.transport
 
     jlink_serial = ctx.config.target.jlink_serial
+    hb = ctx.config.target.heartbeat
+    heartbeat_timeout_s = hb.host_timeout_s if hb.enabled else 300
+    overall_timeout_s = hb.overall_timeout_s
 
     # Resolve J-Link device string from the SoC registry — hard error if missing
     if ctx.soc is None or not ctx.soc.jlink_device:
@@ -43,15 +49,60 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         )
     jlink_device = ctx.soc.jlink_device
 
-    lines = capture_swo_output(
-        build_dir=build_dir,
-        jlink_serial=jlink_serial,
-        jlink_device=jlink_device,
-    )
+    # Use build_dir from context (set by stage 4) — no re-derivation
+    build_dir = ctx.build_dir
+
+    if transport == "usb_cdc":
+        from .usb_reader import capture_usb_output
+
+        lines = capture_usb_output(
+            jlink_serial=jlink_serial,
+            jlink_device=jlink_device,
+        )
+    elif transport == "rtt":
+        from .rtt_reader import capture_rtt_output
+
+        lines = capture_rtt_output(
+            jlink_serial=jlink_serial,
+            jlink_device=jlink_device,
+            model_path=ctx.config.model.path,
+            model_location=ctx.config.model.model_location,
+            timeout_s=overall_timeout_s,
+            heartbeat_timeout_s=heartbeat_timeout_s,
+        )
+    else:
+        from .serial_reader import capture_swo_output
+
+        lines = capture_swo_output(
+            build_dir=build_dir,
+            jlink_serial=jlink_serial,
+            jlink_device=jlink_device,
+        )
     if not lines:
         raise CaptureError(
-            "No data captured from serial port",
+            f"No data captured via {transport} transport",
             hint="Ensure the firmware is running. Try resetting the board.",
+        )
+
+    # --- Firmware error triage --------------------------------------------
+    # Scan for HPX_ERROR= lines before parsing.  A firmware-reported error
+    # is more specific than any "no layer data" fallback message, so surface
+    # it with the best hint we can generate.
+    _raise_on_firmware_error(lines)
+
+    # Pre-parse validation: check for protocol sentinels
+    if not any(HPX_START in l for l in lines[:30]):
+        raise CaptureError(
+            f"Captured data ({len(lines)} lines) does not contain HPX_START sentinel",
+            hint=(
+                "The firmware may not be running the profiler app, or the "
+                "transport connection failed before data arrived."
+            ),
+        )
+    if not any(l.strip() == HPX_END for l in lines[-10:]):
+        log.warning(
+            "HPX_END sentinel not found in captured data — "
+            "capture may be incomplete or truncated."
         )
 
     result = parse_firmware_output(lines)
@@ -81,3 +132,77 @@ def capture_power(ctx: PipelineContext) -> PowerResult:
         duration_s=ctx.config.power.duration_s,
         io_voltage=ctx.config.power.io_voltage,
     )
+
+
+# ---------------------------------------------------------------------------
+# Firmware error classifier
+# ---------------------------------------------------------------------------
+
+# Maps the short ``HPX_ERROR=<kind>`` token to a human-readable hint.  The
+# firmware emits these after its own preflight checks so the host can point
+# the user at the real cause instead of blaming the arena for every failure.
+_ERROR_HINTS: dict[str, str] = {
+    "schema_mismatch": (
+        "The model's schema version does not match what the firmware was "
+        "built for.  Re-export the model with a matching TFLite version."
+    ),
+    "unsupported_op": (
+        "The model uses an operator the firmware resolver did not register.  "
+        "Add the missing op to the resolver (firmware/templates/main.cc.j2 "
+        "get_resolver()) or re-export the model without that op."
+    ),
+    "missing_ops": (
+        "One or more operators in the model are not registered in the "
+        "MicroMutableOpResolver.  See the preceding HPX_ERROR=unsupported_op "
+        "lines for the specific ops."
+    ),
+    "alloc_tensors_failed": (
+        "TFLM AllocateTensors() failed.  Likely causes, in order of "
+        "probability: (1) the arena is too small — increase --arena-size; "
+        "(2) a kernel's Prepare() rejected an op (shape/dtype/parameter "
+        "mismatch not caught by preflight).  The firmware reports the "
+        "configured arena size in the error line."
+    ),
+    "model_init_failed": (
+        "heliaAOT model init returned a non-zero status.  Check that the "
+        "generated module was built against the correct board and that any "
+        "required memories (PSRAM, SHARED_SRAM) are initialised."
+    ),
+    "psram_init_failed": (
+        "PSRAM initialisation failed on the target.  Verify the board "
+        "actually has PSRAM populated and that --model-location=psram is "
+        "appropriate for this hardware."
+    ),
+}
+
+
+def _raise_on_firmware_error(lines: list[str]) -> None:
+    """Raise :class:`CaptureError` if the firmware reported an HPX_ERROR.
+
+    Finds the first ``HPX_ERROR=<kind> ...`` line, extracts the kind and
+    the full payload, looks up a hint, and raises.  Unknown kinds still
+    raise — with a generic hint — so nothing slips through silently.
+    """
+    for line in lines:
+        s = line.strip()
+        if not s.startswith("HPX_ERROR="):
+            continue
+
+        payload = s[len("HPX_ERROR="):]
+        # Kind is the first token up to a space or ':'.  e.g.
+        #   "unsupported_op kind=builtin ..."
+        #   "schema_mismatch:1234_vs_3"
+        kind = payload
+        for sep in (" ", ":"):
+            if sep in kind:
+                kind = kind.split(sep, 1)[0]
+                break
+
+        hint = _ERROR_HINTS.get(
+            kind,
+            "Firmware reported an error.  The payload is shown above.",
+        )
+        raise CaptureError(
+            f"Firmware error: {s}",
+            hint=hint,
+        )

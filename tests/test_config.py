@@ -46,3 +46,41 @@ def test_config_is_frozen():
         assert False, "Should have raised FrozenInstanceError"
     except AttributeError:
         pass
+
+
+def test_timeouts_defaults():
+    """TimeoutsConfig should be populated with defaults when unspecified."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+    }
+    config = load_config(None, cli)
+    t = config.timeouts
+    assert t.configure_s == 120
+    assert t.build_s == 300
+    assert t.flash_s == 120
+    assert t.toolchain_probe_s == 5
+    assert t.binary_probe_s == 10
+    assert t.download_api_s == 30
+    assert t.download_asset_s == 300
+
+
+def test_timeouts_overrides():
+    """YAML/CLI overrides should flow into TimeoutsConfig."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "timeouts": {
+            "build_s": 900,
+            "flash_s": 60,
+            "download_asset_s": 1200,
+        },
+    }
+    config = load_config(None, cli)
+    t = config.timeouts
+    assert t.build_s == 900
+    assert t.flash_s == 60
+    assert t.download_asset_s == 1200
+    # Unspecified values retain defaults
+    assert t.configure_s == 120
+    assert t.toolchain_probe_s == 5

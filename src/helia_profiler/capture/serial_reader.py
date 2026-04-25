@@ -1,134 +1,113 @@
-"""SWO-based firmware output capture.
+"""SWO capture transport — reads HPX output via ITM stimulus port 0.
 
-Reads text output from the target board via SEGGER JLinkSWOViewerCL (ITM
-port 0).
+SWO (Serial Wire Output) reads from the target's ITM debug port via the
+J-Link probe.  It requires no additional hardware beyond the standard
+SWD debug connection.
+
+.. warning::
+
+   SWO has **no flow control**.  The single-word ITM FIFO can silently
+   drop data when the firmware outputs faster than the SWO pin bandwidth
+   (~1 Mbps).  This may produce corrupted CSV rows or missing lines.
+   Prefer RTT (``--transport rtt``) for reliable, lossless capture.
 
 Sequence:
-  1. Reset the board via JLinkExe (no SWO viewer connected yet, so the
-     Secure Bootloader does NOT halt for the debugger).
-  2. Immediately start JLinkSWOViewerCL.  The firmware has a built-in
-     startup delay (see ``main.cc.j2``) to allow the viewer time to attach.
-  3. Collect lines until ``--- HPX_END ---`` or a timeout expires.
-  4. Kill the viewer process.
+  1. Reset the target via JLinkExe.
+  2. Connect pylink and enable SWO reception.
+  3. Collect lines until ``--- HPX_END ---`` or timeout.
+  4. Stop SWO and close the connection.
 """
 
 from __future__ import annotations
 
 import logging
-import signal
-import subprocess
 import time
-from pathlib import Path
 
 from ..errors import CaptureError
-from ..jlink import reset_target, swo_viewer_command
+from ..jlink import reset_target
+from .transport import DEFAULT_TIMEOUT_S, collect_lines
 
 log = logging.getLogger("hpx")
 
-DEFAULT_TIMEOUT_S = 120  # generous default for long profiling runs
+_SBL_SETTLE_S = 1.0  # post-reset delay for SBL before pylink connects
 
 
 def capture_swo_output(
     *,
-    build_dir: Path | None = None,
-    app_name: str = "hpx_profiler",
-    timeout_s: float = DEFAULT_TIMEOUT_S,
+    build_dir=None,  # unused — kept for interface parity
     jlink_serial: str | None = None,
     jlink_device: str = "AP510NFA-CBR",
+    timeout_s: float = DEFAULT_TIMEOUT_S,
+    cpu_freq: int = 96_000_000,
+    swo_freq: int = 1_000_000,
 ) -> list[str]:
-    """Read firmware output via SWO until HPX_END or timeout.
+    """Capture firmware output via SWO/ITM until HPX_END or timeout.
 
-    The firmware includes a startup delay (``am_util_delay_ms``) before
-    printing so the host has time to start the SWO viewer after the reset.
+    .. warning::
 
-    Returns the list of captured lines (including SWO viewer boilerplate
-    which the parser will skip).
+       SWO has no flow control — data can be silently dropped if the
+       firmware outputs faster than the SWO pin bandwidth (~1 Mbps).
+       Use ``--transport rtt`` for guaranteed lossless delivery.
+
+    Returns:
+        List of captured text lines.
     """
-    if build_dir is None:
+    try:
+        import pylink
+    except ImportError as exc:
         raise CaptureError(
-            "build_dir required for SWO capture",
-            hint="Pass the build directory from the pipeline context.",
-        )
+            "pylink-square package not installed (required for SWO transport)",
+            hint="pip install pylink-square",
+        ) from exc
 
-    # --- Step 1: reset the target BEFORE starting the SWO viewer ---
-    # This avoids the JLink probe conflict and prevents the SBL from
-    # detecting a debugger and halting.
+    # --- Step 1: reset the target BEFORE connecting pylink ---
+    # JLinkExe disconnects on exit so the SBL does not detect a debugger.
     reset_target(device=jlink_device, jlink_serial=jlink_serial)
 
-    # --- Step 2: start the SWO viewer ---
-    swo_cmd = swo_viewer_command(device=jlink_device, jlink_serial=jlink_serial)
-    log.info("Starting SWO viewer: %s", " ".join(swo_cmd))
+    # --- Step 2: brief delay for SBL to finish ---
+    time.sleep(_SBL_SETTLE_S)
 
-    lines: list[str] = []
-    viewer: subprocess.Popen[bytes] | None = None
+    # --- Step 3: connect pylink and enable SWO ---
+    jlink = pylink.JLink()
+    jlink.disable_dialog_boxes()
 
     try:
-        viewer = subprocess.Popen(
-            swo_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            cwd=str(build_dir),
+        if jlink_serial:
+            jlink.open(serial_no=int(jlink_serial))
+        else:
+            jlink.open()
+        jlink.set_tif(pylink.JLinkInterfaces.SWD)
+        jlink.connect(jlink_device, 4000)
+        log.info("pylink connected to %s for SWO capture", jlink_device)
+
+        jlink.swo_enable(cpu_speed=cpu_freq, swo_speed=swo_freq, port_mask=0x01)
+        log.info("SWO enabled (cpu=%d Hz, swo=%d Hz)", cpu_freq, swo_freq)
+
+        return collect_lines(
+            lambda: bytes(jlink.swo_read_stimulus(0, 4096)),
+            transport_name="SWO",
+            timeout_s=timeout_s,
+            poll_interval_s=0.01,  # 10 ms — SWO has limited bandwidth
         )
-
-        # Brief wait for the viewer to connect to the probe
-        time.sleep(0.5)
-
-        if viewer.poll() is not None:
-            stderr = viewer.stderr.read().decode("utf-8", errors="replace") if viewer.stderr else ""
-            raise CaptureError(
-                f"SWO viewer exited immediately (rc={viewer.returncode})",
-                hint=f"Check JLink probe connection. stderr: {stderr[:200]}",
-            )
-
-        # --- Step 3: collect lines ---
-        deadline = time.monotonic() + timeout_s
-        assert viewer.stdout is not None
-
-        while time.monotonic() < deadline:
-            raw = viewer.stdout.readline()
-            if not raw:
-                if viewer.poll() is not None:
-                    log.warning("SWO viewer exited (rc=%s)", viewer.returncode)
-                    break
-                continue
-
-            try:
-                line = raw.decode("utf-8", errors="replace").strip()
-            except Exception:
-                continue
-            if not line:
-                continue
-
-            lines.append(line)
-            log.debug("SWO: %s", line)
-
-            if line == "--- HPX_END ---":
-                log.info("Captured %d lines (HPX_END received)", len(lines))
-                return lines
 
     except CaptureError:
         raise
+    except pylink.errors.JLinkException as exc:
+        raise CaptureError(
+            f"J-Link SWO error: {exc}",
+            hint="Check J-Link probe connection and that the probe is not in use.",
+        ) from exc
     except Exception as exc:
         raise CaptureError(
-            f"SWO capture error: {exc}",
-            hint="Check that the JLink probe is connected and not in use.",
+            f"SWO capture failed: {exc}",
+            hint="Check that the J-Link probe is connected and not in use.",
         ) from exc
     finally:
-        if viewer is not None and viewer.poll() is None:
-            viewer.send_signal(signal.SIGINT)
-            try:
-                viewer.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                viewer.kill()
-                viewer.wait(timeout=2)
-
-    log.warning(
-        "SWO capture timed out after %.0fs (%d lines captured)",
-        timeout_s,
-        len(lines),
-    )
-    return lines
-
-
-# Keep the old name as an alias for backwards compatibility
-capture_serial_output = capture_swo_output
+        try:
+            jlink.swo_stop()
+        except Exception:
+            pass
+        try:
+            jlink.close()
+        except Exception:
+            pass

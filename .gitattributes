@@ -1,0 +1,2 @@
+tests/fixtures/mlperf_tiny/**/*.tflite filter=lfs diff=lfs merge=lfs -text
+tests/fixtures/mlperf_tiny/**/*.tflite filter=lfs diff=lfs merge=lfs -text

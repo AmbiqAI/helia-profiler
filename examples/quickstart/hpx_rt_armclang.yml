@@ -1,0 +1,35 @@
+# heliaPROFILER quickstart — heliaRT interpreter engine with armclang
+# Same KWS model as hpx_rt.yml but built with armclang instead of GCC.
+model:
+  path: kws_model.tflite
+  arena_size: 131072          # 128 KB — same as GCC config; armclang archive
+                              #   is now selected automatically by toolchain.
+
+engine:
+  type: helia-rt
+  config:
+    variant: release-with-logs
+    source:
+      repo: AmbiqAI/helia-rt
+      ref: HeliaRT-v1.11.2
+
+target:
+  board: apollo510_evb
+  toolchain: armclang
+
+profiling:
+  pmu_presets: [basic_cpu, memory]   # cycles + cache metrics
+  per_layer: true
+  iterations: 3
+  warmup: 1
+
+power:
+  enabled: false
+
+timeouts:
+  configure_s: 600
+  build_s: 900
+
+output:
+  format: csv
+  dir: ./results_rt_armclang

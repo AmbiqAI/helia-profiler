@@ -101,3 +101,17 @@ class PowerDriver(Protocol):
             How long to wait after restoring power for the target to boot.
         """
         ...
+
+    def enable_passthrough(self) -> None:
+        """Open the instrument and enable current passthrough.
+
+        Closes the input relay so current flows through to the target board.
+        The driver holds the device open until :meth:`disable_passthrough`
+        is called.  Useful when no power capture is needed but the board
+        must be powered via the instrument.
+        """
+        ...
+
+    def disable_passthrough(self) -> None:
+        """Release the instrument opened by :meth:`enable_passthrough`."""
+        ...

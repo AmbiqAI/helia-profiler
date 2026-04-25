@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from ..config import ProfileConfig
-from ..results import NsxModuleRef
+from ..results import NsxModuleRef, MemoryPlan
 
 
 @dataclass(frozen=True)
@@ -34,6 +34,12 @@ class EngineArtifacts:
 
     # Engine-specific template context (merged into Jinja rendering)
     template_vars: dict[str, Any] = field(default_factory=dict)
+
+    # Optional memory plan built from engine-specific internals (e.g.
+    # heliaAOT's ``codegen_ctx.memory_plan``).  If None, ``plan_memory``
+    # stage synthesises a conservative plan from ``model.arena_size`` and
+    # ``model.model_location``.
+    memory_plan: MemoryPlan | None = None
 
 
 @runtime_checkable

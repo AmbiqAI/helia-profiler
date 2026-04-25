@@ -5,6 +5,9 @@
 #include "ns_ambiqsuite_harness.h"
 #include "ns_pmu_map.h"
 
+// Transport-aware printf — defined in main.cc
+extern void hpx_printf(const char *fmt, ...);
+
 void HpxPmuProfiler::Init(ns_pmu_preset_e preset) {
     ns_pmu_reset_config(&pmu_cfg_);
     pmu_cfg_.api = &ns_pmu_V1_0_0;
@@ -66,29 +69,65 @@ void HpxPmuProfiler::EndEvent(uint32_t event_handle) {
 #else
     rec.overflow = false;
 #endif
+    // Emit heartbeat between ops (never inside a measured region) so the
+    // host sees progress on long inferences.  Any printf overhead falls in
+    // the unattributed inter-op gap and does not contaminate layer counters.
+    ++hb_ops_since_;
+    MaybeEmitHeartbeat();
 }
 
 void HpxPmuProfiler::ClearEvents() { num_events_ = 0; }
 
+void HpxPmuProfiler::SetHeartbeat(uint32_t every_cyc, int every_n_ops) {
+    hb_every_cyc_ = every_cyc;
+    hb_every_n_ops_ = every_n_ops;
+    hb_last_cyc_ = DWT->CYCCNT;
+    hb_ops_since_ = 0;
+}
+
+void HpxPmuProfiler::SetIterationContext(int pass_idx, int iter_idx) {
+    hb_pass_ = pass_idx;
+    hb_iter_ = iter_idx;
+    hb_last_cyc_ = DWT->CYCCNT;
+    hb_ops_since_ = 0;
+}
+
+void HpxPmuProfiler::MaybeEmitHeartbeat() {
+    const bool by_ops = (hb_every_n_ops_ > 0) &&
+                        (hb_ops_since_ >= hb_every_n_ops_);
+    bool by_time = false;
+    if (hb_every_cyc_ > 0) {
+        uint32_t now = DWT->CYCCNT;
+        // Rollover-safe unsigned delta works for deltas < 2^31 cycles.
+        uint32_t delta = now - hb_last_cyc_;
+        by_time = (delta >= hb_every_cyc_);
+    }
+    if (!by_ops && !by_time) return;
+    hpx_printf("HPX_HEARTBEAT phase=infer pass=%d iter=%d layer=%d\n",
+               hb_pass_, hb_iter_, num_events_);
+    hb_last_cyc_ = DWT->CYCCNT;
+    hb_ops_since_ = 0;
+}
+
 void HpxPmuProfiler::PrintCsv() const {
     if (!initialized_ || num_events_ == 0) return;
-    ns_printf("\"Layer\",\"Op\"");
+    hpx_printf("\"Layer\",\"Op\"");
     for (int e = 0; e < num_counters_; e++) {
         if (!pmu_cfg_.events[e].enabled) break;
         uint32_t map_idx = pmu_cfg_.counter[e].mapIndex;
         if (map_idx < NS_PMU_MAP_SIZE)
-            ns_printf(",\"%s\"", ns_pmu_map[map_idx].regname);
+            hpx_printf(",\"%s\"", ns_pmu_map[map_idx].regname);
         else
-            ns_printf(",\"event_%d\"", e);
+            hpx_printf(",\"event_%d\"", e);
     }
-    ns_printf(",\"overflow\"\n");
+    hpx_printf(",\"overflow\"\n");
     for (int i = 0; i < num_events_; i++) {
         const LayerRecord& rec = layers_[i];
-        ns_printf("%d,%s", i, rec.tag ? rec.tag : "?");
+        hpx_printf("%d,%s", i, rec.tag ? rec.tag : "?");
         for (int e = 0; e < num_counters_; e++) {
             if (!pmu_cfg_.events[e].enabled) break;
-            ns_printf(",%lu", (unsigned long)rec.counters[e]);
+            hpx_printf(",%lu", (unsigned long)rec.counters[e]);
         }
-        ns_printf(",%d\n", rec.overflow ? 1 : 0);
+        hpx_printf(",%d\n", rec.overflow ? 1 : 0);
     }
 }

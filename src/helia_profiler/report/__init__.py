@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ..errors import ReportError
+from ..model_analysis import ModelAnalysis
 from ..results import BinarySections, LayerResult, PmuResult, RunMetadata
 
 if TYPE_CHECKING:
@@ -73,10 +74,11 @@ def write_report(ctx: PipelineContext) -> list[Path]:
     fmt = ctx.config.output.format
     pmu = ctx.pmu_result
     detailed = ctx.config.output.detailed
+    analysis = ctx.model_analysis
 
     # --- Always: primary profile results ---
     if fmt == "csv":
-        p = _write_csv(pmu, output_dir)
+        p = _write_csv(pmu, output_dir, analysis)
         paths.append(p)
     elif fmt == "json":
         p = _write_json(pmu, ctx.power_result, ctx.run_metadata, output_dir)
@@ -91,6 +93,11 @@ def write_report(ctx: PipelineContext) -> list[Path]:
     # --- Always: run metadata ---
     p = _write_run_metadata(ctx, output_dir)
     paths.append(p)
+
+    # --- heliaAOT operator manifest (engine-specific) ---
+    p = _write_aot_manifest(ctx, output_dir)
+    if p is not None:
+        paths.append(p)
 
     # --- Model Explorer overlays → model_explorer/ subfolder ---
     if ctx.config.output.model_explorer:
@@ -183,6 +190,10 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     if mem:
         summary["memory"] = mem
 
+    # Memory plan — engine-agnostic per-region usage
+    if ctx.memory_plan is not None:
+        summary["memory_plan"] = _serialise_memory_plan(ctx.memory_plan)
+
     # Binary sections
     if ctx.binary_sections is not None:
         bs = ctx.binary_sections
@@ -207,6 +218,19 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             cache["l1d_hit_rate_pct"] = round((1 - l1d_misses / l1d_accesses) * 100, 2)
         summary["cache"] = cache
 
+    # Model analysis — MACs, OPS, TOPS
+    if ctx.model_analysis is not None:
+        ma = ctx.model_analysis
+        analysis_dict: dict[str, Any] = {
+            "total_macs": ma.total_macs,
+            "total_ops": ma.total_ops,
+            "num_parameters": ma.num_parameters,
+        }
+        if total_cycles > 0 and ma.total_ops > 0:
+            analysis_dict["cycles_per_mac"] = round(total_cycles / ma.total_macs, 2) if ma.total_macs else None
+            analysis_dict["cycles_per_op"] = round(total_cycles / ma.total_ops, 2)
+        summary["model_analysis"] = analysis_dict
+
     # Power summary
     if ctx.power_result is not None:
         ps = ctx.power_result.summary
@@ -217,6 +241,16 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             "energy_j": ps.energy_j,
         }
 
+    # Compute TOPS/W if both model analysis and power data are available
+    if ctx.model_analysis is not None and ctx.power_result is not None:
+        ma = ctx.model_analysis
+        ps = ctx.power_result.summary
+        if ps.avg_power_w and ps.avg_power_w > 0 and ps.duration_s and ps.duration_s > 0:
+            tops = ma.total_ops / 1e12 / ps.duration_s
+            tops_per_watt = tops / ps.avg_power_w
+            summary.setdefault("model_analysis", {})["tops"] = round(tops, 6)
+            summary.setdefault("model_analysis", {})["tops_per_watt"] = round(tops_per_watt, 6)
+
     out_path = output_dir / "summary.json"
     out_path.write_text(json.dumps(summary, indent=2, default=str))
     log.info("Wrote summary: %s", out_path)
@@ -226,6 +260,29 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
 # ---------------------------------------------------------------------------
 # memory.json — detailed memory breakdown (detailed/ only)
 # ---------------------------------------------------------------------------
+
+
+def _serialise_memory_plan(plan: Any) -> dict[str, Any]:
+    """Serialise a ``MemoryPlan`` into a JSON-friendly dict."""
+    return {
+        "engine": plan.engine,
+        "model_weight_bytes": plan.model_weight_bytes,
+        "has_overflow": plan.has_overflow,
+        "regions": [
+            {
+                "region": r.region,
+                "capacity": r.capacity,
+                "used": r.used,
+                "free": r.free,
+                "overflow": r.overflow,
+                "consumers": [
+                    {"name": c.name, "size": c.size, "kind": c.kind}
+                    for c in r.consumers
+                ],
+            }
+            for r in plan.regions
+        ],
+    }
 
 
 def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
@@ -264,6 +321,10 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
     if arena:
         data["arena"] = arena
 
+    # Memory plan — engine-agnostic per-region usage
+    if ctx.memory_plan is not None:
+        data["memory_plan"] = _serialise_memory_plan(ctx.memory_plan)
+
     # Per-layer cache/memory counters
     per_layer: list[dict[str, Any]] = []
     for layer in layers:
@@ -295,29 +356,78 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
 
 
 # ---------------------------------------------------------------------------
+# heliaAOT operator manifest persistence
+# ---------------------------------------------------------------------------
+
+
+def _write_aot_manifest(ctx: PipelineContext, output_dir: Path) -> Path | None:
+    """Persist the heliaAOT operator manifest into the report directory.
+
+    The manifest captures exactly which operators the AOT compiler emitted
+    (after fusion / DCE / etc.) together with input/output tensor shapes
+    and dtypes — so a post-run consumer can line the CSV layer rows up
+    with the actual compiled graph.  Silently no-ops for non-AOT engines
+    or when the manifest is empty.
+    """
+    artifacts = getattr(ctx, "engine_artifacts", None)
+    if artifacts is None:
+        return None
+    manifest = (artifacts.template_vars or {}).get("aot_op_manifest")
+    if not manifest:
+        return None
+    out_path = output_dir / "aot_operator_manifest.json"
+    out_path.write_text(json.dumps(manifest, indent=2, default=str))
+    log.info("Wrote AOT operator manifest: %s", out_path)
+    return out_path
+
+
+# ---------------------------------------------------------------------------
 # Core CSV / JSON writers
 # ---------------------------------------------------------------------------
 
 
-def _layer_to_flat_dict(layer: LayerResult) -> dict[str, Any]:
+def _layer_to_flat_dict(
+    layer: LayerResult,
+    analysis: ModelAnalysis | None = None,
+) -> dict[str, Any]:
     """Flatten a LayerResult into a CSV-friendly dict."""
     row: dict[str, Any] = {"id": layer.id, "op": layer.op}
     row.update(layer.counters)
     if layer.cycles is not None:
         row["cycles"] = layer.cycles
     row["overflow"] = layer.overflow
+
+    # Enrich with model analysis data when available
+    if analysis is not None:
+        layer_idx = int(layer.id) if isinstance(layer.id, (int, float)) else None
+        if layer_idx is not None and 0 <= layer_idx < len(analysis.layers):
+            la = analysis.layers[layer_idx]
+            row["macs"] = la.macs
+            row["ops"] = la.ops
+            if la.macs > 0 and layer.cycles:
+                row["cycles_per_mac"] = round(layer.cycles / la.macs, 2)
+
     return row
 
 
-def _write_csv(pmu: PmuResult, output_dir: Path) -> Path:
+def _write_csv(
+    pmu: PmuResult,
+    output_dir: Path,
+    analysis: ModelAnalysis | None = None,
+) -> Path:
     """Write merged per-layer profiling results as CSV."""
     layers = pmu.layers
     if not layers:
         raise ReportError("No layer data to write.")
 
     out_path = output_dir / "profile_results.csv"
-    rows = [_layer_to_flat_dict(layer) for layer in layers]
+    rows = [_layer_to_flat_dict(layer, analysis) for layer in layers]
     fieldnames = list(rows[0].keys())
+    # Ensure enriched columns appear even if first row lacks them
+    if analysis is not None:
+        for col in ("macs", "ops", "cycles_per_mac"):
+            if col not in fieldnames:
+                fieldnames.append(col)
 
     with open(out_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)

@@ -207,3 +207,32 @@ def test_legacy_default_preset():
     result = parse_firmware_output(lines)
     assert "_default" in result.presets
     assert len(result.layers) == 1
+
+
+def test_heartbeat_lines_are_ignored_by_csv_parser():
+    """HPX_HEARTBEAT lines must not feed the CSV parser.
+
+    Regression test: the heartbeat line ``HPX_HEARTBEAT phase=infer pass=0
+    iter=0 layer=3`` starts with ``HPX_`` but is not a metadata ``KEY=val``
+    line, and it appears mid-iteration.  If the parser treats it as a CSV
+    row the preset ends up with spurious layers or malformed rows.
+    """
+    lines = [
+        "--- HPX_START ---",
+        "HPX_VERSION=1",
+        "HPX_HEARTBEAT phase=init",
+        "--- HPX_PRESET cpu ---",
+        "--- HPX_ITER 0 ---",
+        "Layer,Op,ARM_PMU_CPU_CYCLES,overflow",
+        "0,CONV_2D,100,0",
+        "HPX_HEARTBEAT phase=infer pass=0 iter=0 layer=1",
+        "1,ADD,50,0",
+        "HPX_HEARTBEAT phase=infer pass=0 iter=0 layer=2",
+        "--- HPX_END ---",
+    ]
+    result = parse_firmware_output(lines)
+    assert "cpu" in result.presets
+    # Exactly 2 data rows; heartbeats did not create ghost layers.
+    assert len(result.presets["cpu"].layers) == 2
+    ops = [layer.op for layer in result.presets["cpu"].layers]
+    assert ops == ["CONV_2D", "ADD"]

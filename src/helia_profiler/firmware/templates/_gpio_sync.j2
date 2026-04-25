@@ -1,0 +1,23 @@
+{# _gpio_sync.j2 — GPIO sync toggling for external power measurement. #}
+// --- GPIO sync for external power measurement ---
+static constexpr bool kPowerSyncEnabled = {{ power_sync_enabled | lower }};
+static constexpr uint32_t kSyncGpioPin = {{ sync_gpio_pin }};
+
+static inline void sync_gpio_init(void) {
+    if constexpr (kPowerSyncEnabled) {
+        am_hal_gpio_pinconfig(kSyncGpioPin, am_hal_gpio_pincfg_output);
+        am_hal_gpio_output_clear(kSyncGpioPin);
+    }
+}
+
+static inline void sync_gpio_high(void) {
+    if constexpr (kPowerSyncEnabled) {
+        am_hal_gpio_output_set(kSyncGpioPin);
+    }
+}
+
+static inline void sync_gpio_low(void) {
+    if constexpr (kPowerSyncEnabled) {
+        am_hal_gpio_output_clear(kSyncGpioPin);
+    }
+}

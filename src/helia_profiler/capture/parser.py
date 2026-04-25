@@ -34,6 +34,7 @@ import re
 from typing import Any
 
 from ..results import FirmwareMeta, LayerResult, PmuResult, PresetResult
+from .transport import HPX_PROTOCOL_VERSION
 
 log = logging.getLogger("hpx")
 
@@ -67,6 +68,16 @@ def parse_firmware_output(lines: list[str]) -> PmuResult:
             break
 
         if not in_session:
+            continue
+
+        # HPX_HEARTBEAT lines — progress markers, not data.  We count them
+        # and record the last payload so the run summary can expose it, but
+        # they must NOT feed into the CSV parser.  Matched before the
+        # ``HPX_KEY=value`` regex below because heartbeat lines may contain
+        # ``key=value`` pairs after the ``HPX_HEARTBEAT`` prefix.
+        if line.startswith("HPX_HEARTBEAT"):
+            meta_kv["heartbeat_count"] = meta_kv.get("heartbeat_count", 0) + 1
+            meta_kv["last_heartbeat"] = line
             continue
 
         # HPX_KEY=value metadata lines
@@ -133,6 +144,36 @@ def parse_firmware_output(lines: list[str]) -> PmuResult:
             layers=avg_layers,
         )
 
+    # --- Post-parse validation ---
+
+    # HPX protocol version check
+    version = meta_kv.get("version")
+    if version is not None and version != HPX_PROTOCOL_VERSION:
+        log.warning(
+            "HPX protocol version mismatch: firmware=%s, expected=%d. "
+            "Results may be incorrectly parsed.",
+            version, HPX_PROTOCOL_VERSION,
+        )
+
+    # Report accumulated parse errors
+    total_parse_errors = sum(pd.parse_errors for pd in presets.values())
+    if total_parse_errors > 0:
+        log.warning(
+            "%d parse error(s) in firmware output — results may be unreliable. "
+            "Check transport integrity (consider --transport rtt for lossless capture).",
+            total_parse_errors,
+        )
+
+    # Check iteration consistency within each preset
+    for name, pd in presets.items():
+        layer_counts = [len(it) for it in pd.iterations]
+        if layer_counts and len(set(layer_counts)) > 1:
+            log.warning(
+                "Preset '%s': inconsistent layer counts across iterations %s — "
+                "data may be truncated or corrupted",
+                name, layer_counts,
+            )
+
     # Merge layers across all presets
     merged_layers = _merge_presets(typed_presets)
 
@@ -178,6 +219,7 @@ class _PresetData:
         self.header: list[str] | None = None
         self._current_layers: list[dict[str, Any]] | None = None
         self.in_iteration = False
+        self.parse_errors: int = 0  # count of malformed/corrupted rows
 
     def start_iteration(self) -> None:
         if self._current_layers is not None:
@@ -207,16 +249,35 @@ class _PresetData:
         reader = csv.reader(io.StringIO(line))
         for row in reader:
             if len(row) != len(self.header):
+                log.warning(
+                    "Malformed CSV row (expected %d fields, got %d): %.200s",
+                    len(self.header), len(row), line,
+                )
+                self.parse_errors += 1
                 continue
             layer: dict[str, Any] = {}
             for col, val_str in zip(self.header, row):
-                try:
-                    layer[col] = int(val_str)
-                except ValueError:
+                val_str = val_str.strip()
+                if col in _STRING_COLS:
+                    # String columns: try int for Layer/overflow, else keep string
                     try:
-                        layer[col] = float(val_str)
+                        layer[col] = int(val_str)
                     except ValueError:
                         layer[col] = val_str
+                else:
+                    # Numeric PMU counter columns: must be numeric
+                    try:
+                        layer[col] = int(val_str)
+                    except ValueError:
+                        try:
+                            layer[col] = float(val_str)
+                        except ValueError:
+                            log.warning(
+                                "Non-numeric value in PMU column '%s': %r",
+                                col, val_str,
+                            )
+                            layer[col] = None  # excluded from averaging
+                            self.parse_errors += 1
             self._current_layers.append(layer)
 
 

@@ -38,23 +38,6 @@ def find_jlink_exe() -> str:
     )
 
 
-def find_swo_viewer() -> str:
-    """Return the absolute path to ``JLinkSWOViewerCL``.
-
-    Raises :class:`CaptureError` if not found.
-    """
-    exe = shutil.which("JLinkSWOViewerCL")
-    if exe:
-        return exe
-    for candidate in ("/usr/local/bin/JLinkSWOViewerCL",):
-        if os.path.isfile(candidate):
-            return candidate
-    raise CaptureError(
-        "JLinkSWOViewerCL not found",
-        hint="Install the SEGGER J-Link package and ensure JLinkSWOViewerCL is in PATH.",
-    )
-
-
 # ------------------------------------------------------------------
 # Target reset
 # ------------------------------------------------------------------
@@ -110,32 +93,3 @@ def reset_target(
             "JLinkExe not found",
             hint="Install the SEGGER J-Link package and ensure JLinkExe is in PATH.",
         ) from exc
-
-
-# ------------------------------------------------------------------
-# SWO viewer command
-# ------------------------------------------------------------------
-
-def swo_viewer_command(
-    *,
-    device: str,
-    cpu_freq: int = 96_000_000,
-    swo_freq: int = 1_000_000,
-    itm_port: int = 0,
-    jlink_serial: str | None = None,
-) -> list[str]:
-    """Build the ``JLinkSWOViewerCL`` command list.
-
-    Callers can pass the result directly to :func:`subprocess.Popen`.
-    """
-    swo_exe = find_swo_viewer()
-    cmd = [
-        swo_exe,
-        "-device", device,
-        "-cpufreq", str(cpu_freq),
-        "-swofreq", str(swo_freq),
-        "-itmport", str(itm_port),
-    ]
-    if jlink_serial:
-        cmd.extend(["-SelectEmuBySN", jlink_serial])
-    return cmd

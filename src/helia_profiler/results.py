@@ -127,6 +127,7 @@ class RunMetadata:
     model: ModelInfo | None = None
     toolchain: ToolchainInfo | None = None
     firmware: FirmwareMeta | None = None
+    memory_plan: "MemoryPlan | None" = None
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +152,73 @@ class NsxModuleRef:
     name: str
     path: Path
     version: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Memory plan — engine-agnostic view of what sits in each SoC memory region
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MemoryConsumer:
+    """One named thing that consumes bytes in a memory region.
+
+    Examples: model weights, tensor arena, per-DTCM scratch, code/text.
+    """
+
+    name: str
+    size: int
+    kind: str = "arena"  # "arena" | "weights" | "code" | "stack" | "other"
+
+
+@dataclass(frozen=True)
+class MemoryRegionUsage:
+    """Usage breakdown for a single memory region (e.g. DTCM, MRAM).
+
+    ``capacity`` reflects the SoC's physical size for this region (bytes).
+    ``used`` is the sum of ``consumers[i].size`` (what the plan allocates).
+    ``free`` is a convenience property.
+    """
+
+    region: str  # "MRAM" | "SRAM" | "DTCM" | "ITCM" | "PSRAM"
+    capacity: int
+    used: int
+    consumers: tuple[MemoryConsumer, ...] = ()
+
+    @property
+    def free(self) -> int:
+        return max(0, self.capacity - self.used)
+
+    @property
+    def overflow(self) -> bool:
+        return self.capacity > 0 and self.used > self.capacity
+
+
+@dataclass(frozen=True)
+class MemoryPlan:
+    """Engine-agnostic memory plan for a single profiling run.
+
+    Produced by the ``plan_memory`` stage by combining engine-specific
+    knowledge (AOT arena_usages, TFLM single-arena size, weight placement)
+    with the SoC's physical memory layout.  Consumed by the report and by
+    the firmware template generator for placement macros / linker hints.
+    """
+
+    engine: str  # "tflm" | "helia_rt" | "helia_aot"
+    regions: tuple[MemoryRegionUsage, ...] = ()
+    # Total model weight bytes (informational — where they go is in regions).
+    model_weight_bytes: int = 0
+    # True if ANY region is oversubscribed.  A run with overflow will
+    # typically fail at build/flash/boot; the stage raises PlatformError
+    # before that happens so the user gets a clear hint.
+    has_overflow: bool = False
+
+    def region(self, name: str) -> MemoryRegionUsage | None:
+        key = name.upper()
+        for r in self.regions:
+            if r.region.upper() == key:
+                return r
+        return None
 
 
 # ---------------------------------------------------------------------------

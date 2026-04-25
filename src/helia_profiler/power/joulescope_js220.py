@@ -38,6 +38,14 @@ class JoulescopeJS220Driver:
                 "pyjoulescope_driver package not installed (required for JS220)",
                 hint="Install with: pip install pyjoulescope_driver",
             ) from exc
+        except Exception as exc:
+            # numpy/pyjls ABI mismatch raises ValueError during import chain.
+            raise PowerError(
+                f"pyjoulescope_driver failed to import: {exc}",
+                hint="This is usually a numpy ABI mismatch. Try: "
+                "pip install --force-reinstall 'pyjoulescope_driver' 'pyjls' "
+                "or pin 'numpy<2'.",
+            ) from exc
 
     def capture(
         self,
@@ -207,6 +215,45 @@ class JoulescopeJS220Driver:
                 pass
 
         log.info("Power-cycle reset complete")
+
+    def enable_passthrough(self) -> None:
+        """Open the JS220 and enable current passthrough (close input relay)."""
+        import pyjoulescope_driver as jsdrv
+
+        try:
+            self._pt_driver = jsdrv.Driver()
+            self._pt_driver.open()
+        except Exception as exc:
+            raise PowerError(
+                f"Failed to open JS220: {exc}",
+                hint="Ensure the JS220 is connected via USB.",
+            ) from exc
+
+        device_paths = [
+            p for p in self._pt_driver.device_paths() if "js220" in p.lower()
+        ]
+        if not device_paths:
+            self._pt_driver.close()
+            raise PowerError(
+                "No Joulescope JS220 found",
+                hint="Ensure the JS220 is connected via USB.",
+            )
+
+        self._pt_device_path = device_paths[0]
+        self._pt_driver.open(self._pt_device_path)
+        self._pt_driver.publish(f"{self._pt_device_path}/s/i/range/mode", "auto")
+        log.info("JS220 passthrough enabled on %s", self._pt_device_path)
+
+    def disable_passthrough(self) -> None:
+        """Release the JS220 opened by :meth:`enable_passthrough`."""
+        driver = getattr(self, "_pt_driver", None)
+        if driver is not None:
+            try:
+                driver.close()
+            except Exception:
+                pass
+            self._pt_driver = None
+            log.info("JS220 passthrough released")
 
 
 def _process_js220_stats(

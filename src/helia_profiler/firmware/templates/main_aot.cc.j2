@@ -4,12 +4,13 @@
  * @brief heliaPROFILER firmware (heliaAOT) — auto-generated, do not edit.
  *
  * Runs AOT-compiled inference with per-layer PMU profiling via the model
- * operator callback.  Emits CSV results over SWO/UART for the host-side
+ * operator callback.  Emits CSV results over {{ transport | upper }} for the host-side
  * capture stage to parse.
  */
 
 #include <cstdint>
 #include <cstdio>
+#include <cstdarg>
 #include <cstring>
 
 // Pre-include arm_mve.h in C++ context so that hpx_common.h's extern "C"
@@ -25,45 +26,17 @@
 #include "ns_pmu_utils.h"
 #include "ns_pmu_map.h"
 
-#include "ns_core.h"
-#include "ns_ambiqsuite_harness.h"
-#include "nsx_mem.h"
-#include "nsx_system.h"
-#include "am_hal_gpio.h"
+{% include "_system_includes.j2" %}
 
 // ---------------------------------------------------------------------------
 // DWT cycle counter
 // ---------------------------------------------------------------------------
-static inline void dwt_init(void) {
-    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-    DWT->CYCCNT = 0;
-    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
-}
+{% include "_dwt_init.j2" %}
 
 // ---------------------------------------------------------------------------
 // GPIO sync for external power measurement
 // ---------------------------------------------------------------------------
-static constexpr bool kPowerSyncEnabled = {{ power_sync_enabled | lower }};
-static constexpr uint32_t kSyncGpioPin = {{ sync_gpio_pin }};
-
-static inline void sync_gpio_init(void) {
-    if constexpr (kPowerSyncEnabled) {
-        am_hal_gpio_pinconfig(kSyncGpioPin, am_hal_gpio_pincfg_output);
-        am_hal_gpio_output_clear(kSyncGpioPin);
-    }
-}
-
-static inline void sync_gpio_high(void) {
-    if constexpr (kPowerSyncEnabled) {
-        am_hal_gpio_output_set(kSyncGpioPin);
-    }
-}
-
-static inline void sync_gpio_low(void) {
-    if constexpr (kPowerSyncEnabled) {
-        am_hal_gpio_output_clear(kSyncGpioPin);
-    }
-}
+{% include "_gpio_sync.j2" %}
 
 // ---------------------------------------------------------------------------
 // PMU profiler — per-operator recording via AOT callback
@@ -81,6 +54,22 @@ static HpxLayerRecord g_layers[kMaxLayers];
 static int g_num_layers = 0;
 static int g_num_counters = 0;
 static bool g_profiler_enabled = false;
+
+// Heartbeat state — cheap counters/timestamps updated on each op finish so
+// the host can detect a hung run without wall-clock timeouts.
+static uint32_t g_hb_every_cyc = 0;
+static int      g_hb_every_ops = 0;
+static uint32_t g_hb_last_cyc = 0;
+static int      g_hb_ops_since = 0;
+static int      g_hb_pass = 0;
+static int      g_hb_iter = 0;
+
+{% include "_hpx_printf.j2" with context %}
+
+{% if transport == "usb_cdc" %}
+{% include "_usb_timer.j2" %}
+{% endif %}
+
 
 // ---------------------------------------------------------------------------
 // AOT operator name table — extracted from the AIR graph by heliaPROFILER.
@@ -143,27 +132,27 @@ static void profiler_clear(void) {
 
 static void profiler_print_csv(void) {
     if (g_num_layers == 0) return;
-    ns_printf("\"Layer\",\"Op\"");
+    hpx_printf("\"Layer\",\"Op\"");
     for (int e = 0; e < g_num_counters; e++) {
         if (!g_pmu_cfg.events[e].enabled) break;
         uint32_t map_idx = g_pmu_cfg.counter[e].mapIndex;
         if (map_idx < NS_PMU_MAP_SIZE)
-            ns_printf(",\"%s\"", ns_pmu_map[map_idx].regname);
+            hpx_printf(",\"%s\"", ns_pmu_map[map_idx].regname);
         else
-            ns_printf(",\"event_%d\"", e);
+            hpx_printf(",\"event_%d\"", e);
     }
-    ns_printf(",\"overflow\"\n");
+    hpx_printf(",\"overflow\"\n");
     for (int i = 0; i < g_num_layers; i++) {
         const auto &rec = g_layers[i];
         // Print: Layer index, Op type with AOT operator ID for uniqueness.
         // Format: "CONV_2D:3" — type:id, so the host can disambiguate
         // multiple operators of the same type.
-        ns_printf("%d,%s:%ld", i, aot_op_name(i), (long)aot_op_id(i));
+        hpx_printf("%d,%s:%ld", i, aot_op_name(i), (long)aot_op_id(i));
         for (int e = 0; e < g_num_counters; e++) {
             if (!g_pmu_cfg.events[e].enabled) break;
-            ns_printf(",%lu", (unsigned long)rec.counters[e]);
+            hpx_printf(",%lu", (unsigned long)rec.counters[e]);
         }
-        ns_printf(",%d\n", rec.overflow ? 1 : 0);
+        hpx_printf(",%d\n", rec.overflow ? 1 : 0);
     }
 }
 
@@ -207,6 +196,22 @@ static void model_operator_cb(
 #else
         g_layers[idx].overflow = false;
 #endif
+        // Heartbeat emission (inter-op gap, not contaminating a layer)
+        ++g_hb_ops_since;
+        const bool by_ops = (g_hb_every_ops > 0) &&
+                            (g_hb_ops_since >= g_hb_every_ops);
+        bool by_time = false;
+        if (g_hb_every_cyc > 0) {
+            uint32_t now = DWT->CYCCNT;
+            uint32_t delta = now - g_hb_last_cyc;
+            by_time = (delta >= g_hb_every_cyc);
+        }
+        if (by_ops || by_time) {
+            hpx_printf("HPX_HEARTBEAT phase=infer pass=%d iter=%d layer=%d\n",
+                       g_hb_pass, g_hb_iter, g_num_layers);
+            g_hb_last_cyc = DWT->CYCCNT;
+            g_hb_ops_since = 0;
+        }
     }
 }
 
@@ -223,43 +228,78 @@ int main(void) {
     NS_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
     dwt_init();
     sync_gpio_init();
+{% if transport == "usb_cdc" %}
+
+    // Initialize USB CDC and wait for host to connect (DTR)
+    nsx_usb_init(&g_usb_cfg);
+    while (!nsx_usb_connected(&g_usb_cfg)) {
+        am_util_delay_ms(10);
+    }
+    // Brief settling delay after host connects
+    am_util_delay_ms(200);
+{% elif transport == "rtt" %}
+
+    // Set trim mode on buffer 0 (non-blocking — silently drops excess data).
+    // BUFFER_SIZE_UP=32768 is set via CMake so _DoInit() already allocates
+    // a 32 KB buffer.  ConfigUpBuffer(0) can only change flags, not the
+    // buffer pointer/size (SEGGER RTT design for the default terminal).
+    SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,
+                              SEGGER_RTT_MODE_NO_BLOCK_TRIM);
+{% else %}
 
     // Delay to allow the host SWO viewer to attach after reset.
     am_util_delay_ms(5000);
+{% endif %}
 
-    ns_printf("\n--- HPX_START ---\n");
-    ns_printf("HPX_ENGINE=helia_aot\n");
-    ns_printf("HPX_ITERATIONS={{ iterations }}\n");
-    ns_printf("HPX_WARMUP={{ warmup }}\n");
-    ns_printf("HPX_NUM_PRESETS=%d\n", {{ pmu_passes | length }});
-    ns_printf("HPX_PRESETS={{ pmu_pass_names | join(',') }}\n");
-    ns_printf("HPX_POWER_SYNC=%s\n", kPowerSyncEnabled ? "gpio" : "none");
+    hpx_printf("\n--- HPX_START ---\n");
+    hpx_printf("HPX_VERSION=1\n");
+    hpx_printf("HPX_ENGINE=helia_aot\n");
+    hpx_printf("HPX_ITERATIONS={{ iterations }}\n");
+    hpx_printf("HPX_WARMUP={{ warmup }}\n");
+    hpx_printf("HPX_NUM_PRESETS=%d\n", {{ pmu_passes | length }});
+    hpx_printf("HPX_PRESETS={{ pmu_pass_names | join(',') }}\n");
+    hpx_printf("HPX_POWER_SYNC=%s\n", kPowerSyncEnabled ? "gpio" : "none");
     if constexpr (kPowerSyncEnabled) {
-        ns_printf("HPX_SYNC_GPIO=%lu\n", (unsigned long)kSyncGpioPin);
+        hpx_printf("HPX_SYNC_GPIO=%lu\n", (unsigned long)kSyncGpioPin);
     }
+
+    // --- Heartbeat config (matches TFLM template for protocol consistency) --
+    static constexpr bool     kHbEnabled   = {{ heartbeat_enabled | lower }};
+    static constexpr int      kHbEveryNOps = {{ heartbeat_every_n_ops }};
+    static constexpr uint32_t kHbEveryMs   = {{ heartbeat_every_ms }};
+    hpx_printf("HPX_HEARTBEAT_ENABLED=%d\n", (int)kHbEnabled);
+    hpx_printf("HPX_HEARTBEAT_EVERY_N_OPS=%d\n", kHbEveryNOps);
+    hpx_printf("HPX_HEARTBEAT_EVERY_MS=%lu\n", (unsigned long)kHbEveryMs);
+    g_hb_every_cyc = (kHbEnabled && kHbEveryMs > 0)
+        ? (uint32_t)((uint64_t)SystemCoreClock / 1000U * kHbEveryMs)
+        : 0U;
+    g_hb_every_ops = kHbEnabled ? kHbEveryNOps : 0;
+
+    hpx_printf("HPX_HEARTBEAT phase=init\n");
 
     // Initialize AOT model
     int32_t aot_status = {{ aot_prefix }}_model_init(&{{ aot_prefix }}_model_ctx);
     if (aot_status != 0) {
-        ns_printf("HPX_ERROR=model_init_failed:%ld\n", (long)aot_status);
-        while (1) {}
+        hpx_printf("HPX_ERROR=model_init_failed:%ld\n", (long)aot_status);
+        while (1) { __WFI(); }
     }
+    hpx_printf("HPX_HEARTBEAT phase=model_init_done\n");
 
     // Report model metadata
-    ns_printf("HPX_NUM_INPUTS=%d\n", {{ aot_prefix }}_num_inputs);
-    ns_printf("HPX_NUM_OUTPUTS=%d\n", {{ aot_prefix }}_num_outputs);
+    hpx_printf("HPX_NUM_INPUTS=%d\n", {{ aot_prefix }}_num_inputs);
+    hpx_printf("HPX_NUM_OUTPUTS=%d\n", {{ aot_prefix }}_num_outputs);
     for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
-        ns_printf("HPX_INPUT_%d_SIZE=%d\n", i,
+        hpx_printf("HPX_INPUT_%d_SIZE=%d\n", i,
                   (int){{ aot_prefix }}_model_ctx.inputs[i].size);
     }
     for (int i = 0; i < {{ aot_prefix }}_num_outputs; i++) {
-        ns_printf("HPX_OUTPUT_%d_SIZE=%d\n", i,
+        hpx_printf("HPX_OUTPUT_%d_SIZE=%d\n", i,
                   (int){{ aot_prefix }}_model_ctx.outputs[i].size);
     }
 
     // --- Multi-pass PMU profiling ---
 {% for pass in pmu_passes %}
-    ns_printf("\n--- HPX_PRESET {{ pass.name }} ---\n");
+    hpx_printf("\n--- HPX_PRESET {{ pass.name }} ---\n");
 {% if pass.custom %}
     {
         static const uint32_t _pass{{ loop.index0 }}_ids[] = { {{ pass.event_ids | join(', ') }} };
@@ -267,6 +307,10 @@ int main(void) {
     }
 {% else %}
     profiler_init_preset({{ pass.c_enum }});
+{% endif %}
+
+{% if transport == "usb_cdc" %}
+    usb_timer_pause();
 {% endif %}
 
     // Warmup for this pass (profiler disabled, no GPIO sync)
@@ -278,6 +322,7 @@ int main(void) {
         }
         {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
     }
+    hpx_printf("HPX_HEARTBEAT phase=warmup_done pass={{ loop.index0 }}\n");
 
     // Profiled iterations — GPIO sync brackets each inference
     g_profiler_enabled = true;
@@ -287,17 +332,44 @@ int main(void) {
                    {{ aot_prefix }}_model_ctx.inputs[i].size);
         }
         profiler_clear();
+        g_hb_pass = {{ loop.index0 }};
+        g_hb_iter = iter;
+        g_hb_last_cyc = DWT->CYCCNT;
+        g_hb_ops_since = 0;
 
         sync_gpio_high();
         {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
         sync_gpio_low();
 
-        ns_printf("\n--- HPX_ITER %d ---\n", iter);
+{% if transport == "usb_cdc" %}
+        usb_timer_resume();
+{% endif %}
+        hpx_printf("\n--- HPX_ITER %d ---\n", iter);
         profiler_print_csv();
+{% if transport == "usb_cdc" %}
+        usb_timer_pause();
+{% endif %}
     }
+
+{% if transport == "usb_cdc" %}
+    usb_timer_resume();
+{% endif %}
 {% endfor %}
 
-    ns_printf("\n--- HPX_END ---\n");
-    while (1) {}
+{% if transport == "rtt" %}
+    // Before emitting the sentinel, flush cache and wait for the RTT up
+    // buffer to drain — otherwise the trailing CSV burst may be full and
+    // NO_BLOCK_TRIM would silently drop HPX_END.  Also emit a phase
+    // heartbeat so the host inactivity timer refreshes while we drain.
+    hpx_printf("HPX_HEARTBEAT phase=flushing\n");
+    SCB_CleanDCache();
+    hpx_rtt_drain(500 /* ms */);
+{% endif %}
+    hpx_printf("\n--- HPX_END ---\n");
+{% if transport == "rtt" %}
+    SCB_CleanDCache();
+    hpx_rtt_drain(500 /* ms */);
+{% endif %}
+    while (1) { __WFI(); }
     return 0;
 }

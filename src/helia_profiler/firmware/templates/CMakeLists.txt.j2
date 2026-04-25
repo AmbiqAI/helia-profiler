@@ -34,7 +34,22 @@ target_link_libraries(hpx_profiler PRIVATE
     nsx::power
     nsx::pmu_armv8m
     {{ aot_cmake_target }}
+{% if transport == "usb_cdc" %}
+    nsx::usb
+{% endif %}
 )
+{% if transport == "rtt" %}
+target_sources(hpx_profiler PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/src/rtt/SEGGER_RTT.c
+)
+target_include_directories(hpx_profiler PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/src/rtt
+    ${CMAKE_CURRENT_LIST_DIR}/src/rtt/Config
+)
+# ConfigUpBuffer(0) cannot change buffer-0's pointer/size (SEGGER design).
+# Override the compile-time default so _DoInit() allocates 32 KB.
+target_compile_definitions(hpx_profiler PRIVATE BUFFER_SIZE_UP=32768)
+{% endif %}
 {% else %}
 add_executable(hpx_profiler
     src/main.cc
@@ -51,7 +66,41 @@ target_link_libraries(hpx_profiler PRIVATE
     nsx::power
     nsx::pmu_armv8m
     nsx::heliart
+{% if transport == "usb_cdc" %}
+    nsx::usb
+{% endif %}
+{% if model_location == "psram" %}
+    nsx::peripherals
+{% endif %}
 )
+{% if model_location == "psram" %}
+# AmbiqSuite PSRAM device driver — not part of a pre-compiled lib
+target_sources(hpx_profiler PRIVATE
+    ${NSX_ROOT}/modules/nsx-ambiqsuite-r5/sdk/src/am_devices_mspi_psram_aps25616ba_1p2v.c
+)
+target_include_directories(hpx_profiler PRIVATE
+    ${NSX_ROOT}/modules/nsx-ambiqsuite-r5/sdk/devices
+)
+{% endif %}
+{% if transport == "rtt" %}
+target_sources(hpx_profiler PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/src/rtt/SEGGER_RTT.c
+)
+target_include_directories(hpx_profiler PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/src/rtt
+    ${CMAKE_CURRENT_LIST_DIR}/src/rtt/Config
+)
+target_compile_definitions(hpx_profiler PRIVATE BUFFER_SIZE_UP=32768)
+{% endif %}
 {% endif %}
 
 nsx_finalize_app(hpx_profiler)
+
+# armclang in C++ mode triggers -Wreserved-user-defined-literal on some
+# AmbiqSuite headers (string literal concatenation without a space).
+# Suppress it until the SDK headers are fixed upstream.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "ARMClang")
+    target_compile_options(hpx_profiler PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:-Wno-reserved-user-defined-literal>
+    )
+endif()

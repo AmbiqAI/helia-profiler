@@ -36,6 +36,15 @@ class JoulescopeDriver:
                 "Joulescope package not installed",
                 hint="Install with: pip install 'helia-profiler[power]' or pip install joulescope",
             ) from exc
+        except Exception as exc:
+            # Common case: pyjls/numpy ABI mismatch surfaces as ValueError
+            # "numpy.dtype size changed..." during import chain.
+            raise PowerError(
+                f"Joulescope package failed to import: {exc}",
+                hint="This is usually a numpy ABI mismatch. Try: "
+                "pip install --force-reinstall 'joulescope' 'pyjls' "
+                "or pin 'numpy<2'.",
+            ) from exc
 
     def capture(
         self,
@@ -191,3 +200,30 @@ class JoulescopeDriver:
             ) from exc
 
         log.info("Power-cycle reset complete")
+
+    def enable_passthrough(self) -> None:
+        """Open the Joulescope and enable current passthrough (close relay)."""
+        import joulescope
+
+        try:
+            self._pt_device = joulescope.scan_require_one(name="Joulescope")
+        except Exception as exc:
+            raise PowerError(
+                f"Failed to find Joulescope: {exc}",
+                hint="Ensure the Joulescope is connected via USB.",
+            ) from exc
+
+        self._pt_device.open()
+        self._pt_device.parameter_set("i_range", "auto")
+        log.info("Joulescope passthrough enabled")
+
+    def disable_passthrough(self) -> None:
+        """Release the Joulescope opened by :meth:`enable_passthrough`."""
+        device = getattr(self, "_pt_device", None)
+        if device is not None:
+            try:
+                device.close()
+            except Exception:
+                pass
+            self._pt_device = None
+            log.info("Joulescope passthrough released")

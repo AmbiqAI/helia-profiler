@@ -87,6 +87,10 @@ class TestPrepareEngineStage:
         dist = tmp_path / "heliart_dist"
         dist.mkdir()
         (dist / "lib").mkdir()
+        for prefix in ("libhelia-rt", "libtensorflow-microlite"):
+            (
+                dist / "lib" / f"{prefix}-cm55-gcc-release-with-logs.a"
+            ).write_bytes(b"\x00")
         (dist / "tensorflow").mkdir()
         (dist / "third_party").mkdir()
         (dist / "signal").mkdir()

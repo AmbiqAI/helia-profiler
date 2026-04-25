@@ -28,7 +28,7 @@ import jinja2
 from ..config import ProfileConfig
 from ..errors import EngineError
 from ..platform import get_soc_for_board
-from ..results import NsxModuleRef
+from ..results import MemoryConsumer, MemoryPlan, MemoryRegionUsage, NsxModuleRef
 from .base import EngineArtifacts
 
 log = logging.getLogger("hpx")
@@ -159,6 +159,11 @@ class HeliaAOTAdapter:
         if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
             cmsis_nn_cmake["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
 
+        # Build a MemoryPlan from the AOT codegen context so the
+        # plan_memory stage can validate placement against the SoC's
+        # physical memory layout.
+        memory_plan = _extract_memory_plan(codegen_ctx)
+
         return EngineArtifacts(
             extra_modules=[
                 NsxModuleRef(name="nsx-cmsis-nn", path=cmsis_nn_mod_dir),
@@ -176,6 +181,7 @@ class HeliaAOTAdapter:
                 "aot_cmake_target": f"nsx::{cmake_name}",
                 "aot_op_manifest": op_manifest,
             },
+            memory_plan=memory_plan,
         )
 
 
@@ -395,6 +401,35 @@ def _validate_pragmas(aot_module_dir: Path, prefix: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _tensor_metadata(tensor: Any) -> dict[str, Any]:
+    """Extract a JSON-serialisable summary from an ``AirTensor``.
+
+    Returns only the fields useful for post-run analysis; silently omits
+    any attribute that the tensor does not expose (older heliaAOT
+    versions may not expose every field).
+    """
+    meta: dict[str, Any] = {}
+    for key in ("name", "dtype", "ctype", "kind"):
+        val = getattr(tensor, key, None)
+        if val is not None:
+            meta[key] = str(val)
+    for key in ("id", "nbytes", "size", "ndim", "buffer_index"):
+        val = getattr(tensor, key, None)
+        if isinstance(val, (int, float)):
+            meta[key] = int(val)
+    shape = getattr(tensor, "shape", None)
+    if shape is not None:
+        try:
+            meta["shape"] = [int(d) for d in shape]
+        except (TypeError, ValueError):
+            pass
+    for flag in ("is_constant", "is_persistent", "is_scratch"):
+        val = getattr(tensor, flag, None)
+        if isinstance(val, bool):
+            meta[flag] = val
+    return meta
+
+
 def _extract_operator_manifest(
     codegen_ctx: Any,
 ) -> list[dict[str, Any]]:
@@ -409,8 +444,11 @@ def _extract_operator_manifest(
     Returns a list of dicts ordered by execution sequence::
 
         [
-            {"idx": 0, "id": 0, "op_type": "CONV_2D",  "name": "conv_2d_0"},
-            {"idx": 1, "id": 3, "op_type": "ADD",       "name": "add_3"},
+            {
+                "idx": 0, "id": 0, "op_type": "CONV_2D", "name": "conv_2d_0",
+                "inputs": [{"name": "x", "shape": [1, 49, 10, 1], ...}],
+                "outputs": [{"name": "y", "shape": [1, 25, 5, 8], ...}],
+            },
             ...
         ]
 
@@ -419,6 +457,8 @@ def _extract_operator_manifest(
     - ``id``      — AIR operator ID passed to the callback
     - ``op_type`` — operator type string (from ``AirOpType``)
     - ``name``    — full operator name as emitted by heliaAOT
+    - ``inputs``  — list of input tensor metadata (shape/dtype/size)
+    - ``outputs`` — list of output tensor metadata
     """
     operators = getattr(codegen_ctx, "operators", None)
     if not operators:
@@ -426,13 +466,106 @@ def _extract_operator_manifest(
 
     manifest: list[dict[str, Any]] = []
     for idx, aot_op in enumerate(operators):
-        manifest.append({
+        entry: dict[str, Any] = {
             "idx": idx,
             "id": int(aot_op.id),
             "op_type": str(aot_op.TYPE),
             "name": aot_op.name,
-        })
+        }
+        try:
+            entry["inputs"] = [
+                _tensor_metadata(t) for t in (aot_op.input_tensors or [])
+            ]
+        except Exception:  # noqa: BLE001 — defensive for older heliaAOT
+            pass
+        try:
+            entry["outputs"] = [
+                _tensor_metadata(t) for t in (aot_op.output_tensors or [])
+            ]
+        except Exception:  # noqa: BLE001
+            pass
+        manifest.append(entry)
     return manifest
+
+
+# ---------------------------------------------------------------------------
+# Memory-plan extraction (from CodeGenContext)
+# ---------------------------------------------------------------------------
+
+
+def _extract_memory_plan(codegen_ctx: Any) -> MemoryPlan | None:
+    """Build a ``MemoryPlan`` from the heliaAOT ``CodeGenContext``.
+
+    The AOT planner attaches ``codegen_ctx.memory_plan`` (itself a
+    ``helia_aot.memory.defines.MemoryPlan``) containing:
+
+    * ``arena_usages`` — dict[MemoryType, ArenaUsage] with total_size / used
+    * ``tensor_allocs`` — dict[str, TensorAllocation] with memory + size
+
+    We aggregate tensor allocations per region into named ``MemoryConsumer``
+    entries (arena + weights) so the profiler's plan_memory stage and
+    report can show "what lives where" without the user having to grok
+    the AOT internals.
+
+    Returns ``None`` if the context does not expose a memory plan (older
+    heliaAOT versions, or a mock context in tests).
+    """
+    aot_plan = getattr(codegen_ctx, "memory_plan", None)
+    if aot_plan is None:
+        return None
+
+    arena_usages = getattr(aot_plan, "arena_usages", None) or {}
+    tensor_allocs = getattr(aot_plan, "tensor_allocs", None) or {}
+
+    # Accumulate per-region weight bytes from constant tensors.
+    region_weights: dict[str, int] = {}
+    region_weight_count: dict[str, int] = {}
+    total_weights = 0
+    for alloc in tensor_allocs.values():
+        mem = getattr(alloc, "memory", None)
+        size = int(getattr(alloc, "size", 0))
+        if mem is None or size <= 0:
+            continue
+        # heliaAOT uses MemoryType (str enum) — str() yields "MRAM" etc.
+        key = str(mem).upper()
+        # Heuristic: constants live in read-only regions (MRAM/PSRAM).
+        # If we cannot tell, attribute everything to "arena" below.
+        # We still record the raw per-region sum here for reporting.
+        region_weights[key] = region_weights.get(key, 0) + size
+        region_weight_count[key] = region_weight_count.get(key, 0) + 1
+        total_weights += size
+
+    regions: list[MemoryRegionUsage] = []
+    for mem_type, usage in arena_usages.items():
+        key = str(mem_type).upper()
+        total = int(getattr(usage, "total_size", 0))
+        used = int(getattr(usage, "used", 0))
+        consumers: list[MemoryConsumer] = []
+        if used > 0:
+            consumers.append(MemoryConsumer(
+                name=f"{key.lower()}_arena", size=used, kind="arena",
+            ))
+        # Weights in read-only regions are reported separately since
+        # the AOT arena_usages may not include them.
+        w = region_weights.get(key, 0)
+        if w > 0 and key in ("MRAM", "PSRAM"):
+            consumers.append(MemoryConsumer(
+                name=f"{region_weight_count.get(key, 0)}_tensors",
+                size=w, kind="weights",
+            ))
+        regions.append(MemoryRegionUsage(
+            region=key,
+            capacity=total,
+            used=sum(c.size for c in consumers),
+            consumers=tuple(consumers),
+        ))
+
+    return MemoryPlan(
+        engine="helia_aot",
+        regions=tuple(regions),
+        model_weight_bytes=total_weights,
+        has_overflow=any(r.overflow for r in regions),
+    )
 
 
 # ---------------------------------------------------------------------------

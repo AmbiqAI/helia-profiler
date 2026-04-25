@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import glob
 import logging
+import os
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import jinja2
 
@@ -28,6 +29,26 @@ if TYPE_CHECKING:
     from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
+
+# ---------------------------------------------------------------------------
+# Toolchain mapping: config names → nsx CLI --toolchain values
+# ---------------------------------------------------------------------------
+_TOOLCHAIN_MAP: dict[str, str] = {
+    "arm-none-eabi-gcc": "gcc",
+    "gcc": "gcc",
+    "armclang": "armclang",
+    "atfe": "atfe",
+}
+
+
+def _nsx_toolchain(toolchain: str) -> str | None:
+    """Convert a config toolchain name to the ``nsx --toolchain`` value.
+
+    Returns *None* for the default (GCC) so the flag is omitted.
+    """
+    nsx_tc = _TOOLCHAIN_MAP.get(toolchain, toolchain)
+    return nsx_tc if nsx_tc != "gcc" else None
+
 
 # ---------------------------------------------------------------------------
 # SDK tier → module set mapping
@@ -171,6 +192,76 @@ _jinja_env = jinja2.Environment(
 )
 
 
+def _find_segger_rtt_dir() -> Path:
+    """Locate the SEGGER RTT source directory.
+
+    Search order:
+      1. ``SEGGER_RTT_PATH`` environment variable
+      2. Known paths relative to the helia-profiler source tree
+
+    Returns the directory containing ``RTT/`` and ``Config/`` subdirs.
+    """
+    # 1. Explicit environment variable
+    env_path = os.environ.get("SEGGER_RTT_PATH")
+    if env_path:
+        p = Path(env_path)
+        if (p / "RTT" / "SEGGER_RTT.c").exists():
+            return p
+        raise FirmwareError(
+            f"SEGGER_RTT_PATH={env_path} does not contain RTT/SEGGER_RTT.c",
+            hint="Set SEGGER_RTT_PATH to the root dir containing RTT/ and Config/ subdirs.",
+        )
+
+    # 2. Relative to helia-profiler source (monorepo layout)
+    try:
+        import helia_profiler as _hp
+
+        pkg_file = Path(_hp.__file__).resolve()
+        # src/helia_profiler/__init__.py → up 3 levels → helia-profiler/
+        hp_root = pkg_file.parents[2]
+        candidates = [
+            # neuralspot/benchmarks/runtime_benchmarks/extern/SEGGER_RTT/R7.70a
+            hp_root.parent / "benchmarks" / "runtime_benchmarks" / "extern" / "SEGGER_RTT" / "R7.70a",
+            # neuralspot/nsx-modules/nsx-ambiqsuite-r4/sdk/third_party/SEGGER/SEGGER_RTT_V680a
+            hp_root.parent / "nsx-modules" / "nsx-ambiqsuite-r4" / "sdk" / "third_party" / "SEGGER" / "SEGGER_RTT_V680a",
+        ]
+        for c in candidates:
+            if (c / "RTT" / "SEGGER_RTT.c").exists():
+                return c
+    except Exception:
+        pass
+
+    raise FirmwareError(
+        "SEGGER RTT source files not found",
+        hint=(
+            "Set SEGGER_RTT_PATH to the RTT source directory "
+            "(the folder containing RTT/ and Config/ subdirs)."
+        ),
+    )
+
+
+def _copy_segger_rtt(dest_dir: Path) -> None:
+    """Copy SEGGER RTT source files into *dest_dir*/rtt/."""
+    rtt_root = _find_segger_rtt_dir()
+    rtt_dest = dest_dir / "rtt"
+    rtt_dest.mkdir(parents=True, exist_ok=True)
+
+    # RTT source + header
+    for name in ("SEGGER_RTT.c", "SEGGER_RTT.h"):
+        src = rtt_root / "RTT" / name
+        if src.exists():
+            shutil.copy2(src, rtt_dest / name)
+
+    # Config header — nested in Config/ subdir
+    config_dest = rtt_dest / "Config"
+    config_dest.mkdir(parents=True, exist_ok=True)
+    conf_src = rtt_root / "Config" / "SEGGER_RTT_Conf.h"
+    if conf_src.exists():
+        shutil.copy2(conf_src, config_dest / "SEGGER_RTT_Conf.h")
+
+    log.info("Copied SEGGER RTT source from %s", rtt_root)
+
+
 def _model_to_header(model_path: Path) -> str:
     """Convert a .tflite model to a C header (xxd-style byte array)."""
     data = model_path.read_bytes()
@@ -214,6 +305,15 @@ def generate_app(ctx: PipelineContext) -> Path:
     # --- Resolve module list ---
     mod_names = _resolve_module_list(board.name, soc.sdk_tier)
 
+    # Add nsx-usb module when using USB CDC transport
+    transport = config.target.transport
+    if transport == "usb_cdc" and "nsx-usb" not in mod_names:
+        mod_names.append("nsx-usb")
+
+    # Add nsx-peripherals module when using PSRAM for model storage
+    if config.model.model_location == "psram" and "nsx-peripherals" not in mod_names:
+        mod_names.append("nsx-peripherals")
+
     # Build module descriptors (name + local flag)
     modules: list[dict[str, object]] = [{"name": m, "local": False} for m in mod_names]
 
@@ -250,12 +350,18 @@ def generate_app(ctx: PipelineContext) -> Path:
             engine_type=engine_type,
             cmake_vars=artifacts.cmake_vars,
             aot_cmake_target=tvars.get("aot_cmake_target", ""),
+            transport=transport,
+            model_location=config.model.model_location,
         )
     )
 
     # --- Source files ---
     src_dir = app_dir / "src"
     src_dir.mkdir(parents=True, exist_ok=True)
+
+    # --- Copy SEGGER RTT source when using RTT transport ---
+    if transport == "rtt":
+        _copy_segger_rtt(src_dir)
 
     # PMU preset
     first_preset = config.profiling.pmu_presets[0] if config.profiling.pmu_presets else "ml_default"
@@ -271,6 +377,14 @@ def generate_app(ctx: PipelineContext) -> Path:
     power_sync_enabled = config.power.enabled and config.power.mode == "external"
     sync_gpio_pin = config.power.sync_gpio_pin
 
+    # --- Heartbeat template vars (shared across engines) ---
+    hb = config.target.heartbeat
+    heartbeat_vars = {
+        "heartbeat_enabled": hb.enabled,
+        "heartbeat_every_n_ops": hb.every_n_ops if hb.enabled else 0,
+        "heartbeat_every_ms": hb.every_ms if hb.enabled else 0,
+    }
+
     if engine_type == "helia_aot":
         # --- AOT engine: use AOT-specific main template, no model embedding ---
         aot_prefix = tvars["aot_prefix"]
@@ -284,12 +398,20 @@ def generate_app(ctx: PipelineContext) -> Path:
                 pmu_pass_names=[p["name"] for p in pmu_passes],
                 power_sync_enabled=power_sync_enabled,
                 sync_gpio_pin=sync_gpio_pin,
+                transport=transport,
+                printf_linkage="static ",
+                **heartbeat_vars,
             )
         )
     else:
         # --- TFLM / heliaRT: embed model as byte array, use TFLM profiler ---
-        model_header = _model_to_header(config.model.path)
-        (src_dir / "model_data.h").write_text(model_header)
+        model_location = config.model.model_location
+
+        if model_location != "psram":
+            model_header = _model_to_header(config.model.path)
+            (src_dir / "model_data.h").write_text(model_header)
+
+        model_size = config.model.path.stat().st_size
 
         engine_header = tvars.get("engine_header", "tensorflow/lite/micro/micro_interpreter.h")
         (src_dir / "main.cc").write_text(
@@ -302,6 +424,11 @@ def generate_app(ctx: PipelineContext) -> Path:
                 pmu_pass_names=[p["name"] for p in pmu_passes],
                 power_sync_enabled=power_sync_enabled,
                 sync_gpio_pin=sync_gpio_pin,
+                transport=transport,
+                model_location=model_location,
+                model_size=model_size,
+                printf_linkage="",
+                **heartbeat_vars,
             )
         )
 
@@ -337,9 +464,14 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
 
     app_dir = ctx.firmware_dir
     board = ctx.board.name
+    timeouts = ctx.config.timeouts
+    toolchain = ctx.config.target.toolchain
 
-    nsx_cli.configure(app_dir)
-    nsx_cli.build(app_dir)
+    # Map config toolchain names to nsx CLI values
+    nsx_tc = _nsx_toolchain(toolchain)
+
+    nsx_cli.configure(app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s)
+    nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s)
 
     # Locate build output
     build_dir = app_dir / "build" / board
@@ -373,7 +505,11 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
 def flash_app(ctx: PipelineContext) -> None:
     """Invoke ``nsx flash`` to deploy the binary to the target."""
     assert ctx.firmware_dir is not None
+    toolchain = ctx.config.target.toolchain
+    nsx_tc = _nsx_toolchain(toolchain)
     nsx_cli.flash(
         ctx.firmware_dir,
+        toolchain=nsx_tc,
         jlink_serial=ctx.config.target.jlink_serial,
+        timeout_s=ctx.config.timeouts.flash_s,
     )

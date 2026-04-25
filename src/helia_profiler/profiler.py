@@ -11,12 +11,15 @@ from .config import ProfileConfig
 from .console import HpxConsole
 from .pipeline import PipelineContext, PipelineRunner
 from .stages import (
+    AnalyzeModelStage,
     BuildFirmwareStage,
     CapturePmuStage,
     CapturePowerStage,
     FlashFirmwareStage,
     GenerateFirmwareStage,
     GenerateReportStage,
+    PlanMemoryStage,
+    PreflightStage,
     PrepareEngineStage,
     ResolvePlatformStage,
 )
@@ -28,8 +31,11 @@ def build_default_pipeline(console: HpxConsole | None = None) -> PipelineRunner:
     """Create the standard profiling pipeline with all stages."""
     return PipelineRunner(
         [
+            PreflightStage(),
             ResolvePlatformStage(),
             PrepareEngineStage(),
+            AnalyzeModelStage(),
+            PlanMemoryStage(),
             GenerateFirmwareStage(),
             BuildFirmwareStage(),
             FlashFirmwareStage(),

@@ -32,6 +32,11 @@ def collect_checks() -> tuple[
     optional_specs = [
         ("Joulescope (power measurement)", "joulescope"),
     ]
+    # Optional toolchains (checked as binaries on PATH)
+    optional_tools = [
+        ("ARM Compiler (armclang)", "armclang"),
+        ("ARM fromelf (armclang)", "fromelf"),
+    ]
     optional: list[tuple[str, str, bool]] = []
     for label, pkg_name in optional_specs:
         try:
@@ -40,6 +45,9 @@ def collect_checks() -> tuple[
         except ImportError:
             available = False
         optional.append((label, pkg_name, available))
+
+    for label, binary in optional_tools:
+        optional.append((label, binary, shutil.which(binary) is not None))
 
     return checks, optional
 
