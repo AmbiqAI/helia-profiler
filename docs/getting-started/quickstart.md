@@ -1,98 +1,72 @@
 # Quick Start
 
-This guide walks through profiling a TFLite model end-to-end. You'll go from
-a `.tflite` file to per-layer cycle counts in a single command.
+Move from one-off CLI invocations to a YAML config you can check into git
+and re-run later. This page assumes you've already completed
+[your first profile](first-profile.md).
 
-## Prerequisites
+## Why a config file?
 
-- [Installed heliaPROFILER and toolchain](install.md)
-- An Ambiq EVB connected via J-Link USB (e.g. Apollo510 EVB)
+Two reasons:
 
-## 1. Check your setup
+- **Reproducibility** — record the exact engine, toolchain, counter
+  selection, and iteration count next to the model.
+- **Less typing** — long CLI invocations get tedious. The CLI is best for
+  one-off overrides; YAML is best for the things that don't change.
 
-```bash
-hpx doctor
-```
+The config file and CLI flags merge: anything in YAML is the baseline, and
+any CLI flag you pass overrides the matching field. See
+[Configuration](../guide/configuration.md) for the full schema.
 
-All required tools should show ✓. If anything is missing, see [Installation](install.md).
-
-## 2. Profile with defaults
-
-```bash
-hpx profile my_model.tflite --board apollo510_evb
-```
-
-This single command will:
-
-1. Generate a profiler firmware app (NSX project)
-2. Build it with `arm-none-eabi-gcc`
-3. Flash it to the connected EVB
-4. Capture PMU counter data over SWO
-5. Write results to `./results/`
-
-!!! tip
-    If you don't have a model handy, the repo includes a test fixture:
-    ```bash
-    hpx profile tests/fixtures/kws_ref_model.tflite --board apollo510_evb
-    ```
-
-## 3. View results
-
-Results are written to `./results/` by default:
-
-```
-results/
-├── summary.json           # High-level totals (cycles, memory, cache)
-├── profile_results.csv    # Per-layer PMU breakdown
-├── run_metadata.json      # Config, toolchain, platform info
-└── model_explorer/        # Model Explorer overlay JSONs
-    ├── me_overlay_ARM_PMU_CPU_CYCLES.json
-    ├── me_overlay_ARM_PMU_INST_RETIRED.json
-    └── ...
-```
-
-Open `summary.json` for a quick overview:
-
-```json
-{
-  "engine": "helia-rt",
-  "layers": 13,
-  "total_cycles": 2016376,
-  "overflow_detected": false,
-  "top_layers": [
-    {"op": "CONV_2D", "cycles": 338176, "pct": 16.8},
-    {"op": "CONV_2D", "cycles": 207749, "pct": 10.3}
-  ],
-  "memory": {
-    "arena_size": 131072,
-    "allocated_arena": 29780,
-    "model_size": 53936
-  }
-}
-```
-
-## 4. Use a config file
-
-For repeatable runs, create a YAML config:
+## A minimal config
 
 ```yaml title="hpx.yml"
 model:
-  path: my_model.tflite
-  arena_size: 131072
+  path: kws_model.tflite
 
 engine:
   type: helia-rt
 
 target:
   board: apollo510_evb
+```
+
+Run it:
+
+```bash
+hpx profile --config hpx.yml
+```
+
+Everything else falls back to defaults — RTT transport, GCC toolchain, CPU
+counter defaults, 100 iterations, results to `./results/`.
+
+## A real-world config
+
+This is a fuller example annotated with what each field controls. Pick the
+fields you care about; delete the rest.
+
+```yaml title="hpx.yml"
+model:
+  path: kws_model.tflite
+  arena_size: 131072            # (1)!
+  model_location: auto          # (2)!
+
+engine:
+  type: helia-rt
+  config:
+    variant: release-with-logs  # (3)!
+
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc  # (4)!
+  transport: rtt                # (5)!
 
 profiling:
-  pmu_counters:
-    cpu: all
-    memory: all
+  pmu_counters:                 # (6)!
+    cpu: default
+    memory: default
   per_layer: true
-  iterations: 5
-  warmup: 2
+  iterations: 100
+  warmup: 5
 
 output:
   format: csv
@@ -100,31 +74,62 @@ output:
   model_explorer: true
 ```
 
+1.  Tensor arena size in bytes. Required for TFLM/heliaRT. Set to ~1.5× the
+    `allocated_arena` value reported in your first run's `summary.json`.
+2.  `auto` (default — greedy fastest-fit), or pin explicitly to `tcm`,
+    `sram`, `mram`, or `psram`. See [Memory Placement](../guide/memory.md).
+3.  heliaRT library variant. `release-with-logs` keeps SWO printf available
+    for debugging; `release` is leaner.
+4.  Toolchain. See [Toolchains](../guide/toolchains.md) for `armclang` and
+    `atfe` setup.
+5.  Capture transport. See [Transports](../guide/transports.md).
+6.  PMU counter selection. `default` = curated set (4 per group); `all` =
+    every counter (multi-pass). Or list explicit counter names.
+
+## Common workflows
+
+### Compare two runs
+
+Keep configs side-by-side, run each, point them at different output
+directories:
+
 ```bash
-hpx profile --config hpx.yml
+hpx profile --config hpx_rt.yml      --output-dir results/rt
+hpx profile --config hpx_aot.yml     --output-dir results/aot
 ```
 
-## 5. Compare engines
+Diff the `summary.json` files or open both `profile_results.csv` files side
+by side in a spreadsheet.
 
-Profile the same model with a different engine by changing one field:
+### Override one field on the fly
 
-=== "heliaRT"
+Every config field is also a CLI flag:
 
-    ```bash
-    hpx profile my_model.tflite --engine helia-rt
-    ```
+```bash
+hpx profile --config hpx.yml --iterations 10 --board apollo3p_evb
+```
 
-=== "heliaAOT"
+### Try a different toolchain
 
-    ```bash
-    hpx profile my_model.tflite --engine helia-aot
-    ```
+```bash
+hpx profile --config hpx.yml --toolchain armclang
+```
 
-See [Engine Comparison](../examples/engine-comparison.md) for a detailed walkthrough.
+See [Toolchains](../guide/toolchains.md) for what each toolchain costs to
+install and the cycle-count differences.
+
+### Add power capture
+
+```bash
+hpx profile --config hpx.yml --power --power-duration 10
+```
+
+Requires a Joulescope and `pip install 'helia-profiler[power]'`. See
+[Power Measurement](../guide/power.md).
 
 ## What's next?
 
-- [Configuration](../guide/configuration.md) — full config reference
-- [Engines](../guide/engines.md) — choosing between TFLM, heliaRT, heliaAOT
-- [PMU Counters](../guide/pmu-counters.md) — understanding CPU, memory, and MVE events
-- [Examples](../examples/index.md) — recipes for common scenarios
+- [Configuration](../guide/configuration.md) — full YAML schema reference
+- [Inference Engines](../guide/engines.md) — RT vs AOT vs TFLM trade-offs
+- [Toolchains](../guide/toolchains.md) — GCC vs armclang vs ATfE
+- [Examples](../examples/index.md) — end-to-end recipes for common scenarios

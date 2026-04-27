@@ -1,37 +1,148 @@
-# hpx profile
+# `hpx profile`
 
-Profile a LiteRT model on Ambiq Apollo hardware.
+Build profiler firmware, flash the target, capture PMU/power data, and
+write a report.
 
-## Usage
+## Synopsis
 
 ```bash
-hpx profile [MODEL] [OPTIONS]
+hpx profile [MODEL] [--config FILE] [options]
 ```
 
-## Arguments
+## Positional argument
 
 | Argument | Description |
 |---|---|
-| `MODEL` | Path to `.tflite` model file (or set in `hpx.yml`) |
+| `MODEL` | Path to a `.tflite` model file. Optional if `model.path` is set in `--config`. |
 
-## Options
+## Top-level options
 
-| Flag | Type | Description |
-|---|---|---|
-| `--config` | path | YAML config file (`hpx.yml`) |
-| `--engine` | choice | Inference engine: `tflm`, `helia-rt`, `helia-aot` |
-| `--engine-config` | path | Engine-specific YAML config |
-| `--board` | string | Target board (default: `apollo510_evb`) |
-| `--toolchain` | string | Toolchain (default: `arm-none-eabi-gcc`) |
-| `--arena-size` | int | Tensor arena size in bytes |
-| `--pmu-presets` | list | PMU preset names (default: `basic_cpu`) |
-| `--per-layer` / `--no-per-layer` | flag | Per-layer breakdown (default: on) |
-| `--iterations` | int | Inference iterations (default: 100) |
-| `--power` | flag | Enable Joulescope power capture |
-| `--power-duration` | int | Power capture seconds (default: 30) |
-| `--output-dir` | path | Results output directory |
-| `--output-format` | choice | `csv` or `json` |
-| `--no-model-explorer` | flag | Skip Model Explorer overlay generation |
-| `--work-dir` | path | Working directory for generated firmware |
-| `--keep-work-dir` | flag | Keep working directory after run |
-| `-v` / `--verbose` | count | Increase verbosity (repeat for more) |
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--config FILE` | path | — | YAML config file (`hpx.yml`). CLI flags override its values. |
+| `-v`, `--verbose` | count | 0 | Increase log verbosity. `-v` = INFO, `-vv` = DEBUG. |
+| `-h`, `--help` | flag | — | Print help and exit. |
+
+## Engine selection
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--engine` | `tflm` \| `helia-rt` \| `helia-aot` | `tflm` | Inference engine. See [Engines](../guide/engines.md). |
+| `--engine-config FILE` | path | — | Engine-specific YAML loaded into `engine.config`. |
+
+## Model
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--arena-size` | int | (engine-specific) | Tensor arena size in bytes. |
+| `--model-location` | `auto` \| `tcm` \| `sram` \| `mram` \| `psram` | `auto` | Where to place arena + weights. See [Memory](../guide/memory.md). |
+
+## Target hardware
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--board` | string | `apollo510_evb` | Target board. `hpx boards` lists options. |
+| `--toolchain` | `arm-none-eabi-gcc` \| `gcc` \| `armclang` \| `atfe` | `arm-none-eabi-gcc` | Cross-compiler. See [Toolchains](../guide/toolchains.md). |
+| `--jlink-serial` | string | auto-detect | Pin a specific J-Link probe by serial number. |
+| `--transport` | `rtt` \| `usb_cdc` \| `swo` | `rtt` | Capture transport. See [Transports](../guide/transports.md). |
+
+## Profiling
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--pmu-counters NAME=SEL ...` | list | `cpu=default` | Counter selection per group. `SEL` is `default`, `all`, or a comma-separated counter list. |
+| `--pmu-presets NAME ...` | list | `basic_cpu` | Legacy preset names (kept for backward compatibility). |
+| `--per-layer` | flag | on | Per-layer breakdown (default). |
+| `--no-per-layer` | flag | — | Disable per-layer breakdown; capture whole-model only. |
+| `--iterations` | int | 100 | Inference iterations averaged in the report. |
+| `--warmup` | int | 5 | Warmup iterations before measurement. |
+
+## Power
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--power` | flag | off | Enable power capture. See [Power](../guide/power.md). |
+| `--power-driver` | `joulescope` \| `joulescope-js110` \| `joulescope-js220` \| `ondevice` | `joulescope` | Power instrument driver. |
+| `--power-mode` | `external` \| `internal` | `external` | External Joulescope vs on-device measurement. |
+| `--power-duration` | int | 30 | Capture window length in seconds. |
+| `--sync-gpio` | int | 10 | GPIO pin the firmware toggles around inference. |
+
+## Output
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--output-dir DIR` | path | `./results` | Where to write `summary.json`, `profile_results.csv`, and overlays. |
+| `--output-format` | `csv` \| `json` | `csv` | Primary report format. |
+| `--no-model-explorer` | flag | — | Skip Model Explorer overlay generation. |
+| `--detailed` | flag | off | Emit per-preset CSVs and a memory plan dump. |
+
+## Build / debug
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--work-dir DIR` | path | tempdir | Working directory for generated firmware. Useful for debugging the generated NSX project. |
+| `--keep-work-dir` | flag | off | Don't delete the work directory at exit. |
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | Success |
+| 1 | `ConfigError` — bad YAML or invalid CLI combination |
+| 2 | `PlatformError` — unsupported board/SoC |
+| 3 | `EngineError` — engine adapter failure (download, AOT compile, etc.) |
+| 4 | `FirmwareError` — template rendering failure |
+| 5 | `BuildError` — NSX build failure |
+| 6 | `CaptureError` — flash, transport, or PMU capture failure |
+| 7 | `PowerError` — Joulescope driver failure |
+| 8 | `ReportError` — report generation failure |
+
+## Examples
+
+### Quickest possible run
+
+```bash
+hpx profile model.tflite
+```
+
+### Full repeatable run with a config
+
+```bash
+hpx profile --config hpx.yml
+```
+
+### Override a few fields
+
+```bash
+hpx profile --config hpx.yml \
+  --board apollo3p_evb \
+  --iterations 50 \
+  --output-dir ./results/ap3p
+```
+
+### Compare engines (two runs)
+
+```bash
+hpx profile model.tflite --engine helia-rt  --output-dir results/rt
+hpx profile model.tflite --engine helia-aot --output-dir results/aot
+```
+
+### Compare toolchains
+
+```bash
+hpx profile model.tflite --toolchain gcc      --output-dir results/gcc
+hpx profile model.tflite --toolchain armclang --output-dir results/armclang
+```
+
+### Add power capture
+
+```bash
+hpx profile model.tflite --power --power-duration 10
+```
+
+### Inspect generated firmware
+
+```bash
+hpx profile model.tflite --keep-work-dir --work-dir ./build
+ls ./build/firmware/
+```

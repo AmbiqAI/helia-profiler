@@ -111,11 +111,15 @@ nav:
   - Getting Started:
       - Overview: getting-started/index.md
       - Installation: getting-started/install.md
+      - First Profile: getting-started/first-profile.md
       - Quick Start: getting-started/quickstart.md
   - User Guide:
       - Configuration: guide/configuration.md
-      - Engines: guide/engines.md
+      - Inference Engines: guide/engines.md
+      - Toolchains: guide/toolchains.md
       - Boards & Platforms: guide/boards.md
+      - Capture Transports: guide/transports.md
+      - Memory Placement: guide/memory.md
       - PMU Counters: guide/pmu-counters.md
       - Power Measurement: guide/power.md
       - Model Explorer Overlays: guide/model-explorer.md
@@ -125,6 +129,7 @@ nav:
       - Basic Profiling: examples/basic-profiling.md
       - Per-Layer Breakdown: examples/per-layer.md
       - Engine Comparison: examples/engine-comparison.md
+      - Toolchain Comparison: examples/toolchain-comparison.md
       - Power Profiling: examples/power-profiling.md
   - Architecture:
       - Overview: architecture/index.md

@@ -36,4 +36,12 @@ Walkthroughs for common profiling scenarios.
 
     [:octicons-arrow-right-24: Read](power-profiling.md)
 
+-   :material-tools:{ .lg .middle } __Toolchain Comparison__
+
+    ---
+
+    Compare GCC, armclang, and ATfE on the same model and engine.
+
+    [:octicons-arrow-right-24: Read](toolchain-comparison.md)
+
 </div>

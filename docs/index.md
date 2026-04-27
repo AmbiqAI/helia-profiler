@@ -82,16 +82,12 @@ across TFLM, heliaRT, and heliaAOT.
 pip install helia-profiler          # (1)!
 hpx doctor                          # (2)!
 hpx profile model.tflite            # (3)!
-hpx profile model.tflite \
-    --engine helia-aot \
-    --board apollo510_evb \
-    --pmu-presets full_cpu mve       # (4)!
 ```
 
 1.  Install heliaPROFILER and its dependencies.
 2.  Check that the ARM toolchain, J-Link, and NSX are available.
-3.  Profile with defaults — heliaRT on Apollo 510, CPU counters.
-4.  Full control — choose engine, board, and counter presets.
+3.  Profile with defaults — heliaRT, GCC, RTT capture, CPU counters, on the
+    connected Apollo510 EVB. Results land in `./results/`.
 
 The pipeline handles firmware generation, build, flash, data capture, and
 report output. Each step is a modular
