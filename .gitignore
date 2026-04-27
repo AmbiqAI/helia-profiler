@@ -37,3 +37,12 @@ results/
 # uv
 uv.lock
 site/
+
+# Profiling outputs (any location) — consolidate under results/ when possible
+**/results_*/
+**/work_*/
+**/sweep_*/
+**/validation_results_*/
+
+# Personal scratch runners (hardcoded paths)
+run_*.py
