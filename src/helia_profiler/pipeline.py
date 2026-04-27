@@ -66,6 +66,16 @@ class PipelineContext:
     # Memory plan (stage: plan_memory)
     memory_plan: MemoryPlan | None = None
 
+    #: Resolved arena placement region: ``"tcm"``, ``"sram"``, ``"mram"``,
+    #: or ``"psram"``.  Set by :class:`PlanMemoryStage` from
+    #: ``config.model.model_location`` and the SoC memory layout.
+    arena_region: str | None = None
+
+    #: Resolved weights placement region: ``"tcm"``, ``"sram"``, ``"mram"``,
+    #: or ``"psram"``.  Set by :class:`PlanMemoryStage`.  For TFLM/heliaRT
+    #: this drives the section attribute applied to ``model_data[]``.
+    weights_region: str | None = None
+
     # Capture (stage: capture_pmu / capture_power)
     pmu_result: PmuResult | None = None
     power_result: PowerResult | None = None
@@ -164,6 +174,14 @@ class PipelineRunner:
                 self._console.pipeline_done()
 
         finally:
+            # Release Joulescope passthrough opened by EnsureBoardPoweredStage
+            # (if any) so the relay state is left clean for the next run.
+            handle = getattr(ctx, "_power_driver_handle", None)
+            if handle is not None:
+                try:
+                    handle.disable_passthrough()
+                except Exception:  # pragma: no cover — best-effort cleanup
+                    log.debug("Joulescope passthrough release failed (ignored)")
             if should_cleanup:
                 shutil.rmtree(work_dir, ignore_errors=True)
 

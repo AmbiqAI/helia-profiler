@@ -49,12 +49,14 @@ def main(argv: list[str] | None = None) -> None:
     g_engine.add_argument(
         "--model-location",
         type=str,
-        choices=["mram", "psram"],
+        choices=["auto", "tcm", "sram", "mram", "psram"],
         help=(
-            "Where to place model weights. "
-            "'mram' embeds in flash (default). "
-            "'psram' loads at runtime via J-Link into PSRAM "
-            "(requires PSRAM-equipped board, e.g. apollo510_evb)."
+            "Where to place model weights and arena. "
+            "'auto' (default) picks fastest fit (TCM > SRAM > MRAM), "
+            "arena prioritized when regions compete. "
+            "'tcm'/'sram'/'mram' force both into that region. "
+            "'psram' uploads weights at runtime via J-Link "
+            "(requires PSRAM-equipped board)."
         ),
     )
 
@@ -121,6 +123,25 @@ def main(argv: list[str] | None = None) -> None:
     )
     g_power.add_argument(
         "--sync-gpio", type=int, help="GPIO pin for external power sync (default: 10)"
+    )
+    g_power.add_argument(
+        "--no-ensure-power",
+        action="store_true",
+        help=(
+            "Skip the Joulescope auto-passthrough scan at start-up. "
+            "Use when the board is on a bench supply or you want to "
+            "manage the JS relay yourself."
+        ),
+    )
+    g_power.add_argument(
+        "--js-serial",
+        dest="js_serial",
+        type=str,
+        default=None,
+        help=(
+            "Joulescope serial number (e.g. '004204') to disambiguate "
+            "when multiple devices are connected."
+        ),
     )
 
     # -- Output --
@@ -378,6 +399,10 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli.setdefault("power", {})["duration_s"] = args.power_duration
     if args.sync_gpio is not None:
         cli.setdefault("power", {})["sync_gpio_pin"] = args.sync_gpio
+    if getattr(args, "no_ensure_power", False):
+        cli.setdefault("target", {})["ensure_board_powered"] = False
+    if getattr(args, "js_serial", None):
+        cli.setdefault("power", {})["serial"] = args.js_serial
 
     if args.output_dir is not None:
         cli.setdefault("output", {})["dir"] = str(args.output_dir)

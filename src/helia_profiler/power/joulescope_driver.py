@@ -17,8 +17,94 @@ from .base import PowerMode, PowerResult, PowerSample, PowerSummary
 log = logging.getLogger("hpx")
 
 
+def _scan_and_open(serial: str | None = None):
+    """Scan for a Joulescope, optionally filtered by serial, and open it.
+
+    Returns an *opened* device. Translates the common failure modes into
+    actionable :class:`PowerError` messages:
+
+    * No Joulescope plugged in.
+    * Multiple Joulescopes plugged in but no ``serial`` specified.
+    * The requested ``serial`` is not present.
+    * The device is plugged in but already claimed by another process
+      (Joulescope GUI, a stuck ``jsdrv``, a leaked Python handle, etc.) —
+      surfaced via the libusb ``-3`` / "claim_interface" error.
+    """
+    import joulescope
+
+    try:
+        devices = joulescope.scan(name="Joulescope")
+    except Exception as exc:  # pragma: no cover - depends on env
+        raise PowerError(
+            f"Joulescope scan failed: {exc}",
+            hint="Check USB connection and pyjoulescope_driver install.",
+        ) from exc
+
+    if not devices:
+        raise PowerError(
+            "No Joulescope detected",
+            hint="Plug in the Joulescope and ensure it is powered on.",
+        )
+
+    if serial is not None:
+        wanted = str(serial).lstrip("0") or "0"
+        matched = [
+            d for d in devices
+            if wanted in (getattr(d, "device_path", "") or "")
+            or wanted in str(getattr(d, "serial_number", "") or "")
+        ]
+        if not matched:
+            paths = [getattr(d, "device_path", "?") for d in devices]
+            raise PowerError(
+                f"Joulescope serial '{serial}' not found among connected devices",
+                hint=f"Connected devices: {', '.join(paths)}. "
+                "Update power.serial / --js-serial to match.",
+            )
+        device = matched[0]
+    elif len(devices) > 1:
+        paths = [getattr(d, "device_path", "?") for d in devices]
+        raise PowerError(
+            f"{len(devices)} Joulescopes connected — please disambiguate",
+            hint=(
+                f"Set power.serial (or --js-serial) to one of: {', '.join(paths)}."
+            ),
+        )
+    else:
+        device = devices[0]
+
+    try:
+        device.open()
+    except Exception as exc:
+        msg = str(exc).lower()
+        path = getattr(device, "device_path", "?")
+        if (
+            "claim_interface" in msg
+            or "libusb" in msg
+            or "jsdrv_open" in msg
+            or "-3" in msg
+            or "access" in msg
+        ):
+            raise PowerError(
+                f"Joulescope {path} is already in use by another process",
+                hint=(
+                    "Close the Joulescope desktop app or any other process "
+                    "holding the device, then retry. On macOS you can also "
+                    "run 'pkill -f jsdrv' to release stuck handles."
+                ),
+            ) from exc
+        raise PowerError(
+            f"Failed to open Joulescope {path}: {exc}",
+            hint="Check USB connection and re-plug the device if needed.",
+        ) from exc
+
+    return device
+
+
 class JoulescopeDriver:
     """External power driver using the Joulescope JS110/JS220."""
+
+    def __init__(self, *, serial: str | None = None) -> None:
+        self._serial = serial
 
     @property
     def name(self) -> str:
@@ -74,13 +160,7 @@ class JoulescopeDriver:
             sampling_frequency,
         )
 
-        try:
-            device = joulescope.scan_require_one(name="Joulescope")
-        except Exception as exc:
-            raise PowerError(
-                f"Failed to find Joulescope device: {exc}",
-                hint="Ensure the Joulescope is connected via USB and powered on.",
-            ) from exc
+        device = _scan_and_open(self._serial)
 
         samples: list[PowerSample] = []
         total_current = 0.0
@@ -88,7 +168,7 @@ class JoulescopeDriver:
         peak_current = 0.0
 
         try:
-            with device:
+            try:
                 device.parameter_set("sampling_frequency", sampling_frequency)
                 device.parameter_set("i_range", "auto")
 
@@ -117,13 +197,18 @@ class JoulescopeDriver:
                         voltage_v=float(voltage_data[i]),
                     ))
 
-        except PowerError:
-            raise
-        except Exception as exc:
-            raise PowerError(
-                f"Joulescope capture failed: {exc}",
-                hint="Check USB connection and ensure no other software is using the device.",
-            ) from exc
+            except PowerError:
+                raise
+            except Exception as exc:
+                raise PowerError(
+                    f"Joulescope capture failed: {exc}",
+                    hint="Check USB connection and ensure no other software is using the device.",
+                ) from exc
+        finally:
+            try:
+                device.close()
+            except Exception:
+                pass
 
         n = len(samples)
         if n == 0:
@@ -175,22 +260,15 @@ class JoulescopeDriver:
             settle_time_s,
         )
 
-        try:
-            device = joulescope.scan_require_one(name="Joulescope")
-        except Exception as exc:
-            raise PowerError(
-                f"Failed to find Joulescope for power cycle: {exc}",
-                hint="Ensure the Joulescope is connected via USB.",
-            ) from exc
+        device = _scan_and_open(self._serial)
 
         try:
-            with device:
-                device.parameter_set("i_range", "off")
-                log.info("Target power OFF")
-                time.sleep(off_time_s)
-                device.parameter_set("i_range", "auto")
-                log.info("Target power ON — waiting %.1fs for boot", settle_time_s)
-                time.sleep(settle_time_s)
+            device.parameter_set("i_range", "off")
+            log.info("Target power OFF")
+            time.sleep(off_time_s)
+            device.parameter_set("i_range", "auto")
+            log.info("Target power ON — waiting %.1fs for boot", settle_time_s)
+            time.sleep(settle_time_s)
         except PowerError:
             raise
         except Exception as exc:
@@ -198,23 +276,29 @@ class JoulescopeDriver:
                 f"Joulescope power cycle failed: {exc}",
                 hint="Check USB connection.",
             ) from exc
+        finally:
+            try:
+                device.close()
+            except Exception:
+                pass
 
         log.info("Power-cycle reset complete")
 
     def enable_passthrough(self) -> None:
         """Open the Joulescope and enable current passthrough (close relay)."""
-        import joulescope
-
+        device = _scan_and_open(self._serial)
         try:
-            self._pt_device = joulescope.scan_require_one(name="Joulescope")
+            device.parameter_set("i_range", "auto")
         except Exception as exc:
+            try:
+                device.close()
+            except Exception:
+                pass
             raise PowerError(
-                f"Failed to find Joulescope: {exc}",
-                hint="Ensure the Joulescope is connected via USB.",
+                f"Failed to enable Joulescope passthrough: {exc}",
+                hint="Check USB connection.",
             ) from exc
-
-        self._pt_device.open()
-        self._pt_device.parameter_set("i_range", "auto")
+        self._pt_device = device
         log.info("Joulescope passthrough enabled")
 
     def disable_passthrough(self) -> None:

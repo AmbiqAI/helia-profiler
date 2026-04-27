@@ -62,13 +62,16 @@ def _register_builtins() -> None:
     _DRIVERS["ondevice"] = OnDeviceDriver
 
 
-def _auto_detect_joulescope() -> PowerDriver:
+def _auto_detect_joulescope(*, serial: str | None = None) -> PowerDriver:
     """Try JS110 first, then JS220.  Return the first usable driver."""
     _register_builtins()
 
     # Prefer JS110 (more widely deployed, simpler blocking API)
     js110_cls = _DRIVERS["joulescope-js110"]
-    js110 = js110_cls()
+    try:
+        js110 = js110_cls(serial=serial)  # type: ignore[call-arg]
+    except TypeError:
+        js110 = js110_cls()
     try:
         js110.check_available()
         log.info("Auto-detected Joulescope JS110")
@@ -78,7 +81,10 @@ def _auto_detect_joulescope() -> PowerDriver:
 
     # Fall back to JS220
     js220_cls = _DRIVERS["joulescope-js220"]
-    js220 = js220_cls()
+    try:
+        js220 = js220_cls(serial=serial)  # type: ignore[call-arg]
+    except TypeError:
+        js220 = js220_cls()
     try:
         js220.check_available()
         log.info("Auto-detected Joulescope JS220")
@@ -93,14 +99,14 @@ def _auto_detect_joulescope() -> PowerDriver:
     )
 
 
-def get_driver(name: str) -> PowerDriver:
+def get_driver(name: str, *, serial: str | None = None) -> PowerDriver:
     """Instantiate and return the named power driver.
 
     The special name ``"joulescope"`` auto-detects JS110 vs JS220.
     Raises :class:`PowerError` if the name is unknown.
     """
     if name == "joulescope":
-        return _auto_detect_joulescope()
+        return _auto_detect_joulescope(serial=serial)
 
     _register_builtins()
     cls = _DRIVERS.get(name)
@@ -109,7 +115,11 @@ def get_driver(name: str) -> PowerDriver:
             f"Unknown power driver '{name}'",
             hint=f"Available drivers: joulescope, {', '.join(_DRIVERS)}",
         )
-    return cls()
+    try:
+        return cls(serial=serial)  # type: ignore[call-arg]
+    except TypeError:
+        # Driver doesn't accept a serial kwarg (e.g. ondevice).
+        return cls()
 
 
 def list_drivers() -> list[str]:

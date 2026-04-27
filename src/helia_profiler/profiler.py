@@ -15,6 +15,7 @@ from .stages import (
     BuildFirmwareStage,
     CapturePmuStage,
     CapturePowerStage,
+    EnsureBoardPoweredStage,
     FlashFirmwareStage,
     GenerateFirmwareStage,
     GenerateReportStage,
@@ -32,6 +33,7 @@ def build_default_pipeline(console: HpxConsole | None = None) -> PipelineRunner:
     return PipelineRunner(
         [
             PreflightStage(),
+            EnsureBoardPoweredStage(),
             ResolvePlatformStage(),
             PrepareEngineStage(),
             AnalyzeModelStage(),

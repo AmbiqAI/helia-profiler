@@ -20,7 +20,7 @@ def _try_power_cycle(ctx: PipelineContext) -> bool:
     try:
         from ..power import get_driver
 
-        driver = get_driver(ctx.config.power.driver)
+        driver = get_driver(ctx.config.power.driver, serial=ctx.config.power.serial)
         driver.power_cycle(off_time_s=1.0, settle_time_s=2.0)
         log.info("Power-cycle reset succeeded — retrying flash")
         return True

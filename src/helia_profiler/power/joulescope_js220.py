@@ -22,6 +22,9 @@ log = logging.getLogger("hpx")
 class JoulescopeJS220Driver:
     """External power driver for Joulescope JS220."""
 
+    def __init__(self, *, serial: str | None = None) -> None:
+        self._serial = serial
+
     @property
     def name(self) -> str:
         return "Joulescope JS220"
@@ -93,9 +96,33 @@ class JoulescopeJS220Driver:
                     "Use 'joulescope-js110' driver for a JS110.",
                 )
 
-            device_path = device_paths[0]
+            if self._serial:
+                wanted = str(self._serial).lstrip("0") or "0"
+                matched = [p for p in device_paths if wanted in p]
+                if not matched:
+                    raise PowerError(
+                        f"JS220 serial '{self._serial}' not found",
+                        hint=f"Connected JS220s: {', '.join(device_paths)}",
+                    )
+                device_path = matched[0]
+            elif len(device_paths) > 1:
+                raise PowerError(
+                    f"{len(device_paths)} Joulescope JS220s connected — please disambiguate",
+                    hint=f"Set power.serial / --js-serial to one of: {', '.join(device_paths)}",
+                )
+            else:
+                device_path = device_paths[0]
             log.info("JS220 device: %s", device_path)
-            driver.open(device_path)
+            try:
+                driver.open(device_path)
+            except Exception as exc:
+                msg = str(exc).lower()
+                if "claim" in msg or "libusb" in msg or "-3" in msg or "access" in msg:
+                    raise PowerError(
+                        f"JS220 {device_path} is already in use by another process",
+                        hint="Close the Joulescope desktop app or any other process holding the device.",
+                    ) from exc
+                raise
 
             stats_accum: list[dict[str, Any]] = []
 

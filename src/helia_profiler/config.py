@@ -44,11 +44,27 @@ DEFAULT_DOWNLOAD_ASSET_S = 300
 
 @dataclass(frozen=True)
 class ModelConfig:
-    """Model file and arena sizing."""
+    """Model file and arena sizing.
+
+    ``model_location`` controls where weights and the tensor arena live.
+    Valid values:
+
+    * ``auto`` *(default)* — plan-memory stage picks the fastest region(s)
+      that fit. Greedy fastest-fit with arena prioritized over weights when
+      the two compete for the same region. Order: TCM → SRAM → MRAM.
+    * ``tcm`` — force both arena and weights into DTCM (highest performance,
+      smallest capacity). Fails preflight if the SoC has no TCM or it
+      doesn't fit.
+    * ``sram`` — force both into shared SRAM.
+    * ``mram`` — weights stay in MRAM/Flash (rodata); arena goes to TCM
+      when available, else SRAM. Matches pre-auto-placement behavior.
+    * ``psram`` — weights uploaded to external PSRAM at runtime via J-Link;
+      arena in SRAM. Requires a PSRAM-capable board.
+    """
 
     path: Path
     arena_size: int | None = None  # bytes; None = let engine/firmware report
-    model_location: str = "mram"  # "mram" or "psram"
+    model_location: str = "auto"   # auto | tcm | sram | mram | psram
 
 
 @dataclass(frozen=True)
@@ -131,6 +147,11 @@ class TargetConfig:
     jlink_serial: str | None = None  # select J-Link by S/N (None = auto)
     transport: str = DEFAULT_TRANSPORT  # "rtt", "usb_cdc", or "swo"
     heartbeat: HeartbeatConfig = field(default_factory=HeartbeatConfig)
+    # When True (default), scan for a Joulescope at the start of `hpx profile`
+    # and enable current passthrough so the board powers on before flashing.
+    # No-op when no Joulescope is detected.  Set to False to skip the scan
+    # entirely (e.g. board is on a bench supply).
+    ensure_board_powered: bool = True
 
 
 @dataclass(frozen=True)
@@ -153,6 +174,13 @@ class ProfilingConfig:
     per_layer: bool = True
     iterations: int = DEFAULT_ITERATIONS
     warmup: int = DEFAULT_WARMUP
+    # Extreme benchmarking mode: power down memory regions the model does not
+    # use to lower the energy floor.  Currently powers down SSRAM (3 MB) and
+    # collapses MRAM to a single bank (NVM0 only).  Only safe when the model
+    # lives entirely in TCM (model_location == "tcm"); a preflight check
+    # rejects other placements.  Code keeps running from MRAM, so transports
+    # (RTT/USB/SWO) and printf remain available throughout the run.
+    extreme_mode: bool = False
 
 
 @dataclass(frozen=True)
@@ -165,6 +193,10 @@ class PowerConfig:
     duration_s: int = DEFAULT_POWER_DURATION_S
     io_voltage: float = DEFAULT_IO_VOLTAGE
     sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN  # GPIO for external sync
+    # Optional Joulescope serial number (e.g. "004204") to disambiguate
+    # when more than one device is plugged in. Leave None to auto-pick the
+    # single available device (and fail loudly if multiple are present).
+    serial: str | None = None
 
 
 @dataclass(frozen=True)
@@ -236,7 +268,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
     model = ModelConfig(
         path=Path(model_d["path"]),
         arena_size=model_d.get("arena_size"),
-        model_location=model_d.get("model_location", "mram"),
+        model_location=model_d.get("model_location", "auto"),
     )
 
     engine_type_raw = engine_d.get("type", "tflm")
@@ -275,6 +307,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             jlink_serial=target_d.get("jlink_serial"),
             transport=target_d.get("transport", DEFAULT_TRANSPORT),
             heartbeat=_build_heartbeat(target_d.get("heartbeat")),
+            ensure_board_powered=bool(target_d.get("ensure_board_powered", True)),
         ),
         profiling=ProfilingConfig(
             pmu_presets=pmu_presets,
@@ -282,6 +315,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             per_layer=profiling_d.get("per_layer", True),
             iterations=profiling_d.get("iterations", DEFAULT_ITERATIONS),
             warmup=profiling_d.get("warmup", DEFAULT_WARMUP),
+            extreme_mode=bool(profiling_d.get("extreme_mode", False)),
         ),
         power=PowerConfig(
             enabled=power_d.get("enabled", False),
@@ -290,6 +324,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             duration_s=power_d.get("duration_s", DEFAULT_POWER_DURATION_S),
             io_voltage=power_d.get("io_voltage", DEFAULT_IO_VOLTAGE),
             sync_gpio_pin=power_d.get("sync_gpio_pin", DEFAULT_SYNC_GPIO_PIN),
+            serial=power_d.get("serial"),
         ),
         output=OutputConfig(
             format=output_d.get("format", "csv"),

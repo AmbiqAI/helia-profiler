@@ -52,11 +52,16 @@ static unsigned int model_data_len = {{ model_size }};
 static constexpr int kArenaSize = {{ arena_size }};
 static constexpr int kMaxOps = 128;
 
-{% if model_location == "psram" %}
-// Arena in SRAM — TCM is too small for large-model workloads.
+{# Arena placement is driven by the resolved logical region from
+   PlanMemoryStage. TCM is fastest (single-cycle, tightly-coupled);
+   SRAM is shared on-bus memory. #}
+{% if arena_region == "tcm" %}
+NSX_MEM_FAST_BSS alignas(16) static uint8_t g_arena[kArenaSize];
+{% elif arena_region == "sram" %}
 NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_arena[kArenaSize];
 {% else %}
-NSX_MEM_FAST_BSS alignas(16) static uint8_t g_arena[kArenaSize];
+// Fallback: default BSS (typically TCM on AP5, otherwise main RAM)
+alignas(16) static uint8_t g_arena[kArenaSize];
 {% endif %}
 static HpxPmuProfiler g_profiler;
 
@@ -119,6 +124,7 @@ int main(void) {
     NS_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
     dwt_init();
     sync_gpio_init();
+{% include "_extreme_mode.j2" %}
 {% if transport == "usb_cdc" %}
 
     // Initialize USB CDC and wait for host to connect (DTR)
@@ -191,6 +197,7 @@ int main(void) {
 
     hpx_printf("\n--- HPX_START ---\n");
     hpx_printf("HPX_VERSION=1\n");
+    hpx_printf("HPX_EXTREME_MODE=%d\n", {{ 1 if extreme_mode and model_location == "tcm" else 0 }});
     hpx_printf("HPX_MODEL_SIZE=%u\n", model_data_len);
     hpx_printf("HPX_ARENA_SIZE=%d\n", kArenaSize);
     hpx_printf("HPX_ITERATIONS={{ iterations }}\n");

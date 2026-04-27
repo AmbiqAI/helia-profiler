@@ -9,10 +9,10 @@ Checks performed (in order):
 1. **Model file** — exists, is a regular file, non-empty, has a ``.tflite``
    extension, starts with the TFLite ``TFL3`` magic string.
 2. **Arena size** — if specified, is positive.
-3. **Model location** — one of ``mram`` or ``psram``.
+3. **Model location** — one of ``auto``, ``tcm``, ``sram``, ``mram`` or ``psram``.
 4. **Output directory** — can be created + written to.
-5. **Host toolchain** — ``nsx``, ``cmake``, ``ninja``, the ARM GCC prefix,
-   and ``JLinkExe`` are on PATH.
+5. **Host toolchain** — ``nsx``, ``cmake``, ``ninja``, the selected compiler,
+   and ``JLinkExe`` are available. ATfE is located via ``ATFE_ROOT``.
 6. **Transport-specific tools** — e.g. ``JLinkSWOViewerCL`` when
    ``transport=swo``; the Python ``pyocd`` module isn't required because
    heliaPROFILER uses J-Link directly.
@@ -25,6 +25,7 @@ so running preflight on a laptop without a board attached is safe.
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 from pathlib import Path
 
@@ -38,7 +39,7 @@ log = logging.getLogger("hpx")
 # versions emit the identifier at offset 4 (after the root-table offset),
 # so we accept either placement.
 _TFLITE_MAGIC = b"TFL3"
-_VALID_MODEL_LOCATIONS = ("mram", "psram")
+_VALID_MODEL_LOCATIONS = ("auto", "tcm", "sram", "mram", "psram")
 
 
 class PreflightStage:
@@ -154,10 +155,12 @@ def _check_host_tools(transport: str, toolchain: str) -> None:
     ]
 
     # Toolchain-specific compiler binary check.
-    if toolchain in ("armclang", "atfe"):
+    if toolchain == "armclang":
         required.append(
             (toolchain, f"ARM Compiler ({toolchain}) (https://developer.arm.com/tools-and-software/embedded/arm-compiler)"),
         )
+    elif toolchain == "atfe":
+        _check_atfe_tools()
     else:
         gcc_cmd = toolchain if "gcc" in toolchain else f"{toolchain}-gcc"
         required.append(
@@ -183,5 +186,30 @@ def _check_host_tools(transport: str, toolchain: str) -> None:
                 "Install the following and re-run:\n"
                 f"{joined}\n"
                 "Run 'hpx doctor' for a full diagnostic."
+            ),
+        )
+
+
+def _check_atfe_tools() -> None:
+    root = os.environ.get("ATFE_ROOT")
+    if not root:
+        raise ConfigError(
+            "ATfE toolchain requested, but ATFE_ROOT is not set.",
+            hint=(
+                "Set ATFE_ROOT to the Arm Toolchain for Embedded install "
+                "directory, e.g. export ATFE_ROOT=/Applications/ATFEToolchain/ATfE-22.1.0."
+            ),
+        )
+
+    bin_dir = Path(root).expanduser() / "bin"
+    required = ("clang", "clang++", "llvm-ar", "llvm-objcopy", "llvm-size")
+    missing = [name for name in required if not (bin_dir / name).exists()]
+    if missing:
+        raise ConfigError(
+            f"ATfE toolchain incomplete under ATFE_ROOT: {bin_dir}",
+            hint=(
+                "Expected these executables: "
+                f"{', '.join(required)}. Missing: {', '.join(missing)}. "
+                "Install ATfE with the newlib overlay or correct ATFE_ROOT."
             ),
         )

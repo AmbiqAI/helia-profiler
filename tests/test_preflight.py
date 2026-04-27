@@ -140,6 +140,29 @@ class TestPreflightHostTools:
             with pytest.raises(ConfigError, match="JLinkExe"):
                 PreflightStage().run(ctx)
 
+    def test_atfe_uses_atfe_root_tools(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path, {"target": {"toolchain": "atfe"}})
+        atfe_root = tmp_path / "atfe"
+        bin_dir = atfe_root / "bin"
+        bin_dir.mkdir(parents=True)
+        for tool in ("clang", "clang++", "llvm-ar", "llvm-objcopy", "llvm-size"):
+            (bin_dir / tool).write_text("")
+
+        def which_no_atfe_binary(name: str) -> str | None:
+            return None if name == "atfe" else f"/usr/bin/{name}"
+
+        with patch.dict("os.environ", {"ATFE_ROOT": str(atfe_root)}):
+            with patch("shutil.which", side_effect=which_no_atfe_binary):
+                PreflightStage().run(ctx)
+
+    def test_atfe_missing_root_raises(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path, {"target": {"toolchain": "atfe"}})
+
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("shutil.which", side_effect=_all_tools_present):
+                with pytest.raises(ConfigError, match="ATFE_ROOT"):
+                    PreflightStage().run(ctx)
+
 
 class TestPreflightOutputDir:
     def test_creates_missing_output_dir(self, tmp_path: Path):

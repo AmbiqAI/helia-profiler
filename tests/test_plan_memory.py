@@ -49,20 +49,42 @@ class TestMemoryRegionUsage:
 
 
 class TestPlanMemorySynthesise:
-    def test_synth_plan_for_tflm_mram_weights(self, tmp_path: Path):
+    def test_synth_plan_default_auto_places_both_in_tcm(self, tmp_path: Path):
+        """With ``model_location=auto`` (the default), both arena and
+        a tiny model fit comfortably in DTCM on Apollo510."""
         ctx = _make_ctx(tmp_path)
         PlanMemoryStage().run(ctx)
 
         assert ctx.memory_plan is not None
         assert ctx.memory_plan.engine == "tflm"
+        assert ctx.arena_region == "tcm"
+        assert ctx.weights_region == "tcm"
+
+        dtcm = ctx.memory_plan.region("DTCM")
+        assert dtcm is not None
+        assert any(c.kind == "weights" for c in dtcm.consumers)
+        assert any(c.kind == "arena" and c.size == 65536 for c in dtcm.consumers)
+
+    def test_synth_plan_explicit_mram_keeps_weights_in_mram(self, tmp_path: Path):
+        """``model_location=mram`` puts weights in MRAM (rodata) but
+        still places the arena in TCM when available."""
+        ctx = _make_ctx(tmp_path, {
+            "model": {
+                "path": str(tmp_path / "model.tflite"),
+                "arena_size": 65536,
+                "model_location": "mram",
+            },
+        })
+        PlanMemoryStage().run(ctx)
+
+        assert ctx.arena_region == "tcm"
+        assert ctx.weights_region == "mram"
 
         mram = ctx.memory_plan.region("MRAM")
-        sram = ctx.memory_plan.region("SRAM")
-        assert mram is not None and sram is not None
-        # Model flatbuffer placed in MRAM (default model_location=mram)
+        dtcm = ctx.memory_plan.region("DTCM")
+        assert mram is not None and dtcm is not None
         assert any(c.kind == "weights" for c in mram.consumers)
-        # Arena placed in SRAM
-        assert any(c.kind == "arena" and c.size == 65536 for c in sram.consumers)
+        assert any(c.kind == "arena" and c.size == 65536 for c in dtcm.consumers)
 
     def test_synth_plan_psram_routes_weights(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path, {
@@ -73,6 +95,9 @@ class TestPlanMemorySynthesise:
             },
         })
         PlanMemoryStage().run(ctx)
+
+        assert ctx.arena_region == "sram"
+        assert ctx.weights_region == "psram"
 
         psram = ctx.memory_plan.region("PSRAM")
         assert psram is not None

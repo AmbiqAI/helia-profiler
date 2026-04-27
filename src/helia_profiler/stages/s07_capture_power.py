@@ -39,7 +39,7 @@ class CapturePowerStage:
         # External Joulescope drivers cut and restore target power,
         # giving a clean boot with zero debug-domain overhead.
         # Drivers that can't power-cycle (e.g. ondevice) raise PowerError.
-        driver = get_driver(driver_name)
+        driver = get_driver(driver_name, serial=ctx.config.power.serial)
         try:
             driver.power_cycle(off_time_s=0.5, settle_time_s=2.0)
             log.info("Clean power-cycle reset — no debug-domain overhead")

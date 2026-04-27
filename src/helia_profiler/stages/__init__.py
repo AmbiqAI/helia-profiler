@@ -1,6 +1,7 @@
 """Pipeline stages — one module per stage, re-exported here."""
 
 from .s00_preflight import PreflightStage
+from .s00b_ensure_powered import EnsureBoardPoweredStage
 from .s01_resolve_platform import ResolvePlatformStage
 from .s02_prepare_engine import PrepareEngineStage
 from .s02a_analyze_model import AnalyzeModelStage
@@ -14,6 +15,7 @@ from .s08_generate_report import GenerateReportStage
 
 __all__ = [
     "PreflightStage",
+    "EnsureBoardPoweredStage",
     "ResolvePlatformStage",
     "PrepareEngineStage",
     "AnalyzeModelStage",

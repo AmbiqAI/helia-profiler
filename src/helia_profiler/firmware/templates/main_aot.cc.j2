@@ -228,6 +228,7 @@ int main(void) {
     NS_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
     dwt_init();
     sync_gpio_init();
+{% include "_extreme_mode.j2" %}
 {% if transport == "usb_cdc" %}
 
     // Initialize USB CDC and wait for host to connect (DTR)
@@ -254,6 +255,7 @@ int main(void) {
     hpx_printf("\n--- HPX_START ---\n");
     hpx_printf("HPX_VERSION=1\n");
     hpx_printf("HPX_ENGINE=helia_aot\n");
+    hpx_printf("HPX_EXTREME_MODE=%d\n", {{ 1 if extreme_mode and model_location == "tcm" else 0 }});
     hpx_printf("HPX_ITERATIONS={{ iterations }}\n");
     hpx_printf("HPX_WARMUP={{ warmup }}\n");
     hpx_printf("HPX_NUM_PRESETS=%d\n", {{ pmu_passes | length }});
