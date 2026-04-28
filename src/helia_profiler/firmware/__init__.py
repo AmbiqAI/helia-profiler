@@ -223,7 +223,9 @@ def _find_segger_rtt_dir() -> Path:
         # src/helia_profiler/__init__.py → up 3 levels → helia-profiler/
         hp_root = pkg_file.parents[2]
         candidates = [
-            # neuralspot/benchmarks/runtime_benchmarks/extern/SEGGER_RTT/R7.70a
+            # neuralspot/experiments/runtime_benchmarks/extern/SEGGER_RTT/R7.70a
+            hp_root.parent / "experiments" / "runtime_benchmarks" / "extern" / "SEGGER_RTT" / "R7.70a",
+            # legacy path (pre-rename)
             hp_root.parent / "benchmarks" / "runtime_benchmarks" / "extern" / "SEGGER_RTT" / "R7.70a",
             # neuralspot/nsx-modules/nsx-ambiqsuite-r4/sdk/third_party/SEGGER/SEGGER_RTT_V680a
             hp_root.parent / "nsx-modules" / "nsx-ambiqsuite-r4" / "sdk" / "third_party" / "SEGGER" / "SEGGER_RTT_V680a",
