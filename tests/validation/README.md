@@ -14,7 +14,7 @@ hpx validate --engines aot        # subset by engine (aliases: rt, aot)
 hpx validate --power off          # skip Joulescope runs
 hpx validate --power on           # only Joulescope runs
 hpx validate -k kws-aot           # pytest keyword filter
-hpx validate --junit-xml report.xml --output-dir ./validation_results
+hpx validate --junit-xml report.xml --output-dir ./results/validation
 ```
 
 Or drive pytest directly:
@@ -51,10 +51,10 @@ Each model is crossed with engines `{helia-rt, helia-aot}` and power
 
 ## Outputs
 
-All artifacts land under `--output-dir` (default `./validation_results`):
+All artifacts land under `--output-dir` (default `./results/validation`):
 
 ```
-validation_results/
+results/validation/
 ├── validation_report.md                # human-readable pass/fail table
 ├── validation_report.json              # machine-readable full report
 └── <case_id>/                          # one subfolder per case
@@ -107,5 +107,5 @@ with the hardware attached:
 - uses: actions/upload-artifact@v4
   with:
     name: validation-results
-    path: validation_results/
+    path: results/validation/
 ```

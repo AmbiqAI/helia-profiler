@@ -284,8 +284,8 @@ def main(argv: list[str] | None = None) -> None:
     p_validate.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("validation_results"),
-        help="Where to write per-case artifacts + summary report (default: ./validation_results).",
+        default=Path("results/validation"),
+        help="Where to write per-case artifacts + summary report (default: ./results/validation).",
     )
     p_validate.add_argument(
         "--timeout",

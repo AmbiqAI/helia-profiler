@@ -46,3 +46,7 @@ site/
 
 # Personal scratch runners (hardcoded paths)
 run_*.py
+
+# Developer-local profiler configs (see local-configs/README.md)
+local-configs/*
+!local-configs/README.md

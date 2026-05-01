@@ -49,7 +49,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
     grp.addoption(
         "--mlperf-output",
-        default="validation_results",
+        default="results/validation",
         help="Where to write per-case artifacts + summary report.",
     )
     grp.addoption(
