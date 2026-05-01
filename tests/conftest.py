@@ -51,4 +51,13 @@ def fake_dist(tmp_path: Path) -> Path:
     (dist / "third_party").mkdir()
     (dist / "third_party" / "flatbuffers").mkdir()
     (dist / "signal").mkdir()
+    # Copy the bundled test snapshot of heliaRT's nsx/ module into the dist
+    # so that _install_nsx_module finds the upstream-style files. This
+    # mirrors what real heliaRT >= 1.12.2 release zips ship.
+    import shutil
+    nsx_src = FIXTURES_DIR / "heliart_nsx"
+    nsx_dst = dist / "nsx"
+    nsx_dst.mkdir()
+    shutil.copy2(nsx_src / "CMakeLists.txt", nsx_dst / "CMakeLists.txt")
+    shutil.copy2(nsx_src / "nsx-module.yaml", nsx_dst / "nsx-module.yaml")
     return dist

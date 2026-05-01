@@ -82,24 +82,13 @@ class TestPrepareEngineStage:
         assert ctx.engine_adapter.name == "Stock TFLM (CMSIS-NN)"
         assert ctx.engine_artifacts is not None
 
-    def test_helia_rt_adapter(self, tmp_path: Path):
-        # Create fake heliaRT distribution
-        dist = tmp_path / "heliart_dist"
-        dist.mkdir()
-        (dist / "lib").mkdir()
-        for prefix in ("libhelia-rt", "libtensorflow-microlite"):
-            (
-                dist / "lib" / f"{prefix}-cm55-gcc-release-with-logs.a"
-            ).write_bytes(b"\x00")
-        (dist / "tensorflow").mkdir()
-        (dist / "third_party").mkdir()
-        (dist / "signal").mkdir()
+    def test_helia_rt_adapter(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(
             tmp_path,
             {
                 "engine": {
                     "type": "helia-rt",
-                    "config": {"dist_path": str(dist)},
+                    "config": {"dist_path": str(fake_dist)},
                 },
             },
         )

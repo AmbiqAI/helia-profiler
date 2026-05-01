@@ -41,43 +41,64 @@ fork. It is a drop-in replacement for stock TFLM with three kernel
 backends — reference, CMSIS-NN, and the Ambiq-tuned **HELIA** kernels.
 
 The profiler ships pinned to a specific heliaRT release
-(currently **v1.11.2**). Pre-built static libraries are downloaded
-automatically the first time you use this engine.
+(currently **v1.12.2**) and enforces a minimum supported version
+(**v1.12.2**). Pre-built static libraries are downloaded automatically
+the first time you use this engine.
+
+### Distribution resolution
+
+There are three ways to point HPX at a heliaRT distribution. The adapter
+tries them in order and the first match wins:
+
+#### 1. Default (recommended)
+
+No config — HPX downloads the pinned release from `AmbiqAI/helia-rt`,
+caches it under `~/.cache/helia-profiler/heliart/`, and reuses the cache
+on subsequent runs.
+
+```yaml title="hpx.yml"
+engine:
+  type: helia-rt
+```
+
+#### 2. Custom version or fork
+
+Override the version (or repo) via `engine.config.source`:
 
 ```yaml title="hpx.yml"
 engine:
   type: helia-rt
   config:
-    variant: release-with-logs   # (1)!
-    dist_path: /path/to/helia_rt # (2)!
+    source:
+      repo: AmbiqAI/helia-rt        # default if omitted
+      ref:  heliaRT-v1.13.0         # any release tag; bare "1.13.0" also works
 ```
 
-1.  Library variant: `release` (lean), `release-with-logs` (default —
-    keeps SWO printf), or `debug`.
-2.  Optional. Path to a local heliaRT distribution containing `lib/`,
-    `tensorflow/`, and `third_party/`. If unset, the profiler downloads
-    the pinned release into a cache directory on first use.
+The resolved release must be `>= v1.12.2`; older releases are rejected.
 
-### Distribution resolution
+#### 3. Local distribution path
 
-The adapter looks in this order:
+Point at an already-extracted distribution on disk:
 
-1. `engine.config.dist_path` — explicit local path
-2. `HELIART_DIST_PATH` environment variable
-3. `engine.config.source` — a custom GitHub repo + ref
-4. **Auto-download** of the pinned release from `AmbiqAI/helia-rt`
+```yaml title="hpx.yml"
+engine:
+  type: helia-rt
+  config:
+    dist_path: /path/to/helia_rt    # or: HELIART_DIST_PATH env var
+```
 
-The downloaded distribution contains a `nsx/` directory with a native NSX
-module. The profiler uses that module verbatim and links the right
-toolchain-specific archive (`libhelia-rt-{gcc,armclang}.a`).
+The directory must contain `lib/`, `tensorflow/`, `third_party/`,
+`signal/`, and an `nsx/` module (`CMakeLists.txt` + `nsx-module.yaml`).
+Version is parsed from `tensorflow/lite/micro/heliart_version.h` and
+must be `>= v1.12.2`.
 
 ### Toolchain → archive mapping
 
 | `target.toolchain` | heliaRT archive selected |
 |---|---|
-| `arm-none-eabi-gcc`, `gcc` | `libhelia-rt-gcc.a` |
-| `armclang` | `libhelia-rt-armclang.a` |
-| `atfe` | falls back to `libhelia-rt-gcc.a` *(with a warning — heliaRT does not yet ship a dedicated ATfE archive)* |
+| `arm-none-eabi-gcc`, `gcc` | `libhelia-rt-{core}-gcc-{variant}.a` |
+| `armclang` | `libhelia-rt-{core}-armclang-{variant}.a` |
+| `atfe` | falls back to `gcc` *(with a warning — heliaRT does not yet ship a dedicated ATfE archive)* |
 
 ### heliaRT engine config
 
@@ -85,7 +106,8 @@ toolchain-specific archive (`libhelia-rt-{gcc,armclang}.a`).
 |---|---|---|---|
 | `variant` | string | `release-with-logs` | `debug`, `release-with-logs`, or `release` |
 | `dist_path` | string | *(auto-download)* | Local heliaRT distribution path |
-| `source` | object | *(none)* | `{repo: ..., ref: ...}` for custom upstream |
+| `source.repo` | string | `AmbiqAI/helia-rt` | GitHub repo for download |
+| `source.ref` | string | pinned version | Release tag (e.g. `heliaRT-v1.13.0` or bare `1.13.0`) |
 
 ## heliaAOT
 

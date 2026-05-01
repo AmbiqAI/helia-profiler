@@ -39,19 +39,23 @@ from .base import EngineArtifacts
 log = logging.getLogger("hpx")
 
 # ---------------------------------------------------------------------------
-# Pinned heliaRT release — bump this when a new release is adopted.
+# heliaRT version policy.
+#
+# - HELIART_VERSION     : pinned default. Used when the user provides no
+#                         override. Bump when a new release is adopted.
+# - HELIART_MIN_VERSION : minimum-supported version. Any resolved
+#                         distribution (default download, custom GitHub
+#                         ref, or local dist_path) must be >= this.
+#                         Bump only on incompatible API changes.
 # ---------------------------------------------------------------------------
-HELIART_VERSION = "1.11.2"
+HELIART_VERSION = "1.12.2"
+HELIART_MIN_VERSION = "1.12.2"
 HELIART_GH_REPO = "AmbiqAI/helia-rt"
-HELIART_RELEASE_TAG = f"HeliaRT-v{HELIART_VERSION}"
+# NB: the GitHub tag uses lowercase "heliaRT-v..." (case-sensitive on the API).
+HELIART_RELEASE_TAG = f"heliaRT-v{HELIART_VERSION}"
 
 # Cache directory for downloaded distributions
 _CACHE_DIR = Path.home() / ".cache" / "helia-profiler" / "heliart"
-
-# ---------------------------------------------------------------------------
-# Static NSX module files (based on heliaRT's native nsx/ module)
-# ---------------------------------------------------------------------------
-_MODULE_DIR = Path(__file__).resolve().parent / "nsx_heliart"
 
 
 def _core_tag(board: str) -> str:
@@ -188,28 +192,24 @@ def _install_nsx_module(
 ) -> None:
     """Install the NSX module files and distribution content into *module_dir*.
 
-    If the distribution includes a native ``nsx/`` module (v1.12+), those
-    files are used directly.  Otherwise, embedded static module files
-    (shipped with heliaPROFILER) are copied.
-
-    The ``HELIART_VARIANT`` default is patched to match the user's
-    requested *variant*.
+    Requires the distribution to ship a native ``nsx/`` module
+    (heliaRT >= 1.12.2). The ``HELIART_VARIANT`` default is patched to
+    match the user's requested *variant*.
     """
-    # --- Copy NSX module files (CMakeLists.txt + nsx-module.yaml) ---
     nsx_dir = dist_path / "nsx"
-    if (nsx_dir / "CMakeLists.txt").is_file():
-        log.info("Using native nsx/ module from distribution")
-        src_cmake = nsx_dir / "CMakeLists.txt"
-        src_yaml = nsx_dir / "nsx-module.yaml"
-    else:
-        log.info("Distribution lacks nsx/ — using embedded module files")
-        src_cmake = _MODULE_DIR / "CMakeLists.txt"
-        src_yaml = _MODULE_DIR / "nsx-module.yaml"
+    src_cmake = nsx_dir / "CMakeLists.txt"
+    src_yaml = nsx_dir / "nsx-module.yaml"
+    if not src_cmake.is_file() or not src_yaml.is_file():
+        raise EngineError(
+            f"heliaRT distribution at {dist_path} is missing nsx/ module files",
+            hint=(
+                f"Expected nsx/CMakeLists.txt and nsx/nsx-module.yaml. "
+                f"Use heliaRT >= v{HELIART_MIN_VERSION}."
+            ),
+        )
 
-    # Copy nsx-module.yaml as-is
     shutil.copy2(src_yaml, module_dir / "nsx-module.yaml")
 
-    # Copy CMakeLists.txt, patching the variant default if needed
     cmake_text = src_cmake.read_text()
     if variant != "release-with-logs":
         cmake_text = cmake_text.replace(
@@ -324,7 +324,7 @@ def _fetch_github_release(
         raise EngineError(
             f"No GitHub release found for {repo}@{ref}",
             hint=(
-                "Provide a valid release tag (e.g. HeliaRT-v1.7.0), "
+                "Provide a valid release tag (e.g. heliaRT-v1.12.2), "
                 "or set engine.config.dist_path to a local directory."
             ),
         )
@@ -358,7 +358,7 @@ def _resolve_release_tag(repo: str, ref: str, *, api_s: float = 30) -> str | Non
         return ref
 
     # Maybe ref is just a version like "1.7.0" — try common tag formats
-    for fmt in (f"HeliaRT-v{ref}", f"v{ref}"):
+    for fmt in (f"heliaRT-v{ref}", f"HeliaRT-v{ref}", f"v{ref}"):
         api = f"https://api.github.com/repos/{repo}/releases/tags/{fmt}"
         data = _github_api_get(api, timeout_s=api_s)
         if data is not None:
@@ -380,7 +380,12 @@ def _resolve_release_tag(repo: str, ref: str, *, api_s: float = 30) -> str | Non
 
 
 def _find_release_asset(repo: str, tag: str, *, api_s: float = 30) -> str | None:
-    """Find the download URL for the best release asset."""
+    """Find the download URL for the heliaRT release zip.
+
+    Matches ``helia-rt-{tag}.zip`` exactly first; otherwise accepts any
+    asset whose name matches ``helia-rt-*.zip`` (and warns if more than
+    one such asset exists — picks the first deterministically).
+    """
     api = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
     data = _github_api_get(api, timeout_s=api_s)
     if data is None:
@@ -389,18 +394,26 @@ def _find_release_asset(repo: str, tag: str, *, api_s: float = 30) -> str | None
     assets = data.get("assets", [])
     asset_names = {a["name"]: a["browser_download_url"] for a in assets}
 
-    # Try the standard naming convention
+    # Exact match first.
     name = _ASSET_FMT.format(tag=tag)
     if name in asset_names:
         return asset_names[name]
 
-    # If exact naming doesn't match, try partial matching
-    for name, url in asset_names.items():
-        if name.endswith(".zip"):
-            log.info("Using release asset: %s", name)
-            return url
-
-    return None
+    # Tighter glob fallback: helia-rt-*.zip only.
+    candidates = sorted(
+        n for n in asset_names
+        if n.startswith("helia-rt-") and n.endswith(".zip")
+    )
+    if not candidates:
+        return None
+    if len(candidates) > 1:
+        log.warning(
+            "Multiple heliaRT release assets matched 'helia-rt-*.zip' for %s @ %s; "
+            "picking %s. Candidates: %s",
+            repo, tag, candidates[0], candidates,
+        )
+    log.info("Using release asset: %s", candidates[0])
+    return asset_names[candidates[0]]
 
 
 def _github_api_get(url: str, *, timeout_s: float = 30) -> dict | None:
@@ -534,42 +547,52 @@ def _parse_semver(version: str) -> tuple[int, int, int]:
 def _check_version_compatibility(
     dist: Path, detected_version: str | None,
 ) -> None:
-    """Warn or error on version mismatches between dist and adapter."""
+    """Enforce minimum-supported heliaRT version on a resolved distribution.
+
+    Policy:
+    * If the version cannot be parsed from the dist, warn (don't fail) —
+      a sanity check on directory layout already ran in ``_validate_dist``.
+    * If the version is below ``HELIART_MIN_VERSION``, raise.
+    * If the version is above ``HELIART_VERSION`` (the pinned default),
+      log an informational message — a newer-than-pinned release is fine
+      so long as it's >= the floor.
+    """
     if detected_version is None:
         log.warning(
             "Could not detect heliaRT version from distribution at %s — "
-            "skipping compatibility check",
+            "skipping version-floor check (min supported: v%s)",
             dist,
+            HELIART_MIN_VERSION,
         )
         return
 
-    expected = _parse_semver(HELIART_VERSION)
     actual = _parse_semver(detected_version)
+    minimum = _parse_semver(HELIART_MIN_VERSION)
+    pinned = _parse_semver(HELIART_VERSION)
 
-    if actual == expected:
-        return
-
-    if actual[0] != expected[0]:
+    if actual < minimum:
         raise EngineError(
-            f"heliaRT major version mismatch: "
-            f"distribution is v{detected_version}, adapter expects v{HELIART_VERSION}",
+            f"heliaRT v{detected_version} is below the minimum supported "
+            f"version (v{HELIART_MIN_VERSION})",
             hint=(
-                "Major version changes may have breaking API differences. "
-                "Update HELIART_VERSION in the adapter or provide a compatible distribution."
+                f"Use heliaRT >= v{HELIART_MIN_VERSION} (default pinned: "
+                f"v{HELIART_VERSION}). Update engine.config.source.ref "
+                "or engine.config.dist_path to a newer release."
             ),
         )
 
-    if actual[:2] != expected[:2]:
-        log.warning(
-            "heliaRT minor version mismatch: "
-            "distribution is v%s, adapter expects v%s — "
-            "proceed with caution",
-            detected_version,
-            HELIART_VERSION,
-        )
-    else:
+    if actual > pinned:
         log.info(
-            "heliaRT patch version differs: v%s (dist) vs v%s (expected)",
+            "heliaRT v%s is newer than the pinned default v%s — "
+            "proceeding (>= min v%s).",
             detected_version,
             HELIART_VERSION,
+            HELIART_MIN_VERSION,
+        )
+    elif actual != pinned:
+        log.debug(
+            "heliaRT v%s differs from pinned v%s (>= min v%s).",
+            detected_version,
+            HELIART_VERSION,
+            HELIART_MIN_VERSION,
         )

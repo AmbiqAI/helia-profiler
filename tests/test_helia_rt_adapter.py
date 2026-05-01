@@ -73,20 +73,14 @@ class TestInstallNsxModule:
         assert (module_dir / "third_party").is_dir()
         assert (module_dir / "signal").is_dir()
 
-    def test_prefers_native_nsx_from_dist(self, tmp_path: Path, fake_dist: Path):
-        """When the dist includes nsx/, those files should be used."""
-        nsx_dir = fake_dist / "nsx"
-        nsx_dir.mkdir()
-        (nsx_dir / "CMakeLists.txt").write_text(
-            '# native\nset(HELIART_VARIANT "release-with-logs" CACHE STRING "")\n'
-        )
-        (nsx_dir / "nsx-module.yaml").write_text("# native yaml\n")
-
+    def test_missing_nsx_raises(self, tmp_path: Path, fake_dist: Path):
+        """A dist without nsx/ should fail (heliaRT < 1.12.2)."""
+        import shutil
+        shutil.rmtree(fake_dist / "nsx")
         module_dir = tmp_path / "module"
         module_dir.mkdir()
-        _install_nsx_module(module_dir, fake_dist, variant="release-with-logs")
-        assert "# native" in (module_dir / "CMakeLists.txt").read_text()
-        assert "# native yaml" in (module_dir / "nsx-module.yaml").read_text()
+        with pytest.raises(EngineError, match="missing nsx/ module files"):
+            _install_nsx_module(module_dir, fake_dist, variant="release-with-logs")
 
 
 class TestHeliaRTAdapter:
