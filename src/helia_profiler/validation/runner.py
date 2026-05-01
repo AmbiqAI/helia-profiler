@@ -33,6 +33,12 @@ import yaml
 
 from .matrix import CaseSpec
 
+_TRANSIENT_POWER_LOCK_RETRY_DELAY_S = 5.0
+_TRANSIENT_POWER_LOCK_MARKERS = (
+    "is already in use by another process",
+    "busy during open; retrying",
+)
+
 # ---------------------------------------------------------------------------
 # Result schema
 # ---------------------------------------------------------------------------
@@ -149,6 +155,30 @@ class _ProcResult:
     stderr: str
 
 
+def _looks_like_transient_power_lock(proc: subprocess.CompletedProcess[str] | _ProcResult) -> bool:
+    text = f"{proc.stdout or ''}\n{proc.stderr or ''}".lower()
+    return any(marker in text for marker in _TRANSIENT_POWER_LOCK_MARKERS)
+
+
+def _run_profile_command(
+    cmd: list[str],
+    repo_root: Path,
+    timeout_s: float,
+    in_process: bool,
+) -> subprocess.CompletedProcess[str] | _ProcResult:
+    if in_process:
+        return _run_case_inprocess(cmd, repo_root, timeout_s)
+    return subprocess.run(
+        cmd,
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        timeout=timeout_s,
+        check=False,
+        env={**os.environ},
+    )
+
+
 def _run_case_inprocess(
     cmd: list[str],
     cwd: Path,
@@ -246,21 +276,11 @@ def run_case(
 
     start = time.monotonic()
     timed_out = False
-    if in_process:
-        proc: subprocess.CompletedProcess[str] | _ProcResult = _run_case_inprocess(
-            cmd, repo_root, timeout_s
-        )
-    else:
+    attempts = 2 if case.power else 1
+    proc: subprocess.CompletedProcess[str] | _ProcResult
+    for attempt in range(attempts):
         try:
-            proc = subprocess.run(
-                cmd,
-                cwd=str(repo_root),
-                capture_output=True,
-                text=True,
-                timeout=timeout_s,
-                check=False,
-                env={**os.environ},
-            )
+            proc = _run_profile_command(cmd, repo_root, timeout_s, in_process)
         except subprocess.TimeoutExpired as exc:
             duration = time.monotonic() - start
             return CaseResult(
@@ -276,6 +296,16 @@ def run_case(
                 stdout_tail=(exc.stdout or "")[-2000:] if exc.stdout else None,
                 stderr_tail=(exc.stderr or "")[-2000:] if exc.stderr else None,
             )
+
+        if (
+            proc.returncode != 0
+            and case.power
+            and attempt == 0
+            and _looks_like_transient_power_lock(proc)
+        ):
+            time.sleep(_TRANSIENT_POWER_LOCK_RETRY_DELAY_S)
+            continue
+        break
 
     duration = time.monotonic() - start
     stdout_tail = proc.stdout[-2000:] if proc.stdout else None

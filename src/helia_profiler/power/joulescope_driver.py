@@ -20,6 +20,9 @@ from .base import PowerMode, PowerResult, PowerSample, PowerSummary
 
 log = logging.getLogger("hpx")
 
+_OPEN_RETRY_TIMEOUT_S = 3.0
+_OPEN_RETRY_INTERVAL_S = 0.25
+
 
 # ---------------------------------------------------------------------------
 # Family-specific topic / value tables
@@ -102,6 +105,18 @@ def _get_shared_driver() -> Any:
     return drv
 
 
+def _is_device_busy_error(message: str) -> bool:
+    message = message.lower()
+    return (
+        "claim" in message
+        or "libusb" in message
+        or "-3" in message
+        or "access" in message
+        or "in_use" in message
+        or "busy" in message
+    )
+
+
 def _open_device(serial: str | None) -> tuple[Any, str, str]:
     """Open the selected device on the shared driver, returning ``(driver, path, family)``.
 
@@ -145,30 +160,34 @@ def _open_device(serial: str | None) -> tuple[Any, str, str]:
 
     family = _family_from_path(device_path)
 
-    try:
-        drv.open(device_path)
-    except Exception as exc:
-        msg = str(exc).lower()
-        if (
-            "claim" in msg
-            or "libusb" in msg
-            or "-3" in msg
-            or "access" in msg
-            or "in_use" in msg
-            or "busy" in msg
-        ):
-            raise PowerError(
-                f"Joulescope {device_path} is already in use by another process",
-                hint=(
-                    "Close the Joulescope desktop app or any other process "
-                    "holding the device, then retry. On macOS you can also "
-                    "run 'pkill -f jsdrv' to release stuck handles."
-                ),
-            ) from exc
-        # Idempotent re-open is OK; treat "already open" as success.
-        if "already" in msg or "open" in msg:
-            log.debug("Joulescope %s already open — reusing handle", device_path)
-        else:
+    deadline = time.monotonic() + _OPEN_RETRY_TIMEOUT_S
+    while True:
+        try:
+            drv.open(device_path)
+            break
+        except Exception as exc:
+            msg = str(exc).lower()
+            if _is_device_busy_error(msg):
+                if time.monotonic() < deadline:
+                    log.warning(
+                        "Joulescope %s busy during open; retrying in %.2fs",
+                        device_path,
+                        _OPEN_RETRY_INTERVAL_S,
+                    )
+                    time.sleep(_OPEN_RETRY_INTERVAL_S)
+                    continue
+                raise PowerError(
+                    f"Joulescope {device_path} is already in use by another process",
+                    hint=(
+                        "Close the Joulescope desktop app or any other process "
+                        "holding the device, then retry. On macOS you can also "
+                        "run 'pkill -f jsdrv' to release stuck handles."
+                    ),
+                ) from exc
+            # Idempotent re-open is OK; treat "already open" as success.
+            if "already" in msg or "open" in msg:
+                log.debug("Joulescope %s already open — reusing handle", device_path)
+                break
             raise PowerError(
                 f"Failed to open Joulescope {device_path}: {exc}",
                 hint="Check USB connection and re-plug the device if needed.",
