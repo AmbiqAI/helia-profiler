@@ -86,6 +86,16 @@ class PipelineContext:
     # Report (stage: generate_report)
     report_paths: list[Path] = field(default_factory=list)
 
+    #: Optional long-lived power driver handle owned by the pipeline.
+    #:
+    #: Stages that need to keep a Joulescope (or other power driver) USB
+    #: handle open across multiple stages assign it here; the
+    #: :class:`PipelineRunner` ``finally`` block calls
+    #: ``disable_passthrough()`` on whatever is stored to leave hardware in
+    #: a clean state.  Most drivers latch the relay in hardware and release
+    #: the handle immediately, so this stays ``None`` for typical runs.
+    power_driver_handle: Any | None = None
+
 
 # ---------------------------------------------------------------------------
 # Stage protocol — each pipeline step implements this
@@ -174,9 +184,11 @@ class PipelineRunner:
                 self._console.pipeline_done()
 
         finally:
-            # Release Joulescope passthrough opened by EnsureBoardPoweredStage
-            # (if any) so the relay state is left clean for the next run.
-            handle = getattr(ctx, "_power_driver_handle", None)
+            # Release any long-lived power driver handle stashed by an
+            # earlier stage (e.g. EnsureBoardPoweredStage).  Most drivers
+            # latch the relay in hardware and release the handle eagerly,
+            # so this is a no-op for typical runs.
+            handle = ctx.power_driver_handle
             if handle is not None:
                 try:
                     handle.disable_passthrough()

@@ -10,6 +10,7 @@ dependencies = [
     "rich>=13.0",
     "pyserial>=3.5",
     "pylink-square>=0.14.0",
+    "neuralspotx>=0.5,<0.6",
 ]
 
 [project.optional-dependencies]
@@ -23,9 +24,7 @@ dependencies = [
 # in src/helia_profiler/engines/helia_aot.py).
 aot = ["helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@v0.14.0"]
 analysis = ["ai-edge-litert>=1.0", "flatbuffers>=24.0"]
-power = ["joulescope>=1.0"]
-power-js220 = ["pyjoulescope_driver>=1.0"]
-power-all = ["joulescope>=1.0", "pyjoulescope_driver>=1.0"]
+power = ["pyjoulescope_driver>=1.0"]
 
 [project.scripts]
 hpx = "helia_profiler.cli:main"

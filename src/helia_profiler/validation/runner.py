@@ -7,15 +7,24 @@ into a structured :class:`CaseResult` dict.
 The subprocess boundary is deliberate: it exercises the true user-facing
 code path (same as typing ``hpx profile --config foo.yml``), isolates state
 between cases, and maps 1:1 to what a GHA runner will eventually do.
+
+Set ``HPX_VALIDATE_INPROCESS=1`` (or pass ``in_process=True`` to
+:func:`run_case`) to bypass the subprocess and call
+:func:`helia_profiler.cli.main` directly instead.  This is faster, lets
+``coverage.py`` see the pipeline code, and surfaces live tracebacks.  The
+subprocess remains the default so CI still exercises the CLI surface.
 """
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import subprocess
 import sys
 import time
+import traceback
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -126,12 +135,77 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
 # ---------------------------------------------------------------------------
 
 
+def _env_truthy(name: str) -> bool:
+    """Return True iff the environment variable is set to a truthy value."""
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+@dataclass
+class _ProcResult:
+    """Lightweight stand-in for ``subprocess.CompletedProcess``."""
+
+    returncode: int
+    stdout: str
+    stderr: str
+
+
+def _run_case_inprocess(
+    cmd: list[str],
+    cwd: Path,
+    timeout_s: float,
+) -> _ProcResult:
+    """Invoke :func:`helia_profiler.cli.main` directly and capture I/O.
+
+    *cmd* is the same argv the subprocess path would execute (starting
+    with ``"hpx"``).  The leading program name is stripped before the
+    call.  ``cwd`` is changed for the duration so any relative paths in
+    the YAML config are resolved consistently with the subprocess path.
+
+    Returns a :class:`_ProcResult` mimicking
+    :class:`subprocess.CompletedProcess` so the caller can treat both
+    branches uniformly.
+    """
+    # Local import so a missing optional dep at import time of this
+    # module doesn't break subprocess-only users.
+    from helia_profiler.cli import main as cli_main
+
+    argv = list(cmd[1:])  # drop "hpx"
+    out_buf = io.StringIO()
+    err_buf = io.StringIO()
+    prev_cwd = Path.cwd()
+    rc = 0
+    try:
+        os.chdir(cwd)
+        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+            try:
+                cli_main(argv)
+            except SystemExit as exc:
+                rc = int(exc.code) if isinstance(exc.code, int) else (0 if exc.code is None else 1)
+            except KeyboardInterrupt:
+                raise
+            except BaseException as exc:  # noqa: BLE001 — capture full diagnostic
+                traceback.print_exc(file=err_buf)
+                err_buf.write(f"\nin-process run raised {type(exc).__name__}: {exc}\n")
+                rc = 1
+    finally:
+        os.chdir(prev_cwd)
+
+    # ``timeout_s`` is intentionally unused here — in-process runs honor
+    # any timeout enforced inside the pipeline itself (NSX subprocess
+    # watchdog, capture timeouts, etc.).  Wall-clock enforcement at this
+    # layer would require threading and isn't worth the complexity.
+    del timeout_s
+
+    return _ProcResult(returncode=rc, stdout=out_buf.getvalue(), stderr=err_buf.getvalue())
+
+
 def run_case(
     case: CaseSpec,
     repo_root: Path,
     output_root: Path,
     timeout_s: float = 900.0,
     verbose: bool = False,
+    in_process: bool | None = None,
 ) -> CaseResult:
     """Run one validation case end-to-end.
 
@@ -146,10 +220,15 @@ def run_case(
         Directory under which each case's artifacts are written to
         ``output_root/<case_id>/``.
     timeout_s:
-        Wall-clock timeout for the ``hpx profile`` subprocess.
+        Wall-clock timeout for the ``hpx profile`` subprocess (ignored in
+        in-process mode — see module docstring).
     verbose:
         If true, stream the subprocess output live in addition to
         capturing it.
+    in_process:
+        If True, call :func:`helia_profiler.cli.main` directly instead of
+        spawning ``hpx profile`` as a subprocess.  If ``None`` (default),
+        honor the ``HPX_VALIDATE_INPROCESS`` environment variable.
     """
     case_dir = output_root / case.case_id
     case_dir.mkdir(parents=True, exist_ok=True)
@@ -162,32 +241,41 @@ def run_case(
     if verbose:
         cmd.append("-v")
 
+    if in_process is None:
+        in_process = _env_truthy("HPX_VALIDATE_INPROCESS")
+
     start = time.monotonic()
-    try:
-        proc = subprocess.run(
-            cmd,
-            cwd=str(repo_root),
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
-            check=False,
-            env={**os.environ},
+    timed_out = False
+    if in_process:
+        proc: subprocess.CompletedProcess[str] | _ProcResult = _run_case_inprocess(
+            cmd, repo_root, timeout_s
         )
-    except subprocess.TimeoutExpired as exc:
-        duration = time.monotonic() - start
-        return CaseResult(
-            case_id=case.case_id,
-            status="fail",
-            duration_s=duration,
-            engine=case.engine,
-            model_id=case.model.id,
-            board=case.board.id,
-            power=case.power,
-            output_dir=str(case_dir),
-            error=f"timeout after {timeout_s:.0f}s",
-            stdout_tail=(exc.stdout or "")[-2000:] if exc.stdout else None,
-            stderr_tail=(exc.stderr or "")[-2000:] if exc.stderr else None,
-        )
+    else:
+        try:
+            proc = subprocess.run(
+                cmd,
+                cwd=str(repo_root),
+                capture_output=True,
+                text=True,
+                timeout=timeout_s,
+                check=False,
+                env={**os.environ},
+            )
+        except subprocess.TimeoutExpired as exc:
+            duration = time.monotonic() - start
+            return CaseResult(
+                case_id=case.case_id,
+                status="fail",
+                duration_s=duration,
+                engine=case.engine,
+                model_id=case.model.id,
+                board=case.board.id,
+                power=case.power,
+                output_dir=str(case_dir),
+                error=f"timeout after {timeout_s:.0f}s",
+                stdout_tail=(exc.stdout or "")[-2000:] if exc.stdout else None,
+                stderr_tail=(exc.stderr or "")[-2000:] if exc.stderr else None,
+            )
 
     duration = time.monotonic() - start
     stdout_tail = proc.stdout[-2000:] if proc.stdout else None
@@ -241,10 +329,16 @@ def run_case(
                     result.energy_uj = float(power_blob["total_energy_uj"])
                 elif "energy_uJ" in power_blob:
                     result.energy_uj = float(power_blob["energy_uJ"])
+                elif "energy_j" in power_blob:
+                    result.energy_uj = float(power_blob["energy_j"]) * 1e6
                 if "avg_current_ma" in power_blob:
                     result.avg_current_ma = float(power_blob["avg_current_ma"])
+                elif "avg_current_a" in power_blob:
+                    result.avg_current_ma = float(power_blob["avg_current_a"]) * 1e3
                 if "peak_current_ma" in power_blob:
                     result.peak_current_ma = float(power_blob["peak_current_ma"])
+                elif "peak_current_a" in power_blob:
+                    result.peak_current_ma = float(power_blob["peak_current_a"]) * 1e3
         except (ValueError, OSError) as exc:
             result.error = f"could not parse summary.json: {exc}"
             result.status = "fail"

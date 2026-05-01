@@ -17,9 +17,13 @@ Behavior:
 * ``power.enabled = True`` implies passthrough is required, so the stage
   runs even when ``ensure_board_powered`` is False.
 
-The driver handle is stashed on ``ctx._power_driver_handle`` so
-:class:`~helia_profiler.pipeline.PipelineRunner` can release the relay in
-its ``finally`` block.
+The Joulescope relay state (``i_range=auto``) is latched in hardware and
+persists after the USB handle is closed, so this stage releases the
+driver immediately and the board stays powered for the rest of the run.
+If a future driver needs a long-lived handle, it can be stashed on
+:attr:`~helia_profiler.pipeline.PipelineContext.power_driver_handle` and
+:class:`~helia_profiler.pipeline.PipelineRunner` will release it in its
+``finally`` block.
 """
 
 from __future__ import annotations

@@ -10,9 +10,10 @@ Two measurement modes:
 
 Driver names:
 
-- ``joulescope``:       Auto-detect — tries JS110 first, then JS220.
-- ``joulescope-js110``: Force Joulescope JS110 (``joulescope`` package).
-- ``joulescope-js220``: Force Joulescope JS220 (``pyjoulescope_driver``).
+- ``joulescope``:       Joulescope JS110 or JS220 (auto-detected via
+  ``pyjoulescope_driver`` device enumeration).
+- ``joulescope-js110``: Alias for ``joulescope`` (kept for back-compat).
+- ``joulescope-js220``: Alias for ``joulescope`` (kept for back-compat).
 - ``ondevice``:         On-device measurement (experimental).
 
 Use :func:`get_driver` to resolve a driver by name.
@@ -21,13 +22,9 @@ Use :func:`get_driver` to resolve a driver by name.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 from ..errors import PowerError
 from .base import PowerDriver, PowerMode, PowerResult, PowerSample, PowerSummary
-
-if TYPE_CHECKING:
-    pass
 
 log = logging.getLogger("hpx")
 
@@ -40,6 +37,7 @@ __all__ = [
     "get_driver",
     "list_drivers",
 ]
+
 
 # ---------------------------------------------------------------------------
 # Driver registry
@@ -54,66 +52,30 @@ def _register_builtins() -> None:
         return
 
     from .joulescope_driver import JoulescopeDriver
-    from .joulescope_js220 import JoulescopeJS220Driver
     from .ondevice_driver import OnDeviceDriver
 
+    # Single unified Joulescope driver — handles JS110 and JS220.
+    _DRIVERS["joulescope"] = JoulescopeDriver
+    # Back-compat aliases so existing configs / docs keep working.
     _DRIVERS["joulescope-js110"] = JoulescopeDriver
-    _DRIVERS["joulescope-js220"] = JoulescopeJS220Driver
+    _DRIVERS["joulescope-js220"] = JoulescopeDriver
     _DRIVERS["ondevice"] = OnDeviceDriver
-
-
-def _auto_detect_joulescope(*, serial: str | None = None) -> PowerDriver:
-    """Try JS110 first, then JS220.  Return the first usable driver."""
-    _register_builtins()
-
-    # Prefer JS110 (more widely deployed, simpler blocking API)
-    js110_cls = _DRIVERS["joulescope-js110"]
-    try:
-        js110 = js110_cls(serial=serial)  # type: ignore[call-arg]
-    except TypeError:
-        js110 = js110_cls()
-    try:
-        js110.check_available()
-        log.info("Auto-detected Joulescope JS110")
-        return js110
-    except PowerError:
-        pass
-
-    # Fall back to JS220
-    js220_cls = _DRIVERS["joulescope-js220"]
-    try:
-        js220 = js220_cls(serial=serial)  # type: ignore[call-arg]
-    except TypeError:
-        js220 = js220_cls()
-    try:
-        js220.check_available()
-        log.info("Auto-detected Joulescope JS220")
-        return js220
-    except PowerError:
-        pass
-
-    raise PowerError(
-        "No Joulescope driver available",
-        hint="Install 'joulescope' (JS110) or 'pyjoulescope_driver' (JS220).  "
-        "Or specify driver explicitly: --power-driver joulescope-js110",
-    )
 
 
 def get_driver(name: str, *, serial: str | None = None) -> PowerDriver:
     """Instantiate and return the named power driver.
 
-    The special name ``"joulescope"`` auto-detects JS110 vs JS220.
+    The unified ``joulescope`` driver auto-detects JS110 vs JS220 from the
+    enumerated USB device path; the ``-js110`` / ``-js220`` suffixes are
+    accepted as aliases for backwards compatibility.
     Raises :class:`PowerError` if the name is unknown.
     """
-    if name == "joulescope":
-        return _auto_detect_joulescope(serial=serial)
-
     _register_builtins()
     cls = _DRIVERS.get(name)
     if cls is None:
         raise PowerError(
             f"Unknown power driver '{name}'",
-            hint=f"Available drivers: joulescope, {', '.join(_DRIVERS)}",
+            hint=f"Available drivers: {', '.join(sorted(_DRIVERS))}",
         )
     try:
         return cls(serial=serial)  # type: ignore[call-arg]
@@ -125,4 +87,4 @@ def get_driver(name: str, *, serial: str | None = None) -> PowerDriver:
 def list_drivers() -> list[str]:
     """Return the names of all registered power drivers."""
     _register_builtins()
-    return ["joulescope"] + list(_DRIVERS)
+    return sorted(_DRIVERS)

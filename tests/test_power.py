@@ -83,10 +83,10 @@ class TestJoulescopeDriver:
         """Joulescope check_available should raise PowerError if not installed."""
         driver = get_driver("joulescope")
         try:
-            import joulescope  # noqa: F401
+            import pyjoulescope_driver  # noqa: F401
 
-            # If joulescope is actually installed, skip this test
-            pytest.skip("joulescope is installed — cannot test import failure")
+            # If pyjoulescope_driver is actually installed, skip this test
+            pytest.skip("pyjoulescope_driver is installed — cannot test import failure")
         except ImportError:
             with pytest.raises(PowerError, match="not installed"):
                 driver.check_available()

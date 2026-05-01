@@ -15,11 +15,7 @@ modules:
 {% if m.local %}
   local: true
 {% else %}
-  revision: main
   project: {{ m.name }}
 {% endif %}
 {% endfor %}
 features: {}
-module_registry:
-  projects: {}
-  modules: {}

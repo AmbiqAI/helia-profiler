@@ -7,23 +7,21 @@ import failures (missing package OR binary/ABI mismatch) into actionable
 
 from __future__ import annotations
 
-import sys
 from unittest.mock import patch
 
 import pytest
 
 from helia_profiler.errors import PowerError
 from helia_profiler.power.joulescope_driver import JoulescopeDriver
-from helia_profiler.power.joulescope_js220 import JoulescopeJS220Driver
 
 
-class TestJS110Availability:
+class TestJoulescopeAvailability:
     def test_missing_package_raises_with_install_hint(self):
         real_import = __import__
 
         def fake_import(name, *args, **kwargs):
-            if name == "joulescope":
-                raise ImportError("No module named 'joulescope'")
+            if name == "pyjoulescope_driver":
+                raise ImportError("No module named 'pyjoulescope_driver'")
             return real_import(name, *args, **kwargs)
 
         with patch("builtins.__import__", side_effect=fake_import):
@@ -37,7 +35,7 @@ class TestJS110Availability:
         real_import = __import__
 
         def fake_import(name, *args, **kwargs):
-            if name == "joulescope":
+            if name == "pyjoulescope_driver":
                 raise ValueError(
                     "numpy.dtype size changed, may indicate binary incompatibility"
                 )
@@ -50,35 +48,3 @@ class TestJS110Availability:
         assert "failed to import" in str(err)
         assert "numpy" in (err.hint or "").lower()
         assert "force-reinstall" in (err.hint or "")
-
-
-class TestJS220Availability:
-    def test_missing_package_raises_with_install_hint(self):
-        real_import = __import__
-
-        def fake_import(name, *args, **kwargs):
-            if name == "pyjoulescope_driver":
-                raise ImportError("No module named 'pyjoulescope_driver'")
-            return real_import(name, *args, **kwargs)
-
-        with patch("builtins.__import__", side_effect=fake_import):
-            with pytest.raises(PowerError) as exc_info:
-                JoulescopeJS220Driver().check_available()
-        assert "not installed" in str(exc_info.value)
-
-    def test_abi_mismatch_raises_with_numpy_hint(self):
-        real_import = __import__
-
-        def fake_import(name, *args, **kwargs):
-            if name == "pyjoulescope_driver":
-                raise ValueError(
-                    "numpy.dtype size changed, may indicate binary incompatibility"
-                )
-            return real_import(name, *args, **kwargs)
-
-        with patch("builtins.__import__", side_effect=fake_import):
-            with pytest.raises(PowerError) as exc_info:
-                JoulescopeJS220Driver().check_available()
-        err = exc_info.value
-        assert "failed to import" in str(err)
-        assert "numpy" in (err.hint or "").lower()

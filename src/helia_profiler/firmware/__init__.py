@@ -517,6 +517,12 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     # Map config toolchain names to nsx CLI values
     nsx_tc = _nsx_toolchain(toolchain)
 
+    # Lock-aware flow: write nsx.lock once, then materialise modules/ from it
+    # before invoking the toolchain. This makes the resolved module set
+    # reproducible across runs and decouples constraint resolution from build.
+    nsx_cli.lock(app_dir, timeout_s=timeouts.configure_s)
+    nsx_cli.sync(app_dir, timeout_s=timeouts.configure_s)
+
     nsx_cli.configure(app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s)
     nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s)
 

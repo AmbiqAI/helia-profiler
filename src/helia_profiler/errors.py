@@ -39,7 +39,16 @@ class FirmwareError(HpxError):
 
 
 class BuildError(HpxError):
-    """NSX configure / build / flash subprocess failure."""
+    """NSX configure / build / flash / lock / sync failure.
+
+    Carries the underlying tool's diagnostic output (cmake / ninja /
+    JLinkExe / git stderr, NSX exception message, etc.) in
+    :attr:`details`.  When the source is a real subprocess, the original
+    return code is also captured in :attr:`returncode`.
+
+    The legacy ``stderr=`` kwarg / attribute is retained as an alias
+    for back-compat; new code should use ``details=`` instead.
+    """
 
     def __init__(
         self,
@@ -47,11 +56,21 @@ class BuildError(HpxError):
         *,
         hint: str | None = None,
         returncode: int | None = None,
+        details: str | None = None,
         stderr: str | None = None,
     ) -> None:
+        # Accept either spelling.  ``stderr`` wins only when ``details``
+        # is not supplied so callers migrating to the new kwarg get the
+        # value they passed.
+        resolved = details if details is not None else stderr
         self.returncode = returncode
-        self.stderr = stderr
+        self.details = resolved
         super().__init__(message, hint=hint)
+
+    @property
+    def stderr(self) -> str | None:
+        """Back-compat alias for :attr:`details`."""
+        return self.details
 
 
 class CaptureError(HpxError):

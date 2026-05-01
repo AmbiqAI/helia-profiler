@@ -1,106 +1,64 @@
 """NSX build-system helpers.
 
-Encapsulates all ``nsx`` CLI subprocess invocations (configure, build, flash)
-so that the rest of the codebase never calls ``subprocess`` for build
-operations directly.  Each function validates its inputs, applies sensible
-timeouts, and translates failures into :class:`BuildError`.
+Thin facade over :mod:`neuralspotx.api`. The rest of the codebase calls into
+this module (rather than ``neuralspotx`` directly) so that:
+
+* failures surface as :class:`BuildError` with our standard hint structure;
+* a single place enforces the per-subprocess wall-clock timeout for every
+  long-running NSX operation (configure/build/flash/sync);
+* the call sites stay agnostic of whether NSX is exposed as a CLI or a Python
+  API in any given release.
+
+Timeout enforcement is *robust*: NSX's underlying ``cmake`` / ``ninja`` /
+``git`` / ``JLinkExe`` subprocesses are spawned in their own process group,
+and the whole group is SIGTERM/SIGKILL'd when ``timeout_s`` elapses
+(see :mod:`neuralspotx.subprocess_utils`).  No daemon-thread leak on
+hang.
 """
 
 from __future__ import annotations
 
 import logging
 import os
-import shutil
-import subprocess
 from pathlib import Path
+from typing import Any, Callable
+
+from neuralspotx import api as nsx_api
+from neuralspotx.api import NSXError
 
 from .errors import BuildError
 
 log = logging.getLogger("hpx")
 
 # Conservative default timeouts — cmake configure is fast, builds can be
-# slow, flash involves J-Link probe negotiation.  These are *defaults*; the
+# slow, flash involves J-Link probe negotiation. These are *defaults*; the
 # profiler pipeline passes explicit values from ``ProfileConfig.timeouts``.
 _DEFAULT_CONFIGURE_TIMEOUT_S = 120
 _DEFAULT_BUILD_TIMEOUT_S = 300
 _DEFAULT_FLASH_TIMEOUT_S = 120
+_DEFAULT_LOCK_TIMEOUT_S = 180
+_DEFAULT_SYNC_TIMEOUT_S = 300
 
 
-def _require_nsx() -> str:
-    """Return the path to the ``nsx`` CLI, or raise :class:`BuildError`."""
-    exe = shutil.which("nsx")
-    if exe:
-        return exe
-    raise BuildError(
-        "nsx CLI not found",
-        hint="Install neuralspotx: pip install neuralspotx  (or ensure 'nsx' is in PATH)",
-    )
+def _translate(label: str, func: Callable[[], Any]) -> Any:
+    """Run *func* and translate :class:`NSXError` → :class:`BuildError`.
 
-
-def _run_nsx(
-    args: list[str],
-    *,
-    timeout: int,
-    label: str,
-    env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess[str]:
-    """Run an ``nsx`` CLI command with standard error handling.
-
-    Parameters
-    ----------
-    args : list[str]
-        Full argument list (e.g. ``["nsx", "build", "--app-dir", ...]``).
-    timeout : int
-        Maximum seconds to wait before killing the process.
-    label : str
-        Human-readable label for error messages (e.g. ``"nsx build"``).
-    env : dict | None
-        Optional environment override (merged with ``os.environ``).
-
-    Returns
-    -------
-    subprocess.CompletedProcess
-        On success (returncode == 0).
-
-    Raises
-    ------
-    BuildError
-        On any failure (non-zero exit, timeout, missing binary).
+    NSX raises ``NSXError`` for both ordinary subprocess failures and for
+    the timeout-expired path (see ``neuralspotx.api._invoke``), so a
+    single ``except`` is sufficient here.
     """
+
     try:
-        result = subprocess.run(
-            args,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=env,
-        )
-    except FileNotFoundError:
-        raise BuildError(
-            "nsx CLI not found",
-            hint="Install neuralspotx: pip install neuralspotx  (or ensure 'nsx' is in PATH)",
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise BuildError(
-            f"{label} timed out after {timeout}s",
-            hint="The build may be stuck.  Check for missing dependencies or hardware issues.",
-        ) from exc
-
-    if result.returncode != 0:
-        log.error("%s failed (rc=%s)", label, result.returncode)
-        log.error("%s stdout:\n%s", label, result.stdout)
-        log.error("%s stderr:\n%s", label, result.stderr)
-        raise BuildError(
-            f"{label} failed",
-            returncode=result.returncode,
-            stderr=result.stderr,
-        )
-    return result
+        return func()
+    except NSXError as exc:
+        log.error("%s failed: %s", label, exc)
+        raise BuildError(f"{label} failed", details=str(exc)) from exc
 
 
-# ------------------------------------------------------------------
-# Public API
-# ------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Public API — kwargs preserved from the previous subprocess-based shim so
+# call sites in :mod:`helia_profiler.firmware` remain unchanged.
+# ---------------------------------------------------------------------------
 
 
 def configure(
@@ -108,19 +66,13 @@ def configure(
     *,
     toolchain: str | None = None,
     timeout_s: int = _DEFAULT_CONFIGURE_TIMEOUT_S,
-) -> str:
-    """Run ``nsx configure`` on the given app directory.
-
-    Returns the stdout output from the configure step.
-    """
-    _require_nsx()
-    cmd = ["nsx", "configure", "--app-dir", str(app_dir)]
-    if toolchain:
-        cmd += ["--toolchain", toolchain]
-    log.info("Running: %s", " ".join(cmd))
-    result = _run_nsx(cmd, timeout=timeout_s, label="nsx configure")
-    log.info("Configure stdout:\n%s", result.stdout)
-    return result.stdout
+) -> None:
+    """Run ``nsx configure`` on the given app directory."""
+    log.info("nsx configure: %s (toolchain=%s)", app_dir, toolchain or "default")
+    _translate(
+        "nsx configure",
+        lambda: nsx_api.configure_app(app_dir, toolchain=toolchain, timeout_s=timeout_s),
+    )
 
 
 def build(
@@ -128,19 +80,13 @@ def build(
     *,
     toolchain: str | None = None,
     timeout_s: int = _DEFAULT_BUILD_TIMEOUT_S,
-) -> str:
-    """Run ``nsx build`` on the given app directory.
-
-    Returns the stdout output from the build step.
-    """
-    _require_nsx()
-    cmd = ["nsx", "build", "--app-dir", str(app_dir)]
-    if toolchain:
-        cmd += ["--toolchain", toolchain]
-    log.info("Running: %s", " ".join(cmd))
-    result = _run_nsx(cmd, timeout=timeout_s, label="nsx build")
-    log.info("Build stdout:\n%s", result.stdout)
-    return result.stdout
+) -> None:
+    """Run ``nsx build`` on the given app directory."""
+    log.info("nsx build: %s (toolchain=%s)", app_dir, toolchain or "default")
+    _translate(
+        "nsx build",
+        lambda: nsx_api.build_app(app_dir, toolchain=toolchain, timeout_s=timeout_s),
+    )
 
 
 def flash(
@@ -149,26 +95,60 @@ def flash(
     toolchain: str | None = None,
     jlink_serial: str | None = None,
     timeout_s: int = _DEFAULT_FLASH_TIMEOUT_S,
-) -> str:
+) -> None:
     """Run ``nsx flash`` on the given app directory.
 
-    When *jlink_serial* is provided, the ``SEGGER_SNCODE`` environment
-    variable is set so the underlying cmake flash target selects the
-    correct J-Link probe.
-
-    Returns the stdout output from the flash step.
+    When *jlink_serial* is provided, ``SEGGER_SNCODE`` is exported around the
+    call so the underlying CMake flash target selects the correct J-Link probe.
     """
-    _require_nsx()
-    cmd = ["nsx", "-v", "flash", "--app-dir", str(app_dir)]
-    if toolchain:
-        cmd += ["--toolchain", toolchain]
-    log.info("Running: %s", " ".join(cmd))
+    log.info("nsx flash: %s (toolchain=%s)", app_dir, toolchain or "default")
 
-    env = None
+    prev_sncode = os.environ.get("SEGGER_SNCODE")
     if jlink_serial:
-        env = {**os.environ, "SEGGER_SNCODE": jlink_serial}
+        os.environ["SEGGER_SNCODE"] = jlink_serial
         log.info("  J-Link serial: %s", jlink_serial)
+    try:
+        _translate(
+            "nsx flash",
+            lambda: nsx_api.flash_app(app_dir, toolchain=toolchain, timeout_s=timeout_s),
+        )
+    finally:
+        if jlink_serial:
+            if prev_sncode is None:
+                os.environ.pop("SEGGER_SNCODE", None)
+            else:
+                os.environ["SEGGER_SNCODE"] = prev_sncode
 
-    result = _run_nsx(cmd, timeout=timeout_s, label="nsx flash", env=env)
-    log.info("Flash complete.")
-    return result.stdout
+
+# ---------------------------------------------------------------------------
+# Lock / sync — used by the lock-aware build flow.
+# ---------------------------------------------------------------------------
+
+
+def lock(
+    app_dir: Path,
+    *,
+    update: bool = False,
+    timeout_s: int = _DEFAULT_LOCK_TIMEOUT_S,
+) -> Path:
+    """Resolve module constraints and write ``nsx.lock``."""
+    log.info("nsx lock: %s (update=%s)", app_dir, update)
+    return _translate(
+        "nsx lock",
+        lambda: nsx_api.lock_app(app_dir, update=update, quiet=True, timeout_s=timeout_s),
+    )
+
+
+def sync(
+    app_dir: Path,
+    *,
+    frozen: bool = False,
+    force: bool = False,
+    timeout_s: int = _DEFAULT_SYNC_TIMEOUT_S,
+) -> None:
+    """Materialise ``modules/`` so it exactly matches ``nsx.lock``."""
+    log.info("nsx sync: %s (frozen=%s, force=%s)", app_dir, frozen, force)
+    _translate(
+        "nsx sync",
+        lambda: nsx_api.sync_app(app_dir, frozen=frozen, force=force, timeout_s=timeout_s),
+    )
