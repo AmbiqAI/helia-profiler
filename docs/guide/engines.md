@@ -131,6 +131,61 @@ engine:
     namespace collisions when linking multiple AOT models.
 3.  Generated NSX module name (default `hpx_model`).
 
+### Version policy
+
+heliaAOT ships as a Python package (it runs at build-time), so version
+resolution is handled entirely by **pip** — there's no separate cache,
+download, or `dist_path` to manage.
+
+heliaAOT is not published to PyPI, so the profiler's `[aot]` extra pins
+to an upstream release tag (currently `v0.14.0`, where native NSX module
+support landed). The profiler also enforces a runtime
+**minimum supported version** (`HELIAAOT_MIN_VERSION`) so any compatible
+override still has to clear the floor.
+
+You get three modes:
+
+#### 1. Default (recommended)
+
+```bash
+pip install 'helia-profiler[aot]'
+```
+
+Installs the upstream release tag pinned in the profiler's `pyproject.toml`.
+
+#### 2. Custom version or fork
+
+Override the pin with any newer release tag, a feature branch, or a
+personal fork:
+
+```bash
+pip install --upgrade \
+  'helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@v0.15.0'
+
+pip install --upgrade \
+  'helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@feat/my-op'
+
+pip install --upgrade \
+  'helia-aot @ git+https://github.com/<your-fork>/helia-aot.git@<ref>'
+```
+
+Useful when prototyping a new AOT feature against `hpx profile` without
+waiting for a release.
+
+#### 3. Local checkout (editable install)
+
+```bash
+pip install -e /path/to/helia-aot
+```
+
+Edits to your local clone are picked up on the next `hpx profile` run —
+no reinstall required.
+
+At engine load, `hpx` reads the installed version via
+`importlib.metadata` and raises a clear error if it's below the floor or
+if the package isn't installed at all. `hpx doctor` reports whether the
+AOT engine is available.
+
 ### How heliaAOT wires in
 
 The pipeline:

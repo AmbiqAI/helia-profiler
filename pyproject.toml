@@ -13,7 +13,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-aot = ["helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@feat/nsx-module-type"]
+# heliaAOT — Ambiq's AOT compiler. Not published to PyPI, so we pin to a
+# release tag on the upstream repo. Users can override with their own
+# version, fork, or local checkout, e.g.:
+#   pip install --upgrade 'helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@v0.15.0'
+#   pip install 'git+https://github.com/<your-fork>/helia-aot.git@<ref>'
+#   pip install -e /path/to/helia-aot
+# At runtime, hpx enforces a minimum version (see HELIAAOT_MIN_VERSION
+# in src/helia_profiler/engines/helia_aot.py).
+aot = ["helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@v0.14.0"]
 analysis = ["ai-edge-litert>=1.0", "flatbuffers>=24.0"]
 power = ["joulescope>=1.0"]
 power-js220 = ["pyjoulescope_driver>=1.0"]

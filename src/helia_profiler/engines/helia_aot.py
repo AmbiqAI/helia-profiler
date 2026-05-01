@@ -33,6 +33,27 @@ from .base import EngineArtifacts
 
 log = logging.getLogger("hpx")
 
+# ---------------------------------------------------------------------------
+# heliaAOT version policy
+#
+# heliaAOT ships as a Python package, so version resolution is handled
+# entirely by pip. heliaAOT is not on PyPI, so the [aot] extra in
+# pyproject.toml pins to an upstream release tag. Users get three modes:
+#
+#   1. Default       : pip install 'helia-profiler[aot]'
+#                      → installs the release tag pinned in pyproject.toml.
+#   2. Custom version: pip install --upgrade \
+#                          'helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@<tag>'
+#                      or any fork / feature branch in the same form.
+#   3. Local checkout: pip install -e /path/to/helia-aot
+#
+# We don't manage downloads/caches like we do for heliaRT — pip already
+# does that better. We just enforce a minimum-supported version at runtime
+# so a user with an older install gets a clear error instead of a confusing
+# build failure (e.g. missing ModuleType.nsx).
+# ---------------------------------------------------------------------------
+HELIAAOT_MIN_VERSION = "0.14.0"  # native NSX module support (PR #167)
+
 # Default AOT configuration
 _DEFAULT_PREFIX = "hpx"
 _DEFAULT_MODULE_NAME = "hpx_model"
@@ -97,6 +118,9 @@ class HeliaAOTAdapter:
     def prepare(self, config: ProfileConfig, work_dir: Path) -> EngineArtifacts:
         prefix = config.engine.config.get("prefix", _DEFAULT_PREFIX)
         module_name = config.engine.config.get("module_name", _DEFAULT_MODULE_NAME)
+
+        # 0. Verify installed helia-aot satisfies the floor.
+        _check_helia_aot_version()
 
         # 1. Resolve AOT platform from profiler board
         aot_platform = _resolve_aot_platform(config)
@@ -712,3 +736,64 @@ def _write_attributes_header(aot_module_dir: Path, prefix: str) -> Path:
         )
     )
     return header_path
+
+
+# ---------------------------------------------------------------------------
+# helia-aot version check
+# ---------------------------------------------------------------------------
+
+
+def _check_helia_aot_version() -> None:
+    """Verify the installed ``helia-aot`` package satisfies the floor.
+
+    Raises ``EngineError`` with installation guidance if the package is
+    missing or older than ``HELIAAOT_MIN_VERSION``. Logs the detected
+    version on success so it shows up in run logs.
+    """
+    from importlib.metadata import PackageNotFoundError, version as _pkg_version
+
+    try:
+        installed = _pkg_version("helia-aot")
+    except PackageNotFoundError as exc:
+        raise EngineError(
+            "helia-aot is not installed.",
+            hint=(
+                "Install the AOT engine extra:\n"
+                "  pip install 'helia-profiler[aot]'\n"
+                "or pin a specific version / fork / local checkout, e.g.:\n"
+                "  pip install helia-aot==X.Y.Z\n"
+                "  pip install 'git+https://github.com/<fork>/helia-aot.git@<ref>'\n"
+                "  pip install -e /path/to/helia-aot"
+            ),
+        ) from exc
+
+    actual = _parse_semver(installed)
+    minimum = _parse_semver(HELIAAOT_MIN_VERSION)
+    if actual == (0, 0, 0):
+        log.warning(
+            "Could not parse helia-aot version %r — skipping floor check "
+            "(min supported: v%s)",
+            installed,
+            HELIAAOT_MIN_VERSION,
+        )
+        return
+
+    if actual < minimum:
+        raise EngineError(
+            f"helia-aot v{installed} is below the minimum supported "
+            f"version (v{HELIAAOT_MIN_VERSION}).",
+            hint=(
+                f"Upgrade with: pip install -U 'helia-aot>={HELIAAOT_MIN_VERSION}'\n"
+                "or pin a specific newer version / fork / local checkout."
+            ),
+        )
+
+    log.debug("Using helia-aot v%s (>= floor v%s).", installed, HELIAAOT_MIN_VERSION)
+
+
+def _parse_semver(version: str) -> tuple[int, int, int]:
+    """Parse a semver-ish string into (major, minor, patch); (0,0,0) on failure."""
+    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)", version)
+    if not m:
+        return (0, 0, 0)
+    return int(m.group(1)), int(m.group(2)), int(m.group(3))
