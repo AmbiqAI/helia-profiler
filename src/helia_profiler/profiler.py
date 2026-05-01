@@ -8,14 +8,19 @@ from __future__ import annotations
 import logging
 
 from .config import ProfileConfig
+from .console import HpxConsole
 from .pipeline import PipelineContext, PipelineRunner
 from .stages import (
+    AnalyzeModelStage,
     BuildFirmwareStage,
     CapturePmuStage,
     CapturePowerStage,
+    EnsureBoardPoweredStage,
     FlashFirmwareStage,
     GenerateFirmwareStage,
     GenerateReportStage,
+    PlanMemoryStage,
+    PreflightStage,
     PrepareEngineStage,
     ResolvePlatformStage,
 )
@@ -23,19 +28,24 @@ from .stages import (
 log = logging.getLogger("hpx")
 
 
-def build_default_pipeline() -> PipelineRunner:
+def build_default_pipeline(console: HpxConsole | None = None) -> PipelineRunner:
     """Create the standard profiling pipeline with all stages."""
     return PipelineRunner(
         [
+            PreflightStage(),
+            EnsureBoardPoweredStage(),
             ResolvePlatformStage(),
             PrepareEngineStage(),
+            AnalyzeModelStage(),
+            PlanMemoryStage(),
             GenerateFirmwareStage(),
             BuildFirmwareStage(),
             FlashFirmwareStage(),
             CapturePmuStage(),
             CapturePowerStage(),
             GenerateReportStage(),
-        ]
+        ],
+        console=console,
     )
 
 
@@ -47,8 +57,16 @@ def run_profile(config: ProfileConfig) -> PipelineContext:
     swallowed silently.
     """
     _setup_logging(config.verbose)
-    pipeline = build_default_pipeline()
-    return pipeline.run(config)
+    console = HpxConsole(config.verbose)
+    console.print_banner()
+    pipeline = build_default_pipeline(console=console)
+    ctx = pipeline.run(config)
+
+    # Print the rich results summary.
+    if ctx.pmu_result is not None:
+        console.print_results(ctx)
+
+    return ctx
 
 
 def _setup_logging(verbosity: int) -> None:
@@ -62,6 +80,6 @@ def _setup_logging(verbosity: int) -> None:
     logger = logging.getLogger("hpx")
     if not logger.handlers:
         handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter("[hpx] %(message)s"))
+        handler.setFormatter(logging.Formatter("[dim]\[hpx][/dim] %(message)s"))
         logger.addHandler(handler)
     logger.setLevel(level)

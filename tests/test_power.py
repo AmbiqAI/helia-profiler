@@ -106,6 +106,11 @@ class TestOnDeviceDriver:
         with pytest.raises(PowerError, match="not yet implemented"):
             driver.capture(duration_s=10.0, io_voltage=1.8)
 
+    def test_power_cycle_raises_not_supported(self):
+        driver = get_driver("ondevice")
+        with pytest.raises(PowerError, match="cannot power-cycle"):
+            driver.power_cycle()
+
 
 class TestPowerConfig:
     def test_default_config(self, tmp_path: Path):

@@ -1,0 +1,93 @@
+{
+  "engine": "helia-aot",
+  "layers": 13,
+  "total_cycles": 1869209.6666666667,
+  "overflow_detected": false,
+  "top_layers": [
+    {
+      "op": "CONV_2D:0",
+      "cycles": 292064.6666666667,
+      "pct": 15.6
+    },
+    {
+      "op": "DEPTHWISE_CONV_2D:3",
+      "cycles": 195855.0,
+      "pct": 10.5
+    },
+    {
+      "op": "DEPTHWISE_CONV_2D:5",
+      "cycles": 195853.0,
+      "pct": 10.5
+    },
+    {
+      "op": "DEPTHWISE_CONV_2D:1",
+      "cycles": 195597.0,
+      "pct": 10.5
+    },
+    {
+      "op": "DEPTHWISE_CONV_2D:7",
+      "cycles": 195597.0,
+      "pct": 10.5
+    }
+  ],
+  "memory_plan": {
+    "engine": "helia_aot",
+    "model_weight_bytes": 115058,
+    "has_overflow": false,
+    "regions": [
+      {
+        "region": "MRAM",
+        "capacity": 4194304,
+        "used": 0,
+        "free": 4194304,
+        "overflow": false,
+        "consumers": []
+      },
+      {
+        "region": "SRAM",
+        "capacity": 3145728,
+        "used": 0,
+        "free": 3145728,
+        "overflow": false,
+        "consumers": []
+      },
+      {
+        "region": "DTCM",
+        "capacity": 524288,
+        "used": 20960,
+        "free": 503328,
+        "overflow": false,
+        "consumers": [
+          {
+            "name": "dtcm_arena",
+            "size": 20960,
+            "kind": "arena"
+          }
+        ]
+      },
+      {
+        "region": "ITCM",
+        "capacity": 262144,
+        "used": 0,
+        "free": 262144,
+        "overflow": false,
+        "consumers": []
+      },
+      {
+        "region": "PSRAM",
+        "capacity": 32940032,
+        "used": 0,
+        "free": 32940032,
+        "overflow": false,
+        "consumers": []
+      }
+    ]
+  },
+  "model_analysis": {
+    "total_macs": 0,
+    "total_ops": 72152,
+    "num_parameters": 0,
+    "cycles_per_mac": null,
+    "cycles_per_op": 25.91
+  }
+}

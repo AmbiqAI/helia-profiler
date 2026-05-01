@@ -1,8 +1,8 @@
-# hpx engines
+# `hpx engines`
 
-List available inference engines.
+List all inference engines available to the profiler.
 
-## Usage
+## Synopsis
 
 ```bash
 hpx engines
@@ -10,8 +10,17 @@ hpx engines
 
 ## Output
 
-Prints the engine identifiers that can be passed to `--engine`:
+```
+Supported engines:
 
-- `tflm` — Stock TensorFlow Lite Micro (CMSIS-NN)
-- `helia-rt` — heliaRT (Ambiq optimized TFLM fork)
-- `helia-aot` — heliaAOT (ahead-of-time compiled)
+  tflm        Stock TensorFlow Lite for Microcontrollers (CMSIS-NN)
+  helia-rt    AmbiqAI heliaRT — optimized TFLM fork (HELIA / CMSIS-NN / reference backends)
+  helia-aot   AmbiqAI heliaAOT — ahead-of-time compiler (no interpreter at runtime)
+```
+
+Use any of these names with `--engine` or `engine.type:` in YAML.
+
+## See also
+
+- [Inference Engines](../guide/engines.md) — full description of each
+  engine, when to use it, and engine-specific config.

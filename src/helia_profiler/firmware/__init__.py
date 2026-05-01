@@ -9,13 +9,20 @@ from __future__ import annotations
 
 import glob
 import logging
+import os
 import shutil
-import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import jinja2
 
+from .. import nsx as nsx_cli
+from ..counters import (
+    CounterPass,
+    plan_passes,
+    resolve_counters,
+    resolve_legacy_presets,
+)
 from ..errors import BuildError, FirmwareError
 
 if TYPE_CHECKING:
@@ -24,20 +31,43 @@ if TYPE_CHECKING:
 log = logging.getLogger("hpx")
 
 # ---------------------------------------------------------------------------
+# Toolchain mapping: config names → nsx CLI --toolchain values
+# ---------------------------------------------------------------------------
+_TOOLCHAIN_MAP: dict[str, str] = {
+    "arm-none-eabi-gcc": "gcc",
+    "gcc": "gcc",
+    "armclang": "armclang",
+    "atfe": "atfe",
+}
+
+
+def _nsx_toolchain(toolchain: str) -> str | None:
+    """Convert a config toolchain name to the ``nsx --toolchain`` value.
+
+    Returns *None* for the default (GCC) so the flag is omitted.
+    """
+    nsx_tc = _TOOLCHAIN_MAP.get(toolchain, toolchain)
+    return nsx_tc if nsx_tc != "gcc" else None
+
+
+# ---------------------------------------------------------------------------
 # SDK tier → module set mapping
 # ---------------------------------------------------------------------------
 _SDK_MODULES: dict[str, list[str]] = {
     "r3": [
+        "nsx-cmsis-core",
         "nsx-ambiqsuite-r3",
         "nsx-ambiq-hal-r3",
         "nsx-ambiq-bsp-r3",
     ],
     "r4": [
+        "nsx-cmsis-core",
         "nsx-ambiqsuite-r4",
         "nsx-ambiq-hal-r4",
         "nsx-ambiq-bsp-r4",
     ],
     "r5": [
+        "nsx-cmsis-core",
         "nsx-ambiqsuite-r5",
         "nsx-ambiq-hal-r5",
         "nsx-ambiq-bsp-r5",
@@ -88,7 +118,7 @@ def _resolve_module_list(board: str, sdk_tier: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# PMU preset mapping (hpx preset name → C enum)
+# PMU preset mapping (legacy — used only for backward-compat Init() path)
 # ---------------------------------------------------------------------------
 _PMU_PRESET_MAP: dict[str, str] = {
     "basic_cpu": "NS_PMU_PRESET_BASIC_CPU",
@@ -96,6 +126,62 @@ _PMU_PRESET_MAP: dict[str, str] = {
     "mve": "NS_PMU_PRESET_MVE",
     "ml_default": "NS_PMU_PRESET_ML_DEFAULT",
 }
+
+
+def _resolve_pmu_passes(config: Any) -> list[dict[str, Any]]:
+    """Resolve profiling config into firmware pass descriptors.
+
+    If the new ``pmu_counters`` field is set, resolve and plan passes from
+    the counter registry.  Otherwise fall back to legacy preset behaviour.
+
+    Each returned dict has:
+      - ``name``          — pass name for the SWO protocol
+      - ``custom``        — True if using explicit event IDs
+      - ``event_ids``     — list of hex-literal strings (custom only)
+      - ``num_counters``  — number of counters (custom only)
+      - ``c_enum``        — C preset enum name (legacy only)
+      - ``group``         — compute-unit group name
+    """
+    profiling = config.profiling
+
+    # --- New path: explicit counter selection ---
+    if profiling.pmu_counters is not None:
+        counters = resolve_counters(profiling.pmu_counters)
+        passes = plan_passes(counters)
+        return [
+            {
+                "name": p.name,
+                "custom": True,
+                "event_ids": [f"0x{c.event_id:04X}" for c in p.counters],
+                "num_counters": len(p.counters),
+                "c_enum": None,
+                "group": p.group,
+            }
+            for p in passes
+        ]
+
+    # --- Legacy path: named presets ---
+    result: list[dict[str, Any]] = []
+    for preset_name in profiling.pmu_presets:
+        c_enum = _PMU_PRESET_MAP.get(preset_name, "NS_PMU_PRESET_ML_DEFAULT")
+        result.append({
+            "name": preset_name,
+            "custom": False,
+            "event_ids": [],
+            "num_counters": 4,
+            "c_enum": c_enum,
+            "group": preset_name,
+        })
+    if not result:
+        result = [{
+            "name": "ml_default",
+            "custom": False,
+            "event_ids": [],
+            "num_counters": 4,
+            "c_enum": "NS_PMU_PRESET_ML_DEFAULT",
+            "group": "ml_default",
+        }]
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -109,20 +195,120 @@ _jinja_env = jinja2.Environment(
 )
 
 
-def _model_to_header(model_path: Path) -> str:
-    """Convert a .tflite model to a C header (xxd-style byte array)."""
+def _find_segger_rtt_dir() -> Path:
+    """Locate the SEGGER RTT source directory.
+
+    Search order:
+      1. ``SEGGER_RTT_PATH`` environment variable
+      2. Known paths relative to the helia-profiler source tree
+
+    Returns the directory containing ``RTT/`` and ``Config/`` subdirs.
+    """
+    # 1. Explicit environment variable
+    env_path = os.environ.get("SEGGER_RTT_PATH")
+    if env_path:
+        p = Path(env_path)
+        if (p / "RTT" / "SEGGER_RTT.c").exists():
+            return p
+        raise FirmwareError(
+            f"SEGGER_RTT_PATH={env_path} does not contain RTT/SEGGER_RTT.c",
+            hint="Set SEGGER_RTT_PATH to the root dir containing RTT/ and Config/ subdirs.",
+        )
+
+    # 2. Relative to helia-profiler source (monorepo layout)
+    try:
+        import helia_profiler as _hp
+
+        pkg_file = Path(_hp.__file__).resolve()
+        # src/helia_profiler/__init__.py → up 3 levels → helia-profiler/
+        hp_root = pkg_file.parents[2]
+        candidates = [
+            # neuralspot/experiments/runtime_benchmarks/extern/SEGGER_RTT/R7.70a
+            hp_root.parent / "experiments" / "runtime_benchmarks" / "extern" / "SEGGER_RTT" / "R7.70a",
+            # legacy path (pre-rename)
+            hp_root.parent / "benchmarks" / "runtime_benchmarks" / "extern" / "SEGGER_RTT" / "R7.70a",
+            # neuralspot/nsx-modules/nsx-ambiqsuite-r4/sdk/third_party/SEGGER/SEGGER_RTT_V680a
+            hp_root.parent / "nsx-modules" / "nsx-ambiqsuite-r4" / "sdk" / "third_party" / "SEGGER" / "SEGGER_RTT_V680a",
+        ]
+        for c in candidates:
+            if (c / "RTT" / "SEGGER_RTT.c").exists():
+                return c
+    except Exception:
+        pass
+
+    raise FirmwareError(
+        "SEGGER RTT source files not found",
+        hint=(
+            "Set SEGGER_RTT_PATH to the RTT source directory "
+            "(the folder containing RTT/ and Config/ subdirs)."
+        ),
+    )
+
+
+def _copy_segger_rtt(dest_dir: Path) -> None:
+    """Copy SEGGER RTT source files into *dest_dir*/rtt/."""
+    rtt_root = _find_segger_rtt_dir()
+    rtt_dest = dest_dir / "rtt"
+    rtt_dest.mkdir(parents=True, exist_ok=True)
+
+    # RTT source + header
+    for name in ("SEGGER_RTT.c", "SEGGER_RTT.h"):
+        src = rtt_root / "RTT" / name
+        if src.exists():
+            shutil.copy2(src, rtt_dest / name)
+
+    # Config header — nested in Config/ subdir
+    config_dest = rtt_dest / "Config"
+    config_dest.mkdir(parents=True, exist_ok=True)
+    conf_src = rtt_root / "Config" / "SEGGER_RTT_Conf.h"
+    if conf_src.exists():
+        shutil.copy2(conf_src, config_dest / "SEGGER_RTT_Conf.h")
+
+    log.info("Copied SEGGER RTT source from %s", rtt_root)
+
+
+def _model_to_header(model_path: Path, weights_region: str = "mram") -> str:
+    """Convert a .tflite model to a C header (xxd-style byte array).
+
+    ``weights_region`` selects the section attribute applied to
+    ``model_data[]``:
+
+    * ``mram`` (default) — ``static const`` (rodata, stays in flash/MRAM).
+    * ``tcm`` — ``NSX_MEM_FAST static`` (loaded into DTCM at boot).
+    * ``sram`` — ``NSX_MEM_SRAM static`` (loaded into shared SRAM at boot).
+
+    For TCM/SRAM placement we drop ``const`` because NSX initialises these
+    sections by copying from NVM at boot, which requires writable storage.
+    """
     data = model_path.read_bytes()
+
+    if weights_region == "tcm":
+        decl = "NSX_MEM_FAST alignas(16) static unsigned char model_data[] = {"
+        include_nsx = True
+    elif weights_region == "sram":
+        decl = "NSX_MEM_SRAM alignas(16) static unsigned char model_data[] = {"
+        include_nsx = True
+    else:  # mram / default
+        decl = "alignas(16) static const unsigned char model_data[] = {"
+        include_nsx = False
+
     lines = [
         "// Auto-generated by heliaPROFILER — do not edit.",
         f"// Source: {model_path.name}",
-        "alignas(16) static const unsigned char model_data[] = {",
+        f"// Placement: {weights_region}",
     ]
+    if include_nsx:
+        lines.append('#include "nsx_mem.h"')
+    lines.append(decl)
     for i in range(0, len(data), 12):
         chunk = data[i : i + 12]
         hex_vals = ", ".join(f"0x{b:02x}" for b in chunk)
         lines.append(f"    {hex_vals},")
     lines.append("};")
-    lines.append(f"static const unsigned int model_data_len = {len(data)};")
+    if weights_region in ("tcm", "sram"):
+        lines.append(f"static unsigned int model_data_len = {len(data)};")
+    else:
+        lines.append(f"static const unsigned int model_data_len = {len(data)};")
     return "\n".join(lines) + "\n"
 
 
@@ -150,8 +336,28 @@ def generate_app(ctx: PipelineContext) -> Path:
     tvars = artifacts.template_vars
 
     # --- Resolve module list ---
-    modules = _resolve_module_list(board.name, soc.sdk_tier)
-    log.info("NSX modules: %s", ", ".join(modules))
+    mod_names = _resolve_module_list(board.name, soc.sdk_tier)
+
+    # Add nsx-usb module when using USB CDC transport
+    transport = config.target.transport
+    if transport == "usb_cdc" and "nsx-usb" not in mod_names:
+        mod_names.append("nsx-usb")
+
+    # Add nsx-peripherals module when using PSRAM for model storage
+    if config.model.model_location == "psram" and "nsx-peripherals" not in mod_names:
+        mod_names.append("nsx-peripherals")
+
+    # Build module descriptors (name + local flag)
+    modules: list[dict[str, object]] = [{"name": m, "local": False} for m in mod_names]
+
+    # Append engine-provided modules (e.g. nsx-heliart) as local
+    for extra_mod in artifacts.extra_modules:
+        if extra_mod.name not in mod_names:
+            modules.append({"name": extra_mod.name, "local": True})
+
+    log.info("NSX modules: %s", ", ".join(m["name"] for m in modules))  # type: ignore[arg-type]
+
+    engine_type = tvars.get("engine_type", "tflm")
 
     # --- nsx.yml ---
     (app_dir / "nsx.yml").write_text(
@@ -170,22 +376,32 @@ def generate_app(ctx: PipelineContext) -> Path:
         _jinja_env.get_template("modules.cmake.j2").render(modules=modules)
     )
 
-    # --- CMakeLists.txt ---
+    # --- CMakeLists.txt (engine-aware) ---
     (app_dir / "CMakeLists.txt").write_text(
-        _jinja_env.get_template("CMakeLists.txt.j2").render(board=board.name)
+        _jinja_env.get_template("CMakeLists.txt.j2").render(
+            board=board.name,
+            engine_type=engine_type,
+            cmake_vars=artifacts.cmake_vars,
+            aot_cmake_target=tvars.get("aot_cmake_target", ""),
+            transport=transport,
+            model_location=config.model.model_location,
+        )
     )
 
     # --- Source files ---
     src_dir = app_dir / "src"
     src_dir.mkdir(parents=True, exist_ok=True)
 
-    # Model data header
-    model_header = _model_to_header(config.model.path)
-    (src_dir / "model_data.h").write_text(model_header)
+    # --- Copy SEGGER RTT source when using RTT transport ---
+    if transport == "rtt":
+        _copy_segger_rtt(src_dir)
 
     # PMU preset
     first_preset = config.profiling.pmu_presets[0] if config.profiling.pmu_presets else "ml_default"
     pmu_preset_c = _PMU_PRESET_MAP.get(first_preset, "NS_PMU_PRESET_ML_DEFAULT")
+
+    # Build pass list for multi-pass firmware loop
+    pmu_passes = _resolve_pmu_passes(config)
 
     # Arena size: use configured value or default 256KB
     arena_size = config.model.arena_size or (256 * 1024)
@@ -194,38 +410,92 @@ def generate_app(ctx: PipelineContext) -> Path:
     power_sync_enabled = config.power.enabled and config.power.mode == "external"
     sync_gpio_pin = config.power.sync_gpio_pin
 
-    # main.cc
-    engine_header = tvars.get("engine_header", "tensorflow/lite/micro/micro_interpreter.h")
-    (src_dir / "main.cc").write_text(
-        _jinja_env.get_template("main.cc.j2").render(
-            engine_header=engine_header,
-            arena_size=arena_size,
-            iterations=config.profiling.iterations,
-            warmup=config.profiling.warmup,
-            pmu_preset=pmu_preset_c,
-            power_sync_enabled=power_sync_enabled,
-            sync_gpio_pin=sync_gpio_pin,
-        )
-    )
+    # --- Heartbeat template vars (shared across engines) ---
+    hb = config.target.heartbeat
+    heartbeat_vars = {
+        "heartbeat_enabled": hb.enabled,
+        "heartbeat_every_n_ops": hb.every_n_ops if hb.enabled else 0,
+        "heartbeat_every_ms": hb.every_ms if hb.enabled else 0,
+    }
 
-    # PMU profiler
-    (src_dir / "hpx_pmu_profiler.h").write_text(
-        _jinja_env.get_template("hpx_pmu_profiler.h.j2").render()
-    )
-    (src_dir / "hpx_pmu_profiler.cc").write_text(
-        _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render()
-    )
+    if config.profiling.extreme_mode and config.model.model_location != "tcm":
+        log.warning(
+            "profiling.extreme_mode=true ignored: requires model_location=\"tcm\" "
+            "(current: %s).  SSRAM/NVM power-down would corrupt model storage.",
+            config.model.model_location,
+        )
+
+    if engine_type == "helia_aot":
+        # --- AOT engine: use AOT-specific main template, no model embedding ---
+        aot_prefix = tvars["aot_prefix"]
+        (src_dir / "main.cc").write_text(
+            _jinja_env.get_template("main_aot.cc.j2").render(
+                aot_prefix=aot_prefix,
+                aot_op_manifest=tvars.get("aot_op_manifest", []),
+                iterations=config.profiling.iterations,
+                warmup=config.profiling.warmup,
+                pmu_passes=pmu_passes,
+                pmu_pass_names=[p["name"] for p in pmu_passes],
+                power_sync_enabled=power_sync_enabled,
+                sync_gpio_pin=sync_gpio_pin,
+                transport=transport,
+                printf_linkage="static ",
+                extreme_mode=config.profiling.extreme_mode,
+                model_location=config.model.model_location,
+                **heartbeat_vars,
+            )
+        )
+    else:
+        # --- TFLM / heliaRT: embed model as byte array, use TFLM profiler ---
+        model_location = config.model.model_location
+        weights_region = ctx.weights_region or "mram"
+        arena_region = ctx.arena_region or "tcm"
+
+        if model_location != "psram":
+            model_header = _model_to_header(config.model.path, weights_region)
+            (src_dir / "model_data.h").write_text(model_header)
+
+        model_size = config.model.path.stat().st_size
+
+        engine_header = tvars.get("engine_header", "tensorflow/lite/micro/micro_interpreter.h")
+        (src_dir / "main.cc").write_text(
+            _jinja_env.get_template("main.cc.j2").render(
+                engine_header=engine_header,
+                arena_size=arena_size,
+                iterations=config.profiling.iterations,
+                warmup=config.profiling.warmup,
+                pmu_passes=pmu_passes,
+                pmu_pass_names=[p["name"] for p in pmu_passes],
+                power_sync_enabled=power_sync_enabled,
+                sync_gpio_pin=sync_gpio_pin,
+                transport=transport,
+                model_location=model_location,
+                arena_region=arena_region,
+                weights_region=weights_region,
+                model_size=model_size,
+                printf_linkage="",
+                extreme_mode=config.profiling.extreme_mode,
+                **heartbeat_vars,
+            )
+        )
+
+        # PMU profiler (TFLM-specific C++ class)
+        (src_dir / "hpx_pmu_profiler.h").write_text(
+            _jinja_env.get_template("hpx_pmu_profiler.h.j2").render()
+        )
+        (src_dir / "hpx_pmu_profiler.cc").write_text(
+            _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render()
+        )
 
     # --- Engine wrapper module ---
     for extra_mod in artifacts.extra_modules:
-        mod_name = extra_mod["name"]
-        mod_src = Path(extra_mod["path"])
-        mod_dst = app_dir / "modules" / mod_name
+        mod_src = extra_mod.path
+        mod_dst = app_dir / "modules" / extra_mod.name
         if mod_src != mod_dst:
             if mod_dst.exists():
                 shutil.rmtree(mod_dst)
             shutil.copytree(mod_src, mod_dst)
-        log.info("Engine module: %s → %s", mod_name, mod_dst)
+        log.info("Engine module: %s → %s", extra_mod.name, mod_dst)
 
     log.info("Generated profiler app at %s", app_dir)
     return app_dir
@@ -241,48 +511,14 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
 
     app_dir = ctx.firmware_dir
     board = ctx.board.name
+    timeouts = ctx.config.timeouts
+    toolchain = ctx.config.target.toolchain
 
-    # --- nsx configure ---
-    log.info("Running: nsx configure --app-dir %s", app_dir)
-    try:
-        result = subprocess.run(
-            ["nsx", "configure", "--app-dir", str(app_dir)],
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        raise BuildError(
-            "nsx CLI not found",
-            hint="Install neuralspotx: pip install neuralspotx  (or ensure 'nsx' is in PATH)",
-        )
-    if result.returncode != 0:
-        raise BuildError(
-            "nsx configure failed",
-            returncode=result.returncode,
-            stderr=result.stderr,
-        )
-    log.info("Configure stdout:\n%s", result.stdout)
+    # Map config toolchain names to nsx CLI values
+    nsx_tc = _nsx_toolchain(toolchain)
 
-    # --- nsx build ---
-    log.info("Running: nsx build --app-dir %s", app_dir)
-    try:
-        result = subprocess.run(
-            ["nsx", "build", "--app-dir", str(app_dir)],
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        raise BuildError(
-            "nsx CLI not found",
-            hint="Install neuralspotx: pip install neuralspotx  (or ensure 'nsx' is in PATH)",
-        )
-    if result.returncode != 0:
-        raise BuildError(
-            "nsx build failed",
-            returncode=result.returncode,
-            stderr=result.stderr,
-        )
-    log.info("Build stdout:\n%s", result.stdout)
+    nsx_cli.configure(app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s)
+    nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s)
 
     # Locate build output
     build_dir = app_dir / "build" / board
@@ -316,25 +552,11 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
 def flash_app(ctx: PipelineContext) -> None:
     """Invoke ``nsx flash`` to deploy the binary to the target."""
     assert ctx.firmware_dir is not None
-
-    app_dir = ctx.firmware_dir
-
-    log.info("Running: nsx flash --app-dir %s", app_dir)
-    try:
-        result = subprocess.run(
-            ["nsx", "flash", "--app-dir", str(app_dir)],
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        raise BuildError(
-            "nsx CLI not found",
-            hint="Install neuralspotx: pip install neuralspotx  (or ensure 'nsx' is in PATH)",
-        )
-    if result.returncode != 0:
-        raise BuildError(
-            "nsx flash failed",
-            returncode=result.returncode,
-            stderr=result.stderr,
-        )
-    log.info("Flash complete.")
+    toolchain = ctx.config.target.toolchain
+    nsx_tc = _nsx_toolchain(toolchain)
+    nsx_cli.flash(
+        ctx.firmware_dir,
+        toolchain=nsx_tc,
+        jlink_serial=ctx.config.target.jlink_serial,
+        timeout_s=ctx.config.timeouts.flash_s,
+    )

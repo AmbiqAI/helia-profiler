@@ -1,0 +1,11 @@
+{# _usb_timer.j2 — pause/resume USB polling timer (only included when transport==usb_cdc). #}
+// Pause/resume the USB polling timer so tud_task() ISR does not fire
+// during PMU measurement windows (timer 3 = NS_TIMER_USB).
+static inline void usb_timer_pause(void) {
+    am_hal_timer_stop(3);
+    NVIC_DisableIRQ(TIMER3_IRQn);
+}
+static inline void usb_timer_resume(void) {
+    NVIC_EnableIRQ(TIMER3_IRQn);
+    am_hal_timer_start(3);
+}

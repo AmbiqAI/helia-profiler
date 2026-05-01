@@ -1,0 +1,101 @@
+{
+  "engine": "helia-aot",
+  "layers": 13,
+  "total_cycles": 1966836.0,
+  "overflow_detected": false,
+  "top_layers": [
+    {
+      "op": "CONV_2D:0",
+      "cycles": 313795.6666666667,
+      "pct": 16.0
+    },
+    {
+      "op": "DEPTHWISE_CONV_2D:3",
+      "cycles": 207920.0,
+      "pct": 10.6
+    },
+    {
+      "op": "DEPTHWISE_CONV_2D:1",
+      "cycles": 207919.0,
+      "pct": 10.6
+    },
+    {
+      "op": "DEPTHWISE_CONV_2D:5",
+      "cycles": 207919.0,
+      "pct": 10.6
+    },
+    {
+      "op": "DEPTHWISE_CONV_2D:7",
+      "cycles": 207919.0,
+      "pct": 10.6
+    }
+  ],
+  "memory_plan": {
+    "engine": "helia_aot",
+    "model_weight_bytes": 115058,
+    "has_overflow": false,
+    "regions": [
+      {
+        "region": "MRAM",
+        "capacity": 4194304,
+        "used": 0,
+        "free": 4194304,
+        "overflow": false,
+        "consumers": []
+      },
+      {
+        "region": "SRAM",
+        "capacity": 3145728,
+        "used": 0,
+        "free": 3145728,
+        "overflow": false,
+        "consumers": []
+      },
+      {
+        "region": "DTCM",
+        "capacity": 524288,
+        "used": 20960,
+        "free": 503328,
+        "overflow": false,
+        "consumers": [
+          {
+            "name": "dtcm_arena",
+            "size": 20960,
+            "kind": "arena"
+          }
+        ]
+      },
+      {
+        "region": "ITCM",
+        "capacity": 262144,
+        "used": 0,
+        "free": 262144,
+        "overflow": false,
+        "consumers": []
+      },
+      {
+        "region": "PSRAM",
+        "capacity": 32940032,
+        "used": 0,
+        "free": 32940032,
+        "overflow": false,
+        "consumers": []
+      }
+    ]
+  },
+  "model_analysis": {
+    "total_macs": 0,
+    "total_ops": 72152,
+    "num_parameters": 0,
+    "cycles_per_mac": null,
+    "cycles_per_op": 27.26,
+    "tops": 0.0,
+    "tops_per_watt": 0.0
+  },
+  "power": {
+    "avg_current_a": 0.011327200569212437,
+    "avg_power_w": 0.020478513091802597,
+    "peak_current_a": 0.014964050613343716,
+    "energy_j": 0.40957024999999997
+  }
+}

@@ -1,0 +1,13 @@
+{# _system_includes.j2 — shared transport/system includes for main templates. #}
+#include "ns_core.h"
+#include "ns_ambiqsuite_harness.h"
+#include "nsx_mem.h"
+#include "nsx_system.h"
+#include "am_hal_gpio.h"
+#include "am_hal_pwrctrl.h"
+{% if transport == "usb_cdc" %}
+#include "nsx_usb.h"
+#include "am_hal_timer.h"
+{% elif transport == "rtt" %}
+#include "SEGGER_RTT.h"
+{% endif %}

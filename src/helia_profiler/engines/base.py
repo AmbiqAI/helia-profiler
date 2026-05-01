@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from ..config import ProfileConfig
+from ..results import NsxModuleRef, MemoryPlan
 
 
 @dataclass(frozen=True)
@@ -17,7 +18,7 @@ class EngineArtifacts:
     """
 
     # Additional NSX modules the profiler app needs (e.g. a local heliaRT wrapper)
-    extra_modules: list[dict[str, Any]] = field(default_factory=list)
+    extra_modules: list[NsxModuleRef] = field(default_factory=list)
 
     # Additional CMake variables to pass during configure
     cmake_vars: dict[str, str] = field(default_factory=dict)
@@ -33,6 +34,12 @@ class EngineArtifacts:
 
     # Engine-specific template context (merged into Jinja rendering)
     template_vars: dict[str, Any] = field(default_factory=dict)
+
+    # Optional memory plan built from engine-specific internals (e.g.
+    # heliaAOT's ``codegen_ctx.memory_plan``).  If None, ``plan_memory``
+    # stage synthesises a conservative plan from ``model.arena_size`` and
+    # ``model.model_location``.
+    memory_plan: MemoryPlan | None = None
 
 
 @runtime_checkable

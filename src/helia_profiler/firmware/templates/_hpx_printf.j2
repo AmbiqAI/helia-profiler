@@ -1,0 +1,68 @@
+{# _hpx_printf.j2 — transport-aware hpx_printf + RTT drain helper.
+
+   Variables:
+     transport         : "usb_cdc" | "rtt" | other (stdio fallback)
+     printf_linkage    : "" (extern, e.g. main.cc) or "static " (internal, main_aot.cc)
+#}
+// ---------------------------------------------------------------------------
+// hpx_printf — transport-aware printf used by all profiler output
+// ---------------------------------------------------------------------------
+{% set _linkage = printf_linkage | default("") %}
+{% if transport == "usb_cdc" %}
+static uint8_t usb_tx_buf[4096];
+static uint8_t usb_rx_buf[NSX_USB_MIN_CDC_RX_BUFSIZE];
+
+static nsx_usb_config_t g_usb_cfg = {
+    .tx_buffer     = usb_tx_buf,
+    .tx_buffer_len = sizeof(usb_tx_buf),
+    .rx_buffer     = usb_rx_buf,
+    .rx_buffer_len = sizeof(usb_rx_buf),
+};
+
+{{ _linkage }}void hpx_printf(const char *fmt, ...) {
+    static char line_buf[512];
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(line_buf, sizeof(line_buf), fmt, ap);
+    va_end(ap);
+    if (n > 0) {
+        uint32_t sent = 0;
+        nsx_usb_send(&g_usb_cfg, line_buf, (uint32_t)n, &sent);
+    }
+}
+{% elif transport == "rtt" %}
+{{ _linkage }}void hpx_printf(const char *fmt, ...) {
+    static char line_buf[512];
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(line_buf, sizeof(line_buf), fmt, ap);
+    va_end(ap);
+    if (n > 0) {
+        SEGGER_RTT_Write(0, line_buf, (unsigned)n);
+    }
+}
+
+// Wait until the RTT up-buffer has drained (J-Link has read it) or until
+// a soft timeout (in "spin iterations") elapses.  Critical before emitting
+// HPX_END after a heavy CSV dump: NO_BLOCK_TRIM silently drops writes when
+// the ring buffer is full, so HPX_END can otherwise be lost.  Each spin is
+// very short; SystemCoreClock/1000 iterations ≈ 1 ms at worst case.
+static void hpx_rtt_drain(uint32_t timeout_ms) {
+    const uint32_t spins_per_ms = SystemCoreClock / 2000U; // conservative
+    uint32_t total = timeout_ms * spins_per_ms;
+    while (SEGGER_RTT_HasDataUp(0) && total > 0U) {
+        // SCB_CleanDCache so J-Link sees the latest WrOff each poll.
+        SCB_CleanDCache();
+        for (volatile uint32_t s = 0; s < spins_per_ms; ++s) { __NOP(); }
+        if (total > spins_per_ms) total -= spins_per_ms; else total = 0;
+    }
+}
+{% else %}
+{{ _linkage }}void hpx_printf(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    extern uint32_t am_util_stdio_vprintf(const char *, va_list);
+    am_util_stdio_vprintf(fmt, ap);
+    va_end(ap);
+}
+{% endif %}

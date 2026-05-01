@@ -1,55 +1,133 @@
 {# hpx_pmu_profiler.cc — PMU profiler implementation #}
-/**
- * @file hpx_pmu_profiler.cc
- * @brief HpxPmuProfiler implementation for heliaPROFILER.
- *
- * Auto-generated — do not edit.
- */
 #include "hpx_pmu_profiler.h"
-#include <cstdio>
-#include <cstring>
 
-extern "C" {
-#include "nsx_pmu.h"
+// arm_mve.h already pre-included via hpx_pmu_profiler.h
+#include "ns_ambiqsuite_harness.h"
+#include "ns_pmu_map.h"
+
+// Transport-aware printf — defined in main.cc
+extern void hpx_printf(const char *fmt, ...);
+
+void HpxPmuProfiler::Init(ns_pmu_preset_e preset) {
+    ns_pmu_reset_config(&pmu_cfg_);
+    pmu_cfg_.api = &ns_pmu_V1_0_0;
+    ns_pmu_apply_preset(&pmu_cfg_, preset);
+    ns_pmu_init(&pmu_cfg_);
+    num_events_ = 0;
+    // Count how many events the preset configured
+    num_counters_ = 0;
+    for (int i = 0; i < kMaxEvents; i++) {
+        if (pmu_cfg_.events[i].enabled) num_counters_++;
+    }
+    initialized_ = true;
 }
 
-void HpxPmuProfiler::Init(nsx_pmu_preset_t preset) {
-    count_ = 0;
-    nsx_pmu_init(preset);
+void HpxPmuProfiler::InitCustom(const uint32_t event_ids[], int num_events) {
+    ns_pmu_reset_config(&pmu_cfg_);
+    pmu_cfg_.api = &ns_pmu_V1_0_0;
+    int n = (num_events > kMaxEvents) ? kMaxEvents : num_events;
+    for (int i = 0; i < n; i++) {
+        ns_pmu_event_create(&pmu_cfg_.events[i], event_ids[i],
+                            NS_PMU_EVENT_COUNTER_SIZE_32);
+    }
+    ns_pmu_init(&pmu_cfg_);
+    num_events_ = 0;
+    num_counters_ = n;
+    initialized_ = true;
 }
 
-uint32_t HpxPmuProfiler::BeginEvent(const char *tag) {
-    if (count_ >= kMaxEvents) return 0;
-    events_[count_].tag = tag;
-    nsx_pmu_start();
-    nsx_pmu_read(&snap_);  // snapshot start counters
-    return static_cast<uint32_t>(count_);
+uint32_t HpxPmuProfiler::BeginEvent(const char* tag) {
+    if (!initialized_ || num_events_ >= kMaxLayers) return 0;
+    int idx = num_events_++;
+    layers_[idx].tag = tag;
+    layers_[idx].overflow = false;
+    uint32_t saved_cyccnt = DWT->CYCCNT;
+    ns_pmu_reset_counters();
+    DWT->CYCCNT = saved_cyccnt;
+    // Clear any prior overflow flags so we detect overflow for this layer only
+#if (__CORTEX_M >= 55U)
+    ARM_PMU_Set_CNTR_OVS(0xFFFFFFFFU);
+#endif
+    return static_cast<uint32_t>(idx);
 }
 
-void HpxPmuProfiler::EndEvent(uint32_t handle) {
-    nsx_pmu_counters_t end;
-    nsx_pmu_stop();
-    nsx_pmu_read(&end);
-    auto &ev = events_[handle];
-    ev.cycles   = end.cycle - snap_.cycle;
-    ev.counter0 = end.counter[0] - snap_.counter[0];
-    ev.counter1 = end.counter[1] - snap_.counter[1];
-    ev.counter2 = end.counter[2] - snap_.counter[2];
-    ev.counter3 = end.counter[3] - snap_.counter[3];
-    count_++;
+void HpxPmuProfiler::EndEvent(uint32_t event_handle) {
+    if (!initialized_ ||
+        event_handle >= static_cast<uint32_t>(num_events_)) return;
+    uint32_t saved_cyccnt = DWT->CYCCNT;
+    ns_pmu_get_counters(&pmu_cfg_);
+    DWT->CYCCNT = saved_cyccnt;
+    LayerRecord& rec = layers_[event_handle];
+    for (int i = 0; i < num_counters_; i++) {
+        rec.counters[i] = pmu_cfg_.counter[i].counterValue;
+    }
+    // Detect counter overflow via the PMU overflow status register
+#if (__CORTEX_M >= 55U)
+    uint32_t ovs = ARM_PMU_Get_CNTR_OVS();
+    rec.overflow = (ovs != 0);
+    if (ovs) ARM_PMU_Set_CNTR_OVS(ovs);
+#else
+    rec.overflow = false;
+#endif
+    // Emit heartbeat between ops (never inside a measured region) so the
+    // host sees progress on long inferences.  Any printf overhead falls in
+    // the unattributed inter-op gap and does not contaminate layer counters.
+    ++hb_ops_since_;
+    MaybeEmitHeartbeat();
 }
 
-void HpxPmuProfiler::ClearEvents() { count_ = 0; }
+void HpxPmuProfiler::ClearEvents() { num_events_ = 0; }
+
+void HpxPmuProfiler::SetHeartbeat(uint32_t every_cyc, int every_n_ops) {
+    hb_every_cyc_ = every_cyc;
+    hb_every_n_ops_ = every_n_ops;
+    hb_last_cyc_ = DWT->CYCCNT;
+    hb_ops_since_ = 0;
+}
+
+void HpxPmuProfiler::SetIterationContext(int pass_idx, int iter_idx) {
+    hb_pass_ = pass_idx;
+    hb_iter_ = iter_idx;
+    hb_last_cyc_ = DWT->CYCCNT;
+    hb_ops_since_ = 0;
+}
+
+void HpxPmuProfiler::MaybeEmitHeartbeat() {
+    const bool by_ops = (hb_every_n_ops_ > 0) &&
+                        (hb_ops_since_ >= hb_every_n_ops_);
+    bool by_time = false;
+    if (hb_every_cyc_ > 0) {
+        uint32_t now = DWT->CYCCNT;
+        // Rollover-safe unsigned delta works for deltas < 2^31 cycles.
+        uint32_t delta = now - hb_last_cyc_;
+        by_time = (delta >= hb_every_cyc_);
+    }
+    if (!by_ops && !by_time) return;
+    hpx_printf("HPX_HEARTBEAT phase=infer pass=%d iter=%d layer=%d\n",
+               hb_pass_, hb_iter_, num_events_);
+    hb_last_cyc_ = DWT->CYCCNT;
+    hb_ops_since_ = 0;
+}
 
 void HpxPmuProfiler::PrintCsv() const {
-    ns_printf("op,tag,cycles,cnt0,cnt1,cnt2,cnt3\n");
-    for (int i = 0; i < count_; i++) {
-        const auto &ev = events_[i];
-        ns_printf("%d,%s,%lu,%lu,%lu,%lu,%lu\n", i, ev.tag,
-                  (unsigned long)ev.cycles,
-                  (unsigned long)ev.counter0,
-                  (unsigned long)ev.counter1,
-                  (unsigned long)ev.counter2,
-                  (unsigned long)ev.counter3);
+    if (!initialized_ || num_events_ == 0) return;
+    hpx_printf("\"Layer\",\"Op\"");
+    for (int e = 0; e < num_counters_; e++) {
+        if (!pmu_cfg_.events[e].enabled) break;
+        uint32_t map_idx = pmu_cfg_.counter[e].mapIndex;
+        if (map_idx < NS_PMU_MAP_SIZE)
+            hpx_printf(",\"%s\"", ns_pmu_map[map_idx].regname);
+        else
+            hpx_printf(",\"event_%d\"", e);
+    }
+    hpx_printf(",\"overflow\"\n");
+    for (int i = 0; i < num_events_; i++) {
+        const LayerRecord& rec = layers_[i];
+        hpx_printf("%d,%s", i, rec.tag ? rec.tag : "?");
+        for (int e = 0; e < num_counters_; e++) {
+            if (!pmu_cfg_.events[e].enabled) break;
+            hpx_printf(",%lu", (unsigned long)rec.counters[e]);
+        }
+        hpx_printf(",%d\n", rec.overflow ? 1 : 0);
     }
 }

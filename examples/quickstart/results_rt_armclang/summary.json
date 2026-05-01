@@ -1,0 +1,113 @@
+{
+  "engine": "helia-rt",
+  "layers": 13,
+  "total_cycles": 1874428.9999999998,
+  "overflow_detected": false,
+  "top_layers": [
+    {
+      "op": "CONV_2D",
+      "cycles": 292595.6666666667,
+      "pct": 15.6
+    },
+    {
+      "op": "DEPTHWISE_CONV_2D",
+      "cycles": 196188.0,
+      "pct": 10.5
+    },
+    {
+      "op": "DEPTHWISE_CONV_2D",
+      "cycles": 196150.33333333334,
+      "pct": 10.5
+    },
+    {
+      "op": "DEPTHWISE_CONV_2D",
+      "cycles": 196139.0,
+      "pct": 10.5
+    },
+    {
+      "op": "DEPTHWISE_CONV_2D",
+      "cycles": 196139.0,
+      "pct": 10.5
+    }
+  ],
+  "memory": {
+    "arena_size": 131072,
+    "allocated_arena": 29780,
+    "model_size": 53744,
+    "num_tensors": 35,
+    "input_size": 490,
+    "output_size": 12
+  },
+  "memory_plan": {
+    "engine": "helia-rt",
+    "model_weight_bytes": 53744,
+    "has_overflow": false,
+    "regions": [
+      {
+        "region": "MRAM",
+        "capacity": 4194304,
+        "used": 53744,
+        "free": 4140560,
+        "overflow": false,
+        "consumers": [
+          {
+            "name": "model_flatbuffer",
+            "size": 53744,
+            "kind": "weights"
+          }
+        ]
+      },
+      {
+        "region": "SRAM",
+        "capacity": 3145728,
+        "used": 131072,
+        "free": 3014656,
+        "overflow": false,
+        "consumers": [
+          {
+            "name": "tensor_arena",
+            "size": 131072,
+            "kind": "arena"
+          }
+        ]
+      },
+      {
+        "region": "DTCM",
+        "capacity": 524288,
+        "used": 0,
+        "free": 524288,
+        "overflow": false,
+        "consumers": []
+      },
+      {
+        "region": "ITCM",
+        "capacity": 262144,
+        "used": 0,
+        "free": 262144,
+        "overflow": false,
+        "consumers": []
+      },
+      {
+        "region": "PSRAM",
+        "capacity": 32940032,
+        "used": 0,
+        "free": 32940032,
+        "overflow": false,
+        "consumers": []
+      }
+    ]
+  },
+  "cache": {
+    "ARM_PMU_L1D_CACHE_REFILL": 0.0,
+    "ARM_PMU_MEM_ACCESS": 1422554.0,
+    "ARM_PMU_BUS_ACCESS": 28.0,
+    "ARM_PMU_BUS_CYCLES": 1873961.0
+  },
+  "model_analysis": {
+    "total_macs": 0,
+    "total_ops": 72152,
+    "num_parameters": 0,
+    "cycles_per_mac": null,
+    "cycles_per_op": 25.98
+  }
+}

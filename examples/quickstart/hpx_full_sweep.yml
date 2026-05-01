@@ -1,0 +1,35 @@
+# heliaPROFILER quickstart — full PMU sweep (all counters)
+# Runs the AOT-compiled model with every available PMU counter category.
+# Generates a rich dataset for Model Explorer overlays.
+model:
+  path: kws_model.tflite
+  arena_size: 131072
+
+engine:
+  type: helia-aot
+  config:
+    prefix: hpx
+    module_name: hpx_model
+    cmsis_nn_path: ../../../nsx-modules/ns-cmsis-nn
+
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+
+profiling:
+  pmu_counters:
+    cpu: all
+    memory: all
+    mve: all
+  per_layer: true
+  iterations: 5
+  warmup: 2
+
+power:
+  enabled: false
+
+output:
+  format: csv
+  dir: ./results_full_sweep
+  model_explorer: true
+  detailed: true

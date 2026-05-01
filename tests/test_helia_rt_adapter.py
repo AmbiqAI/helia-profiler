@@ -1,4 +1,4 @@
-"""Tests for the heliaRT engine adapter and NSX wrapper generation."""
+"""Tests for the heliaRT engine adapter and NSX module installation."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from helia_profiler.config import load_config
 from helia_profiler.engines.helia_rt import (
     HELIART_VERSION,
     HeliaRTAdapter,
-    _write_wrapper,
+    _install_nsx_module,
 )
 from helia_profiler.errors import EngineError
 
@@ -27,19 +27,22 @@ def _make_config(tmp_path: Path, engine_overrides: dict | None = None):
     return load_config(None, base)
 
 
-class TestWriteWrapper:
-    def test_generates_nsx_module_yaml(self, tmp_path: Path):
-        _write_wrapper(tmp_path, variant="release-with-logs")
-        yaml_path = tmp_path / "nsx-module.yaml"
+class TestInstallNsxModule:
+    def test_copies_nsx_module_yaml(self, tmp_path: Path, fake_dist: Path):
+        module_dir = tmp_path / "module"
+        module_dir.mkdir()
+        _install_nsx_module(module_dir, fake_dist, variant="release-with-logs")
+        yaml_path = module_dir / "nsx-module.yaml"
         assert yaml_path.exists()
         content = yaml_path.read_text()
         assert "nsx-heliart" in content
-        assert HELIART_VERSION in content
         assert "schema_version: 1" in content
 
-    def test_generates_cmakelists(self, tmp_path: Path):
-        _write_wrapper(tmp_path, variant="release-with-logs")
-        cmake_path = tmp_path / "CMakeLists.txt"
+    def test_copies_cmakelists(self, tmp_path: Path, fake_dist: Path):
+        module_dir = tmp_path / "module"
+        module_dir.mkdir()
+        _install_nsx_module(module_dir, fake_dist, variant="release-with-logs")
+        cmake_path = module_dir / "CMakeLists.txt"
         assert cmake_path.exists()
         content = cmake_path.read_text()
         assert "nsx_heliart" in content
@@ -47,17 +50,37 @@ class TestWriteWrapper:
         assert "NSX_BOARD_FLAGS_TARGET" in content
         assert "TF_LITE_STATIC_MEMORY" in content
 
-    def test_variant_in_cmakelists(self, tmp_path: Path):
-        _write_wrapper(tmp_path, variant="debug")
-        content = (tmp_path / "CMakeLists.txt").read_text()
-        assert '"debug"' in content
+    def test_variant_patched_in_cmakelists(self, tmp_path: Path, fake_dist: Path):
+        module_dir = tmp_path / "module"
+        module_dir.mkdir()
+        _install_nsx_module(module_dir, fake_dist, variant="debug")
+        content = (module_dir / "CMakeLists.txt").read_text()
+        assert 'HELIART_VARIANT "debug"' in content
 
-    def test_version_in_both_files(self, tmp_path: Path):
-        _write_wrapper(tmp_path, variant="release")
-        yaml_content = (tmp_path / "nsx-module.yaml").read_text()
-        cmake_content = (tmp_path / "CMakeLists.txt").read_text()
-        assert HELIART_VERSION in yaml_content
-        assert HELIART_VERSION in cmake_content
+    def test_default_variant_unchanged(self, tmp_path: Path, fake_dist: Path):
+        module_dir = tmp_path / "module"
+        module_dir.mkdir()
+        _install_nsx_module(module_dir, fake_dist, variant="release-with-logs")
+        content = (module_dir / "CMakeLists.txt").read_text()
+        assert 'HELIART_VARIANT "release-with-logs"' in content
+
+    def test_copies_dist_dirs(self, tmp_path: Path, fake_dist: Path):
+        module_dir = tmp_path / "module"
+        module_dir.mkdir()
+        _install_nsx_module(module_dir, fake_dist, variant="release-with-logs")
+        assert (module_dir / "lib").is_dir()
+        assert (module_dir / "tensorflow").is_dir()
+        assert (module_dir / "third_party").is_dir()
+        assert (module_dir / "signal").is_dir()
+
+    def test_missing_nsx_raises(self, tmp_path: Path, fake_dist: Path):
+        """A dist without nsx/ should fail (heliaRT < 1.12.2)."""
+        import shutil
+        shutil.rmtree(fake_dist / "nsx")
+        module_dir = tmp_path / "module"
+        module_dir.mkdir()
+        with pytest.raises(EngineError, match="missing nsx/ module files"):
+            _install_nsx_module(module_dir, fake_dist, variant="release-with-logs")
 
 
 class TestHeliaRTAdapter:
@@ -79,9 +102,9 @@ class TestHeliaRTAdapter:
         adapter = HeliaRTAdapter()
         adapter.prepare(config, tmp_path)
         module_dir = tmp_path / "modules" / "nsx-heliart"
-        assert (module_dir / "lib").is_symlink()
-        assert (module_dir / "tensorflow").is_symlink()
-        assert (module_dir / "third_party").is_symlink()
+        assert (module_dir / "lib").is_dir()
+        assert (module_dir / "tensorflow").is_dir()
+        assert (module_dir / "third_party").is_dir()
 
     def test_prepare_returns_extra_module(self, tmp_path: Path, fake_dist: Path):
         config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
@@ -89,9 +112,9 @@ class TestHeliaRTAdapter:
         artifacts = adapter.prepare(config, tmp_path)
         assert len(artifacts.extra_modules) == 1
         mod = artifacts.extra_modules[0]
-        assert mod["name"] == "nsx-heliart"
-        assert mod["version"] == HELIART_VERSION
-        assert Path(mod["path"]).is_dir()
+        assert mod.name == "nsx-heliart"
+        assert mod.version == HELIART_VERSION
+        assert mod.path.is_dir()
 
     def test_prepare_template_vars(self, tmp_path: Path, fake_dist: Path):
         config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
@@ -139,13 +162,25 @@ class TestHeliaRTAdapter:
         adapter = HeliaRTAdapter()
         artifacts1 = adapter.prepare(config, tmp_path)
         artifacts2 = adapter.prepare(config, tmp_path)
-        assert artifacts1.extra_modules[0]["name"] == artifacts2.extra_modules[0]["name"]
+        assert artifacts1.extra_modules[0].name == artifacts2.extra_modules[0].name
 
-    def test_prepare_no_dist_path_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    def test_prepare_no_dist_path_falls_through_to_download(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """When no dist_path or env var is set, prepare() falls through to
+        the GitHub release download path."""
         monkeypatch.delenv("HELIART_DIST_PATH", raising=False)
         config = _make_config(tmp_path)
         adapter = HeliaRTAdapter()
-        with pytest.raises(EngineError, match="distribution path not provided"):
+
+        # Mock the download to raise so we can confirm the fallthrough.
+        monkeypatch.setattr(
+            "helia_profiler.engines.helia_rt._fetch_github_release",
+            lambda *a, **kw: (_ for _ in ()).throw(
+                EngineError("download failed (mocked)")
+            ),
+        )
+        with pytest.raises(EngineError, match="download failed"):
             adapter.prepare(config, tmp_path)
 
     def test_prepare_via_env_var(
@@ -181,4 +216,4 @@ class TestHeliaRTAdapter:
         assert ctx.engine_artifacts is not None
         assert len(ctx.engine_artifacts.extra_modules) == 1
         assert (work_dir / "modules" / "nsx-heliart" / "nsx-module.yaml").exists()
-        assert (work_dir / "modules" / "nsx-heliart" / "lib").is_symlink()
+        assert (work_dir / "modules" / "nsx-heliart" / "lib").is_dir()

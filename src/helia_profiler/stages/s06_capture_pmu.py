@@ -1,4 +1,4 @@
-"""Stage 6 — Capture PMU data from target hardware."""
+"""Stage 6 — Capture PMU data via SWO."""
 
 from __future__ import annotations
 
@@ -25,15 +25,14 @@ class CapturePmuStage:
         from ..capture import capture_pmu
 
         try:
-            pmu_raw = capture_pmu(ctx)
+            pmu_result = capture_pmu(ctx)
         except CaptureError:
             raise
         except Exception as exc:
             raise CaptureError(
-                f"PMU data capture failed: {exc}",
+                f"Capture failed: {exc}",
                 hint="Check serial/SWO connection to the target board.",
             ) from exc
 
-        ctx.pmu_raw = pmu_raw
-        layer_count = len(pmu_raw.get("layers", []))
-        log.info("Captured PMU data: %d layers", layer_count)
+        ctx.pmu_result = pmu_result
+        log.info("Captured PMU data: %d layers", len(pmu_result.layers))

@@ -1,0 +1,29 @@
+# heliaPROFILER quickstart — heliaAOT with ARM Compiler (armclang)
+# Same KWS model as hpx_aot.yml but built with armclang instead of GCC.
+model:
+  path: kws_model.tflite
+  arena_size: 131072          # 128 KB tensor arena
+
+engine:
+  type: helia-aot
+  config:
+    prefix: hpx
+    module_name: hpx_model
+    cmsis_nn_path: ../../../nsx-modules/ns-cmsis-nn
+
+target:
+  board: apollo510_evb
+  toolchain: armclang
+
+profiling:
+  pmu_presets: [basic_cpu]    # lightweight — just cycle counts + IPC
+  per_layer: true
+  iterations: 3
+  warmup: 1
+
+power:
+  enabled: false
+
+output:
+  format: csv
+  dir: ./results_aot_armclang

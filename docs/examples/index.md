@@ -4,36 +4,44 @@ Walkthroughs for common profiling scenarios.
 
 <div class="grid cards" markdown>
 
--   :material-play: __Basic Profiling__
+-   :material-play:{ .lg .middle } __Basic Profiling__
 
     ---
 
     Profile a model with default settings.
 
-    [Read →](basic-profiling.md)
+    [:octicons-arrow-right-24: Read](basic-profiling.md)
 
--   :material-layers: __Per-Layer Breakdown__
+-   :material-layers:{ .lg .middle } __Per-Layer Breakdown__
 
     ---
 
     Analyze operator-level cycle counts and PMU events.
 
-    [Read →](per-layer.md)
+    [:octicons-arrow-right-24: Read](per-layer.md)
 
--   :material-swap-horizontal: __Engine Comparison__
+-   :material-swap-horizontal:{ .lg .middle } __Engine Comparison__
 
     ---
 
     Compare TFLM, heliaRT, and heliaAOT on the same model.
 
-    [Read →](engine-comparison.md)
+    [:octicons-arrow-right-24: Read](engine-comparison.md)
 
--   :material-lightning-bolt: __Power Profiling__
+-   :material-lightning-bolt:{ .lg .middle } __Power Profiling__
 
     ---
 
     Capture current/voltage traces with Joulescope.
 
-    [Read →](power-profiling.md)
+    [:octicons-arrow-right-24: Read](power-profiling.md)
+
+-   :material-tools:{ .lg .middle } __Toolchain Comparison__
+
+    ---
+
+    Compare GCC, armclang, and ATfE on the same model and engine.
+
+    [:octicons-arrow-right-24: Read](toolchain-comparison.md)
 
 </div>

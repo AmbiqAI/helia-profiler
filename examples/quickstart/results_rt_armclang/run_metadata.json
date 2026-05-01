@@ -1,0 +1,82 @@
+{
+  "hpx_version": "0.1.0",
+  "run_id": "9e1dac00-2b02-435d-b580-72dad116939d",
+  "timestamp": "2026-04-24T23:10:03.894489+00:00",
+  "config": {
+    "model": {
+      "path": "kws_model.tflite",
+      "arena_size": 131072,
+      "model_location": "mram"
+    },
+    "engine": {
+      "type": "helia-rt",
+      "backend": null,
+      "config": {
+        "variant": "release-with-logs",
+        "source": {
+          "repo": "AmbiqAI/helia-rt",
+          "ref": "HeliaRT-v1.11.2"
+        }
+      }
+    },
+    "target": {
+      "board": "apollo510_evb",
+      "toolchain": "armclang"
+    },
+    "profiling": {
+      "pmu_presets": [
+        "basic_cpu",
+        "memory"
+      ],
+      "per_layer": true,
+      "iterations": 3,
+      "warmup": 1
+    },
+    "power": {
+      "enabled": false,
+      "driver": "joulescope",
+      "mode": "external",
+      "duration_s": 30
+    },
+    "output": {
+      "format": "csv",
+      "dir": "results_rt_armclang",
+      "model_explorer": true
+    }
+  },
+  "platform": {
+    "board": "apollo510_evb",
+    "soc": "apollo510",
+    "core": "cortex-m55",
+    "pmu_tier": "pmu",
+    "has_mve": true,
+    "clock_lp_mhz": 96,
+    "clock_hp_mhz": 250,
+    "sdk_tier": "r5"
+  },
+  "model": {
+    "name": "kws_model.tflite",
+    "size_bytes": 53744,
+    "sha256": "935c513a5f4dbfe6458c16b0a791e916f5e89d6c9b02ffbefce49c06fbbdf038"
+  },
+  "toolchain": {
+    "compiler": "armclang",
+    "compiler_version": "Product: Hardware Success Kit (Early Access)",
+    "cmake_version": "cmake version 4.1.2"
+  },
+  "firmware": {
+    "model_size": 53744,
+    "arena_size": 131072,
+    "allocated_arena": 29780,
+    "input_size": 490,
+    "output_size": 12,
+    "num_tensors": 35,
+    "num_inputs": 1,
+    "num_outputs": 1,
+    "num_presets": 2,
+    "presets": [
+      "basic_cpu",
+      "memory"
+    ]
+  }
+}

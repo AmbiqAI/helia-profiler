@@ -1,0 +1,7 @@
+{# _dwt_init.j2 — DWT cycle counter setup, identical across engines. #}
+// DWT cycle counter
+static inline void dwt_init(void) {
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}

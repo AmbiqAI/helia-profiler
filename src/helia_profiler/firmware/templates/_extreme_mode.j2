@@ -1,0 +1,49 @@
+{# _extreme_mode.j2 — optional power-floor reduction for benchmarking.
+
+   Activated when profiling.extreme_mode is true AND model_location == "tcm".
+   Code keeps running from MRAM (.text); the transport (RTT/USB/SWO) keeps
+   working.  The two levers we pull here are:
+
+     A. SSRAM off — 3 MB array fully powered down.  Safe because TCM-resident
+        models never touch SSRAM.
+     B. Single NVM bank — collapse MRAM to NVM0 (1 MB), turn NVM1 off.
+
+   Reference: neuralspotx/examples/coremark/src/core_portme.c, which uses
+   the same HAL calls (am_hal_pwrctrl_sram_config / mcu_memory_config) plus
+   a more aggressive ITCM-trampoline path that fully kills NVM.  We do NOT
+   take that further step here because the profiler must keep streaming
+   results back over MRAM-resident transport code.
+
+   NOTE: AM_HAL_PWRCTRL_NVM0_ONLY assumes the firmware fits inside the first
+   1 MB MRAM bank (LMA region 0x00410000-0x0050FFFF).  All four MLPerf Tiny
+   fixtures in heliaPROFILER currently fit; oversized firmware will silently
+   read garbage from the second bank and crash.  Build-time .map inspection
+   covers this.
+#}
+{% if extreme_mode and model_location == "tcm" %}
+
+    // ---------------------------------------------------------------------
+    // EXTREME MODE — collapse unused memory power
+    // ---------------------------------------------------------------------
+    // Power down SSRAM (3 MB unused — model lives in TCM).
+    {
+        am_hal_pwrctrl_sram_memcfg_t sramCfg = {
+            .eSRAMCfg        = AM_HAL_PWRCTRL_SRAM_NONE,
+            .eActiveWithMCU  = AM_HAL_PWRCTRL_SRAM_NONE,
+            .eActiveWithGFX  = AM_HAL_PWRCTRL_SRAM_NONE,
+            .eActiveWithDISP = AM_HAL_PWRCTRL_SRAM_NONE,
+            .eSRAMRetain     = AM_HAL_PWRCTRL_SRAM_NONE,
+        };
+        am_hal_pwrctrl_sram_config(&sramCfg);
+    }
+
+    // Collapse MRAM to a single bank (NVM0 only).  Read-modify-write so we
+    // preserve whatever DTCM/ITCM split nsx_system_init() set up.
+    {
+        am_hal_pwrctrl_mcu_memory_config_t mcuMemCfg;
+        am_hal_pwrctrl_mcu_memory_config_get(&mcuMemCfg);
+        mcuMemCfg.eNVMCfg               = AM_HAL_PWRCTRL_NVM0_ONLY;
+        mcuMemCfg.bKeepNVMOnInDeepSleep = false;
+        am_hal_pwrctrl_mcu_memory_config(&mcuMemCfg);
+    }
+{% endif %}

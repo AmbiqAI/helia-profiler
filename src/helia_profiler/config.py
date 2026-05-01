@@ -10,6 +10,7 @@ from .engines import EngineType
 
 DEFAULT_BOARD = "apollo510_evb"
 DEFAULT_TOOLCHAIN = "arm-none-eabi-gcc"
+SUPPORTED_TOOLCHAINS = {"arm-none-eabi-gcc", "gcc", "armclang", "atfe"}
 DEFAULT_ITERATIONS = 100
 DEFAULT_WARMUP = 5
 DEFAULT_PMU_PRESETS = ("basic_cpu",)
@@ -18,14 +19,52 @@ DEFAULT_IO_VOLTAGE = 1.8
 DEFAULT_POWER_DRIVER = "joulescope"
 DEFAULT_POWER_MODE = "external"
 DEFAULT_SYNC_GPIO_PIN = 10  # EVB-friendly default
+DEFAULT_TRANSPORT = "rtt"
+
+# Heartbeat defaults — firmware emits progress lines so the host can detect
+# a truly hung run without needing large wall-clock timeouts.  Setting either
+# *every_n_ops* or *every_ms* to 0 disables that trigger; setting both to 0
+# disables intra-inference heartbeats entirely (phase heartbeats still fire).
+DEFAULT_HB_EVERY_N_OPS = 8
+DEFAULT_HB_EVERY_MS = 2000
+DEFAULT_HB_HOST_TIMEOUT_S = 30
+DEFAULT_OVERALL_TIMEOUT_S: int | None = None  # None = unbounded when heartbeats on
+
+# Subprocess / network timeouts — consolidated so users can override any one
+# of them from config without touching source.  Values match the legacy
+# module-level constants they replaced.
+DEFAULT_CONFIGURE_TIMEOUT_S = 120
+DEFAULT_BUILD_TIMEOUT_S = 300
+DEFAULT_FLASH_TIMEOUT_S = 120
+DEFAULT_TOOLCHAIN_PROBE_S = 5
+DEFAULT_BINARY_PROBE_S = 10
+DEFAULT_DOWNLOAD_API_S = 30
+DEFAULT_DOWNLOAD_ASSET_S = 300
 
 
 @dataclass(frozen=True)
 class ModelConfig:
-    """Model file and arena sizing."""
+    """Model file and arena sizing.
+
+    ``model_location`` controls where weights and the tensor arena live.
+    Valid values:
+
+    * ``auto`` *(default)* — plan-memory stage picks the fastest region(s)
+      that fit. Greedy fastest-fit with arena prioritized over weights when
+      the two compete for the same region. Order: TCM → SRAM → MRAM.
+    * ``tcm`` — force both arena and weights into DTCM (highest performance,
+      smallest capacity). Fails preflight if the SoC has no TCM or it
+      doesn't fit.
+    * ``sram`` — force both into shared SRAM.
+    * ``mram`` — weights stay in MRAM/Flash (rodata); arena goes to TCM
+      when available, else SRAM. Matches pre-auto-placement behavior.
+    * ``psram`` — weights uploaded to external PSRAM at runtime via J-Link;
+      arena in SRAM. Requires a PSRAM-capable board.
+    """
 
     path: Path
     arena_size: int | None = None  # bytes; None = let engine/firmware report
+    model_location: str = "auto"   # auto | tcm | sram | mram | psram
 
 
 @dataclass(frozen=True)
@@ -39,21 +78,109 @@ class EngineConfig:
 
 
 @dataclass(frozen=True)
+class HeartbeatConfig:
+    """Liveness / progress-reporting settings.
+
+    The firmware emits ``HPX_HEARTBEAT`` lines at configurable intervals so
+    the host can (a) detect a hung run without using a large wall-clock
+    timeout, and (b) show the user live progress.
+
+    Attributes
+    ----------
+    enabled:
+        Master switch.  When ``False``, no heartbeats are emitted or
+        expected and the host falls back to the legacy line-gap timeout.
+    every_n_ops:
+        Emit a heartbeat after this many profiled ops.  ``0`` disables this
+        trigger.  Lower values add more PMU/inter-op overhead but give
+        finer-grained progress.
+    every_ms:
+        Emit a heartbeat when at least this many wall-clock milliseconds
+        have elapsed since the last heartbeat.  ``0`` disables this
+        trigger.  Useful for engines with a single large invocation (e.g.
+        AOT or upcoming Ethos-U command streams) where ``every_n_ops`` does
+        not fire.
+    host_timeout_s:
+        Maximum time the host will wait without receiving *any* line from
+        the firmware before declaring the run hung.
+    overall_timeout_s:
+        Hard ceiling on total capture time, in seconds.  ``None`` means
+        unbounded (rely on heartbeats).  Set to a positive int for a safety
+        net in CI or unattended runs.
+    """
+
+    enabled: bool = True
+    every_n_ops: int = DEFAULT_HB_EVERY_N_OPS
+    every_ms: int = DEFAULT_HB_EVERY_MS
+    host_timeout_s: int = DEFAULT_HB_HOST_TIMEOUT_S
+    overall_timeout_s: int | None = DEFAULT_OVERALL_TIMEOUT_S
+
+
+@dataclass(frozen=True)
+class TimeoutsConfig:
+    """Subprocess and network timeouts (seconds).
+
+    Every subprocess and long-lived HTTP call in heliaPROFILER reads its
+    timeout from this struct instead of hard-coding it.  Override any value
+    in YAML under ``timeouts:`` to adapt to slow CI machines, laggy J-Link
+    probes, or poor network conditions.
+
+    Capture-time timeouts (heartbeat / overall) live on ``HeartbeatConfig``
+    because they are tied to the on-device progress protocol.
+    """
+
+    configure_s: int = DEFAULT_CONFIGURE_TIMEOUT_S
+    build_s: int = DEFAULT_BUILD_TIMEOUT_S
+    flash_s: int = DEFAULT_FLASH_TIMEOUT_S
+    toolchain_probe_s: int = DEFAULT_TOOLCHAIN_PROBE_S
+    binary_probe_s: int = DEFAULT_BINARY_PROBE_S
+    download_api_s: int = DEFAULT_DOWNLOAD_API_S
+    download_asset_s: int = DEFAULT_DOWNLOAD_ASSET_S
+
+
+@dataclass(frozen=True)
 class TargetConfig:
     """Hardware target."""
 
     board: str = DEFAULT_BOARD
     toolchain: str = DEFAULT_TOOLCHAIN
+    jlink_serial: str | None = None  # select J-Link by S/N (None = auto)
+    transport: str = DEFAULT_TRANSPORT  # "rtt", "usb_cdc", or "swo"
+    heartbeat: HeartbeatConfig = field(default_factory=HeartbeatConfig)
+    # When True (default), scan for a Joulescope at the start of `hpx profile`
+    # and enable current passthrough so the board powers on before flashing.
+    # No-op when no Joulescope is detected.  Set to False to skip the scan
+    # entirely (e.g. board is on a bench supply).
+    ensure_board_powered: bool = True
 
 
 @dataclass(frozen=True)
 class ProfilingConfig:
-    """PMU capture settings."""
+    """PMU capture settings.
+
+    Counter selection is specified via *pmu_counters* — a mapping of
+    compute-unit group (``cpu``, ``mve``, ``memory``) to a selection:
+
+    * ``"default"`` — curated set of the most useful counters.
+    * ``"all"``     — every counter in the group (multi-pass).
+    * ``["NAME", …]`` — explicit counter names.
+
+    The legacy *pmu_presets* field is still accepted for backward
+    compatibility and is converted internally.
+    """
 
     pmu_presets: tuple[str, ...] = DEFAULT_PMU_PRESETS
+    pmu_counters: dict[str, str | list[str]] | None = None
     per_layer: bool = True
     iterations: int = DEFAULT_ITERATIONS
     warmup: int = DEFAULT_WARMUP
+    # Extreme benchmarking mode: power down memory regions the model does not
+    # use to lower the energy floor.  Currently powers down SSRAM (3 MB) and
+    # collapses MRAM to a single bank (NVM0 only).  Only safe when the model
+    # lives entirely in TCM (model_location == "tcm"); a preflight check
+    # rejects other placements.  Code keeps running from MRAM, so transports
+    # (RTT/USB/SWO) and printf remain available throughout the run.
+    extreme_mode: bool = False
 
 
 @dataclass(frozen=True)
@@ -66,6 +193,10 @@ class PowerConfig:
     duration_s: int = DEFAULT_POWER_DURATION_S
     io_voltage: float = DEFAULT_IO_VOLTAGE
     sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN  # GPIO for external sync
+    # Optional Joulescope serial number (e.g. "004204") to disambiguate
+    # when more than one device is plugged in. Leave None to auto-pick the
+    # single available device (and fail loudly if multiple are present).
+    serial: str | None = None
 
 
 @dataclass(frozen=True)
@@ -75,6 +206,7 @@ class OutputConfig:
     format: str = "csv"  # csv | json | model-explorer
     dir: Path = Path("./results")
     model_explorer: bool = True  # always emit ME overlay alongside primary format
+    detailed: bool = False  # emit per-preset/group CSVs and memory breakdown
 
 
 @dataclass(frozen=True)
@@ -87,6 +219,7 @@ class ProfileConfig:
     profiling: ProfilingConfig = field(default_factory=ProfilingConfig)
     power: PowerConfig = field(default_factory=PowerConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
+    timeouts: TimeoutsConfig = field(default_factory=TimeoutsConfig)
     work_dir: Path | None = None  # None = use tempdir
     keep_work_dir: bool = False
     verbose: int = 0
@@ -130,10 +263,12 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
     profiling_d = d.get("profiling", {})
     power_d = d.get("power", {})
     output_d = d.get("output", {})
+    timeouts_d = d.get("timeouts", {}) or {}
 
     model = ModelConfig(
         path=Path(model_d["path"]),
         arena_size=model_d.get("arena_size"),
+        model_location=model_d.get("model_location", "auto"),
     )
 
     engine_type_raw = engine_d.get("type", "tflm")
@@ -148,18 +283,39 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
     if isinstance(pmu_presets, list):
         pmu_presets = tuple(pmu_presets)
 
+    pmu_counters_raw = profiling_d.get("pmu_counters")
+    pmu_counters: dict[str, str | list[str]] | None = None
+    if isinstance(pmu_counters_raw, dict):
+        pmu_counters = {}
+        for grp, sel in pmu_counters_raw.items():
+            if isinstance(sel, list):
+                pmu_counters[grp] = sel
+            else:
+                pmu_counters[grp] = str(sel)
+
+    tc = target_d.get("toolchain", DEFAULT_TOOLCHAIN)
+    if tc not in SUPPORTED_TOOLCHAINS:
+        supported = ", ".join(sorted(SUPPORTED_TOOLCHAINS))
+        raise ValueError(f"Unknown toolchain '{tc}'. Supported: {supported}")
+
     return ProfileConfig(
         model=model,
         engine=engine,
         target=TargetConfig(
             board=target_d.get("board", DEFAULT_BOARD),
-            toolchain=target_d.get("toolchain", DEFAULT_TOOLCHAIN),
+            toolchain=tc,
+            jlink_serial=target_d.get("jlink_serial"),
+            transport=target_d.get("transport", DEFAULT_TRANSPORT),
+            heartbeat=_build_heartbeat(target_d.get("heartbeat")),
+            ensure_board_powered=bool(target_d.get("ensure_board_powered", True)),
         ),
         profiling=ProfilingConfig(
             pmu_presets=pmu_presets,
+            pmu_counters=pmu_counters,
             per_layer=profiling_d.get("per_layer", True),
             iterations=profiling_d.get("iterations", DEFAULT_ITERATIONS),
             warmup=profiling_d.get("warmup", DEFAULT_WARMUP),
+            extreme_mode=bool(profiling_d.get("extreme_mode", False)),
         ),
         power=PowerConfig(
             enabled=power_d.get("enabled", False),
@@ -168,13 +324,42 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             duration_s=power_d.get("duration_s", DEFAULT_POWER_DURATION_S),
             io_voltage=power_d.get("io_voltage", DEFAULT_IO_VOLTAGE),
             sync_gpio_pin=power_d.get("sync_gpio_pin", DEFAULT_SYNC_GPIO_PIN),
+            serial=power_d.get("serial"),
         ),
         output=OutputConfig(
             format=output_d.get("format", "csv"),
             dir=Path(output_d.get("dir", "./results")),
             model_explorer=output_d.get("model_explorer", True),
+            detailed=output_d.get("detailed", False),
+        ),
+        timeouts=TimeoutsConfig(
+            configure_s=int(timeouts_d.get("configure_s", DEFAULT_CONFIGURE_TIMEOUT_S)),
+            build_s=int(timeouts_d.get("build_s", DEFAULT_BUILD_TIMEOUT_S)),
+            flash_s=int(timeouts_d.get("flash_s", DEFAULT_FLASH_TIMEOUT_S)),
+            toolchain_probe_s=int(timeouts_d.get("toolchain_probe_s", DEFAULT_TOOLCHAIN_PROBE_S)),
+            binary_probe_s=int(timeouts_d.get("binary_probe_s", DEFAULT_BINARY_PROBE_S)),
+            download_api_s=int(timeouts_d.get("download_api_s", DEFAULT_DOWNLOAD_API_S)),
+            download_asset_s=int(timeouts_d.get("download_asset_s", DEFAULT_DOWNLOAD_ASSET_S)),
         ),
         work_dir=Path(d["work_dir"]) if d.get("work_dir") else None,
         keep_work_dir=d.get("keep_work_dir", False),
         verbose=d.get("verbose", 0),
+    )
+
+
+def _build_heartbeat(raw: Any) -> HeartbeatConfig:
+    """Build a ``HeartbeatConfig`` from YAML/CLI dict (or ``None``)."""
+    if raw is None:
+        return HeartbeatConfig()
+    if not isinstance(raw, dict):
+        return HeartbeatConfig()
+    overall = raw.get("overall_timeout_s", DEFAULT_OVERALL_TIMEOUT_S)
+    if overall is not None:
+        overall = int(overall)
+    return HeartbeatConfig(
+        enabled=bool(raw.get("enabled", True)),
+        every_n_ops=int(raw.get("every_n_ops", DEFAULT_HB_EVERY_N_OPS)),
+        every_ms=int(raw.get("every_ms", DEFAULT_HB_EVERY_MS)),
+        host_timeout_s=int(raw.get("host_timeout_s", DEFAULT_HB_HOST_TIMEOUT_S)),
+        overall_timeout_s=overall,
     )
