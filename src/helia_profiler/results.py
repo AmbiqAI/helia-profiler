@@ -13,8 +13,22 @@ enumerating every possible ARM PMU event as a field would be impractical.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
+
+from .engines import EngineType
+from .placement import MemoryRegion
+
+
+class ConsumerKind(StrEnum):
+    """Logical role of a :class:`MemoryConsumer` entry."""
+
+    ARENA = "arena"
+    WEIGHTS = "weights"
+    CODE = "code"
+    STACK = "stack"
+    OTHER = "other"
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +182,11 @@ class MemoryConsumer:
 
     name: str
     size: int
-    kind: str = "arena"  # "arena" | "weights" | "code" | "stack" | "other"
+    kind: ConsumerKind = ConsumerKind.ARENA
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.kind, ConsumerKind):
+            object.__setattr__(self, "kind", ConsumerKind(self.kind))
 
 
 @dataclass(frozen=True)
@@ -180,10 +198,14 @@ class MemoryRegionUsage:
     ``free`` is a convenience property.
     """
 
-    region: str  # "MRAM" | "SRAM" | "DTCM" | "ITCM" | "PSRAM"
+    region: MemoryRegion
     capacity: int
     used: int
     consumers: tuple[MemoryConsumer, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.region, MemoryRegion):
+            object.__setattr__(self, "region", MemoryRegion(str(self.region).upper()))
 
     @property
     def free(self) -> int:
@@ -204,7 +226,7 @@ class MemoryPlan:
     the firmware template generator for placement macros / linker hints.
     """
 
-    engine: str  # "tflm" | "helia_rt" | "helia_aot"
+    engine: EngineType
     regions: tuple[MemoryRegionUsage, ...] = ()
     # Total model weight bytes (informational — where they go is in regions).
     model_weight_bytes: int = 0
@@ -213,10 +235,14 @@ class MemoryPlan:
     # before that happens so the user gets a clear hint.
     has_overflow: bool = False
 
-    def region(self, name: str) -> MemoryRegionUsage | None:
-        key = name.upper()
+    def __post_init__(self) -> None:
+        if not isinstance(self.engine, EngineType):
+            object.__setattr__(self, "engine", EngineType(self.engine))
+
+    def region(self, name: str | MemoryRegion) -> MemoryRegionUsage | None:
+        key = MemoryRegion(str(name).upper()) if not isinstance(name, MemoryRegion) else name
         for r in self.regions:
-            if r.region.upper() == key:
+            if r.region is key:
                 return r
         return None
 

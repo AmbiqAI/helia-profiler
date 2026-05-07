@@ -3,23 +3,56 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
 from .engines import EngineType
+from .placement import ModelLocation
+from .power.base import PowerMode
+
+
+class Toolchain(StrEnum):
+    """Supported cross-compiler toolchains for the profiler firmware.
+
+    ``GCC`` and ``ARM_NONE_EABI_GCC`` are aliases — both resolve to the
+    GNU Arm Embedded toolchain.  ``ARMCLANG`` is Arm Compiler 6 (Keil),
+    ``ATFE`` is the Arm Toolchain for Embedded (LLVM).
+    """
+
+    ARM_NONE_EABI_GCC = "arm-none-eabi-gcc"
+    GCC = "gcc"
+    ARMCLANG = "armclang"
+    ATFE = "atfe"
+
+
+class Transport(StrEnum):
+    """Host↔target transport for capture and heartbeat traffic."""
+
+    RTT = "rtt"
+    USB_CDC = "usb_cdc"
+    SWO = "swo"
+
+
+class OutputFormat(StrEnum):
+    """Top-level report format emitted by the report stage."""
+
+    CSV = "csv"
+    JSON = "json"
+    MODEL_EXPLORER = "model-explorer"
+
 
 DEFAULT_BOARD = "apollo510_evb"
-DEFAULT_TOOLCHAIN = "arm-none-eabi-gcc"
-SUPPORTED_TOOLCHAINS = {"arm-none-eabi-gcc", "gcc", "armclang", "atfe"}
+DEFAULT_TOOLCHAIN = Toolchain.ARM_NONE_EABI_GCC
 DEFAULT_ITERATIONS = 100
 DEFAULT_WARMUP = 5
 DEFAULT_PMU_PRESETS = ("basic_cpu",)
 DEFAULT_POWER_DURATION_S = 30
 DEFAULT_IO_VOLTAGE = 1.8
 DEFAULT_POWER_DRIVER = "joulescope"
-DEFAULT_POWER_MODE = "external"
+DEFAULT_POWER_MODE = PowerMode.EXTERNAL
 DEFAULT_SYNC_GPIO_PIN = 10  # EVB-friendly default
-DEFAULT_TRANSPORT = "rtt"
+DEFAULT_TRANSPORT = Transport.RTT
 
 # Heartbeat defaults — firmware emits progress lines so the host can detect
 # a truly hung run without needing large wall-clock timeouts.  Setting either
@@ -71,7 +104,18 @@ class ModelConfig:
 
     path: Path
     arena_size: int | None = None  # bytes; None = let engine/firmware report
-    model_location: str = "auto"   # auto | tcm | sram | mram | psram
+    model_location: ModelLocation = ModelLocation.AUTO
+
+    def __post_init__(self) -> None:
+        # Tolerate invalid raw strings here — :class:`PreflightStage`
+        # produces a friendlier ``ConfigError`` for unknown values.
+        if not isinstance(self.model_location, ModelLocation):
+            try:
+                object.__setattr__(
+                    self, "model_location", ModelLocation(self.model_location)
+                )
+            except ValueError:
+                pass
 
 
 @dataclass(frozen=True)
@@ -150,15 +194,21 @@ class TargetConfig:
     """Hardware target."""
 
     board: str = DEFAULT_BOARD
-    toolchain: str = DEFAULT_TOOLCHAIN
+    toolchain: Toolchain = DEFAULT_TOOLCHAIN
     jlink_serial: str | None = None  # select J-Link by S/N (None = auto)
-    transport: str = DEFAULT_TRANSPORT  # "rtt", "usb_cdc", or "swo"
+    transport: Transport = DEFAULT_TRANSPORT
     heartbeat: HeartbeatConfig = field(default_factory=HeartbeatConfig)
     # When True (default), scan for a Joulescope at the start of `hpx profile`
     # and enable current passthrough so the board powers on before flashing.
     # No-op when no Joulescope is detected.  Set to False to skip the scan
     # entirely (e.g. board is on a bench supply).
     ensure_board_powered: bool = True
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.toolchain, Toolchain):
+            object.__setattr__(self, "toolchain", Toolchain(self.toolchain))
+        if not isinstance(self.transport, Transport):
+            object.__setattr__(self, "transport", Transport(self.transport))
 
 
 @dataclass(frozen=True)
@@ -195,7 +245,7 @@ class PowerConfig:
 
     enabled: bool = False
     driver: str = DEFAULT_POWER_DRIVER
-    mode: str = DEFAULT_POWER_MODE  # "external" | "internal"
+    mode: PowerMode = DEFAULT_POWER_MODE
     duration_s: int = DEFAULT_POWER_DURATION_S
     io_voltage: float = DEFAULT_IO_VOLTAGE
     sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN  # GPIO for external sync
@@ -204,15 +254,23 @@ class PowerConfig:
     # single available device (and fail loudly if multiple are present).
     serial: str | None = None
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.mode, PowerMode):
+            object.__setattr__(self, "mode", PowerMode(self.mode))
+
 
 @dataclass(frozen=True)
 class OutputConfig:
     """Report output settings."""
 
-    format: str = "csv"  # csv | json | model-explorer
+    format: OutputFormat = OutputFormat.CSV
     dir: Path = Path("./results")
     model_explorer: bool = True  # always emit ME overlay alongside primary format
     detailed: bool = False  # emit per-preset/group CSVs and memory breakdown
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.format, OutputFormat):
+            object.__setattr__(self, "format", OutputFormat(self.format))
 
 
 @dataclass(frozen=True)
@@ -300,10 +358,12 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             else:
                 pmu_counters[grp] = str(sel)
 
-    tc = target_d.get("toolchain", DEFAULT_TOOLCHAIN)
-    if tc not in SUPPORTED_TOOLCHAINS:
-        supported = ", ".join(sorted(SUPPORTED_TOOLCHAINS))
-        raise ValueError(f"Unknown toolchain '{tc}'. Supported: {supported}")
+    tc_raw = target_d.get("toolchain", DEFAULT_TOOLCHAIN)
+    try:
+        tc = Toolchain(tc_raw)
+    except ValueError:
+        supported = ", ".join(t.value for t in Toolchain)
+        raise ValueError(f"Unknown toolchain '{tc_raw}'. Supported: {supported}") from None
 
     return ProfileConfig(
         model=model,

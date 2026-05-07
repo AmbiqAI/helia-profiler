@@ -372,7 +372,7 @@ def _write_aot_manifest(ctx: PipelineContext, output_dir: Path) -> Path | None:
     artifacts = getattr(ctx, "engine_artifacts", None)
     if artifacts is None:
         return None
-    manifest = (artifacts.template_vars or {}).get("aot_op_manifest")
+    manifest = artifacts.aot_op_manifest
     if not manifest:
         return None
     out_path = output_dir / "aot_operator_manifest.json"

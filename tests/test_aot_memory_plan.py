@@ -50,7 +50,7 @@ class TestExtractMemoryPlan:
         plan = _FakeAotPlan(arena_usages={}, tensor_allocs={})
         result = _extract_memory_plan(_FakeCodegenCtx(plan))
         assert result is not None
-        assert result.engine == "helia_aot"
+        assert result.engine == "helia-aot"
         assert result.regions == ()
 
     def test_arena_region_becomes_consumer(self):

@@ -217,38 +217,28 @@ def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
 
 
 def _serialize_config(config: ProfileConfig) -> dict[str, Any]:
-    """Produce a JSON-safe snapshot of the active configuration."""
-    return {
-        "model": {
-            "path": str(config.model.path),
-            "arena_size": config.model.arena_size,
-            "model_location": config.model.model_location,
-        },
-        "engine": {
-            "type": config.engine.type.value,
-            "backend": config.engine.backend,
-            "config": config.engine.config,
-        },
-        "target": {
-            "board": config.target.board,
-            "toolchain": config.target.toolchain,
-        },
-        "frozen": config.frozen,
-        "profiling": {
-            "pmu_presets": list(config.profiling.pmu_presets),
-            "per_layer": config.profiling.per_layer,
-            "iterations": config.profiling.iterations,
-            "warmup": config.profiling.warmup,
-        },
-        "power": {
-            "enabled": config.power.enabled,
-            "driver": config.power.driver,
-            "mode": config.power.mode,
-            "duration_s": config.power.duration_s,
-        },
-        "output": {
-            "format": config.output.format,
-            "dir": str(config.output.dir),
-            "model_explorer": config.output.model_explorer,
-        },
-    }
+    """Produce a JSON-safe snapshot of the active configuration.
+
+    Walks the full :class:`ProfileConfig` dataclass tree via
+    :func:`dataclasses.asdict`, then coerces non-JSON-native leaves
+    (``Path`` \u2192 ``str``, ``Enum`` \u2192 ``.value``, ``set``/``tuple`` \u2192
+    ``list``) so the resulting dict can be round-tripped through
+    ``json.dumps``.  Adding new fields to any sub-config is automatically
+    reflected in the run-metadata snapshot \u2014 no hand-maintained mirror
+    to drift.
+    """
+    from dataclasses import asdict
+    from enum import Enum
+
+    def _coerce(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {k: _coerce(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple, set)):
+            return [_coerce(v) for v in value]
+        if isinstance(value, Enum):
+            return value.value
+        if isinstance(value, Path):
+            return str(value)
+        return value
+
+    return _coerce(asdict(config))

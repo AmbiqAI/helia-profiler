@@ -461,7 +461,7 @@ def generate_app(ctx: PipelineContext) -> Path:
         (src_dir / "main.cc").write_text(
             _jinja_env.get_template("main_aot.cc.j2").render(
                 aot_prefix=aot_prefix,
-                aot_op_manifest=tvars.get("aot_op_manifest", []),
+                aot_op_manifest=ctx.engine_artifacts.aot_op_manifest or [],
                 iterations=config.profiling.iterations,
                 warmup=config.profiling.warmup,
                 pmu_passes=pmu_passes,

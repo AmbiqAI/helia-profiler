@@ -246,10 +246,10 @@ class HeliaAOTAdapter:
                 "aot_prefix": prefix,
                 "aot_module_name": module_name,
                 "aot_cmake_target": f"nsx::{cmake_name}",
-                "aot_op_manifest": op_manifest,
                 "allocate_arenas": allocate_arenas,
                 "arena_regions": arena_regions,
             },
+            aot_op_manifest=op_manifest or None,
             memory_plan=memory_plan,
         )
 
@@ -700,7 +700,7 @@ def _extract_memory_plan(codegen_ctx: Any) -> MemoryPlan | None:
         ))
 
     return MemoryPlan(
-        engine="helia_aot",
+        engine=EngineType.HELIA_AOT,
         regions=tuple(regions),
         model_weight_bytes=total_weights,
         has_overflow=any(r.overflow for r in regions),

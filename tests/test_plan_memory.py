@@ -158,7 +158,7 @@ class TestPlanMemoryEngineProvided:
         ctx = _make_ctx(tmp_path)
         # Pretend heliaAOT produced a precise plan already.
         plan = MemoryPlan(
-            engine="helia_aot",
+            engine="helia-aot",
             regions=(
                 MemoryRegionUsage(
                     region="MRAM", capacity=0, used=12_000,
@@ -174,7 +174,7 @@ class TestPlanMemoryEngineProvided:
         ctx.engine_artifacts = EngineArtifacts(memory_plan=plan)
         PlanMemoryStage().run(ctx)
 
-        assert ctx.memory_plan.engine == "helia_aot"
+        assert ctx.memory_plan.engine == "helia-aot"
         # Capacities should now be populated from the SoC layout.
         mram = ctx.memory_plan.region("MRAM")
         dtcm = ctx.memory_plan.region("DTCM")
@@ -188,7 +188,7 @@ class TestPlanMemoryOverflow:
         ctx = _make_ctx(tmp_path)
         # Apollo510 DTCM is 508 KB; request far more.
         plan = MemoryPlan(
-            engine="helia_aot",
+            engine="helia-aot",
             regions=(
                 MemoryRegionUsage(
                     region="DTCM", capacity=0, used=8 * 1024 * 1024,

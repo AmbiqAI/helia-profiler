@@ -89,6 +89,13 @@ class EngineArtifacts:
     # Engine-specific template context (merged into Jinja rendering)
     template_vars: dict[str, Any] = field(default_factory=dict)
 
+    # AOT operator manifest \u2014 ordered list of post-codegen operator
+    # descriptors (idx, id, op_type, name, inputs, outputs).  Set by
+    # :class:`HeliaAOTAdapter`; consumed by the firmware template
+    # (``main_aot.cc.j2``) for the per-op callback table and by the
+    # report stage to emit ``ops.json``.  ``None`` for non-AOT engines.
+    aot_op_manifest: list[dict[str, Any]] | None = None
+
     # Optional memory plan built from engine-specific internals (e.g.
     # heliaAOT's ``codegen_ctx.memory_plan``).  If None, ``plan_memory``
     # stage synthesises a conservative plan from ``model.arena_size`` and

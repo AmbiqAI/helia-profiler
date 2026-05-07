@@ -58,3 +58,26 @@ class ArenaRole(StrEnum):
     SCRATCH = "scratch"
     PERSISTENT = "persistent"
     CONSTANT = "constant"
+
+
+class MemoryRegion(StrEnum):
+    """Physical SoC memory region names used in :class:`MemoryPlan`.
+
+    These map onto the Apollo SoC layout:
+
+    * ``DTCM`` — data TCM (zero-wait, smallest)
+    * ``ITCM`` — instruction TCM (Apollo5 only)
+    * ``SRAM`` — shared SRAM
+    * ``MRAM`` — non-volatile flash (XIP)
+    * ``PSRAM`` — external PSRAM (board-dependent)
+
+    The :class:`Placement` enum is the *logical* user-facing vocabulary
+    (``tcm`` → DTCM); :class:`MemoryRegion` is the *physical* region
+    name surfaced in reports and consumed by linker scripts.
+    """
+
+    DTCM = "DTCM"
+    ITCM = "ITCM"
+    SRAM = "SRAM"
+    MRAM = "MRAM"
+    PSRAM = "PSRAM"
