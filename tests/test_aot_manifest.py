@@ -151,7 +151,6 @@ class TestExtractOperatorManifest:
 
 class _StubArtifacts:
     def __init__(self, manifest: list[dict[str, Any]] | None):
-        self.template_vars: dict[str, Any] = {}
         self.aot_op_manifest = manifest
 
 

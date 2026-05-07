@@ -46,7 +46,5 @@ class TFLMAdapter:
         """
         return EngineArtifacts(
             engine_type=EngineType.TFLM,
-            template_vars={
-                "engine_header": "tensorflow/lite/micro/micro_interpreter.h",
-            },
+            engine_header="tensorflow/lite/micro/micro_interpreter.h",
         )

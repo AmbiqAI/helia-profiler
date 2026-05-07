@@ -67,8 +67,7 @@ class EngineArtifacts:
     """
 
     # Identity of the producing engine — single source of truth.  Use
-    # this for engine-specific dispatch instead of pulling a string out
-    # of ``template_vars``.
+    # this for engine-specific dispatch instead of branching on a string.
     engine_type: EngineType = EngineType.TFLM
 
     # Additional NSX modules the profiler app needs (e.g. a local heliaRT wrapper)
@@ -86,8 +85,26 @@ class EngineArtifacts:
     # Paths to static libraries to link
     static_libs: list[Path] = field(default_factory=list)
 
-    # Engine-specific template context (merged into Jinja rendering)
-    template_vars: dict[str, Any] = field(default_factory=dict)
+    # --- Typed engine-output fields (consumed by firmware/template renderer) ---
+
+    # C/C++ header included by the firmware main template to pull in the
+    # engine's public API.  All engines provide this.  Defaults to the
+    # stock TFLM interpreter header so adapters that omit it still render.
+    engine_header: str = "tensorflow/lite/micro/micro_interpreter.h"
+
+    # heliaRT-only metadata (None for other engines).  Surfaced in
+    # report metadata and used by version-compat assertions in tests.
+    engine_backend: str | None = None
+    heliart_version: str | None = None
+    heliart_variant: str | None = None
+    heliart_toolchain_tag: str | None = None
+
+    # heliaAOT-only fields (None / defaults for other engines).
+    aot_prefix: str | None = None
+    aot_module_name: str | None = None
+    aot_cmake_target: str | None = None
+    aot_allocate_arenas: bool = True
+    aot_arena_regions: list[ArenaRegion] = field(default_factory=list)
 
     # AOT operator manifest \u2014 ordered list of post-codegen operator
     # descriptors (idx, id, op_type, name, inputs, outputs).  Set by
@@ -162,8 +179,8 @@ class EngineAdapter(Protocol):
     ) -> list["ArenaRegion"]:
         """Apply firmware-level arena placement override.
 
-        Called after ``prepare()`` produced :attr:`EngineArtifacts.template_vars`'
-        ``arena_regions``.  Default impl is identity (no override).
+        Called after ``prepare()`` produced :attr:`EngineArtifacts.aot_arena_regions`.
+        Default impl is identity (no override).
         AOT-style engines move *scratch* regions to ``target``.
         """
         ...

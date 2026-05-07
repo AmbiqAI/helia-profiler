@@ -117,22 +117,20 @@ class TestHeliaRTAdapter:
         assert mod.version == HELIART_VERSION
         assert mod.path.is_dir()
 
-    def test_prepare_template_vars(self, tmp_path: Path, fake_dist: Path):
+    def test_prepare_typed_fields(self, tmp_path: Path, fake_dist: Path):
         config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
         adapter = HeliaRTAdapter()
         artifacts = adapter.prepare(config, tmp_path)
         assert artifacts.engine_type is EngineType.HELIA_RT
-        assert (
-            artifacts.template_vars["engine_header"] == "tensorflow/lite/micro/micro_interpreter.h"
-        )
-        assert artifacts.template_vars["heliart_version"] == HELIART_VERSION
-        assert artifacts.template_vars["heliart_variant"] == "release-with-logs"
+        assert artifacts.engine_header == "tensorflow/lite/micro/micro_interpreter.h"
+        assert artifacts.heliart_version == HELIART_VERSION
+        assert artifacts.heliart_variant == "release-with-logs"
 
     def test_prepare_default_backend(self, tmp_path: Path, fake_dist: Path):
         config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
         adapter = HeliaRTAdapter()
         artifacts = adapter.prepare(config, tmp_path)
-        assert artifacts.template_vars["engine_backend"] == "helia"
+        assert artifacts.engine_backend == "helia"
 
     def test_prepare_custom_backend(self, tmp_path: Path, fake_dist: Path):
         config = _make_config(
@@ -140,7 +138,7 @@ class TestHeliaRTAdapter:
         )
         adapter = HeliaRTAdapter()
         artifacts = adapter.prepare(config, tmp_path)
-        assert artifacts.template_vars["engine_backend"] == "cmsis-nn"
+        assert artifacts.engine_backend == "cmsis-nn"
 
     def test_prepare_custom_variant(self, tmp_path: Path, fake_dist: Path):
         config = _make_config(
@@ -148,7 +146,7 @@ class TestHeliaRTAdapter:
         )
         adapter = HeliaRTAdapter()
         artifacts = adapter.prepare(config, tmp_path)
-        assert artifacts.template_vars["heliart_variant"] == "debug"
+        assert artifacts.heliart_variant == "debug"
 
     def test_prepare_invalid_variant_raises(self, tmp_path: Path, fake_dist: Path):
         config = _make_config(

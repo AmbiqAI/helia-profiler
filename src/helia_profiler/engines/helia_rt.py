@@ -183,13 +183,11 @@ class HeliaRTAdapter:
                     version=version,
                 ),
             ],
-            template_vars={
-                "engine_backend": backend,
-                "engine_header": "tensorflow/lite/micro/micro_interpreter.h",
-                "heliart_version": version,
-                "heliart_variant": variant,
-                "heliart_toolchain_tag": toolchain_tag,
-            },
+            engine_header="tensorflow/lite/micro/micro_interpreter.h",
+            engine_backend=backend,
+            heliart_version=version,
+            heliart_variant=variant,
+            heliart_toolchain_tag=toolchain_tag,
         )
 
 

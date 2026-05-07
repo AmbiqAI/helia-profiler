@@ -339,7 +339,6 @@ def generate_app(ctx: PipelineContext) -> Path:
     soc = ctx.soc
     board = ctx.board
     artifacts = ctx.engine_artifacts
-    tvars = artifacts.template_vars
     weights_region = ctx.weights_region or Placement.MRAM
     arena_region = ctx.arena_region or Placement.TCM
 
@@ -393,7 +392,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             board=board.name,
             engine_type=engine_type,
             cmake_vars=artifacts.cmake_vars,
-            aot_cmake_target=tvars.get("aot_cmake_target", ""),
+            aot_cmake_target=artifacts.aot_cmake_target or "",
             transport=transport,
             model_location=config.model.model_location,
             arena_region=arena_region,
@@ -444,7 +443,8 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     if engine_type is EngineType.HELIA_AOT:
         # --- AOT engine: use AOT-specific main template, no model embedding ---
-        aot_prefix = tvars["aot_prefix"]
+        aot_prefix = artifacts.aot_prefix
+        assert aot_prefix is not None  # heliaAOT adapter always sets this
 
         # Apply firmware-level placement overrides via the adapter.
         # AOT moves *scratch* arenas to the requested region; other
@@ -454,7 +454,7 @@ def generate_app(ctx: PipelineContext) -> Path:
         adapter = ctx.engine_adapter
         assert adapter is not None  # set by stage 2 before firmware
         aot_arena_regions: list[_ArenaRegion] = adapter.apply_arena_placement_override(
-            list(tvars.get("arena_regions", [])),
+            list(artifacts.aot_arena_regions),
             arena_region,
         )
 
@@ -475,7 +475,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 arena_region=arena_region,
                 weights_region=weights_region,
                 has_full_pmu=soc.has_full_pmu,
-                allocate_arenas=tvars.get("allocate_arenas", True),
+                allocate_arenas=artifacts.aot_allocate_arenas,
                 arena_regions=aot_arena_regions,
                 **heartbeat_vars,
             )
@@ -490,7 +490,7 @@ def generate_app(ctx: PipelineContext) -> Path:
 
         model_size = config.model.path.stat().st_size
 
-        engine_header = tvars.get("engine_header", "tensorflow/lite/micro/micro_interpreter.h")
+        engine_header = artifacts.engine_header
         (src_dir / "main.cc").write_text(
             _jinja_env.get_template("main.cc.j2").render(
                 engine_header=engine_header,
