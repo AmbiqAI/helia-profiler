@@ -8,6 +8,7 @@ from pathlib import Path
 
 import yaml
 
+from helia_profiler.engines import EngineType
 from helia_profiler.validation.matrix import BOARDS, MODELS, CaseSpec
 from helia_profiler.validation.runner import run_case
 
@@ -20,7 +21,7 @@ def test_run_case_retries_once_on_transient_joulescope_lock(tmp_path: Path, monk
 
     case = CaseSpec(
         model=MODELS["kws"],
-        engine="helia-rt",
+        engine=EngineType.HELIA_RT,
         power=True,
         board=BOARDS["apollo510_evb"],
     )

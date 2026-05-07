@@ -34,6 +34,7 @@ from ..config import ProfileConfig
 from ..errors import EngineError
 from ..platform import CoreArch, get_soc
 from ..results import NsxModuleRef
+from . import EngineType
 from .base import EngineArtifacts
 
 log = logging.getLogger("hpx")
@@ -58,8 +59,16 @@ HELIART_RELEASE_TAG = f"heliaRT-v{HELIART_VERSION}"
 _CACHE_DIR = Path.home() / ".cache" / "helia-profiler" / "heliart"
 
 
-def _core_tag(board: str) -> str:
+def _core_tag(board: str, *, override: str | None = None) -> str:
     """Map a board name to the heliaRT library core tag (cm4 or cm55)."""
+    if override:
+        tag = override.lower()
+        if tag not in ("cm4", "cm55"):
+            raise EngineError(
+                f"Invalid core_override '{override}'",
+                hint="Valid values: cm4, cm55",
+            )
+        return tag
     soc = get_soc(_board_to_soc(board))
     if soc.core is CoreArch.CORTEX_M55:
         return "cm55"
@@ -92,6 +101,7 @@ class HeliaRTAdapter:
     def prepare(self, config: ProfileConfig, work_dir: Path) -> EngineArtifacts:
         backend = config.engine.backend or "helia"
         variant = config.engine.config.get("variant", "release-with-logs")
+        core_override = config.engine.config.get("core_override")
 
         # Validate variant
         valid_variants = ("debug", "release-with-logs", "release")
@@ -121,10 +131,18 @@ class HeliaRTAdapter:
             board=config.target.board,
             toolchain_tag=toolchain_tag,
             variant=variant,
+            core_override=core_override,
         )
 
         # Install NSX module files + distribution content
-        _install_nsx_module(module_dir, dist_path, variant=variant)
+        _install_nsx_module(module_dir, dist_path, variant=variant,
+                           core_override=core_override)
+
+        if core_override:
+            log.warning(
+                "heliaRT: core_override=%s — using %s library on %s board",
+                core_override, core_override, config.target.board,
+            )
 
         log.info(
             "heliaRT %s (toolchain=%s, variant=%s, dist=%s)",
@@ -135,6 +153,7 @@ class HeliaRTAdapter:
         )
 
         return EngineArtifacts(
+            engine_type=EngineType.HELIA_RT,
             extra_modules=[
                 NsxModuleRef(
                     name="nsx-heliart",
@@ -143,7 +162,6 @@ class HeliaRTAdapter:
                 ),
             ],
             template_vars={
-                "engine_type": "helia_rt",
                 "engine_backend": backend,
                 "engine_header": "tensorflow/lite/micro/micro_interpreter.h",
                 "heliart_version": version,
@@ -161,6 +179,8 @@ def _toolchain_tag(toolchain: str) -> str:
     tc = (toolchain or "").lower()
     if tc in ("armclang",):
         return "armclang"
+    if tc in ("atfe",):
+        return "atfe"
     if tc in ("arm-none-eabi-gcc", "gcc"):
         return "gcc"
     log.warning(
@@ -171,10 +191,11 @@ def _toolchain_tag(toolchain: str) -> str:
 
 
 def _verify_prebuilt_archive(
-    dist_path: Path, *, board: str, toolchain_tag: str, variant: str
+    dist_path: Path, *, board: str, toolchain_tag: str, variant: str,
+    core_override: str | None = None,
 ) -> None:
     """Fail fast if the required ``.a`` is missing from the distribution."""
-    core = _core_tag(board)
+    core = _core_tag(board, override=core_override)
     name = f"libhelia-rt-{core}-{toolchain_tag}-{variant}.a"
     if not (dist_path / "lib" / name).is_file():
         available = sorted(p.name for p in (dist_path / "lib").glob("*.a"))
@@ -188,7 +209,8 @@ def _verify_prebuilt_archive(
 
 
 def _install_nsx_module(
-    module_dir: Path, dist_path: Path, *, variant: str
+    module_dir: Path, dist_path: Path, *, variant: str,
+    core_override: str | None = None,
 ) -> None:
     """Install the NSX module files and distribution content into *module_dir*.
 
@@ -215,6 +237,18 @@ def _install_nsx_module(
         cmake_text = cmake_text.replace(
             'set(HELIART_VARIANT "release-with-logs"',
             f'set(HELIART_VARIANT "{variant}"',
+        )
+    if core_override:
+        # Hack: override the auto-detected core tag so we can force
+        # e.g. the cm4 (non-MVE) library on an M55 board.
+        # Inject a forced set() after the core-detection block by finding
+        # the "# --- Resolve toolchain tag ---" marker.
+        tag = core_override.lower()
+        cmake_text = cmake_text.replace(
+            '# --- Resolve toolchain tag ---',
+            f'# core_override: force {tag} library on this board\n'
+            f'set(_HELIART_CORE "{tag}")\n\n'
+            f'# --- Resolve toolchain tag ---',
         )
     (module_dir / "CMakeLists.txt").write_text(cmake_text)
 

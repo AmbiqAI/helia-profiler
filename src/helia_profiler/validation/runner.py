@@ -31,6 +31,7 @@ from typing import Any
 
 import yaml
 
+from ..engines import EngineType
 from .matrix import CaseSpec
 
 _TRANSIENT_POWER_LOCK_RETRY_DELAY_S = 5.0
@@ -91,7 +92,7 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
             "arena_size": case.model.arena_size,
         },
         "engine": {
-            "type": case.engine,
+            "type": case.engine.value,
         },
         "target": {
             "board": case.board.id,
@@ -122,7 +123,7 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
             "sync_gpio_pin": 10,
         })
 
-    if case.engine == "helia-aot":
+    if case.engine is EngineType.HELIA_AOT:
         # Point heliaAOT at the vendored nsx-cmsis-nn so `hpx validate`
         # works out of the box from the monorepo checkout.
         cmsis_nn_candidate = repo_root.parent / "nsx-modules" / "ns-cmsis-nn"
@@ -378,7 +379,7 @@ def run_case(
         result.status = "fail"
         return result
 
-    if case.engine == "helia-aot":
+    if case.engine is EngineType.HELIA_AOT:
         manifest_path = case_dir / "aot_operator_manifest.json"
         if manifest_path.exists():
             try:
@@ -407,7 +408,7 @@ def assert_healthy(result: CaseResult) -> None:
     assert result.total_cycles and result.total_cycles > 0, (
         f"{result.case_id}: total_cycles == 0 (PMU capture looks broken)"
     )
-    if result.engine == "helia-aot":
+    if result.engine == EngineType.HELIA_AOT.value:
         assert result.aot_operator_count and result.aot_operator_count >= 1, (
             f"{result.case_id}: AOT manifest empty or missing"
         )

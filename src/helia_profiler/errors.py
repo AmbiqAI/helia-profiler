@@ -77,6 +77,14 @@ class CaptureError(HpxError):
     """Data capture failure — serial timeout, corrupt data, SWO framing."""
 
 
+class NetworkError(BuildError):
+    """Transient network failure during sync/lock (git fetch, module download).
+
+    Subclass of :class:`BuildError` so existing ``except BuildError`` handlers
+    still catch it, but callers that want to retry can specifically catch this.
+    """
+
+
 class PowerError(HpxError):
     """Power measurement failure — Joulescope not found, calibration error."""
 

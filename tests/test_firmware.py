@@ -11,10 +11,12 @@ from helia_profiler.firmware import (
     _board_module_name,
     _model_to_header,
     _resolve_module_list,
+    build_app,
     generate_app,
 )
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.stages.s01_resolve_platform import ResolvePlatformStage
+from helia_profiler.stages.s02b_plan_memory import PlanMemoryStage
 from helia_profiler.stages.s02_prepare_engine import PrepareEngineStage
 
 
@@ -236,6 +238,73 @@ class TestGenerateApp:
 
         main_cc = (app_dir / "src" / "main.cc").read_text()
         assert "kPowerSyncEnabled = false" in main_cc
+
+    def test_weights_psram_override_skips_model_header_and_links_peripherals(
+        self, tmp_path: Path, fake_dist: Path
+    ):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {
+                    "path": str(model),
+                },
+                "engine": {
+                    "type": "helia-rt",
+                    "config": {
+                        "dist_path": str(fake_dist),
+                        "runtime_weights_location": "psram",
+                    },
+                },
+                "target": {"board": "apollo510_evb"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        PlanMemoryStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        main_cc = (app_dir / "src" / "main.cc").read_text()
+        cmake = (app_dir / "CMakeLists.txt").read_text()
+        assert (app_dir / "src" / "model_data.h").exists() is False
+        assert "ns_peripherals_psram.h" in main_cc
+        assert "nsx::peripherals" in cmake
+
+
+class TestBuildApp:
+    def test_frozen_skips_lock_and_uses_frozen_sync(self, tmp_path: Path, fake_dist: Path, monkeypatch):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        app_dir = tmp_path / "app"
+        build_dir = app_dir / "build" / "apollo510_evb"
+        build_dir.mkdir(parents=True, exist_ok=True)
+        binary = build_dir / "hpx_profiler.bin"
+        binary.write_bytes(b"bin")
+        object.__setattr__(ctx, "firmware_dir", app_dir)
+        object.__setattr__(ctx.config, "frozen", True)
+
+        lock_calls: list[tuple] = []
+        sync_calls: list[dict] = []
+
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.lock", lambda *args, **kwargs: lock_calls.append((args, kwargs)))
+        monkeypatch.setattr(
+            "helia_profiler.firmware.nsx_cli.sync",
+            lambda *args, **kwargs: sync_calls.append(kwargs),
+        )
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.configure", lambda *args, **kwargs: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.build", lambda *args, **kwargs: None)
+
+        out_build_dir, out_binary = build_app(ctx)
+
+        assert lock_calls == []
+        assert sync_calls == [{"frozen": True, "timeout_s": ctx.config.timeouts.configure_s}]
+        assert out_build_dir == build_dir
+        assert out_binary == binary
 
 
 class TestKwsModel:

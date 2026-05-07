@@ -2,14 +2,17 @@
 #ifndef HPX_PMU_PROFILER_H
 #define HPX_PMU_PROFILER_H
 
-#include "tensorflow/lite/micro/micro_profiler_interface.h"
-
-// Pre-include arm_mve.h in C++ context so that ns_core.h's extern "C"
-// re-inclusion is a harmless no-op (avoids overload conflicts with GCC 14).
+// Pre-include arm_mve.h in C++ context BEFORE any extern "C" headers
+// to avoid GCC 14 overload conflicts with polymorphic MVE intrinsics.
 #if defined(__ARM_FEATURE_MVE)
 #include <arm_mve.h>
 #endif
+
+#include "tensorflow/lite/micro/micro_profiler_interface.h"
+#include "ns_core.h"
+{% if has_full_pmu %}
 #include "ns_pmu_utils.h"
+{% endif %}
 
 class HpxPmuProfiler : public tflite::MicroProfilerInterface {
  public:
@@ -20,7 +23,11 @@ class HpxPmuProfiler : public tflite::MicroProfilerInterface {
     ~HpxPmuProfiler() override = default;
 
     /// Legacy preset-based init (backward compatibility).
+{% if has_full_pmu %}
     void Init(ns_pmu_preset_e preset = NS_PMU_PRESET_ML_DEFAULT);
+{% else %}
+    void Init(int preset = 0);
+{% endif %}
 
     /// Custom init — configure explicit PMU event IDs.
     /// @param event_ids  Array of ARM PMU event IDs (e.g. 0x0011 for CPU_CYCLES).
@@ -52,7 +59,9 @@ class HpxPmuProfiler : public tflite::MicroProfilerInterface {
         uint32_t counters[kMaxEvents];
         bool overflow;  // true if any PMU counter overflowed during this layer
     };
+{% if has_full_pmu %}
     ns_pmu_config_t pmu_cfg_ = {};
+{% endif %}
     LayerRecord layers_[kMaxLayers] = {};
     int num_events_ = 0;
     int num_counters_ = 0;  // actual number of configured PMU counters

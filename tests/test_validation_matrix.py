@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from helia_profiler.engines import EngineType
 from helia_profiler.validation import (
     BOARDS,
     ENGINES,
@@ -27,7 +28,7 @@ class TestRegistry:
         assert BOARDS["apollo510_evb"].jlink_device == "AP510NFA-CBR"
 
     def test_engines_are_rt_and_aot(self):
-        assert set(ENGINES) == {"helia-rt", "helia-aot"}
+        assert set(ENGINES) == {EngineType.HELIA_RT, EngineType.HELIA_AOT}
 
 
 class TestBuildMatrix:
@@ -50,7 +51,7 @@ class TestBuildMatrix:
     def test_engine_filter(self):
         cases = build_matrix(engines=["helia-aot"], power="off")
         assert len(cases) == 4  # 4 models × 1 engine
-        assert all(c.engine == "helia-aot" for c in cases)
+        assert all(c.engine is EngineType.HELIA_AOT for c in cases)
 
     def test_unknown_model_raises(self):
         with pytest.raises(ValueError, match="Unknown model"):
@@ -76,13 +77,13 @@ class TestBuildMatrix:
     def test_case_id_encodes_power(self):
         off = CaseSpec(
             model=MODELS["kws"],
-            engine="helia-rt",
+            engine=EngineType.HELIA_RT,
             power=False,
             board=BOARDS["apollo510_evb"],
         )
         on = CaseSpec(
             model=MODELS["kws"],
-            engine="helia-rt",
+            engine=EngineType.HELIA_RT,
             power=True,
             board=BOARDS["apollo510_evb"],
         )

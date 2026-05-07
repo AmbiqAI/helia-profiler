@@ -13,6 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..engines import EngineType
+
 # ---------------------------------------------------------------------------
 # Registry types
 # ---------------------------------------------------------------------------
@@ -46,16 +48,15 @@ class CaseSpec:
     """A single validation case — one run end-to-end."""
 
     model: ModelSpec
-    engine: str                 # "helia-rt" | "helia-aot"
+    engine: EngineType
     power: bool                 # Joulescope capture enabled
     board: BoardSpec
 
     @property
     def case_id(self) -> str:
         """Stable slug — used in report tables and output subfolders."""
-        eng = {"helia-rt": "rt", "helia-aot": "aot"}.get(self.engine, self.engine)
         suffix = "-power" if self.power else ""
-        return f"{self.board.id}-{self.model.id}-{eng}{suffix}"
+        return f"{self.board.id}-{self.model.id}-{self.engine.short_slug}{suffix}"
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +64,7 @@ class CaseSpec:
 # ---------------------------------------------------------------------------
 
 #: Supported inference engines for validation.
-ENGINES: tuple[str, ...] = ("helia-rt", "helia-aot")
+ENGINES: tuple[EngineType, ...] = (EngineType.HELIA_RT, EngineType.HELIA_AOT)
 
 
 #: Canonical MLPerf Tiny models shipped as LFS fixtures.
@@ -123,7 +124,7 @@ BOARDS: dict[str, BoardSpec] = {
 
 def build_matrix(
     models: list[str] | None = None,
-    engines: list[str] | None = None,
+    engines: list[str | EngineType] | None = None,
     power: str = "both",
     boards: list[str] | None = None,
 ) -> list[CaseSpec]:
@@ -134,7 +135,8 @@ def build_matrix(
     models:
         Model IDs to include (default: all in :data:`MODELS`).
     engines:
-        Engine names to include (default: all in :data:`ENGINES`).
+        Engine identifiers to include (string slug or :class:`EngineType`;
+        default: all in :data:`ENGINES`).
     power:
         One of ``"both"``, ``"on"``, ``"off"``.  ``"both"`` runs each
         (model, engine) case twice — with and without Joulescope.
@@ -152,18 +154,37 @@ def build_matrix(
         If any filter value is not a known registry key.
     """
     model_ids = models or list(MODELS.keys())
-    engine_ids = engines or list(ENGINES)
     board_ids = boards or list(BOARDS.keys())
+
+    if engines is None:
+        engine_ids: list[EngineType] = list(ENGINES)
+    else:
+        engine_ids = []
+        unknown: list[str] = []
+        for e in engines:
+            if isinstance(e, EngineType):
+                engine_ids.append(e)
+                continue
+            try:
+                engine_ids.append(EngineType(e))
+            except ValueError:
+                unknown.append(str(e))
+        if unknown:
+            raise ValueError(
+                f"Unknown engine(s): {unknown}. Known: {[e.value for e in ENGINES]}"
+            )
+        # Reject engines outside the validation matrix (e.g. TFLM).
+        out_of_matrix = [e.value for e in engine_ids if e not in ENGINES]
+        if out_of_matrix:
+            raise ValueError(
+                f"Engine(s) not in validation matrix: {out_of_matrix}. "
+                f"Known: {[e.value for e in ENGINES]}"
+            )
 
     unknown_m = [m for m in model_ids if m not in MODELS]
     if unknown_m:
         raise ValueError(
             f"Unknown model(s): {unknown_m}. Known: {list(MODELS)}"
-        )
-    unknown_e = [e for e in engine_ids if e not in ENGINES]
-    if unknown_e:
-        raise ValueError(
-            f"Unknown engine(s): {unknown_e}. Known: {list(ENGINES)}"
         )
     unknown_b = [b for b in board_ids if b not in BOARDS]
     if unknown_b:

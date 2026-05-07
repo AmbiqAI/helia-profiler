@@ -16,6 +16,16 @@
 #include <cstdarg>
 #include <cstring>
 
+// Pre-include arm_mve.h in C++ context BEFORE any extern "C" headers
+// (ns_core.h, TFLM) to avoid GCC 14 overload conflicts.
+#if defined(__ARM_FEATURE_MVE)
+#include <arm_mve.h>
+#endif
+{% if not has_full_pmu %}
+#include <cerrno>
+#include <sys/types.h>
+{% endif %}
+
 #include "{{ engine_header }}"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/system_setup.h"
@@ -24,9 +34,24 @@
 #include "tensorflow/compiler/mlir/lite/schema/schema_utils.h"
 
 #include "hpx_pmu_profiler.h"
-
-// arm_mve.h pre-included via hpx_pmu_profiler.h
 {% include "_system_includes.j2" %}
+
+#ifndef SCB_CleanDCache
+#define SCB_CleanDCache() ((void)0)
+#endif
+
+{% if not has_full_pmu %}
+extern "C" __attribute__((weak)) void _exit(int status) {
+    (void)status;
+    while (1) { __WFI(); }
+}
+
+extern "C" __attribute__((weak)) caddr_t _sbrk(int incr) {
+    (void)incr;
+    errno = ENOMEM;
+    return (caddr_t)-1;
+}
+{% endif %}
 
 {% include "_dwt_init.j2" %}
 
@@ -37,9 +62,13 @@
 {% endif %}
 
 
-{% if model_location == "psram" %}
-// PSRAM model loading — model data is written by J-Link at runtime
+{% set psram_needed = (arena_region == "psram") or (weights_region == "psram") %}
+{% if psram_needed %}
 #include "ns_peripherals_psram.h"
+{% endif %}
+
+{% if weights_region == "psram" %}
+// PSRAM model loading — model data is written by J-Link at runtime
 static const unsigned char *model_data = nullptr;
 static unsigned int model_data_len = {{ model_size }};
 {% else %}
@@ -54,14 +83,22 @@ static constexpr int kMaxOps = 128;
 
 {# Arena placement is driven by the resolved logical region from
    PlanMemoryStage. TCM is fastest (single-cycle, tightly-coupled);
-   SRAM is shared on-bus memory. #}
+   SRAM is shared on-bus memory. PSRAM is external and not in the
+   linker MEMORY map, so the arena pointer is bound at runtime to a
+   PSRAM offset right after PSRAM init (see main()). #}
 {% if arena_region == "tcm" %}
-NSX_MEM_FAST_BSS alignas(16) static uint8_t g_arena[kArenaSize];
+NSX_MEM_FAST_BSS alignas(16) static uint8_t g_arena_storage[kArenaSize];
+static uint8_t *g_arena = g_arena_storage;
 {% elif arena_region == "sram" %}
-NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_arena[kArenaSize];
+NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_arena_storage[kArenaSize];
+static uint8_t *g_arena = g_arena_storage;
+{% elif arena_region == "psram" %}
+// Arena lives in external PSRAM; pointer bound after ns_psram_init().
+static uint8_t *g_arena = nullptr;
 {% else %}
 // Fallback: default BSS (typically TCM on AP5, otherwise main RAM)
-alignas(16) static uint8_t g_arena[kArenaSize];
+alignas(16) static uint8_t g_arena_storage[kArenaSize];
+static uint8_t *g_arena = g_arena_storage;
 {% endif %}
 static HpxPmuProfiler g_profiler;
 
@@ -121,6 +158,7 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
 
 int main(void) {
     nsx_system_config_t sys_cfg = nsx_system_development;
+    sys_cfg.perf_mode = NSX_PERF_LOW;  // 96 MHz — best energy efficiency
     NS_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
     dwt_init();
     sync_gpio_init();
@@ -142,15 +180,29 @@ int main(void) {
     // buffer pointer/size (SEGGER RTT design for the default terminal).
     SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,
                               SEGGER_RTT_MODE_NO_BLOCK_TRIM);
-{% if model_location == "psram" %}
+{% else %}
 
-    // Flush RTT control block to SRAM before PSRAM init.
-    // ns_psram_platform_init() calls am_hal_cachectrl_dcache_invalidate(NULL, true)
-    // which discards all dirty D-cache lines.  Without this flush the RTT CB
-    // written above stays only in cache and J-Link (SWD) cannot find it.
+    // Delay to allow the host SWO viewer to attach after reset.
+    // The board boots immediately after flash/reset; without this pause
+    // the profiler output would be emitted before the viewer connects.
+    am_util_delay_ms(5000);
+{% endif %}
+
+{% if psram_needed %}
+
+    // Flush any pending data (e.g. RTT control block) to SRAM before
+    // PSRAM init. ns_psram_platform_init() calls
+    // am_hal_cachectrl_dcache_invalidate(NULL, true) which discards all
+    // dirty D-cache lines. Without this flush the RTT CB written above
+    // stays only in cache and J-Link (SWD) cannot find it.
     SCB_CleanDCache();
 
-    // --- PSRAM init and model load via J-Link ---
+    // --- PSRAM init ---
+    // PSRAM is external (MSPI XIP) and is not in the linker MEMORY map,
+    // so any allocations in PSRAM use a runtime base pointer assigned
+    // here. Region layout:
+    //   [base + 0]              : model data (when weights_region=psram)
+    //   [base + arena_offset]   : tensor arena (when arena_region=psram)
     ns_psram_config_t psram_cfg = {
         .api = &ns_psram_V0_0_1,
         .psram_enable = true,
@@ -164,11 +216,26 @@ int main(void) {
         SCB_CleanDCache();
         while (1) { __WFI(); }
     }
+{% if weights_region == "psram" %}
     model_data = (const unsigned char *)psram_cfg.psram_base_address;
+    // Align arena offset to 64 bytes (cacheline) past the model bytes.
+    static constexpr uint32_t kArenaPsramOffset =
+        ((uint32_t){{ model_size }} + 63u) & ~63u;
+{% else %}
+    static constexpr uint32_t kArenaPsramOffset = 0u;
+{% endif %}
+{% if arena_region == "psram" %}
+    g_arena = (uint8_t *)(psram_cfg.psram_base_address + kArenaPsramOffset);
+    hpx_printf("HPX_PSRAM_ARENA=0x%08lx,%d\n",
+               (unsigned long)g_arena, kArenaSize);
+{% endif %}
+{% if weights_region == "psram" %}
     hpx_printf("HPX_PSRAM_READY=0x%08lx,%u\n",
                (unsigned long)psram_cfg.psram_base_address, model_data_len);
+{% endif %}
     SCB_CleanDCache();
 
+{% if weights_region == "psram" and transport == "rtt" %}
     // Wait for host to write model data and send "GO" via RTT down-channel.
     {
         char go_buf[16] = {0};
@@ -187,17 +254,11 @@ int main(void) {
                                      (int32_t)model_data_len);
     }
 {% endif %}
-{% else %}
-
-    // Delay to allow the host SWO viewer to attach after reset.
-    // The board boots immediately after flash/reset; without this pause
-    // the profiler output would be emitted before the viewer connects.
-    am_util_delay_ms(5000);
 {% endif %}
 
     hpx_printf("\n--- HPX_START ---\n");
     hpx_printf("HPX_VERSION=1\n");
-    hpx_printf("HPX_EXTREME_MODE=%d\n", {{ 1 if extreme_mode and model_location == "tcm" else 0 }});
+    hpx_printf("HPX_EXTREME_MODE=%d\n", {{ 1 if extreme_mode and arena_region == "tcm" and weights_region == "tcm" else 0 }});
     hpx_printf("HPX_MODEL_SIZE=%u\n", model_data_len);
     hpx_printf("HPX_ARENA_SIZE=%d\n", kArenaSize);
     hpx_printf("HPX_ITERATIONS={{ iterations }}\n");
@@ -237,12 +298,20 @@ int main(void) {
 
     // Use the first pass to allocate (all passes use the same model/arena)
 {% if pmu_passes[0].custom %}
+{% if has_full_pmu %}
     {
         static const uint32_t _init_ids[] = { {{ pmu_passes[0].event_ids | join(', ') }} };
         g_profiler.InitCustom(_init_ids, {{ pmu_passes[0].num_counters }});
     }
 {% else %}
+    g_profiler.Init(0);
+{% endif %}
+{% else %}
+{% if has_full_pmu %}
     g_profiler.Init({{ pmu_passes[0].c_enum }});
+{% else %}
+    g_profiler.Init(0);
+{% endif %}
 {% endif %}
     g_profiler.SetHeartbeat(hb_every_cyc, hb_every_ops);
 
@@ -347,12 +416,20 @@ int main(void) {
 {% for pass in pmu_passes %}
     hpx_printf("\n--- HPX_PRESET {{ pass.name }} ---\n");
 {% if pass.custom %}
+{% if has_full_pmu %}
     {
         static const uint32_t _pass{{ loop.index0 }}_ids[] = { {{ pass.event_ids | join(', ') }} };
         g_profiler.InitCustom(_pass{{ loop.index0 }}_ids, {{ pass.num_counters }});
     }
 {% else %}
+    g_profiler.Init(0);
+{% endif %}
+{% else %}
+{% if has_full_pmu %}
     g_profiler.Init({{ pass.c_enum }});
+{% else %}
+    g_profiler.Init(0);
+{% endif %}
 {% endif %}
     // Init resets PMU state; re-arm heartbeat thresholds.
     g_profiler.SetHeartbeat(hb_every_cyc, hb_every_ops);

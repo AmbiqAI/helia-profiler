@@ -46,8 +46,15 @@ DEFAULT_DOWNLOAD_ASSET_S = 300
 class ModelConfig:
     """Model file and arena sizing.
 
-    ``model_location`` controls where weights and the tensor arena live.
-    Valid values:
+    ``model_location`` is the high-level policy for where weights and the
+    tensor arena live.
+
+    Runtime-specific split overrides live under ``engine.config`` as
+    ``runtime_arena_location`` / ``runtime_weights_location`` so they are
+    scoped to interpreters that share the runtime path (currently ``tflm``
+    and ``helia-rt``). ``helia-aot`` uses its own placement controls.
+
+    Policy values:
 
     * ``auto`` *(default)* — plan-memory stage picks the fastest region(s)
       that fit. Greedy fastest-fit with arena prioritized over weights when
@@ -177,9 +184,8 @@ class ProfilingConfig:
     # Extreme benchmarking mode: power down memory regions the model does not
     # use to lower the energy floor.  Currently powers down SSRAM (3 MB) and
     # collapses MRAM to a single bank (NVM0 only).  Only safe when the model
-    # lives entirely in TCM (model_location == "tcm"); a preflight check
-    # rejects other placements.  Code keeps running from MRAM, so transports
-    # (RTT/USB/SWO) and printf remain available throughout the run.
+    # weights and arena both live in TCM. Code keeps running from MRAM, so
+    # transports (RTT/USB/SWO) and printf remain available throughout the run.
     extreme_mode: bool = False
 
 
@@ -220,6 +226,7 @@ class ProfileConfig:
     power: PowerConfig = field(default_factory=PowerConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     timeouts: TimeoutsConfig = field(default_factory=TimeoutsConfig)
+    frozen: bool = False
     work_dir: Path | None = None  # None = use tempdir
     keep_work_dir: bool = False
     verbose: int = 0
@@ -341,6 +348,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             download_api_s=int(timeouts_d.get("download_api_s", DEFAULT_DOWNLOAD_API_S)),
             download_asset_s=int(timeouts_d.get("download_asset_s", DEFAULT_DOWNLOAD_ASSET_S)),
         ),
+        frozen=bool(d.get("frozen", False)),
         work_dir=Path(d["work_dir"]) if d.get("work_dir") else None,
         keep_work_dir=d.get("keep_work_dir", False),
         verbose=d.get("verbose", 0),

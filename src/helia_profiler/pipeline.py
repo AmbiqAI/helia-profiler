@@ -22,6 +22,7 @@ from .engines.base import EngineAdapter, EngineArtifacts
 from .errors import HpxError
 from .platform import BoardDef, SocDef
 from .model_analysis import ModelAnalysis
+from .placement import Placement
 from .power.base import PowerResult
 from .results import MemoryPlan, PmuResult, RunMetadata, BinarySections
 
@@ -66,15 +67,14 @@ class PipelineContext:
     # Memory plan (stage: plan_memory)
     memory_plan: MemoryPlan | None = None
 
-    #: Resolved arena placement region: ``"tcm"``, ``"sram"``, ``"mram"``,
-    #: or ``"psram"``.  Set by :class:`PlanMemoryStage` from
-    #: ``config.model.model_location`` and the SoC memory layout.
-    arena_region: str | None = None
+    #: Resolved arena placement region.  Set by :class:`PlanMemoryStage`
+    #: from ``config.model.model_location`` and the SoC memory layout.
+    arena_region: Placement | None = None
 
-    #: Resolved weights placement region: ``"tcm"``, ``"sram"``, ``"mram"``,
-    #: or ``"psram"``.  Set by :class:`PlanMemoryStage`.  For TFLM/heliaRT
-    #: this drives the section attribute applied to ``model_data[]``.
-    weights_region: str | None = None
+    #: Resolved weights placement region.  Set by :class:`PlanMemoryStage`.
+    #: For TFLM/heliaRT this drives the section attribute applied to
+    #: ``model_data[]``.
+    weights_region: Placement | None = None
 
     # Capture (stage: capture_pmu / capture_power)
     pmu_result: PmuResult | None = None
@@ -233,6 +233,7 @@ def _serialize_config(config: ProfileConfig) -> dict[str, Any]:
             "board": config.target.board,
             "toolchain": config.target.toolchain,
         },
+        "frozen": config.frozen,
         "profiling": {
             "pmu_presets": list(config.profiling.pmu_presets),
             "per_layer": config.profiling.per_layer,

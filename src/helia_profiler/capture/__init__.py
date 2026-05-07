@@ -16,6 +16,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from ..errors import CaptureError
+from ..placement import Placement
 from .transport import HPX_END, HPX_START
 
 if TYPE_CHECKING:
@@ -66,7 +67,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
             jlink_serial=jlink_serial,
             jlink_device=jlink_device,
             model_path=ctx.config.model.path,
-            model_location=ctx.config.model.model_location,
+            weights_region=ctx.weights_region or Placement.MRAM,
             timeout_s=overall_timeout_s,
             heartbeat_timeout_s=heartbeat_timeout_s,
         )

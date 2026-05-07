@@ -3,6 +3,7 @@
 cmake_minimum_required(VERSION 3.24)
 project(hpx_profiler LANGUAGES C CXX ASM)
 
+{% set psram_needed = (arena_region == "psram") or (weights_region == "psram") %}
 set(NSX_BOARD "{{ board }}" CACHE STRING "Target board")
 
 {% for var_name, var_value in cmake_vars.items() %}
@@ -19,7 +20,7 @@ nsx_bootstrap_app(
 )
 
 # --- Profiler application ---
-{% if engine_type == "helia_aot" %}
+{% if engine_type == "helia-aot" %}
 add_executable(hpx_profiler
     src/main.cc
 )
@@ -32,12 +33,26 @@ target_link_libraries(hpx_profiler PRIVATE
     nsx::board
     nsx::runtime_core
     nsx::power
+{% if has_full_pmu %}
     nsx::pmu_armv8m
+{% endif %}
     {{ aot_cmake_target }}
 {% if transport == "usb_cdc" %}
     nsx::usb
 {% endif %}
+{% if psram_needed %}
+    nsx::peripherals
+{% endif %}
 )
+{% if psram_needed %}
+# AmbiqSuite PSRAM device driver — not part of a pre-compiled lib
+target_sources(hpx_profiler PRIVATE
+    ${NSX_ROOT}/modules/nsx-ambiqsuite-r5/sdk/src/am_devices_mspi_psram_aps25616ba_1p2v.c
+)
+target_include_directories(hpx_profiler PRIVATE
+    ${NSX_ROOT}/modules/nsx-ambiqsuite-r5/sdk/devices
+)
+{% endif %}
 {% if transport == "rtt" %}
 target_sources(hpx_profiler PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src/rtt/SEGGER_RTT.c
@@ -64,16 +79,18 @@ target_link_libraries(hpx_profiler PRIVATE
     nsx::board
     nsx::runtime_core
     nsx::power
+{% if has_full_pmu %}
     nsx::pmu_armv8m
+{% endif %}
     nsx::heliart
 {% if transport == "usb_cdc" %}
     nsx::usb
 {% endif %}
-{% if model_location == "psram" %}
+{% if psram_needed %}
     nsx::peripherals
 {% endif %}
 )
-{% if model_location == "psram" %}
+{% if psram_needed %}
 # AmbiqSuite PSRAM device driver — not part of a pre-compiled lib
 target_sources(hpx_profiler PRIVATE
     ${NSX_ROOT}/modules/nsx-ambiqsuite-r5/sdk/src/am_devices_mspi_psram_aps25616ba_1p2v.c

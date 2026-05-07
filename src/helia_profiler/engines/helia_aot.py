@@ -27,9 +27,11 @@ import jinja2
 
 from ..config import ProfileConfig
 from ..errors import EngineError
+from ..placement import ArenaRole, Placement
 from ..platform import get_soc_for_board
 from ..results import MemoryConsumer, MemoryPlan, MemoryRegionUsage, NsxModuleRef
-from .base import EngineArtifacts
+from . import EngineType
+from .base import ArenaRegion, EngineArtifacts
 
 log = logging.getLogger("hpx")
 
@@ -52,7 +54,7 @@ log = logging.getLogger("hpx")
 # so a user with an older install gets a clear error instead of a confusing
 # build failure (e.g. missing ModuleType.nsx).
 # ---------------------------------------------------------------------------
-HELIAAOT_MIN_VERSION = "0.14.0"  # native NSX module support (PR #167)
+HELIAAOT_MIN_VERSION = "0.14.0"  # patched by experiment script
 
 # Default AOT configuration
 _DEFAULT_PREFIX = "hpx"
@@ -188,7 +190,14 @@ class HeliaAOTAdapter:
         # physical memory layout.
         memory_plan = _extract_memory_plan(codegen_ctx)
 
+        # Extract arena binding info for external-arena mode
+        allocate_arenas = config.engine.config.get("aot_args", {}).get(
+            "memory", {}
+        ).get("allocate_arenas", True)
+        arena_regions = _extract_arena_regions(codegen_ctx, prefix)
+
         return EngineArtifacts(
+            engine_type=EngineType.HELIA_AOT,
             extra_modules=[
                 NsxModuleRef(name="nsx-cmsis-nn", path=cmsis_nn_mod_dir),
                 NsxModuleRef(name=module_name, path=aot_module_dir),
@@ -198,12 +207,13 @@ class HeliaAOTAdapter:
                 **cmsis_nn_cmake,
             },
             template_vars={
-                "engine_type": "helia_aot",
                 "engine_header": f"{prefix}_model.h",
                 "aot_prefix": prefix,
                 "aot_module_name": module_name,
                 "aot_cmake_target": f"nsx::{cmake_name}",
                 "aot_op_manifest": op_manifest,
+                "allocate_arenas": allocate_arenas,
+                "arena_regions": arena_regions,
             },
             memory_plan=memory_plan,
         )
@@ -452,6 +462,76 @@ def _tensor_metadata(tensor: Any) -> dict[str, Any]:
         if isinstance(val, bool):
             meta[flag] = val
     return meta
+
+
+# Map AOT planner physical memory names → logical placement names used
+# by firmware templates and the rest of the profiler pipeline.  Keeps the
+# template conditionals simple and avoids brittle string mismatches
+# (e.g. "dtcm" vs "tcm").
+_AOT_MEMORY_TO_PLACEMENT: dict[str, Placement] = {
+    "dtcm": Placement.TCM,
+    "itcm": Placement.TCM,
+    "sram": Placement.SRAM,
+    "mram": Placement.MRAM,
+    "psram": Placement.PSRAM,
+}
+
+
+def _extract_arena_regions(
+    codegen_ctx: Any, prefix: str
+) -> list[ArenaRegion]:
+    """Extract arena region info from the CodeGenContext's render_plan.
+
+    Returns a list of :class:`ArenaRegion` instances — one per AOT
+    scratch / persistent / constant arena.  Used by the firmware
+    template to emit ``bind_arena()`` calls in external-arena mode
+    (``allocate_arenas=false``).
+    """
+    render_plan = getattr(codegen_ctx, "render_plan", None)
+    if render_plan is None:
+        return []
+
+    regions: list[ArenaRegion] = []
+    for arena_list in (
+        render_plan.scratch_arenas,
+        render_plan.persistent_arenas,
+        render_plan.constant_arenas,
+    ):
+        for arena in arena_list:
+            mem_str = str(arena.memory).lower()
+            placement = _AOT_MEMORY_TO_PLACEMENT.get(mem_str)
+            if placement is None:
+                # Unknown physical memory — skip rather than silently
+                # mis-placing the buffer.  Surfaces upstream as an
+                # arena binding gap during firmware build.
+                log.warning(
+                    "AOT planner emitted unrecognised memory %r — skipping arena %d",
+                    mem_str, arena.region_id,
+                )
+                continue
+            try:
+                role = ArenaRole(str(arena.role).lower())
+            except ValueError:
+                log.warning(
+                    "AOT planner emitted unrecognised arena role %r — defaulting to scratch",
+                    arena.role,
+                )
+                role = ArenaRole.SCRATCH
+            name = f"{prefix}_arena_{mem_str}"
+            regions.append(ArenaRegion(
+                region_id=arena.region_id,
+                name=name,
+                enum_name=name,
+                size=int(arena.size),
+                alignment=int(arena.alignment),
+                role=role,
+                memory=mem_str,
+                placement=placement,
+            ))
+
+    # Sort by region_id to match the generated enum ordering
+    regions.sort(key=lambda r: r.region_id)
+    return regions
 
 
 def _extract_operator_manifest(

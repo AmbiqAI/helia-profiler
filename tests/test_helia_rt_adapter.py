@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.config import load_config
+from helia_profiler.engines import EngineType
 from helia_profiler.engines.helia_rt import (
     HELIART_VERSION,
     HeliaRTAdapter,
@@ -120,7 +121,7 @@ class TestHeliaRTAdapter:
         config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
         adapter = HeliaRTAdapter()
         artifacts = adapter.prepare(config, tmp_path)
-        assert artifacts.template_vars["engine_type"] == "helia_rt"
+        assert artifacts.engine_type is EngineType.HELIA_RT
         assert (
             artifacts.template_vars["engine_header"] == "tensorflow/lite/micro/micro_interpreter.h"
         )

@@ -8,7 +8,7 @@ Writes that don't fit are silently dropped (no blocking).  After all output
 is written the firmware calls ``SCB_CleanDCache()`` so the J-Link host can
 read the data via SWD (which bypasses the CPU D-cache).
 
-When ``model_location="psram"``, the firmware initialises PSRAM and emits
+When ``weights_region="psram"``, the firmware initialises PSRAM and emits
 ``HPX_PSRAM_READY=<addr>,<size>`` before waiting.  The host writes the
 model flatbuffer to the PSRAM XIP address via ``jlink.memory_write()`` and
 sends ``HPX_GO`` on the RTT down-channel to resume inference.
@@ -162,11 +162,11 @@ def capture_rtt_output(
     timeout_s: float | None = None,
     heartbeat_timeout_s: float = HEARTBEAT_TIMEOUT_S,
     model_path: Path | None = None,
-    model_location: str = "mram",
+    weights_region: str = "mram",
 ) -> list[str]:
     """Capture firmware output via SEGGER RTT until HPX_END or hang detection.
 
-    When *model_location* is ``"psram"``, the function uploads the model
+    When *weights_region* is ``"psram"``, the function uploads the model
     flatbuffer to PSRAM via J-Link SWD writes before collecting profiling
     output.
 
@@ -255,7 +255,7 @@ def capture_rtt_output(
         )
 
         # --- Step 3a: PSRAM model upload (if applicable) ---
-        if model_location == "psram" and model_path is not None:
+        if weights_region == "psram" and model_path is not None:
             _upload_model_to_psram(jlink, model_path)
 
         # --- Step 3b: collect lines via shared helper ---

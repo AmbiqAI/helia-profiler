@@ -26,6 +26,11 @@
 #include "ns_pmu_utils.h"
 #include "ns_pmu_map.h"
 
+{% set psram_needed = (arena_region == "psram") or (weights_region == "psram") %}
+{% if psram_needed %}
+#include "ns_peripherals_psram.h"
+{% endif %}
+
 {% include "_system_includes.j2" %}
 
 // ---------------------------------------------------------------------------
@@ -225,6 +230,7 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
 
 int main(void) {
     nsx_system_config_t sys_cfg = nsx_system_development;
+    sys_cfg.perf_mode = NSX_PERF_LOW;  // 96 MHz — best energy efficiency
     NS_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
     dwt_init();
     sync_gpio_init();
@@ -255,7 +261,7 @@ int main(void) {
     hpx_printf("\n--- HPX_START ---\n");
     hpx_printf("HPX_VERSION=1\n");
     hpx_printf("HPX_ENGINE=helia_aot\n");
-    hpx_printf("HPX_EXTREME_MODE=%d\n", {{ 1 if extreme_mode and model_location == "tcm" else 0 }});
+    hpx_printf("HPX_EXTREME_MODE=%d\n", {{ 1 if extreme_mode and arena_region == "tcm" and weights_region == "tcm" else 0 }});
     hpx_printf("HPX_ITERATIONS={{ iterations }}\n");
     hpx_printf("HPX_WARMUP={{ warmup }}\n");
     hpx_printf("HPX_NUM_PRESETS=%d\n", {{ pmu_passes | length }});
@@ -278,6 +284,79 @@ int main(void) {
     g_hb_every_ops = kHbEnabled ? kHbEveryNOps : 0;
 
     hpx_printf("HPX_HEARTBEAT phase=init\n");
+
+{% if not allocate_arenas and arena_regions %}
+    // External arena mode: allocate and bind arena buffers before model_init.
+    //
+    // Each region has a "placement" (tcm | sram | psram | <default>) that
+    // controls where its backing storage lives. PSRAM-placed regions are
+    // assigned at runtime from the PSRAM base pointer (PSRAM is external
+    // MSPI XIP and is not in the linker MEMORY map, so static .psram_bss
+    // sections are not available).
+{% set psram_arena_regions = arena_regions | selectattr("placement", "equalto", "psram") | list %}
+{% for region in arena_regions %}
+{% if region.placement == "psram" %}
+    static uint8_t *hpx_arena_buf_{{ region.region_id }} = nullptr;
+{% elif region.placement == "tcm" %}
+    NSX_MEM_FAST_BSS alignas({{ region.alignment }}) static uint8_t hpx_arena_buf_storage_{{ region.region_id }}[{{ region.size }}];
+    static uint8_t *hpx_arena_buf_{{ region.region_id }} = hpx_arena_buf_storage_{{ region.region_id }};
+{% elif region.placement == "sram" %}
+    NSX_MEM_SRAM_BSS alignas({{ region.alignment }}) static uint8_t hpx_arena_buf_storage_{{ region.region_id }}[{{ region.size }}];
+    static uint8_t *hpx_arena_buf_{{ region.region_id }} = hpx_arena_buf_storage_{{ region.region_id }};
+{% else %}
+    alignas({{ region.alignment }}) static uint8_t hpx_arena_buf_storage_{{ region.region_id }}[{{ region.size }}];
+    static uint8_t *hpx_arena_buf_{{ region.region_id }} = hpx_arena_buf_storage_{{ region.region_id }};
+{% endif %}
+{% endfor %}
+{% if psram_arena_regions %}
+    // PSRAM init for arena regions placed in PSRAM.
+    SCB_CleanDCache();
+    {
+        ns_psram_config_t psram_cfg = {
+            .api = &ns_psram_V0_0_1,
+            .psram_enable = true,
+            .psram_type = PSRAM_TYPE_OCT,
+            .psram_block = 0,
+            .psram_size = 0,
+            .psram_base_address = 0,
+        };
+        if (ns_psram_init(&psram_cfg) != 0) {
+            hpx_printf("HPX_ERROR=psram_init_failed\n");
+            SCB_CleanDCache();
+            while (1) { __WFI(); }
+        }
+        // Stack PSRAM-placed arenas at successive 64-byte aligned offsets.
+        uint32_t psram_off = 0;
+{% for region in psram_arena_regions %}
+        psram_off = (psram_off + {{ region.alignment }} - 1u) & ~({{ region.alignment }}u - 1u);
+        hpx_arena_buf_{{ region.region_id }} =
+            (uint8_t *)(psram_cfg.psram_base_address + psram_off);
+        hpx_printf("HPX_PSRAM_ARENA_REGION=%d,0x%08lx,%u\n",
+                   {{ region.region_id }},
+                   (unsigned long)hpx_arena_buf_{{ region.region_id }},
+                   (unsigned)({{ region.size }}));
+        psram_off += (uint32_t){{ region.size }};
+{% endfor %}
+        SCB_CleanDCache();
+    }
+{% endif %}
+    {
+        int32_t bind_status;
+{% for region in arena_regions %}
+        bind_status = {{ aot_prefix }}_bind_arena(
+            ({{ aot_prefix }}_arena_region_t){{ region.region_id }},
+            hpx_arena_buf_{{ region.region_id }},
+            (size_t){{ region.size }}
+        );
+        if (bind_status != 0) {
+            hpx_printf("HPX_ERROR=bind_arena_failed:%d:region=%d\n",
+                       (int)bind_status, {{ region.region_id }});
+            while (1) { __WFI(); }
+        }
+{% endfor %}
+    }
+    hpx_printf("HPX_ARENAS_BOUND=%d\n", {{ arena_regions | length }});
+{% endif %}
 
     // Initialize AOT model
     int32_t aot_status = {{ aot_prefix }}_model_init(&{{ aot_prefix }}_model_ctx);

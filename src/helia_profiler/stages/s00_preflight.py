@@ -9,7 +9,8 @@ Checks performed (in order):
 1. **Model file** — exists, is a regular file, non-empty, has a ``.tflite``
    extension, starts with the TFLite ``TFL3`` magic string.
 2. **Arena size** — if specified, is positive.
-3. **Model location** — one of ``auto``, ``tcm``, ``sram``, ``mram`` or ``psram``.
+3. **Model placement** — ``model_location`` is valid and any runtime-scoped
+    split overrides use supported regions for the selected engine.
 4. **Output directory** — can be created + written to.
 5. **Host toolchain** — ``nsx``, ``cmake``, ``ninja``, the selected compiler,
    and ``JLinkExe`` are available. ATfE is located via ``ATFE_ROOT``.
@@ -29,8 +30,10 @@ import os
 import shutil
 from pathlib import Path
 
+from ..engines import EngineType
 from ..errors import ConfigError
 from ..pipeline import PipelineContext
+from ..placement import ModelLocation, Placement
 
 log = logging.getLogger("hpx")
 
@@ -39,7 +42,13 @@ log = logging.getLogger("hpx")
 # versions emit the identifier at offset 4 (after the root-table offset),
 # so we accept either placement.
 _TFLITE_MAGIC = b"TFL3"
-_VALID_MODEL_LOCATIONS = ("auto", "tcm", "sram", "mram", "psram")
+_VALID_MODEL_LOCATIONS: tuple[ModelLocation, ...] = tuple(ModelLocation)
+_VALID_RUNTIME_ARENA_LOCATIONS: tuple[Placement, ...] = (
+    Placement.TCM,
+    Placement.SRAM,
+    Placement.PSRAM,
+)
+_VALID_RUNTIME_WEIGHTS_LOCATIONS: tuple[Placement, ...] = tuple(Placement)
 
 
 class PreflightStage:
@@ -55,6 +64,7 @@ class PreflightStage:
         _check_model(cfg.model.path)
         _check_arena_size(cfg.model.arena_size)
         _check_model_location(cfg.model.model_location)
+        _check_runtime_split_locations(cfg)
         _check_output_dir(cfg.output.dir)
         _check_host_tools(cfg.target.transport, cfg.target.toolchain)
         log.info("Preflight checks passed.")
@@ -123,6 +133,51 @@ def _check_model_location(loc: str) -> None:
             f"Invalid model.model_location: '{loc}'.",
             hint=f"Expected one of: {', '.join(_VALID_MODEL_LOCATIONS)}.",
         )
+
+
+def _check_explicit_location(loc: str | None, *, name: str, valid: tuple[Placement, ...]) -> None:
+    if loc is None:
+        return
+    if loc not in valid:
+        raise ConfigError(
+            f"Invalid {name}: '{loc}'.",
+            hint=f"Expected one of: {', '.join(valid)}.",
+        )
+
+
+def _check_runtime_split_locations(cfg) -> None:
+    runtime_arena = cfg.engine.config.get("runtime_arena_location")
+    runtime_weights = cfg.engine.config.get("runtime_weights_location")
+
+    if cfg.engine.type is EngineType.HELIA_AOT:
+        # Phase C: scratch arena placement override is supported for AOT.
+        # Weights placement is still planner-controlled (Phase D will add
+        # XIP / copy-to-RAM controls via aot_args).
+        if runtime_weights is not None:
+            raise ConfigError(
+                "engine.config.runtime_weights_location is not supported for engine.type='helia-aot'.",
+                hint=(
+                    "Use heliaAOT placement controls via engine.config.aot_args "
+                    "to control weights placement."
+                ),
+            )
+        _check_explicit_location(
+            runtime_arena,
+            name="engine.config.runtime_arena_location",
+            valid=_VALID_RUNTIME_ARENA_LOCATIONS,
+        )
+        return
+
+    _check_explicit_location(
+        runtime_arena,
+        name="engine.config.runtime_arena_location",
+        valid=_VALID_RUNTIME_ARENA_LOCATIONS,
+    )
+    _check_explicit_location(
+        runtime_weights,
+        name="engine.config.runtime_weights_location",
+        valid=_VALID_RUNTIME_WEIGHTS_LOCATIONS,
+    )
 
 
 def _check_output_dir(out_dir: Path) -> None:

@@ -110,6 +110,38 @@ class TestPreflightConfig:
             with pytest.raises(ConfigError, match="model_location"):
                 PreflightStage().run(ctx)
 
+    def test_invalid_runtime_arena_location_raises(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {"engine": {"config": {"runtime_arena_location": "mram"}}},
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="runtime_arena_location"):
+                PreflightStage().run(ctx)
+
+    def test_invalid_runtime_weights_location_raises(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {"engine": {"config": {"runtime_weights_location": "flash"}}},
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="runtime_weights_location"):
+                PreflightStage().run(ctx)
+
+    def test_runtime_split_overrides_rejected_for_helia_aot(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "engine": {
+                    "type": "helia-aot",
+                    "config": {"runtime_weights_location": "sram"},
+                },
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="runtime_weights_location is not supported"):
+                PreflightStage().run(ctx)
+
 
 class TestPreflightHostTools:
     def test_missing_nsx_raises_with_hint(self, tmp_path: Path):

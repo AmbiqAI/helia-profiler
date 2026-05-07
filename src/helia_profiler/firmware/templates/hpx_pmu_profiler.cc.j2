@@ -1,6 +1,7 @@
 {# hpx_pmu_profiler.cc — PMU profiler implementation #}
 #include "hpx_pmu_profiler.h"
 
+{% if has_full_pmu %}
 // arm_mve.h already pre-included via hpx_pmu_profiler.h
 #include "ns_ambiqsuite_harness.h"
 #include "ns_pmu_map.h"
@@ -131,3 +132,84 @@ void HpxPmuProfiler::PrintCsv() const {
         hpx_printf(",%d\n", rec.overflow ? 1 : 0);
     }
 }
+{% else %}
+#include "ns_ambiqsuite_harness.h"
+
+// Transport-aware printf — defined in main.cc
+extern void hpx_printf(const char *fmt, ...);
+
+void HpxPmuProfiler::Init(int) {
+    num_events_ = 0;
+    num_counters_ = 1;
+    initialized_ = true;
+}
+
+void HpxPmuProfiler::InitCustom(const uint32_t[], int) {
+    Init(0);
+}
+
+uint32_t HpxPmuProfiler::BeginEvent(const char* tag) {
+    if (!initialized_ || num_events_ >= kMaxLayers) return 0;
+    int idx = num_events_++;
+    LayerRecord& rec = layers_[idx];
+    rec.tag = tag;
+    rec.overflow = false;
+    rec.counters[0] = DWT->CYCCNT;
+    return static_cast<uint32_t>(idx);
+}
+
+void HpxPmuProfiler::EndEvent(uint32_t event_handle) {
+    if (!initialized_ ||
+        event_handle >= static_cast<uint32_t>(num_events_)) return;
+    LayerRecord& rec = layers_[event_handle];
+    rec.counters[0] = DWT->CYCCNT - rec.counters[0];
+    rec.overflow = false;
+    ++hb_ops_since_;
+    MaybeEmitHeartbeat();
+}
+
+void HpxPmuProfiler::ClearEvents() { num_events_ = 0; }
+
+void HpxPmuProfiler::SetHeartbeat(uint32_t every_cyc, int every_n_ops) {
+    hb_every_cyc_ = every_cyc;
+    hb_every_n_ops_ = every_n_ops;
+    hb_last_cyc_ = DWT->CYCCNT;
+    hb_ops_since_ = 0;
+}
+
+void HpxPmuProfiler::SetIterationContext(int pass_idx, int iter_idx) {
+    hb_pass_ = pass_idx;
+    hb_iter_ = iter_idx;
+    hb_last_cyc_ = DWT->CYCCNT;
+    hb_ops_since_ = 0;
+}
+
+void HpxPmuProfiler::MaybeEmitHeartbeat() {
+    const bool by_ops = (hb_every_n_ops_ > 0) &&
+                        (hb_ops_since_ >= hb_every_n_ops_);
+    bool by_time = false;
+    if (hb_every_cyc_ > 0) {
+        uint32_t now = DWT->CYCCNT;
+        uint32_t delta = now - hb_last_cyc_;
+        by_time = (delta >= hb_every_cyc_);
+    }
+    if (!by_ops && !by_time) return;
+    hpx_printf("HPX_HEARTBEAT phase=infer pass=%d iter=%d layer=%d\n",
+               hb_pass_, hb_iter_, num_events_);
+    hb_last_cyc_ = DWT->CYCCNT;
+    hb_ops_since_ = 0;
+}
+
+void HpxPmuProfiler::PrintCsv() const {
+    if (!initialized_ || num_events_ == 0) return;
+    hpx_printf("\"Layer\",\"Op\",\"ARM_PMU_CPU_CYCLES\",\"overflow\"\n");
+    for (int i = 0; i < num_events_; i++) {
+        const LayerRecord& rec = layers_[i];
+        hpx_printf("%d,%s,%lu,%d\n",
+                   i,
+                   rec.tag ? rec.tag : "?",
+                   (unsigned long)rec.counters[0],
+                   rec.overflow ? 1 : 0);
+    }
+}
+{% endif %}

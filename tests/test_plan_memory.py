@@ -103,6 +103,43 @@ class TestPlanMemorySynthesise:
         assert psram is not None
         assert any(c.kind == "weights" for c in psram.consumers)
 
+    def test_explicit_weights_override_is_applied(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path, {
+            "engine": {
+                "config": {
+                    "runtime_weights_location": "sram",
+                },
+            },
+        })
+        PlanMemoryStage().run(ctx)
+
+        assert ctx.arena_region == "tcm"
+        assert ctx.weights_region == "sram"
+
+    def test_explicit_arena_override_is_applied(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path, {
+            "engine": {
+                "config": {
+                    "runtime_arena_location": "sram",
+                },
+            },
+        })
+        PlanMemoryStage().run(ctx)
+
+        assert ctx.arena_region == "sram"
+
+    def test_explicit_weights_psram_requires_psram_board(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path, {
+            "engine": {
+                "config": {
+                    "runtime_weights_location": "psram",
+                },
+            },
+        })
+        PlanMemoryStage().run(ctx)
+
+        assert ctx.weights_region == "psram"
+
     def test_empty_regions_added_from_soc(self, tmp_path: Path):
         """Regions the SoC has but the plan does not use should still
         appear (with capacity, used=0) so reports can show them."""

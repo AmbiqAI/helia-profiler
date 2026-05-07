@@ -1,6 +1,7 @@
 {# _extreme_mode.j2 — optional power-floor reduction for benchmarking.
 
-   Activated when profiling.extreme_mode is true AND model_location == "tcm".
+    Activated when profiling.extreme_mode is true AND both arena+weights live
+    in TCM.
    Code keeps running from MRAM (.text); the transport (RTT/USB/SWO) keeps
    working.  The two levers we pull here are:
 
@@ -20,7 +21,7 @@
    read garbage from the second bank and crash.  Build-time .map inspection
    covers this.
 #}
-{% if extreme_mode and model_location == "tcm" %}
+{% if extreme_mode and arena_region == "tcm" and weights_region == "tcm" %}
 
     // ---------------------------------------------------------------------
     // EXTREME MODE — collapse unused memory power

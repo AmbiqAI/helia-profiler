@@ -10,7 +10,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from helia_profiler.engines.helia_aot import _extract_memory_plan
+from helia_profiler.engines.helia_aot import (
+    _AOT_MEMORY_TO_PLACEMENT,
+    _extract_arena_regions,
+    _extract_memory_plan,
+)
+from helia_profiler.placement import ArenaRole, Placement
 
 
 @dataclass
@@ -106,3 +111,107 @@ class TestExtractMemoryPlan:
         assert result.model_weight_bytes == 10
         # DTCM is oversubscribed (used > capacity).
         assert result.has_overflow is True
+
+
+# ---------------------------------------------------------------------------
+# _extract_arena_regions — placement normalisation
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _FakeArena:
+    region_id: int
+    memory: str
+    size: int
+    alignment: int
+    role: str
+
+
+@dataclass
+class _FakeRenderPlan:
+    scratch_arenas: list[_FakeArena]
+    persistent_arenas: list[_FakeArena]
+    constant_arenas: list[_FakeArena]
+
+
+class _FakeCodegenCtxWithPlan:
+    def __init__(self, render_plan: _FakeRenderPlan | None):
+        self.render_plan = render_plan
+
+
+class TestExtractArenaRegions:
+    """Verify that AOT physical memory names are normalised to logical
+    placement names (tcm/sram/mram/psram) consumed by firmware templates."""
+
+    def test_dtcm_normalises_to_tcm(self):
+        plan = _FakeRenderPlan(
+            scratch_arenas=[_FakeArena(0, "DTCM", 20960, 16, "scratch")],
+            persistent_arenas=[],
+            constant_arenas=[],
+        )
+        regions = _extract_arena_regions(_FakeCodegenCtxWithPlan(plan), "hpx")
+        assert len(regions) == 1
+        assert regions[0].memory == "dtcm"
+        assert regions[0].placement is Placement.TCM
+        assert regions[0].role is ArenaRole.SCRATCH
+
+    def test_itcm_normalises_to_tcm(self):
+        plan = _FakeRenderPlan(
+            scratch_arenas=[_FakeArena(0, "ITCM", 4096, 16, "scratch")],
+            persistent_arenas=[],
+            constant_arenas=[],
+        )
+        regions = _extract_arena_regions(_FakeCodegenCtxWithPlan(plan), "hpx")
+        assert regions[0].placement is Placement.TCM
+
+    def test_sram_stays_sram(self):
+        plan = _FakeRenderPlan(
+            scratch_arenas=[_FakeArena(0, "SRAM", 65536, 16, "scratch")],
+            persistent_arenas=[],
+            constant_arenas=[],
+        )
+        regions = _extract_arena_regions(_FakeCodegenCtxWithPlan(plan), "hpx")
+        assert regions[0].placement is Placement.SRAM
+
+    def test_psram_stays_psram(self):
+        plan = _FakeRenderPlan(
+            scratch_arenas=[],
+            persistent_arenas=[],
+            constant_arenas=[_FakeArena(1, "PSRAM", 100000, 64, "constant")],
+        )
+        regions = _extract_arena_regions(_FakeCodegenCtxWithPlan(plan), "hpx")
+        assert regions[0].placement is Placement.PSRAM
+        assert regions[0].role is ArenaRole.CONSTANT
+
+    def test_mram_stays_mram(self):
+        plan = _FakeRenderPlan(
+            scratch_arenas=[],
+            persistent_arenas=[],
+            constant_arenas=[_FakeArena(0, "MRAM", 50000, 16, "constant")],
+        )
+        regions = _extract_arena_regions(_FakeCodegenCtxWithPlan(plan), "hpx")
+        assert regions[0].placement is Placement.MRAM
+
+    def test_unknown_memory_skipped(self):
+        """An unrecognised memory name is dropped (rather than silently
+        mis-placing) — surfaces upstream as an arena-binding gap."""
+        plan = _FakeRenderPlan(
+            scratch_arenas=[_FakeArena(0, "HBM", 1024, 16, "scratch")],
+            persistent_arenas=[],
+            constant_arenas=[],
+        )
+        regions = _extract_arena_regions(_FakeCodegenCtxWithPlan(plan), "hpx")
+        assert regions == []
+
+    def test_missing_render_plan_returns_empty(self):
+        ctx = _FakeCodegenCtxWithPlan(None)
+        assert _extract_arena_regions(ctx, "hpx") == []
+
+    def test_all_known_physical_names_mapped(self):
+        """Every entry in _AOT_MEMORY_TO_PLACEMENT should map to a
+        :class:`Placement` member recognised by the firmware templates."""
+        for phys, logical in _AOT_MEMORY_TO_PLACEMENT.items():
+            assert isinstance(logical, Placement), (
+                f"physical '{phys}' maps to '{logical!r}' which is not a "
+                f"Placement member"
+            )

@@ -23,7 +23,10 @@ from ..counters import (
     resolve_counters,
     resolve_legacy_presets,
 )
+from ..engines import EngineType
 from ..errors import BuildError, FirmwareError
+from ..platform import PmuTier, get_soc_for_board
+from ..placement import ArenaRole, Placement
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -104,8 +107,11 @@ def _resolve_module_list(board: str, sdk_tier: str) -> list[str]:
         )
     modules = list(sdk_mods)
     board_mod = _board_module_name(board)
+    soc = get_soc_for_board(board)
     # Insert board + common modules after SDK modules
     for mod in _COMMON_MODULES:
+        if mod == "nsx-pmu-armv8m" and soc.pmu_tier is not PmuTier.ARMV8M_PMU:
+            continue
         if mod == "nsx-soc-hal":
             modules.append(mod)
             modules.append("nsx-cmsis-startup")
@@ -334,6 +340,8 @@ def generate_app(ctx: PipelineContext) -> Path:
     board = ctx.board
     artifacts = ctx.engine_artifacts
     tvars = artifacts.template_vars
+    weights_region = ctx.weights_region or Placement.MRAM
+    arena_region = ctx.arena_region or Placement.TCM
 
     # --- Resolve module list ---
     mod_names = _resolve_module_list(board.name, soc.sdk_tier)
@@ -343,8 +351,9 @@ def generate_app(ctx: PipelineContext) -> Path:
     if transport == "usb_cdc" and "nsx-usb" not in mod_names:
         mod_names.append("nsx-usb")
 
-    # Add nsx-peripherals module when using PSRAM for model storage
-    if config.model.model_location == "psram" and "nsx-peripherals" not in mod_names:
+    # Add nsx-peripherals module when using PSRAM (for weights or arena)
+    psram_needed = arena_region is Placement.PSRAM or weights_region is Placement.PSRAM
+    if psram_needed and "nsx-peripherals" not in mod_names:
         mod_names.append("nsx-peripherals")
 
     # Build module descriptors (name + local flag)
@@ -357,7 +366,9 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     log.info("NSX modules: %s", ", ".join(m["name"] for m in modules))  # type: ignore[arg-type]
 
-    engine_type = tvars.get("engine_type", "tflm")
+    # Engine identity flows through the typed EngineArtifacts field.
+    # Templates receive the canonical hyphen-form string (StrEnum value).
+    engine_type = artifacts.engine_type
 
     # --- nsx.yml ---
     (app_dir / "nsx.yml").write_text(
@@ -385,6 +396,9 @@ def generate_app(ctx: PipelineContext) -> Path:
             aot_cmake_target=tvars.get("aot_cmake_target", ""),
             transport=transport,
             model_location=config.model.model_location,
+            arena_region=arena_region,
+            weights_region=weights_region,
+            has_full_pmu=soc.has_full_pmu,
         )
     )
 
@@ -418,16 +432,35 @@ def generate_app(ctx: PipelineContext) -> Path:
         "heartbeat_every_ms": hb.every_ms if hb.enabled else 0,
     }
 
-    if config.profiling.extreme_mode and config.model.model_location != "tcm":
+    extreme_mode_safe = arena_region is Placement.TCM and weights_region is Placement.TCM
+    if config.profiling.extreme_mode and not extreme_mode_safe:
         log.warning(
-            "profiling.extreme_mode=true ignored: requires model_location=\"tcm\" "
-            "(current: %s).  SSRAM/NVM power-down would corrupt model storage.",
-            config.model.model_location,
+            "profiling.extreme_mode=true ignored: requires arena+weights in TCM "
+            "(current: arena=%s, weights=%s). SSRAM/NVM power-down would corrupt "
+            "model storage.",
+            arena_region,
+            weights_region,
         )
 
-    if engine_type == "helia_aot":
+    if engine_type is EngineType.HELIA_AOT:
         # --- AOT engine: use AOT-specific main template, no model embedding ---
         aot_prefix = tvars["aot_prefix"]
+
+        # Apply firmware-level placement overrides on AOT arena regions.
+        # When the user pins the arena to a specific region, move *scratch*
+        # arenas there.  Persistent/constant regions stay where AOT planned
+        # them — those typically hold weights/state and have separate
+        # placement controls.
+        from dataclasses import replace as _dc_replace
+        from ..engines.base import ArenaRegion as _ArenaRegion
+
+        aot_arena_regions: list[_ArenaRegion] = list(tvars.get("arena_regions", []))
+        if arena_region in (Placement.PSRAM, Placement.TCM, Placement.SRAM, Placement.MRAM):
+            aot_arena_regions = [
+                _dc_replace(r, placement=arena_region) if r.role is ArenaRole.SCRATCH else r
+                for r in aot_arena_regions
+            ]
+
         (src_dir / "main.cc").write_text(
             _jinja_env.get_template("main_aot.cc.j2").render(
                 aot_prefix=aot_prefix,
@@ -442,16 +475,19 @@ def generate_app(ctx: PipelineContext) -> Path:
                 printf_linkage="static ",
                 extreme_mode=config.profiling.extreme_mode,
                 model_location=config.model.model_location,
+                arena_region=arena_region,
+                weights_region=weights_region,
+                has_full_pmu=soc.has_full_pmu,
+                allocate_arenas=tvars.get("allocate_arenas", True),
+                arena_regions=aot_arena_regions,
                 **heartbeat_vars,
             )
         )
     else:
         # --- TFLM / heliaRT: embed model as byte array, use TFLM profiler ---
         model_location = config.model.model_location
-        weights_region = ctx.weights_region or "mram"
-        arena_region = ctx.arena_region or "tcm"
 
-        if model_location != "psram":
+        if weights_region != "psram":
             model_header = _model_to_header(config.model.path, weights_region)
             (src_dir / "model_data.h").write_text(model_header)
 
@@ -475,16 +511,21 @@ def generate_app(ctx: PipelineContext) -> Path:
                 model_size=model_size,
                 printf_linkage="",
                 extreme_mode=config.profiling.extreme_mode,
+                has_full_pmu=soc.has_full_pmu,
                 **heartbeat_vars,
             )
         )
 
         # PMU profiler (TFLM-specific C++ class)
         (src_dir / "hpx_pmu_profiler.h").write_text(
-            _jinja_env.get_template("hpx_pmu_profiler.h.j2").render()
+            _jinja_env.get_template("hpx_pmu_profiler.h.j2").render(
+                has_full_pmu=soc.has_full_pmu,
+            )
         )
         (src_dir / "hpx_pmu_profiler.cc").write_text(
-            _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render()
+            _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
+                has_full_pmu=soc.has_full_pmu,
+            )
         )
 
     # --- Engine wrapper module ---
@@ -518,10 +559,20 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     nsx_tc = _nsx_toolchain(toolchain)
 
     # Lock-aware flow: write nsx.lock once, then materialise modules/ from it
-    # before invoking the toolchain. This makes the resolved module set
-    # reproducible across runs and decouples constraint resolution from build.
-    nsx_cli.lock(app_dir, timeout_s=timeouts.configure_s)
-    nsx_cli.sync(app_dir, timeout_s=timeouts.configure_s)
+    # before invoking the toolchain. When frozen, skip resolution entirely and
+    # require the existing lock/modules state to be reused as-is.
+    modules_dir = app_dir / "modules"
+    if ctx.config.frozen:
+        nsx_cli.sync(app_dir, frozen=True, timeout_s=timeouts.configure_s)
+    else:
+        nsx_cli.lock(app_dir, timeout_s=timeouts.configure_s)
+        try:
+            nsx_cli.sync(app_dir, timeout_s=timeouts.configure_s)
+        except Exception:
+            # Remove partially-materialised modules so next attempt starts clean.
+            if modules_dir.exists():
+                shutil.rmtree(modules_dir, ignore_errors=True)
+            raise
 
     nsx_cli.configure(app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s)
     nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s)

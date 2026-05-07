@@ -20,13 +20,14 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Any, Callable
 
 from neuralspotx import api as nsx_api
 from neuralspotx.api import NSXError
 
-from .errors import BuildError
+from .errors import BuildError, NetworkError
 
 log = logging.getLogger("hpx")
 
@@ -52,7 +53,29 @@ def _translate(label: str, func: Callable[[], Any]) -> Any:
         return func()
     except NSXError as exc:
         log.error("%s failed: %s", label, exc)
+        msg = str(exc).lower()
+        if _is_network_error(msg):
+            raise NetworkError(f"{label} failed (network)", details=str(exc)) from exc
         raise BuildError(f"{label} failed", details=str(exc)) from exc
+
+
+# Heuristics for transient network failures from git/curl/fetch.
+_NETWORK_KEYWORDS = (
+    "could not resolve host",
+    "connection timed out",
+    "connection refused",
+    "network is unreachable",
+    "ssl_error",
+    "tls handshake",
+    "failed to connect",
+    "unable to access",
+    "the remote end hung up",
+    "early eof",
+)
+
+
+def _is_network_error(msg: str) -> bool:
+    return any(kw in msg for kw in _NETWORK_KEYWORDS)
 
 
 # ---------------------------------------------------------------------------
@@ -98,8 +121,8 @@ def flash(
 ) -> None:
     """Run ``nsx flash`` on the given app directory.
 
-    When *jlink_serial* is provided, ``SEGGER_SNCODE`` is exported around the
-    call so the underlying CMake flash target selects the correct J-Link probe.
+    When *jlink_serial* is provided, ``SEGGER_SNCODE`` is temporarily set so
+    the underlying CMake flash target selects the correct J-Link probe.
     """
     log.info("nsx flash: %s (toolchain=%s)", app_dir, toolchain or "default")
 
@@ -113,6 +136,7 @@ def flash(
             lambda: nsx_api.flash_app(app_dir, toolchain=toolchain, timeout_s=timeout_s),
         )
     finally:
+        # Restore previous state regardless of success/failure.
         if jlink_serial:
             if prev_sncode is None:
                 os.environ.pop("SEGGER_SNCODE", None)
@@ -145,10 +169,35 @@ def sync(
     frozen: bool = False,
     force: bool = False,
     timeout_s: int = _DEFAULT_SYNC_TIMEOUT_S,
+    retries: int = 3,
 ) -> None:
-    """Materialise ``modules/`` so it exactly matches ``nsx.lock``."""
+    """Materialise ``modules/`` so it exactly matches ``nsx.lock``.
+
+    Retries up to *retries* times on transient :class:`NetworkError` with
+    exponential backoff (2s, 4s, 8s …).
+    """
     log.info("nsx sync: %s (frozen=%s, force=%s)", app_dir, frozen, force)
-    _translate(
-        "nsx sync",
-        lambda: nsx_api.sync_app(app_dir, frozen=frozen, force=force, timeout_s=timeout_s),
-    )
+    last_exc: NetworkError | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            _translate(
+                "nsx sync",
+                lambda: nsx_api.sync_app(
+                    app_dir, frozen=frozen, force=force, timeout_s=timeout_s
+                ),
+            )
+            return
+        except NetworkError as exc:
+            last_exc = exc
+            if attempt < retries:
+                delay = 2**attempt
+                log.warning(
+                    "nsx sync: transient network error (attempt %d/%d), "
+                    "retrying in %ds…",
+                    attempt,
+                    retries,
+                    delay,
+                )
+                time.sleep(delay)
+    # All retries exhausted — re-raise the last NetworkError.
+    raise last_exc  # type: ignore[misc]

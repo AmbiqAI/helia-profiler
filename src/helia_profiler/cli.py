@@ -59,6 +59,47 @@ def main(argv: list[str] | None = None) -> None:
             "(requires PSRAM-equipped board)."
         ),
     )
+    g_engine.add_argument(
+        "--arena-location",
+        "--runtime-arena-location",
+        dest="runtime_arena_location",
+        type=str,
+        choices=["tcm", "sram", "psram"],
+        help=(
+            "Tensor arena placement. "
+            "tflm/helia-rt: places the single TFLM arena. "
+            "helia-aot: places the AOT scratch arenas (persistent and "
+            "constant arenas remain where the AOT planner placed them). "
+            "Takes precedence over --model-location for the arena. "
+            "Alias: --runtime-arena-location."
+        ),
+    )
+    g_engine.add_argument(
+        "--weights-location",
+        "--runtime-weights-location",
+        dest="runtime_weights_location",
+        type=str,
+        choices=["tcm", "sram", "mram", "psram"],
+        help=(
+            "Model weights placement. "
+            "tflm/helia-rt: places the model flatbuffer (psram requires "
+            "J-Link upload via the RTT transport). "
+            "helia-aot: not supported (use heliaAOT planner controls via "
+            "engine.config.aot_args; XIP/copy-to-RAM controls land in a "
+            "later phase). "
+            "Takes precedence over --model-location for weights. "
+            "Alias: --runtime-weights-location."
+        ),
+    )
+    g_engine.add_argument(
+        "--core-override",
+        type=str,
+        choices=["cm4", "cm55"],
+        help=(
+            "Force heliaRT to use a specific core library variant "
+            "(e.g. cm4 to disable MVE kernels on an M55 board)."
+        ),
+    )
 
     # -- Target hardware --
     g_target = p_profile.add_argument_group("target hardware")
@@ -75,6 +116,14 @@ def main(argv: list[str] | None = None) -> None:
         type=str,
         choices=["rtt", "usb_cdc", "swo"],
         help="Data transport (default: rtt). RTT is recommended for lossless capture.",
+    )
+    g_target.add_argument(
+        "--frozen",
+        action="store_true",
+        help=(
+            "Use the existing nsx.lock/modules state without re-running dependency "
+            "resolution. Useful for reproducible offline reruns."
+        ),
     )
 
     # -- PMU profiling --
@@ -348,6 +397,18 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli.setdefault("model", {})["arena_size"] = args.arena_size
     if args.model_location is not None:
         cli.setdefault("model", {})["model_location"] = args.model_location
+    if args.runtime_arena_location is not None:
+        cli.setdefault("engine", {}).setdefault("config", {})[
+            "runtime_arena_location"
+        ] = args.runtime_arena_location
+    if args.runtime_weights_location is not None:
+        cli.setdefault("engine", {}).setdefault("config", {})[
+            "runtime_weights_location"
+        ] = args.runtime_weights_location
+    if args.core_override is not None:
+        cli.setdefault("engine", {}).setdefault("config", {})[
+            "core_override"
+        ] = args.core_override
 
     if args.engine is not None:
         cli.setdefault("engine", {})["type"] = args.engine
@@ -362,6 +423,8 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli.setdefault("target", {})["jlink_serial"] = args.jlink_serial
     if args.transport is not None:
         cli.setdefault("target", {})["transport"] = args.transport
+    if args.frozen:
+        cli["frozen"] = True
 
     if args.pmu_presets is not None:
         cli.setdefault("profiling", {})["pmu_presets"] = args.pmu_presets
@@ -459,7 +522,7 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     engine = args.engine  # None, "helia-aot", "helia-rt", "tflm"
-    is_aot = engine == "helia-aot"
+    is_aot = engine == EngineType.HELIA_AOT.value
 
     # --- Original tflite analysis (always needed as baseline) ---
     original = analyze_model(str(args.model))

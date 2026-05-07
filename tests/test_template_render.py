@@ -21,7 +21,12 @@ _env = jinja2.Environment(
 )
 
 
-def _render_tflm(transport: str = "rtt", model_location: str = "mram") -> str:
+def _render_tflm(
+    transport: str = "rtt",
+    model_location: str = "mram",
+    arena_region: str = "tcm",
+    weights_region: str = "mram",
+) -> str:
     return _env.get_template("main.cc.j2").render(
         engine_header="tensorflow/lite/micro/micro_interpreter.h",
         arena_size=65_536,
@@ -33,6 +38,8 @@ def _render_tflm(transport: str = "rtt", model_location: str = "mram") -> str:
         sync_gpio_pin=91,
         transport=transport,
         model_location=model_location,
+        arena_region=arena_region,
+        weights_region=weights_region,
         model_size=1024,
         printf_linkage="",
         heartbeat_enabled=True,
@@ -97,7 +104,12 @@ class TestMainCcRender:
         assert out.count("static inline void sync_gpio_init(void)") == 1
 
     def test_psram_model_location_skips_model_data_header(self):
-        out = _render_tflm(transport="rtt", model_location="psram")
+        out = _render_tflm(transport="rtt", model_location="psram", weights_region="psram")
+        assert "#include \"model_data.h\"" not in out
+        assert "ns_peripherals_psram.h" in out
+
+    def test_psram_weights_override_skips_model_data_header(self):
+        out = _render_tflm(transport="rtt", model_location="auto", weights_region="psram")
         assert "#include \"model_data.h\"" not in out
         assert "ns_peripherals_psram.h" in out
 

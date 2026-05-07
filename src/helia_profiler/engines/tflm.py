@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..config import ProfileConfig
+from . import EngineType
 from .base import EngineArtifacts
 
 
@@ -21,8 +22,8 @@ class TFLMAdapter:
         No extra preparation step needed beyond standard module resolution.
         """
         return EngineArtifacts(
+            engine_type=EngineType.TFLM,
             template_vars={
-                "engine_type": "tflm",
                 "engine_header": "tensorflow/lite/micro/micro_interpreter.h",
             },
         )
