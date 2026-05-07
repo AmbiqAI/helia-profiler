@@ -595,3 +595,12 @@ run metadata, and report file paths.
   high-frequency Joulescope sampling to attribute energy to individual layers.
 - **Multi-board parallel:** Profile the same model across multiple EVBs
   simultaneously (one J-Link serial per board, one Joulescope per power rail).
+- **Pydantic v2 config + results models:** Migrate the `ProfileConfig` /
+  `MemoryPlan` dataclasses to pydantic v2 with a discriminated `EngineConfig`
+  union. Gives JSON-schema export, path-aware validation errors, and
+  per-engine config typing without hand-rolled `__post_init__` coercers.
+- **REST / FastAPI service layer:** Wrap the existing pipeline in a small
+  FastAPI app so CI systems and a future web UI can submit profile jobs,
+  poll status, and download artifacts without shelling out to the CLI.
+  Out of scope for now — captured here so the underlying typed-config /
+  typed-artifacts work continues to support it cleanly.
