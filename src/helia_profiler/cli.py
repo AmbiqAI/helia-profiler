@@ -361,6 +361,23 @@ def main(argv: list[str] | None = None) -> None:
     )
     p_validate.add_argument("-v", "--verbose", action="count", default=0)
 
+    # --- hpx cache ---
+    p_cache = sub.add_parser(
+        "cache",
+        help="Manage hpx/nsx caches",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Manage local caches used by hpx and its nsx dependency:\n\n"
+            "  hpx cache purge      Remove all cached data (module clones,\n"
+            "                       resolved refs). Forces fresh network\n"
+            "                       fetches on next run.\n"
+            "  hpx cache info       Show cache location and size.\n"
+        ),
+    )
+    cache_sub = p_cache.add_subparsers(dest="cache_action")
+    cache_sub.add_parser("purge", help="Remove all cached data")
+    cache_sub.add_parser("info", help="Show cache location and disk usage")
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -381,6 +398,8 @@ def main(argv: list[str] | None = None) -> None:
         _cmd_power_on(args)
     elif args.command == "validate":
         _cmd_validate(args)
+    elif args.command == "cache":
+        _cmd_cache(args)
 
 
 def _cmd_profile(args: argparse.Namespace) -> None:
@@ -870,3 +889,63 @@ def _find_repo_root() -> Path:
         if (parent / "pyproject.toml").is_file() and (parent / "tests").is_dir():
             return parent
     return Path.cwd()
+
+
+# ---------------------------------------------------------------------------
+# hpx cache — manage nsx/hpx caches
+# ---------------------------------------------------------------------------
+
+
+def _cmd_cache(args: argparse.Namespace) -> None:
+    action = getattr(args, "cache_action", None)
+    if action == "purge":
+        _cmd_cache_purge()
+    elif action == "info":
+        _cmd_cache_info()
+    else:
+        print("Usage: hpx cache {purge|info}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _cmd_cache_purge() -> None:
+    """Purge all nsx caches (module cache + resolve-ref cache)."""
+    from neuralspotx import _resolve_cache, module_cache
+
+    # 1. Clear the module content-addressed cache
+    n_modules = module_cache.clear()
+    if n_modules:
+        print(f"  Purged {n_modules} cached module(s).")
+    else:
+        print("  Module cache already empty.")
+
+    # 2. Invalidate the resolve-ref TTL cache
+    _resolve_cache.invalidate_all()
+    print("  Purged resolve-ref cache.")
+
+    print("Done — next nsx lock/sync will fetch from the network.")
+
+
+def _cmd_cache_info() -> None:
+    """Show cache location and approximate disk usage."""
+    from neuralspotx import module_cache
+    from neuralspotx._resolve_cache import _cache_path
+
+    mod_root = module_cache.module_cache_root()
+    resolve_path = _cache_path()
+
+    print(f"Module cache:      {mod_root}")
+    if mod_root.is_dir():
+        entries = module_cache.iter_entries()
+        total_bytes = sum(
+            f.stat().st_size for e in entries for f in e.rglob("*") if f.is_file()
+        )
+        print(f"  Entries: {len(entries)}, Size: {total_bytes / 1024 / 1024:.1f} MB")
+    else:
+        print("  (empty)")
+
+    print(f"Resolve-ref cache: {resolve_path}")
+    if resolve_path.exists():
+        size = resolve_path.stat().st_size
+        print(f"  Size: {size / 1024:.1f} KB")
+    else:
+        print("  (empty)")

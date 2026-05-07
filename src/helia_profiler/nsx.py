@@ -149,6 +149,9 @@ def flash(
 # ---------------------------------------------------------------------------
 
 
+_RESOLVE_TTL_S: float = 1800  # 30 min — safe for typical profiling sessions
+
+
 def lock(
     app_dir: Path,
     *,
@@ -159,7 +162,13 @@ def lock(
     log.info("nsx lock: %s (update=%s)", app_dir, update)
     return _translate(
         "nsx lock",
-        lambda: nsx_api.lock_app(app_dir, update=update, quiet=True, timeout_s=timeout_s),
+        lambda: nsx_api.lock_app(
+            app_dir,
+            update=update,
+            quiet=True,
+            timeout_s=timeout_s,
+            resolve_ttl_s=_RESOLVE_TTL_S,
+        ),
     )
 
 

@@ -98,7 +98,9 @@ class TestNsxLock:
     def test_lock_calls_api_quietly(self, tmp_path: Path) -> None:
         with patch("helia_profiler.nsx.nsx_api.lock_app", return_value=tmp_path / "nsx.lock") as m:
             result = nsx.lock(tmp_path, timeout_s=180)
-        m.assert_called_once_with(tmp_path, update=False, quiet=True, timeout_s=180)
+        m.assert_called_once_with(
+            tmp_path, update=False, quiet=True, timeout_s=180, resolve_ttl_s=1800
+        )
         assert result == tmp_path / "nsx.lock"
 
     def test_lock_propagates_update_flag(self, tmp_path: Path) -> None:
