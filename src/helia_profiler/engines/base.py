@@ -98,11 +98,25 @@ class EngineArtifacts:
 
 @runtime_checkable
 class EngineAdapter(Protocol):
-    """Interface that each inference engine adapter must implement."""
+    """Interface that each inference engine adapter must implement.
+
+    Adapters own all engine-specific behaviour.  Shared pipeline stages
+    (preflight, plan_memory, firmware) call the methods defined here
+    instead of branching on :class:`EngineType`.
+
+    Adapters are cheap to instantiate — preflight (stage 0) constructs
+    one via :func:`get_adapter` to query capabilities before
+    ``prepare()`` runs in stage 2.
+    """
 
     @property
     def name(self) -> str:
         """Human-readable engine name."""
+        ...
+
+    @property
+    def engine_type(self) -> EngineType:
+        """Identity of this adapter (single source of truth)."""
         ...
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> EngineArtifacts:
@@ -110,5 +124,39 @@ class EngineAdapter(Protocol):
 
         This may involve running an AOT compiler, fetching static libraries,
         generating wrapper source files, etc.
+        """
+        ...
+
+    # -- Capability hooks (called by shared stages) --
+
+    def supports_runtime_split(self) -> bool:
+        """Whether ``runtime_arena_location`` / ``runtime_weights_location``
+        config overrides are honoured by this engine.
+
+        AOT engines bake placement into the compiled module, so overrides
+        from the profiler config are rejected with a hint.
+        """
+        ...
+
+    def default_auto_placement(
+        self, *, tcm_cap: int, sram_cap: int
+    ) -> tuple[Placement, Placement] | None:
+        """Engine-specific default for ``model_location=auto``.
+
+        Returns a ``(arena, weights)`` pair, or ``None`` to fall through
+        to the shared greedy fastest-fit policy in ``plan_memory``.
+        """
+        ...
+
+    def apply_arena_placement_override(
+        self,
+        regions: list["ArenaRegion"],
+        target: Placement,
+    ) -> list["ArenaRegion"]:
+        """Apply firmware-level arena placement override.
+
+        Called after ``prepare()`` produced :attr:`EngineArtifacts.template_vars`'
+        ``arena_regions``.  Default impl is identity (no override).
+        AOT-style engines move *scratch* regions to ``target``.
         """
         ...

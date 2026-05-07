@@ -117,6 +117,41 @@ class HeliaAOTAdapter:
     def name(self) -> str:
         return "heliaAOT"
 
+    @property
+    def engine_type(self) -> EngineType:
+        return EngineType.HELIA_AOT
+
+    def supports_runtime_split(self) -> bool:
+        # AOT bakes per-tensor placement into the compiled module; the
+        # profiler-config split overrides cannot influence weights.
+        return False
+
+    def default_auto_placement(
+        self, *, tcm_cap: int, sram_cap: int
+    ) -> tuple[Placement, Placement] | None:
+        # AOT: keep simple — auto means weights in MRAM, arena in TCM.
+        # The AOT compiler further redistributes tensors via PUT_IN_*
+        # macros on the codegen side.
+        del sram_cap
+        arena = Placement.TCM if tcm_cap > 0 else Placement.SRAM
+        return arena, Placement.MRAM
+
+    def apply_arena_placement_override(
+        self, regions: list[ArenaRegion], target: Placement
+    ) -> list[ArenaRegion]:
+        # When the user pins the arena to a specific region, move
+        # *scratch* arenas there.  Persistent/constant regions stay
+        # where the AOT planner placed them — those typically hold
+        # weights/state and have separate placement controls.
+        if target not in (Placement.PSRAM, Placement.TCM, Placement.SRAM, Placement.MRAM):
+            return regions
+        from dataclasses import replace as _dc_replace
+
+        return [
+            _dc_replace(r, placement=target) if r.role is ArenaRole.SCRATCH else r
+            for r in regions
+        ]
+
     def prepare(self, config: ProfileConfig, work_dir: Path) -> EngineArtifacts:
         prefix = config.engine.config.get("prefix", _DEFAULT_PREFIX)
         module_name = config.engine.config.get("module_name", _DEFAULT_MODULE_NAME)

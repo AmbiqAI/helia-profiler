@@ -4,29 +4,11 @@ from __future__ import annotations
 
 import logging
 
-from ..engines import EngineType
+from ..engines import get_adapter
 from ..errors import EngineError
 from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
-
-
-def _get_adapter(engine_type: EngineType):
-    """Import and instantiate the engine adapter for the given type."""
-    if engine_type is EngineType.TFLM:
-        from ..engines.tflm import TFLMAdapter
-
-        return TFLMAdapter()
-    elif engine_type is EngineType.HELIA_RT:
-        from ..engines.helia_rt import HeliaRTAdapter
-
-        return HeliaRTAdapter()
-    elif engine_type is EngineType.HELIA_AOT:
-        from ..engines.helia_aot import HeliaAOTAdapter
-
-        return HeliaAOTAdapter()
-    else:
-        raise EngineError(f"Unknown engine type: {engine_type}")
 
 
 class PrepareEngineStage:
@@ -41,7 +23,7 @@ class PrepareEngineStage:
         engine_type = ctx.config.engine.type
 
         try:
-            adapter = _get_adapter(engine_type)
+            adapter = get_adapter(engine_type)
         except EngineError:
             raise
         except Exception as exc:

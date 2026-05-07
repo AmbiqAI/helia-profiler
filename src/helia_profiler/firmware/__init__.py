@@ -26,7 +26,7 @@ from ..counters import (
 from ..engines import EngineType
 from ..errors import BuildError, FirmwareError
 from ..platform import PmuTier, get_soc_for_board
-from ..placement import ArenaRole, Placement
+from ..placement import Placement
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -446,20 +446,17 @@ def generate_app(ctx: PipelineContext) -> Path:
         # --- AOT engine: use AOT-specific main template, no model embedding ---
         aot_prefix = tvars["aot_prefix"]
 
-        # Apply firmware-level placement overrides on AOT arena regions.
-        # When the user pins the arena to a specific region, move *scratch*
-        # arenas there.  Persistent/constant regions stay where AOT planned
-        # them — those typically hold weights/state and have separate
-        # placement controls.
-        from dataclasses import replace as _dc_replace
+        # Apply firmware-level placement overrides via the adapter.
+        # AOT moves *scratch* arenas to the requested region; other
+        # engines are no-ops.
         from ..engines.base import ArenaRegion as _ArenaRegion
 
-        aot_arena_regions: list[_ArenaRegion] = list(tvars.get("arena_regions", []))
-        if arena_region in (Placement.PSRAM, Placement.TCM, Placement.SRAM, Placement.MRAM):
-            aot_arena_regions = [
-                _dc_replace(r, placement=arena_region) if r.role is ArenaRole.SCRATCH else r
-                for r in aot_arena_regions
-            ]
+        adapter = ctx.engine_adapter
+        assert adapter is not None  # set by stage 2 before firmware
+        aot_arena_regions: list[_ArenaRegion] = adapter.apply_arena_placement_override(
+            list(tvars.get("arena_regions", [])),
+            arena_region,
+        )
 
         (src_dir / "main.cc").write_text(
             _jinja_env.get_template("main_aot.cc.j2").render(

@@ -32,10 +32,11 @@ from urllib.request import Request, urlopen
 
 from ..config import ProfileConfig
 from ..errors import EngineError
+from ..placement import Placement
 from ..platform import CoreArch, get_soc
 from ..results import NsxModuleRef
 from . import EngineType
-from .base import EngineArtifacts
+from .base import ArenaRegion, EngineArtifacts
 
 log = logging.getLogger("hpx")
 
@@ -97,6 +98,27 @@ class HeliaRTAdapter:
     @property
     def name(self) -> str:
         return "heliaRT"
+
+    @property
+    def engine_type(self) -> EngineType:
+        return EngineType.HELIA_RT
+
+    def supports_runtime_split(self) -> bool:
+        return True
+
+    def default_auto_placement(
+        self, *, tcm_cap: int, sram_cap: int
+    ) -> tuple[Placement, Placement] | None:
+        # Fall through to the shared greedy fastest-fit policy.
+        del tcm_cap, sram_cap
+        return None
+
+    def apply_arena_placement_override(
+        self, regions: list[ArenaRegion], target: Placement
+    ) -> list[ArenaRegion]:
+        # heliaRT owns a single TFLM-style arena; no engine-side override.
+        del target
+        return regions
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> EngineArtifacts:
         backend = config.engine.backend or "helia"

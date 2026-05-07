@@ -30,7 +30,7 @@ import os
 import shutil
 from pathlib import Path
 
-from ..engines import EngineType
+from ..engines import get_adapter
 from ..errors import ConfigError
 from ..pipeline import PipelineContext
 from ..placement import ModelLocation, Placement
@@ -149,16 +149,16 @@ def _check_runtime_split_locations(cfg) -> None:
     runtime_arena = cfg.engine.config.get("runtime_arena_location")
     runtime_weights = cfg.engine.config.get("runtime_weights_location")
 
-    if cfg.engine.type is EngineType.HELIA_AOT:
-        # Phase C: scratch arena placement override is supported for AOT.
-        # Weights placement is still planner-controlled (Phase D will add
-        # XIP / copy-to-RAM controls via aot_args).
+    adapter = get_adapter(cfg.engine.type)
+    if not adapter.supports_runtime_split():
+        # Engine bakes placement into its compiled module; the
+        # profiler-config split overrides cannot influence weights.
         if runtime_weights is not None:
             raise ConfigError(
-                "engine.config.runtime_weights_location is not supported for engine.type='helia-aot'.",
+                f"engine.config.runtime_weights_location is not supported for engine.type='{cfg.engine.type.value}'.",
                 hint=(
-                    "Use heliaAOT placement controls via engine.config.aot_args "
-                    "to control weights placement."
+                    f"{adapter.name} controls weights placement via its own "
+                    "compiler args (e.g. engine.config.aot_args)."
                 ),
             )
         _check_explicit_location(
