@@ -524,6 +524,14 @@ def _extract_arena_regions(
     if render_plan is None:
         return []
 
+    # Build a lookup from constant arena memory → sidecar blob filename.
+    # constant_blobs is ordered to match constant_arenas.
+    const_blob_filenames: dict[int, str] = {}
+    constant_blobs = getattr(render_plan, "constant_blobs", ())
+    constant_arenas = getattr(render_plan, "constant_arenas", ())
+    for arena, blob in zip(constant_arenas, constant_blobs):
+        const_blob_filenames[arena.region_id] = blob.sidecar_filename
+
     regions: list[ArenaRegion] = []
     for arena_list in (
         render_plan.scratch_arenas,
@@ -551,6 +559,7 @@ def _extract_arena_regions(
                 )
                 role = ArenaRole.SCRATCH
             name = f"{prefix}_arena_{mem_str}"
+            blob_fn = const_blob_filenames.get(arena.region_id)
             regions.append(ArenaRegion(
                 region_id=arena.region_id,
                 name=name,
@@ -560,6 +569,7 @@ def _extract_arena_regions(
                 role=role,
                 memory=mem_str,
                 placement=placement,
+                blob_filename=blob_fn,
             ))
 
     # Sort by region_id to match the generated enum ordering

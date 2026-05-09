@@ -57,6 +57,7 @@ class ArenaRegion:
     role: ArenaRole
     memory: str
     placement: Placement
+    blob_filename: str | None = None
 
 
 @dataclass(frozen=True)

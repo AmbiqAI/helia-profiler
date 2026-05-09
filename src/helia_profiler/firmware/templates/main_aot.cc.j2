@@ -33,6 +33,14 @@
 
 {% include "_system_includes.j2" %}
 
+{% if not allocate_arenas %}
+{% for region in arena_regions %}
+{% if region.blob_filename %}
+#include "hpx_const_blob_{{ region.region_id }}.h"
+{% endif %}
+{% endfor %}
+{% endif %}
+
 // ---------------------------------------------------------------------------
 // DWT cycle counter
 // ---------------------------------------------------------------------------
@@ -356,6 +364,21 @@ int main(void) {
 {% endfor %}
     }
     hpx_printf("HPX_ARENAS_BOUND=%d\n", {{ arena_regions | length }});
+
+    // Load constant arena sidecar blobs into bound arena buffers.
+    // The AOT compiler emits constant data (weights/biases) as binary
+    // sidecar files — the profiler app embeds them into flash and
+    // copies them into the arena buffers before model_init.
+{% for region in arena_regions %}
+{% if region.blob_filename %}
+    memcpy(hpx_arena_buf_{{ region.region_id }},
+           hpx_const_blob_{{ region.region_id }},
+           sizeof(hpx_const_blob_{{ region.region_id }}));
+    hpx_printf("HPX_CONST_BLOB_LOADED region=%d size=%u\n",
+               {{ region.region_id }},
+               (unsigned)sizeof(hpx_const_blob_{{ region.region_id }}));
+{% endif %}
+{% endfor %}
 {% endif %}
 
     // Initialize AOT model
