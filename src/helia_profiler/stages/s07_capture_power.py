@@ -4,6 +4,10 @@ When using an external Joulescope driver, this stage performs a clean
 power-cycle reset (via the Joulescope relay) before capturing.  This
 eliminates the ~300 µA debug-domain overhead that a J-Link reset leaves
 behind, giving accurate baseline power numbers.
+
+If PMU results are available from a preceding capture stage, the capture
+duration is automatically tightened to `boot_time + firmware_run_time +
+margin` so that short models don't wait for the full `duration_s` timeout.
 """
 
 from __future__ import annotations
@@ -14,6 +18,46 @@ from ..errors import PowerError
 from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
+
+# Guard periods for estimated-duration auto-terminate
+_BOOT_SETTLE_S = 4.0  # power-cycle settle + SBL + firmware init
+_SAFETY_MARGIN_S = 3.0  # extra headroom beyond estimated runtime
+
+
+def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
+    """Estimate how long the firmware needs to run from PMU timing data.
+
+    After a power-cycle, the firmware boots from MRAM and re-runs all
+    presets × (warmup + profiled iterations).  Each iteration invokes the
+    model once.  We know the per-inference cycle count from the PMU result
+    and the clock frequency from the SoC definition.
+
+    Returns ``None`` if there is not enough information to estimate.
+    """
+    pmu = ctx.pmu_result
+    soc = ctx.soc
+    if pmu is None or soc is None:
+        return None
+
+    total_cycles = sum(layer.cycles or 0 for layer in pmu.layers)
+    if total_cycles <= 0:
+        return None
+
+    clock_hz = (soc.clock.hp_mhz or soc.clock.lp_mhz) * 1_000_000
+    if clock_hz <= 0:
+        return None
+
+    cycles_per_inference = total_cycles
+    num_presets = len(pmu.presets) or 1
+    warmup = ctx.config.profiling.warmup
+    iterations = ctx.config.profiling.iterations
+    total_inferences = num_presets * (warmup + iterations)
+
+    inference_time_s = cycles_per_inference / clock_hz
+    firmware_run_s = total_inferences * inference_time_s
+
+    estimated = _BOOT_SETTLE_S + firmware_run_s + _SAFETY_MARGIN_S
+    return estimated
 
 
 class CapturePowerStage:
@@ -51,8 +95,21 @@ class CapturePowerStage:
             )
 
         # --- Capture ---
+        # Tighten capture window if PMU timing data is available.
+        estimated = _estimate_capture_duration(ctx)
+        configured = ctx.config.power.duration_s
+        if estimated is not None and estimated < configured:
+            log.info(
+                "Auto-tuned capture duration: %.1fs (estimated) vs %.1fs (configured)",
+                estimated,
+                configured,
+            )
+            capture_duration = estimated
+        else:
+            capture_duration = configured
+
         try:
-            power_result = capture_power(ctx)
+            power_result = capture_power(ctx, duration_override_s=capture_duration)
         except PowerError:
             raise
         except Exception as exc:
@@ -64,7 +121,7 @@ class CapturePowerStage:
         ctx.power_result = power_result
         log.info(
             "Captured power data (%.1fs, driver=%s, mode=%s)",
-            ctx.config.power.duration_s,
+            capture_duration,
             driver_name,
             mode,
         )

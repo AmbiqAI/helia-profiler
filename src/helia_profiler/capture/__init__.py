@@ -116,7 +116,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     return result
 
 
-def capture_power(ctx: PipelineContext) -> PowerResult:
+def capture_power(ctx: PipelineContext, *, duration_override_s: float | None = None) -> PowerResult:
     """Record a power trace using the configured power driver.
 
     Returns a :class:`PowerResult` directly — no intermediate dict wrapping.
@@ -129,8 +129,10 @@ def capture_power(ctx: PipelineContext) -> PowerResult:
     # Verify driver is usable
     driver.check_available()
 
+    duration = duration_override_s if duration_override_s is not None else ctx.config.power.duration_s
+
     return driver.capture(
-        duration_s=ctx.config.power.duration_s,
+        duration_s=duration,
         io_voltage=ctx.config.power.io_voltage,
     )
 

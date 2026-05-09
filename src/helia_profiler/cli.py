@@ -214,6 +214,11 @@ def main(argv: list[str] | None = None) -> None:
         "--work-dir", type=Path, help="Working directory for generated firmware"
     )
     g_adv.add_argument("--keep-work-dir", action="store_true", help="Keep working directory")
+    g_adv.add_argument(
+        "--clean",
+        action="store_true",
+        help="Wipe cached build directory before building (forces full rebuild)",
+    )
 
     # --- hpx doctor ---
     sub.add_parser("doctor", help="Check toolchain and dependencies")
@@ -499,6 +504,8 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli["work_dir"] = str(args.work_dir)
     if args.keep_work_dir:
         cli["keep_work_dir"] = True
+    if args.clean:
+        cli["clean"] = True
     cli["verbose"] = args.verbose
 
     config = load_config(args.config, cli)

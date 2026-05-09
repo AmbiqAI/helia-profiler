@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import shutil
-import tempfile
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -205,15 +204,34 @@ class PipelineRunner:
 # ---------------------------------------------------------------------------
 
 
+def _default_cache_work_dir(config: ProfileConfig) -> Path:
+    """Deterministic cache path keyed on board-toolchain-engine."""
+    key = f"{config.target.board}-{config.target.toolchain.value}-{config.engine.type.value}"
+    return Path.home() / ".cache" / "helia-profiler" / "workspaces" / key
+
+
 def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
-    """Return (work_dir, should_cleanup)."""
+    """Return (work_dir, should_cleanup).
+
+    Resolution order:
+    1. Explicit ``--work-dir`` — used as-is, never cleaned up.
+    2. Default cache directory under ``~/.cache/helia-profiler/workspaces/``
+       keyed on ``{board}-{toolchain}-{engine}``.  Enables incremental
+       cmake builds across runs.  Never cleaned up automatically.
+    """
     if config.work_dir is not None:
         wd = config.work_dir.resolve()
         wd.mkdir(parents=True, exist_ok=True)
         return wd, False
 
-    wd = Path(tempfile.mkdtemp(prefix="hpx_"))
-    return wd, not config.keep_work_dir
+    # Persistent cache directory — enables incremental builds
+    wd = _default_cache_work_dir(config)
+    if config.clean:
+        if wd.exists():
+            shutil.rmtree(wd, ignore_errors=True)
+            log.info("Cleaned cached work directory: %s", wd)
+    wd.mkdir(parents=True, exist_ok=True)
+    return wd, False
 
 
 def _serialize_config(config: ProfileConfig) -> dict[str, Any]:

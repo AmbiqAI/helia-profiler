@@ -285,8 +285,9 @@ class ProfileConfig:
     output: OutputConfig = field(default_factory=OutputConfig)
     timeouts: TimeoutsConfig = field(default_factory=TimeoutsConfig)
     frozen: bool = False
-    work_dir: Path | None = None  # None = use tempdir
-    keep_work_dir: bool = False
+    work_dir: Path | None = None  # None = use persistent cache dir
+    keep_work_dir: bool = False  # legacy — cache dir is always kept
+    clean: bool = False  # wipe cached work dir before building
     verbose: int = 0
 
 
@@ -411,6 +412,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
         frozen=bool(d.get("frozen", False)),
         work_dir=Path(d["work_dir"]) if d.get("work_dir") else None,
         keep_work_dir=d.get("keep_work_dir", False),
+        clean=bool(d.get("clean", False)),
         verbose=d.get("verbose", 0),
     )
 
