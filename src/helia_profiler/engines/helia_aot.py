@@ -20,6 +20,7 @@ import logging
 import os
 import re
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -781,13 +782,13 @@ def _validate_cmsis_nn(path: Path) -> None:
                 ),
             )
 
+
 def _auto_clone_cmsis_nn() -> Path:
     """Clone ns-cmsis-nn from GitHub into a local cache directory."""
-    import subprocess
-
     cache = _CMSIS_NN_CACHE_DIR
     if cache.is_dir() and (cache / "Include").is_dir() and (cache / "Source").is_dir():
         log.info("ns-cmsis-nn: cache hit at %s", cache)
+        _validate_cmsis_nn(cache)
         return cache
 
     repo_url = f"https://github.com/{_CMSIS_NN_GH_REPO}.git"
