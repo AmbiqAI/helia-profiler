@@ -720,13 +720,17 @@ def _extract_memory_plan(codegen_ctx: Any) -> MemoryPlan | None:
 # ---------------------------------------------------------------------------
 
 
+_CMSIS_NN_GH_REPO = "AmbiqAI/ns-cmsis-nn"
+_CMSIS_NN_CACHE_DIR = Path.home() / ".cache" / "helia-profiler" / "ns-cmsis-nn"
+
+
 def _resolve_cmsis_nn(config: ProfileConfig) -> Path:
     """Resolve the ns-cmsis-nn source tree path.
 
     Checks (in order):
     1. ``engine.config.cmsis_nn_path`` — explicit user-provided path
     2. ``CMSIS_NN_PATH`` environment variable
-    3. Raise an error with guidance.
+    3. Auto-clone from GitHub (cached at ``~/.cache/helia-profiler/ns-cmsis-nn/``)
     """
     raw = config.engine.config.get("cmsis_nn_path")
     if raw:
@@ -740,14 +744,8 @@ def _resolve_cmsis_nn(config: ProfileConfig) -> Path:
         _validate_cmsis_nn(p)
         return p
 
-    raise EngineError(
-        "CMSIS-NN source path not provided",
-        hint=(
-            "Set engine.config.cmsis_nn_path in your config YAML, "
-            "or export CMSIS_NN_PATH to the ns-cmsis-nn repository root "
-            "(containing Include/ and Source/ directories)."
-        ),
-    )
+    # Auto-clone from GitHub
+    return _auto_clone_cmsis_nn()
 
 
 def _validate_cmsis_nn(path: Path) -> None:
@@ -782,6 +780,42 @@ def _validate_cmsis_nn(path: Path) -> None:
                     "See https://github.com/AmbiqAI/ns-cmsis-nn"
                 ),
             )
+
+def _auto_clone_cmsis_nn() -> Path:
+    """Clone ns-cmsis-nn from GitHub into a local cache directory."""
+    import subprocess
+
+    cache = _CMSIS_NN_CACHE_DIR
+    if cache.is_dir() and (cache / "Include").is_dir() and (cache / "Source").is_dir():
+        log.info("ns-cmsis-nn: cache hit at %s", cache)
+        return cache
+
+    repo_url = f"https://github.com/{_CMSIS_NN_GH_REPO}.git"
+    log.info("Cloning ns-cmsis-nn from %s ...", repo_url)
+    cache.parent.mkdir(parents=True, exist_ok=True)
+
+    # Remove stale partial clone
+    if cache.exists():
+        shutil.rmtree(cache)
+
+    try:
+        subprocess.run(
+            ["git", "clone", "--depth", "1", repo_url, str(cache)],
+            capture_output=True, text=True, timeout=120, check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        raise EngineError(
+            f"Failed to clone ns-cmsis-nn from {repo_url}",
+            hint=(
+                "Clone manually and set CMSIS_NN_PATH:\n"
+                f"  git clone {repo_url} /path/to/ns-cmsis-nn\n"
+                "  export CMSIS_NN_PATH=/path/to/ns-cmsis-nn"
+            ),
+        ) from exc
+
+    log.info("Cloned ns-cmsis-nn to %s", cache)
+    _validate_cmsis_nn(cache)
+    return cache
 
 
 # ---------------------------------------------------------------------------

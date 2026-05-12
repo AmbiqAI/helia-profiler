@@ -10,11 +10,11 @@ dependencies = [
     "rich>=13.0",
     "pyserial>=3.5",
     "pylink-square>=0.14.0",
-    "neuralspotx>=0.5,<0.6",
+    "neuralspotx==0.5.1",  # TODO: Relax to >=0.x,<1.0 once NSX API is stable
 ]
 
 [project.optional-dependencies]
-# heliaAOT — Ambiq's AOT compiler. Not published to PyPI, so we pin to a
+# heliaAOT — Ambiq's AOT compiler. Not yet published to PyPI, so we pin to a
 # release tag on the upstream repo. Users can override with their own
 # version, fork, or local checkout, e.g.:
 #   pip install --upgrade 'helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@v0.15.0'
@@ -22,6 +22,7 @@ dependencies = [
 #   pip install -e /path/to/helia-aot
 # At runtime, hpx enforces a minimum version (see HELIAAOT_MIN_VERSION
 # in src/helia_profiler/engines/helia_aot.py).
+# TODO: Switch to PyPI package once helia-aot is published (e.g. "helia-aot>=0.14,<1.0")
 aot = ["helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@v0.14.0"]
 analysis = ["ai-edge-litert>=1.0", "flatbuffers>=24.0"]
 power = ["pyjoulescope_driver>=1.0"]
@@ -78,6 +79,10 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[tool.uv.sources]
+# TODO: Remove this override once neuralspotx is published to PyPI
+neuralspotx = { git = "https://github.com/AmbiqAI/neuralspotx", tag = "neuralspotx-v0.5.1" }
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["F401"]

@@ -204,13 +204,12 @@ _jinja_env = jinja2.Environment(
 def _find_segger_rtt_dir() -> Path:
     """Locate the SEGGER RTT source directory.
 
-    Search order:
-      1. ``SEGGER_RTT_PATH`` environment variable
-      2. Known paths relative to the helia-profiler source tree
+    The ``SEGGER_RTT_PATH`` environment variable must point to the root
+    directory of a SEGGER RTT source checkout (the folder containing
+    ``RTT/`` and ``Config/`` subdirs).
 
-    Returns the directory containing ``RTT/`` and ``Config/`` subdirs.
+    Returns the validated path.
     """
-    # 1. Explicit environment variable
     env_path = os.environ.get("SEGGER_RTT_PATH")
     if env_path:
         p = Path(env_path)
@@ -221,32 +220,12 @@ def _find_segger_rtt_dir() -> Path:
             hint="Set SEGGER_RTT_PATH to the root dir containing RTT/ and Config/ subdirs.",
         )
 
-    # 2. Relative to helia-profiler source (monorepo layout)
-    try:
-        import helia_profiler as _hp
-
-        pkg_file = Path(_hp.__file__).resolve()
-        # src/helia_profiler/__init__.py → up 3 levels → helia-profiler/
-        hp_root = pkg_file.parents[2]
-        candidates = [
-            # neuralspot/experiments/runtime_benchmarks/extern/SEGGER_RTT/R7.70a
-            hp_root.parent / "experiments" / "runtime_benchmarks" / "extern" / "SEGGER_RTT" / "R7.70a",
-            # legacy path (pre-rename)
-            hp_root.parent / "benchmarks" / "runtime_benchmarks" / "extern" / "SEGGER_RTT" / "R7.70a",
-            # neuralspot/nsx-modules/nsx-ambiqsuite-r4/sdk/third_party/SEGGER/SEGGER_RTT_V680a
-            hp_root.parent / "nsx-modules" / "nsx-ambiqsuite-r4" / "sdk" / "third_party" / "SEGGER" / "SEGGER_RTT_V680a",
-        ]
-        for c in candidates:
-            if (c / "RTT" / "SEGGER_RTT.c").exists():
-                return c
-    except Exception:
-        pass
-
     raise FirmwareError(
-        "SEGGER RTT source files not found",
+        "SEGGER RTT source files not found — SEGGER_RTT_PATH is not set.",
         hint=(
-            "Set SEGGER_RTT_PATH to the RTT source directory "
-            "(the folder containing RTT/ and Config/ subdirs)."
+            "Clone the SEGGER RTT sources and set the environment variable:\n"
+            "  git clone https://github.com/SEGGERMicro/RTT.git /path/to/segger-rtt\n"
+            "  export SEGGER_RTT_PATH=/path/to/segger-rtt"
         ),
     )
 
