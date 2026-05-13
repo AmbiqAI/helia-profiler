@@ -14,15 +14,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# heliaAOT — Ambiq's AOT compiler. Not published to PyPI, so we pin to a
-# release tag on the upstream repo. Users can override with their own
-# version, fork, or local checkout, e.g.:
-#   pip install --upgrade 'helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@v0.15.0'
-#   pip install 'git+https://github.com/<your-fork>/helia-aot.git@<ref>'
-#   pip install -e /path/to/helia-aot
-# At runtime, hpx enforces a minimum version (see HELIAAOT_MIN_VERSION
-# in src/helia_profiler/engines/helia_aot.py).
-aot = ["helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@v0.14.0"]
+# heliaAOT is not published to a package registry yet. Keep this extra empty
+# so regular installs, lint, and tests do not need private cross-repo access.
+# The runtime AOT adapter reports explicit manual install guidance.
+aot = []
 analysis = ["ai-edge-litert>=1.0", "flatbuffers>=24.0"]
 power = ["pyjoulescope_driver>=1.0"]
 
