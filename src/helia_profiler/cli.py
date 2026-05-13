@@ -130,6 +130,27 @@ def main(argv: list[str] | None = None) -> None:
         ),
     )
 
+    # -- Build / NSX overrides --
+    g_build = p_profile.add_argument_group("build overrides")
+    g_build.add_argument(
+        "--nsx-channel",
+        type=str,
+        help="NSX channel for module resolution (default: stable).",
+    )
+    g_build.add_argument(
+        "--nsx-module",
+        action="append",
+        metavar="NAME:KEY=VALUE",
+        dest="nsx_module_overrides",
+        help=(
+            "Override an NSX module's source. Repeatable. "
+            "Keys: path (local dir), ref (git ref/tag), version (pin). "
+            "Examples: --nsx-module nsx-ambiq-bsp-r5:path=/my/bsp "
+            "--nsx-module nsx-ambiq-hal-r5:ref=feat/new-soc "
+            "--nsx-module nsx-ambiqsuite-r5:version=2.0.0"
+        ),
+    )
+
     # -- PMU profiling --
     g_pmu = p_profile.add_argument_group("PMU profiling")
     g_pmu.add_argument(
@@ -511,6 +532,40 @@ def _cmd_profile(args: argparse.Namespace) -> None:
     if args.clean:
         cli["clean"] = True
     cli["verbose"] = args.verbose
+
+    # -- Build / NSX overrides --
+    if getattr(args, "nsx_channel", None):
+        cli.setdefault("build", {})["channel"] = args.nsx_channel
+    nsx_overrides_raw = getattr(args, "nsx_module_overrides", None)
+    if nsx_overrides_raw:
+        nsx_modules: dict[str, dict[str, str]] = {}
+        for spec in nsx_overrides_raw:
+            if ":" not in spec:
+                print(
+                    f"Error: --nsx-module format is NAME:KEY=VALUE "
+                    f"(e.g. nsx-ambiq-bsp-r5:path=/my/bsp). Got: '{spec}'",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            name, kv = spec.split(":", 1)
+            if "=" not in kv:
+                print(
+                    f"Error: --nsx-module value must be KEY=VALUE "
+                    f"(e.g. path=/my/bsp, ref=feat/new-soc, version=2.0.0). "
+                    f"Got: '{kv}'",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            key, val = kv.split("=", 1)
+            if key not in ("path", "ref", "version"):
+                print(
+                    f"Error: --nsx-module key must be 'path', 'ref', or "
+                    f"'version'. Got: '{key}'",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            nsx_modules.setdefault(name, {})[key] = val
+        cli.setdefault("build", {})["nsx_modules"] = nsx_modules
 
     config = load_config(args.config, cli)
 

@@ -355,3 +355,113 @@ class TestKwsModel:
         main_cc = (app_dir / "src" / "main.cc").read_text()
         assert "MicroMutableOpResolver" in main_cc
         assert "get_resolver" in main_cc
+
+
+class TestNsxModuleOverrides:
+    """Tests for the build.nsx_modules override mechanism."""
+
+    def _make_ctx_with_overrides(
+        self, tmp_path: Path, fake_dist: Path, build_overrides: dict,
+    ) -> PipelineContext:
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb"},
+                "work_dir": str(tmp_path / "work"),
+                "build": build_overrides,
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        return PipelineContext(config=config, work_dir=work_dir)
+
+    def test_channel_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
+        ctx = self._make_ctx_with_overrides(tmp_path, fake_dist, {"channel": "dev"})
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        assert "channel: dev" in nsx_yml
+
+    def test_default_channel_is_stable(self, tmp_path: Path, fake_dist: Path):
+        ctx = self._make_ctx_with_overrides(tmp_path, fake_dist, {})
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        assert "channel: stable" in nsx_yml
+
+    def test_version_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
+        ctx = self._make_ctx_with_overrides(
+            tmp_path, fake_dist,
+            {"nsx_modules": {"nsx-ambiqsuite-r5": {"version": "2.0.0"}}},
+        )
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        assert 'version: "2.0.0"' in nsx_yml
+        assert "nsx-ambiqsuite-r5" in nsx_yml
+
+    def test_ref_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
+        ctx = self._make_ctx_with_overrides(
+            tmp_path, fake_dist,
+            {"nsx_modules": {"nsx-ambiq-hal-r5": {"ref": "feat/new-soc"}}},
+        )
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        assert "ref: feat/new-soc" in nsx_yml
+        assert "nsx-ambiq-hal-r5" in nsx_yml
+
+    def test_path_override_installs_local_module(self, tmp_path: Path, fake_dist: Path):
+        # Create a fake local module with nsx-module.yaml
+        local_bsp = tmp_path / "my-bsp"
+        local_bsp.mkdir()
+        (local_bsp / "nsx-module.yaml").write_text("schema_version: 1\nmodule:\n  name: nsx-ambiq-bsp-r5\n")
+        (local_bsp / "CMakeLists.txt").write_text("# custom BSP cmake\n")
+
+        ctx = self._make_ctx_with_overrides(
+            tmp_path, fake_dist,
+            {"nsx_modules": {"nsx-ambiq-bsp-r5": {"path": str(local_bsp)}}},
+        )
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        # Module should be installed as local
+        installed = app_dir / "modules" / "nsx-ambiq-bsp-r5"
+        assert installed.is_dir()
+        assert (installed / "nsx-module.yaml").is_file()
+        assert (installed / "CMakeLists.txt").read_text() == "# custom BSP cmake\n"
+
+        # nsx.yml should mark it as local
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        # The module entry should have local: true
+        assert "local: true" in nsx_yml
+
+    def test_path_override_missing_yaml_raises(self, tmp_path: Path, fake_dist: Path):
+        from helia_profiler.errors import FirmwareError
+
+        bad_dir = tmp_path / "bad-module"
+        bad_dir.mkdir()
+        # No nsx-module.yaml
+
+        ctx = self._make_ctx_with_overrides(
+            tmp_path, fake_dist,
+            {"nsx_modules": {"nsx-ambiq-bsp-r5": {"path": str(bad_dir)}}},
+        )
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+
+        with pytest.raises(FirmwareError, match="nsx-module.yaml"):
+            generate_app(ctx)

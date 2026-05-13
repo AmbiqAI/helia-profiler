@@ -50,7 +50,7 @@ log = logging.getLogger("hpx")
 #                         ref, or local dist_path) must be >= this.
 #                         Bump only on incompatible API changes.
 # ---------------------------------------------------------------------------
-HELIART_VERSION = "1.12.2"
+HELIART_VERSION = "1.13.1"
 HELIART_MIN_VERSION = "1.12.2"
 HELIART_GH_REPO = "AmbiqAI/helia-rt"
 # NB: the GitHub tag uses lowercase "heliaRT-v..." (case-sensitive on the API).
@@ -378,7 +378,7 @@ def _fetch_github_release(
         raise EngineError(
             f"No GitHub release found for {repo}@{ref}",
             hint=(
-                "Provide a valid release tag (e.g. heliaRT-v1.12.2), "
+                "Provide a valid release tag (e.g. heliaRT-v1.13.1), "
                 "or set engine.config.dist_path to a local directory."
             ),
         )

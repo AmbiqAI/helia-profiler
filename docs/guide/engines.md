@@ -41,7 +41,7 @@ fork. It is a drop-in replacement for stock TFLM with three kernel
 backends — reference, CMSIS-NN, and the Ambiq-tuned **HELIA** kernels.
 
 The profiler ships pinned to a specific heliaRT release
-(currently **v1.12.2**) and enforces a minimum supported version
+(currently **v1.13.1**) and enforces a minimum supported version
 (**v1.12.2**). Pre-built static libraries are downloaded automatically
 the first time you use this engine.
 

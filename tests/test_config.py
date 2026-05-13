@@ -84,3 +84,106 @@ def test_timeouts_overrides():
     # Unspecified values retain defaults
     assert t.configure_s == 120
     assert t.toolchain_probe_s == 5
+
+
+# ---------------------------------------------------------------------------
+# BuildConfig / NSX module overrides
+# ---------------------------------------------------------------------------
+
+
+def test_build_config_defaults():
+    """BuildConfig should be present with defaults when unspecified."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+    }
+    config = load_config(None, cli)
+    assert config.build.channel == "stable"
+    assert config.build.nsx_modules == {}
+
+
+def test_build_config_channel_override():
+    """Channel override should flow through from YAML/CLI."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "build": {"channel": "dev"},
+    }
+    config = load_config(None, cli)
+    assert config.build.channel == "dev"
+
+
+def test_build_config_nsx_module_path_override():
+    """Local path override for an NSX module."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "build": {
+            "nsx_modules": {
+                "nsx-ambiq-bsp-r5": {"path": "/home/dev/my-bsp"},
+            },
+        },
+    }
+    config = load_config(None, cli)
+    override = config.build.nsx_modules["nsx-ambiq-bsp-r5"]
+    assert override.path == Path("/home/dev/my-bsp")
+    assert override.ref is None
+    assert override.version is None
+
+
+def test_build_config_nsx_module_ref_override():
+    """Git ref override for an NSX module."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "build": {
+            "nsx_modules": {
+                "nsx-ambiq-hal-r5": {"ref": "feat/apollo6-support"},
+            },
+        },
+    }
+    config = load_config(None, cli)
+    override = config.build.nsx_modules["nsx-ambiq-hal-r5"]
+    assert override.ref == "feat/apollo6-support"
+    assert override.path is None
+    assert override.version is None
+
+
+def test_build_config_nsx_module_version_override():
+    """Version pin override for an NSX module."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "build": {
+            "nsx_modules": {
+                "nsx-ambiqsuite-r5": {"version": "2.0.0"},
+            },
+        },
+    }
+    config = load_config(None, cli)
+    override = config.build.nsx_modules["nsx-ambiqsuite-r5"]
+    assert override.version == "2.0.0"
+    assert override.path is None
+    assert override.ref is None
+
+
+def test_build_config_multiple_overrides():
+    """Multiple NSX module overrides in one config."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "build": {
+            "channel": "dev",
+            "nsx_modules": {
+                "nsx-ambiq-bsp-r5": {"path": "/dev/bsp"},
+                "nsx-ambiq-hal-r5": {"ref": "main"},
+                "nsx-ambiqsuite-r5": {"version": "3.0.0"},
+            },
+        },
+    }
+    config = load_config(None, cli)
+    assert config.build.channel == "dev"
+    assert len(config.build.nsx_modules) == 3
+    assert config.build.nsx_modules["nsx-ambiq-bsp-r5"].path == Path("/dev/bsp")
+    assert config.build.nsx_modules["nsx-ambiq-hal-r5"].ref == "main"
+    assert config.build.nsx_modules["nsx-ambiqsuite-r5"].version == "3.0.0"

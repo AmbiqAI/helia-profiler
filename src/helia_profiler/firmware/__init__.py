@@ -123,6 +123,29 @@ def _resolve_module_list(board: str, sdk_tier: str) -> list[str]:
     return modules
 
 
+def _install_local_module_override(dest: Path, source: Path) -> None:
+    """Copy a local NSX module directory into the app's ``modules/`` tree.
+
+    Validates that the source contains an ``nsx-module.yaml`` (required by
+    NSX for any local module).
+    """
+    source = source.expanduser().resolve()
+    if not source.is_dir():
+        raise FirmwareError(
+            f"NSX module override path is not a directory: {source}",
+            hint="Provide a directory containing nsx-module.yaml.",
+        )
+    if not (source / "nsx-module.yaml").is_file():
+        raise FirmwareError(
+            f"NSX module override at {source} is missing nsx-module.yaml",
+            hint="A valid NSX module must contain nsx-module.yaml at its root.",
+        )
+    if dest.is_dir():
+        shutil.rmtree(dest)
+    shutil.copytree(source, dest)
+    log.info("Installed local module override: %s → %s", source, dest)
+
+
 # ---------------------------------------------------------------------------
 # PMU preset mapping (legacy — used only for backward-compat Init() path)
 # ---------------------------------------------------------------------------
@@ -364,8 +387,26 @@ def generate_app(ctx: PipelineContext) -> Path:
     if psram_needed and "nsx-peripherals" not in mod_names:
         mod_names.append("nsx-peripherals")
 
-    # Build module descriptors (name + local flag)
-    modules: list[dict[str, object]] = [{"name": m, "local": False} for m in mod_names]
+    # Build module descriptors (name + local flag + optional overrides)
+    nsx_overrides = config.build.nsx_modules
+    modules: list[dict[str, object]] = []
+    for m in mod_names:
+        override = nsx_overrides.get(m)
+        if override and override.path:
+            # Local path override — install into app modules/ and mark local
+            local_mod_dir = app_dir / "modules" / m
+            _install_local_module_override(local_mod_dir, override.path)
+            modules.append({"name": m, "local": True})
+        elif override and override.ref:
+            modules.append({
+                "name": m, "local": False, "ref": override.ref,
+            })
+        elif override and override.version:
+            modules.append({
+                "name": m, "local": False, "version": override.version,
+            })
+        else:
+            modules.append({"name": m, "local": False})
 
     # Append engine-provided modules (e.g. nsx-heliart) as local
     for extra_mod in artifacts.extra_modules:
@@ -385,6 +426,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             board=board.name,
             soc=soc.name,
             toolchain=config.target.toolchain,
+            channel=config.build.channel,
             modules=modules,
         )
     )
