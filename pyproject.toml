@@ -10,7 +10,7 @@ dependencies = [
     "rich>=13.0",
     "pyserial>=3.5",
     "pylink-square>=0.14.0",
-    "neuralspotx>=0.5,<0.6",
+    "neuralspotx>=0.6,<0.7",
 ]
 
 [project.optional-dependencies]
