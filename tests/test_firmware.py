@@ -465,3 +465,23 @@ class TestNsxModuleOverrides:
 
         with pytest.raises(FirmwareError, match="nsx-module.yaml"):
             generate_app(ctx)
+
+    def test_unmatched_override_logs_warning(
+        self, tmp_path: Path, fake_dist: Path, caplog,
+    ):
+        """Override for a module not in the build should emit a warning."""
+        import logging
+
+        ctx = self._make_ctx_with_overrides(
+            tmp_path, fake_dist,
+            {"nsx_modules": {"nsx-nonexistent-module": {"ref": "main"}}},
+        )
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+
+        with caplog.at_level(logging.WARNING):
+            generate_app(ctx)
+
+        assert any(
+            "nsx-nonexistent-module" in rec.message for rec in caplog.records
+        )

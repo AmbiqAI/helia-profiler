@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
 from .engines import EngineType
+from .errors import ConfigError
 from .placement import ModelLocation
 from .power.base import PowerMode
 
@@ -277,18 +279,28 @@ class OutputConfig:
 class NsxModuleOverride:
     """Override resolution for a single NSX module.
 
-    Modes (first match wins):
+    Exactly one mode must be set:
     * *path* — use a local directory as the module source (``local: true``).
     * *ref* — resolve the module's project at a specific git ref/tag.
     * *version* — pin the module to an exact version constraint.
-
-    Only one mode should be set.  If *path* is set the module becomes local;
-    otherwise it stays a project module with the added constraint.
     """
 
     path: Path | None = None
     ref: str | None = None
     version: str | None = None
+
+    def __post_init__(self) -> None:
+        modes = sum(x is not None for x in (self.path, self.ref, self.version))
+        if modes == 0:
+            raise ConfigError(
+                "NsxModuleOverride requires exactly one of path, ref, or version"
+            )
+        if modes > 1:
+            raise ConfigError(
+                "NsxModuleOverride accepts only one of path, ref, or version "
+                f"(got {modes})",
+                hint="Remove the extra keys so only one override mode is set.",
+            )
 
 
 @dataclass(frozen=True)
@@ -473,17 +485,29 @@ def _build_heartbeat(raw: Any) -> HeartbeatConfig:
     )
 
 
+_CHANNEL_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]*$")
+
+
 def _build_build_config(raw: dict[str, Any]) -> BuildConfig:
     """Build a ``BuildConfig`` from YAML/CLI dict."""
     if not raw:
         return BuildConfig()
     channel = raw.get("channel", "stable")
+    if not _CHANNEL_RE.match(channel):
+        raise ConfigError(
+            f"Invalid build.channel value: {channel!r}",
+            hint="Channel must be an identifier (letters, digits, hyphens, underscores).",
+        )
     nsx_modules_raw = raw.get("nsx_modules", {})
     nsx_modules: dict[str, NsxModuleOverride] = {}
     if isinstance(nsx_modules_raw, dict):
         for name, spec in nsx_modules_raw.items():
             if not isinstance(spec, dict):
-                continue
+                raise ConfigError(
+                    f"build.nsx_modules.{name} must be a mapping "
+                    f"(got {type(spec).__name__})",
+                    hint="Use path: /dir, ref: branch, or version: X.Y.Z",
+                )
             nsx_modules[name] = NsxModuleOverride(
                 path=Path(spec["path"]) if spec.get("path") else None,
                 ref=spec.get("ref"),

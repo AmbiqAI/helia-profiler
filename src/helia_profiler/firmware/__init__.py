@@ -390,23 +390,37 @@ def generate_app(ctx: PipelineContext) -> Path:
     # Build module descriptors (name + local flag + optional overrides)
     nsx_overrides = config.build.nsx_modules
     modules: list[dict[str, object]] = []
+    matched_overrides: set[str] = set()
     for m in mod_names:
         override = nsx_overrides.get(m)
         if override and override.path:
             # Local path override — install into app modules/ and mark local
+            matched_overrides.add(m)
             local_mod_dir = app_dir / "modules" / m
             _install_local_module_override(local_mod_dir, override.path)
             modules.append({"name": m, "local": True})
         elif override and override.ref:
+            matched_overrides.add(m)
             modules.append({
                 "name": m, "local": False, "ref": override.ref,
             })
         elif override and override.version:
+            matched_overrides.add(m)
             modules.append({
                 "name": m, "local": False, "version": override.version,
             })
         else:
             modules.append({"name": m, "local": False})
+
+    # Warn about overrides that didn't match any module in the build
+    unmatched = set(nsx_overrides.keys()) - matched_overrides
+    for name in sorted(unmatched):
+        log.warning(
+            "build.nsx_modules override '%s' did not match any module in this "
+            "build — check the module name (available: %s)",
+            name,
+            ", ".join(mod_names),
+        )
 
     # Append engine-provided modules (e.g. nsx-heliart) as local
     for extra_mod in artifacts.extra_modules:

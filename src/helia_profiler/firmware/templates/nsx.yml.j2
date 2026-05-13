@@ -14,12 +14,12 @@ modules:
 - name: {{ m.name }}
 {% if m.local %}
   local: true
-{% elif m.get("ref") %}
+{% elif m.ref is defined and m.ref %}
   project: {{ m.name }}
-  ref: {{ m["ref"] }}
-{% elif m.get("version") %}
+  ref: {{ m.ref }}
+{% elif m.version is defined and m.version %}
   project: {{ m.name }}
-  version: "{{ m["version"] }}"
+  version: "{{ m.version }}"
 {% else %}
   project: {{ m.name }}
 {% endif %}
