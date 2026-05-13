@@ -69,13 +69,13 @@ def capture_swo_output(
 
     # --- Step 3: connect pylink and enable SWO ---
     jlink = pylink.JLink()
-    jlink.disable_dialog_boxes()
 
     try:
         if jlink_serial:
             jlink.open(serial_no=int(jlink_serial))
         else:
             jlink.open()
+        jlink.disable_dialog_boxes()
         jlink.set_tif(pylink.JLinkInterfaces.SWD)
         jlink.connect(jlink_device, 4000)
         log.info("pylink connected to %s for SWO capture", jlink_device)

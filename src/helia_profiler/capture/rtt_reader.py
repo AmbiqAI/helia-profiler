@@ -190,7 +190,6 @@ def capture_rtt_output(
         ) from exc
 
     jlink = pylink.JLink()
-    jlink.disable_dialog_boxes()
 
     try:
         # --- Step 1: reset the target via JLinkExe subprocess ---
@@ -204,6 +203,7 @@ def capture_rtt_output(
             jlink.open(serial_no=int(jlink_serial))
         else:
             jlink.open()
+        jlink.disable_dialog_boxes()
         jlink.set_tif(pylink.JLinkInterfaces.SWD)
         jlink.connect(jlink_device, 4000)
         log.info("pylink connected to %s for RTT capture", jlink_device)
