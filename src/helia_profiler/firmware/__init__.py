@@ -201,6 +201,11 @@ _jinja_env = jinja2.Environment(
 )
 
 
+def _write_text(path: Path, text: str) -> None:
+    """Write generated source text with deterministic cross-platform encoding."""
+    path.write_text(text, encoding="utf-8")
+
+
 def _find_segger_rtt_dir() -> Path:
     """Locate the SEGGER RTT source directory.
 
@@ -374,7 +379,8 @@ def generate_app(ctx: PipelineContext) -> Path:
     engine_type = artifacts.engine_type
 
     # --- nsx.yml ---
-    (app_dir / "nsx.yml").write_text(
+    _write_text(
+        app_dir / "nsx.yml",
         _jinja_env.get_template("nsx.yml.j2").render(
             board=board.name,
             soc=soc.name,
@@ -386,12 +392,14 @@ def generate_app(ctx: PipelineContext) -> Path:
     # --- cmake/nsx/modules.cmake ---
     cmake_nsx_dir = app_dir / "cmake" / "nsx"
     cmake_nsx_dir.mkdir(parents=True, exist_ok=True)
-    (cmake_nsx_dir / "modules.cmake").write_text(
-        _jinja_env.get_template("modules.cmake.j2").render(modules=modules)
+    _write_text(
+        cmake_nsx_dir / "modules.cmake",
+        _jinja_env.get_template("modules.cmake.j2").render(modules=modules),
     )
 
     # --- CMakeLists.txt (engine-aware) ---
-    (app_dir / "CMakeLists.txt").write_text(
+    _write_text(
+        app_dir / "CMakeLists.txt",
         _jinja_env.get_template("CMakeLists.txt.j2").render(
             board=board.name,
             engine_type=engine_type,
@@ -481,9 +489,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                     if blob_path.exists():
                         header_name = f"hpx_const_blob_{region.region_id}.h"
                         symbol = f"hpx_const_blob_{region.region_id}"
-                        (src_dir / header_name).write_text(
-                            _blob_to_header(blob_path, symbol)
-                        )
+                        _write_text(src_dir / header_name, _blob_to_header(blob_path, symbol))
                         log.info(
                             "Embedded constant blob %s (%d bytes) → %s",
                             region.blob_filename,
@@ -499,7 +505,8 @@ def generate_app(ctx: PipelineContext) -> Path:
                             blob_path,
                         )
 
-        (src_dir / "main.cc").write_text(
+        _write_text(
+            src_dir / "main.cc",
             _jinja_env.get_template("main_aot.cc.j2").render(
                 aot_prefix=aot_prefix,
                 aot_op_manifest=ctx.engine_artifacts.aot_op_manifest or [],
@@ -527,12 +534,13 @@ def generate_app(ctx: PipelineContext) -> Path:
 
         if weights_region != "psram":
             model_header = _model_to_header(config.model.path, weights_region)
-            (src_dir / "model_data.h").write_text(model_header)
+            _write_text(src_dir / "model_data.h", model_header)
 
         model_size = config.model.path.stat().st_size
 
         engine_header = artifacts.engine_header
-        (src_dir / "main.cc").write_text(
+        _write_text(
+            src_dir / "main.cc",
             _jinja_env.get_template("main.cc.j2").render(
                 engine_header=engine_header,
                 arena_size=arena_size,
@@ -555,15 +563,17 @@ def generate_app(ctx: PipelineContext) -> Path:
         )
 
         # PMU profiler (TFLM-specific C++ class)
-        (src_dir / "hpx_pmu_profiler.h").write_text(
+        _write_text(
+            src_dir / "hpx_pmu_profiler.h",
             _jinja_env.get_template("hpx_pmu_profiler.h.j2").render(
                 has_full_pmu=soc.has_full_pmu,
-            )
+            ),
         )
-        (src_dir / "hpx_pmu_profiler.cc").write_text(
+        _write_text(
+            src_dir / "hpx_pmu_profiler.cc",
             _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
                 has_full_pmu=soc.has_full_pmu,
-            )
+            ),
         )
 
     # --- Engine wrapper module ---

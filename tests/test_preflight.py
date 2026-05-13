@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -204,6 +205,10 @@ class TestPreflightOutputDir:
             PreflightStage().run(ctx)
         assert out.is_dir()
 
+    @pytest.mark.skipif(
+        os.name == "nt",
+        reason="POSIX chmod bits do not make the directory unwritable on Windows",
+    )
     def test_unwritable_output_dir_raises(self, tmp_path: Path):
         out = tmp_path / "readonly"
         out.mkdir()
