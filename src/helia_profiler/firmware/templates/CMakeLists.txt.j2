@@ -82,7 +82,9 @@ target_link_libraries(hpx_profiler PRIVATE
 {% if has_full_pmu %}
     nsx::pmu_armv8m
 {% endif %}
+{% if engine_type == "helia-rt" %}
     nsx::heliart
+{% endif %}
 {% if transport == "usb_cdc" %}
     nsx::usb
 {% endif %}
