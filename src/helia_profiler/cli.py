@@ -5,9 +5,13 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ._version import __version__
 from .engines import EngineType
+
+if TYPE_CHECKING:
+    from .model_analysis import ModelAnalysis
 
 
 def main(argv: list[str] | None = None) -> None:

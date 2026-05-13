@@ -20,6 +20,20 @@ from helia_profiler.stages.s02b_plan_memory import PlanMemoryStage
 from helia_profiler.stages.s02_prepare_engine import PrepareEngineStage
 
 
+@pytest.fixture(autouse=True)
+def fake_segger_rtt_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Provide the explicit SEGGER_RTT_PATH required by firmware generation."""
+    rtt_root = tmp_path / "segger-rtt"
+    rtt_dir = rtt_root / "RTT"
+    config_dir = rtt_root / "Config"
+    rtt_dir.mkdir(parents=True)
+    config_dir.mkdir()
+    (rtt_dir / "SEGGER_RTT.c").write_text("// fake RTT source\n")
+    (rtt_dir / "SEGGER_RTT.h").write_text("// fake RTT header\n")
+    (config_dir / "SEGGER_RTT_Conf.h").write_text("// fake RTT config\n")
+    monkeypatch.setenv("SEGGER_RTT_PATH", str(rtt_root))
+
+
 def _make_ctx(
     tmp_path: Path,
     fake_dist: Path,
