@@ -26,6 +26,7 @@ import logging
 import re
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ..errors import CaptureError
 from ..jlink import reset_target
@@ -36,6 +37,9 @@ from .transport import (
 )
 
 log = logging.getLogger("hpx")
+
+if TYPE_CHECKING:
+    import pylink
 
 _RTT_CB_TIMEOUT_S = 30    # max time to wait for RTT control block discovery
 _SBL_SETTLE_S = 2.0       # post-reset delay for SBL + firmware RTT init
@@ -89,8 +93,6 @@ def _upload_model_to_psram(
     SWD memory writes, and finally send ``HPX_GO`` on RTT down-channel 0
     so the firmware proceeds with inference.
     """
-    import pylink  # noqa: F811
-
     buf = b""
     deadline = time.monotonic() + timeout_s
     psram_addr: int | None = None

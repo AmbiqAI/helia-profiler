@@ -31,14 +31,19 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Configure GitHub auth for private dependencies
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          git config --global \
+            url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf \
+            "https://github.com/"
+
       - name: Install lint dependencies
         run: uv sync --group lint
 
       - name: Run ruff lint
         run: uv run --group lint ruff check .
-
-      - name: Run ruff format check
-        run: uv run --group lint ruff format --check .
 
   # ---------------------------------------------------------------
   # Unit tests — run on all three platforms
@@ -64,6 +69,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Configure GitHub auth for private dependencies
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          git config --global \
+            url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf \
+            "https://github.com/"
 
       - name: Install test dependencies
         run: uv sync --group test

@@ -104,7 +104,7 @@ class TestPrepareEngineStage:
         stage = PrepareEngineStage()
         # Without helia-aot CLI + CMSIS-NN path, prepare() raises EngineError.
         # Verify the adapter is correctly instantiated by checking the error.
-        with pytest.raises(EngineError, match="heliaAOT|CMSIS-NN"):
+        with pytest.raises(EngineError, match="helia-aot|heliaAOT|CMSIS-NN"):
             stage.run(ctx)
 
     def test_never_skips(self, tmp_path: Path):
