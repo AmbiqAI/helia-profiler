@@ -84,7 +84,13 @@ def _get_shared_driver() -> Any:
         return _shared_driver
     import atexit
 
-    import pyjoulescope_driver as jsdrv
+    try:
+        import pyjoulescope_driver as jsdrv
+    except ImportError as exc:
+        raise PowerError(
+            "pyjoulescope_driver package not installed",
+            hint="pip install pyjoulescope_driver",
+        ) from exc
 
     try:
         drv = jsdrv.Driver()
