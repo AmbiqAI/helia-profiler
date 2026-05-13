@@ -32,7 +32,8 @@ log = logging.getLogger("hpx")
 _DEFAULT_TIMEOUT_S = 15
 
 _JLINK_NOT_FOUND_HINT = (
-    "Install the SEGGER J-Link package and ensure JLinkExe is in PATH."
+    "Install the SEGGER J-Link package and ensure JLinkExe is in PATH, "
+    "or set JLINK_PATH to the JLinkExe binary."
 )
 
 
@@ -41,10 +42,27 @@ _JLINK_NOT_FOUND_HINT = (
 # ------------------------------------------------------------------
 
 def find_jlink_exe() -> str:
-    """Return the absolute path to ``JLinkExe`` or raise :class:`CaptureError`."""
+    """Return the absolute path to ``JLinkExe`` or raise :class:`CaptureError`.
+
+    Search order:
+      1. ``JLINK_PATH`` environment variable (explicit user override)
+      2. ``JLinkExe`` on ``PATH``
+      3. Common install locations (``/usr/local/bin/JLinkExe``)
+    """
+    # 1. Explicit env var
+    env_path = os.environ.get("JLINK_PATH")
+    if env_path:
+        if os.path.isfile(env_path):
+            return env_path
+        raise CaptureError(
+            f"JLINK_PATH={env_path} does not exist or is not a file",
+            hint="Set JLINK_PATH to the full path of JLinkExe.",
+        )
+    # 2. PATH lookup
     exe = shutil.which("JLinkExe")
     if exe:
         return exe
+    # 3. Common install locations
     for candidate in ("/usr/local/bin/JLinkExe",):
         if os.path.isfile(candidate):
             return candidate

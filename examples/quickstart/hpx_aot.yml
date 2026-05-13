@@ -10,7 +10,9 @@ engine:
   config:
     prefix: hpx
     module_name: hpx_model
-    cmsis_nn_path: ../../../nsx-modules/ns-cmsis-nn
+    # cmsis_nn_path is auto-resolved from GitHub (AmbiqAI/ns-cmsis-nn).
+    # Override with CMSIS_NN_PATH env var or uncomment below for a local checkout:
+    # cmsis_nn_path: /path/to/ns-cmsis-nn
 
 target:
   board: apollo510_evb
