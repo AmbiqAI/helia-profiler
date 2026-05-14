@@ -2,7 +2,10 @@
 
 from pathlib import Path
 
-from helia_profiler.config import ProfileConfig, load_config
+import pytest
+
+from helia_profiler.config import ProfileConfig, load_config, NsxModuleOverride
+from helia_profiler.errors import ConfigError
 
 
 def test_load_config_from_cli_overrides():
@@ -84,3 +87,176 @@ def test_timeouts_overrides():
     # Unspecified values retain defaults
     assert t.configure_s == 120
     assert t.toolchain_probe_s == 5
+
+
+# ---------------------------------------------------------------------------
+# BuildConfig / NSX module overrides
+# ---------------------------------------------------------------------------
+
+
+def test_build_config_defaults():
+    """BuildConfig should be present with defaults when unspecified."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+    }
+    config = load_config(None, cli)
+    assert config.build.channel == "stable"
+    assert config.build.nsx_modules == {}
+
+
+def test_build_config_channel_override():
+    """Channel override should flow through from YAML/CLI."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "build": {"channel": "dev"},
+    }
+    config = load_config(None, cli)
+    assert config.build.channel == "dev"
+
+
+def test_build_config_nsx_module_path_override():
+    """Local path override for an NSX module."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "build": {
+            "nsx_modules": {
+                "nsx-ambiq-bsp-r5": {"path": "/home/dev/my-bsp"},
+            },
+        },
+    }
+    config = load_config(None, cli)
+    override = config.build.nsx_modules["nsx-ambiq-bsp-r5"]
+    assert override.path == Path("/home/dev/my-bsp")
+    assert override.ref is None
+    assert override.version is None
+
+
+def test_build_config_nsx_module_ref_override():
+    """Git ref override for an NSX module."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "build": {
+            "nsx_modules": {
+                "nsx-ambiq-hal-r5": {"ref": "feat/apollo6-support"},
+            },
+        },
+    }
+    config = load_config(None, cli)
+    override = config.build.nsx_modules["nsx-ambiq-hal-r5"]
+    assert override.ref == "feat/apollo6-support"
+    assert override.path is None
+    assert override.version is None
+
+
+def test_build_config_nsx_module_version_override():
+    """Version pin override for an NSX module."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "build": {
+            "nsx_modules": {
+                "nsx-ambiqsuite-r5": {"version": "2.0.0"},
+            },
+        },
+    }
+    config = load_config(None, cli)
+    override = config.build.nsx_modules["nsx-ambiqsuite-r5"]
+    assert override.version == "2.0.0"
+    assert override.path is None
+    assert override.ref is None
+
+
+def test_build_config_multiple_overrides():
+    """Multiple NSX module overrides in one config."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "build": {
+            "channel": "dev",
+            "nsx_modules": {
+                "nsx-ambiq-bsp-r5": {"path": "/dev/bsp"},
+                "nsx-ambiq-hal-r5": {"ref": "main"},
+                "nsx-ambiqsuite-r5": {"version": "3.0.0"},
+            },
+        },
+    }
+    config = load_config(None, cli)
+    assert config.build.channel == "dev"
+    assert len(config.build.nsx_modules) == 3
+    assert config.build.nsx_modules["nsx-ambiq-bsp-r5"].path == Path("/dev/bsp")
+    assert config.build.nsx_modules["nsx-ambiq-hal-r5"].ref == "main"
+    assert config.build.nsx_modules["nsx-ambiqsuite-r5"].version == "3.0.0"
+
+
+# ---------------------------------------------------------------------------
+# NsxModuleOverride validation
+# ---------------------------------------------------------------------------
+
+
+def test_nsx_module_override_rejects_no_mode():
+    """NsxModuleOverride must have at least one mode set."""
+    with pytest.raises(ConfigError, match="exactly one"):
+        NsxModuleOverride()
+
+
+def test_nsx_module_override_rejects_multiple_modes():
+    """NsxModuleOverride rejects more than one mode."""
+    with pytest.raises(ConfigError, match="only one"):
+        NsxModuleOverride(path=Path("/x"), ref="main")
+
+
+def test_nsx_module_override_rejects_all_three():
+    """NsxModuleOverride rejects all three modes set."""
+    with pytest.raises(ConfigError, match="only one"):
+        NsxModuleOverride(path=Path("/x"), ref="main", version="1.0.0")
+
+
+# ---------------------------------------------------------------------------
+# Channel validation
+# ---------------------------------------------------------------------------
+
+
+def test_build_config_invalid_channel():
+    """Invalid channel names should raise ConfigError."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "build": {"channel": "../escape"},
+    }
+    with pytest.raises(ConfigError, match="Invalid build.channel"):
+        load_config(None, cli)
+
+
+def test_build_config_channel_rejects_empty():
+    """Empty string channel should be rejected."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "build": {"channel": ""},
+    }
+    with pytest.raises(ConfigError, match="Invalid build.channel"):
+        load_config(None, cli)
+
+
+# ---------------------------------------------------------------------------
+# Malformed nsx_modules spec
+# ---------------------------------------------------------------------------
+
+
+def test_build_config_malformed_module_spec():
+    """Non-dict module spec should raise ConfigError."""
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "build": {
+            "nsx_modules": {
+                "nsx-ambiq-bsp-r5": "just-a-string",
+            },
+        },
+    }
+    with pytest.raises(ConfigError, match="must be a mapping"):
+        load_config(None, cli)

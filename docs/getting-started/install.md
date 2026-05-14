@@ -103,7 +103,7 @@ Expected output:
 ✓ ninja               1.12.1
 ✓ JLinkExe            V8.12a
 ✓ JLinkSWOViewerCL    V8.12a
-✓ nsx                 0.4.0
+✓ nsx                 0.6.0
 ○ joulescope          (optional — install with pip install 'helia-profiler[power]')
 ```
 

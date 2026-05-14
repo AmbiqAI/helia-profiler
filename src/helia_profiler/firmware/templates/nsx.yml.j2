@@ -6,7 +6,7 @@ target:
   board: {{ board }}
   soc: {{ soc }}
 toolchain: {{ toolchain }}
-channel: stable
+channel: {{ channel }}
 profile: {{ board }}_minimal
 profile_status: active
 modules:
@@ -14,6 +14,12 @@ modules:
 - name: {{ m.name }}
 {% if m.local %}
   local: true
+{% elif m.ref is defined and m.ref %}
+  project: {{ m.name }}
+  ref: {{ m.ref }}
+{% elif m.version is defined and m.version %}
+  project: {{ m.name }}
+  version: "{{ m.version }}"
 {% else %}
   project: {{ m.name }}
 {% endif %}

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
 from .engines import EngineType
+from .errors import ConfigError
 from .placement import ModelLocation
 from .power.base import PowerMode
 
@@ -274,6 +276,51 @@ class OutputConfig:
 
 
 @dataclass(frozen=True)
+class NsxModuleOverride:
+    """Override resolution for a single NSX module.
+
+    Exactly one mode must be set:
+    * *path* — use a local directory as the module source (``local: true``).
+    * *ref* — resolve the module's project at a specific git ref/tag.
+    * *version* — pin the module to an exact version constraint.
+    """
+
+    path: Path | None = None
+    ref: str | None = None
+    version: str | None = None
+
+    def __post_init__(self) -> None:
+        modes = sum(x is not None for x in (self.path, self.ref, self.version))
+        if modes == 0:
+            raise ConfigError(
+                "NsxModuleOverride requires exactly one of path, ref, or version"
+            )
+        if modes > 1:
+            raise ConfigError(
+                "NsxModuleOverride accepts only one of path, ref, or version "
+                f"(got {modes})",
+                hint="Remove the extra keys so only one override mode is set.",
+            )
+
+
+@dataclass(frozen=True)
+class BuildConfig:
+    """NSX build-system overrides.
+
+    Controls how the generated firmware's NSX manifest resolves modules.
+    Default behaviour (empty overrides) uses the ``stable`` channel and
+    lets ``nsx lock`` pick the latest compatible revisions.
+
+    Advanced users can pin individual modules to a version, point them at
+    a local checkout, or select a custom git ref — useful for SoC/board
+    bring-up before changes land in the stable channel.
+    """
+
+    channel: str = "stable"
+    nsx_modules: dict[str, NsxModuleOverride] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class ProfileConfig:
     """Top-level immutable configuration for a profiling run."""
 
@@ -284,6 +331,7 @@ class ProfileConfig:
     power: PowerConfig = field(default_factory=PowerConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     timeouts: TimeoutsConfig = field(default_factory=TimeoutsConfig)
+    build: BuildConfig = field(default_factory=BuildConfig)
     frozen: bool = False
     work_dir: Path | None = None  # None = use persistent cache dir
     keep_work_dir: bool = False  # legacy — cache dir is always kept
@@ -330,6 +378,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
     power_d = d.get("power", {})
     output_d = d.get("output", {})
     timeouts_d = d.get("timeouts", {}) or {}
+    build_d = d.get("build", {}) or {}
 
     model = ModelConfig(
         path=Path(model_d["path"]),
@@ -409,6 +458,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             download_api_s=int(timeouts_d.get("download_api_s", DEFAULT_DOWNLOAD_API_S)),
             download_asset_s=int(timeouts_d.get("download_asset_s", DEFAULT_DOWNLOAD_ASSET_S)),
         ),
+        build=_build_build_config(build_d),
         frozen=bool(d.get("frozen", False)),
         work_dir=Path(d["work_dir"]) if d.get("work_dir") else None,
         keep_work_dir=d.get("keep_work_dir", False),
@@ -433,3 +483,34 @@ def _build_heartbeat(raw: Any) -> HeartbeatConfig:
         host_timeout_s=int(raw.get("host_timeout_s", DEFAULT_HB_HOST_TIMEOUT_S)),
         overall_timeout_s=overall,
     )
+
+
+_CHANNEL_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]*$")
+
+
+def _build_build_config(raw: dict[str, Any]) -> BuildConfig:
+    """Build a ``BuildConfig`` from YAML/CLI dict."""
+    if not raw:
+        return BuildConfig()
+    channel = raw.get("channel", "stable")
+    if not _CHANNEL_RE.match(channel):
+        raise ConfigError(
+            f"Invalid build.channel value: {channel!r}",
+            hint="Channel must be an identifier (letters, digits, hyphens, underscores).",
+        )
+    nsx_modules_raw = raw.get("nsx_modules", {})
+    nsx_modules: dict[str, NsxModuleOverride] = {}
+    if isinstance(nsx_modules_raw, dict):
+        for name, spec in nsx_modules_raw.items():
+            if not isinstance(spec, dict):
+                raise ConfigError(
+                    f"build.nsx_modules.{name} must be a mapping "
+                    f"(got {type(spec).__name__})",
+                    hint="Use path: /dir, ref: branch, or version: X.Y.Z",
+                )
+            nsx_modules[name] = NsxModuleOverride(
+                path=Path(spec["path"]) if spec.get("path") else None,
+                ref=spec.get("ref"),
+                version=spec.get("version"),
+            )
+    return BuildConfig(channel=channel, nsx_modules=nsx_modules)
