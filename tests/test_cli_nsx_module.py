@@ -3,8 +3,6 @@
 import subprocess
 import sys
 
-import pytest
-
 
 def _run_hpx(*args: str) -> subprocess.CompletedProcess[str]:
     """Run hpx profile with given extra args, expecting failure."""
