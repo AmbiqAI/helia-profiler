@@ -65,6 +65,32 @@ class TestPlanMemorySynthesise:
         assert any(c.kind == "weights" for c in dtcm.consumers)
         assert any(c.kind == "arena" and c.size == 65536 for c in dtcm.consumers)
 
+    def test_unset_arena_size_uses_shared_default_for_auto(self, tmp_path: Path):
+        """When arena_size is omitted, auto placement should still use the
+        shared 256 KiB default that firmware generation emits."""
+        model = tmp_path / "mid_model.tflite"
+        model.write_bytes(b"\x00" * (300 * 1024))
+        config = load_config(None, {
+            "model": {"path": str(model), "arena_size": None},
+            "engine": {"type": "tflm"},
+            "work_dir": str(tmp_path / "work"),
+        })
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+
+        PlanMemoryStage().run(ctx)
+
+        assert ctx.arena_region == "tcm"
+        assert ctx.weights_region == "sram"
+
+        dtcm = ctx.memory_plan.region("DTCM")
+        sram = ctx.memory_plan.region("SRAM")
+        assert dtcm is not None and sram is not None
+        assert any(c.kind == "arena" and c.size == 256 * 1024 for c in dtcm.consumers)
+        assert any(c.kind == "weights" and c.size == 300 * 1024 for c in sram.consumers)
+
     def test_synth_plan_explicit_mram_keeps_weights_in_mram(self, tmp_path: Path):
         """``model_location=mram`` puts weights in MRAM (rodata) but
         still places the arena in TCM when available."""

@@ -35,6 +35,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from ..config import DEFAULT_ARENA_SIZE_BYTES
 from ..errors import PlatformError
 from ..engines import get_adapter
 from ..pipeline import PipelineContext
@@ -134,7 +135,7 @@ class PlanMemoryStage:
         will actually emit.
         """
         engine = ctx.config.engine.type.value
-        arena = int(ctx.config.model.arena_size or 0)
+        arena = int(ctx.config.model.arena_size or DEFAULT_ARENA_SIZE_BYTES)
 
         try:
             model_bytes = int(ctx.config.model.path.stat().st_size)
@@ -283,7 +284,7 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
     sram_cap = (soc.memory.sram_kb * 1024) if soc else (1 << 31)
     psram_cap = (soc.memory.psram_kb * 1024) if soc else 0
 
-    arena_size = int(cfg.model.arena_size or 0)
+    arena_size = int(cfg.model.arena_size or DEFAULT_ARENA_SIZE_BYTES)
     try:
         model_size = int(cfg.model.path.stat().st_size)
     except OSError:
