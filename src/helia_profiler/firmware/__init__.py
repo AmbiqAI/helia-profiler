@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 import jinja2
 
 from .. import nsx as nsx_cli
+from ..config import DEFAULT_ARENA_SIZE_BYTES
 from ..counters import (
     CounterPass,
     plan_passes,
@@ -422,7 +423,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             ", ".join(mod_names),
         )
 
-    # Append engine-provided modules (e.g. nsx-heliart) as local
+    # Append engine-provided modules (e.g. nsx-helia-rt) as local
     for extra_mod in artifacts.extra_modules:
         if extra_mod.name not in mod_names:
             modules.append({"name": extra_mod.name, "local": True})
@@ -485,7 +486,7 @@ def generate_app(ctx: PipelineContext) -> Path:
     pmu_passes = _resolve_pmu_passes(config)
 
     # Arena size: use configured value or default 256KB
-    arena_size = config.model.arena_size or (256 * 1024)
+    arena_size = config.model.arena_size or DEFAULT_ARENA_SIZE_BYTES
 
     # External power sync
     power_sync_enabled = config.power.enabled and config.power.mode == "external"

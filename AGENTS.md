@@ -47,7 +47,7 @@ calling the `nsx` CLI. Never use `os.system()` or `shell=True`.
 
 The `HeliaRTAdapter` generates a temporary NSX module wrapper (nsx-module.yaml
 + CMakeLists.txt) so that heliaRT prebuilt static libraries appear as
-`nsx::heliart` to the firmware build. The pinned version lives in
+`nsx::helia_rt` to the firmware build. The pinned version lives in
 `engines/helia_rt.py` — bump `HELIART_VERSION` when adopting a new release.
 This shim is retired once heliaRT ships a native `nsx-module.yaml`.
 

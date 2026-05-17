@@ -14,6 +14,12 @@ from .placement import ModelLocation
 from .power.base import PowerMode
 
 
+# Shared default used when the user leaves model.arena_size unset.
+# Keep plan-memory and firmware generation aligned so auto placement
+# matches the section attributes emitted into the generated app.
+DEFAULT_ARENA_SIZE_BYTES = 256 * 1024
+
+
 class Toolchain(StrEnum):
     """Supported cross-compiler toolchains for the profiler firmware.
 

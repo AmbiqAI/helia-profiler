@@ -89,8 +89,8 @@ engine:
 
 The directory must contain `lib/`, `tensorflow/`, `third_party/`,
 `signal/`, and an `nsx/` module (`CMakeLists.txt` + `nsx-module.yaml`).
-Version is parsed from `tensorflow/lite/micro/heliart_version.h` and
-must be `>= v1.12.2`.
+Version is parsed from `tensorflow/lite/micro/helia_rt_version.h` and
+must be `>= v1.16.0`.
 
 ### Toolchain → archive mapping
 

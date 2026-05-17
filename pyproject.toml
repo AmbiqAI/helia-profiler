@@ -14,10 +14,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# heliaAOT is not published to a package registry yet. Keep this extra empty
-# so regular installs, lint, and tests do not need private cross-repo access.
-# The runtime AOT adapter reports explicit manual install guidance.
-aot = []
+aot = ["helia-aot>=0.15.0"]
 analysis = ["ai-edge-litert>=1.0", "flatbuffers>=24.0"]
 power = ["pyjoulescope_driver>=1.0"]
 

@@ -41,13 +41,11 @@ log = logging.getLogger("hpx")
 #
 # heliaAOT ships as a Python package, so version resolution is handled
 # entirely by pip. heliaAOT is not on PyPI, so the [aot] extra in
-# pyproject.toml pins to an upstream release tag. Users get three modes:
+# helia-aot is published on PyPI. Users get three install modes:
 #
 #   1. Default       : pip install 'helia-profiler[aot]'
-#                      → installs the release tag pinned in pyproject.toml.
-#   2. Custom version: pip install --upgrade \
-#                          'helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@<tag>'
-#                      or any fork / feature branch in the same form.
+#                      → installs the version pinned in pyproject.toml.
+#   2. Specific ver.  : pip install 'helia-aot>=0.15.0'
 #   3. Local checkout: pip install -e /path/to/helia-aot
 #
 # We don't manage downloads/caches like we do for heliaRT — pip already
@@ -55,7 +53,7 @@ log = logging.getLogger("hpx")
 # so a user with an older install gets a clear error instead of a confusing
 # build failure (e.g. missing ModuleType.nsx).
 # ---------------------------------------------------------------------------
-HELIAAOT_MIN_VERSION = "0.14.0"  # patched by experiment script
+HELIAAOT_MIN_VERSION = "0.15.0"
 
 # Default AOT configuration
 _DEFAULT_PREFIX = "hpx"
@@ -330,7 +328,7 @@ def _run_aot_compiler(
             "heliaAOT package not installed",
             hint=(
                 "Install helia-aot: pip install 'helia-profiler[aot]' or "
-                "pip install git+https://github.com/AmbiqAI/helia-aot.git"
+                "pip install helia-aot"
             ),
         )
 
@@ -827,50 +825,49 @@ def _auto_clone_cmsis_nn() -> Path:
 def _write_cmsis_nn_wrapper(module_dir: Path, cmsis_nn_path: Path) -> None:
     """Write the NSX module for ns-cmsis-nn.
 
-    If the repo contains a native ``nsx/`` directory (i.e. the
-    ``feat/nsx-module-type`` branch or later), use the upstream NSX
-    manifest and CMakeLists.txt directly.  A thin root shim delegates
-    to ``nsx/CMakeLists.txt`` so that its ``../Source`` relative paths
-    resolve correctly against the copied Source/ tree.
-
-    Otherwise falls back to generated Jinja2 wrapper templates.
+    Uses the native ``nsx/`` module that ships with ns-cmsis-nn (>= v7.23.0).
+    A thin root shim delegates to ``nsx/CMakeLists.txt`` so that its
+    ``../Source`` relative paths resolve correctly against the copied
+    Source/ tree.
     """
     module_dir.mkdir(parents=True, exist_ok=True)
 
     native_nsx = cmsis_nn_path / "nsx"
-    if (native_nsx / "CMakeLists.txt").is_file() and (
+    if not (native_nsx / "CMakeLists.txt").is_file() or not (
         native_nsx / "nsx-module.yaml"
     ).is_file():
-        log.info("Using native nsx/ module from %s", cmsis_nn_path)
-
-        # Copy the native manifest to the module root
-        shutil.copy2(native_nsx / "nsx-module.yaml", module_dir / "nsx-module.yaml")
-
-        # Place the native CMakeLists.txt in a subdirectory so its
-        # relative paths (../Source, ../Include) resolve against the
-        # copied Source/ and Include/ trees at the module root.
-        nsx_subdir = module_dir / "nsx"
-        nsx_subdir.mkdir(exist_ok=True)
-        shutil.copy2(native_nsx / "CMakeLists.txt", nsx_subdir / "CMakeLists.txt")
-
-        # Root shim delegates to the native build
-        (module_dir / "CMakeLists.txt").write_text(
-            "# Shim — delegates to the native ns-cmsis-nn NSX build.\n"
-            "add_subdirectory(nsx)\n"
+        raise EngineError(
+            f"ns-cmsis-nn at {cmsis_nn_path} is missing native nsx/ module",
+            hint=(
+                "Expected nsx/CMakeLists.txt and nsx/nsx-module.yaml. "
+                "Use ns-cmsis-nn >= v7.23.0 (AmbiqAI/ns-cmsis-nn)."
+            ),
         )
-    else:
-        log.info("No native nsx/ in %s — using generated wrapper", cmsis_nn_path)
-        (module_dir / "nsx-module.yaml").write_text(
-            _jinja_env.get_template("cmsisnn_nsx_module.yaml.j2").render()
-        )
-        (module_dir / "CMakeLists.txt").write_text(
-            _jinja_env.get_template("cmsisnn_CMakeLists.txt.j2").render()
-        )
+
+    log.info("Using native nsx/ module from %s", cmsis_nn_path)
+
+    # Copy the native manifest to the module root
+    shutil.copy2(native_nsx / "nsx-module.yaml", module_dir / "nsx-module.yaml")
+
+    # Place the native CMakeLists.txt in a subdirectory so its
+    # relative paths (../Source, ../Include) resolve against the
+    # copied Source/ and Include/ trees at the module root.
+    nsx_subdir = module_dir / "nsx"
+    nsx_subdir.mkdir(exist_ok=True)
+    shutil.copy2(native_nsx / "CMakeLists.txt", nsx_subdir / "CMakeLists.txt")
+
+    # Root shim delegates to the native build
+    (module_dir / "CMakeLists.txt").write_text(
+        "# Shim — delegates to the native ns-cmsis-nn NSX build.\n"
+        "add_subdirectory(nsx)\n"
+    )
 
     # Copy the CMSIS-NN source tree into the module (no symlinks — Windows-safe)
-    for d in ("Include", "Source"):
+    for d in ("Include", "Source", "cmake"):
         target = module_dir / d
         source = cmsis_nn_path / d
+        if not source.is_dir():
+            continue
         if target.is_dir():
             shutil.rmtree(target)
         shutil.copytree(source, target)
