@@ -24,7 +24,7 @@ endif()
 
 # --- Resolve Cortex-M core tag from SoC family ---
 set(_HELIA_RT_CORE "")
-if(NSX_SOC_FAMILY MATCHES "^apollo5|^apollo330|^apollo510")
+if(NSX_SOC_FAMILY MATCHES "^apollo5|^apollo330|^apollo510|^atomiq")
     set(_HELIA_RT_CORE "cm55")
 elseif(NSX_SOC_FAMILY MATCHES "^apollo4|^apollo3")
     set(_HELIA_RT_CORE "cm4")

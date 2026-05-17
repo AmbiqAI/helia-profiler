@@ -76,6 +76,12 @@ _SDK_MODULES: dict[str, list[str]] = {
         "nsx-ambiq-hal-r5",
         "nsx-ambiq-bsp-r5",
     ],
+    "r6": [
+        "nsx-cmsis-core",
+        "nsx-ambiqsuite-r6",
+        "nsx-ambiq-hal-r6",
+        "nsx-ambiq-bsp-r6",
+    ],
 }
 
 # Common modules every profiler app needs (order matters for CMake)

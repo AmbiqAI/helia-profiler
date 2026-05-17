@@ -277,6 +277,37 @@ _register_board(
     )
 )
 
+# --- Atomiq family (Cortex-M55 + Ethos-U85 NPU) ------------------------------
+
+_register_soc(
+    SocDef(
+        name="atomiq110",
+        family=SocFamily.AP5,  # CM55 + MVE + full PMU, same as AP5
+        core=CoreArch.CORTEX_M55,
+        pmu_tier=PmuTier.ARMV8M_PMU,
+        has_mve=True,
+        memory=MemoryLayout(
+            sram_kb=3072,
+            dtcm_kb=512,
+            itcm_kb=256,
+        ),
+        clock=ClockConfig(lp_mhz=25, hp_mhz=25),  # FPGA: 1/10 speed
+        sdk_tier="r6",
+        c_define="AM_PART_ATOMIQ110",
+        jlink_device="AT110NFA-CBR",
+        pmu_max_ops=4096,
+    )
+)
+
+_register_board(
+    BoardDef(
+        "atomiq110_fpga_turbo",
+        soc="atomiq110",
+        channel="preview",
+        description="Atomiq110 FPGA turbo — Cortex-M55 + Ethos-U85 (1/10 speed)",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # Public lookup API
