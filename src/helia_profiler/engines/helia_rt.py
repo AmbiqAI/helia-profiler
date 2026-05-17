@@ -13,7 +13,7 @@ Distribution resolution (first match wins):
 3. **Default** — downloads from ``AmbiqAI/helia-rt`` at the adapter's
    pinned version tag.
 
-Version compatibility is checked by parsing ``heliart_version.h`` from the
+Version compatibility is checked by parsing ``helia_rt_version.h`` from the
 resolved distribution and comparing against the adapter's expected version.
 """
 
@@ -50,11 +50,11 @@ log = logging.getLogger("hpx")
 #                         ref, or local dist_path) must be >= this.
 #                         Bump only on incompatible API changes.
 # ---------------------------------------------------------------------------
-HELIART_VERSION = "1.13.1"
-HELIART_MIN_VERSION = "1.12.2"
+HELIART_VERSION = "1.16.0"
+HELIART_MIN_VERSION = "1.16.0"
 HELIART_GH_REPO = "AmbiqAI/helia-rt"
-# NB: the GitHub tag uses lowercase "heliaRT-v..." (case-sensitive on the API).
-HELIART_RELEASE_TAG = f"heliaRT-v{HELIART_VERSION}"
+# NB: v1.16.0+ uses "helia-rt-v..." tag format (previously "heliaRT-v...").
+HELIART_RELEASE_TAG = f"helia-rt-v{HELIART_VERSION}"
 
 # Cache directory for downloaded distributions
 _CACHE_DIR = Path.home() / ".cache" / "helia-profiler" / "heliart"
@@ -88,7 +88,7 @@ class HeliaRTAdapter:
 
     Resolves a heliaRT distribution via three modes (local path, GitHub
     source, or default pinned version), validates version compatibility,
-    then installs a local NSX module at ``work_dir/modules/nsx-heliart/``.
+    then installs a local NSX module at ``work_dir/modules/nsx-helia-rt/``.
 
     The module uses heliaRT's native ``nsx/`` CMake integration when the
     distribution includes it.  Otherwise, embedded static module files
@@ -135,54 +135,103 @@ class HeliaRTAdapter:
 
         toolchain_tag = _toolchain_tag(config.target.toolchain)
 
-        # Resolve the heliaRT distribution
-        dist_path, resolved_version = _resolve_distribution(config)
-
-        # Version compatibility check
-        _check_version_compatibility(dist_path, resolved_version)
+        # Source-build mode: opt-in via engine.config.source_path or
+        # HELIART_SOURCE_PATH env. Compiles heliaRT from a local source
+        # tree instead of consuming a prebuilt static-lib release.
+        source_path = _resolve_source_path(config)
 
         # Set up the NSX module directory
-        module_dir = work_dir / "modules" / "nsx-heliart"
+        module_dir = work_dir / "modules" / "nsx-helia-rt"
         module_dir.mkdir(parents=True, exist_ok=True)
 
-        version = resolved_version or HELIART_VERSION
+        # Extra NSX modules added by this adapter. Order matters: CMake
+        # processes them in declaration order, so nsx-cmsis-nn must come
+        # before nsx-helia-rt (the source-build heliaRT references the
+        # nsx_cmsis_nn target during configure).
+        extra_modules: list[NsxModuleRef] = []
+        cmake_vars: dict[str, str] = {}
 
-        # Verify the archive exists in the distribution.
-        _verify_prebuilt_archive(
-            dist_path,
-            board=config.target.board,
-            toolchain_tag=toolchain_tag,
-            variant=variant,
-            core_override=core_override,
-        )
+        if source_path is not None:
+            # --- Source build ---
+            resolved_version = _detect_version(source_path)
+            _check_version_compatibility(source_path, resolved_version)
+            version = resolved_version or HELIART_VERSION
 
-        # Install NSX module files + distribution content
-        _install_nsx_module(module_dir, dist_path, variant=variant,
-                           core_override=core_override)
+            if core_override:
+                log.warning(
+                    "heliaRT source build ignores core_override=%s "
+                    "(SoC family drives kernel selection)",
+                    core_override,
+                )
 
-        if core_override:
-            log.warning(
-                "heliaRT: core_override=%s — using %s library on %s board",
-                core_override, core_override, config.target.board,
+            # Source-built heliaRT depends on the nsx-cmsis-nn module
+            # being present in the build (the prebuilt static lib had
+            # CMSIS-NN baked in; the source build does not). Install it
+            # alongside, reusing the helia_aot wrapper.
+            from .helia_aot import _resolve_cmsis_nn, _write_cmsis_nn_wrapper
+
+            cmsis_nn_path = _resolve_cmsis_nn(config)
+            cmsis_nn_mod_dir = work_dir / "modules" / "nsx-cmsis-nn"
+            _write_cmsis_nn_wrapper(cmsis_nn_mod_dir, cmsis_nn_path)
+            extra_modules.append(
+                NsxModuleRef(name="nsx-cmsis-nn", path=cmsis_nn_mod_dir),
             )
 
-        log.info(
-            "heliaRT %s (toolchain=%s, variant=%s, dist=%s)",
-            version,
-            toolchain_tag,
-            variant,
-            dist_path,
+            # Forward CMSIS-NN inline-asm requantize flag (defaults ON to
+            # match the prebuilt heliaRT build).
+            if config.engine.config.get(
+                "cmsis_nn_requantize_inline_asm", True
+            ):
+                cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
+
+            _install_nsx_module_source(
+                module_dir, source_path, variant=variant,
+            )
+
+            log.info(
+                "heliaRT %s (toolchain=%s, variant=%s, source=%s, "
+                "cmsis_nn=%s)",
+                version, toolchain_tag, variant, source_path, cmsis_nn_path,
+            )
+        else:
+            # --- Prebuilt distribution (legacy) ---
+            dist_path, resolved_version = _resolve_distribution(config)
+            _check_version_compatibility(dist_path, resolved_version)
+            version = resolved_version or HELIART_VERSION
+
+            _verify_prebuilt_archive(
+                dist_path,
+                board=config.target.board,
+                toolchain_tag=toolchain_tag,
+                variant=variant,
+                core_override=core_override,
+            )
+            _install_nsx_module(module_dir, dist_path, variant=variant,
+                                core_override=core_override)
+
+            if core_override:
+                log.warning(
+                    "heliaRT: core_override=%s — using %s library on %s board",
+                    core_override, core_override, config.target.board,
+                )
+
+            log.info(
+                "heliaRT %s (toolchain=%s, variant=%s, dist=%s)",
+                version, toolchain_tag, variant, dist_path,
+            )
+
+        extra_modules.append(
+            NsxModuleRef(
+                name="nsx-helia-rt",
+                path=module_dir,
+                version=version,
+            ),
         )
 
         return EngineArtifacts(
             engine_type=EngineType.HELIA_RT,
-            extra_modules=[
-                NsxModuleRef(
-                    name="nsx-heliart",
-                    path=module_dir,
-                    version=version,
-                ),
-            ],
+            extra_modules=extra_modules,
+            cmake_vars=cmake_vars,
             engine_header="tensorflow/lite/micro/micro_interpreter.h",
             engine_backend=backend,
             heliart_version=version,
@@ -234,42 +283,41 @@ def _install_nsx_module(
 ) -> None:
     """Install the NSX module files and distribution content into *module_dir*.
 
-    Requires the distribution to ship a native ``nsx/`` module
-    (heliaRT >= 1.12.2). The ``HELIART_VARIANT`` default is patched to
-    match the user's requested *variant*.
+    Requires the distribution to ship ``nsx/nsx-module.yaml``
+    (heliaRT >= 1.16.0).  The upstream ``nsx/CMakeLists.txt`` is a
+    source-build module and cannot be used with the prebuilt dist alone
+    (it requires the full repo with ``cmake/helia_rt_sources.cmake``).
+    HPX generates a minimal prebuilt-wrapper CMakeLists.txt instead.
     """
     nsx_dir = dist_path / "nsx"
-    src_cmake = nsx_dir / "CMakeLists.txt"
     src_yaml = nsx_dir / "nsx-module.yaml"
-    if not src_cmake.is_file() or not src_yaml.is_file():
+    if not src_yaml.is_file():
         raise EngineError(
-            f"heliaRT distribution at {dist_path} is missing nsx/ module files",
+            f"heliaRT distribution at {dist_path} is missing nsx/nsx-module.yaml",
             hint=(
-                f"Expected nsx/CMakeLists.txt and nsx/nsx-module.yaml. "
+                f"Expected nsx/nsx-module.yaml. "
                 f"Use heliaRT >= v{HELIART_MIN_VERSION}."
             ),
         )
 
     shutil.copy2(src_yaml, module_dir / "nsx-module.yaml")
 
-    cmake_text = src_cmake.read_text()
-    if variant != "release-with-logs":
-        cmake_text = cmake_text.replace(
-            'set(HELIART_VARIANT "release-with-logs"',
-            f'set(HELIART_VARIANT "{variant}"',
-        )
+    # --- Generate a prebuilt-wrapper CMakeLists.txt ---
+    # v1.16.0's nsx/CMakeLists.txt is a source-build module that requires
+    # the full heliaRT repo.  For the prebuilt dist, we generate a simpler
+    # wrapper that links the static library directly.
+    core_override_block = ""
     if core_override:
-        # Hack: override the auto-detected core tag so we can force
-        # e.g. the cm4 (non-MVE) library on an M55 board.
-        # Inject a forced set() after the core-detection block by finding
-        # the "# --- Resolve toolchain tag ---" marker.
         tag = core_override.lower()
-        cmake_text = cmake_text.replace(
-            '# --- Resolve toolchain tag ---',
-            f'# core_override: force {tag} library on this board\n'
-            f'set(_HELIART_CORE "{tag}")\n\n'
-            f'# --- Resolve toolchain tag ---',
+        core_override_block = (
+            f'\n# core_override: force {tag} library\n'
+            f'set(_HELIA_RT_CORE "{tag}")\n'
         )
+
+    cmake_text = _PREBUILT_CMAKE_TEMPLATE.format(
+        variant=variant,
+        core_override_block=core_override_block,
+    )
     (module_dir / "CMakeLists.txt").write_text(cmake_text)
 
     # --- Copy distribution content (lib/, tensorflow/, third_party/, …) ---
@@ -281,6 +329,208 @@ def _install_nsx_module(
         if source.is_dir():
             shutil.copytree(source, target)
             log.debug("Copied %s → %s", source, target)
+
+
+# Prebuilt wrapper template for heliaRT >= v1.16.0 distributions.
+# The dist's own nsx/CMakeLists.txt is source-build-only; this provides a
+# minimal prebuilt-style module that links the static .a library.
+_PREBUILT_CMAKE_TEMPLATE = """\
+# Auto-generated by hpx HeliaRTAdapter (prebuilt mode).
+# Do not edit — regenerated on every hpx run.
+cmake_minimum_required(VERSION 3.21)
+
+if(NOT DEFINED NSX_BOARD_FLAGS_TARGET)
+    message(FATAL_ERROR
+        "nsx-helia-rt: NSX_BOARD_FLAGS_TARGET must be defined.")
+endif()
+
+if(NOT DEFINED NSX_SOC_FAMILY)
+    message(FATAL_ERROR
+        "nsx-helia-rt: NSX_SOC_FAMILY must be defined.")
+endif()
+
+# --- Resolve Cortex-M core tag from SoC family ---
+set(_HELIA_RT_CORE "")
+if(NSX_SOC_FAMILY MATCHES "^apollo5|^apollo330|^apollo510")
+    set(_HELIA_RT_CORE "cm55")
+elseif(NSX_SOC_FAMILY MATCHES "^apollo4|^apollo3")
+    set(_HELIA_RT_CORE "cm4")
+else()
+    message(FATAL_ERROR
+        "nsx-helia-rt: unsupported NSX_SOC_FAMILY '${{NSX_SOC_FAMILY}}'")
+endif()
+{core_override_block}
+# --- Resolve toolchain tag ---
+set(_HELIA_RT_TOOLCHAIN "gcc")
+if(CMAKE_C_COMPILER_ID STREQUAL "ARMClang" OR
+   CMAKE_C_COMPILER MATCHES "armclang")
+    set(_HELIA_RT_TOOLCHAIN "armclang")
+elseif(CMAKE_C_COMPILER MATCHES "atfe")
+    set(_HELIA_RT_TOOLCHAIN "atfe")
+endif()
+
+# --- Build variant ---
+set(HELIA_RT_VARIANT "{variant}" CACHE STRING
+    "heliaRT build variant" FORCE)
+
+# --- Locate the prebuilt static library ---
+set(_HELIA_RT_LIB_NAME
+    "libhelia-rt-${{_HELIA_RT_CORE}}-${{_HELIA_RT_TOOLCHAIN}}-${{HELIA_RT_VARIANT}}.a")
+set(_HELIA_RT_LIB_PATH
+    "${{CMAKE_CURRENT_LIST_DIR}}/lib/${{_HELIA_RT_LIB_NAME}}")
+
+if(NOT EXISTS "${{_HELIA_RT_LIB_PATH}}")
+    message(FATAL_ERROR
+        "nsx-helia-rt: prebuilt library not found:\\n"
+        "  ${{_HELIA_RT_LIB_PATH}}\\n"
+        "Check HELIA_RT_VARIANT (${{HELIA_RT_VARIANT}}) and "
+        "toolchain (${{_HELIA_RT_TOOLCHAIN}}).")
+endif()
+
+message(STATUS "nsx-helia-rt: using ${{_HELIA_RT_LIB_NAME}}")
+
+# --- Import the prebuilt static library ---
+add_library(nsx_helia_rt_prebuilt STATIC IMPORTED GLOBAL)
+set_target_properties(nsx_helia_rt_prebuilt PROPERTIES
+    IMPORTED_LOCATION "${{_HELIA_RT_LIB_PATH}}"
+)
+
+# --- Cortex-M debug_log glue ---
+add_library(nsx_helia_rt STATIC
+    ${{CMAKE_CURRENT_LIST_DIR}}/tensorflow/lite/micro/cortex_m_generic/debug_log.cc
+)
+set_target_properties(nsx_helia_rt PROPERTIES EXPORT_NAME helia_rt)
+add_library(nsx::helia_rt ALIAS nsx_helia_rt)
+
+target_link_libraries(nsx_helia_rt
+    PUBLIC
+        ${{NSX_BOARD_FLAGS_TARGET}}
+        nsx_helia_rt_prebuilt
+    PRIVATE
+        nsx_soc_hal
+        nsx_core
+)
+
+target_include_directories(nsx_helia_rt
+    PUBLIC
+        $<BUILD_INTERFACE:${{CMAKE_CURRENT_LIST_DIR}}>
+        $<BUILD_INTERFACE:${{CMAKE_CURRENT_LIST_DIR}}/third_party>
+        $<BUILD_INTERFACE:${{CMAKE_CURRENT_LIST_DIR}}/third_party/flatbuffers/include>
+        $<BUILD_INTERFACE:${{CMAKE_CURRENT_LIST_DIR}}/third_party/gemmlowp>
+)
+
+target_compile_definitions(nsx_helia_rt
+    PUBLIC
+        TF_LITE_STATIC_MEMORY
+        NS_TFSTRUCTURE_RECENT
+        NS_TFLM_NEW_MICRO_PROFILER
+)
+"""
+
+
+# ---------------------------------------------------------------------------
+# heliaRT source-build mode
+# ---------------------------------------------------------------------------
+#
+# Opt-in by setting ``engine.config.source_path`` or ``HELIART_SOURCE_PATH``
+# to a heliaRT source-repo root.  The repo must ship the source-build NSX
+# module (heliaRT >= v1.16.0).
+#
+# The adapter writes a thin wrapper ``CMakeLists.txt`` at
+# ``<work_dir>/modules/nsx-helia-rt/`` that sets the variant and includes
+# the source tree's own ``nsx/CMakeLists.txt``.  heliaRT self-resolves its
+# repo root from ``CMAKE_CURRENT_LIST_DIR/..`` inside the included file.
+# No source files are copied — the source tree is referenced by absolute
+# path.
+
+# Files that must exist in the source tree to qualify as a heliaRT source build.
+_SOURCE_REQUIRED_FILES = (
+    "nsx/CMakeLists.txt",
+    "nsx/nsx-module.yaml",
+    "cmake/helia_rt_sources.cmake",
+    "tensorflow/lite/micro/helia_rt_version.h",
+)
+
+
+def _resolve_source_path(config: ProfileConfig) -> Path | None:
+    """Resolve a heliaRT source-tree path, if source-build is requested.
+
+    Source-build is opt-in via:
+    1. ``engine.config.source_path`` (config / CLI), or
+    2. ``HELIART_SOURCE_PATH`` environment variable.
+
+    Returns the absolute, validated source-tree path, or ``None`` if the
+    user did not opt in.  Raises ``EngineError`` if the user opted in but
+    the path is invalid.
+    """
+    raw = config.engine.config.get("source_path")
+    if not raw:
+        raw = os.environ.get("HELIART_SOURCE_PATH")
+    if not raw:
+        return None
+
+    p = Path(str(raw)).expanduser().resolve()
+    if not p.is_dir():
+        raise EngineError(
+            f"heliaRT source_path '{p}' is not a directory",
+            hint="Point engine.config.source_path at a heliaRT source-repo root.",
+        )
+    missing = [rel for rel in _SOURCE_REQUIRED_FILES if not (p / rel).is_file()]
+    if missing:
+        raise EngineError(
+            f"heliaRT source tree at {p} is missing required files: "
+            f"{', '.join(missing)}",
+            hint=(
+                "Source-build requires a heliaRT repo with the source-build "
+                "NSX module (>= v1.16.0). The released "
+                "release zip ships the prebuilt-style nsx/CMakeLists.txt and "
+                "is not compatible with source_path."
+            ),
+        )
+    return p
+
+
+def _install_nsx_module_source(
+    module_dir: Path, source_path: Path, *, variant: str,
+) -> None:
+    """Install a source-build NSX module wrapper at *module_dir*.
+
+    Writes a minimal ``CMakeLists.txt`` that includes the heliaRT source
+    tree's own ``nsx/CMakeLists.txt``.  heliaRT self-resolves its repo
+    root from ``CMAKE_CURRENT_LIST_DIR/..`` inside the included file, so
+    no explicit ``HELIART_TFLM_ROOT`` override is needed.
+
+    No source files are copied — the source tree is referenced by absolute
+    path so an incremental build can reuse its build artifacts across hpx
+    runs.
+    """
+    # Wipe any prior install (e.g. switching modes inside one work_dir).
+    for d in (*_DIST_DIRS, "lib", "nsx"):
+        tgt = module_dir / d
+        if tgt.is_dir():
+            shutil.rmtree(tgt)
+
+    nsx_cmake = source_path / "nsx" / "CMakeLists.txt"
+
+    cmake_text = (
+        "# Auto-generated by hpx HeliaRTAdapter (source-build mode).\n"
+        "# Do not edit — regenerated on every hpx run.\n"
+        "cmake_minimum_required(VERSION 3.21)\n"
+        "\n"
+        f'set(HELIA_RT_VARIANT "{variant}" '
+        'CACHE STRING "heliaRT build variant" FORCE)\n'
+        "\n"
+        "# Delegate to the source-build NSX module that ships with the\n"
+        "# heliaRT repo.  include() sets CMAKE_CURRENT_LIST_DIR to the\n"
+        "# source nsx/ directory, so heliaRT self-resolves its repo root.\n"
+        f'include("{nsx_cmake.as_posix()}")\n'
+    )
+    (module_dir / "CMakeLists.txt").write_text(cmake_text)
+
+    shutil.copy2(
+        source_path / "nsx" / "nsx-module.yaml",
+        module_dir / "nsx-module.yaml",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -378,7 +628,7 @@ def _fetch_github_release(
         raise EngineError(
             f"No GitHub release found for {repo}@{ref}",
             hint=(
-                "Provide a valid release tag (e.g. heliaRT-v1.13.1), "
+                "Provide a valid release tag (e.g. helia-rt-v1.16.0), "
                 "or set engine.config.dist_path to a local directory."
             ),
         )
@@ -411,8 +661,8 @@ def _resolve_release_tag(repo: str, ref: str, *, api_s: float = 30) -> str | Non
     if data is not None:
         return ref
 
-    # Maybe ref is just a version like "1.7.0" — try common tag formats
-    for fmt in (f"heliaRT-v{ref}", f"HeliaRT-v{ref}", f"v{ref}"):
+    # Maybe ref is just a version like "1.16.0" — try common tag formats
+    for fmt in (f"helia-rt-v{ref}", f"heliaRT-v{ref}", f"v{ref}"):
         api = f"https://api.github.com/repos/{repo}/releases/tags/{fmt}"
         data = _github_api_get(api, timeout_s=api_s)
         if data is not None:
@@ -568,13 +818,22 @@ def _detect_version(dist: Path) -> str | None:
     """Parse the heliaRT version from the distribution.
 
     Checks (in order):
-    1. ``heliart_version.h`` — ``#define HELIART_VERSION "v1.7.0"``
+    1. ``helia_rt_version.h`` — ``#define HELIA_RT_VERSION "v1.16.0"``
+       (falls back to legacy ``heliart_version.h`` / ``HELIART_VERSION``)
     2. ``MANIFEST.txt`` — ``neuralspot-helios-rt HeliaRT-v1.7.0``
     """
-    # 1. Version header
-    version_h = dist / "tensorflow" / "lite" / "micro" / "heliart_version.h"
+    # 1. Version header (v1.16.0+ naming)
+    version_h = dist / "tensorflow" / "lite" / "micro" / "helia_rt_version.h"
     if version_h.is_file():
         text = version_h.read_text(errors="replace")
+        m = re.search(r'#define\s+HELIA_RT_VERSION\s+"v?([^"]+)"', text)
+        if m:
+            return m.group(1)
+
+    # 1b. Legacy header (pre-v1.16.0)
+    legacy_h = dist / "tensorflow" / "lite" / "micro" / "heliart_version.h"
+    if legacy_h.is_file():
+        text = legacy_h.read_text(errors="replace")
         m = re.search(r'#define\s+HELIART_VERSION\s+"v?([^"]+)"', text)
         if m:
             return m.group(1)
@@ -583,6 +842,11 @@ def _detect_version(dist: Path) -> str | None:
     manifest = dist / "MANIFEST.txt"
     if manifest.is_file():
         first_line = manifest.read_text(errors="replace").split("\n")[0]
+        # v1.16.0+: "helia-rt helia-rt-v1.16.0"
+        m = re.search(r"helia-rt-v(\S+)", first_line)
+        if m:
+            return m.group(1)
+        # Legacy: "neuralspot-helios-rt HeliaRT-v1.7.0"
         m = re.search(r"HeliaRT-v(\S+)", first_line)
         if m:
             return m.group(1)

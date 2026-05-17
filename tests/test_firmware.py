@@ -131,7 +131,7 @@ class TestGenerateApp:
         PrepareEngineStage().run(ctx)
         app_dir = generate_app(ctx)
 
-        heliart_mod = app_dir / "modules" / "nsx-heliart"
+        heliart_mod = app_dir / "modules" / "nsx-helia-rt"
         assert heliart_mod.is_dir()
         assert (heliart_mod / "nsx-module.yaml").exists()
         assert (heliart_mod / "CMakeLists.txt").exists()
@@ -174,7 +174,7 @@ class TestGenerateApp:
         app_dir = generate_app(ctx)
 
         cmake = (app_dir / "CMakeLists.txt").read_text()
-        assert "nsx::heliart" in cmake
+        assert "nsx::helia_rt" in cmake
 
     def test_idempotent(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)

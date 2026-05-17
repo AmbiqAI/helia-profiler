@@ -1,0 +1,39 @@
+# heliaPROFILER — heliaRT engine, SOURCE-BUILD mode
+# ---------------------------------------------------------------------------
+# Compiles heliaRT from a local source tree instead of consuming the
+# prebuilt static-lib release. Opt-in via engine.config.source_path (or
+# HELIART_SOURCE_PATH env). Use this to validate that source-built heliaRT
+# matches prebuilt per-layer cycle counts.
+#
+# Requires a heliaRT repo with the source-build NSX module (>= v1.16.0).
+# The released zips ship the prebuilt-style nsx/CMakeLists.txt and
+# are NOT compatible with source_path.
+model:
+  # Tiny 3-FC-layer model — matches the hello_world we baselined.
+  path: ../../local-experiments/nsx_heliart_smoke/vendor/helia-rt/tensorflow/lite/micro/examples/hello_world/models/hello_world_int8.tflite
+  arena_size: 4096
+
+engine:
+  type: helia-rt
+  config:
+    variant: release-with-logs
+    # Absolute path to a heliaRT source-repo root. The vendor copy in
+    # nsx_heliart_smoke is pinned to v1.16.0 with the source-build module.
+    source_path: ../../local-experiments/nsx_heliart_smoke/vendor/helia-rt
+
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+
+profiling:
+  pmu_presets: [basic_cpu]
+  per_layer: true
+  iterations: 100
+  warmup: 5
+
+power:
+  enabled: false
+
+output:
+  format: csv
+  dir: ./results_rt_source

@@ -36,7 +36,7 @@ class TestInstallNsxModule:
         yaml_path = module_dir / "nsx-module.yaml"
         assert yaml_path.exists()
         content = yaml_path.read_text()
-        assert "nsx-heliart" in content
+        assert "nsx-helia-rt" in content
         assert "schema_version: 1" in content
 
     def test_copies_cmakelists(self, tmp_path: Path, fake_dist: Path):
@@ -46,8 +46,8 @@ class TestInstallNsxModule:
         cmake_path = module_dir / "CMakeLists.txt"
         assert cmake_path.exists()
         content = cmake_path.read_text()
-        assert "nsx_heliart" in content
-        assert "nsx::heliart" in content
+        assert "nsx_helia_rt" in content
+        assert "nsx::helia_rt" in content
         assert "NSX_BOARD_FLAGS_TARGET" in content
         assert "TF_LITE_STATIC_MEMORY" in content
 
@@ -56,14 +56,14 @@ class TestInstallNsxModule:
         module_dir.mkdir()
         _install_nsx_module(module_dir, fake_dist, variant="debug")
         content = (module_dir / "CMakeLists.txt").read_text()
-        assert 'HELIART_VARIANT "debug"' in content
+        assert 'HELIA_RT_VARIANT "debug"' in content
 
     def test_default_variant_unchanged(self, tmp_path: Path, fake_dist: Path):
         module_dir = tmp_path / "module"
         module_dir.mkdir()
         _install_nsx_module(module_dir, fake_dist, variant="release-with-logs")
         content = (module_dir / "CMakeLists.txt").read_text()
-        assert 'HELIART_VARIANT "release-with-logs"' in content
+        assert 'HELIA_RT_VARIANT "release-with-logs"' in content
 
     def test_copies_dist_dirs(self, tmp_path: Path, fake_dist: Path):
         module_dir = tmp_path / "module"
@@ -75,12 +75,12 @@ class TestInstallNsxModule:
         assert (module_dir / "signal").is_dir()
 
     def test_missing_nsx_raises(self, tmp_path: Path, fake_dist: Path):
-        """A dist without nsx/ should fail (heliaRT < 1.12.2)."""
+        """A dist without nsx/nsx-module.yaml should fail."""
         import shutil
         shutil.rmtree(fake_dist / "nsx")
         module_dir = tmp_path / "module"
         module_dir.mkdir()
-        with pytest.raises(EngineError, match="missing nsx/ module files"):
+        with pytest.raises(EngineError, match="missing nsx/nsx-module.yaml"):
             _install_nsx_module(module_dir, fake_dist, variant="release-with-logs")
 
 
@@ -93,7 +93,7 @@ class TestHeliaRTAdapter:
         config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
         adapter = HeliaRTAdapter()
         adapter.prepare(config, tmp_path)
-        module_dir = tmp_path / "modules" / "nsx-heliart"
+        module_dir = tmp_path / "modules" / "nsx-helia-rt"
         assert module_dir.is_dir()
         assert (module_dir / "nsx-module.yaml").exists()
         assert (module_dir / "CMakeLists.txt").exists()
@@ -102,7 +102,7 @@ class TestHeliaRTAdapter:
         config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
         adapter = HeliaRTAdapter()
         adapter.prepare(config, tmp_path)
-        module_dir = tmp_path / "modules" / "nsx-heliart"
+        module_dir = tmp_path / "modules" / "nsx-helia-rt"
         assert (module_dir / "lib").is_dir()
         assert (module_dir / "tensorflow").is_dir()
         assert (module_dir / "third_party").is_dir()
@@ -113,7 +113,7 @@ class TestHeliaRTAdapter:
         artifacts = adapter.prepare(config, tmp_path)
         assert len(artifacts.extra_modules) == 1
         mod = artifacts.extra_modules[0]
-        assert mod.name == "nsx-heliart"
+        assert mod.name == "nsx-helia-rt"
         assert mod.version == HELIART_VERSION
         assert mod.path.is_dir()
 
@@ -214,5 +214,149 @@ class TestHeliaRTAdapter:
         PrepareEngineStage().run(ctx)
         assert ctx.engine_artifacts is not None
         assert len(ctx.engine_artifacts.extra_modules) == 1
-        assert (work_dir / "modules" / "nsx-heliart" / "nsx-module.yaml").exists()
-        assert (work_dir / "modules" / "nsx-heliart" / "lib").is_dir()
+        assert (work_dir / "modules" / "nsx-helia-rt" / "nsx-module.yaml").exists()
+        assert (work_dir / "modules" / "nsx-helia-rt" / "lib").is_dir()
+
+
+class TestSourceBuildMode:
+    """heliaRT source-build mode (engine.config.source_path)."""
+
+    def test_prepare_uses_source_path(
+        self, tmp_path: Path, fake_source_tree: Path,
+        fake_cmsis_nn: Path, monkeypatch: pytest.MonkeyPatch,
+    ):
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.stages.s01_resolve_platform import ResolvePlatformStage
+        from helia_profiler.stages.s02_prepare_engine import PrepareEngineStage
+
+        monkeypatch.setenv("CMSIS_NN_PATH", str(fake_cmsis_nn))
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {
+                    "type": "helia-rt",
+                    "config": {"source_path": str(fake_source_tree)},
+                },
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+
+        module_dir = work_dir / "modules" / "nsx-helia-rt"
+        cmake = (module_dir / "CMakeLists.txt").read_text()
+        # Source-build wrapper includes the source tree's nsx/CMakeLists.txt
+        # directly (heliaRT self-resolves its repo root).
+        assert f'{fake_source_tree.as_posix()}/nsx/CMakeLists.txt' in cmake
+        assert 'HELIA_RT_VARIANT "release-with-logs"' in cmake
+        # No explicit HELIART_TFLM_ROOT override — heliaRT self-resolves.
+        assert "HELIART_TFLM_ROOT" not in cmake
+
+        # nsx-module.yaml is copied from the source tree.
+        yaml_text = (module_dir / "nsx-module.yaml").read_text()
+        assert "nsx-helia-rt" in yaml_text
+
+        # No prebuilt lib/ tree was installed.
+        assert not (module_dir / "lib").exists()
+
+    def test_invalid_source_path_raises(self, tmp_path: Path):
+        from helia_profiler.engines.helia_rt import _resolve_source_path
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {
+                    "type": "helia-rt",
+                    "config": {"source_path": str(tmp_path / "does_not_exist")},
+                },
+            },
+        )
+        with pytest.raises(EngineError, match="is not a directory"):
+            _resolve_source_path(config)
+
+    def test_source_path_missing_required_files(
+        self, tmp_path: Path
+    ):
+        from helia_profiler.engines.helia_rt import _resolve_source_path
+
+        bare = tmp_path / "bare"
+        bare.mkdir()
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {
+                    "type": "helia-rt",
+                    "config": {"source_path": str(bare)},
+                },
+            },
+        )
+        with pytest.raises(EngineError, match="missing required files"):
+            _resolve_source_path(config)
+
+    def test_env_var_resolves_source_path(
+        self, tmp_path: Path, fake_source_tree: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.engines.helia_rt import _resolve_source_path
+
+        monkeypatch.setenv("HELIART_SOURCE_PATH", str(fake_source_tree))
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+            },
+        )
+        resolved = _resolve_source_path(config)
+        assert resolved == fake_source_tree.resolve()
+
+    def test_source_path_takes_precedence_over_dist(
+        self, tmp_path: Path, fake_dist: Path, fake_source_tree: Path,
+        fake_cmsis_nn: Path, monkeypatch: pytest.MonkeyPatch,
+    ):
+        """When source_path is set, prebuilt dist_path is ignored entirely."""
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.stages.s01_resolve_platform import ResolvePlatformStage
+        from helia_profiler.stages.s02_prepare_engine import PrepareEngineStage
+
+        monkeypatch.setenv("CMSIS_NN_PATH", str(fake_cmsis_nn))
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {
+                    "type": "helia-rt",
+                    "config": {
+                        "dist_path": str(fake_dist),
+                        "source_path": str(fake_source_tree),
+                    },
+                },
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+
+        module_dir = work_dir / "modules" / "nsx-helia-rt"
+        # Source-build path was taken — no prebuilt lib/ tree.
+        assert not (module_dir / "lib").exists()
