@@ -35,11 +35,9 @@
 
 ### Optional extras
 
-For **power measurement** with Joulescope:
-
-```bash
-pip install 'helia-profiler[power]'
-```
+Power-measurement support (`pyjoulescope_driver`) is now installed by
+default with `helia-profiler`. You only need a Joulescope JS110/JS220
+plugged in and the appropriate udev rules (Linux) to start capturing.
 
 For **heliaAOT** engine support:
 
@@ -104,7 +102,6 @@ Expected output:
 ✓ JLinkExe            V8.12a
 ✓ JLinkSWOViewerCL    V8.12a
 ✓ nsx                 0.6.0
-○ joulescope          (optional — install with pip install 'helia-profiler[power]')
 ```
 
 All required tools show ✓. Optional tools show ○ when not installed.

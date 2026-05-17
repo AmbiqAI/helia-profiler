@@ -124,7 +124,7 @@ install and the cycle-count differences.
 hpx profile --config hpx.yml --power --power-duration 10
 ```
 
-Requires a Joulescope and `pip install 'helia-profiler[power]'`. See
+Requires a Joulescope JS110 or JS220. See
 [Power Measurement](../guide/power.md).
 
 ## What's next?
