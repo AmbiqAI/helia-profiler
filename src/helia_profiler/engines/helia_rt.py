@@ -395,8 +395,9 @@ set_target_properties(nsx_helia_rt_prebuilt PROPERTIES
     IMPORTED_LOCATION "${{_HELIA_RT_LIB_PATH}}"
 )
 
-# --- Cortex-M debug_log glue ---
+# --- Platform glue (MicroPrintf + debug_log) ---
 add_library(nsx_helia_rt STATIC
+    ${{CMAKE_CURRENT_LIST_DIR}}/tensorflow/lite/micro/micro_log.cc
     ${{CMAKE_CURRENT_LIST_DIR}}/tensorflow/lite/micro/cortex_m_generic/debug_log.cc
 )
 set_target_properties(nsx_helia_rt PROPERTIES EXPORT_NAME helia_rt)
