@@ -1,4 +1,4 @@
-"""heliaPROFILER — Profile LiteRT models on Ambiq Apollo hardware."""
+"""heliaPROFILER — Profile LiteRT models on Ambiq silicon"""
 
 from ._version import __version__
 from .api import profile

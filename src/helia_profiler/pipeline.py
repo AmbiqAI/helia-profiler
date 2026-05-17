@@ -95,6 +95,12 @@ class PipelineContext:
     #: the handle immediately, so this stays ``None`` for typical runs.
     power_driver_handle: Any | None = None
 
+    #: True if :class:`EnsureBoardPoweredStage` skipped passthrough (no JS,
+    #: driver missing, ambiguous selection, etc.). Used by downstream stages
+    #: (notably ``flash_firmware``) to surface a "is your EVB powered?" hint
+    #: when failures look connection-related.
+    passthrough_skipped: bool = False
+
 
 # ---------------------------------------------------------------------------
 # Stage protocol — each pipeline step implements this
@@ -162,6 +168,10 @@ class PipelineRunner:
                     self._console.stage_start(stage.name)
                 try:
                     stage.run(ctx)
+                except KeyboardInterrupt:
+                    if self._console is not None:
+                        self._console._stop_spinner()
+                    raise
                 except HpxError:
                     if self._console is not None:
                         self._console._stop_spinner()
