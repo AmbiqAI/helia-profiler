@@ -30,7 +30,6 @@ def collect_checks() -> tuple[
         checks.append((label, binary, path))
 
     optional_specs = [
-        ("Joulescope (power measurement)", "joulescope"),
         ("heliaAOT compiler", "helia_aot"),
     ]
     # Optional toolchains (checked as binaries on PATH)

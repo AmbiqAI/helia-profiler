@@ -52,11 +52,27 @@ class FlashFirmwareStage:
             if _try_power_cycle(ctx):
                 flash_app(ctx)  # raises BuildError on second failure
             else:
+                if ctx.passthrough_skipped:
+                    raise BuildError(
+                        str(first_exc),
+                        hint=(
+                            (first_exc.hint + " " if first_exc.hint else "")
+                            + "Verify the EVB is powered (USB / bench supply), "
+                            "or pass --power-serial <NNNN> to select a "
+                            "specific power instrument for passthrough."
+                        ),
+                    ) from first_exc
                 raise
         except Exception as exc:
+            hint = "Check that the board is connected via JLink."
+            if ctx.passthrough_skipped:
+                hint += (
+                    " Verify the EVB is powered, or pass --power-serial <NNNN> "
+                    "to select a specific power instrument for passthrough."
+                )
             raise BuildError(
                 f"Flash failed: {exc}",
-                hint="Check that the board is connected via JLink.",
+                hint=hint,
             ) from exc
 
         log.info("Firmware flashed to %s", ctx.config.target.board)

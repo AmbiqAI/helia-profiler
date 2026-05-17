@@ -90,3 +90,13 @@ class OnDeviceDriver:
     def disable_passthrough(self) -> None:
         """Not applicable for on-device driver."""
         pass
+
+    def ensure_target_powered(self, *, required: bool) -> bool:
+        """No-op — the on-device driver does not control the rail.
+
+        The target is expected to already be powered by USB, bench supply,
+        or an external instrument the user manages directly. Always
+        succeeds (returns ``True``) so the pipeline proceeds.
+        """
+        log.debug("OnDeviceDriver.ensure_target_powered: no rail control — assuming target is on bench/USB supply.")
+        return True

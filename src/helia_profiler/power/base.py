@@ -115,3 +115,30 @@ class PowerDriver(Protocol):
     def disable_passthrough(self) -> None:
         """Release the instrument opened by :meth:`enable_passthrough`."""
         ...
+
+    def ensure_target_powered(self, *, required: bool) -> bool:
+        """Make the target board powered, by whatever means this driver supports.
+
+        High-level vendor-neutral hook called by the pipeline. Each driver
+        owns its full decision matrix (device enumeration, ambiguity
+        handling, hint strings) so the pipeline stays driver-agnostic.
+
+        Semantics:
+
+        - If the driver can guarantee the board is powered (relay closed,
+          supply output enabled, or nothing to do because power comes from
+          elsewhere), return ``True``.
+        - If the driver cannot — or chooses not to — power the board and
+          ``required`` is ``False``, log the reason and return ``False``.
+        - If ``required`` is ``True``, raise :class:`PowerError` instead of
+          returning ``False``. Power capture cannot proceed without an
+          energized rail.
+
+        Parameters
+        ----------
+        required : bool
+            ``True`` when downstream stages need this driver to also
+            *measure* power (strict mode); ``False`` when the call is a
+            best-effort convenience to keep the board alive.
+        """
+        ...
