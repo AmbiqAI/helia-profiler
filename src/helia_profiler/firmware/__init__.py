@@ -659,6 +659,7 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     board = ctx.board.name
     timeouts = ctx.config.timeouts
     toolchain = ctx.config.target.toolchain
+    verbose = ctx.config.verbose
 
     # Map config toolchain names to nsx CLI values
     nsx_tc = _nsx_toolchain(toolchain)
@@ -668,19 +669,19 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     # require the existing lock/modules state to be reused as-is.
     modules_dir = app_dir / "modules"
     if ctx.config.frozen:
-        nsx_cli.sync(app_dir, frozen=True, timeout_s=timeouts.configure_s)
+        nsx_cli.sync(app_dir, frozen=True, timeout_s=timeouts.configure_s, verbose=verbose)
     else:
-        nsx_cli.lock(app_dir, timeout_s=timeouts.configure_s)
+        nsx_cli.lock(app_dir, timeout_s=timeouts.configure_s, verbose=verbose)
         try:
-            nsx_cli.sync(app_dir, timeout_s=timeouts.configure_s)
+            nsx_cli.sync(app_dir, timeout_s=timeouts.configure_s, verbose=verbose)
         except Exception:
             # Remove partially-materialised modules so next attempt starts clean.
             if modules_dir.exists():
                 shutil.rmtree(modules_dir, ignore_errors=True)
             raise
 
-    nsx_cli.configure(app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s)
-    nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s)
+    nsx_cli.configure(app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s, verbose=verbose)
+    nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose)
 
     # Locate build output
     build_dir = app_dir / "build" / board
@@ -721,4 +722,5 @@ def flash_app(ctx: PipelineContext) -> None:
         toolchain=nsx_tc,
         jlink_serial=ctx.config.target.jlink_serial,
         timeout_s=ctx.config.timeouts.flash_s,
+        verbose=ctx.config.verbose,
     )

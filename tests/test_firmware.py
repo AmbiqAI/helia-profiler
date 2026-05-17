@@ -316,7 +316,7 @@ class TestBuildApp:
         out_build_dir, out_binary = build_app(ctx)
 
         assert lock_calls == []
-        assert sync_calls == [{"frozen": True, "timeout_s": ctx.config.timeouts.configure_s}]
+        assert sync_calls == [{"frozen": True, "timeout_s": ctx.config.timeouts.configure_s, "verbose": 0}]
         assert out_build_dir == build_dir
         assert out_binary == binary
 

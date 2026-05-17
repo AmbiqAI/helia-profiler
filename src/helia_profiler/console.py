@@ -708,6 +708,11 @@ class HpxConsole:
         else:
             self._console.print(f"[bold red]Error:[/bold red] {exc}")
 
+    def print_interrupted(self) -> None:
+        """Print a clean one-liner on Ctrl-C."""
+        self._stop_spinner()
+        self._console.print("\n[dim]Interrupted.[/dim]")
+
     # ------------------------------------------------------------------
     # Doctor
     # ------------------------------------------------------------------

@@ -28,7 +28,9 @@ class TestNsxBuild:
     def test_success_calls_api(self, tmp_path: Path) -> None:
         with patch("helia_profiler.nsx.nsx_api.build_app") as build_mock:
             nsx.build(tmp_path, toolchain="armclang", timeout_s=42)
-        build_mock.assert_called_once_with(tmp_path, toolchain="armclang", timeout_s=42)
+        build_mock.assert_called_once_with(
+            tmp_path, toolchain="armclang", timeout_s=42, emit=nsx._quiet_emitter
+        )
 
     def test_nsxerror_raises_build_error(self, tmp_path: Path) -> None:
         with patch("helia_profiler.nsx.nsx_api.build_app", side_effect=NSXError("boom")):
@@ -91,7 +93,9 @@ class TestNsxConfigure:
     def test_configure_calls_api(self, tmp_path: Path) -> None:
         with patch("helia_profiler.nsx.nsx_api.configure_app") as cfg_mock:
             nsx.configure(tmp_path, toolchain="gcc", timeout_s=120)
-        cfg_mock.assert_called_once_with(tmp_path, toolchain="gcc", timeout_s=120)
+        cfg_mock.assert_called_once_with(
+            tmp_path, toolchain="gcc", timeout_s=120, emit=nsx._quiet_emitter
+        )
 
 
 class TestNsxLock:
@@ -99,7 +103,8 @@ class TestNsxLock:
         with patch("helia_profiler.nsx.nsx_api.lock_app", return_value=tmp_path / "nsx.lock") as m:
             result = nsx.lock(tmp_path, timeout_s=180)
         m.assert_called_once_with(
-            tmp_path, update=False, quiet=True, timeout_s=180, resolve_ttl_s=1800
+            tmp_path, update=False, quiet=True, timeout_s=180, resolve_ttl_s=1800,
+            emit=nsx._quiet_emitter,
         )
         assert result == tmp_path / "nsx.lock"
 
@@ -113,7 +118,9 @@ class TestNsxSync:
     def test_sync_calls_api(self, tmp_path: Path) -> None:
         with patch("helia_profiler.nsx.nsx_api.sync_app") as m:
             nsx.sync(tmp_path, timeout_s=300)
-        m.assert_called_once_with(tmp_path, frozen=False, force=False, timeout_s=300)
+        m.assert_called_once_with(
+            tmp_path, frozen=False, force=False, timeout_s=300, emit=nsx._quiet_emitter
+        )
 
     def test_sync_frozen(self, tmp_path: Path) -> None:
         with patch("helia_profiler.nsx.nsx_api.sync_app") as m:

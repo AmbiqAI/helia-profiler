@@ -71,6 +71,10 @@ def run_profile(config: ProfileConfig) -> PipelineContext:
 
 def _setup_logging(verbosity: int) -> None:
     """Configure the ``hpx`` logger based on CLI verbosity."""
+    from rich.logging import RichHandler
+
+    from .console import _console
+
     level = logging.WARNING
     if verbosity >= 2:
         level = logging.DEBUG
@@ -79,7 +83,13 @@ def _setup_logging(verbosity: int) -> None:
 
     logger = logging.getLogger("hpx")
     if not logger.handlers:
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter("[dim]\[hpx][/dim] %(message)s"))
+        handler = RichHandler(
+            console=_console,
+            show_time=False,
+            show_path=False,
+            markup=False,
+            keywords=[],
+        )
+        handler.setFormatter(logging.Formatter("%(message)s"))
         logger.addHandler(handler)
     logger.setLevel(level)

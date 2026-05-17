@@ -210,6 +210,32 @@ def _close_device(drv: Any, device_path: str) -> None:
         pass
 
 
+def enumerate_devices() -> list[tuple[str, str]]:
+    """Return ``[(device_path, family), ...]`` for connected Joulescopes.
+
+    Lightweight discovery: opens the shared :mod:`pyjoulescope_driver`
+    handle but does **not** open any individual device. Raises
+    :class:`PowerError` if the driver package is missing or the underlying
+    enumeration call fails (e.g. libusb permissions).
+    """
+    drv = _get_shared_driver()
+    try:
+        paths = list(drv.device_paths())
+    except Exception as exc:
+        raise PowerError(
+            f"Joulescope enumeration failed: {exc}",
+            hint="Check USB connection.",
+        ) from exc
+    out: list[tuple[str, str]] = []
+    for p in paths:
+        try:
+            out.append((p, _family_from_path(p)))
+        except PowerError:
+            # Unknown family — skip silently rather than fail enumeration.
+            log.debug("Skipping unknown Joulescope device path: %s", p)
+    return out
+
+
 def _extract_scalar(node: Any, default: float = 0.0) -> float:
     """Return a float from an stats sub-node.
 
@@ -262,8 +288,8 @@ class JoulescopeDriver:
         except ImportError as exc:
             raise PowerError(
                 "pyjoulescope_driver package not installed",
-                hint="Install with: pip install 'helia-profiler[power]' "
-                "or pip install pyjoulescope_driver",
+                hint="This should be installed automatically with helia-profiler. "
+                "Reinstall with: pip install --force-reinstall helia-profiler",
             ) from exc
         except Exception as exc:
             # numpy/pyjls ABI mismatch surfaces as ValueError during import.
@@ -439,6 +465,87 @@ class JoulescopeDriver:
             _close_device(_get_shared_driver(), device_path)
             self._pt_device_path = None
             log.info("Joulescope passthrough released")
+
+    # ------------------------------------------------------------------
+    # High-level vendor-neutral hook
+    # ------------------------------------------------------------------
+
+    def ensure_target_powered(self, *, required: bool) -> bool:
+        """Best-effort or strict passthrough enable, per the decision matrix.
+
+        Owns *all* Joulescope-specific knowledge (enumeration, multi-device
+        ambiguity, serial matching, hint strings) so the pipeline stage
+        stays driver-agnostic. See :meth:`PowerDriver.ensure_target_powered`
+        for the contract.
+        """
+
+        def _bail(msg: str, *, hint: str | None = None, level: int = logging.INFO) -> bool:
+            if required:
+                raise PowerError(msg, hint=hint)
+            log.log(level, "%s — skipping Joulescope passthrough.", msg)
+            return False
+
+        # --- Check the driver package is importable.
+        try:
+            self.check_available()
+        except PowerError as exc:
+            if required:
+                raise
+            log.debug("Joulescope driver unavailable (%s) — skipping passthrough.", exc)
+            return False
+
+        # --- Enumerate devices without opening any.
+        try:
+            devices = enumerate_devices()
+        except PowerError as exc:
+            if required:
+                raise
+            log.debug("Joulescope enumeration failed (%s) — skipping passthrough.", exc)
+            return False
+
+        if not devices:
+            return _bail(
+                "No Joulescope detected",
+                hint="Plug in a JS110 or JS220 and ensure it is powered on.",
+                level=logging.DEBUG,
+            )
+
+        # --- Pick a device.
+        if self._serial is not None:
+            wanted = str(self._serial).lstrip("0") or "0"
+            matched = [d for d in devices if wanted in d[0]]
+            if not matched:
+                paths = ", ".join(d[0] for d in devices)
+                return _bail(
+                    f"Joulescope serial '{self._serial}' not found",
+                    hint=f"Connected devices: {paths}. "
+                    "Update power.serial / --power-serial to match.",
+                )
+        elif len(devices) > 1:
+            paths = ", ".join(d[0] for d in devices)
+            return _bail(
+                f"{len(devices)} Joulescopes connected — please disambiguate",
+                hint=f"Set power.serial / --power-serial to one of: {paths}",
+            )
+        # else: exactly one device, no serial needed.
+
+        # --- Enable passthrough; release USB handle immediately (relay is
+        # latched in hardware so the board stays powered).
+        try:
+            self.enable_passthrough()
+        except PowerError as exc:
+            if required:
+                raise
+            log.warning("Joulescope passthrough failed: %s — continuing.", exc)
+            return False
+
+        try:
+            self.disable_passthrough()
+        except Exception:  # pragma: no cover - defensive
+            log.debug("disable_passthrough after enable failed (ignored)")
+
+        log.info("Joulescope passthrough enabled (relay latched).")
+        return True
 
 
 # ---------------------------------------------------------------------------

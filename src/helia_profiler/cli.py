@@ -1,4 +1,4 @@
-"""hpx CLI — Profile LiteRT models on Ambiq Apollo hardware."""
+"""hpx CLI — Profile LiteRT models on Ambiq silicon."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="hpx",
-        description="Profile LiteRT models on Ambiq Apollo hardware.",
+        description="Profile LiteRT models on Ambiq silicon.",
     )
     parser.add_argument("--version", action="version", version=f"hpx {__version__}")
     sub = parser.add_subparsers(dest="command")
@@ -202,19 +202,20 @@ def main(argv: list[str] | None = None) -> None:
         "--no-ensure-power",
         action="store_true",
         help=(
-            "Skip the Joulescope auto-passthrough scan at start-up. "
-            "Use when the board is on a bench supply or you want to "
-            "manage the JS relay yourself."
+            "Skip the auto power-on step at start-up. Use when the board "
+            "is on a bench supply or you want to manage the rail yourself."
         ),
     )
     g_power.add_argument(
+        "--power-serial",
         "--js-serial",
-        dest="js_serial",
+        dest="power_serial",
         type=str,
         default=None,
         help=(
-            "Joulescope serial number (e.g. '004204') to disambiguate "
-            "when multiple devices are connected."
+            "Power instrument serial number to disambiguate when multiple "
+            "devices are connected (e.g. Joulescope serial '004204'). "
+            "Alias: --js-serial."
         ),
     )
 
@@ -513,8 +514,8 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli.setdefault("power", {})["sync_gpio_pin"] = args.sync_gpio
     if getattr(args, "no_ensure_power", False):
         cli.setdefault("target", {})["ensure_board_powered"] = False
-    if getattr(args, "js_serial", None):
-        cli.setdefault("power", {})["serial"] = args.js_serial
+    if getattr(args, "power_serial", None):
+        cli.setdefault("power", {})["serial"] = args.power_serial
 
     if args.output_dir is not None:
         cli.setdefault("output", {})["dir"] = str(args.output_dir)
@@ -576,6 +577,9 @@ def _cmd_profile(args: argparse.Namespace) -> None:
 
     try:
         profile(config)
+    except KeyboardInterrupt:
+        console.print_interrupted()
+        sys.exit(130)
     except HpxError as exc:
         console.print_error(exc)
         sys.exit(1)

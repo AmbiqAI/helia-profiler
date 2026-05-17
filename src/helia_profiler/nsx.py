@@ -18,13 +18,17 @@ hang.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
+import sys
 import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Callable
 
 from neuralspotx import api as nsx_api
+from neuralspotx._io import Emitter, Event
 from neuralspotx.api import NSXError
 
 from .errors import BuildError, NetworkError
@@ -41,13 +45,70 @@ _DEFAULT_LOCK_TIMEOUT_S = 180
 _DEFAULT_SYNC_TIMEOUT_S = 300
 
 
+def _quiet_emitter(event: Event) -> None:
+    """Swallow NSX output — used at default verbosity (no ``-v``)."""
+
+
+def emitter_for_verbosity(verbose: int) -> Emitter | None:
+    """Return the appropriate NSX emitter for a given verbosity level.
+
+    * verbose == 0 → quiet (suppress cmake/ninja/JLink output)
+    * verbose >= 1 → None (use neuralspotx default: prints to stderr/stdout)
+    """
+    if verbose >= 1:
+        return None
+    return _quiet_emitter
+
+
+@contextlib.contextmanager
+def _suppress_output() -> Iterator[None]:
+    """Redirect fd 1 & 2 to ``/dev/null`` for the duration of the block.
+
+    This silences subprocess output that neuralspotx streams directly to the
+    terminal (cmake, ninja, JLinkExe).  Python-level writes to sys.stdout /
+    sys.stderr are also suppressed since the underlying fds are redirected.
+    """
+    devnull_fd = os.open(os.devnull, os.O_WRONLY)
+    saved_stdout_fd = os.dup(1)
+    saved_stderr_fd = os.dup(2)
+    try:
+        # Flush Python buffers before redirecting the underlying fds.
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os.dup2(devnull_fd, 1)
+        os.dup2(devnull_fd, 2)
+        yield
+    finally:
+        # Flush again (any buffered writes during the block go to devnull).
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os.dup2(saved_stdout_fd, 1)
+        os.dup2(saved_stderr_fd, 2)
+        os.close(saved_stdout_fd)
+        os.close(saved_stderr_fd)
+        os.close(devnull_fd)
+
+
+@contextlib.contextmanager
+def _quiet_context(verbose: int) -> Iterator[None]:
+    """Yield a context that suppresses subprocess output when *verbose* == 0."""
+    if verbose >= 1:
+        yield
+    else:
+        with _suppress_output():
+            yield
+
+
 def _translate(label: str, func: Callable[[], Any]) -> Any:
     """Run *func* and translate :class:`NSXError` → :class:`BuildError`.
 
     NSX raises ``NSXError`` for both ordinary subprocess failures and for
     the timeout-expired path (see ``neuralspotx.api._invoke``), so a
-    single ``except`` is sufficient here.
+    single ``except`` is sufficient here.  We also catch
+    :class:`subprocess.CalledProcessError` from operations that do not
+    wrap it in ``NSXError`` (e.g. the build path at verbosity 0).
     """
+    import subprocess
 
     try:
         return func()
@@ -57,6 +118,16 @@ def _translate(label: str, func: Callable[[], Any]) -> Any:
         if _is_network_error(msg):
             raise NetworkError(f"{label} failed (network)", details=str(exc)) from exc
         raise BuildError(f"{label} failed", details=str(exc)) from exc
+    except subprocess.CalledProcessError as exc:
+        details = f"exit code {exc.returncode}: {' '.join(str(a) for a in exc.cmd)}"
+        if exc.stderr:
+            details += f"\n{exc.stderr}"
+        log.error("%s failed: %s", label, details)
+        raise BuildError(
+            f"{label} failed",
+            details=details,
+            hint="Re-run with -v for full subprocess output.",
+        ) from exc
 
 
 # Heuristics for transient network failures from git/curl/fetch.
@@ -89,13 +160,18 @@ def configure(
     *,
     toolchain: str | None = None,
     timeout_s: int = _DEFAULT_CONFIGURE_TIMEOUT_S,
+    verbose: int = 0,
 ) -> None:
     """Run ``nsx configure`` on the given app directory."""
     log.info("nsx configure: %s (toolchain=%s)", app_dir, toolchain or "default")
-    _translate(
-        "nsx configure",
-        lambda: nsx_api.configure_app(app_dir, toolchain=toolchain, timeout_s=timeout_s),
-    )
+    emit = emitter_for_verbosity(verbose)
+    with _quiet_context(verbose):
+        _translate(
+            "nsx configure",
+            lambda: nsx_api.configure_app(
+                app_dir, toolchain=toolchain, timeout_s=timeout_s, emit=emit
+            ),
+        )
 
 
 def build(
@@ -103,13 +179,18 @@ def build(
     *,
     toolchain: str | None = None,
     timeout_s: int = _DEFAULT_BUILD_TIMEOUT_S,
+    verbose: int = 0,
 ) -> None:
     """Run ``nsx build`` on the given app directory."""
     log.info("nsx build: %s (toolchain=%s)", app_dir, toolchain or "default")
-    _translate(
-        "nsx build",
-        lambda: nsx_api.build_app(app_dir, toolchain=toolchain, timeout_s=timeout_s),
-    )
+    emit = emitter_for_verbosity(verbose)
+    with _quiet_context(verbose):
+        _translate(
+            "nsx build",
+            lambda: nsx_api.build_app(
+                app_dir, toolchain=toolchain, timeout_s=timeout_s, emit=emit
+            ),
+        )
 
 
 def flash(
@@ -118,6 +199,7 @@ def flash(
     toolchain: str | None = None,
     jlink_serial: str | None = None,
     timeout_s: int = _DEFAULT_FLASH_TIMEOUT_S,
+    verbose: int = 0,
 ) -> None:
     """Run ``nsx flash`` on the given app directory.
 
@@ -125,16 +207,20 @@ def flash(
     the underlying CMake flash target selects the correct J-Link probe.
     """
     log.info("nsx flash: %s (toolchain=%s)", app_dir, toolchain or "default")
+    emit = emitter_for_verbosity(verbose)
 
     prev_sncode = os.environ.get("SEGGER_SNCODE")
     if jlink_serial:
         os.environ["SEGGER_SNCODE"] = jlink_serial
         log.info("  J-Link serial: %s", jlink_serial)
     try:
-        _translate(
-            "nsx flash",
-            lambda: nsx_api.flash_app(app_dir, toolchain=toolchain, timeout_s=timeout_s),
-        )
+        with _quiet_context(verbose):
+            _translate(
+                "nsx flash",
+                lambda: nsx_api.flash_app(
+                    app_dir, toolchain=toolchain, timeout_s=timeout_s, emit=emit
+                ),
+            )
     finally:
         # Restore previous state regardless of success/failure.
         if jlink_serial:
@@ -157,19 +243,23 @@ def lock(
     *,
     update: bool = False,
     timeout_s: int = _DEFAULT_LOCK_TIMEOUT_S,
+    verbose: int = 0,
 ) -> Path:
     """Resolve module constraints and write ``nsx.lock``."""
     log.info("nsx lock: %s (update=%s)", app_dir, update)
-    return _translate(
-        "nsx lock",
-        lambda: nsx_api.lock_app(
-            app_dir,
-            update=update,
-            quiet=True,
-            timeout_s=timeout_s,
-            resolve_ttl_s=_RESOLVE_TTL_S,
-        ),
-    )
+    emit = emitter_for_verbosity(verbose)
+    with _quiet_context(verbose):
+        return _translate(
+            "nsx lock",
+            lambda: nsx_api.lock_app(
+                app_dir,
+                update=update,
+                quiet=True,
+                timeout_s=timeout_s,
+                resolve_ttl_s=_RESOLVE_TTL_S,
+                emit=emit,
+            ),
+        )
 
 
 def sync(
@@ -179,6 +269,7 @@ def sync(
     force: bool = False,
     timeout_s: int = _DEFAULT_SYNC_TIMEOUT_S,
     retries: int = 3,
+    verbose: int = 0,
 ) -> None:
     """Materialise ``modules/`` so it exactly matches ``nsx.lock``.
 
@@ -186,15 +277,17 @@ def sync(
     exponential backoff (2s, 4s, 8s …).
     """
     log.info("nsx sync: %s (frozen=%s, force=%s)", app_dir, frozen, force)
+    emit = emitter_for_verbosity(verbose)
     last_exc: NetworkError | None = None
     for attempt in range(1, retries + 1):
         try:
-            _translate(
-                "nsx sync",
-                lambda: nsx_api.sync_app(
-                    app_dir, frozen=frozen, force=force, timeout_s=timeout_s
-                ),
-            )
+            with _quiet_context(verbose):
+                _translate(
+                    "nsx sync",
+                    lambda: nsx_api.sync_app(
+                        app_dir, frozen=frozen, force=force, timeout_s=timeout_s, emit=emit
+                    ),
+                )
             return
         except NetworkError as exc:
             last_exc = exc

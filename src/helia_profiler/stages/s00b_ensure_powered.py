@@ -1,29 +1,22 @@
-"""Stage 0b — Ensure board powered: enable Joulescope passthrough early.
+"""Stage 0b — Ensure target board powered.
 
-When a Joulescope sits in series with the EVB power rail, the board is
-unpowered until the JS internal relay closes ("current passthrough").
-Without passthrough J-Link can't see the target → flash fails → users
-have to launch the Joulescope desktop app first.
-
-This stage scans for any Joulescope (JS110/JS220) and, if found, enables
-passthrough so the board comes alive *before* the flash stage runs.  If no
-Joulescope is connected, the stage is a no-op — handy for users running on
-bench supplies.
+Vendor-neutral wrapper around :meth:`PowerDriver.ensure_target_powered`.
+Whatever the configured power driver is (Joulescope relay passthrough,
+programmable bench supply, on-device sensor with no rail control, …), the
+stage just asks the driver to make the board powered and records whether
+it succeeded.
 
 Behavior:
 
-* ``target.ensure_board_powered = True`` (default) — auto-detect & enable.
+* ``target.ensure_board_powered = True`` (default) — best-effort: ask the
+  driver, fall back to "skip" if the driver can't do it.
 * ``target.ensure_board_powered = False`` — skip entirely.
-* ``power.enabled = True`` implies passthrough is required, so the stage
-  runs even when ``ensure_board_powered`` is False.
+* ``power.enabled = True`` implies strict mode: the driver MUST succeed
+  (otherwise downstream power capture can't run).
 
-The Joulescope relay state (``i_range=auto``) is latched in hardware and
-persists after the USB handle is closed, so this stage releases the
-driver immediately and the board stays powered for the rest of the run.
-If a future driver needs a long-lived handle, it can be stashed on
-:attr:`~helia_profiler.pipeline.PipelineContext.power_driver_handle` and
-:class:`~helia_profiler.pipeline.PipelineRunner` will release it in its
-``finally`` block.
+If the driver skipped, :attr:`PipelineContext.passthrough_skipped` is set
+to ``True`` so the flash stage can include "is your EVB powered?" in its
+hint when flash fails.
 """
 
 from __future__ import annotations
@@ -51,42 +44,21 @@ class EnsureBoardPoweredStage:
         try:
             from ..power import get_driver
         except ImportError as exc:  # pragma: no cover
-            log.debug("power module unavailable: %s — skipping passthrough", exc)
+            log.debug("power module unavailable: %s — skipping.", exc)
+            ctx.passthrough_skipped = True
             return
 
         driver_name = cfg.power.driver or "joulescope"
 
         try:
             driver = get_driver(driver_name, serial=cfg.power.serial)
-        except PowerError as exc:
-            if cfg.power.enabled:
-                # Power capture explicitly requested — re-raise so the user
-                # gets a hard error instead of a silent failure later.
-                raise
-            log.info(
-                "No Joulescope detected (%s) — assuming board is on bench supply.",
-                exc,
-            )
-            return
-
-        try:
-            driver.enable_passthrough()
-        except PowerError as exc:
+        except PowerError:
             if cfg.power.enabled:
                 raise
-            log.warning(
-                "Joulescope present but passthrough failed: %s — continuing.",
-                exc,
-            )
+            ctx.passthrough_skipped = True
             return
 
-        # Release the USB handle immediately. The JS110/JS220 relay state
-        # (i_range=auto) is latched in hardware and persists after close, so
-        # the board stays powered while later stages (flash, capture_power)
-        # are free to open the device themselves without libusb conflicts.
-        try:
-            driver.disable_passthrough()
-        except Exception:  # pragma: no cover - defensive
-            log.debug("disable_passthrough after enable failed (ignored)")
-
-        log.info("Joulescope passthrough enabled (driver=%s, relay latched).", driver.name)
+        # Delegate the full decision matrix to the driver itself; the
+        # pipeline stays driver-agnostic.
+        powered = driver.ensure_target_powered(required=cfg.power.enabled)
+        ctx.passthrough_skipped = not powered
