@@ -40,7 +40,7 @@ class PmuCounter:
 # ---------------------------------------------------------------------------
 # M55 / ARMv8-M counter catalogue
 #
-# Source: ns_pmu_map[] in nsx-pmu-armv8m/src/armv8m/ns_pmu_utils.c
+# Source: nsx_pmu_map[] in nsx-pmu-armv8m/src/armv8m/nsx_pmu_utils.c
 # ---------------------------------------------------------------------------
 
 _COUNTERS: dict[str, PmuCounter] = {}

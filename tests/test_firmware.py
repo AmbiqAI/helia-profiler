@@ -5,12 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
 from helia_profiler.config import load_config
 from helia_profiler.firmware import (
     _board_module_name,
     _model_to_header,
     _resolve_module_list,
+    _resolve_module_specs,
     build_app,
     generate_app,
 )
@@ -18,6 +20,120 @@ from helia_profiler.pipeline import PipelineContext
 from helia_profiler.stages.s01_resolve_platform import ResolvePlatformStage
 from helia_profiler.stages.s02b_plan_memory import PlanMemoryStage
 from helia_profiler.stages.s02_prepare_engine import PrepareEngineStage
+
+
+def _fake_starter_profiles() -> dict[str, dict]:
+    return {
+        "apollo510_evb": {
+            "modules": [
+                "nsx-ambiqsuite-r5",
+                "nsx-ambiq-hal-r5",
+                "nsx-ambiq-bsp-r5",
+                "nsx-soc-hal",
+                "nsx-cmsis-startup",
+                "nsx-core",
+                "nsx-tooling",
+                "nsx-board-apollo510-evb",
+            ],
+            "project_overrides": {
+                "nsx-ambiq-sdk-r5": {
+                    "revision": "r5.3",
+                    "metadata": "modules/nsx-ambiqsuite-r5/nsx-module.yaml",
+                }
+            },
+            "module_overrides": {
+                "nsx-ambiqsuite-r5": {"project": "nsx-ambiq-sdk-r5"},
+                "nsx-ambiq-hal-r5": {"project": "nsx-ambiq-sdk-r5"},
+                "nsx-ambiq-bsp-r5": {"project": "nsx-ambiq-sdk-r5"},
+                "nsx-cmsis-core": {"project": "nsx-ambiq-sdk-r5"},
+                "nsx-soc-hal": {"project": "nsx-ambiq-sdk-r5"},
+                "nsx-cmsis-startup": {"project": "nsx-ambiq-sdk-r5"},
+                "nsx-core": {"project": "nsx-ambiq-sdk-r5"},
+                "nsx-pmu-armv8m": {"project": "nsx-ambiq-sdk-r5"},
+            },
+        },
+        "apollo4p_evb": {
+            "modules": [
+                "nsx-ambiqsuite-r4",
+                "nsx-board-apollo4p-evb",
+            ],
+            "project_overrides": {
+                "nsx-ambiq-sdk-r4": {
+                    "revision": "r4.0",
+                    "metadata": "modules/nsx-ambiqsuite-r4/nsx-module.yaml",
+                }
+            },
+            "module_overrides": {
+                "nsx-ambiqsuite-r4": {"project": "nsx-ambiq-sdk-r4"},
+                "nsx-cmsis-core": {"project": "nsx-ambiq-sdk-r4"},
+            },
+        },
+        "apollo3p_evb": {
+            "modules": [
+                "nsx-ambiqsuite-r3",
+                "nsx-board-apollo3p-evb",
+            ],
+            "project_overrides": {
+                "nsx-ambiq-sdk-r3": {
+                    "revision": "r3.0",
+                    "metadata": "modules/nsx-ambiqsuite-r3/nsx-module.yaml",
+                }
+            },
+            "module_overrides": {
+                "nsx-ambiqsuite-r3": {"project": "nsx-ambiq-sdk-r3"},
+                "nsx-cmsis-core": {"project": "nsx-ambiq-sdk-r3"},
+            },
+        },
+        "atomiq110_fpga_turbo": {
+            "modules": [
+                "nsx-ambiqsuite-r6",
+                "nsx-ambiq-hal-r6",
+                "nsx-ambiq-bsp-r6",
+                "nsx-soc-hal",
+                "nsx-cmsis-startup",
+                "nsx-core",
+                "nsx-tooling",
+                "nsx-board-atomiq110-fpga-turbo",
+            ],
+            "project_overrides": {
+                "nsx-ambiq-sdk-r6": {
+                    "revision": "r6.0",
+                    "metadata": "modules/nsx-ambiqsuite-r6/nsx-module.yaml",
+                }
+            },
+            "module_overrides": {
+                "nsx-ambiqsuite-r6": {"project": "nsx-ambiq-sdk-r6"},
+                "nsx-ambiq-hal-r6": {"project": "nsx-ambiq-sdk-r6"},
+                "nsx-ambiq-bsp-r6": {"project": "nsx-ambiq-sdk-r6"},
+                "nsx-cmsis-core": {"project": "nsx-ambiq-sdk-r6"},
+                "nsx-soc-hal": {"project": "nsx-ambiq-sdk-r6"},
+                "nsx-cmsis-startup": {"project": "nsx-ambiq-sdk-r6"},
+                "nsx-core": {"project": "nsx-ambiq-sdk-r6"},
+            },
+        },
+    }
+
+
+@pytest.fixture(autouse=True)
+def fake_nsx_registry(monkeypatch: pytest.MonkeyPatch) -> None:
+    profiles = _fake_starter_profiles()
+    module_projects = {
+        "nsx-tooling": "neuralspotx",
+        "nsx-board-apollo510-evb": "neuralspotx",
+        "nsx-board-apollo4p-evb": "neuralspotx",
+        "nsx-board-apollo3p-evb": "neuralspotx",
+        "nsx-board-atomiq110-fpga-turbo": "neuralspotx",
+        "nsx-pmu-armv8m": "nsx-pmu-armv8m",
+    }
+
+    monkeypatch.setattr(
+        "helia_profiler.firmware.nsx_cli.starter_profile",
+        lambda board: profiles.get(board),
+    )
+    monkeypatch.setattr(
+        "helia_profiler.firmware.nsx_cli.registry_module_project",
+        lambda name: module_projects.get(name),
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -75,6 +191,8 @@ class TestResolveModuleList:
         assert "nsx-core" in modules
         assert "nsx-pmu-armv8m" in modules
         assert "nsx-board-apollo510-evb" in modules
+        assert "nsx-harness" not in modules
+        assert "nsx-utils" not in modules
 
     def test_r4_tier(self):
         modules = _resolve_module_list("apollo4p_evb", "r4")
@@ -90,6 +208,50 @@ class TestResolveModuleList:
 
         with pytest.raises(FirmwareError, match="Unknown SDK tier"):
             _resolve_module_list("board", "r99")
+
+    def test_r5_sdk_modules_resolve_to_monorepo_project(self):
+        modules = _resolve_module_specs("apollo510_evb", "r5")
+        by_name = {module.name: module for module in modules}
+        assert by_name["nsx-ambiqsuite-r5"].project == "nsx-ambiq-sdk-r5"
+        assert by_name["nsx-ambiq-hal-r5"].project == "nsx-ambiq-sdk-r5"
+        assert by_name["nsx-ambiq-bsp-r5"].project == "nsx-ambiq-sdk-r5"
+
+    def test_common_modules_resolve_to_monorepo_project(self):
+        # Modules hpx still consumes directly from the SDK monorepo must be
+        # owned by nsx-ambiq-sdk-{tier}, matching the canonical r5 ownership
+        # model rather than the legacy standalone same-name projects.
+        modules = _resolve_module_specs("apollo510_evb", "r5")
+        by_name = {module.name: module for module in modules}
+        for name in (
+            "nsx-cmsis-core",
+            "nsx-soc-hal",
+            "nsx-cmsis-startup",
+            "nsx-core",
+            "nsx-pmu-armv8m",
+        ):
+            assert by_name[name].project == "nsx-ambiq-sdk-r5", name
+
+    def test_board_and_tooling_modules_resolve_to_neuralspotx(self):
+        modules = _resolve_module_specs("atomiq110_fpga_turbo", "r6")
+        by_name = {module.name: module for module in modules}
+        assert by_name["nsx-board-atomiq110-fpga-turbo"].project == "neuralspotx"
+        assert by_name["nsx-tooling"].project == "neuralspotx"
+
+    def test_r6_unmigrated_pmu_falls_back_to_standalone(self):
+        # The r6 monorepo does not yet vendor nsx-pmu-armv8m, so ownership must
+        # fall back to the standalone project rather than over-pin it onto
+        # nsx-ambiq-sdk-r6.
+        modules = _resolve_module_specs("atomiq110_fpga_turbo", "r6")
+        by_name = {module.name: module for module in modules}
+        assert by_name["nsx-pmu-armv8m"].project == "nsx-pmu-armv8m"
+        # Modules the r6 monorepo does vendor stay on the monorepo project.
+        assert by_name["nsx-core"].project == "nsx-ambiq-sdk-r6"
+        assert by_name["nsx-soc-hal"].project == "nsx-ambiq-sdk-r6"
+
+    def test_power_and_perf_are_not_required_modules(self):
+        modules = _resolve_module_list("apollo510_evb", "r5")
+        assert "nsx-power" not in modules
+        assert "nsx-perf" not in modules
 
 
 class TestModelToHeader:
@@ -166,6 +328,8 @@ class TestGenerateApp:
         assert "HPX_START" in main_cc
         assert "HPX_END" in main_cc
         assert "HpxPmuProfiler" in main_cc
+        assert "ns_ambiqsuite_harness.h" not in main_cc
+        assert "am_util_delay_ms" not in main_cc
 
     def test_cmakelists_links_heliart(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)
@@ -253,7 +417,7 @@ class TestGenerateApp:
         main_cc = (app_dir / "src" / "main.cc").read_text()
         assert "kPowerSyncEnabled = false" in main_cc
 
-    def test_weights_psram_override_skips_model_header_and_links_peripherals(
+    def test_weights_psram_override_skips_model_header_and_links_psram_module(
         self, tmp_path: Path, fake_dist: Path
     ):
         model = tmp_path / "model.tflite"
@@ -286,8 +450,8 @@ class TestGenerateApp:
         main_cc = (app_dir / "src" / "main.cc").read_text()
         cmake = (app_dir / "CMakeLists.txt").read_text()
         assert (app_dir / "src" / "model_data.h").exists() is False
-        assert "ns_peripherals_psram.h" in main_cc
-        assert "nsx::peripherals" in cmake
+        assert "nsx_psram.h" in main_cc
+        assert "nsx::psram" in cmake
 
 
 class TestBuildApp:
@@ -388,7 +552,7 @@ class TestNsxModuleOverrides:
         nsx_yml = (app_dir / "nsx.yml").read_text()
         assert "channel: dev" in nsx_yml
 
-    def test_default_channel_is_stable(self, tmp_path: Path, fake_dist: Path):
+    def test_default_channel_uses_board_channel(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(tmp_path, fake_dist, {})
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)
@@ -396,6 +560,28 @@ class TestNsxModuleOverrides:
 
         nsx_yml = (app_dir / "nsx.yml").read_text()
         assert "channel: stable" in nsx_yml
+
+    def test_preview_board_defaults_to_preview_channel(self, tmp_path: Path, fake_dist: Path):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "atomiq110_fpga_turbo"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        assert "channel: preview" in nsx_yml
 
     def test_version_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(
@@ -408,7 +594,15 @@ class TestNsxModuleOverrides:
 
         nsx_yml = (app_dir / "nsx.yml").read_text()
         assert 'version: "2.0.0"' in nsx_yml
-        assert "nsx-ambiqsuite-r5" in nsx_yml
+        assert "project: nsx-ambiq-sdk-r5" in nsx_yml
+        # A version override targets the whole owning project, so every module
+        # vendored by nsx-ambiq-sdk-r5 receives it.
+        sdk_module_count = sum(
+            1
+            for spec in _resolve_module_specs("apollo510_evb", "r5")
+            if spec.project == "nsx-ambiq-sdk-r5"
+        )
+        assert nsx_yml.count('version: "2.0.0"') == sdk_module_count
 
     def test_ref_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(
@@ -421,7 +615,29 @@ class TestNsxModuleOverrides:
 
         nsx_yml = (app_dir / "nsx.yml").read_text()
         assert "ref: feat/new-soc" in nsx_yml
-        assert "nsx-ambiq-hal-r5" in nsx_yml
+        assert "project: nsx-ambiq-sdk-r5" in nsx_yml
+        # A ref override targets the whole owning project, so every module
+        # vendored by nsx-ambiq-sdk-r5 receives it.
+        sdk_module_count = sum(
+            1
+            for spec in _resolve_module_specs("apollo510_evb", "r5")
+            if spec.project == "nsx-ambiq-sdk-r5"
+        )
+        assert nsx_yml.count("ref: feat/new-soc") == sdk_module_count
+
+    def test_module_registry_emitted_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
+        # The generated manifest must carry the profile's module_registry so the
+        # app's effective registry agrees with the per-module project pins and a
+        # real `nsx lock` passes alignment validation.
+        ctx = self._make_ctx_with_overrides(tmp_path, fake_dist, {})
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        nsx_yml = yaml.safe_load((app_dir / "nsx.yml").read_text())
+        registry = nsx_yml["module_registry"]
+        assert registry["projects"]["nsx-ambiq-sdk-r5"]["revision"]
+        assert registry["modules"]["nsx-pmu-armv8m"]["project"] == "nsx-ambiq-sdk-r5"
 
     def test_path_override_installs_local_module(self, tmp_path: Path, fake_dist: Path):
         # Create a fake local module with nsx-module.yaml

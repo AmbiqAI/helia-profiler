@@ -7,7 +7,7 @@ import logging
 
 from ..errors import ConfigError, PlatformError
 from ..pipeline import PipelineContext
-from ..platform import PmuTier, get_board, get_soc
+from ..platform import PmuTier, get_board, get_soc_for_board
 from ..results import ModelInfo, PlatformInfo
 
 log = logging.getLogger("hpx")
@@ -35,7 +35,7 @@ class ResolvePlatformStage:
             raise ConfigError(str(exc)) from exc
 
         try:
-            soc = get_soc(board.soc)
+            soc = get_soc_for_board(board_name)
         except ValueError as exc:
             raise PlatformError(
                 f"Board '{board_name}' references unknown SoC '{board.soc}'.",

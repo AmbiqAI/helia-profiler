@@ -148,6 +148,19 @@ def _check_explicit_location(loc: str | None, *, name: str, valid: tuple[Placeme
 def _check_runtime_split_locations(cfg) -> None:
     runtime_arena = cfg.engine.config.get("runtime_arena_location")
     runtime_weights = cfg.engine.config.get("runtime_weights_location")
+    weights_in_psram = (
+        cfg.model.model_location == Placement.PSRAM
+        or runtime_weights == Placement.PSRAM
+    )
+
+    if weights_in_psram and cfg.target.transport != "rtt":
+        raise ConfigError(
+            "PSRAM model weights require target.transport='rtt'.",
+            hint=(
+                "Host-side PSRAM model upload currently uses the RTT transport. "
+                "Use --transport rtt, or keep weights in MRAM/SRAM."
+            ),
+        )
 
     adapter = get_adapter(cfg.engine.type)
     if not adapter.supports_runtime_split():

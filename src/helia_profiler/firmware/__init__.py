@@ -11,10 +11,12 @@ import glob
 import logging
 import os
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import jinja2
+import yaml
 
 from .. import nsx as nsx_cli
 from ..config import DEFAULT_ARENA_SIZE_BYTES
@@ -25,8 +27,9 @@ from ..counters import (
     resolve_legacy_presets,
 )
 from ..engines import EngineType
+from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
-from ..platform import PmuTier, get_soc_for_board
+from ..platform import PmuTier, get_board, get_soc_for_board
 from ..placement import Placement
 
 if TYPE_CHECKING:
@@ -45,6 +48,20 @@ _TOOLCHAIN_MAP: dict[str, str] = {
 }
 
 
+@dataclass(frozen=True)
+class NsxModuleSpec:
+    """Resolved NSX module identity for firmware generation.
+
+    ``name`` is the module name used in ``NSX_APP_MODULES``. ``project`` is the
+    owning NSX project/repository used for lock resolution. Keeping them
+    separate avoids assuming that ``project == module`` for monorepo-backed SDK
+    modules.
+    """
+
+    name: str
+    project: str
+
+
 def _nsx_toolchain(toolchain: str) -> str | None:
     """Convert a config toolchain name to the ``nsx --toolchain`` value.
 
@@ -56,41 +73,38 @@ def _nsx_toolchain(toolchain: str) -> str | None:
 
 # ---------------------------------------------------------------------------
 # SDK tier → module set mapping
+#
+# hpx owns the *selection* of modules a profiler app needs (a deliberately lean
+# set — e.g. it uses nsx-core's runtime helpers directly rather than the legacy
+# nsx-harness / nsx-utils modules). The *ownership* of each module (which NSX
+# project vendors it) is NOT hand-maintained here: it is derived from the NSX
+# starter profile for the target board so it always tracks the upstream
+# registry (which consolidates modules under the nsx-ambiq-sdk-{tier} monorepo
+# tier-by-tier). See ``_module_project``.
 # ---------------------------------------------------------------------------
-_SDK_MODULES: dict[str, list[str]] = {
-    "r3": [
-        "nsx-cmsis-core",
-        "nsx-ambiqsuite-r3",
-        "nsx-ambiq-hal-r3",
-        "nsx-ambiq-bsp-r3",
-    ],
-    "r4": [
-        "nsx-cmsis-core",
-        "nsx-ambiqsuite-r4",
-        "nsx-ambiq-hal-r4",
-        "nsx-ambiq-bsp-r4",
-    ],
-    "r5": [
-        "nsx-cmsis-core",
-        "nsx-ambiqsuite-r5",
-        "nsx-ambiq-hal-r5",
-        "nsx-ambiq-bsp-r5",
-    ],
-}
 
-# Common modules every profiler app needs (order matters for CMake)
-_COMMON_MODULES = [
+
+def _sdk_ambiqsuite_module_name(sdk_tier: str) -> str:
+    return f"nsx-ambiqsuite-{sdk_tier}"
+
+
+_KNOWN_SDK_TIERS = ("r3", "r4", "r5", "r6")
+
+# Common modules every profiler app needs, in CMake order. The board module is
+# inserted dynamically right after nsx-cmsis-startup; nsx-tooling is appended
+# last. Ownership of each is resolved from the board's NSX starter profile.
+#
+# nsx-power / nsx-perf were intentionally removed from this lean set: the
+# generated profiler app does not consume their APIs directly, and nsx-core
+# already owns the performance-mode plumbing hpx uses via nsx_system_config_t.
+# Dropping them avoids forcing R6 to resolve modules its SDK monorepo does not
+# currently vendor.
+_COMMON_MODULE_NAMES: tuple[str, ...] = (
     "nsx-soc-hal",
     "nsx-cmsis-startup",
-    # board module inserted dynamically
     "nsx-core",
-    "nsx-harness",
-    "nsx-utils",
-    "nsx-power",
-    "nsx-perf",
     "nsx-pmu-armv8m",
-    "nsx-tooling",
-]
+)
 
 
 def _board_module_name(board: str) -> str:
@@ -98,30 +112,162 @@ def _board_module_name(board: str) -> str:
     return f"nsx-board-{board.replace('_', '-')}"
 
 
-def _resolve_module_list(board: str, sdk_tier: str) -> list[str]:
-    """Build the ordered module list for a profiler app."""
-    sdk_mods = _SDK_MODULES.get(sdk_tier)
-    if sdk_mods is None:
+def _starter_profile_module_names(profile: dict[str, Any]) -> list[str]:
+    """Return the starter profile's authoritative direct module list.
+
+    hpx keeps using the profile as the source of truth for the board/provider
+    stack, then layers its own direct runtime consumers on top.
+    """
+    modules = profile.get("modules") or []
+    if not isinstance(modules, list) or not all(isinstance(name, str) for name in modules):
+        raise FirmwareError(
+            "NSX starter profile is missing a valid module list",
+            hint="Update neuralspotx so the board starter profile declares its modules.",
+        )
+    # hpx intentionally does not consume these legacy helpers directly.
+    return [name for name in modules if name not in {"nsx-harness", "nsx-utils"}]
+
+
+def _get_starter_profile(board: str) -> dict[str, Any]:
+    """Return the NSX starter profile for *board*.
+
+    The profile is the single source of truth for module/project ownership
+    (its ``module_overrides`` repoint SDK modules onto the consolidated
+    nsx-ambiq-sdk-{tier} monorepo for tiers that have migrated).
+    """
+    profile = nsx_cli.starter_profile(board)
+    if profile is None:
+        raise FirmwareError(
+            f"No NSX starter profile for board '{board}'",
+            hint=(
+                "The board must be registered in the NSX registry "
+                "(registry.lock.yaml ships with neuralspotx). Check the board "
+                "name or update neuralspotx."
+            ),
+        )
+    return profile
+
+
+def _module_project(name: str, profile: dict[str, Any]) -> str:
+    """Resolve the owning NSX project for a module name.
+
+    Resolution order, mirroring ``nsx``'s own manifest generation:
+
+    0. The starter profile's ``module_overrides`` — authoritative repoint of a
+       module onto the SDK monorepo for tiers that have migrated.
+    1. The base registry entry (standalone project) for everything else.
+    2. The module name itself as a last resort (opaque / local modules).
+    """
+    override = profile.get("module_overrides", {}).get(name)
+    if isinstance(override, dict) and override.get("project"):
+        return override["project"]
+    return nsx_cli.registry_module_project(name) or name
+
+
+def _render_module_registry(profile: dict[str, Any]) -> str:
+    """Render the ``module_registry`` block for nsx.yml from the profile.
+
+    Emitting the profile's full ``project_overrides`` / ``module_overrides``
+    makes the app's effective registry agree with the per-module project pins
+    in the manifest (so ``nsx`` alignment passes) and ensures transitive
+    dependencies pulled in during closure resolution resolve to the same SDK
+    monorepo as the explicitly listed modules.
+    """
+    project_overrides = profile.get("project_overrides") or {}
+    module_overrides = dict(profile.get("module_overrides") or {})
+    if not project_overrides and not module_overrides:
+        return ""
+    registry: dict[str, Any] = {}
+    if project_overrides:
+        registry["projects"] = dict(project_overrides)
+    if module_overrides:
+        registry["modules"] = dict(module_overrides)
+    return yaml.safe_dump(
+        {"module_registry": registry}, sort_keys=False, default_flow_style=False
+    )
+
+
+def _default_nsx_channel(board_name: str, configured_channel: str | None) -> str:
+    """Resolve the NSX channel for a generated app.
+
+    An explicit config override wins. Otherwise we use the board's registered
+    default so preview-only boards naturally follow the matching NSX channel.
+    """
+    if configured_channel is not None:
+        return configured_channel
+    return get_board(board_name).channel
+
+
+def _resolve_module_specs(board: str, sdk_tier: str) -> list[NsxModuleSpec]:
+    """Build the ordered typed module list for a profiler app.
+
+    Module *selection* is hpx-owned; module *ownership* (project) is derived
+    from the board's NSX starter profile.
+    """
+    if sdk_tier not in _KNOWN_SDK_TIERS:
         raise FirmwareError(
             f"Unknown SDK tier '{sdk_tier}'",
-            hint=f"Known tiers: {', '.join(_SDK_MODULES)}",
+            hint=f"Known tiers: {', '.join(_KNOWN_SDK_TIERS)}",
         )
-    modules = list(sdk_mods)
-    board_mod = _board_module_name(board)
+    profile = _get_starter_profile(board)
     soc = get_soc_for_board(board)
-    # Insert board + common modules after SDK modules
-    for mod in _COMMON_MODULES:
-        if mod == "nsx-pmu-armv8m" and soc.pmu_tier is not PmuTier.ARMV8M_PMU:
+
+    ordered_names: list[str] = _starter_profile_module_names(profile)
+
+    if "nsx-cmsis-core" not in ordered_names:
+        ordered_names.insert(0, "nsx-cmsis-core")
+    if soc.pmu_tier is PmuTier.ARMV8M_PMU and "nsx-pmu-armv8m" not in ordered_names:
+        tooling_idx = ordered_names.index("nsx-tooling") if "nsx-tooling" in ordered_names else len(ordered_names)
+        ordered_names.insert(tooling_idx, "nsx-pmu-armv8m")
+
+    return [NsxModuleSpec(name, _module_project(name, profile)) for name in ordered_names]
+
+
+def _resolve_module_list(board: str, sdk_tier: str) -> list[str]:
+    """Backward-compatible wrapper returning only module names."""
+    return [spec.name for spec in _resolve_module_specs(board, sdk_tier)]
+
+
+def _resolve_project_overrides(
+    module_specs: list[NsxModuleSpec],
+    nsx_overrides: dict[str, Any],
+) -> dict[str, tuple[str, str]]:
+    """Collapse module-targeted ref/version overrides onto owning projects.
+
+    Monorepo-backed SDK modules share a project, so ref/version overrides must
+    resolve coherently at the project level. ``path`` overrides remain module-
+    local because they install a concrete local module directory.
+    """
+    by_name = {spec.name: spec for spec in module_specs}
+    project_overrides: dict[str, tuple[str, str]] = {}
+    for name, override in nsx_overrides.items():
+        spec = by_name.get(name)
+        if spec is None or override.path is not None:
             continue
-        if mod == "nsx-soc-hal":
-            modules.append(mod)
-            modules.append("nsx-cmsis-startup")
-            modules.append(board_mod)
-        elif mod in ("nsx-cmsis-startup",):
-            continue  # already added above
-        else:
-            modules.append(mod)
-    return modules
+        mode = "ref" if override.ref is not None else "version"
+        value = override.ref if override.ref is not None else override.version
+        if value is None:
+            continue
+        existing = project_overrides.get(spec.project)
+        if existing is not None and existing != (mode, value):
+            raise ConfigError(
+                f"Conflicting build.nsx_modules overrides for project '{spec.project}'",
+                hint=(
+                    "Modules from the same NSX project must use the same ref/version. "
+                    f"Conflicting module names: '{name}' and another module in '{spec.project}'."
+                ),
+            )
+        project_overrides[spec.project] = (mode, value)
+    return project_overrides
+
+
+def _module_names_by_project(module_specs: list[NsxModuleSpec]) -> dict[str, set[str]]:
+    """Index generated module names by owning NSX project."""
+
+    names_by_project: dict[str, set[str]] = {}
+    for spec in module_specs:
+        names_by_project.setdefault(spec.project, set()).add(spec.name)
+    return names_by_project
 
 
 def _install_local_module_override(dest: Path, source: Path) -> None:
@@ -151,10 +297,10 @@ def _install_local_module_override(dest: Path, source: Path) -> None:
 # PMU preset mapping (legacy — used only for backward-compat Init() path)
 # ---------------------------------------------------------------------------
 _PMU_PRESET_MAP: dict[str, str] = {
-    "basic_cpu": "NS_PMU_PRESET_BASIC_CPU",
-    "memory": "NS_PMU_PRESET_MEMORY",
-    "mve": "NS_PMU_PRESET_MVE",
-    "ml_default": "NS_PMU_PRESET_ML_DEFAULT",
+    "basic_cpu": "NSX_PMU_PRESET_BASIC_CPU",
+    "memory": "NSX_PMU_PRESET_MEMORY",
+    "mve": "NSX_PMU_PRESET_MVE",
+    "ml_default": "NSX_PMU_PRESET_ML_DEFAULT",
 }
 
 
@@ -193,7 +339,7 @@ def _resolve_pmu_passes(config: Any) -> list[dict[str, Any]]:
     # --- Legacy path: named presets ---
     result: list[dict[str, Any]] = []
     for preset_name in profiling.pmu_presets:
-        c_enum = _PMU_PRESET_MAP.get(preset_name, "NS_PMU_PRESET_ML_DEFAULT")
+        c_enum = _PMU_PRESET_MAP.get(preset_name, "NSX_PMU_PRESET_ML_DEFAULT")
         result.append({
             "name": preset_name,
             "custom": False,
@@ -208,7 +354,7 @@ def _resolve_pmu_passes(config: Any) -> list[dict[str, Any]]:
             "custom": False,
             "event_ids": [],
             "num_counters": 4,
-            "c_enum": "NS_PMU_PRESET_ML_DEFAULT",
+            "c_enum": "NSX_PMU_PRESET_ML_DEFAULT",
             "group": "ml_default",
         }]
     return result
@@ -376,42 +522,56 @@ def generate_app(ctx: PipelineContext) -> Path:
     arena_region = ctx.arena_region or Placement.TCM
 
     # --- Resolve module list ---
-    mod_names = _resolve_module_list(board.name, soc.sdk_tier)
+    module_specs = _resolve_module_specs(board.name, soc.sdk_tier)
+    profile = _get_starter_profile(board.name)
 
     # Add nsx-usb module when using USB CDC transport
     transport = config.target.transport
-    if transport == "usb_cdc" and "nsx-usb" not in mod_names:
-        mod_names.append("nsx-usb")
+    if transport == "usb_cdc" and "nsx-usb" not in {m.name for m in module_specs}:
+        module_specs.append(NsxModuleSpec("nsx-usb", _module_project("nsx-usb", profile)))
 
-    # Add nsx-peripherals module when using PSRAM (for weights or arena)
+    # Add nsx-psram when using PSRAM (for weights or arena)
     psram_needed = arena_region is Placement.PSRAM or weights_region is Placement.PSRAM
-    if psram_needed and "nsx-peripherals" not in mod_names:
-        mod_names.append("nsx-peripherals")
+    if psram_needed and "nsx-psram" not in {m.name for m in module_specs}:
+        module_specs.append(
+            NsxModuleSpec("nsx-psram", _module_project("nsx-psram", profile))
+        )
 
     # Build module descriptors (name + local flag + optional overrides)
     nsx_overrides = config.build.nsx_modules
+    board_mod = _board_module_name(board.name)
+    project_overrides = _resolve_project_overrides(module_specs, nsx_overrides)
+    module_names_by_project = _module_names_by_project(module_specs)
     modules: list[dict[str, object]] = []
     matched_overrides: set[str] = set()
-    for m in mod_names:
-        override = nsx_overrides.get(m)
-        if override and override.path:
+    for spec in module_specs:
+        override = nsx_overrides.get(spec.name)
+        project_override = project_overrides.get(spec.project)
+        if override and override.path and spec.name == board_mod:
+            # NSX treats board modules specially: local board sources live under
+            # boards/<board>, while regular modules live under modules/<name>.
+            matched_overrides.add(spec.name)
+            local_board_dir = app_dir / "boards" / board.name
+            _install_local_module_override(local_board_dir, override.path)
+            modules.append({"name": spec.name, "project": spec.project, "local": True})
+        elif override and override.path:
             # Local path override — install into app modules/ and mark local
-            matched_overrides.add(m)
-            local_mod_dir = app_dir / "modules" / m
+            matched_overrides.add(spec.name)
+            local_mod_dir = app_dir / "modules" / spec.name
             _install_local_module_override(local_mod_dir, override.path)
-            modules.append({"name": m, "local": True})
-        elif override and override.ref:
-            matched_overrides.add(m)
-            modules.append({
-                "name": m, "local": False, "ref": override.ref,
-            })
-        elif override and override.version:
-            matched_overrides.add(m)
-            modules.append({
-                "name": m, "local": False, "version": override.version,
-            })
+            modules.append({"name": spec.name, "project": spec.project, "local": True})
+        elif project_override is not None:
+            matched_overrides.update(
+                name
+                for name, override_spec in nsx_overrides.items()
+                if override_spec.path is None and name in module_names_by_project[spec.project]
+            )
+            mode, value = project_override
+            modules.append(
+                {"name": spec.name, "project": spec.project, "local": False, mode: value}
+            )
         else:
-            modules.append({"name": m, "local": False})
+            modules.append({"name": spec.name, "project": spec.project, "local": False})
 
     # Warn about overrides that didn't match any module in the build
     unmatched = set(nsx_overrides.keys()) - matched_overrides
@@ -420,13 +580,13 @@ def generate_app(ctx: PipelineContext) -> Path:
             "build.nsx_modules override '%s' did not match any module in this "
             "build — check the module name (available: %s)",
             name,
-            ", ".join(mod_names),
+            ", ".join(spec.name for spec in module_specs),
         )
 
     # Append engine-provided modules (e.g. nsx-helia-rt) as local
     for extra_mod in artifacts.extra_modules:
-        if extra_mod.name not in mod_names:
-            modules.append({"name": extra_mod.name, "local": True})
+        if extra_mod.name not in {spec.name for spec in module_specs}:
+            modules.append({"name": extra_mod.name, "project": extra_mod.name, "local": True})
 
     log.info("NSX modules: %s", ", ".join(m["name"] for m in modules))  # type: ignore[arg-type]
 
@@ -441,8 +601,9 @@ def generate_app(ctx: PipelineContext) -> Path:
             board=board.name,
             soc=soc.name,
             toolchain=config.target.toolchain,
-            channel=config.build.channel,
+            channel=_default_nsx_channel(board.name, config.build.channel),
             modules=modules,
+            module_registry_yaml=_render_module_registry(profile),
         )
     )
 
@@ -467,6 +628,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             arena_region=arena_region,
             weights_region=weights_region,
             has_full_pmu=soc.has_full_pmu,
+            ambiqsuite_module=_sdk_ambiqsuite_module_name(soc.sdk_tier),
         )
     )
 
@@ -480,7 +642,7 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # PMU preset
     first_preset = config.profiling.pmu_presets[0] if config.profiling.pmu_presets else "ml_default"
-    pmu_preset_c = _PMU_PRESET_MAP.get(first_preset, "NS_PMU_PRESET_ML_DEFAULT")
+    pmu_preset_c = _PMU_PRESET_MAP.get(first_preset, "NSX_PMU_PRESET_ML_DEFAULT")
 
     # Build pass list for multi-pass firmware loop
     pmu_passes = _resolve_pmu_passes(config)

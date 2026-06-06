@@ -143,6 +143,41 @@ class TestPreflightConfig:
             with pytest.raises(ConfigError, match="runtime_weights_location is not supported"):
                 PreflightStage().run(ctx)
 
+    def test_psram_model_location_requires_rtt_transport(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {"model_location": "psram"},
+                "target": {"transport": "usb_cdc"},
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="PSRAM model weights require"):
+                PreflightStage().run(ctx)
+
+    def test_psram_runtime_weights_require_rtt_transport(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "engine": {"type": "helia-rt", "config": {"runtime_weights_location": "psram"}},
+                "target": {"transport": "usb_cdc"},
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="PSRAM model weights require"):
+                PreflightStage().run(ctx)
+
+    def test_psram_model_location_allows_rtt_transport(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {"model_location": "psram"},
+                "target": {"transport": "rtt"},
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            PreflightStage().run(ctx)
+
 
 class TestPreflightHostTools:
     def test_missing_nsx_raises_with_hint(self, tmp_path: Path):

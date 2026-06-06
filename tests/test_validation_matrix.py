@@ -26,6 +26,7 @@ class TestRegistry:
     def test_apollo510_registered(self):
         assert "apollo510_evb" in BOARDS
         assert BOARDS["apollo510_evb"].jlink_device == "AP510NFA-CBR"
+        assert BOARDS["apollo510_evb"].has_psram is True
 
     def test_engines_are_rt_and_aot(self):
         assert set(ENGINES) == {EngineType.HELIA_RT, EngineType.HELIA_AOT}

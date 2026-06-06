@@ -101,7 +101,7 @@ def test_build_config_defaults():
         "engine": {"type": "tflm"},
     }
     config = load_config(None, cli)
-    assert config.build.channel == "stable"
+    assert config.build.channel is None
     assert config.build.nsx_modules == {}
 
 

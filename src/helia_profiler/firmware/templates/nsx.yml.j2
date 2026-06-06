@@ -15,13 +15,16 @@ modules:
 {% if m.local %}
   local: true
 {% elif m.ref is defined and m.ref %}
-  project: {{ m.name }}
+  project: {{ m.project }}
   ref: {{ m.ref }}
 {% elif m.version is defined and m.version %}
-  project: {{ m.name }}
+  project: {{ m.project }}
   version: "{{ m.version }}"
 {% else %}
-  project: {{ m.name }}
+  project: {{ m.project }}
 {% endif %}
 {% endfor %}
 features: {}
+{% if module_registry_yaml %}
+{{ module_registry_yaml }}
+{%- endif %}

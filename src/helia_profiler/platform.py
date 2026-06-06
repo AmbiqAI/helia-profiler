@@ -11,7 +11,7 @@ family despite the "3" in its name.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 
 # ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ class SocDef:
     has_mve: bool  # Helium / MVE vector extensions
     memory: MemoryLayout
     clock: ClockConfig
-    sdk_tier: str  # "r3", "r4", or "r5" — maps to nsx-ambiqsuite-r*
+    sdk_tier: str  # "r3", "r4", "r5", or "r6" — maps to nsx-ambiqsuite-r*
     c_define: str  # e.g. "AM_PART_APOLLO510"
     jlink_device: str = ""  # J-Link device string (e.g. "AP510NFA-CBR")
     pmu_max_ops: int = 2048  # Max PMU accumulator operations (layers)
@@ -99,6 +99,7 @@ class BoardDef:
     name: str  # e.g. "apollo510_evb"
     soc: str  # SoC name key (matches SocDef.name)
     channel: str  # "stable" or "preview"
+    psram_kb: int | None = None  # None = inherit SoC default
     description: str = ""
 
 
@@ -137,7 +138,8 @@ _register_soc(
     )
 )
 
-_register_board(BoardDef("apollo3p_evb", soc="apollo3p", channel="stable"))
+_register_board(BoardDef("apollo3p_evb", soc="apollo3p", channel="stable", psram_kb=8192))
+_register_board(BoardDef("apollo3p_evb_cygnus", soc="apollo3p", channel="preview", psram_kb=8192))
 
 # --- AP4 family (Cortex-M4F) ------------------------------------------------
 
@@ -171,7 +173,11 @@ _register_soc(
     )
 )
 
-_register_board(BoardDef("apollo4p_evb", soc="apollo4p", channel="preview"))
+_register_board(BoardDef("apollo4p_evb", soc="apollo4p", channel="preview", psram_kb=32768))
+_register_board(BoardDef("apollo4l_evb", soc="apollo4l", channel="preview", psram_kb=32768))
+_register_board(BoardDef("apollo4l_blue_evb", soc="apollo4l", channel="preview", psram_kb=32768))
+_register_board(BoardDef("apollo4p_blue_kbr_evb", soc="apollo4p", channel="preview", psram_kb=32768))
+_register_board(BoardDef("apollo4p_blue_kxr_evb", soc="apollo4p", channel="preview", psram_kb=32768))
 
 # --- AP5 family (Cortex-M55, full PMU + MVE) --------------------------------
 
@@ -277,6 +283,37 @@ _register_board(
     )
 )
 
+# --- Atomiq family (Cortex-M55 + Ethos-U85 NPU) ------------------------------
+
+_register_soc(
+    SocDef(
+        name="atomiq110",
+        family=SocFamily.AP5,  # CM55 + MVE + full PMU, same as AP5
+        core=CoreArch.CORTEX_M55,
+        pmu_tier=PmuTier.ARMV8M_PMU,
+        has_mve=True,
+        memory=MemoryLayout(
+            sram_kb=3072,
+            dtcm_kb=512,
+            itcm_kb=256,
+        ),
+        clock=ClockConfig(lp_mhz=25, hp_mhz=25),  # FPGA: 1/10 speed
+        sdk_tier="r6",
+        c_define="AM_PART_ATOMIQ110",
+        jlink_device="AT110NFA-CBR",
+        pmu_max_ops=4096,
+    )
+)
+
+_register_board(
+    BoardDef(
+        "atomiq110_fpga_turbo",
+        soc="atomiq110",
+        channel="preview",
+        description="Atomiq110 FPGA turbo — Cortex-M55 + Ethos-U85 (1/10 speed)",
+    )
+)
+
 
 # ---------------------------------------------------------------------------
 # Public lookup API
@@ -302,7 +339,13 @@ def get_board(name: str) -> BoardDef:
 def get_soc_for_board(board_name: str) -> SocDef:
     """Resolve the SoC definition for a given board."""
     board = get_board(board_name)
-    return get_soc(board.soc)
+    soc = get_soc(board.soc)
+    if board.psram_kb is None:
+        return soc
+    return replace(
+        soc,
+        memory=replace(soc.memory, psram_kb=board.psram_kb),
+    )
 
 
 def list_boards() -> list[BoardDef]:
