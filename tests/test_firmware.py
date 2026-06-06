@@ -22,6 +22,120 @@ from helia_profiler.stages.s02b_plan_memory import PlanMemoryStage
 from helia_profiler.stages.s02_prepare_engine import PrepareEngineStage
 
 
+def _fake_starter_profiles() -> dict[str, dict]:
+    return {
+        "apollo510_evb": {
+            "modules": [
+                "nsx-ambiqsuite-r5",
+                "nsx-ambiq-hal-r5",
+                "nsx-ambiq-bsp-r5",
+                "nsx-soc-hal",
+                "nsx-cmsis-startup",
+                "nsx-core",
+                "nsx-tooling",
+                "nsx-board-apollo510-evb",
+            ],
+            "project_overrides": {
+                "nsx-ambiq-sdk-r5": {
+                    "revision": "r5.3",
+                    "metadata": "modules/nsx-ambiqsuite-r5/nsx-module.yaml",
+                }
+            },
+            "module_overrides": {
+                "nsx-ambiqsuite-r5": {"project": "nsx-ambiq-sdk-r5"},
+                "nsx-ambiq-hal-r5": {"project": "nsx-ambiq-sdk-r5"},
+                "nsx-ambiq-bsp-r5": {"project": "nsx-ambiq-sdk-r5"},
+                "nsx-cmsis-core": {"project": "nsx-ambiq-sdk-r5"},
+                "nsx-soc-hal": {"project": "nsx-ambiq-sdk-r5"},
+                "nsx-cmsis-startup": {"project": "nsx-ambiq-sdk-r5"},
+                "nsx-core": {"project": "nsx-ambiq-sdk-r5"},
+                "nsx-pmu-armv8m": {"project": "nsx-ambiq-sdk-r5"},
+            },
+        },
+        "apollo4p_evb": {
+            "modules": [
+                "nsx-ambiqsuite-r4",
+                "nsx-board-apollo4p-evb",
+            ],
+            "project_overrides": {
+                "nsx-ambiq-sdk-r4": {
+                    "revision": "r4.0",
+                    "metadata": "modules/nsx-ambiqsuite-r4/nsx-module.yaml",
+                }
+            },
+            "module_overrides": {
+                "nsx-ambiqsuite-r4": {"project": "nsx-ambiq-sdk-r4"},
+                "nsx-cmsis-core": {"project": "nsx-ambiq-sdk-r4"},
+            },
+        },
+        "apollo3p_evb": {
+            "modules": [
+                "nsx-ambiqsuite-r3",
+                "nsx-board-apollo3p-evb",
+            ],
+            "project_overrides": {
+                "nsx-ambiq-sdk-r3": {
+                    "revision": "r3.0",
+                    "metadata": "modules/nsx-ambiqsuite-r3/nsx-module.yaml",
+                }
+            },
+            "module_overrides": {
+                "nsx-ambiqsuite-r3": {"project": "nsx-ambiq-sdk-r3"},
+                "nsx-cmsis-core": {"project": "nsx-ambiq-sdk-r3"},
+            },
+        },
+        "atomiq110_fpga_turbo": {
+            "modules": [
+                "nsx-ambiqsuite-r6",
+                "nsx-ambiq-hal-r6",
+                "nsx-ambiq-bsp-r6",
+                "nsx-soc-hal",
+                "nsx-cmsis-startup",
+                "nsx-core",
+                "nsx-tooling",
+                "nsx-board-atomiq110-fpga-turbo",
+            ],
+            "project_overrides": {
+                "nsx-ambiq-sdk-r6": {
+                    "revision": "r6.0",
+                    "metadata": "modules/nsx-ambiqsuite-r6/nsx-module.yaml",
+                }
+            },
+            "module_overrides": {
+                "nsx-ambiqsuite-r6": {"project": "nsx-ambiq-sdk-r6"},
+                "nsx-ambiq-hal-r6": {"project": "nsx-ambiq-sdk-r6"},
+                "nsx-ambiq-bsp-r6": {"project": "nsx-ambiq-sdk-r6"},
+                "nsx-cmsis-core": {"project": "nsx-ambiq-sdk-r6"},
+                "nsx-soc-hal": {"project": "nsx-ambiq-sdk-r6"},
+                "nsx-cmsis-startup": {"project": "nsx-ambiq-sdk-r6"},
+                "nsx-core": {"project": "nsx-ambiq-sdk-r6"},
+            },
+        },
+    }
+
+
+@pytest.fixture(autouse=True)
+def fake_nsx_registry(monkeypatch: pytest.MonkeyPatch) -> None:
+    profiles = _fake_starter_profiles()
+    module_projects = {
+        "nsx-tooling": "neuralspotx",
+        "nsx-board-apollo510-evb": "neuralspotx",
+        "nsx-board-apollo4p-evb": "neuralspotx",
+        "nsx-board-apollo3p-evb": "neuralspotx",
+        "nsx-board-atomiq110-fpga-turbo": "neuralspotx",
+        "nsx-pmu-armv8m": "nsx-pmu-armv8m",
+    }
+
+    monkeypatch.setattr(
+        "helia_profiler.firmware.nsx_cli.starter_profile",
+        lambda board: profiles.get(board),
+    )
+    monkeypatch.setattr(
+        "helia_profiler.firmware.nsx_cli.registry_module_project",
+        lambda name: module_projects.get(name),
+    )
+
+
 @pytest.fixture(autouse=True)
 def fake_segger_rtt_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Provide the explicit SEGGER_RTT_PATH required by firmware generation."""
