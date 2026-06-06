@@ -113,9 +113,9 @@ class TestResolveModuleList:
             "nsx-soc-hal",
             "nsx-cmsis-startup",
             "nsx-core",
+            "nsx-pmu-armv8m",
         ):
             assert by_name[name].project == "nsx-ambiq-sdk-r5", name
-        assert by_name["nsx-pmu-armv8m"].project == "nsx-pmu-armv8m"
 
     def test_board_and_tooling_modules_resolve_to_neuralspotx(self):
         modules = _resolve_module_specs("atomiq110_fpga_turbo", "r6")
@@ -523,10 +523,7 @@ class TestNsxModuleOverrides:
         nsx_yml = yaml.safe_load((app_dir / "nsx.yml").read_text())
         registry = nsx_yml["module_registry"]
         assert registry["projects"]["nsx-ambiq-sdk-r5"]["revision"]
-        # PMU now resolves from the standalone registry project rather than the
-        # starter profile's monorepo override, so it is intentionally omitted
-        # from the emitted module_registry overrides.
-        assert "nsx-pmu-armv8m" not in registry["modules"]
+        assert registry["modules"]["nsx-pmu-armv8m"]["project"] == "nsx-ambiq-sdk-r5"
 
     def test_path_override_installs_local_module(self, tmp_path: Path, fake_dist: Path):
         # Create a fake local module with nsx-module.yaml

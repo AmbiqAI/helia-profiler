@@ -153,16 +153,11 @@ def _module_project(name: str, profile: dict[str, Any]) -> str:
 
     Resolution order, mirroring ``nsx``'s own manifest generation:
 
-    0. ``nsx-pmu-armv8m`` always follows the base registry project so hpx uses
-       the standalone PMU module with the SDK-local shim backend.
-    1. The starter profile's ``module_overrides`` — authoritative repoint of a
+    0. The starter profile's ``module_overrides`` — authoritative repoint of a
        module onto the SDK monorepo for tiers that have migrated.
-    2. The base registry entry (standalone project) for everything else.
-    3. The module name itself as a last resort (opaque / local modules).
+    1. The base registry entry (standalone project) for everything else.
+    2. The module name itself as a last resort (opaque / local modules).
     """
-    if name == "nsx-pmu-armv8m":
-        return nsx_cli.registry_module_project(name) or name
-
     override = profile.get("module_overrides", {}).get(name)
     if isinstance(override, dict) and override.get("project"):
         return override["project"]
@@ -180,7 +175,6 @@ def _render_module_registry(profile: dict[str, Any]) -> str:
     """
     project_overrides = profile.get("project_overrides") or {}
     module_overrides = dict(profile.get("module_overrides") or {})
-    module_overrides.pop("nsx-pmu-armv8m", None)
     if not project_overrides and not module_overrides:
         return ""
     registry: dict[str, Any] = {}
