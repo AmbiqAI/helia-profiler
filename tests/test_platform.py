@@ -28,6 +28,13 @@ def test_apollo3p_evb_resolves_to_cortex_m4():
     assert soc.family is SocFamily.AP3
     assert soc.pmu_tier is PmuTier.DWT_ONLY
     assert not soc.has_mve
+    assert soc.memory.psram_kb == 8192
+
+
+def test_apollo4p_evb_exposes_board_psram_capacity():
+    soc = get_soc_for_board("apollo4p_evb")
+    assert soc.family is SocFamily.AP4
+    assert soc.memory.psram_kb == 32768
 
 
 def test_apollo330_is_ap5_family():
@@ -55,6 +62,7 @@ def test_list_boards_returns_all():
     names = {b.name for b in boards}
     assert "apollo510_evb" in names
     assert "apollo3p_evb" in names
+    assert "apollo4p_evb" in names
     assert "apollo330mP_evb" in names
 
 

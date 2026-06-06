@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..engines import EngineType
+from ..platform import get_soc_for_board
 
 # ---------------------------------------------------------------------------
 # Registry types
@@ -57,6 +58,18 @@ class CaseSpec:
         """Stable slug — used in report tables and output subfolders."""
         suffix = "-power" if self.power else ""
         return f"{self.board.id}-{self.model.id}-{self.engine.short_slug}{suffix}"
+
+
+def _board_spec(board_id: str, display_name: str, description: str = "") -> BoardSpec:
+    """Build a validation-board entry from the platform registry."""
+    soc = get_soc_for_board(board_id)
+    return BoardSpec(
+        id=board_id,
+        display_name=display_name,
+        jlink_device=soc.jlink_device,
+        has_psram=soc.memory.psram_kb > 0,
+        description=description,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -106,11 +119,9 @@ MODELS: dict[str, ModelSpec] = {
 
 #: Boards supported by the validation harness.
 BOARDS: dict[str, BoardSpec] = {
-    "apollo510_evb": BoardSpec(
-        id="apollo510_evb",
-        display_name="Apollo510 EVB",
-        jlink_device="AP510NFA-CBR",
-        has_psram=True,
+    "apollo510_evb": _board_spec(
+        "apollo510_evb",
+        "Apollo510 EVB",
         description="Ambiq Apollo510 evaluation board (Cortex-M55)",
     ),
     # Future boards (apollo4p_evb, apollo3p_evb, ...) plug in here.
