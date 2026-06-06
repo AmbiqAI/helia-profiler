@@ -32,7 +32,6 @@ target_include_directories(hpx_profiler PRIVATE
 target_link_libraries(hpx_profiler PRIVATE
     nsx::board
     nsx::runtime_core
-    nsx::power
 {% if has_full_pmu %}
     nsx::pmu_armv8m
 {% endif %}
@@ -41,18 +40,9 @@ target_link_libraries(hpx_profiler PRIVATE
     nsx::usb
 {% endif %}
 {% if psram_needed %}
-    nsx::peripherals
+    nsx::psram
 {% endif %}
 )
-{% if psram_needed %}
-# AmbiqSuite PSRAM device driver — not part of a pre-compiled lib
-target_sources(hpx_profiler PRIVATE
-    ${NSX_ROOT}/modules/nsx-ambiqsuite-r5/sdk/src/am_devices_mspi_psram_aps25616ba_1p2v.c
-)
-target_include_directories(hpx_profiler PRIVATE
-    ${NSX_ROOT}/modules/nsx-ambiqsuite-r5/sdk/devices
-)
-{% endif %}
 {% if transport == "rtt" %}
 target_sources(hpx_profiler PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src/rtt/SEGGER_RTT.c
@@ -78,7 +68,6 @@ target_include_directories(hpx_profiler PRIVATE
 target_link_libraries(hpx_profiler PRIVATE
     nsx::board
     nsx::runtime_core
-    nsx::power
 {% if has_full_pmu %}
     nsx::pmu_armv8m
 {% endif %}
@@ -89,18 +78,9 @@ target_link_libraries(hpx_profiler PRIVATE
     nsx::usb
 {% endif %}
 {% if psram_needed %}
-    nsx::peripherals
+    nsx::psram
 {% endif %}
 )
-{% if psram_needed %}
-# AmbiqSuite PSRAM device driver — not part of a pre-compiled lib
-target_sources(hpx_profiler PRIVATE
-    ${NSX_ROOT}/modules/nsx-ambiqsuite-r5/sdk/src/am_devices_mspi_psram_aps25616ba_1p2v.c
-)
-target_include_directories(hpx_profiler PRIVATE
-    ${NSX_ROOT}/modules/nsx-ambiqsuite-r5/sdk/devices
-)
-{% endif %}
 {% if transport == "rtt" %}
 target_sources(hpx_profiler PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src/rtt/SEGGER_RTT.c

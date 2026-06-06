@@ -64,7 +64,7 @@ extern "C" __attribute__((weak)) caddr_t _sbrk(int incr) {
 
 {% set psram_needed = (arena_region == "psram") or (weights_region == "psram") %}
 {% if psram_needed %}
-#include "ns_peripherals_psram.h"
+#include "nsx_psram.h"
 {% endif %}
 
 {% if weights_region == "psram" %}
@@ -93,7 +93,7 @@ static uint8_t *g_arena = g_arena_storage;
 NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_arena_storage[kArenaSize];
 static uint8_t *g_arena = g_arena_storage;
 {% elif arena_region == "psram" %}
-// Arena lives in external PSRAM; pointer bound after ns_psram_init().
+// Arena lives in external PSRAM; pointer bound after nsx_psram_init().
 static uint8_t *g_arena = nullptr;
 {% else %}
 // Fallback: default BSS (typically TCM on AP5, otherwise main RAM)
@@ -168,10 +168,10 @@ int main(void) {
     // Initialize USB CDC and wait for host to connect (DTR)
     nsx_usb_init(&g_usb_cfg);
     while (!nsx_usb_connected(&g_usb_cfg)) {
-        am_util_delay_ms(10);
+        nsx_delay_us(10 * 1000U);
     }
     // Brief settling delay after host connects
-    am_util_delay_ms(200);
+    nsx_delay_us(200 * 1000U);
 {% elif transport == "rtt" %}
 
     // Set trim mode on buffer 0 (non-blocking — silently drops excess data).
@@ -185,13 +185,13 @@ int main(void) {
     // Delay to allow the host SWO viewer to attach after reset.
     // The board boots immediately after flash/reset; without this pause
     // the profiler output would be emitted before the viewer connects.
-    am_util_delay_ms(5000);
+    nsx_delay_us(5000 * 1000U);
 {% endif %}
 
 {% if psram_needed %}
 
     // Flush any pending data (e.g. RTT control block) to SRAM before
-    // PSRAM init. ns_psram_platform_init() calls
+    // PSRAM init. The platform backend may invalidate D-cache during
     // am_hal_cachectrl_dcache_invalidate(NULL, true) which discards all
     // dirty D-cache lines. Without this flush the RTT CB written above
     // stays only in cache and J-Link (SWD) cannot find it.
@@ -203,21 +203,16 @@ int main(void) {
     // here. Region layout:
     //   [base + 0]              : model data (when weights_region=psram)
     //   [base + arena_offset]   : tensor arena (when arena_region=psram)
-    ns_psram_config_t psram_cfg = {
-        .api = &ns_psram_V0_0_1,
-        .psram_enable = true,
-        .psram_type = PSRAM_TYPE_OCT,
-        .psram_block = 0,
-        .psram_size = 0,
-        .psram_base_address = 0,
-    };
-    if (ns_psram_init(&psram_cfg) != 0) {
+    nsx_psram_config_t psram_cfg;
+    nsx_psram_default_config(&psram_cfg);
+    psram_cfg.enable_xip = true;
+    if (nsx_psram_init(&psram_cfg) != 0) {
         hpx_printf("HPX_ERROR=psram_init_failed\n");
         SCB_CleanDCache();
         while (1) { __WFI(); }
     }
 {% if weights_region == "psram" %}
-    model_data = (const unsigned char *)psram_cfg.psram_base_address;
+    model_data = (const unsigned char *)psram_cfg.base_address;
     // Align arena offset to 64 bytes (cacheline) past the model bytes.
     static constexpr uint32_t kArenaPsramOffset =
         ((uint32_t){{ model_size }} + 63u) & ~63u;
@@ -225,13 +220,13 @@ int main(void) {
     static constexpr uint32_t kArenaPsramOffset = 0u;
 {% endif %}
 {% if arena_region == "psram" %}
-    g_arena = (uint8_t *)(psram_cfg.psram_base_address + kArenaPsramOffset);
+    g_arena = (uint8_t *)(psram_cfg.base_address + kArenaPsramOffset);
     hpx_printf("HPX_PSRAM_ARENA=0x%08lx,%d\n",
                (unsigned long)g_arena, kArenaSize);
 {% endif %}
 {% if weights_region == "psram" %}
     hpx_printf("HPX_PSRAM_READY=0x%08lx,%u\n",
-               (unsigned long)psram_cfg.psram_base_address, model_data_len);
+               (unsigned long)psram_cfg.base_address, model_data_len);
 {% endif %}
     SCB_CleanDCache();
 
@@ -250,7 +245,7 @@ int main(void) {
             }
         }
         // Invalidate D-cache for PSRAM region so CPU reads fresh J-Link data.
-        SCB_InvalidateDCache_by_Addr((void *)psram_cfg.psram_base_address,
+        SCB_InvalidateDCache_by_Addr((void *)psram_cfg.base_address,
                                      (int32_t)model_data_len);
     }
 {% endif %}

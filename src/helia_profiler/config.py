@@ -314,15 +314,15 @@ class BuildConfig:
     """NSX build-system overrides.
 
     Controls how the generated firmware's NSX manifest resolves modules.
-    Default behaviour (empty overrides) uses the ``stable`` channel and
-    lets ``nsx lock`` pick the latest compatible revisions.
+    Default behaviour (empty overrides) uses the selected board's default
+    NSX channel and lets ``nsx lock`` pick the latest compatible revisions.
 
     Advanced users can pin individual modules to a version, point them at
     a local checkout, or select a custom git ref — useful for SoC/board
     bring-up before changes land in the stable channel.
     """
 
-    channel: str = "stable"
+    channel: str | None = None
     nsx_modules: dict[str, NsxModuleOverride] = field(default_factory=dict)
 
 
@@ -498,8 +498,8 @@ def _build_build_config(raw: dict[str, Any]) -> BuildConfig:
     """Build a ``BuildConfig`` from YAML/CLI dict."""
     if not raw:
         return BuildConfig()
-    channel = raw.get("channel", "stable")
-    if not _CHANNEL_RE.match(channel):
+    channel = raw.get("channel")
+    if channel is not None and not _CHANNEL_RE.match(channel):
         raise ConfigError(
             f"Invalid build.channel value: {channel!r}",
             hint="Channel must be an identifier (letters, digits, hyphens, underscores).",

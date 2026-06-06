@@ -19,6 +19,7 @@ hang.
 from __future__ import annotations
 
 import contextlib
+import functools
 import logging
 import os
 import sys
@@ -303,3 +304,46 @@ def sync(
                 time.sleep(delay)
     # All retries exhausted — re-raise the last NetworkError.
     raise last_exc  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# NSX module registry / starter-profile access
+#
+# The NSX registry (registry.lock.yaml shipped inside neuralspotx) is the
+# single source of truth for which NSX project owns each module and which
+# starter profile a board resolves to. The firmware generator consults it so
+# module/project ownership is *derived* rather than hand-maintained — the same
+# data ``nsx create-app`` uses to scaffold a manifest.
+# ---------------------------------------------------------------------------
+
+
+@functools.lru_cache(maxsize=1)
+def load_registry() -> dict[str, Any]:
+    """Return the effective NSX registry (cached).
+
+    This is the in-memory registry.lock with derived ``starter_profiles``. It
+    resolves purely from the local neuralspotx install — no network or git.
+    """
+    from neuralspotx.project_config import _load_registry
+
+    return _load_registry()
+
+
+def starter_profile(board: str) -> dict[str, Any] | None:
+    """Return the ``{board}_minimal`` starter profile, or *None* if absent."""
+    profiles = load_registry().get("starter_profiles", {})
+    return profiles.get(f"{board}_minimal")
+
+
+def registry_module_project(name: str) -> str | None:
+    """Resolve a module name to its owning project via the base registry.
+
+    Returns *None* when the module has no registry entry (e.g. a local module
+    such as a generated heliaRT wrapper).
+    """
+    from neuralspotx.metadata import registry_entry_for_module
+
+    try:
+        return registry_entry_for_module(load_registry(), name).project
+    except (KeyError, ValueError):
+        return None

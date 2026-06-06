@@ -48,7 +48,12 @@ def _render_tflm(
     )
 
 
-def _render_aot(transport: str = "rtt") -> str:
+def _render_aot(
+    transport: str = "rtt",
+    arena_region: str = "tcm",
+    weights_region: str = "mram",
+    arena_regions: list[dict[str, object]] | None = None,
+) -> str:
     return _env.get_template("main_aot.cc.j2").render(
         aot_prefix="fake",
         aot_op_manifest=[{"index": 0, "op_name": "CONV_2D"}],
@@ -59,6 +64,11 @@ def _render_aot(transport: str = "rtt") -> str:
         power_sync_enabled=False,
         sync_gpio_pin=91,
         transport=transport,
+        arena_region=arena_region,
+        weights_region=weights_region,
+        arena_regions=arena_regions or [],
+        allocate_arenas=False,
+        extreme_mode=False,
         printf_linkage="static ",
         heartbeat_enabled=True,
         heartbeat_every_n_ops=4,
@@ -106,12 +116,12 @@ class TestMainCcRender:
     def test_psram_model_location_skips_model_data_header(self):
         out = _render_tflm(transport="rtt", model_location="psram", weights_region="psram")
         assert "#include \"model_data.h\"" not in out
-        assert "ns_peripherals_psram.h" in out
+        assert "nsx_psram.h" in out
 
     def test_psram_weights_override_skips_model_data_header(self):
         out = _render_tflm(transport="rtt", model_location="auto", weights_region="psram")
         assert "#include \"model_data.h\"" not in out
-        assert "ns_peripherals_psram.h" in out
+        assert "nsx_psram.h" in out
 
 
 class TestMainAotCcRender:
@@ -139,6 +149,23 @@ class TestMainAotCcRender:
         out = _render_aot(transport="rtt")
         assert out.count("static inline void dwt_init(void)") == 1
         assert out.count("static inline void sync_gpio_init(void)") == 1
+
+    def test_psram_arena_regions_use_nsx_psram_api(self):
+        out = _render_aot(
+            transport="rtt",
+            arena_region="psram",
+            arena_regions=[
+                {
+                    "region_id": 0,
+                    "placement": "psram",
+                    "alignment": 64,
+                    "size": 4096,
+                    "blob_filename": None,
+                }
+            ],
+        )
+        assert "nsx_psram.h" in out
+        assert "nsx_psram_default_config(&psram_cfg);" in out
 
     def test_aot_op_manifest_embedded(self):
         out = _render_aot(transport="rtt")

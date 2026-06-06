@@ -3,17 +3,16 @@
 
 {% if has_full_pmu %}
 // arm_mve.h already pre-included via hpx_pmu_profiler.h
-#include "ns_ambiqsuite_harness.h"
-#include "ns_pmu_map.h"
+#include "nsx_pmu_map.h"
 
 // Transport-aware printf — defined in main.cc
 extern void hpx_printf(const char *fmt, ...);
 
-void HpxPmuProfiler::Init(ns_pmu_preset_e preset) {
-    ns_pmu_reset_config(&pmu_cfg_);
-    pmu_cfg_.api = &ns_pmu_V1_0_0;
-    ns_pmu_apply_preset(&pmu_cfg_, preset);
-    ns_pmu_init(&pmu_cfg_);
+void HpxPmuProfiler::Init(nsx_pmu_preset_e preset) {
+    nsx_pmu_reset_config(&pmu_cfg_);
+    pmu_cfg_.api = &nsx_pmu_V1_0_0;
+    nsx_pmu_apply_preset(&pmu_cfg_, preset);
+    nsx_pmu_init(&pmu_cfg_);
     num_events_ = 0;
     // Count how many events the preset configured
     num_counters_ = 0;
@@ -24,14 +23,14 @@ void HpxPmuProfiler::Init(ns_pmu_preset_e preset) {
 }
 
 void HpxPmuProfiler::InitCustom(const uint32_t event_ids[], int num_events) {
-    ns_pmu_reset_config(&pmu_cfg_);
-    pmu_cfg_.api = &ns_pmu_V1_0_0;
+    nsx_pmu_reset_config(&pmu_cfg_);
+    pmu_cfg_.api = &nsx_pmu_V1_0_0;
     int n = (num_events > kMaxEvents) ? kMaxEvents : num_events;
     for (int i = 0; i < n; i++) {
-        ns_pmu_event_create(&pmu_cfg_.events[i], event_ids[i],
-                            NS_PMU_EVENT_COUNTER_SIZE_32);
+        nsx_pmu_event_create(&pmu_cfg_.events[i], event_ids[i],
+                            NSX_PMU_EVENT_COUNTER_SIZE_32);
     }
-    ns_pmu_init(&pmu_cfg_);
+    nsx_pmu_init(&pmu_cfg_);
     num_events_ = 0;
     num_counters_ = n;
     initialized_ = true;
@@ -43,7 +42,7 @@ uint32_t HpxPmuProfiler::BeginEvent(const char* tag) {
     layers_[idx].tag = tag;
     layers_[idx].overflow = false;
     uint32_t saved_cyccnt = DWT->CYCCNT;
-    ns_pmu_reset_counters();
+    nsx_pmu_reset_counters();
     DWT->CYCCNT = saved_cyccnt;
     // Clear any prior overflow flags so we detect overflow for this layer only
 #if (__CORTEX_M >= 55U)
@@ -56,7 +55,7 @@ void HpxPmuProfiler::EndEvent(uint32_t event_handle) {
     if (!initialized_ ||
         event_handle >= static_cast<uint32_t>(num_events_)) return;
     uint32_t saved_cyccnt = DWT->CYCCNT;
-    ns_pmu_get_counters(&pmu_cfg_);
+    nsx_pmu_get_counters(&pmu_cfg_);
     DWT->CYCCNT = saved_cyccnt;
     LayerRecord& rec = layers_[event_handle];
     for (int i = 0; i < num_counters_; i++) {
@@ -116,8 +115,8 @@ void HpxPmuProfiler::PrintCsv() const {
     for (int e = 0; e < num_counters_; e++) {
         if (!pmu_cfg_.events[e].enabled) break;
         uint32_t map_idx = pmu_cfg_.counter[e].mapIndex;
-        if (map_idx < NS_PMU_MAP_SIZE)
-            hpx_printf(",\"%s\"", ns_pmu_map[map_idx].regname);
+        if (map_idx < NSX_PMU_MAP_SIZE)
+            hpx_printf(",\"%s\"", nsx_pmu_map[map_idx].regname);
         else
             hpx_printf(",\"event_%d\"", e);
     }
@@ -133,7 +132,6 @@ void HpxPmuProfiler::PrintCsv() const {
     }
 }
 {% else %}
-#include "ns_ambiqsuite_harness.h"
 
 // Transport-aware printf — defined in main.cc
 extern void hpx_printf(const char *fmt, ...);
