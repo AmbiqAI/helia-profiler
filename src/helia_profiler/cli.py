@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -164,7 +165,8 @@ def main(argv: list[str] | None = None) -> None:
         metavar="GROUP:SELECT",
         help=(
             "PMU counter selection per compute unit. "
-            "Format: GROUP:SELECT where GROUP is cpu/mve/memory and "
+            "Format: GROUP:SELECT where GROUP is a supported group for the target SoC "
+            "(for example cpu/mve/memory on Cortex-M55) and "
             "SELECT is 'default', 'all', or comma-separated counter names. "
             "Examples: --pmu-counters cpu:default mve:all, "
             "--pmu-counters mve:ARM_PMU_MVE_INST_RETIRED,ARM_PMU_MVE_STALL"
@@ -196,7 +198,12 @@ def main(argv: list[str] | None = None) -> None:
         "--power-duration", type=int, help="Power capture seconds (default: 30)"
     )
     g_power.add_argument(
-        "--sync-gpio", type=int, help="GPIO pin for external power sync (default: 10)"
+        "--sync-gpio",
+        type=int,
+        help=(
+            "GPIO pin for external power sync (default: board default; "
+            "29 on apollo510_evb / apollo510b_evb, 10 on most other built-in EVBs)"
+        ),
     )
     g_power.add_argument(
         "--no-ensure-power",
@@ -400,13 +407,14 @@ def main(argv: list[str] | None = None) -> None:
         epilog=(
             "Manage local caches used by hpx and its nsx dependency:\n\n"
             "  hpx cache purge      Remove all cached data (module clones,\n"
-            "                       resolved refs). Forces fresh network\n"
+            "                       resolved refs, generated workspaces).\n"
+            "                       Forces fresh network\n"
             "                       fetches on next run.\n"
             "  hpx cache info       Show cache location and size.\n"
         ),
     )
     cache_sub = p_cache.add_subparsers(dest="cache_action")
-    cache_sub.add_parser("purge", help="Remove all cached data")
+    cache_sub.add_parser("purge", help="Remove all cached data, including workspaces")
     cache_sub.add_parser("info", help="Show cache location and disk usage")
 
     args = parser.parse_args(argv)
@@ -786,9 +794,16 @@ def _cmd_boards() -> None:
     rows: list[tuple[str, str, str, str, str, str]] = []
     for board in boards:
         soc = get_soc(board.soc)
-        pmu = "full" if soc.has_full_pmu else "dwt"
-        mve = "yes" if soc.has_mve else "no"
-        rows.append((board.name, soc.name, soc.core.value, pmu, mve, board.channel))
+        rows.append(
+            (
+                board.name,
+                soc.name,
+                soc.core.value,
+                ", ".join(soc.profiling_backends),
+                ", ".join(soc.profiling_domains),
+                board.channel,
+            )
+        )
 
     console = HpxConsole()
     console.print_boards(rows)
@@ -977,8 +992,12 @@ def _cmd_cache(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def _workspace_cache_root() -> Path:
+    return Path.home() / ".cache" / "helia-profiler" / "workspaces"
+
+
 def _cmd_cache_purge() -> None:
-    """Purge all nsx caches (module cache + resolve-ref cache)."""
+    """Purge hpx/nsx caches (module cache + resolve-ref cache + workspaces)."""
     from neuralspotx import _resolve_cache, module_cache
 
     # 1. Clear the module content-addressed cache
@@ -992,7 +1011,16 @@ def _cmd_cache_purge() -> None:
     _resolve_cache.invalidate_all()
     print("  Purged resolve-ref cache.")
 
-    print("Done — next nsx lock/sync will fetch from the network.")
+    # 3. Remove persistent per-board workspaces (generated apps + nsx.lock)
+    workspaces_root = _workspace_cache_root()
+    if workspaces_root.is_dir():
+        n_workspaces = sum(1 for child in workspaces_root.iterdir() if child.is_dir())
+        shutil.rmtree(workspaces_root, ignore_errors=True)
+        print(f"  Purged {n_workspaces} cached workspace(s).")
+    else:
+        print("  Workspace cache already empty.")
+
+    print("Done — next profile/build will recreate workspaces and refresh module state.")
 
 
 def _cmd_cache_info() -> None:
@@ -1002,6 +1030,7 @@ def _cmd_cache_info() -> None:
 
     mod_root = module_cache.module_cache_root()
     resolve_path = _cache_path()
+    workspaces_root = _workspace_cache_root()
 
     print(f"Module cache:      {mod_root}")
     if mod_root.is_dir():
@@ -1017,5 +1046,13 @@ def _cmd_cache_info() -> None:
     if resolve_path.exists():
         size = resolve_path.stat().st_size
         print(f"  Size: {size / 1024:.1f} KB")
+    else:
+        print("  (empty)")
+
+    print(f"Workspace cache:   {workspaces_root}")
+    if workspaces_root.is_dir():
+        entries = [entry for entry in workspaces_root.iterdir() if entry.is_dir()]
+        total_bytes = sum(f.stat().st_size for entry in entries for f in entry.rglob("*") if f.is_file())
+        print(f"  Entries: {len(entries)}, Size: {total_bytes / 1024 / 1024:.1f} MB")
     else:
         print("  (empty)")

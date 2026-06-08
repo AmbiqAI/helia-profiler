@@ -79,8 +79,10 @@ Steps:
 
 ## Synchronization
 
-The firmware toggles a GPIO pin (default GPIO 10) at the start and end
-of the inference window. The Joulescope captures this signal on its
+The firmware toggles the board's default sync GPIO pin at the start and end
+of the inference window. On `apollo510_evb` and `apollo510b_evb` the built-in
+default is GPIO 29; most other current built-in EVBs still use GPIO 10.
+The Joulescope captures this signal on its
 GPI input and the host uses the edges to bracket the measurement
 window — only current drawn **during inference** is averaged.
 
@@ -163,7 +165,7 @@ quantization schemes on the same hardware.
 | `mode` | string | `external` | `external` (Joulescope inline) or `internal` (on-device) |
 | `duration_s` | int | `30` | Capture window length |
 | `io_voltage` | float | `1.8` | I/O rail voltage hint for the Joulescope |
-| `sync_gpio_pin` | int | `10` | GPIO pin the firmware toggles around inference |
+| `sync_gpio_pin` | int | board default (`29` on `apollo510_evb` / `apollo510b_evb`) | GPIO pin the firmware toggles around inference |
 
 ## Troubleshooting
 

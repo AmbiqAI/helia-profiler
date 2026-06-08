@@ -11,6 +11,7 @@ from typing import Any
 from .engines import EngineType
 from .errors import ConfigError
 from .placement import ModelLocation
+from .platform import get_default_sync_gpio_pin
 from .power.base import PowerMode
 
 
@@ -421,11 +422,17 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
         supported = ", ".join(t.value for t in Toolchain)
         raise ValueError(f"Unknown toolchain '{tc_raw}'. Supported: {supported}") from None
 
+    board_name = target_d.get("board", DEFAULT_BOARD)
+    sync_gpio_pin = power_d.get(
+        "sync_gpio_pin",
+        get_default_sync_gpio_pin(board_name, fallback=DEFAULT_SYNC_GPIO_PIN),
+    )
+
     return ProfileConfig(
         model=model,
         engine=engine,
         target=TargetConfig(
-            board=target_d.get("board", DEFAULT_BOARD),
+            board=board_name,
             toolchain=tc,
             jlink_serial=target_d.get("jlink_serial"),
             transport=target_d.get("transport", DEFAULT_TRANSPORT),
@@ -446,7 +453,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             mode=power_d.get("mode", DEFAULT_POWER_MODE),
             duration_s=power_d.get("duration_s", DEFAULT_POWER_DURATION_S),
             io_voltage=power_d.get("io_voltage", DEFAULT_IO_VOLTAGE),
-            sync_gpio_pin=power_d.get("sync_gpio_pin", DEFAULT_SYNC_GPIO_PIN),
+            sync_gpio_pin=sync_gpio_pin,
             serial=power_d.get("serial"),
         ),
         output=OutputConfig(

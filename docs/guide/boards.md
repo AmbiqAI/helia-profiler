@@ -101,7 +101,7 @@ adding an entry to the platform registry with:
 - J-Link device string
 - USB VID/PID for USB CDC transport
 - Memory layout (MRAM/SRAM/TCM/PSRAM sizes)
-- Default sync GPIO pin
+- Default sync GPIO pin (`29` for `apollo510_evb` / `apollo510b_evb`; `10` for most other built-in EVBs)
 
 See [Architecture → Adding an Engine](../architecture/adding-an-engine.md)
 for the analogous engine path; the board path follows the same pattern

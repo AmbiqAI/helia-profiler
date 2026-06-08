@@ -770,7 +770,7 @@ class HpxConsole:
     def print_boards(self, boards: list[tuple[str, str, str, str, str, str]]) -> None:
         """Render the boards list.
 
-        Each tuple: ``(board, soc, core, pmu, mve, channel)``
+        Each tuple: ``(board, soc, core, backends, domains, channel)``
         """
         table = Table(
             box=box.SIMPLE_HEAVY,
@@ -780,14 +780,12 @@ class HpxConsole:
         table.add_column("Board", min_width=22)
         table.add_column("SoC", min_width=12)
         table.add_column("Core", min_width=12)
-        table.add_column("PMU", width=5, justify="center")
-        table.add_column("MVE", width=5, justify="center")
+        table.add_column("Backends", min_width=18)
+        table.add_column("Domains", min_width=14)
         table.add_column("Channel")
 
-        for brd, soc, core, pmu, mve, channel in boards:
-            pmu_fmt = "[green]full[/green]" if pmu == "full" else "[dim]dwt[/dim]"
-            mve_fmt = "[green]yes[/green]" if mve == "yes" else "[dim]no[/dim]"
-            table.add_row(brd, soc, core, pmu_fmt, mve_fmt, channel)
+        for brd, soc, core, backends, domains, channel in boards:
+            table.add_row(brd, soc, core, backends, domains, channel)
 
         self._console.print(table)
 
