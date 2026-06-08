@@ -30,6 +30,8 @@ def _render_tflm(
     resolver_mode: str = "all",
     resolver_registrations: list[str] | None = None,
     resource_variable_count: int = 0,
+    perf_mode_symbol: str = "NSX_PERF_LOW",
+    perf_mode_mhz: int = 96,
 ) -> str:
     registrations = resolver_registrations or ["r.AddConv2D();", "r.AddSoftmax();"]
     return _env.get_template("main.cc.j2").render(
@@ -53,6 +55,8 @@ def _render_tflm(
         model_size=1024,
         profiling_backends=["dwt", "armv8m-pmu"] if has_armv8m_pmu else ["dwt"],
         has_armv8m_pmu=has_armv8m_pmu,
+        perf_mode_symbol=perf_mode_symbol,
+        perf_mode_mhz=perf_mode_mhz,
         printf_linkage="",
         heartbeat_enabled=True,
         heartbeat_every_n_ops=4,
@@ -66,6 +70,8 @@ def _render_aot(
     weights_region: str = "mram",
     arena_regions: list[dict[str, object]] | None = None,
     has_armv8m_pmu: bool = True,
+    perf_mode_symbol: str = "NSX_PERF_LOW",
+    perf_mode_mhz: int = 96,
 ) -> str:
     return _env.get_template("main_aot.cc.j2").render(
         aot_prefix="fake",
@@ -85,6 +91,8 @@ def _render_aot(
         extreme_mode=False,
         profiling_backends=["dwt", "armv8m-pmu"] if has_armv8m_pmu else ["dwt"],
         has_armv8m_pmu=has_armv8m_pmu,
+        perf_mode_symbol=perf_mode_symbol,
+        perf_mode_mhz=perf_mode_mhz,
         printf_linkage="static ",
         heartbeat_enabled=True,
         heartbeat_every_n_ops=4,
@@ -132,6 +140,14 @@ class TestMainCcRender:
         assert "#include \"tensorflow/lite/micro/micro_resource_variable.h\"" in out
         assert "kNumResourceVariables = 2" in out
         assert "MicroResourceVariables::Create(allocator, kNumResourceVariables)" in out
+
+    def test_clock_mode_renders_selected_perf_mode(self):
+        out = _render_tflm(transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=250)
+        assert "sys_cfg.perf_mode = NSX_PERF_HIGH;  // 250 MHz" in out
+
+    def test_aot_clock_mode_renders_selected_perf_mode(self):
+        out = _render_aot(transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=250)
+        assert "sys_cfg.perf_mode = NSX_PERF_HIGH;  // 250 MHz" in out
 
     def test_usb_transport_includes_timer_helpers(self):
         out = _render_tflm(transport="usb_cdc")

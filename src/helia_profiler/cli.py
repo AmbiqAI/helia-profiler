@@ -123,6 +123,12 @@ def main(argv: list[str] | None = None) -> None:
         help="Data transport (default: rtt). RTT is recommended for lossless capture.",
     )
     g_target.add_argument(
+        "--clock-mode",
+        type=str,
+        choices=["low", "high"],
+        help="CPU clock mode for generated firmware (default: low). Uses the board's supported low/high frequencies.",
+    )
+    g_target.add_argument(
         "--frozen",
         action="store_true",
         help=(
@@ -481,6 +487,8 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli.setdefault("target", {})["jlink_serial"] = args.jlink_serial
     if args.transport is not None:
         cli.setdefault("target", {})["transport"] = args.transport
+    if args.clock_mode is not None:
+        cli.setdefault("target", {})["clock_mode"] = args.clock_mode
     if args.frozen:
         cli["frozen"] = True
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 
+from ..config import ClockMode
 from ..errors import ConfigError, PlatformError
 from ..pipeline import PipelineContext
 from ..platform import PmuTier, get_board, get_soc_for_board
@@ -45,6 +46,20 @@ class ResolvePlatformStage:
         ctx.board = board
         ctx.soc = soc
 
+        clock_mode = ctx.config.target.clock_mode
+        if clock_mode is ClockMode.HIGH:
+            if soc.clock.hp_mhz is None:
+                raise ConfigError(
+                    f"Board '{board_name}' does not support target.clock_mode=high.",
+                    hint=(
+                        f"Supported clock mode for {soc.name} is low "
+                        f"({soc.clock.lp_mhz} MHz)."
+                    ),
+                )
+            selected_clock_mhz = soc.clock.hp_mhz
+        else:
+            selected_clock_mhz = soc.clock.lp_mhz
+
         log.info(
             "Board: %s  SoC: %s (%s, backends=%s)",
             board.name,
@@ -79,6 +94,8 @@ class ResolvePlatformStage:
             npu=soc.npu.value if soc.npu is not None else None,
             clock_lp_mhz=soc.clock.lp_mhz,
             clock_hp_mhz=soc.clock.hp_mhz,
+            clock_mode=clock_mode.value,
+            clock_mhz=selected_clock_mhz,
             sdk_tier=soc.sdk_tier,
         )
 

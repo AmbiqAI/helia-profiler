@@ -36,6 +36,25 @@ def test_jlink_serial_from_cli():
     assert config.target.jlink_serial == "1160002255"
 
 
+def test_clock_mode_defaults_to_low():
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+    }
+    config = load_config(None, cli)
+    assert config.target.clock_mode.value == "low"
+
+
+def test_clock_mode_from_cli():
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "target": {"clock_mode": "high"},
+    }
+    config = load_config(None, cli)
+    assert config.target.clock_mode.value == "high"
+
+
 def test_config_is_frozen():
     """ProfileConfig should be immutable."""
     cli = {

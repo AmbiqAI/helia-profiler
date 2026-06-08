@@ -111,6 +111,8 @@ class PlatformInfo:
     npu: str | None = None
     clock_lp_mhz: int = 0
     clock_hp_mhz: int | None = None
+    clock_mode: str = ""
+    clock_mhz: int = 0
     sdk_tier: str = ""
 
 

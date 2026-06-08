@@ -43,6 +43,13 @@ class Transport(StrEnum):
     SWO = "swo"
 
 
+class ClockMode(StrEnum):
+    """Target CPU clock mode used by generated firmware."""
+
+    LOW = "low"
+    HIGH = "high"
+
+
 class OutputFormat(StrEnum):
     """Top-level report format emitted by the report stage."""
 
@@ -62,6 +69,7 @@ DEFAULT_POWER_DRIVER = "joulescope"
 DEFAULT_POWER_MODE = PowerMode.EXTERNAL
 DEFAULT_SYNC_GPIO_PIN = 10  # EVB-friendly default
 DEFAULT_TRANSPORT = Transport.RTT
+DEFAULT_CLOCK_MODE = ClockMode.LOW
 
 # Heartbeat defaults — firmware emits progress lines so the host can detect
 # a truly hung run without needing large wall-clock timeouts.  Setting either
@@ -206,6 +214,7 @@ class TargetConfig:
     toolchain: Toolchain = DEFAULT_TOOLCHAIN
     jlink_serial: str | None = None  # select J-Link by S/N (None = auto)
     transport: Transport = DEFAULT_TRANSPORT
+    clock_mode: ClockMode = DEFAULT_CLOCK_MODE
     heartbeat: HeartbeatConfig = field(default_factory=HeartbeatConfig)
     # When True (default), scan for a Joulescope at the start of `hpx profile`
     # and enable current passthrough so the board powers on before flashing.
@@ -218,6 +227,8 @@ class TargetConfig:
             object.__setattr__(self, "toolchain", Toolchain(self.toolchain))
         if not isinstance(self.transport, Transport):
             object.__setattr__(self, "transport", Transport(self.transport))
+        if not isinstance(self.clock_mode, ClockMode):
+            object.__setattr__(self, "clock_mode", ClockMode(self.clock_mode))
 
 
 @dataclass(frozen=True)
@@ -436,6 +447,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             toolchain=tc,
             jlink_serial=target_d.get("jlink_serial"),
             transport=target_d.get("transport", DEFAULT_TRANSPORT),
+            clock_mode=target_d.get("clock_mode", DEFAULT_CLOCK_MODE),
             heartbeat=_build_heartbeat(target_d.get("heartbeat")),
             ensure_board_powered=bool(target_d.get("ensure_board_powered", True)),
         ),
