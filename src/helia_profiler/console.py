@@ -720,11 +720,13 @@ class HpxConsole:
     def print_doctor(
         self,
         checks: list[tuple[str, str, str | None]],
+        required_python: list[tuple[str, str, bool]],
         optional: list[tuple[str, str, bool]],
     ) -> None:
         """Render ``hpx doctor`` results.
 
         *checks*: list of ``(label, binary_name, path_or_none)``
+        *required_python*: list of ``(label, package_name, available)``
         *optional*: list of ``(label, package_name, available)``
         """
         self._console.print()
@@ -744,6 +746,13 @@ class HpxConsole:
                 table.add_row("[green]✓[/green]", label, path)
             else:
                 table.add_row("[red]✗[/red]", f"[red]{label}[/red]", "[red]not found[/red]")
+                all_ok = False
+
+        for label, _pkg, available in required_python:
+            if available:
+                table.add_row("[green]✓[/green]", label, "installed")
+            else:
+                table.add_row("[red]✗[/red]", f"[red]{label}[/red]", "[red]not installed[/red]")
                 all_ok = False
 
         for label, _pkg, available in optional:

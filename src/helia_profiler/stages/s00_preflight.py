@@ -28,6 +28,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+from importlib.util import find_spec
 from pathlib import Path
 
 from ..counters import (
@@ -252,7 +253,6 @@ def _check_output_dir(out_dir: Path) -> None:
 
 def _check_host_tools(transport: str, toolchain: str) -> None:
     required: list[tuple[str, str]] = [
-        ("nsx", "neuralspotx CLI (pip install neuralspotx)"),
         ("cmake", "CMake >= 3.24 (brew install cmake / apt install cmake)"),
         ("ninja", "Ninja build system (brew install ninja / apt install ninja-build)"),
     ]
@@ -290,6 +290,12 @@ def _check_host_tools(transport: str, toolchain: str) -> None:
                 f"{joined}\n"
                 "Run 'hpx doctor' for a full diagnostic."
             ),
+        )
+
+    if find_spec("neuralspotx") is None:
+        raise ConfigError(
+            "Python package 'neuralspotx' is not installed.",
+            hint="Install helia-profiler with its runtime dependencies so the bundled neuralspotx API is available, then re-run 'hpx doctor'.",
         )
 
 

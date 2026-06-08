@@ -772,9 +772,9 @@ def _cmd_doctor() -> None:
     from .doctor import collect_checks
     from .console import HpxConsole
 
-    checks, optional = collect_checks()
+    checks, required_python, optional = collect_checks()
     console = HpxConsole()
-    console.print_doctor(checks, optional)
+    console.print_doctor(checks, required_python, optional)
 
 
 def _cmd_engines() -> None:

@@ -204,17 +204,17 @@ class TestPreflightConfig:
 
 
 class TestPreflightHostTools:
-    def test_missing_nsx_raises_with_hint(self, tmp_path: Path):
+    def test_missing_neuralspotx_package_raises_with_hint(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
 
-        def which_no_nsx(name: str) -> str | None:
-            return None if name == "nsx" else f"/usr/bin/{name}"
-
-        with patch("shutil.which", side_effect=which_no_nsx):
+        with patch("shutil.which", side_effect=_all_tools_present), patch(
+            "helia_profiler.stages.s00_preflight.find_spec",
+            return_value=None,
+        ):
             with pytest.raises(ConfigError) as exc_info:
                 PreflightStage().run(ctx)
 
-        assert "nsx" in str(exc_info.value)
+        assert "neuralspotx" in str(exc_info.value)
         assert exc_info.value.hint is not None
         assert "doctor" in exc_info.value.hint.lower()
 
