@@ -369,11 +369,19 @@ class TestGenerateApp:
         app_dir = generate_app(ctx)
 
         main_cc = (app_dir / "src" / "main.cc").read_text()
+        profiler_h = (app_dir / "src" / "hpx_pmu_profiler.h").read_text()
+        cmake = (app_dir / "CMakeLists.txt").read_text()
         assert "HPX_START" in main_cc
         assert "HPX_END" in main_cc
         assert "HpxPmuProfiler" in main_cc
         assert "ns_ambiqsuite_harness.h" not in main_cc
         assert "am_util_delay_ms" not in main_cc
+        assert '#include "nsx_core.h"' in main_cc
+        assert '#include "nsx_system.h"' in main_cc
+        assert '#include "nsx_core.h"' in profiler_h
+        assert "NSX_TRY(nsx_system_init(&sys_cfg)" in main_cc
+        assert "nsx_system_development" not in main_cc
+        assert "nsx::presets" not in cmake
 
     def test_cmakelists_links_heliart(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)

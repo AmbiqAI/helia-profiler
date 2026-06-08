@@ -270,9 +270,14 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
 };
 
 int main(void) {
-    nsx_system_config_t sys_cfg = nsx_system_development;
+    nsx_system_config_t sys_cfg = {};
     sys_cfg.perf_mode = NSX_PERF_LOW;  // 96 MHz — best energy efficiency
-    NS_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
+    sys_cfg.enable_cache = true;
+    sys_cfg.enable_sram = true;
+    sys_cfg.debug.transport = NSX_DEBUG_NONE;
+    sys_cfg.skip_bsp_init = false;
+    sys_cfg.spot_mgr_profile = true;
+    NSX_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
     dwt_init();
     sync_gpio_init();
 {% include "_extreme_mode.j2" %}

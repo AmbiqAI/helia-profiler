@@ -41,8 +41,8 @@ fork. It is a drop-in replacement for stock TFLM with three kernel
 backends — reference, CMSIS-NN, and the Ambiq-tuned **HELIA** kernels.
 
 The profiler ships pinned to a specific heliaRT release
-(currently **v1.13.1**) and enforces a minimum supported version
-(**v1.12.2**). Pre-built static libraries are downloaded automatically
+(currently **v1.16.0**) and enforces a minimum supported version
+(**v1.16.0**). Pre-built static libraries are downloaded automatically
 the first time you use this engine.
 
 ### Distribution resolution
@@ -71,10 +71,10 @@ engine:
   config:
     source:
       repo: AmbiqAI/helia-rt        # default if omitted
-      ref:  heliaRT-v1.13.0         # any release tag; bare "1.13.0" also works
+      ref:  helia-rt-v1.16.0        # any release tag; bare "1.16.0" also works
 ```
 
-The resolved release must be `>= v1.12.2`; older releases are rejected.
+The resolved release must be `>= v1.16.0`; older releases are rejected.
 
 #### 3. Local distribution path
 
@@ -107,7 +107,7 @@ must be `>= v1.16.0`.
 | `variant` | string | `release-with-logs` | `debug`, `release-with-logs`, or `release` |
 | `dist_path` | string | *(auto-download)* | Local heliaRT distribution path |
 | `source.repo` | string | `AmbiqAI/helia-rt` | GitHub repo for download |
-| `source.ref` | string | pinned version | Release tag (e.g. `heliaRT-v1.13.0` or bare `1.13.0`) |
+| `source.ref` | string | pinned version | Release tag (e.g. `helia-rt-v1.16.0` or bare `1.16.0`) |
 
 ## heliaAOT
 
@@ -119,14 +119,15 @@ at runtime, no flatbuffer parsing, no per-op dispatch.
 engine:
   type: helia-aot
   config:
-    cmsis_nn_path: /path/to/ns-cmsis-nn   # (1)!
+  # cmsis_nn_path: /path/to/ns-cmsis-nn  # (1)!
     prefix: hpx                           # (2)!
     module_name: hpx_model                # (3)!
 ```
 
-1.  **Required.** Path to AmbiqAI's
-    [ns-cmsis-nn](https://github.com/AmbiqAI/ns-cmsis-nn) source. Can also
-    come from the `CMSIS_NN_PATH` environment variable.
+1.  Optional override for AmbiqAI's
+  [ns-cmsis-nn](https://github.com/AmbiqAI/ns-cmsis-nn) source. By default
+  `hpx` resolves `nsx-cmsis-nn` from the NSX registry. Set `cmsis_nn_path`
+  or `CMSIS_NN_PATH` only when you want to vendor a local checkout.
 2.  C symbol prefix for generated code (default `hpx`). Avoids
     namespace collisions when linking multiple AOT models.
 3.  Generated NSX module name (default `hpx_model`).
@@ -137,9 +138,8 @@ heliaAOT ships as a Python package (it runs at build-time), so version
 resolution is handled entirely by **pip** — there's no separate cache,
 download, or `dist_path` to manage.
 
-heliaAOT is not published to PyPI, so the profiler's `[aot]` extra pins
-to an upstream release tag (currently `v0.14.0`, where native NSX module
-support landed). The profiler also enforces a runtime
+The profiler's `[aot]` extra requires `helia-aot>=0.15.0`, and the profiler
+also enforces a runtime
 **minimum supported version** (`HELIAAOT_MIN_VERSION`) so any compatible
 override still has to clear the floor.
 
@@ -194,7 +194,8 @@ The pipeline:
 2. Emits C source files plus a `CodeGenContext` describing operators and
    tensor IDs.
 3. Creates two NSX modules:
-   - `nsx-cmsis-nn` — built from the `cmsis_nn_path` source tree.
+  - `nsx-cmsis-nn` — resolved from the NSX registry by default, or built
+    from a local checkout when `cmsis_nn_path` / `CMSIS_NN_PATH` is set.
    - `nsx-heliaaot-model` — the AOT-compiled C code for this specific model.
 4. Links them into a profiler firmware image with the same harness used
    for TFLM/heliaRT runs.
@@ -217,7 +218,7 @@ The pipeline:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `cmsis_nn_path` | string | *(env or required)* | AmbiqAI ns-cmsis-nn source root |
+| `cmsis_nn_path` | string | *(registry default)* | Optional local AmbiqAI ns-cmsis-nn source root |
 | `prefix` | string | `hpx` | C symbol prefix |
 | `module_name` | string | `hpx_model` | Generated NSX module name |
 | `cmsis_nn_requantize_inline_asm` | bool | `true` | Use inline-asm requantization path |

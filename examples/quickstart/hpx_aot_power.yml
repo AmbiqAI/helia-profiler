@@ -10,7 +10,9 @@ engine:
   config:
     prefix: hpx
     module_name: hpx_model
-    cmsis_nn_path: ../../../nsx-modules/ns-cmsis-nn
+    # cmsis_nn_path is auto-resolved from the NSX registry.
+    # Override with CMSIS_NN_PATH env var or uncomment below for a local checkout:
+    # cmsis_nn_path: /path/to/ns-cmsis-nn
 
 target:
   board: apollo510_evb
@@ -28,7 +30,7 @@ power:
   mode: external
   duration_s: 20
   io_voltage: 1.8
-  sync_gpio_pin: 10
+  sync_gpio_pin: 29
 
 output:
   format: csv
