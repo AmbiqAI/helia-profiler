@@ -30,10 +30,16 @@ import os
 import shutil
 from pathlib import Path
 
+from ..counters import (
+    supported_groups_for_domains,
+    validate_group_selection,
+    validate_legacy_presets,
+)
 from ..engines import get_adapter
 from ..errors import ConfigError
 from ..pipeline import PipelineContext
 from ..placement import ModelLocation, Placement
+from ..platform import get_soc_for_board
 
 log = logging.getLogger("hpx")
 
@@ -65,6 +71,7 @@ class PreflightStage:
         _check_arena_size(cfg.model.arena_size)
         _check_model_location(cfg.model.model_location)
         _check_runtime_split_locations(cfg)
+        _check_pmu_selection(cfg)
         _check_output_dir(cfg.output.dir)
         _check_host_tools(cfg.target.transport, cfg.target.toolchain)
         log.info("Preflight checks passed.")
@@ -191,6 +198,34 @@ def _check_runtime_split_locations(cfg) -> None:
         name="engine.config.runtime_weights_location",
         valid=_VALID_RUNTIME_WEIGHTS_LOCATIONS,
     )
+
+
+def _check_pmu_selection(cfg) -> None:
+    try:
+        soc = get_soc_for_board(cfg.target.board)
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
+
+    supported_groups = supported_groups_for_domains(soc.profiling_domains)
+    try:
+        if cfg.profiling.pmu_counters is not None:
+            validate_group_selection(
+                cfg.profiling.pmu_counters,
+                supported_groups=supported_groups,
+            )
+        else:
+            validate_legacy_presets(
+                cfg.profiling.pmu_presets,
+                supported_groups=supported_groups,
+            )
+    except ValueError as exc:
+        raise ConfigError(
+            str(exc),
+            hint=(
+                f"Board '{cfg.target.board}' exposes profiling groups: "
+                f"{', '.join(supported_groups) if supported_groups else 'none'}."
+            ),
+        ) from exc
 
 
 def _check_output_dir(out_dir: Path) -> None:

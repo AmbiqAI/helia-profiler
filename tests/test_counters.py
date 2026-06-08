@@ -12,6 +12,9 @@ from helia_profiler.counters import (
     plan_passes,
     resolve_legacy_presets,
     LEGACY_PRESET_MAP,
+    supported_groups_for_domains,
+    validate_group_selection,
+    validate_legacy_presets,
 )
 
 
@@ -92,3 +95,18 @@ def test_legacy_preset_map():
 def test_legacy_preset_unknown():
     with pytest.raises(ValueError):
         resolve_legacy_presets(["nonexistent_preset"])
+
+
+def test_supported_groups_for_domains_filters_unknown_domains():
+    groups = supported_groups_for_domains(("cpu", "memory", "mve", "npu"))
+    assert groups == ("cpu", "memory", "mve")
+
+
+def test_validate_group_selection_rejects_unsupported_groups():
+    with pytest.raises(ValueError, match="not supported"):
+        validate_group_selection({"mve": "default"}, supported_groups=("cpu",))
+
+
+def test_validate_legacy_presets_rejects_unsupported_groups():
+    with pytest.raises(ValueError, match="not supported"):
+        validate_legacy_presets(["mve"], supported_groups=("cpu",))

@@ -23,8 +23,10 @@
 #include "{{ aot_prefix }}_model.h"
 #include "{{ aot_prefix }}_common.h"
 
+{% if has_armv8m_pmu %}
 #include "nsx_pmu_utils.h"
 #include "nsx_pmu_map.h"
+{% endif %}
 
 {% set psram_needed = (arena_region == "psram") or (weights_region == "psram") %}
 {% if psram_needed %}
@@ -62,7 +64,11 @@ struct HpxLayerRecord {
     bool overflow;
 };
 
+{% if has_armv8m_pmu %}
 static nsx_pmu_config_t g_pmu_cfg;
+{% else %}
+static uint32_t g_op_start_cyccnt = 0;
+{% endif %}
 static HpxLayerRecord g_layers[kMaxLayers];
 static int g_num_layers = 0;
 static int g_num_counters = 0;
@@ -116,6 +122,7 @@ static const char *aot_op_name(int /*layer_idx*/) { return "op"; }
 static int32_t aot_op_id(int layer_idx) { return layer_idx; }
 {% endif %}
 
+{% if has_armv8m_pmu %}
 static void profiler_init_preset(nsx_pmu_preset_e preset) {
     nsx_pmu_reset_config(&g_pmu_cfg);
     g_pmu_cfg.api = &nsx_pmu_V1_0_0;
@@ -126,7 +133,13 @@ static void profiler_init_preset(nsx_pmu_preset_e preset) {
         if (g_pmu_cfg.events[i].enabled) g_num_counters++;
     }
 }
+{% else %}
+static void profiler_init_preset(int) {
+    g_num_counters = 1;
+}
+{% endif %}
 
+{% if has_armv8m_pmu %}
 static void profiler_init_custom(const uint32_t event_ids[], int num_events) {
     nsx_pmu_reset_config(&g_pmu_cfg);
     g_pmu_cfg.api = &nsx_pmu_V1_0_0;
@@ -138,6 +151,11 @@ static void profiler_init_custom(const uint32_t event_ids[], int num_events) {
     nsx_pmu_init(&g_pmu_cfg);
     g_num_counters = n;
 }
+{% else %}
+static void profiler_init_custom(const uint32_t[], int) {
+    profiler_init_preset(0);
+}
+{% endif %}
 
 static void profiler_clear(void) {
     g_num_layers = 0;
@@ -146,6 +164,7 @@ static void profiler_clear(void) {
 static void profiler_print_csv(void) {
     if (g_num_layers == 0) return;
     hpx_printf("\"Layer\",\"Op\"");
+{% if has_armv8m_pmu %}
     for (int e = 0; e < g_num_counters; e++) {
         if (!g_pmu_cfg.events[e].enabled) break;
         uint32_t map_idx = g_pmu_cfg.counter[e].mapIndex;
@@ -154,6 +173,9 @@ static void profiler_print_csv(void) {
         else
             hpx_printf(",\"event_%d\"", e);
     }
+{% else %}
+    hpx_printf(",\"ARM_PMU_CPU_CYCLES\"");
+{% endif %}
     hpx_printf(",\"overflow\"\n");
     for (int i = 0; i < g_num_layers; i++) {
         const auto &rec = g_layers[i];
@@ -162,7 +184,9 @@ static void profiler_print_csv(void) {
         // multiple operators of the same type.
         hpx_printf("%d,%s:%ld", i, aot_op_name(i), (long)aot_op_id(i));
         for (int e = 0; e < g_num_counters; e++) {
+    {% if has_armv8m_pmu %}
             if (!g_pmu_cfg.events[e].enabled) break;
+    {% endif %}
             hpx_printf(",%lu", (unsigned long)rec.counters[e]);
         }
         hpx_printf(",%d\n", rec.overflow ? 1 : 0);
@@ -185,6 +209,7 @@ static void model_operator_cb(
     if (!g_profiler_enabled) return;
 
     if (state == {{ aot_prefix }}_op_state_run_started) {
+{% if has_armv8m_pmu %}
         // Reset PMU counters at the start of each operator
         uint32_t saved_cyccnt = DWT->CYCCNT;
         nsx_pmu_reset_counters();
@@ -192,10 +217,14 @@ static void model_operator_cb(
 #if (__CORTEX_M >= 55U)
         ARM_PMU_Set_CNTR_OVS(0xFFFFFFFFU);
 #endif
+{% else %}
+    g_op_start_cyccnt = DWT->CYCCNT;
+{% endif %}
     } else if (state == {{ aot_prefix }}_op_state_run_finished) {
         // Read PMU counters after each operator completes
         if (g_num_layers >= kMaxLayers) return;
         int idx = g_num_layers++;
+{% if has_armv8m_pmu %}
         uint32_t saved_cyccnt = DWT->CYCCNT;
         nsx_pmu_get_counters(&g_pmu_cfg);
         DWT->CYCCNT = saved_cyccnt;
@@ -209,6 +238,10 @@ static void model_operator_cb(
 #else
         g_layers[idx].overflow = false;
 #endif
+    {% else %}
+        g_layers[idx].counters[0] = DWT->CYCCNT - g_op_start_cyccnt;
+        g_layers[idx].overflow = false;
+    {% endif %}
         // Heartbeat emission (inter-op gap, not contaminating a layer)
         ++g_hb_ops_since;
         const bool by_ops = (g_hb_every_ops > 0) &&
@@ -399,13 +432,13 @@ int main(void) {
     // --- Multi-pass PMU profiling ---
 {% for pass in pmu_passes %}
     hpx_printf("\n--- HPX_PRESET {{ pass.name }} ---\n");
-{% if pass.custom %}
+{% if has_armv8m_pmu and pass.custom %}
     {
         static const uint32_t _pass{{ loop.index0 }}_ids[] = { {{ pass.event_ids | join(', ') }} };
         profiler_init_custom(_pass{{ loop.index0 }}_ids, {{ pass.num_counters }});
     }
 {% else %}
-    profiler_init_preset({{ pass.c_enum }});
+    profiler_init_preset({{ pass.c_enum if has_armv8m_pmu else 0 }});
 {% endif %}
 
 {% if transport == "usb_cdc" %}

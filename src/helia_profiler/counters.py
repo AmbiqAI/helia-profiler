@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Collection, Mapping, Sequence
 
 # ---------------------------------------------------------------------------
 # Counter descriptor
@@ -220,6 +220,50 @@ def list_counters(group: str | None = None) -> list[PmuCounter]:
 def list_groups() -> list[str]:
     """Return all registered group names."""
     return sorted(GROUPS.keys())
+
+
+def supported_groups_for_domains(domains: Collection[str]) -> tuple[str, ...]:
+    """Return counter groups supported by the active SoC/domain surface.
+
+    ``domains`` comes from ``SocDef.profiling_domains`` and may include
+    future domains before this module has counters for them. Only groups that
+    both exist in the registry and are present on the SoC are returned.
+    """
+    domain_set = set(domains)
+    return tuple(group for group in list_groups() if group in domain_set)
+
+
+def validate_group_selection(
+    selection: Mapping[str, str | list[str]],
+    *,
+    supported_groups: Collection[str],
+) -> None:
+    """Reject PMU group selections unsupported by the target SoC.
+
+    This validation is intentionally separate from ``resolve_counters()`` so
+    callers can fail with a capability-specific message before any firmware
+    generation or build work starts.
+    """
+    supported = set(supported_groups)
+    requested = set(selection)
+    unsupported = sorted(requested - supported)
+    if not unsupported:
+        return
+    supported_text = ", ".join(sorted(supported)) if supported else "none"
+    raise ValueError(
+        "PMU counter groups not supported for this target: "
+        f"{', '.join(unsupported)}. Supported groups for this SoC: {supported_text}."
+    )
+
+
+def validate_legacy_presets(
+    presets: Sequence[str],
+    *,
+    supported_groups: Collection[str],
+) -> None:
+    """Validate legacy preset names against the target's supported groups."""
+    selection = resolve_legacy_presets(presets)
+    validate_group_selection(selection, supported_groups=supported_groups)
 
 
 def resolve_counters(

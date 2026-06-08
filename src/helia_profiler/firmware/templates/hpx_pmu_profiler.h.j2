@@ -8,9 +8,13 @@
 #include <arm_mve.h>
 #endif
 
+// Pull DWT/CoreDebug/SystemCoreClock from the SoC's CMSIS device header
+// rather than relying on HAL umbrella headers.
+#include "{{ cmsis_device_header }}"
+
 #include "tensorflow/lite/micro/micro_profiler_interface.h"
 #include "ns_core.h"
-{% if has_full_pmu %}
+{% if has_armv8m_pmu %}
 #include "nsx_pmu_utils.h"
 {% endif %}
 
@@ -23,7 +27,7 @@ class HpxPmuProfiler : public tflite::MicroProfilerInterface {
     ~HpxPmuProfiler() override = default;
 
     /// Legacy preset-based init (backward compatibility).
-{% if has_full_pmu %}
+{% if has_armv8m_pmu %}
     void Init(nsx_pmu_preset_e preset = NSX_PMU_PRESET_ML_DEFAULT);
 {% else %}
     void Init(int preset = 0);
@@ -59,7 +63,7 @@ class HpxPmuProfiler : public tflite::MicroProfilerInterface {
         uint32_t counters[kMaxEvents];
         bool overflow;  // true if any PMU counter overflowed during this layer
     };
-{% if has_full_pmu %}
+{% if has_armv8m_pmu %}
     nsx_pmu_config_t pmu_cfg_ = {};
 {% endif %}
     LayerRecord layers_[kMaxLayers] = {};
