@@ -106,6 +106,9 @@ class PlatformInfo:
     core: str = ""
     pmu_tier: str = ""
     has_mve: bool = False
+    profiling_backends: list[str] = field(default_factory=list)
+    profiling_domains: list[str] = field(default_factory=list)
+    npu: str | None = None
     clock_lp_mhz: int = 0
     clock_hp_mhz: int | None = None
     sdk_tier: str = ""

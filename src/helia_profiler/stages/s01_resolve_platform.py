@@ -46,11 +46,11 @@ class ResolvePlatformStage:
         ctx.soc = soc
 
         log.info(
-            "Board: %s  SoC: %s (%s, %s)",
+            "Board: %s  SoC: %s (%s, backends=%s)",
             board.name,
             soc.name,
             soc.core.value,
-            "full PMU" if soc.has_full_pmu else "DWT only",
+            ", ".join(soc.profiling_backends),
         )
 
         if soc.pmu_tier is PmuTier.DWT_ONLY:
@@ -60,6 +60,13 @@ class ResolvePlatformStage:
                 soc.name,
             )
 
+        if soc.has_npu:
+            log.info(
+                "%s also exposes accelerator profiling domains: %s",
+                soc.name,
+                ", ".join(domain for domain in soc.profiling_domains if domain != "cpu"),
+            )
+
         # Populate platform metadata
         ctx.run_metadata.platform = PlatformInfo(
             board=board.name,
@@ -67,6 +74,9 @@ class ResolvePlatformStage:
             core=soc.core.value,
             pmu_tier=soc.pmu_tier.value,
             has_mve=soc.has_mve,
+            profiling_backends=list(soc.profiling_backends),
+            profiling_domains=list(soc.profiling_domains),
+            npu=soc.npu.value if soc.npu is not None else None,
             clock_lp_mhz=soc.clock.lp_mhz,
             clock_hp_mhz=soc.clock.hp_mhz,
             sdk_tier=soc.sdk_tier,
