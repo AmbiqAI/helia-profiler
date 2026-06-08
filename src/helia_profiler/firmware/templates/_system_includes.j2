@@ -6,6 +6,14 @@
 {% if power_sync_enabled %}
 #include "nsx_gpio.h"
 {% endif %}
+
+// Unified SDK transition shim: some SDK drops still expose NS_TRY while
+// newer ones renamed the helper to NSX_TRY. Accept either surface so the
+// generated firmware builds across the supported registry revisions.
+#if !defined(NSX_TRY) && defined(NS_TRY)
+#define NSX_TRY NS_TRY
+#endif
+
 {% if extreme_mode and arena_region == "tcm" and weights_region == "tcm" %}
 #include "am_hal_pwrctrl.h"
 {% endif %}

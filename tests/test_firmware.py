@@ -380,6 +380,7 @@ class TestGenerateApp:
         assert '#include "nsx_core.h"' in main_cc
         assert '#include "nsx_system.h"' in main_cc
         assert '#include "nsx_core.h"' in profiler_h
+        assert "#if !defined(NSX_TRY) && defined(NS_TRY)" in main_cc
         assert "NSX_TRY(nsx_system_init(&sys_cfg)" in main_cc
         assert "nsx_system_development" not in main_cc
         assert "nsx::presets" not in cmake

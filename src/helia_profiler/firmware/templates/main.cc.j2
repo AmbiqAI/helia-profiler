@@ -17,7 +17,7 @@
 #include <cstring>
 
 // Pre-include arm_mve.h in C++ context BEFORE any extern "C" headers
-// (ns_core.h, TFLM) to avoid GCC 14 overload conflicts.
+// (nsx_core.h, TFLM) to avoid GCC 14 overload conflicts.
 #if defined(__ARM_FEATURE_MVE)
 #include <arm_mve.h>
 #endif
