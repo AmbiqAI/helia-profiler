@@ -47,6 +47,7 @@ class PipelineContext:
     # Platform resolution (stage: resolve_platform)
     soc: SocDef | None = None
     board: BoardDef | None = None
+    resolved_jlink_serial: str | None = None
 
     # Engine preparation (stage: prepare_engine)
     engine_adapter: EngineAdapter | None = None

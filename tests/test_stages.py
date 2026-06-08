@@ -10,6 +10,7 @@ from helia_profiler.config import load_config
 from helia_profiler.errors import ConfigError, EngineError, FirmwareError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.stages.s01_resolve_platform import ResolvePlatformStage
+from helia_profiler.stages.s01a_resolve_jlink import ResolveJLinkProbeStage
 from helia_profiler.stages.s02_prepare_engine import PrepareEngineStage
 from helia_profiler.stages.s03_generate_firmware import GenerateFirmwareStage
 
@@ -111,6 +112,24 @@ class TestPrepareEngineStage:
         ctx = _make_ctx(tmp_path)
         stage = PrepareEngineStage()
         assert not stage.should_skip(ctx)
+
+
+class TestResolveJLinkProbeStage:
+    def test_resolves_and_records_serial(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        ctx = _make_ctx(tmp_path)
+        ResolvePlatformStage().run(ctx)
+        monkeypatch.setattr(
+            "helia_profiler.stages.s01a_resolve_jlink.resolve_probe_serial",
+            lambda **_: "1160002204",
+        )
+        stage = ResolveJLinkProbeStage()
+        stage.run(ctx)
+        assert ctx.resolved_jlink_serial == "1160002204"
+
+    def test_skips_when_soc_missing(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path)
+        stage = ResolveJLinkProbeStage()
+        assert stage.should_skip(ctx)
 
 
 class TestGenerateFirmwareStage:

@@ -22,6 +22,7 @@ from .stages import (
     PlanMemoryStage,
     PreflightStage,
     PrepareEngineStage,
+    ResolveJLinkProbeStage,
     ResolvePlatformStage,
 )
 
@@ -35,6 +36,7 @@ def build_default_pipeline(console: HpxConsole | None = None) -> PipelineRunner:
             PreflightStage(),
             EnsureBoardPoweredStage(),
             ResolvePlatformStage(),
+            ResolveJLinkProbeStage(),
             PrepareEngineStage(),
             AnalyzeModelStage(),
             PlanMemoryStage(),

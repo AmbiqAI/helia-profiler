@@ -17,12 +17,15 @@ elsewhere.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
 import os
+import re
 import shutil
 import subprocess
 
-from .errors import CaptureError
+from .errors import CaptureError, ConfigError
+from .platform import CoreArch
 
 log = logging.getLogger("hpx")
 
@@ -35,6 +38,24 @@ _JLINK_NOT_FOUND_HINT = (
     "Install the SEGGER J-Link package and ensure JLinkExe is in PATH, "
     "or set JLINK_PATH to the JLinkExe binary."
 )
+_EMU_LIST_RE = re.compile(
+    r"Connection:\s*(?P<connection>[^,]+),\s*Serial number:\s*(?P<serial>\d+),"
+    r"\s*ProductName:\s*(?P<product>[^,]+)"
+)
+_FOUND_CORE_RE = re.compile(r"Found\s+Cortex-M(?P<core>\d+)", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class JLinkProbe:
+    serial: str
+    product: str = ""
+    connection: str = "USB"
+
+
+@dataclass(frozen=True)
+class JLinkProbeMatch:
+    probe: JLinkProbe
+    detected_core: CoreArch | None
 
 
 # ------------------------------------------------------------------
@@ -67,6 +88,160 @@ def find_jlink_exe() -> str:
         if os.path.isfile(candidate):
             return candidate
     raise CaptureError("JLinkExe not found", hint=_JLINK_NOT_FOUND_HINT)
+
+
+def list_connected_probes() -> list[JLinkProbe]:
+    """Return the connected J-Link probes visible to ``JLinkExe``."""
+    jlink_exe = find_jlink_exe()
+    try:
+        result = subprocess.run(
+            [jlink_exe],
+            input="ShowEmuList\nexit\n",
+            capture_output=True,
+            text=True,
+            timeout=_DEFAULT_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ConfigError(
+            "Timed out while enumerating J-Link probes.",
+            hint="Check that the J-Link probes are connected and not in use by another process.",
+        ) from exc
+    except FileNotFoundError as exc:
+        raise ConfigError("JLinkExe not found", hint=_JLINK_NOT_FOUND_HINT) from exc
+
+    probes: list[JLinkProbe] = []
+    seen: set[str] = set()
+    for match in _EMU_LIST_RE.finditer((result.stdout or "") + "\n" + (result.stderr or "")):
+        serial = match.group("serial")
+        if serial in seen:
+            continue
+        seen.add(serial)
+        probes.append(
+            JLinkProbe(
+                serial=serial,
+                product=match.group("product").strip(),
+                connection=match.group("connection").strip(),
+            )
+        )
+    return probes
+
+
+def resolve_probe_serial(
+    *,
+    device: str,
+    expected_core: CoreArch,
+    requested_serial: str | None = None,
+) -> str:
+    """Resolve the J-Link serial to use for this run.
+
+    Selection policy:
+    - explicit serial: must exist and match the requested target core
+    - implicit serial with one attached probe: auto-select only if it matches
+    - implicit serial with multiple probes: auto-select only when exactly one
+      attached probe matches the requested target core; otherwise fail with a
+      disambiguation message listing the available probes
+    """
+    probes = list_connected_probes()
+    if not probes:
+        raise ConfigError(
+            "No J-Link probes detected.",
+            hint="Connect the target board via J-Link or pass --jlink-serial once the probe is attached.",
+        )
+
+    if requested_serial is not None:
+        requested_serial = str(requested_serial)
+        probe = next((probe for probe in probes if probe.serial == requested_serial), None)
+        if probe is None:
+            raise ConfigError(
+                f"J-Link serial '{requested_serial}' was not found.",
+                hint=f"Connected probes: {_format_probe_list(probes)}.",
+            )
+        match = _inspect_probe_target(probe, device=device)
+        if match.detected_core is not expected_core:
+            raise ConfigError(
+                f"J-Link serial '{requested_serial}' does not match the requested target.",
+                hint=(
+                    f"Expected {expected_core.value}, but probe '{probe.serial}' reached "
+                    f"{_format_core(match.detected_core)}. Connected probes: {_format_probe_list(probes)}."
+                ),
+            )
+        return probe.serial
+
+    matches = [match for match in (_inspect_probe_target(probe, device=device) for probe in probes)
+               if match.detected_core is expected_core]
+    if len(matches) == 1:
+        return matches[0].probe.serial
+    if len(matches) > 1:
+        raise ConfigError(
+            f"{len(matches)} J-Link probes match the requested target.",
+            hint=(
+                "Pass --jlink-serial to disambiguate. Matching probes: "
+                f"{_format_probe_matches(matches)}."
+            ),
+        )
+
+    raise ConfigError(
+        "Could not find a connected J-Link probe for the requested target.",
+        hint=(
+            f"Expected a {expected_core.value} target. Connected probes: "
+            f"{_format_probe_matches([_inspect_probe_target(probe, device=device) for probe in probes])}."
+        ),
+    )
+
+
+def _inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
+    jlink_exe = find_jlink_exe()
+    cmd = [
+        jlink_exe,
+        "-device", device,
+        "-if", "SWD",
+        "-speed", "4000",
+        "-autoconnect", "1",
+        "-SelectEmuBySN", probe.serial,
+    ]
+    try:
+        result = subprocess.run(
+            cmd,
+            input="exit\n",
+            capture_output=True,
+            text=True,
+            timeout=_DEFAULT_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ConfigError(
+            f"Timed out while querying J-Link serial '{probe.serial}'.",
+            hint="Check that the probe is connected and not in use by another process.",
+        ) from exc
+
+    detected_core = _parse_detected_core((result.stdout or "") + "\n" + (result.stderr or ""))
+    return JLinkProbeMatch(probe=probe, detected_core=detected_core)
+
+
+def _parse_detected_core(output: str) -> CoreArch | None:
+    match = _FOUND_CORE_RE.search(output)
+    if match is None:
+        return None
+    core = match.group("core")
+    if core == "4":
+        return CoreArch.CORTEX_M4
+    if core == "55":
+        return CoreArch.CORTEX_M55
+    return None
+
+
+def _format_core(core: CoreArch | None) -> str:
+    return core.value if core is not None else "unknown target"
+
+
+def _format_probe_list(probes: list[JLinkProbe]) -> str:
+    return ", ".join(f"{probe.serial} ({probe.product or probe.connection})" for probe in probes)
+
+
+def _format_probe_matches(matches: list[JLinkProbeMatch]) -> str:
+    return ", ".join(
+        f"{match.probe.serial} ({match.probe.product or match.probe.connection}, {_format_core(match.detected_core)})"
+        for match in matches
+    )
 
 
 # ------------------------------------------------------------------
@@ -167,4 +342,12 @@ def reset_target(
     log.info("Reset complete")
 
 
-__all__ = ["find_jlink_exe", "reset_target", "run_jlink_script"]
+__all__ = [
+    "JLinkProbe",
+    "JLinkProbeMatch",
+    "find_jlink_exe",
+    "list_connected_probes",
+    "resolve_probe_serial",
+    "reset_target",
+    "run_jlink_script",
+]

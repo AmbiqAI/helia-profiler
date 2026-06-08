@@ -15,6 +15,7 @@ from helia_profiler.firmware import (
     _resolve_module_list,
     _resolve_module_specs,
     build_app,
+    flash_app,
     generate_app,
 )
 from helia_profiler.pipeline import PipelineContext
@@ -552,6 +553,44 @@ class TestBuildApp:
         assert sync_calls == [{"timeout_s": ctx.config.timeouts.configure_s, "verbose": 0}]
         assert out_build_dir == build_dir
         assert out_binary == binary
+
+
+class TestFlashApp:
+    def test_prefers_resolved_jlink_serial(self, tmp_path: Path, fake_dist: Path, monkeypatch):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        ctx.firmware_dir = tmp_path / "app"
+        ctx.firmware_dir.mkdir(parents=True)
+        ctx.resolved_jlink_serial = "1160002204"
+
+        captured: dict[str, object] = {}
+
+        def fake_flash(*args, **kwargs):
+            captured.update(kwargs)
+
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.flash", fake_flash)
+
+        flash_app(ctx)
+
+        assert captured["jlink_serial"] == "1160002204"
+
+    def test_falls_back_to_configured_jlink_serial(self, tmp_path: Path, fake_dist: Path, monkeypatch):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        ctx.firmware_dir = tmp_path / "app"
+        ctx.firmware_dir.mkdir(parents=True)
+        object.__setattr__(ctx.config.target, "jlink_serial", "0011223344")
+
+        captured: dict[str, object] = {}
+
+        def fake_flash(*args, **kwargs):
+            captured.update(kwargs)
+
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.flash", fake_flash)
+
+        flash_app(ctx)
+
+        assert captured["jlink_serial"] == "0011223344"
 
     def test_frozen_skips_lock_and_uses_frozen_sync(self, tmp_path: Path, fake_dist: Path, monkeypatch):
         ctx = _make_ctx(tmp_path, fake_dist)

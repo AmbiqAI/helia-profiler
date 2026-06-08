@@ -3,6 +3,7 @@
 from .s00_preflight import PreflightStage
 from .s00b_ensure_powered import EnsureBoardPoweredStage
 from .s01_resolve_platform import ResolvePlatformStage
+from .s01a_resolve_jlink import ResolveJLinkProbeStage
 from .s02_prepare_engine import PrepareEngineStage
 from .s02a_analyze_model import AnalyzeModelStage
 from .s02b_plan_memory import PlanMemoryStage
@@ -17,6 +18,7 @@ __all__ = [
     "PreflightStage",
     "EnsureBoardPoweredStage",
     "ResolvePlatformStage",
+    "ResolveJLinkProbeStage",
     "PrepareEngineStage",
     "AnalyzeModelStage",
     "PlanMemoryStage",

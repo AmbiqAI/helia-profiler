@@ -37,7 +37,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
 
     transport = ctx.config.target.transport
 
-    jlink_serial = ctx.config.target.jlink_serial
+    jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
     hb = ctx.config.target.heartbeat
     heartbeat_timeout_s = hb.host_timeout_s if hb.enabled else 300
     overall_timeout_s = hb.overall_timeout_s
