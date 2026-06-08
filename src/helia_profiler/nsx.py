@@ -204,31 +204,26 @@ def flash(
 ) -> None:
     """Run ``nsx flash`` on the given app directory.
 
-    When *jlink_serial* is provided, ``SEGGER_SNCODE`` is temporarily set so
-    the underlying CMake flash target selects the correct J-Link probe.
+    When *jlink_serial* is provided it is forwarded to ``flash_app`` as the
+    ``probe_serial`` so the underlying J-Link tool selects the correct probe
+    (required when multiple probes are attached).
     """
     log.info("nsx flash: %s (toolchain=%s)", app_dir, toolchain or "default")
     emit = emitter_for_verbosity(verbose)
 
-    prev_sncode = os.environ.get("SEGGER_SNCODE")
     if jlink_serial:
-        os.environ["SEGGER_SNCODE"] = jlink_serial
         log.info("  J-Link serial: %s", jlink_serial)
-    try:
-        with _quiet_context(verbose):
-            _translate(
-                "nsx flash",
-                lambda: nsx_api.flash_app(
-                    app_dir, toolchain=toolchain, timeout_s=timeout_s, emit=emit
-                ),
-            )
-    finally:
-        # Restore previous state regardless of success/failure.
-        if jlink_serial:
-            if prev_sncode is None:
-                os.environ.pop("SEGGER_SNCODE", None)
-            else:
-                os.environ["SEGGER_SNCODE"] = prev_sncode
+    with _quiet_context(verbose):
+        _translate(
+            "nsx flash",
+            lambda: nsx_api.flash_app(
+                app_dir,
+                toolchain=toolchain,
+                probe_serial=jlink_serial,
+                timeout_s=timeout_s,
+                emit=emit,
+            ),
+        )
 
 
 # ---------------------------------------------------------------------------
