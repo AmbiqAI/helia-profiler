@@ -20,7 +20,9 @@
 
 class HpxPmuProfiler : public tflite::MicroProfilerInterface {
  public:
-    static constexpr int kMaxLayers = 512;
+    // Large runtime graphs can exceed 2048 recorded ops; keep enough
+    // headroom to avoid silently truncating large-model captures.
+    static constexpr int kMaxLayers = 4096;
     static constexpr int kMaxEvents = 4;
 
     HpxPmuProfiler() = default;

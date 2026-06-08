@@ -3,7 +3,8 @@
 cmake_minimum_required(VERSION 3.24)
 project(hpx_profiler LANGUAGES C CXX ASM)
 
-{% set psram_needed = (arena_region == "psram") or (weights_region == "psram") %}
+{% set psram_arena_needed = (arena_regions | selectattr("placement", "equalto", "psram") | list | length) > 0 %}
+{% set psram_needed = (arena_region == "psram") or (weights_region == "psram") or psram_arena_needed %}
 set(NSX_BOARD "{{ board }}" CACHE STRING "Target board")
 
 {% for var_name, var_value in cmake_vars.items() %}

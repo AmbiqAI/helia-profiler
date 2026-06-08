@@ -129,7 +129,7 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
 
 int main(void) {
     nsx_system_config_t sys_cfg = {};
-    sys_cfg.perf_mode = NSX_PERF_LOW;  // 96 MHz — best energy efficiency
+    sys_cfg.perf_mode = {{ perf_mode_symbol }};  // {{ perf_mode_mhz }} MHz — target.clock_mode
     sys_cfg.enable_cache = true;
     sys_cfg.enable_sram = true;
     sys_cfg.debug.transport = NSX_DEBUG_NONE;

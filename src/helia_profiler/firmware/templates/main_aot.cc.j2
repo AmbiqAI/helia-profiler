@@ -28,7 +28,8 @@
 #include "nsx_pmu_map.h"
 {% endif %}
 
-{% set psram_needed = (arena_region == "psram") or (weights_region == "psram") %}
+{% set psram_arena_needed = (arena_regions | selectattr("placement", "equalto", "psram") | list | length) > 0 %}
+{% set psram_needed = (arena_region == "psram") or (weights_region == "psram") or psram_arena_needed %}
 {% if psram_needed %}
 #include "nsx_psram.h"
 {% endif %}
@@ -56,7 +57,9 @@
 // ---------------------------------------------------------------------------
 // PMU profiler — per-operator recording via AOT callback
 // ---------------------------------------------------------------------------
-static constexpr int kMaxLayers = 512;
+// Large proxy models can compile to well over 2048 operators; keep enough
+// headroom here to avoid silently truncating the capture stream.
+static constexpr int kMaxLayers = 4096;
 static constexpr int kMaxEvents = 4;
 
 struct HpxLayerRecord {
@@ -271,7 +274,7 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
 
 int main(void) {
     nsx_system_config_t sys_cfg = {};
-    sys_cfg.perf_mode = NSX_PERF_LOW;  // 96 MHz — best energy efficiency
+    sys_cfg.perf_mode = {{ perf_mode_symbol }};  // {{ perf_mode_mhz }} MHz — target.clock_mode
     sys_cfg.enable_cache = true;
     sys_cfg.enable_sram = true;
     sys_cfg.debug.transport = NSX_DEBUG_NONE;

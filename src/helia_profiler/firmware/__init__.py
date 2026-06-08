@@ -554,6 +554,14 @@ def generate_app(ctx: PipelineContext) -> Path:
     weights_region = ctx.weights_region or Placement.MRAM
     arena_region = ctx.arena_region or Placement.TCM
     power_sync_enabled = config.power.enabled and config.power.mode == "external"
+    aot_arena_regions = []
+    if artifacts.engine_type is EngineType.HELIA_AOT:
+        adapter = ctx.engine_adapter
+        assert adapter is not None  # set by stage 2 before firmware
+        aot_arena_regions = adapter.apply_arena_placement_override(
+            list(artifacts.aot_arena_regions),
+            arena_region,
+        )
 
     # --- Resolve module list ---
     module_specs = _resolve_module_specs(board.name, soc.sdk_tier)
@@ -565,11 +573,22 @@ def generate_app(ctx: PipelineContext) -> Path:
         module_specs.append(NsxModuleSpec("nsx-usb", _module_project("nsx-usb", profile)))
 
     # Add nsx-psram when using PSRAM (for weights or arena)
-    psram_needed = arena_region is Placement.PSRAM or weights_region is Placement.PSRAM
-    if psram_needed and "nsx-psram" not in {m.name for m in module_specs}:
-        module_specs.append(
-            NsxModuleSpec("nsx-psram", _module_project("nsx-psram", profile))
-        )
+    psram_needed = (
+        arena_region is Placement.PSRAM
+        or weights_region is Placement.PSRAM
+        or any(region.placement is Placement.PSRAM for region in aot_arena_regions)
+    )
+    if psram_needed:
+        module_names = {m.name for m in module_specs}
+        if "nsx-interrupt" not in module_names:
+            module_specs.append(
+                NsxModuleSpec("nsx-interrupt", _module_project("nsx-interrupt", profile))
+            )
+            module_names.add("nsx-interrupt")
+        if "nsx-psram" not in module_names:
+            module_specs.append(
+                NsxModuleSpec("nsx-psram", _module_project("nsx-psram", profile))
+            )
 
     if power_sync_enabled:
         module_names = {m.name for m in module_specs}
@@ -689,6 +708,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             profiling_backends=profiling_backends,
             has_armv8m_pmu=has_armv8m_pmu,
             power_sync_enabled=power_sync_enabled,
+            arena_regions=aot_arena_regions,
             ambiqsuite_module=_sdk_ambiqsuite_module_name(soc.sdk_tier),
         )
     )
@@ -714,6 +734,13 @@ def generate_app(ctx: PipelineContext) -> Path:
         engine_type=engine_type,
         engine_config=config.engine.config,
         model_analysis=ctx.model_analysis,
+    )
+    clock_mode = ctx.config.target.clock_mode.value
+    perf_mode_symbol = "NSX_PERF_HIGH" if clock_mode == "high" else "NSX_PERF_LOW"
+    perf_mode_mhz = (
+        ctx.run_metadata.platform.clock_hp_mhz
+        if clock_mode == "high"
+        else ctx.run_metadata.platform.clock_lp_mhz
     )
     resource_variable_count = sum(
         1 for layer in (ctx.model_analysis.layers if ctx.model_analysis else ())
@@ -746,18 +773,6 @@ def generate_app(ctx: PipelineContext) -> Path:
         # --- AOT engine: use AOT-specific main template, no model embedding ---
         aot_prefix = artifacts.aot_prefix
         assert aot_prefix is not None  # heliaAOT adapter always sets this
-
-        # Apply firmware-level placement overrides via the adapter.
-        # AOT moves *scratch* arenas to the requested region; other
-        # engines are no-ops.
-        from ..engines.base import ArenaRegion as _ArenaRegion
-
-        adapter = ctx.engine_adapter
-        assert adapter is not None  # set by stage 2 before firmware
-        aot_arena_regions: list[_ArenaRegion] = adapter.apply_arena_placement_override(
-            list(artifacts.aot_arena_regions),
-            arena_region,
-        )
 
         # Generate C headers for constant arena sidecar blobs.
         # In external-arena mode the AOT compiler emits constant data as
@@ -816,6 +831,8 @@ def generate_app(ctx: PipelineContext) -> Path:
                 has_armv8m_pmu=has_armv8m_pmu,
                 allocate_arenas=artifacts.aot_allocate_arenas,
                 arena_regions=aot_arena_regions,
+                perf_mode_symbol=perf_mode_symbol,
+                perf_mode_mhz=perf_mode_mhz,
                 **heartbeat_vars,
             )
         )
@@ -855,6 +872,8 @@ def generate_app(ctx: PipelineContext) -> Path:
                 extreme_mode=config.profiling.extreme_mode,
                 profiling_backends=profiling_backends,
                 has_armv8m_pmu=has_armv8m_pmu,
+                perf_mode_symbol=perf_mode_symbol,
+                perf_mode_mhz=perf_mode_mhz,
                 **heartbeat_vars,
             )
         )
