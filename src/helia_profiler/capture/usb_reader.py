@@ -23,6 +23,7 @@ import logging
 import time
 
 import serial  # pyserial
+from serial.tools import list_ports
 
 from ..errors import CaptureError
 from ..jlink import reset_target
@@ -33,6 +34,7 @@ log = logging.getLogger("hpx")
 _ENUM_TIMEOUT_S = 15  # max time to wait for USB enumeration
 _BAUD = 115200  # CDC ignores baud, but pyserial requires a value
 _CDC_PATTERNS = ["/dev/tty.usbmodem*", "/dev/ttyACM*"]
+_JLINK_MARKERS = ("segger", "j-link")
 
 
 def _snapshot_cdc_ports() -> set[str]:
@@ -41,6 +43,23 @@ def _snapshot_cdc_ports() -> set[str]:
     for pat in _CDC_PATTERNS:
         ports.update(glob.glob(pat))
     return ports
+
+
+def _is_jlink_port(port: str) -> bool:
+    """Return True when a serial port belongs to the SEGGER J-Link VCOM."""
+    for info in list_ports.comports():
+        if info.device != port:
+            continue
+        fields = [
+            info.manufacturer,
+            info.product,
+            info.description,
+            info.interface,
+            info.hwid,
+        ]
+        text = " ".join(field for field in fields if field).lower()
+        return any(marker in text for marker in _JLINK_MARKERS)
+    return False
 
 
 def _find_cdc_port(
@@ -63,22 +82,35 @@ def _find_cdc_port(
     while time.monotonic() < deadline:
         current = _snapshot_cdc_ports()
         new_ports = sorted(current - pre_existing)
-        if new_ports:
-            log.info("Found new USB CDC port: %s", new_ports[0])
-            return new_ports[0]
+        for port in new_ports:
+            if _is_jlink_port(port):
+                log.info("Ignoring J-Link VCOM candidate: %s", port)
+                continue
+            log.info("Found new USB CDC port: %s", port)
+            return port
         time.sleep(0.5)
 
-    # Fallback: if no *new* port appeared but there are devices, pick the
-    # last one (often the application USB comes after the JLink VCOM
-    # alphabetically on macOS).
+    # Fallback: if no *new* port appeared but there are existing non-J-Link
+    # devices, reuse one of those. Refuse to open SEGGER VCOM, which only
+    # causes a long timeout and hides the real enumeration failure.
     all_ports = sorted(_snapshot_cdc_ports())
-    if all_ports:
+    fallback_ports = [port for port in all_ports if not _is_jlink_port(port)]
+    if fallback_ports:
         log.warning(
-            "No new USB CDC device appeared; falling back to %s "
-            "(may be JLink VCOM)",
-            all_ports[-1],
+            "No new USB CDC device appeared; falling back to existing USB CDC %s",
+            fallback_ports[-1],
         )
-        return all_ports[-1]
+        return fallback_ports[-1]
+
+    if all_ports:
+        raise CaptureError(
+            "No application USB CDC device appeared after reset",
+            hint=(
+                "Only SEGGER/J-Link serial ports are visible on the host. "
+                "Check the board USB data connection and that nsx_usb is "
+                "enumerating the target CDC device."
+            ),
+        )
 
     raise CaptureError(
         f"No USB CDC device found within {timeout_s}s",
