@@ -27,6 +27,10 @@
 {% endif %}
 
 #include "{{ engine_header }}"
+#if {{ resource_variable_count }} > 0
+#include "tensorflow/lite/micro/micro_allocator.h"
+#include "tensorflow/lite/micro/micro_resource_variable.h"
+#endif
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/system_setup.h"
 #include "tensorflow/lite/micro/tflite_bridge/micro_error_reporter.h"
@@ -79,7 +83,10 @@ static unsigned int model_data_len = {{ model_size }};
 {% include "_hpx_printf.j2" %}
 
 static constexpr int kArenaSize = {{ arena_size }};
-static constexpr int kMaxOps = 128;
+static constexpr int kMaxOps = {{ resolver_max_ops }};
+#if {{ resource_variable_count }} > 0
+static constexpr int kNumResourceVariables = {{ resource_variable_count }};
+#endif
 
 {# Arena placement is driven by the resolved logical region from
    PlanMemoryStage. TCM is fastest (single-cycle, tightly-coupled);
@@ -102,55 +109,19 @@ static uint8_t *g_arena = g_arena_storage;
 {% endif %}
 static HpxPmuProfiler g_profiler;
 
-// Register all common TFLM builtin ops for broad model compatibility.
+// Register builtin ops using the selected resolver strategy.
 static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
     static tflite::MicroMutableOpResolver<kMaxOps> r;
     static bool init = false;
     if (!init) {
-        r.AddAbs();           r.AddAdd();
-        r.AddAddN();          r.AddArgMax();
-        r.AddArgMin();        r.AddAveragePool2D();
-        r.AddBatchMatMul();   r.AddBatchToSpaceNd();
-        r.AddBroadcastArgs(); r.AddBroadcastTo();
-        r.AddCast();          r.AddCeil();
-        r.AddConcatenation(); r.AddConv2D();
-        r.AddCumSum();        r.AddDepthToSpace();
-        r.AddDepthwiseConv2D(); r.AddDequantize();
-        r.AddDiv();           r.AddElu();
-        r.AddEmbeddingLookup(); r.AddEqual();
-        r.AddExp();           r.AddExpandDims();
-        r.AddFill();          r.AddFloor();
-        r.AddFloorDiv();      r.AddFloorMod();
-        r.AddFullyConnected(); r.AddGather();
-        r.AddGatherNd();      r.AddGreater();
-        r.AddGreaterEqual();  r.AddHardSwish();
-        r.AddL2Normalization(); r.AddL2Pool2D();
-        r.AddLeakyRelu();     r.AddLess();
-        r.AddLessEqual();     r.AddLog();
-        r.AddLogSoftmax();    r.AddLogicalAnd();
-        r.AddLogicalNot();    r.AddLogicalOr();
-        r.AddLogistic();      r.AddMaxPool2D();
-        r.AddMaximum();       r.AddMean();
-        r.AddMinimum();       r.AddMirrorPad();
-        r.AddMul();           r.AddNeg();
-        r.AddNotEqual();      r.AddPack();
-        r.AddPad();           r.AddPadV2();
-        r.AddPrelu();         r.AddQuantize();
-        r.AddReduceMax();     r.AddRelu();
-        r.AddRelu6();         r.AddReshape();
-        r.AddResizeBilinear(); r.AddResizeNearestNeighbor();
-        r.AddRound();         r.AddRsqrt();
-        r.AddSelectV2();      r.AddShape();
-        r.AddSlice();         r.AddSoftmax();
-        r.AddSpaceToBatchNd(); r.AddSpaceToDepth();
-        r.AddSplit();         r.AddSplitV();
-        r.AddSqrt();          r.AddSquare();
-        r.AddSquaredDifference(); r.AddSqueeze();
-        r.AddStridedSlice();  r.AddSub();
-        r.AddSum();           r.AddSvdf();
-        r.AddTanh();          r.AddTranspose();
-        r.AddTransposeConv(); r.AddUnidirectionalSequenceLSTM();
-        r.AddUnpack();        r.AddZerosLike();
+{% if resolver_mode == "auto" %}
+    // Auto mode narrows registrations to builtins observed in the model.
+{% else %}
+    // All mode keeps the broad fixed builtin surface for compatibility.
+{% endif %}
+{% for registration in resolver_registrations %}
+    {{ registration }}
+{% endfor %}
         init = true;
     }
     return r;
@@ -381,8 +352,16 @@ int main(void) {
         }
     }
 
+#if {{ resource_variable_count }} > 0
+    tflite::MicroAllocator *allocator = tflite::MicroAllocator::Create(g_arena, kArenaSize);
+    tflite::MicroResourceVariables *resource_variables =
+        tflite::MicroResourceVariables::Create(allocator, kNumResourceVariables);
+    tflite::MicroInterpreter interpreter(model, resolver, allocator,
+                                         resource_variables, &g_profiler);
+#else
     tflite::MicroInterpreter interpreter(model, resolver, g_arena, kArenaSize,
                                          nullptr, &g_profiler);
+#endif
     const TfLiteStatus alloc_status = interpreter.AllocateTensors();
     if (alloc_status != kTfLiteOk) {
         // At this point ops are known-registered, so the most likely causes

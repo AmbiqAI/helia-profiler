@@ -106,6 +106,17 @@ same frozen object.
 | `type` | string | `helia-rt` | Engine: `tflm`, `helia-rt`, `helia-aot` |
 | `config` | dict | `{}` | Engine-specific configuration (see [Engines](engines.md)) |
 
+### heliaRT config notes
+
+- `engine.config.resolver_ops` now defaults to `auto` for `helia-rt`. Leave it
+  unset unless you specifically want the broader `all` resolver surface.
+- Models with `CALL_ONCE`, `VAR_HANDLE`, `ASSIGN_VARIABLE`, or
+  `READ_VARIABLE` do not need special-case firmware patches in config; HPX now
+  enables the resource-variable runtime automatically when model analysis sees
+  those ops.
+- If a `helia-rt` run succeeds, use the reported `allocated_arena` to tighten
+  `model.arena_size` instead of growing the arena blindly.
+
 ### `target`
 
 | Field | Type | Default | Description |

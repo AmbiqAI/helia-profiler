@@ -27,11 +27,19 @@ def _render_tflm(
     arena_region: str = "tcm",
     weights_region: str = "mram",
     has_armv8m_pmu: bool = True,
+    resolver_mode: str = "all",
+    resolver_registrations: list[str] | None = None,
+    resource_variable_count: int = 0,
 ) -> str:
+    registrations = resolver_registrations or ["r.AddConv2D();", "r.AddSoftmax();"]
     return _env.get_template("main.cc.j2").render(
         engine_header="tensorflow/lite/micro/micro_interpreter.h",
         cmsis_device_header="apollo510.h",
         arena_size=65_536,
+        resolver_mode=resolver_mode,
+        resolver_max_ops=len(registrations),
+        resolver_registrations=registrations,
+        resource_variable_count=resource_variable_count,
         iterations=3,
         warmup=1,
         pmu_passes=[{"name": "Cache", "counters": ["ARM_PMU_CPU_CYCLES"]}],
@@ -103,6 +111,27 @@ class TestMainCcRender:
         out = _render_tflm(transport="rtt")
         assert "SEGGER_RTT_Write" in out
         assert "hpx_rtt_drain" in out
+
+    def test_auto_resolver_mode_embeds_selected_registrations(self):
+        out = _render_tflm(
+            transport="rtt",
+            resolver_mode="auto",
+            resolver_registrations=["r.AddConv2D();", "r.AddFullyConnected();"],
+        )
+        assert "Auto mode narrows registrations" in out
+        assert "r.AddConv2D();" in out
+        assert "r.AddFullyConnected();" in out
+        assert "r.AddSoftmax();" not in out
+
+    def test_resource_variable_models_render_resource_variable_runtime(self):
+        out = _render_tflm(
+            transport="rtt",
+            resource_variable_count=2,
+        )
+        assert "#include \"tensorflow/lite/micro/micro_allocator.h\"" in out
+        assert "#include \"tensorflow/lite/micro/micro_resource_variable.h\"" in out
+        assert "kNumResourceVariables = 2" in out
+        assert "MicroResourceVariables::Create(allocator, kNumResourceVariables)" in out
 
     def test_usb_transport_includes_timer_helpers(self):
         out = _render_tflm(transport="usb_cdc")

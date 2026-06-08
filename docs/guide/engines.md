@@ -40,6 +40,12 @@ No engine-specific config is required.
 fork. It is a drop-in replacement for stock TFLM with three kernel
 backends — reference, CMSIS-NN, and the Ambiq-tuned **HELIA** kernels.
 
+The generated firmware now derives the resolver surface from model analysis by
+default and automatically enables the TFLM resource-variable runtime when the
+graph contains `VAR_HANDLE`-style ops. That means models using
+`CALL_ONCE` / `VAR_HANDLE` / `ASSIGN_VARIABLE` / `READ_VARIABLE` no longer need
+manual firmware edits just to stand up the interpreter.
+
 The profiler ships pinned to a specific heliaRT release
 (currently **v1.16.0**) and enforces a minimum supported version
 (**v1.16.0**). Pre-built static libraries are downloaded automatically
@@ -105,9 +111,22 @@ must be `>= v1.16.0`.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `variant` | string | `release-with-logs` | `debug`, `release-with-logs`, or `release` |
+| `resolver_ops` | string | `auto` | Resolver strategy: `auto` registers builtins observed in the model; `all` keeps the broad fixed allowlist |
 | `dist_path` | string | *(auto-download)* | Local heliaRT distribution path |
 | `source.repo` | string | `AmbiqAI/helia-rt` | GitHub repo for download |
 | `source.ref` | string | pinned version | Release tag (e.g. `helia-rt-v1.16.0` or bare `1.16.0`) |
+
+### heliaRT runtime notes
+
+- `resolver_ops: auto` is the default and should stay that way unless you're
+  debugging resolver coverage. It reduces binary bloat and now covers the
+  resource-variable builtins shipped by heliaRT.
+- If a model uses resource-variable ops, HPX counts `VAR_HANDLE` nodes from the
+  analyzed graph and wires `MicroResourceVariables` into the generated
+  interpreter automatically.
+- Size `model.arena_size` from measured output, not guesses. After the first
+  successful run, set it to roughly `1.5x` the reported `allocated_arena` in
+  `summary.json`.
 
 ## heliaAOT
 

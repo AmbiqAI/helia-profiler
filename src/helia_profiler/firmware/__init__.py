@@ -33,6 +33,7 @@ from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
 from ..platform import get_board, get_soc_for_board
 from ..placement import Placement
+from .op_resolver import build_resolver_plan
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -709,6 +710,15 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # Arena size: use configured value or default 256KB
     arena_size = config.model.arena_size or DEFAULT_ARENA_SIZE_BYTES
+    resolver_plan = build_resolver_plan(
+        engine_type=engine_type,
+        engine_config=config.engine.config,
+        model_analysis=ctx.model_analysis,
+    )
+    resource_variable_count = sum(
+        1 for layer in (ctx.model_analysis.layers if ctx.model_analysis else ())
+        if layer.op == "VAR_HANDLE"
+    )
 
     # External power sync
     sync_gpio_pin = config.power.sync_gpio_pin
@@ -837,6 +847,10 @@ def generate_app(ctx: PipelineContext) -> Path:
                 arena_region=arena_region,
                 weights_region=weights_region,
                 model_size=model_size,
+                resolver_mode=resolver_plan.mode,
+                resolver_max_ops=resolver_plan.max_ops,
+                resolver_registrations=resolver_plan.registrations,
+                resource_variable_count=resource_variable_count,
                 printf_linkage="",
                 extreme_mode=config.profiling.extreme_mode,
                 profiling_backends=profiling_backends,
@@ -924,24 +938,23 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     nsx_cli.configure(app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s, verbose=verbose)
     nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose)
 
-    # Locate build output
+    # Locate build output. Prefer the ELF-form executable because later
+    # reporting stages run size tools against it to capture text/data/bss.
     build_dir = app_dir / "build" / board
-    bin_patterns = [
+    artifact_patterns = [
+        str(build_dir / "hpx_profiler"),
+        str(build_dir / "**" / "hpx_profiler"),
+        str(build_dir / "**" / "hpx_profiler.axf"),
+        str(build_dir / "**" / "hpx_profiler.elf"),
         str(build_dir / "hpx_profiler.bin"),
         str(build_dir / "**" / "hpx_profiler.bin"),
     ]
     binary_path = None
-    for pattern in bin_patterns:
+    for pattern in artifact_patterns:
         matches = glob.glob(pattern, recursive=True)
         if matches:
             binary_path = Path(matches[0])
             break
-
-    if binary_path is None:
-        # Try .axf as fallback
-        axf_matches = glob.glob(str(build_dir / "**" / "hpx_profiler.axf"), recursive=True)
-        if axf_matches:
-            binary_path = Path(axf_matches[0])
 
     if binary_path is None:
         raise BuildError(
