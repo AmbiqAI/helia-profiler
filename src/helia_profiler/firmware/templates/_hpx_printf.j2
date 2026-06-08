@@ -52,7 +52,7 @@ static void hpx_rtt_drain(uint32_t timeout_ms) {
     uint32_t total = timeout_ms * spins_per_ms;
     while (SEGGER_RTT_HasDataUp(0) && total > 0U) {
         // SCB_CleanDCache so J-Link sees the latest WrOff each poll.
-{% if has_full_pmu %}
+{% if has_armv8m_pmu %}
         SCB_CleanDCache();
 {% endif %}
         for (volatile uint32_t s = 0; s < spins_per_ms; ++s) { __NOP(); }

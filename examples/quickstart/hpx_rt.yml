@@ -9,9 +9,6 @@ engine:
   type: helia-rt
   config:
     variant: release-with-logs
-    source:
-      repo: AmbiqAI/helia-rt
-      ref: HeliaRT-v1.11.2
 
 target:
   board: apollo510_evb

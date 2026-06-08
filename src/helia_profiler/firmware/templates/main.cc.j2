@@ -21,7 +21,7 @@
 #if defined(__ARM_FEATURE_MVE)
 #include <arm_mve.h>
 #endif
-{% if not has_full_pmu %}
+{% if not has_armv8m_pmu %}
 #include <cerrno>
 #include <sys/types.h>
 {% endif %}
@@ -40,7 +40,7 @@
 #define SCB_CleanDCache() ((void)0)
 #endif
 
-{% if not has_full_pmu %}
+{% if not has_armv8m_pmu %}
 extern "C" __attribute__((weak)) void _exit(int status) {
     (void)status;
     while (1) { __WFI(); }
@@ -157,9 +157,14 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
 }
 
 int main(void) {
-    nsx_system_config_t sys_cfg = nsx_system_development;
+    nsx_system_config_t sys_cfg = {};
     sys_cfg.perf_mode = NSX_PERF_LOW;  // 96 MHz — best energy efficiency
-    NS_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
+    sys_cfg.enable_cache = true;
+    sys_cfg.enable_sram = true;
+    sys_cfg.debug.transport = NSX_DEBUG_NONE;
+    sys_cfg.skip_bsp_init = false;
+    sys_cfg.spot_mgr_profile = true;
+    NSX_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
     dwt_init();
     sync_gpio_init();
 {% include "_extreme_mode.j2" %}
@@ -293,7 +298,7 @@ int main(void) {
 
     // Use the first pass to allocate (all passes use the same model/arena)
 {% if pmu_passes[0].custom %}
-{% if has_full_pmu %}
+{% if has_armv8m_pmu %}
     {
         static const uint32_t _init_ids[] = { {{ pmu_passes[0].event_ids | join(', ') }} };
         g_profiler.InitCustom(_init_ids, {{ pmu_passes[0].num_counters }});
@@ -302,7 +307,7 @@ int main(void) {
     g_profiler.Init(0);
 {% endif %}
 {% else %}
-{% if has_full_pmu %}
+{% if has_armv8m_pmu %}
     g_profiler.Init({{ pmu_passes[0].c_enum }});
 {% else %}
     g_profiler.Init(0);
@@ -411,7 +416,7 @@ int main(void) {
 {% for pass in pmu_passes %}
     hpx_printf("\n--- HPX_PRESET {{ pass.name }} ---\n");
 {% if pass.custom %}
-{% if has_full_pmu %}
+{% if has_armv8m_pmu %}
     {
         static const uint32_t _pass{{ loop.index0 }}_ids[] = { {{ pass.event_ids | join(', ') }} };
         g_profiler.InitCustom(_pass{{ loop.index0 }}_ids, {{ pass.num_counters }});
@@ -420,7 +425,7 @@ int main(void) {
     g_profiler.Init(0);
 {% endif %}
 {% else %}
-{% if has_full_pmu %}
+{% if has_armv8m_pmu %}
     g_profiler.Init({{ pass.c_enum }});
 {% else %}
     g_profiler.Init(0);

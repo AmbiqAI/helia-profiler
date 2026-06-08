@@ -41,6 +41,12 @@ class PmuTier(Enum):
     ARMV8M_PMU = "pmu"  # Cortex-M55: Full Armv8-M PMU, 70+ events, 8 counters
 
 
+class NpuArch(Enum):
+    """Optional accelerator architectures that expose their own PMU surface."""
+
+    ETHOS_U85 = "ethos-u85"
+
+
 # ---------------------------------------------------------------------------
 # SoC definition
 # ---------------------------------------------------------------------------
@@ -79,12 +85,57 @@ class SocDef:
     clock: ClockConfig
     sdk_tier: str  # "r3", "r4", "r5", or "r6" — maps to nsx-ambiqsuite-r*
     c_define: str  # e.g. "AM_PART_APOLLO510"
+    npu: NpuArch | None = None
     jlink_device: str = ""  # J-Link device string (e.g. "AP510NFA-CBR")
     pmu_max_ops: int = 2048  # Max PMU accumulator operations (layers)
 
     @property
     def has_full_pmu(self) -> bool:
         return self.pmu_tier is PmuTier.ARMV8M_PMU
+
+    @property
+    def has_dwt(self) -> bool:
+        """All supported Cortex-M targets expose the DWT cycle counter."""
+        return True
+
+    @property
+    def has_npu(self) -> bool:
+        return self.npu is not None
+
+    @property
+    def profiling_backends(self) -> tuple[str, ...]:
+        """Concrete profiling backends available on this SoC.
+
+        This is intentionally more explicit than ``pmu_tier`` so callers do
+        not flatten a CM55/NPU target into a single boolean like
+        ``has_full_pmu``.
+        """
+        backends = ["dwt"]
+        if self.has_full_pmu:
+            backends.append("armv8m-pmu")
+        if self.npu is not None:
+            backends.append(f"{self.npu.value}-pmu")
+        return tuple(backends)
+
+    @property
+    def profiling_domains(self) -> tuple[str, ...]:
+        """High-level compute domains the profiler can target on this SoC."""
+        domains = ["cpu"]
+        if self.has_full_pmu:
+            domains.append("memory")
+        if self.has_mve:
+            domains.append("mve")
+        if self.npu is not None:
+            domains.append("npu")
+        return tuple(domains)
+
+    @property
+    def feature_flags(self) -> tuple[str, ...]:
+        """Short capability tags suitable for logs, metadata, and CLI output."""
+        flags: list[str] = list(self.profiling_backends)
+        if self.has_mve:
+            flags.append("mve")
+        return tuple(flags)
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +151,7 @@ class BoardDef:
     soc: str  # SoC name key (matches SocDef.name)
     channel: str  # "stable" or "preview"
     psram_kb: int | None = None  # None = inherit SoC default
+    default_sync_gpio_pin: int = 10
     description: str = ""
 
 
@@ -271,8 +323,22 @@ _register_soc(
     )
 )
 
-_register_board(BoardDef("apollo510_evb", soc="apollo510", channel="stable"))
-_register_board(BoardDef("apollo510b_evb", soc="apollo510b", channel="preview"))
+_register_board(
+    BoardDef(
+        "apollo510_evb",
+        soc="apollo510",
+        channel="stable",
+        default_sync_gpio_pin=29,
+    )
+)
+_register_board(
+    BoardDef(
+        "apollo510b_evb",
+        soc="apollo510b",
+        channel="preview",
+        default_sync_gpio_pin=29,
+    )
+)
 _register_board(BoardDef("apollo5b_evb", soc="apollo5b", channel="preview"))
 _register_board(
     BoardDef(
@@ -292,6 +358,7 @@ _register_soc(
         core=CoreArch.CORTEX_M55,
         pmu_tier=PmuTier.ARMV8M_PMU,
         has_mve=True,
+        npu=NpuArch.ETHOS_U85,
         memory=MemoryLayout(
             sram_kb=3072,
             dtcm_kb=512,
@@ -346,6 +413,14 @@ def get_soc_for_board(board_name: str) -> SocDef:
         soc,
         memory=replace(soc.memory, psram_kb=board.psram_kb),
     )
+
+
+def get_default_sync_gpio_pin(board_name: str, fallback: int = 10) -> int:
+    """Return the board's default sync GPIO pin, or *fallback* if unknown."""
+    board = _BOARDS.get(board_name)
+    if board is None:
+        return fallback
+    return board.default_sync_gpio_pin
 
 
 def list_boards() -> list[BoardDef]:

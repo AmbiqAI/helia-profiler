@@ -26,9 +26,11 @@ def _render_tflm(
     model_location: str = "mram",
     arena_region: str = "tcm",
     weights_region: str = "mram",
+    has_armv8m_pmu: bool = True,
 ) -> str:
     return _env.get_template("main.cc.j2").render(
         engine_header="tensorflow/lite/micro/micro_interpreter.h",
+        cmsis_device_header="apollo510.h",
         arena_size=65_536,
         iterations=3,
         warmup=1,
@@ -41,6 +43,8 @@ def _render_tflm(
         arena_region=arena_region,
         weights_region=weights_region,
         model_size=1024,
+        profiling_backends=["dwt", "armv8m-pmu"] if has_armv8m_pmu else ["dwt"],
+        has_armv8m_pmu=has_armv8m_pmu,
         printf_linkage="",
         heartbeat_enabled=True,
         heartbeat_every_n_ops=4,
@@ -53,9 +57,11 @@ def _render_aot(
     arena_region: str = "tcm",
     weights_region: str = "mram",
     arena_regions: list[dict[str, object]] | None = None,
+    has_armv8m_pmu: bool = True,
 ) -> str:
     return _env.get_template("main_aot.cc.j2").render(
         aot_prefix="fake",
+        cmsis_device_header="apollo510.h",
         aot_op_manifest=[{"index": 0, "op_name": "CONV_2D"}],
         iterations=3,
         warmup=1,
@@ -69,6 +75,8 @@ def _render_aot(
         arena_regions=arena_regions or [],
         allocate_arenas=False,
         extreme_mode=False,
+        profiling_backends=["dwt", "armv8m-pmu"] if has_armv8m_pmu else ["dwt"],
+        has_armv8m_pmu=has_armv8m_pmu,
         printf_linkage="static ",
         heartbeat_enabled=True,
         heartbeat_every_n_ops=4,
@@ -113,6 +121,35 @@ class TestMainCcRender:
         assert out.count("static inline void dwt_init(void)") == 1
         assert out.count("static inline void sync_gpio_init(void)") == 1
 
+    def test_external_power_sync_uses_nsx_gpio(self):
+        out = _env.get_template("main.cc.j2").render(
+            engine_header="tensorflow/lite/micro/micro_interpreter.h",
+            cmsis_device_header="apollo510.h",
+            arena_size=65_536,
+            iterations=3,
+            warmup=1,
+            pmu_passes=[{"name": "Cache", "counters": ["ARM_PMU_CPU_CYCLES"]}],
+            pmu_pass_names=["Cache"],
+            power_sync_enabled=True,
+            sync_gpio_pin=42,
+            transport="rtt",
+            model_location="mram",
+            arena_region="tcm",
+            weights_region="mram",
+            model_size=1024,
+            printf_linkage="",
+            heartbeat_enabled=True,
+            heartbeat_every_n_ops=4,
+            heartbeat_every_ms=0,
+        )
+        assert '#include "nsx_gpio.h"' in out
+        assert "nsx_gpio_init" in out
+        assert "nsx_gpio_write" in out
+        assert "am_hal_gpio_" not in out
+        # nsx-core now owns ns_core_initialized(); the firmware must not
+        # redefine it (that would be a duplicate symbol at link time).
+        assert "ns_core_initialized" not in out
+
     def test_psram_model_location_skips_model_data_header(self):
         out = _render_tflm(transport="rtt", model_location="psram", weights_region="psram")
         assert "#include \"model_data.h\"" not in out
@@ -122,6 +159,11 @@ class TestMainCcRender:
         out = _render_tflm(transport="rtt", model_location="auto", weights_region="psram")
         assert "#include \"model_data.h\"" not in out
         assert "nsx_psram.h" in out
+
+    def test_dwt_only_render_avoids_armv8m_pmu_headers(self):
+        out = _render_tflm(transport="rtt", has_armv8m_pmu=False)
+        assert "nsx_pmu_utils.h" not in out
+        assert "g_profiler.Init(0);" in out
 
 
 class TestMainAotCcRender:
@@ -170,3 +212,11 @@ class TestMainAotCcRender:
     def test_aot_op_manifest_embedded(self):
         out = _render_aot(transport="rtt")
         assert "CONV_2D" in out
+
+    def test_dwt_only_aot_render_avoids_armv8m_pmu_api(self):
+        out = _render_aot(transport="rtt", has_armv8m_pmu=False)
+        assert "nsx_pmu_utils.h" not in out
+        assert "nsx_pmu_map.h" not in out
+        assert "ARM_PMU_CPU_CYCLES" in out
+        assert "nsx_pmu_reset_counters" not in out
+        assert "g_op_start_cyccnt" in out

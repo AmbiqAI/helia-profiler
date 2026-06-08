@@ -25,11 +25,13 @@ from ..counters import (
     plan_passes,
     resolve_counters,
     resolve_legacy_presets,
+    supported_groups_for_domains,
+    validate_group_selection,
 )
 from ..engines import EngineType
 from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
-from ..platform import PmuTier, get_board, get_soc_for_board
+from ..platform import get_board, get_soc_for_board
 from ..placement import Placement
 
 if TYPE_CHECKING:
@@ -79,8 +81,8 @@ def _nsx_toolchain(toolchain: str) -> str | None:
 # nsx-harness / nsx-utils modules). The *ownership* of each module (which NSX
 # project vendors it) is NOT hand-maintained here: it is derived from the NSX
 # starter profile for the target board so it always tracks the upstream
-# registry (which consolidates modules under the nsx-ambiq-sdk-{tier} monorepo
-# tier-by-tier). See ``_module_project``.
+# registry (which consolidates migrated tiers under the unified nsx-ambiq-sdk
+# project while r6 remains on nsx-ambiq-sdk-r6). See ``_module_project``.
 # ---------------------------------------------------------------------------
 
 
@@ -88,22 +90,29 @@ def _sdk_ambiqsuite_module_name(sdk_tier: str) -> str:
     return f"nsx-ambiqsuite-{sdk_tier}"
 
 
+def _cmsis_device_header(soc: Any) -> str:
+    mapping = {
+        "apollo3p": "apollo3p.h",
+        "apollo4p": "apollo4p.h",
+        "apollo4l": "apollo4l.h",
+        "apollo510": "apollo510.h",
+        "apollo510b": "apollo510.h",
+        "apollo5b": "apollo510.h",
+        "apollo330P": "apollo330P.h",
+        "atomiq110": "atomiq110.h",
+    }
+    return mapping.get(soc.name, "apollo510.h")
+
+
+def _soc_has_backend(soc: Any, backend: str) -> bool:
+    return backend in getattr(soc, "profiling_backends", ())
+
+
 _KNOWN_SDK_TIERS = ("r3", "r4", "r5", "r6")
 
-# Common modules every profiler app needs, in CMake order. The board module is
-# inserted dynamically right after nsx-cmsis-startup; nsx-tooling is appended
-# last. Ownership of each is resolved from the board's NSX starter profile.
-#
-# nsx-power / nsx-perf were intentionally removed from this lean set: the
-# generated profiler app does not consume their APIs directly, and nsx-core
-# already owns the performance-mode plumbing hpx uses via nsx_system_config_t.
-# Dropping them avoids forcing R6 to resolve modules its SDK monorepo does not
-# currently vendor.
-_COMMON_MODULE_NAMES: tuple[str, ...] = (
-    "nsx-soc-hal",
-    "nsx-cmsis-startup",
-    "nsx-core",
-    "nsx-pmu-armv8m",
+_POWER_SYNC_MODULE_NAMES: tuple[str, ...] = (
+    "nsx-interrupt",
+    "nsx-gpio",
 )
 
 
@@ -133,7 +142,8 @@ def _get_starter_profile(board: str) -> dict[str, Any]:
 
     The profile is the single source of truth for module/project ownership
     (its ``module_overrides`` repoint SDK modules onto the consolidated
-    nsx-ambiq-sdk-{tier} monorepo for tiers that have migrated).
+    unified nsx-ambiq-sdk project for migrated tiers, with r6 remaining on
+    nsx-ambiq-sdk-r6).
     """
     profile = nsx_cli.starter_profile(board)
     if profile is None:
@@ -216,7 +226,7 @@ def _resolve_module_specs(board: str, sdk_tier: str) -> list[NsxModuleSpec]:
 
     if "nsx-cmsis-core" not in ordered_names:
         ordered_names.insert(0, "nsx-cmsis-core")
-    if soc.pmu_tier is PmuTier.ARMV8M_PMU and "nsx-pmu-armv8m" not in ordered_names:
+    if _soc_has_backend(soc, "armv8m-pmu") and "nsx-pmu-armv8m" not in ordered_names:
         tooling_idx = ordered_names.index("nsx-tooling") if "nsx-tooling" in ordered_names else len(ordered_names)
         ordered_names.insert(tooling_idx, "nsx-pmu-armv8m")
 
@@ -304,7 +314,7 @@ _PMU_PRESET_MAP: dict[str, str] = {
 }
 
 
-def _resolve_pmu_passes(config: Any) -> list[dict[str, Any]]:
+def _resolve_pmu_passes(config: Any, soc: Any | None = None) -> list[dict[str, Any]]:
     """Resolve profiling config into firmware pass descriptors.
 
     If the new ``pmu_counters`` field is set, resolve and plan passes from
@@ -319,6 +329,27 @@ def _resolve_pmu_passes(config: Any) -> list[dict[str, Any]]:
       - ``group``         — compute-unit group name
     """
     profiling = config.profiling
+    if soc is not None:
+        supported_groups = supported_groups_for_domains(soc.profiling_domains)
+        try:
+            if profiling.pmu_counters is not None:
+                validate_group_selection(
+                    profiling.pmu_counters,
+                    supported_groups=supported_groups,
+                )
+            else:
+                validate_group_selection(
+                    resolve_legacy_presets(profiling.pmu_presets),
+                    supported_groups=supported_groups,
+                )
+        except ValueError as exc:
+            raise FirmwareError(
+                str(exc),
+                hint=(
+                    f"Target '{soc.name}' supports PMU groups: "
+                    f"{', '.join(supported_groups) if supported_groups else 'none'}."
+                ),
+            ) from exc
 
     # --- New path: explicit counter selection ---
     if profiling.pmu_counters is not None:
@@ -411,8 +442,9 @@ def _copy_segger_rtt(dest_dir: Path) -> None:
     rtt_dest = dest_dir / "rtt"
     rtt_dest.mkdir(parents=True, exist_ok=True)
 
-    # RTT source + header
-    for name in ("SEGGER_RTT.c", "SEGGER_RTT.h"):
+    # RTT source + headers. SEGGER_RTT.h includes SEGGER_RTT_ConfDefaults.h,
+    # which in turn includes Config/SEGGER_RTT_Conf.h.
+    for name in ("SEGGER_RTT.c", "SEGGER_RTT.h", "SEGGER_RTT_ConfDefaults.h"):
         src = rtt_root / "RTT" / name
         if src.exists():
             shutil.copy2(src, rtt_dest / name)
@@ -520,6 +552,7 @@ def generate_app(ctx: PipelineContext) -> Path:
     artifacts = ctx.engine_artifacts
     weights_region = ctx.weights_region or Placement.MRAM
     arena_region = ctx.arena_region or Placement.TCM
+    power_sync_enabled = config.power.enabled and config.power.mode == "external"
 
     # --- Resolve module list ---
     module_specs = _resolve_module_specs(board.name, soc.sdk_tier)
@@ -536,6 +569,13 @@ def generate_app(ctx: PipelineContext) -> Path:
         module_specs.append(
             NsxModuleSpec("nsx-psram", _module_project("nsx-psram", profile))
         )
+
+    if power_sync_enabled:
+        module_names = {m.name for m in module_specs}
+        for name in _POWER_SYNC_MODULE_NAMES:
+            if name not in module_names:
+                module_specs.append(NsxModuleSpec(name, _module_project(name, profile)))
+                module_names.add(name)
 
     # Build module descriptors (name + local flag + optional overrides)
     nsx_overrides = config.build.nsx_modules
@@ -583,16 +623,34 @@ def generate_app(ctx: PipelineContext) -> Path:
             ", ".join(spec.name for spec in module_specs),
         )
 
-    # Append engine-provided modules (e.g. nsx-helia-rt) as local
+    # Append engine-provided modules (e.g. nsx-helia-rt). Each is either a
+    # registry module (NSX clones it from GitHub during `nsx sync`) or a
+    # locally vendored module installed under its registry-derived project
+    # directory.
+    spec_names = {spec.name for spec in module_specs}
     for extra_mod in artifacts.extra_modules:
-        if extra_mod.name not in {spec.name for spec in module_specs}:
-            modules.append({"name": extra_mod.name, "project": extra_mod.name, "local": True})
+        if extra_mod.name in spec_names:
+            continue
+        project = extra_mod.project or extra_mod.name
+        if extra_mod.local:
+            modules.append({"name": extra_mod.name, "project": project, "local": True})
+        else:
+            entry: dict[str, object] = {
+                "name": extra_mod.name,
+                "project": project,
+                "local": False,
+            }
+            if extra_mod.ref:
+                entry["ref"] = extra_mod.ref
+            modules.append(entry)
 
     log.info("NSX modules: %s", ", ".join(m["name"] for m in modules))  # type: ignore[arg-type]
 
     # Engine identity flows through the typed EngineArtifacts field.
     # Templates receive the canonical hyphen-form string (StrEnum value).
     engine_type = artifacts.engine_type
+    profiling_backends = list(soc.profiling_backends)
+    has_armv8m_pmu = _soc_has_backend(soc, "armv8m-pmu")
 
     # --- nsx.yml ---
     _write_text(
@@ -627,7 +685,9 @@ def generate_app(ctx: PipelineContext) -> Path:
             model_location=config.model.model_location,
             arena_region=arena_region,
             weights_region=weights_region,
-            has_full_pmu=soc.has_full_pmu,
+            profiling_backends=profiling_backends,
+            has_armv8m_pmu=has_armv8m_pmu,
+            power_sync_enabled=power_sync_enabled,
             ambiqsuite_module=_sdk_ambiqsuite_module_name(soc.sdk_tier),
         )
     )
@@ -645,14 +705,14 @@ def generate_app(ctx: PipelineContext) -> Path:
     pmu_preset_c = _PMU_PRESET_MAP.get(first_preset, "NSX_PMU_PRESET_ML_DEFAULT")
 
     # Build pass list for multi-pass firmware loop
-    pmu_passes = _resolve_pmu_passes(config)
+    pmu_passes = _resolve_pmu_passes(config, soc)
 
     # Arena size: use configured value or default 256KB
     arena_size = config.model.arena_size or DEFAULT_ARENA_SIZE_BYTES
 
     # External power sync
-    power_sync_enabled = config.power.enabled and config.power.mode == "external"
     sync_gpio_pin = config.power.sync_gpio_pin
+    cmsis_device_header = _cmsis_device_header(soc)
 
     # --- Heartbeat template vars (shared across engines) ---
     hb = config.target.heartbeat
@@ -735,13 +795,15 @@ def generate_app(ctx: PipelineContext) -> Path:
                 pmu_pass_names=[p["name"] for p in pmu_passes],
                 power_sync_enabled=power_sync_enabled,
                 sync_gpio_pin=sync_gpio_pin,
+                cmsis_device_header=cmsis_device_header,
                 transport=transport,
                 printf_linkage="static ",
                 extreme_mode=config.profiling.extreme_mode,
                 model_location=config.model.model_location,
                 arena_region=arena_region,
                 weights_region=weights_region,
-                has_full_pmu=soc.has_full_pmu,
+                profiling_backends=profiling_backends,
+                has_armv8m_pmu=has_armv8m_pmu,
                 allocate_arenas=artifacts.aot_allocate_arenas,
                 arena_regions=aot_arena_regions,
                 **heartbeat_vars,
@@ -769,6 +831,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 pmu_pass_names=[p["name"] for p in pmu_passes],
                 power_sync_enabled=power_sync_enabled,
                 sync_gpio_pin=sync_gpio_pin,
+                cmsis_device_header=cmsis_device_header,
                 transport=transport,
                 model_location=model_location,
                 arena_region=arena_region,
@@ -776,7 +839,8 @@ def generate_app(ctx: PipelineContext) -> Path:
                 model_size=model_size,
                 printf_linkage="",
                 extreme_mode=config.profiling.extreme_mode,
-                has_full_pmu=soc.has_full_pmu,
+                profiling_backends=profiling_backends,
+                has_armv8m_pmu=has_armv8m_pmu,
                 **heartbeat_vars,
             )
         )
@@ -785,20 +849,34 @@ def generate_app(ctx: PipelineContext) -> Path:
         _write_text(
             src_dir / "hpx_pmu_profiler.h",
             _jinja_env.get_template("hpx_pmu_profiler.h.j2").render(
-                has_full_pmu=soc.has_full_pmu,
+                cmsis_device_header=cmsis_device_header,
+                profiling_backends=profiling_backends,
+                has_armv8m_pmu=has_armv8m_pmu,
             ),
         )
         _write_text(
             src_dir / "hpx_pmu_profiler.cc",
             _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
-                has_full_pmu=soc.has_full_pmu,
+                profiling_backends=profiling_backends,
+                has_armv8m_pmu=has_armv8m_pmu,
             ),
         )
 
-    # --- Engine wrapper module ---
+    # --- Engine modules ---
+    # Local modules are vendored into the app under their registry-derived
+    # project directory (so NSX's registry-aware lock finds them). Registry
+    # modules are cloned by NSX during `nsx sync`; nothing to copy here.
     for extra_mod in artifacts.extra_modules:
+        if not extra_mod.local:
+            target = extra_mod.project or extra_mod.name
+            ref_note = f" @ {extra_mod.ref}" if extra_mod.ref else ""
+            log.info(
+                "Engine module: %s → NSX registry (%s%s)",
+                extra_mod.name, target, ref_note,
+            )
+            continue
         mod_src = extra_mod.path
-        mod_dst = app_dir / "modules" / extra_mod.name
+        mod_dst = app_dir / "modules" / (extra_mod.project or extra_mod.name)
         if mod_src != mod_dst:
             if mod_dst.exists():
                 shutil.rmtree(mod_dst)
@@ -826,14 +904,15 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     # Map config toolchain names to nsx CLI values
     nsx_tc = _nsx_toolchain(toolchain)
 
-    # Lock-aware flow: write nsx.lock once, then materialise modules/ from it
-    # before invoking the toolchain. When frozen, skip resolution entirely and
-    # require the existing lock/modules state to be reused as-is.
+    # Lock-aware flow: refresh nsx.lock for normal runs, then materialise
+    # modules/ from it before invoking the toolchain. When frozen, skip
+    # resolution entirely and require the existing lock/modules state to be
+    # reused as-is.
     modules_dir = app_dir / "modules"
     if ctx.config.frozen:
         nsx_cli.sync(app_dir, frozen=True, timeout_s=timeouts.configure_s, verbose=verbose)
     else:
-        nsx_cli.lock(app_dir, timeout_s=timeouts.configure_s, verbose=verbose)
+        nsx_cli.lock(app_dir, update=True, timeout_s=timeouts.configure_s, verbose=verbose)
         try:
             nsx_cli.sync(app_dir, timeout_s=timeouts.configure_s, verbose=verbose)
         except Exception:

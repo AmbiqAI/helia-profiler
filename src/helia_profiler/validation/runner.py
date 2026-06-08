@@ -80,6 +80,32 @@ class CaseResult:
 # ---------------------------------------------------------------------------
 
 
+def _find_local_cmsis_nn_checkout(repo_root: Path) -> Path | None:
+    """Return a usable local ns-cmsis-nn checkout for validation, if present.
+
+    ``hpx validate`` should work with an explicit ``CMSIS_NN_PATH`` override,
+    but it can also opportunistically use a nearby checkout in common local
+    workspace layouts. Candidates are validated against the native NSX module
+    metadata expected by the heliaAOT adapter.
+    """
+    raw_env = os.environ.get("CMSIS_NN_PATH")
+    candidates: list[Path] = []
+    if raw_env:
+        candidates.append(Path(raw_env).expanduser())
+
+    candidates.extend([
+        repo_root / "modules" / "ns-cmsis-nn",
+        repo_root.parent / "nsx-modules" / "ns-cmsis-nn",
+        repo_root.parent.parent / "neuralspotx" / "nsx-modules" / "ns-cmsis-nn",
+    ])
+
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        if (resolved / "nsx" / "nsx-module.yaml").is_file():
+            return resolved
+    return None
+
+
 def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str, Any]:
     """Materialise an hpx profile YAML config for a single case.
 
@@ -120,14 +146,13 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
             "mode": "external",
             "duration_s": 20,
             "io_voltage": 1.8,
-            "sync_gpio_pin": 10,
         })
 
     if case.engine is EngineType.HELIA_AOT:
-        # Point heliaAOT at the vendored nsx-cmsis-nn so `hpx validate`
-        # works out of the box from the monorepo checkout.
-        cmsis_nn_candidate = repo_root.parent / "nsx-modules" / "ns-cmsis-nn"
-        if cmsis_nn_candidate.exists():
+        # Point heliaAOT at an explicit or nearby ns-cmsis-nn checkout when one
+        # is available, instead of assuming a single sibling-repo layout.
+        cmsis_nn_candidate = _find_local_cmsis_nn_checkout(repo_root)
+        if cmsis_nn_candidate is not None:
             cfg["engine"]["config"] = {
                 "prefix": "hpx",
                 "module_name": "hpx_model",

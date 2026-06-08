@@ -4,6 +4,7 @@ import pytest
 
 from helia_profiler.platform import (
     CoreArch,
+    NpuArch,
     PmuTier,
     SocFamily,
     get_board,
@@ -20,6 +21,18 @@ def test_apollo510_evb_resolves_to_cortex_m55():
     assert soc.family is SocFamily.AP5
     assert soc.has_full_pmu
     assert soc.has_mve
+    assert soc.profiling_backends == ("dwt", "armv8m-pmu")
+    assert soc.profiling_domains == ("cpu", "memory", "mve")
+
+
+def test_apollo510_evb_default_sync_gpio_pin_is_29():
+    board = get_board("apollo510_evb")
+    assert board.default_sync_gpio_pin == 29
+
+
+def test_apollo510b_evb_default_sync_gpio_pin_is_29():
+    board = get_board("apollo510b_evb")
+    assert board.default_sync_gpio_pin == 29
 
 
 def test_apollo3p_evb_resolves_to_cortex_m4():
@@ -28,6 +41,8 @@ def test_apollo3p_evb_resolves_to_cortex_m4():
     assert soc.family is SocFamily.AP3
     assert soc.pmu_tier is PmuTier.DWT_ONLY
     assert not soc.has_mve
+    assert soc.profiling_backends == ("dwt",)
+    assert soc.profiling_domains == ("cpu",)
     assert soc.memory.psram_kb == 8192
 
 
@@ -45,6 +60,15 @@ def test_apollo330_is_ap5_family():
     assert soc.has_full_pmu
     assert soc.has_mve
     assert soc.sdk_tier == "r5"
+
+
+def test_atomiq110_exposes_cpu_and_npu_profiling_surfaces():
+    soc = get_soc_for_board("atomiq110_fpga_turbo")
+    assert soc.npu is NpuArch.ETHOS_U85
+    assert soc.has_npu
+    assert soc.profiling_backends == ("dwt", "armv8m-pmu", "ethos-u85-pmu")
+    assert soc.profiling_domains == ("cpu", "memory", "mve", "npu")
+    assert soc.feature_flags == ("dwt", "armv8m-pmu", "ethos-u85-pmu", "mve")
 
 
 def test_unknown_board_raises():

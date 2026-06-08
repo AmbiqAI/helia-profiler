@@ -93,7 +93,7 @@ class TestHeliaRTAdapter:
         config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
         adapter = HeliaRTAdapter()
         adapter.prepare(config, tmp_path)
-        module_dir = tmp_path / "modules" / "nsx-helia-rt"
+        module_dir = tmp_path / "modules" / "helia-rt"
         assert module_dir.is_dir()
         assert (module_dir / "nsx-module.yaml").exists()
         assert (module_dir / "CMakeLists.txt").exists()
@@ -102,7 +102,7 @@ class TestHeliaRTAdapter:
         config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
         adapter = HeliaRTAdapter()
         adapter.prepare(config, tmp_path)
-        module_dir = tmp_path / "modules" / "nsx-helia-rt"
+        module_dir = tmp_path / "modules" / "helia-rt"
         assert (module_dir / "lib").is_dir()
         assert (module_dir / "tensorflow").is_dir()
         assert (module_dir / "third_party").is_dir()
@@ -115,6 +115,8 @@ class TestHeliaRTAdapter:
         mod = artifacts.extra_modules[0]
         assert mod.name == "nsx-helia-rt"
         assert mod.version == HELIART_VERSION
+        assert mod.local is True
+        assert mod.project == "helia-rt"
         assert mod.path.is_dir()
 
     def test_prepare_typed_fields(self, tmp_path: Path, fake_dist: Path):
@@ -163,24 +165,25 @@ class TestHeliaRTAdapter:
         artifacts2 = adapter.prepare(config, tmp_path)
         assert artifacts1.extra_modules[0].name == artifacts2.extra_modules[0].name
 
-    def test_prepare_no_dist_path_falls_through_to_download(
+    def test_prepare_no_dist_path_uses_registry(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        """When no dist_path or env var is set, prepare() falls through to
-        the GitHub release download path."""
+        """With no dist_path/source_path/source configured, prepare()
+        resolves nsx-helia-rt from the NSX registry (no local vendoring)."""
         monkeypatch.delenv("HELIART_DIST_PATH", raising=False)
+        monkeypatch.delenv("HELIART_SOURCE_PATH", raising=False)
         config = _make_config(tmp_path)
         adapter = HeliaRTAdapter()
-
-        # Mock the download to raise so we can confirm the fallthrough.
-        monkeypatch.setattr(
-            "helia_profiler.engines.helia_rt._fetch_github_release",
-            lambda *a, **kw: (_ for _ in ()).throw(
-                EngineError("download failed (mocked)")
-            ),
-        )
-        with pytest.raises(EngineError, match="download failed"):
-            adapter.prepare(config, tmp_path)
+        artifacts = adapter.prepare(config, tmp_path)
+        assert len(artifacts.extra_modules) == 1
+        mod = artifacts.extra_modules[0]
+        assert mod.name == "nsx-helia-rt"
+        assert mod.local is False
+        assert mod.project == "helia-rt"
+        assert mod.ref  # pinned registry tag
+        # Nothing is vendored on disk — NSX clones it from the registry.
+        assert not (tmp_path / "modules" / "helia-rt").exists()
+        assert not (tmp_path / "modules" / "nsx-helia-rt").exists()
 
     def test_prepare_via_env_var(
         self, tmp_path: Path, fake_dist: Path, monkeypatch: pytest.MonkeyPatch
@@ -214,8 +217,8 @@ class TestHeliaRTAdapter:
         PrepareEngineStage().run(ctx)
         assert ctx.engine_artifacts is not None
         assert len(ctx.engine_artifacts.extra_modules) == 1
-        assert (work_dir / "modules" / "nsx-helia-rt" / "nsx-module.yaml").exists()
-        assert (work_dir / "modules" / "nsx-helia-rt" / "lib").is_dir()
+        assert (work_dir / "modules" / "helia-rt" / "nsx-module.yaml").exists()
+        assert (work_dir / "modules" / "helia-rt" / "lib").is_dir()
 
 
 class TestSourceBuildMode:
@@ -250,7 +253,7 @@ class TestSourceBuildMode:
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)
 
-        module_dir = work_dir / "modules" / "nsx-helia-rt"
+        module_dir = work_dir / "modules" / "helia-rt"
         cmake = (module_dir / "CMakeLists.txt").read_text()
         # Source-build wrapper includes the source tree's nsx/CMakeLists.txt
         # directly (heliaRT self-resolves its repo root).

@@ -125,7 +125,36 @@ class TestPowerConfig:
         assert config.power.enabled is False
         assert config.power.driver == "joulescope"
         assert config.power.mode == "external"
-        assert config.power.sync_gpio_pin == 10
+        assert config.power.sync_gpio_pin == 29
+
+    def test_default_sync_gpio_pin_uses_board_metadata(self, tmp_path: Path, monkeypatch):
+        from helia_profiler.config import load_config
+        from helia_profiler.platform import BoardDef
+        import helia_profiler.platform as platform_module
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+
+        original = platform_module._BOARDS["apollo510_evb"]
+        monkeypatch.setitem(
+            platform_module._BOARDS,
+            "apollo510_evb",
+            BoardDef(
+                name=original.name,
+                soc=original.soc,
+                channel=original.channel,
+                psram_kb=original.psram_kb,
+                default_sync_gpio_pin=27,
+                description=original.description,
+            ),
+        )
+
+        config = load_config(
+            None,
+            {"model": {"path": str(model)}, "engine": {"type": "tflm"}},
+        )
+
+        assert config.power.sync_gpio_pin == 27
 
     def test_custom_power_config(self, tmp_path: Path):
         from helia_profiler.config import load_config

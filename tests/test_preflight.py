@@ -178,6 +178,30 @@ class TestPreflightConfig:
         with patch("shutil.which", side_effect=_all_tools_present):
             PreflightStage().run(ctx)
 
+    def test_ap4_rejects_mve_counter_group(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "target": {"board": "apollo4p_evb"},
+                "profiling": {"pmu_counters": {"mve": "default"}},
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="not supported"):
+                PreflightStage().run(ctx)
+
+    def test_ap3_rejects_legacy_mve_preset(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "target": {"board": "apollo3p_evb"},
+                "profiling": {"pmu_presets": ["mve"]},
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="not supported"):
+                PreflightStage().run(ctx)
+
 
 class TestPreflightHostTools:
     def test_missing_nsx_raises_with_hint(self, tmp_path: Path):

@@ -3,21 +3,31 @@
 static constexpr bool kPowerSyncEnabled = {{ power_sync_enabled | lower }};
 static constexpr uint32_t kSyncGpioPin = {{ sync_gpio_pin }};
 
+{% if power_sync_enabled %}
 static inline void sync_gpio_init(void) {
-    if constexpr (kPowerSyncEnabled) {
-        am_hal_gpio_pinconfig(kSyncGpioPin, am_hal_gpio_pincfg_output);
-        am_hal_gpio_output_clear(kSyncGpioPin);
-    }
+    nsx_gpio_config_t cfg = {
+        .api = &nsx_gpio_current_version,
+        .pin = kSyncGpioPin,
+        .mode = NSX_GPIO_MODE_OUTPUT,
+        .initial_level = NSX_GPIO_LEVEL_LOW,
+        .trigger = NSX_GPIO_TRIGGER_NONE,
+        .irq_cb = nullptr,
+        .irq_ctx = nullptr,
+    };
+    (void)nsx_gpio_init(&cfg);
 }
 
 static inline void sync_gpio_high(void) {
-    if constexpr (kPowerSyncEnabled) {
-        am_hal_gpio_output_set(kSyncGpioPin);
-    }
+    (void)nsx_gpio_write(kSyncGpioPin, NSX_GPIO_LEVEL_HIGH);
 }
 
 static inline void sync_gpio_low(void) {
-    if constexpr (kPowerSyncEnabled) {
-        am_hal_gpio_output_clear(kSyncGpioPin);
-    }
+    (void)nsx_gpio_write(kSyncGpioPin, NSX_GPIO_LEVEL_LOW);
 }
+{% else %}
+static inline void sync_gpio_init(void) {}
+
+static inline void sync_gpio_high(void) {}
+
+static inline void sync_gpio_low(void) {}
+{% endif %}

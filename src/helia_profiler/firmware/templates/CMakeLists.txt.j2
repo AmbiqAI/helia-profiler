@@ -32,7 +32,11 @@ target_include_directories(hpx_profiler PRIVATE
 target_link_libraries(hpx_profiler PRIVATE
     nsx::board
     nsx::runtime_core
-{% if has_full_pmu %}
+    nsx::cmsis_core
+{% if power_sync_enabled %}
+    nsx::gpio
+{% endif %}
+{% if has_armv8m_pmu %}
     nsx::pmu_armv8m
 {% endif %}
     {{ aot_cmake_target }}
@@ -68,7 +72,11 @@ target_include_directories(hpx_profiler PRIVATE
 target_link_libraries(hpx_profiler PRIVATE
     nsx::board
     nsx::runtime_core
-{% if has_full_pmu %}
+    nsx::cmsis_core
+{% if power_sync_enabled %}
+    nsx::gpio
+{% endif %}
+{% if has_armv8m_pmu %}
     nsx::pmu_armv8m
 {% endif %}
 {% if engine_type == "helia-rt" %}

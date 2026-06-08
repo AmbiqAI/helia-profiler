@@ -65,7 +65,7 @@ hpx profile [MODEL] [--config FILE] [options]
 | `--power-driver` | `joulescope` \| `joulescope-js110` \| `joulescope-js220` \| `ondevice` | `joulescope` | Power instrument driver. |
 | `--power-mode` | `external` \| `internal` | `external` | External Joulescope vs on-device measurement. |
 | `--power-duration` | int | 30 | Capture window length in seconds. |
-| `--sync-gpio` | int | 10 | GPIO pin the firmware toggles around inference. |
+| `--sync-gpio` | int | board default (`29` on `apollo510_evb` / `apollo510b_evb`, `10` on most other built-in EVBs) | GPIO pin the firmware toggles around inference. |
 
 ## Output
 

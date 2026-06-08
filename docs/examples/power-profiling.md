@@ -37,7 +37,7 @@ power:
   mode: external
   duration_s: 30
   io_voltage: 1.8
-  sync_gpio_pin: 10           # firmware toggles this GPIO during inference
+  sync_gpio_pin: 29           # Apollo510 EVB: known-good sync GPIO to JS110 INPUT0
 
 output:
   format: csv

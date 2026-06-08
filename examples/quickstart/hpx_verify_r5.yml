@@ -1,6 +1,4 @@
-# heliaPROFILER quickstart — AOT + Joulescope power capture
-# Same AOT profile as hpx_aot.yml but with Joulescope energy measurement.
-# Requires a Joulescope JS110/JS220 inline with the EVB power supply.
+# Temp config to verify nsx-core decomposition (R5) — tflm engine, power sync.
 model:
   path: kws_model.tflite
   arena_size: 131072
@@ -10,13 +8,11 @@ engine:
   config:
     prefix: hpx
     module_name: hpx_model
-    # cmsis_nn_path is auto-resolved from the NSX registry.
-    # Override with CMSIS_NN_PATH env var or uncomment below for a local checkout:
-    # cmsis_nn_path: /path/to/ns-cmsis-nn
 
 target:
   board: apollo510_evb
   toolchain: arm-none-eabi-gcc
+  jlink_serial: "1160002204"
 
 profiling:
   pmu_presets: [basic_cpu]
@@ -34,4 +30,4 @@ power:
 
 output:
   format: csv
-  dir: ./results_aot_power
+  dir: ./results_verify_r5

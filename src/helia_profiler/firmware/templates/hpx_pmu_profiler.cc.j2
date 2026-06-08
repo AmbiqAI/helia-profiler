@@ -1,7 +1,7 @@
 {# hpx_pmu_profiler.cc — PMU profiler implementation #}
 #include "hpx_pmu_profiler.h"
 
-{% if has_full_pmu %}
+{% if has_armv8m_pmu %}
 // arm_mve.h already pre-included via hpx_pmu_profiler.h
 #include "nsx_pmu_map.h"
 

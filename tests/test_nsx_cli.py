@@ -5,7 +5,7 @@ shim no longer shells out to a binary. These tests now patch the API
 functions directly and verify that:
 
 * ``BuildError`` is raised on ``NSXError`` translation;
-* ``flash`` exports ``SEGGER_SNCODE`` for the duration of the call;
+* ``flash`` forwards ``jlink_serial`` to ``flash_app`` as ``probe_serial``;
 * ``timeout_s`` is forwarded to the underlying API entry points so the
   in-subprocess process-tree watchdog can enforce it; on timeout NSX
   raises ``NSXError`` which surfaces as ``BuildError``.
@@ -55,32 +55,27 @@ class TestNsxBuild:
 
 
 class TestNsxFlash:
-    def test_flash_sets_sncode_env(self, tmp_path: Path) -> None:
+    def test_flash_forwards_probe_serial(self, tmp_path: Path) -> None:
         captured: dict[str, str | None] = {}
 
-        def fake_flash(*_args, **_kwargs) -> None:  # noqa: ANN401
-            captured["sncode"] = os.environ.get("SEGGER_SNCODE")
+        def fake_flash(_app, **kwargs) -> None:  # noqa: ANN401
+            captured["probe_serial"] = kwargs.get("probe_serial")
 
         with patch("helia_profiler.nsx.nsx_api.flash_app", side_effect=fake_flash):
             nsx.flash(tmp_path, jlink_serial="123456")
-        assert captured["sncode"] == "123456"
-        # Must be cleaned up after the call returns
-        assert os.environ.get("SEGGER_SNCODE") is None
+        assert captured["probe_serial"] == "123456"
 
-    def test_flash_no_serial_does_not_touch_env(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.delenv("SEGGER_SNCODE", raising=False)
-        captured: dict[str, bool] = {}
+    def test_flash_no_serial_passes_none(self, tmp_path: Path) -> None:
+        captured: dict[str, str | None] = {}
 
-        def fake_flash(*_args, **_kwargs) -> None:  # noqa: ANN401
-            captured["set"] = "SEGGER_SNCODE" in os.environ
+        def fake_flash(_app, **kwargs) -> None:  # noqa: ANN401
+            captured["probe_serial"] = kwargs.get("probe_serial")
 
         with patch("helia_profiler.nsx.nsx_api.flash_app", side_effect=fake_flash):
             nsx.flash(tmp_path)
-        assert captured["set"] is False
+        assert captured["probe_serial"] is None
 
-    def test_flash_restores_prior_sncode(
+    def test_flash_does_not_touch_sncode_env(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SEGGER_SNCODE", "PRIOR")

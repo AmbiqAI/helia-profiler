@@ -189,17 +189,11 @@ class HeliaAOTAdapter:
         # 4. Validate memory-placement pragmas in generated code
         _validate_pragmas(aot_module_dir, prefix)
 
-        # 5. Resolve ns-cmsis-nn source tree
-        cmsis_nn_path = _resolve_cmsis_nn(config)
+        # 5. Resolve the ns-cmsis-nn NSX module (registry by default, or a
+        #    vendored local module when a custom path is provided).
+        cmsis_nn_ref = cmsis_nn_module_ref(config, work_dir)
 
-        # 6. Create engine modules
-        modules_dir = work_dir / "modules"
-
-        # CMSIS-NN wrapper module
-        cmsis_nn_mod_dir = modules_dir / "nsx-cmsis-nn"
-        _write_cmsis_nn_wrapper(cmsis_nn_mod_dir, cmsis_nn_path)
-
-        # AOT output is already a valid NSX module (ModuleType.nsx).
+        # 6. AOT output is already a valid NSX module (ModuleType.nsx).
         # Just generate the memory-placement attribute header and tell
         # the AOT module's CMakeLists.txt where to find it.
         attr_header = _write_attributes_header(aot_module_dir, prefix)
@@ -233,7 +227,7 @@ class HeliaAOTAdapter:
         return EngineArtifacts(
             engine_type=EngineType.HELIA_AOT,
             extra_modules=[
-                NsxModuleRef(name="nsx-cmsis-nn", path=cmsis_nn_mod_dir),
+                cmsis_nn_ref,
                 NsxModuleRef(name=module_name, path=aot_module_dir),
             ],
             cmake_vars={
@@ -721,6 +715,47 @@ def _extract_memory_plan(codegen_ctx: Any) -> MemoryPlan | None:
 
 _CMSIS_NN_GH_REPO = "AmbiqAI/ns-cmsis-nn"
 _CMSIS_NN_CACHE_DIR = Path.home() / ".cache" / "helia-profiler" / "ns-cmsis-nn"
+
+# NSX registry identity for ns-cmsis-nn. By default hpx declares this module
+# and lets NSX clone it from the registered GitHub upstream; a user-provided
+# local path (cmsis_nn_path / CMSIS_NN_PATH) vendors it instead.
+CMSIS_NN_PROJECT = "ns-cmsis-nn"   # registry project (path: modules/ns-cmsis-nn)
+CMSIS_NN_MODULE = "nsx-cmsis-nn"   # registry module name
+
+
+def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
+    """Resolve the ns-cmsis-nn NSX module reference.
+
+    By default the module is resolved from the NSX registry (NSX clones it
+    from the registered GitHub upstream during ``nsx sync``). When the user
+    provides a local checkout via ``engine.config.cmsis_nn_path`` or the
+    ``CMSIS_NN_PATH`` environment variable, it is vendored as a local module
+    under its registry-derived project directory (``modules/ns-cmsis-nn``).
+    """
+    raw = config.engine.config.get("cmsis_nn_path") or os.environ.get("CMSIS_NN_PATH")
+    if raw:
+        cmsis_nn_path = Path(str(raw)).expanduser().resolve()
+        _validate_cmsis_nn(cmsis_nn_path)
+        mod_dir = work_dir / "modules" / CMSIS_NN_PROJECT
+        _write_cmsis_nn_wrapper(mod_dir, cmsis_nn_path)
+        log.info("ns-cmsis-nn: vendoring local module from %s", cmsis_nn_path)
+        return NsxModuleRef(
+            name=CMSIS_NN_MODULE,
+            path=mod_dir,
+            local=True,
+            project=CMSIS_NN_PROJECT,
+        )
+
+    log.info(
+        "ns-cmsis-nn — resolving %s from NSX registry (project=%s)",
+        CMSIS_NN_MODULE, CMSIS_NN_PROJECT,
+    )
+    return NsxModuleRef(
+        name=CMSIS_NN_MODULE,
+        path=Path(),
+        local=False,
+        project=CMSIS_NN_PROJECT,
+    )
 
 
 def _resolve_cmsis_nn(config: ProfileConfig) -> Path:

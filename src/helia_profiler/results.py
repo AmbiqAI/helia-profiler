@@ -106,6 +106,9 @@ class PlatformInfo:
     core: str = ""
     pmu_tier: str = ""
     has_mve: bool = False
+    profiling_backends: list[str] = field(default_factory=list)
+    profiling_domains: list[str] = field(default_factory=list)
+    npu: str | None = None
     clock_lp_mhz: int = 0
     clock_hp_mhz: int | None = None
     sdk_tier: str = ""
@@ -161,11 +164,25 @@ class BinarySections:
 
 @dataclass(frozen=True)
 class NsxModuleRef:
-    """Reference to an NSX module needed by the profiler firmware build."""
+    """Reference to an NSX module needed by the profiler firmware build.
+
+    A module is resolved one of two ways:
+
+    * **Registry** (``local=False``) — NSX clones the module from its
+      registered upstream (GitHub). ``project`` is the registry project
+      name and ``ref`` optionally pins a tag/branch. ``path`` is unused.
+    * **Local** (``local=True``) — hpx vendors the module on disk. ``path``
+      is the source directory to copy into the app, and ``project`` (when
+      set) selects the registry-derived install location so NSX's
+      registry-aware lock can find it.
+    """
 
     name: str
     path: Path
     version: str = ""
+    local: bool = True
+    project: str = ""
+    ref: str = ""
 
 
 # ---------------------------------------------------------------------------

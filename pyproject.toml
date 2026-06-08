@@ -81,7 +81,12 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.uv.sources]
-neuralspotx = { git = "https://github.com/AmbiqAI/neuralspotx", tag = "neuralspotx-v0.6.0" }
+# Pinned to a neuralspotx main commit (post-v0.6.1) that ships the
+# consolidated nsx-ambiq-sdk monorepo registry and registers heliaRT
+# (helia-rt) and ns-cmsis-nn as first-class modules. hpx resolves these
+# engine modules from the registry. Move to a tagged release (>= 0.7.0)
+# once one is cut that contains this registry.
+neuralspotx = { git = "https://github.com/AmbiqAI/neuralspotx", rev = "b7b4d7e70a216b920ababebb23b7b963529b3286" }
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["F401"]

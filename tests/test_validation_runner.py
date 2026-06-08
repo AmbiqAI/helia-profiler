@@ -10,7 +10,54 @@ import yaml
 
 from helia_profiler.engines import EngineType
 from helia_profiler.validation.matrix import BOARDS, MODELS, CaseSpec
-from helia_profiler.validation.runner import run_case
+from helia_profiler.validation.runner import _build_config, run_case
+
+
+def test_build_config_aot_prefers_explicit_cmsis_nn_env(
+    tmp_path: Path,
+    fake_cmsis_nn: Path,
+    monkeypatch,
+):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_dir = tmp_path / "out"
+    monkeypatch.setenv("CMSIS_NN_PATH", str(fake_cmsis_nn))
+
+    case = CaseSpec(
+        model=MODELS["kws"],
+        engine=EngineType.HELIA_AOT,
+        power=False,
+        board=BOARDS["apollo510_evb"],
+    )
+
+    cfg = _build_config(case, repo_root=repo_root, output_dir=output_dir)
+
+    assert cfg["engine"]["config"]["cmsis_nn_path"] == str(fake_cmsis_nn)
+
+
+def test_build_config_aot_discovers_neuralspotx_monorepo_checkout(tmp_path: Path):
+    workspace_root = tmp_path / "workspace"
+    repo_root = workspace_root / "tools" / "helia-profiler"
+    repo_root.mkdir(parents=True)
+    output_dir = tmp_path / "out"
+
+    cmsis_nn = workspace_root / "neuralspotx" / "nsx-modules" / "ns-cmsis-nn"
+    cmsis_nn.mkdir(parents=True)
+    (cmsis_nn / "nsx").mkdir()
+    (cmsis_nn / "nsx" / "nsx-module.yaml").write_text(
+        "schema_version: 1\nmodule:\n  name: nsx-cmsis-nn\n"
+    )
+
+    case = CaseSpec(
+        model=MODELS["kws"],
+        engine=EngineType.HELIA_AOT,
+        power=False,
+        board=BOARDS["apollo510_evb"],
+    )
+
+    cfg = _build_config(case, repo_root=repo_root, output_dir=output_dir)
+
+    assert cfg["engine"]["config"]["cmsis_nn_path"] == str(cmsis_nn)
 
 
 def test_run_case_retries_once_on_transient_joulescope_lock(tmp_path: Path, monkeypatch):
@@ -39,6 +86,8 @@ def test_run_case_retries_once_on_transient_joulescope_lock(tmp_path: Path, monk
 
         config_path = Path(cmd[-1])
         config = yaml.safe_load(config_path.read_text())
+        assert config["target"]["board"] == "apollo510_evb"
+        assert "sync_gpio_pin" not in config["power"]
         case_dir = Path(config["output"]["dir"])
         case_dir.mkdir(parents=True, exist_ok=True)
         (case_dir / "summary.json").write_text(json.dumps({

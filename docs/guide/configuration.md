@@ -133,7 +133,7 @@ same frozen object.
 | `mode` | string | `external` | `external` (Joulescope) or `internal` |
 | `duration_s` | int | `30` | Capture duration in seconds |
 | `io_voltage` | float | `1.8` | I/O voltage for Joulescope |
-| `sync_gpio_pin` | int | `10` | GPIO pin for inference sync |
+| `sync_gpio_pin` | int | board default (`29` on `apollo510_evb` / `apollo510b_evb`) | GPIO pin for inference sync |
 
 ### `output`
 

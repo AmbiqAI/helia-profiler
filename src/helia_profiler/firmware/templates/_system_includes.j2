@@ -1,9 +1,14 @@
 {# _system_includes.j2 — shared transport/system includes for main templates. #}
-#include "ns_core.h"
+#include "{{ cmsis_device_header }}"
+#include "nsx_core.h"
 #include "nsx_mem.h"
 #include "nsx_system.h"
-#include "am_hal_gpio.h"
+{% if power_sync_enabled %}
+#include "nsx_gpio.h"
+{% endif %}
+{% if extreme_mode and arena_region == "tcm" and weights_region == "tcm" %}
 #include "am_hal_pwrctrl.h"
+{% endif %}
 {% if transport == "usb_cdc" %}
 #include "nsx_usb.h"
 #include "am_hal_timer.h"
