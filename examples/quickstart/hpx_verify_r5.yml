@@ -1,0 +1,33 @@
+# Temp config to verify nsx-core decomposition (R5) — tflm engine, power sync.
+model:
+  path: kws_model.tflite
+  arena_size: 131072
+
+engine:
+  type: helia-aot
+  config:
+    prefix: hpx
+    module_name: hpx_model
+
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+  jlink_serial: "1160002204"
+
+profiling:
+  pmu_presets: [basic_cpu]
+  per_layer: true
+  iterations: 3
+  warmup: 1
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 20
+  io_voltage: 1.8
+  sync_gpio_pin: 29
+
+output:
+  format: csv
+  dir: ./results_verify_r5

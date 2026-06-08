@@ -56,6 +56,12 @@ HELIART_GH_REPO = "AmbiqAI/helia-rt"
 # NB: v1.16.0+ uses "helia-rt-v..." tag format (previously "heliaRT-v...").
 HELIART_RELEASE_TAG = f"helia-rt-v{HELIART_VERSION}"
 
+# NSX registry identity for heliaRT. By default hpx declares this module and
+# lets NSX clone it from the registered GitHub upstream; a user-provided
+# local path (source_path / dist_path / source) vendors it instead.
+HELIART_PROJECT = "helia-rt"     # registry project (path: modules/helia-rt)
+HELIART_MODULE = "nsx-helia-rt"  # registry module name
+
 # Cache directory for downloaded distributions
 _CACHE_DIR = Path.home() / ".cache" / "helia-profiler" / "heliart"
 
@@ -139,17 +145,57 @@ class HeliaRTAdapter:
         # HELIART_SOURCE_PATH env. Compiles heliaRT from a local source
         # tree instead of consuming a prebuilt static-lib release.
         source_path = _resolve_source_path(config)
+        dist_path_cfg = config.engine.config.get("dist_path") or os.environ.get(
+            "HELIART_DIST_PATH"
+        )
+        source_cfg = config.engine.config.get("source")
 
-        # Set up the NSX module directory
-        module_dir = work_dir / "modules" / "nsx-helia-rt"
-        module_dir.mkdir(parents=True, exist_ok=True)
+        # Whether the user requested a locally vendored heliaRT module
+        # (source build, explicit prebuilt dist, or a custom GitHub
+        # release). When none of these are set, hpx defaults to resolving
+        # nsx-helia-rt from the NSX registry (NSX clones it from GitHub).
+        use_local = (
+            source_path is not None or bool(dist_path_cfg) or bool(source_cfg)
+        )
 
-        # Extra NSX modules added by this adapter. Order matters: CMake
-        # processes them in declaration order, so nsx-cmsis-nn must come
-        # before nsx-helia-rt (the source-build heliaRT references the
-        # nsx_cmsis_nn target during configure).
         extra_modules: list[NsxModuleRef] = []
         cmake_vars: dict[str, str] = {}
+
+        if not use_local:
+            # --- Default: resolve nsx-helia-rt from the NSX registry ---
+            version = HELIART_VERSION
+            log.info(
+                "heliaRT %s — resolving %s from NSX registry "
+                "(project=%s @ %s, toolchain=%s, variant=%s)",
+                version, HELIART_MODULE, HELIART_PROJECT,
+                HELIART_RELEASE_TAG, toolchain_tag, variant,
+            )
+            extra_modules.append(
+                NsxModuleRef(
+                    name=HELIART_MODULE,
+                    path=Path(),
+                    version=version,
+                    local=False,
+                    project=HELIART_PROJECT,
+                    ref=HELIART_RELEASE_TAG,
+                )
+            )
+            return EngineArtifacts(
+                engine_type=EngineType.HELIA_RT,
+                extra_modules=extra_modules,
+                cmake_vars=cmake_vars,
+                engine_header="tensorflow/lite/micro/micro_interpreter.h",
+                engine_backend=backend,
+                heliart_version=version,
+                heliart_variant=variant,
+                heliart_toolchain_tag=toolchain_tag,
+            )
+
+        # --- Local / custom heliaRT module ---
+        # Vendor under the registry-derived project directory
+        # (modules/helia-rt) so NSX's registry-aware lock resolves it.
+        module_dir = work_dir / "modules" / HELIART_PROJECT
+        module_dir.mkdir(parents=True, exist_ok=True)
 
         if source_path is not None:
             # --- Source build ---
@@ -166,16 +212,11 @@ class HeliaRTAdapter:
 
             # Source-built heliaRT depends on the nsx-cmsis-nn module
             # being present in the build (the prebuilt static lib had
-            # CMSIS-NN baked in; the source build does not). Install it
-            # alongside, reusing the helia_aot wrapper.
-            from .helia_aot import _resolve_cmsis_nn, _write_cmsis_nn_wrapper
+            # CMSIS-NN baked in; the source build does not). Resolve it
+            # via the shared helper (NSX registry by default).
+            from .helia_aot import cmsis_nn_module_ref
 
-            cmsis_nn_path = _resolve_cmsis_nn(config)
-            cmsis_nn_mod_dir = work_dir / "modules" / "nsx-cmsis-nn"
-            _write_cmsis_nn_wrapper(cmsis_nn_mod_dir, cmsis_nn_path)
-            extra_modules.append(
-                NsxModuleRef(name="nsx-cmsis-nn", path=cmsis_nn_mod_dir),
-            )
+            extra_modules.append(cmsis_nn_module_ref(config, work_dir))
 
             # Forward CMSIS-NN inline-asm requantize flag (defaults ON to
             # match the prebuilt heliaRT build).
@@ -189,12 +230,12 @@ class HeliaRTAdapter:
             )
 
             log.info(
-                "heliaRT %s (toolchain=%s, variant=%s, source=%s, "
-                "cmsis_nn=%s)",
-                version, toolchain_tag, variant, source_path, cmsis_nn_path,
+                "heliaRT %s (toolchain=%s, variant=%s, source=%s)",
+                version, toolchain_tag, variant, source_path,
             )
         else:
-            # --- Prebuilt distribution (legacy) ---
+            # --- Prebuilt distribution (explicit dist_path or custom
+            #     GitHub release) ---
             dist_path, resolved_version = _resolve_distribution(config)
             _check_version_compatibility(dist_path, resolved_version)
             version = resolved_version or HELIART_VERSION
@@ -222,9 +263,11 @@ class HeliaRTAdapter:
 
         extra_modules.append(
             NsxModuleRef(
-                name="nsx-helia-rt",
+                name=HELIART_MODULE,
                 path=module_dir,
                 version=version,
+                local=True,
+                project=HELIART_PROJECT,
             ),
         )
 
