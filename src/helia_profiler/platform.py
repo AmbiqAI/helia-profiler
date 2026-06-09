@@ -70,9 +70,9 @@ class PerfTier(Enum):
     LOW = "NSX_PERF_LOW"
     MEDIUM = "NSX_PERF_MEDIUM"
     HIGH = "NSX_PERF_HIGH"
+
+
 DEFAULT_SYNC_GPIO_PIN = 10
-
-
 
 
 @dataclass(frozen=True)
@@ -456,58 +456,6 @@ _register_board(
         soc="apollo330P",
         channel="preview",
         description="Apollo330 — Cortex-M55 (AP5 family)",
-    )
-)
-
-# --- Atomiq family (Cortex-M55 + Ethos-U85 NPU) ------------------------------
-
-_register_soc(
-    SocDef(
-        name="atomiq110",
-        family=SocFamily.AP5,  # CM55 + MVE + full PMU, same as AP5
-        core=CoreArch.CORTEX_M55,
-        pmu_tier=PmuTier.ARMV8M_PMU,
-        has_mve=True,
-        npu=NpuArch.ETHOS_U85,
-        memory=MemoryLayout(
-            sram_kb=3072,
-            dtcm_kb=512,
-            itcm_kb=256,
-        ),
-        # Silicon nominal operating points. The current FPGA bitstream runs
-        # the core at a reduced fixed clock (~1/10 speed); the perf-tier
-        # mapping below still selects the correct NSX perf_mode regardless.
-        clocks=(
-            ClockDomain(
-                "cpu",
-                (
-                    ClockSpeed("ulp", 100, PerfTier.LOW),
-                    ClockSpeed("lp", 250, PerfTier.MEDIUM),
-                    ClockSpeed("hp", 500, PerfTier.HIGH),
-                ),
-                default="ulp",
-            ),
-            ClockDomain(
-                "npu",
-                (
-                    ClockSpeed("lp", 250),
-                    ClockSpeed("hp", 500),
-                ),
-                default="lp",
-            ),
-        ),
-        c_define="AM_PART_ATOMIQ110",
-        jlink_device="AT110NFA-CBR",
-        pmu_max_ops=4096,
-    )
-)
-
-_register_board(
-    BoardDef(
-        "atomiq110_fpga_turbo",
-        soc="atomiq110",
-        channel="preview",
-        description="Atomiq110 FPGA turbo — Cortex-M55 + Ethos-U85 (1/10 speed)",
     )
 )
 

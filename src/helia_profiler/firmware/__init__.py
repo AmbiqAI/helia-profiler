@@ -96,7 +96,6 @@ def _cmsis_device_header(soc: Any) -> str:
         "apollo510b": "apollo510.h",
         "apollo5b": "apollo510.h",
         "apollo330P": "apollo330P.h",
-        "atomiq110": "atomiq110.h",
     }
     return mapping.get(soc.name, "apollo510.h")
 

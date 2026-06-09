@@ -88,33 +88,6 @@ def _fake_starter_profiles() -> dict[str, dict]:
                 "nsx-cmsis-core": {"project": unified_project},
             },
         },
-        "atomiq110_fpga_turbo": {
-            "modules": [
-                "nsx-ambiqsuite-r6",
-                "nsx-ambiq-hal-r6",
-                "nsx-ambiq-bsp-r6",
-                "nsx-soc-hal",
-                "nsx-cmsis-startup",
-                "nsx-core",
-                "nsx-tooling",
-                "nsx-board-atomiq110-fpga-turbo",
-            ],
-            "project_overrides": {
-                "nsx-ambiq-sdk-r6": {
-                    "revision": "r6.0",
-                    "metadata": "modules/nsx-ambiqsuite-r6/nsx-module.yaml",
-                }
-            },
-            "module_overrides": {
-                "nsx-ambiqsuite-r6": {"project": "nsx-ambiq-sdk-r6"},
-                "nsx-ambiq-hal-r6": {"project": "nsx-ambiq-sdk-r6"},
-                "nsx-ambiq-bsp-r6": {"project": "nsx-ambiq-sdk-r6"},
-                "nsx-cmsis-core": {"project": "nsx-ambiq-sdk-r6"},
-                "nsx-soc-hal": {"project": "nsx-ambiq-sdk-r6"},
-                "nsx-cmsis-startup": {"project": "nsx-ambiq-sdk-r6"},
-                "nsx-core": {"project": "nsx-ambiq-sdk-r6"},
-            },
-        },
     }
 
 
@@ -126,7 +99,6 @@ def fake_nsx_registry(monkeypatch: pytest.MonkeyPatch) -> None:
         "nsx-board-apollo510-evb": "neuralspotx",
         "nsx-board-apollo4p-evb": "neuralspotx",
         "nsx-board-apollo3p-evb": "neuralspotx",
-        "nsx-board-atomiq110-fpga-turbo": "neuralspotx",
         "nsx-pmu-armv8m": "nsx-pmu-armv8m",
     }
 
@@ -236,21 +208,10 @@ class TestResolveModuleList:
         assert by_name["nsx-pmu-armv8m"].project == "nsx-pmu-armv8m"
 
     def test_board_and_tooling_modules_resolve_to_neuralspotx(self):
-        modules = _resolve_module_specs("atomiq110_fpga_turbo")
+        modules = _resolve_module_specs("apollo510_evb")
         by_name = {module.name: module for module in modules}
-        assert by_name["nsx-board-atomiq110-fpga-turbo"].project == "neuralspotx"
+        assert by_name["nsx-board-apollo510-evb"].project == "neuralspotx"
         assert by_name["nsx-tooling"].project == "neuralspotx"
-
-    def test_r6_unmigrated_pmu_falls_back_to_standalone(self):
-        # The r6 monorepo does not yet vendor nsx-pmu-armv8m, so ownership must
-        # fall back to the standalone project rather than over-pin it onto
-        # nsx-ambiq-sdk-r6.
-        modules = _resolve_module_specs("atomiq110_fpga_turbo")
-        by_name = {module.name: module for module in modules}
-        assert by_name["nsx-pmu-armv8m"].project == "nsx-pmu-armv8m"
-        # Modules the r6 monorepo does vendor stay on the monorepo project.
-        assert by_name["nsx-core"].project == "nsx-ambiq-sdk-r6"
-        assert by_name["nsx-soc-hal"].project == "nsx-ambiq-sdk-r6"
 
     def test_power_and_perf_are_not_required_modules(self):
         modules = _resolve_module_list("apollo510_evb")
@@ -723,7 +684,7 @@ class TestNsxModuleOverrides:
             {
                 "model": {"path": str(model)},
                 "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
-                "target": {"board": "atomiq110_fpga_turbo"},
+                "target": {"board": "apollo4p_evb"},
                 "work_dir": str(tmp_path / "work"),
             },
         )

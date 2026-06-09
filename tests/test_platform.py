@@ -50,12 +50,12 @@ def test_apollo4p_evb_exposes_board_psram_capacity():
     soc = get_soc_for_board("apollo4p_evb")
     assert soc.family is SocFamily.AP4
     assert soc.memory.psram_kb == 32768
+
+
 def test_all_ap5_socs_expose_32mb_psram():
     for soc in list_socs():
         if soc.family is SocFamily.AP5:
             assert soc.memory.psram_kb == 32768
-
-
 
 
 def test_apollo330_is_ap5_family():
@@ -65,15 +65,6 @@ def test_apollo330_is_ap5_family():
     assert soc.core is CoreArch.CORTEX_M55
     assert soc.has_full_pmu
     assert soc.has_mve
-
-
-def test_atomiq110_exposes_cpu_and_npu_profiling_surfaces():
-    soc = get_soc_for_board("atomiq110_fpga_turbo")
-    assert soc.npu is NpuArch.ETHOS_U85
-    assert soc.has_npu
-    assert soc.profiling_backends == ("dwt", "armv8m-pmu", "ethos-u85-pmu")
-    assert soc.profiling_domains == ("cpu", "memory", "mve", "npu")
-    assert soc.feature_flags == ("dwt", "armv8m-pmu", "ethos-u85-pmu", "mve")
 
 
 def test_unknown_board_raises():
