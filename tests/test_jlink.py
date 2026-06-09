@@ -35,9 +35,12 @@ class TestResolveProbeSerial:
 
     def test_requested_serial_must_match_target_core(self) -> None:
         probe = _probe("111111", "Apollo4")
-        with patch("helia_profiler.jlink.list_connected_probes", return_value=[probe]), patch(
-            "helia_profiler.jlink._inspect_probe_target",
-            return_value=_match("111111", CoreArch.CORTEX_M4, "Apollo4"),
+        with (
+            patch("helia_profiler.jlink.list_connected_probes", return_value=[probe]),
+            patch(
+                "helia_profiler.jlink._inspect_probe_target",
+                return_value=_match("111111", CoreArch.CORTEX_M4, "Apollo4"),
+            ),
         ):
             with pytest.raises(ConfigError, match="does not match the requested target"):
                 resolve_probe_serial(
@@ -48,15 +51,21 @@ class TestResolveProbeSerial:
 
     def test_requested_serial_returns_when_target_matches(self) -> None:
         probe = _probe("111111", "Apollo5")
-        with patch("helia_profiler.jlink.list_connected_probes", return_value=[probe]), patch(
-            "helia_profiler.jlink._inspect_probe_target",
-            return_value=_match("111111", CoreArch.CORTEX_M55, "Apollo5"),
+        with (
+            patch("helia_profiler.jlink.list_connected_probes", return_value=[probe]),
+            patch(
+                "helia_profiler.jlink._inspect_probe_target",
+                return_value=_match("111111", CoreArch.CORTEX_M55, "Apollo5"),
+            ),
         ):
-            assert resolve_probe_serial(
-                device="AP510NFA-CBR",
-                expected_core=CoreArch.CORTEX_M55,
-                requested_serial="111111",
-            ) == "111111"
+            assert (
+                resolve_probe_serial(
+                    device="AP510NFA-CBR",
+                    expected_core=CoreArch.CORTEX_M55,
+                    requested_serial="111111",
+                )
+                == "111111"
+            )
 
     def test_auto_selects_unique_matching_probe(self) -> None:
         probes = [_probe("111111", "Apollo4"), _probe("222222", "Apollo5")]
@@ -68,14 +77,20 @@ class TestResolveProbeSerial:
                 probe.product,
             )
 
-        with patch("helia_profiler.jlink.list_connected_probes", return_value=probes), patch(
-            "helia_profiler.jlink._inspect_probe_target",
-            side_effect=inspect,
+        with (
+            patch("helia_profiler.jlink.list_connected_probes", return_value=probes),
+            patch(
+                "helia_profiler.jlink._inspect_probe_target",
+                side_effect=inspect,
+            ),
         ):
-            assert resolve_probe_serial(
-                device="AP510NFA-CBR",
-                expected_core=CoreArch.CORTEX_M55,
-            ) == "222222"
+            assert (
+                resolve_probe_serial(
+                    device="AP510NFA-CBR",
+                    expected_core=CoreArch.CORTEX_M55,
+                )
+                == "222222"
+            )
 
     def test_ambiguous_matching_probes_raise(self) -> None:
         probes = [_probe("111111", "Probe A"), _probe("222222", "Probe B")]
@@ -83,9 +98,12 @@ class TestResolveProbeSerial:
         def inspect(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
             return _match(probe.serial, CoreArch.CORTEX_M55, probe.product)
 
-        with patch("helia_profiler.jlink.list_connected_probes", return_value=probes), patch(
-            "helia_profiler.jlink._inspect_probe_target",
-            side_effect=inspect,
+        with (
+            patch("helia_profiler.jlink.list_connected_probes", return_value=probes),
+            patch(
+                "helia_profiler.jlink._inspect_probe_target",
+                side_effect=inspect,
+            ),
         ):
             with pytest.raises(ConfigError, match="match the requested target") as exc_info:
                 resolve_probe_serial(
@@ -102,11 +120,16 @@ class TestResolveProbeSerial:
         def inspect(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
             return _match(probe.serial, CoreArch.CORTEX_M4, probe.product)
 
-        with patch("helia_profiler.jlink.list_connected_probes", return_value=probes), patch(
-            "helia_profiler.jlink._inspect_probe_target",
-            side_effect=inspect,
+        with (
+            patch("helia_profiler.jlink.list_connected_probes", return_value=probes),
+            patch(
+                "helia_profiler.jlink._inspect_probe_target",
+                side_effect=inspect,
+            ),
         ):
-            with pytest.raises(ConfigError, match="Could not find a connected J-Link probe") as exc_info:
+            with pytest.raises(
+                ConfigError, match="Could not find a connected J-Link probe"
+            ) as exc_info:
                 resolve_probe_serial(
                     device="AP510NFA-CBR",
                     expected_core=CoreArch.CORTEX_M55,

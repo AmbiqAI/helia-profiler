@@ -109,11 +109,10 @@ def main(argv: list[str] | None = None) -> None:
     # -- Target hardware --
     g_target = p_profile.add_argument_group("target hardware")
     g_target.add_argument("--board", type=str, help="Target board (default: apollo510_evb)")
+    g_target.add_argument("--toolchain", type=str, help="Toolchain (default: arm-none-eabi-gcc)")
     g_target.add_argument(
-        "--toolchain", type=str, help="Toolchain (default: arm-none-eabi-gcc)"
-    )
-    g_target.add_argument(
-        "--jlink-serial", type=str,
+        "--jlink-serial",
+        type=str,
         help="J-Link probe serial number (default: auto-detect)",
     )
     g_target.add_argument(
@@ -213,9 +212,7 @@ def main(argv: list[str] | None = None) -> None:
         choices=["external", "internal"],
         help="Power mode (default: external)",
     )
-    g_power.add_argument(
-        "--power-duration", type=int, help="Power capture seconds (default: 30)"
-    )
+    g_power.add_argument("--power-duration", type=int, help="Power capture seconds (default: 30)")
     g_power.add_argument(
         "--sync-gpio",
         type=int,
@@ -262,9 +259,7 @@ def main(argv: list[str] | None = None) -> None:
 
     # -- Advanced --
     g_adv = p_profile.add_argument_group("advanced")
-    g_adv.add_argument(
-        "--work-dir", type=Path, help="Working directory for generated firmware"
-    )
+    g_adv.add_argument("--work-dir", type=Path, help="Working directory for generated firmware")
     g_adv.add_argument("--keep-work-dir", action="store_true", help="Keep working directory")
     g_adv.add_argument(
         "--clean",
@@ -475,17 +470,15 @@ def _cmd_profile(args: argparse.Namespace) -> None:
     if args.model_location is not None:
         cli.setdefault("model", {})["model_location"] = args.model_location
     if args.runtime_arena_location is not None:
-        cli.setdefault("engine", {}).setdefault("config", {})[
-            "runtime_arena_location"
-        ] = args.runtime_arena_location
+        cli.setdefault("engine", {}).setdefault("config", {})["runtime_arena_location"] = (
+            args.runtime_arena_location
+        )
     if args.runtime_weights_location is not None:
-        cli.setdefault("engine", {}).setdefault("config", {})[
-            "runtime_weights_location"
-        ] = args.runtime_weights_location
+        cli.setdefault("engine", {}).setdefault("config", {})["runtime_weights_location"] = (
+            args.runtime_weights_location
+        )
     if args.core_override is not None:
-        cli.setdefault("engine", {}).setdefault("config", {})[
-            "core_override"
-        ] = args.core_override
+        cli.setdefault("engine", {}).setdefault("config", {})["core_override"] = args.core_override
 
     if args.engine is not None:
         cli.setdefault("engine", {})["type"] = args.engine
@@ -594,8 +587,7 @@ def _cmd_profile(args: argparse.Namespace) -> None:
             key, val = kv.split("=", 1)
             if key not in ("path", "ref", "version"):
                 print(
-                    f"Error: --nsx-module key must be 'path', 'ref', or "
-                    f"'version'. Got: '{key}'",
+                    f"Error: --nsx-module key must be 'path', 'ref', or 'version'. Got: '{key}'",
                     file=sys.stderr,
                 )
                 sys.exit(1)
@@ -863,6 +855,7 @@ def _cmd_power_on(args: argparse.Namespace) -> None:
     print("Board powered — press Ctrl-C to release.")
     try:
         import signal
+
         signal.pause()
     except KeyboardInterrupt:
         pass
@@ -895,8 +888,7 @@ def _normalise_engines(raw: str) -> str:
     for token in [t.strip() for t in raw.split(",") if t.strip()]:
         if token not in _ENGINE_ALIASES:
             print(
-                f"Error: unknown engine '{token}'. "
-                f"Known: rt, aot, helia-rt, helia-aot.",
+                f"Error: unknown engine '{token}'. Known: rt, aot, helia-rt, helia-aot.",
                 file=sys.stderr,
             )
             sys.exit(2)
@@ -948,18 +940,21 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         import pytest  # noqa: F401  (imported to fail fast with a clear msg)
     except ImportError:
         print(
-            "Error: pytest is required for `hpx validate`. "
-            "Install it with `pip install pytest`.",
+            "Error: pytest is required for `hpx validate`. Install it with `pip install pytest`.",
             file=sys.stderr,
         )
         sys.exit(2)
 
     pytest_args: list[str] = [
         str(tests_dir),
-        "-m", "hardware",
-        "--mlperf-power", args.power,
-        "--mlperf-output", str(args.output_dir.resolve()),
-        "--mlperf-timeout", str(args.timeout),
+        "-m",
+        "hardware",
+        "--mlperf-power",
+        args.power,
+        "--mlperf-output",
+        str(args.output_dir.resolve()),
+        "--mlperf-timeout",
+        str(args.timeout),
     ]
     if args.models.strip():
         pytest_args += ["--mlperf-models", args.models.strip()]
@@ -977,6 +972,7 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         pytest_args.append("-v")
 
     import pytest
+
     print(f"Running: pytest {' '.join(pytest_args)}\n")
     rc = pytest.main(pytest_args)
 
@@ -1061,9 +1057,7 @@ def _cmd_cache_info() -> None:
     print(f"Module cache:      {mod_root}")
     if mod_root.is_dir():
         entries = module_cache.iter_entries()
-        total_bytes = sum(
-            f.stat().st_size for e in entries for f in e.rglob("*") if f.is_file()
-        )
+        total_bytes = sum(f.stat().st_size for e in entries for f in e.rglob("*") if f.is_file())
         print(f"  Entries: {len(entries)}, Size: {total_bytes / 1024 / 1024:.1f} MB")
     else:
         print("  (empty)")
@@ -1078,7 +1072,9 @@ def _cmd_cache_info() -> None:
     print(f"Workspace cache:   {workspaces_root}")
     if workspaces_root.is_dir():
         entries = [entry for entry in workspaces_root.iterdir() if entry.is_dir()]
-        total_bytes = sum(f.stat().st_size for entry in entries for f in entry.rglob("*") if f.is_file())
+        total_bytes = sum(
+            f.stat().st_size for entry in entries for f in entry.rglob("*") if f.is_file()
+        )
         print(f"  Entries: {len(entries)}, Size: {total_bytes / 1024 / 1024:.1f} MB")
     else:
         print("  (empty)")

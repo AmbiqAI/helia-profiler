@@ -147,8 +147,7 @@ class HeliaAOTAdapter:
         from dataclasses import replace as _dc_replace
 
         return [
-            _dc_replace(r, placement=target) if r.role is ArenaRole.SCRATCH else r
-            for r in regions
+            _dc_replace(r, placement=target) if r.role is ArenaRole.SCRATCH else r for r in regions
         ]
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> EngineArtifacts:
@@ -165,7 +164,11 @@ class HeliaAOTAdapter:
         aot_output_dir = work_dir / "aot_output"
         aot_module_dir = aot_output_dir / module_name
         codegen_ctx = _run_aot_compiler(
-            config, aot_output_dir, module_name, prefix, aot_platform,
+            config,
+            aot_output_dir,
+            module_name,
+            prefix,
+            aot_platform,
         )
 
         # 3. Extract operator manifest from the CodeGenContext.
@@ -219,9 +222,9 @@ class HeliaAOTAdapter:
         memory_plan = _extract_memory_plan(codegen_ctx)
 
         # Extract arena binding info for external-arena mode
-        allocate_arenas = config.engine.config.get("aot_args", {}).get(
-            "memory", {}
-        ).get("allocate_arenas", True)
+        allocate_arenas = (
+            config.engine.config.get("aot_args", {}).get("memory", {}).get("allocate_arenas", True)
+        )
         arena_regions = _extract_arena_regions(codegen_ctx, prefix)
 
         return EngineArtifacts(
@@ -271,10 +274,7 @@ def _resolve_aot_platform(config: ProfileConfig) -> str:
         known = ", ".join(sorted(_BOARD_TO_AOT_PLATFORM))
         raise EngineError(
             f"No heliaAOT platform mapping for board '{board}'",
-            hint=(
-                f"Set engine.config.platform_name explicitly, or use a "
-                f"supported board: {known}"
-            ),
+            hint=(f"Set engine.config.platform_name explicitly, or use a supported board: {known}"),
         )
 
     if aot_platform != board:
@@ -320,10 +320,7 @@ def _run_aot_compiler(
     except ImportError:
         raise EngineError(
             "heliaAOT package not installed",
-            hint=(
-                "Install helia-aot: pip install 'helia-profiler[aot]' or "
-                "pip install helia-aot"
-            ),
+            hint=("Install helia-aot: pip install 'helia-profiler[aot]' or pip install helia-aot"),
         )
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -366,7 +363,10 @@ def _run_aot_compiler(
 
     log.info(
         "heliaAOT convert: model=%s, module=%s/%s, platform=%s",
-        config.model.path, output_dir, module_name, aot_platform,
+        config.model.path,
+        output_dir,
+        module_name,
+        aot_platform,
     )
     log.debug("ConvertArgs: %s", convert_args)
 
@@ -421,8 +421,7 @@ def _validate_pragmas(aot_module_dir: Path, prefix: str) -> None:
     platform_h = aot_module_dir / "includes-api" / f"{prefix}_platform.h"
     if not platform_h.is_file():
         log.warning(
-            "AOT platform header not found (%s) — cannot validate "
-            "memory-placement macros.",
+            "AOT platform header not found (%s) — cannot validate memory-placement macros.",
             platform_h,
         )
         return
@@ -503,9 +502,7 @@ _AOT_MEMORY_TO_PLACEMENT: dict[str, Placement] = {
 }
 
 
-def _extract_arena_regions(
-    codegen_ctx: Any, prefix: str
-) -> list[ArenaRegion]:
+def _extract_arena_regions(codegen_ctx: Any, prefix: str) -> list[ArenaRegion]:
     """Extract arena region info from the CodeGenContext's render_plan.
 
     Returns a list of :class:`ArenaRegion` instances — one per AOT
@@ -540,7 +537,8 @@ def _extract_arena_regions(
                 # arena binding gap during firmware build.
                 log.warning(
                     "AOT planner emitted unrecognised memory %r — skipping arena %d",
-                    mem_str, arena.region_id,
+                    mem_str,
+                    arena.region_id,
                 )
                 continue
             try:
@@ -553,17 +551,19 @@ def _extract_arena_regions(
                 role = ArenaRole.SCRATCH
             name = f"{prefix}_arena_{mem_str}"
             blob_fn = const_blob_filenames.get(arena.region_id)
-            regions.append(ArenaRegion(
-                region_id=arena.region_id,
-                name=name,
-                enum_name=name,
-                size=int(arena.size),
-                alignment=int(arena.alignment),
-                role=role,
-                memory=mem_str,
-                placement=placement,
-                blob_filename=blob_fn,
-            ))
+            regions.append(
+                ArenaRegion(
+                    region_id=arena.region_id,
+                    name=name,
+                    enum_name=name,
+                    size=int(arena.size),
+                    alignment=int(arena.alignment),
+                    role=role,
+                    memory=mem_str,
+                    placement=placement,
+                    blob_filename=blob_fn,
+                )
+            )
 
     # Sort by region_id to match the generated enum ordering
     regions.sort(key=lambda r: r.region_id)
@@ -613,15 +613,11 @@ def _extract_operator_manifest(
             "name": aot_op.name,
         }
         try:
-            entry["inputs"] = [
-                _tensor_metadata(t) for t in (aot_op.input_tensors or [])
-            ]
+            entry["inputs"] = [_tensor_metadata(t) for t in (aot_op.input_tensors or [])]
         except Exception:  # noqa: BLE001 — defensive for older heliaAOT
             pass
         try:
-            entry["outputs"] = [
-                _tensor_metadata(t) for t in (aot_op.output_tensors or [])
-            ]
+            entry["outputs"] = [_tensor_metadata(t) for t in (aot_op.output_tensors or [])]
         except Exception:  # noqa: BLE001
             pass
         manifest.append(entry)
@@ -682,23 +678,32 @@ def _extract_memory_plan(codegen_ctx: Any) -> MemoryPlan | None:
         used = int(getattr(usage, "used", 0))
         consumers: list[MemoryConsumer] = []
         if used > 0:
-            consumers.append(MemoryConsumer(
-                name=f"{key.lower()}_arena", size=used, kind="arena",
-            ))
+            consumers.append(
+                MemoryConsumer(
+                    name=f"{key.lower()}_arena",
+                    size=used,
+                    kind="arena",
+                )
+            )
         # Weights in read-only regions are reported separately since
         # the AOT arena_usages may not include them.
         w = region_weights.get(key, 0)
         if w > 0 and key in ("MRAM", "PSRAM"):
-            consumers.append(MemoryConsumer(
-                name=f"{region_weight_count.get(key, 0)}_tensors",
-                size=w, kind="weights",
-            ))
-        regions.append(MemoryRegionUsage(
-            region=key,
-            capacity=total,
-            used=sum(c.size for c in consumers),
-            consumers=tuple(consumers),
-        ))
+            consumers.append(
+                MemoryConsumer(
+                    name=f"{region_weight_count.get(key, 0)}_tensors",
+                    size=w,
+                    kind="weights",
+                )
+            )
+        regions.append(
+            MemoryRegionUsage(
+                region=key,
+                capacity=total,
+                used=sum(c.size for c in consumers),
+                consumers=tuple(consumers),
+            )
+        )
 
     return MemoryPlan(
         engine=EngineType.HELIA_AOT,
@@ -719,8 +724,8 @@ _CMSIS_NN_CACHE_DIR = Path.home() / ".cache" / "helia-profiler" / "ns-cmsis-nn"
 # NSX registry identity for ns-cmsis-nn. By default hpx declares this module
 # and lets NSX clone it from the registered GitHub upstream; a user-provided
 # local path (cmsis_nn_path / CMSIS_NN_PATH) vendors it instead.
-CMSIS_NN_PROJECT = "ns-cmsis-nn"   # registry project (path: modules/ns-cmsis-nn)
-CMSIS_NN_MODULE = "nsx-cmsis-nn"   # registry module name
+CMSIS_NN_PROJECT = "ns-cmsis-nn"  # registry project (path: modules/ns-cmsis-nn)
+CMSIS_NN_MODULE = "nsx-cmsis-nn"  # registry module name
 
 
 def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
@@ -748,7 +753,8 @@ def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
 
     log.info(
         "ns-cmsis-nn — resolving %s from NSX registry (project=%s)",
-        CMSIS_NN_MODULE, CMSIS_NN_PROJECT,
+        CMSIS_NN_MODULE,
+        CMSIS_NN_PROJECT,
     )
     return NsxModuleRef(
         name=CMSIS_NN_MODULE,
@@ -803,6 +809,7 @@ def _validate_cmsis_nn(path: Path) -> None:
     header = path / "Include" / "arm_nnfunctions.h"
     if header.is_file():
         import re as _re
+
         text = header.read_text(errors="replace")[:2048]
         m = _re.search(r"\$Revision:\s*V\.(\d+)\.", text)
         if m and int(m.group(1)) >= 19:
@@ -835,7 +842,10 @@ def _auto_clone_cmsis_nn() -> Path:
     try:
         subprocess.run(
             ["git", "clone", "--depth", "1", repo_url, str(cache)],
-            capture_output=True, text=True, timeout=120, check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=True,
         )
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as exc:
         raise EngineError(
@@ -868,9 +878,10 @@ def _write_cmsis_nn_wrapper(module_dir: Path, cmsis_nn_path: Path) -> None:
     module_dir.mkdir(parents=True, exist_ok=True)
 
     native_nsx = cmsis_nn_path / "nsx"
-    if not (native_nsx / "CMakeLists.txt").is_file() or not (
-        native_nsx / "nsx-module.yaml"
-    ).is_file():
+    if (
+        not (native_nsx / "CMakeLists.txt").is_file()
+        or not (native_nsx / "nsx-module.yaml").is_file()
+    ):
         raise EngineError(
             f"ns-cmsis-nn at {cmsis_nn_path} is missing native nsx/ module",
             hint=(
@@ -893,8 +904,7 @@ def _write_cmsis_nn_wrapper(module_dir: Path, cmsis_nn_path: Path) -> None:
 
     # Root shim delegates to the native build
     (module_dir / "CMakeLists.txt").write_text(
-        "# Shim — delegates to the native ns-cmsis-nn NSX build.\n"
-        "add_subdirectory(nsx)\n"
+        "# Shim — delegates to the native ns-cmsis-nn NSX build.\nadd_subdirectory(nsx)\n"
     )
 
     # Copy the CMSIS-NN source tree into the module (no symlinks — Windows-safe)
@@ -961,8 +971,7 @@ def _check_helia_aot_version() -> None:
     minimum = _parse_semver(HELIAAOT_MIN_VERSION)
     if actual == (0, 0, 0):
         log.warning(
-            "Could not parse helia-aot version %r — skipping floor check "
-            "(min supported: v%s)",
+            "Could not parse helia-aot version %r — skipping floor check (min supported: v%s)",
             installed,
             HELIAAOT_MIN_VERSION,
         )

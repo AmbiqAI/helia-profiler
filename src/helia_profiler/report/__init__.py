@@ -213,7 +213,9 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     if cache:
         # Compute derived metrics
         l1d_accesses = cache.get("ARM_PMU_L1D_CACHE_RD", cache.get("ARM_PMU_L1D_CACHE", 0))
-        l1d_misses = cache.get("ARM_PMU_L1D_CACHE_MISS_RD", cache.get("ARM_PMU_L1D_CACHE_REFILL", 0))
+        l1d_misses = cache.get(
+            "ARM_PMU_L1D_CACHE_MISS_RD", cache.get("ARM_PMU_L1D_CACHE_REFILL", 0)
+        )
         if l1d_accesses > 0:
             cache["l1d_hit_rate_pct"] = round((1 - l1d_misses / l1d_accesses) * 100, 2)
         summary["cache"] = cache
@@ -227,7 +229,9 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             "num_parameters": ma.num_parameters,
         }
         if total_cycles > 0 and ma.total_ops > 0:
-            analysis_dict["cycles_per_mac"] = round(total_cycles / ma.total_macs, 2) if ma.total_macs else None
+            analysis_dict["cycles_per_mac"] = (
+                round(total_cycles / ma.total_macs, 2) if ma.total_macs else None
+            )
             analysis_dict["cycles_per_op"] = round(total_cycles / ma.total_ops, 2)
         summary["model_analysis"] = analysis_dict
 
@@ -276,8 +280,7 @@ def _serialise_memory_plan(plan: Any) -> dict[str, Any]:
                 "free": r.free,
                 "overflow": r.overflow,
                 "consumers": [
-                    {"name": c.name, "size": c.size, "kind": c.kind}
-                    for c in r.consumers
+                    {"name": c.name, "size": c.size, "kind": c.kind} for c in r.consumers
                 ],
             }
             for r in plan.regions
@@ -344,7 +347,9 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
                 totals[cname] = totals.get(cname, 0) + layer.counters[cname]
     if totals:
         l1d_accesses = totals.get("ARM_PMU_L1D_CACHE_RD", totals.get("ARM_PMU_L1D_CACHE", 0))
-        l1d_misses = totals.get("ARM_PMU_L1D_CACHE_MISS_RD", totals.get("ARM_PMU_L1D_CACHE_REFILL", 0))
+        l1d_misses = totals.get(
+            "ARM_PMU_L1D_CACHE_MISS_RD", totals.get("ARM_PMU_L1D_CACHE_REFILL", 0)
+        )
         if l1d_accesses > 0:
             totals["l1d_hit_rate_pct"] = round((1 - l1d_misses / l1d_accesses) * 100, 2)
         data["cache_totals"] = totals
@@ -525,6 +530,7 @@ def _write_power_csv(power: PowerResult, output_dir: Path) -> Path:
 def _firmware_meta_to_dict(meta: Any) -> dict[str, Any]:
     """Convert FirmwareMeta to a JSON-safe dict, dropping None values."""
     from ..results import FirmwareMeta
+
     if isinstance(meta, FirmwareMeta):
         return {k: v for k, v in asdict(meta).items() if v is not None}
     return {}

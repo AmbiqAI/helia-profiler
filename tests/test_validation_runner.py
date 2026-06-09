@@ -90,11 +90,15 @@ def test_run_case_retries_once_on_transient_joulescope_lock(tmp_path: Path, monk
         assert "sync_gpio_pin" not in config["power"]
         case_dir = Path(config["output"]["dir"])
         case_dir.mkdir(parents=True, exist_ok=True)
-        (case_dir / "summary.json").write_text(json.dumps({
-            "layers": 13,
-            "total_cycles": 123456,
-            "power": {"energy_j": 0.1, "avg_current_a": 0.005, "peak_current_a": 0.02},
-        }))
+        (case_dir / "summary.json").write_text(
+            json.dumps(
+                {
+                    "layers": 13,
+                    "total_cycles": 123456,
+                    "power": {"energy_j": 0.1, "avg_current_a": 0.005, "peak_current_a": 0.02},
+                }
+            )
+        )
         return subprocess.CompletedProcess(cmd, 0, stdout="ok\n", stderr="")
 
     monkeypatch.setattr("helia_profiler.validation.runner.subprocess.run", fake_run)

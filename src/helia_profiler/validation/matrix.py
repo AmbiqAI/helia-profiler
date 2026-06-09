@@ -25,11 +25,11 @@ from ..platform import get_soc_for_board
 class ModelSpec:
     """One canonical benchmark model."""
 
-    id: str                     # short stable ID (used on CLI + in reports)
-    name: str                   # human-readable name
-    category: str               # MLPerf Tiny category (kws / vww / ic / ad)
-    fixture_path: str           # path relative to helia-profiler root
-    arena_size: int             # tensor arena in bytes (RT / TFLM)
+    id: str  # short stable ID (used on CLI + in reports)
+    name: str  # human-readable name
+    category: str  # MLPerf Tiny category (kws / vww / ic / ad)
+    fixture_path: str  # path relative to helia-profiler root
+    arena_size: int  # tensor arena in bytes (RT / TFLM)
     description: str = ""
 
 
@@ -37,9 +37,9 @@ class ModelSpec:
 class BoardSpec:
     """One target board supported by the validation suite."""
 
-    id: str                     # CLI-facing ID (e.g. apollo510_evb)
-    display_name: str           # human-readable name
-    jlink_device: str           # device name for J-Link / probes
+    id: str  # CLI-facing ID (e.g. apollo510_evb)
+    display_name: str  # human-readable name
+    jlink_device: str  # device name for J-Link / probes
     has_psram: bool = False
     description: str = ""
 
@@ -50,7 +50,7 @@ class CaseSpec:
 
     model: ModelSpec
     engine: EngineType
-    power: bool                 # Joulescope capture enabled
+    power: bool  # Joulescope capture enabled
     board: BoardSpec
 
     @property
@@ -181,9 +181,7 @@ def build_matrix(
             except ValueError:
                 unknown.append(str(e))
         if unknown:
-            raise ValueError(
-                f"Unknown engine(s): {unknown}. Known: {[e.value for e in ENGINES]}"
-            )
+            raise ValueError(f"Unknown engine(s): {unknown}. Known: {[e.value for e in ENGINES]}")
         # Reject engines outside the validation matrix (e.g. TFLM).
         out_of_matrix = [e.value for e in engine_ids if e not in ENGINES]
         if out_of_matrix:
@@ -194,18 +192,12 @@ def build_matrix(
 
     unknown_m = [m for m in model_ids if m not in MODELS]
     if unknown_m:
-        raise ValueError(
-            f"Unknown model(s): {unknown_m}. Known: {list(MODELS)}"
-        )
+        raise ValueError(f"Unknown model(s): {unknown_m}. Known: {list(MODELS)}")
     unknown_b = [b for b in board_ids if b not in BOARDS]
     if unknown_b:
-        raise ValueError(
-            f"Unknown board(s): {unknown_b}. Known: {list(BOARDS)}"
-        )
+        raise ValueError(f"Unknown board(s): {unknown_b}. Known: {list(BOARDS)}")
     if power not in ("both", "on", "off"):
-        raise ValueError(
-            f"power must be 'both'|'on'|'off', got {power!r}"
-        )
+        raise ValueError(f"power must be 'both'|'on'|'off', got {power!r}")
 
     power_flags: list[bool]
     if power == "both":
@@ -222,7 +214,5 @@ def build_matrix(
             model = MODELS[model_id]
             for engine in engine_ids:
                 for p in power_flags:
-                    cases.append(
-                        CaseSpec(model=model, engine=engine, power=p, board=board)
-                    )
+                    cases.append(CaseSpec(model=model, engine=engine, power=p, board=board))
     return cases

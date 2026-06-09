@@ -102,8 +102,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         )
     if not any(l.strip() == HPX_END for l in lines[-10:]):
         log.warning(
-            "HPX_END sentinel not found in captured data — "
-            "capture may be incomplete or truncated."
+            "HPX_END sentinel not found in captured data — capture may be incomplete or truncated."
         )
 
     result = parse_firmware_output(lines)
@@ -129,7 +128,9 @@ def capture_power(ctx: PipelineContext, *, duration_override_s: float | None = N
     # Verify driver is usable
     driver.check_available()
 
-    duration = duration_override_s if duration_override_s is not None else ctx.config.power.duration_s
+    duration = (
+        duration_override_s if duration_override_s is not None else ctx.config.power.duration_s
+    )
 
     return driver.capture(
         duration_s=duration,
@@ -191,7 +192,7 @@ def _raise_on_firmware_error(lines: list[str]) -> None:
         if not s.startswith("HPX_ERROR="):
             continue
 
-        payload = s[len("HPX_ERROR="):]
+        payload = s[len("HPX_ERROR=") :]
         # Kind is the first token up to a space or ':'.  e.g.
         #   "unsupported_op kind=builtin ..."
         #   "schema_mismatch:1234_vs_3"

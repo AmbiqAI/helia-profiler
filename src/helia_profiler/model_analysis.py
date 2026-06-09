@@ -246,6 +246,7 @@ def _elementwise_ops(output_shape: list[int]) -> int:
 # Parameter counting
 # ---------------------------------------------------------------------------
 
+
 def _count_tensor_elements(sg: Any, tensor_idx: int) -> int:
     """Count elements in a tensor by its index."""
     if tensor_idx < 0:
@@ -291,12 +292,35 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
     _ELEMENTWISE_OPS = set()
     bo = _schema.BuiltinOperator
     for name in (
-        "RELU", "RELU6", "RELU_N1_TO_1", "LEAKY_RELU", "PRELU", "ELU",
-        "LOGISTIC", "TANH", "HARD_SWISH",
-        "ADD", "SUB", "MUL", "DIV", "MAXIMUM", "MINIMUM",
-        "SQUARED_DIFFERENCE", "RSQRT", "SQRT", "ABS", "NEG", "FLOOR",
-        "CEIL", "ROUND", "LOG", "EXP", "SIN", "COS",
-        "QUANTIZE", "DEQUANTIZE",
+        "RELU",
+        "RELU6",
+        "RELU_N1_TO_1",
+        "LEAKY_RELU",
+        "PRELU",
+        "ELU",
+        "LOGISTIC",
+        "TANH",
+        "HARD_SWISH",
+        "ADD",
+        "SUB",
+        "MUL",
+        "DIV",
+        "MAXIMUM",
+        "MINIMUM",
+        "SQUARED_DIFFERENCE",
+        "RSQRT",
+        "SQRT",
+        "ABS",
+        "NEG",
+        "FLOOR",
+        "CEIL",
+        "ROUND",
+        "LOG",
+        "EXP",
+        "SIN",
+        "COS",
+        "QUANTIZE",
+        "DEQUANTIZE",
     ):
         val = getattr(bo, name, None)
         if val is not None:
@@ -305,10 +329,23 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
     # Zero-cost ops (no compute)
     _ZERO_OPS = set()
     for name in (
-        "RESHAPE", "SQUEEZE", "EXPAND_DIMS", "TRANSPOSE",
-        "PAD", "PADV2", "MIRROR_PAD",
-        "CONCATENATION", "SPLIT", "SPLIT_V", "SLICE", "STRIDED_SLICE",
-        "GATHER", "GATHER_ND", "CAST", "PACK", "UNPACK",
+        "RESHAPE",
+        "SQUEEZE",
+        "EXPAND_DIMS",
+        "TRANSPOSE",
+        "PAD",
+        "PADV2",
+        "MIRROR_PAD",
+        "CONCATENATION",
+        "SPLIT",
+        "SPLIT_V",
+        "SLICE",
+        "STRIDED_SLICE",
+        "GATHER",
+        "GATHER_ND",
+        "CAST",
+        "PACK",
+        "UNPACK",
     ):
         val = getattr(bo, name, None)
         if val is not None:
@@ -355,9 +392,13 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
                 "padding": conv_opts.Padding(),
             }
             macs = _conv2d_macs(
-                in_shapes[0], in_shapes[1], out_shapes[0] if out_shapes else [],
-                conv_opts.StrideH(), conv_opts.StrideW(),
-                conv_opts.DilationHFactor(), conv_opts.DilationWFactor(),
+                in_shapes[0],
+                in_shapes[1],
+                out_shapes[0] if out_shapes else [],
+                conv_opts.StrideH(),
+                conv_opts.StrideW(),
+                conv_opts.DilationHFactor(),
+                conv_opts.DilationWFactor(),
                 has_bias,
             )
             ops = 2 * macs
@@ -380,8 +421,11 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
                 "padding": dw_opts.Padding(),
             }
             macs = _depthwise_conv2d_macs(
-                in_shapes[0], in_shapes[1], out_shapes[0] if out_shapes else [],
-                dm, has_bias,
+                in_shapes[0],
+                in_shapes[1],
+                out_shapes[0] if out_shapes else [],
+                dm,
+                has_bias,
             )
             ops = 2 * macs
             total_params += _count_tensor_elements(sg, op.Inputs(1))
@@ -451,16 +495,18 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
         else:
             log.debug("model_analysis: unhandled op %s (builtin=%d)", name, builtin)
 
-        layers.append(LayerOps(
-            id=i,
-            op=name,
-            macs=macs,
-            ops=ops,
-            input_shapes=in_shapes,
-            output_shapes=out_shapes,
-            params=params,
-            original_id=i,
-        ))
+        layers.append(
+            LayerOps(
+                id=i,
+                op=name,
+                macs=macs,
+                ops=ops,
+                input_shapes=in_shapes,
+                output_shapes=out_shapes,
+                params=params,
+                original_id=i,
+            )
+        )
 
     total_macs = sum(l.macs for l in layers)
     total_ops = sum(l.ops for l in layers)
@@ -601,35 +647,61 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
 
         # ---- Element-wise ops ----
         elif ot.name in {
-            "RELU", "RELU6", "LEAKY_RELU", "PRELU", "ELU",
-            "LOGISTIC", "TANH", "HARD_SWISH",
-            "ADD", "SUB", "MUL", "DIV", "MAXIMUM", "MINIMUM",
-            "QUANTIZE", "DEQUANTIZE",
+            "RELU",
+            "RELU6",
+            "LEAKY_RELU",
+            "PRELU",
+            "ELU",
+            "LOGISTIC",
+            "TANH",
+            "HARD_SWISH",
+            "ADD",
+            "SUB",
+            "MUL",
+            "DIV",
+            "MAXIMUM",
+            "MINIMUM",
+            "QUANTIZE",
+            "DEQUANTIZE",
         }:
             if out_shapes:
                 ops = _elementwise_ops(out_shapes[0])
 
         # ---- Zero-cost / data-movement ops ----
         elif ot.name in {
-            "RESHAPE", "SQUEEZE", "EXPAND_DIMS", "TRANSPOSE",
-            "PAD", "PADV2", "CONCATENATION", "SPLIT", "SPLIT_V",
-            "SLICE", "STRIDED_SLICE", "GATHER", "CAST", "PACK", "UNPACK",
+            "RESHAPE",
+            "SQUEEZE",
+            "EXPAND_DIMS",
+            "TRANSPOSE",
+            "PAD",
+            "PADV2",
+            "CONCATENATION",
+            "SPLIT",
+            "SPLIT_V",
+            "SLICE",
+            "STRIDED_SLICE",
+            "GATHER",
+            "CAST",
+            "PACK",
+            "UNPACK",
         }:
             pass  # 0 ops
 
         else:
             log.debug("air_model_analysis: unhandled op %s", op_name)
 
-        layers.append(LayerOps(
-            id=i,
-            op=op_name,
-            macs=macs,
-            ops=ops,
-            input_shapes=in_shapes,
-            output_shapes=out_shapes,
-            params=params,
-            original_id=int(op.id),
-        ))
+        layers.append(
+            LayerOps(
+                id=i,
+                op=op_name,
+                macs=macs,
+                ops=ops,
+                input_shapes=in_shapes,
+                output_shapes=out_shapes,
+                params=params,
+                original_id=int(op.id),
+            )
+        )
 
     total_macs = sum(l.macs for l in layers)
     total_ops = sum(l.ops for l in layers)

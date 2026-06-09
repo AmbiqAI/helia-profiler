@@ -36,9 +36,7 @@ class TestJoulescopeAvailability:
 
         def fake_import(name, *args, **kwargs):
             if name == "pyjoulescope_driver":
-                raise ValueError(
-                    "numpy.dtype size changed, may indicate binary incompatibility"
-                )
+                raise ValueError("numpy.dtype size changed, may indicate binary incompatibility")
             return real_import(name, *args, **kwargs)
 
         with patch("builtins.__import__", side_effect=fake_import):
@@ -66,10 +64,13 @@ class TestJoulescopeOpenRetries:
 
         fake_driver = FakeDriver()
 
-        with patch(
-            "helia_profiler.power.joulescope_driver._get_shared_driver",
-            return_value=fake_driver,
-        ), patch("helia_profiler.power.joulescope_driver.time.sleep"):
+        with (
+            patch(
+                "helia_profiler.power.joulescope_driver._get_shared_driver",
+                return_value=fake_driver,
+            ),
+            patch("helia_profiler.power.joulescope_driver.time.sleep"),
+        ):
             drv, device_path, family = _open_device(serial=None)
 
         assert drv is fake_driver

@@ -50,7 +50,7 @@ class CaseResult:
     """Outcome of running a single :class:`CaseSpec`."""
 
     case_id: str
-    status: str                              # "pass" | "fail" | "skip"
+    status: str  # "pass" | "fail" | "skip"
     duration_s: float
     engine: str
     model_id: str
@@ -93,11 +93,13 @@ def _find_local_cmsis_nn_checkout(repo_root: Path) -> Path | None:
     if raw_env:
         candidates.append(Path(raw_env).expanduser())
 
-    candidates.extend([
-        repo_root / "modules" / "ns-cmsis-nn",
-        repo_root.parent / "nsx-modules" / "ns-cmsis-nn",
-        repo_root.parent.parent / "neuralspotx" / "nsx-modules" / "ns-cmsis-nn",
-    ])
+    candidates.extend(
+        [
+            repo_root / "modules" / "ns-cmsis-nn",
+            repo_root.parent / "nsx-modules" / "ns-cmsis-nn",
+            repo_root.parent.parent / "neuralspotx" / "nsx-modules" / "ns-cmsis-nn",
+        ]
+    )
 
     for candidate in candidates:
         resolved = candidate.resolve()
@@ -141,12 +143,14 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
     }
 
     if case.power:
-        cfg["power"].update({
-            "driver": "joulescope",
-            "mode": "external",
-            "duration_s": 20,
-            "io_voltage": 1.8,
-        })
+        cfg["power"].update(
+            {
+                "driver": "joulescope",
+                "mode": "external",
+                "duration_s": 20,
+                "io_voltage": 1.8,
+            }
+        )
 
     if case.engine is EngineType.HELIA_AOT:
         # Point heliaAOT at an explicit or nearby ns-cmsis-nn checkout when one
@@ -374,10 +378,13 @@ def run_case(
     if summary_path.exists():
         try:
             summary = json.loads(summary_path.read_text())
-            result.layers = int(summary.get("layers")) if summary.get("layers") is not None else None
+            result.layers = (
+                int(summary.get("layers")) if summary.get("layers") is not None else None
+            )
             result.total_cycles = (
                 int(summary.get("total_cycles"))
-                if summary.get("total_cycles") is not None else None
+                if summary.get("total_cycles") is not None
+                else None
             )
             power_blob = summary.get("power") or {}
             if power_blob:
@@ -424,12 +431,8 @@ def run_case(
 
 def assert_healthy(result: CaseResult) -> None:
     """Raise AssertionError if ``result`` does not meet minimum bar."""
-    assert result.status == "pass", (
-        f"{result.case_id}: run failed — {result.error}"
-    )
-    assert result.layers and result.layers >= 1, (
-        f"{result.case_id}: summary.json reports no layers"
-    )
+    assert result.status == "pass", f"{result.case_id}: run failed — {result.error}"
+    assert result.layers and result.layers >= 1, f"{result.case_id}: summary.json reports no layers"
     assert result.total_cycles and result.total_cycles > 0, (
         f"{result.case_id}: total_cycles == 0 (PMU capture looks broken)"
     )

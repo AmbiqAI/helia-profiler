@@ -106,8 +106,7 @@ class ClockDomain:
         speed = self.speed(self.default)
         if speed is None:
             raise ValueError(
-                f"Clock domain '{self.name}' default '{self.default}' "
-                "is not a declared speed."
+                f"Clock domain '{self.name}' default '{self.default}' is not a declared speed."
             )
         return speed
 
@@ -300,8 +299,12 @@ _register_soc(
 _register_board(BoardDef("apollo4p_evb", soc="apollo4p", channel="preview", psram_kb=32768))
 _register_board(BoardDef("apollo4l_evb", soc="apollo4l", channel="preview", psram_kb=32768))
 _register_board(BoardDef("apollo4l_blue_evb", soc="apollo4l", channel="preview", psram_kb=32768))
-_register_board(BoardDef("apollo4p_blue_kbr_evb", soc="apollo4p", channel="preview", psram_kb=32768))
-_register_board(BoardDef("apollo4p_blue_kxr_evb", soc="apollo4p", channel="preview", psram_kb=32768))
+_register_board(
+    BoardDef("apollo4p_blue_kbr_evb", soc="apollo4p", channel="preview", psram_kb=32768)
+)
+_register_board(
+    BoardDef("apollo4p_blue_kxr_evb", soc="apollo4p", channel="preview", psram_kb=32768)
+)
 
 # --- AP5 family (Cortex-M55, full PMU + MVE) --------------------------------
 

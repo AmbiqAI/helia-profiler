@@ -59,7 +59,7 @@ HELIART_RELEASE_TAG = f"helia-rt-v{HELIART_VERSION}"
 # NSX registry identity for heliaRT. By default hpx declares this module and
 # lets NSX clone it from the registered GitHub upstream; a user-provided
 # local path (source_path / dist_path / source) vendors it instead.
-HELIART_PROJECT = "helia-rt"     # registry project (path: modules/helia-rt)
+HELIART_PROJECT = "helia-rt"  # registry project (path: modules/helia-rt)
 HELIART_MODULE = "nsx-helia-rt"  # registry module name
 
 # Cache directory for downloaded distributions
@@ -145,18 +145,14 @@ class HeliaRTAdapter:
         # HELIART_SOURCE_PATH env. Compiles heliaRT from a local source
         # tree instead of consuming a prebuilt static-lib release.
         source_path = _resolve_source_path(config)
-        dist_path_cfg = config.engine.config.get("dist_path") or os.environ.get(
-            "HELIART_DIST_PATH"
-        )
+        dist_path_cfg = config.engine.config.get("dist_path") or os.environ.get("HELIART_DIST_PATH")
         source_cfg = config.engine.config.get("source")
 
         # Whether the user requested a locally vendored heliaRT module
         # (source build, explicit prebuilt dist, or a custom GitHub
         # release). When none of these are set, hpx defaults to resolving
         # nsx-helia-rt from the NSX registry (NSX clones it from GitHub).
-        use_local = (
-            source_path is not None or bool(dist_path_cfg) or bool(source_cfg)
-        )
+        use_local = source_path is not None or bool(dist_path_cfg) or bool(source_cfg)
 
         extra_modules: list[NsxModuleRef] = []
         cmake_vars: dict[str, str] = {}
@@ -167,8 +163,12 @@ class HeliaRTAdapter:
             log.info(
                 "heliaRT %s — resolving %s from NSX registry "
                 "(project=%s @ %s, toolchain=%s, variant=%s)",
-                version, HELIART_MODULE, HELIART_PROJECT,
-                HELIART_RELEASE_TAG, toolchain_tag, variant,
+                version,
+                HELIART_MODULE,
+                HELIART_PROJECT,
+                HELIART_RELEASE_TAG,
+                toolchain_tag,
+                variant,
             )
             extra_modules.append(
                 NsxModuleRef(
@@ -220,18 +220,21 @@ class HeliaRTAdapter:
 
             # Forward CMSIS-NN inline-asm requantize flag (defaults ON to
             # match the prebuilt heliaRT build).
-            if config.engine.config.get(
-                "cmsis_nn_requantize_inline_asm", True
-            ):
+            if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
                 cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
 
             _install_nsx_module_source(
-                module_dir, source_path, variant=variant,
+                module_dir,
+                source_path,
+                variant=variant,
             )
 
             log.info(
                 "heliaRT %s (toolchain=%s, variant=%s, source=%s)",
-                version, toolchain_tag, variant, source_path,
+                version,
+                toolchain_tag,
+                variant,
+                source_path,
             )
         else:
             # --- Prebuilt distribution (explicit dist_path or custom
@@ -247,18 +250,22 @@ class HeliaRTAdapter:
                 variant=variant,
                 core_override=core_override,
             )
-            _install_nsx_module(module_dir, dist_path, variant=variant,
-                                core_override=core_override)
+            _install_nsx_module(module_dir, dist_path, variant=variant, core_override=core_override)
 
             if core_override:
                 log.warning(
                     "heliaRT: core_override=%s — using %s library on %s board",
-                    core_override, core_override, config.target.board,
+                    core_override,
+                    core_override,
+                    config.target.board,
                 )
 
             log.info(
                 "heliaRT %s (toolchain=%s, variant=%s, dist=%s)",
-                version, toolchain_tag, variant, dist_path,
+                version,
+                toolchain_tag,
+                variant,
+                dist_path,
             )
 
         extra_modules.append(
@@ -303,7 +310,11 @@ def _toolchain_tag(toolchain: str) -> str:
 
 
 def _verify_prebuilt_archive(
-    dist_path: Path, *, board: str, toolchain_tag: str, variant: str,
+    dist_path: Path,
+    *,
+    board: str,
+    toolchain_tag: str,
+    variant: str,
     core_override: str | None = None,
 ) -> None:
     """Fail fast if the required ``.a`` is missing from the distribution."""
@@ -321,7 +332,10 @@ def _verify_prebuilt_archive(
 
 
 def _install_nsx_module(
-    module_dir: Path, dist_path: Path, *, variant: str,
+    module_dir: Path,
+    dist_path: Path,
+    *,
+    variant: str,
     core_override: str | None = None,
 ) -> None:
     """Install the NSX module files and distribution content into *module_dir*.
@@ -337,10 +351,7 @@ def _install_nsx_module(
     if not src_yaml.is_file():
         raise EngineError(
             f"heliaRT distribution at {dist_path} is missing nsx/nsx-module.yaml",
-            hint=(
-                f"Expected nsx/nsx-module.yaml. "
-                f"Use heliaRT >= v{HELIART_MIN_VERSION}."
-            ),
+            hint=(f"Expected nsx/nsx-module.yaml. Use heliaRT >= v{HELIART_MIN_VERSION}."),
         )
 
     shutil.copy2(src_yaml, module_dir / "nsx-module.yaml")
@@ -353,8 +364,7 @@ def _install_nsx_module(
     if core_override:
         tag = core_override.lower()
         core_override_block = (
-            f'\n# core_override: force {tag} library\n'
-            f'set(_HELIA_RT_CORE "{tag}")\n'
+            f'\n# core_override: force {tag} library\nset(_HELIA_RT_CORE "{tag}")\n'
         )
 
     cmake_text = _PREBUILT_CMAKE_TEMPLATE.format(
@@ -522,8 +532,7 @@ def _resolve_source_path(config: ProfileConfig) -> Path | None:
     missing = [rel for rel in _SOURCE_REQUIRED_FILES if not (p / rel).is_file()]
     if missing:
         raise EngineError(
-            f"heliaRT source tree at {p} is missing required files: "
-            f"{', '.join(missing)}",
+            f"heliaRT source tree at {p} is missing required files: {', '.join(missing)}",
             hint=(
                 "Source-build requires a heliaRT repo with the source-build "
                 "NSX module (>= v1.16.0). The released "
@@ -535,7 +544,10 @@ def _resolve_source_path(config: ProfileConfig) -> Path | None:
 
 
 def _install_nsx_module_source(
-    module_dir: Path, source_path: Path, *, variant: str,
+    module_dir: Path,
+    source_path: Path,
+    *,
+    variant: str,
 ) -> None:
     """Install a source-build NSX module wrapper at *module_dir*.
 
@@ -626,13 +638,15 @@ def _resolve_distribution(config: ProfileConfig) -> tuple[Path, str | None]:
 
     # --- 4. Default: pinned version from default repo ---
     log.info(
-        "No dist_path or source configured — "
-        "fetching heliaRT %s from %s",
+        "No dist_path or source configured — fetching heliaRT %s from %s",
         HELIART_RELEASE_TAG,
         HELIART_GH_REPO,
     )
     return _fetch_github_release(
-        HELIART_GH_REPO, HELIART_RELEASE_TAG, api_s=api_s, asset_s=asset_s,
+        HELIART_GH_REPO,
+        HELIART_RELEASE_TAG,
+        api_s=api_s,
+        asset_s=asset_s,
     )
 
 
@@ -748,17 +762,17 @@ def _find_release_asset(repo: str, tag: str, *, api_s: float = 30) -> str | None
         return asset_names[name]
 
     # Tighter glob fallback: helia-rt-*.zip only.
-    candidates = sorted(
-        n for n in asset_names
-        if n.startswith("helia-rt-") and n.endswith(".zip")
-    )
+    candidates = sorted(n for n in asset_names if n.startswith("helia-rt-") and n.endswith(".zip"))
     if not candidates:
         return None
     if len(candidates) > 1:
         log.warning(
             "Multiple heliaRT release assets matched 'helia-rt-*.zip' for %s @ %s; "
             "picking %s. Candidates: %s",
-            repo, tag, candidates[0], candidates,
+            repo,
+            tag,
+            candidates[0],
+            candidates,
         )
     log.info("Using release asset: %s", candidates[0])
     return asset_names[candidates[0]]
@@ -818,7 +832,7 @@ def _download_and_extract(url: str, dest: Path, *, timeout_s: float = 300) -> No
                 continue
             name = member.filename
             if strip_prefix and name.startswith(strip_prefix):
-                name = name[len(strip_prefix):]
+                name = name[len(strip_prefix) :]
             if not name:
                 continue
             out = dest / name
@@ -907,7 +921,8 @@ def _parse_semver(version: str) -> tuple[int, int, int]:
 
 
 def _check_version_compatibility(
-    dist: Path, detected_version: str | None,
+    dist: Path,
+    detected_version: str | None,
 ) -> None:
     """Enforce minimum-supported heliaRT version on a resolved distribution.
 
@@ -945,8 +960,7 @@ def _check_version_compatibility(
 
     if actual > pinned:
         log.info(
-            "heliaRT v%s is newer than the pinned default v%s — "
-            "proceeding (>= min v%s).",
+            "heliaRT v%s is newer than the pinned default v%s — proceeding (>= min v%s).",
             detected_version,
             HELIART_VERSION,
             HELIART_MIN_VERSION,

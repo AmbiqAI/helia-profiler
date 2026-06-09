@@ -44,9 +44,11 @@ def test_resolve_all():
 
 
 def test_resolve_explicit_names():
-    counters = resolve_counters({
-        "cpu": ["ARM_PMU_CPU_CYCLES", "ARM_PMU_INST_RETIRED"],
-    })
+    counters = resolve_counters(
+        {
+            "cpu": ["ARM_PMU_CPU_CYCLES", "ARM_PMU_INST_RETIRED"],
+        }
+    )
     assert len(counters) == 2
     names = {c.name for c in counters}
     assert "ARM_PMU_CPU_CYCLES" in names

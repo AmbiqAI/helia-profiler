@@ -299,7 +299,6 @@ class JoulescopeDriver:
                 "pip install --force-reinstall 'pyjoulescope_driver' 'pyjls'.",
             ) from exc
 
-
     # ------------------------------------------------------------------
     # Capture
     # ------------------------------------------------------------------

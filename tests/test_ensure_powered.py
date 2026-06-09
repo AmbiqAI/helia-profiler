@@ -102,45 +102,53 @@ class TestJoulescopeEnsureTargetPowered_BestEffort:
 
     def test_one_device_enables_and_returns_true(self):
         driver = JoulescopeDriver()
-        with patch.object(driver, "check_available"), _patch_devices(
-            [("u/js220/000123", "js220")]
-        ), patch.object(driver, "enable_passthrough") as enable, patch.object(
-            driver, "disable_passthrough"
-        ) as disable:
+        with (
+            patch.object(driver, "check_available"),
+            _patch_devices([("u/js220/000123", "js220")]),
+            patch.object(driver, "enable_passthrough") as enable,
+            patch.object(driver, "disable_passthrough") as disable,
+        ):
             assert driver.ensure_target_powered(required=False) is True
         enable.assert_called_once()
         disable.assert_called_once()
 
     def test_multi_devices_no_serial_returns_false(self):
         driver = JoulescopeDriver()
-        with patch.object(driver, "check_available"), _patch_devices(
-            [("u/js220/000111", "js220"), ("u/js110/000222", "js110")]
-        ), patch.object(driver, "enable_passthrough") as enable:
+        with (
+            patch.object(driver, "check_available"),
+            _patch_devices([("u/js220/000111", "js220"), ("u/js110/000222", "js110")]),
+            patch.object(driver, "enable_passthrough") as enable,
+        ):
             assert driver.ensure_target_powered(required=False) is False
         enable.assert_not_called()
 
     def test_multi_devices_with_matching_serial_succeeds(self):
         driver = JoulescopeDriver(serial="000222")
-        with patch.object(driver, "check_available"), _patch_devices(
-            [("u/js220/000111", "js220"), ("u/js110/000222", "js110")]
-        ), patch.object(driver, "enable_passthrough"), patch.object(
-            driver, "disable_passthrough"
+        with (
+            patch.object(driver, "check_available"),
+            _patch_devices([("u/js220/000111", "js220"), ("u/js110/000222", "js110")]),
+            patch.object(driver, "enable_passthrough"),
+            patch.object(driver, "disable_passthrough"),
         ):
             assert driver.ensure_target_powered(required=False) is True
 
     def test_serial_no_match_returns_false(self):
         driver = JoulescopeDriver(serial="999999")
-        with patch.object(driver, "check_available"), _patch_devices(
-            [("u/js220/000111", "js220")]
-        ), patch.object(driver, "enable_passthrough") as enable:
+        with (
+            patch.object(driver, "check_available"),
+            _patch_devices([("u/js220/000111", "js220")]),
+            patch.object(driver, "enable_passthrough") as enable,
+        ):
             assert driver.ensure_target_powered(required=False) is False
         enable.assert_not_called()
 
     def test_passthrough_failure_returns_false(self):
         driver = JoulescopeDriver()
-        with patch.object(driver, "check_available"), _patch_devices(
-            [("u/js220/000123", "js220")]
-        ), patch.object(driver, "enable_passthrough", side_effect=PowerError("relay")):
+        with (
+            patch.object(driver, "check_available"),
+            _patch_devices([("u/js220/000123", "js220")]),
+            patch.object(driver, "enable_passthrough", side_effect=PowerError("relay")),
+        ):
             assert driver.ensure_target_powered(required=False) is False
 
 
@@ -161,16 +169,15 @@ class TestJoulescopeEnsureTargetPowered_Strict:
 
     def test_multi_devices_no_serial_raises(self):
         driver = JoulescopeDriver()
-        with patch.object(driver, "check_available"), _patch_devices(
-            [("u/js220/000111", "js220"), ("u/js110/000222", "js110")]
+        with (
+            patch.object(driver, "check_available"),
+            _patch_devices([("u/js220/000111", "js220"), ("u/js110/000222", "js110")]),
         ):
             with pytest.raises(PowerError, match="disambiguate"):
                 driver.ensure_target_powered(required=True)
 
     def test_serial_no_match_raises(self):
         driver = JoulescopeDriver(serial="999")
-        with patch.object(driver, "check_available"), _patch_devices(
-            [("u/js220/000111", "js220")]
-        ):
+        with patch.object(driver, "check_available"), _patch_devices([("u/js220/000111", "js220")]):
             with pytest.raises(PowerError, match="not found"):
                 driver.ensure_target_powered(required=True)

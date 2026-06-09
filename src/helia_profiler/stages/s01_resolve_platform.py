@@ -54,10 +54,7 @@ class ResolvePlatformStage:
         if cpu_speed is None:
             raise ConfigError(
                 f"Board '{board_name}' does not support cpu clock '{cpu_name}'.",
-                hint=(
-                    f"Supported cpu speeds for {soc.name}: "
-                    f"{', '.join(cpu_domain.speed_names)}."
-                ),
+                hint=(f"Supported cpu speeds for {soc.name}: {', '.join(cpu_domain.speed_names)}."),
             )
         if cpu_speed.perf_tier is None:
             raise PlatformError(
@@ -76,11 +73,9 @@ class ResolvePlatformStage:
             npu_speed = npu_domain.speed(selection.npu)
             if npu_speed is None:
                 raise ConfigError(
-                    f"Board '{board_name}' does not support npu clock "
-                    f"'{selection.npu}'.",
+                    f"Board '{board_name}' does not support npu clock '{selection.npu}'.",
                     hint=(
-                        f"Supported npu speeds for {soc.name}: "
-                        f"{', '.join(npu_domain.speed_names)}."
+                        f"Supported npu speeds for {soc.name}: {', '.join(npu_domain.speed_names)}."
                     ),
                 )
         elif npu_domain is not None:

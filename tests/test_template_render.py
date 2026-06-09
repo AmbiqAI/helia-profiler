@@ -136,8 +136,8 @@ class TestMainCcRender:
             transport="rtt",
             resource_variable_count=2,
         )
-        assert "#include \"tensorflow/lite/micro/micro_allocator.h\"" in out
-        assert "#include \"tensorflow/lite/micro/micro_resource_variable.h\"" in out
+        assert '#include "tensorflow/lite/micro/micro_allocator.h"' in out
+        assert '#include "tensorflow/lite/micro/micro_resource_variable.h"' in out
         assert "kNumResourceVariables = 2" in out
         assert "MicroResourceVariables::Create(allocator, kNumResourceVariables)" in out
 
@@ -197,12 +197,12 @@ class TestMainCcRender:
 
     def test_psram_model_location_skips_model_data_header(self):
         out = _render_tflm(transport="rtt", model_location="psram", weights_region="psram")
-        assert "#include \"model_data.h\"" not in out
+        assert '#include "model_data.h"' not in out
         assert "nsx_psram.h" in out
 
     def test_psram_weights_override_skips_model_data_header(self):
         out = _render_tflm(transport="rtt", model_location="auto", weights_region="psram")
-        assert "#include \"model_data.h\"" not in out
+        assert '#include "model_data.h"' not in out
         assert "nsx_psram.h" in out
 
     def test_dwt_only_render_avoids_armv8m_pmu_headers(self):

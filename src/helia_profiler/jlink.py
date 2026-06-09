@@ -62,6 +62,7 @@ class JLinkProbeMatch:
 # Executable discovery
 # ------------------------------------------------------------------
 
+
 def find_jlink_exe() -> str:
     """Return the absolute path to ``JLinkExe`` or raise :class:`CaptureError`.
 
@@ -167,8 +168,11 @@ def resolve_probe_serial(
             )
         return probe.serial
 
-    matches = [match for match in (_inspect_probe_target(probe, device=device) for probe in probes)
-               if match.detected_core is expected_core]
+    matches = [
+        match
+        for match in (_inspect_probe_target(probe, device=device) for probe in probes)
+        if match.detected_core is expected_core
+    ]
     if len(matches) == 1:
         return matches[0].probe.serial
     if len(matches) > 1:
@@ -193,11 +197,16 @@ def _inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
     jlink_exe = find_jlink_exe()
     cmd = [
         jlink_exe,
-        "-device", device,
-        "-if", "SWD",
-        "-speed", "4000",
-        "-autoconnect", "1",
-        "-SelectEmuBySN", probe.serial,
+        "-device",
+        device,
+        "-if",
+        "SWD",
+        "-speed",
+        "4000",
+        "-autoconnect",
+        "1",
+        "-SelectEmuBySN",
+        probe.serial,
     ]
     try:
         result = subprocess.run(
@@ -248,6 +257,7 @@ def _format_probe_matches(matches: list[JLinkProbeMatch]) -> str:
 # Generic JLinkExe driver
 # ------------------------------------------------------------------
 
+
 def run_jlink_script(
     script: str,
     *,
@@ -284,10 +294,14 @@ def run_jlink_script(
     jlink_exe = find_jlink_exe()
     cmd = [
         jlink_exe,
-        "-device", device,
-        "-if", interface,
-        "-speed", str(speed_khz),
-        "-autoconnect", "1",
+        "-device",
+        device,
+        "-if",
+        interface,
+        "-speed",
+        str(speed_khz),
+        "-autoconnect",
+        "1",
     ]
     if jlink_serial:
         cmd.extend(["-SelectEmuBySN", jlink_serial])
@@ -319,6 +333,7 @@ def run_jlink_script(
 # ------------------------------------------------------------------
 # Target reset
 # ------------------------------------------------------------------
+
 
 def reset_target(
     *,

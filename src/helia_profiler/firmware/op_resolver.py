@@ -156,13 +156,9 @@ def build_resolver_plan(
             )
         else:
             model_ops = {layer.op for layer in model_analysis.layers}
-            registrations = tuple(
-                code for name, code in _ALL_REGISTRATIONS if name in model_ops
-            )
+            registrations = tuple(code for name, code in _ALL_REGISTRATIONS if name in model_ops)
             unsupported = sorted(
-                op
-                for op in model_ops
-                if op not in _ALL_BY_NAME and not op.startswith("CUSTOM(")
+                op for op in model_ops if op not in _ALL_BY_NAME and not op.startswith("CUSTOM(")
             )
             if unsupported:
                 log.warning(

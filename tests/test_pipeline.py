@@ -204,6 +204,7 @@ class TestPipelineContext:
         config = _make_config(tmp_path)
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         from helia_profiler.results import FirmwareMeta, PmuResult
+
         ctx.pmu_result = PmuResult(meta=FirmwareMeta(), layers=[])
         assert ctx.pmu_result is not None
         assert ctx.pmu_result.layers == []

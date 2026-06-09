@@ -186,9 +186,7 @@ def _render_module_registry(profile: dict[str, Any]) -> str:
         registry["projects"] = dict(project_overrides)
     if module_overrides:
         registry["modules"] = dict(module_overrides)
-    return yaml.safe_dump(
-        {"module_registry": registry}, sort_keys=False, default_flow_style=False
-    )
+    return yaml.safe_dump({"module_registry": registry}, sort_keys=False, default_flow_style=False)
 
 
 def _default_nsx_channel(board_name: str, configured_channel: str | None) -> str:
@@ -216,7 +214,11 @@ def _resolve_module_specs(board: str) -> list[NsxModuleSpec]:
     if "nsx-cmsis-core" not in ordered_names:
         ordered_names.insert(0, "nsx-cmsis-core")
     if _soc_has_backend(soc, "armv8m-pmu") and "nsx-pmu-armv8m" not in ordered_names:
-        tooling_idx = ordered_names.index("nsx-tooling") if "nsx-tooling" in ordered_names else len(ordered_names)
+        tooling_idx = (
+            ordered_names.index("nsx-tooling")
+            if "nsx-tooling" in ordered_names
+            else len(ordered_names)
+        )
         ordered_names.insert(tooling_idx, "nsx-pmu-armv8m")
 
     return [NsxModuleSpec(name, _module_project(name, profile)) for name in ordered_names]
@@ -360,23 +362,27 @@ def _resolve_pmu_passes(config: Any, soc: Any | None = None) -> list[dict[str, A
     result: list[dict[str, Any]] = []
     for preset_name in profiling.pmu_presets:
         c_enum = _PMU_PRESET_MAP.get(preset_name, "NSX_PMU_PRESET_ML_DEFAULT")
-        result.append({
-            "name": preset_name,
-            "custom": False,
-            "event_ids": [],
-            "num_counters": 4,
-            "c_enum": c_enum,
-            "group": preset_name,
-        })
+        result.append(
+            {
+                "name": preset_name,
+                "custom": False,
+                "event_ids": [],
+                "num_counters": 4,
+                "c_enum": c_enum,
+                "group": preset_name,
+            }
+        )
     if not result:
-        result = [{
-            "name": "ml_default",
-            "custom": False,
-            "event_ids": [],
-            "num_counters": 4,
-            "c_enum": "NSX_PMU_PRESET_ML_DEFAULT",
-            "group": "ml_default",
-        }]
+        result = [
+            {
+                "name": "ml_default",
+                "custom": False,
+                "event_ids": [],
+                "num_counters": 4,
+                "c_enum": "NSX_PMU_PRESET_ML_DEFAULT",
+                "group": "ml_default",
+            }
+        ]
     return result
 
 
@@ -512,9 +518,7 @@ def _blob_to_header(blob_path: Path, symbol_name: str) -> str:
         hex_vals = ", ".join(f"0x{b:02x}" for b in chunk)
         lines.append(f"    {hex_vals},")
     lines.append("};")
-    lines.append(
-        f"static const size_t {symbol_name}_len = sizeof({symbol_name});"
-    )
+    lines.append(f"static const size_t {symbol_name}_len = sizeof({symbol_name});")
     return "\n".join(lines) + "\n"
 
 
@@ -574,9 +578,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             )
             module_names.add("nsx-interrupt")
         if "nsx-psram" not in module_names:
-            module_specs.append(
-                NsxModuleSpec("nsx-psram", _module_project("nsx-psram", profile))
-            )
+            module_specs.append(NsxModuleSpec("nsx-psram", _module_project("nsx-psram", profile)))
 
     if power_sync_enabled:
         module_names = {m.name for m in module_specs}
@@ -670,7 +672,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             channel=_default_nsx_channel(board.name, config.build.channel),
             modules=modules,
             module_registry_yaml=_render_module_registry(profile),
-        )
+        ),
     )
 
     # --- cmake/nsx/modules.cmake ---
@@ -697,7 +699,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             has_armv8m_pmu=has_armv8m_pmu,
             power_sync_enabled=power_sync_enabled,
             arena_regions=aot_arena_regions,
-        )
+        ),
     )
 
     # --- Source files ---
@@ -726,7 +728,8 @@ def generate_app(ctx: PipelineContext) -> Path:
     perf_mode_symbol = clock.cpu_perf_tier
     perf_mode_mhz = clock.cpu_clock_mhz
     resource_variable_count = sum(
-        1 for layer in (ctx.model_analysis.layers if ctx.model_analysis else ())
+        1
+        for layer in (ctx.model_analysis.layers if ctx.model_analysis else ())
         if layer.op == "VAR_HANDLE"
     )
 
@@ -785,8 +788,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                         )
                     else:
                         log.warning(
-                            "Constant arena %d references blob %s but file "
-                            "not found at %s",
+                            "Constant arena %d references blob %s but file not found at %s",
                             region.region_id,
                             region.blob_filename,
                             blob_path,
@@ -817,7 +819,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 perf_mode_symbol=perf_mode_symbol,
                 perf_mode_mhz=perf_mode_mhz,
                 **heartbeat_vars,
-            )
+            ),
         )
     else:
         # --- TFLM / heliaRT: embed model as byte array, use TFLM profiler ---
@@ -858,7 +860,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 perf_mode_symbol=perf_mode_symbol,
                 perf_mode_mhz=perf_mode_mhz,
                 **heartbeat_vars,
-            )
+            ),
         )
 
         # PMU profiler (TFLM-specific C++ class)
@@ -888,7 +890,9 @@ def generate_app(ctx: PipelineContext) -> Path:
             ref_note = f" @ {extra_mod.ref}" if extra_mod.ref else ""
             log.info(
                 "Engine module: %s → NSX registry (%s%s)",
-                extra_mod.name, target, ref_note,
+                extra_mod.name,
+                target,
+                ref_note,
             )
             continue
         mod_src = extra_mod.path

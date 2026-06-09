@@ -111,7 +111,10 @@ class PlanMemoryStage:
                 pct = (r.used * 100 / r.capacity) if r.capacity else 0
                 log.info(
                     "  %-6s %7d / %7d B (%5.1f%%)",
-                    r.region, r.used, r.capacity, pct,
+                    r.region,
+                    r.used,
+                    r.capacity,
+                    pct,
                 )
 
     # ------------------------------------------------------------------
@@ -155,13 +158,17 @@ class PlanMemoryStage:
         if model_bytes > 0:
             region_map.setdefault(weight_phys, []).append(
                 MemoryConsumer(
-                    name="model_flatbuffer", size=model_bytes, kind="weights",
+                    name="model_flatbuffer",
+                    size=model_bytes,
+                    kind="weights",
                 )
             )
         if arena > 0:
             region_map.setdefault(arena_phys, []).append(
                 MemoryConsumer(
-                    name="tensor_arena", size=arena, kind="arena",
+                    name="tensor_arena",
+                    size=arena,
+                    kind="arena",
                 )
             )
 
@@ -186,7 +193,9 @@ class PlanMemoryStage:
     # ------------------------------------------------------------------
 
     def _apply_capacities(
-        self, plan: MemoryPlan, ctx: PipelineContext,
+        self,
+        plan: MemoryPlan,
+        ctx: PipelineContext,
     ) -> MemoryPlan:
         """Fill in per-region capacities from the resolved SoC layout."""
         if ctx.soc is None:
@@ -202,16 +211,22 @@ class PlanMemoryStage:
             cap_bytes = cap_kb * 1024
             existing = by_region.pop(region_name, None)
             if existing is not None:
-                rebuilt.append(MemoryRegionUsage(
-                    region=region_name,
-                    capacity=cap_bytes,
-                    used=existing.used,
-                    consumers=existing.consumers,
-                ))
+                rebuilt.append(
+                    MemoryRegionUsage(
+                        region=region_name,
+                        capacity=cap_bytes,
+                        used=existing.used,
+                        consumers=existing.consumers,
+                    )
+                )
             elif cap_bytes > 0:
-                rebuilt.append(MemoryRegionUsage(
-                    region=region_name, capacity=cap_bytes, used=0,
-                ))
+                rebuilt.append(
+                    MemoryRegionUsage(
+                        region=region_name,
+                        capacity=cap_bytes,
+                        used=0,
+                    )
+                )
 
         for leftover in by_region.values():
             rebuilt.append(leftover)
@@ -297,10 +312,9 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
     if location == ModelLocation.PSRAM:
         if psram_cap == 0:
             raise PlatformError(
-                f"model_location=psram requested, but board "
-                f"{cfg.target.board} has no PSRAM.",
+                f"model_location=psram requested, but board {cfg.target.board} has no PSRAM.",
                 hint="Use --model-location auto | mram | sram | tcm, "
-                     "or pick a PSRAM-capable board.",
+                "or pick a PSRAM-capable board.",
             )
         # weights uploaded to PSRAM at runtime; arena lives in SRAM.
         arena_region = Placement.SRAM
@@ -308,10 +322,8 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
     elif location == ModelLocation.TCM:
         if tcm_cap == 0:
             raise PlatformError(
-                f"model_location=tcm requested, but board "
-                f"{cfg.target.board} has no DTCM.",
-                hint="Use --model-location auto on AP3/AP4 boards, "
-                     "or pick an AP5 board with DTCM.",
+                f"model_location=tcm requested, but board {cfg.target.board} has no DTCM.",
+                hint="Use --model-location auto on AP3/AP4 boards, or pick an AP5 board with DTCM.",
             )
         arena_region = Placement.TCM
         weights_region = Placement.TCM
@@ -332,9 +344,9 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
         )
 
     # Engine-specific auto policy (e.g. AOT pins arena=TCM, weights=MRAM).
-    elif (engine_default := adapter.default_auto_placement(
-        tcm_cap=tcm_cap, sram_cap=sram_cap
-    )) is not None:
+    elif (
+        engine_default := adapter.default_auto_placement(tcm_cap=tcm_cap, sram_cap=sram_cap)
+    ) is not None:
         arena_region, weights_region = engine_default
     else:
         # Greedy fastest-fit, arena first.

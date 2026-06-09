@@ -16,11 +16,13 @@ def _canned_reader(chunks: list[bytes]):
 
 
 def test_collect_lines_returns_on_hpx_end():
-    read = _canned_reader([
-        b"--- HPX_START ---\n",
-        b"HPX_VERSION=1\n",
-        b"--- HPX_END ---\n",
-    ])
+    read = _canned_reader(
+        [
+            b"--- HPX_START ---\n",
+            b"HPX_VERSION=1\n",
+            b"--- HPX_END ---\n",
+        ]
+    )
     lines = collect_lines(read, transport_name="TEST")
     assert lines[0] == "--- HPX_START ---"
     assert lines[-1] == "--- HPX_END ---"
@@ -73,6 +75,7 @@ def test_hang_detected_when_no_heartbeat():
             return b""
 
     import time as _t
+
     t0 = _t.monotonic()
     lines = collect_lines(
         read,
@@ -89,9 +92,11 @@ def test_hang_detected_when_no_heartbeat():
 
 def test_legacy_kwargs_still_work():
     """timeout_s / line_timeout_s are accepted for back-compat."""
-    read = _canned_reader([
-        b"--- HPX_START ---\n--- HPX_END ---\n",
-    ])
+    read = _canned_reader(
+        [
+            b"--- HPX_START ---\n--- HPX_END ---\n",
+        ]
+    )
     lines = collect_lines(
         read,
         transport_name="TEST",

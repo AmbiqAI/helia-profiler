@@ -51,14 +51,10 @@ def fake_dist(tmp_path: Path) -> Path:
     for core in ("cm4", "cm55"):
         for tc in ("gcc", "armclang"):
             for variant in ("release", "release-with-logs", "debug"):
-                (
-                    dist / "lib" / f"libhelia-rt-{core}-{tc}-{variant}.a"
-                ).write_bytes(b"\x00")
+                (dist / "lib" / f"libhelia-rt-{core}-{tc}-{variant}.a").write_bytes(b"\x00")
     tf_dir = dist / "tensorflow" / "lite" / "micro"
     tf_dir.mkdir(parents=True)
-    (tf_dir / "helia_rt_version.h").write_text(
-        f'#define HELIA_RT_VERSION "v{HELIART_VERSION}"\n'
-    )
+    (tf_dir / "helia_rt_version.h").write_text(f'#define HELIA_RT_VERSION "v{HELIART_VERSION}"\n')
     (tf_dir / "micro_log.cc").write_text("// stub\n")
     cortex_dir = tf_dir / "cortex_m_generic"
     cortex_dir.mkdir()
@@ -70,6 +66,7 @@ def fake_dist(tmp_path: Path) -> Path:
     # so that _install_nsx_module finds the upstream-style files. This
     # mirrors what real heliaRT >= 1.16.0 release zips ship.
     import shutil
+
     nsx_src = FIXTURES_DIR / "heliart_nsx"
     nsx_dst = dist / "nsx"
     nsx_dst.mkdir()
@@ -92,20 +89,17 @@ def fake_source_tree(tmp_path: Path) -> Path:
     (src / "nsx").mkdir()
     (src / "nsx" / "CMakeLists.txt").write_text(
         "# source-build heliaRT nsx CMakeLists (test stub)\n"
-        'add_library(nsx_helia_rt INTERFACE)\n'
-        'add_library(nsx::helia_rt ALIAS nsx_helia_rt)\n'
+        "add_library(nsx_helia_rt INTERFACE)\n"
+        "add_library(nsx::helia_rt ALIAS nsx_helia_rt)\n"
     )
     (src / "nsx" / "nsx-module.yaml").write_text(
-        "schema_version: 1\nmodule:\n  name: nsx-helia-rt\n"
-        f'  version: "{HELIART_VERSION}"\n'
+        f'schema_version: 1\nmodule:\n  name: nsx-helia-rt\n  version: "{HELIART_VERSION}"\n'
     )
     (src / "cmake").mkdir()
     (src / "cmake" / "helia_rt_sources.cmake").write_text("# stub\n")
     tf_dir = src / "tensorflow" / "lite" / "micro"
     tf_dir.mkdir(parents=True)
-    (tf_dir / "helia_rt_version.h").write_text(
-        f'#define HELIA_RT_VERSION "v{HELIART_VERSION}"\n'
-    )
+    (tf_dir / "helia_rt_version.h").write_text(f'#define HELIA_RT_VERSION "v{HELIART_VERSION}"\n')
     return src
 
 
@@ -132,7 +126,6 @@ def fake_cmsis_nn(tmp_path: Path) -> Path:
         "add_library(nsx::cmsis_nn ALIAS nsx_cmsis_nn)\n"
     )
     (nsx / "nsx-module.yaml").write_text(
-        "schema_version: 1\nmodule:\n  name: nsx-cmsis-nn\n"
-        '  version: "7.23.0"\n'
+        'schema_version: 1\nmodule:\n  name: nsx-cmsis-nn\n  version: "7.23.0"\n'
     )
     return nn

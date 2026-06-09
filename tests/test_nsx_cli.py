@@ -98,7 +98,11 @@ class TestNsxLock:
         with patch("helia_profiler.nsx.nsx_api.lock_app", return_value=tmp_path / "nsx.lock") as m:
             result = nsx.lock(tmp_path, timeout_s=180)
         m.assert_called_once_with(
-            tmp_path, update=False, quiet=True, timeout_s=180, resolve_ttl_s=1800,
+            tmp_path,
+            update=False,
+            quiet=True,
+            timeout_s=180,
+            resolve_ttl_s=1800,
             emit=nsx._quiet_emitter,
         )
         assert result == tmp_path / "nsx.lock"

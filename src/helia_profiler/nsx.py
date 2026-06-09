@@ -188,9 +188,7 @@ def build(
     with _quiet_context(verbose):
         _translate(
             "nsx build",
-            lambda: nsx_api.build_app(
-                app_dir, toolchain=toolchain, timeout_s=timeout_s, emit=emit
-            ),
+            lambda: nsx_api.build_app(app_dir, toolchain=toolchain, timeout_s=timeout_s, emit=emit),
         )
 
 
@@ -290,8 +288,7 @@ def sync(
             if attempt < retries:
                 delay = 2**attempt
                 log.warning(
-                    "nsx sync: transient network error (attempt %d/%d), "
-                    "retrying in %ds…",
+                    "nsx sync: transient network error (attempt %d/%d), retrying in %ds…",
                     attempt,
                     retries,
                     delay,

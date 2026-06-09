@@ -207,9 +207,12 @@ class TestPreflightHostTools:
     def test_missing_neuralspotx_package_raises_with_hint(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
 
-        with patch("shutil.which", side_effect=_all_tools_present), patch(
-            "helia_profiler.stages.s00_preflight.find_spec",
-            return_value=None,
+        with (
+            patch("shutil.which", side_effect=_all_tools_present),
+            patch(
+                "helia_profiler.stages.s00_preflight.find_spec",
+                return_value=None,
+            ),
         ):
             with pytest.raises(ConfigError) as exc_info:
                 PreflightStage().run(ctx)

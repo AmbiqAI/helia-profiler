@@ -152,9 +152,7 @@ def collect_lines(
                 if line == HPX_START:
                     seen_start = True
                 if line == HPX_END:
-                    log.info(
-                        "Captured %d lines (HPX_END received)", len(lines)
-                    )
+                    log.info("Captured %d lines (HPX_END received)", len(lines))
                     return lines
         else:
             if time.monotonic() > hb_deadline:

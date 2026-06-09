@@ -212,6 +212,5 @@ class TestExtractArenaRegions:
         :class:`Placement` member recognised by the firmware templates."""
         for phys, logical in _AOT_MEMORY_TO_PLACEMENT.items():
             assert isinstance(logical, Placement), (
-                f"physical '{phys}' maps to '{logical!r}' which is not a "
-                f"Placement member"
+                f"physical '{phys}' maps to '{logical!r}' which is not a Placement member"
             )

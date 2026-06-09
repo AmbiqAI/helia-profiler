@@ -6,8 +6,14 @@ import sys
 
 def _run_hpx(*args: str) -> subprocess.CompletedProcess[str]:
     """Run hpx profile with given extra args, expecting failure."""
-    cmd = [sys.executable, "-c", "from helia_profiler.cli import main; main()",
-           "profile", "fake.tflite", *args]
+    cmd = [
+        sys.executable,
+        "-c",
+        "from helia_profiler.cli import main; main()",
+        "profile",
+        "fake.tflite",
+        *args,
+    ]
     return subprocess.run(cmd, capture_output=True, text=True)
 
 

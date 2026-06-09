@@ -84,7 +84,9 @@ def _sections_via_size(
     try:
         result = subprocess.run(
             [size_cmd, str(binary_path)],
-            capture_output=True, text=True, timeout=timeout_s,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
         log.debug("%s probe failed: %s", size_cmd, exc)
@@ -106,9 +108,7 @@ def _sections_via_size(
     return BinarySections(text=text, data=data, bss=bss, total=total)
 
 
-_FROMELF_TOTALS_RE = re.compile(
-    r"\s*Grand Totals?\s*[:\s]+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)"
-)
+_FROMELF_TOTALS_RE = re.compile(r"\s*Grand Totals?\s*[:\s]+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)")
 
 
 def _sections_via_fromelf(
@@ -125,7 +125,9 @@ def _sections_via_fromelf(
     try:
         result = subprocess.run(
             ["fromelf", "--text", "-z", str(binary_path)],
-            capture_output=True, text=True, timeout=timeout_s,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
         log.debug("fromelf probe failed: %s", exc)
@@ -143,7 +145,10 @@ def _sections_via_fromelf(
             total = text + data + bss
             log.info(
                 "Binary sections (fromelf): text=%d data=%d bss=%d total=%d",
-                text, data, bss, total,
+                text,
+                data,
+                bss,
+                total,
             )
             return BinarySections(text=text, data=data, bss=bss, total=total)
     log.debug("Could not find Grand Totals in fromelf output")
@@ -166,9 +171,7 @@ def binary_sections(
         return _sections_via_fromelf(binary_path, timeout_s=timeout_s)
 
     prefix = toolchain.rsplit("-gcc", 1)[0] if toolchain.endswith("-gcc") else toolchain
-    return _sections_via_size(
-        binary_path, size_cmd=f"{prefix}-size", timeout_s=timeout_s
-    )
+    return _sections_via_size(binary_path, size_cmd=f"{prefix}-size", timeout_s=timeout_s)
 
 
 __all__ = [

@@ -16,6 +16,7 @@ from helia_profiler.report import _write_aot_manifest
 
 # ---------- fake AotOperator surface -----------------------------------------
 
+
 @dataclass
 class _FakeTensor:
     name: str = "t"
@@ -70,6 +71,7 @@ class TestTensorMetadata:
     def test_missing_attributes_are_omitted(self):
         class _Bare:
             name = "x"
+
         meta = _tensor_metadata(_Bare())
         assert meta == {"name": "x"}
 
@@ -77,6 +79,7 @@ class TestTensorMetadata:
         class _Weird:
             name = "y"
             shape = 42  # noqa — simulates malformed AOT surface
+
         meta = _tensor_metadata(_Weird())
         assert "shape" not in meta
         assert meta["name"] == "y"
@@ -163,6 +166,7 @@ class TestWriteAotManifest:
     def test_returns_none_when_no_engine_artifacts(self, tmp_path: Path):
         class _NoArtifacts:
             pass
+
         assert _write_aot_manifest(_NoArtifacts(), tmp_path) is None
 
     def test_returns_none_for_empty_manifest(self, tmp_path: Path):

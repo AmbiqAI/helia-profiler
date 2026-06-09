@@ -41,17 +41,17 @@ log = logging.getLogger("hpx")
 if TYPE_CHECKING:
     import pylink
 
-_RTT_CB_TIMEOUT_S = 30    # max time to wait for RTT control block discovery
-_SBL_SETTLE_S = 2.0       # post-reset delay for SBL + firmware RTT init
+_RTT_CB_TIMEOUT_S = 30  # max time to wait for RTT control block discovery
+_SBL_SETTLE_S = 2.0  # post-reset delay for SBL + firmware RTT init
 _PSRAM_READY_TIMEOUT_S = 15  # wait for PSRAM init + ready signal
-_PSRAM_WRITE_CHUNK = 65536   # bytes per J-Link memory_write call
+_PSRAM_WRITE_CHUNK = 65536  # bytes per J-Link memory_write call
 
 # Default SRAM regions to scan for the "SEGGER RTT" control-block magic.
 # Apollo510 TCM/SRAM lives at 0x20000000..0x20200000; Apollo4/3 SRAM starts
 # at 0x10000000.  We scan both so a single path works across all boards.
 _RTT_SCAN_RANGES: tuple[tuple[int, int], ...] = (
-    (0x20000000, 0x200000),   # Apollo510 TCM + SSRAM
-    (0x10000000, 0x100000),   # Apollo4/3 SRAM
+    (0x20000000, 0x200000),  # Apollo510 TCM + SSRAM
+    (0x10000000, 0x100000),  # Apollo4/3 SRAM
 )
 _RTT_SCAN_CHUNK = 0x4000  # 16 KB per memory_read call
 _RTT_MAGIC = b"SEGGER RTT"
@@ -227,10 +227,7 @@ def capture_rtt_output(
         else:
             # Fall back to J-Link auto-scan if manual scan found nothing
             # (e.g. non-standard SRAM ranges).
-            log.info(
-                "manual RTT scan did not find control block; "
-                "falling back to J-Link auto-scan"
-            )
+            log.info("manual RTT scan did not find control block; falling back to J-Link auto-scan")
             jlink.rtt_start()
 
         status = None

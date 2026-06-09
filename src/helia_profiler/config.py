@@ -135,9 +135,7 @@ class ModelConfig:
         # produces a friendlier ``ConfigError`` for unknown values.
         if not isinstance(self.model_location, ModelLocation):
             try:
-                object.__setattr__(
-                    self, "model_location", ModelLocation(self.model_location)
-                )
+                object.__setattr__(self, "model_location", ModelLocation(self.model_location))
             except ValueError:
                 pass
 
@@ -317,13 +315,10 @@ class NsxModuleOverride:
     def __post_init__(self) -> None:
         modes = sum(x is not None for x in (self.path, self.ref, self.version))
         if modes == 0:
-            raise ConfigError(
-                "NsxModuleOverride requires exactly one of path, ref, or version"
-            )
+            raise ConfigError("NsxModuleOverride requires exactly one of path, ref, or version")
         if modes > 1:
             raise ConfigError(
-                "NsxModuleOverride accepts only one of path, ref, or version "
-                f"(got {modes})",
+                f"NsxModuleOverride accepts only one of path, ref, or version (got {modes})",
                 hint="Remove the extra keys so only one override mode is set.",
             )
 
@@ -536,8 +531,7 @@ def _build_build_config(raw: dict[str, Any]) -> BuildConfig:
         for name, spec in nsx_modules_raw.items():
             if not isinstance(spec, dict):
                 raise ConfigError(
-                    f"build.nsx_modules.{name} must be a mapping "
-                    f"(got {type(spec).__name__})",
+                    f"build.nsx_modules.{name} must be a mapping (got {type(spec).__name__})",
                     hint="Use path: /dir, ref: branch, or version: X.Y.Z",
                 )
             nsx_modules[name] = NsxModuleOverride(

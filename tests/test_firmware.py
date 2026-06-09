@@ -322,7 +322,9 @@ class TestGenerateApp:
         assert "nsx-core" in modules_cmake
         assert "nsx-pmu-armv8m" in modules_cmake
 
-    def test_ap4_generation_avoids_armv8m_pmu_module_and_link_target(self, tmp_path: Path, fake_dist: Path):
+    def test_ap4_generation_avoids_armv8m_pmu_module_and_link_target(
+        self, tmp_path: Path, fake_dist: Path
+    ):
         ctx = _make_ctx(tmp_path, fake_dist, board="apollo4p_evb")
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)
@@ -518,7 +520,9 @@ class TestGenerateApp:
 
 
 class TestBuildApp:
-    def test_non_frozen_updates_lock_before_sync(self, tmp_path: Path, fake_dist: Path, monkeypatch):
+    def test_non_frozen_updates_lock_before_sync(
+        self, tmp_path: Path, fake_dist: Path, monkeypatch
+    ):
         ctx = _make_ctx(tmp_path, fake_dist)
         ResolvePlatformStage().run(ctx)
         app_dir = tmp_path / "app"
@@ -539,12 +543,16 @@ class TestBuildApp:
             "helia_profiler.firmware.nsx_cli.sync",
             lambda *args, **kwargs: sync_calls.append(kwargs),
         )
-        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.configure", lambda *args, **kwargs: None)
+        monkeypatch.setattr(
+            "helia_profiler.firmware.nsx_cli.configure", lambda *args, **kwargs: None
+        )
         monkeypatch.setattr("helia_profiler.firmware.nsx_cli.build", lambda *args, **kwargs: None)
 
         out_build_dir, out_binary = build_app(ctx)
 
-        assert lock_calls == [{"update": True, "timeout_s": ctx.config.timeouts.configure_s, "verbose": 0}]
+        assert lock_calls == [
+            {"update": True, "timeout_s": ctx.config.timeouts.configure_s, "verbose": 0}
+        ]
         assert sync_calls == [{"timeout_s": ctx.config.timeouts.configure_s, "verbose": 0}]
         assert out_build_dir == build_dir
         assert out_binary == binary
@@ -569,7 +577,9 @@ class TestFlashApp:
 
         assert captured["jlink_serial"] == "1160002204"
 
-    def test_falls_back_to_configured_jlink_serial(self, tmp_path: Path, fake_dist: Path, monkeypatch):
+    def test_falls_back_to_configured_jlink_serial(
+        self, tmp_path: Path, fake_dist: Path, monkeypatch
+    ):
         ctx = _make_ctx(tmp_path, fake_dist)
         ResolvePlatformStage().run(ctx)
         ctx.firmware_dir = tmp_path / "app"
@@ -587,7 +597,9 @@ class TestFlashApp:
 
         assert captured["jlink_serial"] == "0011223344"
 
-    def test_frozen_skips_lock_and_uses_frozen_sync(self, tmp_path: Path, fake_dist: Path, monkeypatch):
+    def test_frozen_skips_lock_and_uses_frozen_sync(
+        self, tmp_path: Path, fake_dist: Path, monkeypatch
+    ):
         ctx = _make_ctx(tmp_path, fake_dist)
         ResolvePlatformStage().run(ctx)
         app_dir = tmp_path / "app"
@@ -601,18 +613,25 @@ class TestFlashApp:
         lock_calls: list[tuple] = []
         sync_calls: list[dict] = []
 
-        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.lock", lambda *args, **kwargs: lock_calls.append((args, kwargs)))
+        monkeypatch.setattr(
+            "helia_profiler.firmware.nsx_cli.lock",
+            lambda *args, **kwargs: lock_calls.append((args, kwargs)),
+        )
         monkeypatch.setattr(
             "helia_profiler.firmware.nsx_cli.sync",
             lambda *args, **kwargs: sync_calls.append(kwargs),
         )
-        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.configure", lambda *args, **kwargs: None)
+        monkeypatch.setattr(
+            "helia_profiler.firmware.nsx_cli.configure", lambda *args, **kwargs: None
+        )
         monkeypatch.setattr("helia_profiler.firmware.nsx_cli.build", lambda *args, **kwargs: None)
 
         out_build_dir, out_binary = build_app(ctx)
 
         assert lock_calls == []
-        assert sync_calls == [{"frozen": True, "timeout_s": ctx.config.timeouts.configure_s, "verbose": 0}]
+        assert sync_calls == [
+            {"frozen": True, "timeout_s": ctx.config.timeouts.configure_s, "verbose": 0}
+        ]
         assert out_build_dir == build_dir
         assert out_binary == binary
 
@@ -657,7 +676,10 @@ class TestNsxModuleOverrides:
     """Tests for the build.nsx_modules override mechanism."""
 
     def _make_ctx_with_overrides(
-        self, tmp_path: Path, fake_dist: Path, build_overrides: dict,
+        self,
+        tmp_path: Path,
+        fake_dist: Path,
+        build_overrides: dict,
     ) -> PipelineContext:
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
@@ -717,7 +739,8 @@ class TestNsxModuleOverrides:
 
     def test_version_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(
-            tmp_path, fake_dist,
+            tmp_path,
+            fake_dist,
             {"nsx_modules": {"nsx-core": {"version": "2.0.0"}}},
         )
         ResolvePlatformStage().run(ctx)
@@ -730,15 +753,14 @@ class TestNsxModuleOverrides:
         # A version override targets the whole owning project, so every module
         # vendored by nsx-ambiq-sdk receives it.
         sdk_module_count = sum(
-            1
-            for spec in _resolve_module_specs("apollo510_evb")
-            if spec.project == "nsx-ambiq-sdk"
+            1 for spec in _resolve_module_specs("apollo510_evb") if spec.project == "nsx-ambiq-sdk"
         )
         assert nsx_yml.count('version: "2.0.0"') == sdk_module_count
 
     def test_ref_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(
-            tmp_path, fake_dist,
+            tmp_path,
+            fake_dist,
             {"nsx_modules": {"nsx-core": {"ref": "feat/new-soc"}}},
         )
         ResolvePlatformStage().run(ctx)
@@ -751,9 +773,7 @@ class TestNsxModuleOverrides:
         # A ref override targets the whole owning project, so every module
         # vendored by nsx-ambiq-sdk receives it.
         sdk_module_count = sum(
-            1
-            for spec in _resolve_module_specs("apollo510_evb")
-            if spec.project == "nsx-ambiq-sdk"
+            1 for spec in _resolve_module_specs("apollo510_evb") if spec.project == "nsx-ambiq-sdk"
         )
         assert nsx_yml.count("ref: feat/new-soc") == sdk_module_count
 
@@ -775,11 +795,14 @@ class TestNsxModuleOverrides:
         # Create a fake local module with nsx-module.yaml
         local_module = tmp_path / "my-nsx-core"
         local_module.mkdir()
-        (local_module / "nsx-module.yaml").write_text("schema_version: 1\nmodule:\n  name: nsx-core\n")
+        (local_module / "nsx-module.yaml").write_text(
+            "schema_version: 1\nmodule:\n  name: nsx-core\n"
+        )
         (local_module / "CMakeLists.txt").write_text("# custom nsx-core cmake\n")
 
         ctx = self._make_ctx_with_overrides(
-            tmp_path, fake_dist,
+            tmp_path,
+            fake_dist,
             {"nsx_modules": {"nsx-core": {"path": str(local_module)}}},
         )
         ResolvePlatformStage().run(ctx)
@@ -805,7 +828,8 @@ class TestNsxModuleOverrides:
         # No nsx-module.yaml
 
         ctx = self._make_ctx_with_overrides(
-            tmp_path, fake_dist,
+            tmp_path,
+            fake_dist,
             {"nsx_modules": {"nsx-core": {"path": str(bad_dir)}}},
         )
         ResolvePlatformStage().run(ctx)
@@ -815,13 +839,17 @@ class TestNsxModuleOverrides:
             generate_app(ctx)
 
     def test_unmatched_override_logs_warning(
-        self, tmp_path: Path, fake_dist: Path, caplog,
+        self,
+        tmp_path: Path,
+        fake_dist: Path,
+        caplog,
     ):
         """Override for a module not in the build should emit a warning."""
         import logging
 
         ctx = self._make_ctx_with_overrides(
-            tmp_path, fake_dist,
+            tmp_path,
+            fake_dist,
             {"nsx_modules": {"nsx-nonexistent-module": {"ref": "main"}}},
         )
         ResolvePlatformStage().run(ctx)
@@ -830,6 +858,4 @@ class TestNsxModuleOverrides:
         with caplog.at_level(logging.WARNING):
             generate_app(ctx)
 
-        assert any(
-            "nsx-nonexistent-module" in rec.message for rec in caplog.records
-        )
+        assert any("nsx-nonexistent-module" in rec.message for rec in caplog.records)

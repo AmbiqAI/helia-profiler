@@ -70,11 +70,14 @@ class TestPlanMemorySynthesise:
         shared 256 KiB default that firmware generation emits."""
         model = tmp_path / "mid_model.tflite"
         model.write_bytes(b"\x00" * (300 * 1024))
-        config = load_config(None, {
-            "model": {"path": str(model), "arena_size": None},
-            "engine": {"type": "tflm"},
-            "work_dir": str(tmp_path / "work"),
-        })
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model), "arena_size": None},
+                "engine": {"type": "tflm"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
         work_dir = tmp_path / "work"
         work_dir.mkdir(parents=True, exist_ok=True)
         ctx = PipelineContext(config=config, work_dir=work_dir)
@@ -94,13 +97,16 @@ class TestPlanMemorySynthesise:
     def test_synth_plan_explicit_mram_keeps_weights_in_mram(self, tmp_path: Path):
         """``model_location=mram`` puts weights in MRAM (rodata) but
         still places the arena in TCM when available."""
-        ctx = _make_ctx(tmp_path, {
-            "model": {
-                "path": str(tmp_path / "model.tflite"),
-                "arena_size": 65536,
-                "model_location": "mram",
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {
+                    "path": str(tmp_path / "model.tflite"),
+                    "arena_size": 65536,
+                    "model_location": "mram",
+                },
             },
-        })
+        )
         PlanMemoryStage().run(ctx)
 
         assert ctx.arena_region == "tcm"
@@ -113,13 +119,16 @@ class TestPlanMemorySynthesise:
         assert any(c.kind == "arena" and c.size == 65536 for c in dtcm.consumers)
 
     def test_synth_plan_psram_routes_weights(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {
-            "model": {
-                "path": str(tmp_path / "model.tflite"),
-                "arena_size": 65536,
-                "model_location": "psram",
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {
+                    "path": str(tmp_path / "model.tflite"),
+                    "arena_size": 65536,
+                    "model_location": "psram",
+                },
             },
-        })
+        )
         PlanMemoryStage().run(ctx)
 
         assert ctx.arena_region == "sram"
@@ -130,38 +139,47 @@ class TestPlanMemorySynthesise:
         assert any(c.kind == "weights" for c in psram.consumers)
 
     def test_explicit_weights_override_is_applied(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {
-            "engine": {
-                "config": {
-                    "runtime_weights_location": "sram",
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "engine": {
+                    "config": {
+                        "runtime_weights_location": "sram",
+                    },
                 },
             },
-        })
+        )
         PlanMemoryStage().run(ctx)
 
         assert ctx.arena_region == "tcm"
         assert ctx.weights_region == "sram"
 
     def test_explicit_arena_override_is_applied(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {
-            "engine": {
-                "config": {
-                    "runtime_arena_location": "sram",
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "engine": {
+                    "config": {
+                        "runtime_arena_location": "sram",
+                    },
                 },
             },
-        })
+        )
         PlanMemoryStage().run(ctx)
 
         assert ctx.arena_region == "sram"
 
     def test_explicit_weights_psram_requires_psram_board(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {
-            "engine": {
-                "config": {
-                    "runtime_weights_location": "psram",
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "engine": {
+                    "config": {
+                        "runtime_weights_location": "psram",
+                    },
                 },
             },
-        })
+        )
         PlanMemoryStage().run(ctx)
 
         assert ctx.weights_region == "psram"
@@ -187,11 +205,15 @@ class TestPlanMemoryEngineProvided:
             engine="helia-aot",
             regions=(
                 MemoryRegionUsage(
-                    region="MRAM", capacity=0, used=12_000,
+                    region="MRAM",
+                    capacity=0,
+                    used=12_000,
                     consumers=(MemoryConsumer("weights", 12_000, "weights"),),
                 ),
                 MemoryRegionUsage(
-                    region="DTCM", capacity=0, used=4_096,
+                    region="DTCM",
+                    capacity=0,
+                    used=4_096,
                     consumers=(MemoryConsumer("dtcm_arena", 4_096, "arena"),),
                 ),
             ),
@@ -217,7 +239,9 @@ class TestPlanMemoryOverflow:
             engine="helia-aot",
             regions=(
                 MemoryRegionUsage(
-                    region="DTCM", capacity=0, used=8 * 1024 * 1024,
+                    region="DTCM",
+                    capacity=0,
+                    used=8 * 1024 * 1024,
                     consumers=(MemoryConsumer("giant_arena", 8 * 1024 * 1024, "arena"),),
                 ),
             ),

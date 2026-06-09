@@ -98,5 +98,7 @@ class OnDeviceDriver:
         or an external instrument the user manages directly. Always
         succeeds (returns ``True``) so the pipeline proceeds.
         """
-        log.debug("OnDeviceDriver.ensure_target_powered: no rail control — assuming target is on bench/USB supply.")
+        log.debug(
+            "OnDeviceDriver.ensure_target_powered: no rail control — assuming target is on bench/USB supply."
+        )
         return True

@@ -157,8 +157,7 @@ def _check_runtime_split_locations(cfg) -> None:
     runtime_arena = cfg.engine.config.get("runtime_arena_location")
     runtime_weights = cfg.engine.config.get("runtime_weights_location")
     weights_in_psram = (
-        cfg.model.model_location == Placement.PSRAM
-        or runtime_weights == Placement.PSRAM
+        cfg.model.model_location == Placement.PSRAM or runtime_weights == Placement.PSRAM
     )
 
     if weights_in_psram and cfg.target.transport != "rtt":
@@ -260,7 +259,10 @@ def _check_host_tools(transport: str, toolchain: str) -> None:
     # Toolchain-specific compiler binary check.
     if toolchain == "armclang":
         required.append(
-            (toolchain, f"ARM Compiler ({toolchain}) (https://developer.arm.com/tools-and-software/embedded/arm-compiler)"),
+            (
+                toolchain,
+                f"ARM Compiler ({toolchain}) (https://developer.arm.com/tools-and-software/embedded/arm-compiler)",
+            ),
         )
     elif toolchain == "atfe":
         _check_atfe_tools()

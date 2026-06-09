@@ -77,6 +77,7 @@ class TestInstallNsxModule:
     def test_missing_nsx_raises(self, tmp_path: Path, fake_dist: Path):
         """A dist without nsx/nsx-module.yaml should fail."""
         import shutil
+
         shutil.rmtree(fake_dist / "nsx")
         module_dir = tmp_path / "module"
         module_dir.mkdir()
@@ -225,8 +226,11 @@ class TestSourceBuildMode:
     """heliaRT source-build mode (engine.config.source_path)."""
 
     def test_prepare_uses_source_path(
-        self, tmp_path: Path, fake_source_tree: Path,
-        fake_cmsis_nn: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        fake_source_tree: Path,
+        fake_cmsis_nn: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         from helia_profiler.pipeline import PipelineContext
         from helia_profiler.stages.s01_resolve_platform import ResolvePlatformStage
@@ -257,7 +261,7 @@ class TestSourceBuildMode:
         cmake = (module_dir / "CMakeLists.txt").read_text()
         # Source-build wrapper includes the source tree's nsx/CMakeLists.txt
         # directly (heliaRT self-resolves its repo root).
-        assert f'{fake_source_tree.as_posix()}/nsx/CMakeLists.txt' in cmake
+        assert f"{fake_source_tree.as_posix()}/nsx/CMakeLists.txt" in cmake
         assert 'HELIA_RT_VARIANT "release-with-logs"' in cmake
         # No explicit HELIART_TFLM_ROOT override — heliaRT self-resolves.
         assert "HELIART_TFLM_ROOT" not in cmake
@@ -287,9 +291,7 @@ class TestSourceBuildMode:
         with pytest.raises(EngineError, match="is not a directory"):
             _resolve_source_path(config)
 
-    def test_source_path_missing_required_files(
-        self, tmp_path: Path
-    ):
+    def test_source_path_missing_required_files(self, tmp_path: Path):
         from helia_profiler.engines.helia_rt import _resolve_source_path
 
         bare = tmp_path / "bare"
@@ -328,8 +330,12 @@ class TestSourceBuildMode:
         assert resolved == fake_source_tree.resolve()
 
     def test_source_path_takes_precedence_over_dist(
-        self, tmp_path: Path, fake_dist: Path, fake_source_tree: Path,
-        fake_cmsis_nn: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        fake_dist: Path,
+        fake_source_tree: Path,
+        fake_cmsis_nn: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         """When source_path is set, prebuilt dist_path is ignored entirely."""
         from helia_profiler.pipeline import PipelineContext

@@ -9,6 +9,7 @@ from helia_profiler.capture.parser import parse_firmware_output, _infer_group
 # Helpers to build synthetic HPX protocol streams
 # ---------------------------------------------------------------------------
 
+
 def _make_preset_block(
     name: str,
     header: list[str],
@@ -43,6 +44,7 @@ def _wrap_session(
 # _infer_group
 # ---------------------------------------------------------------------------
 
+
 def test_infer_group_new_style():
     assert _infer_group("mve_0") == "mve"
     assert _infer_group("mve_1") == "mve"
@@ -59,6 +61,7 @@ def test_infer_group_legacy():
 # ---------------------------------------------------------------------------
 # Single-preset parsing (legacy)
 # ---------------------------------------------------------------------------
+
 
 def test_single_preset_basic():
     header = ["Layer", "Op", "ARM_PMU_CPU_CYCLES"]
@@ -83,6 +86,7 @@ def test_single_preset_basic():
 # ---------------------------------------------------------------------------
 # Multi-pass parsing (new-style)
 # ---------------------------------------------------------------------------
+
 
 def test_multi_pass_same_group_merged():
     """Two MVE passes should merge into a single 'mve' group."""
@@ -142,6 +146,7 @@ def test_multi_group_separate():
 # Iteration averaging
 # ---------------------------------------------------------------------------
 
+
 def test_iteration_averaging():
     """Multiple iterations should be averaged."""
     header = ["Layer", "Op", "ARM_PMU_CPU_CYCLES"]
@@ -169,6 +174,7 @@ def test_iteration_averaging():
 # Overflow detection
 # ---------------------------------------------------------------------------
 
+
 def test_overflow_detection():
     lines = [
         "--- HPX_START ---",
@@ -186,6 +192,7 @@ def test_overflow_detection():
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
 
 def test_empty_session():
     lines = ["--- HPX_START ---", "--- HPX_END ---"]

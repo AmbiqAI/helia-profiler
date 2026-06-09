@@ -182,8 +182,7 @@ def capture_usb_output(
                 # Timeout on readline — no data for LINE_TIMEOUT_S
                 if lines and any(HPX_START in l for l in lines[:20]):
                     log.warning(
-                        "No USB data for %ds after receiving %d lines — "
-                        "HPX_END may have been lost",
+                        "No USB data for %ds after receiving %d lines — HPX_END may have been lost",
                         LINE_TIMEOUT_S,
                         len(lines),
                     )

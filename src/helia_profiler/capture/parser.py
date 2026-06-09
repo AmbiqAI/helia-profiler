@@ -118,7 +118,11 @@ def parse_firmware_output(lines: list[str]) -> PmuResult:
 
     # Build FirmwareMeta from key-value pairs
     preset_names_str = meta_kv.get("presets", "")
-    preset_names = tuple(preset_names_str.split(",")) if isinstance(preset_names_str, str) and preset_names_str else ()
+    preset_names = (
+        tuple(preset_names_str.split(","))
+        if isinstance(preset_names_str, str) and preset_names_str
+        else ()
+    )
     firmware_meta = FirmwareMeta(
         model_size=meta_kv.get("model_size"),
         arena_size=meta_kv.get("arena_size"),
@@ -152,7 +156,8 @@ def parse_firmware_output(lines: list[str]) -> PmuResult:
         log.warning(
             "HPX protocol version mismatch: firmware=%s, expected=%d. "
             "Results may be incorrectly parsed.",
-            version, HPX_PROTOCOL_VERSION,
+            version,
+            HPX_PROTOCOL_VERSION,
         )
 
     # Report accumulated parse errors
@@ -171,7 +176,8 @@ def parse_firmware_output(lines: list[str]) -> PmuResult:
             log.warning(
                 "Preset '%s': inconsistent layer counts across iterations %s — "
                 "data may be truncated or corrupted",
-                name, layer_counts,
+                name,
+                layer_counts,
             )
 
     # Merge layers across all presets
@@ -251,7 +257,9 @@ class _PresetData:
             if len(row) != len(self.header):
                 log.warning(
                     "Malformed CSV row (expected %d fields, got %d): %.200s",
-                    len(self.header), len(row), line,
+                    len(self.header),
+                    len(row),
+                    line,
                 )
                 self.parse_errors += 1
                 continue
@@ -274,7 +282,8 @@ class _PresetData:
                         except ValueError:
                             log.warning(
                                 "Non-numeric value in PMU column '%s': %r",
-                                col, val_str,
+                                col,
+                                val_str,
                             )
                             layer[col] = None  # excluded from averaging
                             self.parse_errors += 1
@@ -322,13 +331,15 @@ def _average_iterations(
             if layer_idx < len(it) and it[layer_idx].get("overflow", 0) not in (0, "0", False)
         )
 
-        averaged.append(LayerResult(
-            id=layer_id,
-            op=op_name,
-            counters=counters,
-            cycles=cycles,
-            overflow=overflow_count > 0,
-        ))
+        averaged.append(
+            LayerResult(
+                id=layer_id,
+                op=op_name,
+                counters=counters,
+                cycles=cycles,
+                overflow=overflow_count > 0,
+            )
+        )
 
     return averaged
 
@@ -343,14 +354,20 @@ def _raw_iterations_to_typed(
     for iteration in iterations:
         layer_list: list[LayerResult] = []
         for row in iteration:
-            counters = {col: float(row[col]) for col in numeric_cols if col in row and isinstance(row[col], (int, float))}
-            layer_list.append(LayerResult(
-                id=row.get("Layer", 0),
-                op=row.get("Op", row.get("tag", "unknown")),
-                counters=counters,
-                cycles=counters.get("ARM_PMU_CPU_CYCLES"),
-                overflow=row.get("overflow", 0) not in (0, "0", False),
-            ))
+            counters = {
+                col: float(row[col])
+                for col in numeric_cols
+                if col in row and isinstance(row[col], (int, float))
+            }
+            layer_list.append(
+                LayerResult(
+                    id=row.get("Layer", 0),
+                    op=row.get("Op", row.get("tag", "unknown")),
+                    counters=counters,
+                    cycles=counters.get("ARM_PMU_CPU_CYCLES"),
+                    overflow=row.get("overflow", 0) not in (0, "0", False),
+                )
+            )
         typed.append(layer_list)
     return typed
 
@@ -391,13 +408,15 @@ def _merge_presets(
     for i, base in enumerate(base_layers):
         counters = merged_counters[i]
         cycles = counters.get("ARM_PMU_CPU_CYCLES")
-        result.append(LayerResult(
-            id=base.id,
-            op=base.op,
-            counters=counters,
-            cycles=cycles,
-            overflow=merged_overflow[i],
-        ))
+        result.append(
+            LayerResult(
+                id=base.id,
+                op=base.op,
+                counters=counters,
+                cycles=cycles,
+                overflow=merged_overflow[i],
+            )
+        )
 
     return result
 

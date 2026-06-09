@@ -24,8 +24,10 @@ class TestConv2DMacs:
             input_shape=[1, 8, 8, 3],
             weight_shape=[16, 3, 3, 3],
             output_shape=[1, 8, 8, 16],
-            stride_h=1, stride_w=1,
-            dilation_h=1, dilation_w=1,
+            stride_h=1,
+            stride_w=1,
+            dilation_h=1,
+            dilation_w=1,
             has_bias=True,
         )
         assert macs == 27_648
@@ -35,8 +37,10 @@ class TestConv2DMacs:
             input_shape=[1, 8, 8, 3],
             weight_shape=[16, 3, 3, 3],
             output_shape=[1, 4, 4, 16],
-            stride_h=2, stride_w=2,
-            dilation_h=1, dilation_w=1,
+            stride_h=2,
+            stride_w=2,
+            dilation_h=1,
+            dilation_w=1,
             has_bias=False,
         )
         # 3*3*3*16*4*4 = 6_912
@@ -47,8 +51,10 @@ class TestConv2DMacs:
             input_shape=[1, 8, 8, 3],
             weight_shape=[16, 3, 3],  # 3-D — malformed
             output_shape=[1, 8, 8, 16],
-            stride_h=1, stride_w=1,
-            dilation_h=1, dilation_w=1,
+            stride_h=1,
+            stride_w=1,
+            dilation_h=1,
+            dilation_w=1,
             has_bias=True,
         )
         assert macs == 0

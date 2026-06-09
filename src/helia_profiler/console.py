@@ -146,8 +146,7 @@ class HpxConsole:
         if self.verbosity >= 1:
             self._stop_spinner()
             self._console.print(
-                f"  {icon}  [bold]{label}[/bold]"
-                f" [green]✓[/green] [dim]{elapsed:.1f}s[/dim]"
+                f"  {icon}  [bold]{label}[/bold] [green]✓[/green] [dim]{elapsed:.1f}s[/dim]"
             )
 
     def stage_skip(self, name: str) -> None:
@@ -303,7 +302,10 @@ class HpxConsole:
         if ctx.binary_sections is not None:
             bs = ctx.binary_sections
             bin_table = Table(
-                box=None, show_header=True, padding=(0, 2), expand=False,
+                box=None,
+                show_header=True,
+                padding=(0, 2),
+                expand=False,
             )
             bin_table.add_column("Section", style="dim")
             bin_table.add_column("Size", justify="right")
@@ -460,9 +462,9 @@ class HpxConsole:
         for r in regions_with_capacity:
             pct = (r.used / r.capacity * 100) if r.capacity else 0.0
             bar = _progress_bar(min(pct, 100.0), width=20)
-            consumers = ", ".join(
-                f"{c.name}={_fmt_bytes(c.size)}" for c in r.consumers if c.size
-            ) or "—"
+            consumers = (
+                ", ".join(f"{c.name}={_fmt_bytes(c.size)}" for c in r.consumers if c.size) or "—"
+            )
 
             if r.overflow:
                 used_cell = f"[bold red]{_fmt_bytes(r.used)}[/bold red]"
@@ -561,15 +563,21 @@ class HpxConsole:
 
             row_vals = [str(la.id)]
             if engine_label != "tflite":
-                oid = la.original_id if hasattr(la, "original_id") and la.original_id is not None else "—"
+                oid = (
+                    la.original_id
+                    if hasattr(la, "original_id") and la.original_id is not None
+                    else "—"
+                )
                 row_vals.append(str(oid))
-            row_vals.extend([
-                la.op,
-                macs_str,
-                ops_str,
-                f"[{pct_style}]{pct_str}[/{pct_style}]" if pct_style else pct_str,
-                out_shape,
-            ])
+            row_vals.extend(
+                [
+                    la.op,
+                    macs_str,
+                    ops_str,
+                    f"[{pct_style}]{pct_str}[/{pct_style}]" if pct_style else pct_str,
+                    out_shape,
+                ]
+            )
             layer_table.add_row(*row_vals)
 
         self._console.print(layer_table)
@@ -587,7 +595,10 @@ class HpxConsole:
             self._console.print()
 
             cmp_table = Table(
-                show_header=True, box=box.SIMPLE_HEAVY, show_edge=False, padding=(0, 1),
+                show_header=True,
+                box=box.SIMPLE_HEAVY,
+                show_edge=False,
+                padding=(0, 1),
             )
             cmp_table.add_column("Metric", min_width=16)
             cmp_table.add_column(ref_label, justify="right", min_width=14)
@@ -650,7 +661,11 @@ class HpxConsole:
             mapped_table.add_column("Δ", justify="right", width=8)
 
             for la in primary.layers:
-                oid = la.original_id if hasattr(la, "original_id") and la.original_id is not None else None
+                oid = (
+                    la.original_id
+                    if hasattr(la, "original_id") and la.original_id is not None
+                    else None
+                )
                 ref_layer = ref_by_id.get(oid) if oid is not None else None
 
                 ref_macs_str = f"{ref_layer.macs:,}" if ref_layer and ref_layer.macs else "—"
