@@ -9,7 +9,7 @@ from typing import Any, Protocol, runtime_checkable
 from ..config import ProfileConfig
 from ..placement import ArenaRole, Placement
 from ..results import NsxModuleRef, MemoryPlan
-from . import EngineType
+from . import EngineType, TFLM_ENGINE_HEADER
 
 
 @dataclass(frozen=True)
@@ -91,7 +91,7 @@ class EngineArtifacts:
     # C/C++ header included by the firmware main template to pull in the
     # engine's public API.  All engines provide this.  Defaults to the
     # stock TFLM interpreter header so adapters that omit it still render.
-    engine_header: str = "tensorflow/lite/micro/micro_interpreter.h"
+    engine_header: str = TFLM_ENGINE_HEADER
 
     # heliaRT-only metadata (None for other engines).  Surfaced in
     # report metadata and used by version-compat assertions in tests.

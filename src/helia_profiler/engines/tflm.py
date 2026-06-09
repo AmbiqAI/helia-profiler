@@ -6,7 +6,7 @@ from pathlib import Path
 
 from ..config import ProfileConfig
 from ..placement import Placement
-from . import EngineType
+from . import EngineType, TFLM_ENGINE_HEADER
 from .base import ArenaRegion, EngineArtifacts
 
 
@@ -46,5 +46,5 @@ class TFLMAdapter:
         """
         return EngineArtifacts(
             engine_type=EngineType.TFLM,
-            engine_header="tensorflow/lite/micro/micro_interpreter.h",
+            engine_header=TFLM_ENGINE_HEADER,
         )

@@ -9,6 +9,9 @@ if TYPE_CHECKING:
     from .base import EngineAdapter
 
 
+TFLM_ENGINE_HEADER = "tensorflow/lite/micro/micro_interpreter.h"
+
+
 class EngineType(StrEnum):
     """Supported inference engine identifiers.
 

@@ -50,6 +50,12 @@ def test_apollo4p_evb_exposes_board_psram_capacity():
     soc = get_soc_for_board("apollo4p_evb")
     assert soc.family is SocFamily.AP4
     assert soc.memory.psram_kb == 32768
+def test_all_ap5_socs_expose_32mb_psram():
+    for soc in list_socs():
+        if soc.family is SocFamily.AP5:
+            assert soc.memory.psram_kb == 32768
+
+
 
 
 def test_apollo330_is_ap5_family():

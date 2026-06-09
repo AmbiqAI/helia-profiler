@@ -35,7 +35,7 @@ from ..errors import EngineError
 from ..placement import Placement
 from ..platform import CoreArch, get_soc
 from ..results import NsxModuleRef
-from . import EngineType
+from . import EngineType, TFLM_ENGINE_HEADER
 from .base import ArenaRegion, EngineArtifacts
 
 log = logging.getLogger("hpx")
@@ -184,7 +184,7 @@ class HeliaRTAdapter:
                 engine_type=EngineType.HELIA_RT,
                 extra_modules=extra_modules,
                 cmake_vars=cmake_vars,
-                engine_header="tensorflow/lite/micro/micro_interpreter.h",
+                engine_header=TFLM_ENGINE_HEADER,
                 engine_backend=backend,
                 heliart_version=version,
                 heliart_variant=variant,
@@ -282,7 +282,7 @@ class HeliaRTAdapter:
             engine_type=EngineType.HELIA_RT,
             extra_modules=extra_modules,
             cmake_vars=cmake_vars,
-            engine_header="tensorflow/lite/micro/micro_interpreter.h",
+            engine_header=TFLM_ENGINE_HEADER,
             engine_backend=backend,
             heliart_version=version,
             heliart_variant=variant,

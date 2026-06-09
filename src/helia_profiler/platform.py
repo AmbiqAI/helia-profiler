@@ -70,6 +70,9 @@ class PerfTier(Enum):
     LOW = "NSX_PERF_LOW"
     MEDIUM = "NSX_PERF_MEDIUM"
     HIGH = "NSX_PERF_HIGH"
+DEFAULT_SYNC_GPIO_PIN = 10
+
+
 
 
 @dataclass(frozen=True)
@@ -201,7 +204,7 @@ class BoardDef:
     soc: str  # SoC name key (matches SocDef.name)
     channel: str  # "stable" or "preview"
     psram_kb: int | None = None  # None = inherit SoC default
-    default_sync_gpio_pin: int = 10
+    default_sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN
     description: str = ""
 
 
@@ -320,7 +323,7 @@ _register_soc(
             sram_kb=3072,
             dtcm_kb=512,
             itcm_kb=256,
-            psram_kb=32168,
+            psram_kb=32768,
             nvm_kb=8192,
         ),
         clocks=(
@@ -351,7 +354,7 @@ _register_soc(
             sram_kb=3072,
             dtcm_kb=512,
             itcm_kb=256,
-            psram_kb=32168,
+            psram_kb=32768,
         ),
         clocks=(
             ClockDomain(
@@ -381,7 +384,7 @@ _register_soc(
             sram_kb=3072,
             dtcm_kb=512,
             itcm_kb=256,
-            psram_kb=32168,
+            psram_kb=32768,
         ),
         clocks=(
             ClockDomain(
@@ -412,7 +415,7 @@ _register_soc(
             sram_kb=3072,
             dtcm_kb=512,
             itcm_kb=256,
-            psram_kb=32168,
+            psram_kb=32768,
         ),
         clocks=(
             ClockDomain(
@@ -542,7 +545,7 @@ def get_soc_for_board(board_name: str) -> SocDef:
     )
 
 
-def get_default_sync_gpio_pin(board_name: str, fallback: int = 10) -> int:
+def get_default_sync_gpio_pin(board_name: str, fallback: int = DEFAULT_SYNC_GPIO_PIN) -> int:
     """Return the board's default sync GPIO pin, or *fallback* if unknown."""
     board = _BOARDS.get(board_name)
     if board is None:
