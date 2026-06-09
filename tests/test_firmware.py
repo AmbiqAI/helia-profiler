@@ -34,9 +34,11 @@ def _fake_starter_profiles() -> dict[str, dict]:
                 "nsx-ambiq-bsp-r5",
                 "nsx-soc-hal",
                 "nsx-cmsis-startup",
-                "nsx-core",
-                "nsx-tooling",
                 "nsx-board-apollo510-evb",
+                "nsx-cmsis-core",
+                "nsx-core",
+                "nsx-pmu-armv8m",
+                "nsx-tooling",
             ],
             "project_overrides": {
                 unified_project: {
@@ -59,6 +61,9 @@ def _fake_starter_profiles() -> dict[str, dict]:
         "apollo4p_evb": {
             "modules": [
                 "nsx-ambiqsuite-r4",
+                "nsx-cmsis-core",
+                "nsx-core",
+                "nsx-tooling",
                 "nsx-board-apollo4p-evb",
             ],
             "project_overrides": {
@@ -70,11 +75,15 @@ def _fake_starter_profiles() -> dict[str, dict]:
             "module_overrides": {
                 "nsx-ambiqsuite-r4": {"project": unified_project},
                 "nsx-cmsis-core": {"project": unified_project},
+                "nsx-core": {"project": unified_project},
             },
         },
         "apollo3p_evb": {
             "modules": [
                 "nsx-ambiqsuite-r3",
+                "nsx-cmsis-core",
+                "nsx-core",
+                "nsx-tooling",
                 "nsx-board-apollo3p-evb",
             ],
             "project_overrides": {
@@ -86,6 +95,7 @@ def _fake_starter_profiles() -> dict[str, dict]:
             "module_overrides": {
                 "nsx-ambiqsuite-r3": {"project": unified_project},
                 "nsx-cmsis-core": {"project": unified_project},
+                "nsx-core": {"project": unified_project},
             },
         },
     }

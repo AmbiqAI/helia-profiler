@@ -31,7 +31,7 @@ from ..counters import (
 from ..engines import EngineType
 from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
-from ..platform import get_board, get_soc_for_board
+from ..platform import get_board
 from ..placement import Placement
 from .op_resolver import build_resolver_plan
 
@@ -105,8 +105,8 @@ def _board_module_name(board: str) -> str:
 def _starter_profile_module_names(profile: dict[str, Any]) -> list[str]:
     """Return the starter profile's authoritative direct module list.
 
-    hpx keeps using the profile as the source of truth for the board/provider
-    stack, then layers its own direct runtime consumers on top.
+    hpx trusts the profile as the source of truth for the board/provider stack
+    and direct runtime consumers.
     """
     modules = profile.get("modules") or []
     if not isinstance(modules, list) or not all(isinstance(name, str) for name in modules):
@@ -189,23 +189,12 @@ def _default_nsx_channel(board_name: str, configured_channel: str | None) -> str
 def _resolve_module_specs(board: str) -> list[NsxModuleSpec]:
     """Build the ordered typed module list for a profiler app.
 
-    Module *selection* is hpx-owned; module *ownership* (project) is derived
-    from the board's NSX starter profile.
+    Module selection and ownership are both derived from the board's NSX
+    starter profile.
     """
     profile = _get_starter_profile(board)
-    soc = get_soc_for_board(board)
 
     ordered_names: list[str] = _starter_profile_module_names(profile)
-
-    if "nsx-cmsis-core" not in ordered_names:
-        ordered_names.insert(0, "nsx-cmsis-core")
-    if _soc_has_backend(soc, "armv8m-pmu") and "nsx-pmu-armv8m" not in ordered_names:
-        tooling_idx = (
-            ordered_names.index("nsx-tooling")
-            if "nsx-tooling" in ordered_names
-            else len(ordered_names)
-        )
-        ordered_names.insert(tooling_idx, "nsx-pmu-armv8m")
 
     return [NsxModuleSpec(name, _module_project(name, profile)) for name in ordered_names]
 

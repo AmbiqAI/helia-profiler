@@ -316,6 +316,9 @@ def load_registry() -> dict[str, Any]:
     This is the in-memory registry.lock with derived ``starter_profiles``. It
     resolves purely from the local neuralspotx install — no network or git.
     """
+    if hasattr(nsx_api, "load_registry"):
+        return nsx_api.load_registry()
+
     from neuralspotx.project_config import _load_registry
 
     return _load_registry()
@@ -323,6 +326,9 @@ def load_registry() -> dict[str, Any]:
 
 def starter_profile(board: str) -> dict[str, Any] | None:
     """Return the ``{board}_minimal`` starter profile, or *None* if absent."""
+    if hasattr(nsx_api, "starter_profile"):
+        return nsx_api.starter_profile(board)
+
     profiles = load_registry().get("starter_profiles", {})
     return profiles.get(f"{board}_minimal")
 
@@ -333,6 +339,9 @@ def registry_module_project(name: str) -> str | None:
     Returns *None* when the module has no registry entry (e.g. a local module
     such as a generated heliaRT wrapper).
     """
+    if hasattr(nsx_api, "registry_module_project"):
+        return nsx_api.registry_module_project(name)
+
     from neuralspotx.metadata import registry_entry_for_module
 
     try:
