@@ -30,7 +30,7 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
     After a power-cycle, the firmware boots from MRAM and re-runs all
     presets × (warmup + profiled iterations).  Each iteration invokes the
     model once.  We know the per-inference cycle count from the PMU result
-    and the clock frequency from the SoC definition.
+    and the clock frequency from the resolved CPU clock selection.
 
     Returns ``None`` if there is not enough information to estimate.
     """
@@ -43,7 +43,9 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
     if total_cycles <= 0:
         return None
 
-    clock_hz = (soc.clock.hp_mhz or soc.clock.lp_mhz) * 1_000_000
+    # Use the CPU clock actually selected for this run (resolved in stage 1),
+    # not the SoC's top frequency.
+    clock_hz = ctx.run_metadata.platform.cpu_clock_mhz * 1_000_000
     if clock_hz <= 0:
         return None
 

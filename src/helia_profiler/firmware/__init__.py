@@ -735,13 +735,9 @@ def generate_app(ctx: PipelineContext) -> Path:
         engine_config=config.engine.config,
         model_analysis=ctx.model_analysis,
     )
-    clock_mode = ctx.config.target.clock_mode.value
-    perf_mode_symbol = "NSX_PERF_HIGH" if clock_mode == "high" else "NSX_PERF_LOW"
-    perf_mode_mhz = (
-        ctx.run_metadata.platform.clock_hp_mhz
-        if clock_mode == "high"
-        else ctx.run_metadata.platform.clock_lp_mhz
-    )
+    clock = ctx.run_metadata.platform
+    perf_mode_symbol = clock.cpu_perf_tier
+    perf_mode_mhz = clock.cpu_clock_mhz
     resource_variable_count = sum(
         1 for layer in (ctx.model_analysis.layers if ctx.model_analysis else ())
         if layer.op == "VAR_HANDLE"

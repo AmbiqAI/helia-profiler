@@ -109,10 +109,11 @@ class PlatformInfo:
     profiling_backends: list[str] = field(default_factory=list)
     profiling_domains: list[str] = field(default_factory=list)
     npu: str | None = None
-    clock_lp_mhz: int = 0
-    clock_hp_mhz: int | None = None
-    clock_mode: str = ""
-    clock_mhz: int = 0
+    cpu_clock_name: str = ""  # selected CPU speed name (e.g. "hp")
+    cpu_clock_mhz: int = 0  # selected CPU frequency
+    cpu_perf_tier: str = ""  # NSX perf_mode symbol (e.g. "NSX_PERF_HIGH")
+    npu_clock_name: str | None = None  # selected NPU speed name, if any
+    npu_clock_mhz: int | None = None  # selected NPU frequency, if any
     sdk_tier: str = ""
 
 

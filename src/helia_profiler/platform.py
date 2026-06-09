@@ -64,12 +64,52 @@ class MemoryLayout:
     nvm_kb: int = 0
 
 
-@dataclass(frozen=True)
-class ClockConfig:
-    """Supported clock modes in MHz."""
+class PerfTier(Enum):
+    """NSX CPU performance tier — maps directly to ``nsx_perf_mode_e``."""
 
-    lp_mhz: int = 96
-    hp_mhz: int | None = None  # None = HP mode not available
+    LOW = "NSX_PERF_LOW"
+    MEDIUM = "NSX_PERF_MEDIUM"
+    HIGH = "NSX_PERF_HIGH"
+
+
+@dataclass(frozen=True)
+class ClockSpeed:
+    """A single named operating point within a clock domain.
+
+    ``name`` uses Ambiq datasheet terminology (``ulp`` / ``lp`` / ``hp``).
+    ``perf_tier`` is the NSX firmware control value applied for CPU domains;
+    NPU speeds leave it ``None`` until NSX exposes an NPU clock API.
+    """
+
+    name: str
+    mhz: int
+    perf_tier: PerfTier | None = None
+
+
+@dataclass(frozen=True)
+class ClockDomain:
+    """An independently selectable clock domain on a SoC (e.g. cpu, npu)."""
+
+    name: str
+    speeds: tuple[ClockSpeed, ...]
+    default: str  # name of the default speed
+
+    def speed(self, name: str) -> ClockSpeed | None:
+        return next((s for s in self.speeds if s.name == name), None)
+
+    @property
+    def speed_names(self) -> tuple[str, ...]:
+        return tuple(s.name for s in self.speeds)
+
+    @property
+    def default_speed(self) -> ClockSpeed:
+        speed = self.speed(self.default)
+        if speed is None:
+            raise ValueError(
+                f"Clock domain '{self.name}' default '{self.default}' "
+                "is not a declared speed."
+            )
+        return speed
 
 
 @dataclass(frozen=True)
@@ -82,12 +122,24 @@ class SocDef:
     pmu_tier: PmuTier
     has_mve: bool  # Helium / MVE vector extensions
     memory: MemoryLayout
-    clock: ClockConfig
+    clocks: tuple[ClockDomain, ...]
     sdk_tier: str  # "r3", "r4", "r5", or "r6" — maps to nsx-ambiqsuite-r*
     c_define: str  # e.g. "AM_PART_APOLLO510"
     npu: NpuArch | None = None
     jlink_device: str = ""  # J-Link device string (e.g. "AP510NFA-CBR")
     pmu_max_ops: int = 2048  # Max PMU accumulator operations (layers)
+
+    def clock_domain(self, name: str) -> ClockDomain | None:
+        """Return the named clock domain, or ``None`` if not present."""
+        return next((d for d in self.clocks if d.name == name), None)
+
+    @property
+    def cpu_clock(self) -> ClockDomain:
+        """The CPU clock domain (every SoC declares one)."""
+        domain = self.clock_domain("cpu")
+        if domain is None:
+            raise ValueError(f"SoC '{self.name}' has no cpu clock domain.")
+        return domain
 
     @property
     def has_full_pmu(self) -> bool:
@@ -183,7 +235,13 @@ _register_soc(
         pmu_tier=PmuTier.DWT_ONLY,
         has_mve=False,
         memory=MemoryLayout(mram_kb=1024, sram_kb=384, dtcm_kb=64),
-        clock=ClockConfig(lp_mhz=96),
+        clocks=(
+            ClockDomain(
+                "cpu",
+                (ClockSpeed("lp", 96, PerfTier.LOW),),
+                default="lp",
+            ),
+        ),
         sdk_tier="r3",
         c_define="AM_PART_APOLLO3P",
         jlink_device="AMA3B2KK-KBR",
@@ -203,7 +261,16 @@ _register_soc(
         pmu_tier=PmuTier.DWT_ONLY,
         has_mve=False,
         memory=MemoryLayout(mram_kb=2000, sram_kb=1024, dtcm_kb=384),
-        clock=ClockConfig(lp_mhz=96, hp_mhz=192),
+        clocks=(
+            ClockDomain(
+                "cpu",
+                (
+                    ClockSpeed("lp", 96, PerfTier.LOW),
+                    ClockSpeed("hp", 192, PerfTier.HIGH),
+                ),
+                default="lp",
+            ),
+        ),
         sdk_tier="r4",
         c_define="AM_PART_APOLLO4P",
         jlink_device="AMAP42KP-KBR",
@@ -218,7 +285,16 @@ _register_soc(
         pmu_tier=PmuTier.DWT_ONLY,
         has_mve=False,
         memory=MemoryLayout(mram_kb=2000, sram_kb=1024, dtcm_kb=384),
-        clock=ClockConfig(lp_mhz=96, hp_mhz=192),
+        clocks=(
+            ClockDomain(
+                "cpu",
+                (
+                    ClockSpeed("lp", 96, PerfTier.LOW),
+                    ClockSpeed("hp", 192, PerfTier.HIGH),
+                ),
+                default="lp",
+            ),
+        ),
         sdk_tier="r4",
         c_define="AM_PART_APOLLO4L",
         jlink_device="AMAP42KL-KBR",
@@ -248,7 +324,16 @@ _register_soc(
             psram_kb=32168,
             nvm_kb=8192,
         ),
-        clock=ClockConfig(lp_mhz=96, hp_mhz=250),
+        clocks=(
+            ClockDomain(
+                "cpu",
+                (
+                    ClockSpeed("lp", 96, PerfTier.LOW),
+                    ClockSpeed("hp", 250, PerfTier.HIGH),
+                ),
+                default="lp",
+            ),
+        ),
         sdk_tier="r5",
         c_define="AM_PART_APOLLO510",
         jlink_device="AP510NFA-CBR",
@@ -270,7 +355,16 @@ _register_soc(
             itcm_kb=256,
             psram_kb=32168,
         ),
-        clock=ClockConfig(lp_mhz=96, hp_mhz=250),
+        clocks=(
+            ClockDomain(
+                "cpu",
+                (
+                    ClockSpeed("lp", 96, PerfTier.LOW),
+                    ClockSpeed("hp", 250, PerfTier.HIGH),
+                ),
+                default="lp",
+            ),
+        ),
         sdk_tier="r5",
         c_define="AM_PART_APOLLO510B",
         jlink_device="AP510NFA-CBR",
@@ -292,7 +386,16 @@ _register_soc(
             itcm_kb=256,
             psram_kb=32168,
         ),
-        clock=ClockConfig(lp_mhz=96, hp_mhz=250),
+        clocks=(
+            ClockDomain(
+                "cpu",
+                (
+                    ClockSpeed("lp", 96, PerfTier.LOW),
+                    ClockSpeed("hp", 250, PerfTier.HIGH),
+                ),
+                default="lp",
+            ),
+        ),
         sdk_tier="r5",
         c_define="AM_PART_APOLLO5B",
         jlink_device="AP510NFA-CBR",
@@ -315,7 +418,16 @@ _register_soc(
             itcm_kb=256,
             psram_kb=32168,
         ),
-        clock=ClockConfig(lp_mhz=96, hp_mhz=250),
+        clocks=(
+            ClockDomain(
+                "cpu",
+                (
+                    ClockSpeed("lp", 96, PerfTier.LOW),
+                    ClockSpeed("hp", 250, PerfTier.HIGH),
+                ),
+                default="lp",
+            ),
+        ),
         sdk_tier="r5",
         c_define="AM_PART_APOLLO330P",
         jlink_device="AP330NFA-CBR",
@@ -364,7 +476,28 @@ _register_soc(
             dtcm_kb=512,
             itcm_kb=256,
         ),
-        clock=ClockConfig(lp_mhz=25, hp_mhz=25),  # FPGA: 1/10 speed
+        # Silicon nominal operating points. The current FPGA bitstream runs
+        # the core at a reduced fixed clock (~1/10 speed); the perf-tier
+        # mapping below still selects the correct NSX perf_mode regardless.
+        clocks=(
+            ClockDomain(
+                "cpu",
+                (
+                    ClockSpeed("ulp", 100, PerfTier.LOW),
+                    ClockSpeed("lp", 250, PerfTier.MEDIUM),
+                    ClockSpeed("hp", 500, PerfTier.HIGH),
+                ),
+                default="ulp",
+            ),
+            ClockDomain(
+                "npu",
+                (
+                    ClockSpeed("lp", 250),
+                    ClockSpeed("hp", 500),
+                ),
+                default="lp",
+            ),
+        ),
         sdk_tier="r6",
         c_define="AM_PART_ATOMIQ110",
         jlink_device="AT110NFA-CBR",

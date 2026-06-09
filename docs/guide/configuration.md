@@ -110,6 +110,11 @@ same frozen object.
 
 - `engine.config.resolver_ops` now defaults to `auto` for `helia-rt`. Leave it
   unset unless you specifically want the broader `all` resolver surface.
+- `target.clock.cpu` is the supported way to choose CPU frequency. Set it to
+  one of the board's named speeds (`lp`/`hp`, or `ulp`/`lp`/`hp` on Atomiq);
+  HPX validates the selection against the chosen board's platform registry
+  entry and maps it onto the correct NSX perf mode in the generated firmware.
+  Leave it unset to use the board's lowest-power tier.
 - Models with `CALL_ONCE`, `VAR_HANDLE`, `ASSIGN_VARIABLE`, or
   `READ_VARIABLE` do not need special-case firmware patches in config; HPX now
   enables the resource-variable runtime automatically when model analysis sees
@@ -124,6 +129,8 @@ same frozen object.
 | `board` | string | `apollo510_evb` | Target board name |
 | `toolchain` | string | `arm-none-eabi-gcc` | Compiler toolchain prefix |
 | `jlink_serial` | string | `""` | J-Link serial (empty = auto-detect) |
+| `clock.cpu` | string | board default | CPU clock speed name, e.g. `lp`/`hp` (rejected if the board has no such speed) |
+| `clock.npu` | string | board default | NPU clock speed name on NPU-equipped boards, e.g. `lp`/`hp` (recorded in metadata; not yet applied by firmware) |
 
 ### `profiling`
 
