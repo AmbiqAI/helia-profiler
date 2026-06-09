@@ -100,7 +100,7 @@ def test_legacy_preset_unknown():
 
 
 def test_supported_groups_for_domains_filters_unknown_domains():
-    groups = supported_groups_for_domains(("cpu", "memory", "mve", "npu"))
+    groups = supported_groups_for_domains(("cpu", "memory", "mve", "custom"))
     assert groups == ("cpu", "memory", "mve")
 
 
