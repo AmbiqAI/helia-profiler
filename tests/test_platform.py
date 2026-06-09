@@ -52,6 +52,33 @@ def test_apollo4p_evb_exposes_board_psram_capacity():
     assert soc.memory.psram_kb == 32768
 
 
+def test_apollo510_family_uses_shared_cmsis_header():
+    assert get_soc("apollo510").cmsis_header == "apollo510.h"
+    assert get_soc("apollo510b").cmsis_header == "apollo510.h"
+    assert get_soc("apollo5b").cmsis_header == "apollo510.h"
+
+
+def test_apollo510_family_uses_ap5_rtt_scan_window():
+    assert get_soc("apollo510").rtt_scan_ranges == ((0x20000000, 0x200000),)
+    assert get_soc("apollo510b").rtt_scan_ranges == ((0x20000000, 0x200000),)
+    assert get_soc("apollo5b").rtt_scan_ranges == ((0x20000000, 0x200000),)
+
+
+def test_cortex_m4_socs_use_ap3_ap4_rtt_scan_window():
+    for soc in list_socs():
+        if soc.family in (SocFamily.AP3, SocFamily.AP4):
+            assert soc.rtt_scan_ranges == ((0x10000000, 0x100000),)
+
+
+def test_every_soc_declares_cmsis_header_and_rtt_scan_ranges():
+    for soc in list_socs():
+        assert soc.cmsis_header.endswith(".h"), f"{soc.name} missing cmsis_header"
+        assert soc.rtt_scan_ranges, f"{soc.name} missing rtt_scan_ranges"
+        for base, length in soc.rtt_scan_ranges:
+            assert base > 0 and length > 0, f"{soc.name} has invalid rtt scan window"
+
+
+
 def test_all_ap5_socs_expose_32mb_psram():
     for soc in list_socs():
         if soc.family is SocFamily.AP5:

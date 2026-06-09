@@ -126,6 +126,8 @@ class SocDef:
     memory: MemoryLayout
     clocks: tuple[ClockDomain, ...]
     c_define: str  # e.g. "AM_PART_APOLLO510"
+    cmsis_header: str  # e.g. "apollo510.h"
+    rtt_scan_ranges: tuple[tuple[int, int], ...]
     npu: NpuArch | None = None
     jlink_device: str = ""  # J-Link device string (e.g. "AP510NFA-CBR")
     pmu_max_ops: int = 2048  # Max PMU accumulator operations (layers)
@@ -244,6 +246,8 @@ _register_soc(
             ),
         ),
         c_define="AM_PART_APOLLO3P",
+        cmsis_header="apollo3p.h",
+        rtt_scan_ranges=((0x10000000, 0x100000),),
         jlink_device="AMA3B2KK-KBR",
     )
 )
@@ -272,6 +276,8 @@ _register_soc(
             ),
         ),
         c_define="AM_PART_APOLLO4P",
+        cmsis_header="apollo4p.h",
+        rtt_scan_ranges=((0x10000000, 0x100000),),
         jlink_device="AMAP42KP-KBR",
     )
 )
@@ -295,6 +301,8 @@ _register_soc(
             ),
         ),
         c_define="AM_PART_APOLLO4L",
+        cmsis_header="apollo4l.h",
+        rtt_scan_ranges=((0x10000000, 0x100000),),
         jlink_device="AMAP42KL-KBR",
     )
 )
@@ -337,6 +345,8 @@ _register_soc(
             ),
         ),
         c_define="AM_PART_APOLLO510",
+        cmsis_header="apollo510.h",
+        rtt_scan_ranges=((0x20000000, 0x200000),),
         jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
     )
@@ -367,6 +377,8 @@ _register_soc(
             ),
         ),
         c_define="AM_PART_APOLLO510B",
+        cmsis_header="apollo510.h",
+        rtt_scan_ranges=((0x20000000, 0x200000),),
         jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
     )
@@ -397,6 +409,8 @@ _register_soc(
             ),
         ),
         c_define="AM_PART_APOLLO5B",
+        cmsis_header="apollo510.h",
+        rtt_scan_ranges=((0x20000000, 0x200000),),
         jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
     )
@@ -428,6 +442,8 @@ _register_soc(
             ),
         ),
         c_define="AM_PART_APOLLO330P",
+        cmsis_header="apollo330P.h",
+        rtt_scan_ranges=((0x20000000, 0x200000),),
         jlink_device="AP330NFA-CBR",
         pmu_max_ops=4096,
     )

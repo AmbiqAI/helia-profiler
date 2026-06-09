@@ -66,6 +66,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         lines = capture_rtt_output(
             jlink_serial=jlink_serial,
             jlink_device=jlink_device,
+            rtt_scan_ranges=ctx.soc.rtt_scan_ranges,
             model_path=ctx.config.model.path,
             weights_region=ctx.weights_region or Placement.MRAM,
             timeout_s=overall_timeout_s,

@@ -46,20 +46,13 @@ _SBL_SETTLE_S = 2.0  # post-reset delay for SBL + firmware RTT init
 _PSRAM_READY_TIMEOUT_S = 15  # wait for PSRAM init + ready signal
 _PSRAM_WRITE_CHUNK = 65536  # bytes per J-Link memory_write call
 
-# Default SRAM regions to scan for the "SEGGER RTT" control-block magic.
-# Apollo510 TCM/SRAM lives at 0x20000000..0x20200000; Apollo4/3 SRAM starts
-# at 0x10000000.  We scan both so a single path works across all boards.
-_RTT_SCAN_RANGES: tuple[tuple[int, int], ...] = (
-    (0x20000000, 0x200000),  # Apollo510 TCM + SSRAM
-    (0x10000000, 0x100000),  # Apollo4/3 SRAM
-)
 _RTT_SCAN_CHUNK = 0x4000  # 16 KB per memory_read call
 _RTT_MAGIC = b"SEGGER RTT"
 
 
 def _scan_for_rtt_control_block(
     jlink: "pylink.JLink",
-    ranges: tuple[tuple[int, int], ...] = _RTT_SCAN_RANGES,
+    ranges: tuple[tuple[int, int], ...],
 ) -> int | None:
     """Scan SRAM for the "SEGGER RTT" control-block magic.
 
@@ -161,6 +154,7 @@ def capture_rtt_output(
     *,
     jlink_serial: str | None = None,
     jlink_device: str = "AP510NFA-CBR",
+    rtt_scan_ranges: tuple[tuple[int, int], ...],
     timeout_s: float | None = None,
     heartbeat_timeout_s: float = HEARTBEAT_TIMEOUT_S,
     model_path: Path | None = None,
@@ -217,7 +211,7 @@ def capture_rtt_output(
         cb_deadline = time.monotonic() + _RTT_CB_TIMEOUT_S
         block_address = None
         while time.monotonic() < cb_deadline and block_address is None:
-            block_address = _scan_for_rtt_control_block(jlink)
+            block_address = _scan_for_rtt_control_block(jlink, rtt_scan_ranges)
             if block_address is None:
                 time.sleep(0.2)
 

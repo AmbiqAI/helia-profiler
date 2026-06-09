@@ -87,19 +87,6 @@ def _nsx_toolchain(toolchain: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def _cmsis_device_header(soc: Any) -> str:
-    mapping = {
-        "apollo3p": "apollo3p.h",
-        "apollo4p": "apollo4p.h",
-        "apollo4l": "apollo4l.h",
-        "apollo510": "apollo510.h",
-        "apollo510b": "apollo510.h",
-        "apollo5b": "apollo510.h",
-        "apollo330P": "apollo330P.h",
-    }
-    return mapping.get(soc.name, "apollo510.h")
-
-
 def _soc_has_backend(soc: Any, backend: str) -> bool:
     return backend in getattr(soc, "profiling_backends", ())
 
@@ -734,7 +721,7 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # External power sync
     sync_gpio_pin = config.power.sync_gpio_pin
-    cmsis_device_header = _cmsis_device_header(soc)
+    cmsis_device_header = soc.cmsis_header
 
     # --- Heartbeat template vars (shared across engines) ---
     hb = config.target.heartbeat
