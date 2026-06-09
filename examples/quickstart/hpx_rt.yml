@@ -1,6 +1,6 @@
 # heliaPROFILER quickstart — heliaRT interpreter engine
 # Profiles the same KWS model using the heliaRT runtime (TFLM-based).
-# Results land in ./results_rt/
+# Results land in ./results/results_rt/
 model:
   path: kws_model.tflite
   arena_size: 131072          # 128 KB tensor arena
@@ -25,4 +25,4 @@ power:
 
 output:
   format: csv
-  dir: ./results_rt
+  dir: ./results/results_rt

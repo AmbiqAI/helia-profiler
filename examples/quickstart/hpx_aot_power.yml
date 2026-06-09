@@ -34,4 +34,4 @@ power:
 
 output:
   format: csv
-  dir: ./results_aot_power
+  dir: ./results/results_aot_power

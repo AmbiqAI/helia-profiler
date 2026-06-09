@@ -29,4 +29,4 @@ timeouts:
 
 output:
   format: csv
-  dir: ./results_rt_armclang
+  dir: ./results/results_rt_armclang

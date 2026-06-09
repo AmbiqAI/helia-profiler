@@ -31,7 +31,8 @@ htmlcov/
 # Generated firmware working directories
 hpx_*/
 
-# Profiling results (local runs)
+# Repo-local scratch areas (never tracked)
+experiments/
 results/
 
 # uv
@@ -47,15 +48,4 @@ site/
 # Personal scratch runners (hardcoded paths)
 run_*.py
 
-# Developer-local profiler configs (see local-configs/README.md)
-local-configs/*
-!local-configs/README.md
-
-# Developer-local experiment scripts and outputs.  These are intentionally
-# out of version control: ad-hoc runners with hardcoded paths/SHAs, sweeps,
-# scratch notebooks, etc.  Each tracked subdir keeps its README.md so the
-# folder layout itself is discoverable.
-local-scripts/*
-!local-scripts/README.md
-local-experiments/*
-!local-experiments/README.md
+# Legacy local scratch directories were consolidated under experiments/.

@@ -1,6 +1,6 @@
 # heliaPROFILER quickstart — heliaAOT engine
 # Profiles a KWS (keyword spotting) DS-CNN model using the AOT compiler.
-# All results land in this folder under ./results_aot/
+# All results land in this folder under ./results/results_aot/
 model:
   path: kws_model.tflite
   arena_size: 131072          # 128 KB tensor arena
@@ -29,4 +29,4 @@ power:
 
 output:
   format: csv
-  dir: ./results_aot
+  dir: ./results/results_aot

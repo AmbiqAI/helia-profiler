@@ -149,7 +149,7 @@ fromelf --version
 ## Toolchain comparison
 
 KWS reference model on Apollo510 EVB, 100 iterations, default counter
-set. Numbers come from `examples/quickstart/results_*/summary.json`.
+set. Numbers come from `results/results_*/summary.json`.
 
 | Engine | Toolchain | Total cycles | vs GCC |
 |---|---|---|---|

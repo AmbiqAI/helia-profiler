@@ -52,7 +52,7 @@ for dir in results_compare/*/; do
 done
 ```
 
-Reference numbers from this repo's `examples/quickstart/results_*`:
+Reference numbers from this repo's `results/results_*`:
 
 | Run | Total cycles | vs heliaRT/GCC |
 |---|---|---|

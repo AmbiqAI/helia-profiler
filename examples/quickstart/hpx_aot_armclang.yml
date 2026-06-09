@@ -28,4 +28,4 @@ power:
 
 output:
   format: csv
-  dir: ./results_aot_armclang
+  dir: ./results/results_aot_armclang

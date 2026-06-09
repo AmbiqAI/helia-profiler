@@ -30,4 +30,4 @@ power:
 
 output:
   format: csv
-  dir: ./results_verify_r5
+  dir: ./results/results_verify_r5

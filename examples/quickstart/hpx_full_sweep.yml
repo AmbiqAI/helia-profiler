@@ -32,6 +32,6 @@ power:
 
 output:
   format: csv
-  dir: ./results_full_sweep
+  dir: ./results/results_full_sweep
   model_explorer: true
   detailed: true
