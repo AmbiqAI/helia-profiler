@@ -41,12 +41,6 @@ class PmuTier(Enum):
     ARMV8M_PMU = "pmu"  # Cortex-M55: Full Armv8-M PMU, 70+ events, 8 counters
 
 
-class NpuArch(Enum):
-    """Optional accelerator architectures that expose their own PMU surface."""
-
-    ETHOS_U85 = "ethos-u85"
-
-
 # ---------------------------------------------------------------------------
 # SoC definition
 # ---------------------------------------------------------------------------
@@ -80,8 +74,7 @@ class ClockSpeed:
     """A single named operating point within a clock domain.
 
     ``name`` uses Ambiq datasheet terminology (``ulp`` / ``lp`` / ``hp``).
-    ``perf_tier`` is the NSX firmware control value applied for CPU domains;
-    NPU speeds leave it ``None`` until NSX exposes an NPU clock API.
+    ``perf_tier`` is the NSX firmware control value applied for CPU domains.
     """
 
     name: str
@@ -91,7 +84,7 @@ class ClockSpeed:
 
 @dataclass(frozen=True)
 class ClockDomain:
-    """An independently selectable clock domain on a SoC (e.g. cpu, npu)."""
+    """An independently selectable clock domain on a SoC (e.g. cpu)."""
 
     name: str
     speeds: tuple[ClockSpeed, ...]
@@ -128,7 +121,6 @@ class SocDef:
     c_define: str  # e.g. "AM_PART_APOLLO510"
     cmsis_header: str  # e.g. "apollo510.h"
     rtt_scan_ranges: tuple[tuple[int, int], ...]
-    npu: NpuArch | None = None
     jlink_device: str = ""  # J-Link device string (e.g. "AP510NFA-CBR")
     pmu_max_ops: int = 2048  # Max PMU accumulator operations (layers)
 
@@ -154,22 +146,16 @@ class SocDef:
         return True
 
     @property
-    def has_npu(self) -> bool:
-        return self.npu is not None
-
-    @property
     def profiling_backends(self) -> tuple[str, ...]:
         """Concrete profiling backends available on this SoC.
 
         This is intentionally more explicit than ``pmu_tier`` so callers do
-        not flatten a CM55/NPU target into a single boolean like
+        not flatten a CM55 target into a single boolean like
         ``has_full_pmu``.
         """
         backends = ["dwt"]
         if self.has_full_pmu:
             backends.append("armv8m-pmu")
-        if self.npu is not None:
-            backends.append(f"{self.npu.value}-pmu")
         return tuple(backends)
 
     @property
@@ -180,8 +166,6 @@ class SocDef:
             domains.append("memory")
         if self.has_mve:
             domains.append("mve")
-        if self.npu is not None:
-            domains.append("npu")
         return tuple(domains)
 
     @property

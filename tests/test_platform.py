@@ -4,7 +4,6 @@ import pytest
 
 from helia_profiler.platform import (
     CoreArch,
-    NpuArch,
     PmuTier,
     SocFamily,
     get_board,

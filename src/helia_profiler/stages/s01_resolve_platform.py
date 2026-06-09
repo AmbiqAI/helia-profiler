@@ -7,7 +7,7 @@ import logging
 
 from ..errors import ConfigError, PlatformError
 from ..pipeline import PipelineContext
-from ..platform import ClockSpeed, PmuTier, get_board, get_soc_for_board
+from ..platform import PmuTier, get_board, get_soc_for_board
 from ..results import ModelInfo, PlatformInfo
 
 log = logging.getLogger("hpx")
@@ -62,25 +62,6 @@ class ResolvePlatformStage:
                 hint="This is likely a bug in the platform registry.",
             )
 
-        npu_domain = soc.clock_domain("npu")
-        npu_speed: ClockSpeed | None = None
-        if selection.npu is not None:
-            if npu_domain is None:
-                raise ConfigError(
-                    f"Board '{board_name}' has no NPU clock domain.",
-                    hint=f"{soc.name} does not expose a separate NPU clock.",
-                )
-            npu_speed = npu_domain.speed(selection.npu)
-            if npu_speed is None:
-                raise ConfigError(
-                    f"Board '{board_name}' does not support npu clock '{selection.npu}'.",
-                    hint=(
-                        f"Supported npu speeds for {soc.name}: {', '.join(npu_domain.speed_names)}."
-                    ),
-                )
-        elif npu_domain is not None:
-            npu_speed = npu_domain.default_speed
-
         log.info(
             "Board: %s  SoC: %s (%s, backends=%s)",
             board.name,
@@ -89,30 +70,17 @@ class ResolvePlatformStage:
             ", ".join(soc.profiling_backends),
         )
         log.info(
-            "Clock: cpu=%s (%d MHz, %s)%s",
+            "Clock: cpu=%s (%d MHz, %s)",
             cpu_speed.name,
             cpu_speed.mhz,
             cpu_speed.perf_tier.value,
-            f"  npu={npu_speed.name} ({npu_speed.mhz} MHz)" if npu_speed else "",
         )
-        if npu_speed is not None:
-            log.info(
-                "NPU clock is recorded in metadata but not yet applied by "
-                "firmware (no NSX NPU clock API)."
-            )
 
         if soc.pmu_tier is PmuTier.DWT_ONLY:
             log.warning(
                 "%s has DWT-only profiling (no Armv8-M PMU). "
                 "Per-layer PMU breakdowns will be limited to cycle counts.",
                 soc.name,
-            )
-
-        if soc.has_npu:
-            log.info(
-                "%s also exposes accelerator profiling domains: %s",
-                soc.name,
-                ", ".join(domain for domain in soc.profiling_domains if domain != "cpu"),
             )
 
         # Populate platform metadata
@@ -124,12 +92,9 @@ class ResolvePlatformStage:
             has_mve=soc.has_mve,
             profiling_backends=list(soc.profiling_backends),
             profiling_domains=list(soc.profiling_domains),
-            npu=soc.npu.value if soc.npu is not None else None,
             cpu_clock_name=cpu_speed.name,
             cpu_clock_mhz=cpu_speed.mhz,
             cpu_perf_tier=cpu_speed.perf_tier.value,
-            npu_clock_name=npu_speed.name if npu_speed is not None else None,
-            npu_clock_mhz=npu_speed.mhz if npu_speed is not None else None,
         )
 
         # Validate model path exists early

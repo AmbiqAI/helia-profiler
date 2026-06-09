@@ -130,7 +130,6 @@ same frozen object.
 | `toolchain` | string | `arm-none-eabi-gcc` | Compiler toolchain prefix |
 | `jlink_serial` | string | `""` | J-Link serial (empty = auto-detect) |
 | `clock.cpu` | string | board default | CPU clock speed name, e.g. `lp`/`hp` (rejected if the board has no such speed) |
-| `clock.npu` | string | board default | NPU clock speed name on NPU-equipped boards, e.g. `lp`/`hp` (recorded in metadata; not yet applied by firmware) |
 
 ### `profiling`
 

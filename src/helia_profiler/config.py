@@ -48,14 +48,13 @@ class ClockSelection:
     """Per-domain clock speed selection for the generated firmware.
 
     Each field names a speed within the SoC's matching clock domain using
-    Ambiq datasheet terminology (e.g. ``cpu="hp"``, ``npu="lp"``).  ``None``
-    selects that domain's default speed.  Values are validated against the
-    resolved SoC in stage 1, so unknown names raise a clear ConfigError
-    rather than failing silently.
+    Ambiq datasheet terminology (e.g. ``cpu="hp"``).  ``None`` selects that
+    domain's default speed.  Values are validated against the resolved SoC in
+    stage 1, so unknown names raise a clear ConfigError rather than failing
+    silently.
     """
 
     cpu: str | None = None
-    npu: str | None = None
 
 
 class OutputFormat(StrEnum):
@@ -171,7 +170,7 @@ class HeartbeatConfig:
         Emit a heartbeat when at least this many wall-clock milliseconds
         have elapsed since the last heartbeat.  ``0`` disables this
         trigger.  Useful for engines with a single large invocation (e.g.
-        AOT or upcoming Ethos-U command streams) where ``every_n_ops`` does
+        AOT command streams) where ``every_n_ops`` does
         not fire.
     host_timeout_s:
         Maximum time the host will wait without receiving *any* line from

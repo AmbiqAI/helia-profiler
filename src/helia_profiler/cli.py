@@ -127,17 +127,7 @@ def main(argv: list[str] | None = None) -> None:
         metavar="SPEED",
         help=(
             "CPU clock speed for generated firmware (board-specific, e.g. "
-            "'lp'/'hp', or 'ulp'/'lp'/'hp' on Atomiq). Default: the board's "
-            "lowest-power tier."
-        ),
-    )
-    g_target.add_argument(
-        "--npu-clock",
-        type=str,
-        metavar="SPEED",
-        help=(
-            "NPU clock speed on NPU-equipped boards (e.g. 'lp'/'hp'). "
-            "Default: the NPU domain's lowest-power tier."
+            "'lp'/'hp'). Default: the board's lowest-power tier."
         ),
     )
     g_target.add_argument(
@@ -496,8 +486,6 @@ def _cmd_profile(args: argparse.Namespace) -> None:
     clock_sel: dict[str, str] = {}
     if args.cpu_clock is not None:
         clock_sel["cpu"] = args.cpu_clock
-    if args.npu_clock is not None:
-        clock_sel["npu"] = args.npu_clock
     if clock_sel:
         cli.setdefault("target", {})["clock"] = clock_sel
     if args.frozen:

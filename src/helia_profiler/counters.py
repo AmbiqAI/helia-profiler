@@ -12,8 +12,8 @@ Pass planning (splitting N selected counters into batches of
 ``MAX_COUNTERS_PER_PASS``) is also handled here so firmware generation
 receives a ready-made list of passes.
 
-Future compute units (e.g. Ethos-U85 NPU) can be added by extending
-``_COUNTERS`` and ``_GROUPS`` with a new group key.
+Future compute units can be added by extending ``_COUNTERS`` and
+``_GROUPS`` with a new group key.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ class PmuCounter:
 
     name: str
     event_id: int
-    group: str  # "cpu", "memory", "mve", "npu", …
+    group: str  # "cpu", "memory", "mve", …
     description: str = ""
 
 

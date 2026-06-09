@@ -43,18 +43,16 @@ def test_clock_defaults_to_none_selection():
     }
     config = load_config(None, cli)
     assert config.target.clock.cpu is None
-    assert config.target.clock.npu is None
 
 
 def test_clock_from_cli():
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "tflm"},
-        "target": {"clock": {"cpu": "hp", "npu": "lp"}},
+        "target": {"clock": {"cpu": "hp"}},
     }
     config = load_config(None, cli)
     assert config.target.clock.cpu == "hp"
-    assert config.target.clock.npu == "lp"
 
 
 def test_config_is_frozen():
