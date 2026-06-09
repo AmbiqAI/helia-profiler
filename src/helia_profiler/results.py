@@ -114,9 +114,6 @@ class PlatformInfo:
     cpu_perf_tier: str = ""  # NSX perf_mode symbol (e.g. "NSX_PERF_HIGH")
     npu_clock_name: str | None = None  # selected NPU speed name, if any
     npu_clock_mhz: int | None = None  # selected NPU frequency, if any
-    sdk_tier: str = ""
-
-
 @dataclass
 class ModelInfo:
     """Model file metadata (populated by stage 1)."""

@@ -82,13 +82,9 @@ def _nsx_toolchain(toolchain: str) -> str | None:
 # nsx-harness / nsx-utils modules). The *ownership* of each module (which NSX
 # project vendors it) is NOT hand-maintained here: it is derived from the NSX
 # starter profile for the target board so it always tracks the upstream
-# registry (which consolidates migrated tiers under the unified nsx-ambiq-sdk
-# project while r6 remains on nsx-ambiq-sdk-r6). See ``_module_project``.
+# registry (which repoints migrated Ambiq modules onto the unified
+# nsx-ambiq-sdk project). See ``_module_project``.
 # ---------------------------------------------------------------------------
-
-
-def _sdk_ambiqsuite_module_name(sdk_tier: str) -> str:
-    return f"nsx-ambiqsuite-{sdk_tier}"
 
 
 def _cmsis_device_header(soc: Any) -> str:
@@ -108,8 +104,6 @@ def _cmsis_device_header(soc: Any) -> str:
 def _soc_has_backend(soc: Any, backend: str) -> bool:
     return backend in getattr(soc, "profiling_backends", ())
 
-
-_KNOWN_SDK_TIERS = ("r3", "r4", "r5", "r6")
 
 _POWER_SYNC_MODULE_NAMES: tuple[str, ...] = (
     "nsx-interrupt",
@@ -141,10 +135,9 @@ def _starter_profile_module_names(profile: dict[str, Any]) -> list[str]:
 def _get_starter_profile(board: str) -> dict[str, Any]:
     """Return the NSX starter profile for *board*.
 
-    The profile is the single source of truth for module/project ownership
-    (its ``module_overrides`` repoint SDK modules onto the consolidated
-    unified nsx-ambiq-sdk project for migrated tiers, with r6 remaining on
-    nsx-ambiq-sdk-r6).
+    The profile is the single source of truth for module/project ownership.
+    hpx follows the installed NSX starter profile's module and project map
+    rather than maintaining a parallel SDK-tier table.
     """
     profile = nsx_cli.starter_profile(board)
     if profile is None:
@@ -209,17 +202,12 @@ def _default_nsx_channel(board_name: str, configured_channel: str | None) -> str
     return get_board(board_name).channel
 
 
-def _resolve_module_specs(board: str, sdk_tier: str) -> list[NsxModuleSpec]:
+def _resolve_module_specs(board: str) -> list[NsxModuleSpec]:
     """Build the ordered typed module list for a profiler app.
 
     Module *selection* is hpx-owned; module *ownership* (project) is derived
     from the board's NSX starter profile.
     """
-    if sdk_tier not in _KNOWN_SDK_TIERS:
-        raise FirmwareError(
-            f"Unknown SDK tier '{sdk_tier}'",
-            hint=f"Known tiers: {', '.join(_KNOWN_SDK_TIERS)}",
-        )
     profile = _get_starter_profile(board)
     soc = get_soc_for_board(board)
 
@@ -234,9 +222,9 @@ def _resolve_module_specs(board: str, sdk_tier: str) -> list[NsxModuleSpec]:
     return [NsxModuleSpec(name, _module_project(name, profile)) for name in ordered_names]
 
 
-def _resolve_module_list(board: str, sdk_tier: str) -> list[str]:
+def _resolve_module_list(board: str) -> list[str]:
     """Backward-compatible wrapper returning only module names."""
-    return [spec.name for spec in _resolve_module_specs(board, sdk_tier)]
+    return [spec.name for spec in _resolve_module_specs(board)]
 
 
 def _resolve_project_overrides(
@@ -564,7 +552,7 @@ def generate_app(ctx: PipelineContext) -> Path:
         )
 
     # --- Resolve module list ---
-    module_specs = _resolve_module_specs(board.name, soc.sdk_tier)
+    module_specs = _resolve_module_specs(board.name)
     profile = _get_starter_profile(board.name)
 
     # Add nsx-usb module when using USB CDC transport
@@ -709,7 +697,6 @@ def generate_app(ctx: PipelineContext) -> Path:
             has_armv8m_pmu=has_armv8m_pmu,
             power_sync_enabled=power_sync_enabled,
             arena_regions=aot_arena_regions,
-            ambiqsuite_module=_sdk_ambiqsuite_module_name(soc.sdk_tier),
         )
     )
 

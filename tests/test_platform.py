@@ -59,7 +59,6 @@ def test_apollo330_is_ap5_family():
     assert soc.core is CoreArch.CORTEX_M55
     assert soc.has_full_pmu
     assert soc.has_mve
-    assert soc.sdk_tier == "r5"
 
 
 def test_atomiq110_exposes_cpu_and_npu_profiling_surfaces():

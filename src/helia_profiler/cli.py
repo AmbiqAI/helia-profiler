@@ -165,9 +165,9 @@ def main(argv: list[str] | None = None) -> None:
         help=(
             "Override an NSX module's source. Repeatable. "
             "Keys: path (local dir), ref (git ref/tag), version (pin). "
-            "Examples: --nsx-module nsx-ambiq-bsp-r5:path=/my/bsp "
-            "--nsx-module nsx-ambiq-hal-r5:ref=feat/new-soc "
-            "--nsx-module nsx-ambiqsuite-r5:version=2.0.0"
+            "Examples: --nsx-module nsx-core:path=/my/nsx-core "
+            "--nsx-module nsx-cmsis-core:ref=feat/new-cmsis "
+            "--nsx-module nsx-gpio:version=2.0.0"
         ),
     )
 

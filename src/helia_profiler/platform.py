@@ -123,7 +123,6 @@ class SocDef:
     has_mve: bool  # Helium / MVE vector extensions
     memory: MemoryLayout
     clocks: tuple[ClockDomain, ...]
-    sdk_tier: str  # "r3", "r4", "r5", or "r6" — maps to nsx-ambiqsuite-r*
     c_define: str  # e.g. "AM_PART_APOLLO510"
     npu: NpuArch | None = None
     jlink_device: str = ""  # J-Link device string (e.g. "AP510NFA-CBR")
@@ -242,7 +241,6 @@ _register_soc(
                 default="lp",
             ),
         ),
-        sdk_tier="r3",
         c_define="AM_PART_APOLLO3P",
         jlink_device="AMA3B2KK-KBR",
     )
@@ -271,7 +269,6 @@ _register_soc(
                 default="lp",
             ),
         ),
-        sdk_tier="r4",
         c_define="AM_PART_APOLLO4P",
         jlink_device="AMAP42KP-KBR",
     )
@@ -295,7 +292,6 @@ _register_soc(
                 default="lp",
             ),
         ),
-        sdk_tier="r4",
         c_define="AM_PART_APOLLO4L",
         jlink_device="AMAP42KL-KBR",
     )
@@ -334,7 +330,6 @@ _register_soc(
                 default="lp",
             ),
         ),
-        sdk_tier="r5",
         c_define="AM_PART_APOLLO510",
         jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
@@ -365,7 +360,6 @@ _register_soc(
                 default="lp",
             ),
         ),
-        sdk_tier="r5",
         c_define="AM_PART_APOLLO510B",
         jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
@@ -396,7 +390,6 @@ _register_soc(
                 default="lp",
             ),
         ),
-        sdk_tier="r5",
         c_define="AM_PART_APOLLO5B",
         jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
@@ -428,7 +421,6 @@ _register_soc(
                 default="lp",
             ),
         ),
-        sdk_tier="r5",
         c_define="AM_PART_APOLLO330P",
         jlink_device="AP330NFA-CBR",
         pmu_max_ops=4096,
@@ -498,7 +490,6 @@ _register_soc(
                 default="lp",
             ),
         ),
-        sdk_tier="r6",
         c_define="AM_PART_ATOMIQ110",
         jlink_device="AT110NFA-CBR",
         pmu_max_ops=4096,

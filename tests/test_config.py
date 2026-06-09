@@ -144,13 +144,13 @@ def test_build_config_nsx_module_path_override():
         "engine": {"type": "tflm"},
         "build": {
             "nsx_modules": {
-                "nsx-ambiq-bsp-r5": {"path": "/home/dev/my-bsp"},
+                "nsx-core": {"path": "/home/dev/my-nsx-core"},
             },
         },
     }
     config = load_config(None, cli)
-    override = config.build.nsx_modules["nsx-ambiq-bsp-r5"]
-    assert override.path == Path("/home/dev/my-bsp")
+    override = config.build.nsx_modules["nsx-core"]
+    assert override.path == Path("/home/dev/my-nsx-core")
     assert override.ref is None
     assert override.version is None
 
@@ -162,12 +162,12 @@ def test_build_config_nsx_module_ref_override():
         "engine": {"type": "tflm"},
         "build": {
             "nsx_modules": {
-                "nsx-ambiq-hal-r5": {"ref": "feat/apollo6-support"},
+                "nsx-cmsis-core": {"ref": "feat/apollo6-support"},
             },
         },
     }
     config = load_config(None, cli)
-    override = config.build.nsx_modules["nsx-ambiq-hal-r5"]
+    override = config.build.nsx_modules["nsx-cmsis-core"]
     assert override.ref == "feat/apollo6-support"
     assert override.path is None
     assert override.version is None
@@ -180,12 +180,12 @@ def test_build_config_nsx_module_version_override():
         "engine": {"type": "tflm"},
         "build": {
             "nsx_modules": {
-                "nsx-ambiqsuite-r5": {"version": "2.0.0"},
+                "nsx-gpio": {"version": "2.0.0"},
             },
         },
     }
     config = load_config(None, cli)
-    override = config.build.nsx_modules["nsx-ambiqsuite-r5"]
+    override = config.build.nsx_modules["nsx-gpio"]
     assert override.version == "2.0.0"
     assert override.path is None
     assert override.ref is None
@@ -199,18 +199,18 @@ def test_build_config_multiple_overrides():
         "build": {
             "channel": "dev",
             "nsx_modules": {
-                "nsx-ambiq-bsp-r5": {"path": "/dev/bsp"},
-                "nsx-ambiq-hal-r5": {"ref": "main"},
-                "nsx-ambiqsuite-r5": {"version": "3.0.0"},
+                "nsx-core": {"path": "/dev/nsx-core"},
+                "nsx-cmsis-core": {"ref": "main"},
+                "nsx-gpio": {"version": "3.0.0"},
             },
         },
     }
     config = load_config(None, cli)
     assert config.build.channel == "dev"
     assert len(config.build.nsx_modules) == 3
-    assert config.build.nsx_modules["nsx-ambiq-bsp-r5"].path == Path("/dev/bsp")
-    assert config.build.nsx_modules["nsx-ambiq-hal-r5"].ref == "main"
-    assert config.build.nsx_modules["nsx-ambiqsuite-r5"].version == "3.0.0"
+    assert config.build.nsx_modules["nsx-core"].path == Path("/dev/nsx-core")
+    assert config.build.nsx_modules["nsx-cmsis-core"].ref == "main"
+    assert config.build.nsx_modules["nsx-gpio"].version == "3.0.0"
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +275,7 @@ def test_build_config_malformed_module_spec():
         "engine": {"type": "tflm"},
         "build": {
             "nsx_modules": {
-                "nsx-ambiq-bsp-r5": "just-a-string",
+                "nsx-core": "just-a-string",
             },
         },
     }

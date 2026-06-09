@@ -188,8 +188,8 @@ class TestBoardModuleName:
 
 
 class TestResolveModuleList:
-    def test_r5_tier(self):
-        modules = _resolve_module_list("apollo510_evb", "r5")
+    def test_apollo510_profile_modules(self):
+        modules = _resolve_module_list("apollo510_evb")
         assert "nsx-ambiqsuite-r5" in modules
         assert "nsx-ambiq-hal-r5" in modules
         assert "nsx-ambiq-bsp-r5" in modules
@@ -199,24 +199,18 @@ class TestResolveModuleList:
         assert "nsx-harness" not in modules
         assert "nsx-utils" not in modules
 
-    def test_r4_tier(self):
-        modules = _resolve_module_list("apollo4p_evb", "r4")
+    def test_apollo4_profile_modules(self):
+        modules = _resolve_module_list("apollo4p_evb")
         assert "nsx-ambiqsuite-r4" in modules
         assert "nsx-board-apollo4p-evb" in modules
         assert "nsx-pmu-armv8m" not in modules
 
-    def test_r3_tier(self):
-        modules = _resolve_module_list("apollo3p_evb", "r3")
+    def test_apollo3_profile_modules(self):
+        modules = _resolve_module_list("apollo3p_evb")
         assert "nsx-ambiqsuite-r3" in modules
 
-    def test_bad_tier_raises(self):
-        from helia_profiler.errors import FirmwareError
-
-        with pytest.raises(FirmwareError, match="Unknown SDK tier"):
-            _resolve_module_list("board", "r99")
-
     def test_r5_sdk_modules_resolve_to_monorepo_project(self):
-        modules = _resolve_module_specs("apollo510_evb", "r5")
+        modules = _resolve_module_specs("apollo510_evb")
         by_name = {module.name: module for module in modules}
         assert by_name["nsx-ambiqsuite-r5"].project == "nsx-ambiq-sdk"
         assert by_name["nsx-ambiq-hal-r5"].project == "nsx-ambiq-sdk"
@@ -226,7 +220,7 @@ class TestResolveModuleList:
         # Modules hpx still consumes directly from the SDK monorepo must be
         # owned by the unified nsx-ambiq-sdk project rather than legacy
         # standalone same-name projects.
-        modules = _resolve_module_specs("apollo510_evb", "r5")
+        modules = _resolve_module_specs("apollo510_evb")
         by_name = {module.name: module for module in modules}
         for name in (
             "nsx-cmsis-core",
@@ -236,13 +230,13 @@ class TestResolveModuleList:
         ):
             assert by_name[name].project == "nsx-ambiq-sdk", name
 
-    def test_armv8m_pmu_module_stays_standalone_on_r5(self):
-        modules = _resolve_module_specs("apollo510_evb", "r5")
+    def test_armv8m_pmu_module_stays_standalone_on_apollo510(self):
+        modules = _resolve_module_specs("apollo510_evb")
         by_name = {module.name: module for module in modules}
         assert by_name["nsx-pmu-armv8m"].project == "nsx-pmu-armv8m"
 
     def test_board_and_tooling_modules_resolve_to_neuralspotx(self):
-        modules = _resolve_module_specs("atomiq110_fpga_turbo", "r6")
+        modules = _resolve_module_specs("atomiq110_fpga_turbo")
         by_name = {module.name: module for module in modules}
         assert by_name["nsx-board-atomiq110-fpga-turbo"].project == "neuralspotx"
         assert by_name["nsx-tooling"].project == "neuralspotx"
@@ -251,7 +245,7 @@ class TestResolveModuleList:
         # The r6 monorepo does not yet vendor nsx-pmu-armv8m, so ownership must
         # fall back to the standalone project rather than over-pin it onto
         # nsx-ambiq-sdk-r6.
-        modules = _resolve_module_specs("atomiq110_fpga_turbo", "r6")
+        modules = _resolve_module_specs("atomiq110_fpga_turbo")
         by_name = {module.name: module for module in modules}
         assert by_name["nsx-pmu-armv8m"].project == "nsx-pmu-armv8m"
         # Modules the r6 monorepo does vendor stay on the monorepo project.
@@ -259,7 +253,7 @@ class TestResolveModuleList:
         assert by_name["nsx-soc-hal"].project == "nsx-ambiq-sdk-r6"
 
     def test_power_and_perf_are_not_required_modules(self):
-        modules = _resolve_module_list("apollo510_evb", "r5")
+        modules = _resolve_module_list("apollo510_evb")
         assert "nsx-power" not in modules
         assert "nsx-perf" not in modules
 
@@ -724,7 +718,7 @@ class TestNsxModuleOverrides:
     def test_version_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(
             tmp_path, fake_dist,
-            {"nsx_modules": {"nsx-ambiqsuite-r5": {"version": "2.0.0"}}},
+            {"nsx_modules": {"nsx-core": {"version": "2.0.0"}}},
         )
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)
@@ -737,7 +731,7 @@ class TestNsxModuleOverrides:
         # vendored by nsx-ambiq-sdk receives it.
         sdk_module_count = sum(
             1
-            for spec in _resolve_module_specs("apollo510_evb", "r5")
+            for spec in _resolve_module_specs("apollo510_evb")
             if spec.project == "nsx-ambiq-sdk"
         )
         assert nsx_yml.count('version: "2.0.0"') == sdk_module_count
@@ -745,7 +739,7 @@ class TestNsxModuleOverrides:
     def test_ref_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(
             tmp_path, fake_dist,
-            {"nsx_modules": {"nsx-ambiq-hal-r5": {"ref": "feat/new-soc"}}},
+            {"nsx_modules": {"nsx-core": {"ref": "feat/new-soc"}}},
         )
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)
@@ -758,7 +752,7 @@ class TestNsxModuleOverrides:
         # vendored by nsx-ambiq-sdk receives it.
         sdk_module_count = sum(
             1
-            for spec in _resolve_module_specs("apollo510_evb", "r5")
+            for spec in _resolve_module_specs("apollo510_evb")
             if spec.project == "nsx-ambiq-sdk"
         )
         assert nsx_yml.count("ref: feat/new-soc") == sdk_module_count
@@ -779,24 +773,24 @@ class TestNsxModuleOverrides:
 
     def test_path_override_installs_local_module(self, tmp_path: Path, fake_dist: Path):
         # Create a fake local module with nsx-module.yaml
-        local_bsp = tmp_path / "my-bsp"
-        local_bsp.mkdir()
-        (local_bsp / "nsx-module.yaml").write_text("schema_version: 1\nmodule:\n  name: nsx-ambiq-bsp-r5\n")
-        (local_bsp / "CMakeLists.txt").write_text("# custom BSP cmake\n")
+        local_module = tmp_path / "my-nsx-core"
+        local_module.mkdir()
+        (local_module / "nsx-module.yaml").write_text("schema_version: 1\nmodule:\n  name: nsx-core\n")
+        (local_module / "CMakeLists.txt").write_text("# custom nsx-core cmake\n")
 
         ctx = self._make_ctx_with_overrides(
             tmp_path, fake_dist,
-            {"nsx_modules": {"nsx-ambiq-bsp-r5": {"path": str(local_bsp)}}},
+            {"nsx_modules": {"nsx-core": {"path": str(local_module)}}},
         )
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)
         app_dir = generate_app(ctx)
 
         # Module should be installed as local
-        installed = app_dir / "modules" / "nsx-ambiq-bsp-r5"
+        installed = app_dir / "modules" / "nsx-core"
         assert installed.is_dir()
         assert (installed / "nsx-module.yaml").is_file()
-        assert (installed / "CMakeLists.txt").read_text() == "# custom BSP cmake\n"
+        assert (installed / "CMakeLists.txt").read_text() == "# custom nsx-core cmake\n"
 
         # nsx.yml should mark it as local
         nsx_yml = (app_dir / "nsx.yml").read_text()
@@ -812,7 +806,7 @@ class TestNsxModuleOverrides:
 
         ctx = self._make_ctx_with_overrides(
             tmp_path, fake_dist,
-            {"nsx_modules": {"nsx-ambiq-bsp-r5": {"path": str(bad_dir)}}},
+            {"nsx_modules": {"nsx-core": {"path": str(bad_dir)}}},
         )
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)

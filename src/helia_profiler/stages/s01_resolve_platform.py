@@ -135,7 +135,6 @@ class ResolvePlatformStage:
             cpu_perf_tier=cpu_speed.perf_tier.value,
             npu_clock_name=npu_speed.name if npu_speed is not None else None,
             npu_clock_mhz=npu_speed.mhz if npu_speed is not None else None,
-            sdk_tier=soc.sdk_tier,
         )
 
         # Validate model path exists early
