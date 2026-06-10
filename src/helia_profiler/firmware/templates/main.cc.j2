@@ -40,8 +40,10 @@
 #include "hpx_pmu_profiler.h"
 {% include "_system_includes.j2" %}
 
-#ifndef SCB_CleanDCache
-#define SCB_CleanDCache() ((void)0)
+#if defined(NSX_HAS_CACHE) && NSX_HAS_CACHE
+#define HPX_CLEAN_DCACHE() ((void)am_hal_cachectrl_dcache_clean(NULL))
+#else
+#define HPX_CLEAN_DCACHE() ((void)0)
 #endif
 
 {% if not has_armv8m_pmu %}
@@ -156,6 +158,9 @@ int main(void) {
     // buffer pointer/size (SEGGER RTT design for the default terminal).
     SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,
                               SEGGER_RTT_MODE_NO_BLOCK_TRIM);
+    // Flush the RTT control block metadata so J-Link can see the configured
+    // buffer counts/flags before the host attaches on cached M55 targets.
+    HPX_CLEAN_DCACHE();
 {% else %}
 
     // Delay to allow the host SWO viewer to attach after reset.
@@ -166,12 +171,10 @@ int main(void) {
 
 {% if psram_needed %}
 
-    // Flush any pending data (e.g. RTT control block) to SRAM before
-    // PSRAM init. The platform backend may invalidate D-cache during
+    // Flush any pending data to SRAM before PSRAM init. The platform backend may invalidate D-cache during
     // am_hal_cachectrl_dcache_invalidate(NULL, true) which discards all
-    // dirty D-cache lines. Without this flush the RTT CB written above
-    // stays only in cache and J-Link (SWD) cannot find it.
-    SCB_CleanDCache();
+    // dirty D-cache lines.
+    HPX_CLEAN_DCACHE();
 
     // --- PSRAM init ---
     // PSRAM is external (MSPI XIP) and is not in the linker MEMORY map,
@@ -184,7 +187,7 @@ int main(void) {
     psram_cfg.enable_xip = true;
     if (nsx_psram_init(&psram_cfg) != 0) {
         hpx_printf("HPX_ERROR=psram_init_failed\n");
-        SCB_CleanDCache();
+        HPX_CLEAN_DCACHE();
         while (1) { __WFI(); }
     }
 {% if weights_region == "psram" %}
@@ -204,7 +207,7 @@ int main(void) {
     hpx_printf("HPX_PSRAM_READY=0x%08lx,%u\n",
                (unsigned long)psram_cfg.base_address, model_data_len);
 {% endif %}
-    SCB_CleanDCache();
+    HPX_CLEAN_DCACHE();
 
 {% if weights_region == "psram" and transport == "rtt" %}
     // Wait for host to write model data and send "GO" via RTT down-channel.
@@ -455,12 +458,12 @@ int main(void) {
     // NO_BLOCK_TRIM would silently drop HPX_END.  Also emit a phase
     // heartbeat so the host inactivity timer refreshes while we drain.
     hpx_printf("HPX_HEARTBEAT phase=flushing\n");
-    SCB_CleanDCache();
+    HPX_CLEAN_DCACHE();
     hpx_rtt_drain(500 /* ms */);
 {% endif %}
     hpx_printf("\n--- HPX_END ---\n");
 {% if transport == "rtt" %}
-    SCB_CleanDCache();
+    HPX_CLEAN_DCACHE();
     hpx_rtt_drain(500 /* ms */);
 {% endif %}
     while (1) { __WFI(); }

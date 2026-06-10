@@ -48,6 +48,52 @@ _PSRAM_WRITE_CHUNK = 65536  # bytes per J-Link memory_write call
 
 _RTT_SCAN_CHUNK = 0x4000  # 16 KB per memory_read call
 _RTT_MAGIC = b"SEGGER RTT"
+_RTT_DESC_WORDS = 6
+_RTT_CB_HEADER_SIZE = 24
+_RTT_DESC_SIZE = _RTT_DESC_WORDS * 4
+
+
+def _direct_rtt_read(
+    jlink: "pylink.JLink",
+    *,
+    block_address: int,
+    buffer_index: int = 0,
+    max_bytes: int = 4096,
+) -> bytes:
+    """Read directly from an RTT up-buffer via SWD memory accesses.
+
+    Some Apollo5 setups expose a valid RTT control block in RAM but SEGGER's
+    RTT control API never transitions to a discovered state. This helper polls
+    the control block and advances ``RdOff`` manually so host capture can still
+    proceed.
+    """
+    max_up_buffers = jlink.memory_read32(block_address + 16, 1)[0]
+    if buffer_index >= max_up_buffers:
+        return b""
+
+    desc_addr = block_address + _RTT_CB_HEADER_SIZE + (buffer_index * _RTT_DESC_SIZE)
+    name_ptr, buf_ptr, size, wr_off, rd_off, _flags = jlink.memory_read32(desc_addr, _RTT_DESC_WORDS)
+    if name_ptr == 0 or buf_ptr == 0 or size == 0 or wr_off == rd_off:
+        return b""
+
+    if wr_off > size or rd_off > size:
+        return b""
+
+    if wr_off > rd_off:
+        count = min(wr_off - rd_off, max_bytes)
+        data = bytes(jlink.memory_read8(buf_ptr + rd_off, count))
+        new_rd_off = rd_off + count
+    else:
+        first_count = min(size - rd_off, max_bytes)
+        first = bytes(jlink.memory_read8(buf_ptr + rd_off, first_count))
+        remain = max_bytes - len(first)
+        second = bytes(jlink.memory_read8(buf_ptr, min(wr_off, remain)))
+        data = first + second
+        new_rd_off = (rd_off + len(data)) % size
+
+    if data:
+        jlink.memory_write32(desc_addr + 16, [new_rd_off])
+    return data
 
 
 def _scan_for_rtt_control_block(
@@ -201,6 +247,10 @@ def capture_rtt_output(
         jlink.set_tif(pylink.JLinkInterfaces.SWD)
         jlink.connect(jlink_device, 4000)
         log.info("pylink connected to %s for RTT capture", jlink_device)
+        if jlink.halted():
+            jlink.restart()
+            time.sleep(0.1)
+            log.info("Resumed target after pylink attach")
 
         # --- Step 3: start RTT and wait for control block ---
         # J-Link's built-in RTT auto-scan does not always cover the SRAM
@@ -235,12 +285,29 @@ def capture_rtt_output(
             time.sleep(0.05)
 
         if status is None or status.NumUpBuffers == 0:
-            raise CaptureError(
-                "RTT control block not found on target",
-                hint=(
-                    "Ensure the firmware was built with RTT support "
-                    "(--transport rtt) and the target is running."
-                ),
+            if block_address is None:
+                raise CaptureError(
+                    "RTT control block not found on target",
+                    hint=(
+                        "Ensure the firmware was built with RTT support "
+                        "(--transport rtt) and the target is running."
+                    ),
+                )
+            if weights_region == "psram" and model_path is not None:
+                raise CaptureError(
+                    "RTT API attach failed on target",
+                    hint="PSRAM model upload currently requires a working J-Link RTT API session.",
+                )
+            log.warning(
+                "SEGGER RTT API did not attach to control block 0x%08X; falling back to direct SWD polling",
+                block_address,
+            )
+            return collect_lines(
+                lambda: _direct_rtt_read(jlink, block_address=block_address, max_bytes=4096),
+                transport_name="RTT",
+                overall_timeout_s=timeout_s,
+                heartbeat_timeout_s=heartbeat_timeout_s,
+                poll_interval_s=0.005,
             )
         log.info(
             "RTT control block found (%d up buffers)",

@@ -36,6 +36,12 @@
 
 {% include "_system_includes.j2" %}
 
+#if defined(NSX_HAS_CACHE) && NSX_HAS_CACHE
+#define HPX_CLEAN_DCACHE() ((void)am_hal_cachectrl_dcache_clean(NULL))
+#else
+#define HPX_CLEAN_DCACHE() ((void)0)
+#endif
+
 {% if not allocate_arenas %}
 {% for region in arena_regions %}
 {% if region.blob_filename %}
@@ -301,6 +307,9 @@ int main(void) {
     // buffer pointer/size (SEGGER RTT design for the default terminal).
     SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,
                               SEGGER_RTT_MODE_NO_BLOCK_TRIM);
+    // Flush the RTT control block metadata so J-Link can see the configured
+    // buffer counts/flags before the host attaches on cached M55 targets.
+    HPX_CLEAN_DCACHE();
 {% else %}
 
     // Delay to allow the host SWO viewer to attach after reset.
@@ -359,14 +368,14 @@ int main(void) {
 {% endfor %}
 {% if psram_arena_regions %}
     // PSRAM init for arena regions placed in PSRAM.
-    SCB_CleanDCache();
+    HPX_CLEAN_DCACHE();
     {
         nsx_psram_config_t psram_cfg;
         nsx_psram_default_config(&psram_cfg);
         psram_cfg.enable_xip = true;
         if (nsx_psram_init(&psram_cfg) != 0) {
             hpx_printf("HPX_ERROR=psram_init_failed\n");
-            SCB_CleanDCache();
+            HPX_CLEAN_DCACHE();
             while (1) { __WFI(); }
         }
         // Stack PSRAM-placed arenas at successive 64-byte aligned offsets.
@@ -381,7 +390,7 @@ int main(void) {
                    (unsigned)({{ region.size }}));
         psram_off += (uint32_t){{ region.size }};
 {% endfor %}
-        SCB_CleanDCache();
+        HPX_CLEAN_DCACHE();
     }
 {% endif %}
     {
@@ -502,12 +511,12 @@ int main(void) {
     // NO_BLOCK_TRIM would silently drop HPX_END.  Also emit a phase
     // heartbeat so the host inactivity timer refreshes while we drain.
     hpx_printf("HPX_HEARTBEAT phase=flushing\n");
-    SCB_CleanDCache();
+    HPX_CLEAN_DCACHE();
     hpx_rtt_drain(500 /* ms */);
 {% endif %}
     hpx_printf("\n--- HPX_END ---\n");
 {% if transport == "rtt" %}
-    SCB_CleanDCache();
+    HPX_CLEAN_DCACHE();
     hpx_rtt_drain(500 /* ms */);
 {% endif %}
     while (1) { __WFI(); }

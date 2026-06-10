@@ -37,7 +37,6 @@ def _fake_starter_profiles() -> dict[str, dict]:
                 "nsx-board-apollo510-evb",
                 "nsx-cmsis-core",
                 "nsx-core",
-                "nsx-pmu-armv8m",
                 "nsx-tooling",
             ],
             "project_overrides": {
@@ -428,6 +427,17 @@ class TestGenerateApp:
         assert "nsx-gpio" in nsx_yml
         assert "nsx-interrupt" in nsx_yml
         assert "nsx::gpio" in cmake
+
+    def test_rtt_generation_flushes_cache_after_buffer_config(self, tmp_path: Path, fake_dist: Path):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        main_cc = (app_dir / "src" / "main.cc").read_text()
+        assert 'SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,' in main_cc
+        assert "HPX_CLEAN_DCACHE();" in main_cc.split('SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,', 1)[1]
+        assert "SEGGER_RTT_Write(0, line_buf, (unsigned)n);\n        HPX_CLEAN_DCACHE();" in main_cc
 
     def test_gpio_sync_not_enabled_for_internal(self, tmp_path: Path, fake_dist: Path):
         model = tmp_path / "model.tflite"

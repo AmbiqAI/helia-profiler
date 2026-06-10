@@ -7,12 +7,18 @@ which is where the bulk of the estimation bugs would hide.
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from helia_profiler.model_analysis import (
     _conv2d_macs,
     _depthwise_conv2d_macs,
     _elementwise_ops,
     _fully_connected_macs,
     _transpose_conv_macs,
+    analyze_model,
+    is_available,
 )
 
 
@@ -124,3 +130,16 @@ class TestElementwise:
 
     def test_empty_shape(self):
         assert _elementwise_ops([]) == 0
+
+
+@pytest.mark.skipif(not is_available(), reason="ai-edge-litert not installed")
+def test_quickstart_kws_model_reports_real_builtin_ops():
+    model_path = Path(__file__).resolve().parents[1] / "examples" / "quickstart" / "kws_model.tflite"
+
+    analysis = analyze_model(model_path)
+
+    assert analysis is not None
+    ops = {layer.op for layer in analysis.layers}
+    assert "CONV_2D" in ops
+    assert "SOFTMAX" in ops
+    assert ops != {"ADD"}

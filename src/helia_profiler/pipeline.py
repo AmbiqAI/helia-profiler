@@ -256,10 +256,15 @@ def _serialize_config(config: ProfileConfig) -> dict[str, Any]:
     reflected in the run-metadata snapshot \u2014 no hand-maintained mirror
     to drift.
     """
-    from dataclasses import asdict
+    from dataclasses import fields, is_dataclass
     from enum import Enum
+    from types import MappingProxyType
 
     def _coerce(value: Any) -> Any:
+        if is_dataclass(value):
+            return {field.name: _coerce(getattr(value, field.name)) for field in fields(value)}
+        if isinstance(value, (dict, MappingProxyType)):
+            return {k: _coerce(v) for k, v in value.items()}
         if isinstance(value, dict):
             return {k: _coerce(v) for k, v in value.items()}
         if isinstance(value, (list, tuple, set)):
@@ -270,4 +275,4 @@ def _serialize_config(config: ProfileConfig) -> dict[str, Any]:
             return str(value)
         return value
 
-    return _coerce(asdict(config))
+    return _coerce(config)

@@ -284,8 +284,13 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
     # Build opcode → builtin-code lookup
     def _builtin_code(opcode_idx: int) -> int:
         oc = model.OperatorCodes(opcode_idx)
-        # BuiltinCode() returns the v2 code; DeprecatedBuiltinCode() is v1.
         code = oc.BuiltinCode()
+        deprecated = oc.DeprecatedBuiltinCode()
+        # Older flatbuffers often leave BuiltinCode() at ADD(0) and store the
+        # real builtin enum only in DeprecatedBuiltinCode(). Prefer the
+        # deprecated field when BuiltinCode() still carries the placeholder.
+        if code == 0 and deprecated != 0:
+            return deprecated
         return code
 
     # Element-wise ops that count as 1 op per element

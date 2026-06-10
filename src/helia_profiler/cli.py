@@ -345,6 +345,8 @@ def main(argv: list[str] | None = None) -> None:
             "  hpx validate --models kws,ic         # subset by model\n"
             "  hpx validate --engines aot           # subset by engine\n"
             "  hpx validate --power off             # skip Joulescope\n"
+            "  hpx validate --repeat 10 --models kws --engines rt --power off\n"
+            "                                       # stress-run the same case 10 times\n"
             "  hpx validate -k kws-aot              # pytest keyword filter\n"
         ),
     )
@@ -371,6 +373,12 @@ def main(argv: list[str] | None = None) -> None:
         type=str,
         default="apollo510_evb",
         help="Comma-separated board IDs (default: apollo510_evb).",
+    )
+    p_validate.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
+        help="Repeat each selected case N times for stress testing (default: 1).",
     )
     p_validate.add_argument(
         "--output-dir",
@@ -898,6 +906,7 @@ def _cmd_validate(args: argparse.Namespace) -> None:
                 engines=[e.strip() for e in engines_csv.split(",") if e.strip()] or None,
                 power=args.power,
                 boards=[b.strip() for b in args.boards.split(",") if b.strip()] or None,
+                repeat=args.repeat,
             )
         except ValueError as exc:
             print(f"Error: {exc}", file=sys.stderr)
@@ -950,6 +959,7 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         pytest_args += ["--mlperf-engines", engines_csv]
     if args.boards.strip():
         pytest_args += ["--mlperf-boards", args.boards.strip()]
+    pytest_args += ["--mlperf-repeat", str(args.repeat)]
     if args.keyword:
         pytest_args += ["-k", args.keyword]
     if args.junit_xml:

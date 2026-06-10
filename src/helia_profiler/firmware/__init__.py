@@ -32,6 +32,7 @@ from ..engines import EngineType
 from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
 from ..placement import Placement
+from ..platform import get_soc_for_board
 from .op_resolver import build_resolver_plan
 
 if TYPE_CHECKING:
@@ -138,6 +139,24 @@ def _get_starter_profile(board: str, *, profile_board: str | None = None) -> dic
     return profile
 
 
+def _needs_armv8m_pmu_module(board: str, *, profile_board: str | None = None) -> bool:
+    """Return whether this board needs the standalone Armv8-M PMU module.
+
+    Some installed NSX starter profiles still omit ``nsx-pmu-armv8m`` for AP5
+    boards even though hpx's generated firmware links ``nsx::pmu_armv8m``.
+    Keep a narrow compatibility fallback until those profiles are updated.
+    """
+    for candidate in (board, profile_board):
+        if candidate is None:
+            continue
+        try:
+            soc = get_soc_for_board(candidate)
+        except ValueError:
+            continue
+        return _soc_has_backend(soc, "armv8m-pmu")
+    return False
+
+
 def _module_project(name: str, profile: dict[str, Any]) -> str:
     """Resolve the owning NSX project for a module name.
 
@@ -195,6 +214,11 @@ def _resolve_module_specs(board: str, *, profile_board: str | None = None) -> li
     profile = _get_starter_profile(board, profile_board=profile_board)
 
     ordered_names: list[str] = _starter_profile_module_names(profile)
+    if (
+        _needs_armv8m_pmu_module(board, profile_board=profile_board)
+        and "nsx-pmu-armv8m" not in ordered_names
+    ):
+        ordered_names.append("nsx-pmu-armv8m")
 
     return [NsxModuleSpec(name, _module_project(name, profile)) for name in ordered_names]
 

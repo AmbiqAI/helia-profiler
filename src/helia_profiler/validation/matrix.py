@@ -52,12 +52,17 @@ class CaseSpec:
     engine: EngineType
     power: bool  # Joulescope capture enabled
     board: BoardSpec
+    attempt: int = 1
+    repeat_total: int = 1
 
     @property
     def case_id(self) -> str:
         """Stable slug — used in report tables and output subfolders."""
         suffix = "-power" if self.power else ""
-        return f"{self.board.id}-{self.model.id}-{self.engine.short_slug}{suffix}"
+        base = f"{self.board.id}-{self.model.id}-{self.engine.short_slug}{suffix}"
+        if self.repeat_total > 1:
+            return f"{base}-run{self.attempt:02d}"
+        return base
 
 
 def _board_spec(board_id: str, display_name: str, description: str = "") -> BoardSpec:
@@ -138,6 +143,7 @@ def build_matrix(
     engines: list[str | EngineType] | None = None,
     power: str = "both",
     boards: list[str] | None = None,
+    repeat: int = 1,
 ) -> list[CaseSpec]:
     """Expand user filters into a concrete list of :class:`CaseSpec`.
 
@@ -157,7 +163,7 @@ def build_matrix(
     Returns
     -------
     list[CaseSpec]
-        Ordered deterministically — by board → model category → engine → power.
+        Ordered deterministically — by board → model category → engine → power → attempt.
 
     Raises
     ------
@@ -198,6 +204,8 @@ def build_matrix(
         raise ValueError(f"Unknown board(s): {unknown_b}. Known: {list(BOARDS)}")
     if power not in ("both", "on", "off"):
         raise ValueError(f"power must be 'both'|'on'|'off', got {power!r}")
+    if repeat < 1:
+        raise ValueError(f"repeat must be >= 1, got {repeat!r}")
 
     power_flags: list[bool]
     if power == "both":
@@ -214,5 +222,15 @@ def build_matrix(
             model = MODELS[model_id]
             for engine in engine_ids:
                 for p in power_flags:
-                    cases.append(CaseSpec(model=model, engine=engine, power=p, board=board))
+                    for attempt in range(1, repeat + 1):
+                        cases.append(
+                            CaseSpec(
+                                model=model,
+                                engine=engine,
+                                power=p,
+                                board=board,
+                                attempt=attempt,
+                                repeat_total=repeat,
+                            )
+                        )
     return cases

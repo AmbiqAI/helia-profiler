@@ -39,6 +39,7 @@ static nsx_usb_config_t g_usb_cfg = {
     va_end(ap);
     if (n > 0) {
         SEGGER_RTT_Write(0, line_buf, (unsigned)n);
+        HPX_CLEAN_DCACHE();
     }
 }
 
@@ -51,9 +52,9 @@ static void hpx_rtt_drain(uint32_t timeout_ms) {
     const uint32_t spins_per_ms = SystemCoreClock / 2000U; // conservative
     uint32_t total = timeout_ms * spins_per_ms;
     while (SEGGER_RTT_HasDataUp(0) && total > 0U) {
-        // SCB_CleanDCache so J-Link sees the latest WrOff each poll.
+        // Flush cache so J-Link sees the latest WrOff each poll.
 {% if has_armv8m_pmu %}
-        SCB_CleanDCache();
+        HPX_CLEAN_DCACHE();
 {% endif %}
         for (volatile uint32_t s = 0; s < spins_per_ms; ++s) { __NOP(); }
         if (total > spins_per_ms) total -= spins_per_ms; else total = 0;

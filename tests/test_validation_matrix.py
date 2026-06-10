@@ -44,6 +44,9 @@ class TestBuildMatrix:
     def test_power_on_halves_matrix(self):
         assert len(build_matrix(power="on")) == 8
 
+    def test_repeat_multiplies_matrix(self):
+        assert len(build_matrix(power="off", repeat=3)) == 24
+
     def test_model_filter(self):
         cases = build_matrix(models=["kws"], power="off")
         assert len(cases) == 2  # kws × 2 engines
@@ -70,6 +73,10 @@ class TestBuildMatrix:
         with pytest.raises(ValueError, match="power must be"):
             build_matrix(power="maybe")
 
+    def test_invalid_repeat_raises(self):
+        with pytest.raises(ValueError, match="repeat must be"):
+            build_matrix(repeat=0)
+
     def test_case_id_is_stable_and_unique(self):
         cases = build_matrix()
         ids = [c.case_id for c in cases]
@@ -90,6 +97,17 @@ class TestBuildMatrix:
         )
         assert off.case_id == "apollo510_evb-kws-rt"
         assert on.case_id == "apollo510_evb-kws-rt-power"
+
+    def test_case_id_encodes_repeat_attempt_when_stressing(self):
+        repeated = CaseSpec(
+            model=MODELS["kws"],
+            engine=EngineType.HELIA_RT,
+            power=False,
+            board=BOARDS["apollo510_evb"],
+            attempt=2,
+            repeat_total=3,
+        )
+        assert repeated.case_id == "apollo510_evb-kws-rt-run02"
 
     def test_deterministic_order(self):
         a = build_matrix()

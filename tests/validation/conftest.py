@@ -48,6 +48,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Comma-separated board IDs (default: apollo510_evb).",
     )
     grp.addoption(
+        "--mlperf-repeat",
+        type=int,
+        default=1,
+        help="Repeat each selected case N times for stress testing (default: 1).",
+    )
+    grp.addoption(
         "--mlperf-output",
         default="results/validation",
         help="Where to write per-case artifacts + summary report.",
@@ -81,6 +87,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
         engines=_split_csv(cfg.getoption("--mlperf-engines")),
         power=cfg.getoption("--mlperf-power"),
         boards=_split_csv(cfg.getoption("--mlperf-boards")),
+        repeat=cfg.getoption("--mlperf-repeat"),
     )
     metafunc.parametrize(
         "case",
