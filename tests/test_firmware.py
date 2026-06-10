@@ -435,6 +435,7 @@ class TestGenerateApp:
         app_dir = generate_app(ctx)
 
         main_cc = (app_dir / "src" / "main.cc").read_text()
+        assert '#include "am_hal_cachectrl.h"' in main_cc
         assert 'SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,' in main_cc
         assert "HPX_CLEAN_DCACHE();" in main_cc.split('SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,', 1)[1]
         assert "SEGGER_RTT_Write(0, line_buf, (unsigned)n);\n        HPX_CLEAN_DCACHE();" in main_cc
