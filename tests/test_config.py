@@ -279,3 +279,58 @@ def test_build_config_malformed_module_spec():
     }
     with pytest.raises(ConfigError, match="must be a mapping"):
         load_config(None, cli)
+
+
+def test_custom_board_inherits_builtin_board_profile_and_sync_pin():
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "target": {
+            "board": "apollo510_lab",
+            "custom_boards": {
+                "apollo510_lab": {
+                    "based_on": "apollo510_evb",
+                    "default_sync_gpio_pin": 33,
+                }
+            },
+        },
+    }
+
+    config = load_config(None, cli)
+
+    board = config.platform_registry.boards["apollo510_lab"]
+    assert config.power.sync_gpio_pin == 33
+    assert board.profile_source_board == "apollo510_evb"
+    assert board.channel == "stable"
+
+
+def test_custom_soc_and_board_are_available_via_platform_registry():
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+        "target": {
+            "board": "apollo510_custom_board",
+            "custom_socs": {
+                "apollo510_custom": {
+                    "based_on": "apollo510",
+                    "jlink_device": "AP510-CUSTOM",
+                    "rtt_scan_ranges": [[553648128, 1048576]],
+                }
+            },
+            "custom_boards": {
+                "apollo510_custom_board": {
+                    "soc": "apollo510_custom",
+                    "channel": "dev",
+                    "starter_profile_board": "apollo510_evb",
+                }
+            },
+        },
+    }
+
+    config = load_config(None, cli)
+    soc = config.platform_registry.socs["apollo510_custom"]
+    board = config.platform_registry.boards["apollo510_custom_board"]
+
+    assert soc.jlink_device == "AP510-CUSTOM"
+    assert soc.rtt_scan_ranges == ((553648128, 1048576),)
+    assert board.profile_source_board == "apollo510_evb"

@@ -127,31 +127,27 @@ class TestPowerConfig:
         assert config.power.mode == "external"
         assert config.power.sync_gpio_pin == 29
 
-    def test_default_sync_gpio_pin_uses_board_metadata(self, tmp_path: Path, monkeypatch):
+    def test_default_sync_gpio_pin_uses_board_metadata(self, tmp_path: Path):
         from helia_profiler.config import load_config
-        from helia_profiler.platform import BoardDef
-        import helia_profiler.platform as platform_module
 
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")
 
-        original = platform_module._BOARDS["apollo510_evb"]
-        monkeypatch.setitem(
-            platform_module._BOARDS,
-            "apollo510_evb",
-            BoardDef(
-                name=original.name,
-                soc=original.soc,
-                channel=original.channel,
-                psram_kb=original.psram_kb,
-                default_sync_gpio_pin=27,
-                description=original.description,
-            ),
-        )
-
         config = load_config(
             None,
-            {"model": {"path": str(model)}, "engine": {"type": "tflm"}},
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "tflm"},
+                "target": {
+                    "board": "apollo510_lab",
+                    "custom_boards": {
+                        "apollo510_lab": {
+                            "based_on": "apollo510_evb",
+                            "default_sync_gpio_pin": 27,
+                        }
+                    },
+                },
+            },
         )
 
         assert config.power.sync_gpio_pin == 27

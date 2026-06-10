@@ -31,7 +31,6 @@ from ..counters import (
 from ..engines import EngineType
 from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
-from ..platform import get_board
 from ..placement import Placement
 from .op_resolver import build_resolver_plan
 
@@ -118,17 +117,18 @@ def _starter_profile_module_names(profile: dict[str, Any]) -> list[str]:
     return [name for name in modules if name not in {"nsx-harness", "nsx-utils"}]
 
 
-def _get_starter_profile(board: str) -> dict[str, Any]:
+def _get_starter_profile(board: str, *, profile_board: str | None = None) -> dict[str, Any]:
     """Return the NSX starter profile for *board*.
 
     The profile is the single source of truth for module/project ownership.
     hpx follows the installed NSX starter profile's module and project map
     rather than maintaining a parallel SDK-tier table.
     """
-    profile = nsx_cli.starter_profile(board)
+    lookup_board = profile_board or board
+    profile = nsx_cli.starter_profile(lookup_board)
     if profile is None:
         raise FirmwareError(
-            f"No NSX starter profile for board '{board}'",
+            f"No NSX starter profile for board '{lookup_board}'",
             hint=(
                 "The board must be registered in the NSX registry "
                 "(registry.lock.yaml ships with neuralspotx). Check the board "
@@ -175,7 +175,7 @@ def _render_module_registry(profile: dict[str, Any]) -> str:
     return yaml.safe_dump({"module_registry": registry}, sort_keys=False, default_flow_style=False)
 
 
-def _default_nsx_channel(board_name: str, configured_channel: str | None) -> str:
+def _default_nsx_channel(board_channel: str, configured_channel: str | None) -> str:
     """Resolve the NSX channel for a generated app.
 
     An explicit config override wins. Otherwise we use the board's registered
@@ -183,25 +183,25 @@ def _default_nsx_channel(board_name: str, configured_channel: str | None) -> str
     """
     if configured_channel is not None:
         return configured_channel
-    return get_board(board_name).channel
+    return board_channel
 
 
-def _resolve_module_specs(board: str) -> list[NsxModuleSpec]:
+def _resolve_module_specs(board: str, *, profile_board: str | None = None) -> list[NsxModuleSpec]:
     """Build the ordered typed module list for a profiler app.
 
     Module selection and ownership are both derived from the board's NSX
     starter profile.
     """
-    profile = _get_starter_profile(board)
+    profile = _get_starter_profile(board, profile_board=profile_board)
 
     ordered_names: list[str] = _starter_profile_module_names(profile)
 
     return [NsxModuleSpec(name, _module_project(name, profile)) for name in ordered_names]
 
 
-def _resolve_module_list(board: str) -> list[str]:
+def _resolve_module_list(board: str, *, profile_board: str | None = None) -> list[str]:
     """Backward-compatible wrapper returning only module names."""
-    return [spec.name for spec in _resolve_module_specs(board)]
+    return [spec.name for spec in _resolve_module_specs(board, profile_board=profile_board)]
 
 
 def _resolve_project_overrides(
@@ -531,8 +531,9 @@ def generate_app(ctx: PipelineContext) -> Path:
         )
 
     # --- Resolve module list ---
-    module_specs = _resolve_module_specs(board.name)
-    profile = _get_starter_profile(board.name)
+    profile_board = getattr(board, "profile_source_board", board.name)
+    module_specs = _resolve_module_specs(board.name, profile_board=profile_board)
+    profile = _get_starter_profile(board.name, profile_board=profile_board)
 
     # Add nsx-usb module when using USB CDC transport
     transport = config.target.transport
@@ -644,7 +645,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             board=board.name,
             soc=soc.name,
             toolchain=config.target.toolchain,
-            channel=_default_nsx_channel(board.name, config.build.channel),
+            channel=_default_nsx_channel(board.channel, config.build.channel),
             modules=modules,
             module_registry_yaml=_render_module_registry(profile),
         ),

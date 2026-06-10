@@ -30,12 +30,12 @@ class ResolvePlatformStage:
             )
 
         try:
-            board = get_board(board_name)
+            board = get_board(board_name, registry=ctx.config.platform_registry)
         except ValueError as exc:
             raise ConfigError(str(exc)) from exc
 
         try:
-            soc = get_soc_for_board(board_name)
+            soc = get_soc_for_board(board_name, registry=ctx.config.platform_registry)
         except ValueError as exc:
             raise PlatformError(
                 f"Board '{board_name}' references unknown SoC '{board.soc}'.",

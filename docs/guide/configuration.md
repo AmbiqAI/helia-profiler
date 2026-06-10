@@ -131,6 +131,13 @@ same frozen object.
 | `jlink_serial` | string | `""` | J-Link serial (empty = auto-detect) |
 | `clock.cpu` | string | board default | CPU clock speed name, e.g. `lp`/`hp` (rejected if the board has no such speed) |
 
+Advanced target overrides:
+
+- `target.custom_boards` adds config-scoped board definitions without editing the built-in platform registry.
+- `target.custom_socs` adds config-scoped SoC definitions for bring-up cases where the built-in SoC metadata is not sufficient.
+- `target.custom_boards.<name>.based_on` clones an existing built-in board and lets you override fields like `channel`, `psram_kb`, and `default_sync_gpio_pin`.
+- `target.custom_boards.<name>.starter_profile_board` reuses the NSX starter profile from a built-in board when the custom board should inherit its module graph.
+
 ### `profiling`
 
 | Field | Type | Default | Description |

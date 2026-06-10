@@ -23,6 +23,7 @@ import functools
 import logging
 import os
 import sys
+import threading
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -44,6 +45,12 @@ _DEFAULT_BUILD_TIMEOUT_S = 300
 _DEFAULT_FLASH_TIMEOUT_S = 120
 _DEFAULT_LOCK_TIMEOUT_S = 180
 _DEFAULT_SYNC_TIMEOUT_S = 300
+
+
+# Quiet mode temporarily swaps the process stdio file descriptors so noisy NSX
+# subprocesses inherit /dev/null. Serialize that swap so concurrent quiet-mode
+# calls cannot race and restore each other's stdout/stderr handles incorrectly.
+_QUIET_OUTPUT_LOCK = threading.RLock()
 
 
 def _quiet_emitter(event: Event) -> None:
@@ -96,8 +103,9 @@ def _quiet_context(verbose: int) -> Iterator[None]:
     if verbose >= 1:
         yield
     else:
-        with _suppress_output():
-            yield
+        with _QUIET_OUTPUT_LOCK:
+            with _suppress_output():
+                yield
 
 
 def _translate(label: str, func: Callable[[], Any]) -> Any:

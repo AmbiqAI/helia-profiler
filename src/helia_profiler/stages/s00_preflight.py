@@ -202,7 +202,7 @@ def _check_runtime_split_locations(cfg) -> None:
 
 def _check_pmu_selection(cfg) -> None:
     try:
-        soc = get_soc_for_board(cfg.target.board)
+        soc = get_soc_for_board(cfg.target.board, registry=cfg.platform_registry)
     except ValueError as exc:
         raise ConfigError(str(exc)) from exc
 

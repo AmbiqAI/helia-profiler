@@ -3,9 +3,12 @@
 import pytest
 
 from helia_profiler.platform import (
+    BoardDef,
     CoreArch,
     PmuTier,
+    SocDef,
     SocFamily,
+    build_platform_registry,
     get_board,
     get_soc,
     get_soc_for_board,
@@ -125,3 +128,59 @@ def test_all_ap5_socs_have_full_pmu():
         if soc.family is SocFamily.AP5:
             assert soc.has_full_pmu, f"{soc.name} is AP5 but missing full PMU"
             assert soc.has_mve, f"{soc.name} is AP5 but missing MVE"
+
+
+def test_custom_board_registry_can_extend_builtin_board_metadata():
+    registry = build_platform_registry(
+        boards={
+            "apollo510_lab": BoardDef(
+                name="apollo510_lab",
+                soc="apollo510",
+                channel="dev",
+                default_sync_gpio_pin=41,
+                starter_profile_board="apollo510_evb",
+            )
+        }
+    )
+
+    board = get_board("apollo510_lab", registry=registry)
+    soc = get_soc_for_board("apollo510_lab", registry=registry)
+
+    assert board.default_sync_gpio_pin == 41
+    assert board.profile_source_board == "apollo510_evb"
+    assert soc.name == "apollo510"
+
+
+def test_custom_soc_registry_can_override_jlink_and_rtt():
+    base_soc = get_soc("apollo510")
+    registry = build_platform_registry(
+        socs={
+            "apollo510_custom": SocDef(
+                name="apollo510_custom",
+                family=base_soc.family,
+                core=base_soc.core,
+                pmu_tier=base_soc.pmu_tier,
+                has_mve=base_soc.has_mve,
+                memory=base_soc.memory,
+                clocks=base_soc.clocks,
+                c_define=base_soc.c_define,
+                cmsis_header=base_soc.cmsis_header,
+                rtt_scan_ranges=((0x21000000, 0x100000),),
+                jlink_device="AP510-CUSTOM",
+                pmu_max_ops=base_soc.pmu_max_ops,
+            )
+        },
+        boards={
+            "apollo510_custom_board": BoardDef(
+                name="apollo510_custom_board",
+                soc="apollo510_custom",
+                channel="dev",
+                starter_profile_board="apollo510_evb",
+            )
+        },
+    )
+
+    soc = get_soc_for_board("apollo510_custom_board", registry=registry)
+
+    assert soc.jlink_device == "AP510-CUSTOM"
+    assert soc.rtt_scan_ranges == ((0x21000000, 0x100000),)

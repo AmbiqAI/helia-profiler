@@ -228,6 +228,12 @@ class TestResolveModuleList:
         assert "nsx-power" not in modules
         assert "nsx-perf" not in modules
 
+    def test_custom_board_can_reuse_builtin_starter_profile(self):
+        modules = _resolve_module_specs("apollo510_lab", profile_board="apollo510_evb")
+        by_name = {module.name: module for module in modules}
+        assert by_name["nsx-board-apollo510-evb"].project == "neuralspotx"
+        assert by_name["nsx-core"].project == "nsx-ambiq-sdk"
+
 
 class TestModelToHeader:
     def test_basic(self, tmp_path: Path):

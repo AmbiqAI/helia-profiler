@@ -33,7 +33,7 @@ from urllib.request import Request, urlopen
 from ..config import ProfileConfig
 from ..errors import EngineError
 from ..placement import Placement
-from ..platform import CoreArch, get_soc
+from ..platform import CoreArch, PlatformRegistry, get_board, get_soc
 from ..results import NsxModuleRef
 from . import EngineType, TFLM_ENGINE_HEADER
 from .base import ArenaRegion, EngineArtifacts
@@ -66,7 +66,12 @@ HELIART_MODULE = "nsx-helia-rt"  # registry module name
 _CACHE_DIR = Path.home() / ".cache" / "helia-profiler" / "heliart"
 
 
-def _core_tag(board: str, *, override: str | None = None) -> str:
+def _core_tag(
+    board: str,
+    *,
+    registry: PlatformRegistry | None = None,
+    override: str | None = None,
+) -> str:
     """Map a board name to the heliaRT library core tag (cm4 or cm55)."""
     if override:
         tag = override.lower()
@@ -76,17 +81,15 @@ def _core_tag(board: str, *, override: str | None = None) -> str:
                 hint="Valid values: cm4, cm55",
             )
         return tag
-    soc = get_soc(_board_to_soc(board))
+    soc = get_soc(_board_to_soc(board, registry=registry), registry=registry)
     if soc.core is CoreArch.CORTEX_M55:
         return "cm55"
     return "cm4"
 
 
-def _board_to_soc(board: str) -> str:
+def _board_to_soc(board: str, *, registry: PlatformRegistry | None = None) -> str:
     """Resolve board name to SoC name via the platform registry."""
-    from ..platform import get_board
-
-    return get_board(board).soc
+    return get_board(board, registry=registry).soc
 
 
 class HeliaRTAdapter:
@@ -246,6 +249,7 @@ class HeliaRTAdapter:
             _verify_prebuilt_archive(
                 dist_path,
                 board=config.target.board,
+                registry=config.platform_registry,
                 toolchain_tag=toolchain_tag,
                 variant=variant,
                 core_override=core_override,
@@ -313,12 +317,13 @@ def _verify_prebuilt_archive(
     dist_path: Path,
     *,
     board: str,
+    registry: PlatformRegistry | None = None,
     toolchain_tag: str,
     variant: str,
     core_override: str | None = None,
 ) -> None:
     """Fail fast if the required ``.a`` is missing from the distribution."""
-    core = _core_tag(board, override=core_override)
+    core = _core_tag(board, registry=registry, override=core_override)
     name = f"libhelia-rt-{core}-{toolchain_tag}-{variant}.a"
     if not (dist_path / "lib" / name).is_file():
         available = sorted(p.name for p in (dist_path / "lib").glob("*.a"))
