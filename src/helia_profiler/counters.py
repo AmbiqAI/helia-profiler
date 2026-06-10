@@ -18,9 +18,11 @@ Future compute units can be added by extending ``_COUNTERS`` and
 
 from __future__ import annotations
 
+import json
+import importlib.resources as resources
 import math
-from dataclasses import dataclass, field
-from typing import Any, Collection, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Collection, Mapping, Sequence
 
 # ---------------------------------------------------------------------------
 # Counter descriptor
@@ -40,96 +42,26 @@ class PmuCounter:
 # ---------------------------------------------------------------------------
 # M55 / ARMv8-M counter catalogue
 #
-# Source: nsx_pmu_map[] in nsx-pmu-armv8m/src/armv8m/nsx_pmu_utils.c
+# Source: data/armv8m_pmu_events.json, synced from the upstream
+# nsx-pmu-armv8m export generated from nsx_pmu_map[] in
+# nsx-pmu-armv8m/src/armv8m/nsx_pmu_utils.c
 # ---------------------------------------------------------------------------
 
-_COUNTERS: dict[str, PmuCounter] = {}
+def _load_counter_catalog() -> dict[str, PmuCounter]:
+    catalog_path = resources.files("helia_profiler").joinpath("data/armv8m_pmu_events.json")
+    rows = json.loads(catalog_path.read_text(encoding="utf-8"))
+    return {
+        row["name"]: PmuCounter(
+            name=row["name"],
+            event_id=int(row["event_id"], 16),
+            group=row["group"],
+            description=row["description"],
+        )
+        for row in rows
+    }
 
 
-def _c(name: str, eid: int, group: str, desc: str = "") -> None:
-    _COUNTERS[name] = PmuCounter(name=name, event_id=eid, group=group, description=desc)
-
-
-# --- CPU core events ---
-_c("ARM_PMU_SW_INCR", 0x0000, "cpu", "Software increment")
-_c("ARM_PMU_L1I_CACHE_REFILL", 0x0001, "cpu", "L1 I-Cache refill")
-_c("ARM_PMU_L1D_CACHE_REFILL", 0x0003, "memory", "L1 D-Cache refill")
-_c("ARM_PMU_L1D_CACHE", 0x0004, "memory", "L1 D-Cache access")
-_c("ARM_PMU_LD_RETIRED", 0x0006, "cpu", "Memory-reading instruction retired")
-_c("ARM_PMU_ST_RETIRED", 0x0007, "cpu", "Memory-writing instruction retired")
-_c("ARM_PMU_INST_RETIRED", 0x0008, "cpu", "Instruction retired")
-_c("ARM_PMU_EXC_TAKEN", 0x0009, "cpu", "Exception entry")
-_c("ARM_PMU_EXC_RETURN", 0x000A, "cpu", "Exception return")
-_c("ARM_PMU_PC_WRITE_RETIRED", 0x000C, "cpu", "Software PC change retired")
-_c("ARM_PMU_BR_IMMED_RETIRED", 0x000D, "cpu", "Immediate branch retired")
-_c("ARM_PMU_BR_RETURN_RETIRED", 0x000E, "cpu", "Function return retired")
-_c("ARM_PMU_UNALIGNED_LDST_RETIRED", 0x000F, "cpu", "Unaligned load/store retired")
-_c("ARM_PMU_CPU_CYCLES", 0x0011, "cpu", "CPU cycle")
-_c("ARM_PMU_MEM_ACCESS", 0x0013, "memory", "Data memory access")
-_c("ARM_PMU_L1I_CACHE", 0x0014, "memory", "L1 I-Cache access")
-_c("ARM_PMU_L1D_CACHE_WB", 0x0015, "memory", "L1 D-Cache write-back")
-_c("ARM_PMU_BUS_ACCESS", 0x0019, "memory", "Bus access")
-_c("ARM_PMU_MEMORY_ERROR", 0x001A, "memory", "Local memory error")
-_c("ARM_PMU_BUS_CYCLES", 0x001D, "memory", "Bus cycle")
-_c("ARM_PMU_L1D_CACHE_ALLOCATE", 0x001F, "memory", "L1 D-Cache allocate (no refill)")
-_c("ARM_PMU_BR_RETIRED", 0x0021, "cpu", "Branch retired")
-_c("ARM_PMU_BR_MIS_PRED_RETIRED", 0x0022, "cpu", "Mispredicted branch retired")
-_c("ARM_PMU_STALL_FRONTEND", 0x0023, "cpu", "Frontend stall cycle")
-_c("ARM_PMU_STALL_BACKEND", 0x0024, "cpu", "Backend stall cycle")
-_c("ARM_PMU_LL_CACHE_RD", 0x0036, "memory", "Last-level cache read")
-_c("ARM_PMU_LL_CACHE_MISS_RD", 0x0037, "memory", "Last-level cache read miss")
-_c("ARM_PMU_L1D_CACHE_MISS_RD", 0x0039, "memory", "L1 D-Cache read miss")
-_c("ARM_PMU_STALL", 0x003C, "cpu", "Stall cycle")
-_c("ARM_PMU_L1D_CACHE_RD", 0x0040, "memory", "L1 D-Cache read")
-_c("ARM_PMU_LE_RETIRED", 0x0100, "cpu", "Loop end retired")
-_c("ARM_PMU_LE_CANCEL", 0x0108, "cpu", "Loop end cancelled")
-_c("ARM_PMU_SE_CALL_S", 0x0114, "cpu", "Secure call (to S)")
-_c("ARM_PMU_SE_CALL_NS", 0x0115, "cpu", "Secure call (to NS)")
-
-# --- MVE events ---
-_c("ARM_PMU_MVE_INST_RETIRED", 0x0200, "mve", "MVE instruction retired")
-_c("ARM_PMU_MVE_FP_RETIRED", 0x0204, "mve", "MVE FP instruction retired")
-_c("ARM_PMU_MVE_FP_HP_RETIRED", 0x0208, "mve", "MVE half-precision FP retired")
-_c("ARM_PMU_MVE_FP_SP_RETIRED", 0x020C, "mve", "MVE single-precision FP retired")
-_c("ARM_PMU_MVE_FP_MAC_RETIRED", 0x0214, "mve", "MVE FP MAC retired")
-_c("ARM_PMU_MVE_INT_RETIRED", 0x0224, "mve", "MVE integer instruction retired")
-_c("ARM_PMU_MVE_INT_MAC_RETIRED", 0x0228, "mve", "MVE integer MAC retired")
-_c("ARM_PMU_MVE_LDST_RETIRED", 0x0238, "mve", "MVE load/store retired")
-_c("ARM_PMU_MVE_LD_RETIRED", 0x023C, "mve", "MVE load retired")
-_c("ARM_PMU_MVE_ST_RETIRED", 0x0240, "mve", "MVE store retired")
-_c("ARM_PMU_MVE_LDST_CONTIG_RETIRED", 0x0244, "mve", "MVE contiguous load/store retired")
-_c("ARM_PMU_MVE_LD_CONTIG_RETIRED", 0x0248, "mve", "MVE contiguous load retired")
-_c("ARM_PMU_MVE_ST_CONTIG_RETIRED", 0x024C, "mve", "MVE contiguous store retired")
-_c("ARM_PMU_MVE_LDST_NONCONTIG_RETIRED", 0x0250, "mve", "MVE non-contiguous load/store retired")
-_c("ARM_PMU_MVE_LD_NONCONTIG_RETIRED", 0x0254, "mve", "MVE non-contiguous load retired")
-_c("ARM_PMU_MVE_ST_NONCONTIG_RETIRED", 0x0258, "mve", "MVE non-contiguous store retired")
-_c("ARM_PMU_MVE_LDST_MULTI_RETIRED", 0x025C, "mve", "MVE multi-register load/store retired")
-_c("ARM_PMU_MVE_LD_MULTI_RETIRED", 0x0260, "mve", "MVE multi-register load retired")
-_c("ARM_PMU_MVE_ST_MULTI_RETIRED", 0x0264, "mve", "MVE multi-register store retired")
-_c("ARM_PMU_MVE_LDST_UNALIGNED_RETIRED", 0x028C, "mve", "MVE unaligned load/store retired")
-_c("ARM_PMU_MVE_LD_UNALIGNED_RETIRED", 0x0290, "mve", "MVE unaligned load retired")
-_c("ARM_PMU_MVE_ST_UNALIGNED_RETIRED", 0x0294, "mve", "MVE unaligned store retired")
-_c(
-    "ARM_PMU_MVE_LDST_UNALIGNED_NONCONTIG_RETIRED",
-    0x0298,
-    "mve",
-    "MVE unaligned non-contiguous load/store retired",
-)
-_c("ARM_PMU_MVE_VREDUCE_RETIRED", 0x02A0, "mve", "MVE vector reduction retired")
-_c("ARM_PMU_MVE_VREDUCE_FP_RETIRED", 0x02A4, "mve", "MVE FP vector reduction retired")
-_c("ARM_PMU_MVE_VREDUCE_INT_RETIRED", 0x02A8, "mve", "MVE integer vector reduction retired")
-_c("ARM_PMU_MVE_PRED", 0x02B8, "mve", "Cycles with predicated MVE beats")
-_c("ARM_PMU_MVE_STALL", 0x02CC, "mve", "MVE stall cycle")
-_c("ARM_PMU_MVE_STALL_RESOURCE", 0x02CD, "mve", "MVE stall — resource conflict")
-_c("ARM_PMU_MVE_STALL_RESOURCE_MEM", 0x02CE, "mve", "MVE stall — memory resource conflict")
-_c("ARM_PMU_MVE_STALL_RESOURCE_FP", 0x02CF, "mve", "MVE stall — FP resource conflict")
-_c("ARM_PMU_MVE_STALL_RESOURCE_INT", 0x02D0, "mve", "MVE stall — integer resource conflict")
-_c("ARM_PMU_MVE_STALL_BREAK", 0x02D3, "mve", "MVE stall — chain break")
-_c("ARM_PMU_MVE_STALL_DEPENDENCY", 0x02D4, "mve", "MVE stall — register dependency")
-
-# --- TCM events ---
-_c("ARM_PMU_ITCM_ACCESS", 0x4007, "memory", "Instruction TCM access")
-_c("ARM_PMU_DTCM_ACCESS", 0x4008, "memory", "Data TCM access")
+_COUNTERS: dict[str, PmuCounter] = _load_counter_catalog()
 
 
 # ---------------------------------------------------------------------------

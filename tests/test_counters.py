@@ -8,6 +8,8 @@ from helia_profiler.counters import (
     GROUPS,
     DEFAULT_COUNTERS,
     MAX_COUNTERS_PER_PASS,
+    get_counter,
+    list_counters,
     resolve_counters,
     plan_passes,
     resolve_legacy_presets,
@@ -22,6 +24,21 @@ def test_groups_exist():
     assert "cpu" in GROUPS
     assert "mve" in GROUPS
     assert "memory" in GROUPS
+
+
+def test_catalog_matches_upstream_export_size():
+    assert len(list_counters()) == 70
+
+
+def test_catalog_includes_noncontiguous_unaligned_mve_counter():
+    counter = get_counter("ARM_PMU_MVE_LDST_UNALIGNED_NONCONTIG_RETIRED")
+    assert counter.event_id == 0x0298
+    assert counter.group == "mve"
+
+
+def test_catalog_uses_upstream_descriptions():
+    counter = get_counter("ARM_PMU_INST_RETIRED")
+    assert counter.description == "Instruction architecturally executed"
 
 
 def test_default_counters_fit_one_pass():
