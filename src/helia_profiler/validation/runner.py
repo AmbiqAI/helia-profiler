@@ -21,6 +21,7 @@ import contextlib
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -209,6 +210,23 @@ def _run_profile_command(
     )
 
 
+def _resolve_hpx_command() -> list[str]:
+    """Return the best CLI invocation for the current Python environment."""
+    python_dir = Path(sys.executable).expanduser().parent
+    candidates = [python_dir / "hpx"]
+    if os.name == "nt":
+        candidates.insert(0, python_dir / "hpx.exe")
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return [str(candidate)]
+
+    found = shutil.which("hpx")
+    if found:
+        return [found]
+    return ["hpx"]
+
+
 def _run_case_inprocess(
     cmd: list[str],
     cwd: Path,
@@ -297,12 +315,15 @@ def run_case(
     config = _build_config(case, repo_root, case_dir)
     config_path.write_text(yaml.safe_dump(config, sort_keys=False))
 
-    cmd = ["hpx", "profile", "--config", str(config_path)]
-    if verbose:
-        cmd.append("-v")
-
     if in_process is None:
         in_process = _env_truthy("HPX_VALIDATE_INPROCESS")
+
+    if in_process:
+        cmd = ["hpx", "profile", "--config", str(config_path)]
+    else:
+        cmd = [*_resolve_hpx_command(), "profile", "--config", str(config_path)]
+    if verbose:
+        cmd.append("-v")
 
     start = time.monotonic()
     timed_out = False

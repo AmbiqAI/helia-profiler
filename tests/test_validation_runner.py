@@ -109,3 +109,46 @@ def test_run_case_retries_once_on_transient_joulescope_lock(tmp_path: Path, monk
     assert result.status == "pass"
     assert result.energy_uj == 100000.0
     assert calls["count"] == 2
+
+
+def test_run_case_uses_current_python_for_subprocess(tmp_path: Path, monkeypatch):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_root = tmp_path / "out"
+    seen: dict[str, object] = {}
+    fake_python = tmp_path / "venv" / "bin" / "python"
+    fake_hpx = fake_python.parent / "hpx"
+    fake_hpx.parent.mkdir(parents=True)
+    fake_python.write_text("")
+    fake_hpx.write_text("")
+
+    case = CaseSpec(
+        model=MODELS["kws"],
+        engine=EngineType.HELIA_RT,
+        power=False,
+        board=BOARDS["apollo510_evb"],
+    )
+
+    def fake_run(cmd, cwd, capture_output, text, timeout, check, env):
+        del capture_output, text, timeout, check, env
+        seen["cmd"] = cmd
+        seen["cwd"] = cwd
+        config_path = Path(cmd[-1])
+        case_dir = Path(yaml.safe_load(config_path.read_text())["output"]["dir"])
+        case_dir.mkdir(parents=True, exist_ok=True)
+        (case_dir / "summary.json").write_text(json.dumps({"layers": 13, "total_cycles": 123456}))
+        return subprocess.CompletedProcess(cmd, 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr("helia_profiler.validation.runner.subprocess.run", fake_run)
+    monkeypatch.setattr("helia_profiler.validation.runner.sys.executable", str(fake_python))
+
+    result = run_case(case=case, repo_root=repo_root, output_root=output_root, timeout_s=30)
+
+    assert result.status == "pass"
+    assert seen["cwd"] == str(repo_root)
+    assert seen["cmd"] == [
+        str(fake_hpx),
+        "profile",
+        "--config",
+        str(output_root / case.case_id / "config.yml"),
+    ]
