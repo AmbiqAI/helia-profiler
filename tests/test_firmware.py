@@ -49,12 +49,15 @@ def _fake_starter_profiles() -> dict[str, dict]:
                 "nsx-ambiqsuite-r5": {"project": unified_project},
                 "nsx-ambiq-hal-r5": {"project": unified_project},
                 "nsx-ambiq-bsp-r5": {"project": unified_project},
+                "nsx-ambiq-usb-r5": {"project": unified_project},
                 "nsx-cmsis-core": {"project": unified_project},
                 "nsx-gpio": {"project": unified_project},
                 "nsx-interrupt": {"project": unified_project},
+                "nsx-psram": {"project": unified_project},
                 "nsx-soc-hal": {"project": unified_project},
                 "nsx-cmsis-startup": {"project": unified_project},
                 "nsx-core": {"project": unified_project},
+                "nsx-usb": {"project": unified_project},
             },
         },
         "apollo4p_evb": {
@@ -73,8 +76,13 @@ def _fake_starter_profiles() -> dict[str, dict]:
             },
             "module_overrides": {
                 "nsx-ambiqsuite-r4": {"project": unified_project},
+                "nsx-ambiq-usb-r4": {"project": unified_project},
                 "nsx-cmsis-core": {"project": unified_project},
                 "nsx-core": {"project": unified_project},
+                "nsx-gpio": {"project": unified_project},
+                "nsx-interrupt": {"project": unified_project},
+                "nsx-psram": {"project": unified_project},
+                "nsx-usb": {"project": unified_project},
             },
         },
         "apollo3p_evb": {
@@ -95,6 +103,9 @@ def _fake_starter_profiles() -> dict[str, dict]:
                 "nsx-ambiqsuite-r3": {"project": unified_project},
                 "nsx-cmsis-core": {"project": unified_project},
                 "nsx-core": {"project": unified_project},
+                "nsx-gpio": {"project": unified_project},
+                "nsx-interrupt": {"project": unified_project},
+                "nsx-psram": {"project": unified_project},
             },
         },
     }
@@ -110,6 +121,20 @@ def fake_nsx_registry(monkeypatch: pytest.MonkeyPatch) -> None:
         "nsx-board-apollo3p-evb": "neuralspotx",
         "nsx-pmu-armv8m": "nsx-pmu-armv8m",
     }
+    projects = {
+        "neuralspotx": {
+            "name": "neuralspotx",
+            "url": "https://github.com/AmbiqAI/neuralspotx.git",
+            "revision": "stable-tag",
+            "path": "neuralspotx",
+        },
+        "nsx-ambiq-sdk": {
+            "name": "nsx-ambiq-sdk",
+            "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+            "revision": "r5.3",
+            "path": "modules/nsx-ambiq-sdk",
+        },
+    }
 
     monkeypatch.setattr(
         "helia_profiler.firmware.nsx_cli.starter_profile",
@@ -118,6 +143,10 @@ def fake_nsx_registry(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "helia_profiler.firmware.nsx_cli.registry_module_project",
         lambda name: module_projects.get(name),
+    )
+    monkeypatch.setattr(
+        "helia_profiler.firmware.nsx_cli.registry_project",
+        lambda name: projects.get(name),
     )
 
 
@@ -703,6 +732,19 @@ class TestNsxModuleOverrides:
         nsx_yml = (app_dir / "nsx.yml").read_text()
         assert "channel: stable" in nsx_yml
 
+    def test_default_build_uses_main_for_nsx_and_unified_sdk(self, tmp_path: Path, fake_dist: Path):
+        ctx = self._make_ctx_with_overrides(tmp_path, fake_dist, {})
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        specs = _resolve_module_specs("apollo510_evb")
+        sdk_module_count = sum(1 for spec in specs if spec.project == "nsx-ambiq-sdk")
+        nsx_module_count = sum(1 for spec in specs if spec.project == "neuralspotx")
+        assert nsx_yml.count("project: nsx-ambiq-sdk\n  ref: main") == sdk_module_count
+        assert nsx_yml.count("project: neuralspotx\n  ref: main") == nsx_module_count
+
     def test_preview_board_defaults_to_preview_channel(self, tmp_path: Path, fake_dist: Path):
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
@@ -725,6 +767,83 @@ class TestNsxModuleOverrides:
         nsx_yml = (app_dir / "nsx.yml").read_text()
         assert "channel: preview" in nsx_yml
 
+    def test_usb_cdc_adds_provider_usb_module(self, tmp_path: Path, fake_dist: Path):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb", "transport": "usb_cdc"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        assert "- name: nsx-ambiq-usb-r5" in nsx_yml
+        assert "- name: nsx-usb" in nsx_yml
+
+        manifest = yaml.safe_load(nsx_yml)
+        registry = manifest["module_registry"]
+        assert registry["modules"]["nsx-ambiq-usb-r5"]["project"] == "nsx-ambiq-sdk"
+        assert registry["modules"]["nsx-usb"]["project"] == "nsx-ambiq-sdk"
+
+    def test_psram_modules_resolve_through_profile_overrides(self, tmp_path: Path, fake_dist: Path):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model), "model_location": "psram"},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb", "transport": "rtt"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        manifest = yaml.safe_load((app_dir / "nsx.yml").read_text())
+        registry = manifest["module_registry"]
+        assert registry["modules"]["nsx-interrupt"]["project"] == "nsx-ambiq-sdk"
+        assert registry["modules"]["nsx-psram"]["project"] == "nsx-ambiq-sdk"
+
+    def test_power_sync_modules_resolve_through_profile_overrides(self, tmp_path: Path, fake_dist: Path):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb", "transport": "rtt"},
+                "power": {"enabled": True, "mode": "external"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        manifest = yaml.safe_load((app_dir / "nsx.yml").read_text())
+        registry = manifest["module_registry"]
+        assert registry["modules"]["nsx-gpio"]["project"] == "nsx-ambiq-sdk"
+        assert registry["modules"]["nsx-interrupt"]["project"] == "nsx-ambiq-sdk"
+
     def test_version_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(
             tmp_path,
@@ -744,6 +863,7 @@ class TestNsxModuleOverrides:
             1 for spec in _resolve_module_specs("apollo510_evb") if spec.project == "nsx-ambiq-sdk"
         )
         assert nsx_yml.count('version: "2.0.0"') == sdk_module_count
+        assert "project: neuralspotx\n  ref: main" in nsx_yml
 
     def test_ref_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(
@@ -764,6 +884,7 @@ class TestNsxModuleOverrides:
             1 for spec in _resolve_module_specs("apollo510_evb") if spec.project == "nsx-ambiq-sdk"
         )
         assert nsx_yml.count("ref: feat/new-soc") == sdk_module_count
+        assert "project: neuralspotx\n  ref: main" in nsx_yml
 
     def test_module_registry_emitted_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         # The generated manifest must carry the profile's module_registry so the
@@ -776,7 +897,8 @@ class TestNsxModuleOverrides:
 
         nsx_yml = yaml.safe_load((app_dir / "nsx.yml").read_text())
         registry = nsx_yml["module_registry"]
-        assert registry["projects"]["nsx-ambiq-sdk"]["revision"]
+        assert registry["projects"]["nsx-ambiq-sdk"]["revision"] == "main"
+        assert registry["projects"]["neuralspotx"]["revision"] == "main"
         assert "nsx-pmu-armv8m" not in registry.get("modules", {})
 
     def test_path_override_installs_local_module(self, tmp_path: Path, fake_dist: Path):

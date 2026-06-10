@@ -356,3 +356,11 @@ def registry_module_project(name: str) -> str | None:
         return registry_entry_for_module(load_registry(), name).project
     except (KeyError, ValueError):
         return None
+
+
+def registry_project(name: str) -> dict[str, Any] | None:
+    """Return the base registry entry for a project, or *None* if absent."""
+    entry = (load_registry().get("projects") or {}).get(name)
+    if not isinstance(entry, dict):
+        return None
+    return dict(entry)

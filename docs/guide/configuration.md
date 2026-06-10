@@ -138,6 +138,19 @@ Advanced target overrides:
 - `target.custom_boards.<name>.based_on` clones an existing built-in board and lets you override fields like `channel`, `psram_kb`, and `default_sync_gpio_pin`.
 - `target.custom_boards.<name>.starter_profile_board` reuses the NSX starter profile from a built-in board when the custom board should inherit its module graph.
 
+### `build`
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `channel` | string | board default | NSX channel recorded in the generated app manifest |
+| `nsx_modules` | dict | `{}` | Per-module NSX source overrides (`path`, `ref`, or `version`) |
+
+Build-resolution notes:
+
+- By default, generated profiler apps keep the board's normal NSX `channel`, but HPX explicitly resolves both `neuralspotx` and `nsx-ambiq-sdk` from `main`.
+- `build.nsx_modules.<module>.ref` or `.version` overrides win over that default for the owning project.
+- `build.nsx_modules.<module>.path` installs a local module checkout into the generated app and bypasses registry resolution for that module only.
+
 ### `profiling`
 
 | Field | Type | Default | Description |

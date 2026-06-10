@@ -96,6 +96,27 @@ _POWER_SYNC_MODULE_NAMES: tuple[str, ...] = (
     "nsx-gpio",
 )
 
+_DEFAULT_MAIN_PROJECT_REFS: dict[str, str] = {
+    "neuralspotx": "main",
+    "nsx-ambiq-sdk": "main",
+}
+
+
+def _usb_provider_module_names(module_specs: list[NsxModuleSpec], profile: dict[str, Any]) -> list[str]:
+    """Return provider-specific USB support modules implied by the SDK tier."""
+    present = {spec.name for spec in module_specs}
+    overrides = profile.get("module_overrides") or {}
+    required: list[str] = []
+    for name in sorted(present):
+        if not name.startswith("nsx-ambiqsuite-r"):
+            continue
+        candidate = name.replace("nsx-ambiqsuite-", "nsx-ambiq-usb-", 1)
+        if candidate in present or candidate in required:
+            continue
+        if candidate in overrides or nsx_cli.registry_module_project(candidate) is not None:
+            required.append(candidate)
+    return required
+
 
 def _board_module_name(board: str) -> str:
     """Derive the NSX board module name from a board name."""
@@ -173,7 +194,10 @@ def _module_project(name: str, profile: dict[str, Any]) -> str:
     return nsx_cli.registry_module_project(name) or name
 
 
-def _render_module_registry(profile: dict[str, Any]) -> str:
+def _render_module_registry(
+    profile: dict[str, Any],
+    project_ref_overrides: dict[str, tuple[str, str]],
+) -> str:
     """Render the ``module_registry`` block for nsx.yml from the profile.
 
     Emitting the profile's full ``project_overrides`` / ``module_overrides``
@@ -182,8 +206,16 @@ def _render_module_registry(profile: dict[str, Any]) -> str:
     dependencies pulled in during closure resolution resolve to the same SDK
     monorepo as the explicitly listed modules.
     """
-    project_overrides = profile.get("project_overrides") or {}
+    project_overrides = dict(profile.get("project_overrides") or {})
     module_overrides = dict(profile.get("module_overrides") or {})
+    for project, (mode, value) in project_ref_overrides.items():
+        if mode != "ref":
+            continue
+        override = dict(project_overrides.get(project) or {})
+        if not override:
+            override = nsx_cli.registry_project(project) or {"name": project}
+        override["revision"] = value
+        project_overrides[project] = override
     if not project_overrides and not module_overrides:
         return ""
     registry: dict[str, Any] = {}
@@ -258,6 +290,11 @@ def _resolve_project_overrides(
                 ),
             )
         project_overrides[spec.project] = (mode, value)
+    for project, ref in _DEFAULT_MAIN_PROJECT_REFS.items():
+        if project in project_overrides:
+            continue
+        if any(spec.project == project for spec in module_specs):
+            project_overrides[project] = ("ref", ref)
     return project_overrides
 
 
@@ -559,10 +596,16 @@ def generate_app(ctx: PipelineContext) -> Path:
     module_specs = _resolve_module_specs(board.name, profile_board=profile_board)
     profile = _get_starter_profile(board.name, profile_board=profile_board)
 
-    # Add nsx-usb module when using USB CDC transport
+    # Add transport modules when using USB CDC transport
     transport = config.target.transport
-    if transport == "usb_cdc" and "nsx-usb" not in {m.name for m in module_specs}:
-        module_specs.append(NsxModuleSpec("nsx-usb", _module_project("nsx-usb", profile)))
+    if transport == "usb_cdc":
+        module_names = {m.name for m in module_specs}
+        for name in _usb_provider_module_names(module_specs, profile):
+            if name not in module_names:
+                module_specs.append(NsxModuleSpec(name, _module_project(name, profile)))
+                module_names.add(name)
+        if "nsx-usb" not in module_names:
+            module_specs.append(NsxModuleSpec("nsx-usb", _module_project("nsx-usb", profile)))
 
     # Add nsx-psram when using PSRAM (for weights or arena)
     psram_needed = (
@@ -671,7 +714,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             toolchain=config.target.toolchain,
             channel=_default_nsx_channel(board.channel, config.build.channel),
             modules=modules,
-            module_registry_yaml=_render_module_registry(profile),
+            module_registry_yaml=_render_module_registry(profile, project_overrides),
         ),
     )
 

@@ -342,8 +342,9 @@ class BuildConfig:
     """NSX build-system overrides.
 
     Controls how the generated firmware's NSX manifest resolves modules.
-    Default behaviour (empty overrides) uses the selected board's default
-    NSX channel and lets ``nsx lock`` pick the latest compatible revisions.
+    Default behaviour keeps the selected board's default NSX channel, but
+    generated manifests explicitly track ``main`` for the ``neuralspotx`` and
+    ``nsx-ambiq-sdk`` projects unless the user overrides those modules.
 
     Advanced users can pin individual modules to a version, point them at
     a local checkout, or select a custom git ref — useful for SoC/board
