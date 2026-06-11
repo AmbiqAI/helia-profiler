@@ -86,6 +86,10 @@ def fake_source_tree(tmp_path: Path) -> Path:
     """
     src = tmp_path / "heliart_src"
     src.mkdir()
+    (src / "CMakeLists.txt").write_text(
+        "cmake_minimum_required(VERSION 3.21)\n"
+        "include(${CMAKE_CURRENT_LIST_DIR}/cmake/helia_rt_sources.cmake)\n"
+    )
     (src / "nsx").mkdir()
     (src / "nsx" / "CMakeLists.txt").write_text(
         "# source-build heliaRT nsx CMakeLists (test stub)\n"
@@ -96,7 +100,16 @@ def fake_source_tree(tmp_path: Path) -> Path:
         f'schema_version: 1\nmodule:\n  name: nsx-helia-rt\n  version: "{HELIART_VERSION}"\n'
     )
     (src / "cmake").mkdir()
-    (src / "cmake" / "helia_rt_sources.cmake").write_text("# stub\n")
+    (src / "cmake" / "helia_rt_sources.cmake").write_text(
+        "# stub\n"
+        "function(helia_rt_backend_compile_definitions OUT_VAR)\n"
+        "  set(_defs \"\")\n"
+        "  if(\"${ARGN}\" MATCHES \"BACKEND;helia\")\n"
+        "    set(_defs CMSIS_NN HELIA)\n"
+        "  endif()\n"
+        "  set(${OUT_VAR} ${_defs} PARENT_SCOPE)\n"
+        "endfunction()\n"
+    )
     tf_dir = src / "tensorflow" / "lite" / "micro"
     tf_dir.mkdir(parents=True)
     (tf_dir / "helia_rt_version.h").write_text(f'#define HELIA_RT_VERSION "v{HELIART_VERSION}"\n')
