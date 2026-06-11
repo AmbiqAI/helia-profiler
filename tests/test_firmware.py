@@ -898,8 +898,32 @@ class TestNsxModuleOverrides:
         nsx_yml = yaml.safe_load((app_dir / "nsx.yml").read_text())
         registry = nsx_yml["module_registry"]
         assert registry["projects"]["nsx-ambiq-sdk"]["revision"] == "main"
+        assert registry["projects"]["nsx-ambiq-sdk"]["url"] == "https://github.com/AmbiqAI/nsx-ambiq-sdk.git"
+        assert registry["projects"]["nsx-ambiq-sdk"]["path"] == "modules/nsx-ambiq-sdk"
         assert registry["projects"]["neuralspotx"]["revision"] == "main"
         assert "nsx-pmu-armv8m" not in registry.get("modules", {})
+
+    def test_armv8m_pmu_registry_override_is_normalized_to_standalone(
+        self, tmp_path: Path, fake_dist: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        profiles = _fake_starter_profiles()
+        profiles["apollo510_evb"]["module_overrides"]["nsx-pmu-armv8m"] = {
+            "project": "nsx-ambiq-sdk",
+            "revision": "main",
+            "metadata": "modules/nsx-pmu-armv8m/nsx-module.yaml",
+        }
+        monkeypatch.setattr(
+            "helia_profiler.firmware.nsx_cli.starter_profile",
+            lambda board: profiles.get(board),
+        )
+
+        ctx = self._make_ctx_with_overrides(tmp_path, fake_dist, {})
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        manifest = yaml.safe_load((app_dir / "nsx.yml").read_text())
+        assert manifest["module_registry"]["modules"]["nsx-pmu-armv8m"]["project"] == "nsx-pmu-armv8m"
 
     def test_path_override_installs_local_module(self, tmp_path: Path, fake_dist: Path):
         # Create a fake local module with nsx-module.yaml

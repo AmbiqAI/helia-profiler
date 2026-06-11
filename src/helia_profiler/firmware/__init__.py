@@ -178,6 +178,28 @@ def _needs_armv8m_pmu_module(board: str, *, profile_board: str | None = None) ->
     return False
 
 
+def _effective_module_override(name: str, profile: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the effective starter-profile override for a module, if any.
+
+    ``nsx-pmu-armv8m`` is currently shipped as a standalone module even when
+    some Apollo5 starter profiles repoint it into ``nsx-ambiq-sdk``. Keep the
+    profile override for everything else, but preserve the standalone owner for
+    this module so ``nsx lock`` can find its metadata in the real repo layout.
+    """
+    override = profile.get("module_overrides", {}).get(name)
+    if not isinstance(override, dict):
+        return override if override is not None else None
+    if name != "nsx-pmu-armv8m":
+        return override
+
+    registry_project = nsx_cli.registry_module_project(name)
+    if registry_project and registry_project != override.get("project"):
+        updated = dict(override)
+        updated["project"] = registry_project
+        return updated
+    return override
+
+
 def _module_project(name: str, profile: dict[str, Any]) -> str:
     """Resolve the owning NSX project for a module name.
 
@@ -188,7 +210,7 @@ def _module_project(name: str, profile: dict[str, Any]) -> str:
     1. The base registry entry (standalone project) for everything else.
     2. The module name itself as a last resort (opaque / local modules).
     """
-    override = profile.get("module_overrides", {}).get(name)
+    override = _effective_module_override(name, profile)
     if isinstance(override, dict) and override.get("project"):
         return override["project"]
     return nsx_cli.registry_module_project(name) or name
@@ -207,7 +229,15 @@ def _render_module_registry(
     monorepo as the explicitly listed modules.
     """
     project_overrides = dict(profile.get("project_overrides") or {})
-    module_overrides = dict(profile.get("module_overrides") or {})
+    module_overrides = {
+        name: _effective_module_override(name, profile)
+        for name in (profile.get("module_overrides") or {})
+    }
+    for project, override in list(project_overrides.items()):
+        enriched = nsx_cli.registry_project(project) or {"name": project}
+        if isinstance(override, dict):
+            enriched.update(override)
+        project_overrides[project] = enriched
     for project, (mode, value) in project_ref_overrides.items():
         if mode != "ref":
             continue
