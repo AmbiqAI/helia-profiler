@@ -423,9 +423,23 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
         model_location=model_d.get("model_location", "auto"),
     )
 
-    engine_type_raw = engine_d.get("type", "tflm")
+    engine_type_raw = engine_d.get("type", EngineType.HELIA_RT.value)
+    if engine_type_raw == EngineType.TFLM.value:
+        raise ConfigError(
+            "engine.type='tflm' is temporarily unavailable",
+            hint="Use engine.type='helia-rt' for the interpreter runtime.",
+        )
+    try:
+        engine_type = EngineType(engine_type_raw)
+    except ValueError as exc:
+        supported = ", ".join(
+            engine.value for engine in (EngineType.HELIA_RT, EngineType.HELIA_AOT)
+        )
+        raise ConfigError(
+            f"Invalid engine.type: {engine_type_raw!r}. Supported: {supported}"
+        ) from exc
     engine = EngineConfig(
-        type=EngineType(engine_type_raw),
+        type=engine_type,
         backend=engine_d.get("backend"),
         config=engine_d.get("config", {}),
         config_path=Path(engine_d["config_path"]) if engine_d.get("config_path") else None,

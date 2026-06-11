@@ -25,7 +25,7 @@ def _make_ctx(tmp_path: Path, overrides: dict | None = None) -> PipelineContext:
     model.write_bytes(_MIN_TFLITE)
     base: dict = {
         "model": {"path": str(model)},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "output": {"dir": str(tmp_path / "out")},
         "work_dir": str(tmp_path / "work"),
     }

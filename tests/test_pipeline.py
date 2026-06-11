@@ -108,7 +108,7 @@ def _make_config(tmp_path: Path):
         None,
         {
             "model": {"path": str(model_file)},
-            "engine": {"type": "tflm"},
+            "engine": {"type": "helia-rt"},
             "work_dir": str(tmp_path / "work"),
         },
     )

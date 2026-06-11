@@ -23,7 +23,7 @@ def _make_ctx(tmp_path: Path, overrides: dict | None = None) -> PipelineContext:
     model.write_bytes(b"\x00" * 2048)
     base = {
         "model": {"path": str(model), "arena_size": 65536},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "work_dir": str(tmp_path / "work"),
     }
     if overrides:
@@ -56,7 +56,7 @@ class TestPlanMemorySynthesise:
         PlanMemoryStage().run(ctx)
 
         assert ctx.memory_plan is not None
-        assert ctx.memory_plan.engine == "tflm"
+        assert ctx.memory_plan.engine == "helia-rt"
         assert ctx.arena_region == "tcm"
         assert ctx.weights_region == "tcm"
 
@@ -74,7 +74,7 @@ class TestPlanMemorySynthesise:
             None,
             {
                 "model": {"path": str(model), "arena_size": None},
-                "engine": {"type": "tflm"},
+                "engine": {"type": "helia-rt"},
                 "work_dir": str(tmp_path / "work"),
             },
         )

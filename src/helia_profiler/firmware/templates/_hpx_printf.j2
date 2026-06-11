@@ -60,6 +60,17 @@ static void hpx_rtt_drain(uint32_t timeout_ms) {
         if (total > spins_per_ms) total -= spins_per_ms; else total = 0;
     }
 }
+{% elif transport == "swo" %}
+{{ _linkage }}void hpx_printf(const char *fmt, ...) {
+    static char line_buf[512];
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(line_buf, sizeof(line_buf), fmt, ap);
+    va_end(ap);
+    if (n > 0) {
+        nsx_printf("%s", line_buf);
+    }
+}
 {% else %}
 {{ _linkage }}void hpx_printf(const char *fmt, ...) {
     static char line_buf[512];

@@ -74,6 +74,9 @@ class FirmwareMeta:
     num_inputs: int | None = None
     num_outputs: int | None = None
     num_presets: int | None = None
+    profiled_infer_count: int | None = None
+    profiled_infer_total_us: int | None = None
+    profiled_infer_avg_us: int | None = None
     presets: tuple[str, ...] = ()
 
 
@@ -95,6 +98,15 @@ class PmuResult:
 # ---------------------------------------------------------------------------
 # Run metadata (enriched progressively by pipeline stages)
 # ---------------------------------------------------------------------------
+
+
+@dataclass
+class TimingInfo:
+    """Host-observed wall-clock timings for a profiling capture."""
+
+    capture_duration_s: float | None = None
+    hpx_start_latency_s: float | None = None
+    protocol_duration_s: float | None = None
 
 
 @dataclass
@@ -144,6 +156,7 @@ class RunMetadata:
     toolchain: ToolchainInfo | None = None
     firmware: FirmwareMeta | None = None
     memory_plan: "MemoryPlan | None" = None
+    timing: TimingInfo | None = None
 
 
 # ---------------------------------------------------------------------------

@@ -83,6 +83,24 @@ def test_single_preset_basic():
     assert not result.overflow_detected
 
 
+def test_target_profiled_infer_timing_metadata():
+    lines = _wrap_session(
+        {
+            "presets": "basic_cpu",
+            "profiled_infer_count": "6",
+            "profiled_infer_total_us": "48000",
+            "profiled_infer_avg_us": "8000",
+        },
+        [_make_preset_block("basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]])],
+    )
+
+    result = parse_firmware_output(lines)
+
+    assert result.meta.profiled_infer_count == 6
+    assert result.meta.profiled_infer_total_us == 48000
+    assert result.meta.profiled_infer_avg_us == 8000
+
+
 # ---------------------------------------------------------------------------
 # Multi-pass parsing (new-style)
 # ---------------------------------------------------------------------------

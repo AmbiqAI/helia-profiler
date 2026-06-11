@@ -104,3 +104,22 @@ def test_legacy_kwargs_still_work():
         line_timeout_s=5,
     )
     assert lines[-1] == "--- HPX_END ---"
+
+
+def test_collect_lines_invokes_on_line_callback():
+    seen: list[str] = []
+
+    read = _canned_reader(
+        [
+            b"--- HPX_START ---\n",
+            b"HPX_VERSION=1\n",
+            b"--- HPX_END ---\n",
+        ]
+    )
+    lines = collect_lines(
+        read,
+        transport_name="TEST",
+        on_line=lambda line, _ts: seen.append(line),
+    )
+
+    assert seen == lines

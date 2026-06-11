@@ -30,9 +30,12 @@ from typing import TYPE_CHECKING
 
 from ..errors import CaptureError
 from ..jlink import reset_target
+from .readiness import open_jlink_with_retry, resume_if_halted
 from .transport import (
     DEFAULT_TIMEOUT_S,
     HEARTBEAT_TIMEOUT_S,
+    HPX_END,
+    HPX_START,
     collect_lines,
 )
 
@@ -42,7 +45,6 @@ if TYPE_CHECKING:
     import pylink
 
 _RTT_CB_TIMEOUT_S = 30  # max time to wait for RTT control block discovery
-_SBL_SETTLE_S = 2.0  # post-reset delay for SBL + firmware RTT init
 _PSRAM_READY_TIMEOUT_S = 15  # wait for PSRAM init + ready signal
 _PSRAM_WRITE_CHUNK = 65536  # bytes per J-Link memory_write call
 
@@ -205,6 +207,7 @@ def capture_rtt_output(
     heartbeat_timeout_s: float = HEARTBEAT_TIMEOUT_S,
     model_path: Path | None = None,
     weights_region: str = "mram",
+    timing_out: dict[str, float] | None = None,
 ) -> list[str]:
     """Capture firmware output via SEGGER RTT until HPX_END or hang detection.
 
@@ -221,6 +224,26 @@ def capture_rtt_output(
     Returns:
         List of captured text lines.
     """
+    capture_started_s = time.monotonic()
+    hpx_start_s: float | None = None
+    hpx_end_s: float | None = None
+
+    def on_line(line: str, line_ts: float) -> None:
+        nonlocal hpx_start_s, hpx_end_s
+        if line == HPX_START and hpx_start_s is None:
+            hpx_start_s = line_ts
+        elif line == HPX_END:
+            hpx_end_s = line_ts
+
+    def finalize_timing() -> None:
+        if timing_out is None:
+            return
+        timing_out["capture_duration_s"] = time.monotonic() - capture_started_s
+        if hpx_start_s is not None:
+            timing_out["hpx_start_latency_s"] = hpx_start_s - capture_started_s
+        if hpx_start_s is not None and hpx_end_s is not None:
+            timing_out["protocol_duration_s"] = hpx_end_s - hpx_start_s
+
     try:
         import pylink
     except ImportError as exc:
@@ -236,21 +259,21 @@ def capture_rtt_output(
         # JLinkExe handles the Apollo510 secure bootloader (SBL) correctly;
         # pylink's reset() does not trigger the vendor-specific handler.
         reset_target(device=jlink_device, jlink_serial=jlink_serial)
-        time.sleep(_SBL_SETTLE_S)
 
-        # --- Step 2: connect pylink ---
-        if jlink_serial:
-            jlink.open(serial_no=int(jlink_serial))
-        else:
-            jlink.open()
-        jlink.disable_dialog_boxes()
-        jlink.set_tif(pylink.JLinkInterfaces.SWD)
-        jlink.connect(jlink_device, 4000)
+        # --- Step 2: connect pylink and wait for RTT readiness ---
+        # Apollo510 may still be transitioning through SBL immediately after
+        # reset. Rather than burning a fixed settle delay up front, retry the
+        # host attach and then poll until the RTT control block becomes visible.
+        cb_deadline = time.monotonic() + _RTT_CB_TIMEOUT_S
+        open_jlink_with_retry(
+            jlink,
+            device=jlink_device,
+            jlink_serial=jlink_serial,
+            timeout_s=_RTT_CB_TIMEOUT_S,
+        )
+
         log.info("pylink connected to %s for RTT capture", jlink_device)
-        if jlink.halted():
-            jlink.restart()
-            time.sleep(0.1)
-            log.info("Resumed target after pylink attach")
+        resume_if_halted(jlink)
 
         # --- Step 3: start RTT and wait for control block ---
         # J-Link's built-in RTT auto-scan does not always cover the SRAM
@@ -258,7 +281,6 @@ def capture_rtt_output(
         # TCM at 0x2000xxxx).  Do an explicit host-side scan for the
         # "SEGGER RTT" magic signature and pass the address to
         # rtt_start() so discovery is deterministic across toolchains.
-        cb_deadline = time.monotonic() + _RTT_CB_TIMEOUT_S
         block_address = None
         while time.monotonic() < cb_deadline and block_address is None:
             block_address = _scan_for_rtt_control_block(jlink, rtt_scan_ranges)
@@ -302,13 +324,16 @@ def capture_rtt_output(
                 "SEGGER RTT API did not attach to control block 0x%08X; falling back to direct SWD polling",
                 block_address,
             )
-            return collect_lines(
+            lines = collect_lines(
                 lambda: _direct_rtt_read(jlink, block_address=block_address, max_bytes=4096),
                 transport_name="RTT",
                 overall_timeout_s=timeout_s,
                 heartbeat_timeout_s=heartbeat_timeout_s,
                 poll_interval_s=0.005,
+                on_line=on_line,
             )
+            finalize_timing()
+            return lines
         log.info(
             "RTT control block found (%d up buffers)",
             status.NumUpBuffers,
@@ -319,13 +344,16 @@ def capture_rtt_output(
             _upload_model_to_psram(jlink, model_path)
 
         # --- Step 3b: collect lines via shared helper ---
-        return collect_lines(
+        lines = collect_lines(
             lambda: bytes(jlink.rtt_read(0, 4096)),
             transport_name="RTT",
             overall_timeout_s=timeout_s,
             heartbeat_timeout_s=heartbeat_timeout_s,
             poll_interval_s=0.005,  # 5 ms — RTT has high bandwidth
+            on_line=on_line,
         )
+        finalize_timing()
+        return lines
 
     except CaptureError:
         raise

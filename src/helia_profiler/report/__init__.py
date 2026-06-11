@@ -245,6 +245,36 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             "energy_j": ps.energy_j,
         }
 
+    if ctx.run_metadata.timing is not None:
+        timing = {}
+        if ctx.run_metadata.timing.capture_duration_s is not None:
+            timing["capture_duration_s"] = round(ctx.run_metadata.timing.capture_duration_s, 6)
+        if ctx.run_metadata.timing.hpx_start_latency_s is not None:
+            timing["hpx_start_latency_s"] = round(ctx.run_metadata.timing.hpx_start_latency_s, 6)
+        if ctx.run_metadata.timing.protocol_duration_s is not None:
+            timing["protocol_duration_s"] = round(ctx.run_metadata.timing.protocol_duration_s, 6)
+        if meta.profiled_infer_count is not None:
+            timing["device_profiled_infer_count"] = meta.profiled_infer_count
+        if meta.profiled_infer_total_us is not None:
+            timing["device_profiled_infer_total_us"] = meta.profiled_infer_total_us
+        if meta.profiled_infer_avg_us is not None:
+            timing["device_profiled_infer_avg_us"] = meta.profiled_infer_avg_us
+        if timing:
+            summary["latency"] = timing
+    elif any(
+        value is not None
+        for value in (meta.profiled_infer_count, meta.profiled_infer_total_us, meta.profiled_infer_avg_us)
+    ):
+        summary["latency"] = {
+            key: value
+            for key, value in {
+                "device_profiled_infer_count": meta.profiled_infer_count,
+                "device_profiled_infer_total_us": meta.profiled_infer_total_us,
+                "device_profiled_infer_avg_us": meta.profiled_infer_avg_us,
+            }.items()
+            if value is not None
+        }
+
     # Compute TOPS/W if both model analysis and power data are available
     if ctx.model_analysis is not None and ctx.power_result is not None:
         ma = ctx.model_analysis
@@ -551,6 +581,8 @@ def _metadata_to_dict(meta: RunMetadata) -> dict[str, Any]:
         d["model"] = asdict(meta.model)
     if meta.toolchain is not None:
         d["toolchain"] = asdict(meta.toolchain)
+    if meta.timing is not None:
+        d["timing"] = asdict(meta.timing)
     return d
 
 

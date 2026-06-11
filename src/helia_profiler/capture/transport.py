@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 
 log = logging.getLogger("hpx")
 
@@ -73,6 +74,7 @@ def collect_lines(
     overall_timeout_s: float | None = None,
     heartbeat_timeout_s: float = HEARTBEAT_TIMEOUT_S,
     poll_interval_s: float = 0.005,
+    on_line: Callable[[str, float], None] | None = None,
     # Legacy kwargs — accepted for back-compat; if provided they override
     # the new parameters.  Will be removed in a future release.
     timeout_s: float | None = None,
@@ -142,8 +144,11 @@ def collect_lines(
                 line = raw_line.decode("utf-8", errors="replace").strip()
                 if not line:
                     continue
+                line_ts = time.monotonic()
 
                 lines.append(line)
+                if on_line is not None:
+                    on_line(line, line_ts)
                 if line.startswith("HPX_HEARTBEAT"):
                     log.info("%s heartbeat: %s", transport_name, line)
                 else:

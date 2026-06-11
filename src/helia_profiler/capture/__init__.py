@@ -52,6 +52,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
 
     # Use build_dir from context (set by stage 4) — no re-derivation
     build_dir = ctx.build_dir
+    timing_raw: dict[str, float] = {}
 
     if transport == "usb_cdc":
         from .usb_reader import capture_usb_output
@@ -59,6 +60,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         lines = capture_usb_output(
             jlink_serial=jlink_serial,
             jlink_device=jlink_device,
+            timing_out=timing_raw,
         )
     elif transport == "rtt":
         from .rtt_reader import capture_rtt_output
@@ -71,14 +73,20 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
             weights_region=ctx.weights_region or Placement.MRAM,
             timeout_s=overall_timeout_s,
             heartbeat_timeout_s=heartbeat_timeout_s,
+            timing_out=timing_raw,
         )
     else:
         from .serial_reader import capture_swo_output
+
+        cpu_clock_mhz = ctx.run_metadata.platform.cpu_clock_mhz
+        cpu_freq_hz = cpu_clock_mhz * 1_000_000 if cpu_clock_mhz > 0 else 96_000_000
 
         lines = capture_swo_output(
             build_dir=build_dir,
             jlink_serial=jlink_serial,
             jlink_device=jlink_device,
+            cpu_freq=cpu_freq_hz,
+            timing_out=timing_raw,
         )
     if not lines:
         raise CaptureError(
@@ -111,6 +119,15 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         raise CaptureError(
             "No layer data parsed from firmware output",
             hint="Check that the firmware is printing HPX protocol data.",
+        )
+
+    if timing_raw:
+        from ..results import TimingInfo
+
+        ctx.run_metadata.timing = TimingInfo(
+            capture_duration_s=timing_raw.get("capture_duration_s"),
+            hpx_start_latency_s=timing_raw.get("hpx_start_latency_s"),
+            protocol_duration_s=timing_raw.get("protocol_duration_s"),
         )
 
     return result

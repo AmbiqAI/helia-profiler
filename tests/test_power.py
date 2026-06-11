@@ -120,7 +120,7 @@ class TestPowerConfig:
         model.write_bytes(b"\x00")
         config = load_config(
             None,
-            {"model": {"path": str(model)}, "engine": {"type": "tflm"}},
+            {"model": {"path": str(model)}, "engine": {"type": "helia-rt"}},
         )
         assert config.power.enabled is False
         assert config.power.driver == "joulescope"
@@ -137,7 +137,7 @@ class TestPowerConfig:
             None,
             {
                 "model": {"path": str(model)},
-                "engine": {"type": "tflm"},
+                "engine": {"type": "helia-rt"},
                 "target": {
                     "board": "apollo510_lab",
                     "custom_boards": {
@@ -161,7 +161,7 @@ class TestPowerConfig:
             None,
             {
                 "model": {"path": str(model)},
-                "engine": {"type": "tflm"},
+                "engine": {"type": "helia-rt"},
                 "power": {
                     "enabled": True,
                     "driver": "ondevice",
@@ -188,7 +188,7 @@ class TestCapturePowerStage:
         model.write_bytes(b"\x00")
         config = load_config(
             None,
-            {"model": {"path": str(model)}, "engine": {"type": "tflm"}},
+            {"model": {"path": str(model)}, "engine": {"type": "helia-rt"}},
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         stage = CapturePowerStage()
@@ -205,7 +205,7 @@ class TestCapturePowerStage:
             None,
             {
                 "model": {"path": str(model)},
-                "engine": {"type": "tflm"},
+                "engine": {"type": "helia-rt"},
                 "power": {"enabled": True},
             },
         )

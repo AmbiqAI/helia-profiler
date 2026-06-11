@@ -101,7 +101,7 @@ def _render_aot(
 
 
 class TestMainCcRender:
-    @pytest.mark.parametrize("transport", ["rtt", "usb_cdc", "stdio"])
+    @pytest.mark.parametrize("transport", ["rtt", "usb_cdc", "swo", "stdio"])
     def test_renders_without_error(self, transport: str):
         out = _render_tflm(transport=transport)
         assert "hpx_printf" in out
@@ -160,6 +160,13 @@ class TestMainCcRender:
         assert "usb_timer_pause" not in out
         assert "nsx_usb_send" not in out
 
+    def test_swo_transport_uses_itm_output(self):
+        out = _render_tflm(transport="swo")
+        assert "sys_cfg.debug.transport = NSX_DEBUG_ITM;" in out
+        assert "nsx_itm_printf_enable();" in out
+        assert 'nsx_printf("%s", line_buf);' in out
+        assert "ITM->PORT[0].u8" not in out
+
     def test_shared_blocks_appear_exactly_once(self):
         out = _render_tflm(transport="rtt")
         # After dedup, each shared helper must render once (not twice).
@@ -212,7 +219,7 @@ class TestMainCcRender:
 
 
 class TestMainAotCcRender:
-    @pytest.mark.parametrize("transport", ["rtt", "usb_cdc", "stdio"])
+    @pytest.mark.parametrize("transport", ["rtt", "usb_cdc", "swo", "stdio"])
     def test_renders_without_error(self, transport: str):
         out = _render_aot(transport=transport)
         assert "fake_model_invoke" in out or "fake_model" in out
@@ -231,6 +238,13 @@ class TestMainAotCcRender:
     def test_rtt_transport_includes_drain(self):
         out = _render_aot(transport="rtt")
         assert "hpx_rtt_drain" in out
+
+    def test_aot_swo_transport_uses_itm_output(self):
+        out = _render_aot(transport="swo")
+        assert "sys_cfg.debug.transport = NSX_DEBUG_ITM;" in out
+        assert "nsx_itm_printf_enable();" in out
+        assert 'nsx_printf("%s", line_buf);' in out
+        assert "ITM->PORT[0].u8" not in out
 
     def test_shared_blocks_appear_exactly_once(self):
         out = _render_aot(transport="rtt")

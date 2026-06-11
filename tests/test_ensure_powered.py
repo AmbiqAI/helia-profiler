@@ -27,7 +27,7 @@ def _ctx(tmp_path: Path, power: dict | None = None) -> PipelineContext:
     model.write_bytes(b"\x00")
     overrides: dict = {
         "model": {"path": str(model)},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
     }
     if power is not None:
         overrides["power"] = power

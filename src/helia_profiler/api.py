@@ -6,7 +6,7 @@ This is the primary entry point for library users::
 
     config = ProfileConfig(
         model=ModelConfig(path=Path("my_model.tflite")),
-        engine=EngineConfig(type=EngineType.TFLM),
+        engine=EngineConfig(type=EngineType.HELIA_RT),
     )
     result = profile(config)
     print(f"{result.total_cycles:,.0f} total cycles across {result.layer_count} layers")

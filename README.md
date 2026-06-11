@@ -17,11 +17,8 @@ pipx install helia-profiler
 # Check toolchain and dependencies
 hpx doctor
 
-# Profile a model with stock TFLM
-hpx profile model.tflite --engine tflm --arena-size 65536
-
-# Profile with heliaRT (HELIA backend)
-hpx profile model.tflite --engine helia-rt --arena-size 65536
+# Profile a model with heliaRT (default interpreter path)
+hpx profile model.tflite --arena-size 65536
 
 # Profile with heliaAOT
 hpx profile model.tflite --engine helia-aot --engine-config aot_config.yml
@@ -34,9 +31,11 @@ hpx profile --config hpx.yml
 
 | Engine | Description |
 | --- | --- |
-| `tflm` | Stock TensorFlow Lite for Microcontrollers with CMSIS-NN |
 | `helia-rt` | Ambiq's optimized TFLM fork with HELIA/CMSIS-NN/reference backends |
 | `helia-aot` | Ambiq's ahead-of-time model compiler |
+
+Stock `tflm` is temporarily unavailable in the public CLI/config surface.
+Use `helia-rt` for interpreter-based profiling.
 
 ## What It Does
 

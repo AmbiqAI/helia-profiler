@@ -27,11 +27,14 @@ from serial.tools import list_ports
 
 from ..errors import CaptureError
 from ..jlink import reset_target
+from .readiness import poll_until
+from .timing import USB_REENUM_FLOOR_S
 from .transport import DEFAULT_TIMEOUT_S, HPX_END, HPX_START, LINE_TIMEOUT_S
 
 log = logging.getLogger("hpx")
 
 _ENUM_TIMEOUT_S = 15  # max time to wait for USB enumeration
+_DISAPPEAR_TIMEOUT_S = 5  # max time to wait for the old CDC device to drop
 _BAUD = 115200  # CDC ignores baud, but pyserial requires a value
 _CDC_PATTERNS = ["/dev/tty.usbmodem*", "/dev/ttyACM*"]
 _JLINK_MARKERS = ("segger", "j-link")
@@ -128,6 +131,7 @@ def capture_usb_output(
     jlink_device: str = "AP510NFA-CBR",
     timeout_s: float = DEFAULT_TIMEOUT_S,
     usb_port: str | None = None,
+    timing_out: dict[str, float] | None = None,
 ) -> list[str]:
     """Capture firmware output via USB CDC until HPX_END or timeout.
 
@@ -138,6 +142,19 @@ def capture_usb_output(
     Returns:
         List of captured text lines.
     """
+    capture_started_s = time.monotonic()
+    hpx_start_s: float | None = None
+    hpx_end_s: float | None = None
+
+    def finalize_timing() -> None:
+        if timing_out is None:
+            return
+        timing_out["capture_duration_s"] = time.monotonic() - capture_started_s
+        if hpx_start_s is not None:
+            timing_out["hpx_start_latency_s"] = hpx_start_s - capture_started_s
+        if hpx_start_s is not None and hpx_end_s is not None:
+            timing_out["protocol_duration_s"] = hpx_end_s - hpx_start_s
+
     # --- Step 0: snapshot existing CDC ports before reset ---
     pre_existing = _snapshot_cdc_ports()
     log.info("Pre-existing CDC ports: %s", sorted(pre_existing) or "(none)")
@@ -146,10 +163,19 @@ def capture_usb_output(
     reset_target(device=jlink_device, jlink_serial=jlink_serial)
 
     # --- Step 2: wait for TinyUSB device to disappear after reset ---
-    # The old TinyUSB CDC device will vanish briefly after the target
-    # resets.  Wait for it to drop, then snapshot again so we detect the
-    # new enumeration as a fresh device.
-    time.sleep(1.5)
+    # The old TinyUSB CDC device vanishes briefly after the target resets.
+    # Use a small floor to avoid racing the host USB enumerator, then *poll*
+    # for the old application device(s) to drop rather than sleeping a fixed
+    # window.  Snapshot again afterwards so the new enumeration is detected as
+    # a fresh device.
+    time.sleep(USB_REENUM_FLOOR_S)
+    app_ports_before = {p for p in pre_existing if not _is_jlink_port(p)}
+    if app_ports_before:
+        poll_until(
+            lambda: not (app_ports_before & _snapshot_cdc_ports()),
+            timeout_s=_DISAPPEAR_TIMEOUT_S,
+            description="old USB CDC device to drop",
+        )
     post_reset = _snapshot_cdc_ports()
     log.info("Post-reset CDC ports: %s", sorted(post_reset) or "(none)")
 
@@ -196,11 +222,16 @@ def capture_usb_output(
             if not line:
                 continue
 
+            line_ts = time.monotonic()
             lines.append(line)
             log.debug("USB: %s", line)
+            if line == HPX_START and hpx_start_s is None:
+                hpx_start_s = line_ts
 
             if line == HPX_END:
+                hpx_end_s = line_ts
                 log.info("Captured %d lines (HPX_END received)", len(lines))
+                finalize_timing()
                 return lines
 
     except CaptureError:
@@ -224,4 +255,5 @@ def capture_usb_output(
         timeout_s,
         len(lines),
     )
+    finalize_timing()
     return lines

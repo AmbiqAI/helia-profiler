@@ -25,11 +25,14 @@ import time
 
 from ..errors import CaptureError
 from ..jlink import reset_target
+from .readiness import open_jlink_with_retry, resume_if_halted
+from .timing import SBL_SETTLE_S
 from .transport import DEFAULT_TIMEOUT_S, collect_lines
 
 log = logging.getLogger("hpx")
 
-_SBL_SETTLE_S = 1.0  # post-reset delay for SBL before pylink connects
+#: Max time to keep retrying the host J-Link attach after reset.
+_ATTACH_TIMEOUT_S = 30
 
 
 def capture_swo_output(
@@ -40,6 +43,7 @@ def capture_swo_output(
     timeout_s: float = DEFAULT_TIMEOUT_S,
     cpu_freq: int = 96_000_000,
     swo_freq: int = 1_000_000,
+    timing_out: dict[str, float] | None = None,
 ) -> list[str]:
     """Capture firmware output via SWO/ITM until HPX_END or timeout.
 
@@ -52,6 +56,26 @@ def capture_swo_output(
     Returns:
         List of captured text lines.
     """
+    capture_started_s = time.monotonic()
+    hpx_start_s: float | None = None
+    hpx_end_s: float | None = None
+
+    def on_line(line: str, line_ts: float) -> None:
+        nonlocal hpx_start_s, hpx_end_s
+        if line == "--- HPX_START ---" and hpx_start_s is None:
+            hpx_start_s = line_ts
+        elif line == "--- HPX_END ---":
+            hpx_end_s = line_ts
+
+    def finalize_timing() -> None:
+        if timing_out is None:
+            return
+        timing_out["capture_duration_s"] = time.monotonic() - capture_started_s
+        if hpx_start_s is not None:
+            timing_out["hpx_start_latency_s"] = hpx_start_s - capture_started_s
+        if hpx_start_s is not None and hpx_end_s is not None:
+            timing_out["protocol_duration_s"] = hpx_end_s - hpx_start_s
+
     try:
         import pylink
     except ImportError as exc:
@@ -64,31 +88,37 @@ def capture_swo_output(
     # JLinkExe disconnects on exit so the SBL does not detect a debugger.
     reset_target(device=jlink_device, jlink_serial=jlink_serial)
 
-    # --- Step 2: brief delay for SBL to finish ---
-    time.sleep(_SBL_SETTLE_S)
+    # --- Step 2: small SBL settle floor, then retry the host attach ---
+    # The SBL bring-up is not observable from the host, so wait a short floor
+    # and then poll the attach (open_jlink_with_retry) instead of assuming the
+    # target is ready after one fixed sleep.
+    time.sleep(SBL_SETTLE_S)
 
     # --- Step 3: connect pylink and enable SWO ---
     jlink = pylink.JLink()
 
     try:
-        if jlink_serial:
-            jlink.open(serial_no=int(jlink_serial))
-        else:
-            jlink.open()
-        jlink.disable_dialog_boxes()
-        jlink.set_tif(pylink.JLinkInterfaces.SWD)
-        jlink.connect(jlink_device, 4000)
+        open_jlink_with_retry(
+            jlink,
+            device=jlink_device,
+            jlink_serial=jlink_serial,
+            timeout_s=_ATTACH_TIMEOUT_S,
+        )
         log.info("pylink connected to %s for SWO capture", jlink_device)
+        resume_if_halted(jlink)
 
         jlink.swo_enable(cpu_speed=cpu_freq, swo_speed=swo_freq, port_mask=0x01)
         log.info("SWO enabled (cpu=%d Hz, swo=%d Hz)", cpu_freq, swo_freq)
 
-        return collect_lines(
+        lines = collect_lines(
             lambda: bytes(jlink.swo_read_stimulus(0, 4096)),
             transport_name="SWO",
             timeout_s=timeout_s,
             poll_interval_s=0.01,  # 10 ms — SWO has limited bandwidth
+            on_line=on_line,
         )
+        finalize_timing()
+        return lines
 
     except CaptureError:
         raise

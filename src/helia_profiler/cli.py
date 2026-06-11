@@ -46,8 +46,8 @@ def main(argv: list[str] | None = None) -> None:
     g_engine.add_argument(
         "--engine",
         type=str,
-        choices=[e.value for e in EngineType],
-        help="Inference engine (default: tflm)",
+        choices=[EngineType.HELIA_RT.value, EngineType.HELIA_AOT.value],
+        help="Inference engine (default: helia-rt)",
     )
     g_engine.add_argument("--engine-config", type=Path, help="Engine-specific YAML config")
     g_engine.add_argument("--arena-size", type=int, help="Tensor arena size in bytes")
@@ -277,13 +277,13 @@ def main(argv: list[str] | None = None) -> None:
     p_analyze.add_argument(
         "--engine",
         type=str,
-        choices=[e.value for e in EngineType],
+        choices=[EngineType.HELIA_RT.value, EngineType.HELIA_AOT.value],
         default=None,
         help=(
             "Analyze as this engine would execute it. "
             "Default (no flag) uses the raw tflite graph. "
             "'helia-aot' runs AOT compilation and analyzes the transformed graph. "
-            "'helia-rt' / 'tflm' analyze the original tflite (same graph)."
+            "'helia-rt' analyzes the original tflite graph."
         ),
     )
     p_analyze.add_argument(
@@ -632,7 +632,7 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
-    engine = args.engine  # None, "helia-aot", "helia-rt", "tflm"
+    engine = args.engine  # None, "helia-aot", or "helia-rt"
     is_aot = engine == EngineType.HELIA_AOT.value
 
     # --- Original tflite analysis (always needed as baseline) ---
@@ -796,7 +796,7 @@ def _cmd_engines() -> None:
     from .console import HpxConsole
 
     console = HpxConsole()
-    console.print_engines([e.value for e in EngineType])
+    console.print_engines([EngineType.HELIA_RT.value, EngineType.HELIA_AOT.value])
 
 
 def _cmd_boards() -> None:

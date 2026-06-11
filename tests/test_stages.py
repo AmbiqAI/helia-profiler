@@ -20,7 +20,7 @@ def _make_ctx(tmp_path: Path, overrides: dict | None = None) -> PipelineContext:
     model.write_bytes(b"\x00")
     base = {
         "model": {"path": str(model)},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "work_dir": str(tmp_path / "work"),
     }
     if overrides:
@@ -59,7 +59,7 @@ class TestResolvePlatformStage:
             None,
             {
                 "model": {"path": str(tmp_path / "missing.tflite")},
-                "engine": {"type": "tflm"},
+                "engine": {"type": "helia-rt"},
             },
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
@@ -74,13 +74,21 @@ class TestResolvePlatformStage:
 
 
 class TestPrepareEngineStage:
-    def test_tflm_adapter(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path)
+    def test_helia_rt_adapter_default(self, tmp_path: Path, fake_dist: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "engine": {
+                    "type": "helia-rt",
+                    "config": {"dist_path": str(fake_dist)},
+                },
+            },
+        )
         ResolvePlatformStage().run(ctx)
         stage = PrepareEngineStage()
         stage.run(ctx)
         assert ctx.engine_adapter is not None
-        assert ctx.engine_adapter.name == "Stock TFLM (CMSIS-NN)"
+        assert ctx.engine_adapter.name == "heliaRT"
         assert ctx.engine_artifacts is not None
 
     def test_helia_rt_adapter(self, tmp_path: Path, fake_dist: Path):

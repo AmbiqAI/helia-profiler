@@ -13,12 +13,13 @@ hpx engines
 ```
 Supported engines:
 
-  tflm        Stock TensorFlow Lite for Microcontrollers (CMSIS-NN)
   helia-rt    AmbiqAI heliaRT — optimized TFLM fork (HELIA / CMSIS-NN / reference backends)
   helia-aot   AmbiqAI heliaAOT — ahead-of-time compiler (no interpreter at runtime)
 ```
 
 Use any of these names with `--engine` or `engine.type:` in YAML.
+
+Stock `tflm` is temporarily unavailable in the public CLI/config surface.
 
 ## See also
 

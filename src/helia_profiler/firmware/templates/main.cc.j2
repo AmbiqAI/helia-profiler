@@ -47,6 +47,17 @@
 #define HPX_CLEAN_DCACHE() ((void)0)
 #endif
 
+// --- Boot-time host-attach delays (microseconds) ---
+// These are the few unavoidable firmware-side waits where the host has no
+// observable signal to poll: the host SWO/ITM viewer needs time to attach
+// after reset, and USB CDC needs a brief settle after the host asserts DTR.
+// Keep them named here so they stay discoverable and do not accrete as bare
+// magic numbers throughout main().  The host side polls wherever it can
+// (see capture/readiness.py); these cover only the genuinely-blind windows.
+#define HPX_SWO_ATTACH_DELAY_US   (500U * 1000U)  // host SWO viewer attach grace
+#define HPX_USB_POLL_DELAY_US     (10U * 1000U)   // re-poll cadence while waiting for DTR
+#define HPX_USB_SETTLE_DELAY_US   (200U * 1000U)  // settle after host asserts DTR
+
 {% if not has_armv8m_pmu %}
 extern "C" __attribute__((weak)) void _exit(int status) {
     (void)status;
@@ -135,10 +146,13 @@ int main(void) {
     sys_cfg.perf_mode = {{ perf_mode_symbol }};  // {{ perf_mode_mhz }} MHz — target.clock.cpu
     sys_cfg.enable_cache = true;
     sys_cfg.enable_sram = true;
-    sys_cfg.debug.transport = NSX_DEBUG_NONE;
+    sys_cfg.debug.transport = {% if transport == "swo" %}NSX_DEBUG_ITM{% else %}NSX_DEBUG_NONE{% endif %};
     sys_cfg.skip_bsp_init = false;
     sys_cfg.spot_mgr_profile = true;
     NSX_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
+{% if transport == "swo" %}
+    nsx_itm_printf_enable();
+{% endif %}
     dwt_init();
     sync_gpio_init();
 {% include "_extreme_mode.j2" %}
@@ -147,10 +161,10 @@ int main(void) {
     // Initialize USB CDC and wait for host to connect (DTR)
     nsx_usb_init(&g_usb_cfg);
     while (!nsx_usb_connected(&g_usb_cfg)) {
-        nsx_delay_us(10 * 1000U);
+        nsx_delay_us(HPX_USB_POLL_DELAY_US);
     }
     // Brief settling delay after host connects
-    nsx_delay_us(200 * 1000U);
+    nsx_delay_us(HPX_USB_SETTLE_DELAY_US);
 {% elif transport == "rtt" %}
 
     // Set trim mode on buffer 0 (non-blocking — silently drops excess data).
@@ -165,9 +179,8 @@ int main(void) {
 {% else %}
 
     // Delay to allow the host SWO viewer to attach after reset.
-    // The board boots immediately after flash/reset; without this pause
-    // the profiler output would be emitted before the viewer connects.
-    nsx_delay_us(5000 * 1000U);
+    // NSX owns the ITM/SWO bring-up when debug.transport=NSX_DEBUG_ITM.
+    nsx_delay_us(HPX_SWO_ATTACH_DELAY_US);
 {% endif %}
 
 {% if psram_needed %}
@@ -390,6 +403,10 @@ int main(void) {
     hpx_printf("HPX_NUM_INPUTS=%d\n", (int)interpreter.inputs_size());
     hpx_printf("HPX_NUM_OUTPUTS=%d\n", (int)interpreter.outputs_size());
 
+    // Target-side profiled inference timing (excludes CSV/transport output).
+    uint64_t profiled_infer_cycles = 0;
+    uint32_t profiled_infer_count = 0;
+
     // --- Multi-pass PMU profiling ---
     // Each pass configures a specific set of PMU counters.  When the user
     // requests more counters than fit in a single pass (4 with 32-bit
@@ -435,7 +452,10 @@ int main(void) {
         g_profiler.SetIterationContext({{ loop.index0 }}, iter);
 
         sync_gpio_high();
+        uint32_t infer_start_cyc = DWT->CYCCNT;
         interpreter.Invoke();
+        profiled_infer_cycles += (uint32_t)(DWT->CYCCNT - infer_start_cyc);
+        profiled_infer_count++;
         sync_gpio_low();
 
 {% if transport == "usb_cdc" %}
@@ -452,6 +472,19 @@ int main(void) {
     usb_timer_resume();
 {% endif %}
 {% endfor %}
+
+    if (profiled_infer_count > 0 && SystemCoreClock > 0U) {
+        const uint32_t profiled_infer_total_us = (uint32_t)(
+            (profiled_infer_cycles * 1000000ULL + ((uint64_t)SystemCoreClock / 2ULL)) /
+            (uint64_t)SystemCoreClock);
+        const uint32_t profiled_infer_avg_us = (uint32_t)(
+            (profiled_infer_cycles * 1000000ULL +
+             (((uint64_t)SystemCoreClock * (uint64_t)profiled_infer_count) / 2ULL)) /
+            ((uint64_t)SystemCoreClock * (uint64_t)profiled_infer_count));
+        hpx_printf("HPX_PROFILED_INFER_COUNT=%lu\n", (unsigned long)profiled_infer_count);
+        hpx_printf("HPX_PROFILED_INFER_TOTAL_US=%lu\n", (unsigned long)profiled_infer_total_us);
+        hpx_printf("HPX_PROFILED_INFER_AVG_US=%lu\n", (unsigned long)profiled_infer_avg_us);
+    }
 
 {% if transport == "rtt" %}
     // Before emitting the sentinel, flush cache and wait for the RTT up

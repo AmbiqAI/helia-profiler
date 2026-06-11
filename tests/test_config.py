@@ -12,14 +12,14 @@ def test_load_config_from_cli_overrides():
     """Config should be constructible from CLI overrides alone."""
     cli = {
         "model": {"path": "test.tflite", "arena_size": 32768},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
     }
     config = load_config(None, cli)
 
     assert isinstance(config, ProfileConfig)
     assert config.model.path == Path("test.tflite")
     assert config.model.arena_size == 32768
-    assert config.engine.type.value == "tflm"
+    assert config.engine.type.value == "helia-rt"
     assert config.target.board == "apollo510_evb"
     assert config.target.jlink_serial is None
     assert config.profiling.iterations == 100
@@ -29,7 +29,7 @@ def test_jlink_serial_from_cli():
     """jlink_serial should be settable via CLI overrides."""
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "target": {"jlink_serial": "1160002255"},
     }
     config = load_config(None, cli)
@@ -39,7 +39,7 @@ def test_jlink_serial_from_cli():
 def test_clock_defaults_to_none_selection():
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
     }
     config = load_config(None, cli)
     assert config.target.clock.cpu is None
@@ -48,7 +48,7 @@ def test_clock_defaults_to_none_selection():
 def test_clock_from_cli():
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "target": {"clock": {"cpu": "hp"}},
     }
     config = load_config(None, cli)
@@ -59,7 +59,7 @@ def test_config_is_frozen():
     """ProfileConfig should be immutable."""
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
     }
     config = load_config(None, cli)
 
@@ -74,7 +74,7 @@ def test_timeouts_defaults():
     """TimeoutsConfig should be populated with defaults when unspecified."""
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
     }
     config = load_config(None, cli)
     t = config.timeouts
@@ -91,7 +91,7 @@ def test_timeouts_overrides():
     """YAML/CLI overrides should flow into TimeoutsConfig."""
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "timeouts": {
             "build_s": 900,
             "flash_s": 60,
@@ -117,18 +117,38 @@ def test_build_config_defaults():
     """BuildConfig should be present with defaults when unspecified."""
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
     }
     config = load_config(None, cli)
     assert config.build.channel is None
     assert config.build.nsx_modules == {}
 
 
+def test_engine_defaults_to_helia_rt():
+    cli = {
+        "model": {"path": "test.tflite"},
+    }
+
+    config = load_config(None, cli)
+
+    assert config.engine.type.value == "helia-rt"
+
+
+def test_tflm_engine_rejected():
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "tflm"},
+    }
+
+    with pytest.raises(ConfigError, match="temporarily unavailable"):
+        load_config(None, cli)
+
+
 def test_build_config_channel_override():
     """Channel override should flow through from YAML/CLI."""
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "build": {"channel": "dev"},
     }
     config = load_config(None, cli)
@@ -139,7 +159,7 @@ def test_build_config_nsx_module_path_override():
     """Local path override for an NSX module."""
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "build": {
             "nsx_modules": {
                 "nsx-core": {"path": "/home/dev/my-nsx-core"},
@@ -157,7 +177,7 @@ def test_build_config_nsx_module_ref_override():
     """Git ref override for an NSX module."""
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "build": {
             "nsx_modules": {
                 "nsx-cmsis-core": {"ref": "feat/apollo6-support"},
@@ -175,7 +195,7 @@ def test_build_config_nsx_module_version_override():
     """Version pin override for an NSX module."""
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "build": {
             "nsx_modules": {
                 "nsx-gpio": {"version": "2.0.0"},
@@ -193,7 +213,7 @@ def test_build_config_multiple_overrides():
     """Multiple NSX module overrides in one config."""
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "build": {
             "channel": "dev",
             "nsx_modules": {
@@ -243,7 +263,7 @@ def test_build_config_invalid_channel():
     """Invalid channel names should raise ConfigError."""
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "build": {"channel": "../escape"},
     }
     with pytest.raises(ConfigError, match="Invalid build.channel"):
@@ -254,7 +274,7 @@ def test_build_config_channel_rejects_empty():
     """Empty string channel should be rejected."""
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "build": {"channel": ""},
     }
     with pytest.raises(ConfigError, match="Invalid build.channel"):
@@ -270,7 +290,7 @@ def test_build_config_malformed_module_spec():
     """Non-dict module spec should raise ConfigError."""
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "build": {
             "nsx_modules": {
                 "nsx-core": "just-a-string",
@@ -284,7 +304,7 @@ def test_build_config_malformed_module_spec():
 def test_custom_board_inherits_builtin_board_profile_and_sync_pin():
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "target": {
             "board": "apollo510_lab",
             "custom_boards": {
@@ -307,7 +327,7 @@ def test_custom_board_inherits_builtin_board_profile_and_sync_pin():
 def test_custom_soc_and_board_are_available_via_platform_registry():
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "helia-rt"},
         "target": {
             "board": "apollo510_custom_board",
             "custom_socs": {

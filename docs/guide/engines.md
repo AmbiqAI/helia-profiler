@@ -1,6 +1,6 @@
 # Inference Engines
 
-heliaPROFILER supports three inference engines. Each profiling run uses
+heliaPROFILER currently exposes two inference engines. Each profiling run uses
 **exactly one** engine — you choose which at configuration time. There is
 no "run all" mode; comparison is done by running the profiler more than
 once with different configs.
@@ -9,30 +9,15 @@ once with different configs.
 
 | Engine | `--engine` | Interpreter? | Best for | Typical binary |
 |---|---|---|---|---|
-| Stock TFLM | `tflm` | Yes | Baseline reference | ~570 KB |
 | heliaRT | `helia-rt` | Yes | Optimized interpreter performance | ~570 KB |
 | heliaAOT | `helia-aot` | No | Maximum performance, smallest code | ~96 KB |
 
-The pipeline, capture protocol, and report format are identical for all
-three. Only the firmware payload changes.
+The pipeline, capture protocol, and report format are identical for both
+engines. Only the firmware payload changes.
 
-## Stock TFLM
-
-Standard [TensorFlow Lite for Microcontrollers](https://www.tensorflow.org/lite/microcontrollers)
-with CMSIS-NN operator kernels. Unmodified upstream runtime.
-
-Use it when:
-
-- You need a baseline to compare optimized engines against.
-- You're profiling a model with operators that aren't yet covered by
-  heliaRT or heliaAOT.
-
-```yaml title="hpx.yml"
-engine:
-  type: tflm
-```
-
-No engine-specific config is required.
+Stock TFLM is temporarily unavailable in the public CLI/config surface.
+Use `helia-rt` for interpreter-based profiling until the stock adapter is
+restored.
 
 ## heliaRT
 
@@ -217,7 +202,7 @@ The pipeline:
     from a local checkout when `cmsis_nn_path` / `CMSIS_NN_PATH` is set.
    - `nsx-heliaaot-model` — the AOT-compiled C code for this specific model.
 4. Links them into a profiler firmware image with the same harness used
-   for TFLM/heliaRT runs.
+  for interpreter and AOT runs.
 
 ### Key constraints
 
@@ -248,19 +233,16 @@ The pipeline:
 
 ```mermaid
 graph TD
-    A[Start] --> B{Need an op heliaAOT/heliaRT<br/>doesn't support?}
-    B -->|Yes| C[tflm]
-    B -->|No| D{Need smallest binary<br/>or fastest inference?}
-    D -->|Yes| E[helia-aot]
-    D -->|No| F[helia-rt]
+  A[Start] --> B{Need smallest binary<br/>or fastest inference?}
+  B -->|Yes| C[helia-aot]
+  B -->|No| D[helia-rt]
 ```
 
 | Scenario | Recommended |
 |---|---|
 | First-time profiling, baseline numbers | `helia-rt` |
-| Comparing optimized vs. stock | `tflm` then `helia-rt` |
 | Production deployment | `helia-aot` |
-| Unsupported ops, prototyping new model | `tflm` or `helia-rt` |
+| Unsupported ops, prototyping new model | `helia-rt` |
 | Smallest flash footprint | `helia-aot` |
 
 ## Reference numbers
