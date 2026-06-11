@@ -496,14 +496,14 @@ target_compile_definitions(nsx_helia_rt
 # module (heliaRT >= v1.16.0).
 #
 # The adapter writes a thin wrapper ``CMakeLists.txt`` at
-# ``<work_dir>/modules/nsx-helia-rt/`` that sets the variant and includes
-# the source tree's own ``nsx/CMakeLists.txt``.  heliaRT self-resolves its
-# repo root from ``CMAKE_CURRENT_LIST_DIR/..`` inside the included file.
-# No source files are copied — the source tree is referenced by absolute
-# path.
+# ``<work_dir>/modules/nsx-helia-rt/`` that sets the variant, points
+# ``HELIA_RT_TFLM_ROOT`` at the source tree, and includes the source tree's
+# own ``nsx/CMakeLists.txt``. No source files are copied — the source tree is
+# referenced by absolute path.
 
 # Files that must exist in the source tree to qualify as a heliaRT source build.
 _SOURCE_REQUIRED_FILES = (
+    "CMakeLists.txt",
     "nsx/CMakeLists.txt",
     "nsx/nsx-module.yaml",
     "cmake/helia_rt_sources.cmake",
@@ -557,16 +557,11 @@ def _install_nsx_module_source(
     """Install a source-build NSX module wrapper at *module_dir*.
 
     Writes a minimal ``CMakeLists.txt`` that includes the heliaRT source
-    tree's own ``nsx/CMakeLists.txt``.  heliaRT self-resolves its repo
-    root from ``CMAKE_CURRENT_LIST_DIR/..`` inside the included file, so
-    no explicit ``HELIART_TFLM_ROOT`` override is needed.
-
-    No source files are copied — the source tree is referenced by absolute
-    path so an incremental build can reuse its build artifacts across hpx
-    runs.
+    tree's own ``nsx/CMakeLists.txt`` while pointing ``HELIA_RT_TFLM_ROOT``
+    at the user-supplied heliaRT checkout.
     """
     # Wipe any prior install (e.g. switching modes inside one work_dir).
-    for d in (*_DIST_DIRS, "lib", "nsx"):
+    for d in (*_DIST_DIRS, "lib", "nsx", "_source_shim"):
         tgt = module_dir / d
         if tgt.is_dir():
             shutil.rmtree(tgt)
@@ -580,10 +575,12 @@ def _install_nsx_module_source(
         "\n"
         f'set(HELIA_RT_VARIANT "{variant}" '
         'CACHE STRING "heliaRT build variant" FORCE)\n'
+        f'set(HELIA_RT_TFLM_ROOT "{source_path.as_posix()}" '
+        'CACHE PATH "heliaRT repo root" FORCE)\n'
         "\n"
         "# Delegate to the source-build NSX module that ships with the\n"
-        "# heliaRT repo.  include() sets CMAKE_CURRENT_LIST_DIR to the\n"
-        "# source nsx/ directory, so heliaRT self-resolves its repo root.\n"
+        "# heliaRT repo while overriding HELIA_RT_TFLM_ROOT to the user\n"
+        "# supplied source checkout.\n"
         f'include("{nsx_cmake.as_posix()}")\n'
     )
     (module_dir / "CMakeLists.txt").write_text(cmake_text)

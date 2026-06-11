@@ -12,6 +12,7 @@ from helia_profiler.engines.helia_rt import (
     HELIART_VERSION,
     HeliaRTAdapter,
     _install_nsx_module,
+    _install_nsx_module_source,
 )
 from helia_profiler.errors import EngineError
 
@@ -260,11 +261,10 @@ class TestSourceBuildMode:
         module_dir = work_dir / "modules" / "helia-rt"
         cmake = (module_dir / "CMakeLists.txt").read_text()
         # Source-build wrapper includes the source tree's nsx/CMakeLists.txt
-        # directly (heliaRT self-resolves its repo root).
+        # directly and points HELIA_RT_TFLM_ROOT at the source checkout.
         assert f"{fake_source_tree.as_posix()}/nsx/CMakeLists.txt" in cmake
         assert 'HELIA_RT_VARIANT "release-with-logs"' in cmake
-        # No explicit HELIART_TFLM_ROOT override — heliaRT self-resolves.
-        assert "HELIART_TFLM_ROOT" not in cmake
+        assert f'HELIA_RT_TFLM_ROOT "{fake_source_tree.as_posix()}"' in cmake
 
         # nsx-module.yaml is copied from the source tree.
         yaml_text = (module_dir / "nsx-module.yaml").read_text()
@@ -369,3 +369,13 @@ class TestSourceBuildMode:
         module_dir = work_dir / "modules" / "nsx-helia-rt"
         # Source-build path was taken — no prebuilt lib/ tree.
         assert not (module_dir / "lib").exists()
+
+def test_install_nsx_module_source_points_to_source_root(tmp_path: Path, fake_source_tree: Path):
+    module_dir = tmp_path / "module"
+    module_dir.mkdir()
+
+    _install_nsx_module_source(module_dir, fake_source_tree, variant="release-with-logs")
+
+    cmake = (module_dir / "CMakeLists.txt").read_text()
+    assert f'HELIA_RT_TFLM_ROOT "{fake_source_tree.as_posix()}"' in cmake
+    assert not (module_dir / "_source_shim").exists()
