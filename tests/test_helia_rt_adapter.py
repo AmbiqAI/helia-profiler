@@ -366,8 +366,10 @@ class TestSourceBuildMode:
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)
 
-        module_dir = work_dir / "modules" / "nsx-helia-rt"
-        # Source-build path was taken — no prebuilt lib/ tree.
+        module_dir = work_dir / "modules" / "helia-rt"
+        # Source-build path was taken — the local heliaRT module exists and no
+        # prebuilt lib/ tree was installed from dist_path.
+        assert (module_dir / "CMakeLists.txt").exists()
         assert not (module_dir / "lib").exists()
 
 def test_install_nsx_module_source_points_to_source_root(tmp_path: Path, fake_source_tree: Path):
