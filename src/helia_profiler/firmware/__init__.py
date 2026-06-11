@@ -330,6 +330,13 @@ def _install_local_module_override(dest: Path, source: Path) -> None:
     log.info("Installed local module override: %s → %s", source, dest)
 
 
+def _copy_local_engine_module(dest: Path, source: Path) -> None:
+    """Copy a prepared local engine module into the generated app tree."""
+    if dest.is_dir():
+        shutil.rmtree(dest)
+    shutil.copytree(source, dest)
+
+
 # ---------------------------------------------------------------------------
 # PMU preset mapping (legacy — used only for backward-compat Init() path)
 # ---------------------------------------------------------------------------
@@ -925,8 +932,11 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # --- Engine modules ---
     # Local modules are vendored into the app under their registry-derived
-    # project directory (so NSX's registry-aware lock finds them). Registry
-    # modules are cloned by NSX during `nsx sync`; nothing to copy here.
+    # project directory so ``nsx lock`` can resolve them. When the module
+    # name differs from the project (e.g. nsx-helia-rt in project helia-rt),
+    # also mirror the same content under modules/<name> because the later
+    # CMake bootstrap stage resolves local module add_subdirectory() paths by
+    # module name.
     for extra_mod in artifacts.extra_modules:
         if not extra_mod.local:
             target = extra_mod.project or extra_mod.name
@@ -939,12 +949,21 @@ def generate_app(ctx: PipelineContext) -> Path:
             )
             continue
         mod_src = extra_mod.path
-        mod_dst = app_dir / "modules" / (extra_mod.project or extra_mod.name)
-        if mod_src != mod_dst:
-            if mod_dst.exists():
-                shutil.rmtree(mod_dst)
-            shutil.copytree(mod_src, mod_dst)
-        log.info("Engine module: %s → %s", extra_mod.name, mod_dst)
+        primary_dst = app_dir / "modules" / (extra_mod.project or extra_mod.name)
+        if mod_src != primary_dst:
+            _copy_local_engine_module(primary_dst, mod_src)
+
+        alias_dst = app_dir / "modules" / extra_mod.name
+        if alias_dst != primary_dst:
+            _copy_local_engine_module(alias_dst, mod_src)
+            log.info(
+                "Engine module: %s → %s (alias: %s)",
+                extra_mod.name,
+                primary_dst,
+                alias_dst,
+            )
+        else:
+            log.info("Engine module: %s → %s", extra_mod.name, primary_dst)
 
     log.info("Generated profiler app at %s", app_dir)
     return app_dir

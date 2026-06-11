@@ -306,6 +306,9 @@ class TestGenerateApp:
         assert heliart_mod.is_dir()
         assert (heliart_mod / "nsx-module.yaml").exists()
         assert (heliart_mod / "CMakeLists.txt").exists()
+        heliart_alias = app_dir / "modules" / "nsx-helia-rt"
+        assert heliart_alias.is_dir()
+        assert (heliart_alias / "nsx-module.yaml").exists()
 
     def test_nsx_yml_contains_board(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)
@@ -326,6 +329,43 @@ class TestGenerateApp:
         modules_cmake = (app_dir / "cmake" / "nsx" / "modules.cmake").read_text()
         assert "nsx-core" in modules_cmake
         assert "nsx-pmu-armv8m" in modules_cmake
+
+    def test_source_build_installs_heliart_under_module_name(
+        self,
+        tmp_path: Path,
+        fake_source_tree: Path,
+        fake_cmsis_nn: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setenv("CMSIS_NN_PATH", str(fake_cmsis_nn))
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {
+                    "type": "helia-rt",
+                    "config": {"source_path": str(fake_source_tree)},
+                },
+                "target": {"board": "apollo510_evb"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        heliart_module = app_dir / "modules" / "helia-rt"
+        heliart_alias = app_dir / "modules" / "nsx-helia-rt"
+        assert (heliart_module / "nsx-module.yaml").is_file()
+        assert (heliart_module / "CMakeLists.txt").is_file()
+        assert (heliart_alias / "nsx-module.yaml").is_file()
+        assert (heliart_alias / "CMakeLists.txt").is_file()
 
     def test_ap4_generation_avoids_armv8m_pmu_module_and_link_target(
         self, tmp_path: Path, fake_dist: Path
