@@ -71,6 +71,7 @@ class PreflightStage:
         _check_model(cfg.model.path)
         _check_arena_size(cfg.model.arena_size)
         _check_model_location(cfg.model.model_location)
+        _check_rtt_buffer_size(cfg.target.rtt_buffer_size_up)
         _check_runtime_split_locations(cfg)
         _check_pmu_selection(cfg)
         _check_output_dir(cfg.output.dir)
@@ -150,6 +151,16 @@ def _check_explicit_location(loc: str | None, *, name: str, valid: tuple[Placeme
         raise ConfigError(
             f"Invalid {name}: '{loc}'.",
             hint=f"Expected one of: {', '.join(valid)}.",
+        )
+
+
+def _check_rtt_buffer_size(size: int | None) -> None:
+    if size is None:
+        return
+    if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
+        raise ConfigError(
+            f"target.rtt_buffer_size_up must be a positive integer (got {size!r}).",
+            hint="Set target.rtt_buffer_size_up to a positive byte count, or leave it unset to use the toolchain-aware default.",
         )
 
 

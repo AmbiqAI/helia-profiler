@@ -131,8 +131,9 @@ power-cycle reset via the Joulescope (if available).
 The core data collection stage:
 
 1. **Reset the target** — J-Link reset to start firmware from the beginning
-2. **Start SWO viewer** — `JLinkSWOViewerCL` captures the trace output
-3. **Parse HPX protocol** — firmware prints structured data over SWO:
+2. **Attach the selected transport reader** — `pylink` drives RTT/SWO capture
+    and `pyserial` reads USB CDC when selected
+3. **Parse HPX protocol** — firmware prints structured data over the selected transport:
     - `HPX_START` / `HPX_END` markers
     - Metadata key-value pairs (arena size, model size, tensor count)
     - CSV rows: one row per layer per iteration with counter values

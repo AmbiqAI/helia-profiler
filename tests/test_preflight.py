@@ -111,6 +111,18 @@ class TestPreflightConfig:
             with pytest.raises(ConfigError, match="model_location"):
                 PreflightStage().run(ctx)
 
+    def test_zero_rtt_buffer_size_raises(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path, {"target": {"rtt_buffer_size_up": 0}})
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="rtt_buffer_size_up"):
+                PreflightStage().run(ctx)
+
+    def test_negative_rtt_buffer_size_raises(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path, {"target": {"rtt_buffer_size_up": -1}})
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="rtt_buffer_size_up"):
+                PreflightStage().run(ctx)
+
     def test_invalid_runtime_arena_location_raises(self, tmp_path: Path):
         ctx = _make_ctx(
             tmp_path,

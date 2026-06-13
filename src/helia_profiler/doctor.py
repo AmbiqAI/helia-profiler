@@ -32,10 +32,10 @@ def collect_checks() -> tuple[
 
     required_python_specs = [
         ("neuralspotx Python package", "neuralspotx"),
+        ("pylink Python package (RTT/SWO transport)", "pylink"),
     ]
     optional_specs = [
         ("heliaAOT compiler", "helia_aot"),
-        ("pylink Python package (RTT/SWO transport)", "pylink"),
     ]
     # Optional toolchains (checked as binaries on PATH)
     optional_tools = [
