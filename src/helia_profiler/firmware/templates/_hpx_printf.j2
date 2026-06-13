@@ -60,6 +60,26 @@ static void hpx_rtt_drain(uint32_t timeout_ms) {
         if (total > spins_per_ms) total -= spins_per_ms; else total = 0;
     }
 }
+
+// Lossless / non-blocking mode switch for the RTT up-buffer.
+//
+// The buffer is configured NO_BLOCK_TRIM at init so that any RTT write that
+// happens *during* a timed interpreter.Invoke()/model_run() (e.g. an in-flight
+// heartbeat) can never stall the CPU and contaminate the cycle/PMU counts —
+// such writes are intentionally droppable.
+//
+// CSV dumps and the HPX_END sentinel happen *outside* the timed window, where
+// losing data is fatal to the host parser.  For those, switch to
+// BLOCK_IF_FIFO_FULL so the firmware waits for the J-Link host to drain rather
+// than silently dropping rows or the sentinel.  This makes correctness
+// independent of BUFFER_SIZE_UP and model size; the buffer size becomes a pure
+// throughput/latency knob.
+static void hpx_rtt_set_blocking(void) {
+    SEGGER_RTT_SetFlagsUpBuffer(0, SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL);
+}
+static void hpx_rtt_set_nonblocking(void) {
+    SEGGER_RTT_SetFlagsUpBuffer(0, SEGGER_RTT_MODE_NO_BLOCK_TRIM);
+}
 {% elif transport == "swo" %}
 {{ _linkage }}void hpx_printf(const char *fmt, ...) {
     static char line_buf[512];

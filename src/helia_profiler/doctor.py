@@ -23,7 +23,6 @@ def collect_checks() -> tuple[
         ("CMake (>= 3.24)", "cmake"),
         ("Ninja build system", "ninja"),
         ("SEGGER J-Link commander", "JLinkExe"),
-        ("SEGGER SWO viewer", "JLinkSWOViewerCL"),
     ]
 
     checks: list[tuple[str, str, str | None]] = []
@@ -33,6 +32,7 @@ def collect_checks() -> tuple[
 
     required_python_specs = [
         ("neuralspotx Python package", "neuralspotx"),
+        ("pylink Python package (RTT/SWO transport)", "pylink"),
     ]
     optional_specs = [
         ("heliaAOT compiler", "helia_aot"),

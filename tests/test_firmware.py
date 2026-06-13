@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -158,7 +159,30 @@ def fake_segger_rtt_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     config_dir = rtt_root / "Config"
     rtt_dir.mkdir(parents=True)
     config_dir.mkdir()
-    (rtt_dir / "SEGGER_RTT.c").write_text("// fake RTT source\n")
+    (rtt_dir / "SEGGER_RTT.c").write_text(
+        '#include "SEGGER_RTT.h"\n'
+        '\n'
+        '#if SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
+        '  #if ((defined __GNUC__) || (defined __clang__))\n'
+        '    SEGGER_RTT_CB _SEGGER_RTT                                                             __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
+        '    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)]   __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
+        '    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)] __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
+        '  #elif (defined __ICCARM__)\n'
+        '    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
+        '    SEGGER_RTT_CB _SEGGER_RTT;\n'
+        '    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
+        '    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)];\n'
+        '    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
+        '    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)];\n'
+        '  #else\n'
+        '    #error "Don\'t know how to place _SEGGER_RTT, _acUpBuffer, _acDownBuffer cache-line aligned"\n'
+        '  #endif\n'
+        '#else\n'
+        '  SEGGER_RTT_PUT_CB_SECTION(SEGGER_RTT_CB_ALIGN(SEGGER_RTT_CB _SEGGER_RTT));\n'
+        '  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acUpBuffer  [BUFFER_SIZE_UP]));\n'
+        '  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acDownBuffer[BUFFER_SIZE_DOWN]));\n'
+        '#endif\n'
+    )
     (rtt_dir / "SEGGER_RTT.h").write_text("// fake RTT header\n")
     (rtt_dir / "SEGGER_RTT_ConfDefaults.h").write_text("// fake RTT conf defaults\n")
     (config_dir / "SEGGER_RTT_Conf.h").write_text("// fake RTT config\n")
@@ -306,6 +330,10 @@ class TestGenerateApp:
         assert heliart_mod.is_dir()
         assert (heliart_mod / "nsx-module.yaml").exists()
         assert (heliart_mod / "CMakeLists.txt").exists()
+        heliart_alias = app_dir / "modules" / "nsx-helia-rt"
+        assert heliart_alias.is_dir()
+        assert (heliart_alias / "nsx-module.yaml").exists()
+        assert (heliart_alias / "CMakeLists.txt").exists()
 
     def test_nsx_yml_contains_board(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)
@@ -326,6 +354,43 @@ class TestGenerateApp:
         modules_cmake = (app_dir / "cmake" / "nsx" / "modules.cmake").read_text()
         assert "nsx-core" in modules_cmake
         assert "nsx-pmu-armv8m" in modules_cmake
+
+    def test_source_build_installs_heliart_under_module_name(
+        self,
+        tmp_path: Path,
+        fake_source_tree: Path,
+        fake_cmsis_nn: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setenv("CMSIS_NN_PATH", str(fake_cmsis_nn))
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {
+                    "type": "helia-rt",
+                    "config": {"source_path": str(fake_source_tree)},
+                },
+                "target": {"board": "apollo510_evb"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        heliart_module = app_dir / "modules" / "helia-rt"
+        heliart_alias = app_dir / "modules" / "nsx-helia-rt"
+        assert (heliart_module / "nsx-module.yaml").is_file()
+        assert (heliart_module / "CMakeLists.txt").is_file()
+        assert (heliart_alias / "nsx-module.yaml").is_file()
+        assert (heliart_alias / "CMakeLists.txt").is_file()
 
     def test_ap4_generation_avoids_armv8m_pmu_module_and_link_target(
         self, tmp_path: Path, fake_dist: Path
@@ -464,10 +529,77 @@ class TestGenerateApp:
         app_dir = generate_app(ctx)
 
         main_cc = (app_dir / "src" / "main.cc").read_text()
+        cmake = (app_dir / "CMakeLists.txt").read_text()
         assert '#include "am_hal_cachectrl.h"' in main_cc
         assert 'SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,' in main_cc
         assert "HPX_CLEAN_DCACHE();" in main_cc.split('SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,', 1)[1]
         assert "SEGGER_RTT_Write(0, line_buf, (unsigned)n);\n        HPX_CLEAN_DCACHE();" in main_cc
+        assert "BUFFER_SIZE_UP=32768" in cmake
+
+    def test_atfe_rtt_generation_uses_smaller_buffer(self, tmp_path: Path, fake_dist: Path):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        object.__setattr__(ctx.config.target, "toolchain", "atfe")
+        object.__setattr__(ctx.config.target, "transport", "rtt")
+        app_dir = generate_app(ctx)
+
+        cmake = (app_dir / "CMakeLists.txt").read_text()
+        assert "BUFFER_SIZE_UP=12288" in cmake
+
+    def test_rtt_generation_places_segger_buffers_in_sram(self, tmp_path: Path, fake_dist: Path):
+        rtt_root = Path(os.environ["SEGGER_RTT_PATH"])
+        (rtt_root / "RTT" / "SEGGER_RTT.c").write_text(
+            '#include "SEGGER_RTT.h"\n'
+            '\n'
+            '#if SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
+            '  #if ((defined __GNUC__) || (defined __clang__))\n'
+            '    SEGGER_RTT_CB _SEGGER_RTT                                                             __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
+            '    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)]   __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
+            '    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)] __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
+            '  #elif (defined __ICCARM__)\n'
+            '    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
+            '    SEGGER_RTT_CB _SEGGER_RTT;\n'
+            '    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
+            '    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)];\n'
+            '    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
+            '    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)];\n'
+            '  #else\n'
+            '    #error "Don\'t know how to place _SEGGER_RTT, _acUpBuffer, _acDownBuffer cache-line aligned"\n'
+            '  #endif\n'
+            '#else\n'
+            '  SEGGER_RTT_PUT_CB_SECTION(SEGGER_RTT_CB_ALIGN(SEGGER_RTT_CB _SEGGER_RTT));\n'
+            '  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acUpBuffer  [BUFFER_SIZE_UP]));\n'
+            '  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acDownBuffer[BUFFER_SIZE_DOWN]));\n'
+            '#endif\n'
+        )
+
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        rtt_c = (app_dir / "src" / "rtt" / "SEGGER_RTT.c").read_text()
+        assert '#include "SEGGER_RTT.h"\n#include "nsx_mem.h"\n' in rtt_c
+        assert "NSX_MEM_SRAM_BSS SEGGER_RTT_CB _SEGGER_RTT" in rtt_c
+        assert "static NSX_MEM_SRAM_BSS char   _acUpBuffer" in rtt_c
+        assert "static NSX_MEM_SRAM_BSS char   _acDownBuffer" in rtt_c
+
+    def test_rtt_generation_raises_when_segger_layout_is_unexpected(
+        self, tmp_path: Path, fake_dist: Path
+    ):
+        rtt_root = Path(os.environ["SEGGER_RTT_PATH"])
+        (rtt_root / "RTT" / "SEGGER_RTT.c").write_text(
+            '#include "SEGGER_RTT.h"\n'
+            'static int not_the_expected_layout = 1;\n'
+        )
+
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+
+        with pytest.raises(FirmwareError, match="Failed to patch SEGGER_RTT.c"):
+            generate_app(ctx)
 
     def test_gpio_sync_not_enabled_for_internal(self, tmp_path: Path, fake_dist: Path):
         model = tmp_path / "model.tflite"

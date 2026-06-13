@@ -1,31 +1,23 @@
 # Data Capture
 
-The capture subsystem collects PMU counter data from the target MCU over
-Serial Wire Output (SWO) and optionally power measurements via Joulescope.
+The capture subsystem collects PMU counter data from the target MCU over RTT,
+USB CDC, or SWO, and optionally power measurements via Joulescope.
 
 ## SWO capture pipeline
 
 ```mermaid
 graph LR
     A[Firmware<br/>SWO printf] -->|ITM Channel 0| B[J-Link probe]
-    B -->|USB| C[JLinkSWOViewerCL]
-    C -->|stdout pipe| D[serial_reader.py]
+    B -->|USB| C[pylink]
+    C --> D[serial_reader.py]
     D -->|raw lines| E[parser.py]
     E -->|PmuResult| F[Pipeline context]
 ```
 
-### JLinkSWOViewerCL
+### SWO capture backend
 
-The SEGGER `JLinkSWOViewerCL` tool captures SWO trace output. It's started
-as a subprocess and its stdout is piped to the serial reader:
-
-```python
-proc = subprocess.Popen(
-    ["JLinkSWOViewerCL", "-device", soc, "-if", "SWD", "-speed", "4000"],
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE,
-)
-```
+SWO capture uses the J-Link probe through the `pylink` Python bindings.
+The reader configures SWO in-process and then drains stimulus port 0:
 
 The reader collects lines until it sees `HPX_END` or a timeout expires.
 

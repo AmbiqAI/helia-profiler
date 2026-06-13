@@ -88,7 +88,7 @@ opens that serial port and reads the same HPX protocol stream.
 
 [Serial Wire Output](https://developer.arm.com/documentation/100748/0623/Debugging-your-application/Using-the-Serial-Wire-Viewer)
 streams data over the SWO pin via the target's ITM stimulus port 0.
-Captured by `JLinkSWOViewerCL`.
+Captured via the J-Link probe using the `pylink` API.
 
 ### Hardware
 

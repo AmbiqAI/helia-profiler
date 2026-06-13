@@ -141,7 +141,7 @@ src/helia_profiler/
 │   └── templates/      # Jinja2 templates (CMakeLists, main.cc, etc.)
 │
 ├── capture/            # Data acquisition
-│   ├── serial_reader.py  # SWO capture via JLinkSWOViewerCL
+│   ├── serial_reader.py  # SWO capture via pylink/J-Link API
 │   └── parser.py         # HPX protocol parser → PmuResult
 │
 ├── power/              # Power measurement drivers

@@ -18,25 +18,25 @@ profiler invokes:
 - `atfe` (when present)
 - `cmake`
 - `ninja`
-- `JLinkExe` (and connected J-Link probes)
-- `JLinkSWOViewerCL` (used for SWO transport diagnostics)
-- `nsx`
-- `joulescope` Python package (optional — only when power extras
-  installed)
+- `JLinkExe`
+- `neuralspotx` Python package
+- `pylink` Python package (required for RTT/SWO transport, including the
+  default RTT flow)
+- `helia-aot` Python package (optional)
+- `armclang`, `fromelf` (optional)
 
 ## Output
 
 ```
-✓ arm-none-eabi-gcc   14.3.1
-✓ arm-none-eabi-size  14.3.1
-✓ cmake               3.31.6
-✓ ninja               1.12.1
-✓ JLinkExe            V8.12a
-✓ J-Link probe        000123456789  Apollo510 EVB
-✓ nsx                 0.6.0
-○ armclang            (not installed)
-○ atfe                (not installed)
-○ joulescope          (optional — pip install 'helia-profiler[power]')
+✓ ARM GCC toolchain: /usr/bin/arm-none-eabi-gcc
+✓ CMake (>= 3.24): /usr/bin/cmake
+✓ Ninja build system: /usr/bin/ninja
+✓ SEGGER J-Link commander: /usr/bin/JLinkExe
+✓ neuralspotx Python package: installed
+✓ pylink Python package (RTT/SWO transport): installed
+○ heliaAOT compiler: not installed
+○ ARM Compiler (armclang): not installed
+○ ARM fromelf (armclang): not installed
 ```
 
 | Symbol | Meaning |
@@ -52,8 +52,9 @@ profiler invokes:
 | 0 | All required dependencies present |
 | 1 | At least one required dependency is missing |
 
-`doctor` only flags **required** dependencies as failures. Missing
-optional binaries (armclang, atfe, joulescope) report `○` and exit 0.
+`doctor` flags **required** dependencies as failures. Missing optional
+capabilities (for example `helia-aot` or Arm Compiler binaries) report
+`○` and exit 0.
 
 ## See also
 

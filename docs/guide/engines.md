@@ -226,6 +226,7 @@ The pipeline:
 | `prefix` | string | `hpx` | C symbol prefix |
 | `module_name` | string | `hpx_model` | Generated NSX module name |
 | `cmsis_nn_requantize_inline_asm` | bool | `true` | Use inline-asm requantization path |
+| `linker_profile` | string | `default` | NSX linker-script profile (`default`, `itcm`); `itcm` promotes hot kernels into ITCM (Apollo5-family M55 SoCs) |
 | `aot_args` | dict | `{}` | Pass-through args to the AOT compiler |
 | `platform_name` | string | *(from board)* | Override the board → AOT platform mapping |
 

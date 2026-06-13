@@ -3,10 +3,13 @@
 RTT uses an in-SRAM ring buffer that the J-Link reads via background SWD
 memory accesses — **zero CPU interrupts, zero PMU contamination**.
 
-The firmware uses ``SEGGER_RTT_MODE_NO_BLOCK_TRIM`` with a 32 KB up-buffer.
-Writes that don't fit are silently dropped (no blocking).  After all output
-is written the firmware calls ``SCB_CleanDCache()`` so the J-Link host can
-read the data via SWD (which bypasses the CPU D-cache).
+The firmware uses a compile-time sized up-buffer. It keeps RTT non-blocking
+during boot and timed inference so diagnostic writes cannot stall the CPU and
+contaminate PMU measurements. It switches to blocking mode outside the timed
+window for CSV dumps and the final ``HPX_END`` sentinel so profiling rows are
+not silently dropped. After output bursts, the firmware calls
+``SCB_CleanDCache()`` so the J-Link host can read the data via SWD (which
+bypasses the CPU D-cache).
 
 When ``weights_region="psram"``, the firmware initialises PSRAM and emits
 ``HPX_PSRAM_READY=<addr>,<size>`` before waiting.  The host writes the

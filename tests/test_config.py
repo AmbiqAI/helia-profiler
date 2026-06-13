@@ -36,6 +36,16 @@ def test_jlink_serial_from_cli():
     assert config.target.jlink_serial == "1160002255"
 
 
+def test_rtt_buffer_size_up_from_cli():
+    cli = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "helia-rt"},
+        "target": {"rtt_buffer_size_up": 16384},
+    }
+    config = load_config(None, cli)
+    assert config.target.rtt_buffer_size_up == 16384
+
+
 def test_clock_defaults_to_none_selection():
     cli = {
         "model": {"path": "test.tflite"},

@@ -10,6 +10,7 @@ from __future__ import annotations
 import glob
 import logging
 import os
+import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,6 +51,9 @@ _TOOLCHAIN_MAP: dict[str, str] = {
     "atfe": "atfe",
 }
 
+_DEFAULT_RTT_BUFFER_SIZE_UP = 32768
+_ATFE_RTT_BUFFER_SIZE_UP = 12288
+
 
 @dataclass(frozen=True)
 class NsxModuleSpec:
@@ -72,6 +76,15 @@ def _nsx_toolchain(toolchain: str) -> str | None:
     """
     nsx_tc = _TOOLCHAIN_MAP.get(toolchain, toolchain)
     return nsx_tc if nsx_tc != "gcc" else None
+
+
+def _rtt_buffer_size_up(toolchain: str, transport: str, configured_size: int | None) -> int:
+    """Return the compile-time SEGGER RTT up-buffer size for generated apps."""
+    if configured_size is not None:
+        return configured_size
+    if transport == "rtt" and toolchain == "atfe":
+        return _ATFE_RTT_BUFFER_SIZE_UP
+    return _DEFAULT_RTT_BUFFER_SIZE_UP
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +343,13 @@ def _install_local_module_override(dest: Path, source: Path) -> None:
     log.info("Installed local module override: %s → %s", source, dest)
 
 
+def _copy_local_engine_module(dest: Path, source: Path) -> None:
+    """Copy a prepared local engine module into the generated app tree."""
+    if dest.is_dir():
+        shutil.rmtree(dest)
+    shutil.copytree(source, dest)
+
+
 # ---------------------------------------------------------------------------
 # PMU preset mapping (legacy — used only for backward-compat Init() path)
 # ---------------------------------------------------------------------------
@@ -486,6 +506,54 @@ def _copy_segger_rtt(dest_dir: Path) -> None:
     conf_src = rtt_root / "Config" / "SEGGER_RTT_Conf.h"
     if conf_src.exists():
         shutil.copy2(conf_src, config_dest / "SEGGER_RTT_Conf.h")
+
+    # Apollo510-class linker scripts place default .bss in MCU_TCM, which
+    # makes SEGGER RTT's large staging buffers consume scarce profiling memory.
+    # Move the control block and channel buffers into shared SRAM instead.
+    rtt_c = rtt_dest / "SEGGER_RTT.c"
+    if rtt_c.exists():
+        text = rtt_c.read_text(encoding="utf-8")
+        if '#include "nsx_mem.h"' not in text:
+            updated, include_replacements = re.subn(
+                r'(?m)^#include\s+"SEGGER_RTT\.h"\r?$\n?',
+                '#include "SEGGER_RTT.h"\n#include "nsx_mem.h"\n',
+                text,
+                count=1,
+            )
+            if include_replacements != 1:
+                raise FirmwareError(
+                    "Failed to patch SEGGER_RTT.c for SRAM placement",
+                    hint=(
+                        "Could not inject nsx_mem.h after SEGGER_RTT.h. "
+                        "Update the RTT patch logic for this SEGGER RTT release."
+                    ),
+                )
+            text = updated
+
+        text, replacements = re.subn(
+            r'(?m)^(\s*)(static\s+)(char\s+)(_ac(?:Up|Down)Buffer\s*\[[^\n]+\]\s+__attribute__\s*\(\(aligned\s*\(SEGGER_RTT_CPU_CACHE_LINE_SIZE\)\)\);)$',
+            lambda match: (
+                f"{match.group(1)}static NSX_MEM_SRAM_BSS {match.group(3)}{match.group(4)}"
+            ),
+            text,
+        )
+        text, cb_replacements = re.subn(
+            r'(?m)^(\s*)(SEGGER_RTT_CB\s+)(_SEGGER_RTT\s*__attribute__\s*\(\(aligned\s*\(SEGGER_RTT_CPU_CACHE_LINE_SIZE\)\)\);)$',
+            lambda match: (
+                f"{match.group(1)}NSX_MEM_SRAM_BSS {match.group(2)}{match.group(3)}"
+            ),
+            text,
+            count=1,
+        )
+        if replacements != 2 or cb_replacements != 1:
+            raise FirmwareError(
+                "Failed to patch SEGGER_RTT.c for SRAM placement",
+                hint=(
+                    "Could not locate the SEGGER RTT control block and buffer declarations. "
+                    "Update the RTT patch logic for this SEGGER RTT release."
+                ),
+            )
+        rtt_c.write_text(text, encoding="utf-8")
 
     log.info("Copied SEGGER RTT source from %s", rtt_root)
 
@@ -735,6 +803,12 @@ def generate_app(ctx: PipelineContext) -> Path:
             cmake_vars=artifacts.cmake_vars,
             aot_cmake_target=artifacts.aot_cmake_target or "",
             transport=transport,
+            toolchain=config.target.toolchain,
+            rtt_buffer_size_up=_rtt_buffer_size_up(
+                config.target.toolchain,
+                transport,
+                config.target.rtt_buffer_size_up,
+            ),
             model_location=config.model.model_location,
             arena_region=arena_region,
             weights_region=weights_region,
@@ -925,8 +999,11 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # --- Engine modules ---
     # Local modules are vendored into the app under their registry-derived
-    # project directory (so NSX's registry-aware lock finds them). Registry
-    # modules are cloned by NSX during `nsx sync`; nothing to copy here.
+    # project directory so ``nsx lock`` can resolve them. When the module
+    # name differs from the project (e.g. nsx-helia-rt in project helia-rt),
+    # also mirror the same content under modules/<name> because the later
+    # CMake bootstrap stage resolves local module add_subdirectory() paths by
+    # module name.
     for extra_mod in artifacts.extra_modules:
         if not extra_mod.local:
             target = extra_mod.project or extra_mod.name
@@ -939,12 +1016,21 @@ def generate_app(ctx: PipelineContext) -> Path:
             )
             continue
         mod_src = extra_mod.path
-        mod_dst = app_dir / "modules" / (extra_mod.project or extra_mod.name)
-        if mod_src != mod_dst:
-            if mod_dst.exists():
-                shutil.rmtree(mod_dst)
-            shutil.copytree(mod_src, mod_dst)
-        log.info("Engine module: %s → %s", extra_mod.name, mod_dst)
+        primary_dst = app_dir / "modules" / (extra_mod.project or extra_mod.name)
+        if mod_src != primary_dst:
+            _copy_local_engine_module(primary_dst, mod_src)
+
+        alias_dst = app_dir / "modules" / extra_mod.name
+        if alias_dst != primary_dst:
+            _copy_local_engine_module(alias_dst, mod_src)
+            log.info(
+                "Engine module: %s → %s (alias: %s)",
+                extra_mod.name,
+                primary_dst,
+                alias_dst,
+            )
+        else:
+            log.info("Engine module: %s → %s", extra_mod.name, primary_dst)
 
     log.info("Generated profiler app at %s", app_dir)
     return app_dir

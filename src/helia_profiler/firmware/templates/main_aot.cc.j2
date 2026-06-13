@@ -308,7 +308,7 @@ int main(void) {
 {% if transport == "usb_cdc" %}
 
     // Initialize USB CDC and wait for host to connect (DTR)
-    nsx_usb_init(&g_usb_cfg);
+    NSX_TRY(nsx_usb_init(&g_usb_cfg), "USB CDC init failed\n");
     while (!nsx_usb_connected(&g_usb_cfg)) {
         nsx_delay_us(HPX_USB_POLL_DELAY_US);
     }
@@ -316,9 +316,12 @@ int main(void) {
     nsx_delay_us(HPX_USB_SETTLE_DELAY_US);
 {% elif transport == "rtt" %}
 
-    // Set trim mode on buffer 0 (non-blocking — silently drops excess data).
-    // BUFFER_SIZE_UP=32768 is set via CMake so _DoInit() already allocates
-    // a 32 KB buffer.  ConfigUpBuffer(0) can only change flags, not the
+    // Configure buffer 0 in non-blocking trim mode for the boot/timed phases
+    // (writes that don't fit are dropped rather than stalling the CPU).
+    // hpx_rtt_set_blocking() later switches to lossless blocking mode around
+    // CSV dumps and HPX_END so no profiling row or the sentinel is ever lost.
+    // BUFFER_SIZE_UP is set via CMake so _DoInit() already allocates the
+    // compile-time buffer size. ConfigUpBuffer(0) can only change flags, not the
     // buffer pointer/size (SEGGER RTT design for the default terminal).
     SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,
                               SEGGER_RTT_MODE_NO_BLOCK_TRIM);
@@ -515,11 +518,18 @@ int main(void) {
 
 {% if transport == "usb_cdc" %}
         usb_timer_resume();
+{% elif transport == "rtt" %}
+        // CSV dump is outside the timed window — make it lossless.
+        hpx_rtt_set_blocking();
 {% endif %}
         hpx_printf("\n--- HPX_ITER %d ---\n", iter);
         profiler_print_csv();
 {% if transport == "usb_cdc" %}
         usb_timer_pause();
+{% elif transport == "rtt" %}
+        // Restore non-blocking before the next timed model_run() so heartbeats
+        // emitted mid-inference can never stall and skew measurements.
+        hpx_rtt_set_nonblocking();
 {% endif %}
     }
 
@@ -542,10 +552,11 @@ int main(void) {
     }
 
 {% if transport == "rtt" %}
-    // Before emitting the sentinel, flush cache and wait for the RTT up
-    // buffer to drain — otherwise the trailing CSV burst may be full and
-    // NO_BLOCK_TRIM would silently drop HPX_END.  Also emit a phase
-    // heartbeat so the host inactivity timer refreshes while we drain.
+    // All timed inference work is done — switch to lossless blocking mode so
+    // the final sentinel can never be dropped, then flush and drain as a
+    // belt-and-braces measure.  Emit a phase heartbeat so the host inactivity
+    // timer refreshes while we drain.
+    hpx_rtt_set_blocking();
     hpx_printf("HPX_HEARTBEAT phase=flushing\n");
     HPX_CLEAN_DCACHE();
     hpx_rtt_drain(500 /* ms */);

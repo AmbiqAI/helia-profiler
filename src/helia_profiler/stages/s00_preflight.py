@@ -14,9 +14,9 @@ Checks performed (in order):
 4. **Output directory** — can be created + written to.
 5. **Host toolchain** — ``nsx``, ``cmake``, ``ninja``, the selected compiler,
    and ``JLinkExe`` are available. ATfE is located via ``ATFE_ROOT``.
-6. **Transport-specific tools** — e.g. ``JLinkSWOViewerCL`` when
-   ``transport=swo``; the Python ``pyocd`` module isn't required because
-   heliaPROFILER uses J-Link directly.
+6. **Transport-specific tools** — e.g. ``pylink`` when ``transport=swo``;
+    the Python ``pyocd`` module isn't required because heliaPROFILER uses
+    J-Link directly.
 
 All failures raise :class:`ConfigError` with a hint explaining how to fix
 it.  The stage never touches hardware — that's reserved for later stages —
@@ -71,6 +71,7 @@ class PreflightStage:
         _check_model(cfg.model.path)
         _check_arena_size(cfg.model.arena_size)
         _check_model_location(cfg.model.model_location)
+        _check_rtt_buffer_size(cfg.target.rtt_buffer_size_up)
         _check_runtime_split_locations(cfg)
         _check_pmu_selection(cfg)
         _check_output_dir(cfg.output.dir)
@@ -150,6 +151,16 @@ def _check_explicit_location(loc: str | None, *, name: str, valid: tuple[Placeme
         raise ConfigError(
             f"Invalid {name}: '{loc}'.",
             hint=f"Expected one of: {', '.join(valid)}.",
+        )
+
+
+def _check_rtt_buffer_size(size: int | None) -> None:
+    if size is None:
+        return
+    if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
+        raise ConfigError(
+            f"target.rtt_buffer_size_up must be a positive integer (got {size!r}).",
+            hint="Set target.rtt_buffer_size_up to a positive byte count, or leave it unset to use the toolchain-aware default.",
         )
 
 
@@ -298,6 +309,12 @@ def _check_host_tools(transport: str, toolchain: str) -> None:
         raise ConfigError(
             "Python package 'neuralspotx' is not installed.",
             hint="Install helia-profiler with its runtime dependencies so the bundled neuralspotx API is available, then re-run 'hpx doctor'.",
+        )
+
+    if transport in ("rtt", "swo") and find_spec("pylink") is None:
+        raise ConfigError(
+            f"Python package 'pylink' is required for {transport.upper()} transport.",
+            hint="Install pylink-square, then re-run 'hpx doctor'.",
         )
 
 

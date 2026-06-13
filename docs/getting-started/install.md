@@ -68,15 +68,22 @@ pip install 'helia-profiler[aot]'
 ## SEGGER J-Link
 
 Download and install from [segger.com/jlink](https://www.segger.com/downloads/jlink/).
-You need both:
+You need:
 
 - **JLinkExe** — flash firmware to the EVB
-- **JLinkSWOViewerCL** — capture SWO trace data
+- **`pylink-square`** — Python bindings used for RTT and SWO capture
+
+Install `pylink-square` with your Python environment if you plan to use the
+default RTT transport or SWO:
+
+```bash
+pip install pylink-square
+```
 
 ## neuralspotx (nsx)
 
 ```bash
-pip install neuralspotx
+pip install 'neuralspotx>=0.6.7,<0.7'
 ```
 
 Verify `nsx` is available:
@@ -100,8 +107,9 @@ Expected output:
 ✓ cmake               3.31.6
 ✓ ninja               1.12.1
 ✓ JLinkExe            V8.12a
-✓ JLinkSWOViewerCL    V8.12a
-✓ nsx                 0.6.0
+✓ neuralspotx Python package  installed
+✓ pylink Python package (RTT/SWO transport)  installed
+✓ nsx                 <version>
 ```
 
 All required tools show ✓. Optional tools show ○ when not installed.

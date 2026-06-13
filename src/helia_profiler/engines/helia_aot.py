@@ -215,6 +215,9 @@ class HeliaAOTAdapter:
         cmsis_nn_cmake: dict[str, str] = {}
         if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
             cmsis_nn_cmake["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
+        linker_profile = config.engine.config.get("linker_profile")
+        if linker_profile:
+            cmsis_nn_cmake["NSX_LINKER_PROFILE"] = str(linker_profile)
 
         # Build a MemoryPlan from the AOT codegen context so the
         # plan_memory stage can validate placement against the SoC's
