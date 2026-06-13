@@ -127,7 +127,8 @@ def main(argv: list[str] | None = None) -> None:
         metavar="BYTES",
         help=(
             "SEGGER RTT up-buffer size for generated RTT firmware. "
-            "If too small, RTT writes can be dropped and HPX_END may be lost. "
+            "If too small, non-blocking writes during timed inference may be dropped, "
+            "while blocking CSV/HPX_END writes may stall long enough to hit host timeouts. "
             "If omitted, hpx uses a toolchain-aware default."
         ),
     )
@@ -501,6 +502,8 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli.setdefault("target", {})["jlink_serial"] = args.jlink_serial
     if args.transport is not None:
         cli.setdefault("target", {})["transport"] = args.transport
+    if args.rtt_buffer_size_up is not None:
+        cli.setdefault("target", {})["rtt_buffer_size_up"] = args.rtt_buffer_size_up
     clock_sel: dict[str, str] = {}
     if args.cpu_clock is not None:
         clock_sel["cpu"] = args.cpu_clock

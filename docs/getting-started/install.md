@@ -83,7 +83,7 @@ pip install pylink-square
 ## neuralspotx (nsx)
 
 ```bash
-pip install git+https://github.com/AmbiqAI/neuralspotx.git
+pip install 'neuralspotx>=0.6.7,<0.7'
 ```
 
 Verify `nsx` is available:
