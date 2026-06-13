@@ -320,6 +320,7 @@ class TestGenerateApp:
         heliart_alias = app_dir / "modules" / "nsx-helia-rt"
         assert heliart_alias.is_dir()
         assert (heliart_alias / "nsx-module.yaml").exists()
+        assert (heliart_alias / "CMakeLists.txt").exists()
 
     def test_nsx_yml_contains_board(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)
