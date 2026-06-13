@@ -531,7 +531,7 @@ def _copy_segger_rtt(dest_dir: Path) -> None:
             text = updated
 
         text, replacements = re.subn(
-            r'(?m)^(\s*)(static\s+)?(char\s+)(_ac(?:Up|Down)Buffer\s*\[[^\n]+)$',
+            r'(?m)^(\s*)(static\s+)(char\s+)(_ac(?:Up|Down)Buffer\s*\[[^\n]+\]\s+__attribute__\s*\(\(aligned\s*\(SEGGER_RTT_CPU_CACHE_LINE_SIZE\)\)\);)$',
             lambda match: (
                 f"{match.group(1)}static NSX_MEM_SRAM_BSS {match.group(3)}{match.group(4)}"
             ),
