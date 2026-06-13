@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -158,7 +159,17 @@ def fake_segger_rtt_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     config_dir = rtt_root / "Config"
     rtt_dir.mkdir(parents=True)
     config_dir.mkdir()
-    (rtt_dir / "SEGGER_RTT.c").write_text("// fake RTT source\n")
+    (rtt_dir / "SEGGER_RTT.c").write_text(
+        '#include "SEGGER_RTT.h"\n'
+        '\n'
+        '#if SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
+        '  #if ((defined __GNUC__) || (defined __clang__))\n'
+        '    SEGGER_RTT_CB _SEGGER_RTT                                                             __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
+        '    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)]   __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
+        '    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)] __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
+        '  #endif\n'
+        '#endif\n'
+    )
     (rtt_dir / "SEGGER_RTT.h").write_text("// fake RTT header\n")
     (rtt_dir / "SEGGER_RTT_ConfDefaults.h").write_text("// fake RTT conf defaults\n")
     (config_dir / "SEGGER_RTT_Conf.h").write_text("// fake RTT config\n")
@@ -504,10 +515,64 @@ class TestGenerateApp:
         app_dir = generate_app(ctx)
 
         main_cc = (app_dir / "src" / "main.cc").read_text()
+        cmake = (app_dir / "CMakeLists.txt").read_text()
         assert '#include "am_hal_cachectrl.h"' in main_cc
         assert 'SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,' in main_cc
         assert "HPX_CLEAN_DCACHE();" in main_cc.split('SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,', 1)[1]
         assert "SEGGER_RTT_Write(0, line_buf, (unsigned)n);\n        HPX_CLEAN_DCACHE();" in main_cc
+        assert "BUFFER_SIZE_UP=32768" in cmake
+
+    def test_atfe_rtt_generation_uses_smaller_buffer(self, tmp_path: Path, fake_dist: Path):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        object.__setattr__(ctx.config.target, "toolchain", "atfe")
+        object.__setattr__(ctx.config.target, "transport", "rtt")
+        app_dir = generate_app(ctx)
+
+        cmake = (app_dir / "CMakeLists.txt").read_text()
+        assert "BUFFER_SIZE_UP=12288" in cmake
+
+    def test_rtt_generation_places_segger_buffers_in_sram(self, tmp_path: Path, fake_dist: Path):
+        rtt_root = Path(os.environ["SEGGER_RTT_PATH"])
+        (rtt_root / "RTT" / "SEGGER_RTT.c").write_text(
+            '#include "SEGGER_RTT.h"\n'
+            '\n'
+            '#if SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
+            '  #if ((defined __GNUC__) || (defined __clang__))\n'
+            '    SEGGER_RTT_CB _SEGGER_RTT                                                             __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
+            '    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)]   __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
+            '    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)] __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
+            '  #endif\n'
+            '#endif\n'
+        )
+
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        rtt_c = (app_dir / "src" / "rtt" / "SEGGER_RTT.c").read_text()
+        assert '#include "SEGGER_RTT.h"\n#include "nsx_mem.h"\n' in rtt_c
+        assert "NSX_MEM_SRAM_BSS SEGGER_RTT_CB _SEGGER_RTT" in rtt_c
+        assert "static NSX_MEM_SRAM_BSS char   _acUpBuffer" in rtt_c
+        assert "static NSX_MEM_SRAM_BSS char   _acDownBuffer" in rtt_c
+
+    def test_rtt_generation_raises_when_segger_layout_is_unexpected(
+        self, tmp_path: Path, fake_dist: Path
+    ):
+        rtt_root = Path(os.environ["SEGGER_RTT_PATH"])
+        (rtt_root / "RTT" / "SEGGER_RTT.c").write_text(
+            '#include "SEGGER_RTT.h"\n'
+            'static int not_the_expected_layout = 1;\n'
+        )
+
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+
+        with pytest.raises(FirmwareError, match="Failed to patch SEGGER_RTT.c"):
+            generate_app(ctx)
 
     def test_gpio_sync_not_enabled_for_internal(self, tmp_path: Path, fake_dist: Path):
         model = tmp_path / "model.tflite"

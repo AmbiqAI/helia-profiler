@@ -235,6 +235,39 @@ class TestPreflightHostTools:
             with pytest.raises(ConfigError, match="JLinkExe"):
                 PreflightStage().run(ctx)
 
+    def test_rtt_requires_pylink_package(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path, {"target": {"transport": "rtt"}})
+
+        def fake_find_spec(name: str):
+            if name == "neuralspotx":
+                return object()
+            if name == "pylink":
+                return None
+            return object()
+
+        with (
+            patch("shutil.which", side_effect=_all_tools_present),
+            patch("helia_profiler.stages.s00_preflight.find_spec", side_effect=fake_find_spec),
+        ):
+            with pytest.raises(ConfigError, match="pylink"):
+                PreflightStage().run(ctx)
+
+    def test_usb_cdc_does_not_require_pylink_package(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path, {"target": {"transport": "usb_cdc"}})
+
+        def fake_find_spec(name: str):
+            if name == "neuralspotx":
+                return object()
+            if name == "pylink":
+                return None
+            return object()
+
+        with (
+            patch("shutil.which", side_effect=_all_tools_present),
+            patch("helia_profiler.stages.s00_preflight.find_spec", side_effect=fake_find_spec),
+        ):
+            PreflightStage().run(ctx)
+
     def test_atfe_uses_atfe_root_tools(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path, {"target": {"toolchain": "atfe"}})
         atfe_root = tmp_path / "atfe"

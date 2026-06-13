@@ -25,6 +25,10 @@ def test_collect_checks_reports_required_python_separately() -> None:
     assert any(label == "ARM GCC toolchain" and path for label, _binary, path in checks)
     assert required_python == [("neuralspotx Python package", "neuralspotx", True)]
     assert any(label == "heliaAOT compiler" for label, _name, _available in optional)
+    assert any(
+        label == "pylink Python package (RTT/SWO transport)"
+        for label, _name, _available in optional
+    )
 
 
 def test_collect_checks_marks_missing_required_python() -> None:

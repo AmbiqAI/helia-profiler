@@ -33,7 +33,7 @@ profiler invokes:
 ✓ ninja               1.12.1
 ✓ JLinkExe            V8.12a
 ✓ J-Link probe        000123456789  Apollo510 EVB
-✓ nsx                 0.6.0
+✓ nsx                 <version>
 ○ armclang            (not installed)
 ○ atfe                (not installed)
 ○ joulescope          (optional — pip install 'helia-profiler[power]')

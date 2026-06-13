@@ -76,7 +76,7 @@ You need both:
 ## neuralspotx (nsx)
 
 ```bash
-pip install neuralspotx
+pip install git+https://github.com/AmbiqAI/neuralspotx.git
 ```
 
 Verify `nsx` is available:
@@ -101,7 +101,7 @@ Expected output:
 ✓ ninja               1.12.1
 ✓ JLinkExe            V8.12a
 ✓ JLinkSWOViewerCL    V8.12a
-✓ nsx                 0.6.0
+✓ nsx                 <version>
 ```
 
 All required tools show ✓. Optional tools show ○ when not installed.

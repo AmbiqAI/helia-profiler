@@ -109,16 +109,28 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
                 "transport connection failed before data arrived."
             ),
         )
-    if not any(l.strip() == HPX_END for l in lines[-10:]):
+    saw_end = any(l.strip() == HPX_END for l in lines[-10:])
+    if not saw_end:
         log.warning(
-            "HPX_END sentinel not found in captured data — capture may be incomplete or truncated."
+            "HPX_END sentinel not found in captured data (%d lines) — capture "
+            "was truncated before the firmware finished. %s",
+            len(lines),
+            _truncation_hint(str(transport)),
         )
 
     result = parse_firmware_output(lines)
     if not result.layers:
+        # We saw HPX_START (checked above) but parsed zero layers.  Either the
+        # CSV stream was lost in transit (lossy transport / undersized buffer)
+        # or the run was cut short before any iteration completed.
+        detail = (
+            "the stream was truncated before any CSV data arrived"
+            if not saw_end
+            else "the firmware emitted HPX_END but no parseable CSV rows"
+        )
         raise CaptureError(
-            "No layer data parsed from firmware output",
-            hint="Check that the firmware is printing HPX protocol data.",
+            f"No layer data parsed from firmware output ({len(lines)} lines, {detail}).",
+            hint=_truncation_hint(str(transport)),
         )
 
     if timing_raw:
@@ -196,6 +208,38 @@ _ERROR_HINTS: dict[str, str] = {
         "appropriate for this hardware."
     ),
 }
+
+
+def _truncation_hint(transport: str) -> str:
+    """Return a transport-specific hint for truncated / empty captures.
+
+    Each transport fails differently when the firmware output does not reach
+    the host intact, so point the user at the most likely cause and fix.
+    """
+    if transport == "rtt":
+        return (
+            "RTT capture switches to lossless blocking mode for CSV/HPX_END, so "
+            "truncation here usually means the host stopped reading (J-Link "
+            "detached, capture timed out, or the firmware hung). Check the "
+            "J-Link connection and heartbeat/overall timeouts. If the run is "
+            "genuinely long, raise target.heartbeat.overall_timeout_s. A larger "
+            "--rtt-buffer-size-up reduces back-pressure stalls on big models."
+        )
+    if transport == "swo":
+        return (
+            "SWO/ITM has no flow control — its single-word FIFO silently drops "
+            "data when the firmware prints faster than the ~1 Mbps SWO pin. "
+            "For lossless capture use --transport rtt. If you must use SWO, "
+            "reduce output volume (fewer --iterations or --pmu-counters)."
+        )
+    if transport == "usb_cdc":
+        return (
+            "USB CDC capture truncated. Confirm the board's application USB "
+            "device enumerated after reset (a separate CDC port from the "
+            "J-Link), the cable is data-capable, and the host had time to open "
+            "the port. RTT (--transport rtt) avoids USB enumeration entirely."
+        )
+    return "Check that the firmware is printing HPX protocol data over the selected transport."
 
 
 def _raise_on_firmware_error(lines: list[str]) -> None:

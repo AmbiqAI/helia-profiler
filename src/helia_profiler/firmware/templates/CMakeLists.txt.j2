@@ -57,8 +57,9 @@ target_include_directories(hpx_profiler PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src/rtt/Config
 )
 # ConfigUpBuffer(0) cannot change buffer-0's pointer/size (SEGGER design).
-# Override the compile-time default so _DoInit() allocates 32 KB.
-target_compile_definitions(hpx_profiler PRIVATE BUFFER_SIZE_UP=32768)
+# Override the compile-time default so _DoInit() allocates the requested
+# transport buffer size.
+target_compile_definitions(hpx_profiler PRIVATE BUFFER_SIZE_UP={{ rtt_buffer_size_up }})
 {% endif %}
 {% else %}
 add_executable(hpx_profiler
@@ -98,17 +99,26 @@ target_include_directories(hpx_profiler PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src/rtt
     ${CMAKE_CURRENT_LIST_DIR}/src/rtt/Config
 )
-target_compile_definitions(hpx_profiler PRIVATE BUFFER_SIZE_UP=32768)
+target_compile_definitions(hpx_profiler PRIVATE BUFFER_SIZE_UP={{ rtt_buffer_size_up }})
 {% endif %}
 {% endif %}
 
 nsx_finalize_app(hpx_profiler)
 
-# armclang in C++ mode triggers -Wreserved-user-defined-literal on some
-# AmbiqSuite headers (string literal concatenation without a space).
+# armclang/ATFE clang++ in C++ mode trigger -Wreserved-user-defined-literal on
+# some AmbiqSuite headers (string literal concatenation without a space).
 # Suppress it until the SDK headers are fixed upstream.
-if(CMAKE_CXX_COMPILER_ID STREQUAL "ARMClang")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "ARMClang" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_options(hpx_profiler PRIVATE
         $<$<COMPILE_LANGUAGE:CXX>:-Wno-reserved-user-defined-literal>
+    )
+endif()
+
+# ATFE clang++ does not define __GNUC_STDC_INLINE__ in C++ mode, but Ambiq's
+# HAL uses that macro to select the GNU-compatible declaration path for some
+# APIs. Define it for ATFE C++ builds so power-sync GPIO support compiles.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    target_compile_definitions(hpx_profiler PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:__GNUC_STDC_INLINE__=1>
     )
 endif()

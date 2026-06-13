@@ -3,7 +3,8 @@
 RTT uses an in-SRAM ring buffer that the J-Link reads via background SWD
 memory accesses — **zero CPU interrupts, zero PMU contamination**.
 
-The firmware uses ``SEGGER_RTT_MODE_NO_BLOCK_TRIM`` with a 32 KB up-buffer.
+The firmware uses ``SEGGER_RTT_MODE_NO_BLOCK_TRIM`` with a compile-time sized
+up-buffer.
 Writes that don't fit are silently dropped (no blocking).  After all output
 is written the firmware calls ``SCB_CleanDCache()`` so the J-Link host can
 read the data via SWD (which bypasses the CPU D-cache).

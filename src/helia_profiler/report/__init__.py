@@ -243,7 +243,32 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             "avg_power_w": ps.avg_power_w,
             "peak_current_a": ps.peak_current_a,
             "energy_j": ps.energy_j,
+            "capture_duration_s": ps.duration_s,
+            "measurement_scope": "whole_capture_window",
         }
+        meta = ctx.pmu_result.meta if ctx.pmu_result is not None else None
+        if meta and meta.profiled_infer_total_us is not None:
+            active_duration_s = meta.profiled_infer_total_us / 1_000_000.0
+            summary["power"]["active_window_estimated_duration_s"] = round(active_duration_s, 6)
+            summary["power"]["active_window_estimated_energy_j"] = round(
+                ps.avg_power_w * active_duration_s,
+                9,
+            )
+            summary["power"]["active_window_estimate_method"] = (
+                "scaled from whole-window average power using device-profiled inference time; "
+                "not instrument-GPIO-gated"
+            )
+            if meta.profiled_infer_count and meta.profiled_infer_count > 0:
+                energy_per_infer = (ps.avg_power_w * active_duration_s) / meta.profiled_infer_count
+                summary["power"]["active_window_estimated_energy_per_inference_j"] = round(
+                    energy_per_infer,
+                    9,
+                )
+                if energy_per_infer > 0:
+                    summary["power"]["active_window_estimated_inferences_per_joule"] = round(
+                        1.0 / energy_per_infer,
+                        6,
+                    )
 
     if ctx.run_metadata.timing is not None:
         timing = {}

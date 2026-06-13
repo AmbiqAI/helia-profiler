@@ -14,9 +14,9 @@ Checks performed (in order):
 4. **Output directory** — can be created + written to.
 5. **Host toolchain** — ``nsx``, ``cmake``, ``ninja``, the selected compiler,
    and ``JLinkExe`` are available. ATfE is located via ``ATFE_ROOT``.
-6. **Transport-specific tools** — e.g. ``JLinkSWOViewerCL`` when
-   ``transport=swo``; the Python ``pyocd`` module isn't required because
-   heliaPROFILER uses J-Link directly.
+6. **Transport-specific tools** — e.g. ``pylink`` when ``transport=swo``;
+    the Python ``pyocd`` module isn't required because heliaPROFILER uses
+    J-Link directly.
 
 All failures raise :class:`ConfigError` with a hint explaining how to fix
 it.  The stage never touches hardware — that's reserved for later stages —
@@ -298,6 +298,12 @@ def _check_host_tools(transport: str, toolchain: str) -> None:
         raise ConfigError(
             "Python package 'neuralspotx' is not installed.",
             hint="Install helia-profiler with its runtime dependencies so the bundled neuralspotx API is available, then re-run 'hpx doctor'.",
+        )
+
+    if transport in ("rtt", "swo") and find_spec("pylink") is None:
+        raise ConfigError(
+            f"Python package 'pylink' is required for {transport.upper()} transport.",
+            hint="Install pylink-square, then re-run 'hpx doctor'.",
         )
 
 

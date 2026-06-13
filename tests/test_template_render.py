@@ -18,7 +18,21 @@ _env = jinja2.Environment(
     trim_blocks=True,
     lstrip_blocks=True,
     keep_trailing_newline=True,
+    undefined=jinja2.StrictUndefined,
 )
+
+
+def _sample_pmu_passes() -> list[dict[str, object]]:
+    return [
+        {
+            "name": "Cache",
+            "custom": False,
+            "event_ids": [],
+            "num_counters": 4,
+            "c_enum": "NSX_PMU_PRESET_BASIC_CPU",
+            "group": "cpu",
+        }
+    ]
 
 
 def _render_tflm(
@@ -32,6 +46,7 @@ def _render_tflm(
     resource_variable_count: int = 0,
     perf_mode_symbol: str = "NSX_PERF_LOW",
     perf_mode_mhz: int = 96,
+    extreme_mode: bool = False,
 ) -> str:
     registrations = resolver_registrations or ["r.AddConv2D();", "r.AddSoftmax();"]
     return _env.get_template("main.cc.j2").render(
@@ -44,7 +59,7 @@ def _render_tflm(
         resource_variable_count=resource_variable_count,
         iterations=3,
         warmup=1,
-        pmu_passes=[{"name": "Cache", "counters": ["ARM_PMU_CPU_CYCLES"]}],
+        pmu_passes=_sample_pmu_passes(),
         pmu_pass_names=["Cache"],
         power_sync_enabled=False,
         sync_gpio_pin=91,
@@ -57,6 +72,7 @@ def _render_tflm(
         has_armv8m_pmu=has_armv8m_pmu,
         perf_mode_symbol=perf_mode_symbol,
         perf_mode_mhz=perf_mode_mhz,
+        extreme_mode=extreme_mode,
         printf_linkage="",
         heartbeat_enabled=True,
         heartbeat_every_n_ops=4,
@@ -76,10 +92,10 @@ def _render_aot(
     return _env.get_template("main_aot.cc.j2").render(
         aot_prefix="fake",
         cmsis_device_header="apollo510.h",
-        aot_op_manifest=[{"index": 0, "op_name": "CONV_2D"}],
+        aot_op_manifest=[{"id": 0, "op_type": "CONV_2D"}],
         iterations=3,
         warmup=1,
-        pmu_passes=[{"name": "Cache", "counters": ["ARM_PMU_CPU_CYCLES"]}],
+        pmu_passes=_sample_pmu_passes(),
         pmu_pass_names=["Cache"],
         power_sync_enabled=False,
         sync_gpio_pin=91,
@@ -120,6 +136,22 @@ class TestMainCcRender:
         assert "SEGGER_RTT_Write" in out
         assert "hpx_rtt_drain" in out
 
+    def test_rtt_transport_switches_to_blocking_for_csv_and_end(self):
+        out = _render_tflm(transport="rtt")
+        # Lossless mode-switch helpers must be defined and used.
+        assert "hpx_rtt_set_blocking" in out
+        assert "hpx_rtt_set_nonblocking" in out
+        assert "SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL" in out
+        # Blocking is engaged around the CSV dump and restored afterwards.
+        assert out.count("hpx_rtt_set_blocking();") >= 2  # per-iter dump + HPX_END
+        assert out.count("hpx_rtt_set_nonblocking();") >= 1
+
+    def test_non_rtt_transport_omits_blocking_switch(self):
+        for transport in ("usb_cdc", "swo", "stdio"):
+            out = _render_tflm(transport=transport)
+            assert "hpx_rtt_set_blocking" not in out
+            assert "hpx_rtt_set_nonblocking" not in out
+
     def test_auto_resolver_mode_embeds_selected_registrations(self):
         out = _render_tflm(
             transport="rtt",
@@ -154,6 +186,7 @@ class TestMainCcRender:
         assert "usb_timer_pause" in out
         assert "usb_timer_resume" in out
         assert "nsx_usb_send" in out
+        assert 'NSX_TRY(nsx_usb_init(&g_usb_cfg), "USB CDC init failed\\n");' in out
 
     def test_rtt_transport_excludes_usb_timer(self):
         out = _render_tflm(transport="rtt")
@@ -180,7 +213,7 @@ class TestMainCcRender:
             arena_size=65_536,
             iterations=3,
             warmup=1,
-            pmu_passes=[{"name": "Cache", "counters": ["ARM_PMU_CPU_CYCLES"]}],
+            pmu_passes=_sample_pmu_passes(),
             pmu_pass_names=["Cache"],
             power_sync_enabled=True,
             sync_gpio_pin=42,
@@ -189,6 +222,15 @@ class TestMainCcRender:
             arena_region="tcm",
             weights_region="mram",
             model_size=1024,
+            resolver_mode="all",
+            resolver_max_ops=2,
+            resolver_registrations=["r.AddConv2D();", "r.AddSoftmax();"],
+            resource_variable_count=0,
+            extreme_mode=False,
+            profiling_backends=["dwt", "armv8m-pmu"],
+            has_armv8m_pmu=True,
+            perf_mode_symbol="NSX_PERF_LOW",
+            perf_mode_mhz=96,
             printf_linkage="",
             heartbeat_enabled=True,
             heartbeat_every_n_ops=4,
@@ -234,10 +276,25 @@ class TestMainAotCcRender:
         out = _render_aot(transport="usb_cdc")
         assert "usb_timer_pause" in out
         assert "nsx_usb_send" in out
+        assert 'NSX_TRY(nsx_usb_init(&g_usb_cfg), "USB CDC init failed\\n");' in out
 
     def test_rtt_transport_includes_drain(self):
         out = _render_aot(transport="rtt")
         assert "hpx_rtt_drain" in out
+
+    def test_aot_rtt_transport_switches_to_blocking_for_csv_and_end(self):
+        out = _render_aot(transport="rtt")
+        assert "hpx_rtt_set_blocking" in out
+        assert "hpx_rtt_set_nonblocking" in out
+        assert "SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL" in out
+        assert out.count("hpx_rtt_set_blocking();") >= 2
+        assert out.count("hpx_rtt_set_nonblocking();") >= 1
+
+    def test_aot_non_rtt_transport_omits_blocking_switch(self):
+        for transport in ("usb_cdc", "swo", "stdio"):
+            out = _render_aot(transport=transport)
+            assert "hpx_rtt_set_blocking" not in out
+            assert "hpx_rtt_set_nonblocking" not in out
 
     def test_aot_swo_transport_uses_itm_output(self):
         out = _render_aot(transport="swo")

@@ -122,6 +122,16 @@ def main(argv: list[str] | None = None) -> None:
         help="Data transport (default: rtt). RTT is recommended for lossless capture.",
     )
     g_target.add_argument(
+        "--rtt-buffer-size-up",
+        type=int,
+        metavar="BYTES",
+        help=(
+            "SEGGER RTT up-buffer size for generated RTT firmware. "
+            "If too small, RTT writes can be dropped and HPX_END may be lost. "
+            "If omitted, hpx uses a toolchain-aware default."
+        ),
+    )
+    g_target.add_argument(
         "--cpu-clock",
         type=str,
         metavar="SPEED",
