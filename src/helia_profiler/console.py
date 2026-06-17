@@ -994,6 +994,7 @@ def _build_compare_run_table(metrics: list[MetricDiff]) -> Table:
 
 
 def _build_compare_layer_table(layer_rows: list[dict[str, Any]], *, top_layers: int) -> Table:
+    top_layers = max(0, top_layers)
     table = Table(
         title=f"[bold]Layers[/bold] [dim](top {top_layers} by absolute cycle delta)[/dim]",
         box=box.SIMPLE_HEAVY,
