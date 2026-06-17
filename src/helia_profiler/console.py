@@ -516,7 +516,7 @@ class HpxConsole:
             self._console.print(
                 Panel(
                     files_text,
-                    title=f"[bold]Output → [link=file://{output_dir}]{output_dir}[/link][/bold]",
+                    title=f"[bold]Output → [link={output_dir.as_uri()}]{escape(str(output_dir))}[/link][/bold]",
                     title_align="left",
                     border_style="bright_blue",
                     padding=(0, 2),
