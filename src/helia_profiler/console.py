@@ -455,10 +455,15 @@ class HpxConsole:
         overview = Table(show_header=False, box=None, padding=(0, 2), expand=False)
         overview.add_column("key", style="dim", no_wrap=True)
         overview.add_column("value")
-        overview.add_row("Baseline", f"[link=file://{result.baseline.path}]{escape(str(result.baseline.path))}[/link]")
+        baseline_uri = result.baseline.path.as_uri()
+        candidate_uri = result.candidate.path.as_uri()
+        overview.add_row(
+            "Baseline",
+            f"[link={baseline_uri}]{escape(str(result.baseline.path))}[/link]",
+        )
         overview.add_row(
             "Candidate",
-            f"[link=file://{result.candidate.path}]{escape(str(result.candidate.path))}[/link]",
+            f"[link={candidate_uri}]{escape(str(result.candidate.path))}[/link]",
         )
         if total_cycles is not None:
             overview.add_row(
