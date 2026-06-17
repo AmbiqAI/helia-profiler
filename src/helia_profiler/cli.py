@@ -422,6 +422,31 @@ def main(argv: list[str] | None = None) -> None:
     )
     p_validate.add_argument("-v", "--verbose", action="count", default=0)
 
+    # --- hpx compare ---
+    p_compare = sub.add_parser(
+        "compare",
+        help="Compare two hpx result directories",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  hpx compare results/rt_gcc results/rt_atfe\n"
+            "  hpx compare results/rt results/aot --output-dir results/rt_vs_aot\n"
+        ),
+    )
+    p_compare.add_argument("baseline", type=Path, help="Baseline hpx result directory")
+    p_compare.add_argument("candidate", type=Path, help="Candidate hpx result directory")
+    p_compare.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Write compare_summary.json and layer_diff.csv to this directory",
+    )
+    p_compare.add_argument(
+        "--top-layers",
+        type=int,
+        default=10,
+        help="Number of layer deltas to show in terminal output (default: 10)",
+    )
+
     # --- hpx cache ---
     p_cache = sub.add_parser(
         "cache",
@@ -460,6 +485,8 @@ def main(argv: list[str] | None = None) -> None:
         _cmd_power_on(args)
     elif args.command == "validate":
         _cmd_validate(args)
+    elif args.command == "compare":
+        _cmd_compare(args)
     elif args.command == "cache":
         _cmd_cache(args)
 
@@ -994,6 +1021,24 @@ def _cmd_validate(args: argparse.Namespace) -> None:
     if report_json.exists():
         print(f"JSON report:     {report_json}")
     sys.exit(int(rc))
+
+
+def _cmd_compare(args: argparse.Namespace) -> None:
+    """Compare two completed hpx profile output directories."""
+    from .compare import compare_runs, write_compare_artifacts
+    from .console import HpxConsole
+    from .errors import HpxError
+
+    console = HpxConsole()
+    try:
+        result = compare_runs(args.baseline, args.candidate)
+        paths = None
+        if args.output_dir is not None:
+            paths = write_compare_artifacts(result, args.output_dir)
+        console.print_compare(result, top_layers=args.top_layers, output_paths=paths)
+    except HpxError as exc:
+        console.print_error(exc)
+        sys.exit(1)
 
 
 def _find_repo_root() -> Path:
