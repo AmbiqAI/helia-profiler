@@ -133,6 +133,7 @@ def test_write_compare_artifacts(tmp_path: Path):
     assert {p.name for p in paths} == {"compare_summary.json", "layer_diff.csv"}
     summary = json.loads((tmp_path / "diff" / "compare_summary.json").read_text())
     assert summary["metrics"][0]["name"] == "total_cycles"
-    rows = list(csv.DictReader(open(tmp_path / "diff" / "layer_diff.csv")))
+    with open(tmp_path / "diff" / "layer_diff.csv", newline="") as f:
+        rows = list(csv.DictReader(f))
     assert rows[0]["baseline_op"] == "CONV_2D"
     assert rows[0]["delta_cycles"] == "-100.0"
