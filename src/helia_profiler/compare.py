@@ -188,6 +188,7 @@ def render_compare(result: CompareResult, *, top_layers: int = 10) -> str:
     lines.extend(_format_table(["metric", "baseline", "candidate", "delta"], metric_rows))
     lines.append("")
 
+    top_layers = max(0, top_layers)
     lines.append(f"Layers: top {top_layers} by absolute cycle delta")
     top = sorted(
         result.layer_rows,
