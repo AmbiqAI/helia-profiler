@@ -141,8 +141,12 @@ class TestMainCcRender:
         # Lossless mode-switch helpers must be defined and used.
         assert "hpx_rtt_set_blocking" in out
         assert "hpx_rtt_set_nonblocking" in out
-        assert "SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL" in out
-        # Blocking is engaged around the CSV dump and restored afterwards.
+        # Lossless writes are done by our own cache-coherent writer, not by
+        # SEGGER's BLOCK_IF_FIFO_FULL (which deadlocks reading stale RdOff on
+        # cached M55 over SWD).
+        assert "hpx_rtt_write_lossless" in out
+        assert "SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL" not in out
+        # Lossless mode is engaged around the CSV dump and restored afterwards.
         assert out.count("hpx_rtt_set_blocking();") >= 2  # per-iter dump + HPX_END
         assert out.count("hpx_rtt_set_nonblocking();") >= 1
 
@@ -286,7 +290,8 @@ class TestMainAotCcRender:
         out = _render_aot(transport="rtt")
         assert "hpx_rtt_set_blocking" in out
         assert "hpx_rtt_set_nonblocking" in out
-        assert "SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL" in out
+        assert "hpx_rtt_write_lossless" in out
+        assert "SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL" not in out
         assert out.count("hpx_rtt_set_blocking();") >= 2
         assert out.count("hpx_rtt_set_nonblocking();") >= 1
 
