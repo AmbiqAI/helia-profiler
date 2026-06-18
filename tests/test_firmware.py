@@ -330,10 +330,12 @@ class TestGenerateApp:
         assert heliart_mod.is_dir()
         assert (heliart_mod / "nsx-module.yaml").exists()
         assert (heliart_mod / "CMakeLists.txt").exists()
+        assert (heliart_mod / "nsx" / "CMakeLists.txt").exists()
         heliart_alias = app_dir / "modules" / "nsx-helia-rt"
         assert heliart_alias.is_dir()
         assert (heliart_alias / "nsx-module.yaml").exists()
         assert (heliart_alias / "CMakeLists.txt").exists()
+        assert (heliart_alias / "nsx" / "CMakeLists.txt").exists()
 
     def test_nsx_yml_contains_board(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)
@@ -389,8 +391,10 @@ class TestGenerateApp:
         heliart_alias = app_dir / "modules" / "nsx-helia-rt"
         assert (heliart_module / "nsx-module.yaml").is_file()
         assert (heliart_module / "CMakeLists.txt").is_file()
+        assert (heliart_module / "nsx" / "CMakeLists.txt").is_file()
         assert (heliart_alias / "nsx-module.yaml").is_file()
         assert (heliart_alias / "CMakeLists.txt").is_file()
+        assert (heliart_alias / "nsx" / "CMakeLists.txt").is_file()
 
     def test_ap4_generation_avoids_armv8m_pmu_module_and_link_target(
         self, tmp_path: Path, fake_dist: Path
@@ -533,7 +537,9 @@ class TestGenerateApp:
         assert '#include "am_hal_cachectrl.h"' in main_cc
         assert 'SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,' in main_cc
         assert "HPX_CLEAN_DCACHE();" in main_cc.split('SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,', 1)[1]
-        assert "SEGGER_RTT_Write(0, line_buf, (unsigned)n);\n        HPX_CLEAN_DCACHE();" in main_cc
+        assert "static void hpx_rtt_write_lossless(const char *buf, unsigned len)" in main_cc
+        assert "SEGGER_RTT_Write(0, buf, len);\n    HPX_CLEAN_DCACHE();" in main_cc
+        assert "SEGGER_RTT_Write(0, line_buf, (unsigned)n);\n            HPX_CLEAN_DCACHE();" in main_cc
         assert "BUFFER_SIZE_UP=32768" in cmake
 
     def test_atfe_rtt_generation_uses_smaller_buffer(self, tmp_path: Path, fake_dist: Path):

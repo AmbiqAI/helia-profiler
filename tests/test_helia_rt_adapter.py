@@ -52,6 +52,14 @@ class TestInstallNsxModule:
         assert "NSX_BOARD_FLAGS_TARGET" in content
         assert "TF_LITE_STATIC_MEMORY" in content
 
+    def test_writes_nested_nsx_shim(self, tmp_path: Path, fake_dist: Path):
+        module_dir = tmp_path / "module"
+        module_dir.mkdir()
+        _install_nsx_module(module_dir, fake_dist, variant="release-with-logs")
+        shim = module_dir / "nsx" / "CMakeLists.txt"
+        assert shim.exists()
+        assert '../CMakeLists.txt' in shim.read_text()
+
     def test_variant_patched_in_cmakelists(self, tmp_path: Path, fake_dist: Path):
         module_dir = tmp_path / "module"
         module_dir.mkdir()
@@ -99,6 +107,7 @@ class TestHeliaRTAdapter:
         assert module_dir.is_dir()
         assert (module_dir / "nsx-module.yaml").exists()
         assert (module_dir / "CMakeLists.txt").exists()
+        assert (module_dir / "nsx" / "CMakeLists.txt").exists()
 
     def test_prepare_links_distribution(self, tmp_path: Path, fake_dist: Path):
         config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})

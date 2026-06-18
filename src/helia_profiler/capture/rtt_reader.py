@@ -16,6 +16,11 @@ When ``weights_region="psram"``, the firmware initialises PSRAM and emits
 model flatbuffer to the PSRAM XIP address via ``jlink.memory_write()`` and
 sends ``HPX_GO`` on the RTT down-channel to resume inference.
 
+For ordinary RTT runs, the firmware emits ``HPX_READY`` and waits until the
+host replies with ``HPX_HOST_READY`` on RTT down-channel 0 before emitting
+``HPX_START``. This prevents the host from attaching mid-stream and missing
+the protocol sentinels.
+
 Sequence:
   1. Reset the target via JLinkExe (handles Apollo510 SBL correctly).
   2. Connect pylink and start RTT — locate the RTT control block.
@@ -52,6 +57,7 @@ _RTT_CB_TIMEOUT_S = 30  # max time to wait for RTT control block discovery
 _RTT_PRECLEAN_TIMEOUT_S = 10  # bound the pre-reset connect used to wipe stale blocks
 _PSRAM_READY_TIMEOUT_S = 15  # wait for PSRAM init + ready signal
 _PSRAM_WRITE_CHUNK = 65536  # bytes per J-Link memory_write call
+_RTT_READY_TIMEOUT_S = 15  # wait for firmware/host RTT startup handshake
 
 _RTT_SCAN_CHUNK = 0x4000  # 16 KB per memory_read call
 _RTT_MAGIC = b"SEGGER RTT"
@@ -68,6 +74,8 @@ _RTT_DISCOVERY_SETTLE_S = 2.0
 # stale block left in retained SRAM by a previous firmware).
 _RTT_APP_CHANNEL0_NAME = b"HPX"
 _RTT_NAME_MAX_LEN = 16
+_RTT_READY_LINE = "HPX_READY"
+_RTT_HOST_READY_CMD = b"HPX_HOST_READY"
 
 # Scoring weights.  These are powers of two chosen so the qualitative signals
 # dominate in priority order (name match > live activity > buffer size) while
@@ -185,6 +193,56 @@ def _direct_rtt_read(
     if data:
         jlink.memory_write32(desc_addr + 16, [new_rd_off])
     return data
+
+
+def _direct_rtt_write(
+    jlink: "pylink.JLink",
+    *,
+    block_address: int,
+    data: bytes,
+    buffer_index: int = 0,
+) -> int:
+    """Write directly to an RTT down-buffer via SWD memory accesses."""
+    if not data:
+        return 0
+
+    max_up_buffers = jlink.memory_read32(block_address + 16, 1)[0]
+    max_down_buffers = jlink.memory_read32(block_address + 20, 1)[0]
+    if buffer_index >= max_down_buffers:
+        return 0
+
+    desc_addr = (
+        block_address
+        + _RTT_CB_HEADER_SIZE
+        + (max_up_buffers * _RTT_DESC_SIZE)
+        + (buffer_index * _RTT_DESC_SIZE)
+    )
+    _name_ptr, buf_ptr, size, wr_off, rd_off, _flags = jlink.memory_read32(
+        desc_addr,
+        _RTT_DESC_WORDS,
+    )
+    if buf_ptr == 0 or size <= 1:
+        return 0
+    if wr_off > size or rd_off > size:
+        return 0
+
+    if rd_off <= wr_off:
+        free = size - (wr_off - rd_off) - 1
+    else:
+        free = rd_off - wr_off - 1
+    if free <= 0:
+        return 0
+
+    payload = data[:free]
+    first_count = min(len(payload), size - wr_off)
+    if first_count:
+        jlink.memory_write8(buf_ptr + wr_off, list(payload[:first_count]))
+    second_count = len(payload) - first_count
+    if second_count:
+        jlink.memory_write8(buf_ptr, list(payload[first_count:]))
+    new_wr_off = (wr_off + len(payload)) % size
+    jlink.memory_write32(desc_addr + 12, [new_wr_off])
+    return len(payload)
 
 
 def _scan_rtt_control_blocks(
@@ -314,10 +372,109 @@ def _direct_rtt_read_any(
     return b"", preferred_block_address
 
 
+def _wait_for_rtt_line(
+    read_chunk,
+    *,
+    expected_line: str,
+    timeout_s: float,
+) -> bytes:
+    """Read RTT text until *expected_line* is observed.
+
+    Returns every byte consumed while waiting so the caller can feed the same
+    stream into the next protocol stage without losing any early lines.
+    """
+    buf = b""
+    captured = b""
+    deadline = time.monotonic() + timeout_s
+
+    while time.monotonic() < deadline:
+        chunk = read_chunk()
+        if chunk:
+            buf += chunk
+            while b"\n" in buf:
+                raw_line, buf = buf.split(b"\n", 1)
+                captured += raw_line + b"\n"
+                line = raw_line.decode("ascii", errors="replace").strip()
+                if not line:
+                    continue
+                if line == expected_line:
+                    return captured + buf
+                if line.startswith("HPX_ERROR="):
+                    raise CaptureError(
+                        f"Firmware reported RTT startup error: {line}",
+                        hint="Check target boot logs and RTT handshake state.",
+                    )
+        else:
+            time.sleep(0.005)
+
+    raise CaptureError(
+        f"Timed out waiting for {expected_line} from firmware",
+        hint="The target did not complete the RTT startup handshake.",
+    )
+
+
+def _write_rtt_command_direct(
+    jlink: "pylink.JLink",
+    *,
+    block_address: int,
+    command: bytes,
+    timeout_s: float = _RTT_READY_TIMEOUT_S,
+) -> None:
+    written = 0
+    deadline = time.monotonic() + timeout_s
+
+    while written < len(command) and time.monotonic() < deadline:
+        advanced = _direct_rtt_write(
+            jlink,
+            block_address=block_address,
+            data=command[written:],
+        )
+        if advanced > 0:
+            written += advanced
+            continue
+        time.sleep(0.005)
+
+    if written < len(command):
+        raise CaptureError(
+            "Timed out sending RTT host-ready command",
+            hint="The firmware did not expose a writable RTT down-buffer in time.",
+        )
+
+
+def _perform_rtt_ready_handshake(
+    *,
+    read_chunk,
+    write_command,
+) -> bytes:
+    pending = _wait_for_rtt_line(
+        read_chunk,
+        expected_line=_RTT_READY_LINE,
+        timeout_s=_RTT_READY_TIMEOUT_S,
+    )
+    write_command(_RTT_HOST_READY_CMD)
+    return pending
+
+
+def _prepend_pending_bytes(read_chunk, pending: bytes):
+    """Return a read function that yields *pending* before *read_chunk*()."""
+    pending_buf = pending
+
+    def _read() -> bytes:
+        nonlocal pending_buf
+        if pending_buf:
+            chunk = pending_buf
+            pending_buf = b""
+            return chunk
+        return read_chunk()
+
+    return _read
+
+
 def _upload_model_to_psram(
     jlink: "pylink.JLink",
     model_path: Path,
     timeout_s: float = _PSRAM_READY_TIMEOUT_S,
+    initial_buf: bytes = b"",
 ) -> None:
     """Wait for HPX_PSRAM_READY, upload model via J-Link, send HPX_GO.
 
@@ -327,7 +484,7 @@ def _upload_model_to_psram(
     SWD memory writes, and finally send ``HPX_GO`` on RTT down-channel 0
     so the firmware proceeds with inference.
     """
-    buf = b""
+    buf = initial_buf
     deadline = time.monotonic() + timeout_s
     psram_addr: int | None = None
     expected_size: int | None = None
@@ -542,17 +699,35 @@ def capture_rtt_output(
             log.info("manual RTT scan did not find control block; falling back to J-Link auto-scan")
             jlink.rtt_start()
 
-        status = None
-        while time.monotonic() < cb_deadline:
+        # Probe the SEGGER RTT API directly instead of trusting NumUpBuffers,
+        # which is unreliable on some J-Link/Apollo5 DLL combos (it can report 0
+        # even while the RTT engine is happily delivering data).  The firmware
+        # has already emitted HPX_READY and is blocked at the host-ready gate, so
+        # a working attach returns those bytes here.  Commit to the J-Link-driven
+        # RTT path on the first byte (or a positive NumUpBuffers) and feed the
+        # probed bytes into the handshake; fall back to direct SWD only if
+        # nothing arrives across the window.
+        probe_bytes = b""
+        num_up_buffers = 0
+        api_attached = False
+        probe_deadline = time.monotonic() + _RTT_CB_TIMEOUT_S
+        while time.monotonic() < probe_deadline:
             try:
-                status = jlink.rtt_get_status()
-                if status.NumUpBuffers > 0:
-                    break
+                num_up_buffers = jlink.rtt_get_status().NumUpBuffers
             except pylink.errors.JLinkRTTException:
-                status = None
+                num_up_buffers = 0
+            try:
+                chunk = bytes(jlink.rtt_read(0, 4096))
+            except pylink.errors.JLinkRTTException:
+                chunk = b""
+            if chunk:
+                probe_bytes += chunk
+            if probe_bytes or num_up_buffers > 0:
+                api_attached = True
+                break
             time.sleep(0.05)
 
-        if status is None or status.NumUpBuffers == 0:
+        if not api_attached:
             if block_address is None:
                 raise CaptureError(
                     "RTT control block not found on target",
@@ -567,9 +742,30 @@ def capture_rtt_output(
                     hint="PSRAM model upload currently requires a working J-Link RTT API session.",
                 )
             log.warning(
-                "SEGGER RTT API did not attach to control block 0x%08X; falling back to direct SWD polling",
+                "SEGGER RTT API delivered no data for control block 0x%08X; falling back to direct SWD polling",
                 block_address,
             )
+            try:
+                jlink.rtt_stop()
+            except Exception:
+                pass
+            try:
+                jlink.close()
+            except Exception:
+                pass
+
+            # Some Apollo5 setups leave the probe in a bad state after a failed
+            # SEGGER RTT API attach. Reopen a fresh SWD session before the
+            # manual control-block polling path so direct reads/writes behave
+            # like a standalone memory-access session.
+            jlink = pylink.JLink()
+            open_jlink_with_retry(
+                jlink,
+                device=jlink_device,
+                jlink_serial=jlink_serial,
+                timeout_s=_RTT_CB_TIMEOUT_S,
+            )
+            resume_if_halted(jlink)
             active_block_address = block_address
 
             def read_direct_chunk() -> bytes:
@@ -582,8 +778,18 @@ def capture_rtt_output(
                 )
                 return data
 
+            pending = _perform_rtt_ready_handshake(
+                read_chunk=read_direct_chunk,
+                write_command=lambda command: _write_rtt_command_direct(
+                    jlink,
+                    block_address=active_block_address,
+                    command=command,
+                ),
+            )
+            read_after_handshake = _prepend_pending_bytes(read_direct_chunk, pending)
+
             lines = collect_lines(
-                read_direct_chunk,
+                read_after_handshake,
                 transport_name="RTT",
                 overall_timeout_s=timeout_s,
                 heartbeat_timeout_s=heartbeat_timeout_s,
@@ -593,28 +799,41 @@ def capture_rtt_output(
             finalize_timing()
             return lines
         log.info(
-            "RTT control block found (%d up buffers)",
-            status.NumUpBuffers,
+            "SEGGER RTT API attached (NumUpBuffers=%d, probed %d bytes)",
+            num_up_buffers,
+            len(probe_bytes),
+        )
+
+        def read_rtt_chunk() -> bytes:
+            # Pure J-Link RTT engine read.  Do NOT mix in a direct-SWD read on
+            # this path: the background RTT engine and a manual _direct_rtt_read
+            # would both drain the same up buffer and advance RdOff, racing each
+            # other and interleaving/corrupting the byte stream (CSV rows spliced
+            # mid-row with heartbeats).  The attach probe already proved the
+            # engine delivers, so a single reader is correct and sufficient.
+            return bytes(jlink.rtt_read(0, 4096))
+
+        # Feed the bytes already drained during the attach probe (typically the
+        # HPX_READY line) into the handshake so none are lost.
+        handshake_read = (
+            _prepend_pending_bytes(read_rtt_chunk, probe_bytes)
+            if probe_bytes
+            else read_rtt_chunk
+        )
+        pending = _perform_rtt_ready_handshake(
+            read_chunk=handshake_read,
+            write_command=lambda command: jlink.rtt_write(0, list(command)),
         )
 
         # --- Step 3a: PSRAM model upload (if applicable) ---
         if weights_region == "psram" and model_path is not None:
-            _upload_model_to_psram(jlink, model_path)
+            _upload_model_to_psram(jlink, model_path, initial_buf=pending)
+            pending = b""
 
         # --- Step 3b: collect lines via shared helper ---
-        def read_rtt_chunk() -> bytes:
-            data = bytes(jlink.rtt_read(0, 4096))
-            if data or block_address is None:
-                return data
-            # The SEGGER API attached but delivered nothing this poll.  Read the
-            # known control block directly via SWD as a cheap safety net for the
-            # "attached but silent" case — no SRAM rescan, since the pre-clean
-            # phase already removed any duplicate blocks.  When the buffer is
-            # genuinely empty (wr == rd) this returns b"" without side effects.
-            return _direct_rtt_read(jlink, block_address=block_address, max_bytes=4096)
-
+        read_after_handshake = _prepend_pending_bytes(read_rtt_chunk, pending)
         lines = collect_lines(
-            read_rtt_chunk,
+            read_after_handshake,
             transport_name="RTT",
             overall_timeout_s=timeout_s,
             heartbeat_timeout_s=heartbeat_timeout_s,

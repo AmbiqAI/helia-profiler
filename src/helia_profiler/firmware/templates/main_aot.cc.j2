@@ -38,9 +38,16 @@
 
 #if defined(NSX_HAS_CACHE) && NSX_HAS_CACHE
 #include "am_hal_cachectrl.h"
+// Up channel (device->host): clean pushes our writes OUT to SRAM so J-Link
+// reads fresh data.  Down channel (host->device): invalidate so the CPU
+// discards stale cached copies of bytes J-Link wrote into SRAM via SWD and
+// re-reads from memory.  bClean=true makes the invalidate clean+invalidate so
+// it never drops our own pending up-buffer writes.
 #define HPX_CLEAN_DCACHE() ((void)am_hal_cachectrl_dcache_clean(NULL))
+#define HPX_INVAL_DCACHE() ((void)am_hal_cachectrl_dcache_invalidate(NULL, true))
 #else
 #define HPX_CLEAN_DCACHE() ((void)0)
+#define HPX_INVAL_DCACHE() ((void)0)
 #endif
 
 // --- Boot-time host-attach delays (microseconds) ---
@@ -53,6 +60,7 @@
 #define HPX_SWO_ATTACH_DELAY_US   (500U * 1000U)  // host SWO viewer attach grace
 #define HPX_USB_POLL_DELAY_US     (10U * 1000U)   // re-poll cadence while waiting for DTR
 #define HPX_USB_SETTLE_DELAY_US   (200U * 1000U)  // settle after host asserts DTR
+#define HPX_RTT_HOST_READY_TIMEOUT_MS 15000U
 
 {% if not allocate_arenas %}
 {% for region in arena_regions %}
@@ -328,6 +336,13 @@ int main(void) {
     // Flush the RTT control block metadata so J-Link can see the configured
     // buffer counts/flags before the host attaches on cached M55 targets.
     HPX_CLEAN_DCACHE();
+    hpx_printf("HPX_READY\n");
+    HPX_CLEAN_DCACHE();
+    if (!hpx_rtt_wait_for_command("HPX_HOST_READY", HPX_RTT_HOST_READY_TIMEOUT_MS)) {
+        hpx_printf("HPX_ERROR=rtt_host_ready_timeout\n");
+        HPX_CLEAN_DCACHE();
+        while (1) { __WFI(); }
+    }
 {% else %}
 
     // Delay to allow the host SWO viewer to attach after reset.

@@ -31,6 +31,46 @@ static nsx_usb_config_t g_usb_cfg = {
     }
 }
 {% elif transport == "rtt" %}
+// Per-line timeout for lossless RTT writes (CSV rows + HPX_END).  Generous: the
+// host normally drains within milliseconds; this only caps a truly dead host so
+// the firmware cannot wedge forever.
+#ifndef HPX_RTT_LOSSLESS_TIMEOUT_MS
+#define HPX_RTT_LOSSLESS_TIMEOUT_MS 2000U
+#endif
+
+// When true, hpx_printf writes losslessly (waits for ring-buffer space) instead
+// of dropping on overflow.  Set around CSV dumps / HPX_END; cleared during the
+// timed inference window where droppable heartbeats must never stall the CPU.
+static volatile bool g_hpx_rtt_lossless = false;
+
+// Lossless RTT up-buffer write.
+//
+// The up-buffer stays in NO_BLOCK_TRIM at all times; we do the "wait for space"
+// ourselves rather than using SEGGER's BLOCK_IF_FIFO_FULL.  SEGGER's blocking
+// write spins on the up-buffer RdOff, which the host (J-Link) advances by
+// writing SRAM over SWD.  On a cached M55 the CPU reads that RdOff through stale
+// D-cache and never observes the drain, so the blocking write deadlocks once the
+// buffer fills.  Here we INVALIDATE before each space check so we see the host's
+// RdOff coherently, then issue the (now guaranteed to fit) write and CLEAN so
+// the host sees our bytes.  CSV/HPX_END phase only — never inside a timed window.
+static void hpx_rtt_write_lossless(const char *buf, unsigned len) {
+    const uint32_t spins_per_ms = SystemCoreClock / 2000U;
+    uint32_t budget = HPX_RTT_LOSSLESS_TIMEOUT_MS * spins_per_ms;
+    for (;;) {
+        HPX_INVAL_DCACHE();  // refresh host-advanced RdOff before checking space
+        if (SEGGER_RTT_GetAvailWriteSpace(0) >= len) {
+            break;
+        }
+        if (budget == 0U) {
+            break;  // host appears dead — fall through; NO_BLOCK_TRIM will trim
+        }
+        for (volatile uint32_t s = 0; s < spins_per_ms; ++s) { __NOP(); }
+        budget = (budget > spins_per_ms) ? budget - spins_per_ms : 0U;
+    }
+    SEGGER_RTT_Write(0, buf, len);
+    HPX_CLEAN_DCACHE();  // publish bytes to SRAM so the host/J-Link can read them
+}
+
 {{ _linkage }}void hpx_printf(const char *fmt, ...) {
     static char line_buf[512];
     va_list ap;
@@ -38,47 +78,92 @@ static nsx_usb_config_t g_usb_cfg = {
     int n = vsnprintf(line_buf, sizeof(line_buf), fmt, ap);
     va_end(ap);
     if (n > 0) {
-        SEGGER_RTT_Write(0, line_buf, (unsigned)n);
-        HPX_CLEAN_DCACHE();
+        if (g_hpx_rtt_lossless) {
+            hpx_rtt_write_lossless(line_buf, (unsigned)n);
+        } else {
+            // Timed window: droppable, never stalls (protects PMU/cycle counts).
+            SEGGER_RTT_Write(0, line_buf, (unsigned)n);
+            HPX_CLEAN_DCACHE();
+        }
     }
 }
 
-// Wait until the RTT up-buffer has drained (J-Link has read it) or until
-// a soft timeout (in "spin iterations") elapses.  Critical before emitting
-// HPX_END after a heavy CSV dump: NO_BLOCK_TRIM silently drops writes when
-// the ring buffer is full, so HPX_END can otherwise be lost.  Each spin is
-// very short; SystemCoreClock/1000 iterations ≈ 1 ms at worst case.
+// Wait until the RTT up-buffer has drained (host has read it) or a soft timeout
+// elapses.  Belt-and-braces after HPX_END.  HasDataUp compares WrOff against the
+// host-advanced RdOff, so invalidate each poll to observe the drain coherently
+// on cached targets.
 static void hpx_rtt_drain(uint32_t timeout_ms) {
     const uint32_t spins_per_ms = SystemCoreClock / 2000U; // conservative
     uint32_t total = timeout_ms * spins_per_ms;
-    while (SEGGER_RTT_HasDataUp(0) && total > 0U) {
-        // Flush cache so J-Link sees the latest WrOff each poll.
 {% if has_armv8m_pmu %}
-        HPX_CLEAN_DCACHE();
+    HPX_INVAL_DCACHE();
 {% endif %}
+    while (SEGGER_RTT_HasDataUp(0) && total > 0U) {
         for (volatile uint32_t s = 0; s < spins_per_ms; ++s) { __NOP(); }
         if (total > spins_per_ms) total -= spins_per_ms; else total = 0;
+{% if has_armv8m_pmu %}
+        HPX_INVAL_DCACHE();
+{% endif %}
     }
 }
 
-// Lossless / non-blocking mode switch for the RTT up-buffer.
+// Lossless-write mode toggle for the RTT up-buffer (see hpx_rtt_write_lossless).
 //
-// The buffer is configured NO_BLOCK_TRIM at init so that any RTT write that
-// happens *during* a timed interpreter.Invoke()/model_run() (e.g. an in-flight
-// heartbeat) can never stall the CPU and contaminate the cycle/PMU counts —
-// such writes are intentionally droppable.
-//
-// CSV dumps and the HPX_END sentinel happen *outside* the timed window, where
-// losing data is fatal to the host parser.  For those, switch to
-// BLOCK_IF_FIFO_FULL so the firmware waits for the J-Link host to drain rather
-// than silently dropping rows or the sentinel.  This makes correctness
-// independent of BUFFER_SIZE_UP and model size; the buffer size becomes a pure
-// throughput/latency knob.
+// The buffer stays NO_BLOCK_TRIM at all times so a write that happens *during* a
+// timed interpreter.Invoke()/model_run() (e.g. an in-flight heartbeat) can never
+// stall the CPU and skew the cycle/PMU counts — those writes are intentionally
+// droppable.  CSV dumps and the HPX_END sentinel happen *outside* the timed
+// window where losing data is fatal to the host parser, so we flip the lossless
+// flag for those.  Correctness is independent of BUFFER_SIZE_UP and model size;
+// the buffer size is a pure throughput/latency knob.
 static void hpx_rtt_set_blocking(void) {
-    SEGGER_RTT_SetFlagsUpBuffer(0, SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL);
+    g_hpx_rtt_lossless = true;
 }
 static void hpx_rtt_set_nonblocking(void) {
-    SEGGER_RTT_SetFlagsUpBuffer(0, SEGGER_RTT_MODE_NO_BLOCK_TRIM);
+    g_hpx_rtt_lossless = false;
+}
+
+static bool hpx_rtt_wait_for_command(const char *token, uint32_t timeout_ms) {
+    static char cmd_buf[32];
+    const size_t token_len = strlen(token);
+    unsigned used = 0;
+    const uint32_t spins_per_ms = SystemCoreClock / 2000U;
+    uint32_t total = timeout_ms * spins_per_ms;
+
+    memset(cmd_buf, 0, sizeof(cmd_buf));
+    while (total > 0U) {
+        // Down channel: J-Link wrote the host command into SRAM via SWD.  The
+        // CPU may hold a stale cached copy of the down-buffer descriptor
+        // (WrOff) and payload, so invalidate before reading or we spin forever
+        // never seeing the host's bytes.  This runs only during the one-time
+        // startup handshake, never inside a timed PMU window.
+{% if has_armv8m_pmu %}
+        HPX_INVAL_DCACHE();
+{% endif %}
+        unsigned n = SEGGER_RTT_Read(0, cmd_buf + used,
+                                     sizeof(cmd_buf) - 1U - used);
+        if (n > 0U) {
+            used += n;
+            cmd_buf[used] = '\0';
+            if (strstr(cmd_buf, token) != nullptr) {
+                return true;
+            }
+            if (used == sizeof(cmd_buf) - 1U) {
+                unsigned keep = token_len > 1U ? (unsigned)token_len - 1U : 0U;
+                if (keep > used) {
+                    keep = used;
+                }
+                if (keep > 0U) {
+                    memmove(cmd_buf, cmd_buf + used - keep, keep);
+                }
+                used = keep;
+                cmd_buf[used] = '\0';
+            }
+        }
+        for (volatile uint32_t s = 0; s < spins_per_ms; ++s) { __NOP(); }
+        if (total > spins_per_ms) total -= spins_per_ms; else total = 0U;
+    }
+    return false;
 }
 {% elif transport == "swo" %}
 {{ _linkage }}void hpx_printf(const char *fmt, ...) {
