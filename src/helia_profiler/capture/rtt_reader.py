@@ -328,10 +328,12 @@ def _wipe_rtt_control_blocks(
     """
     zeros = [0] * _RTT_ID_SIZE
     wiped = 0
+    seen: set[int] = set()
     for base, length in ranges:
         for offset in range(0, length, _RTT_SCAN_CHUNK):
+            chunk_len = min(_RTT_SCAN_CHUNK, length - offset)
             try:
-                chunk = bytes(jlink.memory_read8(base + offset, _RTT_SCAN_CHUNK))
+                chunk = bytes(jlink.memory_read8(base + offset, chunk_len))
             except Exception:  # noqa: BLE001 — probe errors are non-fatal
                 continue
             start = 0
@@ -340,7 +342,14 @@ def _wipe_rtt_control_blocks(
                 if idx < 0:
                     break
                 addr = base + offset + idx
+                if addr in seen:
+                    start = idx + 1
+                    continue
+                seen.add(addr)
                 try:
+                    if _score_rtt_control_block(jlink, addr) < 0:
+                        start = idx + 1
+                        continue
                     jlink.memory_write8(addr, zeros)
                     wiped += 1
                     log.debug("pre-clean blanked RTT control block at 0x%08X", addr)
@@ -356,12 +365,16 @@ def _direct_rtt_read_any(
     ranges: tuple[tuple[int, int], ...],
     preferred_block_address: int | None = None,
     max_bytes: int = 4096,
+    allow_rescan: bool = True,
 ) -> tuple[bytes, int | None]:
     """Read from whichever RTT control block is actually publishing bytes."""
     if preferred_block_address is not None:
         data = _direct_rtt_read(jlink, block_address=preferred_block_address, max_bytes=max_bytes)
         if data:
             return data, preferred_block_address
+
+    if not allow_rescan:
+        return b"", preferred_block_address
 
     for block_address, _score in _scan_rtt_control_blocks(jlink, ranges):
         if preferred_block_address is not None and block_address == preferred_block_address:
@@ -643,9 +656,10 @@ def capture_rtt_output(
         reset_target(device=jlink_device, jlink_serial=jlink_serial)
 
         # --- Step 2: connect pylink and wait for RTT readiness ---
-        # Apollo510 may still be transitioning through SBL immediately after
-        # reset. Rather than burning a fixed settle delay up front, retry the
-        # host attach and then poll until the RTT control block becomes visible.
+        # Apollo510 may still be transitioning through the unobservable SBL
+        # phase immediately after reset, so keep a small fixed floor delay here.
+        # After that, retry the host attach and poll until the RTT control
+        # block becomes visible.
         time.sleep(SBL_SETTLE_S)
         cb_deadline = time.monotonic() + _RTT_CB_TIMEOUT_S
         open_jlink_with_retry(
@@ -767,15 +781,22 @@ def capture_rtt_output(
             )
             resume_if_halted(jlink)
             active_block_address = block_address
+            direct_idle_polls = 0
 
             def read_direct_chunk() -> bytes:
                 nonlocal active_block_address
+                nonlocal direct_idle_polls
                 data, active_block_address = _direct_rtt_read_any(
                     jlink,
                     ranges=rtt_scan_ranges,
                     preferred_block_address=active_block_address,
                     max_bytes=4096,
+                    allow_rescan=direct_idle_polls >= 20,
                 )
+                if data:
+                    direct_idle_polls = 0
+                else:
+                    direct_idle_polls += 1
                 return data
 
             pending = _perform_rtt_ready_handshake(

@@ -9,6 +9,7 @@ from helia_profiler.capture.rtt_reader import (
     _direct_rtt_write,
     _direct_rtt_read,
     _scan_for_rtt_control_block,
+    _wipe_rtt_control_blocks,
     capture_rtt_output,
 )
 from helia_profiler.capture.serial_reader import capture_swo_output
@@ -29,7 +30,7 @@ class _FakeJLink:
         if addr == 0x30000010:
             return [1]
         if addr == 0x30000018:
-            return [0x30000100, 0x30000200, 4096, 0, 0, 0]
+            return [0x30000100, 0x30000200, 4096, 0, 0, 0][:count]
         return [0] * count
 
 
@@ -41,7 +42,7 @@ class _FakeDirectRttJLink:
         if addr == 0x20000010:
             return [3]
         if addr == 0x20000018:
-            return [0x1234, 0x20001000, 64, 10, 2, 1]
+            return [0x1234, 0x20001000, 64, 10, 2, 1][:count]
         raise AssertionError(f"unexpected read32 addr=0x{addr:08X} count={count}")
 
     def memory_read8(self, addr: int, length: int) -> list[int]:
@@ -64,7 +65,7 @@ class _FakeDirectRttWriteJLink:
         if addr == 0x20000014:
             return [1]
         if addr == 0x20000030:
-            return [0x1234, 0x20002000, 16, 2, 0, 0]
+            return [0x1234, 0x20002000, 16, 2, 0, 0][:count]
         raise AssertionError(f"unexpected read32 addr=0x{addr:08X} count={count}")
 
     def memory_write8(self, addr: int, data: list[int]) -> None:
@@ -101,6 +102,45 @@ def test_direct_rtt_write_advances_wr_off():
     assert written == 5
     assert jlink.byte_writes == [(0x20002002, [82, 69, 65, 68, 89])]
     assert jlink.word_writes == [(0x2000003C, [7])]
+
+
+def test_wipe_rtt_control_blocks_validates_candidates_and_honors_range_end():
+    class _FakeWipeJLink:
+        def __init__(self):
+            self.read_lengths: list[int] = []
+            self.writes: list[tuple[int, list[int]]] = []
+
+        def memory_read8(self, addr: int, length: int) -> list[int]:
+            self.read_lengths.append(length)
+            if addr == 0x30000000:
+                chunk = bytearray(length)
+                chunk[0:10] = b"SEGGER RTT"
+                if length >= 42:
+                    chunk[32:42] = b"SEGGER RTT"
+                return list(chunk)
+            if addr == 0x30000100:
+                return list((b"HPX\x00" + b"\x00" * length)[:length])
+            return [0] * length
+
+        def memory_read32(self, addr: int, count: int) -> list[int]:
+            if addr == 0x30000010:
+                return [1]
+            if addr == 0x30000018:
+                return [0x30000100, 0x30000200, 4096, 1, 0, 0][:count]
+            if addr == 0x30000030:
+                return [0, 0, 0, 0, 0, 0][:count]
+            return [0] * count
+
+        def memory_write8(self, addr: int, data: list[int]) -> None:
+            self.writes.append((addr, data))
+
+    jlink = _FakeWipeJLink()
+
+    wiped = _wipe_rtt_control_blocks(jlink, ((0x30000000, 42),))
+
+    assert wiped == 1
+    assert jlink.read_lengths[0] == 42
+    assert jlink.writes == [(0x30000000, [0] * 16)]
 
 
 def test_capture_pmu_passes_soc_rtt_scan_ranges(tmp_path: Path, monkeypatch):
@@ -295,7 +335,7 @@ def test_capture_rtt_output_sends_host_ready_before_collect(monkeypatch):
             if addr == 0x20000010:
                 return [1]
             if addr == 0x20000018:
-                return [0x20000100, 0x20000200, 4096, 16, 0, 0]
+                return [0x20000100, 0x20000200, 4096, 16, 0, 0][:count]
             return [0] * count
 
         def memory_write8(self, addr: int, data: list[int]) -> None:
@@ -379,7 +419,7 @@ def test_capture_rtt_output_preserves_bytes_after_hpx_ready(monkeypatch):
             if addr == 0x20000010:
                 return [1]
             if addr == 0x20000018:
-                return [0x20000100, 0x20000200, 4096, 16, 0, 0]
+                return [0x20000100, 0x20000200, 4096, 16, 0, 0][:count]
             return [0] * count
 
         def memory_write8(self, addr: int, data: list[int]) -> None:
@@ -472,7 +512,7 @@ def test_capture_rtt_output_restarts_halted_target(monkeypatch):
             if addr == 0x20000010:
                 return [1]
             if addr == 0x20000018:
-                return [0x20000100, 0x20000200, 4096, 16, 0, 0]
+                return [0x20000100, 0x20000200, 4096, 16, 0, 0][:count]
             return [0] * count
 
         def memory_write8(self, addr: int, data: list[int]) -> None:
@@ -560,7 +600,7 @@ def test_capture_rtt_output_retries_attach_until_target_ready(monkeypatch):
             if addr == 0x20000010:
                 return [1]
             if addr == 0x20000018:
-                return [0x20000100, 0x20000200, 4096, 16, 0, 0]
+                return [0x20000100, 0x20000200, 4096, 16, 0, 0][:count]
             return [0] * count
 
         def memory_write8(self, addr: int, data: list[int]) -> None:
@@ -697,6 +737,97 @@ def test_capture_rtt_output_tolerates_preclean_attach_failure(monkeypatch):
 
     # Pre-clean attach raised, capture phase attach succeeded: two attempts.
     assert attach_calls["n"] == 2
+
+
+def test_capture_rtt_output_direct_fallback_rescans_only_after_idle_backoff(monkeypatch):
+    class _FakeStatus:
+        NumUpBuffers = 0
+
+    class _FakeJLinkHandle:
+        def open(self, serial_no=None):
+            return None
+
+        def disable_dialog_boxes(self):
+            return None
+
+        def set_tif(self, tif):
+            return None
+
+        def connect(self, device, speed):
+            return None
+
+        def halt(self):
+            return None
+
+        def halted(self):
+            return False
+
+        def rtt_start(self, block_address=None):
+            return None
+
+        def rtt_get_status(self):
+            return _FakeStatus()
+
+        def rtt_read(self, buffer_index, length):
+            return []
+
+        def rtt_stop(self):
+            return None
+
+        def close(self):
+            return None
+
+    fake_jlink = _FakeJLinkHandle()
+    fake_pylink = types.SimpleNamespace(
+        JLink=lambda: fake_jlink,
+        JLinkInterfaces=types.SimpleNamespace(SWD=1),
+        errors=types.SimpleNamespace(JLinkException=Exception, JLinkRTTException=Exception),
+    )
+
+    allow_rescan_calls: list[bool] = []
+
+    def fake_direct_rtt_read_any(*_args, **kwargs):
+        allow_rescan_calls.append(kwargs["allow_rescan"])
+        call_index = len(allow_rescan_calls)
+        if call_index == 1:
+            return b"HPX_READY\n", kwargs["preferred_block_address"]
+        if call_index <= 21:
+            return b"", kwargs["preferred_block_address"]
+        return b"--- HPX_START ---\n--- HPX_END ---\n", kwargs["preferred_block_address"]
+
+    def fake_collect_lines(read_chunk, **_kwargs):
+        for _ in range(22):
+            read_chunk()
+        return ["--- HPX_START ---", "--- HPX_END ---"]
+
+    monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader.reset_target", lambda **kwargs: None)
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.sleep", lambda _: None)
+    monkeypatch.setattr(
+        "helia_profiler.capture.rtt_reader._scan_for_rtt_control_block",
+        lambda *_args, **_kwargs: (0x20000000, 123),
+    )
+    monkeypatch.setattr(
+        "helia_profiler.capture.rtt_reader._direct_rtt_read_any",
+        fake_direct_rtt_read_any,
+    )
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader._RTT_CB_TIMEOUT_S", 0.1)
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader._RTT_DISCOVERY_SETTLE_S", 0.0)
+    monkeypatch.setattr(
+        "helia_profiler.capture.rtt_reader._write_rtt_command_direct",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader.collect_lines", fake_collect_lines)
+
+    capture_rtt_output(
+        jlink_serial="1160002204",
+        jlink_device="AP510NFA-CBR",
+        rtt_scan_ranges=((0x20000000, 0x4000),),
+    )
+
+    assert allow_rescan_calls[0] is False
+    assert all(flag is False for flag in allow_rescan_calls[1:21])
+    assert allow_rescan_calls[21] is True
 
 
 def test_capture_swo_output_restarts_halted_target(monkeypatch):
