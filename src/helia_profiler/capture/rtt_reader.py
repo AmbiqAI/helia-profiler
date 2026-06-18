@@ -394,7 +394,7 @@ def _upload_model_to_psram(
 def capture_rtt_output(
     *,
     jlink_serial: str | None = None,
-    jlink_device: str = "AP510NFA-CBR",
+    jlink_device: str,
     rtt_scan_ranges: tuple[tuple[int, int], ...],
     timeout_s: float | None = None,
     heartbeat_timeout_s: float = HEARTBEAT_TIMEOUT_S,

@@ -128,7 +128,7 @@ def capture_usb_output(
     *,
     build_dir: None = None,  # unused — kept for interface parity with SWO
     jlink_serial: str | None = None,
-    jlink_device: str = "AP510NFA-CBR",
+    jlink_device: str,
     timeout_s: float = DEFAULT_TIMEOUT_S,
     usb_port: str | None = None,
     timing_out: dict[str, float] | None = None,

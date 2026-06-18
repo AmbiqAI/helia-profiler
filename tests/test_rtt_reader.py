@@ -104,6 +104,7 @@ def test_capture_pmu_passes_soc_rtt_scan_ranges(tmp_path: Path, monkeypatch):
     result = capture_pmu(ctx)
 
     assert result.layers[0].cycles == 1
+    assert captured["jlink_device"] == ctx.soc.jlink_device
     assert captured["rtt_scan_ranges"] == ctx.soc.rtt_scan_ranges
     assert ctx.run_metadata.timing is not None
     assert ctx.run_metadata.timing.capture_duration_s == 1.25
@@ -146,7 +147,46 @@ def test_capture_pmu_passes_resolved_cpu_clock_to_swo(tmp_path: Path, monkeypatc
     result = capture_pmu(ctx)
 
     assert result.layers[0].cycles == 1
+    assert captured["jlink_device"] == ctx.soc.jlink_device
     assert captured["cpu_freq"] == 250_000_000
+
+
+def test_capture_pmu_passes_resolved_jlink_device_to_usb(tmp_path: Path, monkeypatch):
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "target": {"transport": "usb_cdc"},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    ctx.build_dir = tmp_path / "build"
+    ctx.build_dir.mkdir()
+    ctx.resolved_jlink_serial = "1160002204"
+
+    captured: dict[str, object] = {}
+
+    def fake_capture_usb_output(**kwargs):
+        captured.update(kwargs)
+        return [
+            "--- HPX_START ---",
+            "--- HPX_PRESET basic_cpu ---",
+            "--- HPX_ITER 0 ---",
+            "Layer,Op,ARM_PMU_CPU_CYCLES",
+            "0,CONV_2D,1",
+            "--- HPX_END ---",
+        ]
+
+    monkeypatch.setattr("helia_profiler.capture.usb_reader.capture_usb_output", fake_capture_usb_output)
+
+    result = capture_pmu(ctx)
+
+    assert result.layers[0].cycles == 1
+    assert captured["jlink_device"] == ctx.soc.jlink_device
 
 
 def test_capture_rtt_output_restarts_halted_target(monkeypatch):

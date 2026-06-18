@@ -39,7 +39,7 @@ def capture_swo_output(
     *,
     build_dir=None,  # unused — kept for interface parity
     jlink_serial: str | None = None,
-    jlink_device: str = "AP510NFA-CBR",
+    jlink_device: str,
     timeout_s: float = DEFAULT_TIMEOUT_S,
     cpu_freq: int = 96_000_000,
     swo_freq: int = 1_000_000,
