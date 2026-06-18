@@ -19,6 +19,7 @@ class RunArtifacts:
     summary: dict[str, Any]
     metadata: dict[str, Any]
     layers: list[dict[str, Any]]
+    layer_memory: dict[Any, list[dict[str, Any]]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -87,7 +88,7 @@ def compare_runs(baseline_dir: Path, candidate_dir: Path) -> CompareResult:
 
     config_rows = _compare_config(baseline.metadata, candidate.metadata)
     metrics = _compare_metrics(baseline.summary, candidate.summary)
-    layer_rows = _compare_layers(baseline.layers, candidate.layers)
+    layer_rows = _compare_layers(baseline, candidate)
     warnings = _build_warnings(baseline, candidate, config_rows, metrics, layer_rows)
 
     return CompareResult(
@@ -116,8 +117,16 @@ def load_run_artifacts(path: Path) -> RunArtifacts:
             hint="Run `hpx profile` with the default CSV output format before comparing.",
         )
     layers = _read_layer_csv(layers_path)
+    layer_memory_path = run_dir / "aot_memory_layers.csv"
+    layer_memory = _read_layer_memory_csv(layer_memory_path) if layer_memory_path.is_file() else {}
 
-    return RunArtifacts(path=run_dir, summary=summary, metadata=metadata, layers=layers)
+    return RunArtifacts(
+        path=run_dir,
+        summary=summary,
+        metadata=metadata,
+        layers=layers,
+        layer_memory=layer_memory,
+    )
 
 
 def write_compare_artifacts(result: CompareResult, output_dir: Path) -> list[Path]:
@@ -203,10 +212,14 @@ def render_compare(result: CompareResult, *, top_layers: int = 10) -> str:
             "candidate": _format_number(row.get("candidate_cycles")),
             "delta": _format_layer_delta(row),
             "speedup": _format_speedup(row.get("speedup")),
+            "memory": row.get("memory_diff", ""),
         }
         for row in top
     ]
-    lines.extend(_format_table(["id", "op", "baseline", "candidate", "delta", "speedup"], layer_rows))
+    columns = ["id", "op", "baseline", "candidate", "delta", "speedup"]
+    if any(row.get("memory") for row in layer_rows):
+        columns.append("memory")
+    lines.extend(_format_table(columns, layer_rows))
     return "\n".join(lines)
 
 
@@ -276,7 +289,9 @@ def _compare_metrics(base: dict[str, Any], cand: dict[str, Any]) -> list[MetricD
     return metrics
 
 
-def _compare_layers(base: list[dict[str, Any]], cand: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[dict[str, Any]]:
+    base = base_run.layers
+    cand = cand_run.layers
     rows: list[dict[str, Any]] = []
     max_len = max(len(base), len(cand))
     for idx in range(max_len):
@@ -309,6 +324,17 @@ def _compare_layers(base: list[dict[str, Any]], cand: list[dict[str, Any]]) -> l
             "baseline_overflow": b.get("overflow"),
             "candidate_overflow": c.get("overflow"),
         }
+        base_mem = _memory_rows_for_layer(base_run.layer_memory, b, idx)
+        cand_mem = _memory_rows_for_layer(cand_run.layer_memory, c, idx)
+        base_mem_counts = _layer_memory_counts(base_mem)
+        cand_mem_counts = _layer_memory_counts(cand_mem)
+        base_mem_summary = _format_memory_summary(base_mem_counts)
+        cand_mem_summary = _format_memory_summary(cand_mem_counts)
+        if base_mem_summary or cand_mem_summary:
+            row["baseline_memory"] = base_mem_summary
+            row["candidate_memory"] = cand_mem_summary
+            row["memory_changed"] = base_mem_summary != cand_mem_summary
+            row["memory_diff"] = _format_memory_diff(base_mem_counts, cand_mem_counts)
 
         for key in sorted((set(b) & set(c)) - {"id", "op", "cycles", "overflow"}):
             bf = _to_float(b.get(key))
@@ -346,7 +372,112 @@ def _build_warnings(
     missing_metrics = [m.name for m in metrics if m.baseline is None or m.candidate is None]
     if missing_metrics:
         warnings.append("Some run-level metrics are missing in one run: " + ", ".join(missing_metrics))
+    if (baseline.layer_memory or candidate.layer_memory) and not (baseline.layer_memory and candidate.layer_memory):
+        warnings.append(
+            "AOT memory placement artifacts are present in only one run; placement diffs may be partial."
+        )
     return warnings
+
+
+def _read_layer_memory_csv(path: Path) -> dict[Any, list[dict[str, Any]]]:
+    rows = _read_layer_csv(path)
+    by_key: dict[Any, list[dict[str, Any]]] = {}
+    for row in rows:
+        for key in set((row.get("layer_id"), row.get("layer_idx"))):
+            if key is not None:
+                by_key.setdefault(key, []).append(row)
+    return by_key
+
+
+def _memory_rows_for_layer(
+    layer_memory: dict[Any, list[dict[str, Any]]],
+    layer: dict[str, Any],
+    idx: int,
+) -> list[dict[str, Any]]:
+    for key in (layer.get("id"), idx):
+        if key in layer_memory:
+            return layer_memory[key]
+        text_key = str(key)
+        if text_key in layer_memory:
+            return layer_memory[text_key]
+    return []
+
+
+def _layer_memory_counts(rows: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    """Return ``role -> placement -> tensor count`` for one layer."""
+
+    counts: dict[str, dict[str, int]] = {}
+    for row in rows:
+        kind = _friendly_memory_role(
+            str(row.get("tensor_kind") or row.get("arena_role") or row.get("tensor_role") or "tensor")
+        )
+        placement = _format_placement(row)
+        counts.setdefault(kind, {})[placement] = counts.setdefault(kind, {}).get(placement, 0) + 1
+    return counts
+
+
+def _format_memory_summary(counts: dict[str, dict[str, int]]) -> str:
+    if not counts:
+        return ""
+    parts: list[str] = []
+    for kind, placements in sorted(counts.items()):
+        placement_text = " + ".join(
+            _format_counted_placement(count, placement)
+            for placement, count in sorted(placements.items())
+        )
+        parts.append(f"{kind}: {placement_text}")
+    return "; ".join(parts)
+
+
+def _format_memory_diff(
+    base: dict[str, dict[str, int]],
+    cand: dict[str, dict[str, int]],
+) -> str:
+    if not base and not cand:
+        return ""
+    if base == cand:
+        return f"unchanged: {_format_memory_summary(base)}"
+    parts: list[str] = []
+    for kind in sorted(set(base) | set(cand)):
+        base_places = base.get(kind, {})
+        cand_places = cand.get(kind, {})
+        if base_places == cand_places:
+            continue
+        before = _format_placement_group(base_places) if base_places else "none"
+        after = _format_placement_group(cand_places) if cand_places else "none"
+        parts.append(f"{kind}: {before} -> {after}")
+    return "; ".join(parts)
+
+
+def _format_placement(row: dict[str, Any]) -> str:
+    memory = str(row.get("memory") or "?").upper()
+    source = row.get("source_memory")
+    source_s = str(source).upper() if source else memory
+    return f"staged {source_s} to {memory}" if source_s != memory else f"in {memory}"
+
+
+def _format_placement_group(placements: dict[str, int]) -> str:
+    return " + ".join(
+        _format_counted_placement(count, placement)
+        for placement, count in sorted(placements.items())
+    )
+
+
+def _format_counted_placement(count: int, placement: str) -> str:
+    noun = "buffer" if count == 1 else "buffers"
+    return f"{count} {noun} {placement}"
+
+
+def _friendly_memory_role(kind: str) -> str:
+    labels = {
+        "constant": "constants",
+        "scratch": "scratch",
+        "persistent": "persistent",
+        "input": "inputs",
+        "output": "outputs",
+        "local": "local buffers",
+    }
+    return labels.get(kind.lower(), kind.lower())
 
 
 def _get_nested(data: dict[str, Any], path: tuple[str, ...]) -> Any:
@@ -450,6 +581,10 @@ def _layer_fieldnames(rows: list[dict[str, Any]]) -> list[str]:
         "speedup",
         "baseline_overflow",
         "candidate_overflow",
+        "baseline_memory",
+        "candidate_memory",
+        "memory_changed",
+        "memory_diff",
     ]
     keys = set().union(*(row.keys() for row in rows)) if rows else set()
     return [key for key in preferred if key in keys] + sorted(keys - set(preferred))

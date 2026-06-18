@@ -92,6 +92,52 @@ def _write_run(
             )
 
 
+def _write_aot_memory_layers(path: Path, memory: str, source_memory: str | None = None) -> None:
+    with open(path / "aot_memory_layers.csv", "w", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "layer_idx",
+                "layer_id",
+                "op_type",
+                "op_name",
+                "tensor_role",
+                "tensor_id",
+                "tensor_name",
+                "tensor_kind",
+                "memory",
+                "source_memory",
+                "staged",
+                "arena_role",
+                "arena_region_id",
+                "offset",
+                "size",
+                "shape",
+            ],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "layer_idx": 0,
+                "layer_id": 0,
+                "op_type": "CONV_2D",
+                "op_name": "conv_2d_0",
+                "tensor_role": "local",
+                "tensor_id": 17,
+                "tensor_name": "weights",
+                "tensor_kind": "constant",
+                "memory": memory,
+                "source_memory": source_memory or memory,
+                "staged": source_memory is not None and source_memory != memory,
+                "arena_role": "constant",
+                "arena_region_id": 1,
+                "offset": 0,
+                "size": 1024,
+                "shape": "[64, 1, 5, 1]",
+            }
+        )
+
+
 def test_compare_runs_computes_run_and_layer_deltas(tmp_path: Path):
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
@@ -137,3 +183,26 @@ def test_write_compare_artifacts(tmp_path: Path):
         rows = list(csv.DictReader(f))
     assert rows[0]["baseline_op"] == "CONV_2D"
     assert rows[0]["delta_cycles"] == "-100.0"
+
+
+def test_compare_includes_aot_memory_placement_diffs(tmp_path: Path):
+    baseline = tmp_path / "dtcm"
+    candidate = tmp_path / "sram"
+    _write_run(baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+    _write_run(candidate, toolchain="arm-none-eabi-gcc", total_cycles=900, avg_us=9, layer_cycles=[700])
+    _write_aot_memory_layers(baseline, "dtcm")
+    _write_aot_memory_layers(candidate, "sram", source_memory="mram")
+
+    result = compare_runs(baseline, candidate)
+
+    row = result.layer_rows[0]
+    assert row["memory_changed"] is True
+    assert "constants: 1 buffer in DTCM" in row["baseline_memory"]
+    assert "constants: 1 buffer staged MRAM to SRAM" in row["candidate_memory"]
+    assert "->" in row["memory_diff"]
+
+    paths = write_compare_artifacts(result, tmp_path / "diff")
+    assert {p.name for p in paths} == {"compare_summary.json", "layer_diff.csv"}
+    rows = list(csv.DictReader(open(tmp_path / "diff" / "layer_diff.csv")))
+    assert rows[0]["memory_changed"] == "True"
+    assert "staged MRAM to SRAM" in rows[0]["candidate_memory"]

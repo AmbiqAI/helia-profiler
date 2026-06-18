@@ -463,7 +463,11 @@ def _validate_pragmas(aot_module_dir: Path, prefix: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _tensor_metadata(tensor: Any) -> dict[str, Any]:
+def _tensor_metadata(
+    tensor: Any,
+    allocations: dict[str, Any] | None = None,
+    arena_region_ids: dict[tuple[str, str, str], int] | None = None,
+) -> dict[str, Any]:
     """Extract a JSON-serialisable summary from an ``AirTensor``.
 
     Returns only the fields useful for post-run analysis; silently omits
@@ -489,6 +493,49 @@ def _tensor_metadata(tensor: Any) -> dict[str, Any]:
         val = getattr(tensor, flag, None)
         if isinstance(val, bool):
             meta[flag] = val
+    if allocations:
+        tensor_keys = [
+            str(v)
+            for v in (
+                getattr(tensor, "id", None),
+                getattr(tensor, "name", None),
+                meta.get("id"),
+                meta.get("name"),
+            )
+            if v is not None
+        ]
+        alloc = next((allocations[k] for k in tensor_keys if k in allocations), None)
+        if alloc is not None:
+            binding = getattr(alloc, "binding", None)
+            memory = getattr(binding, "memory", getattr(alloc, "memory", None))
+            source_memory = getattr(binding, "source_memory", None)
+            role = getattr(binding, "role", None)
+            offset = getattr(binding, "offset", getattr(alloc, "offset", None))
+            size = getattr(alloc, "size", None)
+
+            if memory is not None:
+                meta["memory"] = str(memory).lower()
+            if source_memory is not None:
+                meta["source_memory"] = str(source_memory).lower()
+            if role is not None:
+                meta["arena_role"] = str(role).lower()
+            if isinstance(offset, (int, float)):
+                meta["offset"] = int(offset)
+            if isinstance(size, (int, float)):
+                meta["allocation_size"] = int(size)
+
+            if memory is not None and role is not None:
+                key = (
+                    str(role).lower(),
+                    str(memory).lower(),
+                    str(source_memory or memory).lower(),
+                )
+                if arena_region_ids and key in arena_region_ids:
+                    meta["arena_region_id"] = arena_region_ids[key]
+            source = meta.get("source_memory")
+            runtime = meta.get("memory")
+            if source is not None and runtime is not None:
+                meta["staged"] = source != runtime
     return meta
 
 
@@ -607,6 +654,10 @@ def _extract_operator_manifest(
     if not operators:
         return []
 
+    memory_plan = getattr(codegen_ctx, "memory_plan", None)
+    allocations = getattr(memory_plan, "tensor_allocs", None) or {}
+    arena_region_ids = _arena_region_id_lookup(codegen_ctx)
+
     manifest: list[dict[str, Any]] = []
     for idx, aot_op in enumerate(operators):
         entry: dict[str, Any] = {
@@ -616,15 +667,49 @@ def _extract_operator_manifest(
             "name": aot_op.name,
         }
         try:
-            entry["inputs"] = [_tensor_metadata(t) for t in (aot_op.input_tensors or [])]
+            entry["inputs"] = [
+                _tensor_metadata(t, allocations, arena_region_ids)
+                for t in (aot_op.input_tensors or [])
+            ]
         except Exception:  # noqa: BLE001 — defensive for older heliaAOT
             pass
         try:
-            entry["outputs"] = [_tensor_metadata(t) for t in (aot_op.output_tensors or [])]
+            entry["outputs"] = [
+                _tensor_metadata(t, allocations, arena_region_ids)
+                for t in (aot_op.output_tensors or [])
+            ]
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            local_tensors = [_tensor_metadata(t, allocations, arena_region_ids) for t in (aot_op.local_tensors or [])]
+            if local_tensors:
+                entry["local_tensors"] = local_tensors
         except Exception:  # noqa: BLE001
             pass
         manifest.append(entry)
     return manifest
+
+
+def _arena_region_id_lookup(codegen_ctx: Any) -> dict[tuple[str, str, str], int]:
+    """Return ``(role, runtime_memory, source_memory) → region_id``."""
+
+    render_plan = getattr(codegen_ctx, "render_plan", None)
+    if render_plan is None:
+        return {}
+    lookup: dict[tuple[str, str, str], int] = {}
+    for arena_list in (
+        getattr(render_plan, "scratch_arenas", ()),
+        getattr(render_plan, "persistent_arenas", ()),
+        getattr(render_plan, "constant_arenas", ()),
+    ):
+        for arena in arena_list:
+            role = str(getattr(arena, "role", "")).lower()
+            memory = str(getattr(arena, "memory", "")).lower()
+            source_memory = str(getattr(arena, "source_memory", getattr(arena, "memory", ""))).lower()
+            region_id = getattr(arena, "region_id", None)
+            if role and memory and source_memory and isinstance(region_id, (int, float)):
+                lookup[(role, memory, source_memory)] = int(region_id)
+    return lookup
 
 
 # ---------------------------------------------------------------------------
