@@ -396,7 +396,7 @@ _register_soc(
         c_define="AM_PART_APOLLO510B",
         cmsis_header="apollo510.h",
         rtt_scan_ranges=((0x20000000, 0x200000),),
-        jlink_device="AP510NFA-CBR",
+        jlink_device="AP510BFA-CBR",
         pmu_max_ops=4096,
     )
 )

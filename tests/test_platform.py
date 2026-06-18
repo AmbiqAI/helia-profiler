@@ -37,6 +37,11 @@ def test_apollo510b_evb_default_sync_gpio_pin_is_29():
     assert board.default_sync_gpio_pin == 29
 
 
+def test_apollo510b_uses_expected_jlink_device():
+    soc = get_soc("apollo510b")
+    assert soc.jlink_device == "AP510BFA-CBR"
+
+
 def test_apollo3p_evb_resolves_to_cortex_m4():
     soc = get_soc_for_board("apollo3p_evb")
     assert soc.core is CoreArch.CORTEX_M4

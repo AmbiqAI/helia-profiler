@@ -41,6 +41,7 @@ from .transport import (
     HPX_START,
     collect_lines,
 )
+from .timing import SBL_SETTLE_S
 
 log = logging.getLogger("hpx")
 
@@ -48,6 +49,7 @@ if TYPE_CHECKING:
     import pylink
 
 _RTT_CB_TIMEOUT_S = 30  # max time to wait for RTT control block discovery
+_RTT_PRECLEAN_TIMEOUT_S = 10  # bound the pre-reset connect used to wipe stale blocks
 _PSRAM_READY_TIMEOUT_S = 15  # wait for PSRAM init + ready signal
 _PSRAM_WRITE_CHUNK = 65536  # bytes per J-Link memory_write call
 
@@ -56,6 +58,90 @@ _RTT_MAGIC = b"SEGGER RTT"
 _RTT_DESC_WORDS = 6
 _RTT_CB_HEADER_SIZE = 24
 _RTT_DESC_SIZE = _RTT_DESC_WORDS * 4
+_RTT_ID_SIZE = 16  # bytes of the acID magic field at the start of a control block
+_RTT_DISCOVERY_SETTLE_S = 2.0
+
+# The firmware always names up-channel 0 "HPX" (see firmware/templates/
+# main*.cc.j2: SEGGER_RTT_ConfigUpBuffer(0, "HPX", ...)).  This is the
+# strongest, board-agnostic way to tell *our* RTT control block apart from
+# unrelated ones (e.g. a bootloader/monitor's default "Terminal" block, or a
+# stale block left in retained SRAM by a previous firmware).
+_RTT_APP_CHANNEL0_NAME = b"HPX"
+_RTT_NAME_MAX_LEN = 16
+
+# Scoring weights.  These are powers of two chosen so the qualitative signals
+# dominate in priority order (name match > live activity > buffer size) while
+# still letting buffer size act as a final tiebreaker.
+_RTT_NAME_MATCH_BONUS = 1 << 28
+_RTT_ACTIVITY_BONUS = 1 << 26
+
+
+def _read_rtt_up_channel0_name(
+    jlink: "pylink.JLink",
+    block_address: int,
+    max_len: int = _RTT_NAME_MAX_LEN,
+) -> bytes:
+    """Return the NUL-terminated name string of up-channel 0, or ``b""``.
+
+    The name lives behind the ``sName`` pointer in the channel-0 buffer
+    descriptor.  Any probe error degrades gracefully to an empty name so the
+    caller simply falls back to the other (size/activity) signals.
+    """
+    try:
+        name_ptr = jlink.memory_read32(block_address + _RTT_CB_HEADER_SIZE, 1)[0]
+        if name_ptr == 0:
+            return b""
+        raw = bytes(jlink.memory_read8(name_ptr, max_len))
+    except Exception:  # noqa: BLE001 — name probing is best-effort
+        return b""
+    nul = raw.find(0)
+    return raw[:nul] if nul >= 0 else raw
+
+
+def _score_rtt_control_block(jlink: "pylink.JLink", block_address: int) -> int:
+    """Rank an RTT control-block candidate by how likely it is *our* live block.
+
+    A raw "SEGGER RTT" magic match is too weak on its own: Apollo5 parts retain
+    SRAM across reset/reflash, so a structurally-valid but stale control block
+    from a previous firmware can survive alongside the current one.  This ranks
+    candidates by, in order: (1) up-channel 0 named "HPX", (2) the block has
+    unread data (it is actively producing output, not a drained leftover),
+    (3) larger plausible buffer.  Returns -1 for unusable candidates.
+    """
+    try:
+        max_up_buffers = jlink.memory_read32(block_address + 16, 1)[0]
+        if max_up_buffers <= 0:
+            return -1
+        desc_addr = block_address + _RTT_CB_HEADER_SIZE
+        name_ptr, buf_ptr, size, wr_off, rd_off, _flags = jlink.memory_read32(desc_addr, _RTT_DESC_WORDS)
+    except Exception:  # noqa: BLE001 — invalid candidates are ignored
+        return -1
+
+    # Structural validity: a usable up-channel 0 must point at a real buffer
+    # with sane read/write offsets.  Reject clearly-broken candidates outright.
+    if buf_ptr == 0 or size <= 0:
+        return -1
+    if wr_off > size or rd_off > size:
+        return -1
+
+    score = 0
+    if name_ptr != 0:
+        score += 1
+
+    # Strongest signal: the firmware names up-channel 0 "HPX".  This filters out
+    # unrelated RTT blocks regardless of SoC (Apollo510, Apollo510B, ...).
+    if _read_rtt_up_channel0_name(jlink, block_address) == _RTT_APP_CHANNEL0_NAME:
+        score += _RTT_NAME_MATCH_BONUS
+
+    # Next strongest: a block with unread data (wr_off != rd_off) is live.  A
+    # drained stale block left in retained SRAM has wr_off == rd_off and so
+    # scores lower than the block actively emitting HPX output.
+    if wr_off != rd_off:
+        score += _RTT_ACTIVITY_BONUS
+
+    # Final tiebreaker: prefer the larger plausible buffer.
+    score += min(size, 1 << 20)
+    return score
 
 
 def _direct_rtt_read(
@@ -101,27 +187,131 @@ def _direct_rtt_read(
     return data
 
 
-def _scan_for_rtt_control_block(
+def _scan_rtt_control_blocks(
     jlink: "pylink.JLink",
     ranges: tuple[tuple[int, int], ...],
-) -> int | None:
-    """Scan SRAM for the "SEGGER RTT" control-block magic.
+) -> list[tuple[int, int]]:
+    """Return every valid RTT control block as ``(address, score)``, best-first.
 
-    Returns the absolute address of the control block, or None if not
-    found.  This is a deterministic fallback for J-Link's built-in RTT
-    auto-scan, which on some devices (notably Apollo510 + armclang
-    linker output) fails to cover the relevant SRAM region.
+    Single pass over the SRAM ranges: each "SEGGER RTT" magic match is scored
+    once and de-duplicated, then the survivors are sorted by score.  This is a
+    deterministic fallback for J-Link's built-in RTT auto-scan, which on some
+    devices fails to cover the relevant SRAM region.
     """
+    candidates: list[tuple[int, int]] = []
+    seen: set[int] = set()
+
     for base, length in ranges:
         for offset in range(0, length, _RTT_SCAN_CHUNK):
             try:
                 chunk = bytes(jlink.memory_read8(base + offset, _RTT_SCAN_CHUNK))
             except Exception:  # noqa: BLE001 — probe errors are non-fatal
                 continue
-            idx = chunk.find(_RTT_MAGIC)
-            if idx >= 0:
-                return base + offset + idx
-    return None
+            start = 0
+            while True:
+                idx = chunk.find(_RTT_MAGIC, start)
+                if idx < 0:
+                    break
+                block_address = base + offset + idx
+                if block_address not in seen:
+                    seen.add(block_address)
+                    score = _score_rtt_control_block(jlink, block_address)
+                    if score >= 0:
+                        candidates.append((block_address, score))
+                start = idx + 1
+
+    candidates.sort(key=lambda item: item[1], reverse=True)
+    return candidates
+
+
+def _scan_for_rtt_control_block(
+    jlink: "pylink.JLink",
+    ranges: tuple[tuple[int, int], ...],
+) -> tuple[int, int] | None:
+    """Return the best-scoring RTT control block and its score, or None.
+
+    Thin wrapper over :func:`_scan_rtt_control_blocks` for callers that only
+    need the single best candidate.
+    """
+    candidates = _scan_rtt_control_blocks(jlink, ranges)
+    if not candidates:
+        return None
+    best_addr, best_score = candidates[0]
+    if len(candidates) > 1:
+        second_addr, second_score = candidates[1]
+        log.debug(
+            "RTT scan found %d control blocks; selected 0x%08X (score=%d) over 0x%08X (score=%d)",
+            len(candidates),
+            best_addr,
+            best_score,
+            second_addr,
+            second_score,
+        )
+    return best_addr, best_score
+
+
+def _wipe_rtt_control_blocks(
+    jlink: "pylink.JLink",
+    ranges: tuple[tuple[int, int], ...],
+) -> int:
+    """Blank the "SEGGER RTT" magic of every control block found in SRAM.
+
+    Apollo5 parts retain SRAM across reset/reflash, so a control block written
+    by a *previously* flashed firmware (often a different buffer size, at a
+    different link address) can survive and race the live block during
+    discovery.  Zeroing the leading acID field makes those blocks invisible to
+    both the J-Link auto-scan and our own scan.
+
+    This is intended as a pre-reset clean: the currently flashed firmware
+    re-establishes its single control block on the next reset, while the stale
+    locations stay dead because no running code ever rewrites them.
+
+    Returns the number of control blocks blanked.
+    """
+    zeros = [0] * _RTT_ID_SIZE
+    wiped = 0
+    for base, length in ranges:
+        for offset in range(0, length, _RTT_SCAN_CHUNK):
+            try:
+                chunk = bytes(jlink.memory_read8(base + offset, _RTT_SCAN_CHUNK))
+            except Exception:  # noqa: BLE001 — probe errors are non-fatal
+                continue
+            start = 0
+            while True:
+                idx = chunk.find(_RTT_MAGIC, start)
+                if idx < 0:
+                    break
+                addr = base + offset + idx
+                try:
+                    jlink.memory_write8(addr, zeros)
+                    wiped += 1
+                    log.debug("pre-clean blanked RTT control block at 0x%08X", addr)
+                except Exception:  # noqa: BLE001 — a failed wipe is non-fatal
+                    pass
+                start = idx + 1
+    return wiped
+
+
+def _direct_rtt_read_any(
+    jlink: "pylink.JLink",
+    *,
+    ranges: tuple[tuple[int, int], ...],
+    preferred_block_address: int | None = None,
+    max_bytes: int = 4096,
+) -> tuple[bytes, int | None]:
+    """Read from whichever RTT control block is actually publishing bytes."""
+    if preferred_block_address is not None:
+        data = _direct_rtt_read(jlink, block_address=preferred_block_address, max_bytes=max_bytes)
+        if data:
+            return data, preferred_block_address
+
+    for block_address, _score in _scan_rtt_control_blocks(jlink, ranges):
+        if preferred_block_address is not None and block_address == preferred_block_address:
+            continue
+        data = _direct_rtt_read(jlink, block_address=block_address, max_bytes=max_bytes)
+        if data:
+            return data, block_address
+    return b"", preferred_block_address
 
 
 def _upload_model_to_psram(
@@ -258,6 +448,36 @@ def capture_rtt_output(
     jlink = pylink.JLink()
 
     try:
+        # --- Phase 0: pre-clean stale RTT control blocks ---
+        # Apollo5 retains SRAM across reset, so a control block from a
+        # previously flashed firmware can linger and race the live one during
+        # discovery.  Connect to the still-running target, blank every
+        # "SEGGER RTT" magic, and release the probe; the reset below then lets
+        # the current firmware come up as the only block in SRAM.  Best-effort:
+        # if the pre-clean attach fails we fall through to reset and rely on
+        # the discovery scoring to pick the live block.
+        try:
+            open_jlink_with_retry(
+                jlink,
+                device=jlink_device,
+                jlink_serial=jlink_serial,
+                timeout_s=_RTT_PRECLEAN_TIMEOUT_S,
+            )
+            try:
+                jlink.halt()
+            except Exception:  # noqa: BLE001 — halt is best-effort
+                pass
+            wiped = _wipe_rtt_control_blocks(jlink, rtt_scan_ranges)
+            if wiped:
+                log.info("pre-clean blanked %d stale RTT control block(s)", wiped)
+        except CaptureError:
+            log.debug("pre-clean RTT attach failed; continuing without wipe", exc_info=True)
+        finally:
+            try:
+                jlink.close()
+            except Exception:  # noqa: BLE001 — close errors are non-fatal
+                pass
+
         # --- Step 1: reset the target via JLinkExe subprocess ---
         # JLinkExe handles the Apollo510 secure bootloader (SBL) correctly;
         # pylink's reset() does not trigger the vendor-specific handler.
@@ -267,6 +487,7 @@ def capture_rtt_output(
         # Apollo510 may still be transitioning through SBL immediately after
         # reset. Rather than burning a fixed settle delay up front, retry the
         # host attach and then poll until the RTT control block becomes visible.
+        time.sleep(SBL_SETTLE_S)
         cb_deadline = time.monotonic() + _RTT_CB_TIMEOUT_S
         open_jlink_with_retry(
             jlink,
@@ -284,11 +505,29 @@ def capture_rtt_output(
         # TCM at 0x2000xxxx).  Do an explicit host-side scan for the
         # "SEGGER RTT" magic signature and pass the address to
         # rtt_start() so discovery is deterministic across toolchains.
+        # A named, actively-producing "HPX" block is the unambiguous winner, so
+        # stop as soon as one appears.  Otherwise keep scanning through a short
+        # settle window: on Apollo5 the live block's magic ID can show up a beat
+        # after a stale block's, and we want to outlast that race rather than
+        # latching onto the first signature we happen to see.
         block_address = None
-        while time.monotonic() < cb_deadline and block_address is None:
-            block_address = _scan_for_rtt_control_block(jlink, rtt_scan_ranges)
-            if block_address is None:
-                time.sleep(0.2)
+        best_score = -1
+        first_candidate_s: float | None = None
+        live_named_score = _RTT_NAME_MATCH_BONUS + _RTT_ACTIVITY_BONUS
+        while time.monotonic() < cb_deadline:
+            candidate = _scan_for_rtt_control_block(jlink, rtt_scan_ranges)
+            if candidate is not None:
+                candidate_addr, candidate_score = candidate
+                if candidate_score > best_score:
+                    block_address = candidate_addr
+                    best_score = candidate_score
+                if best_score >= live_named_score:
+                    break
+                if first_candidate_s is None:
+                    first_candidate_s = time.monotonic()
+                elif time.monotonic() - first_candidate_s >= _RTT_DISCOVERY_SETTLE_S:
+                    break
+            time.sleep(0.2)
 
         if block_address is not None:
             log.info("RTT control block located at 0x%08X", block_address)
@@ -327,8 +566,20 @@ def capture_rtt_output(
                 "SEGGER RTT API did not attach to control block 0x%08X; falling back to direct SWD polling",
                 block_address,
             )
+            active_block_address = block_address
+
+            def read_direct_chunk() -> bytes:
+                nonlocal active_block_address
+                data, active_block_address = _direct_rtt_read_any(
+                    jlink,
+                    ranges=rtt_scan_ranges,
+                    preferred_block_address=active_block_address,
+                    max_bytes=4096,
+                )
+                return data
+
             lines = collect_lines(
-                lambda: _direct_rtt_read(jlink, block_address=block_address, max_bytes=4096),
+                read_direct_chunk,
                 transport_name="RTT",
                 overall_timeout_s=timeout_s,
                 heartbeat_timeout_s=heartbeat_timeout_s,
@@ -347,8 +598,19 @@ def capture_rtt_output(
             _upload_model_to_psram(jlink, model_path)
 
         # --- Step 3b: collect lines via shared helper ---
+        def read_rtt_chunk() -> bytes:
+            data = bytes(jlink.rtt_read(0, 4096))
+            if data or block_address is None:
+                return data
+            # The SEGGER API attached but delivered nothing this poll.  Read the
+            # known control block directly via SWD as a cheap safety net for the
+            # "attached but silent" case — no SRAM rescan, since the pre-clean
+            # phase already removed any duplicate blocks.  When the buffer is
+            # genuinely empty (wr == rd) this returns b"" without side effects.
+            return _direct_rtt_read(jlink, block_address=block_address, max_bytes=4096)
+
         lines = collect_lines(
-            lambda: bytes(jlink.rtt_read(0, 4096)),
+            read_rtt_chunk,
             transport_name="RTT",
             overall_timeout_s=timeout_s,
             heartbeat_timeout_s=heartbeat_timeout_s,

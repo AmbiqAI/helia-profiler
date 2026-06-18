@@ -23,6 +23,14 @@ class _FakeJLink:
     def memory_read8(self, addr: int, length: int) -> list[int]:
         return list(self._memory.get(addr, b"\x00" * length))
 
+    def memory_read32(self, addr: int, count: int) -> list[int]:
+        # Model a single valid control block at 0x30000000 so scoring accepts it.
+        if addr == 0x30000010:
+            return [1]
+        if addr == 0x30000018:
+            return [0x30000100, 0x30000200, 4096, 0, 0, 0]
+        return [0] * count
+
 
 class _FakeDirectRttJLink:
     def __init__(self):
@@ -49,7 +57,8 @@ def test_scan_for_rtt_control_block_uses_provided_ranges():
     chunk = magic + b"\x00" * (0x4000 - len(magic))
     jlink = _FakeJLink({0x30000000: chunk})
 
-    assert _scan_for_rtt_control_block(jlink, ((0x30000000, 0x4000),)) == 0x30000000
+    result = _scan_for_rtt_control_block(jlink, ((0x30000000, 0x4000),))
+    assert result is not None and result[0] == 0x30000000
     assert _scan_for_rtt_control_block(jlink, ((0x20000000, 0x4000),)) is None
 
 
@@ -161,6 +170,9 @@ def test_capture_rtt_output_restarts_halted_target(monkeypatch):
         def connect(self, device, speed):
             return None
 
+        def halt(self):
+            return None
+
         def halted(self):
             return self._halted
 
@@ -170,8 +182,20 @@ def test_capture_rtt_output_restarts_halted_target(monkeypatch):
             return True
 
         def memory_read8(self, addr: int, length: int) -> list[int]:
-            data = b"SEGGER RTT" + b"\x00" * max(0, length - len("SEGGER RTT"))
-            return list(data[:length])
+            # The channel-0 name pointer resolves to "HPX"; everything else
+            # carries the control-block magic so the scan can locate it.
+            data = b"HPX\x00" if addr == 0x20000100 else b"SEGGER RTT"
+            return list((data + b"\x00" * length)[:length])
+
+        def memory_read32(self, addr: int, count: int) -> list[int]:
+            if addr == 0x20000010:
+                return [1]
+            if addr == 0x20000018:
+                return [0x20000100, 0x20000200, 4096, 16, 0, 0]
+            return [0] * count
+
+        def memory_write8(self, addr: int, data: list[int]) -> None:
+            return None
 
         def rtt_start(self, block_address=None):
             return None
@@ -232,12 +256,25 @@ def test_capture_rtt_output_retries_attach_until_target_ready(monkeypatch):
                 raise Exception("target not ready")
             return None
 
+        def halt(self):
+            return None
+
         def halted(self):
             return False
 
         def memory_read8(self, addr: int, length: int) -> list[int]:
-            data = b"SEGGER RTT" + b"\x00" * max(0, length - len("SEGGER RTT"))
-            return list(data[:length])
+            data = b"HPX\x00" if addr == 0x20000100 else b"SEGGER RTT"
+            return list((data + b"\x00" * length)[:length])
+
+        def memory_read32(self, addr: int, count: int) -> list[int]:
+            if addr == 0x20000010:
+                return [1]
+            if addr == 0x20000018:
+                return [0x20000100, 0x20000200, 4096, 16, 0, 0]
+            return [0] * count
+
+        def memory_write8(self, addr: int, data: list[int]) -> None:
+            return None
 
         def rtt_start(self, block_address=None):
             return None
@@ -272,7 +309,9 @@ def test_capture_rtt_output_retries_attach_until_target_ready(monkeypatch):
         rtt_scan_ranges=((0x20000000, 0x4000),),
     )
 
-    assert fake_jlink.open_calls == 2
+    # Pre-clean attaches once (absorbing the first not-ready failure via retry)
+    # and the capture phase attaches again, so open() is called three times.
+    assert fake_jlink.open_calls == 3
 
 
 def test_capture_swo_output_restarts_halted_target(monkeypatch):
