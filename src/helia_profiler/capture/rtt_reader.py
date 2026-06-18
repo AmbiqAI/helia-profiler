@@ -456,6 +456,7 @@ def capture_rtt_output(
         # the current firmware come up as the only block in SRAM.  Best-effort:
         # if the pre-clean attach fails we fall through to reset and rely on
         # the discovery scoring to pick the live block.
+        preclean_ok = False
         try:
             open_jlink_with_retry(
                 jlink,
@@ -468,6 +469,7 @@ def capture_rtt_output(
             except Exception:  # noqa: BLE001 — halt is best-effort
                 pass
             wiped = _wipe_rtt_control_blocks(jlink, rtt_scan_ranges)
+            preclean_ok = True
             if wiped:
                 log.info("pre-clean blanked %d stale RTT control block(s)", wiped)
         except CaptureError:
@@ -505,11 +507,13 @@ def capture_rtt_output(
         # TCM at 0x2000xxxx).  Do an explicit host-side scan for the
         # "SEGGER RTT" magic signature and pass the address to
         # rtt_start() so discovery is deterministic across toolchains.
-        # A named, actively-producing "HPX" block is the unambiguous winner, so
-        # stop as soon as one appears.  Otherwise keep scanning through a short
-        # settle window: on Apollo5 the live block's magic ID can show up a beat
-        # after a stale block's, and we want to outlast that race rather than
-        # latching onto the first signature we happen to see.
+        # When the pre-clean wipe ran, stale blocks are gone, so the first
+        # named, actively-producing "HPX" block is unambiguously ours and we
+        # stop as soon as it appears.  When pre-clean could not attach, a stale
+        # block may still carry leftover unread bytes that also look named and
+        # "live", so we do NOT early-break on it: instead keep scanning through
+        # the settle window and let scoring (size as tiebreaker) outlast the
+        # race for the live block's signature to settle.
         block_address = None
         best_score = -1
         first_candidate_s: float | None = None
@@ -521,7 +525,7 @@ def capture_rtt_output(
                 if candidate_score > best_score:
                     block_address = candidate_addr
                     best_score = candidate_score
-                if best_score >= live_named_score:
+                if preclean_ok and best_score >= live_named_score:
                     break
                 if first_candidate_s is None:
                     first_candidate_s = time.monotonic()

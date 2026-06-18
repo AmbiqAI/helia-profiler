@@ -354,6 +354,82 @@ def test_capture_rtt_output_retries_attach_until_target_ready(monkeypatch):
     assert fake_jlink.open_calls == 3
 
 
+def test_capture_rtt_output_tolerates_preclean_attach_failure(monkeypatch):
+    # When the pre-clean attach fails the run must still complete, discovering
+    # the live block through the settle window rather than early-breaking.
+    from helia_profiler.errors import CaptureError
+
+    class _FakeStatus:
+        NumUpBuffers = 1
+
+    class _FakeJLinkHandle:
+        def halt(self):
+            return None
+
+        def halted(self):
+            return False
+
+        def memory_read8(self, addr: int, length: int) -> list[int]:
+            data = b"HPX\x00" if addr == 0x20000100 else b"SEGGER RTT"
+            return list((data + b"\x00" * length)[:length])
+
+        def memory_read32(self, addr: int, count: int) -> list[int]:
+            if addr == 0x20000010:
+                return [1]
+            if addr == 0x20000018:
+                return [0x20000100, 0x20000200, 4096, 16, 0, 0]
+            return [0] * count
+
+        def memory_write8(self, addr: int, data: list[int]) -> None:
+            return None
+
+        def rtt_start(self, block_address=None):
+            return None
+
+        def rtt_get_status(self):
+            return _FakeStatus()
+
+        def rtt_read(self, buffer_index, length):
+            return []
+
+        def rtt_stop(self):
+            return None
+
+        def close(self):
+            return None
+
+    fake_jlink = _FakeJLinkHandle()
+    fake_pylink = types.SimpleNamespace(
+        JLink=lambda: fake_jlink,
+        JLinkInterfaces=types.SimpleNamespace(SWD=1),
+        errors=types.SimpleNamespace(JLinkException=Exception, JLinkRTTException=Exception),
+    )
+
+    attach_calls = {"n": 0}
+
+    def fake_open(jlink, **kwargs):
+        attach_calls["n"] += 1
+        if attach_calls["n"] == 1:
+            raise CaptureError("pre-clean attach failed")
+        return None
+
+    monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader.open_jlink_with_retry", fake_open)
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader.reset_target", lambda **kwargs: None)
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader._RTT_DISCOVERY_SETTLE_S", 0.0)
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader.collect_lines", lambda *args, **kwargs: [])
+
+    capture_rtt_output(
+        jlink_serial="1160002204",
+        jlink_device="AP510BFA-CBR",
+        rtt_scan_ranges=((0x20000000, 0x4000),),
+    )
+
+    # Pre-clean attach raised, capture phase attach succeeded: two attempts.
+    assert attach_calls["n"] == 2
+
+
 def test_capture_swo_output_restarts_halted_target(monkeypatch):
     class _FakeJLinkHandle:
         def __init__(self):
