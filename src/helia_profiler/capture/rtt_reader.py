@@ -261,8 +261,9 @@ def _scan_rtt_control_blocks(
 
     for base, length in ranges:
         for offset in range(0, length, _RTT_SCAN_CHUNK):
+            chunk_len = min(_RTT_SCAN_CHUNK, length - offset)
             try:
-                chunk = bytes(jlink.memory_read8(base + offset, _RTT_SCAN_CHUNK))
+                chunk = bytes(jlink.memory_read8(base + offset, chunk_len))
             except Exception:  # noqa: BLE001 — probe errors are non-fatal
                 continue
             start = 0
