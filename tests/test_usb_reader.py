@@ -6,6 +6,21 @@ import pytest
 
 from helia_profiler.capture import usb_reader
 from helia_profiler.errors import CaptureError
+from helia_profiler.usb_identity import USB_MARKER_PREFIX, usb_marker_serial
+
+
+def _port(device, **kw):
+    base = dict(
+        manufacturer=None,
+        product=None,
+        description=None,
+        interface=None,
+        hwid="",
+        serial_number=None,
+    )
+    base.update(kw)
+    return SimpleNamespace(device=device, **base)
+
 
 
 def test_find_cdc_port_raises_when_only_jlink_ports_exist(monkeypatch):
@@ -76,3 +91,74 @@ def test_find_cdc_port_falls_back_to_existing_non_jlink(monkeypatch):
     port = usb_reader._find_cdc_port(pre_existing={"/dev/ttyACM0", "/dev/ttyACM2"}, timeout_s=0)
 
     assert port == "/dev/ttyACM2"
+
+
+def test_find_cdc_port_raises_on_multiple_app_devices(monkeypatch):
+    """Two non-J-Link CDC devices is ambiguous — must raise, not guess."""
+    monkeypatch.setattr(
+        usb_reader,
+        "_snapshot_cdc_ports",
+        lambda: {"/dev/ttyACM1", "/dev/ttyACM2"},
+    )
+    monkeypatch.setattr(
+        usb_reader.list_ports,
+        "comports",
+        lambda: [
+            _port("/dev/ttyACM1", manufacturer="Ambiq", product="NSX USB Device"),
+            _port("/dev/ttyACM2", manufacturer="Ambiq", product="NSX USB Device"),
+        ],
+    )
+
+    with pytest.raises(CaptureError, match="could not be identified automatically") as exc_info:
+        usb_reader._find_cdc_port(timeout_s=0)
+
+    assert "--usb-port" in (exc_info.value.hint or "")
+
+
+def test_usb_marker_serial_derivation():
+    assert usb_marker_serial(None) is None
+    assert usb_marker_serial("") is None
+    assert usb_marker_serial("1160001350") == f"{USB_MARKER_PREFIX}1160001350"
+    # Truncated to the 31-char USB string-descriptor limit.
+    assert len(usb_marker_serial("9" * 40)) == 31
+
+
+def test_find_port_by_marker_matches_serial_number():
+    marker = usb_marker_serial("1160001350")
+    monkeypatch_ports = [
+        _port("/dev/ttyACM0", manufacturer="SEGGER", product="J-Link", serial_number="1160001350"),
+        _port("/dev/ttyACM1", manufacturer="Ambiq", product="NSX HPX Profiler", serial_number=marker),
+        _port("/dev/ttyACM2", manufacturer="Ambiq", product="NSX USB Device", serial_number="000001"),
+    ]
+    import helia_profiler.capture.usb_reader as mod
+
+    orig = mod.list_ports.comports
+    mod.list_ports.comports = lambda: monkeypatch_ports
+    try:
+        assert mod._find_port_by_marker(marker) == "/dev/ttyACM1"
+        assert mod._find_port_by_marker("HPX-nope") is None
+    finally:
+        mod.list_ports.comports = orig
+
+
+def test_resolve_cdc_port_prefers_marker(monkeypatch):
+    """When a marker is given, the matching device wins over other CDC ports."""
+    marker = usb_marker_serial("1160001350")
+    monkeypatch.setattr(usb_reader.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(
+        usb_reader,
+        "_snapshot_cdc_ports",
+        lambda: {"/dev/ttyACM1", "/dev/ttyACM3"},
+    )
+    monkeypatch.setattr(
+        usb_reader.list_ports,
+        "comports",
+        lambda: [
+            _port("/dev/ttyACM1", manufacturer="Ambiq", product="NSX USB Device", serial_number="000001"),
+            _port("/dev/ttyACM3", manufacturer="Ambiq", product="NSX HPX Profiler", serial_number=marker),
+        ],
+    )
+
+    port = usb_reader._resolve_cdc_port(marker=marker, pre_existing=set(), timeout_s=1)
+
+    assert port == "/dev/ttyACM3"

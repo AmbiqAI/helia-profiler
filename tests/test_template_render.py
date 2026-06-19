@@ -47,6 +47,7 @@ def _render_tflm(
     perf_mode_symbol: str = "NSX_PERF_LOW",
     perf_mode_mhz: int = 96,
     extreme_mode: bool = False,
+    usb_serial_marker: str | None = None,
 ) -> str:
     registrations = resolver_registrations or ["r.AddConv2D();", "r.AddSoftmax();"]
     return _env.get_template("main.cc.j2").render(
@@ -64,6 +65,7 @@ def _render_tflm(
         power_sync_enabled=False,
         sync_gpio_pin=91,
         transport=transport,
+        usb_serial_marker=usb_serial_marker,
         model_location=model_location,
         arena_region=arena_region,
         weights_region=weights_region,
@@ -191,6 +193,18 @@ class TestMainCcRender:
         assert "usb_timer_resume" in out
         assert "nsx_usb_send" in out
         assert 'NSX_TRY(nsx_usb_init(&g_usb_cfg), "USB CDC init failed\\n");' in out
+
+    def test_usb_serial_marker_stamps_descriptor(self):
+        out = _render_tflm(transport="usb_cdc", usb_serial_marker="HPX-1160001350")
+        assert "g_hpx_usb_desc" in out
+        assert '.serial  = "HPX-1160001350",' in out
+        assert ".device_desc   = &g_hpx_usb_desc," in out
+
+    def test_usb_without_marker_omits_descriptor(self):
+        out = _render_tflm(transport="usb_cdc", usb_serial_marker=None)
+        assert "g_hpx_usb_desc" not in out
+        assert ".device_desc" not in out
+
 
     def test_rtt_transport_excludes_usb_timer(self):
         out = _render_tflm(transport="rtt")

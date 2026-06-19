@@ -233,6 +233,7 @@ class TargetConfig:
     toolchain: Toolchain = DEFAULT_TOOLCHAIN
     jlink_serial: str | None = None  # select J-Link by S/N (None = auto)
     transport: Transport = DEFAULT_TRANSPORT
+    usb_port: str | None = None
     rtt_buffer_size_up: int | None = None
     clock: ClockSelection = field(default_factory=ClockSelection)
     heartbeat: HeartbeatConfig = field(default_factory=HeartbeatConfig)
@@ -485,6 +486,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             toolchain=tc,
             jlink_serial=target_d.get("jlink_serial"),
             transport=target_d.get("transport", DEFAULT_TRANSPORT),
+            usb_port=target_d.get("usb_port"),
             rtt_buffer_size_up=target_d.get("rtt_buffer_size_up"),
             clock=ClockSelection(**(target_d.get("clock") or {})),
             heartbeat=_build_heartbeat(target_d.get("heartbeat")),

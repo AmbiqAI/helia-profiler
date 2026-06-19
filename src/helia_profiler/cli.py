@@ -122,6 +122,14 @@ def main(argv: list[str] | None = None) -> None:
         help="Data transport (default: rtt). RTT is recommended for lossless capture.",
     )
     g_target.add_argument(
+        "--usb-port",
+        type=str,
+        help=(
+            "Explicit USB CDC device path for --transport usb_cdc "
+            "(for example /dev/ttyACM1)."
+        ),
+    )
+    g_target.add_argument(
         "--rtt-buffer-size-up",
         type=int,
         metavar="BYTES",
@@ -529,6 +537,8 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli.setdefault("target", {})["jlink_serial"] = args.jlink_serial
     if args.transport is not None:
         cli.setdefault("target", {})["transport"] = args.transport
+    if getattr(args, "usb_port", None) is not None:
+        cli.setdefault("target", {})["usb_port"] = args.usb_port
     if args.rtt_buffer_size_up is not None:
         cli.setdefault("target", {})["rtt_buffer_size_up"] = args.rtt_buffer_size_up
     clock_sel: dict[str, str] = {}

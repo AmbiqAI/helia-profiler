@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 from ..errors import CaptureError
 from ..placement import Placement
+from ..usb_identity import usb_marker_serial
 from .transport import HPX_END, HPX_START
 
 if TYPE_CHECKING:
@@ -60,6 +61,8 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         lines = capture_usb_output(
             jlink_serial=jlink_serial,
             jlink_device=jlink_device,
+            usb_port=ctx.config.target.usb_port,
+            usb_marker=usb_marker_serial(jlink_serial),
             timing_out=timing_raw,
         )
     elif transport == "rtt":

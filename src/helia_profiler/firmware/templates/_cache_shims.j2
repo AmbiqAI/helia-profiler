@@ -1,0 +1,30 @@
+{# _cache_shims.j2 — cache/coherence helpers shared by main templates.
+
+    hpx uses the guarantee-named nsx-mem coherence API rather than SoC-local HAL
+    calls:
+      - publish_writes: device -> host / DMA visibility
+      - invalidate_observed_data: host / DMA -> device visibility
+      - sync_shared_data: conservative ownership handoff for a shared buffer
+
+    The capability macros in nsx_mem.h tell us when a guarantee is actually
+    implemented on the current family; unsupported guarantees compile to no-op
+    shim macros so the firmware stays portable across Apollo2/3/4/5 targets.
+#}
+#define HPX_CACHE_FLUSH() ((void)nsx_cache_flush())
+#define HPX_CACHE_PUBLISH_WRITES() ((void)nsx_cache_publish_writes())
+
+#if NSX_CACHE_HAS_INVALIDATE_OBSERVED
+#define HPX_CACHE_INVALIDATE_OBSERVED() ((void)nsx_cache_invalidate_observed_data())
+#else
+#define HPX_CACHE_INVALIDATE_OBSERVED() ((void)0)
+#endif
+
+#if NSX_CACHE_HAS_SYNC_SHARED
+#define HPX_CACHE_SYNC_SHARED_DATA() ((void)nsx_cache_sync_shared_data())
+#else
+#define HPX_CACHE_SYNC_SHARED_DATA() HPX_CACHE_PUBLISH_WRITES()
+#endif
+
+// Backward-compatible local names used throughout the existing templates.
+#define HPX_CLEAN_DCACHE() HPX_CACHE_PUBLISH_WRITES()
+#define HPX_INVAL_DCACHE() HPX_CACHE_INVALIDATE_OBSERVED()
