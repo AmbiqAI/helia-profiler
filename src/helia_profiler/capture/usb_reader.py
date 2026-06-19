@@ -27,14 +27,12 @@ from serial.tools import list_ports
 
 from ..errors import CaptureError
 from ..jlink import reset_target
-from .readiness import poll_until
-from .timing import USB_REENUM_FLOOR_S
+from .timing import READINESS_POLL_INTERVAL_S, USB_REENUM_FLOOR_S
 from .transport import DEFAULT_TIMEOUT_S, HPX_END, HPX_START, LINE_TIMEOUT_S
 
 log = logging.getLogger("hpx")
 
 _ENUM_TIMEOUT_S = 15  # max time to wait for USB enumeration
-_DISAPPEAR_TIMEOUT_S = 5  # max time to wait for the old CDC device to drop
 _BAUD = 115200  # CDC ignores baud, but pyserial requires a value
 _CDC_PATTERNS = ["/dev/tty.usbmodem*", "/dev/ttyACM*"]
 _JLINK_MARKERS = ("segger", "j-link")
@@ -65,47 +63,122 @@ def _is_jlink_port(port: str) -> bool:
     return False
 
 
+def _app_cdc_ports(ports: set[str] | None = None) -> list[str]:
+    """Return the non-J-Link CDC ports (candidate application devices), sorted."""
+    if ports is None:
+        ports = _snapshot_cdc_ports()
+    return sorted(port for port in ports if not _is_jlink_port(port))
+
+
+def _find_port_by_marker(marker: str) -> str | None:
+    """Return the CDC port whose USB serial-number descriptor equals *marker*.
+
+    hpx stamps a unique ``iSerialNumber`` into the firmware's USB descriptor at
+    build time, so an exact match identifies *this* board's CDC device — even
+    when several Ambiq boards are attached.  pyserial exposes ``serial_number``
+    from the descriptor on Linux, macOS, and Windows.
+    """
+    for info in list_ports.comports():
+        if (info.serial_number or "") == marker:
+            return info.device
+    return None
+
+
+def _describe_port(port: str) -> str:
+    """Return a human-readable description of *port* for diagnostics."""
+    for info in list_ports.comports():
+        if info.device == port:
+            bits = [b for b in (info.manufacturer, info.product, info.serial_number) if b]
+            return f"{port} ({', '.join(bits)})" if bits else port
+    return port
+
+
+def _ambiguous_cdc_error(candidates: list[str]) -> CaptureError:
+    """Build the error raised when the target CDC port cannot be disambiguated."""
+    listing = ", ".join(_describe_port(port) for port in candidates)
+    return CaptureError(
+        "Multiple application USB CDC devices are present and the target could "
+        f"not be identified automatically: {listing}",
+        hint=(
+            "Another USB CDC board is connected. Rebuild so the firmware USB "
+            "marker is applied, or pin the port explicitly with --usb-port "
+            "(target.usb_port in YAML), e.g. --usb-port /dev/ttyACM1."
+        ),
+    )
+
+
+def _resolve_cdc_port(
+    *,
+    marker: str | None,
+    pre_existing: set[str] | None = None,
+    timeout_s: float = _ENUM_TIMEOUT_S,
+) -> str:
+    """Locate the target's USB CDC port after a reset.
+
+    Selection order:
+      1. The CDC device whose USB serial-number descriptor equals *marker*
+         (stamped into the firmware by hpx) — authoritative and unambiguous.
+      2. Heuristic fallback: a freshly enumerated, single non-J-Link CDC device
+         (see :func:`_find_cdc_port`).
+    """
+    time.sleep(USB_REENUM_FLOOR_S)
+
+    if marker:
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            port = _find_port_by_marker(marker)
+            if port is not None:
+                log.info("Matched USB CDC device by marker %r -> %s", marker, port)
+                return port
+            time.sleep(READINESS_POLL_INTERVAL_S)
+        log.warning(
+            "No USB CDC device advertised the expected marker %r within %.1fs; "
+            "falling back to heuristic detection.",
+            marker,
+            timeout_s,
+        )
+
+    return _find_cdc_port(pre_existing=pre_existing, timeout_s=timeout_s if not marker else 0)
+
+
 def _find_cdc_port(
     pre_existing: set[str] | None = None,
     timeout_s: float = _ENUM_TIMEOUT_S,
 ) -> str:
-    """Wait for a **new** USB CDC device to appear and return its path.
+    """Wait for a non-J-Link USB CDC device and return its path.
 
-    If *pre_existing* is given, only devices NOT in that set are considered.
-    This filters out the JLink VCOM that is already present before the
-    firmware boots.
-
-    Falls back to the first available device if no new device appears but
-    at least one device exists.
+    *pre_existing* lets callers prefer a freshly enumerated device over ports
+    that were already present (e.g. another board's CDC).  When the wait
+    expires the current non-J-Link devices are weighed: exactly one is used,
+    more than one is rejected as ambiguous (the caller should rely on the
+    firmware marker or pass an explicit ``--usb-port``), and none raises.
     """
     deadline = time.monotonic() + timeout_s
     if pre_existing is None:
         pre_existing = set()
 
     while time.monotonic() < deadline:
-        current = _snapshot_cdc_ports()
-        new_ports = sorted(current - pre_existing)
-        for port in new_ports:
-            if _is_jlink_port(port):
-                log.info("Ignoring J-Link VCOM candidate: %s", port)
-                continue
-            log.info("Found new USB CDC port: %s", port)
-            return port
+        new_ports = _app_cdc_ports(_snapshot_cdc_ports() - pre_existing)
+        if len(new_ports) == 1:
+            log.info("Found new USB CDC port: %s", new_ports[0])
+            return new_ports[0]
         time.sleep(0.5)
 
-    # Fallback: if no *new* port appeared but there are existing non-J-Link
-    # devices, reuse one of those. Refuse to open SEGGER VCOM, which only
-    # causes a long timeout and hides the real enumeration failure.
-    all_ports = sorted(_snapshot_cdc_ports())
-    fallback_ports = [port for port in all_ports if not _is_jlink_port(port)]
-    if fallback_ports:
+    # No single fresh device appeared — fall back to currently present
+    # non-J-Link devices. Refuse to open SEGGER VCOM, which only causes a long
+    # timeout and hides the real enumeration failure.
+    candidates = _app_cdc_ports()
+    if len(candidates) == 1:
         log.warning(
-            "No new USB CDC device appeared; falling back to existing USB CDC %s",
-            fallback_ports[-1],
+            "No new USB CDC device appeared; using the only application CDC "
+            "device present: %s",
+            candidates[0],
         )
-        return fallback_ports[-1]
+        return candidates[0]
+    if len(candidates) > 1:
+        raise _ambiguous_cdc_error(candidates)
 
-    if all_ports:
+    if _snapshot_cdc_ports():
         raise CaptureError(
             "No application USB CDC device appeared after reset",
             hint=(
@@ -131,6 +204,7 @@ def capture_usb_output(
     jlink_device: str,
     timeout_s: float = DEFAULT_TIMEOUT_S,
     usb_port: str | None = None,
+    usb_marker: str | None = None,
     timing_out: dict[str, float] | None = None,
 ) -> list[str]:
     """Capture firmware output via USB CDC until HPX_END or timeout.
@@ -162,25 +236,18 @@ def capture_usb_output(
     # --- Step 1: reset the target ---
     reset_target(device=jlink_device, jlink_serial=jlink_serial)
 
-    # --- Step 2: wait for TinyUSB device to disappear after reset ---
-    # The old TinyUSB CDC device vanishes briefly after the target resets.
-    # Use a small floor to avoid racing the host USB enumerator, then *poll*
-    # for the old application device(s) to drop rather than sleeping a fixed
-    # window.  Snapshot again afterwards so the new enumeration is detected as
-    # a fresh device.
-    time.sleep(USB_REENUM_FLOOR_S)
-    app_ports_before = {p for p in pre_existing if not _is_jlink_port(p)}
-    if app_ports_before:
-        poll_until(
-            lambda: not (app_ports_before & _snapshot_cdc_ports()),
-            timeout_s=_DISAPPEAR_TIMEOUT_S,
-            description="old USB CDC device to drop",
-        )
-    post_reset = _snapshot_cdc_ports()
-    log.info("Post-reset CDC ports: %s", sorted(post_reset) or "(none)")
-
-    # --- Step 3: find the NEW USB CDC port ---
-    port = usb_port or _find_cdc_port(pre_existing=post_reset)
+    # --- Step 2: locate the target's USB CDC port ---
+    # An explicit --usb-port always wins.  Otherwise prefer the unique USB
+    # serial-number marker that hpx stamped into this build's descriptor: it
+    # identifies *this* board unambiguously even when several Ambiq boards are
+    # attached.  Fall back to host heuristics only when no marker is available
+    # or it never enumerates.
+    if usb_port is not None:
+        port = usb_port
+        log.info("Using pinned USB CDC port: %s", port)
+        time.sleep(USB_REENUM_FLOOR_S)
+    else:
+        port = _resolve_cdc_port(marker=usb_marker, pre_existing=pre_existing)
 
     # --- Step 3: open port with DTR ---
     log.info("Opening USB CDC port: %s", port)

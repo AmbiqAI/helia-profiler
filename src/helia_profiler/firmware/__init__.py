@@ -34,6 +34,7 @@ from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
 from ..placement import Placement
 from ..platform import get_soc_for_board
+from ..usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
 from .op_resolver import build_resolver_plan
 
 if TYPE_CHECKING:
@@ -666,6 +667,12 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # Add transport modules when using USB CDC transport
     transport = config.target.transport
+    # Unique USB serial marker for this build, derived from the J-Link probe
+    # serial so the host can match this exact board's CDC device.  None when no
+    # probe serial is known (firmware keeps its default descriptor).
+    usb_serial_marker = usb_marker_serial(
+        ctx.resolved_jlink_serial or config.target.jlink_serial
+    )
     if transport == "usb_cdc":
         module_names = {m.name for m in module_specs}
         for name in _usb_provider_module_names(module_specs, profile):
@@ -924,6 +931,8 @@ def generate_app(ctx: PipelineContext) -> Path:
                 sync_gpio_pin=sync_gpio_pin,
                 cmsis_device_header=cmsis_device_header,
                 transport=transport,
+                usb_serial_marker=usb_serial_marker,
+                usb_serial_product=USB_MARKER_PRODUCT,
                 printf_linkage="static ",
                 extreme_mode=config.profiling.extreme_mode,
                 model_location=config.model.model_location,
@@ -962,6 +971,8 @@ def generate_app(ctx: PipelineContext) -> Path:
                 sync_gpio_pin=sync_gpio_pin,
                 cmsis_device_header=cmsis_device_header,
                 transport=transport,
+                usb_serial_marker=usb_serial_marker,
+                usb_serial_product=USB_MARKER_PRODUCT,
                 model_location=model_location,
                 arena_region=arena_region,
                 weights_region=weights_region,
