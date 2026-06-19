@@ -534,7 +534,12 @@ class TestGenerateApp:
 
         main_cc = (app_dir / "src" / "main.cc").read_text()
         cmake = (app_dir / "CMakeLists.txt").read_text()
-        assert '#include "am_hal_cachectrl.h"' in main_cc
+        assert '#define HPX_CACHE_FLUSH() ((void)nsx_cache_flush())' in main_cc
+        assert '#define HPX_CACHE_PUBLISH_WRITES() ((void)nsx_cache_publish_writes())' in main_cc
+        assert '#define HPX_CACHE_INVALIDATE_OBSERVED() ((void)nsx_cache_invalidate_observed_data())' in main_cc
+        assert '#define HPX_CLEAN_DCACHE() HPX_CACHE_PUBLISH_WRITES()' in main_cc
+        assert '#define HPX_INVAL_DCACHE() HPX_CACHE_INVALIDATE_OBSERVED()' in main_cc
+        assert '#include "am_hal_cachectrl.h"' not in main_cc
         assert 'SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,' in main_cc
         assert "HPX_CLEAN_DCACHE();" in main_cc.split('SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,', 1)[1]
         assert "static void hpx_rtt_write_lossless(const char *buf, unsigned len)" in main_cc
@@ -550,11 +555,11 @@ class TestGenerateApp:
         app_dir = generate_app(ctx)
 
         main_cc = (app_dir / "src" / "main.cc").read_text()
-        assert '#include "am_hal_cachectrl.h"' not in main_cc
-        assert "am_hal_cachectrl_dcache_clean" not in main_cc
-        assert "am_hal_cachectrl_dcache_invalidate" not in main_cc
-        assert "#define HPX_CLEAN_DCACHE() ((void)0)" in main_cc
-        assert "#define HPX_INVAL_DCACHE() ((void)0)" in main_cc
+        assert '#define HPX_CACHE_FLUSH() ((void)nsx_cache_flush())' in main_cc
+        assert '#define HPX_CACHE_PUBLISH_WRITES() ((void)nsx_cache_publish_writes())' in main_cc
+        assert "#if NSX_CACHE_HAS_INVALIDATE_OBSERVED" in main_cc
+        assert "#define HPX_CLEAN_DCACHE() HPX_CACHE_PUBLISH_WRITES()" in main_cc
+        assert "#define HPX_INVAL_DCACHE() HPX_CACHE_INVALIDATE_OBSERVED()" in main_cc
 
     def test_atfe_rtt_generation_uses_smaller_buffer(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)
