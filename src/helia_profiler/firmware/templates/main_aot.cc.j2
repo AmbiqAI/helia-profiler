@@ -36,7 +36,7 @@
 
 {% include "_system_includes.j2" %}
 
-#if defined(NSX_HAS_CACHE) && NSX_HAS_CACHE
+{% if has_armv8m_pmu %}
 #include "am_hal_cachectrl.h"
 // Up channel (device->host): clean pushes our writes OUT to SRAM so J-Link
 // reads fresh data.  Down channel (host->device): invalidate so the CPU
@@ -45,10 +45,10 @@
 // it never drops our own pending up-buffer writes.
 #define HPX_CLEAN_DCACHE() ((void)am_hal_cachectrl_dcache_clean(NULL))
 #define HPX_INVAL_DCACHE() ((void)am_hal_cachectrl_dcache_invalidate(NULL, true))
-#else
+{% else %}
 #define HPX_CLEAN_DCACHE() ((void)0)
 #define HPX_INVAL_DCACHE() ((void)0)
-#endif
+{% endif %}
 
 // --- Boot-time host-attach delays (microseconds) ---
 // These are the few unavoidable firmware-side waits where the host has no
@@ -322,6 +322,7 @@ int main(void) {
     }
     // Brief settling delay after host connects
     nsx_delay_us(HPX_USB_SETTLE_DELAY_US);
+    dwt_init();
 {% elif transport == "rtt" %}
 
     // Configure buffer 0 in non-blocking trim mode for the boot/timed phases

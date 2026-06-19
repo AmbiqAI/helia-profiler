@@ -542,6 +542,20 @@ class TestGenerateApp:
         assert "SEGGER_RTT_Write(0, line_buf, (unsigned)n);\n            HPX_CLEAN_DCACHE();" in main_cc
         assert "BUFFER_SIZE_UP=32768" in cmake
 
+    def test_apollo4_rtt_generation_avoids_ap5_dcache_calls(self, tmp_path: Path, fake_dist: Path):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        object.__setattr__(ctx.config.target, "board", "apollo4p_evb")
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        main_cc = (app_dir / "src" / "main.cc").read_text()
+        assert '#include "am_hal_cachectrl.h"' not in main_cc
+        assert "am_hal_cachectrl_dcache_clean" not in main_cc
+        assert "am_hal_cachectrl_dcache_invalidate" not in main_cc
+        assert "#define HPX_CLEAN_DCACHE() ((void)0)" in main_cc
+        assert "#define HPX_INVAL_DCACHE() ((void)0)" in main_cc
+
     def test_atfe_rtt_generation_uses_smaller_buffer(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)
         ResolvePlatformStage().run(ctx)
