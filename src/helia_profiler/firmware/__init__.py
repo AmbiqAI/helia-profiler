@@ -37,6 +37,7 @@ from ..usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
 from .op_resolver import build_resolver_plan
 
 if TYPE_CHECKING:
+    from ..config import ProfileConfig
     from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
@@ -138,7 +139,6 @@ def _resolve_compiler_launcher(config: "ProfileConfig") -> str | None:
         )
     log.info("Using compiler launcher: %s (from %s)", found, source)
     return found
-
 
 
 # ---------------------------------------------------------------------------

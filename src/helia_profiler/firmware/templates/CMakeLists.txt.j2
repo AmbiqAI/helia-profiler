@@ -13,6 +13,8 @@ set({{ var_name }} "{{ var_value }}")
 
 {% if compiler_launcher %}
 # Compiler launcher (e.g. sccache/ccache) — caches object output across builds.
+# ASM is included intentionally: the NSX toolchains compile their assembly via
+# the C/clang driver, so the launcher wraps it the same way as C/C++.
 set(CMAKE_C_COMPILER_LAUNCHER "{{ compiler_launcher }}")
 set(CMAKE_CXX_COMPILER_LAUNCHER "{{ compiler_launcher }}")
 set(CMAKE_ASM_COMPILER_LAUNCHER "{{ compiler_launcher }}")
