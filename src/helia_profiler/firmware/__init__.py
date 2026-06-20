@@ -10,7 +10,6 @@ from __future__ import annotations
 import glob
 import logging
 import os
-import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,6 +37,7 @@ from ..usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
 from .op_resolver import build_resolver_plan
 
 if TYPE_CHECKING:
+    from ..config import ProfileConfig
     from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
@@ -88,6 +88,59 @@ def _rtt_buffer_size_up(toolchain: str, transport: str, configured_size: int | N
     return _DEFAULT_RTT_BUFFER_SIZE_UP
 
 
+# Compiler launchers tried, in order, when ``build.compiler_launcher`` is
+# ``"auto"``.  sccache is preferred (better cross-platform + CI story); ccache
+# is the common local fallback.
+_AUTO_COMPILER_LAUNCHERS: tuple[str, ...] = ("sccache", "ccache")
+_DISABLED_LAUNCHER_VALUES = frozenset({"", "none", "off", "false", "disabled", "0"})
+
+
+def _resolve_compiler_launcher(config: "ProfileConfig") -> str | None:
+    """Resolve the CMake compiler launcher executable for this build.
+
+    Precedence: the ``HPX_COMPILER_LAUNCHER`` environment variable overrides
+    ``build.compiler_launcher``.  Returns an absolute path to the launcher, or
+    ``None`` when caching is disabled or no launcher is available.
+
+    * ``"auto"`` — use the first of :data:`_AUTO_COMPILER_LAUNCHERS` found on
+      ``PATH``; do nothing if none are installed (installing the binary is the
+      opt-in).
+    * disabled values (``none``/``off``/``false``/empty) — ``None``.
+    * an explicit tool name or path — required: raises if it cannot be found.
+    """
+    setting = os.environ.get("HPX_COMPILER_LAUNCHER")
+    source = "HPX_COMPILER_LAUNCHER"
+    if setting is None:
+        setting = config.build.compiler_launcher
+        source = "build.compiler_launcher"
+    setting = setting.strip()
+
+    if setting.lower() in _DISABLED_LAUNCHER_VALUES:
+        return None
+
+    if setting.lower() == "auto":
+        for name in _AUTO_COMPILER_LAUNCHERS:
+            found = shutil.which(name)
+            if found:
+                log.info("Using compiler launcher: %s (auto-detected)", found)
+                return found
+        return None
+
+    found = shutil.which(setting)
+    if found is None and Path(setting).is_file() and os.access(setting, os.X_OK):
+        found = str(Path(setting).resolve())
+    if found is None:
+        raise FirmwareError(
+            f"Compiler launcher {setting!r} (from {source}) was not found on PATH.",
+            hint=(
+                "Install it, use the full path, or set the launcher to 'auto'/'none'. "
+                "For sccache: https://github.com/mozilla/sccache."
+            ),
+        )
+    log.info("Using compiler launcher: %s (from %s)", found, source)
+    return found
+
+
 # ---------------------------------------------------------------------------
 # SDK tier → module set mapping
 #
@@ -122,9 +175,12 @@ def _usb_provider_module_names(module_specs: list[NsxModuleSpec], profile: dict[
     overrides = profile.get("module_overrides") or {}
     required: list[str] = []
     for name in sorted(present):
-        if not name.startswith("nsx-ambiqsuite-r"):
+        if name == "nsx-ambiqsuite":
+            candidate = "nsx-ambiq-usb"
+        elif name.startswith("nsx-ambiqsuite-"):
+            candidate = name.replace("nsx-ambiqsuite-", "nsx-ambiq-usb-", 1)
+        else:
             continue
-        candidate = name.replace("nsx-ambiqsuite-", "nsx-ambiq-usb-", 1)
         if candidate in present or candidate in required:
             continue
         if candidate in overrides or nsx_cli.registry_module_project(candidate) is not None:
@@ -372,7 +428,8 @@ def _resolve_pmu_passes(config: Any, soc: Any | None = None) -> list[dict[str, A
       - ``name``          — pass name for the SWO protocol
       - ``custom``        — True if using explicit event IDs
       - ``event_ids``     — list of hex-literal strings (custom only)
-      - ``num_counters``  — number of counters (custom only)
+      - ``counter_names`` — human-readable counter names for host labelling
+      - ``num_counters``  — number of counters
       - ``c_enum``        — C preset enum name (legacy only)
       - ``group``         — compute-unit group name
     """
@@ -408,6 +465,7 @@ def _resolve_pmu_passes(config: Any, soc: Any | None = None) -> list[dict[str, A
                 "name": p.name,
                 "custom": True,
                 "event_ids": [f"0x{c.event_id:04X}" for c in p.counters],
+                "counter_names": [c.name for c in p.counters],
                 "num_counters": len(p.counters),
                 "c_enum": None,
                 "group": p.group,
@@ -419,23 +477,27 @@ def _resolve_pmu_passes(config: Any, soc: Any | None = None) -> list[dict[str, A
     result: list[dict[str, Any]] = []
     for preset_name in profiling.pmu_presets:
         c_enum = _PMU_PRESET_MAP.get(preset_name, "NSX_PMU_PRESET_ML_DEFAULT")
+        counters = resolve_counters(resolve_legacy_presets([preset_name]))
         result.append(
             {
                 "name": preset_name,
                 "custom": False,
                 "event_ids": [],
-                "num_counters": 4,
+                "counter_names": [c.name for c in counters],
+                "num_counters": len(counters),
                 "c_enum": c_enum,
                 "group": preset_name,
             }
         )
     if not result:
+        counters = resolve_counters(resolve_legacy_presets(["ml_default"]))
         result = [
             {
                 "name": "ml_default",
                 "custom": False,
                 "event_ids": [],
-                "num_counters": 4,
+                "counter_names": [c.name for c in counters],
+                "num_counters": len(counters),
                 "c_enum": "NSX_PMU_PRESET_ML_DEFAULT",
                 "group": "ml_default",
             }
@@ -501,60 +563,67 @@ def _copy_segger_rtt(dest_dir: Path) -> None:
         if src.exists():
             shutil.copy2(src, rtt_dest / name)
 
-    # Config header — nested in Config/ subdir
-    config_dest = rtt_dest / "Config"
-    config_dest.mkdir(parents=True, exist_ok=True)
-    conf_src = rtt_root / "Config" / "SEGGER_RTT_Conf.h"
-    if conf_src.exists():
-        shutil.copy2(conf_src, config_dest / "SEGGER_RTT_Conf.h")
-
-    # Apollo510-class linker scripts place default .bss in MCU_TCM, which
-    # makes SEGGER RTT's large staging buffers consume scarce profiling memory.
-    # Move the control block and channel buffers into shared SRAM instead.
+    # Apollo-class linker scripts place default .bss in MCU_TCM, which makes
+    # SEGGER RTT's large staging buffers consume scarce profiling memory. Move
+    # the control block and channel buffers into shared SRAM instead.
+    #
+    # SEGGER RTT already supports this via its own SEGGER_RTT_SECTION hook: when
+    # SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0 (the default on Apollo parts, which
+    # have no data cache that RTT must work around) the control block and
+    # buffers are declared through SEGGER_RTT_PUT_CB_SECTION /
+    # SEGGER_RTT_PUT_BUFFER_SECTION, which emit
+    # ``__attribute__((section(SEGGER_RTT_SECTION)))`` for GCC/clang. We point
+    # that section at the NSX ``.sram_bss`` input section (collected into
+    # SHARED_SRAM by the linker scripts) via the generated config header.
+    #
+    # NOTE: do *not* try to rewrite the ``#if SEGGER_RTT_CPU_CACHE_LINE_SIZE``
+    # aligned declarations — that branch is dead code here (the macro is 0), so
+    # patching it has no effect on the compiled object.
     rtt_c = rtt_dest / "SEGGER_RTT.c"
     if rtt_c.exists():
         text = rtt_c.read_text(encoding="utf-8")
-        if '#include "nsx_mem.h"' not in text:
-            updated, include_replacements = re.subn(
-                r'(?m)^#include\s+"SEGGER_RTT\.h"\r?$\n?',
-                '#include "SEGGER_RTT.h"\n#include "nsx_mem.h"\n',
-                text,
-                count=1,
-            )
-            if include_replacements != 1:
-                raise FirmwareError(
-                    "Failed to patch SEGGER_RTT.c for SRAM placement",
-                    hint=(
-                        "Could not inject nsx_mem.h after SEGGER_RTT.h. "
-                        "Update the RTT patch logic for this SEGGER RTT release."
-                    ),
-                )
-            text = updated
-
-        text, replacements = re.subn(
-            r'(?m)^(\s*)(static\s+)(char\s+)(_ac(?:Up|Down)Buffer\s*\[[^\n]+\]\s+__attribute__\s*\(\(aligned\s*\(SEGGER_RTT_CPU_CACHE_LINE_SIZE\)\)\);)$',
-            lambda match: (
-                f"{match.group(1)}static NSX_MEM_SRAM_BSS {match.group(3)}{match.group(4)}"
-            ),
-            text,
-        )
-        text, cb_replacements = re.subn(
-            r'(?m)^(\s*)(SEGGER_RTT_CB\s+)(_SEGGER_RTT\s*__attribute__\s*\(\(aligned\s*\(SEGGER_RTT_CPU_CACHE_LINE_SIZE\)\)\);)$',
-            lambda match: (
-                f"{match.group(1)}NSX_MEM_SRAM_BSS {match.group(2)}{match.group(3)}"
-            ),
-            text,
-            count=1,
-        )
-        if replacements != 2 or cb_replacements != 1:
+        if (
+            "SEGGER_RTT_PUT_CB_SECTION(" not in text
+            or "SEGGER_RTT_PUT_BUFFER_SECTION(" not in text
+        ):
             raise FirmwareError(
                 "Failed to patch SEGGER_RTT.c for SRAM placement",
                 hint=(
-                    "Could not locate the SEGGER RTT control block and buffer declarations. "
-                    "Update the RTT patch logic for this SEGGER RTT release."
+                    "SEGGER_RTT.c does not use SEGGER_RTT_PUT_CB_SECTION / "
+                    "SEGGER_RTT_PUT_BUFFER_SECTION; cannot place the RTT control "
+                    "block and buffers in shared SRAM. Update the RTT patch "
+                    "logic for this SEGGER RTT release."
                 ),
             )
-        rtt_c.write_text(text, encoding="utf-8")
+
+    # Config header — nested in Config/ subdir. Append the SEGGER_RTT_SECTION
+    # definition so the buffers land in shared SRAM on parts that have a
+    # dedicated .sram_bss region (NSX_MEM__HAS_SRAM_BSS); on simpler parts the
+    # macro stays undefined and SEGGER falls back to the default .bss region.
+    config_dest = rtt_dest / "Config"
+    config_dest.mkdir(parents=True, exist_ok=True)
+    conf_dest = config_dest / "SEGGER_RTT_Conf.h"
+    conf_src = rtt_root / "Config" / "SEGGER_RTT_Conf.h"
+    if conf_src.exists():
+        shutil.copy2(conf_src, conf_dest)
+
+    sram_placement = (
+        "\n"
+        "/* heliaPROFILER: place the RTT control block and channel buffers in\n"
+        " * shared SRAM instead of scarce MCU_TCM .bss. SEGGER's compiled\n"
+        " * (SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0) path honours SEGGER_RTT_SECTION\n"
+        " * via __attribute__((section(...))); the matching .sram_bss input\n"
+        " * section is collected into SHARED_SRAM by the NSX linker scripts. */\n"
+        '#include "nsx_mem.h"\n'
+        "#if NSX_MEM__HAS_SRAM_BSS\n"
+        "  #ifndef SEGGER_RTT_SECTION\n"
+        "    #define SEGGER_RTT_SECTION NSX_MEM__SEC_SRAM_BSS\n"
+        "  #endif\n"
+        "#endif\n"
+    )
+    existing_conf = conf_dest.read_text(encoding="utf-8") if conf_dest.exists() else ""
+    if "SEGGER_RTT_SECTION" not in existing_conf:
+        conf_dest.write_text(existing_conf + sram_placement, encoding="utf-8")
 
     log.info("Copied SEGGER RTT source from %s", rtt_root)
 
@@ -802,12 +871,14 @@ def generate_app(ctx: PipelineContext) -> Path:
     )
 
     # --- CMakeLists.txt (engine-aware) ---
+    compiler_launcher = _resolve_compiler_launcher(config)
     _write_text(
         app_dir / "CMakeLists.txt",
         _jinja_env.get_template("CMakeLists.txt.j2").render(
             board=board.name,
             engine_type=engine_type,
             cmake_vars=artifacts.cmake_vars,
+            compiler_launcher=compiler_launcher or "",
             aot_cmake_target=artifacts.aot_cmake_target or "",
             transport=transport,
             toolchain=config.target.toolchain,

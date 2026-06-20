@@ -25,7 +25,6 @@
 
 {% if has_armv8m_pmu %}
 #include "nsx_pmu_utils.h"
-#include "nsx_pmu_map.h"
 {% endif %}
 
 {% set psram_arena_needed = (arena_regions | selectattr("placement", "equalto", "psram") | list | length) > 0 %}
@@ -90,6 +89,7 @@ static HpxLayerRecord g_layers[kMaxLayers];
 static int g_num_layers = 0;
 static int g_num_counters = 0;
 static bool g_profiler_enabled = false;
+static const char* g_counter_names[kMaxEvents] = {};
 
 // Heartbeat state — cheap counters/timestamps updated on each op finish so
 // the host can detect a hung run without wall-clock timeouts.
@@ -140,6 +140,16 @@ static int32_t aot_op_id(int layer_idx) { return layer_idx; }
 {% endif %}
 
 {% if has_armv8m_pmu %}
+static void profiler_set_counter_names(const char* const names[], int num_names) {
+    int limit = (num_names > kMaxEvents) ? kMaxEvents : num_names;
+    for (int i = 0; i < limit; i++) {
+        g_counter_names[i] = names[i];
+    }
+    for (int i = limit; i < kMaxEvents; i++) {
+        g_counter_names[i] = nullptr;
+    }
+}
+
 static void profiler_init_preset(nsx_pmu_preset_e preset) {
     nsx_pmu_reset_config(&g_pmu_cfg);
     g_pmu_cfg.api = &nsx_pmu_V1_0_0;
@@ -184,11 +194,10 @@ static void profiler_print_csv(void) {
 {% if has_armv8m_pmu %}
     for (int e = 0; e < g_num_counters; e++) {
         if (!g_pmu_cfg.events[e].enabled) break;
-        uint32_t map_idx = g_pmu_cfg.counter[e].mapIndex;
-        if (map_idx < NSX_PMU_MAP_SIZE)
-            hpx_printf(",\"%s\"", nsx_pmu_map[map_idx].regname);
+        if (g_counter_names[e] != nullptr)
+            hpx_printf(",\"%s\"", g_counter_names[e]);
         else
-            hpx_printf(",\"event_%d\"", e);
+            hpx_printf(",\"0x%04lx\"", (unsigned long)g_pmu_cfg.events[e].eventId);
     }
 {% else %}
     hpx_printf(",\"ARM_PMU_CPU_CYCLES\"");
@@ -479,10 +488,20 @@ int main(void) {
 {% if has_armv8m_pmu and pass.custom %}
     {
         static const uint32_t _pass{{ loop.index0 }}_ids[] = { {{ pass.event_ids | join(', ') }} };
+        static const char* _pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
         profiler_init_custom(_pass{{ loop.index0 }}_ids, {{ pass.num_counters }});
+        profiler_set_counter_names(_pass{{ loop.index0 }}_names, {{ pass.num_counters }});
     }
 {% else %}
-    profiler_init_preset({{ pass.c_enum if has_armv8m_pmu else 0 }});
+    {% if has_armv8m_pmu %}
+    {
+        static const char* _pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
+        profiler_init_preset({{ pass.c_enum }});
+        profiler_set_counter_names(_pass{{ loop.index0 }}_names, {{ pass.num_counters }});
+    }
+    {% else %}
+    profiler_init_preset(0);
+    {% endif %}
 {% endif %}
 
 {% if transport == "usb_cdc" %}

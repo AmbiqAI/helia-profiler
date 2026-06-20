@@ -67,11 +67,24 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         )
     elif transport == "rtt":
         from .rtt_reader import capture_rtt_output
+        from .rtt_symbol import resolve_rtt_control_block_address
+
+        # Recover the linked RTT control block address from the build artifacts
+        # so capture can attach directly and skip the slow SWD discovery sweep.
+        known_block_address = resolve_rtt_control_block_address(
+            build_dir, ctx.config.target.toolchain
+        )
+        if known_block_address is not None:
+            log.info(
+                "Using known RTT control block address 0x%08X (skipping host-side scan)",
+                known_block_address,
+            )
 
         lines = capture_rtt_output(
             jlink_serial=jlink_serial,
             jlink_device=jlink_device,
             rtt_scan_ranges=ctx.soc.rtt_scan_ranges,
+            known_block_address=known_block_address,
             model_path=ctx.config.model.path,
             weights_region=ctx.weights_region or Placement.MRAM,
             timeout_s=overall_timeout_s,

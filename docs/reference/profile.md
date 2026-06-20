@@ -82,6 +82,8 @@ hpx profile [MODEL] [--config FILE] [options]
 |---|---|---|---|
 | `--work-dir DIR` | path | tempdir | Working directory for generated firmware. Useful for debugging the generated NSX project. |
 | `--keep-work-dir` | flag | off | Don't delete the work directory at exit. |
+| `--compiler-launcher NAME` | string | `auto` | CMake compiler launcher to cache compiles. `auto` uses `sccache`/`ccache` if installed; a name/path requires it to be found. Overridden by `HPX_COMPILER_LAUNCHER`. |
+| `--no-compiler-launcher` | flag | — | Disable the compiler launcher (same as `--compiler-launcher none`). |
 
 ## Exit codes
 

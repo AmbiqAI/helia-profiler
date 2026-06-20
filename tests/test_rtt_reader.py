@@ -184,6 +184,40 @@ def test_capture_pmu_passes_soc_rtt_scan_ranges(tmp_path: Path, monkeypatch):
     assert ctx.run_metadata.timing.protocol_duration_s == 0.75
 
 
+def test_capture_pmu_passes_known_block_address_from_map(tmp_path: Path, monkeypatch):
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    ctx.build_dir = tmp_path / "build"
+    ctx.build_dir.mkdir()
+    (ctx.build_dir / "hpx_profiler.map").write_text(
+        "                0x20088010                _SEGGER_RTT\n"
+    )
+    ctx.resolved_jlink_serial = "1160002204"
+    ctx.weights_region = "mram"
+
+    captured: dict[str, object] = {}
+
+    def fake_capture_rtt_output(**kwargs):
+        captured.update(kwargs)
+        return ["--- HPX_START ---", "--- HPX_PRESET basic_cpu ---", "--- HPX_ITER 0 ---", "Layer,Op,ARM_PMU_CPU_CYCLES", "0,CONV_2D,1", "--- HPX_END ---"]
+
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader.capture_rtt_output", fake_capture_rtt_output)
+
+    capture_pmu(ctx)
+
+    assert captured["known_block_address"] == 0x20088010
+
+
+
 def test_capture_pmu_passes_resolved_cpu_clock_to_swo(tmp_path: Path, monkeypatch):
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")

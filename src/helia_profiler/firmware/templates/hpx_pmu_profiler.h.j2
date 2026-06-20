@@ -47,6 +47,7 @@ class HpxPmuProfiler : public tflite::MicroProfilerInterface {
     void PrintCsv() const;
     int num_events() const { return num_events_; }
     int num_counters() const { return num_counters_; }
+    void SetCounterNames(const char* const names[], int num_names);
 
     /// Configure heartbeat emission cadence.
     /// @param every_cyc   DWT CYCCNT delta between heartbeats; 0 disables.
@@ -69,6 +70,7 @@ class HpxPmuProfiler : public tflite::MicroProfilerInterface {
     nsx_pmu_config_t pmu_cfg_ = {};
 {% endif %}
     LayerRecord layers_[kMaxLayers] = {};
+    const char* counter_names_[kMaxEvents] = {};
     int num_events_ = 0;
     int num_counters_ = 0;  // actual number of configured PMU counters
     bool initialized_ = false;

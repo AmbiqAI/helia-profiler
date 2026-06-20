@@ -296,14 +296,20 @@ int main(void) {
 {% if has_armv8m_pmu %}
     {
         static const uint32_t _init_ids[] = { {{ pmu_passes[0].event_ids | join(', ') }} };
+        static const char* _init_names[] = { {% for name in pmu_passes[0].counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
         g_profiler.InitCustom(_init_ids, {{ pmu_passes[0].num_counters }});
+        g_profiler.SetCounterNames(_init_names, {{ pmu_passes[0].num_counters }});
     }
 {% else %}
     g_profiler.Init(0);
 {% endif %}
 {% else %}
 {% if has_armv8m_pmu %}
-    g_profiler.Init({{ pmu_passes[0].c_enum }});
+    {
+        static const char* _init_names[] = { {% for name in pmu_passes[0].counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
+        g_profiler.Init({{ pmu_passes[0].c_enum }});
+        g_profiler.SetCounterNames(_init_names, {{ pmu_passes[0].num_counters }});
+    }
 {% else %}
     g_profiler.Init(0);
 {% endif %}
@@ -426,14 +432,20 @@ int main(void) {
 {% if has_armv8m_pmu %}
     {
         static const uint32_t _pass{{ loop.index0 }}_ids[] = { {{ pass.event_ids | join(', ') }} };
+        static const char* _pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
         g_profiler.InitCustom(_pass{{ loop.index0 }}_ids, {{ pass.num_counters }});
+        g_profiler.SetCounterNames(_pass{{ loop.index0 }}_names, {{ pass.num_counters }});
     }
 {% else %}
     g_profiler.Init(0);
 {% endif %}
 {% else %}
 {% if has_armv8m_pmu %}
-    g_profiler.Init({{ pass.c_enum }});
+    {
+        static const char* _pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
+        g_profiler.Init({{ pass.c_enum }});
+        g_profiler.SetCounterNames(_pass{{ loop.index0 }}_names, {{ pass.num_counters }});
+    }
 {% else %}
     g_profiler.Init(0);
 {% endif %}

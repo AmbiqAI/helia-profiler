@@ -363,7 +363,12 @@ _register_soc(
         ),
         c_define="AM_PART_APOLLO510",
         cmsis_header="apollo510.h",
-        rtt_scan_ranges=((0x20000000, 0x200000),),
+        # RTT lives in .sram_bss → SHARED_SRAM (base 0x20080000). Scan only the
+        # first 1 MB of SHARED_SRAM instead of the full 2 MB from the TCM base:
+        # the control block lands a few KB in, so discovery (and the stale-block
+        # pre-clean) finish in a couple of chunks instead of sweeping ~557 KB of
+        # TCM first. The known-address fast path skips scanning entirely.
+        rtt_scan_ranges=((0x20080000, 0x100000),),
         jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
     )
@@ -395,7 +400,8 @@ _register_soc(
         ),
         c_define="AM_PART_APOLLO510B",
         cmsis_header="apollo510.h",
-        rtt_scan_ranges=((0x20000000, 0x200000),),
+        # See apollo510: scan the SHARED_SRAM window where .sram_bss is linked.
+        rtt_scan_ranges=((0x20080000, 0x100000),),
         jlink_device="AP510BFA-CBR",
         pmu_max_ops=4096,
     )
@@ -427,7 +433,8 @@ _register_soc(
         ),
         c_define="AM_PART_APOLLO5B",
         cmsis_header="apollo510.h",
-        rtt_scan_ranges=((0x20000000, 0x200000),),
+        # See apollo510: scan the SHARED_SRAM window where .sram_bss is linked.
+        rtt_scan_ranges=((0x20080000, 0x100000),),
         jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
     )
@@ -460,7 +467,8 @@ _register_soc(
         ),
         c_define="AM_PART_APOLLO330P",
         cmsis_header="apollo330P.h",
-        rtt_scan_ranges=((0x20000000, 0x200000),),
+        # See apollo510: scan the SHARED_SRAM window where .sram_bss is linked.
+        rtt_scan_ranges=((0x20080000, 0x100000),),
         jlink_device="AP330NFA-CBR",
         pmu_max_ops=4096,
     )

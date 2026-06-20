@@ -28,6 +28,12 @@ def _sample_pmu_passes() -> list[dict[str, object]]:
             "name": "Cache",
             "custom": False,
             "event_ids": [],
+            "counter_names": [
+                "ARM_PMU_CPU_CYCLES",
+                "ARM_PMU_INST_RETIRED",
+                "ARM_PMU_STALL_FRONTEND",
+                "ARM_PMU_STALL_BACKEND",
+            ],
             "num_counters": 4,
             "c_enum": "NSX_PMU_PRESET_BASIC_CPU",
             "group": "cpu",
