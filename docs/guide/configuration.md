@@ -144,12 +144,20 @@ Advanced target overrides:
 |---|---|---|---|
 | `channel` | string | board default | NSX channel recorded in the generated app manifest |
 | `nsx_modules` | dict | `{}` | Per-module NSX source overrides (`path`, `ref`, or `version`) |
+| `compiler_launcher` | string | `auto` | CMake compiler launcher used to cache compiles. `auto`, `none`, or a tool name/path (`sccache`, `ccache`). |
 
 Build-resolution notes:
 
 - By default, generated profiler apps keep the board's normal NSX `channel`, but HPX explicitly resolves both `neuralspotx` and `nsx-ambiq-sdk` from `main`.
 - `build.nsx_modules.<module>.ref` or `.version` overrides win over that default for the owning project.
 - `build.nsx_modules.<module>.path` installs a local module checkout into the generated app and bypasses registry resolution for that module only.
+
+Compiler-launcher notes:
+
+- `auto` (the default) wraps every compile with [`sccache`](https://github.com/mozilla/sccache) or [`ccache`](https://ccache.dev) if either is found on `PATH`, and does nothing otherwise — so simply installing the binary opts you in. Caching is correctness-safe (the launcher hashes the full compile inputs) and only accelerates the compile step, not NSX lock/sync/configure or flash.
+- `none` (also `off`/`false`) disables the launcher.
+- An explicit tool name or path (e.g. `sccache`) is **required**: the build fails if it cannot be found.
+- The `HPX_COMPILER_LAUNCHER` environment variable overrides this field, and the `--compiler-launcher` / `--no-compiler-launcher` CLI flags override both.
 
 ### `profiling`
 

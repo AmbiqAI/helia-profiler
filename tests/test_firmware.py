@@ -61,6 +61,39 @@ def _fake_starter_profiles() -> dict[str, dict]:
                 "nsx-usb": {"project": unified_project},
             },
         },
+        "apollo510b_evb": {
+            "modules": [
+                "nsx-ambiqsuite",
+                "nsx-ambiq-hal",
+                "nsx-ambiq-bsp",
+                "nsx-soc-hal",
+                "nsx-cmsis-startup",
+                "nsx-board-apollo510b-evb",
+                "nsx-cmsis-core",
+                "nsx-core",
+                "nsx-tooling",
+            ],
+            "project_overrides": {
+                unified_project: {
+                    "revision": "main",
+                    "metadata": "modules/nsx-ambiqsuite/nsx-module.yaml",
+                }
+            },
+            "module_overrides": {
+                "nsx-ambiqsuite": {"project": unified_project},
+                "nsx-ambiq-hal": {"project": unified_project},
+                "nsx-ambiq-bsp": {"project": unified_project},
+                "nsx-ambiq-usb": {"project": unified_project},
+                "nsx-cmsis-core": {"project": unified_project},
+                "nsx-gpio": {"project": unified_project},
+                "nsx-interrupt": {"project": unified_project},
+                "nsx-psram": {"project": unified_project},
+                "nsx-soc-hal": {"project": unified_project},
+                "nsx-cmsis-startup": {"project": unified_project},
+                "nsx-core": {"project": unified_project},
+                "nsx-usb": {"project": unified_project},
+            },
+        },
         "apollo4p_evb": {
             "modules": [
                 "nsx-ambiqsuite-r4",
@@ -604,11 +637,18 @@ class TestGenerateApp:
         PrepareEngineStage().run(ctx)
         app_dir = generate_app(ctx)
 
+        # The SEGGER source is copied verbatim — placement is driven entirely by
+        # the generated config header defining SEGGER_RTT_SECTION, which the
+        # compiled (cache-line == 0) branch turns into
+        # __attribute__((section(".sram_bss"))).
         rtt_c = (app_dir / "src" / "rtt" / "SEGGER_RTT.c").read_text()
-        assert '#include "SEGGER_RTT.h"\n#include "nsx_mem.h"\n' in rtt_c
-        assert "NSX_MEM_SRAM_BSS SEGGER_RTT_CB _SEGGER_RTT" in rtt_c
-        assert "static NSX_MEM_SRAM_BSS char   _acUpBuffer" in rtt_c
-        assert "static NSX_MEM_SRAM_BSS char   _acDownBuffer" in rtt_c
+        assert "SEGGER_RTT_PUT_CB_SECTION(" in rtt_c
+        assert "SEGGER_RTT_PUT_BUFFER_SECTION(" in rtt_c
+
+        conf = (app_dir / "src" / "rtt" / "Config" / "SEGGER_RTT_Conf.h").read_text()
+        assert '#include "nsx_mem.h"' in conf
+        assert "#if NSX_MEM__HAS_SRAM_BSS" in conf
+        assert "#define SEGGER_RTT_SECTION NSX_MEM__SEC_SRAM_BSS" in conf
 
     def test_rtt_generation_raises_when_segger_layout_is_unexpected(
         self, tmp_path: Path, fake_dist: Path
@@ -950,6 +990,34 @@ class TestNsxModuleOverrides:
         manifest = yaml.safe_load(nsx_yml)
         registry = manifest["module_registry"]
         assert registry["modules"]["nsx-ambiq-usb-r5"]["project"] == "nsx-ambiq-sdk"
+        assert registry["modules"]["nsx-usb"]["project"] == "nsx-ambiq-sdk"
+
+    def test_usb_cdc_adds_suffixless_provider_usb_module(self, tmp_path: Path, fake_dist: Path):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510b_evb", "transport": "usb_cdc"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        assert "- name: nsx-ambiq-usb" in nsx_yml
+        assert "- name: nsx-usb" in nsx_yml
+
+        manifest = yaml.safe_load(nsx_yml)
+        registry = manifest["module_registry"]
+        assert registry["modules"]["nsx-ambiq-usb"]["project"] == "nsx-ambiq-sdk"
         assert registry["modules"]["nsx-usb"]["project"] == "nsx-ambiq-sdk"
 
     def test_psram_modules_resolve_through_profile_overrides(self, tmp_path: Path, fake_dist: Path):

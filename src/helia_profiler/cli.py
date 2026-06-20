@@ -178,6 +178,24 @@ def main(argv: list[str] | None = None) -> None:
             "--nsx-module nsx-gpio:version=2.0.0"
         ),
     )
+    g_build.add_argument(
+        "--compiler-launcher",
+        type=str,
+        metavar="NAME",
+        dest="compiler_launcher",
+        help=(
+            "CMake compiler launcher to cache compiles (e.g. sccache, ccache). "
+            "'auto' (default) uses sccache/ccache if installed; a name or path "
+            "requires it to be found. Overrides build.compiler_launcher; the "
+            "HPX_COMPILER_LAUNCHER env var overrides both."
+        ),
+    )
+    g_build.add_argument(
+        "--no-compiler-launcher",
+        action="store_true",
+        dest="no_compiler_launcher",
+        help="Disable the compiler launcher (equivalent to --compiler-launcher none).",
+    )
 
     # -- PMU profiling --
     g_pmu = p_profile.add_argument_group("PMU profiling")
@@ -610,6 +628,10 @@ def _cmd_profile(args: argparse.Namespace) -> None:
     # -- Build / NSX overrides --
     if getattr(args, "nsx_channel", None):
         cli.setdefault("build", {})["channel"] = args.nsx_channel
+    if getattr(args, "no_compiler_launcher", False):
+        cli.setdefault("build", {})["compiler_launcher"] = "none"
+    elif getattr(args, "compiler_launcher", None):
+        cli.setdefault("build", {})["compiler_launcher"] = args.compiler_launcher
     nsx_overrides_raw = getattr(args, "nsx_module_overrides", None)
     if nsx_overrides_raw:
         nsx_modules: dict[str, dict[str, str]] = {}
@@ -617,7 +639,7 @@ def _cmd_profile(args: argparse.Namespace) -> None:
             if ":" not in spec:
                 print(
                     f"Error: --nsx-module format is NAME:KEY=VALUE "
-                    f"(e.g. nsx-ambiq-bsp-r5:path=/my/bsp). Got: '{spec}'",
+                    f"(e.g. nsx-ambiq-bsp:path=/my/bsp). Got: '{spec}'",
                     file=sys.stderr,
                 )
                 sys.exit(1)

@@ -66,9 +66,12 @@ def test_apollo510_family_uses_shared_cmsis_header():
 
 
 def test_apollo510_family_uses_ap5_rtt_scan_window():
-    assert get_soc("apollo510").rtt_scan_ranges == ((0x20000000, 0x200000),)
-    assert get_soc("apollo510b").rtt_scan_ranges == ((0x20000000, 0x200000),)
-    assert get_soc("apollo5b").rtt_scan_ranges == ((0x20000000, 0x200000),)
+    # AP5 RTT lives in .sram_bss → SHARED_SRAM (base 0x20080000); the scan
+    # window is the first 1 MB of SHARED_SRAM, not the full 2 MB from the TCM
+    # base, so discovery does not sweep ~557 KB of TCM first.
+    assert get_soc("apollo510").rtt_scan_ranges == ((0x20080000, 0x100000),)
+    assert get_soc("apollo510b").rtt_scan_ranges == ((0x20080000, 0x100000),)
+    assert get_soc("apollo5b").rtt_scan_ranges == ((0x20080000, 0x100000),)
 
 
 def test_cortex_m4_socs_use_ap3_ap4_rtt_scan_window():

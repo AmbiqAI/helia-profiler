@@ -3,10 +3,19 @@
 
 {% if has_armv8m_pmu %}
 // arm_mve.h already pre-included via hpx_pmu_profiler.h
-#include "nsx_pmu_map.h"
 
 // Transport-aware printf — defined in main.cc
 extern void hpx_printf(const char *fmt, ...);
+
+void HpxPmuProfiler::SetCounterNames(const char* const names[], int num_names) {
+    int limit = (num_names > kMaxEvents) ? kMaxEvents : num_names;
+    for (int i = 0; i < limit; i++) {
+        counter_names_[i] = names[i];
+    }
+    for (int i = limit; i < kMaxEvents; i++) {
+        counter_names_[i] = nullptr;
+    }
+}
 
 void HpxPmuProfiler::Init(nsx_pmu_preset_e preset) {
     nsx_pmu_reset_config(&pmu_cfg_);
@@ -114,11 +123,10 @@ void HpxPmuProfiler::PrintCsv() const {
     hpx_printf("\"Layer\",\"Op\"");
     for (int e = 0; e < num_counters_; e++) {
         if (!pmu_cfg_.events[e].enabled) break;
-        uint32_t map_idx = pmu_cfg_.counter[e].mapIndex;
-        if (map_idx < NSX_PMU_MAP_SIZE)
-            hpx_printf(",\"%s\"", nsx_pmu_map[map_idx].regname);
+        if (counter_names_[e] != nullptr)
+            hpx_printf(",\"%s\"", counter_names_[e]);
         else
-            hpx_printf(",\"event_%d\"", e);
+            hpx_printf(",\"0x%04lx\"", (unsigned long)pmu_cfg_.events[e].eventId);
     }
     hpx_printf(",\"overflow\"\n");
     for (int i = 0; i < num_events_; i++) {
@@ -135,6 +143,8 @@ void HpxPmuProfiler::PrintCsv() const {
 
 // Transport-aware printf — defined in main.cc
 extern void hpx_printf(const char *fmt, ...);
+
+void HpxPmuProfiler::SetCounterNames(const char* const[], int) {}
 
 void HpxPmuProfiler::Init(int) {
     num_events_ = 0;

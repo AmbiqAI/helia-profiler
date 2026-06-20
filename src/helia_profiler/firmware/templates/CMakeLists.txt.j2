@@ -11,6 +11,13 @@ set(NSX_BOARD "{{ board }}" CACHE STRING "Target board")
 set({{ var_name }} "{{ var_value }}")
 {% endfor %}
 
+{% if compiler_launcher %}
+# Compiler launcher (e.g. sccache/ccache) — caches object output across builds.
+set(CMAKE_C_COMPILER_LAUNCHER "{{ compiler_launcher }}")
+set(CMAKE_CXX_COMPILER_LAUNCHER "{{ compiler_launcher }}")
+set(CMAKE_ASM_COMPILER_LAUNCHER "{{ compiler_launcher }}")
+{% endif %}
+
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/nsx/modules.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/nsx/nsx_app_bootstrap.cmake)
 

@@ -351,10 +351,18 @@ class BuildConfig:
     Advanced users can pin individual modules to a version, point them at
     a local checkout, or select a custom git ref — useful for SoC/board
     bring-up before changes land in the stable channel.
+
+    ``compiler_launcher`` selects a CMake compiler launcher (e.g. ``sccache``
+    or ``ccache``) that wraps every compile to cache object output and speed
+    up repeated builds.  ``"auto"`` (the default) uses ``sccache`` then
+    ``ccache`` if either is on ``PATH`` and otherwise does nothing — so the
+    mere presence of the binary is the opt-in.  ``"none"`` disables it; an
+    explicit tool name or path requires that the launcher be found.
     """
 
     channel: str | None = None
     nsx_modules: dict[str, NsxModuleOverride] = field(default_factory=dict)
+    compiler_launcher: str = "auto"
 
 
 @dataclass(frozen=True)
@@ -801,4 +809,16 @@ def _build_build_config(raw: dict[str, Any]) -> BuildConfig:
                 ref=spec.get("ref"),
                 version=spec.get("version"),
             )
-    return BuildConfig(channel=channel, nsx_modules=nsx_modules)
+    compiler_launcher = raw.get("compiler_launcher", "auto")
+    if compiler_launcher is None or compiler_launcher is False:
+        compiler_launcher = "none"
+    if not isinstance(compiler_launcher, str):
+        raise ConfigError(
+            f"build.compiler_launcher must be a string (got {type(compiler_launcher).__name__})",
+            hint="Use 'auto', 'none', or a tool name/path like 'sccache' or 'ccache'.",
+        )
+    return BuildConfig(
+        channel=channel,
+        nsx_modules=nsx_modules,
+        compiler_launcher=compiler_launcher,
+    )

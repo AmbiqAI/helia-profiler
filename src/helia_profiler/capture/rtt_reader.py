@@ -567,6 +567,7 @@ def capture_rtt_output(
     jlink_serial: str | None = None,
     jlink_device: str,
     rtt_scan_ranges: tuple[tuple[int, int], ...],
+    known_block_address: int | None = None,
     timeout_s: float | None = None,
     heartbeat_timeout_s: float = HEARTBEAT_TIMEOUT_S,
     model_path: Path | None = None,
@@ -580,6 +581,11 @@ def capture_rtt_output(
     output.
 
     Args:
+        known_block_address: Linked address of the RTT control block recovered
+            from build artifacts.  When provided, capture attaches directly to
+            this address and skips both the stale-block pre-clean and the
+            host-side discovery scan.  If the firmware never publishes bytes
+            there, capture transparently falls back to scanning.
         timeout_s: Overall wall-clock ceiling.  ``None`` = rely on
             heartbeats (recommended for long inferences).
         heartbeat_timeout_s: Maximum gap between any firmware lines before
@@ -592,12 +598,29 @@ def capture_rtt_output(
     hpx_start_s: float | None = None
     hpx_end_s: float | None = None
 
+    def record_phase_duration(name: str, started_s: float, *, detail: str = "") -> float:
+        elapsed_s = time.monotonic() - started_s
+        if timing_out is not None:
+            timing_out[f"rtt_phase_{name}_s"] = elapsed_s
+        suffix = f" ({detail})" if detail else ""
+        log.info("RTT phase %s completed in %.3fs%s", name, elapsed_s, suffix)
+        return elapsed_s
+
     def on_line(line: str, line_ts: float) -> None:
         nonlocal hpx_start_s, hpx_end_s
         if line == HPX_START and hpx_start_s is None:
             hpx_start_s = line_ts
+            log.info(
+                "RTT observed HPX_START %.3fs after capture start",
+                hpx_start_s - capture_started_s,
+            )
         elif line == HPX_END:
             hpx_end_s = line_ts
+            if hpx_start_s is not None:
+                log.info(
+                    "RTT observed HPX_END %.3fs after HPX_START",
+                    hpx_end_s - hpx_start_s,
+                )
 
     def finalize_timing() -> None:
         if timing_out is None:
@@ -627,53 +650,77 @@ def capture_rtt_output(
         # the current firmware come up as the only block in SRAM.  Best-effort:
         # if the pre-clean attach fails we fall through to reset and rely on
         # the discovery scoring to pick the live block.
+        #
+        # When the control block address is known up-front, discovery targets a
+        # single fixed address that the firmware re-initialises on every boot,
+        # so stale blocks elsewhere are irrelevant and the pre-clean is skipped.
         preclean_ok = False
-        try:
-            open_jlink_with_retry(
-                jlink,
-                device=jlink_device,
-                jlink_serial=jlink_serial,
-                timeout_s=_RTT_PRECLEAN_TIMEOUT_S,
-            )
+        if known_block_address is None:
+            preclean_started_s = time.monotonic()
             try:
-                jlink.halt()
-            except Exception:  # noqa: BLE001 — halt is best-effort
-                pass
-            wiped = _wipe_rtt_control_blocks(jlink, rtt_scan_ranges)
-            preclean_ok = True
-            if wiped:
-                log.info("pre-clean blanked %d stale RTT control block(s)", wiped)
-        except CaptureError:
-            log.debug("pre-clean RTT attach failed; continuing without wipe", exc_info=True)
-        finally:
-            try:
-                jlink.close()
-            except Exception:  # noqa: BLE001 — close errors are non-fatal
-                pass
+                open_jlink_with_retry(
+                    jlink,
+                    device=jlink_device,
+                    jlink_serial=jlink_serial,
+                    timeout_s=_RTT_PRECLEAN_TIMEOUT_S,
+                )
+                try:
+                    jlink.halt()
+                except Exception:  # noqa: BLE001 — halt is best-effort
+                    pass
+                wiped = _wipe_rtt_control_blocks(jlink, rtt_scan_ranges)
+                preclean_ok = True
+                if wiped:
+                    log.info("pre-clean blanked %d stale RTT control block(s)", wiped)
+            except CaptureError:
+                log.debug("pre-clean RTT attach failed; continuing without wipe", exc_info=True)
+            finally:
+                record_phase_duration(
+                    "preclean",
+                    preclean_started_s,
+                    detail="attached" if preclean_ok else "attach_failed",
+                )
+                try:
+                    jlink.close()
+                except Exception:  # noqa: BLE001 — close errors are non-fatal
+                    pass
 
         # --- Step 1: reset the target via JLinkExe subprocess ---
         # JLinkExe handles the Apollo510 secure bootloader (SBL) correctly;
         # pylink's reset() does not trigger the vendor-specific handler.
+        reset_started_s = time.monotonic()
         reset_target(device=jlink_device, jlink_serial=jlink_serial)
+        record_phase_duration("reset", reset_started_s)
 
         # --- Step 2: connect pylink and wait for RTT readiness ---
         # Apollo510 may still be transitioning through the unobservable SBL
         # phase immediately after reset, so keep a small fixed floor delay here.
         # After that, retry the host attach and poll until the RTT control
         # block becomes visible.
+        sbl_settle_started_s = time.monotonic()
         time.sleep(SBL_SETTLE_S)
+        record_phase_duration("sbl_settle", sbl_settle_started_s)
         cb_deadline = time.monotonic() + _RTT_CB_TIMEOUT_S
+        attach_started_s = time.monotonic()
         open_jlink_with_retry(
             jlink,
             device=jlink_device,
             jlink_serial=jlink_serial,
             timeout_s=_RTT_CB_TIMEOUT_S,
         )
+        record_phase_duration("attach", attach_started_s)
 
         log.info("pylink connected to %s for RTT capture", jlink_device)
         resume_if_halted(jlink)
 
         # --- Step 3: start RTT and wait for control block ---
+        # When the linked control block address is known (recovered from the
+        # build map/ELF), attach directly and skip the host-side scan entirely.
+        # The firmware re-initialises that fixed address on boot, so this is
+        # both deterministic and ~100x faster than sweeping SRAM over SWD.  If
+        # the firmware never publishes bytes there, the API-probe fallback below
+        # re-scans, so a stale or mismatched address degrades gracefully.
+        #
         # J-Link's built-in RTT auto-scan does not always cover the SRAM
         # regions used by armclang-linked firmware (e.g. the Apollo510
         # TCM at 0x2000xxxx).  Do an explicit host-side scan for the
@@ -686,24 +733,40 @@ def capture_rtt_output(
         # "live", so we do NOT early-break on it: instead keep scanning through
         # the settle window and let scoring (size as tiebreaker) outlast the
         # race for the live block's signature to settle.
-        block_address = None
-        best_score = -1
-        first_candidate_s: float | None = None
-        live_named_score = _RTT_NAME_MATCH_BONUS + _RTT_ACTIVITY_BONUS
-        while time.monotonic() < cb_deadline:
-            candidate = _scan_for_rtt_control_block(jlink, rtt_scan_ranges)
-            if candidate is not None:
-                candidate_addr, candidate_score = candidate
-                if candidate_score > best_score:
-                    block_address = candidate_addr
-                    best_score = candidate_score
-                if preclean_ok and best_score >= live_named_score:
-                    break
-                if first_candidate_s is None:
-                    first_candidate_s = time.monotonic()
-                elif time.monotonic() - first_candidate_s >= _RTT_DISCOVERY_SETTLE_S:
-                    break
-            time.sleep(0.2)
+        if known_block_address is not None:
+            block_address = known_block_address
+            scan_started_s = time.monotonic()
+            record_phase_duration(
+                "control_block_scan",
+                scan_started_s,
+                detail=f"known_address=0x{known_block_address:08X}",
+            )
+        else:
+            block_address = None
+            best_score = -1
+            first_candidate_s: float | None = None
+            live_named_score = _RTT_NAME_MATCH_BONUS + _RTT_ACTIVITY_BONUS
+            scan_started_s = time.monotonic()
+            while time.monotonic() < cb_deadline:
+                candidate = _scan_for_rtt_control_block(jlink, rtt_scan_ranges)
+                if candidate is not None:
+                    candidate_addr, candidate_score = candidate
+                    if candidate_score > best_score:
+                        block_address = candidate_addr
+                        best_score = candidate_score
+                    if preclean_ok and best_score >= live_named_score:
+                        break
+                    if first_candidate_s is None:
+                        first_candidate_s = time.monotonic()
+                    elif time.monotonic() - first_candidate_s >= _RTT_DISCOVERY_SETTLE_S:
+                        break
+                time.sleep(0.2)
+            scan_detail = (
+                f"block=0x{block_address:08X}, score={best_score}"
+                if block_address is not None
+                else "no_block"
+            )
+            record_phase_duration("control_block_scan", scan_started_s, detail=scan_detail)
 
         if block_address is not None:
             log.info("RTT control block located at 0x%08X", block_address)
@@ -726,6 +789,7 @@ def capture_rtt_output(
         num_up_buffers = 0
         api_attached = False
         probe_deadline = time.monotonic() + _RTT_CB_TIMEOUT_S
+        api_probe_started_s = time.monotonic()
         while time.monotonic() < probe_deadline:
             try:
                 num_up_buffers = jlink.rtt_get_status().NumUpBuffers
@@ -741,6 +805,15 @@ def capture_rtt_output(
                 api_attached = True
                 break
             time.sleep(0.05)
+        record_phase_duration(
+            "api_probe",
+            api_probe_started_s,
+            detail=(
+                f"attached,num_up_buffers={num_up_buffers},probed_bytes={len(probe_bytes)}"
+                if api_attached
+                else "no_attach"
+            ),
+        )
 
         if not api_attached:
             if block_address is None:
@@ -774,12 +847,14 @@ def capture_rtt_output(
             # manual control-block polling path so direct reads/writes behave
             # like a standalone memory-access session.
             jlink = pylink.JLink()
+            fallback_attach_started_s = time.monotonic()
             open_jlink_with_retry(
                 jlink,
                 device=jlink_device,
                 jlink_serial=jlink_serial,
                 timeout_s=_RTT_CB_TIMEOUT_S,
             )
+            record_phase_duration("fallback_attach", fallback_attach_started_s)
             resume_if_halted(jlink)
             active_block_address = block_address
             direct_idle_polls = 0
@@ -800,6 +875,7 @@ def capture_rtt_output(
                     direct_idle_polls += 1
                 return data
 
+            handshake_started_s = time.monotonic()
             pending = _perform_rtt_ready_handshake(
                 read_chunk=read_direct_chunk,
                 write_command=lambda command: _write_rtt_command_direct(
@@ -808,8 +884,14 @@ def capture_rtt_output(
                     command=command,
                 ),
             )
+            record_phase_duration(
+                "ready_handshake_direct",
+                handshake_started_s,
+                detail=f"pending_bytes={len(pending)}",
+            )
             read_after_handshake = _prepend_pending_bytes(read_direct_chunk, pending)
 
+            collect_started_s = time.monotonic()
             lines = collect_lines(
                 read_after_handshake,
                 transport_name="RTT",
@@ -818,6 +900,7 @@ def capture_rtt_output(
                 poll_interval_s=0.005,
                 on_line=on_line,
             )
+            record_phase_duration("line_collection_direct", collect_started_s)
             finalize_timing()
             return lines
         log.info(
@@ -842,18 +925,27 @@ def capture_rtt_output(
             if probe_bytes
             else read_rtt_chunk
         )
+        handshake_started_s = time.monotonic()
         pending = _perform_rtt_ready_handshake(
             read_chunk=handshake_read,
             write_command=lambda command: jlink.rtt_write(0, list(command)),
         )
+        record_phase_duration(
+            "ready_handshake_api",
+            handshake_started_s,
+            detail=f"pending_bytes={len(pending)}",
+        )
 
         # --- Step 3a: PSRAM model upload (if applicable) ---
         if weights_region == "psram" and model_path is not None:
+            psram_upload_started_s = time.monotonic()
             _upload_model_to_psram(jlink, model_path, initial_buf=pending)
+            record_phase_duration("psram_upload", psram_upload_started_s)
             pending = b""
 
         # --- Step 3b: collect lines via shared helper ---
         read_after_handshake = _prepend_pending_bytes(read_rtt_chunk, pending)
+        collect_started_s = time.monotonic()
         lines = collect_lines(
             read_after_handshake,
             transport_name="RTT",
@@ -862,6 +954,7 @@ def capture_rtt_output(
             poll_interval_s=0.005,  # 5 ms — RTT has high bandwidth
             on_line=on_line,
         )
+        record_phase_duration("line_collection_api", collect_started_s)
         finalize_timing()
         return lines
 
