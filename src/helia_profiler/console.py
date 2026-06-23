@@ -502,6 +502,10 @@ class HpxConsole:
         self._console.print()
         self._console.print(_build_compare_layer_table(result.layer_rows, top_layers=top_layers))
         self._console.print()
+        placement_table = _build_compare_placement_table(result.layer_rows, top_layers=top_layers)
+        if placement_table is not None:
+            self._console.print(placement_table)
+            self._console.print()
 
         if output_paths:
             output_dir = output_paths[0].parent.resolve()
@@ -1022,12 +1026,52 @@ def _build_compare_layer_table(layer_rows: list[dict[str, Any]], *, top_layers: 
         if overflow:
             op_cell = f"{op_cell} [yellow]OVF[/yellow]"
 
-        table.add_row(
+        row_values = [
             str(row.get("id", "")),
             op_cell,
             _format_compact_number(row.get("baseline_cycles")),
             _format_compact_number(row.get("candidate_cycles")),
             _format_layer_change_compact(row),
+        ]
+        table.add_row(*row_values)
+
+    return table
+
+
+def _build_compare_placement_table(layer_rows: list[dict[str, Any]], *, top_layers: int) -> Table | None:
+    changed = [row for row in layer_rows if row.get("memory_changed")]
+    if not changed:
+        return None
+
+    top_layers = max(0, top_layers)
+    rows = sorted(
+        changed,
+        key=lambda row: abs(_to_compare_float(row.get("delta_cycles")) or 0.0),
+        reverse=True,
+    )[:top_layers]
+
+    table = Table(
+        title=f"[bold]Buffer Placement Changes[/bold] [dim](top {top_layers} by absolute cycle delta)[/dim]",
+        box=box.SIMPLE_HEAVY,
+        show_edge=False,
+        title_justify="left",
+        padding=(0, 1),
+        expand=True,
+    )
+    table.add_column("#", style="dim", width=4, justify="right")
+    table.add_column("Operator", min_width=14, overflow="ellipsis")
+    table.add_column("Before", min_width=26, ratio=1, overflow="fold")
+    table.add_column("After", min_width=26, ratio=1, overflow="fold")
+
+    for row in rows:
+        op = str(row.get("candidate_op", ""))
+        if not row.get("op_match", True):
+            op = f"{row.get('baseline_op', '<missing>')} -> {row.get('candidate_op', '<missing>')}"
+        table.add_row(
+            str(row.get("id", "")),
+            escape(op),
+            escape(str(row.get("baseline_memory", ""))),
+            f"[yellow]{escape(str(row.get('candidate_memory', '')))}[/yellow]",
         )
 
     return table

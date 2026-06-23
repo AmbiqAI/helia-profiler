@@ -13,6 +13,8 @@ results/
 ├── summary.json            # Machine-readable high-level summary
 ├── profile_results.csv     # Merged per-layer PMU breakdown (all counters)
 ├── run_metadata.json       # Config, toolchain, platform, model info
+├── aot_operator_manifest.json # AOT only: compiled operators + tensor placement
+├── aot_memory_layers.csv   # AOT only: spreadsheet-friendly per-layer buffers
 └── model_explorer/         # Model Explorer overlay JSONs
     ├── me_overlay_ARM_PMU_CPU_CYCLES.json
     ├── me_overlay_ARM_PMU_INST_RETIRED.json
@@ -138,6 +140,38 @@ Full provenance for the run:
     "model_size": 53936
   }
 }
+```
+
+### aot_operator_manifest.json
+
+For `helia-aot` runs, this captures the operators emitted by the AOT
+compiler after graph transforms. Each operator includes inputs, outputs, and
+local tensors such as weights, weight sums, and per-op scratch buffers.
+
+When the installed `helia-aot` package exposes placement data, tensor entries
+also include:
+
+| Field | Meaning |
+|---|---|
+| `memory` | Runtime memory used by the kernel (`dtcm`, `sram`, `mram`, `psram`) |
+| `source_memory` | Cold-storage source for staged constants |
+| `staged` | `true` when a constant is copied from `source_memory` into `memory` |
+| `arena_role` | `scratch`, `persistent`, or `constant` |
+| `arena_region_id` | AOT arena enum value used by `bind_arena()` |
+| `offset` | Byte offset inside the AOT arena |
+| `allocation_size` | Planned allocation size in bytes |
+
+### aot_memory_layers.csv
+
+For `helia-aot` runs, this is a flat CSV view of the same placement data.
+It is intended for customers who want to sort or filter buffers in a
+spreadsheet while experimenting with AOT memory placement.
+
+Example columns:
+
+```csv
+layer_idx,layer_id,op_type,op_name,tensor_role,tensor_id,tensor_name,tensor_kind,memory,source_memory,staged,arena_role,arena_region_id,offset,size,shape
+0,0,CONV_2D,conv_2d_0,local,17,tensor_17,constant,dtcm,dtcm,False,constant,1,0,2560,"[64, 1, 5, 1]"
 ```
 
 ### detailed/memory.json
