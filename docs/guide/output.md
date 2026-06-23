@@ -170,8 +170,8 @@ spreadsheet while experimenting with AOT memory placement.
 Example columns:
 
 ```csv
-layer_idx,layer_id,op_type,op_name,tensor_role,tensor_id,tensor_name,tensor_kind,memory,source_memory,staged,arena_role,arena_region_id,offset,size
-0,0,CONV_2D,conv_2d_0,local,17,tensor_17,constant,dtcm,dtcm,False,constant,1,0,2560
+layer_idx,layer_id,op_type,op_name,tensor_role,tensor_id,tensor_name,tensor_kind,memory,source_memory,staged,arena_role,arena_region_id,offset,size,shape
+0,0,CONV_2D,conv_2d_0,local,17,tensor_17,constant,dtcm,dtcm,False,constant,1,0,2560,"[64, 1, 5, 1]"
 ```
 
 ### detailed/memory.json

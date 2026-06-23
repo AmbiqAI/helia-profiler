@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from helia_profiler.engines.helia_aot import (
+    _arena_region_id_lookup,
     _extract_operator_manifest,
     _tensor_metadata,
 )
@@ -240,6 +241,21 @@ class TestExtractOperatorManifest:
         assert "inputs" not in out[0]
         assert out[0]["outputs"] == []
 
+    def test_arena_lookup_uses_runtime_memory_when_source_memory_is_none(self):
+        render_plan = type(
+            "_RenderPlan",
+            (),
+            {
+                "scratch_arenas": [],
+                "persistent_arenas": [],
+                "constant_arenas": [_FakeArena(2, "constant", "DTCM", None)],
+            },
+        )()
+
+        lookup = _arena_region_id_lookup(_FakeCtx([], render_plan=render_plan))
+
+        assert lookup[("constant", "dtcm", "dtcm")] == 2
+
 
 # ---------- _write_aot_manifest ----------------------------------------------
 
@@ -314,3 +330,30 @@ class TestWriteAotMemoryLayers:
         assert rows[0]["tensor_role"] == "local"
         assert rows[0]["memory"] == "dtcm"
         assert rows[0]["source_memory"] == "mram"
+
+    def test_prefers_nbytes_when_allocation_size_missing(self, tmp_path: Path):
+        manifest = [
+            {
+                "idx": 0,
+                "id": 0,
+                "op_type": "CONV_2D",
+                "name": "conv_2d_0",
+                "local_tensors": [
+                    {
+                        "id": 17,
+                        "name": "weights",
+                        "kind": "constant",
+                        "memory": "dtcm",
+                        "source_memory": "mram",
+                        "nbytes": 1024,
+                        "size": 256,
+                    }
+                ],
+            }
+        ]
+
+        out = _write_aot_memory_layers(_StubCtx(manifest), tmp_path)
+
+        assert out is not None
+        rows = list(csv.DictReader(open(out)))
+        assert rows[0]["size"] == "1024"

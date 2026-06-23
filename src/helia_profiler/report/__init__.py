@@ -482,7 +482,7 @@ def _write_aot_memory_layers(ctx: PipelineContext, output_dir: Path) -> Path | N
                         "arena_role": tensor.get("arena_role"),
                         "arena_region_id": tensor.get("arena_region_id"),
                         "offset": tensor.get("offset"),
-                        "size": tensor.get("allocation_size", tensor.get("size")),
+                        "size": tensor.get("allocation_size", tensor.get("nbytes", tensor.get("size"))),
                         "shape": json.dumps(tensor.get("shape")) if tensor.get("shape") is not None else "",
                     }
                 )

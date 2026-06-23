@@ -705,7 +705,8 @@ def _arena_region_id_lookup(codegen_ctx: Any) -> dict[tuple[str, str, str], int]
         for arena in arena_list:
             role = str(getattr(arena, "role", "")).lower()
             memory = str(getattr(arena, "memory", "")).lower()
-            source_memory = str(getattr(arena, "source_memory", getattr(arena, "memory", ""))).lower()
+            raw_source_memory = getattr(arena, "source_memory", None)
+            source_memory = str(raw_source_memory if raw_source_memory is not None else getattr(arena, "memory", "")).lower()
             region_id = getattr(arena, "region_id", None)
             if role and memory and source_memory and isinstance(region_id, (int, float)):
                 lookup[(role, memory, source_memory)] = int(region_id)
