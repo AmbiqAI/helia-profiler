@@ -525,12 +525,18 @@ def _write_aot_memory_layers(ctx: PipelineContext, output_dir: Path) -> Path | N
 def _layer_to_flat_dict(
     layer: LayerResult,
     analysis: ModelAnalysis | None = None,
+    total_cycles: float | None = None,
 ) -> dict[str, Any]:
     """Flatten a LayerResult into a CSV-friendly dict."""
     row: dict[str, Any] = {"id": layer.id, "op": layer.op}
     row.update(layer.counters)
     if layer.cycles is not None:
         row["cycles"] = layer.cycles
+    if total_cycles is not None:
+        if layer.cycles is None or total_cycles <= 0:
+            row["cycles_pct"] = None
+        else:
+            row["cycles_pct"] = round(layer.cycles / total_cycles * 100, 1)
     row["overflow"] = layer.overflow
 
     # Enrich with model analysis data when available
@@ -557,7 +563,8 @@ def _write_csv(
         raise ReportError("No layer data to write.")
 
     out_path = output_dir / "profile_results.csv"
-    rows = [_layer_to_flat_dict(layer, analysis) for layer in layers]
+    total_cycles = sum(layer.cycles or 0 for layer in layers)
+    rows = [_layer_to_flat_dict(layer, analysis, total_cycles) for layer in layers]
     fieldnames = list(rows[0].keys())
     # Ensure enriched columns appear even if first row lacks them
     if analysis is not None:
@@ -585,7 +592,8 @@ def _write_preset_csv(
     if not layers:
         return out_path
 
-    rows = [_layer_to_flat_dict(layer) for layer in layers]
+    total_cycles = sum(layer.cycles or 0 for layer in layers)
+    rows = [_layer_to_flat_dict(layer, total_cycles=total_cycles) for layer in layers]
     fieldnames = list(rows[0].keys())
 
     with open(out_path, "w", newline="") as f:
@@ -606,14 +614,21 @@ def _write_json(
 ) -> Path:
     """Write full profiling results as JSON."""
     out_path = output_dir / "profile_results.json"
+    total_cycles = sum(layer.cycles or 0 for layer in pmu.layers)
+    preset_totals = {
+        name: sum(layer.cycles or 0 for layer in pr.layers) for name, pr in pmu.presets.items()
+    }
 
     data: dict[str, Any] = {
         "metadata": _metadata_to_dict(run_metadata),
         "summary": _firmware_meta_to_dict(pmu.meta),
-        "layers": [_layer_to_flat_dict(l) for l in pmu.layers],
+        "layers": [_layer_to_flat_dict(l, total_cycles=total_cycles) for l in pmu.layers],
         "presets": {
             name: {
-                "layers": [_layer_to_flat_dict(l) for l in pr.layers],
+                "layers": [
+                    _layer_to_flat_dict(l, total_cycles=preset_totals[name])
+                    for l in pr.layers
+                ],
                 "iteration_count": len(pr.iterations),
             }
             for name, pr in pmu.presets.items()

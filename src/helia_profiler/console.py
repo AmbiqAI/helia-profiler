@@ -61,6 +61,12 @@ _CACHE_DISPLAY = (
     "ARM_PMU_BUS_ACCESS",
 )
 
+_MVE_INST = "ARM_PMU_MVE_INST_RETIRED"
+_MVE_INT_MAC = "ARM_PMU_MVE_INT_MAC_RETIRED"
+_MVE_LDST = "ARM_PMU_MVE_LDST_RETIRED"
+_MVE_STALL = "ARM_PMU_MVE_STALL"
+_INST_RETIRED = "ARM_PMU_INST_RETIRED"
+
 
 def _mini_progress_bar(done: int, total: int, width: int = 20) -> str:
     """Return a compact Unicode progress bar like ``[████████░░░░]``."""
@@ -250,6 +256,15 @@ class HpxConsole:
         if has_macs:
             layer_table.add_column("MACs", justify="right", min_width=12)
             layer_table.add_column("Cyc/MAC", justify="right", min_width=8)
+        has_mve = any(
+            any(k in layer.counters for k in (_MVE_INST, _MVE_INT_MAC, _MVE_LDST, _MVE_STALL))
+            for layer in layers
+        )
+        if has_mve:
+            layer_table.add_column("MVE inst\n/ all inst", justify="right", min_width=10)
+            layer_table.add_column("MVE MACs\n/ MVE inst", justify="right", min_width=10)
+            layer_table.add_column("MVE LD/ST\n/ MVE inst", justify="right", min_width=10)
+            layer_table.add_column("MVE stalls\n/ all cycles", justify="right", min_width=10)
         layer_table.add_column("", width=4)  # overflow marker
 
         # Build a lookup from layer id -> LayerOps
@@ -283,6 +298,8 @@ class HpxConsole:
                 lm = macs_lookup.get(lid, 0)
                 row_vals.append(f"{lm:,}" if lm else "—")
                 row_vals.append(f"{cyc / lm:.1f}" if lm and cyc else "—")
+            if has_mve:
+                row_vals.extend(_format_mve_cells(layer.counters, cyc))
             row_vals.append(ovf)
 
             layer_table.add_row(*row_vals)
@@ -936,6 +953,31 @@ def _fmt_bytes(n: int) -> str:
     if n < 1024 * 1024:
         return f"{n / 1024:.1f} KB"
     return f"{n / (1024 * 1024):.2f} MB"
+
+
+def _format_mve_cells(counters: dict[str, float], cycles: float) -> list[str]:
+    mve_inst = _to_float(counters.get(_MVE_INST))
+    inst = _to_float(counters.get(_INST_RETIRED))
+    mve_mac = _to_float(counters.get(_MVE_INT_MAC))
+    mve_ldst = _to_float(counters.get(_MVE_LDST))
+    mve_stall = _to_float(counters.get(_MVE_STALL))
+
+    mve_pct = f"{mve_inst / inst * 100:.1f}%" if mve_inst is not None and inst else "—"
+    mac_density = f"{mve_mac / mve_inst:.2f}" if mve_mac is not None and mve_inst else "—"
+    ldst_density = f"{mve_ldst / mve_inst:.2f}" if mve_ldst is not None and mve_inst else "—"
+    stall_pct = f"{mve_stall / cycles * 100:.1f}%" if mve_stall is not None and cycles else "—"
+    return [mve_pct, mac_density, ldst_density, stall_pct]
+
+
+def _to_float(value: Any) -> float | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _find_compare_metric(metrics: list[MetricDiff], name: str) -> MetricDiff | None:

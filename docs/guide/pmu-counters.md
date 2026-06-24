@@ -142,6 +142,10 @@ The report automatically computes derived metrics from raw counters:
 | Metric | Formula | Included in |
 |---|---|---|
 | L1D hit rate | `1 - (L1D_CACHE_MISS_RD / L1D_CACHE_RD) × 100%` | `summary.json`, `memory.json` |
+| MVE instruction share | `MVE_INST_RETIRED / INST_RETIRED × 100%` | Terminal summary |
+| MVE MAC density | `MVE_INT_MAC_RETIRED / MVE_INST_RETIRED` | Terminal summary |
+| MVE load/store density | `MVE_LDST_RETIRED / MVE_INST_RETIRED` | Terminal summary |
+| MVE stall share | `MVE_STALL / CPU_CYCLES × 100%` | Terminal summary |
 
 ## DWT-only fallback
 

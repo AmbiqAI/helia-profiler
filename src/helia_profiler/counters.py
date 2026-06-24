@@ -91,7 +91,7 @@ DEFAULT_COUNTERS: dict[str, list[str]] = {
     "mve": [
         "ARM_PMU_MVE_INST_RETIRED",
         "ARM_PMU_MVE_INT_MAC_RETIRED",
-        "ARM_PMU_MVE_LDST_MULTI_RETIRED",
+        "ARM_PMU_MVE_LDST_RETIRED",
         "ARM_PMU_MVE_STALL",
     ],
 }
