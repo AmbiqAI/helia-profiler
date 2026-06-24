@@ -256,7 +256,10 @@ class HpxConsole:
         if has_macs:
             layer_table.add_column("MACs", justify="right", min_width=12)
             layer_table.add_column("Cyc/MAC", justify="right", min_width=8)
-        has_mve = any(_MVE_INST in layer.counters for layer in layers)
+        has_mve = any(
+            any(k in layer.counters for k in (_MVE_INST, _MVE_INT_MAC, _MVE_LDST, _MVE_STALL))
+            for layer in layers
+        )
         if has_mve:
             layer_table.add_column("MVE inst\n/ all inst", justify="right", min_width=10)
             layer_table.add_column("MVE MACs\n/ MVE inst", justify="right", min_width=10)
