@@ -533,9 +533,10 @@ def _layer_to_flat_dict(
     if layer.cycles is not None:
         row["cycles"] = layer.cycles
     if total_cycles is not None:
-        row["cycles_pct"] = (
-            round((layer.cycles or 0) / total_cycles * 100, 1) if total_cycles else 0
-        )
+        if layer.cycles is None or total_cycles <= 0:
+            row["cycles_pct"] = None
+        else:
+            row["cycles_pct"] = round(layer.cycles / total_cycles * 100, 1)
     row["overflow"] = layer.overflow
 
     # Enrich with model analysis data when available
