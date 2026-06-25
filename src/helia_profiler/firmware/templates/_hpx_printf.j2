@@ -131,48 +131,6 @@ static void hpx_rtt_set_blocking(void) {
 static void hpx_rtt_set_nonblocking(void) {
     g_hpx_rtt_lossless = false;
 }
-
-static bool hpx_rtt_wait_for_command(const char *token, uint32_t timeout_ms) {
-    static char cmd_buf[32];
-    const size_t token_len = strlen(token);
-    unsigned used = 0;
-    const uint32_t spins_per_ms = SystemCoreClock / 2000U;
-    uint32_t total = timeout_ms * spins_per_ms;
-
-    memset(cmd_buf, 0, sizeof(cmd_buf));
-    while (total > 0U) {
-        // Down channel: J-Link wrote the host command into SRAM via SWD.  The
-        // CPU may hold stale observed data for the down-buffer descriptor
-        // (WrOff) and payload, so drop any cache-observed copies before
-        // reading or we spin forever never seeing the host's bytes. This runs
-        // only during the one-time startup handshake, never inside a timed PMU
-        // window.
-        HPX_INVAL_DCACHE();
-        unsigned n = SEGGER_RTT_Read(0, cmd_buf + used,
-                                     sizeof(cmd_buf) - 1U - used);
-        if (n > 0U) {
-            used += n;
-            cmd_buf[used] = '\0';
-            if (strstr(cmd_buf, token) != nullptr) {
-                return true;
-            }
-            if (used == sizeof(cmd_buf) - 1U) {
-                unsigned keep = token_len > 1U ? (unsigned)token_len - 1U : 0U;
-                if (keep > used) {
-                    keep = used;
-                }
-                if (keep > 0U) {
-                    memmove(cmd_buf, cmd_buf + used - keep, keep);
-                }
-                used = keep;
-                cmd_buf[used] = '\0';
-            }
-        }
-        for (volatile uint32_t s = 0; s < spins_per_ms; ++s) { __NOP(); }
-        if (total > spins_per_ms) total -= spins_per_ms; else total = 0U;
-    }
-    return false;
-}
 {% elif transport == "swo" %}
 {{ _linkage }}void hpx_printf(const char *fmt, ...) {
     static char line_buf[512];

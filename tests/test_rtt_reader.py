@@ -4,14 +4,18 @@ import sys
 import types
 from pathlib import Path
 
+import pytest
+
 from helia_profiler.capture import capture_pmu
 from helia_profiler.capture.rtt_reader import (
     _direct_rtt_write,
     _direct_rtt_read,
     _scan_for_rtt_control_block,
+    _write_rtt_command_api,
     _wipe_rtt_control_blocks,
     capture_rtt_output,
 )
+from helia_profiler.errors import CaptureError
 from helia_profiler.capture.serial_reader import capture_swo_output
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
@@ -102,6 +106,50 @@ def test_direct_rtt_write_advances_wr_off():
     assert written == 5
     assert jlink.byte_writes == [(0x20002002, [82, 69, 65, 68, 89])]
     assert jlink.word_writes == [(0x2000003C, [7])]
+
+
+def test_api_rtt_write_retries_until_full_command_sent(monkeypatch):
+    class _FakeApiRttWriteJLink:
+        def __init__(self):
+            self.calls: list[list[int]] = []
+            self._returns = iter([0, 3, 2])
+
+        def rtt_write(self, channel: int, data: list[int]) -> int:
+            assert channel == 0
+            self.calls.append(data)
+            return next(self._returns)
+
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.sleep", lambda _s: None)
+    jlink = _FakeApiRttWriteJLink()
+
+    _write_rtt_command_api(jlink, command=b"READY", timeout_s=0.1)
+
+    assert jlink.calls == [
+        [82, 69, 65, 68, 89],
+        [82, 69, 65, 68, 89],
+        [68, 89],
+    ]
+
+
+def test_api_rtt_write_times_out_when_down_buffer_never_accepts_bytes(monkeypatch):
+    class _FakeApiRttWriteJLink:
+        def rtt_write(self, channel: int, data: list[int]) -> int:
+            assert channel == 0
+            return 0
+
+    sleeps = {"count": 0}
+
+    def fake_sleep(_s: float) -> None:
+        sleeps["count"] += 1
+
+    times = iter([0.0, 0.0, 0.02, 0.04, 0.06])
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.sleep", fake_sleep)
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.monotonic", lambda: next(times))
+
+    with pytest.raises(CaptureError, match="Timed out sending RTT host-ready command"):
+        _write_rtt_command_api(_FakeApiRttWriteJLink(), command=b"READY", timeout_s=0.05)
+
+    assert sleeps["count"] >= 1
 
 
 def test_wipe_rtt_control_blocks_validates_candidates_and_honors_range_end():
@@ -334,7 +382,7 @@ def test_capture_pmu_rejects_rtt_protocol_without_hpx_start(tmp_path: Path, monk
         raise AssertionError("expected CaptureError for missing HPX_START")
 
 
-def test_capture_rtt_output_sends_host_ready_before_collect(monkeypatch):
+def test_capture_rtt_output_does_not_send_down_channel_command(monkeypatch):
     class _FakeStatus:
         NumUpBuffers = 1
 
@@ -416,7 +464,10 @@ def test_capture_rtt_output_sends_host_ready_before_collect(monkeypatch):
         rtt_scan_ranges=((0x20000000, 0x4000),),
     )
 
-    assert fake_jlink.commands == [(0, list(b"HPX_HOST_READY"))]
+    # The firmware now streams the HPX_START header losslessly on the up-channel
+    # and never waits on a host->target command, so the host must not write to
+    # the RTT down-channel during the ready handshake.
+    assert fake_jlink.commands == []
 
 
 def test_capture_rtt_output_preserves_bytes_after_hpx_ready(monkeypatch):

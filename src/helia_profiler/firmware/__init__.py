@@ -563,18 +563,28 @@ def _copy_segger_rtt(dest_dir: Path) -> None:
         if src.exists():
             shutil.copy2(src, rtt_dest / name)
 
-    # Apollo-class linker scripts place default .bss in MCU_TCM, which makes
-    # SEGGER RTT's large staging buffers consume scarce profiling memory. Move
-    # the control block and channel buffers into shared SRAM instead.
+    # RTT buffer placement is cache-coherency sensitive on the Cortex-M55 parts.
     #
-    # SEGGER RTT already supports this via its own SEGGER_RTT_SECTION hook: when
-    # SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0 (the default on Apollo parts, which
-    # have no data cache that RTT must work around) the control block and
-    # buffers are declared through SEGGER_RTT_PUT_CB_SECTION /
+    # SEGGER RTT supports relocation via its SEGGER_RTT_SECTION hook: when
+    # SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0 (the default on Apollo parts) the
+    # control block and buffers are declared through SEGGER_RTT_PUT_CB_SECTION /
     # SEGGER_RTT_PUT_BUFFER_SECTION, which emit
-    # ``__attribute__((section(SEGGER_RTT_SECTION)))`` for GCC/clang. We point
-    # that section at the NSX ``.sram_bss`` input section (collected into
-    # SHARED_SRAM by the linker scripts) via the generated config header.
+    # ``__attribute__((section(SEGGER_RTT_SECTION)))`` for GCC/clang.
+    #
+    # On the cacheless Cortex-M4 parts (Apollo3/4) there is no coherency hazard,
+    # so we point that section at the NSX ``.sram_bss`` input section (collected
+    # into SHARED_SRAM by the linker scripts) to keep SEGGER's large staging
+    # buffers out of scarce MCU_TCM .bss.
+    #
+    # On the cache-coherent Cortex-M55 parts (Apollo5 / Apollo510 family) shared
+    # SRAM is *cached*, and SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0 tells RTT there is
+    # no cache to work around. That combination is incoherent with J-Link's
+    # asynchronous SWD reads/writes of the ring: the host can observe a stale
+    # ring (old bytes published before the new payload reaches SRAM) or have its
+    # up-buffer RdOff clobbered by the CPU's whole-cache clean, corrupting the
+    # stream. We therefore keep the buffers in *non-cached* TCM (the default .bss
+    # region) on these parts so SWD reads stay coherent with zero cache
+    # maintenance — the configuration SEGGER RTT actually assumes.
     #
     # NOTE: do *not* try to rewrite the ``#if SEGGER_RTT_CPU_CACHE_LINE_SIZE``
     # aligned declarations — that branch is dead code here (the macro is 0), so
@@ -609,13 +619,23 @@ def _copy_segger_rtt(dest_dir: Path) -> None:
 
     sram_placement = (
         "\n"
-        "/* heliaPROFILER: place the RTT control block and channel buffers in\n"
-        " * shared SRAM instead of scarce MCU_TCM .bss. SEGGER's compiled\n"
-        " * (SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0) path honours SEGGER_RTT_SECTION\n"
-        " * via __attribute__((section(...))); the matching .sram_bss input\n"
-        " * section is collected into SHARED_SRAM by the NSX linker scripts. */\n"
+        "/* heliaPROFILER: RTT control block + channel buffer placement.\n"
+        " *\n"
+        " * Cache-coherent Cortex-M55 parts (Apollo5 / Apollo510 family): keep the\n"
+        " * buffers in NON-CACHED TCM (default .bss). Their shared SRAM is cached,\n"
+        " * and SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0 assumes no cache, so .sram_bss\n"
+        " * placement is incoherent with J-Link's async SWD ring access (stale\n"
+        " * reads / clobbered RdOff). TCM is not cached, so SWD stays coherent with\n"
+        " * zero cache maintenance.\n"
+        " *\n"
+        " * Cacheless Cortex-M4 parts (Apollo3/4): no coherency hazard, so move the\n"
+        " * large staging buffers into shared SRAM (.sram_bss) to spare MCU_TCM. */\n"
         '#include "nsx_mem.h"\n'
-        "#if NSX_MEM__HAS_SRAM_BSS\n"
+        "#if defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510B) || \\\n"
+        "    defined(AM_PART_APOLLO5A)  || defined(AM_PART_APOLLO5B)  || \\\n"
+        "    defined(AM_PART_APOLLO510L) || defined(AM_PART_APOLLO330P)\n"
+        "  /* Non-cached TCM: leave SEGGER_RTT_SECTION undefined (default .bss). */\n"
+        "#elif NSX_MEM__HAS_SRAM_BSS\n"
         "  #ifndef SEGGER_RTT_SECTION\n"
         "    #define SEGGER_RTT_SECTION NSX_MEM__SEC_SRAM_BSS\n"
         "  #endif\n"

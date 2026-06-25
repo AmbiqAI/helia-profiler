@@ -47,7 +47,6 @@
 #define HPX_SWO_ATTACH_DELAY_US   (500U * 1000U)  // host SWO viewer attach grace
 #define HPX_USB_POLL_DELAY_US     (10U * 1000U)   // re-poll cadence while waiting for DTR
 #define HPX_USB_SETTLE_DELAY_US   (200U * 1000U)  // settle after host asserts DTR
-#define HPX_RTT_HOST_READY_TIMEOUT_MS 15000U
 
 {% if not allocate_arenas %}
 {% for region in arena_regions %}
@@ -334,13 +333,18 @@ int main(void) {
     // Flush the RTT control block metadata so J-Link can see the configured
     // buffer counts/flags before the host attaches on cached M55 targets.
     HPX_CLEAN_DCACHE();
+    // Lossless from boot: put the up-buffer in wait-for-space (blocking) mode
+    // so HPX_READY and the entire HPX_START header are captured no matter when
+    // the host attaches.  The firmware applies back-pressure (spins until the
+    // host drains) instead of waiting on a host->target down-channel command.
+    // That down-channel handshake is the fragile path that kept regressing
+    // across SEGGER / SDK updates (stale D-cache on the down-buffer descriptor),
+    // so we drop it entirely.  hpx_rtt_set_nonblocking() is restored before the
+    // timed inference window so mid-inference heartbeats stay droppable and
+    // never skew counts.
+    hpx_rtt_set_blocking();
     hpx_printf("HPX_READY\n");
     HPX_CLEAN_DCACHE();
-    if (!hpx_rtt_wait_for_command("HPX_HOST_READY", HPX_RTT_HOST_READY_TIMEOUT_MS)) {
-        hpx_printf("HPX_ERROR=rtt_host_ready_timeout\n");
-        HPX_CLEAN_DCACHE();
-        while (1) { __WFI(); }
-    }
 {% else %}
 
     // Delay to allow the host SWO viewer to attach after reset.
@@ -482,6 +486,11 @@ int main(void) {
     uint64_t profiled_infer_cycles = 0;
     uint32_t profiled_infer_count = 0;
 
+{% if transport == "rtt" %}
+    // Boot header was captured losslessly; restore droppable writes for the
+    // timed window so an in-flight heartbeat can never stall model_run().
+    hpx_rtt_set_nonblocking();
+{% endif %}
     // --- Multi-pass PMU profiling ---
 {% for pass in pmu_passes %}
     hpx_printf("\n--- HPX_PRESET {{ pass.name }} ---\n");
