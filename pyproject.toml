@@ -33,6 +33,12 @@ docs = [
     "zensical>=0.0.11",
 ]
 
+# TEMPORARY: track neuralspotx main to pick up SDK/board fixes ahead of a PyPI
+# release (e.g. apollo2/3 HAL_MCU_DIR fix #159). Revert to the PyPI version
+# constraint above before cutting a helia-profiler release.
+[tool.uv.sources]
+neuralspotx = { git = "ssh://git@github.com/AmbiqAI/neuralspotx.git", branch = "main" }
+
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
