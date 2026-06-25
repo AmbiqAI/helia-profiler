@@ -22,8 +22,13 @@
 #include <arm_mve.h>
 #endif
 {% if not has_armv8m_pmu %}
+// newlib (GCC/ATfE) syscall surface for the DWT-only retarget below.
+// Arm Compiler 6 (armclang) ships no <sys/types.h>/caddr_t and manages the
+// heap via its own runtime, so skip these newlib-only headers there.
+#ifndef NSX_TOOLCHAIN_ARMCLANG
 #include <cerrno>
 #include <sys/types.h>
+#endif
 {% endif %}
 
 #include "{{ engine_header }}"
@@ -54,6 +59,10 @@
 #define HPX_USB_SETTLE_DELAY_US   (200U * 1000U)  // settle after host asserts DTR
 
 {% if not has_armv8m_pmu %}
+// Weak newlib syscall retargets for the DWT-only (GCC/ATfE) path. armclang
+// supplies its own _sys_exit/heap management and lacks caddr_t, so these are
+// both unnecessary and uncompilable under Arm Compiler 6.
+#ifndef NSX_TOOLCHAIN_ARMCLANG
 extern "C" __attribute__((weak)) void _exit(int status) {
     (void)status;
     while (1) { __WFI(); }
@@ -64,6 +73,7 @@ extern "C" __attribute__((weak)) caddr_t _sbrk(int incr) {
     errno = ENOMEM;
     return (caddr_t)-1;
 }
+#endif
 {% endif %}
 
 {% include "_dwt_init.j2" %}
