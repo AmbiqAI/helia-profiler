@@ -34,6 +34,13 @@ log = logging.getLogger("hpx")
 #: Max time to keep retrying the host J-Link attach after reset.
 _ATTACH_TIMEOUT_S = 30
 
+#: Some Apollo boards occasionally need one extra reset/attach cycle before
+#: SWO traffic starts flowing after a fresh flash.
+_MAX_CAPTURE_ATTEMPTS = 2
+
+#: Poll SWO aggressively enough to keep up with Apollo ITM bursts.
+_SWO_POLL_INTERVAL_S = 0.001
+
 
 def capture_swo_output(
     *,
@@ -84,60 +91,70 @@ def capture_swo_output(
             hint="pip install pylink-square",
         ) from exc
 
-    # --- Step 1: reset the target BEFORE connecting pylink ---
-    # JLinkExe disconnects on exit so the SBL does not detect a debugger.
-    reset_target(device=jlink_device, jlink_serial=jlink_serial)
+    for attempt in range(1, _MAX_CAPTURE_ATTEMPTS + 1):
+        # --- Step 1: reset the target BEFORE connecting pylink ---
+        # JLinkExe disconnects on exit so the SBL does not detect a debugger.
+        reset_target(device=jlink_device, jlink_serial=jlink_serial)
 
-    # --- Step 2: small SBL settle floor, then retry the host attach ---
-    # The SBL bring-up is not observable from the host, so wait a short floor
-    # and then poll the attach (open_jlink_with_retry) instead of assuming the
-    # target is ready after one fixed sleep.
-    time.sleep(SBL_SETTLE_S)
+        # --- Step 2: small SBL settle floor, then retry the host attach ---
+        # The SBL bring-up is not observable from the host, so wait a short floor
+        # and then poll the attach (open_jlink_with_retry) instead of assuming the
+        # target is ready after one fixed sleep.
+        time.sleep(SBL_SETTLE_S)
 
-    # --- Step 3: connect pylink and enable SWO ---
-    jlink = pylink.JLink()
+        # --- Step 3: connect pylink and enable SWO ---
+        jlink = pylink.JLink()
 
-    try:
-        open_jlink_with_retry(
-            jlink,
-            device=jlink_device,
-            jlink_serial=jlink_serial,
-            timeout_s=_ATTACH_TIMEOUT_S,
-        )
-        log.info("pylink connected to %s for SWO capture", jlink_device)
-        resume_if_halted(jlink)
-
-        jlink.swo_enable(cpu_speed=cpu_freq, swo_speed=swo_freq, port_mask=0x01)
-        log.info("SWO enabled (cpu=%d Hz, swo=%d Hz)", cpu_freq, swo_freq)
-
-        lines = collect_lines(
-            lambda: bytes(jlink.swo_read_stimulus(0, 4096)),
-            transport_name="SWO",
-            timeout_s=timeout_s,
-            poll_interval_s=0.01,  # 10 ms — SWO has limited bandwidth
-            on_line=on_line,
-        )
-        finalize_timing()
-        return lines
-
-    except CaptureError:
-        raise
-    except pylink.errors.JLinkException as exc:
-        raise CaptureError(
-            f"J-Link SWO error: {exc}",
-            hint="Check J-Link probe connection and that the probe is not in use.",
-        ) from exc
-    except Exception as exc:
-        raise CaptureError(
-            f"SWO capture failed: {exc}",
-            hint="Check that the J-Link probe is connected and not in use.",
-        ) from exc
-    finally:
         try:
-            jlink.swo_stop()
-        except Exception:
-            pass
-        try:
-            jlink.close()
-        except Exception:
-            pass
+            open_jlink_with_retry(
+                jlink,
+                device=jlink_device,
+                jlink_serial=jlink_serial,
+                timeout_s=_ATTACH_TIMEOUT_S,
+            )
+            log.info("pylink connected to %s for SWO capture", jlink_device)
+            resume_if_halted(jlink)
+
+            jlink.swo_enable(cpu_speed=cpu_freq, swo_speed=swo_freq, port_mask=0x01)
+            log.info("SWO enabled (cpu=%d Hz, swo=%d Hz)", cpu_freq, swo_freq)
+
+            lines = collect_lines(
+                lambda: bytes(jlink.swo_read_stimulus(0, 4096)),
+                transport_name="SWO",
+                timeout_s=timeout_s,
+                poll_interval_s=_SWO_POLL_INTERVAL_S,
+                on_line=on_line,
+            )
+            if lines or attempt == _MAX_CAPTURE_ATTEMPTS:
+                finalize_timing()
+                return lines
+            log.warning(
+                "SWO attempt %d/%d captured no data; retrying with a fresh reset",
+                attempt,
+                _MAX_CAPTURE_ATTEMPTS,
+            )
+
+        except CaptureError:
+            raise
+        except pylink.errors.JLinkException as exc:
+            raise CaptureError(
+                f"J-Link SWO error: {exc}",
+                hint="Check J-Link probe connection and that the probe is not in use.",
+            ) from exc
+        except Exception as exc:
+            raise CaptureError(
+                f"SWO capture failed: {exc}",
+                hint="Check that the J-Link probe is connected and not in use.",
+            ) from exc
+        finally:
+            try:
+                jlink.swo_stop()
+            except Exception:
+                pass
+            try:
+                jlink.close()
+            except Exception:
+                pass
+
+    finalize_timing()
+    return []
