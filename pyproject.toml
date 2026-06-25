@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-aot = ["helia-aot>=0.15.0"]
+aot = ["helia-aot>=0.18.0"]
 analysis = ["ai-edge-litert>=1.0", "flatbuffers>=24.0"]
 # Kept for backward compatibility — pyjoulescope_driver is now a core dep.
 power = []

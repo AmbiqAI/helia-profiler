@@ -142,7 +142,7 @@ heliaAOT ships as a Python package (it runs at build-time), so version
 resolution is handled entirely by **pip** — there's no separate cache,
 download, or `dist_path` to manage.
 
-The profiler's `[aot]` extra requires `helia-aot>=0.15.0`, and the profiler
+The profiler's `[aot]` extra requires `helia-aot>=0.18.0`, and the profiler
 also enforces a runtime
 **minimum supported version** (`HELIAAOT_MIN_VERSION`) so any compatible
 override still has to clear the floor.
@@ -164,7 +164,7 @@ personal fork:
 
 ```bash
 pip install --upgrade \
-  'helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@v0.15.0'
+  'helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@v0.18.0'
 
 pip install --upgrade \
   'helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@feat/my-op'

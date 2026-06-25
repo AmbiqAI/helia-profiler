@@ -45,7 +45,7 @@ log = logging.getLogger("hpx")
 #
 #   1. Default       : pip install 'helia-profiler[aot]'
 #                      → installs the version pinned in pyproject.toml.
-#   2. Specific ver.  : pip install 'helia-aot>=0.15.0'
+#   2. Specific ver.  : pip install 'helia-aot>=0.18.0'
 #   3. Local checkout: pip install -e /path/to/helia-aot
 #
 # We don't manage downloads/caches like we do for heliaRT — pip already
@@ -53,7 +53,7 @@ log = logging.getLogger("hpx")
 # so a user with an older install gets a clear error instead of a confusing
 # build failure (e.g. missing ModuleType.nsx).
 # ---------------------------------------------------------------------------
-HELIAAOT_MIN_VERSION = "0.15.0"
+HELIAAOT_MIN_VERSION = "0.18.0"
 
 # Default AOT configuration
 _DEFAULT_PREFIX = "hpx"
