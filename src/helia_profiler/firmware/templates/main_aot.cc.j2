@@ -299,12 +299,14 @@ int main(void) {
     sys_cfg.perf_mode = {{ perf_mode_symbol }};  // {{ perf_mode_mhz }} MHz — target.clock.cpu
     sys_cfg.enable_cache = true;
     sys_cfg.enable_sram = true;
-    sys_cfg.debug.transport = {% if transport == "swo" %}NSX_DEBUG_ITM{% else %}NSX_DEBUG_NONE{% endif %};
+    sys_cfg.debug.transport = {% if transport == "swo" %}NSX_DEBUG_ITM{% elif transport == "uart" %}NSX_DEBUG_UART{% else %}NSX_DEBUG_NONE{% endif %};
     sys_cfg.skip_bsp_init = false;
     sys_cfg.spot_mgr_profile = true;
     NSX_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
 {% if transport == "swo" %}
     nsx_itm_printf_enable();
+{% elif transport == "uart" %}
+    nsx_uart_printf_enable();
 {% endif %}
     dwt_init();
     sync_gpio_init();

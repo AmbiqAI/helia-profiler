@@ -57,6 +57,7 @@ class Transport(StrEnum):
     RTT = "rtt"
     USB_CDC = "usb_cdc"
     SWO = "swo"
+    UART = "uart"
 
 
 @dataclass(frozen=True)

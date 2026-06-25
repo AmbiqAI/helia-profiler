@@ -284,7 +284,7 @@ def _check_host_tools(transport: str, toolchain: str) -> None:
         )
 
     # Transport-specific.
-    if transport in ("rtt", "swo", "usb_cdc"):
+    if transport in ("rtt", "swo", "usb_cdc", "uart"):
         required.append(
             ("JLinkExe", "SEGGER J-Link commander (https://www.segger.com/downloads/jlink/)"),
         )

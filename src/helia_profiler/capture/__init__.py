@@ -1,10 +1,12 @@
 """Data capture from target hardware.
 
-Supports three transports for reading profiling data from the target:
+Supports the following transports for reading profiling data from the target:
 
 - **RTT** (recommended): Lossless, flow-controlled via SEGGER RTT over SWD.
 - **USB CDC**: CRC-protected USB serial, requires USB connection.
 - **SWO**: ITM debug output, minimal setup but no flow control.
+- **UART**: Output over the J-Link OB virtual COM port; for boards without
+  a USB device stack (e.g. Apollo3). 115200 8N1, no flow control.
 
 - ``capture_pmu``: Read PMU / DWT counters and per-layer breakdown.
 - ``capture_power``: Record current/voltage traces via power driver.
@@ -94,10 +96,21 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     else:
         from .serial_reader import capture_swo_output
 
-        cpu_clock_mhz = ctx.run_metadata.platform.cpu_clock_mhz
-        cpu_freq_hz = cpu_clock_mhz * 1_000_000 if cpu_clock_mhz > 0 else 96_000_000
+        if transport == "uart":
+            from .uart_reader import capture_uart_output
 
-        lines = capture_swo_output(
+            lines = capture_uart_output(
+                jlink_serial=jlink_serial,
+                jlink_device=jlink_device,
+                timeout_s=overall_timeout_s,
+                heartbeat_timeout_s=heartbeat_timeout_s,
+                timing_out=timing_raw,
+            )
+        else:
+            cpu_clock_mhz = ctx.run_metadata.platform.cpu_clock_mhz
+            cpu_freq_hz = cpu_clock_mhz * 1_000_000 if cpu_clock_mhz > 0 else 96_000_000
+
+            lines = capture_swo_output(
             build_dir=build_dir,
             jlink_serial=jlink_serial,
             jlink_device=jlink_device,

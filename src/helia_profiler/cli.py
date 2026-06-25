@@ -118,7 +118,7 @@ def main(argv: list[str] | None = None) -> None:
     g_target.add_argument(
         "--transport",
         type=str,
-        choices=["rtt", "usb_cdc", "swo"],
+        choices=["rtt", "usb_cdc", "swo", "uart"],
         help="Data transport (default: rtt). RTT is recommended for lossless capture.",
     )
     g_target.add_argument(
