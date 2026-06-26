@@ -28,6 +28,7 @@ from serial.tools import list_ports
 
 from ..errors import CaptureError
 from ..jlink import reset_target
+from ..usb_identity import USB_MARKER_PREFIX
 from .readiness import attached_reset_session
 from .timing import READINESS_POLL_INTERVAL_S, USB_REENUM_FLOOR_S
 from .transport import DEFAULT_TIMEOUT_S, HPX_END, HPX_START, LINE_TIMEOUT_S
@@ -70,6 +71,36 @@ def _app_cdc_ports(ports: set[str] | None = None) -> list[str]:
     if ports is None:
         ports = _snapshot_cdc_ports()
     return sorted(port for port in ports if not _is_jlink_port(port))
+
+
+def _port_serial_number(port: str) -> str:
+    """Return the USB iSerialNumber descriptor for *port* (empty if unknown)."""
+    for info in list_ports.comports():
+        if info.device == port:
+            return info.serial_number or ""
+    return ""
+
+
+def _is_foreign_hpx_port(port: str, expected_marker: str | None) -> bool:
+    """Return True when *port* advertises a *different* hpx marker.
+
+    Every hpx-profiled board stamps ``HPX-<jlink_serial>`` into its CDC serial
+    descriptor, so a device carrying some *other* ``HPX-*`` marker is provably a
+    different board (e.g. another EVB still running its firmware).  Such a device
+    must never be used as a heuristic fallback for this target, otherwise the
+    capture opens the wrong board and blocks until the read timeout.
+    """
+    if not expected_marker:
+        return False
+    serial = _port_serial_number(port)
+    return serial.startswith(USB_MARKER_PREFIX) and serial != expected_marker
+
+
+def _drop_foreign_hpx_ports(
+    ports: list[str], expected_marker: str | None
+) -> list[str]:
+    """Drop ports that belong to a *different* hpx board from *ports*."""
+    return [p for p in ports if not _is_foreign_hpx_port(p, expected_marker)]
 
 
 def _find_port_by_marker(marker: str) -> str | None:
@@ -140,12 +171,17 @@ def _resolve_cdc_port(
             timeout_s,
         )
 
-    return _find_cdc_port(pre_existing=pre_existing, timeout_s=timeout_s if not marker else 0)
+    return _find_cdc_port(
+        pre_existing=pre_existing,
+        timeout_s=timeout_s if not marker else 0,
+        expected_marker=marker,
+    )
 
 
 def _find_cdc_port(
     pre_existing: set[str] | None = None,
     timeout_s: float = _ENUM_TIMEOUT_S,
+    expected_marker: str | None = None,
 ) -> str:
     """Wait for a non-J-Link USB CDC device and return its path.
 
@@ -154,13 +190,19 @@ def _find_cdc_port(
     expires the current non-J-Link devices are weighed: exactly one is used,
     more than one is rejected as ambiguous (the caller should rely on the
     firmware marker or pass an explicit ``--usb-port``), and none raises.
+
+    *expected_marker* (when known) drops any device advertising a *different*
+    ``HPX-*`` marker, so a stale CDC device from another attached board is never
+    mistaken for this target.
     """
     deadline = time.monotonic() + timeout_s
     if pre_existing is None:
         pre_existing = set()
 
     while time.monotonic() < deadline:
-        new_ports = _app_cdc_ports(_snapshot_cdc_ports() - pre_existing)
+        new_ports = _drop_foreign_hpx_ports(
+            _app_cdc_ports(_snapshot_cdc_ports() - pre_existing), expected_marker
+        )
         if len(new_ports) == 1:
             log.info("Found new USB CDC port: %s", new_ports[0])
             return new_ports[0]
@@ -168,8 +210,9 @@ def _find_cdc_port(
 
     # No single fresh device appeared — fall back to currently present
     # non-J-Link devices. Refuse to open SEGGER VCOM, which only causes a long
-    # timeout and hides the real enumeration failure.
-    candidates = _app_cdc_ports()
+    # timeout and hides the real enumeration failure.  Also refuse a CDC device
+    # that advertises a different board's hpx marker.
+    candidates = _drop_foreign_hpx_ports(_app_cdc_ports(), expected_marker)
     if len(candidates) == 1:
         log.warning(
             "No new USB CDC device appeared; using the only application CDC "
