@@ -319,6 +319,7 @@ def _render_module_registry(
     """
     project_overrides = dict(profile.get("project_overrides") or {})
     module_overrides = dict(profile.get("module_overrides") or {})
+    ref_overrides_by_project: dict[str, str] = {}
     for project, (mode, value) in project_ref_overrides.items():
         if mode != "ref":
             continue
@@ -327,6 +328,21 @@ def _render_module_registry(
             override = nsx_cli.registry_project(project) or {"name": project}
         override["revision"] = value
         project_overrides[project] = override
+        ref_overrides_by_project[project] = value
+    # Align per-module revisions with their owning project's ref override.
+    # The starter profile pins each migrated module's ``revision`` to ``main``;
+    # NSX's lock resolution honours that module-level pin over the project
+    # revision, so an un-aligned module would drag the whole SDK monorepo back
+    # to ``main``. Re-point every module owned by an overridden project.
+    if ref_overrides_by_project:
+        for name, override in list(module_overrides.items()):
+            if not isinstance(override, dict):
+                continue
+            project = override.get("project")
+            if project in ref_overrides_by_project:
+                aligned = dict(override)
+                aligned["revision"] = ref_overrides_by_project[project]
+                module_overrides[name] = aligned
     if not project_overrides and not module_overrides:
         return ""
     registry: dict[str, Any] = {}

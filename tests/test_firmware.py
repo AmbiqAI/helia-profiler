@@ -1117,6 +1117,32 @@ class TestNsxModuleOverrides:
         assert nsx_yml.count("ref: feat/new-soc") == sdk_module_count
         assert "project: neuralspotx\n  ref: main" in nsx_yml
 
+    def test_ref_override_aligns_module_registry_revisions(self, tmp_path: Path, fake_dist: Path):
+        # Regression: a project ref override must also re-point the per-module
+        # `module_registry.modules.<name>.revision` entries. The starter profile
+        # pins those to `main`; NSX's lock resolution honours the module-level
+        # revision over the project revision, so a stale `main` here drags the
+        # whole SDK monorepo back to `main` (and vendors the wrong commit).
+        ctx = self._make_ctx_with_overrides(
+            tmp_path,
+            fake_dist,
+            {"nsx_modules": {"nsx-core": {"ref": "feat/new-soc"}}},
+        )
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        registry = yaml.safe_load((app_dir / "nsx.yml").read_text())["module_registry"]
+        assert registry["projects"]["nsx-ambiq-sdk"]["revision"] == "feat/new-soc"
+        sdk_modules = {
+            name
+            for name, entry in registry["modules"].items()
+            if entry.get("project") == "nsx-ambiq-sdk"
+        }
+        assert sdk_modules, "expected nsx-ambiq-sdk modules in the registry"
+        for name in sdk_modules:
+            assert registry["modules"][name]["revision"] == "feat/new-soc", name
+
     def test_module_registry_emitted_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         # The generated manifest must carry the profile's module_registry so the
         # app's effective registry agrees with the per-module project pins and a
