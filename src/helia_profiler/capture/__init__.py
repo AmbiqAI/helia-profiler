@@ -53,6 +53,12 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         )
     jlink_device = ctx.soc.jlink_device
 
+    # Apollo4 gates DWT->CYCCNT behind the debug power domain, which only stays
+    # powered while a debugger is attached.  UART/USB normally release the probe
+    # after reset, so on those SoCs the readers must hold a pylink session open
+    # for the whole capture or every per-layer cycle reads back 0.
+    keep_debugger_attached = ctx.soc.requires_attached_probe_for_cycles
+
     # Use build_dir from context (set by stage 4) — no re-derivation
     build_dir = ctx.build_dir
     timing_raw: dict[str, float] = {}
@@ -65,6 +71,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
             jlink_device=jlink_device,
             usb_port=ctx.config.target.usb_port,
             usb_marker=usb_marker_serial(jlink_serial),
+            keep_attached=keep_debugger_attached,
             timing_out=timing_raw,
         )
     elif transport == "rtt":
@@ -104,6 +111,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
                 jlink_device=jlink_device,
                 timeout_s=overall_timeout_s,
                 heartbeat_timeout_s=heartbeat_timeout_s,
+                keep_attached=keep_debugger_attached,
                 timing_out=timing_raw,
             )
         else:

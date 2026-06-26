@@ -148,6 +148,22 @@ class SocDef:
         return True
 
     @property
+    def requires_attached_probe_for_cycles(self) -> bool:
+        """Whether DWT cycle counts require a debugger attached during capture.
+
+        On Apollo4 (Cortex-M4) the ``DWT->CYCCNT`` counter lives in the core
+        debug power domain, which stays powered only while a debugger asserts
+        the DAP's ``CDBGPWRUPREQ`` — a signal firmware cannot set from the core.
+        The SWO/RTT readers keep a debugger attached incidentally, but the
+        UART/USB readers release the probe, so per-layer cycles read back as 0.
+        When this is True those readers must hold a pylink session open for the
+        whole capture (see ``attached_reset_session``).  AP3/AP5 do not gate the
+        domain this way and the AP5 secure bootloader prefers the probe
+        released, so they stay False.
+        """
+        return self.family is SocFamily.AP4
+
+    @property
     def profiling_backends(self) -> tuple[str, ...]:
         """Concrete profiling backends available on this SoC.
 

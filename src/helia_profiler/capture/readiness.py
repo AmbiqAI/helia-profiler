@@ -16,12 +16,13 @@ a deadline elapses**, never sleep blindly hoping the target caught up.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING
 
-from .timing import READINESS_POLL_INTERVAL_S
+from .timing import READINESS_POLL_INTERVAL_S, SBL_SETTLE_S
 
 log = logging.getLogger("hpx")
 
@@ -149,3 +150,60 @@ def open_jlink_with_retry(
                     hint="Check target power and that the probe is not in use.",
                 ) from last_exc
             time.sleep(interval_s)
+
+
+@contextlib.contextmanager
+def attached_reset_session(
+    *,
+    device: str,
+    jlink_serial: str | None = None,
+    attach_timeout_s: float = 30.0,
+    settle_s: float = SBL_SETTLE_S,
+) -> Iterator["pylink.JLink"]:
+    """Reset the target and hold a pylink debugger ATTACHED for the whole capture.
+
+    Why this exists
+    ---------------
+    On Apollo4 (Cortex-M4) the ``DWT->CYCCNT`` cycle counter the profiler reads
+    for per-layer CPU cycles lives in the core **debug power domain**.  That
+    domain is powered only while a debugger asserts the Debug Access Port's
+    ``CDBGPWRUPREQ`` signal — which is *not* memory-mapped and therefore cannot
+    be set by firmware running on the core (verified: enabling the Ambiq debug
+    peripheral domain, the CM4 debug clock, and the DCU trace/perf gate from
+    firmware all fail to keep it alive).  When the plain UART/USB readers reset
+    with ``reset_target`` (JLinkExe, which releases the probe on exit), that
+    domain powers down and every per-layer cycle reads back as 0.
+
+    The SWO and RTT readers never hit this because they re-attach via pylink and
+    keep the session open for the whole capture.  This context manager gives the
+    UART/USB readers the same property: it attaches via pylink, performs the
+    reset+go itself, and holds the session open until the caller is done
+    reading, so the debug domain stays powered for the entire timed inference.
+    (Empirically verified on silicon: detaching mid-inference freezes the
+    counter on the very next layer.)
+
+    Scope this to the SoCs that actually need it (Apollo4 — see
+    ``SocDef.requires_attached_probe_for_cycles``).  AP3/AP5 do not gate the
+    debug domain this way, and the AP5 secure bootloader prefers the probe
+    released, so they keep using ``reset_target``.
+    """
+    import pylink
+
+    jlink = pylink.JLink()
+    open_jlink_with_retry(
+        jlink, device=device, jlink_serial=jlink_serial, timeout_s=attach_timeout_s
+    )
+    try:
+        # Reset+go through the attached session so the debug power domain is held
+        # up (CDBGPWRUPREQ asserted) for the entire capture window.
+        jlink.reset(halt=True)
+        jlink.restart()
+        if settle_s > 0:
+            time.sleep(settle_s)
+        log.info("Holding J-Link attached during capture (debug domain kept powered)")
+        yield jlink
+    finally:
+        try:
+            jlink.close()
+        except Exception:  # noqa: BLE001 — close errors are non-fatal
+            pass

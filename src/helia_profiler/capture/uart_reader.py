@@ -32,6 +32,7 @@ from serial.tools import list_ports
 
 from ..errors import CaptureError
 from ..jlink import reset_target
+from .readiness import attached_reset_session
 from .transport import (
     DEFAULT_TIMEOUT_S,
     HEARTBEAT_TIMEOUT_S,
@@ -117,6 +118,7 @@ def capture_uart_output(
     jlink_device: str,
     timeout_s: float | None = DEFAULT_TIMEOUT_S,
     heartbeat_timeout_s: float = HEARTBEAT_TIMEOUT_S,
+    keep_attached: bool = False,
     timing_out: dict[str, float] | None = None,
 ) -> list[str]:
     """Capture firmware output via the J-Link OB VCOM UART.
@@ -126,6 +128,11 @@ def capture_uart_output(
         jlink_device: J-Link device string for the reset command.
         timeout_s: Absolute capture ceiling (``None`` = unbounded).
         heartbeat_timeout_s: Max gap between received lines before giving up.
+        keep_attached: Hold a pylink debugger attached for the whole capture
+            (reset+go via pylink) instead of releasing the probe.  Required on
+            SoCs that gate the DWT cycle counter behind the debug power domain
+            (Apollo4) or per-layer cycles read back as 0.  See
+            :func:`~helia_profiler.capture.readiness.attached_reset_session`.
         timing_out: Optional dict populated with capture-timing telemetry.
 
     Returns:
@@ -150,22 +157,34 @@ def capture_uart_output(
         ser = serial.Serial(port=port, baudrate=_BAUD, timeout=0)
         ser.reset_input_buffer()
 
-        # Reset the target only after the VCOM is open so the firmware's
-        # boot-time attach delay cannot outrun the host.
-        reset_target(device=jlink_device, jlink_serial=jlink_serial)
-        ser.reset_input_buffer()
-
         def read_fn() -> bytes:
             waiting = ser.in_waiting
             return ser.read(waiting if waiting else _READ_CHUNK)
 
-        lines = collect_lines(
-            read_fn,
-            transport_name="UART",
-            overall_timeout_s=timeout_s,
-            heartbeat_timeout_s=heartbeat_timeout_s,
-            on_line=on_line,
-        )
+        def _collect() -> list[str]:
+            ser.reset_input_buffer()
+            return collect_lines(
+                read_fn,
+                transport_name="UART",
+                overall_timeout_s=timeout_s,
+                heartbeat_timeout_s=heartbeat_timeout_s,
+                on_line=on_line,
+            )
+
+        # Reset the target only after the VCOM is open so the firmware's
+        # boot-time attach delay cannot outrun the host.
+        if keep_attached:
+            # Apollo4 gates DWT->CYCCNT behind the debug power domain, which only
+            # stays powered while a debugger is attached.  Hold a pylink session
+            # open across the capture instead of releasing the probe, or every
+            # per-layer cycle reads back 0.
+            with attached_reset_session(
+                device=jlink_device, jlink_serial=jlink_serial
+            ):
+                lines = _collect()
+        else:
+            reset_target(device=jlink_device, jlink_serial=jlink_serial)
+            lines = _collect()
     except CaptureError:
         raise
     except serial.SerialException as exc:

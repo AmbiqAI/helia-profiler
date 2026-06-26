@@ -152,3 +152,22 @@ The report automatically computes derived metrics from raw counters:
 On Cortex-M4 targets (AP3, AP4), only the cycle counter is available. The
 profiler warns you and captures cycle counts only — PMU counter selections are
 silently ignored.
+
+### Apollo4: the debugger must stay attached
+
+On Apollo4 (Cortex-M4) the `DWT->CYCCNT` cycle counter lives in the core
+**debug power domain**. That domain is powered only while a debugger asserts
+the Debug Access Port's `CDBGPWRUPREQ` signal — which is *not* memory-mapped
+and therefore cannot be set by firmware running on the core. If the host
+releases the J-Link probe after reset, the domain powers down mid-run and every
+per-layer cycle count reads back as **0**.
+
+The RTT and SWO transports already hold a debugger attached for the whole
+capture, so they are unaffected. For the UART and USB transports heliaPROFILER
+detects Apollo4 automatically and keeps a `pylink` session attached for the
+entire capture (reset and go are driven through that session), so per-layer
+cycles are captured correctly. No configuration is required.
+
+Other families (AP3, AP5) do not gate the debug domain this way — and the AP5
+secure bootloader prefers the probe released — so they keep releasing the probe
+after reset as before.

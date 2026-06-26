@@ -18,6 +18,7 @@ Sequence:
 
 from __future__ import annotations
 
+import contextlib
 import glob
 import logging
 import time
@@ -27,6 +28,7 @@ from serial.tools import list_ports
 
 from ..errors import CaptureError
 from ..jlink import reset_target
+from .readiness import attached_reset_session
 from .timing import READINESS_POLL_INTERVAL_S, USB_REENUM_FLOOR_S
 from .transport import DEFAULT_TIMEOUT_S, HPX_END, HPX_START, LINE_TIMEOUT_S
 
@@ -205,6 +207,7 @@ def capture_usb_output(
     timeout_s: float = DEFAULT_TIMEOUT_S,
     usb_port: str | None = None,
     usb_marker: str | None = None,
+    keep_attached: bool = False,
     timing_out: dict[str, float] | None = None,
 ) -> list[str]:
     """Capture firmware output via USB CDC until HPX_END or timeout.
@@ -212,6 +215,12 @@ def capture_usb_output(
     USB CDC provides CRC-protected, flow-controlled delivery.  The
     firmware waits for DTR assertion before printing, so there is no
     fixed startup delay.
+
+    When *keep_attached* is set, a pylink debugger session is held open for the
+    whole capture (reset+go through pylink) instead of releasing the probe.
+    This is required on SoCs that gate the DWT cycle counter behind the debug
+    power domain (Apollo4) — see
+    :func:`~helia_profiler.capture.readiness.attached_reset_session`.
 
     Returns:
         List of captured text lines.
@@ -234,27 +243,39 @@ def capture_usb_output(
     log.info("Pre-existing CDC ports: %s", sorted(pre_existing) or "(none)")
 
     # --- Step 1: reset the target ---
-    reset_target(device=jlink_device, jlink_serial=jlink_serial)
-
-    # --- Step 2: locate the target's USB CDC port ---
-    # An explicit --usb-port always wins.  Otherwise prefer the unique USB
-    # serial-number marker that hpx stamped into this build's descriptor: it
-    # identifies *this* board unambiguously even when several Ambiq boards are
-    # attached.  Fall back to host heuristics only when no marker is available
-    # or it never enumerates.
-    if usb_port is not None:
-        port = usb_port
-        log.info("Using pinned USB CDC port: %s", port)
-        time.sleep(USB_REENUM_FLOOR_S)
-    else:
-        port = _resolve_cdc_port(marker=usb_marker, pre_existing=pre_existing)
-
-    # --- Step 3: open port with DTR ---
-    log.info("Opening USB CDC port: %s", port)
     ser: serial.Serial | None = None
     lines: list[str] = []
+    # On SoCs that gate the DWT cycle counter behind the debug power domain
+    # (Apollo4), a debugger must stay attached for the whole capture or every
+    # per-layer cycle reads back 0.  Hold the pylink session open across reset,
+    # re-enumeration, and the read; it is released in the finally block.
+    reset_stack = contextlib.ExitStack()
 
     try:
+        if keep_attached:
+            reset_stack.enter_context(
+                attached_reset_session(
+                    device=jlink_device, jlink_serial=jlink_serial
+                )
+            )
+        else:
+            reset_target(device=jlink_device, jlink_serial=jlink_serial)
+
+        # --- Step 2: locate the target's USB CDC port ---
+        # An explicit --usb-port always wins.  Otherwise prefer the unique USB
+        # serial-number marker that hpx stamped into this build's descriptor: it
+        # identifies *this* board unambiguously even when several Ambiq boards
+        # are attached.  Fall back to host heuristics only when no marker is
+        # available or it never enumerates.
+        if usb_port is not None:
+            port = usb_port
+            log.info("Using pinned USB CDC port: %s", port)
+            time.sleep(USB_REENUM_FLOOR_S)
+        else:
+            port = _resolve_cdc_port(marker=usb_marker, pre_existing=pre_existing)
+
+        # --- Step 3: open port with DTR ---
+        log.info("Opening USB CDC port: %s", port)
         ser = serial.Serial(
             port=port,
             baudrate=_BAUD,
@@ -316,6 +337,7 @@ def capture_usb_output(
     finally:
         if ser is not None and ser.is_open:
             ser.close()
+        reset_stack.close()
 
     log.warning(
         "USB CDC capture timed out after %.0fs (%d lines captured)",
