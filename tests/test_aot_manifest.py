@@ -10,10 +10,25 @@ from typing import Any
 
 from helia_profiler.engines.helia_aot import (
     _arena_region_id_lookup,
+    _BOARD_TO_AOT_PLATFORM,
     _extract_operator_manifest,
     _tensor_metadata,
 )
 from helia_profiler.report import _write_aot_manifest, _write_aot_memory_layers
+
+
+def test_apollo4_board_variants_map_to_aot_platform():
+    # heliaAOT registers exact platforms for the Apollo4 blue/L variants; hpx
+    # must map each profiler board to its heliaAOT platform or AOT profiling
+    # fails with "No heliaAOT platform mapping for board".
+    for board in (
+        "apollo4p_evb",
+        "apollo4p_blue_kbr_evb",
+        "apollo4p_blue_kxr_evb",
+        "apollo4l_evb",
+        "apollo4l_blue_evb",
+    ):
+        assert _BOARD_TO_AOT_PLATFORM.get(board) == board
 
 
 # ---------- fake AotOperator surface -----------------------------------------

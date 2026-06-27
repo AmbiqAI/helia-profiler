@@ -78,6 +78,10 @@ _jinja_env = jinja2.Environment(
 _BOARD_TO_AOT_PLATFORM: dict[str, str] = {
     "apollo3p_evb": "apollo3p_evb",
     "apollo4p_evb": "apollo4p_evb",
+    "apollo4p_blue_kbr_evb": "apollo4p_blue_kbr_evb",
+    "apollo4p_blue_kxr_evb": "apollo4p_blue_kxr_evb",
+    "apollo4l_evb": "apollo4l_evb",
+    "apollo4l_blue_evb": "apollo4l_blue_evb",
     "apollo510_evb": "apollo510_evb",
     "apollo510b_evb": "apollo510_evb",  # same SoC family / memory layout
     "apollo5b_evb": "apollo510_evb",
