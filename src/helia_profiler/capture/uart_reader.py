@@ -174,9 +174,10 @@ def capture_uart_output(
         # Reset the target only after the VCOM is open so the firmware's
         # boot-time attach delay cannot outrun the host.
         if keep_attached:
-            # Apollo4 gates DWT->CYCCNT behind the debug power domain, which only
-            # stays powered while a debugger is attached.  Hold a pylink session
-            # open across the capture instead of releasing the probe, or every
+            # The Cortex-M4F families (Apollo3/3P and Apollo4/4P) gate
+            # DWT->CYCCNT behind the debug power domain, which only stays
+            # powered while a debugger is attached.  Hold a pylink session open
+            # across the capture instead of releasing the probe, or every
             # per-layer cycle reads back 0.
             with attached_reset_session(
                 device=jlink_device, jlink_serial=jlink_serial

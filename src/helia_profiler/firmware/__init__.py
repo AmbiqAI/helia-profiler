@@ -1078,6 +1078,8 @@ def generate_app(ctx: PipelineContext) -> Path:
                 aot_op_manifest=ctx.engine_artifacts.aot_op_manifest or [],
                 iterations=config.profiling.iterations,
                 warmup=config.profiling.warmup,
+                clean_warmup=max(1, config.profiling.warmup),
+                clean_iters=max(1, config.profiling.iterations),
                 pmu_passes=pmu_passes,
                 pmu_pass_names=[p["name"] for p in pmu_passes],
                 power_sync_enabled=power_sync_enabled,

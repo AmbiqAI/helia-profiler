@@ -164,8 +164,9 @@ def attached_reset_session(
 
     Why this exists
     ---------------
-    On Apollo4 (Cortex-M4) the ``DWT->CYCCNT`` cycle counter the profiler reads
-    for per-layer CPU cycles lives in the core **debug power domain**.  That
+    On the Cortex-M4F families (Apollo3/3P and Apollo4/4P) the ``DWT->CYCCNT``
+    cycle counter the profiler reads for per-layer CPU cycles lives in the core
+    **debug power domain**.  That
     domain is powered only while a debugger asserts the Debug Access Port's
     ``CDBGPWRUPREQ`` signal — which is *not* memory-mapped and therefore cannot
     be set by firmware running on the core (verified: enabling the Ambiq debug
@@ -182,10 +183,10 @@ def attached_reset_session(
     (Empirically verified on silicon: detaching mid-inference freezes the
     counter on the very next layer.)
 
-    Scope this to the SoCs that actually need it (Apollo4 — see
-    ``SocDef.requires_attached_probe_for_cycles``).  AP3/AP5 do not gate the
-    debug domain this way, and the AP5 secure bootloader prefers the probe
-    released, so they keep using ``reset_target``.
+    Scope this to the SoCs that actually need it (Apollo3/3P and Apollo4/4P —
+    see ``SocDef.requires_attached_probe_for_cycles``).  AP5 does not gate the
+    debug domain this way (it uses the Armv8-M PMU), and its secure bootloader
+    prefers the probe released, so it keeps using ``reset_target``.
     """
     import pylink
 

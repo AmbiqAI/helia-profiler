@@ -1,10 +1,12 @@
 """Resolve the SEGGER RTT control block address from build artifacts.
 
-The firmware pins its RTT control block (``_SEGGER_RTT``) into ``.sram_bss``
-via ``SEGGER_RTT_SECTION`` (see ``firmware/__init__.py``), so its link address
-is deterministic for a given build.  Recovering that address lets the host
-capture path attach directly with ``rtt_start(block_address=...)`` and skip the
-slow SWD memory sweep that discovery would otherwise need.
+The firmware pins its RTT control block (``_SEGGER_RTT``) into a fixed section
+chosen per cache family (see ``firmware/__init__.py``): non-cached TCM
+(default ``.bss``) on the cache-coherent Cortex-M55 parts, and ``.sram_bss``
+(SHARED_SRAM) on the cacheless Cortex-M4 parts.  Either way its link address is
+deterministic for a given build.  Recovering that address lets the host capture
+path attach directly with ``rtt_start(block_address=...)`` and skip the slow
+SWD memory sweep that discovery would otherwise need.
 
 Resolution is best-effort: every helper returns ``None`` on any failure so the
 caller transparently falls back to scanning.

@@ -53,10 +53,11 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         )
     jlink_device = ctx.soc.jlink_device
 
-    # Apollo4 gates DWT->CYCCNT behind the debug power domain, which only stays
-    # powered while a debugger is attached.  UART/USB normally release the probe
-    # after reset, so on those SoCs the readers must hold a pylink session open
-    # for the whole capture or every per-layer cycle reads back 0.
+    # The Cortex-M4F families (Apollo3/3P and Apollo4/4P) gate DWT->CYCCNT
+    # behind the debug power domain, which only stays powered while a debugger
+    # is attached.  UART/USB normally release the probe after reset, so on those
+    # SoCs the readers must hold a pylink session open for the whole capture or
+    # every per-layer cycle reads back 0.
     keep_debugger_attached = ctx.soc.requires_attached_probe_for_cycles
 
     # Use build_dir from context (set by stage 4) — no re-derivation
@@ -172,7 +173,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
             _truncation_hint(str(transport)),
         )
 
-    result = parse_firmware_output(lines)
+    result = parse_firmware_output(lines, aggregation=ctx.config.profiling.aggregation)
     if not result.layers:
         # We saw HPX_START (checked above) but parsed zero layers.  Either the
         # CSV stream was lost in transit (lossy transport / undersized buffer)
@@ -195,10 +196,18 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     if timing_raw:
         from ..results import TimingInfo
 
+        # Collect the attributed boot/attach phase breakdown (RTT records
+        # reset / sbl_settle / attach / control_block_scan / line_collection).
+        phases = {
+            key[len("rtt_phase_"): -len("_s")]: round(value, 6)
+            for key, value in timing_raw.items()
+            if key.startswith("rtt_phase_") and key.endswith("_s")
+        }
         ctx.run_metadata.timing = TimingInfo(
             capture_duration_s=timing_raw.get("capture_duration_s"),
             hpx_start_latency_s=timing_raw.get("hpx_start_latency_s"),
             protocol_duration_s=timing_raw.get("protocol_duration_s"),
+            phases=phases or None,
         )
 
     return result

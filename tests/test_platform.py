@@ -66,12 +66,14 @@ def test_apollo510_family_uses_shared_cmsis_header():
 
 
 def test_apollo510_family_uses_ap5_rtt_scan_window():
-    # AP5 RTT lives in .sram_bss → SHARED_SRAM (base 0x20080000); the scan
-    # window is the first 1 MB of SHARED_SRAM, not the full 2 MB from the TCM
-    # base, so discovery does not sweep ~557 KB of TCM first.
-    assert get_soc("apollo510").rtt_scan_ranges == ((0x20080000, 0x100000),)
-    assert get_soc("apollo510b").rtt_scan_ranges == ((0x20080000, 0x100000),)
-    assert get_soc("apollo5b").rtt_scan_ranges == ((0x20080000, 0x100000),)
+    # On the cache-coherent M55 parts RTT is pinned to non-cached TCM (.bss),
+    # not .sram_bss/SHARED_SRAM. DTCM is based at 0x20000000 (512 KB), so the
+    # fallback scan window covers that region (the known-address nm/map path is
+    # the primary route and skips scanning entirely).
+    assert get_soc("apollo510").rtt_scan_ranges == ((0x20000000, 0x80000),)
+    assert get_soc("apollo510b").rtt_scan_ranges == ((0x20000000, 0x80000),)
+    assert get_soc("apollo5b").rtt_scan_ranges == ((0x20000000, 0x80000),)
+    assert get_soc("apollo330P").rtt_scan_ranges == ((0x20000000, 0x80000),)
 
 
 def test_cortex_m4_socs_use_ap3_ap4_rtt_scan_window():

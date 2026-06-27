@@ -217,6 +217,9 @@ def test_capture_pmu_passes_soc_rtt_scan_ranges(tmp_path: Path, monkeypatch):
             timing_out["capture_duration_s"] = 1.25
             timing_out["hpx_start_latency_s"] = 0.2
             timing_out["protocol_duration_s"] = 0.75
+            timing_out["rtt_phase_reset_s"] = 0.05
+            timing_out["rtt_phase_sbl_settle_s"] = 0.2
+            timing_out["rtt_phase_attach_s"] = 0.1
         return ["--- HPX_START ---", "--- HPX_PRESET basic_cpu ---", "--- HPX_ITER 0 ---", "Layer,Op,ARM_PMU_CPU_CYCLES", "0,CONV_2D,1", "--- HPX_END ---"]
 
     monkeypatch.setattr("helia_profiler.capture.rtt_reader.capture_rtt_output", fake_capture_rtt_output)
@@ -230,6 +233,11 @@ def test_capture_pmu_passes_soc_rtt_scan_ranges(tmp_path: Path, monkeypatch):
     assert ctx.run_metadata.timing.capture_duration_s == 1.25
     assert ctx.run_metadata.timing.hpx_start_latency_s == 0.2
     assert ctx.run_metadata.timing.protocol_duration_s == 0.75
+    assert ctx.run_metadata.timing.phases == {
+        "reset": 0.05,
+        "sbl_settle": 0.2,
+        "attach": 0.1,
+    }
 
 
 def test_capture_pmu_passes_known_block_address_from_map(tmp_path: Path, monkeypatch):

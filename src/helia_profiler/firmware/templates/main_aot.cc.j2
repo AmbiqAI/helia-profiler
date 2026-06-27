@@ -451,8 +451,7 @@ int main(void) {
         psram_cfg.enable_xip = true;
         if (nsx_psram_init(&psram_cfg) != 0) {
             hpx_printf("HPX_ERROR=psram_init_failed\n");
-            HPX_CLEAN_DCACHE();
-            while (1) { __WFI(); }
+            hpx_park();
         }
         // Stack PSRAM-placed arenas at successive 64-byte aligned offsets.
         uint32_t psram_off = 0;
@@ -480,7 +479,7 @@ int main(void) {
         if (bind_status != 0) {
             hpx_printf("HPX_ERROR=bind_arena_failed:%d:region=%d\n",
                        (int)bind_status, {{ region.region_id }});
-            while (1) { __WFI(); }
+            hpx_park();
         }
 {% endfor %}
     }
@@ -506,7 +505,7 @@ int main(void) {
     int32_t aot_status = {{ aot_prefix }}_model_init(&{{ aot_prefix }}_model_ctx);
     if (aot_status != 0) {
         hpx_printf("HPX_ERROR=model_init_failed:%ld\n", (long)aot_status);
-        while (1) { __WFI(); }
+        hpx_park();
     }
     hpx_printf("HPX_HEARTBEAT phase=model_init_done\n");
 
@@ -533,6 +532,64 @@ int main(void) {
     // Target-side profiled inference timing (excludes CSV/transport output).
     uint64_t profiled_infer_cycles = 0;
     uint32_t profiled_infer_count = 0;
+
+    // --- Clean end-to-end inference timing (no per-layer instrumentation) ---
+    // The per-layer PMU passes below bracket every op (the model operator
+    // callback resets/reads PMU counters), which perturbs caches/pipeline and
+    // adds overhead the sum-of-layers cannot see.  To report the most
+    // representative whole-model latency, run a warmed, UNinstrumented timing
+    // pass FIRST: prime caches with warmup iterations, then DWT-time clean
+    // model_run()s with the profiler disabled.  Emitted as HPX_CLEAN_INFER_* —
+    // these never replace the per-layer numbers, they sit alongside them for
+    // comparison.
+    //
+    // This pass is also the canonical window for external power measurement:
+    // it is the only inference loop free of instrumentation/transport overhead,
+    // so the GPIO sync brackets it (not the instrumented passes below).  When
+    // power sync is disabled, sync_gpio_high/low compile to no-ops.
+    {
+        g_profiler_enabled = false;
+        // Warm caches / branch predictor / MRAM prefetch (uninstrumented).
+        for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
+            for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
+                memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
+                       {{ aot_prefix }}_model_ctx.inputs[i].size);
+            }
+            {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
+        }
+        hpx_printf("HPX_HEARTBEAT phase=clean_warmup_done\n");
+        uint64_t clean_cycles = 0;
+        uint32_t clean_count = 0;
+        sync_gpio_high();
+        for (int iter = 0; iter < {{ clean_iters | default(1) }}; iter++) {
+            for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
+                memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
+                       {{ aot_prefix }}_model_ctx.inputs[i].size);
+            }
+            uint32_t t0 = DWT->CYCCNT;
+            {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
+            clean_cycles += (uint32_t)(DWT->CYCCNT - t0);
+            clean_count++;
+        }
+        sync_gpio_low();
+        if (clean_count > 0) {
+            const uint32_t clean_avg_cycles =
+                (uint32_t)((clean_cycles + (clean_count / 2U)) / clean_count);
+            hpx_printf("HPX_CLEAN_INFER_COUNT=%lu\n", (unsigned long)clean_count);
+            hpx_printf("HPX_CLEAN_INFER_TOTAL_CYCLES=%llu\n",
+                       (unsigned long long)clean_cycles);
+            hpx_printf("HPX_CLEAN_INFER_AVG_CYCLES=%lu\n",
+                       (unsigned long)clean_avg_cycles);
+            if (SystemCoreClock > 0U) {
+                const uint32_t clean_avg_us = (uint32_t)(
+                    ((uint64_t)clean_avg_cycles * 1000000ULL +
+                     ((uint64_t)SystemCoreClock / 2ULL)) /
+                    (uint64_t)SystemCoreClock);
+                hpx_printf("HPX_CLEAN_INFER_AVG_US=%lu\n",
+                           (unsigned long)clean_avg_us);
+            }
+        }
+    }
 
 {% if transport == "rtt" %}
     // Boot header was captured losslessly; restore droppable writes for the
@@ -576,7 +633,8 @@ int main(void) {
     }
     hpx_printf("HPX_HEARTBEAT phase=warmup_done pass={{ loop.index0 }}\n");
 
-    // Profiled iterations — GPIO sync brackets each inference
+    // Profiled iterations — per-layer PMU instrumentation (no GPIO sync; the
+    // clean pass above owns the external-power window).
     g_profiler_enabled = true;
     for (int iter = 0; iter < {{ iterations }}; iter++) {
         for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
@@ -589,12 +647,10 @@ int main(void) {
         g_hb_last_cyc = DWT->CYCCNT;
         g_hb_ops_since = 0;
 
-        sync_gpio_high();
         uint32_t infer_start_cyc = DWT->CYCCNT;
         {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
         profiled_infer_cycles += (uint32_t)(DWT->CYCCNT - infer_start_cyc);
         profiled_infer_count++;
-        sync_gpio_low();
 
 {% if transport == "usb_cdc" %}
         usb_timer_resume();
@@ -646,6 +702,6 @@ int main(void) {
     HPX_CLEAN_DCACHE();
     hpx_rtt_drain(500 /* ms */);
 {% endif %}
-    while (1) { __WFI(); }
+    hpx_park();
     return 0;
 }

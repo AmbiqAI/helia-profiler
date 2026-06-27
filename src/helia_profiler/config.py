@@ -86,6 +86,12 @@ DEFAULT_BOARD = "apollo510_evb"
 DEFAULT_TOOLCHAIN = Toolchain.ARM_NONE_EABI_GCC
 DEFAULT_ITERATIONS = 100
 DEFAULT_WARMUP = 5
+# Per-iteration aggregation estimator for per-layer counters.  ``median`` is
+# the default because it rejects the occasional corrupted iteration (e.g. an
+# Apollo4 DWT->CYCCNT uint32 wrap or a frozen-zero read while the host probe is
+# still settling) that a plain mean would smear across the whole layer.
+DEFAULT_AGGREGATION = "median"
+AGGREGATION_METHODS = ("mean", "median", "trimmed")
 DEFAULT_PMU_PRESETS = ("basic_cpu",)
 DEFAULT_POWER_DURATION_S = 30
 DEFAULT_IO_VOLTAGE = 1.8
@@ -273,12 +279,24 @@ class ProfilingConfig:
     per_layer: bool = True
     iterations: int = DEFAULT_ITERATIONS
     warmup: int = DEFAULT_WARMUP
+    # How per-layer counters are aggregated across profiled iterations:
+    # ``mean`` (arithmetic mean), ``median`` (robust default), or ``trimmed``
+    # (drop the high/low extremes, then mean).  All methods first reject
+    # structurally-invalid samples (uint32-wrap / frozen-zero) and log them.
+    aggregation: str = DEFAULT_AGGREGATION
     # Extreme benchmarking mode: power down memory regions the model does not
     # use to lower the energy floor.  Currently powers down SSRAM (3 MB) and
     # collapses MRAM to a single bank (NVM0 only).  Only safe when the model
     # weights and arena both live in TCM. Code keeps running from MRAM, so
     # transports (RTT/USB/SWO) and printf remain available throughout the run.
     extreme_mode: bool = False
+
+    def __post_init__(self) -> None:
+        if self.aggregation not in AGGREGATION_METHODS:
+            raise ValueError(
+                f"Invalid aggregation '{self.aggregation}'. "
+                f"Choose one of: {', '.join(AGGREGATION_METHODS)}."
+            )
 
 
 @dataclass(frozen=True)
@@ -507,6 +525,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             per_layer=profiling_d.get("per_layer", True),
             iterations=profiling_d.get("iterations", DEFAULT_ITERATIONS),
             warmup=profiling_d.get("warmup", DEFAULT_WARMUP),
+            aggregation=profiling_d.get("aggregation", DEFAULT_AGGREGATION),
             extreme_mode=bool(profiling_d.get("extreme_mode", False)),
         ),
         power=PowerConfig(

@@ -158,17 +158,20 @@ class SocDef:
     def requires_attached_probe_for_cycles(self) -> bool:
         """Whether DWT cycle counts require a debugger attached during capture.
 
-        On Apollo4 (Cortex-M4) the ``DWT->CYCCNT`` counter lives in the core
-        debug power domain, which stays powered only while a debugger asserts
-        the DAP's ``CDBGPWRUPREQ`` — a signal firmware cannot set from the core.
-        The SWO/RTT readers keep a debugger attached incidentally, but the
-        UART/USB readers release the probe, so per-layer cycles read back as 0.
-        When this is True those readers must hold a pylink session open for the
-        whole capture (see ``attached_reset_session``).  AP3/AP5 do not gate the
-        domain this way and the AP5 secure bootloader prefers the probe
-        released, so they stay False.
+        On the Cortex-M4F families (Apollo3/3P and Apollo4/4P/4L) the
+        ``DWT->CYCCNT`` counter lives in the core debug power domain, which
+        stays powered only while a debugger asserts the DAP's ``CDBGPWRUPREQ``
+        — a signal firmware cannot set from the core.  The SWO/RTT readers keep
+        a debugger attached incidentally, but the UART/USB readers release the
+        probe, so per-layer cycles read back as 0.  When this is True those
+        readers must hold a pylink session open for the whole capture (see
+        ``attached_reset_session``).  AP3 gating was confirmed empirically
+        (2026-06-27): AOT-over-UART read 0 cycles until the probe was held
+        attached, after which it matched the RTT/SWO cycle counts.  AP5
+        (Cortex-M55) uses the resettable Armv8-M PMU and its secure bootloader
+        prefers the probe released, so it stays False.
         """
-        return self.family is SocFamily.AP4
+        return self.family in (SocFamily.AP3, SocFamily.AP4)
 
     @property
     def profiling_backends(self) -> tuple[str, ...]:
@@ -402,12 +405,12 @@ _register_soc(
         ),
         c_define="AM_PART_APOLLO510",
         cmsis_header="apollo510.h",
-        # RTT lives in .sram_bss → SHARED_SRAM (base 0x20080000). Scan only the
-        # first 1 MB of SHARED_SRAM instead of the full 2 MB from the TCM base:
-        # the control block lands a few KB in, so discovery (and the stale-block
-        # pre-clean) finish in a couple of chunks instead of sweeping ~557 KB of
-        # TCM first. The known-address fast path skips scanning entirely.
-        rtt_scan_ranges=((0x20080000, 0x100000),),
+        # On the cache-coherent M55 parts RTT is pinned to non-cached TCM
+        # (default .bss), NOT .sram_bss — see firmware/__init__.py and
+        # SEGGER_RTT_Conf.h. DTCM is based at 0x20000000 (512 KB), so the
+        # fallback scan covers that window. The known-address fast path (nm/map)
+        # is the primary route and skips scanning entirely.
+        rtt_scan_ranges=((0x20000000, 0x80000),),
         jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
     )
@@ -439,8 +442,8 @@ _register_soc(
         ),
         c_define="AM_PART_APOLLO510B",
         cmsis_header="apollo510.h",
-        # See apollo510: scan the SHARED_SRAM window where .sram_bss is linked.
-        rtt_scan_ranges=((0x20080000, 0x100000),),
+        # See apollo510: M55 RTT lives in non-cached TCM (.bss), DTCM @ 0x20000000.
+        rtt_scan_ranges=((0x20000000, 0x80000),),
         jlink_device="AP510BFA-CBR",
         pmu_max_ops=4096,
     )
@@ -472,8 +475,8 @@ _register_soc(
         ),
         c_define="AM_PART_APOLLO5B",
         cmsis_header="apollo510.h",
-        # See apollo510: scan the SHARED_SRAM window where .sram_bss is linked.
-        rtt_scan_ranges=((0x20080000, 0x100000),),
+        # See apollo510: M55 RTT lives in non-cached TCM (.bss), DTCM @ 0x20000000.
+        rtt_scan_ranges=((0x20000000, 0x80000),),
         jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
     )
@@ -506,8 +509,8 @@ _register_soc(
         ),
         c_define="AM_PART_APOLLO330P",
         cmsis_header="apollo330P.h",
-        # See apollo510: scan the SHARED_SRAM window where .sram_bss is linked.
-        rtt_scan_ranges=((0x20080000, 0x100000),),
+        # See apollo510: M55 RTT lives in non-cached TCM (.bss), DTCM @ 0x20000000.
+        rtt_scan_ranges=((0x20000000, 0x80000),),
         jlink_device="AP330NFA-CBR",
         pmu_max_ops=4096,
     )

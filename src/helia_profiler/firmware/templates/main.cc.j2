@@ -235,8 +235,7 @@ int main(void) {
     psram_cfg.enable_xip = true;
     if (nsx_psram_init(&psram_cfg) != 0) {
         hpx_printf("HPX_ERROR=psram_init_failed\n");
-        HPX_CLEAN_DCACHE();
-        while (1) { __WFI(); }
+        hpx_park();
     }
 {% if weights_region == "psram" %}
     model_data = (const unsigned char *)psram_cfg.base_address;
@@ -315,7 +314,7 @@ int main(void) {
     if (model->version() != TFLITE_SCHEMA_VERSION) {
         hpx_printf("HPX_ERROR=schema_mismatch:%lu_vs_%d\n",
                   model->version(), TFLITE_SCHEMA_VERSION);
-        while (1) { __WFI(); }
+        hpx_park();
     }
 
     // Use the first pass to allocate (all passes use the same model/arena)
@@ -405,7 +404,7 @@ int main(void) {
         if (missing > 0) {
             hpx_printf("HPX_ERROR=missing_ops count=%d hint=rebuild_with_op_registration\n",
                        missing);
-            while (1) { __WFI(); }
+            hpx_park();
         }
     }
 
@@ -428,7 +427,7 @@ int main(void) {
         hpx_printf("HPX_ERROR=alloc_tensors_failed arena=%d status=%d "
                    "hint=arena_too_small_or_kernel_prepare_failed\n",
                    kArenaSize, (int)alloc_status);
-        while (1) { __WFI(); }
+        hpx_park();
     }
     hpx_printf("HPX_HEARTBEAT phase=allocated arena_used=%lu\n",
                (unsigned long)interpreter.arena_used_bytes());
@@ -463,6 +462,11 @@ int main(void) {
     // with warmup iterations, then DWT-time clean Invoke()s with the profiler
     // disabled.  Emitted as HPX_CLEAN_INFER_* — these never replace the
     // per-layer numbers, they sit alongside them for comparison.
+    //
+    // This pass is also the canonical window for external power measurement:
+    // it is the only inference loop free of instrumentation/transport overhead,
+    // so the GPIO sync brackets it (not the instrumented passes below).  When
+    // power sync is disabled, sync_gpio_high/low compile to no-ops.
     {
         g_profiler.SetEnabled(false);
         // Warm caches / branch predictor / MRAM prefetch (uninstrumented).
@@ -473,6 +477,7 @@ int main(void) {
         hpx_printf("HPX_HEARTBEAT phase=clean_warmup_done\n");
         uint64_t clean_cycles = 0;
         uint32_t clean_count = 0;
+        sync_gpio_high();
         for (int iter = 0; iter < {{ clean_iters | default(1) }}; iter++) {
             memset(input->data.raw, 0, input->bytes);
             uint32_t t0 = DWT->CYCCNT;
@@ -480,6 +485,7 @@ int main(void) {
             clean_cycles += (uint32_t)(DWT->CYCCNT - t0);
             clean_count++;
         }
+        sync_gpio_low();
         g_profiler.SetEnabled(true);
         if (clean_count > 0) {
             const uint32_t clean_avg_cycles =
@@ -549,18 +555,17 @@ int main(void) {
     }
     hpx_printf("HPX_HEARTBEAT phase=warmup_done pass={{ loop.index0 }}\n");
 
-    // Profiled iterations — GPIO sync brackets each inference
+    // Profiled iterations — per-layer PMU instrumentation (no GPIO sync; the
+    // clean pass above owns the external-power window).
     for (int iter = 0; iter < {{ iterations }}; iter++) {
         memset(input->data.raw, 0, input->bytes);
         g_profiler.ClearEvents();
         g_profiler.SetIterationContext({{ loop.index0 }}, iter);
 
-        sync_gpio_high();
         uint32_t infer_start_cyc = DWT->CYCCNT;
         interpreter.Invoke();
         profiled_infer_cycles += (uint32_t)(DWT->CYCCNT - infer_start_cyc);
         profiled_infer_count++;
-        sync_gpio_low();
 
 {% if transport == "usb_cdc" %}
         usb_timer_resume();
@@ -612,6 +617,6 @@ int main(void) {
     HPX_CLEAN_DCACHE();
     hpx_rtt_drain(500 /* ms */);
 {% endif %}
-    while (1) { __WFI(); }
+    hpx_park();
     return 0;
 }

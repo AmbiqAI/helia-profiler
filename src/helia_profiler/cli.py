@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
 
 def main(argv: list[str] | None = None) -> None:
+    from .config import AGGREGATION_METHODS
+
     parser = argparse.ArgumentParser(
         prog="hpx",
         description="Profile LiteRT models on Ambiq silicon.",
@@ -223,6 +225,15 @@ def main(argv: list[str] | None = None) -> None:
     g_pmu.add_argument("--no-per-layer", action="store_false", dest="per_layer")
     g_pmu.add_argument("--iterations", type=int, help="Inference iterations (default: 100)")
     g_pmu.add_argument("--warmup", type=int, help="Warmup iterations (default: 5)")
+    g_pmu.add_argument(
+        "--aggregation",
+        choices=list(AGGREGATION_METHODS),
+        help=(
+            "How per-layer counters are aggregated across iterations "
+            "(default: median). 'median' rejects corrupted iterations; "
+            "'trimmed' drops extremes then means; 'mean' is the raw average."
+        ),
+    )
 
     # -- Power measurement --
     g_power = p_profile.add_argument_group("power measurement")
@@ -592,6 +603,8 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli.setdefault("profiling", {})["iterations"] = args.iterations
     if args.warmup is not None:
         cli.setdefault("profiling", {})["warmup"] = args.warmup
+    if getattr(args, "aggregation", None) is not None:
+        cli.setdefault("profiling", {})["aggregation"] = args.aggregation
 
     if args.power:
         cli.setdefault("power", {})["enabled"] = True

@@ -168,6 +168,48 @@ class TestMainCcRender:
             assert "hpx_rtt_set_blocking" not in out
             assert "hpx_rtt_set_nonblocking" not in out
 
+    def test_all_exits_route_through_hpx_park(self):
+        # Every terminal exit (error paths + HPX_END) must call hpx_park() so the
+        # final diagnostic is delivered; no raw __WFI() spin loops should remain
+        # in the main entry point.
+        for transport in ("rtt", "usb_cdc", "swo", "stdio"):
+            out = _render_tflm(transport=transport)
+            assert "void hpx_park(void)" in out
+            assert "while (1) { __WFI(); }" not in out
+            # schema_mismatch + missing_ops + alloc_tensors_failed + HPX_END
+            # (psram exit only renders when a region is in PSRAM).
+            assert out.count("hpx_park();") >= 4
+
+    def test_rtt_park_drains_before_wfi(self):
+        # On RTT the park helper must publish + drain (core still spinning) before
+        # entering WFI, because the TCM-resident ring is unreadable to the J-Link
+        # once the core sleeps. This is what lets failure messages escape.
+        out = _render_tflm(transport="rtt")
+        park = out.split("void hpx_park(void)", 1)[1].split("}", 1)[0]
+        assert "hpx_rtt_set_blocking();" in park
+        assert "hpx_rtt_drain(HPX_RTT_FAIL_DRAIN_MS)" in park
+        assert "__WFI();" in park
+        assert "HPX_RTT_FAIL_DRAIN_MS" in out
+
+    def test_non_rtt_park_is_plain_wfi(self):
+        # Non-RTT transports send synchronously, so park has no drain — just WFI.
+        for transport in ("usb_cdc", "swo", "stdio"):
+            out = _render_tflm(transport=transport)
+            park = out.split("void hpx_park(void)", 1)[1].split("}", 1)[0]
+            assert "__WFI();" in park
+            assert "hpx_rtt_drain" not in park
+            assert "HPX_RTT_FAIL_DRAIN_MS" not in out
+
+    def test_aot_exits_route_through_hpx_park(self):
+        # The AOT entry point must also park on every exit (model_init failure +
+        # HPX_END at minimum) and drain RTT before WFI.
+        out = _render_aot(transport="rtt")
+        assert "void hpx_park(void)" in out
+        assert "while (1) { __WFI(); }" not in out
+        assert out.count("hpx_park();") >= 2
+        park = out.split("void hpx_park(void)", 1)[1].split("}", 1)[0]
+        assert "hpx_rtt_drain(HPX_RTT_FAIL_DRAIN_MS)" in park
+
     def test_auto_resolver_mode_embeds_selected_registrations(self):
         out = _render_tflm(
             transport="rtt",
@@ -436,6 +478,24 @@ class TestMainAotCcRender:
     def test_aot_op_manifest_embedded(self):
         out = _render_aot(transport="rtt")
         assert "CONV_2D" in out
+
+    def test_aot_emits_clean_inference_pass(self):
+        """AOT must emit HPX_CLEAN_INFER_* (parity with the TFLM template)."""
+        out = _render_aot(transport="rtt")
+        assert "HPX_CLEAN_INFER_COUNT" in out
+        assert "HPX_CLEAN_INFER_AVG_CYCLES" in out
+        assert "phase=clean_warmup_done" in out
+
+    def test_aot_gpio_sync_brackets_clean_pass_not_instrumented(self):
+        """GPIO sync brackets the clean (power) window, not the per-layer pass."""
+        out = _render_aot(transport="rtt")
+        # sync_gpio_high precedes the clean DWT-timed loop and clean_cycles math.
+        hi = out.index("sync_gpio_high();")
+        lo = out.index("sync_gpio_low();")
+        assert hi < out.index("clean_cycles +=") < lo
+        # The instrumented profiled loop no longer toggles the sync GPIO.
+        assert out.count("sync_gpio_high();") == 1
+        assert out.count("sync_gpio_low();") == 1
 
     def test_dwt_only_aot_render_avoids_armv8m_pmu_api(self):
         out = _render_aot(transport="rtt", has_armv8m_pmu=False)

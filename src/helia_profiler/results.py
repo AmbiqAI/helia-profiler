@@ -117,6 +117,11 @@ class TimingInfo:
     capture_duration_s: float | None = None
     hpx_start_latency_s: float | None = None
     protocol_duration_s: float | None = None
+    # Attributed breakdown of the boot/attach window into named phases
+    # (e.g. ``reset``, ``sbl_settle``, ``attach``, ``control_block_scan``).
+    # Lets the few unavoidable settle floors be inspected and tuned with data
+    # instead of guesswork.  Currently populated for the RTT transport.
+    phases: dict[str, float] | None = None
 
 
 @dataclass

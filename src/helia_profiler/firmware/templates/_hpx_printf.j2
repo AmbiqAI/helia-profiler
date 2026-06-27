@@ -154,3 +154,32 @@ static void hpx_rtt_set_nonblocking(void) {
     }
 }
 {% endif %}
+
+// ---------------------------------------------------------------------------
+// hpx_park — terminal halt used by the HPX_END happy path and every error exit.
+//
+// On RTT the control block + ring buffers live in non-cached TCM on the
+// cache-coherent Cortex-M55 parts, and the J-Link can only reach TCM while the
+// core clock is running.  Once the core enters __WFI() the host can no longer
+// drain the ring, so any bytes still queued — crucially a final HPX_ERROR=...
+// line on a failure path — would be lost.  We therefore switch to lossless
+// mode, publish, and drain the ring while the core is still spinning, then
+// park.  Non-RTT transports (SWO/USB/stdio) send synchronously, so they simply
+// park.  This keeps the failure diagnostics observable regardless of toolchain.
+// ---------------------------------------------------------------------------
+{% if transport == "rtt" %}
+#ifndef HPX_RTT_FAIL_DRAIN_MS
+// Generous: if no host has attached yet, hpx_rtt_drain() spins the full window
+// (RdOff never advances), giving a late-attaching host time to read the buffer.
+#define HPX_RTT_FAIL_DRAIN_MS 3000U
+#endif
+{% endif %}
+
+{{ _linkage }}void hpx_park(void) {
+{% if transport == "rtt" %}
+    hpx_rtt_set_blocking();
+    HPX_CLEAN_DCACHE();
+    hpx_rtt_drain(HPX_RTT_FAIL_DRAIN_MS);
+{% endif %}
+    for (;;) { __WFI(); }
+}
