@@ -218,6 +218,19 @@ class HpxConsole:
         overview.add_row("Layers", str(len(layers)))
         overview.add_row("Total cycles", f"[bold cyan]{total_cycles:,.0f}[/bold cyan]")
 
+        # Clean end-to-end cycles (no per-layer instrumentation), with the
+        # delta vs the per-layer sum so the instrumentation overhead is visible.
+        clean_cycles = meta.clean_infer_avg_cycles
+        if clean_cycles:
+            delta_txt = ""
+            if total_cycles > 0:
+                delta_pct = (clean_cycles - total_cycles) / total_cycles * 100.0
+                delta_txt = f"  [dim]({delta_pct:+.1f}% vs per-layer sum)[/dim]"
+            overview.add_row(
+                "Clean E2E cycles",
+                f"[bold green]{clean_cycles:,.0f}[/bold green]{delta_txt}",
+            )
+
         # Model analysis summary
         if ctx.model_analysis is not None:
             ma = ctx.model_analysis

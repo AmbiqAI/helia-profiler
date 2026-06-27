@@ -287,11 +287,26 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             timing["device_profiled_infer_total_us"] = meta.profiled_infer_total_us
         if meta.profiled_infer_avg_us is not None:
             timing["device_profiled_infer_avg_us"] = meta.profiled_infer_avg_us
+        if meta.clean_infer_count is not None:
+            timing["device_clean_infer_count"] = meta.clean_infer_count
+        if meta.clean_infer_total_cycles is not None:
+            timing["device_clean_infer_total_cycles"] = meta.clean_infer_total_cycles
+        if meta.clean_infer_avg_cycles is not None:
+            timing["device_clean_infer_avg_cycles"] = meta.clean_infer_avg_cycles
+        if meta.clean_infer_avg_us is not None:
+            timing["device_clean_infer_avg_us"] = meta.clean_infer_avg_us
         if timing:
             summary["latency"] = timing
     elif any(
         value is not None
-        for value in (meta.profiled_infer_count, meta.profiled_infer_total_us, meta.profiled_infer_avg_us)
+        for value in (
+            meta.profiled_infer_count,
+            meta.profiled_infer_total_us,
+            meta.profiled_infer_avg_us,
+            meta.clean_infer_count,
+            meta.clean_infer_avg_cycles,
+            meta.clean_infer_avg_us,
+        )
     ):
         summary["latency"] = {
             key: value
@@ -299,6 +314,10 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                 "device_profiled_infer_count": meta.profiled_infer_count,
                 "device_profiled_infer_total_us": meta.profiled_infer_total_us,
                 "device_profiled_infer_avg_us": meta.profiled_infer_avg_us,
+                "device_clean_infer_count": meta.clean_infer_count,
+                "device_clean_infer_total_cycles": meta.clean_infer_total_cycles,
+                "device_clean_infer_avg_cycles": meta.clean_infer_avg_cycles,
+                "device_clean_infer_avg_us": meta.clean_infer_avg_us,
             }.items()
             if value is not None
         }

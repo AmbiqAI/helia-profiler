@@ -21,15 +21,6 @@
 #if defined(__ARM_FEATURE_MVE)
 #include <arm_mve.h>
 #endif
-{% if not has_armv8m_pmu %}
-// newlib (GCC/ATfE) syscall surface for the DWT-only retarget below.
-// Arm Compiler 6 (armclang) ships no <sys/types.h>/caddr_t and manages the
-// heap via its own runtime, so skip these newlib-only headers there.
-#ifndef NSX_TOOLCHAIN_ARMCLANG
-#include <cerrno>
-#include <sys/types.h>
-#endif
-{% endif %}
 
 #include "{{ engine_header }}"
 #if {{ resource_variable_count }} > 0
@@ -44,6 +35,10 @@
 
 #include "hpx_pmu_profiler.h"
 {% include "_system_includes.j2" %}
+{% if apollo3_burst %}
+// Apollo3/3P TurboSPOT (burst) control lives in the AmbiqSuite HAL umbrella.
+#include "am_mcu_apollo.h"
+{% endif %}
 
 {% include "_cache_shims.j2" %}
 
@@ -58,23 +53,7 @@
 #define HPX_USB_POLL_DELAY_US     (10U * 1000U)   // re-poll cadence while waiting for DTR
 #define HPX_USB_SETTLE_DELAY_US   (200U * 1000U)  // settle after host asserts DTR
 
-{% if not has_armv8m_pmu %}
-// Weak newlib syscall retargets for the DWT-only (GCC/ATfE) path. armclang
-// supplies its own _sys_exit/heap management and lacks caddr_t, so these are
-// both unnecessary and uncompilable under Arm Compiler 6.
-#ifndef NSX_TOOLCHAIN_ARMCLANG
-extern "C" __attribute__((weak)) void _exit(int status) {
-    (void)status;
-    while (1) { __WFI(); }
-}
-
-extern "C" __attribute__((weak)) caddr_t _sbrk(int incr) {
-    (void)incr;
-    errno = ENOMEM;
-    return (caddr_t)-1;
-}
-#endif
-{% endif %}
+{% include "_newlib_syscalls.j2" %}
 
 {% include "_dwt_init.j2" %}
 
@@ -162,6 +141,38 @@ int main(void) {
 {% endif %}
     dwt_init();
     sync_gpio_init();
+{% if apollo3_burst %}
+    // --- Apollo3/3P TurboSPOT (96 MHz burst) ------------------------------
+    // NSX exposes no perf-mode selector on Apollo3, so request burst directly
+    // through the AmbiqSuite HAL.  Burst raises ONLY the CPU clock, so mirror
+    // it into SystemCoreClock to keep every device-side cycle->time value (and
+    // the host's registry clock assumption) consistent.  If burst is
+    // unavailable the host's device-clock cross-check flags the mismatch.
+    int hpx_burst_avail = 0;
+    int hpx_burst_engaged = 0;
+    {
+        am_hal_burst_avail_e burst_avail = AM_HAL_BURST_NOTAVAIL;
+        am_hal_burst_mode_e burst_state = AM_HAL_NORMAL_MODE;
+        am_hal_burst_mode_initialize(&burst_avail);
+        if (burst_avail == AM_HAL_BURST_AVAIL) {
+            am_hal_burst_mode_enable(&burst_state);
+        }
+        hpx_burst_avail = (burst_avail == AM_HAL_BURST_AVAIL);
+        hpx_burst_engaged = (burst_state == AM_HAL_BURST_MODE);
+        if (hpx_burst_engaged) {
+            SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
+        }
+    }
+{% else %}
+    // NSX applies the perf mode inside nsx_system_init, but the CMSIS
+    // SystemCoreClock global is NOT updated to match: on Apollo4/5
+    // SystemCoreClockUpdate() is hardcoded to the 96 MHz reset default, so at
+    // the hp tier it understates the real core clock (e.g. 192/250 MHz).  Set
+    // it to the resolved operating point so every device-side cycle->time
+    // value (profiled/clean inference us, heartbeat cadence) uses the real
+    // clock.  Harmless when it already matches (lp tiers).
+    SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
+{% endif %}
 {% include "_extreme_mode.j2" %}
 {% if transport == "usb_cdc" %}
 
@@ -431,10 +442,63 @@ int main(void) {
     hpx_printf("HPX_NUM_TENSORS=%d\n", (int)model->subgraphs()->Get(0)->tensors()->size());
     hpx_printf("HPX_NUM_INPUTS=%d\n", (int)interpreter.inputs_size());
     hpx_printf("HPX_NUM_OUTPUTS=%d\n", (int)interpreter.outputs_size());
+    // Ground-truth CPU clock as actually configured on-device.  The host uses
+    // this to verify its registry assumption (used for SWO baud + cycle->time
+    // math) matches reality instead of trusting a hardcoded frequency.
+    hpx_printf("HPX_SYSTEM_CLOCK_HZ=%lu\n", (unsigned long)SystemCoreClock);
+{% if apollo3_burst %}
+    hpx_printf("HPX_BURST_AVAIL=%d\n", hpx_burst_avail);
+    hpx_printf("HPX_BURST_ENGAGED=%d\n", hpx_burst_engaged);
+{% endif %}
 
     // Target-side profiled inference timing (excludes CSV/transport output).
     uint64_t profiled_infer_cycles = 0;
     uint32_t profiled_infer_count = 0;
+
+    // --- Clean end-to-end inference timing (no per-layer instrumentation) ---
+    // The per-layer PMU passes below bracket every op (BeginEvent/EndEvent +
+    // counter resets), which perturbs caches/pipeline and adds overhead the
+    // sum-of-layers cannot see.  To report the most representative whole-model
+    // latency, run a warmed, UNinstrumented timing pass FIRST: prime caches
+    // with warmup iterations, then DWT-time clean Invoke()s with the profiler
+    // disabled.  Emitted as HPX_CLEAN_INFER_* — these never replace the
+    // per-layer numbers, they sit alongside them for comparison.
+    {
+        g_profiler.SetEnabled(false);
+        // Warm caches / branch predictor / MRAM prefetch (uninstrumented).
+        for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
+            memset(input->data.raw, 0, input->bytes);
+            interpreter.Invoke();
+        }
+        hpx_printf("HPX_HEARTBEAT phase=clean_warmup_done\n");
+        uint64_t clean_cycles = 0;
+        uint32_t clean_count = 0;
+        for (int iter = 0; iter < {{ clean_iters | default(1) }}; iter++) {
+            memset(input->data.raw, 0, input->bytes);
+            uint32_t t0 = DWT->CYCCNT;
+            interpreter.Invoke();
+            clean_cycles += (uint32_t)(DWT->CYCCNT - t0);
+            clean_count++;
+        }
+        g_profiler.SetEnabled(true);
+        if (clean_count > 0) {
+            const uint32_t clean_avg_cycles =
+                (uint32_t)((clean_cycles + (clean_count / 2U)) / clean_count);
+            hpx_printf("HPX_CLEAN_INFER_COUNT=%lu\n", (unsigned long)clean_count);
+            hpx_printf("HPX_CLEAN_INFER_TOTAL_CYCLES=%llu\n",
+                       (unsigned long long)clean_cycles);
+            hpx_printf("HPX_CLEAN_INFER_AVG_CYCLES=%lu\n",
+                       (unsigned long)clean_avg_cycles);
+            if (SystemCoreClock > 0U) {
+                const uint32_t clean_avg_us = (uint32_t)(
+                    ((uint64_t)clean_avg_cycles * 1000000ULL +
+                     ((uint64_t)SystemCoreClock / 2ULL)) /
+                    (uint64_t)SystemCoreClock);
+                hpx_printf("HPX_CLEAN_INFER_AVG_US=%lu\n",
+                           (unsigned long)clean_avg_us);
+            }
+        }
+    }
 
 {% if transport == "rtt" %}
     // Boot header was captured losslessly; restore droppable writes for the

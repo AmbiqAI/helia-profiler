@@ -305,6 +305,163 @@ def test_capture_pmu_passes_resolved_cpu_clock_to_swo(tmp_path: Path, monkeypatc
     assert captured["cpu_freq"] == 250_000_000
 
 
+def test_capture_pmu_swo_requires_resolved_cpu_clock(tmp_path: Path, monkeypatch):
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "target": {"transport": "swo"},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    ctx.build_dir = tmp_path / "build"
+    ctx.build_dir.mkdir()
+    ctx.resolved_jlink_serial = "1160002204"
+    # Simulate a platform whose clock failed to resolve — the host must refuse
+    # to guess a SWO baud rather than silently assume a default frequency.
+    ctx.run_metadata.platform.cpu_clock_mhz = 0
+
+    with pytest.raises(CaptureError, match="resolved trace clock"):
+        capture_pmu(ctx)
+
+
+def test_capture_pmu_swo_uses_fixed_trace_clock_on_apollo3(tmp_path: Path, monkeypatch):
+    """Apollo3 SWO baud is fixed (CPU-independent), so burst must not change it."""
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "target": {
+                "board": "apollo3p_evb",
+                "transport": "swo",
+                "clock": {"cpu": "hp"},  # 96 MHz burst
+            },
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    ctx.build_dir = tmp_path / "build"
+    ctx.build_dir.mkdir()
+    ctx.resolved_jlink_serial = "1160000174"
+
+    # CPU runs at 96 MHz under burst, but the TPIU trace clock stays at 48 MHz.
+    assert ctx.run_metadata.platform.cpu_clock_mhz == 96
+    assert ctx.soc.swo_trace_clock_mhz == 48
+
+    captured: dict[str, object] = {}
+
+    def fake_capture_swo_output(**kwargs):
+        captured.update(kwargs)
+        return [
+            "--- HPX_START ---",
+            "--- HPX_PRESET basic_cpu ---",
+            "--- HPX_ITER 0 ---",
+            "Layer,Op,ARM_PMU_CPU_CYCLES",
+            "0,CONV_2D,1",
+            "--- HPX_END ---",
+        ]
+
+    monkeypatch.setattr(
+        "helia_profiler.capture.serial_reader.capture_swo_output", fake_capture_swo_output
+    )
+
+    capture_pmu(ctx)
+
+    # Host must program J-Link's SWO prescaler against 48 MHz, not the 96 MHz
+    # burst core clock, or the ITM stream is undecodable.
+    assert captured["cpu_freq"] == 48_000_000
+
+
+
+def test_capture_pmu_warns_when_device_clock_disagrees(tmp_path: Path, monkeypatch, caplog):
+    import logging
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "target": {"transport": "swo", "clock": {"cpu": "hp"}},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    ctx.build_dir = tmp_path / "build"
+    ctx.build_dir.mkdir()
+    ctx.resolved_jlink_serial = "1160002204"
+
+    def fake_capture_swo_output(**kwargs):
+        # Registry assumed 250 MHz (hp); device actually ran at 96 MHz.
+        return [
+            "--- HPX_START ---",
+            "HPX_SYSTEM_CLOCK_HZ=96000000",
+            "--- HPX_PRESET basic_cpu ---",
+            "--- HPX_ITER 0 ---",
+            "Layer,Op,ARM_PMU_CPU_CYCLES",
+            "0,CONV_2D,1",
+            "--- HPX_END ---",
+        ]
+
+    monkeypatch.setattr(
+        "helia_profiler.capture.serial_reader.capture_swo_output", fake_capture_swo_output
+    )
+
+    with caplog.at_level(logging.WARNING, logger="hpx"):
+        capture_pmu(ctx)
+
+    assert any("Device reports CPU clock" in r.message for r in caplog.records)
+
+
+def test_capture_pmu_no_clock_warning_when_device_clock_matches(tmp_path: Path, monkeypatch, caplog):
+    import logging
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "target": {"transport": "swo", "clock": {"cpu": "hp"}},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    ctx.build_dir = tmp_path / "build"
+    ctx.build_dir.mkdir()
+    ctx.resolved_jlink_serial = "1160002204"
+
+    def fake_capture_swo_output(**kwargs):
+        # Device reports the same 250 MHz the registry assumed (hp).
+        return [
+            "--- HPX_START ---",
+            "HPX_SYSTEM_CLOCK_HZ=250000000",
+            "--- HPX_PRESET basic_cpu ---",
+            "--- HPX_ITER 0 ---",
+            "Layer,Op,ARM_PMU_CPU_CYCLES",
+            "0,CONV_2D,1",
+            "--- HPX_END ---",
+        ]
+
+    monkeypatch.setattr(
+        "helia_profiler.capture.serial_reader.capture_swo_output", fake_capture_swo_output
+    )
+
+    with caplog.at_level(logging.WARNING, logger="hpx"):
+        capture_pmu(ctx)
+
+    assert not any("Device reports CPU clock" in r.message for r in caplog.records)
+
+
 def test_capture_pmu_passes_resolved_jlink_device_to_usb(tmp_path: Path, monkeypatch):
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")

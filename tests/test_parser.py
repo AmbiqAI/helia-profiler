@@ -101,6 +101,37 @@ def test_target_profiled_infer_timing_metadata():
     assert result.meta.profiled_infer_avg_us == 8000
 
 
+def test_clean_infer_timing_metadata():
+    lines = _wrap_session(
+        {
+            "presets": "basic_cpu",
+            "clean_infer_count": "5",
+            "clean_infer_total_cycles": "10000",
+            "clean_infer_avg_cycles": "2000",
+            "clean_infer_avg_us": "21",
+        },
+        [_make_preset_block("basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]])],
+    )
+
+    result = parse_firmware_output(lines)
+
+    assert result.meta.clean_infer_count == 5
+    assert result.meta.clean_infer_total_cycles == 10000
+    assert result.meta.clean_infer_avg_cycles == 2000
+    assert result.meta.clean_infer_avg_us == 21
+
+
+def test_system_clock_hz_metadata():
+    lines = _wrap_session(
+        {"presets": "basic_cpu", "system_clock_hz": "48000000"},
+        [_make_preset_block("basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]])],
+    )
+
+    result = parse_firmware_output(lines)
+
+    assert result.meta.system_clock_hz == 48000000
+
+
 # ---------------------------------------------------------------------------
 # Multi-pass parsing (new-style)
 # ---------------------------------------------------------------------------

@@ -125,6 +125,13 @@ class SocDef:
     rtt_scan_ranges: tuple[tuple[int, int], ...]
     jlink_device: str = ""  # J-Link device string (e.g. "AP510NFA-CBR")
     pmu_max_ops: int = 2048  # Max PMU accumulator operations (layers)
+    #: SWO/ITM trace reference clock (MHz), when the TPIU TRACECLKIN is NOT the
+    #: CPU clock.  Apollo3 routes a dedicated, CPU-independent clock to the
+    #: TPIU, so the SWO baud does not change with TurboSPOT burst — the host
+    #: must always reference this fixed clock when programming J-Link's SWO
+    #: prescaler.  ``None`` means SWO is core-clocked (Apollo4/5): use the
+    #: selected CPU frequency.
+    swo_trace_clock_mhz: int | None = None
 
     def clock_domain(self, name: str) -> ClockDomain | None:
         """Return the named clock domain, or ``None`` if not present."""
@@ -274,7 +281,19 @@ _register_soc(
         clocks=(
             ClockDomain(
                 "cpu",
-                (ClockSpeed("lp", 96, PerfTier.LOW),),
+                # Apollo3/3P run at 48 MHz HFRC in normal mode.  The 96 MHz
+                # "burst" (TurboSPOT) tier is NOT reachable through NSX
+                # (nsx_platform_set_perf_mode is a no-op on Apollo3), so the
+                # firmware enables it directly via am_hal_burst_mode_enable()
+                # when "hp" is selected and mirrors the real 96 MHz into
+                # SystemCoreClock.  Host-side timing and the SWO trace-clock
+                # (cpu_speed passed to JLink.swo_enable) follow the selected
+                # ClockSpeed.mhz, so they stay matched to the actual device
+                # clock for both tiers.  Default remains 48 MHz.
+                (
+                    ClockSpeed("lp", 48, PerfTier.LOW),
+                    ClockSpeed("hp", 96, PerfTier.HIGH),
+                ),
                 default="lp",
             ),
         ),
@@ -282,6 +301,10 @@ _register_soc(
         cmsis_header="apollo3p.h",
         rtt_scan_ranges=((0x10000000, 0x100000),),
         jlink_device="AMA3B2KK-KBR",
+        # Apollo3's TPIU TRACECLKIN is a dedicated 48 MHz-domain clock, NOT the
+        # core clock — TurboSPOT burst (hp/96 MHz) does not change the SWO baud,
+        # so the host always programs J-Link's SWO prescaler against 48 MHz.
+        swo_trace_clock_mhz=48,
     )
 )
 

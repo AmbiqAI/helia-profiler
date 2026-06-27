@@ -46,7 +46,7 @@ void HpxPmuProfiler::InitCustom(const uint32_t event_ids[], int num_events) {
 }
 
 uint32_t HpxPmuProfiler::BeginEvent(const char* tag) {
-    if (!initialized_ || num_events_ >= kMaxLayers) return 0;
+    if (!initialized_ || !enabled_ || num_events_ >= kMaxLayers) return 0;
     int idx = num_events_++;
     layers_[idx].tag = tag;
     layers_[idx].overflow = false;
@@ -61,7 +61,7 @@ uint32_t HpxPmuProfiler::BeginEvent(const char* tag) {
 }
 
 void HpxPmuProfiler::EndEvent(uint32_t event_handle) {
-    if (!initialized_ ||
+    if (!initialized_ || !enabled_ ||
         event_handle >= static_cast<uint32_t>(num_events_)) return;
     uint32_t saved_cyccnt = DWT->CYCCNT;
     nsx_pmu_get_counters(&pmu_cfg_);
@@ -157,7 +157,7 @@ void HpxPmuProfiler::InitCustom(const uint32_t[], int) {
 }
 
 uint32_t HpxPmuProfiler::BeginEvent(const char* tag) {
-    if (!initialized_ || num_events_ >= kMaxLayers) return 0;
+    if (!initialized_ || !enabled_ || num_events_ >= kMaxLayers) return 0;
     int idx = num_events_++;
     LayerRecord& rec = layers_[idx];
     rec.tag = tag;
@@ -167,7 +167,7 @@ uint32_t HpxPmuProfiler::BeginEvent(const char* tag) {
 }
 
 void HpxPmuProfiler::EndEvent(uint32_t event_handle) {
-    if (!initialized_ ||
+    if (!initialized_ || !enabled_ ||
         event_handle >= static_cast<uint32_t>(num_events_)) return;
     LayerRecord& rec = layers_[event_handle];
     rec.counters[0] = DWT->CYCCNT - rec.counters[0];

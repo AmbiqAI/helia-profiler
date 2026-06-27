@@ -32,7 +32,7 @@ from ..engines import EngineType
 from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
 from ..placement import Placement
-from ..platform import get_soc_for_board
+from ..platform import SocFamily, get_soc_for_board
 from ..usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
 from .op_resolver import build_resolver_plan
 
@@ -999,6 +999,11 @@ def generate_app(ctx: PipelineContext) -> Path:
     clock = ctx.run_metadata.platform
     perf_mode_symbol = clock.cpu_perf_tier
     perf_mode_mhz = clock.cpu_clock_mhz
+    # Apollo3/3P reach 96 MHz only through TurboSPOT burst, which NSX never
+    # enables (nsx_platform_set_perf_mode is a no-op on AP3).  When the user
+    # selects a >48 MHz tier on AP3, the firmware enables burst directly via
+    # the AmbiqSuite HAL.  Other families switch via NSX perf mode as usual.
+    apollo3_burst = soc.family is SocFamily.AP3 and perf_mode_mhz > 48
     resource_variable_count = sum(
         1
         for layer in (ctx.model_analysis.layers if ctx.model_analysis else ())
@@ -1092,6 +1097,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 arena_regions=aot_arena_regions,
                 perf_mode_symbol=perf_mode_symbol,
                 perf_mode_mhz=perf_mode_mhz,
+                apollo3_burst=apollo3_burst,
                 **heartbeat_vars,
             ),
         )
@@ -1113,6 +1119,8 @@ def generate_app(ctx: PipelineContext) -> Path:
                 arena_size=arena_size,
                 iterations=config.profiling.iterations,
                 warmup=config.profiling.warmup,
+                clean_warmup=max(1, config.profiling.warmup),
+                clean_iters=max(1, config.profiling.iterations),
                 pmu_passes=pmu_passes,
                 pmu_pass_names=[p["name"] for p in pmu_passes],
                 power_sync_enabled=power_sync_enabled,
@@ -1135,6 +1143,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 has_armv8m_pmu=has_armv8m_pmu,
                 perf_mode_symbol=perf_mode_symbol,
                 perf_mode_mhz=perf_mode_mhz,
+                apollo3_burst=apollo3_burst,
                 **heartbeat_vars,
             ),
         )

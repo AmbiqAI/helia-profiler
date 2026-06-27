@@ -115,8 +115,25 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
                 timing_out=timing_raw,
             )
         else:
+            # SWO baud is derived from the trace clock, so it MUST come from the
+            # resolved platform — never a hardcoded guess.  A wrong assumption
+            # here halves/doubles the ITM baud and yields an undecodable stream
+            # (this is exactly how the Apollo3 96-vs-48 MHz registry bug
+            # manifested).  Most SoCs clock the TPIU from the CPU, but Apollo3
+            # uses a dedicated, CPU-independent trace clock that does not change
+            # with TurboSPOT burst — so honor swo_trace_clock_mhz when set.
             cpu_clock_mhz = ctx.run_metadata.platform.cpu_clock_mhz
-            cpu_freq_hz = cpu_clock_mhz * 1_000_000 if cpu_clock_mhz > 0 else 96_000_000
+            swo_ref_mhz = ctx.soc.swo_trace_clock_mhz or cpu_clock_mhz
+            if swo_ref_mhz <= 0:
+                raise CaptureError(
+                    "SWO capture requires a resolved trace clock, but none was set.",
+                    hint=(
+                        "Stage 1 (resolve_platform) must run before capture so the "
+                        "selected target.clock.cpu frequency (or the SoC's fixed SWO "
+                        "trace clock) drives the SWO baud rate."
+                    ),
+                )
+            cpu_freq_hz = swo_ref_mhz * 1_000_000
 
             lines = capture_swo_output(
             build_dir=build_dir,
@@ -169,6 +186,11 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
             f"No layer data parsed from firmware output ({len(lines)} lines, {detail}).",
             hint=_truncation_hint(str(transport)),
         )
+
+    # Cross-check the device's actual clock against the registry value the host
+    # assumed.  This catches registry drift or an NSX perf-mode that silently
+    # failed to apply — both of which corrupt SWO baud and cycle->time math.
+    _verify_device_clock(ctx, result)
 
     if timing_raw:
         from ..results import TimingInfo
@@ -277,6 +299,42 @@ def _truncation_hint(transport: str) -> str:
             "the port. RTT (--transport rtt) avoids USB enumeration entirely."
         )
     return "Check that the firmware is printing HPX protocol data over the selected transport."
+
+
+def _verify_device_clock(ctx: PipelineContext, result: PmuResult) -> None:
+    """Warn if the device's actual clock disagrees with the registry value.
+
+    The host derives SWO baud and every cycle->time conversion from the
+    ``target.clock.cpu`` selection resolved against the platform registry.
+    The firmware reports its real ``SystemCoreClock`` so we can detect when
+    that assumption is wrong — e.g. a stale registry entry or an NSX perf-mode
+    that did not take effect on this SoC.  A mismatch does not abort the run
+    (the cycle counts themselves are still valid), but it makes every derived
+    time value suspect, so surface it loudly.
+    """
+    platform = ctx.run_metadata.platform
+    if platform is None:
+        return
+    device_hz = result.meta.system_clock_hz
+    registry_mhz = platform.cpu_clock_mhz
+    if not device_hz or registry_mhz <= 0:
+        return
+
+    registry_hz = registry_mhz * 1_000_000
+    # HFRC trim tolerance is a few percent; 5% comfortably clears real trim
+    # variation while still catching integer-ratio mistakes (48 vs 96 MHz).
+    if abs(device_hz - registry_hz) > 0.05 * registry_hz:
+        log.warning(
+            "Device reports CPU clock %.3f MHz but the platform registry "
+            "assumed %d MHz (cpu=%s) for %s. SWO baud and all cycle->time "
+            "values use the registry value and will be wrong. Fix the clock "
+            "for %s in the platform registry or the target.clock.cpu setting.",
+            device_hz / 1_000_000,
+            registry_mhz,
+            platform.cpu_clock_name or "?",
+            platform.soc or "?",
+            platform.soc or "this SoC",
+        )
 
 
 def _raise_on_firmware_error(lines: list[str]) -> None:

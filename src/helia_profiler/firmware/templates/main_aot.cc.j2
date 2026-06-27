@@ -34,6 +34,10 @@
 {% endif %}
 
 {% include "_system_includes.j2" %}
+{% if apollo3_burst %}
+// Apollo3/3P TurboSPOT (burst) control lives in the AmbiqSuite HAL umbrella.
+#include "am_mcu_apollo.h"
+{% endif %}
 
 {% include "_cache_shims.j2" %}
 
@@ -47,6 +51,8 @@
 #define HPX_SWO_ATTACH_DELAY_US   (500U * 1000U)  // host SWO viewer attach grace
 #define HPX_USB_POLL_DELAY_US     (10U * 1000U)   // re-poll cadence while waiting for DTR
 #define HPX_USB_SETTLE_DELAY_US   (200U * 1000U)  // settle after host asserts DTR
+
+{% include "_newlib_syscalls.j2" %}
 
 {% if not allocate_arenas %}
 {% for region in arena_regions %}
@@ -310,6 +316,38 @@ int main(void) {
 {% endif %}
     dwt_init();
     sync_gpio_init();
+{% if apollo3_burst %}
+    // --- Apollo3/3P TurboSPOT (96 MHz burst) ------------------------------
+    // NSX exposes no perf-mode selector on Apollo3, so request burst directly
+    // through the AmbiqSuite HAL.  Burst raises ONLY the CPU clock, so mirror
+    // it into SystemCoreClock to keep every device-side cycle->time value (and
+    // the host's registry clock assumption) consistent.  If burst is
+    // unavailable the host's device-clock cross-check flags the mismatch.
+    int hpx_burst_avail = 0;
+    int hpx_burst_engaged = 0;
+    {
+        am_hal_burst_avail_e burst_avail = AM_HAL_BURST_NOTAVAIL;
+        am_hal_burst_mode_e burst_state = AM_HAL_NORMAL_MODE;
+        am_hal_burst_mode_initialize(&burst_avail);
+        if (burst_avail == AM_HAL_BURST_AVAIL) {
+            am_hal_burst_mode_enable(&burst_state);
+        }
+        hpx_burst_avail = (burst_avail == AM_HAL_BURST_AVAIL);
+        hpx_burst_engaged = (burst_state == AM_HAL_BURST_MODE);
+        if (hpx_burst_engaged) {
+            SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
+        }
+    }
+{% else %}
+    // NSX applies the perf mode inside nsx_system_init, but the CMSIS
+    // SystemCoreClock global is NOT updated to match: on Apollo4/5
+    // SystemCoreClockUpdate() is hardcoded to the 96 MHz reset default, so at
+    // the hp tier it understates the real core clock (e.g. 192/250 MHz).  Set
+    // it to the resolved operating point so every device-side cycle->time
+    // value (profiled/clean inference us, heartbeat cadence) uses the real
+    // clock.  Harmless when it already matches (lp tiers).
+    SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
+{% endif %}
 {% include "_extreme_mode.j2" %}
 {% if transport == "usb_cdc" %}
 
@@ -475,6 +513,14 @@ int main(void) {
     // Report model metadata
     hpx_printf("HPX_NUM_INPUTS=%d\n", {{ aot_prefix }}_num_inputs);
     hpx_printf("HPX_NUM_OUTPUTS=%d\n", {{ aot_prefix }}_num_outputs);
+    // Ground-truth CPU clock as actually configured on-device.  The host uses
+    // this to verify its registry assumption (used for SWO baud + cycle->time
+    // math) matches reality instead of trusting a hardcoded frequency.
+    hpx_printf("HPX_SYSTEM_CLOCK_HZ=%lu\n", (unsigned long)SystemCoreClock);
+{% if apollo3_burst %}
+    hpx_printf("HPX_BURST_AVAIL=%d\n", hpx_burst_avail);
+    hpx_printf("HPX_BURST_ENGAGED=%d\n", hpx_burst_engaged);
+{% endif %}
     for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
         hpx_printf("HPX_INPUT_%d_SIZE=%d\n", i,
                   (int){{ aot_prefix }}_model_ctx.inputs[i].size);

@@ -80,6 +80,7 @@ def _render_tflm(
         has_armv8m_pmu=has_armv8m_pmu,
         perf_mode_symbol=perf_mode_symbol,
         perf_mode_mhz=perf_mode_mhz,
+        apollo3_burst=False,
         extreme_mode=extreme_mode,
         printf_linkage="",
         heartbeat_enabled=True,
@@ -96,10 +97,12 @@ def _render_aot(
     has_armv8m_pmu: bool = True,
     perf_mode_symbol: str = "NSX_PERF_LOW",
     perf_mode_mhz: int = 96,
+    apollo3_burst: bool = False,
+    cmsis_device_header: str = "apollo510.h",
 ) -> str:
     return _env.get_template("main_aot.cc.j2").render(
         aot_prefix="fake",
-        cmsis_device_header="apollo510.h",
+        cmsis_device_header=cmsis_device_header,
         aot_op_manifest=[{"id": 0, "op_type": "CONV_2D"}],
         iterations=3,
         warmup=1,
@@ -117,6 +120,7 @@ def _render_aot(
         has_armv8m_pmu=has_armv8m_pmu,
         perf_mode_symbol=perf_mode_symbol,
         perf_mode_mhz=perf_mode_mhz,
+        apollo3_burst=apollo3_burst,
         printf_linkage="static ",
         heartbeat_enabled=True,
         heartbeat_every_n_ops=4,
@@ -193,6 +197,84 @@ class TestMainCcRender:
         out = _render_aot(transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=250)
         assert "sys_cfg.perf_mode = NSX_PERF_HIGH;  // 250 MHz" in out
 
+    def test_apollo3_burst_enabled_emits_burst_block(self):
+        out = _render_tflm(
+            transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=96
+        )
+        # No burst when the flag is off (default in helper).
+        assert "am_hal_burst_mode_enable" not in out
+        out = _env.get_template("main.cc.j2").render(
+            engine_header="tensorflow/lite/micro/micro_interpreter.h",
+            cmsis_device_header="apollo3p.h",
+            arena_size=65_536,
+            iterations=3,
+            warmup=1,
+            clean_warmup=1,
+            clean_iters=3,
+            pmu_passes=_sample_pmu_passes(),
+            pmu_pass_names=["Cache"],
+            power_sync_enabled=False,
+            sync_gpio_pin=91,
+            transport="rtt",
+            model_location="mram",
+            arena_region="tcm",
+            weights_region="mram",
+            model_size=1024,
+            resolver_mode="all",
+            resolver_max_ops=2,
+            resolver_registrations=["r.AddConv2D();", "r.AddSoftmax();"],
+            resource_variable_count=0,
+            extreme_mode=False,
+            profiling_backends=["dwt"],
+            has_armv8m_pmu=False,
+            perf_mode_symbol="NSX_PERF_HIGH",
+            perf_mode_mhz=96,
+            apollo3_burst=True,
+            printf_linkage="",
+            heartbeat_enabled=True,
+            heartbeat_every_n_ops=4,
+            heartbeat_every_ms=0,
+        )
+        assert "am_hal_burst_mode_initialize" in out
+        assert "am_hal_burst_mode_enable" in out
+        assert "SystemCoreClock = 96U * 1000000U" in out
+        assert "HPX_BURST_ENGAGED" in out
+
+    def test_aot_apollo3_burst_enabled_emits_burst_block(self):
+        out = _render_aot(transport="rtt", apollo3_burst=False)
+        assert "am_hal_burst_mode_enable" not in out
+        out = _render_aot(
+            transport="rtt",
+            apollo3_burst=True,
+            cmsis_device_header="apollo3p.h",
+            has_armv8m_pmu=False,
+            perf_mode_symbol="NSX_PERF_HIGH",
+            perf_mode_mhz=96,
+        )
+        assert "am_hal_burst_mode_initialize" in out
+        assert "am_hal_burst_mode_enable" in out
+        assert "SystemCoreClock = 96U * 1000000U" in out
+        assert "HPX_BURST_ENGAGED" in out
+
+    def test_newlib_syscalls_present_for_m4_absent_for_m55(self):
+        # newlib _sbrk/_exit retargets are required to link on Cortex-M4
+        # (DWT-only) but must be skipped on Armv8-M (M55).  Both engine
+        # templates must agree, or AOT-vs-heliaRT drift reintroduces the
+        # Apollo3 link failure (undefined _sbrk/_exit).
+        for render in (_render_tflm, _render_aot):
+            m4 = render(has_armv8m_pmu=False)
+            m55 = render(has_armv8m_pmu=True)
+            assert "_sbrk" in m4 and "_exit" in m4
+            assert "_sbrk" not in m55 and "_exit" not in m55
+
+    def test_systemcoreclock_set_from_resolved_clock_non_burst(self):
+        # Non-AP3-burst targets must pin SystemCoreClock to the resolved clock
+        # because NSX leaves the CMSIS global at the 96 MHz reset default.
+        tflm = _render_tflm(transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=250)
+        assert "SystemCoreClock = 250U * 1000000U" in tflm
+        aot = _render_aot(transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=192)
+        assert "SystemCoreClock = 192U * 1000000U" in aot
+
     def test_usb_transport_includes_timer_helpers(self):
         out = _render_tflm(transport="usb_cdc")
         assert "usb_timer_pause" in out
@@ -255,6 +337,7 @@ class TestMainCcRender:
             has_armv8m_pmu=True,
             perf_mode_symbol="NSX_PERF_LOW",
             perf_mode_mhz=96,
+            apollo3_burst=False,
             printf_linkage="",
             heartbeat_enabled=True,
             heartbeat_every_n_ops=4,

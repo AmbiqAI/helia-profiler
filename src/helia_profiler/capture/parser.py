@@ -133,9 +133,14 @@ def parse_firmware_output(lines: list[str]) -> PmuResult:
         num_inputs=meta_kv.get("num_inputs"),
         num_outputs=meta_kv.get("num_outputs"),
         num_presets=meta_kv.get("num_presets"),
+        system_clock_hz=meta_kv.get("system_clock_hz"),
         profiled_infer_count=meta_kv.get("profiled_infer_count"),
         profiled_infer_total_us=meta_kv.get("profiled_infer_total_us"),
         profiled_infer_avg_us=meta_kv.get("profiled_infer_avg_us"),
+        clean_infer_count=meta_kv.get("clean_infer_count"),
+        clean_infer_total_cycles=meta_kv.get("clean_infer_total_cycles"),
+        clean_infer_avg_cycles=meta_kv.get("clean_infer_avg_cycles"),
+        clean_infer_avg_us=meta_kv.get("clean_infer_avg_us"),
         presets=preset_names,
     )
 
