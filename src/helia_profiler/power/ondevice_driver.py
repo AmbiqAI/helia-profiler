@@ -73,6 +73,20 @@ class OnDeviceDriver:
             hint="This feature is under development.",
         )
 
+    def capture_gated(
+        self,
+        *,
+        duration_s: float,
+        io_voltage: float,
+        sync_input_index: int,
+        **kwargs: Any,
+    ) -> PowerResult:
+        del duration_s, io_voltage, sync_input_index, kwargs
+        raise PowerError(
+            "On-device power measurement has no host-side GPIO gating path",
+            hint="Host-side gated capture is supported only for external Joulescope drivers.",
+        )
+
     def power_cycle(self, *, off_time_s: float = 0.5, settle_time_s: float = 1.0) -> None:
         """Not supported for on-device driver."""
         raise PowerError(

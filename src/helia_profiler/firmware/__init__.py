@@ -1012,6 +1012,9 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # External power sync
     sync_gpio_pin = config.power.sync_gpio_pin
+    sync_lockstep = config.power.lockstep
+    state_gpio_pin = config.power.state_gpio_pin
+    go_gpio_pin = config.power.go_gpio_pin
     cmsis_device_header = soc.cmsis_header
 
     # --- Heartbeat template vars (shared across engines) ---
@@ -1080,10 +1083,17 @@ def generate_app(ctx: PipelineContext) -> Path:
                 warmup=config.profiling.warmup,
                 clean_warmup=max(1, config.profiling.warmup),
                 clean_iters=max(1, config.profiling.iterations),
+                window_mode=config.profiling.window_mode,
+                window_target_ms=config.profiling.window_target_ms,
+                window_min=config.profiling.window_min,
+                window_max=config.profiling.window_max,
                 pmu_passes=pmu_passes,
                 pmu_pass_names=[p["name"] for p in pmu_passes],
                 power_sync_enabled=power_sync_enabled,
                 sync_gpio_pin=sync_gpio_pin,
+                lockstep=sync_lockstep,
+                state_gpio_pin=state_gpio_pin,
+                go_gpio_pin=go_gpio_pin,
                 cmsis_device_header=cmsis_device_header,
                 transport=transport,
                 usb_serial_marker=usb_serial_marker,
@@ -1123,10 +1133,17 @@ def generate_app(ctx: PipelineContext) -> Path:
                 warmup=config.profiling.warmup,
                 clean_warmup=max(1, config.profiling.warmup),
                 clean_iters=max(1, config.profiling.iterations),
+                window_mode=config.profiling.window_mode,
+                window_target_ms=config.profiling.window_target_ms,
+                window_min=config.profiling.window_min,
+                window_max=config.profiling.window_max,
                 pmu_passes=pmu_passes,
                 pmu_pass_names=[p["name"] for p in pmu_passes],
                 power_sync_enabled=power_sync_enabled,
                 sync_gpio_pin=sync_gpio_pin,
+                lockstep=sync_lockstep,
+                state_gpio_pin=state_gpio_pin,
+                go_gpio_pin=go_gpio_pin,
                 cmsis_device_header=cmsis_device_header,
                 transport=transport,
                 usb_serial_marker=usb_serial_marker,

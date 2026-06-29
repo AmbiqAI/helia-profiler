@@ -549,9 +549,9 @@ class TestGenerateApp:
         nsx_yml = (app_dir / "nsx.yml").read_text()
         cmake = (app_dir / "CMakeLists.txt").read_text()
         assert "kPowerSyncEnabled = true" in main_cc
-        assert "kSyncGpioPin = 42" in main_cc
-        assert "sync_gpio_high" in main_cc
-        assert "sync_gpio_low" in main_cc
+        assert "kSyncGpioPin      = 42" in main_cc
+        assert "hpx_sync_window_begin" in main_cc
+        assert "hpx_sync_window_end" in main_cc
         assert "nsx_gpio_init" in main_cc
         assert "nsx_gpio_write" in main_cc
         assert "am_hal_gpio_" not in main_cc

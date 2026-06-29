@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from helia_profiler.capture.transport import collect_lines
+from helia_profiler.capture.transport import (
+    WINDOW_BUDGET_MARGIN_S,
+    WINDOW_BUDGET_SAFETY,
+    collect_lines,
+    window_budget_s,
+)
 
 
 def _canned_reader(chunks: list[bytes]):
@@ -123,3 +128,82 @@ def test_collect_lines_invokes_on_line_callback():
     )
 
     assert seen == lines
+
+
+# ---------------------------------------------------------------------------
+# Clean-window "announce and extend"
+# ---------------------------------------------------------------------------
+
+
+def test_window_budget_parses_est_ms():
+    budget = window_budget_s(
+        "HPX_HEARTBEAT phase=clean_window_begin iters=200 est_ms=1000"
+    )
+    assert budget == 1.0 * WINDOW_BUDGET_SAFETY + WINDOW_BUDGET_MARGIN_S
+
+
+def test_window_budget_none_for_zero_or_missing_est():
+    # Fixed-window builds emit est_ms=0 — no usable estimate.
+    assert window_budget_s("HPX_HEARTBEAT phase=clean_window_begin iters=3 est_ms=0") is None
+    # A normal heartbeat is not a window announce.
+    assert window_budget_s("HPX_HEARTBEAT phase=infer pass=0 iter=0 layer=5") is None
+    # Malformed estimate is ignored rather than raising.
+    assert window_budget_s("HPX_HEARTBEAT phase=clean_window_begin est_ms=abc") is None
+
+
+def test_clean_window_announce_survives_blackout_longer_than_heartbeat():
+    """A clean-window announce widens the deadline so a silent window longer
+    than the normal heartbeat timeout still reaches HPX_END."""
+    import time as _t
+
+    released = _t.monotonic() + 0.4  # quiet > heartbeat_timeout, << budget
+    state = {"emitted_start": False}
+
+    def read() -> bytes:
+        if not state["emitted_start"]:
+            state["emitted_start"] = True
+            return (
+                b"--- HPX_START ---\n"
+                b"HPX_HEARTBEAT phase=clean_window_begin iters=200 est_ms=1000\n"
+            )
+        if _t.monotonic() >= released:
+            return b"--- HPX_END ---\n"
+        return b""
+
+    lines = collect_lines(
+        read,
+        transport_name="TEST",
+        heartbeat_timeout_s=0.2,
+        poll_interval_s=0.01,
+    )
+    # Without the announce, the 0.2s heartbeat would bail before 0.4s.
+    assert "--- HPX_END ---" in lines
+
+
+def test_no_announce_still_times_out_on_silence():
+    """Sanity: without a usable announce the normal heartbeat still trips on a
+    blackout, so the extension is doing real work in the test above."""
+    import time as _t
+
+    released = _t.monotonic() + 0.4
+    state = {"emitted_start": False}
+
+    def read() -> bytes:
+        if not state["emitted_start"]:
+            state["emitted_start"] = True
+            # est_ms=0 → no extension.
+            return (
+                b"--- HPX_START ---\n"
+                b"HPX_HEARTBEAT phase=clean_window_begin iters=3 est_ms=0\n"
+            )
+        if _t.monotonic() >= released:
+            return b"--- HPX_END ---\n"
+        return b""
+
+    lines = collect_lines(
+        read,
+        transport_name="TEST",
+        heartbeat_timeout_s=0.2,
+        poll_interval_s=0.01,
+    )
+    assert "--- HPX_END ---" not in lines

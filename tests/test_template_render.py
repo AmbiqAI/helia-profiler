@@ -54,6 +54,7 @@ def _render_tflm(
     perf_mode_mhz: int = 96,
     extreme_mode: bool = False,
     usb_serial_marker: str | None = None,
+    window_mode: str = "fixed",
 ) -> str:
     registrations = resolver_registrations or ["r.AddConv2D();", "r.AddSoftmax();"]
     return _env.get_template("main.cc.j2").render(
@@ -66,6 +67,12 @@ def _render_tflm(
         resource_variable_count=resource_variable_count,
         iterations=3,
         warmup=1,
+        clean_warmup=1,
+        clean_iters=3,
+        window_mode=window_mode,
+        window_target_ms=250,
+        window_min=10,
+        window_max=200,
         pmu_passes=_sample_pmu_passes(),
         pmu_pass_names=["Cache"],
         power_sync_enabled=False,
@@ -99,6 +106,7 @@ def _render_aot(
     perf_mode_mhz: int = 96,
     apollo3_burst: bool = False,
     cmsis_device_header: str = "apollo510.h",
+    window_mode: str = "fixed",
 ) -> str:
     return _env.get_template("main_aot.cc.j2").render(
         aot_prefix="fake",
@@ -106,6 +114,12 @@ def _render_aot(
         aot_op_manifest=[{"id": 0, "op_type": "CONV_2D"}],
         iterations=3,
         warmup=1,
+        clean_warmup=1,
+        clean_iters=3,
+        window_mode=window_mode,
+        window_target_ms=250,
+        window_min=10,
+        window_max=200,
         pmu_passes=_sample_pmu_passes(),
         pmu_pass_names=["Cache"],
         power_sync_enabled=False,
@@ -133,7 +147,7 @@ class TestMainCcRender:
     def test_renders_without_error(self, transport: str):
         out = _render_tflm(transport=transport)
         assert "hpx_printf" in out
-        assert "sync_gpio_init" in out
+        assert "hpx_sync_init" in out
         assert "dwt_init" in out
 
     def test_tflm_hpx_printf_is_extern_linkage(self):
@@ -352,7 +366,7 @@ class TestMainCcRender:
         out = _render_tflm(transport="rtt")
         # After dedup, each shared helper must render once (not twice).
         assert out.count("static inline void dwt_init(void)") == 1
-        assert out.count("static inline void sync_gpio_init(void)") == 1
+        assert out.count("static inline void hpx_sync_init(void)") == 1
 
     def test_external_power_sync_uses_nsx_gpio(self):
         out = _env.get_template("main.cc.j2").render(
@@ -414,7 +428,7 @@ class TestMainAotCcRender:
     def test_renders_without_error(self, transport: str):
         out = _render_aot(transport=transport)
         assert "fake_model_invoke" in out or "fake_model" in out
-        assert "sync_gpio_init" in out
+        assert "hpx_sync_init" in out
         assert "dwt_init" in out
 
     def test_aot_hpx_printf_is_static(self):
@@ -456,7 +470,7 @@ class TestMainAotCcRender:
     def test_shared_blocks_appear_exactly_once(self):
         out = _render_aot(transport="rtt")
         assert out.count("static inline void dwt_init(void)") == 1
-        assert out.count("static inline void sync_gpio_init(void)") == 1
+        assert out.count("static inline void hpx_sync_init(void)") == 1
 
     def test_psram_arena_regions_use_nsx_psram_api(self):
         out = _render_aot(
@@ -484,18 +498,52 @@ class TestMainAotCcRender:
         out = _render_aot(transport="rtt")
         assert "HPX_CLEAN_INFER_COUNT" in out
         assert "HPX_CLEAN_INFER_AVG_CYCLES" in out
-        assert "phase=clean_warmup_done" in out
+        assert "phase=clean_window_begin" in out
 
     def test_aot_gpio_sync_brackets_clean_pass_not_instrumented(self):
         """GPIO sync brackets the clean (power) window, not the per-layer pass."""
         out = _render_aot(transport="rtt")
-        # sync_gpio_high precedes the clean DWT-timed loop and clean_cycles math.
-        hi = out.index("sync_gpio_high();")
-        lo = out.index("sync_gpio_low();")
+        # window_begin precedes the clean DWT-timed loop and clean_cycles math.
+        hi = out.index("hpx_sync_window_begin();")
+        lo = out.index("hpx_sync_window_end();")
         assert hi < out.index("clean_cycles +=") < lo
         # The instrumented profiled loop no longer toggles the sync GPIO.
-        assert out.count("sync_gpio_high();") == 1
-        assert out.count("sync_gpio_low();") == 1
+        assert out.count("hpx_sync_window_begin();") == 1
+        assert out.count("hpx_sync_window_end();") == 1
+
+    def test_fixed_window_mode_uses_literal_clean_iters(self):
+        """Default (fixed) mode hardcodes the clean iteration count, no runtime math."""
+        for render in (_render_tflm, _render_aot):
+            out = render(transport="rtt")
+            assert "const int clean_iters_n = 3;" in out
+            assert "clean_warm_cyc" not in out
+            assert "target_cyc" not in out
+            # Fixed mode announces the window as pure state with est_ms=0
+            # (no runtime warm measurement to estimate from).
+            assert "phase=clean_window_begin iters=%d est_ms=0" in out
+
+    def test_auto_window_mode_computes_clean_iters_at_runtime(self):
+        """Auto mode measures warm cycles and clamps N to fill the target window."""
+        for render in (_render_tflm, _render_aot):
+            out = render(transport="rtt", window_mode="auto")
+            # Runtime adaptive computation present, no compile-time literal.
+            assert "const int clean_iters_n = 3;" not in out
+            assert "uint32_t clean_warm_cyc = 0U;" in out
+            assert "((uint64_t)SystemCoreClock / 1000ULL) * (uint64_t)250U" in out
+            assert "if (n < 10ULL) n = 10ULL;" in out
+            assert "if (n > 200ULL) n = 200ULL;" in out
+            # Robustness: warm several times and keep the MAX reading so a
+            # transient DWT->CYCCNT freeze (J-Link DEMCR/DWT reset on attach)
+            # cannot under-size the window; fall back to window_min, not max.
+            assert "if (wc > clean_warm_cyc) clean_warm_cyc = wc;" in out
+            assert "int clean_iters_n = 10;" in out
+            assert "int clean_iters_n = 200;" not in out
+            # The gated loop still iterates over the computed count.
+            assert "for (int iter = 0; iter < clean_iters_n; iter++)" in out
+            # Auto mode announces the window with a runtime duration estimate
+            # (iters * warm cycles / clock) so the host can widen its deadline.
+            assert "phase=clean_window_begin iters=%d est_ms=%llu" in out
+            assert "clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)" in out
 
     def test_dwt_only_aot_render_avoids_armv8m_pmu_api(self):
         out = _render_aot(transport="rtt", has_armv8m_pmu=False)

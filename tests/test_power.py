@@ -8,7 +8,16 @@ import pytest
 
 from helia_profiler.errors import PowerError
 from helia_profiler.power import get_driver, list_drivers
-from helia_profiler.power.base import PowerMode, PowerResult, PowerSample, PowerSummary
+from helia_profiler.power.base import (
+    GatedPowerWindow,
+    PowerMode,
+    PowerResult,
+    PowerSample,
+    PowerSummary,
+)
+
+#: time64 tick rate (2**30 ticks per second), mirrors ``pyjoulescope_driver.time64.SECOND``.
+_SECOND = 1 << 30
 
 
 class TestPowerTypes:
@@ -40,7 +49,103 @@ class TestPowerTypes:
         result = PowerResult(summary=summary)
         assert result.per_layer is None
         assert result.samples == []
+        assert result.gated_windows == []
         assert result.metadata == {}
+
+    def test_gated_window_is_typed(self):
+        window = GatedPowerWindow(
+            start_s=0.1,
+            end_s=0.3,
+            duration_s=0.2,
+            charge_c=0.001,
+            energy_j=0.002,
+            avg_current_a=0.005,
+            avg_power_w=0.01,
+            peak_current_a=0.02,
+            sample_count=123,
+        )
+        assert window.duration_s == 0.2
+        assert window.sample_count == 123
+
+
+class TestGatedStatsProcessing:
+    """Host-side integration of on-device stat packets into gated windows."""
+
+    @staticmethod
+    def _packet(u0: int, u1: int, cur_int: float, pwr_int: float, cur_max: float):
+        return {
+            "time": {"utc": {"value": [u0, u1]}},
+            "signals": {
+                "current": {
+                    "avg": {"value": cur_int / ((u1 - u0) / _SECOND)},
+                    "max": {"value": cur_max},
+                    "integral": {"value": cur_int},
+                },
+                "power": {
+                    "avg": {"value": pwr_int / ((u1 - u0) / _SECOND)},
+                    "integral": {"value": pwr_int},
+                },
+            },
+        }
+
+    def test_gated_window_sums_ondevice_integrals(self):
+        from helia_profiler.power.joulescope_driver import _process_gated_stats
+
+        ms = _SECOND // 1000
+        packets = []
+        for i in range(20):
+            u0 = i * ms
+            u1 = (i + 1) * ms
+            # Inject a transient spike in one in-window packet's max sample.
+            cur_max = 0.5 if i == 8 else 0.12
+            packets.append(self._packet(u0, u1, 0.0001, 0.00018, cur_max))
+
+        rise = 5 * ms  # window covers packets with midpoint in [5ms, 15ms]
+        fall = 15 * ms
+        poll_samples = [(0, 0), (rise, 1), (fall, 0)]
+
+        windows, summary = _process_gated_stats(
+            packets=packets, poll_samples=poll_samples, io_voltage=1.8
+        )
+
+        assert len(windows) == 1
+        w = windows[0]
+        assert w.sample_count == 10
+        assert w.charge_c == pytest.approx(0.001, rel=1e-6)
+        assert w.energy_j == pytest.approx(0.0018, rel=1e-6)
+        assert w.duration_s == pytest.approx(0.01, rel=1e-6)
+        assert w.avg_current_a == pytest.approx(0.1, rel=1e-6)
+        assert w.avg_power_w == pytest.approx(0.18, rel=1e-6)
+        # Raw peak captures the transient spike; the p99 robust peak rejects it.
+        assert w.peak_current_a == pytest.approx(0.5, rel=1e-6)
+        assert w.peak_current_p99_a < 0.5
+        assert w.median_current_a == pytest.approx(0.1, rel=1e-6)
+        assert summary.energy_j == pytest.approx(0.0018, rel=1e-6)
+
+    def test_no_windows_returns_empty(self):
+        from helia_profiler.power.joulescope_driver import _process_gated_stats
+
+        ms = _SECOND // 1000
+        packets = [self._packet(0, ms, 0.0001, 0.00018, 0.12)]
+        windows, summary = _process_gated_stats(
+            packets=packets, poll_samples=[], io_voltage=1.8
+        )
+        assert windows == []
+        assert summary.sample_count == 0
+
+    def test_whole_summary_sums_all_packets(self):
+        from helia_profiler.power.joulescope_driver import _whole_summary_from_stats
+
+        ms = _SECOND // 1000
+        packets = [
+            self._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12) for i in range(10)
+        ]
+        summary = _whole_summary_from_stats(packets)
+        assert summary.sample_count == 10
+        assert summary.energy_j == pytest.approx(0.0018, rel=1e-6)
+        assert summary.duration_s == pytest.approx(0.01, rel=1e-6)
+        assert summary.avg_power_w == pytest.approx(0.18, rel=1e-6)
+
 
 
 class TestPowerMode:
@@ -212,3 +317,117 @@ class TestCapturePowerStage:
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         stage = CapturePowerStage()
         assert stage.should_skip(ctx) is False
+
+    def test_resets_target_before_capture(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        # Power capture must re-launch the firmware so the gated window fires
+        # under the live poller; relay-cycled boards drawing USB bench power are
+        # not rebooted, so a J-Link reset is the deterministic restart.
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.platform import get_soc_for_board
+        from helia_profiler.stages.s07_capture_power import CapturePowerStage
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "target": {"transport": "uart", "jlink_serial": "1160002204"},
+                "power": {"enabled": True, "driver": "joulescope-js110"},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.soc = get_soc_for_board("apollo510_evb")
+        reset_calls: dict[str, object] = {}
+
+        class FakeDriver:
+            def power_cycle(self, **kwargs):
+                pass
+
+        monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: FakeDriver())
+        monkeypatch.setattr(
+            "helia_profiler.jlink.reset_target",
+            lambda **k: reset_calls.update(k),
+        )
+        monkeypatch.setattr(
+            "helia_profiler.capture.capture_power",
+            lambda ctx, **k: PowerResult(summary=PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0)),
+        )
+        CapturePowerStage().run(ctx)
+        assert reset_calls["jlink_serial"] == "1160002204"
+        assert reset_calls["device"] == ctx.soc.jlink_device
+
+
+class TestCapturePowerWrapper:
+    def test_capture_power_uses_gated_joulescope_path_and_preserves_serial(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.capture import capture_power
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {
+                    "enabled": True,
+                    "driver": "joulescope-js110",
+                    "serial": "004204",
+                    "sync_input_index": 0,
+                },
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[])
+
+        summary = PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6)
+        called: dict[str, object] = {}
+
+        class FakeDriver:
+            def check_available(self):
+                called["checked"] = True
+
+            def capture(self, **kwargs):
+                called["capture"] = kwargs
+                return PowerResult(summary=summary)
+
+            def capture_gated(self, **kwargs):
+                called["capture_gated"] = kwargs
+                return PowerResult(
+                    summary=summary,
+                    metadata={"measurement_scope": "gpio_gated_clean_window"},
+                )
+
+        def fake_get_driver(name: str, *, serial: str | None = None):
+            called["name"] = name
+            called["serial"] = serial
+            return FakeDriver()
+
+        monkeypatch.setattr("helia_profiler.power.get_driver", fake_get_driver)
+
+        result = capture_power(ctx, duration_override_s=7.0)
+
+        assert result.metadata["measurement_scope"] == "gpio_gated_clean_window"
+        assert called["name"] == "joulescope-js110"
+        assert called["serial"] == "004204"
+        assert called["checked"] is True
+        assert "capture" not in called
+        gated = dict(called["capture_gated"])
+        on_started = gated.pop("on_started")
+        assert callable(on_started)
+        assert gated == {
+            "duration_s": 7.0,
+            "io_voltage": 1.8,
+            "sync_input_index": 0,
+            "stats_rate_hz": 1000,
+            "clean_infer_count": 11,
+        }

@@ -12,11 +12,14 @@ Replaces the previous split driver implementation that used the legacy
 from __future__ import annotations
 
 import logging
+import threading
 import time
+from collections.abc import Callable
 from typing import Any
 
 from ..errors import PowerError
-from .base import PowerMode, PowerResult, PowerSample, PowerSummary
+from .base import GatedPowerWindow, PowerMode, PowerResult, PowerSample, PowerSummary
+from .sync import DeviceState, NullSyncController, SyncController, SyncWiring
 
 log = logging.getLogger("hpx")
 
@@ -50,6 +53,24 @@ _STATS_CTRL = {
 _POWER_CYCLE = {
     "js110": ("s/i/range/select", 0, 128),
     "js220": ("s/i/range/mode", "off", "auto"),
+}
+
+#: Native full-rate sampling frequency per family (Hz).  Used to convert a
+#: desired host-side stats rate into the device ``s/stats/scnt`` sample count
+#: (``scnt = native_rate / stats_rate_hz``).
+_NATIVE_SAMPLE_RATE = {
+    "js110": 2_000_000,
+    "js220": 1_000_000,
+}
+
+#: Host-side configurable statistics topics ``(scnt, ctrl, value)``.  Unlike the
+#: fixed-2 Hz JS110 sensor-side ``s/sstats`` used by :meth:`capture`, this stream
+#: is rate-settable and each packet carries the instrument's full-rate charge and
+#: energy integrals — exactly what the gated window needs, with KB (not MB) of
+#: data and no raw sample streaming.
+_HOST_STATS = {
+    "js110": ("s/stats/scnt", "s/stats/ctrl", "s/stats/value"),
+    "js220": ("s/stats/scnt", "s/stats/ctrl", "s/stats/value"),
 }
 
 
@@ -278,6 +299,21 @@ class JoulescopeDriver:
     def mode(self) -> PowerMode:
         return PowerMode.EXTERNAL
 
+    @property
+    def num_gpi(self) -> int:
+        return 2  # JS110/JS220 expose 2 general-purpose inputs
+
+    @property
+    def has_gpo(self) -> bool:
+        return True  # JS110/JS220 expose 2 general-purpose outputs
+
+    def make_sync_controller(self, wiring: SyncWiring) -> SyncController:
+        """Return a 3-wire lock-step controller, or a gate-only fallback."""
+        if not wiring.lockstep or not self.has_gpo:
+            return NullSyncController()
+        return JoulescopeSyncController(serial=self._serial, wiring=wiring)
+
+
     # ------------------------------------------------------------------
     # Availability check
     # ------------------------------------------------------------------
@@ -395,6 +431,197 @@ class JoulescopeDriver:
             raise PowerError(
                 f"Joulescope capture failed: {exc}",
                 hint="Check USB connection and ensure no other software is using the device.",
+            ) from exc
+        finally:
+            _close_device(driver, device_path)
+
+    def capture_gated(
+        self,
+        *,
+        duration_s: float,
+        io_voltage: float,
+        sync_input_index: int,
+        stats_rate_hz: int = 1000,
+        clean_infer_count: int | None = None,
+        poll_interval_s: float = 0.004,
+        min_high_windows: int = 1,
+        guard_s: float = 0.15,
+        on_started: Callable[[], None] | None = None,
+        **kwargs: Any,
+    ) -> PowerResult:
+        """Capture GPIO-gated power using on-device-integrated host stats.
+
+        Instead of streaming raw current/voltage at the instrument's native
+        ~1-2 MSPS and integrating on the host (MB/s of data), this configures
+        the device's host-side statistics stream at ``stats_rate_hz`` (via
+        ``s/stats/scnt``).  Each stat packet carries the instrument's *full-rate*
+        charge and energy integrals over a ~1 ms sub-window, so summing the
+        packets that fall inside the GPIO-high window yields exact window energy
+        with only a few KB of data.  The per-packet avg/min/max/std also give a
+        spike-robust current/power distribution for reporting.
+
+        The gated clean pass runs first in the firmware, so once the poller sees
+        ``min_high_windows`` complete GPIO-high windows plus a ``guard_s`` settle
+        we early-stop; ``duration_s`` is only a safety upper bound.
+        """
+        del kwargs
+
+        try:
+            from pyjoulescope_driver import time64
+        except Exception as exc:
+            raise PowerError(
+                f"Joulescope gated capture requires pyjoulescope_driver: {exc}",
+                hint="Reinstall pyjoulescope_driver and pyjls in the active environment.",
+            ) from exc
+
+        driver, device_path, family = _open_device(self._serial)
+
+        cycle_topic, _off_value, on_value = _POWER_CYCLE[family]
+        native_rate = _NATIVE_SAMPLE_RATE[family]
+        scnt_topic, sctrl_topic, sval_topic = _HOST_STATS[family]
+        scnt = max(1, round(native_rate / max(1, int(stats_rate_hz))))
+
+        packets: list[dict[str, Any]] = []
+        stop = threading.Event()
+        poll_samples: list[tuple[int, int]] = []
+        bit = 1 << sync_input_index
+        windows_done = 0
+
+        def _on_stats(_topic: str, value: Any) -> None:
+            if isinstance(value, dict):
+                packets.append(value)
+
+        def _poller() -> None:
+            nonlocal windows_done
+            prev_level = 0
+            high_seen = False
+            complete_at: float | None = None
+            while not stop.is_set():
+                try:
+                    gpi_value = driver.publish_and_wait(
+                        f"{device_path}/s/gpi/+/!req",
+                        0,
+                        f"{device_path}/s/gpi/+/!value",
+                        timeout=0.5,
+                    )
+                    level = 1 if (int(gpi_value) & bit) else 0
+                    poll_samples.append((time64.now(), level))
+                    if level and not prev_level:
+                        high_seen = True
+                    elif prev_level and not level and high_seen:
+                        windows_done += 1
+                        if windows_done >= min_high_windows and complete_at is None:
+                            complete_at = time.monotonic()
+                    prev_level = level
+                except Exception:
+                    pass
+                # Early-stop once we have the gated window(s) plus a settle guard
+                # so the trailing stat packets covering the window arrive.
+                if complete_at is not None and (time.monotonic() - complete_at) >= guard_s:
+                    stop.set()
+                    break
+                time.sleep(poll_interval_s)
+
+        capture_start = time.monotonic()
+        try:
+            try:
+                driver.publish(f"{device_path}/{cycle_topic}", on_value)
+            except Exception:
+                pass
+
+            driver.publish(f"{device_path}/{scnt_topic}", scnt)
+            driver.publish(f"{device_path}/{sctrl_topic}", 1)
+            driver.subscribe(f"{device_path}/{sval_topic}", "pub", _on_stats)
+            try:
+                thread = threading.Thread(target=_poller, daemon=True)
+                thread.start()
+                # The poller is now sampling GPI.  For transports whose firmware
+                # blocks until the host attaches (USB CDC waits on DTR), release
+                # it now — *after* the poller is watching — so the gated GPIO
+                # window cannot fire before we are ready to see it.
+                if on_started is not None:
+                    try:
+                        on_started()
+                    except Exception:
+                        log.warning("on_started hook failed", exc_info=True)
+                # Block until the poller early-stops or the safety bound elapses.
+                stop.wait(timeout=duration_s)
+            finally:
+                stop.set()
+                try:
+                    thread.join(timeout=1.0)
+                except Exception:
+                    pass
+                try:
+                    driver.publish(f"{device_path}/{sctrl_topic}", 0)
+                except Exception:
+                    pass
+                try:
+                    driver.unsubscribe(f"{device_path}/{sval_topic}", _on_stats)
+                except Exception:
+                    pass
+
+            windows, gated_summary = _process_gated_stats(
+                packets=packets,
+                poll_samples=poll_samples,
+                io_voltage=io_voltage,
+            )
+            if not windows:
+                raise PowerError(
+                    "No GPIO-high windows detected during Joulescope gated capture",
+                    hint=(
+                        "Check the sync wiring between the target GPIO and Joulescope INPUT"
+                        f"{sync_input_index}, confirm the firmware enabled power sync, and "
+                        "ensure the clean window contains >=1 stat packet at "
+                        f"stats_rate_hz={stats_rate_hz}."
+                    ),
+                )
+
+            captured_s = time.monotonic() - capture_start
+            metadata: dict[str, Any] = {
+                "driver": f"joulescope-{family}",
+                "device": device_path,
+                "io_voltage": io_voltage,
+                "measurement_scope": "gpio_gated_clean_window",
+                "gating_method": "gpi_snapshot_poll+host_stats_integral",
+                "sync_input_index": sync_input_index,
+                "stats_rate_hz": stats_rate_hz,
+                "stats_scnt": scnt,
+                "window_count": len(windows),
+                "gpi_poll_count": len(poll_samples),
+                "stat_packets": len(packets),
+                "early_stopped": windows_done >= min_high_windows,
+                "capture_window_s": round(captured_s, 4),
+                "capture_safety_bound_s": duration_s,
+            }
+            if clean_infer_count is not None:
+                metadata["clean_infer_count"] = clean_infer_count
+            if packets:
+                whole_summary = _whole_summary_from_stats(packets)
+                metadata["whole_capture_summary"] = _summary_to_dict(whole_summary)
+
+            log.info(
+                "Joulescope gated: windows=%d, gated_dur=%.3f ms, energy=%.6f J, "
+                "%d stat packets @ ~%d Hz (%s)",
+                len(windows),
+                gated_summary.duration_s * 1000.0,
+                gated_summary.energy_j,
+                len(packets),
+                stats_rate_hz,
+                family.upper(),
+            )
+
+            return PowerResult(
+                summary=gated_summary,
+                gated_windows=windows,
+                metadata=metadata,
+            )
+        except PowerError:
+            raise
+        except Exception as exc:
+            raise PowerError(
+                f"Joulescope gated capture failed: {exc}",
+                hint="Check USB connection, sync wiring, and that no other software is using the device.",
             ) from exc
         finally:
             _close_device(driver, device_path)
@@ -547,6 +774,68 @@ class JoulescopeDriver:
         return True
 
 
+class JoulescopeSyncController:
+    """3-wire lock-step controller backed by Joulescope GPI/GPO.
+
+    Drives OUTPUT0 (go), reads INPUT0 (gate) and INPUT1 (state) on the same
+    shared process-wide driver used for capture, so it composes with an active
+    gated capture without re-opening the relay.
+    """
+
+    def __init__(self, *, serial: str | None, wiring: SyncWiring) -> None:
+        self._serial = serial
+        self._wiring = wiring
+        self._driver: Any = None
+        self._path: str | None = None
+
+    @property
+    def lockstep(self) -> bool:
+        return True
+
+    def _ensure(self) -> tuple[Any, str]:
+        if self._driver is None:
+            self._driver, self._path, _family = _open_device(self._serial)
+        return self._driver, str(self._path)
+
+    def _read_input(self, index: int) -> bool:
+        driver, path = self._ensure()
+        value = driver.publish_and_wait(
+            f"{path}/s/gpi/+/!req", 0, f"{path}/s/gpi/+/!value", timeout=0.5
+        )
+        return bool(int(value) & (1 << index))
+
+    def _write_go(self, high: bool) -> None:
+        driver, path = self._ensure()
+        driver.publish(f"{path}/s/gpo/{self._wiring.go_output_index}/value", 1 if high else 0)
+
+    def arm(self) -> None:
+        self._write_go(False)
+
+    def wait_ready(self, *, timeout_s: float) -> bool:
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            if self._read_input(self._wiring.state_input_index):
+                return True
+            time.sleep(0.005)
+        return False
+
+    def signal_go(self) -> None:
+        self._write_go(True)
+
+    def read_state(self) -> DeviceState:
+        if self._read_input(self._wiring.gate_input_index):
+            return DeviceState.RUNNING
+        if self._read_input(self._wiring.state_input_index):
+            return DeviceState.READY
+        return DeviceState.UNKNOWN
+
+    def release(self) -> None:
+        try:
+            self._write_go(False)
+        except Exception:  # pragma: no cover - defensive
+            pass
+
+
 # ---------------------------------------------------------------------------
 # Stats parsing — works for both the JS110 ``s/sstats/value`` shape and the
 # JS220 ``s/stats/value`` shape, both of which expose
@@ -604,6 +893,198 @@ def _process_stats(
         sample_count=len(stats),
     )
     return samples, summary
+
+
+def _sv(field: Any, default: float = 0.0) -> float:
+    """Extract a ``{'value': x, 'units': ...}`` scalar from a stats packet."""
+    if isinstance(field, dict):
+        try:
+            return float(field.get("value", default))
+        except (TypeError, ValueError):
+            return default
+    return default
+
+
+def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
+    """Vectorise the per-packet fields we use from ``s/stats/value`` packets."""
+    import numpy as np
+
+    mid, dur, cur_avg, cur_max, cur_int, pwr_avg, pwr_int = ([] for _ in range(7))
+    for p in packets:
+        t = p.get("time", {}) if isinstance(p, dict) else {}
+        utc = (t.get("utc", {}) or {}).get("value")
+        if not utc or len(utc) < 2:
+            continue
+        u0, u1 = float(utc[0]), float(utc[1])
+        sig = p.get("signals", {})
+        cur = sig.get("current", {})
+        pwr = sig.get("power", {})
+        mid.append(0.5 * (u0 + u1))
+        dur.append((u1 - u0))
+        cur_avg.append(_sv(cur.get("avg")))
+        cur_max.append(_sv(cur.get("max")))
+        cur_int.append(_sv(cur.get("integral")))
+        pwr_avg.append(_sv(pwr.get("avg")))
+        pwr_int.append(_sv(pwr.get("integral")))
+    # Report current/power as magnitude.  The Joulescope's sign reflects which
+    # terminal sources vs sinks; on a SoC-only rail wired with reversed IN/OUT
+    # the draw reads negative even though the magnitude is correct.  We measure
+    # consumption, so normalize to |I|/|P|; timestamps are left untouched.
+    return {
+        "mid": np.asarray(mid, dtype=np.float64),
+        "dur_ticks": np.asarray(dur, dtype=np.float64),
+        "cur_avg": np.abs(np.asarray(cur_avg, dtype=np.float64)),
+        "cur_max": np.abs(np.asarray(cur_max, dtype=np.float64)),
+        "cur_int": np.abs(np.asarray(cur_int, dtype=np.float64)),
+        "pwr_avg": np.abs(np.asarray(pwr_avg, dtype=np.float64)),
+        "pwr_int": np.abs(np.asarray(pwr_int, dtype=np.float64)),
+    }
+
+
+def _whole_summary_from_stats(packets: list[dict[str, Any]]) -> PowerSummary:
+    """Summarise the entire captured window from on-device stat integrals."""
+    import numpy as np
+    from pyjoulescope_driver import time64
+
+    a = _stats_arrays(packets)
+    if a["mid"].size == 0:
+        return PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0)
+    duration_s = float(a["dur_ticks"].sum() / time64.SECOND)
+    charge_c = float(a["cur_int"].sum())
+    energy_j = float(a["pwr_int"].sum())
+    peak = float(a["cur_max"].max()) if a["cur_max"].size else 0.0
+    avg_current = charge_c / duration_s if duration_s > 0 else 0.0
+    avg_power = energy_j / duration_s if duration_s > 0 else 0.0
+    return PowerSummary(
+        avg_current_a=avg_current,
+        avg_power_w=avg_power,
+        peak_current_a=peak,
+        energy_j=energy_j,
+        duration_s=duration_s,
+        sample_count=int(a["mid"].size),
+    )
+
+
+def _segment_gpi_windows(poll_samples: list[tuple[int, int]]) -> list[tuple[float, float]]:
+    import numpy as np
+
+    if not poll_samples:
+        return []
+    poll_t = np.asarray([t for t, _ in poll_samples], dtype=np.float64)
+    poll_v = np.asarray([v for _, v in poll_samples], dtype=np.int8)
+    high = poll_v > 0
+    edges = np.diff(high.astype(int))
+    rises = poll_t[1:][edges == 1]
+    falls = poll_t[1:][edges == -1]
+    windows: list[tuple[float, float]] = []
+    fall_index = 0
+    for rise in rises:
+        while fall_index < len(falls) and falls[fall_index] <= rise:
+            fall_index += 1
+        if fall_index < len(falls):
+            windows.append((float(rise), float(falls[fall_index])))
+            fall_index += 1
+    return windows
+
+
+def _process_gated_stats(
+    *,
+    packets: list[dict[str, Any]],
+    poll_samples: list[tuple[int, int]],
+    io_voltage: float,
+) -> tuple[list[GatedPowerWindow], PowerSummary]:
+    """Integrate the gated window(s) from on-device stat-packet integrals.
+
+    Each packet carries the instrument's full-rate charge/energy integral over a
+    ~1 ms sub-window, so summing the packets whose midpoint falls inside a
+    GPIO-high window gives exact window charge/energy.  The per-packet
+    avg/max samples within the window yield the spike-robust distribution
+    (median / p95 / p99 / glitch-robust peak) so a lone transient sample cannot
+    define the headline current.
+    """
+    import numpy as np
+    from pyjoulescope_driver import time64
+
+    del io_voltage  # voltage is folded into the on-device power integral
+
+    a = _stats_arrays(packets)
+    windows = _segment_gpi_windows(poll_samples)
+    if a["mid"].size == 0 or not windows:
+        return [], PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0)
+
+    mid = a["mid"]
+    t0 = float(mid.min())
+    gated_windows: list[GatedPowerWindow] = []
+    total_charge = 0.0
+    total_energy = 0.0
+    total_duration = 0.0
+    total_samples = 0
+    peak_current = 0.0
+
+    for rise, fall in windows:
+        mask = (mid >= rise) & (mid <= fall)
+        if not bool(mask.any()):
+            continue
+        duration_s = float(a["dur_ticks"][mask].sum() / time64.SECOND)
+        if duration_s <= 0:
+            continue
+        charge_c = float(a["cur_int"][mask].sum())
+        energy_j = float(a["pwr_int"][mask].sum())
+        seg_cur_avg = a["cur_avg"][mask]
+        seg_cur_max = a["cur_max"][mask]
+        seg_pwr_avg = a["pwr_avg"][mask]
+        avg_current_a = charge_c / duration_s
+        avg_power_w = energy_j / duration_s
+        peak_current_a = float(seg_cur_max.max())
+        total_charge += charge_c
+        total_energy += energy_j
+        total_duration += duration_s
+        total_samples += int(seg_cur_avg.size)
+        peak_current = max(peak_current, peak_current_a)
+        gated_windows.append(
+            GatedPowerWindow(
+                start_s=float((rise - t0) / time64.SECOND),
+                end_s=float((fall - t0) / time64.SECOND),
+                duration_s=duration_s,
+                charge_c=charge_c,
+                energy_j=energy_j,
+                avg_current_a=avg_current_a,
+                avg_power_w=avg_power_w,
+                peak_current_a=peak_current_a,
+                sample_count=int(seg_cur_avg.size),
+                median_current_a=float(np.median(seg_cur_avg)),
+                p95_current_a=float(np.percentile(seg_cur_avg, 95)),
+                p99_current_a=float(np.percentile(seg_cur_avg, 99)),
+                peak_current_p99_a=float(np.percentile(seg_cur_max, 99)),
+                median_power_w=float(np.median(seg_pwr_avg)),
+                p95_power_w=float(np.percentile(seg_pwr_avg, 95)),
+                p99_power_w=float(np.percentile(seg_pwr_avg, 99)),
+            )
+        )
+
+    if total_duration <= 0 or not gated_windows:
+        return [], PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0)
+
+    summary = PowerSummary(
+        avg_current_a=total_charge / total_duration,
+        avg_power_w=total_energy / total_duration,
+        peak_current_a=peak_current,
+        energy_j=total_energy,
+        duration_s=total_duration,
+        sample_count=total_samples,
+    )
+    return gated_windows, summary
+
+
+def _summary_to_dict(summary: PowerSummary) -> dict[str, float | int]:
+    return {
+        "avg_current_a": summary.avg_current_a,
+        "avg_power_w": summary.avg_power_w,
+        "peak_current_a": summary.peak_current_a,
+        "energy_j": summary.energy_j,
+        "duration_s": summary.duration_s,
+        "sample_count": summary.sample_count,
+    }
 
 
 # Optional helper exposed for unit tests; not part of the public surface.

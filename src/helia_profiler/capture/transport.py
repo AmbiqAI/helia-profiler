@@ -63,6 +63,57 @@ HEARTBEAT_TIMEOUT_S = 30
 
 
 # ---------------------------------------------------------------------------
+# Clean-window "announce and extend"
+# ---------------------------------------------------------------------------
+#
+# Before the silent clean (power) window the firmware emits, e.g.::
+#
+#     HPX_HEARTBEAT phase=clean_window_begin iters=200 est_ms=1000
+#
+# That window is intentionally quiet (no per-line traffic so the power/cycle
+# measurement stays pristine), which can outlast the normal inactivity
+# heartbeat for a large model.  The host owns the timeout *policy*: on the
+# announce it widens its deadline to cover the firmware's estimate plus a
+# safety factor, so a long-but-healthy blackout is not mistaken for a hang.
+
+#: Phase marker that precedes the silent clean-inference window.
+CLEAN_WINDOW_BEGIN_PHASE = "phase=clean_window_begin"
+
+#: Multiplier applied to the firmware's est_ms so jitter / a slightly slower
+#: run than the warm estimate cannot trip the deadline.
+WINDOW_BUDGET_SAFETY = 2.0
+
+#: Flat cushion (seconds) added on top of the scaled estimate.
+WINDOW_BUDGET_MARGIN_S = 15.0
+
+
+def window_budget_s(line: str) -> float | None:
+    """Return the deadline budget (seconds) for a clean-window announce.
+
+    Parses a ``HPX_HEARTBEAT phase=clean_window_begin ... est_ms=<n>`` line and
+    returns ``est_ms / 1000 * WINDOW_BUDGET_SAFETY + WINDOW_BUDGET_MARGIN_S``.
+
+    Returns ``None`` when *line* is not a clean-window announce or carries no
+    usable (> 0) estimate — e.g. fixed-window builds emit ``est_ms=0`` because
+    they take no runtime warm measurement, in which case the caller keeps its
+    normal heartbeat behaviour.
+    """
+    if CLEAN_WINDOW_BEGIN_PHASE not in line:
+        return None
+    est_ms: int | None = None
+    for tok in line.split():
+        if tok.startswith("est_ms="):
+            try:
+                est_ms = int(tok.split("=", 1)[1])
+            except ValueError:
+                est_ms = None
+            break
+    if est_ms is None or est_ms <= 0:
+        return None
+    return est_ms / 1000.0 * WINDOW_BUDGET_SAFETY + WINDOW_BUDGET_MARGIN_S
+
+
+# ---------------------------------------------------------------------------
 # Shared line-collection loop (byte-stream transports: RTT, SWO)
 # ---------------------------------------------------------------------------
 
@@ -151,6 +202,22 @@ def collect_lines(
                     on_line(line, line_ts)
                 if line.startswith("HPX_HEARTBEAT"):
                     log.info("%s heartbeat: %s", transport_name, line)
+                    budget = window_budget_s(line)
+                    if budget is not None:
+                        window_deadline = line_ts + budget
+                        if window_deadline > hb_deadline:
+                            hb_deadline = window_deadline
+                        if (
+                            overall_deadline is not None
+                            and window_deadline > overall_deadline
+                        ):
+                            overall_deadline = window_deadline
+                        log.info(
+                            "%s: clean window announced (~%.0fs budget) — "
+                            "holding deadline through the silent measurement window",
+                            transport_name,
+                            budget,
+                        )
                 else:
                     log.debug("%s: %s", transport_name, line)
 

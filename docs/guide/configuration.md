@@ -179,6 +179,8 @@ Compiler-launcher notes:
 | `duration_s` | int | `30` | Capture duration in seconds |
 | `io_voltage` | float | `1.8` | I/O voltage for Joulescope |
 | `sync_gpio_pin` | int | board default (`29` on `apollo510_evb` / `apollo510b_evb`) | GPIO pin for inference sync |
+| `sync_input_index` | int | `0` | Joulescope digital INPUT channel wired to the sync GPIO |
+| `stats_rate_hz` | int | `1000` | Host stats rate for gated power capture |
 
 ### `output`
 

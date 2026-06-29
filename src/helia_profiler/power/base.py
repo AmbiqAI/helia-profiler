@@ -40,11 +40,43 @@ class PowerSummary:
 
 
 @dataclass(frozen=True)
+class GatedPowerWindow:
+    """One GPIO-high window with on-device-integrated charge/energy.
+
+    Charge and energy are exact full-rate integrals reported by the instrument;
+    the ``*_current_a`` / ``*_power_w`` distribution fields summarise the
+    per-stat-packet samples within the window so a brief transient spike does
+    not silently inflate the headline average (``avg_*`` is a true mean, while
+    ``median``/``p95``/``p99`` expose the spread and a glitch-robust peak).
+    """
+
+    start_s: float
+    end_s: float
+    duration_s: float
+    charge_c: float
+    energy_j: float
+    avg_current_a: float
+    avg_power_w: float
+    peak_current_a: float
+    sample_count: int
+    # Spike-robust distribution of the within-window samples (defaults keep
+    # backward compatibility with callers that only set the core fields).
+    median_current_a: float = 0.0
+    p95_current_a: float = 0.0
+    p99_current_a: float = 0.0
+    peak_current_p99_a: float = 0.0
+    median_power_w: float = 0.0
+    p95_power_w: float = 0.0
+    p99_power_w: float = 0.0
+
+
+@dataclass(frozen=True)
 class PowerResult:
     """Complete result of a power capture."""
 
     summary: PowerSummary
     samples: list[PowerSample] = field(default_factory=list)
+    gated_windows: list[GatedPowerWindow] = field(default_factory=list)
     per_layer: dict[str, Any] | None = None  # internal mode only
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -83,6 +115,23 @@ class PowerDriver(Protocol):
         sync pin during the capture window.
 
         Raises :class:`PowerError` on failure.
+        """
+        ...
+
+    def capture_gated(
+        self,
+        *,
+        duration_s: float,
+        io_voltage: float,
+        sync_input_index: int,
+        **kwargs: Any,
+    ) -> PowerResult:
+        """Run a host-side GPIO-gated power capture.
+
+        This is only meaningful for external host instruments that can sample
+        current/voltage while also observing a sync input (for example,
+        Joulescope JS110/JS220). Drivers without host-side GPIO visibility
+        should raise :class:`PowerError`.
         """
         ...
 

@@ -96,6 +96,23 @@ class CapturePowerStage:
                 driver_name,
             )
 
+        # --- Re-launch the firmware so the gated window fires under the poller ---
+        # PMU/clean capture already consumed the firmware's single gated pass.
+        # Boards that draw bench power from USB are not rebooted by the relay
+        # cut above, so the clean window never re-runs and the Joulescope sees no
+        # GPIO-high strobe.  A J-Link reset restarts the firmware deterministically
+        # (it parks at hpx_sync_wait_go in lock-step), so power capture arms GO
+        # and watches the window from the start.  USB CDC also needs the reset —
+        # DTR release only frees the *first* boot, so after PMU the device is
+        # idle; capture re-opens the CDC port to release the post-reset boot.
+        if ctx.soc and ctx.soc.jlink_device:
+            from ..jlink import reset_target
+
+            reset_target(
+                device=ctx.soc.jlink_device,
+                jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
+            )
+
         # --- Capture ---
         # Tighten capture window if PMU timing data is available.
         estimated = _estimate_capture_duration(ctx)

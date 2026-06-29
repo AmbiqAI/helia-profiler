@@ -74,6 +74,7 @@ class PreflightStage:
         _check_rtt_buffer_size(cfg.target.rtt_buffer_size_up)
         _check_runtime_split_locations(cfg)
         _check_pmu_selection(cfg)
+        _check_transport_support(cfg)
         _check_output_dir(cfg.output.dir)
         _check_host_tools(cfg.target.transport, cfg.target.toolchain)
         log.info("Preflight checks passed.")
@@ -237,6 +238,23 @@ def _check_pmu_selection(cfg) -> None:
                 f"{', '.join(supported_groups) if supported_groups else 'none'}."
             ),
         ) from exc
+
+
+def _check_transport_support(cfg) -> None:
+    if cfg.target.transport != "usb_cdc":
+        return
+    try:
+        soc = get_soc_for_board(cfg.target.board, registry=cfg.platform_registry)
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
+    if not soc.has_usb:
+        raise ConfigError(
+            f"Board '{cfg.target.board}' ({soc.name}) has no USB device support.",
+            hint=(
+                "Apollo3/3P has no compatible nsx-ambiq-usb module — use "
+                "transport=uart, swo, or rtt instead."
+            ),
+        )
 
 
 def _check_output_dir(out_dir: Path) -> None:

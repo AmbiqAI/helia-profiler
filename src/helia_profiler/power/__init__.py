@@ -24,12 +24,20 @@ from __future__ import annotations
 import logging
 
 from ..errors import PowerError
-from .base import PowerDriver, PowerMode, PowerResult, PowerSample, PowerSummary
+from .base import (
+    GatedPowerWindow,
+    PowerDriver,
+    PowerMode,
+    PowerResult,
+    PowerSample,
+    PowerSummary,
+)
 
 log = logging.getLogger("hpx")
 
 __all__ = [
     "PowerDriver",
+    "GatedPowerWindow",
     "PowerMode",
     "PowerResult",
     "PowerSample",

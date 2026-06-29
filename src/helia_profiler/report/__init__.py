@@ -42,6 +42,16 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("hpx")
 
+
+def _power_summary_to_dict(summary: Any) -> dict[str, Any]:
+    return {
+        "avg_current_a": summary.avg_current_a,
+        "avg_power_w": summary.avg_power_w,
+        "peak_current_a": summary.peak_current_a,
+        "energy_j": summary.energy_j,
+        "capture_duration_s": summary.duration_s,
+    }
+
 # Memory-related PMU counter names used for cache/memory summaries.
 _CACHE_COUNTERS = (
     "ARM_PMU_L1D_CACHE",
@@ -241,16 +251,42 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     # Power summary
     if ctx.power_result is not None:
         ps = ctx.power_result.summary
-        summary["power"] = {
-            "avg_current_a": ps.avg_current_a,
-            "avg_power_w": ps.avg_power_w,
-            "peak_current_a": ps.peak_current_a,
-            "energy_j": ps.energy_j,
-            "capture_duration_s": ps.duration_s,
-            "measurement_scope": "whole_capture_window",
-        }
+        power_meta = ctx.power_result.metadata
+        measurement_scope = power_meta.get("measurement_scope", "whole_capture_window")
+        summary["power"] = _power_summary_to_dict(ps)
+        summary["power"]["measurement_scope"] = measurement_scope
+        # High-level summaries report only the gated (inference) portion. The
+        # non-inference whole-capture window is annotated in the detailed power
+        # CSV, not here, so users compare like-for-like inference energy.
+        if power_meta.get("sync_input_index") is not None:
+            summary["power"]["sync_input_index"] = power_meta["sync_input_index"]
+        if power_meta.get("gating_method") is not None:
+            summary["power"]["gating_method"] = power_meta["gating_method"]
+        if ctx.power_result.gated_windows:
+            summary["power"]["gated_window_count"] = len(ctx.power_result.gated_windows)
         meta = ctx.pmu_result.meta if ctx.pmu_result is not None else None
-        if meta and meta.profiled_infer_total_us is not None:
+        if measurement_scope == "gpio_gated_clean_window":
+            if ctx.power_result.gated_windows:
+                gw = ctx.power_result.gated_windows[0]
+                # Spike-robust distribution: a lone transient sample cannot
+                # define the headline current/power. The peak is reported both
+                # as the raw max and as the p99 of per-packet maxima.
+                summary["power"]["median_current_a"] = round(gw.median_current_a, 9)
+                summary["power"]["p95_current_a"] = round(gw.p95_current_a, 9)
+                summary["power"]["p99_current_a"] = round(gw.p99_current_a, 9)
+                summary["power"]["peak_current_p99_a"] = round(gw.peak_current_p99_a, 9)
+                summary["power"]["median_power_w"] = round(gw.median_power_w, 9)
+                summary["power"]["p95_power_w"] = round(gw.p95_power_w, 9)
+                summary["power"]["p99_power_w"] = round(gw.p99_power_w, 9)
+            if meta and meta.clean_infer_count and meta.clean_infer_count > 0:
+                energy_per_infer = ps.energy_j / meta.clean_infer_count
+                summary["power"]["energy_per_inference_j"] = round(energy_per_infer, 9)
+                if energy_per_infer > 0:
+                    summary["power"]["inferences_per_joule"] = round(
+                        1.0 / energy_per_infer,
+                        6,
+                    )
+        elif meta and meta.profiled_infer_total_us is not None:
             active_duration_s = meta.profiled_infer_total_us / 1_000_000.0
             summary["power"]["active_window_estimated_duration_s"] = round(active_duration_s, 6)
             summary["power"]["active_window_estimated_energy_j"] = round(
@@ -329,7 +365,14 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
         ma = ctx.model_analysis
         ps = ctx.power_result.summary
         if ps.avg_power_w and ps.avg_power_w > 0 and ps.duration_s and ps.duration_s > 0:
-            tops = ma.total_ops / 1e12 / ps.duration_s
+            infer_count = 1
+            if (
+                ctx.power_result.metadata.get("measurement_scope") == "gpio_gated_clean_window"
+                and ctx.pmu_result is not None
+                and ctx.pmu_result.meta.clean_infer_count
+            ):
+                infer_count = ctx.pmu_result.meta.clean_infer_count
+            tops = (ma.total_ops * infer_count) / 1e12 / ps.duration_s
             tops_per_watt = tops / ps.avg_power_w
             summary.setdefault("model_analysis", {})["tops"] = round(tops, 6)
             summary.setdefault("model_analysis", {})["tops_per_watt"] = round(tops_per_watt, 6)
@@ -673,18 +716,59 @@ def _write_json(
 
 
 def _write_power_csv(power: PowerResult, output_dir: Path) -> Path:
-    """Write power summary as a separate CSV."""
+    """Write power summary as a separate CSV.
+
+    The high-level summary.json reports only the gated (inference) portion. This
+    detailed CSV is the place where the non-inference whole-capture window is
+    annotated, so it carries both the gated metrics and, when available, the
+    ``whole_capture_window`` rows for reference.
+    """
     out_path = output_dir / "power_summary.csv"
     summary = power.summary
+    meta = power.metadata or {}
+    scope = meta.get("measurement_scope", "whole_capture_window")
     with open(out_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["metric", "value"])
-        writer.writerow(["avg_current_a", summary.avg_current_a])
-        writer.writerow(["avg_power_w", summary.avg_power_w])
-        writer.writerow(["peak_current_a", summary.peak_current_a])
-        writer.writerow(["energy_j", summary.energy_j])
-        writer.writerow(["duration_s", summary.duration_s])
-        writer.writerow(["sample_count", summary.sample_count])
+        writer.writerow(["scope", "metric", "value"])
+        writer.writerow([scope, "avg_current_a", summary.avg_current_a])
+        writer.writerow([scope, "avg_power_w", summary.avg_power_w])
+        writer.writerow([scope, "peak_current_a", summary.peak_current_a])
+        writer.writerow([scope, "energy_j", summary.energy_j])
+        writer.writerow([scope, "duration_s", summary.duration_s])
+        writer.writerow([scope, "sample_count", summary.sample_count])
+
+        # Per-window detail for gated captures.
+        for i, w in enumerate(power.gated_windows):
+            writer.writerow([f"gated_window_{i}", "start_s", w.start_s])
+            writer.writerow([f"gated_window_{i}", "duration_s", w.duration_s])
+            writer.writerow([f"gated_window_{i}", "energy_j", w.energy_j])
+            writer.writerow([f"gated_window_{i}", "charge_c", w.charge_c])
+            writer.writerow([f"gated_window_{i}", "avg_current_a", w.avg_current_a])
+            writer.writerow([f"gated_window_{i}", "avg_power_w", w.avg_power_w])
+            writer.writerow([f"gated_window_{i}", "peak_current_a", w.peak_current_a])
+            writer.writerow([f"gated_window_{i}", "sample_count", w.sample_count])
+            # Spike-robust distribution from per-packet stats.
+            writer.writerow([f"gated_window_{i}", "median_current_a", w.median_current_a])
+            writer.writerow([f"gated_window_{i}", "p95_current_a", w.p95_current_a])
+            writer.writerow([f"gated_window_{i}", "p99_current_a", w.p99_current_a])
+            writer.writerow([f"gated_window_{i}", "peak_current_p99_a", w.peak_current_p99_a])
+            writer.writerow([f"gated_window_{i}", "median_power_w", w.median_power_w])
+            writer.writerow([f"gated_window_{i}", "p95_power_w", w.p95_power_w])
+            writer.writerow([f"gated_window_{i}", "p99_power_w", w.p99_power_w])
+
+        # Non-inference reference: whole captured window (annotation only).
+        whole = meta.get("whole_capture_summary")
+        if isinstance(whole, dict):
+            for key in (
+                "avg_current_a",
+                "avg_power_w",
+                "peak_current_a",
+                "energy_j",
+                "duration_s",
+                "sample_count",
+            ):
+                if key in whole:
+                    writer.writerow(["whole_capture_window", key, whole[key]])
     log.info("Wrote power summary: %s", out_path)
     return out_path
 

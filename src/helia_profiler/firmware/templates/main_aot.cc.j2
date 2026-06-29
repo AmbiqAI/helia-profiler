@@ -315,7 +315,8 @@ int main(void) {
     nsx_uart_printf_enable();
 {% endif %}
     dwt_init();
-    sync_gpio_init();
+    hpx_sync_init();
+    hpx_sync_ready();
 {% if apollo3_burst %}
     // --- Apollo3/3P TurboSPOT (96 MHz burst) ------------------------------
     // NSX exposes no perf-mode selector on Apollo3, so request burst directly
@@ -546,9 +547,51 @@ int main(void) {
     // This pass is also the canonical window for external power measurement:
     // it is the only inference loop free of instrumentation/transport overhead,
     // so the GPIO sync brackets it (not the instrumented passes below).  When
-    // power sync is disabled, sync_gpio_high/low compile to no-ops.
+    // power sync is disabled, hpx_sync_window_begin/end compile to no-ops.
     {
         g_profiler_enabled = false;
+{% if window_mode | default("fixed") == "auto" %}
+        // Adaptive clean-window sizing.  Warm caches / branch predictor / MRAM
+        // prefetch (uninstrumented) and capture the warm per-inference cycle
+        // cost, then choose how many gated iterations to run so the window
+        // fills ~{{ window_target_ms }} ms of wall-time, clamped to
+        // [{{ window_min }}, {{ window_max }}].  Short models run more
+        // iterations and big models fewer, giving a consistent window for
+        // reliable external power gating.  The host divides the gated energy by
+        // the reported HPX_CLEAN_INFER_COUNT.
+        //
+        // Robustness: a debugger attaching over SWD (notably the J-Link RTT
+        // background engine) can reset/reconfigure DEMCR/DWT *after* our boot
+        // dwt_init() runs, transiently freezing DWT->CYCCNT during an early
+        // warmup iteration.  A frozen counter yields a near-zero cycle reading,
+        // which would size the window to window_max (thousands of iterations →
+        // minutes of silence that trip the host capture heartbeat).  The reset
+        // is a single one-shot event during attach, so we re-assert the counter,
+        // warm several times, and take the MAX reading: a transient freeze only
+        // ever makes a reading too *low*, so the maximum rejects it.  If the
+        // counter never advances at all we fall back to window_min.
+        dwt_init();
+        uint32_t clean_warm_cyc = 0U;
+        for (int w = 0; w < 3; w++) {
+            for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
+                memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
+                       {{ aot_prefix }}_model_ctx.inputs[i].size);
+            }
+            uint32_t wt0 = DWT->CYCCNT;
+            {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
+            uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
+            if (wc > clean_warm_cyc) clean_warm_cyc = wc;
+        }
+        int clean_iters_n = {{ window_min }};
+        if (clean_warm_cyc > 0U) {
+            const uint64_t target_cyc =
+                ((uint64_t)SystemCoreClock / 1000ULL) * (uint64_t){{ window_target_ms }}U;
+            uint64_t n = target_cyc / (uint64_t)clean_warm_cyc;
+            if (n < {{ window_min }}ULL) n = {{ window_min }}ULL;
+            if (n > {{ window_max }}ULL) n = {{ window_max }}ULL;
+            clean_iters_n = (int)n;
+        }
+{% else %}
         // Warm caches / branch predictor / MRAM prefetch (uninstrumented).
         for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
             for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
@@ -557,11 +600,39 @@ int main(void) {
             }
             {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
         }
-        hpx_printf("HPX_HEARTBEAT phase=clean_warmup_done\n");
+        const int clean_iters_n = {{ clean_iters | default(1) }};
+{% endif %}
+        // Announce the upcoming silent clean (power) window so the host can
+        // widen its capture deadline for the blackout.  Firmware only reports
+        // state + the one runtime scalar the host cannot know a priori — how
+        // long a single inference takes — folded into est_ms (iters * warm
+        // cycles / clock).  The host owns the actual timeout policy.
+{% if window_mode | default("fixed") == "auto" %}
+        uint64_t clean_est_ms = 0;
+        if (SystemCoreClock >= 1000U) {
+            clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)
+                           / ((uint64_t)SystemCoreClock / 1000ULL);
+        }
+        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\n",
+                   clean_iters_n, (unsigned long long)clean_est_ms);
+{% else %}
+        // Fixed window: no runtime warm measurement, so est_ms=0 — the host
+        // already knows the iteration count from its own settings.
+        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=0\n",
+                   clean_iters_n);
+{% endif %}
         uint64_t clean_cycles = 0;
         uint32_t clean_count = 0;
-        sync_gpio_high();
-        for (int iter = 0; iter < {{ clean_iters | default(1) }}; iter++) {
+        hpx_sync_wait_go();
+{% if transport == "usb_cdc" %}
+        // Silence the 1 kHz tud_task() polling timer for the duration of the
+        // clean window.  Its ISR otherwise fires mid-inference and pollutes the
+        // E2E cycle count (and the external-power window) — measured as a flat
+        // ~+18% latency tax on AP4.  The PMU window below already does this.
+        usb_timer_pause();
+{% endif %}
+        hpx_sync_window_begin();
+        for (int iter = 0; iter < clean_iters_n; iter++) {
             for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
                 memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
                        {{ aot_prefix }}_model_ctx.inputs[i].size);
@@ -571,7 +642,10 @@ int main(void) {
             clean_cycles += (uint32_t)(DWT->CYCCNT - t0);
             clean_count++;
         }
-        sync_gpio_low();
+        hpx_sync_window_end();
+{% if transport == "usb_cdc" %}
+        usb_timer_resume();
+{% endif %}
         if (clean_count > 0) {
             const uint32_t clean_avg_cycles =
                 (uint32_t)((clean_cycles + (clean_count / 2U)) / clean_count);

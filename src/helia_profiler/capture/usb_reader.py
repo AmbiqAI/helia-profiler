@@ -31,7 +31,13 @@ from ..jlink import reset_target
 from ..usb_identity import USB_MARKER_PREFIX
 from .readiness import attached_reset_session
 from .timing import READINESS_POLL_INTERVAL_S, USB_REENUM_FLOOR_S
-from .transport import DEFAULT_TIMEOUT_S, HPX_END, HPX_START, LINE_TIMEOUT_S
+from .transport import (
+    DEFAULT_TIMEOUT_S,
+    HPX_END,
+    HPX_START,
+    LINE_TIMEOUT_S,
+    window_budget_s,
+)
 
 log = logging.getLogger("hpx")
 
@@ -358,6 +364,20 @@ def capture_usb_output(
             log.debug("USB: %s", line)
             if line == HPX_START and hpx_start_s is None:
                 hpx_start_s = line_ts
+
+            # Clean (power) window announce: widen the capture deadline to cover
+            # the firmware's estimate of the upcoming silent window so a long
+            # but healthy blackout is not cut short.
+            budget = window_budget_s(line)
+            if budget is not None:
+                window_deadline = line_ts + budget
+                if window_deadline > deadline:
+                    deadline = window_deadline
+                    log.info(
+                        "USB: clean window announced (~%.0fs budget) — "
+                        "holding deadline through the silent measurement window",
+                        budget,
+                    )
 
             if line == HPX_END:
                 hpx_end_s = line_ts

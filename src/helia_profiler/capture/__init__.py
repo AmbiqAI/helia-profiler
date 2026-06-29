@@ -213,6 +213,67 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     return result
 
 
+class _UsbDtrHolder:
+    """Hold a USB CDC port open (DTR asserted) for a gated power capture.
+
+    The USB firmware spins in ``nsx_usb_connected()`` until the host opens its
+    CDC port and raises DTR.  During a Joulescope-gated power run nothing reads
+    firmware output, so this just resolves the target's CDC port, opens it, and
+    asserts DTR — releasing the firmware to run the gated clean window — then
+    holds it open until :meth:`close`.
+    """
+
+    def __init__(self, *, usb_port: str | None, usb_marker: str | None) -> None:
+        self._usb_port = usb_port
+        self._usb_marker = usb_marker
+        self._ser = None  # type: ignore[var-annotated]
+
+    def open(self) -> None:
+        import serial
+
+        from .usb_reader import _BAUD, _resolve_cdc_port
+
+        port = self._usb_port
+        if port is None:
+            port = _resolve_cdc_port(marker=self._usb_marker)
+        log.info("Opening USB CDC port for gated power capture: %s", port)
+        self._ser = serial.Serial(
+            port=port,
+            baudrate=_BAUD,
+            timeout=1.0,
+            dsrdtr=True,  # assert DTR so nsx_usb_connected() returns true
+        )
+        self._ser.dtr = True
+
+    def close(self) -> None:
+        if self._ser is not None:
+            try:
+                self._ser.close()
+            except Exception:
+                log.debug("Failed to close USB DTR holder port", exc_info=True)
+            finally:
+                self._ser = None
+
+
+def _make_sync_controller(ctx: PipelineContext, driver: object):
+    """Build a host sync controller from config, or a gate-only fallback.
+
+    Lock-step is opt-in (``power.lockstep``); without it, or on drivers that
+    cannot drive a GO output, the controller is a no-op and the device free-runs.
+    """
+    from ..power.sync import NullSyncController, SyncWiring
+
+    if not ctx.config.power.lockstep or not hasattr(driver, "make_sync_controller"):
+        return NullSyncController()
+    wiring = SyncWiring(
+        lockstep=True,
+        gate_input_index=ctx.config.power.sync_input_index,
+        state_input_index=ctx.config.power.state_input_index,
+        go_output_index=ctx.config.power.go_output_index,
+    )
+    return driver.make_sync_controller(wiring)
+
+
 def capture_power(ctx: PipelineContext, *, duration_override_s: float | None = None) -> PowerResult:
     """Record a power trace using the configured power driver.
 
@@ -221,7 +282,7 @@ def capture_power(ctx: PipelineContext, *, duration_override_s: float | None = N
     from ..power import get_driver
 
     driver_name = ctx.config.power.driver
-    driver = get_driver(driver_name)
+    driver = get_driver(driver_name, serial=ctx.config.power.serial)
 
     # Verify driver is usable
     driver.check_available()
@@ -230,10 +291,53 @@ def capture_power(ctx: PipelineContext, *, duration_override_s: float | None = N
         duration_override_s if duration_override_s is not None else ctx.config.power.duration_s
     )
 
-    return driver.capture(
-        duration_s=duration,
-        io_voltage=ctx.config.power.io_voltage,
-    )
+    clean_count = None
+    if ctx.pmu_result is not None:
+        clean_count = ctx.pmu_result.meta.clean_infer_count
+
+    if (
+        driver_name in {"joulescope", "joulescope-js110", "joulescope-js220"}
+        and clean_count is not None
+    ):
+        # USB CDC firmware blocks in nsx_usb_connected() until the host asserts
+        # DTR.  Unlike SWO/UART/RTT (which free-run after reset), it will never
+        # reach the gated clean window — and the Joulescope would see no
+        # GPIO-high window — unless we open its CDC port.  Hand capture_gated an
+        # on_started hook that opens the port *after* the GPI poller is live, so
+        # the firmware is released only once we are watching for the window.
+        dtr_holder: _UsbDtrHolder | None = None
+        if ctx.config.target.transport == "usb_cdc":
+            jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
+            dtr_holder = _UsbDtrHolder(
+                usb_port=ctx.config.target.usb_port,
+                usb_marker=usb_marker_serial(jlink_serial),
+            )
+        # 3-wire lock-step: arm the host GO line before the device may run and
+        # release it once the poller is live, chained after any USB DTR open.
+        sync = _make_sync_controller(ctx, driver)
+        sync.arm()
+
+        def _release() -> None:
+            if dtr_holder is not None:
+                dtr_holder.open()
+            sync.signal_go()
+
+        try:
+            return driver.capture_gated(
+                duration_s=duration,
+                io_voltage=ctx.config.power.io_voltage,
+                sync_input_index=ctx.config.power.sync_input_index,
+                stats_rate_hz=ctx.config.power.stats_rate_hz,
+                clean_infer_count=clean_count,
+                on_started=_release,
+            )
+        finally:
+            sync.release()
+            if dtr_holder is not None:
+                dtr_holder.close()
+
+
+    return driver.capture(duration_s=duration, io_voltage=ctx.config.power.io_voltage)
 
 
 # ---------------------------------------------------------------------------

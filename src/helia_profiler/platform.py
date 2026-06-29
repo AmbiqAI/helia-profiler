@@ -69,6 +69,10 @@ class PerfTier(Enum):
 
 
 DEFAULT_SYNC_GPIO_PIN = 10
+# 3-wire lock-step sync defaults: device drives gate + state, host drives go.
+# 0 disables the wire (degrades gracefully to 1-wire gate-only handshake).
+DEFAULT_STATE_GPIO_PIN = 0
+DEFAULT_GO_GPIO_PIN = 0
 
 
 @dataclass(frozen=True)
@@ -132,6 +136,11 @@ class SocDef:
     #: prescaler.  ``None`` means SWO is core-clocked (Apollo4/5): use the
     #: selected CPU frequency.
     swo_trace_clock_mhz: int | None = None
+
+    #: Whether nsx-ambiq-usb supports this SoC (gates the usb_cdc transport).
+    #: Apollo3/3P has no compatible nsx-ambiq-usb module, so usb_cdc is rejected
+    #: at preflight with a clear message instead of failing at nsx lock.
+    has_usb: bool = True
 
     def clock_domain(self, name: str) -> ClockDomain | None:
         """Return the named clock domain, or ``None`` if not present."""
@@ -218,7 +227,9 @@ class BoardDef:
     soc: str  # SoC name key (matches SocDef.name)
     channel: str  # "stable" or "preview"
     psram_kb: int | None = None  # None = inherit SoC default
-    default_sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN
+    default_sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN  # gate (device -> host)
+    default_state_gpio_pin: int = DEFAULT_STATE_GPIO_PIN  # state/error (device -> host)
+    default_go_gpio_pin: int = DEFAULT_GO_GPIO_PIN  # go (host -> device)
     starter_profile_board: str | None = None  # derive NSX profile/modules from this board
     description: str = ""
 
@@ -308,6 +319,8 @@ _register_soc(
         # core clock — TurboSPOT burst (hp/96 MHz) does not change the SWO baud,
         # so the host always programs J-Link's SWO prescaler against 48 MHz.
         swo_trace_clock_mhz=48,
+        # No nsx-ambiq-usb support on Apollo3/3P — usb_cdc transport unavailable.
+        has_usb=False,
     )
 )
 
@@ -522,6 +535,8 @@ _register_board(
         soc="apollo510",
         channel="stable",
         default_sync_gpio_pin=29,
+        default_state_gpio_pin=36,
+        default_go_gpio_pin=14,
     )
 )
 _register_board(
@@ -530,6 +545,8 @@ _register_board(
         soc="apollo510b",
         channel="preview",
         default_sync_gpio_pin=29,
+        default_state_gpio_pin=36,
+        default_go_gpio_pin=14,
     )
 )
 _register_board(BoardDef("apollo5b_evb", soc="apollo5b", channel="preview"))
@@ -610,6 +627,34 @@ def get_default_sync_gpio_pin(
     if board is None:
         return fallback
     return board.default_sync_gpio_pin
+
+
+def get_default_state_gpio_pin(
+    board_name: str,
+    fallback: int = DEFAULT_STATE_GPIO_PIN,
+    *,
+    registry: PlatformRegistry | None = None,
+) -> int:
+    """Return the board's default state/error GPIO pin, or *fallback* if unknown."""
+    active = registry or build_platform_registry()
+    board = active.boards.get(board_name)
+    if board is None:
+        return fallback
+    return board.default_state_gpio_pin
+
+
+def get_default_go_gpio_pin(
+    board_name: str,
+    fallback: int = DEFAULT_GO_GPIO_PIN,
+    *,
+    registry: PlatformRegistry | None = None,
+) -> int:
+    """Return the board's default go GPIO pin, or *fallback* if unknown."""
+    active = registry or build_platform_registry()
+    board = active.boards.get(board_name)
+    if board is None:
+        return fallback
+    return board.default_go_gpio_pin
 
 
 def list_boards(*, registry: PlatformRegistry | None = None) -> list[BoardDef]:

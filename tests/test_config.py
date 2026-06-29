@@ -30,6 +30,26 @@ def test_aggregation_defaults_to_median():
     assert config.profiling.aggregation == "median"
 
 
+def test_power_stats_rate_hz_default_and_override():
+    base = {"model": {"path": "m.tflite"}, "engine": {"type": "helia-rt"}}
+    config = load_config(None, base)
+    assert config.power.stats_rate_hz == 1000
+
+    cli = {**base, "power": {"stats_rate_hz": 2000}}
+    config = load_config(None, cli)
+    assert config.power.stats_rate_hz == 2000
+
+
+def test_power_stats_rate_hz_must_be_positive():
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "power": {"stats_rate_hz": 0},
+    }
+    with pytest.raises(ValueError, match="stats_rate_hz must be >= 1"):
+        load_config(None, cli)
+
+
 def test_aggregation_cli_override():
     cli = {
         "model": {"path": "m.tflite"},
