@@ -349,6 +349,7 @@ int main(void) {
     // clock.  Harmless when it already matches (lp tiers).
     SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
 {% endif %}
+{% include "_ssram_power.j2" %}
 {% include "_extreme_mode.j2" %}
 {% if transport == "usb_cdc" %}
 

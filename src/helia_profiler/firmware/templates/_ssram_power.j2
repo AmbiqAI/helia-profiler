@@ -1,0 +1,39 @@
+{# _ssram_power.j2 — bring up the shared SSRAM array.
+
+   The Apollo5 shared SSRAM (3 MB) is NOT powered by nsx_system_init(): that
+   only configures the MCU TCM split.  Two distinct needs are served here:
+
+   1. SRAM-RESIDENT arena/weights — the MCU must actively read/write the array
+      during inference, so it has to stay powered while the MCU is on
+      (eActiveWithMCU = SRAM_3M).  Without this the buffers are unbacked at
+      run time: reads return garbage and inference hangs.
+
+   2. force_shared_sram (static-power lever) — mirror AutoDeploy's
+      ns_power_config(bNeedSharedSRAM=true) exactly (apollo5 ns_power.c:
+      eSRAMCfg=SRAM_3M, eSRAMRetain=SRAM_3M, eActiveWith*=NONE).  This retains
+      the whole array without keeping it MCU-active, so a TCM-resident model
+      can be compared against AutoDeploy's power floor.
+
+   When the arena/weights live in SRAM the MCU-active need (1) takes precedence
+   and also covers the retention of (2).
+
+   Mutually exclusive with _extreme_mode.j2 (which powers SSRAM OFF and only
+   fires when both arena and weights are in TCM).
+#}
+{% set _sram_resident = (arena_region | default("") == "sram") or (weights_region | default("") == "sram") %}
+{% if (soc_family | default("")) == "ap5" and (_sram_resident or (force_shared_sram | default(false))) %}
+
+    // ---------------------------------------------------------------------
+    // Shared SSRAM power-on (3 MB).  {{ "Active+retained for SRAM-resident buffers." if _sram_resident else "Retained only - mirrors AutoDeploy ns_power_config(bNeedSharedSRAM=true)." }}
+    // ---------------------------------------------------------------------
+    {
+        am_hal_pwrctrl_sram_memcfg_t sramCfg = {
+            .eSRAMCfg        = AM_HAL_PWRCTRL_SRAM_3M,
+            .eActiveWithMCU  = {% if _sram_resident %}AM_HAL_PWRCTRL_SRAM_3M{% else %}AM_HAL_PWRCTRL_SRAM_NONE{% endif %},
+            .eActiveWithGFX  = AM_HAL_PWRCTRL_SRAM_NONE,
+            .eActiveWithDISP = AM_HAL_PWRCTRL_SRAM_NONE,
+            .eSRAMRetain     = AM_HAL_PWRCTRL_SRAM_3M,
+        };
+        am_hal_pwrctrl_sram_config(&sramCfg);
+    }
+{% endif %}
