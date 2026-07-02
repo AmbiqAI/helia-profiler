@@ -12,6 +12,7 @@ Replaces the previous split driver implementation that used the legacy
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from collections.abc import Callable
@@ -368,7 +369,9 @@ class JoulescopeDriver:
 
         def _on_stats(_topic: str, value: Any) -> None:
             if isinstance(value, dict):
-                packets.append(value)
+                packet = dict(value)
+                packet["_host_time64"] = time64.now()
+                packets.append(packet)
 
         try:
             # Make sure current is flowing through the shunt (auto range).
@@ -491,6 +494,32 @@ class JoulescopeDriver:
             if isinstance(value, dict):
                 packets.append(value)
 
+        # Opt-in full-rate cross-check (AutoDeploy-equivalent reference method).
+        # Set HPX_POWER_FULLRATE_XCHECK=1 to also stream raw s/i + s/v at the
+        # instrument's native rate and integrate energy over the GPI windows,
+        # logged alongside the 1 kHz stats-sum for direct comparison.
+        fr_xcheck = os.environ.get("HPX_POWER_FULLRATE_XCHECK") == "1"
+        fr_cur: list[Any] = []
+        fr_volt: list[Any] = []
+        fr_anchors: list[tuple[int, int, float]] = []
+        fr_n = [0]
+
+        def _on_fr_current(_topic: str, value: Any) -> None:
+            import numpy as np
+
+            data = np.asarray(value["data"], dtype=np.float32)
+            sr = value["sample_rate"] / max(1, value.get("decimate_factor", 1))
+            utc = value.get("utc")
+            if utc is not None:
+                fr_anchors.append((fr_n[0], int(utc), float(sr)))
+            fr_cur.append(data.copy())
+            fr_n[0] += len(data)
+
+        def _on_fr_voltage(_topic: str, value: Any) -> None:
+            import numpy as np
+
+            fr_volt.append(np.asarray(value["data"], dtype=np.float32).copy())
+
         def _poller() -> None:
             nonlocal windows_done
             prev_level = 0
@@ -532,6 +561,16 @@ class JoulescopeDriver:
             driver.publish(f"{device_path}/{scnt_topic}", scnt)
             driver.publish(f"{device_path}/{sctrl_topic}", 1)
             driver.subscribe(f"{device_path}/{sval_topic}", "pub", _on_stats)
+            if fr_xcheck:
+                try:
+                    driver.subscribe(f"{device_path}/s/i/!data", ["pub"], _on_fr_current)
+                    driver.subscribe(f"{device_path}/s/v/!data", ["pub"], _on_fr_voltage)
+                    driver.publish(f"{device_path}/s/i/ctrl", 1, timeout=0)
+                    driver.publish(f"{device_path}/s/v/ctrl", 1, timeout=0)
+                    log.info("Joulescope full-rate energy cross-check enabled (s/i + s/v streaming)")
+                except Exception:
+                    log.warning("Failed to enable full-rate cross-check streaming", exc_info=True)
+                    fr_xcheck = False
             try:
                 thread = threading.Thread(target=_poller, daemon=True)
                 thread.start()
@@ -560,6 +599,14 @@ class JoulescopeDriver:
                     driver.unsubscribe(f"{device_path}/{sval_topic}", _on_stats)
                 except Exception:
                     pass
+                if fr_xcheck:
+                    try:
+                        driver.publish(f"{device_path}/s/i/ctrl", 0, timeout=0)
+                        driver.publish(f"{device_path}/s/v/ctrl", 0, timeout=0)
+                        driver.unsubscribe(f"{device_path}/s/i/!data", _on_fr_current)
+                        driver.unsubscribe(f"{device_path}/s/v/!data", _on_fr_voltage)
+                    except Exception:
+                        pass
 
             windows, gated_summary = _process_gated_stats(
                 packets=packets,
@@ -596,9 +643,73 @@ class JoulescopeDriver:
             }
             if clean_infer_count is not None:
                 metadata["clean_infer_count"] = clean_infer_count
+            if fr_xcheck:
+                fr = _fullrate_energy_over_windows(
+                    cur_chunks=fr_cur,
+                    volt_chunks=fr_volt,
+                    anchors=fr_anchors,
+                    poll_samples=poll_samples,
+                )
+                if fr:
+                    metadata["fullrate_xcheck"] = fr
+                    stats_energy_per = (
+                        gated_summary.energy_j / len(windows) if windows else 0.0
+                    )
+                    fr_energy_per = fr["energy_per_window_j"]
+                    log.info(
+                        "Joulescope FULL-RATE xcheck: mean=%.3f mA, power=%.3f mW, "
+                        "energy/window=%.1f uJ over %.2f ms @ %.0f Hz (%d samples) | "
+                        "stats-sum: mean=%.3f mA, energy/window=%.1f uJ | ratio(full/stats)=%.2fx",
+                        fr["mean_current_a"] * 1000.0,
+                        fr["mean_power_w"] * 1000.0,
+                        fr_energy_per * 1e6,
+                        fr["duration_s"] / max(1, fr["window_count"]) * 1000.0,
+                        fr["sample_rate_hz"],
+                        fr["sample_count"],
+                        gated_summary.avg_current_a * 1000.0,
+                        stats_energy_per * 1e6,
+                        (fr_energy_per / stats_energy_per) if stats_energy_per else float("nan"),
+                    )
+                else:
+                    log.warning(
+                        "Full-rate cross-check requested but produced no result "
+                        "(chunks=%d, anchors=%d)",
+                        len(fr_cur),
+                        len(fr_anchors),
+                    )
             if packets:
                 whole_summary = _whole_summary_from_stats(packets)
                 metadata["whole_capture_summary"] = _summary_to_dict(whole_summary)
+                diagnostics = _gated_stats_diagnostics(
+                    packets=packets,
+                    poll_samples=poll_samples,
+                )
+                metadata["gating_diagnostics"] = diagnostics
+                sane_window = gated_summary.avg_current_a > whole_summary.avg_current_a
+                metadata["gated_vs_whole_current_ok"] = sane_window
+                if not sane_window:
+                    log.warning(
+                        "Joulescope gated avg current %.3f mA <= whole-capture avg %.3f mA; "
+                        "gate/stats timing may be misaligned or the firmware may be sleeping "
+                        "inside the asserted window",
+                        gated_summary.avg_current_a * 1000.0,
+                        whole_summary.avg_current_a * 1000.0,
+                    )
+                if diagnostics["selected_packets"] == 0:
+                    log.warning(
+                        "Joulescope gated window selected zero stat packets; check GPI/stat "
+                        "timestamp alignment and stats_rate_hz=%d",
+                        stats_rate_hz,
+                    )
+                else:
+                    log.info(
+                        "Joulescope gated packet mask: selected=%d rejected=%d, "
+                        "selected median=%.3f mA rejected median=%.3f mA",
+                        diagnostics["selected_packets"],
+                        diagnostics["rejected_packets"],
+                        diagnostics["selected_median_current_a"] * 1000.0,
+                        diagnostics["rejected_median_current_a"] * 1000.0,
+                    )
 
             log.info(
                 "Joulescope gated: windows=%d, gated_dur=%.3f ms, energy=%.6f J, "
@@ -909,20 +1020,25 @@ def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
     """Vectorise the per-packet fields we use from ``s/stats/value`` packets."""
     import numpy as np
 
-    mid, dur, cur_avg, cur_max, cur_int, pwr_avg, pwr_int = ([] for _ in range(7))
+    mid, host_time, dur, cur_avg, cur_max, cur_min, cur_int, pwr_avg, pwr_int = (
+        [] for _ in range(9)
+    )
     for p in packets:
         t = p.get("time", {}) if isinstance(p, dict) else {}
         utc = (t.get("utc", {}) or {}).get("value")
         if not utc or len(utc) < 2:
             continue
         u0, u1 = float(utc[0]), float(utc[1])
+        host_tick = p.get("_host_time64") if isinstance(p, dict) else None
         sig = p.get("signals", {})
         cur = sig.get("current", {})
         pwr = sig.get("power", {})
         mid.append(0.5 * (u0 + u1))
+        host_time.append(float(host_tick) if host_tick is not None else np.nan)
         dur.append((u1 - u0))
         cur_avg.append(_sv(cur.get("avg")))
         cur_max.append(_sv(cur.get("max")))
+        cur_min.append(_sv(cur.get("min")))
         cur_int.append(_sv(cur.get("integral")))
         pwr_avg.append(_sv(pwr.get("avg")))
         pwr_int.append(_sv(pwr.get("integral")))
@@ -930,15 +1046,43 @@ def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
     # terminal sources vs sinks; on a SoC-only rail wired with reversed IN/OUT
     # the draw reads negative even though the magnitude is correct.  We measure
     # consumption, so normalize to |I|/|P|; timestamps are left untouched.
+    #
+    # Polarity-robust peak: the JS110 reports per-window avg/min/max as *signed*
+    # values.  With reversed IN/OUT the SoC draw is negative, so the true current
+    # PEAK is the most-negative sample (the ``min`` field) and ``max`` holds the
+    # trough (closest to zero).  Taking ``|max|`` alone therefore reports the
+    # trough as the peak — the tell is a "peak" that comes out *below* the p99 of
+    # the per-window averages, which is physically impossible (max >= mean
+    # always).  We saw exactly that on AP510 (peak 1.34 mA < p99-avg 1.55 mA).
+    # ``max(|max|, |min|)`` recovers the real peak regardless of wiring polarity;
+    # it also leaves the correctly-wired (positive) case unchanged.  The window
+    # average is unaffected — it comes from the abs'd charge integral, which is
+    # direction-independent — so this only fixes the peak/percentile stats.
+    abs_max = np.abs(np.asarray(cur_max, dtype=np.float64))
+    abs_min = np.abs(np.asarray(cur_min, dtype=np.float64))
     return {
         "mid": np.asarray(mid, dtype=np.float64),
+        "host_time": np.asarray(host_time, dtype=np.float64),
         "dur_ticks": np.asarray(dur, dtype=np.float64),
         "cur_avg": np.abs(np.asarray(cur_avg, dtype=np.float64)),
-        "cur_max": np.abs(np.asarray(cur_max, dtype=np.float64)),
+        "cur_max": abs_max,
+        "cur_min": abs_min,
+        "cur_peak": np.maximum(abs_max, abs_min),
         "cur_int": np.abs(np.asarray(cur_int, dtype=np.float64)),
         "pwr_avg": np.abs(np.asarray(pwr_avg, dtype=np.float64)),
         "pwr_int": np.abs(np.asarray(pwr_int, dtype=np.float64)),
     }
+
+
+def _gated_mask_axis(a: dict[str, Any]) -> tuple[Any, str]:
+    """Return the timestamp axis used to align packets with GPI polls."""
+    host_time = a.get("host_time")
+    if host_time is not None and getattr(host_time, "size", 0) and not bool(host_time.size == 0):
+        import numpy as np
+
+        if not np.isnan(host_time).any():
+            return host_time, "host_packet_arrival_time64"
+    return a["mid"], "device_packet_midpoint_time64"
 
 
 def _whole_summary_from_stats(packets: list[dict[str, Any]]) -> PowerSummary:
@@ -952,7 +1096,7 @@ def _whole_summary_from_stats(packets: list[dict[str, Any]]) -> PowerSummary:
     duration_s = float(a["dur_ticks"].sum() / time64.SECOND)
     charge_c = float(a["cur_int"].sum())
     energy_j = float(a["pwr_int"].sum())
-    peak = float(a["cur_max"].max()) if a["cur_max"].size else 0.0
+    peak = float(a["cur_peak"].max()) if a["cur_peak"].size else 0.0
     avg_current = charge_c / duration_s if duration_s > 0 else 0.0
     avg_power = energy_j / duration_s if duration_s > 0 else 0.0
     return PowerSummary(
@@ -987,6 +1131,161 @@ def _segment_gpi_windows(poll_samples: list[tuple[int, int]]) -> list[tuple[floa
     return windows
 
 
+def _fullrate_energy_over_windows(
+    *,
+    cur_chunks: list[Any],
+    volt_chunks: list[Any],
+    anchors: list[tuple[int, int, float]],
+    poll_samples: list[tuple[int, int]],
+) -> dict[str, Any] | None:
+    """Integrate raw full-rate current/voltage over the GPI-high windows.
+
+    This is the *reference* energy method used by AutoDeploy: rather than
+    summing the device's 1 kHz statistics ``integral`` fields, it integrates
+    the full-rate (``s/i/!data`` + ``s/v/!data``) sample stream directly.  Any
+    high-frequency current content (e.g. SIMO buck switching spikes) that the
+    decimated statistics stream smooths away is captured here.
+
+    Returns per-window and aggregate energy/charge, or ``None`` if there is
+    insufficient data to build a timeline.
+    """
+    import numpy as np
+    from pyjoulescope_driver import time64
+
+    if not cur_chunks or not anchors:
+        return None
+
+    cur = np.concatenate(cur_chunks)
+    volt = np.concatenate(volt_chunks) if volt_chunks else np.array([], np.float32)
+    n = min(len(cur), len(volt)) if len(volt) else len(cur)
+    if n == 0:
+        return None
+    cur = cur[:n]
+    volt = volt[:n] if len(volt) else np.full(n, np.nan, np.float32)
+
+    idx = np.asarray([a[0] for a in anchors], dtype=np.float64)
+    utc = np.asarray([a[1] for a in anchors], dtype=np.float64)
+    sr = float(anchors[-1][2])
+    if sr <= 0:
+        return None
+    slope = time64.SECOND / sr
+    i0, u0 = idx[0], utc[0]
+    sample_utc = u0 + (np.arange(n, dtype=np.float64) - i0) * slope
+
+    windows = _segment_gpi_windows(poll_samples)
+    if not windows:
+        return None
+
+    dt = 1.0 / sr
+    win_out: list[dict[str, float]] = []
+    tot_charge = 0.0
+    tot_energy = 0.0
+    tot_dur = 0.0
+    for rise, fall in windows:
+        mask = (sample_utc >= rise) & (sample_utc < fall)
+        seg_i = cur[mask]
+        seg_v = volt[mask]
+        if seg_i.size == 0:
+            continue
+        charge_c = float(np.sum(seg_i) * dt)
+        energy_j = float(np.sum(seg_i * seg_v) * dt)
+        dur_s = (fall - rise) / time64.SECOND
+        tot_charge += charge_c
+        tot_energy += energy_j
+        tot_dur += dur_s
+        win_out.append(
+            {
+                "duration_s": dur_s,
+                "charge_c": charge_c,
+                "energy_j": energy_j,
+                "mean_current_a": float(np.mean(seg_i)),
+                "peak_current_a": float(np.max(np.abs(seg_i))),
+            }
+        )
+
+    if not win_out or tot_dur <= 0:
+        return None
+
+    return {
+        "method": "fullrate_trapezoid_integral",
+        "sample_rate_hz": sr,
+        "sample_count": int(n),
+        "window_count": len(win_out),
+        "duration_s": tot_dur,
+        "charge_c": tot_charge,
+        "energy_j": tot_energy,
+        "mean_current_a": tot_charge / tot_dur,
+        "mean_power_w": tot_energy / tot_dur,
+        "energy_per_window_j": tot_energy / len(win_out),
+        "windows": win_out,
+    }
+
+
+def _gated_stats_diagnostics(
+    *,
+    packets: list[dict[str, Any]],
+    poll_samples: list[tuple[int, int]],
+) -> dict[str, Any]:
+    """Summarise how the GPIO windows intersect the stats packets."""
+    import numpy as np
+
+    a = _stats_arrays(packets)
+    windows = _segment_gpi_windows(poll_samples)
+    mask_axis, axis_name = _gated_mask_axis(a)
+
+    diagnostics: dict[str, Any] = {
+        "mask_time_axis": axis_name,
+        "window_count": len(windows),
+        "gpi_poll_count": len(poll_samples),
+        "stat_packet_count": int(mask_axis.size),
+        "selected_packets": 0,
+        "rejected_packets": int(mask_axis.size),
+        "selected_median_current_a": 0.0,
+        "rejected_median_current_a": 0.0,
+        "selected_min_current_a": 0.0,
+        "selected_max_current_a": 0.0,
+        "rejected_min_current_a": 0.0,
+        "rejected_max_current_a": 0.0,
+        "mask_axis_first_tick": None,
+        "mask_axis_last_tick": None,
+        "packet_midpoint_first_tick": None,
+        "packet_midpoint_last_tick": None,
+        "gpi_first_tick": None,
+        "gpi_last_tick": None,
+        "windows": [
+            {"rise_tick": int(rise), "fall_tick": int(fall)} for rise, fall in windows
+        ],
+    }
+    if poll_samples:
+        diagnostics["gpi_first_tick"] = int(poll_samples[0][0])
+        diagnostics["gpi_last_tick"] = int(poll_samples[-1][0])
+    if mask_axis.size == 0:
+        return diagnostics
+
+    diagnostics["mask_axis_first_tick"] = int(mask_axis.min())
+    diagnostics["mask_axis_last_tick"] = int(mask_axis.max())
+    diagnostics["packet_midpoint_first_tick"] = int(a["mid"].min())
+    diagnostics["packet_midpoint_last_tick"] = int(a["mid"].max())
+
+    selected_mask = np.zeros(mask_axis.shape, dtype=bool)
+    for rise, fall in windows:
+        selected_mask |= (mask_axis >= rise) & (mask_axis <= fall)
+
+    selected = a["cur_avg"][selected_mask]
+    rejected = a["cur_avg"][~selected_mask]
+    diagnostics["selected_packets"] = int(selected.size)
+    diagnostics["rejected_packets"] = int(rejected.size)
+    if selected.size:
+        diagnostics["selected_median_current_a"] = float(np.median(selected))
+        diagnostics["selected_min_current_a"] = float(selected.min())
+        diagnostics["selected_max_current_a"] = float(selected.max())
+    if rejected.size:
+        diagnostics["rejected_median_current_a"] = float(np.median(rejected))
+        diagnostics["rejected_min_current_a"] = float(rejected.min())
+        diagnostics["rejected_max_current_a"] = float(rejected.max())
+    return diagnostics
+
+
 def _process_gated_stats(
     *,
     packets: list[dict[str, Any]],
@@ -1012,8 +1311,8 @@ def _process_gated_stats(
     if a["mid"].size == 0 or not windows:
         return [], PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0)
 
-    mid = a["mid"]
-    t0 = float(mid.min())
+    mask_axis, _axis_name = _gated_mask_axis(a)
+    t0 = float(mask_axis.min())
     gated_windows: list[GatedPowerWindow] = []
     total_charge = 0.0
     total_energy = 0.0
@@ -1022,7 +1321,7 @@ def _process_gated_stats(
     peak_current = 0.0
 
     for rise, fall in windows:
-        mask = (mid >= rise) & (mid <= fall)
+        mask = (mask_axis >= rise) & (mask_axis <= fall)
         if not bool(mask.any()):
             continue
         duration_s = float(a["dur_ticks"][mask].sum() / time64.SECOND)
@@ -1031,7 +1330,7 @@ def _process_gated_stats(
         charge_c = float(a["cur_int"][mask].sum())
         energy_j = float(a["pwr_int"][mask].sum())
         seg_cur_avg = a["cur_avg"][mask]
-        seg_cur_max = a["cur_max"][mask]
+        seg_cur_max = a["cur_peak"][mask]
         seg_pwr_avg = a["pwr_avg"][mask]
         avg_current_a = charge_c / duration_s
         avg_power_w = energy_j / duration_s

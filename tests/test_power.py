@@ -88,6 +88,19 @@ class TestGatedStatsProcessing:
             },
         }
 
+    @staticmethod
+    def _packet_with_host_time(
+        u0: int,
+        u1: int,
+        cur_int: float,
+        pwr_int: float,
+        cur_max: float,
+        host_time64: int,
+    ):
+        packet = TestGatedStatsProcessing._packet(u0, u1, cur_int, pwr_int, cur_max)
+        packet["_host_time64"] = host_time64
+        return packet
+
     def test_gated_window_sums_ondevice_integrals(self):
         from helia_profiler.power.joulescope_driver import _process_gated_stats
 
@@ -132,6 +145,64 @@ class TestGatedStatsProcessing:
         )
         assert windows == []
         assert summary.sample_count == 0
+
+    def test_gated_diagnostics_separates_selected_packets(self):
+        from helia_profiler.power.joulescope_driver import _gated_stats_diagnostics
+
+        ms = _SECOND // 1000
+        packets = []
+        for i in range(20):
+            u0 = i * ms
+            u1 = (i + 1) * ms
+            cur_int = 0.0001 if 5 <= i < 15 else 0.00002
+            pwr_int = cur_int * 1.8
+            packets.append(self._packet(u0, u1, cur_int, pwr_int, 0.12))
+
+        rise = 5 * ms
+        fall = 15 * ms
+        poll_samples = [(0, 0), (rise, 1), (fall, 0)]
+
+        diagnostics = _gated_stats_diagnostics(packets=packets, poll_samples=poll_samples)
+
+        assert diagnostics["window_count"] == 1
+        assert diagnostics["selected_packets"] == 10
+        assert diagnostics["rejected_packets"] == 10
+        assert diagnostics["selected_median_current_a"] == pytest.approx(0.1, rel=1e-6)
+        assert diagnostics["rejected_median_current_a"] == pytest.approx(0.02, rel=1e-6)
+
+    def test_gated_stats_uses_host_packet_time_axis_when_available(self):
+        from helia_profiler.power.joulescope_driver import (
+            _gated_stats_diagnostics,
+            _process_gated_stats,
+        )
+
+        ms = _SECOND // 1000
+        host_base = 10_000 * ms
+        packets = []
+        for i in range(20):
+            u0 = i * ms
+            u1 = (i + 1) * ms
+            host_tick = host_base + ((i * ms) + (ms // 2))
+            cur_int = 0.0001 if 5 <= i < 15 else 0.00002
+            pwr_int = cur_int * 1.8
+            packets.append(
+                self._packet_with_host_time(u0, u1, cur_int, pwr_int, 0.12, host_tick)
+            )
+
+        rise = host_base + 5 * ms
+        fall = host_base + 15 * ms
+        poll_samples = [(host_base, 0), (rise, 1), (fall, 0)]
+
+        windows, summary = _process_gated_stats(
+            packets=packets, poll_samples=poll_samples, io_voltage=1.8
+        )
+        diagnostics = _gated_stats_diagnostics(packets=packets, poll_samples=poll_samples)
+
+        assert len(windows) == 1
+        assert windows[0].sample_count == 10
+        assert summary.avg_current_a == pytest.approx(0.1, rel=1e-6)
+        assert diagnostics["mask_time_axis"] == "host_packet_arrival_time64"
+        assert diagnostics["selected_packets"] == 10
 
     def test_whole_summary_sums_all_packets(self):
         from helia_profiler.power.joulescope_driver import _whole_summary_from_stats
