@@ -10,13 +10,14 @@ from typing import TYPE_CHECKING
 
 from ._version import __version__
 from .engines import EngineType
+from .placement import ModelLocation, Placement
 
 if TYPE_CHECKING:
     from .model_analysis import ModelAnalysis
 
 
 def main(argv: list[str] | None = None) -> None:
-    from .config import AGGREGATION_METHODS
+    from .config import AGGREGATION_METHODS, Transport
 
     parser = argparse.ArgumentParser(
         prog="hpx",
@@ -56,14 +57,11 @@ def main(argv: list[str] | None = None) -> None:
     g_engine.add_argument(
         "--model-location",
         type=str,
-        choices=["auto", "tcm", "sram", "mram", "psram"],
+        choices=[loc.value for loc in ModelLocation],
         help=(
-            "Where to place model weights and arena. "
-            "'auto' (default) picks fastest fit (TCM > SRAM > MRAM), "
-            "arena prioritized when regions compete. "
-            "'tcm'/'sram'/'mram' force both into that region. "
-            "'psram' uploads weights at runtime via J-Link "
-            "(requires PSRAM-equipped board)."
+            "Compatibility placement preset for both arena and weights. "
+            "Prefer --arena-location and --weights-location for runtime engines. "
+            "'auto' picks fastest fit; 'mram' keeps weights in MRAM and arena in fast RAM."
         ),
     )
     g_engine.add_argument(
@@ -71,12 +69,11 @@ def main(argv: list[str] | None = None) -> None:
         "--runtime-arena-location",
         dest="runtime_arena_location",
         type=str,
-        choices=["tcm", "sram", "psram"],
+        choices=[p.value for p in Placement if p is not Placement.MRAM],
         help=(
             "Tensor arena placement. "
-            "tflm/helia-rt: places the single TFLM arena. "
-            "helia-aot: places the AOT scratch arenas (persistent and "
-            "constant arenas remain where the AOT planner placed them). "
+            "helia-rt: places the single runtime tensor arena. "
+            "helia-aot: use engine.config.aot_args.memory.tensors instead. "
             "Takes precedence over --model-location for the arena. "
             "Alias: --runtime-arena-location."
         ),
@@ -86,14 +83,12 @@ def main(argv: list[str] | None = None) -> None:
         "--runtime-weights-location",
         dest="runtime_weights_location",
         type=str,
-        choices=["tcm", "sram", "mram", "psram"],
+        choices=[p.value for p in Placement],
         help=(
             "Model weights placement. "
-            "tflm/helia-rt: places the model flatbuffer (psram requires "
+            "helia-rt: places the model flatbuffer (psram requires "
             "J-Link upload via the RTT transport). "
-            "helia-aot: not supported (use heliaAOT planner controls via "
-            "engine.config.aot_args; XIP/copy-to-RAM controls land in a "
-            "later phase). "
+            "helia-aot: use engine.config.aot_args.memory.tensors instead. "
             "Takes precedence over --model-location for weights. "
             "Alias: --runtime-weights-location."
         ),
@@ -120,7 +115,7 @@ def main(argv: list[str] | None = None) -> None:
     g_target.add_argument(
         "--transport",
         type=str,
-        choices=["rtt", "usb_cdc", "swo", "uart"],
+        choices=[t.value for t in Transport],
         help="Data transport (default: rtt). RTT is recommended for lossless capture.",
     )
     g_target.add_argument(
@@ -260,11 +255,21 @@ def main(argv: list[str] | None = None) -> None:
         ),
     )
     g_power.add_argument(
+        "--ensure-power",
+        action="store_true",
+        help=(
+            "Scan for a Joulescope at start-up and enable current passthrough "
+            "so the board powers on before flashing. Off by default; only "
+            "needed when the board's power genuinely comes from the "
+            "Joulescope rail (--power already implies this)."
+        ),
+    )
+    g_power.add_argument(
         "--no-ensure-power",
         action="store_true",
         help=(
-            "Skip the auto power-on step at start-up. Use when the board "
-            "is on a bench supply or you want to manage the rail yourself."
+            "Explicitly skip the auto power-on step, overriding --ensure-power "
+            "or a config file's ensure_board_powered: true."
         ),
     )
     g_power.add_argument(
@@ -543,13 +548,9 @@ def _cmd_profile(args: argparse.Namespace) -> None:
     if args.model_location is not None:
         cli.setdefault("model", {})["model_location"] = args.model_location
     if args.runtime_arena_location is not None:
-        cli.setdefault("engine", {}).setdefault("config", {})["runtime_arena_location"] = (
-            args.runtime_arena_location
-        )
+        cli.setdefault("model", {})["arena_location"] = args.runtime_arena_location
     if args.runtime_weights_location is not None:
-        cli.setdefault("engine", {}).setdefault("config", {})["runtime_weights_location"] = (
-            args.runtime_weights_location
-        )
+        cli.setdefault("model", {})["weights_location"] = args.runtime_weights_location
     if args.core_override is not None:
         cli.setdefault("engine", {}).setdefault("config", {})["core_override"] = args.core_override
 
@@ -616,6 +617,8 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli.setdefault("power", {})["duration_s"] = args.power_duration
     if args.sync_gpio is not None:
         cli.setdefault("power", {})["sync_gpio_pin"] = args.sync_gpio
+    if getattr(args, "ensure_power", False):
+        cli.setdefault("target", {})["ensure_board_powered"] = True
     if getattr(args, "no_ensure_power", False):
         cli.setdefault("target", {})["ensure_board_powered"] = False
     if getattr(args, "power_serial", None):

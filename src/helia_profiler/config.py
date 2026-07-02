@@ -10,7 +10,7 @@ from typing import Any
 
 from .engines import EngineType
 from .errors import ConfigError
-from .placement import ModelLocation
+from .placement import ModelLocation, Placement
 from .platform import (
     DEFAULT_GO_GPIO_PIN,
     DEFAULT_STATE_GPIO_PIN,
@@ -101,6 +101,8 @@ DEFAULT_WINDOW_MODE = "auto"
 DEFAULT_WINDOW_TARGET_MS = 1000
 DEFAULT_WINDOW_MIN = 10
 DEFAULT_WINDOW_MAX = 2000
+CLEAN_WINDOW_PROBES = ("infer", "busy_loop")
+DEFAULT_CLEAN_WINDOW_PROBE = "infer"
 # Per-iteration aggregation estimator for per-layer counters.  ``median`` is
 # the default because it rejects the occasional corrupted iteration (e.g. an
 # Apollo4 DWT->CYCCNT uint32 wrap or a frozen-zero read while the host probe is
@@ -150,13 +152,13 @@ DEFAULT_DOWNLOAD_ASSET_S = 300
 class ModelConfig:
     """Model file and arena sizing.
 
-    ``model_location`` is the high-level policy for where weights and the
-    tensor arena live.
+    ``arena_location`` and ``weights_location`` are the preferred placement
+    controls for runtime engines such as heliaRT: the arena is the mutable
+    tensor arena, while weights are the model flatbuffer/constant data.
 
-    Runtime-specific split overrides live under ``engine.config`` as
-    ``runtime_arena_location`` / ``runtime_weights_location`` so they are
-    scoped to interpreters that share the runtime path (currently ``tflm``
-    and ``helia-rt``). ``helia-aot`` uses its own placement controls.
+    ``model_location`` is retained as a compatibility preset for older configs.
+    Split fields take precedence when present. ``helia-aot`` uses its own
+    tensor-kind placement controls via ``engine.config.aot_args.memory.tensors``.
 
     Policy values:
 
@@ -176,6 +178,8 @@ class ModelConfig:
     path: Path
     arena_size: int | None = None  # bytes; None = let engine/firmware report
     model_location: ModelLocation = ModelLocation.AUTO
+    arena_location: Placement | None = None
+    weights_location: Placement | None = None
 
     def __post_init__(self) -> None:
         # Tolerate invalid raw strings here — :class:`PreflightStage`
@@ -185,6 +189,13 @@ class ModelConfig:
                 object.__setattr__(self, "model_location", ModelLocation(self.model_location))
             except ValueError:
                 pass
+        for field_name in ("arena_location", "weights_location"):
+            raw = getattr(self, field_name)
+            if raw is not None and not isinstance(raw, Placement):
+                try:
+                    object.__setattr__(self, field_name, Placement(raw))
+                except ValueError:
+                    pass
 
 
 @dataclass(frozen=True)
@@ -270,11 +281,15 @@ class TargetConfig:
     rtt_buffer_size_up: int | None = None
     clock: ClockSelection = field(default_factory=ClockSelection)
     heartbeat: HeartbeatConfig = field(default_factory=HeartbeatConfig)
-    # When True (default), scan for a Joulescope at the start of `hpx profile`
-    # and enable current passthrough so the board powers on before flashing.
-    # No-op when no Joulescope is detected.  Set to False to skip the scan
-    # entirely (e.g. board is on a bench supply).
-    ensure_board_powered: bool = True
+    # When True, scan for a Joulescope at the start of `hpx profile` and
+    # enable current passthrough so the board powers on before flashing.
+    # Default is False (opt-in): most boards are powered independently of
+    # any Joulescope, and probing for one on every run is unnecessary I/O
+    # that isn't worth the risk on every invocation. Set to True (or pass
+    # --ensure-power) when the board's power genuinely comes from the
+    # Joulescope rail. Always runs when power.enabled is True, since power
+    # capture requires the driver regardless.
+    ensure_board_powered: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.toolchain, Toolchain):
@@ -315,6 +330,24 @@ class ProfilingConfig:
     window_target_ms: int = DEFAULT_WINDOW_TARGET_MS
     window_min: int = DEFAULT_WINDOW_MIN
     window_max: int = DEFAULT_WINDOW_MAX
+    # Optional bench probe for the clean GPIO-gated window. ``busy_loop`` keeps
+    # the gate high around a calibrated CPU spin for roughly window_target_ms
+    # so bring-up can distinguish wrong gate semantics from inference behavior.
+    clean_window_probe: str = DEFAULT_CLEAN_WINDOW_PROBE
+    # Sanity-check diagnostic: when true, the firmware emits an
+    # ``HPX_CLEAN_ITER=<n>`` line over the active transport on every iteration
+    # of the clean (GPIO-gated power) window.  This proves the device is
+    # genuinely looping inferences for the whole measured window rather than
+    # stalling/sleeping.  It perturbs the power reading (extra transport
+    # traffic inside the gate), so leave it OFF for real measurements.
+    clean_window_trace: bool = False
+    # Static-power diagnostic: when true, the firmware unconditionally powers
+    # and retains the full shared SSRAM array at boot (mirroring AutoDeploy's
+    # ns_power_config(bNeedSharedSRAM=true)), even when the model runs entirely
+    # from TCM.  Used to measure the SSRAM static/retention contribution to
+    # the power floor.  SRAM-resident arena/weights power the array on
+    # regardless; this flag forces it on for the TCM case too.
+    force_shared_sram: bool = False
     # How per-layer counters are aggregated across profiled iterations:
     # ``mean`` (arithmetic mean), ``median`` (robust default), or ``trimmed``
     # (drop the high/low extremes, then mean).  All methods first reject
@@ -347,6 +380,11 @@ class ProfilingConfig:
         if self.window_target_ms < 1:
             raise ValueError(
                 f"window_target_ms must be >= 1, got {self.window_target_ms}."
+            )
+        if self.clean_window_probe not in CLEAN_WINDOW_PROBES:
+            raise ValueError(
+                f"Invalid clean_window_probe '{self.clean_window_probe}'. "
+                f"Choose one of: {', '.join(CLEAN_WINDOW_PROBES)}."
             )
 
 
@@ -529,6 +567,8 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
         path=Path(model_d["path"]),
         arena_size=model_d.get("arena_size"),
         model_location=model_d.get("model_location", "auto"),
+        arena_location=model_d.get("arena_location"),
+        weights_location=model_d.get("weights_location"),
     )
 
     engine_type_raw = engine_d.get("type", EngineType.HELIA_RT.value)
@@ -612,7 +652,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             rtt_buffer_size_up=target_d.get("rtt_buffer_size_up"),
             clock=ClockSelection(**(target_d.get("clock") or {})),
             heartbeat=_build_heartbeat(target_d.get("heartbeat")),
-            ensure_board_powered=bool(target_d.get("ensure_board_powered", True)),
+            ensure_board_powered=bool(target_d.get("ensure_board_powered", False)),
         ),
         profiling=ProfilingConfig(
             pmu_presets=pmu_presets,
@@ -625,6 +665,11 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             window_target_ms=profiling_d.get("window_target_ms", DEFAULT_WINDOW_TARGET_MS),
             window_min=profiling_d.get("window_min", DEFAULT_WINDOW_MIN),
             window_max=profiling_d.get("window_max", DEFAULT_WINDOW_MAX),
+            clean_window_probe=profiling_d.get(
+                "clean_window_probe", DEFAULT_CLEAN_WINDOW_PROBE
+            ),
+            clean_window_trace=bool(profiling_d.get("clean_window_trace", False)),
+            force_shared_sram=bool(profiling_d.get("force_shared_sram", False)),
             extreme_mode=bool(profiling_d.get("extreme_mode", False)),
         ),
         power=PowerConfig(

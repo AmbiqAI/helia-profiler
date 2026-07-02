@@ -61,6 +61,8 @@ _CONFIG_FIELDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("PMU counters", ("config", "profiling", "pmu_counters")),
     ("PMU presets", ("config", "profiling", "pmu_presets")),
     ("Arena size", ("config", "model", "arena_size")),
+    ("Arena location", ("config", "model", "arena_location")),
+    ("Weights location", ("config", "model", "weights_location")),
     ("Model location", ("config", "model", "model_location")),
     ("hpx version", ("hpx_version",)),
 )
