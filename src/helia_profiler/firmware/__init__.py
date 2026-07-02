@@ -801,10 +801,26 @@ def generate_app(ctx: PipelineContext) -> Path:
     if artifacts.engine_type is EngineType.HELIA_AOT:
         adapter = ctx.engine_adapter
         assert adapter is not None  # set by stage 2 before firmware
-        aot_arena_regions = adapter.apply_arena_placement_override(
-            list(artifacts.aot_arena_regions),
-            arena_region,
+        # heliaAOT has finer-grained per-tensor placement control than the
+        # shared --arena-location/--weights-location knobs: a custom AOT
+        # memory config (engine.config_path, or inline
+        # engine.config.aot_args.memory.tensors) already resolves each
+        # tensor's placement correctly (reflected in artifacts.aot_arena_
+        # regions). Only fall back to re-pinning scratch arenas onto the
+        # shared arena_region default when the user did NOT supply one of
+        # those — otherwise this override would silently clobber a custom
+        # yaml's placement (e.g. reporting "tcm" for a scratch arena the
+        # user explicitly placed in "sram").
+        has_custom_aot_memory = config.engine.config_path is not None or bool(
+            config.engine.config.get("aot_args", {}).get("memory", {}).get("tensors")
         )
+        if has_custom_aot_memory:
+            aot_arena_regions = list(artifacts.aot_arena_regions)
+        else:
+            aot_arena_regions = adapter.apply_arena_placement_override(
+                list(artifacts.aot_arena_regions),
+                arena_region,
+            )
 
     # --- Resolve module list ---
     profile_board = getattr(board, "profile_source_board", board.name)
@@ -1087,6 +1103,9 @@ def generate_app(ctx: PipelineContext) -> Path:
                 window_target_ms=config.profiling.window_target_ms,
                 window_min=config.profiling.window_min,
                 window_max=config.profiling.window_max,
+                clean_window_probe=config.profiling.clean_window_probe,
+                clean_window_trace=config.profiling.clean_window_trace,
+                force_shared_sram=config.profiling.force_shared_sram,
                 pmu_passes=pmu_passes,
                 pmu_pass_names=[p["name"] for p in pmu_passes],
                 power_sync_enabled=power_sync_enabled,
@@ -1138,6 +1157,9 @@ def generate_app(ctx: PipelineContext) -> Path:
                 window_target_ms=config.profiling.window_target_ms,
                 window_min=config.profiling.window_min,
                 window_max=config.profiling.window_max,
+                clean_window_probe=config.profiling.clean_window_probe,
+                clean_window_trace=config.profiling.clean_window_trace,
+                force_shared_sram=config.profiling.force_shared_sram,
                 pmu_passes=pmu_passes,
                 pmu_pass_names=[p["name"] for p in pmu_passes],
                 power_sync_enabled=power_sync_enabled,

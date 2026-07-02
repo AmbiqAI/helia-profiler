@@ -24,6 +24,7 @@ from .stages import (
     PrepareEngineStage,
     ResolveJLinkProbeStage,
     ResolvePlatformStage,
+    VerifyPlacementStage,
 )
 
 log = logging.getLogger("hpx")
@@ -42,6 +43,7 @@ def build_default_pipeline(console: HpxConsole | None = None) -> PipelineRunner:
             PlanMemoryStage(),
             GenerateFirmwareStage(),
             BuildFirmwareStage(),
+            VerifyPlacementStage(),
             FlashFirmwareStage(),
             CapturePmuStage(),
             CapturePowerStage(),

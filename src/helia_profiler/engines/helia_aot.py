@@ -28,8 +28,8 @@ import jinja2
 
 from ..config import ProfileConfig
 from ..errors import EngineError
-from ..placement import ArenaRole, Placement
-from ..platform import get_soc_for_board
+from ..placement import ArenaRole, ModelLocation, Placement
+from ..platform import SocDef, get_soc_for_board
 from ..results import MemoryConsumer, MemoryPlan, MemoryRegionUsage, NsxModuleRef
 from . import EngineType
 from .base import ArenaRegion, EngineArtifacts
@@ -301,6 +301,102 @@ def _resolve_aot_platform(config: ProfileConfig) -> str:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Per-kind tensor placement → heliaAOT attribute rulesets
+#
+# heliaAOT splits the model into three AIR tensor kinds — ``constant``
+# (read-only weights), ``persistent`` (read-write state) and ``scratch``
+# (transient activations) — each planned into its own arena.  Compatibility
+# ``model_location`` presets map onto these three kinds, but precise AOT
+# placement belongs in ``engine.config.aot_args.memory.tensors`` where users can
+# specify constant/persistent/scratch rules directly.
+# ---------------------------------------------------------------------------
+
+_PLACEMENT_TO_AOT_MEMTYPE: dict[Placement, str] = {
+    Placement.TCM: "dtcm",
+    Placement.SRAM: "sram",
+    Placement.MRAM: "mram",
+    Placement.PSRAM: "psram",
+}
+
+# Extra AOT physical-memory-name strings that map onto an existing Placement
+# but aren't its canonical string above (e.g. heliaAOT's "itcm" kind also
+# means "tightly-coupled", same logical region as "dtcm"). Kept separate from
+# _PLACEMENT_TO_AOT_MEMTYPE so that dict stays a clean 1:1 canonical mapping.
+_AOT_MEMORY_ALIASES: dict[str, Placement] = {
+    "itcm": Placement.TCM,
+}
+
+
+def _resolve_aot_placement_intent(
+    config: ProfileConfig, soc: SocDef | None
+) -> tuple[Placement, Placement] | None:
+    """Resolve ``(arena, weights)`` placement for AOT from the profiler config.
+
+    ``arena`` covers the read-write scratch + persistent tensors; ``weights``
+    covers the read-only constants.  Returns ``None`` for ``model_location=auto``
+    so the AOT greedy planner keeps full freedom.
+    """
+    location = config.model.model_location
+    has_tcm = bool(soc and soc.memory.dtcm_kb > 0)
+
+    if location == ModelLocation.AUTO:
+        return None
+
+    if location == ModelLocation.TCM:
+        arena = weights = Placement.TCM
+    elif location == ModelLocation.SRAM:
+        arena = weights = Placement.SRAM
+    elif location == ModelLocation.PSRAM:
+        arena = Placement.SRAM
+        weights = Placement.PSRAM
+    else:  # AUTO (with override) or MRAM: arena in fastest RAM, weights in MRAM
+        arena = Placement.TCM if has_tcm else Placement.SRAM
+        weights = Placement.MRAM
+
+    return arena, weights
+
+
+def _resolve_aot_tensor_rulesets(
+    config: ProfileConfig, soc: SocDef | None
+) -> list[dict[str, Any]]:
+    """Build heliaAOT per-kind attribute rulesets (constant/persistent/scratch).
+
+    Returns an empty list when the placement is ``auto`` (planner decides).
+    """
+    intent = _resolve_aot_placement_intent(config, soc)
+    if intent is None:
+        return []
+    arena, weights = intent
+    arena_mem = _PLACEMENT_TO_AOT_MEMTYPE[arena]
+
+    # scratch + persistent are read-write: their runtime memory is the arena.
+    rulesets: list[dict[str, Any]] = [
+        {"type": "scratch", "attributes": {"memory": arena_mem}},
+        {"type": "persistent", "attributes": {"memory": arena_mem}},
+    ]
+
+    # Constants are read-only: their cold source must be non-volatile (MRAM, or
+    # XIP PSRAM).  When the requested weights region is writable RAM (TCM/SRAM),
+    # keep the cold blob in MRAM and stage a runtime copy there via
+    # ``constant_destination_memory``.
+    if weights in (Placement.MRAM, Placement.PSRAM):
+        rulesets.append(
+            {"type": "constant", "attributes": {"memory": _PLACEMENT_TO_AOT_MEMTYPE[weights]}}
+        )
+    else:
+        rulesets.append(
+            {
+                "type": "constant",
+                "attributes": {
+                    "memory": "mram",
+                    "constant_destination_memory": _PLACEMENT_TO_AOT_MEMTYPE[weights],
+                },
+            }
+        )
+    return rulesets
+
+
 def _run_aot_compiler(
     config: ProfileConfig,
     output_dir: Path,
@@ -350,6 +446,24 @@ def _run_aot_compiler(
     extra = config.engine.config.get("aot_args", {})
     if isinstance(extra, dict):
         _deep_merge(base_data, extra)
+
+    # Pin the three AIR tensor kinds (constant/persistent/scratch) onto the
+    # profiler's requested memories via wildcard attribute rulesets.  These are
+    # the *base* rules; any user-supplied ``aot_args.memory.tensors`` are kept
+    # and appended after so they take precedence (equal-specificity ties resolve
+    # to the later rule; explicit per-id rules are strictly more specific).
+    profiler_rulesets = _resolve_aot_tensor_rulesets(
+        config, get_soc_for_board(config.target.board)
+    )
+    if profiler_rulesets:
+        mem = base_data.setdefault("memory", {})
+        user_tensors = mem.get("tensors") or []
+        mem["tensors"] = profiler_rulesets + list(user_tensors)
+        log.info(
+            "AOT tensor placement: scratch/persistent=%s, constant=%s",
+            profiler_rulesets[0]["attributes"]["memory"],
+            profiler_rulesets[2]["attributes"],
+        )
 
     # Build ConvertArgs — profiler mandatory fields always win
     try:
@@ -546,13 +660,12 @@ def _tensor_metadata(
 # Map AOT planner physical memory names → logical placement names used
 # by firmware templates and the rest of the profiler pipeline.  Keeps the
 # template conditionals simple and avoids brittle string mismatches
-# (e.g. "dtcm" vs "tcm").
+# (e.g. "dtcm" vs "tcm"). Mechanically derived from _PLACEMENT_TO_AOT_MEMTYPE
+# (the canonical Placement -> string mapping) plus _AOT_MEMORY_ALIASES, so the
+# two directions cannot silently drift out of sync with each other.
 _AOT_MEMORY_TO_PLACEMENT: dict[str, Placement] = {
-    "dtcm": Placement.TCM,
-    "itcm": Placement.TCM,
-    "sram": Placement.SRAM,
-    "mram": Placement.MRAM,
-    "psram": Placement.PSRAM,
+    **{mem_str: placement for placement, mem_str in _PLACEMENT_TO_AOT_MEMTYPE.items()},
+    **_AOT_MEMORY_ALIASES,
 }
 
 
@@ -778,10 +891,15 @@ def _extract_memory_plan(codegen_ctx: Any) -> MemoryPlan | None:
                     kind="arena",
                 )
             )
-        # Weights in read-only regions are reported separately since
-        # the AOT arena_usages may not include them.
+        # Constant tensors are reported separately from the scratch/
+        # persistent arena since the AOT arena_usages total/used may not
+        # include them. This applies regardless of which region the
+        # constants landed in — a custom aot_args.memory config can place
+        # constants directly in DTCM/SRAM (not just the traditional MRAM/
+        # PSRAM read-only regions), and those bytes must still be counted
+        # here or they'd silently vanish from the reported "used" total.
         w = region_weights.get(key, 0)
-        if w > 0 and key in ("MRAM", "PSRAM"):
+        if w > 0:
             consumers.append(
                 MemoryConsumer(
                     name=f"{region_weight_count.get(key, 0)}_tensors",

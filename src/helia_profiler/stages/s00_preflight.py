@@ -9,8 +9,8 @@ Checks performed (in order):
 1. **Model file** — exists, is a regular file, non-empty, has a ``.tflite``
    extension, starts with the TFLite ``TFL3`` magic string.
 2. **Arena size** — if specified, is positive.
-3. **Model placement** — ``model_location`` is valid and any runtime-scoped
-    split overrides use supported regions for the selected engine.
+3. **Model placement** — ``model_location`` is valid and any runtime split
+    placement overrides use supported regions for the selected engine.
 4. **Output directory** — can be created + written to.
 5. **Host toolchain** — ``nsx``, ``cmake``, ``ninja``, the selected compiler,
    and ``JLinkExe`` are available. ATfE is located via ``ATFE_ROOT``.
@@ -166,8 +166,14 @@ def _check_rtt_buffer_size(size: int | None) -> None:
 
 
 def _check_runtime_split_locations(cfg) -> None:
-    runtime_arena = cfg.engine.config.get("runtime_arena_location")
-    runtime_weights = cfg.engine.config.get("runtime_weights_location")
+    runtime_arena = cfg.model.arena_location
+    runtime_weights = cfg.model.weights_location
+    legacy_runtime_arena = cfg.engine.config.get("runtime_arena_location")
+    legacy_runtime_weights = cfg.engine.config.get("runtime_weights_location")
+    if runtime_arena is None:
+        runtime_arena = legacy_runtime_arena
+    if runtime_weights is None:
+        runtime_weights = legacy_runtime_weights
     weights_in_psram = (
         cfg.model.model_location == Placement.PSRAM or runtime_weights == Placement.PSRAM
     )
@@ -185,29 +191,30 @@ def _check_runtime_split_locations(cfg) -> None:
     if not adapter.supports_runtime_split():
         # Engine bakes placement into its compiled module; the
         # profiler-config split overrides cannot influence weights.
-        if runtime_weights is not None:
+        if runtime_arena is not None or runtime_weights is not None:
+            field = "model.weights_location" if runtime_weights is not None else "model.arena_location"
+            if runtime_weights is None and legacy_runtime_arena is not None:
+                field = "engine.config.runtime_arena_location"
+            elif runtime_weights is not None and legacy_runtime_weights is not None:
+                field = "engine.config.runtime_weights_location"
             raise ConfigError(
-                f"engine.config.runtime_weights_location is not supported for engine.type='{cfg.engine.type.value}'.",
+                f"{field} is not supported for engine.type='{cfg.engine.type.value}'.",
                 hint=(
-                    f"{adapter.name} controls weights placement via its own "
-                    "compiler args (e.g. engine.config.aot_args)."
+                    f"{adapter.name} controls tensor placement via its own compiler args. "
+                    "Use engine.config.aot_args.memory.tensors to place constant, "
+                    "persistent, and scratch tensors."
                 ),
             )
-        _check_explicit_location(
-            runtime_arena,
-            name="engine.config.runtime_arena_location",
-            valid=_VALID_RUNTIME_ARENA_LOCATIONS,
-        )
         return
 
     _check_explicit_location(
         runtime_arena,
-        name="engine.config.runtime_arena_location",
+        name="model.arena_location",
         valid=_VALID_RUNTIME_ARENA_LOCATIONS,
     )
     _check_explicit_location(
         runtime_weights,
-        name="engine.config.runtime_weights_location",
+        name="model.weights_location",
         valid=_VALID_RUNTIME_WEIGHTS_LOCATIONS,
     )
 

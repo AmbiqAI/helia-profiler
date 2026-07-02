@@ -35,7 +35,9 @@ hpx profile [MODEL] [--config FILE] [options]
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--arena-size` | int | (engine-specific) | Tensor arena size in bytes. |
-| `--model-location` | `auto` \| `tcm` \| `sram` \| `mram` \| `psram` | `auto` | Where to place arena + weights. See [Memory](../guide/memory.md). |
+| `--arena-location` | `tcm` \| `sram` \| `psram` | — | Runtime tensor arena placement for heliaRT. Alias: `--runtime-arena-location`. |
+| `--weights-location` | `tcm` \| `sram` \| `mram` \| `psram` | — | Runtime model/weights placement for heliaRT. Alias: `--runtime-weights-location`. |
+| `--model-location` | `auto` \| `tcm` \| `sram` \| `mram` \| `psram` | `auto` | Compatibility preset for arena + weights. Prefer split placement flags. See [Memory](../guide/memory.md). |
 
 ## Target hardware
 

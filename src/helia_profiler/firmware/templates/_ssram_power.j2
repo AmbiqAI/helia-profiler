@@ -19,8 +19,20 @@
 
    Mutually exclusive with _extreme_mode.j2 (which powers SSRAM OFF and only
    fires when both arena and weights are in TCM).
+
+   SRAM-residency detection has two sources, either of which can trigger it:
+   1. arena_region / weights_region - the shared "couple settings" used by
+      heliaRT (via --arena-location/--weights-location) and by heliaAOT when
+      NO custom per-tensor config is given (its auto-placement still funnels
+      through these same two vars).
+   2. arena_regions - heliaAOT's fully-resolved per-tensor placement list,
+      extracted from the actual generated code. This is the source of truth
+      when a custom AOT memory YAML places individual tensors (scratch,
+      persistent, constant) in SRAM independently of arena_region/
+      weights_region, which a hand-written --config can bypass entirely.
 #}
-{% set _sram_resident = (arena_region | default("") == "sram") or (weights_region | default("") == "sram") %}
+{% set _aot_sram_resident = ((arena_regions | default([])) | selectattr("placement", "equalto", "sram") | list | length) > 0 %}
+{% set _sram_resident = (arena_region | default("") == "sram") or (weights_region | default("") == "sram") or _aot_sram_resident %}
 {% if (soc_family | default("")) == "ap5" and (_sram_resident or (force_shared_sram | default(false))) %}
 
     // ---------------------------------------------------------------------

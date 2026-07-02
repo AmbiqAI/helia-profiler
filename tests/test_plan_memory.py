@@ -142,6 +142,22 @@ class TestPlanMemorySynthesise:
         ctx = _make_ctx(
             tmp_path,
             {
+                "model": {
+                    "path": str(tmp_path / "model.tflite"),
+                    "arena_size": 65536,
+                    "weights_location": "sram",
+                },
+            },
+        )
+        PlanMemoryStage().run(ctx)
+
+        assert ctx.arena_region == "tcm"
+        assert ctx.weights_region == "sram"
+
+    def test_legacy_explicit_weights_override_is_applied(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
                 "engine": {
                     "config": {
                         "runtime_weights_location": "sram",
@@ -155,6 +171,21 @@ class TestPlanMemorySynthesise:
         assert ctx.weights_region == "sram"
 
     def test_explicit_arena_override_is_applied(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {
+                    "path": str(tmp_path / "model.tflite"),
+                    "arena_size": 65536,
+                    "arena_location": "sram",
+                },
+            },
+        )
+        PlanMemoryStage().run(ctx)
+
+        assert ctx.arena_region == "sram"
+
+    def test_legacy_explicit_arena_override_is_applied(self, tmp_path: Path):
         ctx = _make_ctx(
             tmp_path,
             {

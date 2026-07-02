@@ -3,11 +3,11 @@
 Where you place the **tensor arena** (activations / scratch space) and the
 **model weights** (the `.tflite` flatbuffer or AOT weight blobs) often
 matters more than the model itself. heliaPROFILER lets you control both
-through a single knob — `model_location` — and picks a sensible default
-when you don't.
+explicitly with `arena_location` and `weights_location`, and keeps
+`model_location` as a compatibility preset when you want one knob.
 
-This guide explains the memory tiers on Ambiq SoCs, what `model_location`
-does, and how to read the placement decisions in your reports.
+This guide explains the memory tiers on Ambiq SoCs, how split placement works,
+and how to read the placement decisions in your reports.
 
 ---
 
@@ -41,7 +41,28 @@ Two things to remember:
 
 ---
 
-## `model_location`: the one knob
+## Split placement controls
+
+For runtime engines such as heliaRT, prefer the explicit split controls:
+
+```yaml
+model:
+  path: model.tflite
+  arena_size: 65536
+  arena_location: tcm
+  weights_location: mram
+```
+
+```bash
+hpx profile model.tflite --arena-location tcm --weights-location mram
+```
+
+`arena_location` accepts `tcm`, `sram`, or `psram`. `weights_location` accepts
+`tcm`, `sram`, `mram`, or `psram`. Split placement makes the policy explicit:
+the arena is mutable activation/scratch storage, while weights are the model
+flatbuffer or read-only constants.
+
+## `model_location`: compatibility preset
 
 Set `model_location` in your YAML or pass `--model-location` on the CLI:
 
@@ -53,7 +74,7 @@ model:
 ```
 
 ```bash
-heliaprofile run --model model.tflite --model-location tcm
+hpx profile model.tflite --model-location tcm
 ```
 
 Five values are accepted:
@@ -66,8 +87,9 @@ Five values are accepted:
 | `mram`    | TCM (or SRAM)  | MRAM             | Legacy default: weights stay in flash rodata.               |
 | `psram`   | SRAM           | PSRAM (external) | Weights uploaded to PSRAM at runtime. Opt-in only.          |
 
-`auto` and `psram` are special-cased; the others place arena and weights
-in exactly the regions the value names.
+`auto` and `psram` are special-cased; the others place arena and weights in the
+regions the value names. If `arena_location` or `weights_location` is also set,
+that split field takes precedence over the preset for that object.
 
 ---
 
@@ -87,7 +109,8 @@ inference cycle, whereas weights are streamed once per layer and benefit
 less from a single-cycle hit.
 
 `auto` **never** chooses PSRAM — that path requires the runtime upload
-handshake and you have to opt in explicitly with `--model-location psram`.
+handshake and you have to opt in explicitly with `weights_location: psram` or
+`--model-location psram`.
 
 A small slack budget (~8 KB in TCM, ~32 KB in SRAM) is reserved for
 stack, heap, and BSS so the rest of the firmware still builds.
@@ -116,7 +139,7 @@ weights=SRAM. Still much faster than MRAM weights.
 
 `auto` policy → arena too big for DTCM, fits in SRAM; weights too big for
 SRAM → arena=SRAM, weights=MRAM. Or, opt in to PSRAM with
-`--model-location psram` to free up SRAM.
+`weights_location: psram` to free up SRAM.
 
 ---
 
@@ -144,14 +167,15 @@ model flatbuffer (50 KB) goes in SRAM.
 
 * **Repeatable benchmarks across configs:** pin to `tcm` or `mram` so a
   small model-size change doesn't cross a tier boundary mid-experiment.
-* **Compare placement effects:** run the same model with `--model-location
-  tcm` vs `mram` and diff the cycle counts. The TCM-vs-MRAM gap is the
-  cost of running weights from flash.
+* **Compare placement effects:** run the same model with `--arena-location
+  tcm --weights-location tcm` vs `--arena-location tcm --weights-location mram`
+  and diff the cycle counts. The TCM-vs-MRAM gap is the cost of running weights
+  from flash.
 * **Power experiments:** weights in TCM may let the SoC power-gate MRAM
   during inference. Use `--model-location tcm` and compare Joulescope
   traces.
-* **Large models:** `--model-location psram` is the only option once
-  weights exceed SRAM capacity.
+* **Large models:** `--weights-location psram` is the option once weights exceed
+  SRAM capacity.
 
 ---
 
@@ -159,12 +183,12 @@ model flatbuffer (50 KB) goes in SRAM.
 
 * **heliaRT / TFLM** (interpreter): a single tensor arena holds all
   activations; weights are the model flatbuffer. Both can be steered by
-  `model_location`.
+  `arena_location` and `weights_location`.
 * **heliaAOT**: the AOT compiler emits per-tensor section attributes
-  (`PUT_IN_DTCM`, `PUT_IN_SRAM`, …) so it does its own redistribution.
-  `model_location` still selects the *default* tier and arena region; AOT
-  refines from there. The Memory Plan table reflects AOT's actual
-  allocation.
+  (`PUT_IN_DTCM`, `PUT_IN_SRAM`, …) so placement is per tensor kind. Use
+  `engine.config.aot_args.memory.tensors` to specify `constant`, `persistent`,
+  and `scratch` placement. `model_location` is retained only as a compatibility
+  preset; split runtime fields are rejected for AOT.
 
 ---
 

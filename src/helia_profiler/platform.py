@@ -16,6 +16,8 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from types import MappingProxyType
 
+from .placement import Placement
+
 # ---------------------------------------------------------------------------
 # SoC family (determines core, PMU tier, and MVE availability)
 # ---------------------------------------------------------------------------
@@ -58,6 +60,23 @@ class MemoryLayout:
     itcm_kb: int = 0
     psram_kb: int = 0
     nvm_kb: int = 0
+
+
+@dataclass(frozen=True)
+class MemoryRange:
+    """A half-open physical address range ``[start, start+length)``."""
+
+    start: int
+    length: int
+
+    @property
+    def end(self) -> int:
+        """Exclusive end address."""
+        return self.start + self.length
+
+    def contains(self, address: int) -> bool:
+        """True if *address* falls inside this range."""
+        return self.start <= address < self.end
 
 
 class PerfTier(Enum):
@@ -291,7 +310,20 @@ _register_soc(
         core=CoreArch.CORTEX_M4,
         pmu_tier=PmuTier.DWT_ONLY,
         has_mve=False,
-        memory=MemoryLayout(mram_kb=1024, sram_kb=384, dtcm_kb=64),
+        # Apollo3p (Blue Plus): 2 MB NOR flash (ROMEM, 2,048,000 B usable above
+        # the 0xC000 bootloader region), a real 64 KB low-latency TCM at
+        # 0x10000000, and 700 KB main SRAM ("RWMEM") at 0x10011000.
+        #
+        # The TCM is genuine tightly-coupled memory in silicon (datasheet: "64
+        # kB TCM", zero-wait-state, DMA-excluded) — but the nsx linker's
+        # default `.bss`/`.data` targets RWMEM, not TCM; historically only
+        # `.tcm` *code* (NSX_MEM_FAST_CODE) reached the real TCM. Data placed
+        # there via NSX_MEM_FAST_BSS silently fell back to RWMEM (a no-op
+        # macro) until nsx-ambiq-sdk#29 added a dedicated NOLOAD `.tcm_bss`
+        # section. dtcm_kb=64 here (and the Placement.TCM base below) reflect
+        # that fix — hpx build against an nsx-ambiq-sdk revision without it
+        # will silently place the "TCM" arena in RWMEM instead.
+        memory=MemoryLayout(mram_kb=2000, sram_kb=700, dtcm_kb=64),
         clocks=(
             ClockDomain(
                 "cpu",
@@ -324,8 +356,30 @@ _register_soc(
     )
 )
 
-_register_board(BoardDef("apollo3p_evb", soc="apollo3p", channel="stable", psram_kb=8192))
-_register_board(BoardDef("apollo3p_evb_cygnus", soc="apollo3p", channel="preview", psram_kb=8192))
+# Power-capture GPIOs mirror neuralSPOT AutoDeploy AP3 wiring:
+# state bus GPIO 22/23 (device->JS GPI0/GPI1) + trigger GPIO 24 (JS GPO0->device).
+_register_board(
+    BoardDef(
+        "apollo3p_evb",
+        soc="apollo3p",
+        channel="stable",
+        psram_kb=8192,
+        default_sync_gpio_pin=22,
+        default_state_gpio_pin=23,
+        default_go_gpio_pin=24,
+    )
+)
+_register_board(
+    BoardDef(
+        "apollo3p_evb_cygnus",
+        soc="apollo3p",
+        channel="preview",
+        psram_kb=8192,
+        default_sync_gpio_pin=22,
+        default_state_gpio_pin=23,
+        default_go_gpio_pin=24,
+    )
+)
 
 # --- AP4 family (Cortex-M4F) ------------------------------------------------
 
@@ -379,14 +433,63 @@ _register_soc(
     )
 )
 
-_register_board(BoardDef("apollo4p_evb", soc="apollo4p", channel="preview", psram_kb=32768))
-_register_board(BoardDef("apollo4l_evb", soc="apollo4l", channel="preview", psram_kb=32768))
-_register_board(BoardDef("apollo4l_blue_evb", soc="apollo4l", channel="preview", psram_kb=32768))
+# Power-capture GPIOs mirror neuralSPOT AutoDeploy AP4 wiring:
+#   AP4P: state bus GPIO 22/23 + trigger GPIO 24.
+#   AP4L: state0 moves to GPIO 61 (22 unavailable), state1 GPIO 23 + trigger GPIO 24.
 _register_board(
-    BoardDef("apollo4p_blue_kbr_evb", soc="apollo4p", channel="preview", psram_kb=32768)
+    BoardDef(
+        "apollo4p_evb",
+        soc="apollo4p",
+        channel="preview",
+        psram_kb=32768,
+        default_sync_gpio_pin=22,
+        default_state_gpio_pin=23,
+        default_go_gpio_pin=24,
+    )
 )
 _register_board(
-    BoardDef("apollo4p_blue_kxr_evb", soc="apollo4p", channel="preview", psram_kb=32768)
+    BoardDef(
+        "apollo4l_evb",
+        soc="apollo4l",
+        channel="preview",
+        psram_kb=32768,
+        default_sync_gpio_pin=61,
+        default_state_gpio_pin=23,
+        default_go_gpio_pin=24,
+    )
+)
+_register_board(
+    BoardDef(
+        "apollo4l_blue_evb",
+        soc="apollo4l",
+        channel="preview",
+        psram_kb=32768,
+        default_sync_gpio_pin=61,
+        default_state_gpio_pin=23,
+        default_go_gpio_pin=24,
+    )
+)
+_register_board(
+    BoardDef(
+        "apollo4p_blue_kbr_evb",
+        soc="apollo4p",
+        channel="preview",
+        psram_kb=32768,
+        default_sync_gpio_pin=22,
+        default_state_gpio_pin=23,
+        default_go_gpio_pin=24,
+    )
+)
+_register_board(
+    BoardDef(
+        "apollo4p_blue_kxr_evb",
+        soc="apollo4p",
+        channel="preview",
+        psram_kb=32768,
+        default_sync_gpio_pin=22,
+        default_state_gpio_pin=23,
+        default_go_gpio_pin=24,
+    )
 )
 
 # --- AP5 family (Cortex-M55, full PMU + MVE) --------------------------------
@@ -667,3 +770,72 @@ def list_socs(*, registry: PlatformRegistry | None = None) -> list[SocDef]:
     """Return all registered SoCs."""
     active = registry or build_platform_registry()
     return list(active.socs.values())
+
+
+# ---------------------------------------------------------------------------
+# Physical memory address ranges (for build-time placement verification)
+# ---------------------------------------------------------------------------
+
+# Base addresses of the arena/weights-eligible memory regions, per SoC family.
+# Sizes come from each SoC's ``MemoryLayout``; only the bases are family-wide.
+# DTCM and SRAM are contiguous on AP4/AP5 (SRAM begins right after DTCM), but
+# the bases are listed explicitly rather than derived so the mapping stays
+# obvious and robust to layout changes.
+#
+# AP3 does not share a single family base map the way AP4/AP5 do. apollo3p
+# (Blue Plus) has a real 64 KB low-latency TCM at 0x10000000 (arena-eligible
+# via NSX_MEM_FAST_BSS's dedicated `.tcm_bss` section, nsx-ambiq-sdk#29), a
+# separate 700 KB main SRAM "RWMEM" at 0x10011000 (default .bss/.data home),
+# and "MRAM" is read-only NOR flash (XIP) at 0x0000C000 used for weights.
+# apollo3 (Blue) instead has a flat 384 KB SRAM at 0x10000000 and no separate
+# TCM — it is not currently a registered target, so the AP3 entry below
+# encodes apollo3p only.
+_FAMILY_MEMORY_BASES: dict[SocFamily, dict[Placement, int]] = {
+    SocFamily.AP3: {
+        Placement.TCM: 0x10000000,   # real 64 KB low-latency TCM (NSX_MEM_FAST_BSS, nsx-ambiq-sdk#29)
+        Placement.SRAM: 0x10011000,  # RWMEM main SRAM (default .bss/.data home)
+        Placement.MRAM: 0x00000000,  # NOR flash XIP (ROMEM @ 0x0000C000), weights
+    },
+    SocFamily.AP4: {
+        Placement.TCM: 0x10000000,   # DTCM
+        Placement.SRAM: 0x10060000,  # SHARED_SRAM (right after 384 KB DTCM)
+        Placement.MRAM: 0x00000000,  # MRAM (XIP)
+        Placement.PSRAM: 0x60000000,
+    },
+    SocFamily.AP5: {
+        Placement.TCM: 0x20000000,   # DTCM
+        Placement.SRAM: 0x20080000,  # SSRAM (right after 512 KB DTCM)
+        Placement.MRAM: 0x00000000,  # MRAM (XIP)
+        Placement.PSRAM: 0x60000000,
+    },
+}
+
+# MemoryLayout size field backing each placement region.
+_PLACEMENT_SIZE_FIELD: dict[Placement, str] = {
+    Placement.TCM: "dtcm_kb",
+    Placement.SRAM: "sram_kb",
+    Placement.MRAM: "mram_kb",
+    Placement.PSRAM: "psram_kb",
+}
+
+
+def soc_placement_ranges(soc: SocDef) -> dict[Placement, MemoryRange]:
+    """Return physical address ranges for each arena/weights placement region.
+
+    Maps each :class:`~helia_profiler.placement.Placement` to the concrete
+    ``[start, start+length)`` window on *soc*, derived from the family base
+    addresses and the SoC's ``MemoryLayout`` sizes.  Regions the SoC does not
+    have (size 0) are omitted.  Returns an empty mapping for SoC families whose
+    memory model is not yet characterised, so callers treat verification as
+    best-effort.
+    """
+    bases = _FAMILY_MEMORY_BASES.get(soc.family)
+    if bases is None:
+        return {}
+    ranges: dict[Placement, MemoryRange] = {}
+    for placement, base in bases.items():
+        size_kb = getattr(soc.memory, _PLACEMENT_SIZE_FIELD[placement], 0)
+        if size_kb > 0:
+            ranges[placement] = MemoryRange(base, size_kb * 1024)
+    return ranges
+

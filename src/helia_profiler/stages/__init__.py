@@ -9,6 +9,7 @@ from .s02a_analyze_model import AnalyzeModelStage
 from .s02b_plan_memory import PlanMemoryStage
 from .s03_generate_firmware import GenerateFirmwareStage
 from .s04_build_firmware import BuildFirmwareStage
+from .s04b_verify_placement import VerifyPlacementStage
 from .s05_flash_firmware import FlashFirmwareStage
 from .s06_capture_pmu import CapturePmuStage
 from .s07_capture_power import CapturePowerStage
@@ -24,6 +25,7 @@ __all__ = [
     "PlanMemoryStage",
     "GenerateFirmwareStage",
     "BuildFirmwareStage",
+    "VerifyPlacementStage",
     "FlashFirmwareStage",
     "CapturePmuStage",
     "CapturePowerStage",

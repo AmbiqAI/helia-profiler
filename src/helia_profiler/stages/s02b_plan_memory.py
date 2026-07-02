@@ -2,9 +2,10 @@
 
 Two responsibilities:
 
-1. **Resolve placement** — translate ``config.model.model_location`` (one of
-   ``auto`` / ``tcm`` / ``sram`` / ``mram`` / ``psram``) plus the SoC
-   memory layout into concrete ``arena_region`` and ``weights_region``
+1. **Resolve placement** — translate split ``model.arena_location`` /
+    ``model.weights_location`` controls, or compatibility ``model_location``
+    presets, plus the SoC memory layout into concrete ``arena_region`` and
+    ``weights_region``
    values written to ``ctx``.  These drive the section attributes the
    firmware template applies to ``model_data[]`` and ``g_arena[]``.
 
@@ -39,7 +40,7 @@ from ..config import DEFAULT_ARENA_SIZE_BYTES
 from ..errors import PlatformError
 from ..engines import get_adapter
 from ..pipeline import PipelineContext
-from ..placement import ModelLocation, Placement
+from ..placement import MemoryRegion, ModelLocation, Placement
 from ..platform import MemoryLayout, SocDef
 from ..results import MemoryConsumer, MemoryPlan, MemoryRegionUsage
 
@@ -50,22 +51,22 @@ log = logging.getLogger("hpx")
 
 
 # Mapping of MemoryPlan region names to MemoryLayout fields.
-_REGION_FIELDS: dict[str, str] = {
-    "MRAM": "mram_kb",
-    "SRAM": "sram_kb",
-    "DTCM": "dtcm_kb",
-    "ITCM": "itcm_kb",
-    "PSRAM": "psram_kb",
+_REGION_FIELDS: dict[MemoryRegion, str] = {
+    MemoryRegion.MRAM: "mram_kb",
+    MemoryRegion.SRAM: "sram_kb",
+    MemoryRegion.DTCM: "dtcm_kb",
+    MemoryRegion.ITCM: "itcm_kb",
+    MemoryRegion.PSRAM: "psram_kb",
 }
 
 # Logical region (used by ctx.{arena,weights}_region) → physical region
 # (used in MemoryPlan / NSX layout).  ``Placement.TCM`` means DTCM here —
 # ITCM is a code-only region and not eligible for arena/weights.
-_LOGICAL_TO_PHYSICAL: dict[Placement, str] = {
-    Placement.TCM: "DTCM",
-    Placement.SRAM: "SRAM",
-    Placement.MRAM: "MRAM",
-    Placement.PSRAM: "PSRAM",
+_LOGICAL_TO_PHYSICAL: dict[Placement, MemoryRegion] = {
+    Placement.TCM: MemoryRegion.DTCM,
+    Placement.SRAM: MemoryRegion.SRAM,
+    Placement.MRAM: MemoryRegion.MRAM,
+    Placement.PSRAM: MemoryRegion.PSRAM,
 }
 
 
@@ -147,11 +148,11 @@ class PlanMemoryStage:
 
         weight_phys = _LOGICAL_TO_PHYSICAL.get(
             Placement(ctx.weights_region) if ctx.weights_region else Placement.MRAM,
-            "MRAM",
+            MemoryRegion.MRAM,
         )
         arena_phys = _LOGICAL_TO_PHYSICAL.get(
             Placement(ctx.arena_region) if ctx.arena_region else Placement.TCM,
-            "DTCM",
+            MemoryRegion.DTCM,
         )
 
         region_map: dict[str, list[MemoryConsumer]] = {}
@@ -323,7 +324,7 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
         if tcm_cap == 0:
             raise PlatformError(
                 f"model_location=tcm requested, but board {cfg.target.board} has no DTCM.",
-                hint="Use --model-location auto on AP3/AP4 boards, or pick an AP5 board with DTCM.",
+                hint="Use --model-location auto, or pick a board with DTCM.",
             )
         arena_region = Placement.TCM
         weights_region = Placement.TCM
@@ -401,30 +402,37 @@ def _apply_explicit_overrides(
     tcm_cap: int,
     psram_cap: int,
 ) -> tuple[Placement, Placement]:
-    requested_arena = cfg.engine.config.get("runtime_arena_location")
-    requested_weights = cfg.engine.config.get("runtime_weights_location")
+    requested_arena = cfg.model.arena_location
+    requested_weights = cfg.model.weights_location
+
+    # Backwards compatibility for configs written before model.arena_location
+    # and model.weights_location existed.
+    if requested_arena is None:
+        requested_arena = cfg.engine.config.get("runtime_arena_location")
+    if requested_weights is None:
+        requested_weights = cfg.engine.config.get("runtime_weights_location")
 
     if requested_arena == Placement.TCM and tcm_cap == 0:
         raise PlatformError(
-            f"engine.config.runtime_arena_location=tcm requested, but board {cfg.target.board} has no DTCM.",
+            f"model.arena_location=tcm requested, but board {cfg.target.board} has no DTCM.",
             hint="Use --runtime-arena-location sram, or pick a board with DTCM.",
         )
 
     if requested_arena == Placement.PSRAM and psram_cap == 0:
         raise PlatformError(
-            f"engine.config.runtime_arena_location=psram requested, but board {cfg.target.board} has no PSRAM.",
+            f"model.arena_location=psram requested, but board {cfg.target.board} has no PSRAM.",
             hint="Use --runtime-arena-location tcm | sram, or pick a PSRAM-capable board.",
         )
 
     if requested_weights == Placement.TCM and tcm_cap == 0:
         raise PlatformError(
-            f"engine.config.runtime_weights_location=tcm requested, but board {cfg.target.board} has no DTCM.",
+            f"model.weights_location=tcm requested, but board {cfg.target.board} has no DTCM.",
             hint="Use --runtime-weights-location sram | mram, or pick a board with DTCM.",
         )
 
     if requested_weights == Placement.PSRAM and psram_cap == 0:
         raise PlatformError(
-            f"engine.config.runtime_weights_location=psram requested, but board {cfg.target.board} has no PSRAM.",
+            f"model.weights_location=psram requested, but board {cfg.target.board} has no PSRAM.",
             hint="Use --runtime-weights-location tcm | sram | mram, or pick a PSRAM-capable board.",
         )
 

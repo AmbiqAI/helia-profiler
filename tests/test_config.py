@@ -67,6 +67,13 @@ def test_invalid_aggregation_rejected():
         ProfilingConfig(aggregation="bogus")
 
 
+def test_invalid_clean_window_probe_rejected():
+    from helia_profiler.config import ProfilingConfig
+
+    with pytest.raises(ValueError, match="Invalid clean_window_probe"):
+        ProfilingConfig(clean_window_probe="bogus")
+
+
 def test_jlink_serial_from_cli():
     """jlink_serial should be settable via CLI overrides."""
     cli = {
