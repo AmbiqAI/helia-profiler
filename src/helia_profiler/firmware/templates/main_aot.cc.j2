@@ -48,7 +48,16 @@
 // Keep them named here so they stay discoverable and do not accrete as bare
 // magic numbers throughout main().  The host side polls wherever it can
 // (see capture/readiness.py); these cover only the genuinely-blind windows.
-#define HPX_SWO_ATTACH_DELAY_US   (500U * 1000U)  // host SWO viewer attach grace
+// SWO/ITM has no back-pressure, so a one-shot "delay then print the header"
+// races the host's attach+enable: when the host enables SWO a hair late the
+// HPX_START sentinel has already been clocked into the undrained ITM FIFO and
+// is lost (the host then catches the stream from the second line on).  Emit
+// disposable HPX_READY sync lines across the whole attach window instead; once
+// the host enables SWO mid-preamble it stays synced and draining, so the real
+// HPX_START header is guaranteed to be captured.  The parser ignores every
+// line before "--- HPX_START ---".
+#define HPX_SWO_SYNC_PREAMBLE_LINES  40            // disposable sync lines before the header
+#define HPX_SWO_SYNC_GAP_US          (20U * 1000U) // gap per sync line (~800ms total grace)
 #define HPX_USB_POLL_DELAY_US     (10U * 1000U)   // re-poll cadence while waiting for DTR
 #define HPX_USB_SETTLE_DELAY_US   (200U * 1000U)  // settle after host asserts DTR
 
@@ -389,9 +398,15 @@ int main(void) {
     HPX_CLEAN_DCACHE();
 {% else %}
 
-    // Delay to allow the host SWO viewer to attach after reset.
+    // SWO/ITM sync preamble (see HPX_SWO_SYNC_* above): keep the link warm with
+    // disposable HPX_READY lines so the host is guaranteed to be enabled and
+    // draining the ITM FIFO before the real HPX_START header is emitted.  This
+    // closes the attach race that intermittently dropped the start sentinel.
     // NSX owns the ITM/SWO bring-up when debug.transport=NSX_DEBUG_ITM.
-    nsx_delay_us(HPX_SWO_ATTACH_DELAY_US);
+    for (int hpx_sync_i = 0; hpx_sync_i < HPX_SWO_SYNC_PREAMBLE_LINES; ++hpx_sync_i) {
+        hpx_printf("HPX_READY\n");
+        nsx_delay_us(HPX_SWO_SYNC_GAP_US);
+    }
 {% endif %}
 
     hpx_printf("\n--- HPX_START ---\n");
@@ -633,6 +648,17 @@ int main(void) {
         usb_timer_pause();
 {% endif %}
         hpx_sync_window_begin();
+{% if clean_window_probe | default("infer") == "busy_loop" %}
+        hpx_printf("HPX_CLEAN_WINDOW_PROBE=busy_loop\n");
+        const uint64_t clean_probe_target_cyc =
+            ((uint64_t)SystemCoreClock / 1000ULL) * (uint64_t){{ window_target_ms }}U;
+        uint32_t t0 = DWT->CYCCNT;
+        while ((uint32_t)(DWT->CYCCNT - t0) < (uint32_t)clean_probe_target_cyc) {
+            __asm volatile("nop");
+        }
+        clean_cycles = (uint32_t)(DWT->CYCCNT - t0);
+        clean_count = 1;
+{% else %}
         for (int iter = 0; iter < clean_iters_n; iter++) {
             for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
                 memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
@@ -642,7 +668,13 @@ int main(void) {
             {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
             clean_cycles += (uint32_t)(DWT->CYCCNT - t0);
             clean_count++;
+{% if clean_window_trace | default(false) %}
+            // Sanity-check trace: prove the device is looping inferences for
+            // the whole gated window.  Perturbs power — diagnostic use only.
+            hpx_printf("HPX_CLEAN_ITER=%d\n", iter);
+{% endif %}
         }
+{% endif %}
         hpx_sync_window_end();
 {% if transport == "usb_cdc" %}
         usb_timer_resume();

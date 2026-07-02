@@ -155,8 +155,12 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     # it with the best hint we can generate.
     _raise_on_firmware_error(lines)
 
-    # Pre-parse validation: check for protocol sentinels
-    if not any(HPX_START in l for l in lines[:30]):
+    # Pre-parse validation: check for protocol sentinels.  Scan the whole
+    # capture, not just the head: the SWO transport emits a variable-length
+    # HPX_READY sync preamble before "--- HPX_START ---" (see the firmware
+    # templates), so the sentinel does not sit at a fixed offset.  The parser
+    # likewise ignores everything before HPX_START.
+    if not any(HPX_START in l for l in lines):
         raise CaptureError(
             f"Captured data ({len(lines)} lines) does not contain HPX_START sentinel",
             hint=(

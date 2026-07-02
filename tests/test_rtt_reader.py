@@ -1201,3 +1201,132 @@ def test_capture_swo_output_retries_once_after_empty_capture(monkeypatch):
         ("AP510NFA-CBR", "1160002204"),
         ("AP510NFA-CBR", "1160002204"),
     ]
+
+
+def test_capture_swo_output_retries_when_start_sentinel_missing(monkeypatch):
+    """A partial capture missing HPX_START is the SWO startup race — retry."""
+
+    class _FakeJLinkHandle:
+        def open(self, serial_no=None):
+            return None
+
+        def disable_dialog_boxes(self):
+            return None
+
+        def set_tif(self, tif):
+            return None
+
+        def connect(self, device, speed):
+            return None
+
+        def halted(self):
+            return False
+
+        def swo_enable(self, cpu_speed, swo_speed, port_mask):
+            return None
+
+        def swo_read_stimulus(self, port, length):
+            return []
+
+        def swo_stop(self):
+            return None
+
+        def close(self):
+            return None
+
+    fake_pylink = types.SimpleNamespace(
+        JLink=lambda: _FakeJLinkHandle(),
+        JLinkInterfaces=types.SimpleNamespace(SWD=1),
+        errors=types.SimpleNamespace(JLinkException=Exception),
+    )
+
+    reset_calls: list[tuple[str, str | None]] = []
+    collect_call_count = {"count": 0}
+
+    def fake_collect_lines(*args, **kwargs):
+        collect_call_count["count"] += 1
+        if collect_call_count["count"] == 1:
+            # Head lost to the startup race: data but no start sentinel.
+            return ["0,CONV_2D,1", "--- HPX_END ---"]
+        return ["--- HPX_START ---", "0,CONV_2D,1", "--- HPX_END ---"]
+
+    monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
+    monkeypatch.setattr(
+        "helia_profiler.capture.serial_reader.reset_target",
+        lambda **kwargs: reset_calls.append((kwargs["device"], kwargs.get("jlink_serial"))),
+    )
+    monkeypatch.setattr("helia_profiler.capture.serial_reader.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.capture.serial_reader.collect_lines", fake_collect_lines)
+
+    lines = capture_swo_output(
+        jlink_serial="1160002204",
+        jlink_device="AP510NFA-CBR",
+    )
+
+    assert lines == ["--- HPX_START ---", "0,CONV_2D,1", "--- HPX_END ---"]
+    assert collect_call_count["count"] == 2
+
+
+def test_capture_swo_output_returns_partial_after_final_attempt(monkeypatch):
+    """If every attempt loses the start sentinel, return the last capture.
+
+    Downstream validation raises the precise "no HPX_START" error; the reader
+    must not loop forever on a target that genuinely never emits the sentinel.
+    """
+
+    class _FakeJLinkHandle:
+        def open(self, serial_no=None):
+            return None
+
+        def disable_dialog_boxes(self):
+            return None
+
+        def set_tif(self, tif):
+            return None
+
+        def connect(self, device, speed):
+            return None
+
+        def halted(self):
+            return False
+
+        def swo_enable(self, cpu_speed, swo_speed, port_mask):
+            return None
+
+        def swo_read_stimulus(self, port, length):
+            return []
+
+        def swo_stop(self):
+            return None
+
+        def close(self):
+            return None
+
+    fake_pylink = types.SimpleNamespace(
+        JLink=lambda: _FakeJLinkHandle(),
+        JLinkInterfaces=types.SimpleNamespace(SWD=1),
+        errors=types.SimpleNamespace(JLinkException=Exception),
+    )
+
+    collect_call_count = {"count": 0}
+
+    def fake_collect_lines(*args, **kwargs):
+        collect_call_count["count"] += 1
+        return ["0,CONV_2D,1", "--- HPX_END ---"]
+
+    monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
+    monkeypatch.setattr(
+        "helia_profiler.capture.serial_reader.reset_target", lambda **kwargs: None
+    )
+    monkeypatch.setattr("helia_profiler.capture.serial_reader.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.capture.serial_reader.collect_lines", fake_collect_lines)
+
+    from helia_profiler.capture.serial_reader import _MAX_CAPTURE_ATTEMPTS
+
+    lines = capture_swo_output(
+        jlink_serial="1160002204",
+        jlink_device="AP510NFA-CBR",
+    )
+
+    assert lines == ["0,CONV_2D,1", "--- HPX_END ---"]
+    assert collect_call_count["count"] == _MAX_CAPTURE_ATTEMPTS

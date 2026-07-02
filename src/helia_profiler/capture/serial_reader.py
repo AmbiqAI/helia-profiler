@@ -35,11 +35,19 @@ log = logging.getLogger("hpx")
 _ATTACH_TIMEOUT_S = 30
 
 #: Some Apollo boards occasionally need one extra reset/attach cycle before
-#: SWO traffic starts flowing after a fresh flash.
-_MAX_CAPTURE_ATTEMPTS = 2
+#: SWO traffic starts flowing after a fresh flash.  This also recovers the
+#: startup race where the firmware emits ``--- HPX_START ---`` during the
+#: host's attach/enable window: SWO has no back-pressure, so that line is
+#: lost and the capture arrives missing its start sentinel.  A fresh reset
+#: re-runs the firmware with the host already draining the ITM FIFO.
+_MAX_CAPTURE_ATTEMPTS = 3
 
 #: Poll SWO aggressively enough to keep up with Apollo ITM bursts.
 _SWO_POLL_INTERVAL_S = 0.001
+
+#: Protocol start sentinel.  A capture that has lines but lacks this marker
+#: lost its head to the SWO startup race and is worth one more attempt.
+_HPX_START_SENTINEL = "--- HPX_START ---"
 
 
 def capture_swo_output(
@@ -69,7 +77,7 @@ def capture_swo_output(
 
     def on_line(line: str, line_ts: float) -> None:
         nonlocal hpx_start_s, hpx_end_s
-        if line == "--- HPX_START ---" and hpx_start_s is None:
+        if line == _HPX_START_SENTINEL and hpx_start_s is None:
             hpx_start_s = line_ts
         elif line == "--- HPX_END ---":
             hpx_end_s = line_ts
@@ -125,14 +133,30 @@ def capture_swo_output(
                 poll_interval_s=_SWO_POLL_INTERVAL_S,
                 on_line=on_line,
             )
-            if lines or attempt == _MAX_CAPTURE_ATTEMPTS:
+            # A usable capture has data *and* its start sentinel.  Lines
+            # without the sentinel mean the firmware's head was emitted before
+            # the host was draining the FIFO (SWO has no back-pressure) — a
+            # recoverable startup race, so retry with a fresh reset rather than
+            # returning a partial capture that fails downstream validation.
+            have_start = any(_HPX_START_SENTINEL in l for l in lines)
+            if (lines and have_start) or attempt == _MAX_CAPTURE_ATTEMPTS:
                 finalize_timing()
                 return lines
-            log.warning(
-                "SWO attempt %d/%d captured no data; retrying with a fresh reset",
-                attempt,
-                _MAX_CAPTURE_ATTEMPTS,
-            )
+            if lines and not have_start:
+                log.warning(
+                    "SWO attempt %d/%d captured %d lines but missed the "
+                    "HPX_START sentinel (startup race); retrying with a fresh "
+                    "reset",
+                    attempt,
+                    _MAX_CAPTURE_ATTEMPTS,
+                    len(lines),
+                )
+            else:
+                log.warning(
+                    "SWO attempt %d/%d captured no data; retrying with a fresh reset",
+                    attempt,
+                    _MAX_CAPTURE_ATTEMPTS,
+                )
 
         except CaptureError:
             raise

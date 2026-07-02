@@ -55,6 +55,7 @@ def _render_tflm(
     extreme_mode: bool = False,
     usb_serial_marker: str | None = None,
     window_mode: str = "fixed",
+    clean_window_probe: str = "infer",
 ) -> str:
     registrations = resolver_registrations or ["r.AddConv2D();", "r.AddSoftmax();"]
     return _env.get_template("main.cc.j2").render(
@@ -73,6 +74,7 @@ def _render_tflm(
         window_target_ms=250,
         window_min=10,
         window_max=200,
+        clean_window_probe=clean_window_probe,
         pmu_passes=_sample_pmu_passes(),
         pmu_pass_names=["Cache"],
         power_sync_enabled=False,
@@ -107,6 +109,7 @@ def _render_aot(
     apollo3_burst: bool = False,
     cmsis_device_header: str = "apollo510.h",
     window_mode: str = "fixed",
+    clean_window_probe: str = "infer",
 ) -> str:
     return _env.get_template("main_aot.cc.j2").render(
         aot_prefix="fake",
@@ -120,6 +123,7 @@ def _render_aot(
         window_target_ms=250,
         window_min=10,
         window_max=200,
+        clean_window_probe=clean_window_probe,
         pmu_passes=_sample_pmu_passes(),
         pmu_pass_names=["Cache"],
         power_sync_enabled=False,
@@ -181,6 +185,27 @@ class TestMainCcRender:
             out = _render_tflm(transport=transport)
             assert "hpx_rtt_set_blocking" not in out
             assert "hpx_rtt_set_nonblocking" not in out
+
+    def test_swo_emits_sync_preamble_before_start(self):
+        # SWO has no back-pressure, so the firmware keeps the ITM link warm with
+        # a disposable HPX_READY sync preamble until the host is draining, then
+        # prints the real header.  This closes the attach race that dropped the
+        # HPX_START sentinel.
+        out = _render_tflm(transport="swo")
+        # Split on the actual sentinel emission (not the explanatory comments
+        # that also mention HPX_START).
+        preamble = out.split('hpx_printf("\\n--- HPX_START ---\\n")', 1)[0]
+        assert "for (int hpx_sync_i = 0; hpx_sync_i < HPX_SWO_SYNC_PREAMBLE_LINES" in preamble
+        assert 'hpx_printf("HPX_READY\\n");' in preamble
+        assert "nsx_delay_us(HPX_SWO_SYNC_GAP_US);" in preamble
+
+    def test_non_swo_transport_omits_sync_preamble(self):
+        # The sync preamble loop is for the lossy ITM/SWO path; RTT (back-
+        # pressure) and USB CDC (host-ready DTR signal) have dedicated branches
+        # and must not run it.  stdio shares the SWO else-branch by design.
+        for transport in ("rtt", "usb_cdc"):
+            out = _render_tflm(transport=transport)
+            assert "hpx_sync_i < HPX_SWO_SYNC_PREAMBLE_LINES" not in out
 
     def test_all_exits_route_through_hpx_park(self):
         # Every terminal exit (error paths + HPX_END) must call hpx_park() so the
@@ -544,6 +569,21 @@ class TestMainAotCcRender:
             # (iters * warm cycles / clock) so the host can widen its deadline.
             assert "phase=clean_window_begin iters=%d est_ms=%llu" in out
             assert "clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)" in out
+
+    def test_busy_loop_probe_replaces_clean_window_body(self):
+        tflm_out = _render_tflm(
+            transport="rtt", window_mode="auto", clean_window_probe="busy_loop"
+        )
+        assert 'HPX_CLEAN_WINDOW_PROBE=busy_loop' in tflm_out
+        assert 'while ((uint32_t)(DWT->CYCCNT - t0) < (uint32_t)clean_probe_target_cyc)' in tflm_out
+        assert 'clean_count = 1;' in tflm_out
+
+        aot_out = _render_aot(
+            transport="rtt", window_mode="auto", clean_window_probe="busy_loop"
+        )
+        assert 'HPX_CLEAN_WINDOW_PROBE=busy_loop' in aot_out
+        assert 'while ((uint32_t)(DWT->CYCCNT - t0) < (uint32_t)clean_probe_target_cyc)' in aot_out
+        assert 'clean_count = 1;' in aot_out
 
     def test_dwt_only_aot_render_avoids_armv8m_pmu_api(self):
         out = _render_aot(transport="rtt", has_armv8m_pmu=False)
