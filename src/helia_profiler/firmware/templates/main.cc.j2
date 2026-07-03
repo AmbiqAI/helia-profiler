@@ -39,6 +39,12 @@
 // Apollo3/3P TurboSPOT (burst) control lives in the AmbiqSuite HAL umbrella.
 #include "am_mcu_apollo.h"
 {% endif %}
+{% if has_armv8m_pmu %}
+#include "nsx_ambiq_pmu.h"
+{% if not apollo3_burst %}
+#include "am_mcu_apollo.h"
+{% endif %}
+{% endif %}
 
 {% include "_cache_shims.j2" %}
 
@@ -554,12 +560,34 @@ int main(void) {
         uint64_t clean_cycles = 0;
         uint32_t clean_count = 0;
         hpx_sync_wait_go();
+        // Set the input once before the gated window, not on every
+        // iteration — AutoDeploy's power loop re-invokes on the same fixed
+        // input every run rather than re-zeroing it each time, and
+        // re-memset()ing per iteration adds real, avoidable overhead inside
+        // the timed/measured window (empirically ~2-3% of per-inference
+        // energy for a small KWS model; found 2026-07-02 while diagnosing
+        // the HPX-vs-AutoDeploy power gap).
+        memset(input->data.raw, 0, input->bytes);
 {% if transport == "usb_cdc" %}
         // Silence the 1 kHz tud_task() polling timer for the duration of the
         // clean window.  Its ISR otherwise fires mid-inference and pollutes the
         // E2E cycle count (and the external-power window) — measured as a flat
         // ~+18% latency tax on AP4.  The PMU window below already does this.
         usb_timer_pause();
+{% endif %}
+{% if has_armv8m_pmu %}
+        // g_profiler.Init() (called earlier) leaves the ARM PMU counters
+        // running and the AM_HAL_PWRCTRL_PERIPH_DEBUG power domain powered
+        // (via am_hal_debug_enable()) for the rest of firmware execution —
+        // SetEnabled(false) above only gates software instrumentation, it
+        // never touches this hardware.  AutoDeploy's power firmware never
+        // calls any PMU code, so it never powers this domain at all.
+        // Releasing both for the gated/clean window measured a real,
+        // reproducible ~5% power/energy reduction on AP510 KWS
+        // (2026-07-03) — restored immediately after so the per-layer PMU
+        // passes below still work.
+        nsx_ambiq_pmu_disable();
+        am_hal_debug_disable();
 {% endif %}
         hpx_sync_window_begin();
 {% if clean_window_probe | default("infer") == "busy_loop" %}
@@ -574,7 +602,6 @@ int main(void) {
         clean_count = 1;
 {% else %}
         for (int iter = 0; iter < clean_iters_n; iter++) {
-            memset(input->data.raw, 0, input->bytes);
             uint32_t t0 = DWT->CYCCNT;
             interpreter.Invoke();
             clean_cycles += (uint32_t)(DWT->CYCCNT - t0);
@@ -587,6 +614,11 @@ int main(void) {
         }
 {% endif %}
         hpx_sync_window_end();
+{% if has_armv8m_pmu %}
+        // Restore PMU/debug state for the instrumented per-layer passes below.
+        am_hal_debug_enable();
+        nsx_ambiq_pmu_enable();
+{% endif %}
 {% if transport == "usb_cdc" %}
         usb_timer_resume();
 {% endif %}
