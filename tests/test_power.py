@@ -433,6 +433,126 @@ class TestCapturePowerStage:
         assert reset_calls["device"] == ctx.soc.jlink_device
 
 
+class TestEstimateCaptureDuration:
+    """Regression coverage for the auto-tuned capture-duration estimate.
+
+    Bug: the estimate previously only accounted for the per-layer PMU
+    passes (presets x (warmup + iterations)) and ignored the separately
+    configured GPIO-gated clean window, so a long clean window (window_mode
+    'auto' with a large window_target_ms, or a large 'fixed' iterations
+    count) produced a safety bound shorter than the actual firmware run,
+    causing the Joulescope poller to miss the window's falling edge.
+    """
+
+    def _make_ctx(self, tmp_path: Path, *, profiling_overrides: dict):
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.platform import get_soc_for_board
+        from helia_profiler.results import FirmwareMeta, LayerResult, PlatformInfo, PmuResult
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "profiling": profiling_overrides,
+                "power": {"enabled": True},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.soc = get_soc_for_board("apollo510_evb")
+        ctx.run_metadata.platform = PlatformInfo(cpu_clock_mhz=96)
+        # 96,000 cycles at 96 MHz == 1 ms/inference, a convenient round number.
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(presets=("basic_cpu",)),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=96_000.0)],
+        )
+        return ctx
+
+    def test_fixed_window_includes_clean_iterations(self, tmp_path: Path):
+        from helia_profiler.stages.s07_capture_power import (
+            _BOOT_SETTLE_S,
+            _SAFETY_MARGIN_S,
+            _estimate_capture_duration,
+        )
+
+        ctx = self._make_ctx(
+            tmp_path,
+            profiling_overrides={
+                "window_mode": "fixed",
+                "iterations": 300,
+                "warmup": 1,
+            },
+        )
+        estimated = _estimate_capture_duration(ctx)
+        assert estimated is not None
+        # profiled pass: 1 * (1 + 300) = 301 inferences.
+        # clean pass (fixed): max(1, 300) + max(1, 1) = 301 inferences.
+        # total = 602 inferences * 1 ms/inference = 0.602 s.
+        expected = _BOOT_SETTLE_S + 0.602 + _SAFETY_MARGIN_S
+        assert estimated == pytest.approx(expected, rel=1e-6)
+
+    def test_auto_window_scales_with_target_ms(self, tmp_path: Path):
+        from helia_profiler.stages.s07_capture_power import (
+            _BOOT_SETTLE_S,
+            _SAFETY_MARGIN_S,
+            _estimate_capture_duration,
+        )
+
+        ctx = self._make_ctx(
+            tmp_path,
+            profiling_overrides={
+                "window_mode": "auto",
+                "window_target_ms": 8000,
+                "window_min": 10,
+                "window_max": 500,
+                "iterations": 3,
+                "warmup": 1,
+            },
+        )
+        estimated = _estimate_capture_duration(ctx)
+        assert estimated is not None
+        # profiled pass: 1 * (1 + 3) = 4 inferences = 4ms.
+        # clean pass (auto): target 8000ms / 1ms = 8000 iters, clamped to
+        # window_max=500, plus 3 hardcoded warm reps = 503 inferences = 0.503s.
+        expected = _BOOT_SETTLE_S + (0.004 + 0.503) + _SAFETY_MARGIN_S
+        assert estimated == pytest.approx(expected, rel=1e-6)
+
+    def test_auto_window_regression_reproduces_prior_underestimate_bug(
+        self, tmp_path: Path
+    ):
+        # This mirrors the real config that triggered "No GPIO-high windows
+        # detected": a 21.136ms-per-inference model with window_target_ms
+        # 8000 needs ~379 clean iterations (~8s), which the old estimate
+        # (based only on the 4 profiled PMU passes) undercounted as ~7.1s.
+        from helia_profiler.stages.s07_capture_power import _estimate_capture_duration
+        from helia_profiler.results import FirmwareMeta, LayerResult, PmuResult
+
+        ctx = self._make_ctx(
+            tmp_path,
+            profiling_overrides={
+                "window_mode": "auto",
+                "window_target_ms": 8000,
+                "window_min": 10,
+                "window_max": 500,
+                "iterations": 3,
+                "warmup": 1,
+            },
+        )
+        # 2,029,073 cycles at 96 MHz == ~21.136ms/inference (real AP510 KWS values).
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(presets=("basic_cpu",)),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=2_029_073.0)],
+        )
+        estimated = _estimate_capture_duration(ctx)
+        assert estimated is not None
+        # The real firmware run was observed at ~8.16s wall-clock; the fixed
+        # estimate must cover that, unlike the old ~7.1s underestimate.
+        assert estimated > 8.16
+
+
 class TestCapturePowerWrapper:
     def test_capture_power_uses_gated_joulescope_path_and_preserves_serial(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

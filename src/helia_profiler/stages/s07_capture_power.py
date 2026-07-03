@@ -24,13 +24,30 @@ _BOOT_SETTLE_S = 4.0  # power-cycle settle + SBL + firmware init
 _SAFETY_MARGIN_S = 3.0  # extra headroom beyond estimated runtime
 
 
+#: Auto window mode warms the clean pass with 3 hardcoded uninstrumented
+#: reps before timing (main.cc.j2 / main_aot.cc.j2), independent of
+#: profiling.warmup which only applies to the per-layer PMU passes.
+_AUTO_WINDOW_WARMUP_REPS = 3
+
+
 def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
     """Estimate how long the firmware needs to run from PMU timing data.
 
-    After a power-cycle, the firmware boots from MRAM and re-runs all
-    presets × (warmup + profiled iterations).  Each iteration invokes the
-    model once.  We know the per-inference cycle count from the PMU result
-    and the clock frequency from the resolved CPU clock selection.
+    After a power-cycle, the firmware boots from MRAM and runs two distinct
+    phases before HPX_END:
+
+    1. The GPIO-gated *clean* window — ``iterations`` clean inferences in
+       ``window_mode: fixed``, or a runtime-sized loop targeting
+       ``window_target_ms`` of wall-time in ``window_mode: auto`` (clamped to
+       ``[window_min, window_max]``).
+    2. The per-layer PMU-instrumented passes — ``presets × (warmup +
+       iterations)`` inferences.
+
+    Both phases must be covered by the estimate; the clean window in
+    particular can be made arbitrarily long (e.g. to build a multi-second
+    Joulescope integration window), and previously this function only
+    accounted for the PMU passes, causing the Joulescope poller's safety
+    bound to elapse mid-window and miss the falling edge entirely.
 
     Returns ``None`` if there is not enough information to estimate.
     """
@@ -50,13 +67,25 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
         return None
 
     cycles_per_inference = total_cycles
-    num_presets = len(pmu.presets) or 1
-    warmup = ctx.config.profiling.warmup
-    iterations = ctx.config.profiling.iterations
-    total_inferences = num_presets * (warmup + iterations)
-
     inference_time_s = cycles_per_inference / clock_hz
-    firmware_run_s = total_inferences * inference_time_s
+
+    profiling = ctx.config.profiling
+    num_presets = len(pmu.presets) or 1
+    profiled_inferences = num_presets * (profiling.warmup + profiling.iterations)
+    profiled_run_s = profiled_inferences * inference_time_s
+
+    if profiling.window_mode == "auto":
+        target_s = profiling.window_target_ms / 1000.0
+        clean_iters = target_s / inference_time_s if inference_time_s > 0 else profiling.window_min
+        clean_iters = max(profiling.window_min, min(profiling.window_max, clean_iters))
+        clean_warmup_reps = _AUTO_WINDOW_WARMUP_REPS
+    else:
+        clean_iters = max(1, profiling.iterations)
+        clean_warmup_reps = max(1, profiling.warmup)
+
+    clean_run_s = (clean_iters + clean_warmup_reps) * inference_time_s
+
+    firmware_run_s = profiled_run_s + clean_run_s
 
     estimated = _BOOT_SETTLE_S + firmware_run_s + _SAFETY_MARGIN_S
     return estimated
@@ -106,12 +135,27 @@ class CapturePowerStage:
         # DTR release only frees the *first* boot, so after PMU the device is
         # idle; capture re-opens the CDC port to release the post-reset boot.
         if ctx.soc and ctx.soc.jlink_device:
-            from ..jlink import reset_target
+            from ..jlink import reset_target, reset_target_poi
+            from ..platform import SocFamily
 
             reset_target(
                 device=ctx.soc.jlink_device,
                 jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
             )
+            # Apollo5-family only: a debug-level reset alone leaves PMU/
+            # power-management registers untouched, which was found
+            # (2026-07-02, AP510 KWS LP) to measurably inflate steady-state
+            # power (~8.2 mW vs ~6.9 mW for identical firmware) relative to
+            # a true power-on-initialization reset.  neuralSPOT AutoDeploy
+            # performs this exact extra reset before every power
+            # measurement; mirror it here so HPX numbers are not biased
+            # high by leftover debug-domain/PMU state.  Not yet validated
+            # on Apollo3/Apollo4, so scoped to AP5 only.
+            if ctx.soc.family is SocFamily.AP5:
+                reset_target_poi(
+                    device=ctx.soc.jlink_device,
+                    jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
+                )
 
         # --- Capture ---
         # Tighten capture window if PMU timing data is available.

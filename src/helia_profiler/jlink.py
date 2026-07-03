@@ -29,6 +29,27 @@ from .platform import CoreArch
 
 log = logging.getLogger("hpx")
 
+# --- Apollo5 RSTGEN software power-on-initialization (SWPOI) reset ---------
+#
+# ``AM_HAL_RESET_CONTROL_SWPOI`` (am_hal_reset.h): "power on initialization,
+# which results in a reset of all blocks except for registers in clock gen,
+# RTC, stimer."  This is a *more thorough* reset than the debug-level
+# ``ResetTarget()`` HPX's plain ``reset_target()`` performs (equivalent to
+# AIRCR/SWPOR, which additionally leaves PMU registers untouched).  SWPOI
+# also resets PMU/power-management state, which was empirically found
+# (2026-07-02, AP510 KWS LP) to change steady-state measured power by
+# ~15-20% (~8.2 mW debug-reset-only vs ~6.9 mW after SWPOI) for identical
+# firmware — matching neuralSPOT AutoDeploy's own ``make reset`` step,
+# which performs this exact register write after every deploy.
+#
+# Writing this register triggers an immediate chip reset, so the write
+# transaction itself is interrupted mid-flight and JLinkExe reports it as a
+# failed memory write / non-zero exit code — this is the expected symptom
+# of the reset succeeding, not evidence that it did not happen.  neuralSPOT's
+# own tooling relies on this (it discards the return code of `make reset`).
+_RSTGEN_SWPOI_ADDR = 0x40000004
+_RSTGEN_SWPOI_VALUE = 0x1B
+
 # Default wall-clock budget for any single JLinkExe invocation (seconds).
 # Reset/erase scripts complete in well under 5s on healthy hardware; 15s
 # leaves room for slow USB enumeration on macOS.
@@ -357,6 +378,75 @@ def reset_target(
     log.info("Reset complete")
 
 
+def reset_target_poi(
+    *,
+    device: str,
+    jlink_serial: str | None = None,
+    speed_khz: int = 4000,
+    interface: str = "SWD",
+    timeout_s: int = _DEFAULT_TIMEOUT_S,
+) -> None:
+    """Trigger an Apollo5 SWPOI (software power-on-initialization) reset.
+
+    This is a *deeper* reset than :func:`reset_target`: it additionally
+    resets PMU/power-management registers left untouched by a debug-level
+    reset, which measurably lowers steady-state power for some firmware
+    (see the module-level comment above ``_RSTGEN_SWPOI_ADDR``).  It also
+    reboots the CPU, so the firmware relaunches exactly as it does after
+    :func:`reset_target` — this can replace that call, not just follow it.
+
+    Apollo5-family only (Apollo510/510B/5B/330P).  Callers must gate this
+    on ``SocFamily.AP5`` themselves; the RSTGEN register layout has not
+    been validated on Apollo3/Apollo4.
+
+    The register write intentionally triggers an immediate self-reset, so
+    JLinkExe's own memory-write verification fails and it exits non-zero —
+    this is expected and is *not* treated as an error here (matching
+    neuralSPOT's own ``make reset``, which discards this exit code).
+    """
+    log.info("Triggering Apollo5 SWPOI reset via JLinkExe (serial=%s)", jlink_serial or "auto")
+    jlink_exe = find_jlink_exe()
+    cmd = [
+        jlink_exe,
+        "-device",
+        device,
+        "-if",
+        interface,
+        "-speed",
+        str(speed_khz),
+        "-autoconnect",
+        "1",
+    ]
+    if jlink_serial:
+        cmd.extend(["-SelectEmuBySN", jlink_serial])
+
+    script = (
+        "connect\n"
+        "sleep 1000\n"
+        f"w4 {_RSTGEN_SWPOI_ADDR:x} {_RSTGEN_SWPOI_VALUE:x}\n"
+        "sleep 1000\n"
+        "exit\n"
+    )
+    try:
+        subprocess.run(
+            cmd,
+            input=script,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise CaptureError(
+            f"JLinkExe SWPOI reset timed out ({timeout_s}s)",
+            hint="Check that the J-Link probe is connected and not in use by another process.",
+        ) from exc
+    except FileNotFoundError as exc:
+        raise CaptureError("JLinkExe not found", hint=_JLINK_NOT_FOUND_HINT) from exc
+    # Non-zero return code is expected (the write self-interrupts the debug
+    # session) and is deliberately not checked here.
+    log.info("SWPOI reset complete")
+
+
 __all__ = [
     "JLinkProbe",
     "JLinkProbeMatch",
@@ -364,5 +454,6 @@ __all__ = [
     "list_connected_probes",
     "resolve_probe_serial",
     "reset_target",
+    "reset_target_poi",
     "run_jlink_script",
 ]
