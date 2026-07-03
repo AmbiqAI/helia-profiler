@@ -286,6 +286,87 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                         1.0 / energy_per_infer,
                         6,
                     )
+                # Sanity-check the gated window's ACTUAL measured duration
+                # against what clean_infer_count inferences should take,
+                # based on the firmware's own reported per-inference time.
+                # energy_per_inference_j always divides by the firmware's
+                # precisely-known clean_infer_count (not by an inferred count
+                # from the measured duration) because that count is exact;
+                # the Joulescope-side gated-window duration is the more
+                # failure-prone side of this equation. If the instrument's
+                # gated capture misses part of the true window (e.g. a
+                # GPI-edge/timing-alignment fluke), the observed duration
+                # will be shorter (or longer) than expected, and dividing
+                # correctly-measured-but-incomplete energy by the full count
+                # silently produces a WRONG per-inference number with no
+                # other symptom. Found 2026-07-02: a UART-transport capture's
+                # gated window was ~10% short, understating energy/inference
+                # by ~6% with no error raised. This check cannot fix the
+                # measurement, only flag it.
+                if meta.clean_infer_avg_us and meta.clean_infer_avg_us > 0 and ps.duration_s > 0:
+                    expected_duration_s = (
+                        meta.clean_infer_count * meta.clean_infer_avg_us
+                    ) / 1_000_000.0
+                    duration_ratio = (
+                        ps.duration_s / expected_duration_s if expected_duration_s > 0 else 0.0
+                    )
+                    summary["power"]["gated_window_expected_duration_s"] = round(
+                        expected_duration_s, 6
+                    )
+                    summary["power"]["gated_window_duration_ratio"] = round(duration_ratio, 4)
+                    # Allow up to half an inference's worth of slack either
+                    # way before flagging -- normal GPIO-edge/packet-boundary
+                    # jitter is well under this.
+                    tolerance = 0.5 / meta.clean_infer_count
+                    if abs(duration_ratio - 1.0) > tolerance:
+                        summary["power"]["gated_window_duration_suspect"] = True
+                        log.warning(
+                            "Joulescope gated window duration (%.4fs) does not match "
+                            "clean_infer_count=%d x clean_infer_avg_us=%dus (expected "
+                            "%.4fs, ratio=%.3f) -- energy_per_inference_j may be "
+                            "systematically wrong. A truncated or extended capture "
+                            "window divided by the full inference count silently "
+                            "biases this number; check the gated-window capture for "
+                            "missed GPIO edges.",
+                            ps.duration_s,
+                            meta.clean_infer_count,
+                            meta.clean_infer_avg_us,
+                            expected_duration_s,
+                            duration_ratio,
+                        )
+                elif meta.clean_infer_avg_cycles is not None or meta.clean_infer_avg_us is not None:
+                    # The firmware counted clean_infer_count > 0 inferences but
+                    # reported a zero (or missing) avg cycle/us figure -- an
+                    # inference cannot take zero time, so this means the
+                    # device-side DWT-based clean-window measurement was
+                    # corrupted (known cause: a debugger/RTT attach racing the
+                    # one-shot DWT->CYCCNT read, freezing/resetting it mid-
+                    # window -- see main.cc.j2's warmup-phase workaround
+                    # comment for the same underlying race). Previously this
+                    # silently skipped the duration sanity check entirely
+                    # (leaving gated_window_duration_ratio absent with no
+                    # warning) instead of flagging the bad reading. Found
+                    # 2026-07-03 while validating an ITCM placement
+                    # experiment. The Joulescope-measured energy/power numbers
+                    # themselves are NOT affected (they don't depend on
+                    # device-reported cycles), only this specific duration
+                    # cross-check is unavailable.
+                    summary["power"]["gated_window_duration_suspect"] = True
+                    log.warning(
+                        "Device reported clean_infer_count=%d but "
+                        "clean_infer_avg_cycles=%r / clean_infer_avg_us=%r -- "
+                        "an inference cannot take zero time, so the device-side "
+                        "clean-window cycle measurement was likely corrupted "
+                        "(e.g. a debugger/RTT attach racing the one-shot DWT "
+                        "read). The duration-consistency sanity check could not "
+                        "run; energy_per_inference_j itself is unaffected (it "
+                        "only depends on Joulescope-measured energy and the "
+                        "exact clean_infer_count), but device-reported timing "
+                        "diagnostics for this run should not be trusted.",
+                        meta.clean_infer_count,
+                        meta.clean_infer_avg_cycles,
+                        meta.clean_infer_avg_us,
+                    )
         elif meta and meta.profiled_infer_total_us is not None:
             active_duration_s = meta.profiled_infer_total_us / 1_000_000.0
             summary["power"]["active_window_estimated_duration_s"] = round(active_duration_s, 6)

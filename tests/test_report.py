@@ -179,3 +179,99 @@ def test_write_summary_prefers_gpio_gated_power_when_present(tmp_path: Path):
     assert "whole_capture_window" not in summary["power"]
     assert summary["power"]["sync_input_index"] == 0
     assert summary["model_analysis"]["tops"] == 0.0
+
+
+def _gated_power_ctx(
+    tmp_path: Path, *, clean_infer_count: int, clean_infer_avg_us: int, duration_s: float
+) -> PipelineContext:
+    config = load_config(
+        None,
+        {
+            "model": {"path": "test.tflite"},
+            "engine": {"type": "helia-rt"},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.pmu_result = PmuResult(
+        meta=FirmwareMeta(
+            clean_infer_count=clean_infer_count,
+            clean_infer_avg_us=clean_infer_avg_us,
+        ),
+        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+    )
+    ctx.power_result = PowerResult(
+        summary=PowerSummary(
+            avg_current_a=0.004,
+            avg_power_w=0.008,
+            peak_current_a=0.006,
+            energy_j=0.0016,
+            duration_s=duration_s,
+            sample_count=100,
+        ),
+        gated_windows=[
+            GatedPowerWindow(
+                start_s=0.0,
+                end_s=duration_s,
+                duration_s=duration_s,
+                charge_c=0.0002,
+                energy_j=0.0016,
+                avg_current_a=0.004,
+                avg_power_w=0.008,
+                peak_current_a=0.006,
+                sample_count=100,
+            )
+        ],
+        metadata={"measurement_scope": "gpio_gated_clean_window"},
+    )
+    return ctx
+
+
+def test_write_summary_flags_truncated_gated_window(tmp_path: Path):
+    # 11 inferences at 21ms each should take ~0.231s; a 0.210s observed
+    # window is ~10% short (missing roughly one inference's worth) --
+    # dividing correctly-measured energy by the full count of 11 would
+    # silently understate energy_per_inference_j with no other symptom.
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=11, clean_infer_avg_us=21000, duration_s=0.210
+    )
+
+    out_path = _write_summary(ctx, tmp_path)
+    summary = json.loads(out_path.read_text())
+
+    assert summary["power"]["gated_window_duration_suspect"] is True
+    assert summary["power"]["gated_window_expected_duration_s"] == 0.231
+    assert summary["power"]["gated_window_duration_ratio"] < 0.95
+
+
+def test_write_summary_does_not_flag_normal_gated_window(tmp_path: Path):
+    # Same expected duration (~0.231s), but the observed window matches
+    # within normal GPIO-edge/packet-boundary jitter -- no flag expected.
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=11, clean_infer_avg_us=21000, duration_s=0.230
+    )
+
+    out_path = _write_summary(ctx, tmp_path)
+    summary = json.loads(out_path.read_text())
+
+    assert "gated_window_duration_suspect" not in summary["power"]
+    assert summary["power"]["gated_window_duration_ratio"] > 0.95
+
+
+def test_write_summary_flags_zero_device_cycles_as_suspect(tmp_path: Path):
+    # clean_infer_count > 0 but the device reported clean_infer_avg_us=0 --
+    # an inference cannot take zero time, so this means the device-side
+    # DWT-based clean-window cycle measurement was corrupted (known cause:
+    # a debugger/RTT attach racing the one-shot DWT->CYCCNT read). Previously
+    # this silently skipped the duration sanity check with no warning at
+    # all; it should now flag the run as suspect instead.
+    ctx = _gated_power_ctx(tmp_path, clean_infer_count=11, clean_infer_avg_us=0, duration_s=0.230)
+
+    out_path = _write_summary(ctx, tmp_path)
+    summary = json.loads(out_path.read_text())
+
+    assert summary["power"]["gated_window_duration_suspect"] is True
+    # energy_per_inference_j itself is still computed (Joulescope energy /
+    # exact clean_infer_count) -- only the duration cross-check is skipped.
+    assert "energy_per_inference_j" in summary["power"]
+    assert "gated_window_duration_ratio" not in summary["power"]
+
