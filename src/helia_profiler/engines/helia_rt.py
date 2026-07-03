@@ -162,6 +162,14 @@ class HeliaRTAdapter:
 
         if not use_local:
             # --- Default: resolve nsx-helia-rt from the NSX registry ---
+            # This clones AmbiqAI/helia-rt from GitHub at the pinned tag and
+            # builds it from source via NSX (the registry module's own
+            # manifest resolves its own nsx-cmsis-nn dependency, so we don't
+            # need to add it to extra_modules here as the source_path branch
+            # below does for a locally-vendored checkout). Because this is a
+            # source build, the CMSIS-NN inline-asm requantize flag still
+            # needs to be forwarded — it is not baked in the way it would be
+            # for a genuinely prebuilt archive (see the `else` branch below).
             version = HELIART_VERSION
             log.info(
                 "heliaRT %s — resolving %s from NSX registry "
@@ -183,6 +191,8 @@ class HeliaRTAdapter:
                     ref=HELIART_RELEASE_TAG,
                 )
             )
+            if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
+                cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
             return EngineArtifacts(
                 engine_type=EngineType.HELIA_RT,
                 extra_modules=extra_modules,
