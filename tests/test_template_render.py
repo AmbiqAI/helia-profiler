@@ -575,14 +575,23 @@ class TestMainAotCcRender:
             transport="rtt", window_mode="auto", clean_window_probe="busy_loop"
         )
         assert 'HPX_CLEAN_WINDOW_PROBE=busy_loop' in tflm_out
-        assert 'while ((uint32_t)(DWT->CYCCNT - t0) < (uint32_t)clean_probe_target_cyc)' in tflm_out
+        # The busy-loop bound is calibrated via DWT BEFORE the PMU/debug
+        # domain is disabled, then the gated window itself runs a plain
+        # bounded counter loop with no live DWT reads — DWT lives in the
+        # same debug power domain that gets disabled, so a live
+        # "while (DWT->CYCCNT - t0 < target)" loop as the exit condition
+        # would hang forever once that domain is off (regression found
+        # 2026-07-03: real firmware hang on hardware).
+        assert 'for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++)' in tflm_out
+        assert 'while ((uint32_t)(DWT->CYCCNT - t0) < (uint32_t)clean_probe_target_cyc)' not in tflm_out
         assert 'clean_count = 1;' in tflm_out
 
         aot_out = _render_aot(
             transport="rtt", window_mode="auto", clean_window_probe="busy_loop"
         )
         assert 'HPX_CLEAN_WINDOW_PROBE=busy_loop' in aot_out
-        assert 'while ((uint32_t)(DWT->CYCCNT - t0) < (uint32_t)clean_probe_target_cyc)' in aot_out
+        assert 'for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++)' in aot_out
+        assert 'while ((uint32_t)(DWT->CYCCNT - t0) < (uint32_t)clean_probe_target_cyc)' not in aot_out
         assert 'clean_count = 1;' in aot_out
 
     def test_dwt_only_aot_render_avoids_armv8m_pmu_api(self):

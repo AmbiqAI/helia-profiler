@@ -653,6 +653,32 @@ int main(void) {
             memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
                    {{ aot_prefix }}_model_ctx.inputs[i].size);
         }
+{% if clean_window_probe | default("infer") == "busy_loop" %}
+        // Calibrate the busy-loop nop count BEFORE the PMU/debug domain is
+        // disabled below.  DWT lives in the same CoreSight debug power
+        // domain that am_hal_debug_disable() gates off — reading
+        // DWT->CYCCNT while that domain is disabled reads a frozen value, so
+        // a live "while (DWT->CYCCNT - t0 < target) nop();" loop as the
+        // window's exit condition hangs forever once the domain is off
+        // (found 2026-07-03: real firmware hang, required a J-Link reset to
+        // recover the board).  Instead, measure nops-per-cycle once here
+        // (domain still powered), then run a plain bounded counter loop with
+        // no DWT reads at all inside the disabled window.
+        uint32_t busy_calib_t0 = DWT->CYCCNT;
+        volatile uint32_t busy_calib_i = 0;
+        for (; busy_calib_i < 100000U; busy_calib_i++) {
+            __asm volatile("nop");
+        }
+        uint32_t busy_calib_cyc = (uint32_t)(DWT->CYCCNT - busy_calib_t0);
+        const uint64_t clean_probe_target_cyc =
+            ((uint64_t)SystemCoreClock / 1000ULL) * (uint64_t){{ window_target_ms }}U;
+        uint32_t busy_loop_iters = 100000U;
+        if (busy_calib_cyc > 0U) {
+            const uint64_t scaled =
+                ((uint64_t)busy_calib_i * clean_probe_target_cyc) / (uint64_t)busy_calib_cyc;
+            busy_loop_iters = (scaled > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)scaled;
+        }
+{% endif %}
 {% if transport == "usb_cdc" %}
         // Silence the 1 kHz tud_task() polling timer for the duration of the
         // clean window.  Its ISR otherwise fires mid-inference and pollutes the
@@ -685,13 +711,12 @@ int main(void) {
         hpx_sync_window_begin();
 {% if clean_window_probe | default("infer") == "busy_loop" %}
         hpx_printf("HPX_CLEAN_WINDOW_PROBE=busy_loop\n");
-        const uint64_t clean_probe_target_cyc =
-            ((uint64_t)SystemCoreClock / 1000ULL) * (uint64_t){{ window_target_ms }}U;
-        uint32_t t0 = DWT->CYCCNT;
-        while ((uint32_t)(DWT->CYCCNT - t0) < (uint32_t)clean_probe_target_cyc) {
+        // No DWT reads here — the debug domain (and DWT with it) may be
+        // disabled above.  Plain bounded counter loop only.
+        for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++) {
             __asm volatile("nop");
         }
-        clean_cycles = (uint32_t)(DWT->CYCCNT - t0);
+        clean_cycles = clean_probe_target_cyc;
         clean_count = 1;
 {% else %}
         for (int iter = 0; iter < clean_iters_n; iter++) {
