@@ -236,7 +236,7 @@ class _UsbDtrHolder:
     def open(self) -> None:
         import serial
 
-        from .usb_reader import _BAUD, _resolve_cdc_port
+        from ..transport.usb_cdc import _BAUD, _resolve_cdc_port
 
         port = self._usb_port
         if port is None:

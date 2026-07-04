@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from helia_profiler.capture.transport import (
+from helia_profiler.transport.protocol import (
     WINDOW_BUDGET_MARGIN_S,
     WINDOW_BUDGET_SAFETY,
     collect_lines,

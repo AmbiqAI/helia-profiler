@@ -43,16 +43,16 @@ def reader_recorder(monkeypatch):
         return _reader
 
     monkeypatch.setattr(
-        "helia_profiler.capture.usb_reader.capture_usb_output", _make("usb_cdc")
+        "helia_profiler.transport.usb_cdc.capture_usb_output", _make("usb_cdc")
     )
     monkeypatch.setattr(
-        "helia_profiler.capture.rtt_reader.capture_rtt_output", _make("rtt")
+        "helia_profiler.transport.rtt.capture_rtt_output", _make("rtt")
     )
     monkeypatch.setattr(
-        "helia_profiler.capture.serial_reader.capture_swo_output", _make("swo")
+        "helia_profiler.transport.swo.capture_swo_output", _make("swo")
     )
     monkeypatch.setattr(
-        "helia_profiler.capture.uart_reader.capture_uart_output", _make("uart")
+        "helia_profiler.transport.uart.capture_uart_output", _make("uart")
     )
     return calls
 

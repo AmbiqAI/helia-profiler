@@ -203,20 +203,20 @@ class TestPmuPhaseHasNoLifecycleReset:
 
 class TestReaderResetOwnership:
     def test_swo_reader_uses_released_jlinkexe_reset(self, monkeypatch):
-        from helia_profiler.capture.serial_reader import capture_swo_output
+        from helia_profiler.transport.swo import capture_swo_output
 
         events = _install_reader_reset_recorder(
-            monkeypatch, "helia_profiler.capture.serial_reader"
+            monkeypatch, "helia_profiler.transport.swo"
         )
         with pytest.raises(_ResetStop):
             capture_swo_output(jlink_device="AP510NFA-CBR", jlink_serial="1160002204")
         assert events == ["jlinkexe_reset"]
 
     def test_rtt_reader_uses_released_jlinkexe_reset(self, monkeypatch):
-        from helia_profiler.capture.rtt_reader import capture_rtt_output
+        from helia_profiler.transport.rtt import capture_rtt_output
 
         events = _install_reader_reset_recorder(
-            monkeypatch, "helia_profiler.capture.rtt_reader"
+            monkeypatch, "helia_profiler.transport.rtt"
         )
         # known_block_address skips the pre-clean scan so reset is the first
         # real primitive after pylink.JLink() construction.
@@ -236,10 +236,10 @@ class TestReaderResetOwnership:
     def test_uart_reader_reset_owner_follows_keep_attached(
         self, monkeypatch, keep_attached, expected
     ):
-        import helia_profiler.capture.uart_reader as uart_reader
+        import helia_profiler.transport.uart as uart_reader
 
         events = _install_reader_reset_recorder(
-            monkeypatch, "helia_profiler.capture.uart_reader"
+            monkeypatch, "helia_profiler.transport.uart"
         )
         monkeypatch.setattr(uart_reader, "_find_jlink_vcom_port", lambda _serial: "PORT")
 
@@ -270,10 +270,10 @@ class TestReaderResetOwnership:
     def test_usb_reader_reset_owner_follows_keep_attached(
         self, monkeypatch, keep_attached, expected
     ):
-        import helia_profiler.capture.usb_reader as usb_reader
+        import helia_profiler.transport.usb_cdc as usb_reader
 
         events = _install_reader_reset_recorder(
-            monkeypatch, "helia_profiler.capture.usb_reader"
+            monkeypatch, "helia_profiler.transport.usb_cdc"
         )
         monkeypatch.setattr(usb_reader, "_snapshot_cdc_ports", lambda: set())
 
@@ -306,10 +306,10 @@ def _expected_pmu_reset_owner(family: str, transport: str) -> str:
 def _drive_reader_reset(monkeypatch, tmp_path, family: str, transport: str) -> list[str]:
     """Return the reset-owner label sequence the PMU reader emits for a combo."""
     module = {
-        "swo": "helia_profiler.capture.serial_reader",
-        "rtt": "helia_profiler.capture.rtt_reader",
-        "uart": "helia_profiler.capture.uart_reader",
-        "usb_cdc": "helia_profiler.capture.usb_reader",
+        "swo": "helia_profiler.transport.swo",
+        "rtt": "helia_profiler.transport.rtt",
+        "uart": "helia_profiler.transport.uart",
+        "usb_cdc": "helia_profiler.transport.usb_cdc",
     }[transport]
     events = _install_reader_reset_recorder(monkeypatch, module)
 
@@ -317,7 +317,7 @@ def _drive_reader_reset(monkeypatch, tmp_path, family: str, transport: str) -> l
     keep = ctx.soc.requires_attached_probe_for_cycles
 
     if transport == "uart":
-        import helia_profiler.capture.uart_reader as uart_reader
+        import helia_profiler.transport.uart as uart_reader
 
         monkeypatch.setattr(uart_reader, "_find_jlink_vcom_port", lambda _s: "PORT")
 
@@ -337,7 +337,7 @@ def _drive_reader_reset(monkeypatch, tmp_path, family: str, transport: str) -> l
                 jlink_device=ctx.soc.jlink_device, jlink_serial="1", keep_attached=keep
             )
     elif transport == "usb_cdc":
-        import helia_profiler.capture.usb_reader as usb_reader
+        import helia_profiler.transport.usb_cdc as usb_reader
 
         monkeypatch.setattr(usb_reader, "_snapshot_cdc_ports", lambda: set())
         with pytest.raises(_ResetStop):
@@ -345,12 +345,12 @@ def _drive_reader_reset(monkeypatch, tmp_path, family: str, transport: str) -> l
                 jlink_device=ctx.soc.jlink_device, jlink_serial="1", keep_attached=keep
             )
     elif transport == "swo":
-        from helia_profiler.capture.serial_reader import capture_swo_output
+        from helia_profiler.transport.swo import capture_swo_output
 
         with pytest.raises(_ResetStop):
             capture_swo_output(jlink_device=ctx.soc.jlink_device, jlink_serial="1")
     else:  # rtt
-        from helia_profiler.capture.rtt_reader import capture_rtt_output
+        from helia_profiler.transport.rtt import capture_rtt_output
 
         with pytest.raises(_ResetStop):
             capture_rtt_output(

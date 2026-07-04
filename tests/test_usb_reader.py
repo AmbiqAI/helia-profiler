@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from helia_profiler.capture import usb_reader
+from helia_profiler.transport import usb_cdc as usb_reader
 from helia_profiler.errors import CaptureError
 from helia_profiler.usb_identity import USB_MARKER_PREFIX, usb_marker_serial
 
@@ -130,7 +130,7 @@ def test_find_port_by_marker_matches_serial_number():
         _port("/dev/ttyACM1", manufacturer="Ambiq", product="NSX HPX Profiler", serial_number=marker),
         _port("/dev/ttyACM2", manufacturer="Ambiq", product="NSX USB Device", serial_number="000001"),
     ]
-    import helia_profiler.capture.usb_reader as mod
+    import helia_profiler.transport.usb_cdc as mod
 
     orig = mod.list_ports.comports
     mod.list_ports.comports = lambda: monkeypatch_ports

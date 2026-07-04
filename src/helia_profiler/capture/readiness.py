@@ -20,7 +20,7 @@ import logging
 import time
 from collections.abc import Callable
 
-from .timing import READINESS_POLL_INTERVAL_S
+from ..transport.timing import READINESS_POLL_INTERVAL_S
 from ..target.probe.jlink import (
     attached_reset_session,
     open_jlink_with_retry,
