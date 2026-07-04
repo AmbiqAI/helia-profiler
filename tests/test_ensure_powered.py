@@ -40,6 +40,28 @@ def _ctx(tmp_path: Path, power: dict | None = None) -> PipelineContext:
 # ---------------------------------------------------------------------------
 
 
+class TestShouldSkip:
+    def test_skipped_by_default_without_power_capture(self, tmp_path: Path):
+        ctx = _ctx(tmp_path)
+        assert EnsureBoardPoweredStage().should_skip(ctx) is True
+
+    def test_not_skipped_when_power_enabled(self, tmp_path: Path):
+        ctx = _ctx(tmp_path, power={"enabled": True})
+        assert EnsureBoardPoweredStage().should_skip(ctx) is False
+
+    def test_not_skipped_when_ensure_board_powered_opted_in(self, tmp_path: Path):
+        ctx = _ctx(tmp_path)
+        ctx.config = load_config(
+            None,
+            {
+                "model": {"path": str(ctx.config.model.path)},
+                "engine": {"type": "helia-rt"},
+                "target": {"ensure_board_powered": True},
+            },
+        )
+        assert EnsureBoardPoweredStage().should_skip(ctx) is False
+
+
 class TestStageDelegation:
     def test_delegates_to_driver_and_records_success(self, tmp_path: Path):
         ctx = _ctx(tmp_path)

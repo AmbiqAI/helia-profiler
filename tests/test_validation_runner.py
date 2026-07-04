@@ -8,9 +8,37 @@ from pathlib import Path
 
 import yaml
 
+from helia_profiler.config import Toolchain, Transport
 from helia_profiler.engines import EngineType
+from helia_profiler.placement import ModelLocation
 from helia_profiler.validation.matrix import BOARDS, MODELS, CaseSpec
 from helia_profiler.validation.runner import _build_config, run_case
+
+
+def test_build_config_includes_reliability_axes(tmp_path: Path):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_dir = tmp_path / "out"
+
+    case = CaseSpec(
+        model=MODELS["kws"],
+        engine=EngineType.HELIA_RT,
+        power=False,
+        board=BOARDS["apollo4p_blue_kxr_evb"],
+        toolchain=Toolchain.ATFE,
+        transport=Transport.UART,
+        memory=ModelLocation.SRAM,
+        jlink_serial="1160001481",
+    )
+
+    cfg = _build_config(case, repo_root=repo_root, output_dir=output_dir)
+
+    assert cfg["target"]["board"] == "apollo4p_blue_kxr_evb"
+    assert cfg["target"]["toolchain"] == "atfe"
+    assert cfg["target"]["transport"] == "uart"
+    assert cfg["target"]["jlink_serial"] == "1160001481"
+    assert cfg["model"]["model_location"] == "sram"
+    assert cfg["power"]["enabled"] is False
 
 
 def test_build_config_aot_prefers_explicit_cmsis_nn_env(
@@ -152,3 +180,72 @@ def test_run_case_uses_current_python_for_subprocess(tmp_path: Path, monkeypatch
         "--config",
         str(output_root / case.case_id / "config.yml"),
     ]
+
+
+def test_run_case_writes_full_child_log(tmp_path: Path, monkeypatch):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_root = tmp_path / "out"
+
+    case = CaseSpec(
+        model=MODELS["kws"],
+        engine=EngineType.HELIA_RT,
+        power=False,
+        board=BOARDS["apollo510_evb"],
+    )
+
+    def fake_run(cmd, cwd, capture_output, text, timeout, check, env):
+        del cwd, capture_output, text, timeout, check, env
+        config_path = Path(cmd[-1])
+        case_dir = Path(yaml.safe_load(config_path.read_text())["output"]["dir"])
+        case_dir.mkdir(parents=True, exist_ok=True)
+        (case_dir / "summary.json").write_text(json.dumps({"layers": 13, "total_cycles": 123456}))
+        return subprocess.CompletedProcess(
+            cmd, 0, stdout="child stdout marker\n", stderr="child stderr marker\n"
+        )
+
+    monkeypatch.setattr("helia_profiler.validation.runner.subprocess.run", fake_run)
+
+    result = run_case(case=case, repo_root=repo_root, output_root=output_root, timeout_s=30)
+
+    log_file = output_root / case.case_id / "hpx_profile.log"
+    assert result.log_path == str(log_file)
+    assert log_file.exists()
+    text = log_file.read_text()
+    assert text.startswith("$ ")
+    assert "--- stdout ---" in text
+    assert "child stdout marker" in text
+    assert "--- stderr ---" in text
+    assert "child stderr marker" in text
+
+
+def test_run_case_verbose_appends_v_flag(tmp_path: Path, monkeypatch):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_root = tmp_path / "out"
+    seen: dict[str, object] = {}
+
+    case = CaseSpec(
+        model=MODELS["kws"],
+        engine=EngineType.HELIA_RT,
+        power=False,
+        board=BOARDS["apollo510_evb"],
+    )
+
+    def fake_run(cmd, cwd, capture_output, text, timeout, check, env):
+        del cwd, capture_output, text, timeout, check, env
+        seen["cmd"] = cmd
+        config_path = Path(cmd[cmd.index("--config") + 1])
+        case_dir = Path(yaml.safe_load(config_path.read_text())["output"]["dir"])
+        case_dir.mkdir(parents=True, exist_ok=True)
+        (case_dir / "summary.json").write_text(json.dumps({"layers": 13, "total_cycles": 123456}))
+        return subprocess.CompletedProcess(cmd, 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr("helia_profiler.validation.runner.subprocess.run", fake_run)
+
+    result = run_case(
+        case=case, repo_root=repo_root, output_root=output_root, timeout_s=30, verbose=True
+    )
+
+    assert result.status == "pass"
+    assert seen["cmd"][-1] == "-v"

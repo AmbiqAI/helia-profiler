@@ -1,0 +1,29 @@
+{# _newlib_syscalls.j2 — weak newlib syscall retargets for the DWT-only path.
+
+   newlib's _sbrk_r / abort pull in _sbrk and _exit; without these stubs the
+   link fails on Cortex-M4 (DWT-only) targets with an undefined reference that
+   surfaces as "dangerous relocation: unsupported relocation".  Armv8-M (M55)
+   targets do not need them, and Arm Compiler 6 (armclang) supplies its own
+   _sys_exit/heap management and lacks <sys/types.h>/caddr_t, so both are gated
+   out there.  Shared by main.cc.j2 and main_aot.cc.j2 to avoid template drift.
+
+   Must be included at global scope AFTER the CMSIS device header (for __WFI).
+#}
+{% if not has_armv8m_pmu %}
+#ifndef NSX_TOOLCHAIN_ARMCLANG
+#include <cerrno>
+#include <sys/types.h>
+
+// Weak so a real BSP/syscalls object can override them.
+extern "C" __attribute__((weak)) void _exit(int status) {
+    (void)status;
+    while (1) { __WFI(); }
+}
+
+extern "C" __attribute__((weak)) caddr_t _sbrk(int incr) {
+    (void)incr;
+    errno = ENOMEM;
+    return (caddr_t)-1;
+}
+#endif
+{% endif %}

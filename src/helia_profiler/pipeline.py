@@ -68,7 +68,8 @@ class PipelineContext:
     memory_plan: MemoryPlan | None = None
 
     #: Resolved arena placement region.  Set by :class:`PlanMemoryStage`
-    #: from ``config.model.model_location`` and the SoC memory layout.
+    #: from split model placement controls / compatibility presets and the
+    #: SoC memory layout.
     arena_region: Placement | None = None
 
     #: Resolved weights placement region.  Set by :class:`PlanMemoryStage`.

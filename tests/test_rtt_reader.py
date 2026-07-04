@@ -4,14 +4,18 @@ import sys
 import types
 from pathlib import Path
 
+import pytest
+
 from helia_profiler.capture import capture_pmu
 from helia_profiler.capture.rtt_reader import (
     _direct_rtt_write,
     _direct_rtt_read,
     _scan_for_rtt_control_block,
+    _write_rtt_command_api,
     _wipe_rtt_control_blocks,
     capture_rtt_output,
 )
+from helia_profiler.errors import CaptureError
 from helia_profiler.capture.serial_reader import capture_swo_output
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
@@ -104,6 +108,50 @@ def test_direct_rtt_write_advances_wr_off():
     assert jlink.word_writes == [(0x2000003C, [7])]
 
 
+def test_api_rtt_write_retries_until_full_command_sent(monkeypatch):
+    class _FakeApiRttWriteJLink:
+        def __init__(self):
+            self.calls: list[list[int]] = []
+            self._returns = iter([0, 3, 2])
+
+        def rtt_write(self, channel: int, data: list[int]) -> int:
+            assert channel == 0
+            self.calls.append(data)
+            return next(self._returns)
+
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.sleep", lambda _s: None)
+    jlink = _FakeApiRttWriteJLink()
+
+    _write_rtt_command_api(jlink, command=b"READY", timeout_s=0.1)
+
+    assert jlink.calls == [
+        [82, 69, 65, 68, 89],
+        [82, 69, 65, 68, 89],
+        [68, 89],
+    ]
+
+
+def test_api_rtt_write_times_out_when_down_buffer_never_accepts_bytes(monkeypatch):
+    class _FakeApiRttWriteJLink:
+        def rtt_write(self, channel: int, data: list[int]) -> int:
+            assert channel == 0
+            return 0
+
+    sleeps = {"count": 0}
+
+    def fake_sleep(_s: float) -> None:
+        sleeps["count"] += 1
+
+    times = iter([0.0, 0.0, 0.02, 0.04, 0.06])
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.sleep", fake_sleep)
+    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.monotonic", lambda: next(times))
+
+    with pytest.raises(CaptureError, match="Timed out sending RTT host-ready command"):
+        _write_rtt_command_api(_FakeApiRttWriteJLink(), command=b"READY", timeout_s=0.05)
+
+    assert sleeps["count"] >= 1
+
+
 def test_wipe_rtt_control_blocks_validates_candidates_and_honors_range_end():
     class _FakeWipeJLink:
         def __init__(self):
@@ -169,6 +217,9 @@ def test_capture_pmu_passes_soc_rtt_scan_ranges(tmp_path: Path, monkeypatch):
             timing_out["capture_duration_s"] = 1.25
             timing_out["hpx_start_latency_s"] = 0.2
             timing_out["protocol_duration_s"] = 0.75
+            timing_out["rtt_phase_reset_s"] = 0.05
+            timing_out["rtt_phase_sbl_settle_s"] = 0.2
+            timing_out["rtt_phase_attach_s"] = 0.1
         return ["--- HPX_START ---", "--- HPX_PRESET basic_cpu ---", "--- HPX_ITER 0 ---", "Layer,Op,ARM_PMU_CPU_CYCLES", "0,CONV_2D,1", "--- HPX_END ---"]
 
     monkeypatch.setattr("helia_profiler.capture.rtt_reader.capture_rtt_output", fake_capture_rtt_output)
@@ -182,6 +233,11 @@ def test_capture_pmu_passes_soc_rtt_scan_ranges(tmp_path: Path, monkeypatch):
     assert ctx.run_metadata.timing.capture_duration_s == 1.25
     assert ctx.run_metadata.timing.hpx_start_latency_s == 0.2
     assert ctx.run_metadata.timing.protocol_duration_s == 0.75
+    assert ctx.run_metadata.timing.phases == {
+        "reset": 0.05,
+        "sbl_settle": 0.2,
+        "attach": 0.1,
+    }
 
 
 def test_capture_pmu_passes_known_block_address_from_map(tmp_path: Path, monkeypatch):
@@ -255,6 +311,163 @@ def test_capture_pmu_passes_resolved_cpu_clock_to_swo(tmp_path: Path, monkeypatc
     assert result.layers[0].cycles == 1
     assert captured["jlink_device"] == ctx.soc.jlink_device
     assert captured["cpu_freq"] == 250_000_000
+
+
+def test_capture_pmu_swo_requires_resolved_cpu_clock(tmp_path: Path, monkeypatch):
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "target": {"transport": "swo"},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    ctx.build_dir = tmp_path / "build"
+    ctx.build_dir.mkdir()
+    ctx.resolved_jlink_serial = "1160002204"
+    # Simulate a platform whose clock failed to resolve — the host must refuse
+    # to guess a SWO baud rather than silently assume a default frequency.
+    ctx.run_metadata.platform.cpu_clock_mhz = 0
+
+    with pytest.raises(CaptureError, match="resolved trace clock"):
+        capture_pmu(ctx)
+
+
+def test_capture_pmu_swo_uses_fixed_trace_clock_on_apollo3(tmp_path: Path, monkeypatch):
+    """Apollo3 SWO baud is fixed (CPU-independent), so burst must not change it."""
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "target": {
+                "board": "apollo3p_evb",
+                "transport": "swo",
+                "clock": {"cpu": "hp"},  # 96 MHz burst
+            },
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    ctx.build_dir = tmp_path / "build"
+    ctx.build_dir.mkdir()
+    ctx.resolved_jlink_serial = "1160000174"
+
+    # CPU runs at 96 MHz under burst, but the TPIU trace clock stays at 48 MHz.
+    assert ctx.run_metadata.platform.cpu_clock_mhz == 96
+    assert ctx.soc.swo_trace_clock_mhz == 48
+
+    captured: dict[str, object] = {}
+
+    def fake_capture_swo_output(**kwargs):
+        captured.update(kwargs)
+        return [
+            "--- HPX_START ---",
+            "--- HPX_PRESET basic_cpu ---",
+            "--- HPX_ITER 0 ---",
+            "Layer,Op,ARM_PMU_CPU_CYCLES",
+            "0,CONV_2D,1",
+            "--- HPX_END ---",
+        ]
+
+    monkeypatch.setattr(
+        "helia_profiler.capture.serial_reader.capture_swo_output", fake_capture_swo_output
+    )
+
+    capture_pmu(ctx)
+
+    # Host must program J-Link's SWO prescaler against 48 MHz, not the 96 MHz
+    # burst core clock, or the ITM stream is undecodable.
+    assert captured["cpu_freq"] == 48_000_000
+
+
+
+def test_capture_pmu_warns_when_device_clock_disagrees(tmp_path: Path, monkeypatch, caplog):
+    import logging
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "target": {"transport": "swo", "clock": {"cpu": "hp"}},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    ctx.build_dir = tmp_path / "build"
+    ctx.build_dir.mkdir()
+    ctx.resolved_jlink_serial = "1160002204"
+
+    def fake_capture_swo_output(**kwargs):
+        # Registry assumed 250 MHz (hp); device actually ran at 96 MHz.
+        return [
+            "--- HPX_START ---",
+            "HPX_SYSTEM_CLOCK_HZ=96000000",
+            "--- HPX_PRESET basic_cpu ---",
+            "--- HPX_ITER 0 ---",
+            "Layer,Op,ARM_PMU_CPU_CYCLES",
+            "0,CONV_2D,1",
+            "--- HPX_END ---",
+        ]
+
+    monkeypatch.setattr(
+        "helia_profiler.capture.serial_reader.capture_swo_output", fake_capture_swo_output
+    )
+
+    with caplog.at_level(logging.WARNING, logger="hpx"):
+        capture_pmu(ctx)
+
+    assert any("Device reports CPU clock" in r.message for r in caplog.records)
+
+
+def test_capture_pmu_no_clock_warning_when_device_clock_matches(tmp_path: Path, monkeypatch, caplog):
+    import logging
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "target": {"transport": "swo", "clock": {"cpu": "hp"}},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    ctx.build_dir = tmp_path / "build"
+    ctx.build_dir.mkdir()
+    ctx.resolved_jlink_serial = "1160002204"
+
+    def fake_capture_swo_output(**kwargs):
+        # Device reports the same 250 MHz the registry assumed (hp).
+        return [
+            "--- HPX_START ---",
+            "HPX_SYSTEM_CLOCK_HZ=250000000",
+            "--- HPX_PRESET basic_cpu ---",
+            "--- HPX_ITER 0 ---",
+            "Layer,Op,ARM_PMU_CPU_CYCLES",
+            "0,CONV_2D,1",
+            "--- HPX_END ---",
+        ]
+
+    monkeypatch.setattr(
+        "helia_profiler.capture.serial_reader.capture_swo_output", fake_capture_swo_output
+    )
+
+    with caplog.at_level(logging.WARNING, logger="hpx"):
+        capture_pmu(ctx)
+
+    assert not any("Device reports CPU clock" in r.message for r in caplog.records)
 
 
 def test_capture_pmu_passes_resolved_jlink_device_to_usb(tmp_path: Path, monkeypatch):
@@ -334,7 +547,7 @@ def test_capture_pmu_rejects_rtt_protocol_without_hpx_start(tmp_path: Path, monk
         raise AssertionError("expected CaptureError for missing HPX_START")
 
 
-def test_capture_rtt_output_sends_host_ready_before_collect(monkeypatch):
+def test_capture_rtt_output_does_not_send_down_channel_command(monkeypatch):
     class _FakeStatus:
         NumUpBuffers = 1
 
@@ -416,7 +629,10 @@ def test_capture_rtt_output_sends_host_ready_before_collect(monkeypatch):
         rtt_scan_ranges=((0x20000000, 0x4000),),
     )
 
-    assert fake_jlink.commands == [(0, list(b"HPX_HOST_READY"))]
+    # The firmware now streams the HPX_START header losslessly on the up-channel
+    # and never waits on a host->target command, so the host must not write to
+    # the RTT down-channel during the ready handshake.
+    assert fake_jlink.commands == []
 
 
 def test_capture_rtt_output_preserves_bytes_after_hpx_ready(monkeypatch):
@@ -920,3 +1136,197 @@ def test_capture_swo_output_restarts_halted_target(monkeypatch):
     )
 
     assert fake_jlink.restart_calls == 1
+
+
+def test_capture_swo_output_retries_once_after_empty_capture(monkeypatch):
+    class _FakeJLinkHandle:
+        def open(self, serial_no=None):
+            return None
+
+        def disable_dialog_boxes(self):
+            return None
+
+        def set_tif(self, tif):
+            return None
+
+        def connect(self, device, speed):
+            return None
+
+        def halted(self):
+            return False
+
+        def swo_enable(self, cpu_speed, swo_speed, port_mask):
+            return None
+
+        def swo_read_stimulus(self, port, length):
+            return []
+
+        def swo_stop(self):
+            return None
+
+        def close(self):
+            return None
+
+    fake_pylink = types.SimpleNamespace(
+        JLink=lambda: _FakeJLinkHandle(),
+        JLinkInterfaces=types.SimpleNamespace(SWD=1),
+        errors=types.SimpleNamespace(JLinkException=Exception),
+    )
+
+    reset_calls: list[tuple[str, str | None]] = []
+    collect_call_count = {"count": 0}
+
+    def fake_collect_lines(*args, **kwargs):
+        collect_call_count["count"] += 1
+        if collect_call_count["count"] == 1:
+            return []
+        return ["--- HPX_START ---", "--- HPX_END ---"]
+
+    monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
+    monkeypatch.setattr(
+        "helia_profiler.capture.serial_reader.reset_target",
+        lambda **kwargs: reset_calls.append((kwargs["device"], kwargs.get("jlink_serial"))),
+    )
+    monkeypatch.setattr("helia_profiler.capture.serial_reader.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.capture.serial_reader.collect_lines", fake_collect_lines)
+
+    lines = capture_swo_output(
+        jlink_serial="1160002204",
+        jlink_device="AP510NFA-CBR",
+    )
+
+    assert lines == ["--- HPX_START ---", "--- HPX_END ---"]
+    assert collect_call_count["count"] == 2
+    assert reset_calls == [
+        ("AP510NFA-CBR", "1160002204"),
+        ("AP510NFA-CBR", "1160002204"),
+    ]
+
+
+def test_capture_swo_output_retries_when_start_sentinel_missing(monkeypatch):
+    """A partial capture missing HPX_START is the SWO startup race — retry."""
+
+    class _FakeJLinkHandle:
+        def open(self, serial_no=None):
+            return None
+
+        def disable_dialog_boxes(self):
+            return None
+
+        def set_tif(self, tif):
+            return None
+
+        def connect(self, device, speed):
+            return None
+
+        def halted(self):
+            return False
+
+        def swo_enable(self, cpu_speed, swo_speed, port_mask):
+            return None
+
+        def swo_read_stimulus(self, port, length):
+            return []
+
+        def swo_stop(self):
+            return None
+
+        def close(self):
+            return None
+
+    fake_pylink = types.SimpleNamespace(
+        JLink=lambda: _FakeJLinkHandle(),
+        JLinkInterfaces=types.SimpleNamespace(SWD=1),
+        errors=types.SimpleNamespace(JLinkException=Exception),
+    )
+
+    reset_calls: list[tuple[str, str | None]] = []
+    collect_call_count = {"count": 0}
+
+    def fake_collect_lines(*args, **kwargs):
+        collect_call_count["count"] += 1
+        if collect_call_count["count"] == 1:
+            # Head lost to the startup race: data but no start sentinel.
+            return ["0,CONV_2D,1", "--- HPX_END ---"]
+        return ["--- HPX_START ---", "0,CONV_2D,1", "--- HPX_END ---"]
+
+    monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
+    monkeypatch.setattr(
+        "helia_profiler.capture.serial_reader.reset_target",
+        lambda **kwargs: reset_calls.append((kwargs["device"], kwargs.get("jlink_serial"))),
+    )
+    monkeypatch.setattr("helia_profiler.capture.serial_reader.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.capture.serial_reader.collect_lines", fake_collect_lines)
+
+    lines = capture_swo_output(
+        jlink_serial="1160002204",
+        jlink_device="AP510NFA-CBR",
+    )
+
+    assert lines == ["--- HPX_START ---", "0,CONV_2D,1", "--- HPX_END ---"]
+    assert collect_call_count["count"] == 2
+
+
+def test_capture_swo_output_returns_partial_after_final_attempt(monkeypatch):
+    """If every attempt loses the start sentinel, return the last capture.
+
+    Downstream validation raises the precise "no HPX_START" error; the reader
+    must not loop forever on a target that genuinely never emits the sentinel.
+    """
+
+    class _FakeJLinkHandle:
+        def open(self, serial_no=None):
+            return None
+
+        def disable_dialog_boxes(self):
+            return None
+
+        def set_tif(self, tif):
+            return None
+
+        def connect(self, device, speed):
+            return None
+
+        def halted(self):
+            return False
+
+        def swo_enable(self, cpu_speed, swo_speed, port_mask):
+            return None
+
+        def swo_read_stimulus(self, port, length):
+            return []
+
+        def swo_stop(self):
+            return None
+
+        def close(self):
+            return None
+
+    fake_pylink = types.SimpleNamespace(
+        JLink=lambda: _FakeJLinkHandle(),
+        JLinkInterfaces=types.SimpleNamespace(SWD=1),
+        errors=types.SimpleNamespace(JLinkException=Exception),
+    )
+
+    collect_call_count = {"count": 0}
+
+    def fake_collect_lines(*args, **kwargs):
+        collect_call_count["count"] += 1
+        return ["0,CONV_2D,1", "--- HPX_END ---"]
+
+    monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
+    monkeypatch.setattr(
+        "helia_profiler.capture.serial_reader.reset_target", lambda **kwargs: None
+    )
+    monkeypatch.setattr("helia_profiler.capture.serial_reader.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.capture.serial_reader.collect_lines", fake_collect_lines)
+
+    from helia_profiler.capture.serial_reader import _MAX_CAPTURE_ATTEMPTS
+
+    lines = capture_swo_output(
+        jlink_serial="1160002204",
+        jlink_device="AP510NFA-CBR",
+    )
+
+    assert lines == ["0,CONV_2D,1", "--- HPX_END ---"]
+    assert collect_call_count["count"] == _MAX_CAPTURE_ATTEMPTS

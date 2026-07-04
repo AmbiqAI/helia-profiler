@@ -39,6 +39,30 @@ starting point.
 
     [:octicons-arrow-right-24: engines](engines.md)
 
+-   :material-usb-port:{ .lg .middle } __`hpx probes`__
+
+  ---
+
+  List and match J-Link probes.
+
+  [:octicons-arrow-right-24: probes](probes.md)
+
+-   :material-serial-port:{ .lg .middle } __`hpx ports`__
+
+  ---
+
+  List host serial ports.
+
+  [:octicons-arrow-right-24: ports](ports.md)
+
+-   :material-restart:{ .lg .middle } __`hpx target`__
+
+  ---
+
+  Run target reset helpers.
+
+  [:octicons-arrow-right-24: target](target.md)
+
 </div>
 
 ## Common conventions

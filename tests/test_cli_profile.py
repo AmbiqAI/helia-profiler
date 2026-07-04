@@ -32,6 +32,7 @@ def _profile_args(**overrides):
         power_mode=None,
         power_duration=None,
         sync_gpio=None,
+        ensure_power=False,
         no_ensure_power=False,
         power_serial=None,
         output_dir=None,
@@ -66,5 +67,26 @@ def test_profile_cli_forwards_rtt_buffer_size(monkeypatch) -> None:
 
     assert seen["overrides"] == {
         "target": {"rtt_buffer_size_up": 16384},
+        "verbose": False,
+    }
+
+
+def test_profile_cli_forwards_split_placement_to_model(monkeypatch) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_load_config(path, overrides):
+        seen["path"] = path
+        seen["overrides"] = overrides
+        return SimpleNamespace(verbose=False)
+
+    monkeypatch.setattr("helia_profiler.config.load_config", fake_load_config)
+    monkeypatch.setattr("helia_profiler.api.profile", lambda config: None)
+
+    cli._cmd_profile(
+        _profile_args(runtime_arena_location="sram", runtime_weights_location="mram")
+    )
+
+    assert seen["overrides"] == {
+        "model": {"arena_location": "sram", "weights_location": "mram"},
         "verbose": False,
     }

@@ -74,9 +74,19 @@ class FirmwareMeta:
     num_inputs: int | None = None
     num_outputs: int | None = None
     num_presets: int | None = None
+    #: Actual CPU clock (Hz) reported by the firmware's ``SystemCoreClock``.
+    #: Ground truth for verifying the host's registry clock assumption.
+    system_clock_hz: int | None = None
     profiled_infer_count: int | None = None
     profiled_infer_total_us: int | None = None
     profiled_infer_avg_us: int | None = None
+    #: Clean end-to-end inference timing measured with per-layer
+    #: instrumentation disabled (warmed caches).  Cycles are DWT core cycles,
+    #: directly comparable to the per-layer ``cycles`` sum.
+    clean_infer_count: int | None = None
+    clean_infer_total_cycles: int | None = None
+    clean_infer_avg_cycles: int | None = None
+    clean_infer_avg_us: int | None = None
     presets: tuple[str, ...] = ()
 
 
@@ -107,6 +117,11 @@ class TimingInfo:
     capture_duration_s: float | None = None
     hpx_start_latency_s: float | None = None
     protocol_duration_s: float | None = None
+    # Attributed breakdown of the boot/attach window into named phases
+    # (e.g. ``reset``, ``sbl_settle``, ``attach``, ``control_block_scan``).
+    # Lets the few unavoidable settle floors be inspected and tuned with data
+    # instead of guesswork.  Currently populated for the RTT transport.
+    phases: dict[str, float] | None = None
 
 
 @dataclass

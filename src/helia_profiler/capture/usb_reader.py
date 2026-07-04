@@ -18,6 +18,7 @@ Sequence:
 
 from __future__ import annotations
 
+import contextlib
 import glob
 import logging
 import time
@@ -27,8 +28,16 @@ from serial.tools import list_ports
 
 from ..errors import CaptureError
 from ..jlink import reset_target
+from ..usb_identity import USB_MARKER_PREFIX
+from .readiness import attached_reset_session
 from .timing import READINESS_POLL_INTERVAL_S, USB_REENUM_FLOOR_S
-from .transport import DEFAULT_TIMEOUT_S, HPX_END, HPX_START, LINE_TIMEOUT_S
+from .transport import (
+    DEFAULT_TIMEOUT_S,
+    HPX_END,
+    HPX_START,
+    LINE_TIMEOUT_S,
+    window_budget_s,
+)
 
 log = logging.getLogger("hpx")
 
@@ -68,6 +77,36 @@ def _app_cdc_ports(ports: set[str] | None = None) -> list[str]:
     if ports is None:
         ports = _snapshot_cdc_ports()
     return sorted(port for port in ports if not _is_jlink_port(port))
+
+
+def _port_serial_number(port: str) -> str:
+    """Return the USB iSerialNumber descriptor for *port* (empty if unknown)."""
+    for info in list_ports.comports():
+        if info.device == port:
+            return info.serial_number or ""
+    return ""
+
+
+def _is_foreign_hpx_port(port: str, expected_marker: str | None) -> bool:
+    """Return True when *port* advertises a *different* hpx marker.
+
+    Every hpx-profiled board stamps ``HPX-<jlink_serial>`` into its CDC serial
+    descriptor, so a device carrying some *other* ``HPX-*`` marker is provably a
+    different board (e.g. another EVB still running its firmware).  Such a device
+    must never be used as a heuristic fallback for this target, otherwise the
+    capture opens the wrong board and blocks until the read timeout.
+    """
+    if not expected_marker:
+        return False
+    serial = _port_serial_number(port)
+    return serial.startswith(USB_MARKER_PREFIX) and serial != expected_marker
+
+
+def _drop_foreign_hpx_ports(
+    ports: list[str], expected_marker: str | None
+) -> list[str]:
+    """Drop ports that belong to a *different* hpx board from *ports*."""
+    return [p for p in ports if not _is_foreign_hpx_port(p, expected_marker)]
 
 
 def _find_port_by_marker(marker: str) -> str | None:
@@ -138,12 +177,17 @@ def _resolve_cdc_port(
             timeout_s,
         )
 
-    return _find_cdc_port(pre_existing=pre_existing, timeout_s=timeout_s if not marker else 0)
+    return _find_cdc_port(
+        pre_existing=pre_existing,
+        timeout_s=timeout_s if not marker else 0,
+        expected_marker=marker,
+    )
 
 
 def _find_cdc_port(
     pre_existing: set[str] | None = None,
     timeout_s: float = _ENUM_TIMEOUT_S,
+    expected_marker: str | None = None,
 ) -> str:
     """Wait for a non-J-Link USB CDC device and return its path.
 
@@ -152,13 +196,19 @@ def _find_cdc_port(
     expires the current non-J-Link devices are weighed: exactly one is used,
     more than one is rejected as ambiguous (the caller should rely on the
     firmware marker or pass an explicit ``--usb-port``), and none raises.
+
+    *expected_marker* (when known) drops any device advertising a *different*
+    ``HPX-*`` marker, so a stale CDC device from another attached board is never
+    mistaken for this target.
     """
     deadline = time.monotonic() + timeout_s
     if pre_existing is None:
         pre_existing = set()
 
     while time.monotonic() < deadline:
-        new_ports = _app_cdc_ports(_snapshot_cdc_ports() - pre_existing)
+        new_ports = _drop_foreign_hpx_ports(
+            _app_cdc_ports(_snapshot_cdc_ports() - pre_existing), expected_marker
+        )
         if len(new_ports) == 1:
             log.info("Found new USB CDC port: %s", new_ports[0])
             return new_ports[0]
@@ -166,8 +216,9 @@ def _find_cdc_port(
 
     # No single fresh device appeared — fall back to currently present
     # non-J-Link devices. Refuse to open SEGGER VCOM, which only causes a long
-    # timeout and hides the real enumeration failure.
-    candidates = _app_cdc_ports()
+    # timeout and hides the real enumeration failure.  Also refuse a CDC device
+    # that advertises a different board's hpx marker.
+    candidates = _drop_foreign_hpx_ports(_app_cdc_ports(), expected_marker)
     if len(candidates) == 1:
         log.warning(
             "No new USB CDC device appeared; using the only application CDC "
@@ -205,6 +256,7 @@ def capture_usb_output(
     timeout_s: float = DEFAULT_TIMEOUT_S,
     usb_port: str | None = None,
     usb_marker: str | None = None,
+    keep_attached: bool = False,
     timing_out: dict[str, float] | None = None,
 ) -> list[str]:
     """Capture firmware output via USB CDC until HPX_END or timeout.
@@ -212,6 +264,12 @@ def capture_usb_output(
     USB CDC provides CRC-protected, flow-controlled delivery.  The
     firmware waits for DTR assertion before printing, so there is no
     fixed startup delay.
+
+    When *keep_attached* is set, a pylink debugger session is held open for the
+    whole capture (reset+go through pylink) instead of releasing the probe.
+    This is required on SoCs that gate the DWT cycle counter behind the debug
+    power domain (Apollo4) — see
+    :func:`~helia_profiler.capture.readiness.attached_reset_session`.
 
     Returns:
         List of captured text lines.
@@ -234,27 +292,39 @@ def capture_usb_output(
     log.info("Pre-existing CDC ports: %s", sorted(pre_existing) or "(none)")
 
     # --- Step 1: reset the target ---
-    reset_target(device=jlink_device, jlink_serial=jlink_serial)
-
-    # --- Step 2: locate the target's USB CDC port ---
-    # An explicit --usb-port always wins.  Otherwise prefer the unique USB
-    # serial-number marker that hpx stamped into this build's descriptor: it
-    # identifies *this* board unambiguously even when several Ambiq boards are
-    # attached.  Fall back to host heuristics only when no marker is available
-    # or it never enumerates.
-    if usb_port is not None:
-        port = usb_port
-        log.info("Using pinned USB CDC port: %s", port)
-        time.sleep(USB_REENUM_FLOOR_S)
-    else:
-        port = _resolve_cdc_port(marker=usb_marker, pre_existing=pre_existing)
-
-    # --- Step 3: open port with DTR ---
-    log.info("Opening USB CDC port: %s", port)
     ser: serial.Serial | None = None
     lines: list[str] = []
+    # On SoCs that gate the DWT cycle counter behind the debug power domain
+    # (Apollo4), a debugger must stay attached for the whole capture or every
+    # per-layer cycle reads back 0.  Hold the pylink session open across reset,
+    # re-enumeration, and the read; it is released in the finally block.
+    reset_stack = contextlib.ExitStack()
 
     try:
+        if keep_attached:
+            reset_stack.enter_context(
+                attached_reset_session(
+                    device=jlink_device, jlink_serial=jlink_serial
+                )
+            )
+        else:
+            reset_target(device=jlink_device, jlink_serial=jlink_serial)
+
+        # --- Step 2: locate the target's USB CDC port ---
+        # An explicit --usb-port always wins.  Otherwise prefer the unique USB
+        # serial-number marker that hpx stamped into this build's descriptor: it
+        # identifies *this* board unambiguously even when several Ambiq boards
+        # are attached.  Fall back to host heuristics only when no marker is
+        # available or it never enumerates.
+        if usb_port is not None:
+            port = usb_port
+            log.info("Using pinned USB CDC port: %s", port)
+            time.sleep(USB_REENUM_FLOOR_S)
+        else:
+            port = _resolve_cdc_port(marker=usb_marker, pre_existing=pre_existing)
+
+        # --- Step 3: open port with DTR ---
+        log.info("Opening USB CDC port: %s", port)
         ser = serial.Serial(
             port=port,
             baudrate=_BAUD,
@@ -295,6 +365,20 @@ def capture_usb_output(
             if line == HPX_START and hpx_start_s is None:
                 hpx_start_s = line_ts
 
+            # Clean (power) window announce: widen the capture deadline to cover
+            # the firmware's estimate of the upcoming silent window so a long
+            # but healthy blackout is not cut short.
+            budget = window_budget_s(line)
+            if budget is not None:
+                window_deadline = line_ts + budget
+                if window_deadline > deadline:
+                    deadline = window_deadline
+                    log.info(
+                        "USB: clean window announced (~%.0fs budget) — "
+                        "holding deadline through the silent measurement window",
+                        budget,
+                    )
+
             if line == HPX_END:
                 hpx_end_s = line_ts
                 log.info("Captured %d lines (HPX_END received)", len(lines))
@@ -316,6 +400,7 @@ def capture_usb_output(
     finally:
         if ser is not None and ser.is_open:
             ser.close()
+        reset_stack.close()
 
     log.warning(
         "USB CDC capture timed out after %.0fs (%d lines captured)",

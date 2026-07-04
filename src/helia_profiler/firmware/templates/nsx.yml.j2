@@ -1,19 +1,19 @@
 {# nsx.yml — NSX project manifest for the profiler app #}
-schema_version: 1
+schema_version: 2
 project:
   name: hpx_profiler
-target:
-  board: {{ board }}
-  soc: {{ soc }}
+targets:
+  default: {{ board }}
+  supported:
+    - {{ board }}
 toolchain: {{ toolchain }}
 channel: {{ channel }}
-profile: {{ board }}_minimal
-profile_status: active
 modules:
 {% for m in modules %}
 - name: {{ m.name }}
 {% if m.local %}
-  local: true
+  source:
+    vendored: true
 {% elif m.ref is defined and m.ref %}
   project: {{ m.project }}
   ref: {{ m.ref }}

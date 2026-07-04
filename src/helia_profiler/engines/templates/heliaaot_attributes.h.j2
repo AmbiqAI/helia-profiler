@@ -37,6 +37,8 @@
   #define {{ prefix|upper }}_PUT_IN_DTCM_INIT
 
   /* SRAM — shared SRAM requires explicit section placement */
+  #define {{ prefix|upper }}_PUT_IN_DRAM       __attribute__((section(".sram_bss")))
+  #define {{ prefix|upper }}_PUT_IN_DRAM_INIT  __attribute__((section(".shared")))
   #define {{ prefix|upper }}_PUT_IN_SRAM       __attribute__((section(".sram_bss")))
   #define {{ prefix|upper }}_PUT_IN_SRAM_INIT  __attribute__((section(".shared")))
 
@@ -50,6 +52,7 @@
 
   /* ITCM — tightly-coupled instruction memory */
   #define {{ prefix|upper }}_PUT_IN_ITCM       __attribute__((section(".itcm_text")))
+  #define {{ prefix|upper }}_PUT_IN_ITCM_INIT  __attribute__((section(".itcm_text")))
 
 /*
  * Apollo330P / Apollo510L  (Cortex-M55, DTCM overlay for code, no ITCM)
@@ -59,6 +62,8 @@
   #define {{ prefix|upper }}_PUT_IN_DTCM
   #define {{ prefix|upper }}_PUT_IN_DTCM_INIT
 
+  #define {{ prefix|upper }}_PUT_IN_DRAM       __attribute__((section(".sram_bss")))
+  #define {{ prefix|upper }}_PUT_IN_DRAM_INIT  __attribute__((section(".shared")))
   #define {{ prefix|upper }}_PUT_IN_SRAM       __attribute__((section(".sram_bss")))
   #define {{ prefix|upper }}_PUT_IN_SRAM_INIT  __attribute__((section(".shared")))
 
@@ -70,6 +75,7 @@
 
   /* Fast code → DTCM overlay (not ITCM, which doesn't exist) */
   #define {{ prefix|upper }}_PUT_IN_ITCM       __attribute__((section(".dtcm_text")))
+  #define {{ prefix|upper }}_PUT_IN_ITCM_INIT  __attribute__((section(".dtcm_text")))
 
 /*
  * Apollo4P / Apollo4L  (Cortex-M4F, TCM + 1 MB Shared SRAM, no ITCM)
@@ -79,6 +85,8 @@
   #define {{ prefix|upper }}_PUT_IN_DTCM
   #define {{ prefix|upper }}_PUT_IN_DTCM_INIT
 
+  #define {{ prefix|upper }}_PUT_IN_DRAM       __attribute__((section(".sram_bss")))
+  #define {{ prefix|upper }}_PUT_IN_DRAM_INIT  __attribute__((section(".shared")))
   #define {{ prefix|upper }}_PUT_IN_SRAM       __attribute__((section(".sram_bss")))
   #define {{ prefix|upper }}_PUT_IN_SRAM_INIT  __attribute__((section(".shared")))
 
@@ -90,15 +98,24 @@
 
   /* No ITCM on Apollo4 — no-op (code stays in NVM .text) */
   #define {{ prefix|upper }}_PUT_IN_ITCM
+  #define {{ prefix|upper }}_PUT_IN_ITCM_INIT
 
 /*
- * Apollo3P / Apollo3 Blue Plus  (Cortex-M4F, 64 KB TCM, no shared SRAM)
+ * Apollo3P (Cortex-M4F, 64 KB TCM, no shared SRAM)
+ *
+ * Unlike every other current SoC, Apollo3P's default .bss/.data does NOT
+ * target the physical TCM (it targets Main SRAM/RWMEM instead) — so DTCM
+ * placement here needs an explicit section, backed by nsx-ambiq-sdk#29's
+ * dedicated NOLOAD `.tcm_bss` region. Requires an nsx-ambiq-sdk revision
+ * that includes that fix; older revisions silently fall back to RWMEM.
  */
-#elif defined(AM_PART_APOLLO3P) || defined(AM_PART_APOLLO3)
+#elif defined(AM_PART_APOLLO3P)
 
-  #define {{ prefix|upper }}_PUT_IN_DTCM
-  #define {{ prefix|upper }}_PUT_IN_DTCM_INIT
+  #define {{ prefix|upper }}_PUT_IN_DTCM       __attribute__((section(".tcm_bss")))
+  #define {{ prefix|upper }}_PUT_IN_DTCM_INIT  __attribute__((section(".tcm")))
 
+  #define {{ prefix|upper }}_PUT_IN_DRAM
+  #define {{ prefix|upper }}_PUT_IN_DRAM_INIT
   /* No shared SRAM concept on Apollo3 — fall back to default data region */
   #define {{ prefix|upper }}_PUT_IN_SRAM
   #define {{ prefix|upper }}_PUT_IN_SRAM_INIT
@@ -111,6 +128,32 @@
 
   /* TCM code section on Apollo3 */
   #define {{ prefix|upper }}_PUT_IN_ITCM       __attribute__((section(".tcm")))
+  #define {{ prefix|upper }}_PUT_IN_ITCM_INIT  __attribute__((section(".tcm")))
+
+/*
+ * Apollo3 (Blue) — flat 384 KB SRAM, no separate TCM. Not currently a
+ * registered hpx target; kept as a distinct branch (rather than sharing
+ * Apollo3P's) since it has no `.tcm`/`.tcm_bss` linker sections to target.
+ */
+#elif defined(AM_PART_APOLLO3)
+
+  #define {{ prefix|upper }}_PUT_IN_DTCM
+  #define {{ prefix|upper }}_PUT_IN_DTCM_INIT
+
+  #define {{ prefix|upper }}_PUT_IN_DRAM
+  #define {{ prefix|upper }}_PUT_IN_DRAM_INIT
+  #define {{ prefix|upper }}_PUT_IN_SRAM
+  #define {{ prefix|upper }}_PUT_IN_SRAM_INIT
+
+  #define {{ prefix|upper }}_PUT_IN_MRAM       const
+  #define {{ prefix|upper }}_PUT_IN_MRAM_INIT  const
+
+  #define {{ prefix|upper }}_PUT_IN_PSRAM
+  #define {{ prefix|upper }}_PUT_IN_PSRAM_INIT
+
+  #define {{ prefix|upper }}_PUT_IN_ITCM
+  #define {{ prefix|upper }}_PUT_IN_ITCM_INIT
+
 
 /*
  * Unknown SoC — all macros become no-ops.  The profiler will warn about
@@ -121,6 +164,8 @@
 
   #define {{ prefix|upper }}_PUT_IN_DTCM
   #define {{ prefix|upper }}_PUT_IN_DTCM_INIT
+  #define {{ prefix|upper }}_PUT_IN_DRAM
+  #define {{ prefix|upper }}_PUT_IN_DRAM_INIT
   #define {{ prefix|upper }}_PUT_IN_SRAM
   #define {{ prefix|upper }}_PUT_IN_SRAM_INIT
   #define {{ prefix|upper }}_PUT_IN_MRAM       const
@@ -128,5 +173,6 @@
   #define {{ prefix|upper }}_PUT_IN_PSRAM
   #define {{ prefix|upper }}_PUT_IN_PSRAM_INIT
   #define {{ prefix|upper }}_PUT_IN_ITCM
+  #define {{ prefix|upper }}_PUT_IN_ITCM_INIT
 
 #endif

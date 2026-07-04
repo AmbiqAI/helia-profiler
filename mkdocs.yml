@@ -144,3 +144,6 @@ nav:
       - hpx doctor: reference/doctor.md
       - hpx boards: reference/boards.md
       - hpx engines: reference/engines.md
+      - hpx probes: reference/probes.md
+      - hpx ports: reference/ports.md
+      - hpx target: reference/target.md

@@ -31,6 +31,7 @@ import csv
 import io
 import logging
 import re
+import statistics
 from typing import Any
 
 from ..results import FirmwareMeta, LayerResult, PmuResult, PresetResult
@@ -41,12 +42,24 @@ log = logging.getLogger("hpx")
 # Columns that carry string identifiers, not numeric values.
 _STRING_COLS = frozenset({"Layer", "Op", "tag", "name", "overflow"})
 
+# A per-layer counter at or above this value is treated as a uint32 underflow
+# wrap (finish < start), not a real measurement.  Per-layer counters on these
+# parts are comfortably below 2^31; a sample this large means the on-device
+# subtraction wrapped (the Apollo4 DWT->CYCCNT settling artifact).
+_UINT32_WRAP_THRESHOLD = 1 << 31
 
-def parse_firmware_output(lines: list[str]) -> PmuResult:
+
+def parse_firmware_output(
+    lines: list[str], aggregation: str = "median"
+) -> PmuResult:
     """Parse HPX protocol output into structured profiling data.
 
     Returns a :class:`PmuResult` with firmware metadata, per-preset breakdowns,
     and merged per-layer results across all presets.
+
+    *aggregation* selects how per-layer counters are reduced across profiled
+    iterations: ``"median"`` (default, robust), ``"mean"``, or ``"trimmed"``.
+    Structurally-invalid samples (uint32-wrap / frozen-zero) are rejected first.
     """
     meta_kv: dict[str, Any] = {}
     presets: dict[str, _PresetData] = {}
@@ -133,16 +146,23 @@ def parse_firmware_output(lines: list[str]) -> PmuResult:
         num_inputs=meta_kv.get("num_inputs"),
         num_outputs=meta_kv.get("num_outputs"),
         num_presets=meta_kv.get("num_presets"),
+        system_clock_hz=meta_kv.get("system_clock_hz"),
         profiled_infer_count=meta_kv.get("profiled_infer_count"),
         profiled_infer_total_us=meta_kv.get("profiled_infer_total_us"),
         profiled_infer_avg_us=meta_kv.get("profiled_infer_avg_us"),
+        clean_infer_count=meta_kv.get("clean_infer_count"),
+        clean_infer_total_cycles=meta_kv.get("clean_infer_total_cycles"),
+        clean_infer_avg_cycles=meta_kv.get("clean_infer_avg_cycles"),
+        clean_infer_avg_us=meta_kv.get("clean_infer_avg_us"),
         presets=preset_names,
     )
 
     # Build per-preset typed results
     typed_presets: dict[str, PresetResult] = {}
     for name, pd in presets.items():
-        avg_layers = _average_iterations(pd.iterations, pd.header or [])
+        avg_layers = _average_iterations(
+            pd.iterations, pd.header or [], aggregation=aggregation
+        )
         typed_iters = _raw_iterations_to_typed(pd.iterations, pd.header or [])
         typed_presets[name] = PresetResult(
             name=name,
@@ -293,19 +313,78 @@ class _PresetData:
             self._current_layers.append(layer)
 
 
+def _row_is_frozen(row: dict[str, Any], numeric_cols: list[str]) -> bool:
+    """Whether a single per-iteration sample row is a frozen PMU readout.
+
+    A genuine debug-domain freeze (the probe not yet powered / still settling)
+    zeroes the *entire* PMU readout for that iteration at once.  A row is
+    therefore only "frozen" when **every** numeric counter present in it reads
+    ``0`` — a single legitimately-zero counter (e.g. a sparse stall counter on
+    a tiny layer) must not trip the detector, or healthy samples get discarded
+    and the user sees a confusing false alert.  Returns ``False`` for a row
+    with no numeric counters (nothing to judge).
+    """
+    seen = False
+    for col in numeric_cols:
+        v = row.get(col)
+        if isinstance(v, (int, float)):
+            seen = True
+            if v != 0:
+                return False
+    return seen
+
+
+def _aggregate(vals: list[float], method: str) -> float:
+    """Reduce per-iteration samples to a single value via *method*."""
+    if not vals:
+        return 0.0
+    if method == "mean":
+        return sum(vals) / len(vals)
+    if method == "median":
+        return float(statistics.median(vals))
+    if method == "trimmed":
+        # Drop one low and one high extreme, then mean.  Needs >=3 samples to
+        # trim; otherwise fall back to a plain mean.
+        if len(vals) >= 3:
+            ordered = sorted(vals)[1:-1]
+            return sum(ordered) / len(ordered)
+        return sum(vals) / len(vals)
+    # Unknown method should have been rejected at config load; be safe.
+    return float(statistics.median(vals))
+
+
 def _average_iterations(
     iterations: list[list[dict[str, Any]]],
     header: list[str],
+    aggregation: str = "median",
 ) -> list[LayerResult]:
-    """Average numeric columns across iterations, returning typed LayerResult."""
+    """Aggregate numeric columns across iterations, returning typed LayerResult.
+
+    Per ``aggregation`` (``mean`` | ``median`` | ``trimmed``), each per-layer
+    counter is reduced across profiled iterations after rejecting
+    structurally-invalid samples (uint32-wrap / frozen-zero).  Rejections are
+    summarised in a single warning so a corrupted iteration is visible without
+    per-layer log spam.
+    """
     if not iterations:
         return []
 
     num_layers = len(iterations[0])
     numeric_cols = [c for c in header if c not in _STRING_COLS]
 
+    total_wrap = 0
+    total_frozen = 0
+
     averaged: list[LayerResult] = []
     for layer_idx in range(num_layers):
+        # Collect this layer's sample rows (with their iteration index) so
+        # frozen-zero detection can reason about the whole PMU readout per row.
+        rows = [
+            (it_idx, it[layer_idx])
+            for it_idx, it in enumerate(iterations)
+            if layer_idx < len(it)
+        ]
+
         if layer_idx < len(iterations[0]):
             first = iterations[0][layer_idx]
             op_name = first.get("Op", first.get("tag", "unknown"))
@@ -314,16 +393,40 @@ def _average_iterations(
             op_name = "unknown"
             layer_id = layer_idx
 
+        # Row-level frozen-zero rejection: drop an iteration only when its
+        # *entire* PMU readout was zero.  Keep them when every iteration is
+        # frozen (a genuinely-zero layer) so a counter is never silently
+        # emptied.
+        frozen_iters = {
+            it_idx for it_idx, row in rows if _row_is_frozen(row, numeric_cols)
+        }
+        if len(frozen_iters) >= len(rows):
+            frozen_iters = set()
+        total_frozen += len(frozen_iters)
+
         counters: dict[str, float] = {}
         for col in numeric_cols:
-            vals: list[float] = []
-            for it in iterations:
-                if layer_idx < len(it):
-                    v = it[layer_idx].get(col)
-                    if isinstance(v, (int, float)):
-                        vals.append(float(v))
-            if vals:
-                counters[col] = sum(vals) / len(vals)
+            clean: list[float] = []
+            raw: list[float] = []
+            for it_idx, row in rows:
+                v = row.get(col)
+                if not isinstance(v, (int, float)):
+                    continue
+                raw.append(float(v))
+                # uint32-wrap is an independent per-counter underflow, judged
+                # on the individual value rather than the whole row.
+                if v >= _UINT32_WRAP_THRESHOLD:
+                    total_wrap += 1
+                    continue
+                if it_idx in frozen_iters:
+                    continue
+                clean.append(float(v))
+            if not clean:
+                # Everything looked invalid — fall back to the raw samples
+                # rather than emitting an empty counter.
+                clean = raw
+            if clean:
+                counters[col] = _aggregate(clean, aggregation)
 
         cycles = counters.get("ARM_PMU_CPU_CYCLES")
 
@@ -342,6 +445,16 @@ def _average_iterations(
                 cycles=cycles,
                 overflow=overflow_count > 0,
             )
+        )
+
+    if total_wrap or total_frozen:
+        log.warning(
+            "Rejected %d uint32-wrap value(s) and %d frozen-zero sample row(s) "
+            "before %s aggregation (likely debug-probe settling on the first "
+            "iterations; counters reflect the surviving samples).",
+            total_wrap,
+            total_frozen,
+            aggregation,
         )
 
     return averaged

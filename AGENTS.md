@@ -63,6 +63,26 @@ projects. It generates temporary firmware, profiles, and reports results.
 - `pyserial` for serial communication
 - No POSIX-only assumptions
 
+### HPX CLI Before Raw Debug Tools
+
+Run HPX through the project environment, preferably from any directory as:
+
+```bash
+uv --directory /home/adamp/Ambiq/tools/helia-profiler run hpx ...
+```
+
+For probe and target diagnostics, prefer HPX's non-interactive helpers before
+reaching for raw SEGGER Commander sessions:
+
++ `hpx probes list [--board <board>] [--json]`
++ `hpx probes match --board <board> [--jlink-serial <serial>]`
++ `hpx ports list [--all] [--json]`
++ `hpx target reset --board <board> [--jlink-serial <serial>] [--kind debug|swpoi]`
+
+Avoid raw `JLinkExe` in agent workflows unless HPX lacks the needed operation.
+If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
+`exit`, set a timeout, and prefer adding a wrapper in `jlink.py` afterward.
+
 ## Module Responsibilities
 
 | Module | Responsibility |

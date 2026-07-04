@@ -56,6 +56,27 @@ static nsx_usb_config_t g_usb_cfg = {
 // timed inference window where droppable heartbeats must never stall the CPU.
 static volatile bool g_hpx_rtt_lossless = false;
 
+// Refresh ONLY the SEGGER RTT control block in the D-cache so the CPU observes
+// the host-advanced up-buffer RdOff.  The control block and RTT ring buffers
+// live in non-cacheable TCM, so on Apollo510 this is effectively a no-op (the
+// region has no D-cache lines), yet it stays correct should the block ever be
+// relocated to cacheable memory.  It replaces the previous WHOLE-cache
+// invalidate (am_hal_cachectrl_dcache_invalidate(NULL, false)), which also
+// discarded not-yet-written-back lines of a tensor arena placed in cacheable
+// SSRAM/PSRAM -- silently zeroing the allocator's persistent tensors so
+// interpreter.input()/output() returned NULL and inference hung.  TCM arenas
+// were immune (non-cacheable), which is why only Apollo510 SRAM/PSRAM broke.
+static inline void hpx_rtt_invalidate_cb(void) {
+{% if (soc_family | default("")) == "ap5" %}
+#if defined(__DCACHE_PRESENT) && (__DCACHE_PRESENT == 1U)
+    SCB_InvalidateDCache_by_Addr((volatile void *)&_SEGGER_RTT,
+                                 (int32_t)sizeof(_SEGGER_RTT));
+#endif
+{% else %}
+    // Cortex-M4 (Apollo3/Apollo4) has no CPU D-cache; nothing to invalidate.
+{% endif %}
+}
+
 // Lossless RTT up-buffer write.
 //
 // The up-buffer stays in NO_BLOCK_TRIM at all times; we do the "wait for space"
@@ -70,7 +91,7 @@ static void hpx_rtt_write_lossless(const char *buf, unsigned len) {
     const uint32_t spins_per_ms = SystemCoreClock / 2000U;
     uint32_t budget = HPX_RTT_LOSSLESS_TIMEOUT_MS * spins_per_ms;
     for (;;) {
-        HPX_INVAL_DCACHE();  // refresh host-advanced RdOff before checking space
+        hpx_rtt_invalidate_cb();  // refresh host-advanced RdOff (CB only, not the arena)
         if (SEGGER_RTT_GetAvailWriteSpace(0) >= len) {
             break;
         }
@@ -108,11 +129,11 @@ static void hpx_rtt_write_lossless(const char *buf, unsigned len) {
 static void hpx_rtt_drain(uint32_t timeout_ms) {
     const uint32_t spins_per_ms = SystemCoreClock / 2000U; // conservative
     uint32_t total = timeout_ms * spins_per_ms;
-    HPX_INVAL_DCACHE();
+    hpx_rtt_invalidate_cb();
     while (SEGGER_RTT_HasDataUp(0) && total > 0U) {
         for (volatile uint32_t s = 0; s < spins_per_ms; ++s) { __NOP(); }
         if (total > spins_per_ms) total -= spins_per_ms; else total = 0;
-        HPX_INVAL_DCACHE();
+        hpx_rtt_invalidate_cb();
     }
 }
 
@@ -130,48 +151,6 @@ static void hpx_rtt_set_blocking(void) {
 }
 static void hpx_rtt_set_nonblocking(void) {
     g_hpx_rtt_lossless = false;
-}
-
-static bool hpx_rtt_wait_for_command(const char *token, uint32_t timeout_ms) {
-    static char cmd_buf[32];
-    const size_t token_len = strlen(token);
-    unsigned used = 0;
-    const uint32_t spins_per_ms = SystemCoreClock / 2000U;
-    uint32_t total = timeout_ms * spins_per_ms;
-
-    memset(cmd_buf, 0, sizeof(cmd_buf));
-    while (total > 0U) {
-        // Down channel: J-Link wrote the host command into SRAM via SWD.  The
-        // CPU may hold stale observed data for the down-buffer descriptor
-        // (WrOff) and payload, so drop any cache-observed copies before
-        // reading or we spin forever never seeing the host's bytes. This runs
-        // only during the one-time startup handshake, never inside a timed PMU
-        // window.
-        HPX_INVAL_DCACHE();
-        unsigned n = SEGGER_RTT_Read(0, cmd_buf + used,
-                                     sizeof(cmd_buf) - 1U - used);
-        if (n > 0U) {
-            used += n;
-            cmd_buf[used] = '\0';
-            if (strstr(cmd_buf, token) != nullptr) {
-                return true;
-            }
-            if (used == sizeof(cmd_buf) - 1U) {
-                unsigned keep = token_len > 1U ? (unsigned)token_len - 1U : 0U;
-                if (keep > used) {
-                    keep = used;
-                }
-                if (keep > 0U) {
-                    memmove(cmd_buf, cmd_buf + used - keep, keep);
-                }
-                used = keep;
-                cmd_buf[used] = '\0';
-            }
-        }
-        for (volatile uint32_t s = 0; s < spins_per_ms; ++s) { __NOP(); }
-        if (total > spins_per_ms) total -= spins_per_ms; else total = 0U;
-    }
-    return false;
 }
 {% elif transport == "swo" %}
 {{ _linkage }}void hpx_printf(const char *fmt, ...) {
@@ -196,3 +175,32 @@ static bool hpx_rtt_wait_for_command(const char *token, uint32_t timeout_ms) {
     }
 }
 {% endif %}
+
+// ---------------------------------------------------------------------------
+// hpx_park — terminal halt used by the HPX_END happy path and every error exit.
+//
+// On RTT the control block + ring buffers live in non-cached TCM on the
+// cache-coherent Cortex-M55 parts, and the J-Link can only reach TCM while the
+// core clock is running.  Once the core enters __WFI() the host can no longer
+// drain the ring, so any bytes still queued — crucially a final HPX_ERROR=...
+// line on a failure path — would be lost.  We therefore switch to lossless
+// mode, publish, and drain the ring while the core is still spinning, then
+// park.  Non-RTT transports (SWO/USB/stdio) send synchronously, so they simply
+// park.  This keeps the failure diagnostics observable regardless of toolchain.
+// ---------------------------------------------------------------------------
+{% if transport == "rtt" %}
+#ifndef HPX_RTT_FAIL_DRAIN_MS
+// Generous: if no host has attached yet, hpx_rtt_drain() spins the full window
+// (RdOff never advances), giving a late-attaching host time to read the buffer.
+#define HPX_RTT_FAIL_DRAIN_MS 3000U
+#endif
+{% endif %}
+
+{{ _linkage }}void hpx_park(void) {
+{% if transport == "rtt" %}
+    hpx_rtt_set_blocking();
+    HPX_CLEAN_DCACHE();
+    hpx_rtt_drain(HPX_RTT_FAIL_DRAIN_MS);
+{% endif %}
+    for (;;) { __WFI(); }
+}

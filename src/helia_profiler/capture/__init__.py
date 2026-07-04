@@ -1,10 +1,12 @@
 """Data capture from target hardware.
 
-Supports three transports for reading profiling data from the target:
+Supports the following transports for reading profiling data from the target:
 
 - **RTT** (recommended): Lossless, flow-controlled via SEGGER RTT over SWD.
 - **USB CDC**: CRC-protected USB serial, requires USB connection.
 - **SWO**: ITM debug output, minimal setup but no flow control.
+- **UART**: Output over the J-Link OB virtual COM port; for boards without
+  a USB device stack (e.g. Apollo3). 115200 8N1, no flow control.
 
 - ``capture_pmu``: Read PMU / DWT counters and per-layer breakdown.
 - ``capture_power``: Record current/voltage traces via power driver.
@@ -13,9 +15,11 @@ Supports three transports for reading profiling data from the target:
 from __future__ import annotations
 
 import logging
+import time
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from ..errors import CaptureError
+from ..errors import CaptureError, PowerError
 from ..placement import Placement
 from ..usb_identity import usb_marker_serial
 from .transport import HPX_END, HPX_START
@@ -24,6 +28,7 @@ if TYPE_CHECKING:
     from ..pipeline import PipelineContext
     from ..power.base import PowerResult
     from ..results import PmuResult
+    from ..target_lifecycle import TargetLifecyclePlan
 
 log = logging.getLogger("hpx")
 
@@ -51,6 +56,13 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         )
     jlink_device = ctx.soc.jlink_device
 
+    # The Cortex-M4F families (Apollo3/3P and Apollo4/4P) gate DWT->CYCCNT
+    # behind the debug power domain, which only stays powered while a debugger
+    # is attached.  UART/USB normally release the probe after reset, so on those
+    # SoCs the readers must hold a pylink session open for the whole capture or
+    # every per-layer cycle reads back 0.
+    keep_debugger_attached = ctx.soc.requires_attached_probe_for_cycles
+
     # Use build_dir from context (set by stage 4) — no re-derivation
     build_dir = ctx.build_dir
     timing_raw: dict[str, float] = {}
@@ -63,6 +75,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
             jlink_device=jlink_device,
             usb_port=ctx.config.target.usb_port,
             usb_marker=usb_marker_serial(jlink_serial),
+            keep_attached=keep_debugger_attached,
             timing_out=timing_raw,
         )
     elif transport == "rtt":
@@ -94,10 +107,39 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     else:
         from .serial_reader import capture_swo_output
 
-        cpu_clock_mhz = ctx.run_metadata.platform.cpu_clock_mhz
-        cpu_freq_hz = cpu_clock_mhz * 1_000_000 if cpu_clock_mhz > 0 else 96_000_000
+        if transport == "uart":
+            from .uart_reader import capture_uart_output
 
-        lines = capture_swo_output(
+            lines = capture_uart_output(
+                jlink_serial=jlink_serial,
+                jlink_device=jlink_device,
+                timeout_s=overall_timeout_s,
+                heartbeat_timeout_s=heartbeat_timeout_s,
+                keep_attached=keep_debugger_attached,
+                timing_out=timing_raw,
+            )
+        else:
+            # SWO baud is derived from the trace clock, so it MUST come from the
+            # resolved platform — never a hardcoded guess.  A wrong assumption
+            # here halves/doubles the ITM baud and yields an undecodable stream
+            # (this is exactly how the Apollo3 96-vs-48 MHz registry bug
+            # manifested).  Most SoCs clock the TPIU from the CPU, but Apollo3
+            # uses a dedicated, CPU-independent trace clock that does not change
+            # with TurboSPOT burst — so honor swo_trace_clock_mhz when set.
+            cpu_clock_mhz = ctx.run_metadata.platform.cpu_clock_mhz
+            swo_ref_mhz = ctx.soc.swo_trace_clock_mhz or cpu_clock_mhz
+            if swo_ref_mhz <= 0:
+                raise CaptureError(
+                    "SWO capture requires a resolved trace clock, but none was set.",
+                    hint=(
+                        "Stage 1 (resolve_platform) must run before capture so the "
+                        "selected target.clock.cpu frequency (or the SoC's fixed SWO "
+                        "trace clock) drives the SWO baud rate."
+                    ),
+                )
+            cpu_freq_hz = swo_ref_mhz * 1_000_000
+
+            lines = capture_swo_output(
             build_dir=build_dir,
             jlink_serial=jlink_serial,
             jlink_device=jlink_device,
@@ -116,8 +158,12 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     # it with the best hint we can generate.
     _raise_on_firmware_error(lines)
 
-    # Pre-parse validation: check for protocol sentinels
-    if not any(HPX_START in l for l in lines[:30]):
+    # Pre-parse validation: check for protocol sentinels.  Scan the whole
+    # capture, not just the head: the SWO transport emits a variable-length
+    # HPX_READY sync preamble before "--- HPX_START ---" (see the firmware
+    # templates), so the sentinel does not sit at a fixed offset.  The parser
+    # likewise ignores everything before HPX_START.
+    if not any(HPX_START in l for l in lines):
         raise CaptureError(
             f"Captured data ({len(lines)} lines) does not contain HPX_START sentinel",
             hint=(
@@ -134,7 +180,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
             _truncation_hint(str(transport)),
         )
 
-    result = parse_firmware_output(lines)
+    result = parse_firmware_output(lines, aggregation=ctx.config.profiling.aggregation)
     if not result.layers:
         # We saw HPX_START (checked above) but parsed zero layers.  Either the
         # CSV stream was lost in transit (lossy transport / undersized buffer)
@@ -149,19 +195,98 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
             hint=_truncation_hint(str(transport)),
         )
 
+    # Cross-check the device's actual clock against the registry value the host
+    # assumed.  This catches registry drift or an NSX perf-mode that silently
+    # failed to apply — both of which corrupt SWO baud and cycle->time math.
+    _verify_device_clock(ctx, result)
+
     if timing_raw:
         from ..results import TimingInfo
 
+        # Collect the attributed boot/attach phase breakdown (RTT records
+        # reset / sbl_settle / attach / control_block_scan / line_collection).
+        phases = {
+            key[len("rtt_phase_"): -len("_s")]: round(value, 6)
+            for key, value in timing_raw.items()
+            if key.startswith("rtt_phase_") and key.endswith("_s")
+        }
         ctx.run_metadata.timing = TimingInfo(
             capture_duration_s=timing_raw.get("capture_duration_s"),
             hpx_start_latency_s=timing_raw.get("hpx_start_latency_s"),
             protocol_duration_s=timing_raw.get("protocol_duration_s"),
+            phases=phases or None,
         )
 
     return result
 
 
-def capture_power(ctx: PipelineContext, *, duration_override_s: float | None = None) -> PowerResult:
+class _UsbDtrHolder:
+    """Hold a USB CDC port open (DTR asserted) for a gated power capture.
+
+    The USB firmware spins in ``nsx_usb_connected()`` until the host opens its
+    CDC port and raises DTR.  During a Joulescope-gated power run nothing reads
+    firmware output, so this just resolves the target's CDC port, opens it, and
+    asserts DTR — releasing the firmware to run the gated clean window — then
+    holds it open until :meth:`close`.
+    """
+
+    def __init__(self, *, usb_port: str | None, usb_marker: str | None) -> None:
+        self._usb_port = usb_port
+        self._usb_marker = usb_marker
+        self._ser = None  # type: ignore[var-annotated]
+
+    def open(self) -> None:
+        import serial
+
+        from .usb_reader import _BAUD, _resolve_cdc_port
+
+        port = self._usb_port
+        if port is None:
+            port = _resolve_cdc_port(marker=self._usb_marker)
+        log.info("Opening USB CDC port for gated power capture: %s", port)
+        self._ser = serial.Serial(
+            port=port,
+            baudrate=_BAUD,
+            timeout=1.0,
+            dsrdtr=True,  # assert DTR so nsx_usb_connected() returns true
+        )
+        self._ser.dtr = True
+
+    def close(self) -> None:
+        if self._ser is not None:
+            try:
+                self._ser.close()
+            except Exception:
+                log.debug("Failed to close USB DTR holder port", exc_info=True)
+            finally:
+                self._ser = None
+
+
+def _make_sync_controller(ctx: PipelineContext, driver: object):
+    """Build a host sync controller from config, or a gate-only fallback.
+
+    Lock-step is opt-in (``power.lockstep``); without it, or on drivers that
+    cannot drive a GO output, the controller is a no-op and the device free-runs.
+    """
+    from ..power.sync import NullSyncController, SyncWiring
+
+    if not ctx.config.power.lockstep or not hasattr(driver, "make_sync_controller"):
+        return NullSyncController()
+    wiring = SyncWiring(
+        lockstep=True,
+        gate_input_index=ctx.config.power.sync_input_index,
+        state_input_index=ctx.config.power.state_input_index,
+        go_output_index=ctx.config.power.go_output_index,
+    )
+    return driver.make_sync_controller(wiring)
+
+
+def capture_power(
+    ctx: PipelineContext,
+    *,
+    duration_override_s: float | None = None,
+    prepare_target: Callable[[object, str], "TargetLifecyclePlan"] | None = None,
+) -> PowerResult:
     """Record a power trace using the configured power driver.
 
     Returns a :class:`PowerResult` directly — no intermediate dict wrapping.
@@ -169,18 +294,109 @@ def capture_power(ctx: PipelineContext, *, duration_override_s: float | None = N
     from ..power import get_driver
 
     driver_name = ctx.config.power.driver
-    driver = get_driver(driver_name)
+    driver = get_driver(driver_name, serial=ctx.config.power.serial)
 
     # Verify driver is usable
     driver.check_available()
+    lifecycle_plan = None
+
+    def _prepare_target_once() -> None:
+        nonlocal lifecycle_plan
+        if prepare_target is not None and lifecycle_plan is None:
+            lifecycle_plan = prepare_target(driver, driver_name)
+
+    def _attach_lifecycle_metadata(result: PowerResult) -> PowerResult:
+        if lifecycle_plan is not None:
+            result.metadata.setdefault("target_lifecycle", lifecycle_plan.to_metadata())
+        return result
 
     duration = (
         duration_override_s if duration_override_s is not None else ctx.config.power.duration_s
     )
 
-    return driver.capture(
-        duration_s=duration,
-        io_voltage=ctx.config.power.io_voltage,
+    clean_count = None
+    if ctx.pmu_result is not None:
+        clean_count = ctx.pmu_result.meta.clean_infer_count
+
+    if (
+        driver_name in {"joulescope", "joulescope-js110", "joulescope-js220"}
+        and clean_count is not None
+    ):
+        # USB CDC firmware blocks in nsx_usb_connected() until the host asserts
+        # DTR.  Unlike SWO/UART/RTT (which free-run after reset), it will never
+        # reach the gated clean window — and the Joulescope would see no
+        # GPIO-high window — unless we open its CDC port.  Hand capture_gated an
+        # on_started hook that opens the port *after* the GPI poller is live, so
+        # the firmware is released only once we are watching for the window.
+        dtr_holder: _UsbDtrHolder | None = None
+        if ctx.config.target.transport == "usb_cdc":
+            jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
+            dtr_holder = _UsbDtrHolder(
+                usb_port=ctx.config.target.usb_port,
+                usb_marker=usb_marker_serial(jlink_serial),
+            )
+        # 3-wire lock-step: arm the host GO line before the device may run and
+        # release it once the poller is live, chained after any USB DTR open.
+        sync = _make_sync_controller(ctx, driver)
+        sync.arm()
+        # Reset/relaunch only after GO is held low and the state input is open.
+        # Otherwise a fast boot can pass through the READY barrier before the
+        # host is watching, leaving power capture to fail later as a missing gate.
+        _prepare_target_once()
+        sync_metadata: dict[str, object]
+
+        if sync.lockstep:
+            from ..power.diagnostics import SyncHandshakeMetadata
+
+            ready_started = time.monotonic()
+            ready = sync.wait_ready(timeout_s=duration)
+            ready_wait_s = round(time.monotonic() - ready_started, 6)
+            if not ready:
+                state = sync.read_state()
+                sync.release()
+                raise PowerError(
+                    "Target did not signal READY before gated power capture",
+                    hint=(
+                        "Check the state/go GPIO wiring, reset strategy, and that the firmware "
+                        "is parked in the power sync wait state. "
+                        f"Last observed state: {state.value}; waited {ready_wait_s:.3f}s."
+                    ),
+                )
+            sync_metadata = SyncHandshakeMetadata(
+                lockstep=True,
+                ready_wait_s=ready_wait_s,
+                ready_observed=True,
+            ).to_metadata()
+        else:
+            from ..power.diagnostics import SyncHandshakeMetadata
+
+            sync_metadata = SyncHandshakeMetadata(lockstep=False).to_metadata()
+
+        def _release() -> None:
+            if dtr_holder is not None:
+                dtr_holder.open()
+            sync.signal_go()
+
+        try:
+            result = driver.capture_gated(
+                duration_s=duration,
+                io_voltage=ctx.config.power.io_voltage,
+                sync_input_index=ctx.config.power.sync_input_index,
+                stats_rate_hz=ctx.config.power.stats_rate_hz,
+                clean_infer_count=clean_count,
+                on_started=_release,
+            )
+            result.metadata.setdefault("sync", sync_metadata)
+            return _attach_lifecycle_metadata(result)
+        finally:
+            sync.release()
+            if dtr_holder is not None:
+                dtr_holder.close()
+
+
+    _prepare_target_once()
+    return _attach_lifecycle_metadata(
+        driver.capture(duration_s=duration, io_voltage=ctx.config.power.io_voltage)
     )
 
 
@@ -256,6 +472,42 @@ def _truncation_hint(transport: str) -> str:
             "the port. RTT (--transport rtt) avoids USB enumeration entirely."
         )
     return "Check that the firmware is printing HPX protocol data over the selected transport."
+
+
+def _verify_device_clock(ctx: PipelineContext, result: PmuResult) -> None:
+    """Warn if the device's actual clock disagrees with the registry value.
+
+    The host derives SWO baud and every cycle->time conversion from the
+    ``target.clock.cpu`` selection resolved against the platform registry.
+    The firmware reports its real ``SystemCoreClock`` so we can detect when
+    that assumption is wrong — e.g. a stale registry entry or an NSX perf-mode
+    that did not take effect on this SoC.  A mismatch does not abort the run
+    (the cycle counts themselves are still valid), but it makes every derived
+    time value suspect, so surface it loudly.
+    """
+    platform = ctx.run_metadata.platform
+    if platform is None:
+        return
+    device_hz = result.meta.system_clock_hz
+    registry_mhz = platform.cpu_clock_mhz
+    if not device_hz or registry_mhz <= 0:
+        return
+
+    registry_hz = registry_mhz * 1_000_000
+    # HFRC trim tolerance is a few percent; 5% comfortably clears real trim
+    # variation while still catching integer-ratio mistakes (48 vs 96 MHz).
+    if abs(device_hz - registry_hz) > 0.05 * registry_hz:
+        log.warning(
+            "Device reports CPU clock %.3f MHz but the platform registry "
+            "assumed %d MHz (cpu=%s) for %s. SWO baud and all cycle->time "
+            "values use the registry value and will be wrong. Fix the clock "
+            "for %s in the platform registry or the target.clock.cpu setting.",
+            device_hz / 1_000_000,
+            registry_mhz,
+            platform.cpu_clock_name or "?",
+            platform.soc or "?",
+            platform.soc or "this SoC",
+        )
 
 
 def _raise_on_firmware_error(lines: list[str]) -> None:

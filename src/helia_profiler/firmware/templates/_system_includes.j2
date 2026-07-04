@@ -14,7 +14,9 @@
 #define NSX_TRY NS_TRY
 #endif
 
-{% if extreme_mode and arena_region == "tcm" and weights_region == "tcm" %}
+{% set _aot_sram_resident = ((arena_regions | default([])) | selectattr("placement", "equalto", "sram") | list | length) > 0 %}
+{% set _sram_resident = (arena_region | default("") == "sram") or (weights_region | default("") == "sram") or _aot_sram_resident %}
+{% if (extreme_mode and arena_region == "tcm" and weights_region == "tcm") or ((soc_family | default("")) == "ap5" and (_sram_resident or (force_shared_sram | default(false)))) %}
 #include "am_hal_pwrctrl.h"
 {% endif %}
 {% if transport == "usb_cdc" %}

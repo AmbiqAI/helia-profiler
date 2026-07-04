@@ -549,9 +549,9 @@ class TestGenerateApp:
         nsx_yml = (app_dir / "nsx.yml").read_text()
         cmake = (app_dir / "CMakeLists.txt").read_text()
         assert "kPowerSyncEnabled = true" in main_cc
-        assert "kSyncGpioPin = 42" in main_cc
-        assert "sync_gpio_high" in main_cc
-        assert "sync_gpio_low" in main_cc
+        assert "kSyncGpioPin      = 42" in main_cc
+        assert "hpx_sync_window_begin" in main_cc
+        assert "hpx_sync_window_end" in main_cc
         assert "nsx_gpio_init" in main_cc
         assert "nsx_gpio_write" in main_cc
         assert "am_hal_gpio_" not in main_cc
@@ -605,7 +605,9 @@ class TestGenerateApp:
         cmake = (app_dir / "CMakeLists.txt").read_text()
         assert "BUFFER_SIZE_UP=12288" in cmake
 
-    def test_rtt_generation_places_segger_buffers_in_sram(self, tmp_path: Path, fake_dist: Path):
+    def test_rtt_generation_places_segger_buffers_by_cache_family(
+        self, tmp_path: Path, fake_dist: Path
+    ):
         rtt_root = Path(os.environ["SEGGER_RTT_PATH"])
         (rtt_root / "RTT" / "SEGGER_RTT.c").write_text(
             '#include "SEGGER_RTT.h"\n'
@@ -638,16 +640,20 @@ class TestGenerateApp:
         app_dir = generate_app(ctx)
 
         # The SEGGER source is copied verbatim — placement is driven entirely by
-        # the generated config header defining SEGGER_RTT_SECTION, which the
-        # compiled (cache-line == 0) branch turns into
-        # __attribute__((section(".sram_bss"))).
+        # the generated config header. Cache-coherent Cortex-M55 parts keep the
+        # buffers in non-cached TCM (no SEGGER_RTT_SECTION override) so SWD reads
+        # stay coherent; cacheless Cortex-M4 parts fall through to .sram_bss.
         rtt_c = (app_dir / "src" / "rtt" / "SEGGER_RTT.c").read_text()
         assert "SEGGER_RTT_PUT_CB_SECTION(" in rtt_c
         assert "SEGGER_RTT_PUT_BUFFER_SECTION(" in rtt_c
 
         conf = (app_dir / "src" / "rtt" / "Config" / "SEGGER_RTT_Conf.h").read_text()
         assert '#include "nsx_mem.h"' in conf
-        assert "#if NSX_MEM__HAS_SRAM_BSS" in conf
+        # M55 / Apollo5 family is gated to non-cached TCM (.bss default).
+        assert "defined(AM_PART_APOLLO510)" in conf
+        assert "defined(AM_PART_APOLLO330P)" in conf
+        # Cacheless parts still relocate the buffers into shared SRAM.
+        assert "#elif NSX_MEM__HAS_SRAM_BSS" in conf
         assert "#define SEGGER_RTT_SECTION NSX_MEM__SEC_SRAM_BSS" in conf
 
     def test_rtt_generation_raises_when_segger_layout_is_unexpected(
@@ -1111,6 +1117,32 @@ class TestNsxModuleOverrides:
         assert nsx_yml.count("ref: feat/new-soc") == sdk_module_count
         assert "project: neuralspotx\n  ref: main" in nsx_yml
 
+    def test_ref_override_aligns_module_registry_revisions(self, tmp_path: Path, fake_dist: Path):
+        # Regression: a project ref override must also re-point the per-module
+        # `module_registry.modules.<name>.revision` entries. The starter profile
+        # pins those to `main`; NSX's lock resolution honours the module-level
+        # revision over the project revision, so a stale `main` here drags the
+        # whole SDK monorepo back to `main` (and vendors the wrong commit).
+        ctx = self._make_ctx_with_overrides(
+            tmp_path,
+            fake_dist,
+            {"nsx_modules": {"nsx-core": {"ref": "feat/new-soc"}}},
+        )
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        registry = yaml.safe_load((app_dir / "nsx.yml").read_text())["module_registry"]
+        assert registry["projects"]["nsx-ambiq-sdk"]["revision"] == "feat/new-soc"
+        sdk_modules = {
+            name
+            for name, entry in registry["modules"].items()
+            if entry.get("project") == "nsx-ambiq-sdk"
+        }
+        assert sdk_modules, "expected nsx-ambiq-sdk modules in the registry"
+        for name in sdk_modules:
+            assert registry["modules"][name]["revision"] == "feat/new-soc", name
+
     def test_module_registry_emitted_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         # The generated manifest must carry the profile's module_registry so the
         # app's effective registry agrees with the per-module project pins and a
@@ -1150,10 +1182,9 @@ class TestNsxModuleOverrides:
         assert (installed / "nsx-module.yaml").is_file()
         assert (installed / "CMakeLists.txt").read_text() == "# custom nsx-core cmake\n"
 
-        # nsx.yml should mark it as local
+        # nsx.yml should mark it as a vendored (local) module under schema v2
         nsx_yml = (app_dir / "nsx.yml").read_text()
-        # The module entry should have local: true
-        assert "local: true" in nsx_yml
+        assert "vendored: true" in nsx_yml
 
     def test_path_override_missing_yaml_raises(self, tmp_path: Path, fake_dist: Path):
         from helia_profiler.errors import FirmwareError

@@ -10,8 +10,10 @@ from typing import Any
 
 from .engines import EngineType
 from .errors import ConfigError
-from .placement import ModelLocation
+from .placement import ModelLocation, Placement
 from .platform import (
+    DEFAULT_GO_GPIO_PIN,
+    DEFAULT_STATE_GPIO_PIN,
     DEFAULT_SYNC_GPIO_PIN,
     BoardDef,
     ClockDomain,
@@ -25,9 +27,12 @@ from .platform import (
     SocFamily,
     build_platform_registry,
     get_board,
+    get_default_go_gpio_pin,
+    get_default_state_gpio_pin,
     get_default_sync_gpio_pin,
     get_soc,
 )
+from .target_lifecycle import ResetStrategy
 from .power.base import PowerMode
 
 
@@ -57,6 +62,7 @@ class Transport(StrEnum):
     RTT = "rtt"
     USB_CDC = "usb_cdc"
     SWO = "swo"
+    UART = "uart"
 
 
 @dataclass(frozen=True)
@@ -85,11 +91,43 @@ DEFAULT_BOARD = "apollo510_evb"
 DEFAULT_TOOLCHAIN = Toolchain.ARM_NONE_EABI_GCC
 DEFAULT_ITERATIONS = 100
 DEFAULT_WARMUP = 5
+# Clean / GPIO-gated end-to-end window sizing.  ``"fixed"`` reuses
+# ``iterations`` for the clean pass (historical behaviour).  ``"auto"`` (default)
+# lets the firmware size the gated window at runtime from the measured
+# clean-inference time so short models run more iterations and big models run
+# fewer — filling a consistent ~1 s wall-clock window for ordinary profiling.
+# External power capture raises this to a longer minimum window so host-side
+# GPIO polling and Joulescope packet alignment have several seconds to settle.
+WINDOW_MODES = ("fixed", "auto")
+DEFAULT_WINDOW_MODE = "auto"
+DEFAULT_WINDOW_TARGET_MS = 1000
+DEFAULT_POWER_WINDOW_TARGET_MS = 5000
+DEFAULT_WINDOW_MIN = 10
+DEFAULT_WINDOW_MAX = 2000
+CLEAN_WINDOW_PROBES = ("infer", "busy_loop")
+DEFAULT_CLEAN_WINDOW_PROBE = "infer"
+# Per-iteration aggregation estimator for per-layer counters.  ``median`` is
+# the default because it rejects the occasional corrupted iteration (e.g. an
+# Apollo4 DWT->CYCCNT uint32 wrap or a frozen-zero read while the host probe is
+# still settling) that a plain mean would smear across the whole layer.
+DEFAULT_AGGREGATION = "median"
+AGGREGATION_METHODS = ("mean", "median", "trimmed")
 DEFAULT_PMU_PRESETS = ("basic_cpu",)
 DEFAULT_POWER_DURATION_S = 30
 DEFAULT_IO_VOLTAGE = 1.8
 DEFAULT_POWER_DRIVER = "joulescope"
 DEFAULT_POWER_MODE = PowerMode.EXTERNAL
+DEFAULT_POWER_SYNC_INPUT_INDEX = 0
+# 3-wire lock-step sync: extra host-side digital channels. gate=INPUT0,
+# state/error=INPUT1, go (host->device) = OUTPUT0. Lock-step is off by default
+# so existing 1-wire gate captures are unchanged.
+DEFAULT_POWER_STATE_INPUT_INDEX = 1
+DEFAULT_POWER_GO_OUTPUT_INDEX = 0
+#: Host-side statistics rate (Hz) for GPIO-gated Joulescope capture. The device
+#: integrates charge/energy at its full native rate (~2 MSPS) and delivers the
+#: integrals as stat packets at this cadence; ~1 kHz brackets a ~250 ms window
+#: to <1% while keeping the data volume at a few KB (vs MB/s for raw streaming).
+DEFAULT_POWER_STATS_RATE_HZ = 1000
 DEFAULT_TRANSPORT = Transport.RTT
 
 # Heartbeat defaults — firmware emits progress lines so the host can detect
@@ -117,13 +155,13 @@ DEFAULT_DOWNLOAD_ASSET_S = 300
 class ModelConfig:
     """Model file and arena sizing.
 
-    ``model_location`` is the high-level policy for where weights and the
-    tensor arena live.
+    ``arena_location`` and ``weights_location`` are the preferred placement
+    controls for runtime engines such as heliaRT: the arena is the mutable
+    tensor arena, while weights are the model flatbuffer/constant data.
 
-    Runtime-specific split overrides live under ``engine.config`` as
-    ``runtime_arena_location`` / ``runtime_weights_location`` so they are
-    scoped to interpreters that share the runtime path (currently ``tflm``
-    and ``helia-rt``). ``helia-aot`` uses its own placement controls.
+    ``model_location`` is retained as a compatibility preset for older configs.
+    Split fields take precedence when present. ``helia-aot`` uses its own
+    tensor-kind placement controls via ``engine.config.aot_args.memory.tensors``.
 
     Policy values:
 
@@ -143,6 +181,8 @@ class ModelConfig:
     path: Path
     arena_size: int | None = None  # bytes; None = let engine/firmware report
     model_location: ModelLocation = ModelLocation.AUTO
+    arena_location: Placement | None = None
+    weights_location: Placement | None = None
 
     def __post_init__(self) -> None:
         # Tolerate invalid raw strings here — :class:`PreflightStage`
@@ -152,6 +192,13 @@ class ModelConfig:
                 object.__setattr__(self, "model_location", ModelLocation(self.model_location))
             except ValueError:
                 pass
+        for field_name in ("arena_location", "weights_location"):
+            raw = getattr(self, field_name)
+            if raw is not None and not isinstance(raw, Placement):
+                try:
+                    object.__setattr__(self, field_name, Placement(raw))
+                except ValueError:
+                    pass
 
 
 @dataclass(frozen=True)
@@ -237,11 +284,15 @@ class TargetConfig:
     rtt_buffer_size_up: int | None = None
     clock: ClockSelection = field(default_factory=ClockSelection)
     heartbeat: HeartbeatConfig = field(default_factory=HeartbeatConfig)
-    # When True (default), scan for a Joulescope at the start of `hpx profile`
-    # and enable current passthrough so the board powers on before flashing.
-    # No-op when no Joulescope is detected.  Set to False to skip the scan
-    # entirely (e.g. board is on a bench supply).
-    ensure_board_powered: bool = True
+    # When True, scan for a Joulescope at the start of `hpx profile` and
+    # enable current passthrough so the board powers on before flashing.
+    # Default is False (opt-in): most boards are powered independently of
+    # any Joulescope, and probing for one on every run is unnecessary I/O
+    # that isn't worth the risk on every invocation. Set to True (or pass
+    # --ensure-power) when the board's power genuinely comes from the
+    # Joulescope rail. Always runs when power.enabled is True, since power
+    # capture requires the driver regardless.
+    ensure_board_powered: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.toolchain, Toolchain):
@@ -272,12 +323,72 @@ class ProfilingConfig:
     per_layer: bool = True
     iterations: int = DEFAULT_ITERATIONS
     warmup: int = DEFAULT_WARMUP
+    # Clean / GPIO-gated end-to-end window sizing.  ``"fixed"`` (default) runs
+    # exactly ``iterations`` clean inferences.  ``"auto"`` lets the firmware
+    # choose the clean-window iteration count at runtime to fill
+    # ``window_target_ms`` of wall-time, clamped to ``[window_min, window_max]``.
+    # The firmware reports the actual count it ran (``HPX_CLEAN_INFER_COUNT``),
+    # which the host divides into the gated energy for per-inference numbers.
+    window_mode: str = DEFAULT_WINDOW_MODE
+    window_target_ms: int = DEFAULT_WINDOW_TARGET_MS
+    window_min: int = DEFAULT_WINDOW_MIN
+    window_max: int = DEFAULT_WINDOW_MAX
+    # Optional bench probe for the clean GPIO-gated window. ``busy_loop`` keeps
+    # the gate high around a calibrated CPU spin for roughly window_target_ms
+    # so bring-up can distinguish wrong gate semantics from inference behavior.
+    clean_window_probe: str = DEFAULT_CLEAN_WINDOW_PROBE
+    # Sanity-check diagnostic: when true, the firmware emits an
+    # ``HPX_CLEAN_ITER=<n>`` line over the active transport on every iteration
+    # of the clean (GPIO-gated power) window.  This proves the device is
+    # genuinely looping inferences for the whole measured window rather than
+    # stalling/sleeping.  It perturbs the power reading (extra transport
+    # traffic inside the gate), so leave it OFF for real measurements.
+    clean_window_trace: bool = False
+    # Static-power diagnostic: when true, the firmware unconditionally powers
+    # and retains the full shared SSRAM array at boot (mirroring AutoDeploy's
+    # ns_power_config(bNeedSharedSRAM=true)), even when the model runs entirely
+    # from TCM.  Used to measure the SSRAM static/retention contribution to
+    # the power floor.  SRAM-resident arena/weights power the array on
+    # regardless; this flag forces it on for the TCM case too.
+    force_shared_sram: bool = False
+    # How per-layer counters are aggregated across profiled iterations:
+    # ``mean`` (arithmetic mean), ``median`` (robust default), or ``trimmed``
+    # (drop the high/low extremes, then mean).  All methods first reject
+    # structurally-invalid samples (uint32-wrap / frozen-zero) and log them.
+    aggregation: str = DEFAULT_AGGREGATION
     # Extreme benchmarking mode: power down memory regions the model does not
     # use to lower the energy floor.  Currently powers down SSRAM (3 MB) and
     # collapses MRAM to a single bank (NVM0 only).  Only safe when the model
     # weights and arena both live in TCM. Code keeps running from MRAM, so
     # transports (RTT/USB/SWO) and printf remain available throughout the run.
     extreme_mode: bool = False
+
+    def __post_init__(self) -> None:
+        if self.aggregation not in AGGREGATION_METHODS:
+            raise ValueError(
+                f"Invalid aggregation '{self.aggregation}'. "
+                f"Choose one of: {', '.join(AGGREGATION_METHODS)}."
+            )
+        if self.window_mode not in WINDOW_MODES:
+            raise ValueError(
+                f"Invalid window_mode '{self.window_mode}'. "
+                f"Choose one of: {', '.join(WINDOW_MODES)}."
+            )
+        if self.window_min < 1:
+            raise ValueError(f"window_min must be >= 1, got {self.window_min}.")
+        if self.window_max < self.window_min:
+            raise ValueError(
+                f"window_max ({self.window_max}) must be >= window_min ({self.window_min})."
+            )
+        if self.window_target_ms < 1:
+            raise ValueError(
+                f"window_target_ms must be >= 1, got {self.window_target_ms}."
+            )
+        if self.clean_window_probe not in CLEAN_WINDOW_PROBES:
+            raise ValueError(
+                f"Invalid clean_window_probe '{self.clean_window_probe}'. "
+                f"Choose one of: {', '.join(CLEAN_WINDOW_PROBES)}."
+            )
 
 
 @dataclass(frozen=True)
@@ -290,6 +401,25 @@ class PowerConfig:
     duration_s: int = DEFAULT_POWER_DURATION_S
     io_voltage: float = DEFAULT_IO_VOLTAGE
     sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN  # GPIO for external sync
+    # Host-side sync input index on external instruments. For Joulescope this
+    # is the digital input channel number (validated default wiring is INPUT0).
+    sync_input_index: int = DEFAULT_POWER_SYNC_INPUT_INDEX
+    # Optional 3-wire lock-step handshake (AutoDeploy-compatible wiring).
+    # gate=sync_gpio_pin (device->host), state_gpio_pin (device->host),
+    # go_gpio_pin (host->device). 0 disables a wire; lockstep stays off until
+    # the monitor exposes a GO output and both extra pins are configured.
+    lockstep: bool = False
+    state_gpio_pin: int = DEFAULT_STATE_GPIO_PIN
+    go_gpio_pin: int = DEFAULT_GO_GPIO_PIN
+    state_input_index: int = DEFAULT_POWER_STATE_INPUT_INDEX
+    go_output_index: int = DEFAULT_POWER_GO_OUTPUT_INDEX
+    # Host-side statistics rate (Hz) for gated Joulescope capture. Controls the
+    # cadence of on-device-integrated charge/energy stat packets used to bracket
+    # the gated window. Higher = finer edge resolution, more (still tiny) packets.
+    stats_rate_hz: int = DEFAULT_POWER_STATS_RATE_HZ
+    # Reset strategy before power capture. "auto" keeps board/SoC defaults;
+    # explicit strategies are for bring-up experiments and custom boards.
+    reset_strategy: ResetStrategy = ResetStrategy.AUTO
     # Optional Joulescope serial number (e.g. "004204") to disambiguate
     # when more than one device is plugged in. Leave None to auto-pick the
     # single available device (and fail loudly if multiple are present).
@@ -298,6 +428,20 @@ class PowerConfig:
     def __post_init__(self) -> None:
         if not isinstance(self.mode, PowerMode):
             object.__setattr__(self, "mode", PowerMode(self.mode))
+        if not isinstance(self.reset_strategy, ResetStrategy):
+            object.__setattr__(self, "reset_strategy", ResetStrategy(self.reset_strategy))
+        if self.sync_input_index < 0:
+            raise ValueError(
+                f"power.sync_input_index must be >= 0, got {self.sync_input_index}."
+            )
+        if self.stats_rate_hz < 1:
+            raise ValueError(
+                f"power.stats_rate_hz must be >= 1, got {self.stats_rate_hz}."
+            )
+        if self.lockstep and (self.state_gpio_pin <= 0 or self.go_gpio_pin <= 0):
+            raise ValueError(
+                "power.lockstep requires both state_gpio_pin and go_gpio_pin > 0."
+            )
 
 
 @dataclass(frozen=True)
@@ -431,6 +575,8 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
         path=Path(model_d["path"]),
         arena_size=model_d.get("arena_size"),
         model_location=model_d.get("model_location", "auto"),
+        arena_location=model_d.get("arena_location"),
+        weights_location=model_d.get("weights_location"),
     )
 
     engine_type_raw = engine_d.get("type", EngineType.HELIA_RT.value)
@@ -485,6 +631,22 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             registry=platform_registry,
         ),
     )
+    state_gpio_pin = power_d.get(
+        "state_gpio_pin",
+        get_default_state_gpio_pin(
+            board_name,
+            fallback=DEFAULT_STATE_GPIO_PIN,
+            registry=platform_registry,
+        ),
+    )
+    go_gpio_pin = power_d.get(
+        "go_gpio_pin",
+        get_default_go_gpio_pin(
+            board_name,
+            fallback=DEFAULT_GO_GPIO_PIN,
+            registry=platform_registry,
+        ),
+    )
 
     return ProfileConfig(
         model=model,
@@ -498,7 +660,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             rtt_buffer_size_up=target_d.get("rtt_buffer_size_up"),
             clock=ClockSelection(**(target_d.get("clock") or {})),
             heartbeat=_build_heartbeat(target_d.get("heartbeat")),
-            ensure_board_powered=bool(target_d.get("ensure_board_powered", True)),
+            ensure_board_powered=bool(target_d.get("ensure_board_powered", False)),
         ),
         profiling=ProfilingConfig(
             pmu_presets=pmu_presets,
@@ -506,6 +668,16 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             per_layer=profiling_d.get("per_layer", True),
             iterations=profiling_d.get("iterations", DEFAULT_ITERATIONS),
             warmup=profiling_d.get("warmup", DEFAULT_WARMUP),
+            aggregation=profiling_d.get("aggregation", DEFAULT_AGGREGATION),
+            window_mode=profiling_d.get("window_mode", DEFAULT_WINDOW_MODE),
+            window_target_ms=profiling_d.get("window_target_ms", DEFAULT_WINDOW_TARGET_MS),
+            window_min=profiling_d.get("window_min", DEFAULT_WINDOW_MIN),
+            window_max=profiling_d.get("window_max", DEFAULT_WINDOW_MAX),
+            clean_window_probe=profiling_d.get(
+                "clean_window_probe", DEFAULT_CLEAN_WINDOW_PROBE
+            ),
+            clean_window_trace=bool(profiling_d.get("clean_window_trace", False)),
+            force_shared_sram=bool(profiling_d.get("force_shared_sram", False)),
             extreme_mode=bool(profiling_d.get("extreme_mode", False)),
         ),
         power=PowerConfig(
@@ -515,6 +687,20 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             duration_s=power_d.get("duration_s", DEFAULT_POWER_DURATION_S),
             io_voltage=power_d.get("io_voltage", DEFAULT_IO_VOLTAGE),
             sync_gpio_pin=sync_gpio_pin,
+            sync_input_index=power_d.get(
+                "sync_input_index", DEFAULT_POWER_SYNC_INPUT_INDEX
+            ),
+            lockstep=bool(power_d.get("lockstep", False)),
+            state_gpio_pin=state_gpio_pin,
+            go_gpio_pin=go_gpio_pin,
+            state_input_index=power_d.get(
+                "state_input_index", DEFAULT_POWER_STATE_INPUT_INDEX
+            ),
+            go_output_index=power_d.get(
+                "go_output_index", DEFAULT_POWER_GO_OUTPUT_INDEX
+            ),
+            stats_rate_hz=power_d.get("stats_rate_hz", DEFAULT_POWER_STATS_RATE_HZ),
+            reset_strategy=power_d.get("reset_strategy", ResetStrategy.AUTO.value),
             serial=power_d.get("serial"),
         ),
         output=OutputConfig(
@@ -647,6 +833,18 @@ def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, Boar
                 spec.get(
                     "default_sync_gpio_pin",
                     base_board.default_sync_gpio_pin if base_board else DEFAULT_SYNC_GPIO_PIN,
+                )
+            ),
+            default_state_gpio_pin=int(
+                spec.get(
+                    "default_state_gpio_pin",
+                    base_board.default_state_gpio_pin if base_board else DEFAULT_STATE_GPIO_PIN,
+                )
+            ),
+            default_go_gpio_pin=int(
+                spec.get(
+                    "default_go_gpio_pin",
+                    base_board.default_go_gpio_pin if base_board else DEFAULT_GO_GPIO_PIN,
                 )
             ),
             starter_profile_board=(

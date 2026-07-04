@@ -1,9 +1,9 @@
 """Stage 7 — Capture power data via configured power driver (optional).
 
-When using an external Joulescope driver, this stage performs a clean
-power-cycle reset (via the Joulescope relay) before capturing.  This
-eliminates the ~300 µA debug-domain overhead that a J-Link reset leaves
-behind, giving accurate baseline power numbers.
+Power capture relaunches firmware through an explicit target lifecycle policy
+before arming the measurement.  The default policy uses reset primitives, not
+instrument rail cycling; Joulescope power cycling remains an explicit recovery
+or bring-up experiment only.
 
 If PMU results are available from a preceding capture stage, the capture
 duration is automatically tightened to `boot_time + firmware_run_time +
@@ -14,23 +14,42 @@ from __future__ import annotations
 
 import logging
 
+from ..config import DEFAULT_POWER_WINDOW_TARGET_MS
 from ..errors import PowerError
 from ..pipeline import PipelineContext
+from ..target_lifecycle import CapturePhase, prepare_target_for_phase
 
 log = logging.getLogger("hpx")
 
 # Guard periods for estimated-duration auto-terminate
-_BOOT_SETTLE_S = 4.0  # power-cycle settle + SBL + firmware init
-_SAFETY_MARGIN_S = 3.0  # extra headroom beyond estimated runtime
+_BOOT_SETTLE_S = 8.0  # reset/SBL/firmware init allowance
+_SAFETY_MARGIN_S = 6.0  # extra headroom beyond estimated runtime
+
+
+#: Auto window mode warms the clean pass with 3 hardcoded uninstrumented
+#: reps before timing (main.cc.j2 / main_aot.cc.j2), independent of
+#: profiling.warmup which only applies to the per-layer PMU passes.
+_AUTO_WINDOW_WARMUP_REPS = 3
 
 
 def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
     """Estimate how long the firmware needs to run from PMU timing data.
 
-    After a power-cycle, the firmware boots from MRAM and re-runs all
-    presets × (warmup + profiled iterations).  Each iteration invokes the
-    model once.  We know the per-inference cycle count from the PMU result
-    and the clock frequency from the resolved CPU clock selection.
+    After a power-cycle, the firmware boots from MRAM and runs two distinct
+    phases before HPX_END:
+
+    1. The GPIO-gated *clean* window — ``iterations`` clean inferences in
+       ``window_mode: fixed``, or a runtime-sized loop targeting
+       ``window_target_ms`` of wall-time in ``window_mode: auto`` (clamped to
+       ``[window_min, window_max]``).
+    2. The per-layer PMU-instrumented passes — ``presets × (warmup +
+       iterations)`` inferences.
+
+    Both phases must be covered by the estimate; the clean window in
+    particular can be made arbitrarily long (e.g. to build a multi-second
+    Joulescope integration window), and previously this function only
+    accounted for the PMU passes, causing the Joulescope poller's safety
+    bound to elapse mid-window and miss the falling edge entirely.
 
     Returns ``None`` if there is not enough information to estimate.
     """
@@ -50,13 +69,26 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
         return None
 
     cycles_per_inference = total_cycles
-    num_presets = len(pmu.presets) or 1
-    warmup = ctx.config.profiling.warmup
-    iterations = ctx.config.profiling.iterations
-    total_inferences = num_presets * (warmup + iterations)
-
     inference_time_s = cycles_per_inference / clock_hz
-    firmware_run_s = total_inferences * inference_time_s
+
+    profiling = ctx.config.profiling
+    num_presets = len(pmu.presets) or 1
+    profiled_inferences = num_presets * (profiling.warmup + profiling.iterations)
+    profiled_run_s = profiled_inferences * inference_time_s
+
+    if profiling.window_mode == "auto":
+        target_ms = max(profiling.window_target_ms, DEFAULT_POWER_WINDOW_TARGET_MS)
+        target_s = target_ms / 1000.0
+        clean_iters = target_s / inference_time_s if inference_time_s > 0 else profiling.window_min
+        clean_iters = max(profiling.window_min, min(profiling.window_max, clean_iters))
+        clean_warmup_reps = _AUTO_WINDOW_WARMUP_REPS
+    else:
+        clean_iters = max(1, profiling.iterations)
+        clean_warmup_reps = max(1, profiling.warmup)
+
+    clean_run_s = (clean_iters + clean_warmup_reps) * inference_time_s
+
+    firmware_run_s = profiled_run_s + clean_run_s
 
     estimated = _BOOT_SETTLE_S + firmware_run_s + _SAFETY_MARGIN_S
     return estimated
@@ -74,27 +106,30 @@ class CapturePowerStage:
 
     def run(self, ctx: PipelineContext) -> None:
         from ..capture import capture_power
-        from ..power import get_driver
 
         driver_name = ctx.config.power.driver
         mode = ctx.config.power.mode
         log.info("Power driver: %s (mode: %s)", driver_name, mode)
 
-        # --- Power-cycle reset for accurate measurement ---
-        # Let the driver decide whether it supports power cycling.
-        # External Joulescope drivers cut and restore target power,
-        # giving a clean boot with zero debug-domain overhead.
-        # Drivers that can't power-cycle (e.g. ondevice) raise PowerError.
-        driver = get_driver(driver_name, serial=ctx.config.power.serial)
-        try:
-            driver.power_cycle(off_time_s=0.5, settle_time_s=2.0)
-            log.info("Clean power-cycle reset — no debug-domain overhead")
-        except PowerError:
-            log.warning(
-                "Power-cycle reset not available for '%s' — "
-                "power numbers may include ~300 µA debug-domain overhead.",
-                driver_name,
+        def _prepare_target(driver: object, resolved_driver_name: str):
+            lifecycle_plan = prepare_target_for_phase(
+                ctx,
+                phase=CapturePhase.POWER,
+                power_driver=driver,
+                power_driver_name=resolved_driver_name,
             )
+            log.info(
+                "Power lifecycle: power_cycle=%s reset=%s",
+                (
+                    "ok"
+                    if lifecycle_plan.power_cycle_succeeded
+                    else "failed"
+                    if lifecycle_plan.power_cycle_attempted
+                    else "not-requested"
+                ),
+                lifecycle_plan.reset_action.value,
+            )
+            return lifecycle_plan
 
         # --- Capture ---
         # Tighten capture window if PMU timing data is available.
@@ -111,7 +146,11 @@ class CapturePowerStage:
             capture_duration = configured
 
         try:
-            power_result = capture_power(ctx, duration_override_s=capture_duration)
+            power_result = capture_power(
+                ctx,
+                duration_override_s=capture_duration,
+                prepare_target=_prepare_target,
+            )
         except PowerError:
             raise
         except Exception as exc:

@@ -22,8 +22,13 @@ def test_auto_mode_selects_only_needed_rt_registrations():
     )
 
     assert plan.mode == "auto"
-    assert plan.registrations == ("r.AddConv2D();", "r.AddSoftmax();")
-    assert plan.max_ops == 2
+    assert plan.registrations == (
+        "r.AddConv2D();",
+        "r.AddDequantize();",
+        "r.AddQuantize();",
+        "r.AddSoftmax();",
+    )
+    assert plan.max_ops == 4
 
 
 def test_rt_defaults_to_auto_when_unset():
@@ -34,7 +39,23 @@ def test_rt_defaults_to_auto_when_unset():
     )
 
     assert plan.mode == "auto"
-    assert plan.registrations == ("r.AddConv2D();", "r.AddSoftmax();")
+    assert plan.registrations == (
+        "r.AddConv2D();",
+        "r.AddDequantize();",
+        "r.AddQuantize();",
+        "r.AddSoftmax();",
+    )
+
+
+def test_rt_auto_mode_includes_quantize_for_heliart_prepare():
+    plan = build_resolver_plan(
+        engine_type=EngineType.HELIA_RT,
+        engine_config={"resolver_ops": "auto"},
+        model_analysis=_analysis("CONV_2D", "SOFTMAX"),
+    )
+
+    assert "r.AddQuantize();" in plan.registrations
+    assert "r.AddDequantize();" in plan.registrations
 
 
 def test_auto_mode_selects_resource_variable_ops_when_needed():
@@ -53,6 +74,8 @@ def test_auto_mode_selects_resource_variable_ops_when_needed():
     assert plan.registrations == (
         "r.AddAssignVariable();",
         "r.AddCallOnce();",
+        "r.AddDequantize();",
+        "r.AddQuantize();",
         "r.AddReadVariable();",
         "r.AddVarHandle();",
     )

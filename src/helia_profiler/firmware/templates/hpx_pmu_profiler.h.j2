@@ -60,6 +60,12 @@ class HpxPmuProfiler : public tflite::MicroProfilerInterface {
     /// Called by main.cc at the start of each iteration.
     void SetIterationContext(int pass_idx, int iter_idx);
 
+    /// Enable/disable per-op recording.  When disabled, BeginEvent/EndEvent
+    /// are no-ops (no PMU reset, no counter reads, no heartbeats) so an
+    /// Invoke() can be timed end-to-end without per-layer instrumentation
+    /// overhead perturbing the result.
+    void SetEnabled(bool enabled) { enabled_ = enabled; }
+
  private:
     struct LayerRecord {
         const char* tag;
@@ -74,6 +80,7 @@ class HpxPmuProfiler : public tflite::MicroProfilerInterface {
     int num_events_ = 0;
     int num_counters_ = 0;  // actual number of configured PMU counters
     bool initialized_ = false;
+    bool enabled_ = true;   // false during the clean end-to-end timing pass
 
     // Heartbeat state (not in hot PMU path — emission happens between ops)
     uint32_t hb_every_cyc_ = 0;

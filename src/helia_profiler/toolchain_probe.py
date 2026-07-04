@@ -174,8 +174,65 @@ def binary_sections(
     return _sections_via_size(binary_path, size_cmd=f"{prefix}-size", timeout_s=timeout_s)
 
 
+# ---------------------------------------------------------------------------
+# Symbol address probe (for build-time placement verification)
+# ---------------------------------------------------------------------------
+
+
+def _nm_command(toolchain: str) -> str:
+    """Return the ``nm`` executable matching *toolchain*.
+
+    armclang / ATfE ship the LLVM binutils (``llvm-nm``); GCC uses the
+    cross-prefixed ``<prefix>-nm`` (e.g. ``arm-none-eabi-nm``).
+    """
+    if toolchain in ("armclang", "atfe"):
+        return "llvm-nm"
+    prefix = toolchain.rsplit("-gcc", 1)[0] if toolchain.endswith("-gcc") else toolchain
+    return f"{prefix}-nm"
+
+
+def symbol_address(
+    binary_path: Path,
+    toolchain: str,
+    symbol: str,
+    *,
+    timeout_s: int,
+) -> tuple[int, str] | None:
+    """Return ``(address, nm_type_letter)`` for *symbol* in *binary_path*.
+
+    Reads the linked address via ``nm``.  The symbol is matched as a suffix so
+    a C++-mangled local (``_ZL15g_arena_storage``) and a plain C symbol
+    (``g_arena_storage``) both resolve.  Returns ``None`` on any failure
+    (missing tool, symbol absent, parse error) so callers stay best-effort.
+    """
+    nm = _nm_command(toolchain)
+    try:
+        result = subprocess.run(
+            [nm, str(binary_path)],
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+        log.debug("%s probe failed: %s", nm, exc)
+        return None
+    if result.returncode != 0:
+        log.debug("%s failed: %s", nm, (result.stderr or "").strip())
+        return None
+    pattern = re.compile(
+        rf"^([0-9a-fA-F]+)\s+(\S)\s+\S*{re.escape(symbol)}\s*$",
+        re.MULTILINE,
+    )
+    match = pattern.search(result.stdout or "")
+    if match is None:
+        log.debug("symbol %s not found via %s in %s", symbol, nm, binary_path)
+        return None
+    return int(match.group(1), 16), match.group(2)
+
+
 __all__ = [
     "binary_sections",
     "cmake_version",
     "compiler_version",
+    "symbol_address",
 ]

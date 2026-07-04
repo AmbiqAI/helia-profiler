@@ -16,6 +16,8 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from types import MappingProxyType
 
+from .placement import Placement
+
 # ---------------------------------------------------------------------------
 # SoC family (determines core, PMU tier, and MVE availability)
 # ---------------------------------------------------------------------------
@@ -60,6 +62,23 @@ class MemoryLayout:
     nvm_kb: int = 0
 
 
+@dataclass(frozen=True)
+class MemoryRange:
+    """A half-open physical address range ``[start, start+length)``."""
+
+    start: int
+    length: int
+
+    @property
+    def end(self) -> int:
+        """Exclusive end address."""
+        return self.start + self.length
+
+    def contains(self, address: int) -> bool:
+        """True if *address* falls inside this range."""
+        return self.start <= address < self.end
+
+
 class PerfTier(Enum):
     """NSX CPU performance tier — maps directly to ``nsx_perf_mode_e``."""
 
@@ -69,6 +88,10 @@ class PerfTier(Enum):
 
 
 DEFAULT_SYNC_GPIO_PIN = 10
+# 3-wire lock-step sync defaults: device drives gate + state, host drives go.
+# 0 disables the wire (degrades gracefully to 1-wire gate-only handshake).
+DEFAULT_STATE_GPIO_PIN = 0
+DEFAULT_GO_GPIO_PIN = 0
 
 
 @dataclass(frozen=True)
@@ -125,6 +148,18 @@ class SocDef:
     rtt_scan_ranges: tuple[tuple[int, int], ...]
     jlink_device: str = ""  # J-Link device string (e.g. "AP510NFA-CBR")
     pmu_max_ops: int = 2048  # Max PMU accumulator operations (layers)
+    #: SWO/ITM trace reference clock (MHz), when the TPIU TRACECLKIN is NOT the
+    #: CPU clock.  Apollo3 routes a dedicated, CPU-independent clock to the
+    #: TPIU, so the SWO baud does not change with TurboSPOT burst — the host
+    #: must always reference this fixed clock when programming J-Link's SWO
+    #: prescaler.  ``None`` means SWO is core-clocked (Apollo4/5): use the
+    #: selected CPU frequency.
+    swo_trace_clock_mhz: int | None = None
+
+    #: Whether nsx-ambiq-usb supports this SoC (gates the usb_cdc transport).
+    #: Apollo3/3P has no compatible nsx-ambiq-usb module, so usb_cdc is rejected
+    #: at preflight with a clear message instead of failing at nsx lock.
+    has_usb: bool = True
 
     def clock_domain(self, name: str) -> ClockDomain | None:
         """Return the named clock domain, or ``None`` if not present."""
@@ -146,6 +181,25 @@ class SocDef:
     def has_dwt(self) -> bool:
         """All supported Cortex-M targets expose the DWT cycle counter."""
         return True
+
+    @property
+    def requires_attached_probe_for_cycles(self) -> bool:
+        """Whether DWT cycle counts require a debugger attached during capture.
+
+        On the Cortex-M4F families (Apollo3/3P and Apollo4/4P/4L) the
+        ``DWT->CYCCNT`` counter lives in the core debug power domain, which
+        stays powered only while a debugger asserts the DAP's ``CDBGPWRUPREQ``
+        — a signal firmware cannot set from the core.  The SWO/RTT readers keep
+        a debugger attached incidentally, but the UART/USB readers release the
+        probe, so per-layer cycles read back as 0.  When this is True those
+        readers must hold a pylink session open for the whole capture (see
+        ``attached_reset_session``).  AP3 gating was confirmed empirically
+        (2026-06-27): AOT-over-UART read 0 cycles until the probe was held
+        attached, after which it matched the RTT/SWO cycle counts.  AP5
+        (Cortex-M55) uses the resettable Armv8-M PMU and its secure bootloader
+        prefers the probe released, so it stays False.
+        """
+        return self.family in (SocFamily.AP3, SocFamily.AP4)
 
     @property
     def profiling_backends(self) -> tuple[str, ...]:
@@ -192,7 +246,9 @@ class BoardDef:
     soc: str  # SoC name key (matches SocDef.name)
     channel: str  # "stable" or "preview"
     psram_kb: int | None = None  # None = inherit SoC default
-    default_sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN
+    default_sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN  # gate (device -> host)
+    default_state_gpio_pin: int = DEFAULT_STATE_GPIO_PIN  # state/error (device -> host)
+    default_go_gpio_pin: int = DEFAULT_GO_GPIO_PIN  # go (host -> device)
     starter_profile_board: str | None = None  # derive NSX profile/modules from this board
     description: str = ""
 
@@ -254,11 +310,36 @@ _register_soc(
         core=CoreArch.CORTEX_M4,
         pmu_tier=PmuTier.DWT_ONLY,
         has_mve=False,
-        memory=MemoryLayout(mram_kb=1024, sram_kb=384, dtcm_kb=64),
+        # Apollo3p (Blue Plus): 2 MB NOR flash (ROMEM, 2,048,000 B usable above
+        # the 0xC000 bootloader region), a real 64 KB low-latency TCM at
+        # 0x10000000, and 700 KB main SRAM ("RWMEM") at 0x10011000.
+        #
+        # The TCM is genuine tightly-coupled memory in silicon (datasheet: "64
+        # kB TCM", zero-wait-state, DMA-excluded) — but the nsx linker's
+        # default `.bss`/`.data` targets RWMEM, not TCM; historically only
+        # `.tcm` *code* (NSX_MEM_FAST_CODE) reached the real TCM. Data placed
+        # there via NSX_MEM_FAST_BSS silently fell back to RWMEM (a no-op
+        # macro) until nsx-ambiq-sdk#29 added a dedicated NOLOAD `.tcm_bss`
+        # section. dtcm_kb=64 here (and the Placement.TCM base below) reflect
+        # that fix — hpx build against an nsx-ambiq-sdk revision without it
+        # will silently place the "TCM" arena in RWMEM instead.
+        memory=MemoryLayout(mram_kb=2000, sram_kb=700, dtcm_kb=64),
         clocks=(
             ClockDomain(
                 "cpu",
-                (ClockSpeed("lp", 96, PerfTier.LOW),),
+                # Apollo3/3P run at 48 MHz HFRC in normal mode.  The 96 MHz
+                # "burst" (TurboSPOT) tier is NOT reachable through NSX
+                # (nsx_platform_set_perf_mode is a no-op on Apollo3), so the
+                # firmware enables it directly via am_hal_burst_mode_enable()
+                # when "hp" is selected and mirrors the real 96 MHz into
+                # SystemCoreClock.  Host-side timing and the SWO trace-clock
+                # (cpu_speed passed to JLink.swo_enable) follow the selected
+                # ClockSpeed.mhz, so they stay matched to the actual device
+                # clock for both tiers.  Default remains 48 MHz.
+                (
+                    ClockSpeed("lp", 48, PerfTier.LOW),
+                    ClockSpeed("hp", 96, PerfTier.HIGH),
+                ),
                 default="lp",
             ),
         ),
@@ -266,11 +347,39 @@ _register_soc(
         cmsis_header="apollo3p.h",
         rtt_scan_ranges=((0x10000000, 0x100000),),
         jlink_device="AMA3B2KK-KBR",
+        # Apollo3's TPIU TRACECLKIN is a dedicated 48 MHz-domain clock, NOT the
+        # core clock — TurboSPOT burst (hp/96 MHz) does not change the SWO baud,
+        # so the host always programs J-Link's SWO prescaler against 48 MHz.
+        swo_trace_clock_mhz=48,
+        # No nsx-ambiq-usb support on Apollo3/3P — usb_cdc transport unavailable.
+        has_usb=False,
     )
 )
 
-_register_board(BoardDef("apollo3p_evb", soc="apollo3p", channel="stable", psram_kb=8192))
-_register_board(BoardDef("apollo3p_evb_cygnus", soc="apollo3p", channel="preview", psram_kb=8192))
+# Power-capture GPIOs mirror neuralSPOT AutoDeploy AP3 wiring:
+# state bus GPIO 22/23 (device->JS GPI0/GPI1) + trigger GPIO 24 (JS GPO0->device).
+_register_board(
+    BoardDef(
+        "apollo3p_evb",
+        soc="apollo3p",
+        channel="stable",
+        psram_kb=8192,
+        default_sync_gpio_pin=22,
+        default_state_gpio_pin=23,
+        default_go_gpio_pin=24,
+    )
+)
+_register_board(
+    BoardDef(
+        "apollo3p_evb_cygnus",
+        soc="apollo3p",
+        channel="preview",
+        psram_kb=8192,
+        default_sync_gpio_pin=22,
+        default_state_gpio_pin=23,
+        default_go_gpio_pin=24,
+    )
+)
 
 # --- AP4 family (Cortex-M4F) ------------------------------------------------
 
@@ -324,14 +433,63 @@ _register_soc(
     )
 )
 
-_register_board(BoardDef("apollo4p_evb", soc="apollo4p", channel="preview", psram_kb=32768))
-_register_board(BoardDef("apollo4l_evb", soc="apollo4l", channel="preview", psram_kb=32768))
-_register_board(BoardDef("apollo4l_blue_evb", soc="apollo4l", channel="preview", psram_kb=32768))
+# Power-capture GPIOs mirror neuralSPOT AutoDeploy AP4 wiring:
+#   AP4P: state bus GPIO 22/23 + trigger GPIO 24.
+#   AP4L: state0 moves to GPIO 61 (22 unavailable), state1 GPIO 23 + trigger GPIO 24.
 _register_board(
-    BoardDef("apollo4p_blue_kbr_evb", soc="apollo4p", channel="preview", psram_kb=32768)
+    BoardDef(
+        "apollo4p_evb",
+        soc="apollo4p",
+        channel="preview",
+        psram_kb=32768,
+        default_sync_gpio_pin=22,
+        default_state_gpio_pin=23,
+        default_go_gpio_pin=24,
+    )
 )
 _register_board(
-    BoardDef("apollo4p_blue_kxr_evb", soc="apollo4p", channel="preview", psram_kb=32768)
+    BoardDef(
+        "apollo4l_evb",
+        soc="apollo4l",
+        channel="preview",
+        psram_kb=32768,
+        default_sync_gpio_pin=61,
+        default_state_gpio_pin=23,
+        default_go_gpio_pin=24,
+    )
+)
+_register_board(
+    BoardDef(
+        "apollo4l_blue_evb",
+        soc="apollo4l",
+        channel="preview",
+        psram_kb=32768,
+        default_sync_gpio_pin=61,
+        default_state_gpio_pin=23,
+        default_go_gpio_pin=24,
+    )
+)
+_register_board(
+    BoardDef(
+        "apollo4p_blue_kbr_evb",
+        soc="apollo4p",
+        channel="preview",
+        psram_kb=32768,
+        default_sync_gpio_pin=22,
+        default_state_gpio_pin=23,
+        default_go_gpio_pin=24,
+    )
+)
+_register_board(
+    BoardDef(
+        "apollo4p_blue_kxr_evb",
+        soc="apollo4p",
+        channel="preview",
+        psram_kb=32768,
+        default_sync_gpio_pin=22,
+        default_state_gpio_pin=23,
+        default_go_gpio_pin=24,
+    )
 )
 
 # --- AP5 family (Cortex-M55, full PMU + MVE) --------------------------------
@@ -363,12 +521,12 @@ _register_soc(
         ),
         c_define="AM_PART_APOLLO510",
         cmsis_header="apollo510.h",
-        # RTT lives in .sram_bss → SHARED_SRAM (base 0x20080000). Scan only the
-        # first 1 MB of SHARED_SRAM instead of the full 2 MB from the TCM base:
-        # the control block lands a few KB in, so discovery (and the stale-block
-        # pre-clean) finish in a couple of chunks instead of sweeping ~557 KB of
-        # TCM first. The known-address fast path skips scanning entirely.
-        rtt_scan_ranges=((0x20080000, 0x100000),),
+        # On the cache-coherent M55 parts RTT is pinned to non-cached TCM
+        # (default .bss), NOT .sram_bss — see firmware/__init__.py and
+        # SEGGER_RTT_Conf.h. DTCM is based at 0x20000000 (512 KB), so the
+        # fallback scan covers that window. The known-address fast path (nm/map)
+        # is the primary route and skips scanning entirely.
+        rtt_scan_ranges=((0x20000000, 0x80000),),
         jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
     )
@@ -400,8 +558,8 @@ _register_soc(
         ),
         c_define="AM_PART_APOLLO510B",
         cmsis_header="apollo510.h",
-        # See apollo510: scan the SHARED_SRAM window where .sram_bss is linked.
-        rtt_scan_ranges=((0x20080000, 0x100000),),
+        # See apollo510: M55 RTT lives in non-cached TCM (.bss), DTCM @ 0x20000000.
+        rtt_scan_ranges=((0x20000000, 0x80000),),
         jlink_device="AP510BFA-CBR",
         pmu_max_ops=4096,
     )
@@ -433,8 +591,8 @@ _register_soc(
         ),
         c_define="AM_PART_APOLLO5B",
         cmsis_header="apollo510.h",
-        # See apollo510: scan the SHARED_SRAM window where .sram_bss is linked.
-        rtt_scan_ranges=((0x20080000, 0x100000),),
+        # See apollo510: M55 RTT lives in non-cached TCM (.bss), DTCM @ 0x20000000.
+        rtt_scan_ranges=((0x20000000, 0x80000),),
         jlink_device="AP510NFA-CBR",
         pmu_max_ops=4096,
     )
@@ -467,8 +625,8 @@ _register_soc(
         ),
         c_define="AM_PART_APOLLO330P",
         cmsis_header="apollo330P.h",
-        # See apollo510: scan the SHARED_SRAM window where .sram_bss is linked.
-        rtt_scan_ranges=((0x20080000, 0x100000),),
+        # See apollo510: M55 RTT lives in non-cached TCM (.bss), DTCM @ 0x20000000.
+        rtt_scan_ranges=((0x20000000, 0x80000),),
         jlink_device="AP330NFA-CBR",
         pmu_max_ops=4096,
     )
@@ -480,6 +638,8 @@ _register_board(
         soc="apollo510",
         channel="stable",
         default_sync_gpio_pin=29,
+        default_state_gpio_pin=36,
+        default_go_gpio_pin=14,
     )
 )
 _register_board(
@@ -488,6 +648,8 @@ _register_board(
         soc="apollo510b",
         channel="preview",
         default_sync_gpio_pin=29,
+        default_state_gpio_pin=36,
+        default_go_gpio_pin=14,
     )
 )
 _register_board(BoardDef("apollo5b_evb", soc="apollo5b", channel="preview"))
@@ -570,6 +732,34 @@ def get_default_sync_gpio_pin(
     return board.default_sync_gpio_pin
 
 
+def get_default_state_gpio_pin(
+    board_name: str,
+    fallback: int = DEFAULT_STATE_GPIO_PIN,
+    *,
+    registry: PlatformRegistry | None = None,
+) -> int:
+    """Return the board's default state/error GPIO pin, or *fallback* if unknown."""
+    active = registry or build_platform_registry()
+    board = active.boards.get(board_name)
+    if board is None:
+        return fallback
+    return board.default_state_gpio_pin
+
+
+def get_default_go_gpio_pin(
+    board_name: str,
+    fallback: int = DEFAULT_GO_GPIO_PIN,
+    *,
+    registry: PlatformRegistry | None = None,
+) -> int:
+    """Return the board's default go GPIO pin, or *fallback* if unknown."""
+    active = registry or build_platform_registry()
+    board = active.boards.get(board_name)
+    if board is None:
+        return fallback
+    return board.default_go_gpio_pin
+
+
 def list_boards(*, registry: PlatformRegistry | None = None) -> list[BoardDef]:
     """Return all registered boards."""
     active = registry or build_platform_registry()
@@ -580,3 +770,72 @@ def list_socs(*, registry: PlatformRegistry | None = None) -> list[SocDef]:
     """Return all registered SoCs."""
     active = registry or build_platform_registry()
     return list(active.socs.values())
+
+
+# ---------------------------------------------------------------------------
+# Physical memory address ranges (for build-time placement verification)
+# ---------------------------------------------------------------------------
+
+# Base addresses of the arena/weights-eligible memory regions, per SoC family.
+# Sizes come from each SoC's ``MemoryLayout``; only the bases are family-wide.
+# DTCM and SRAM are contiguous on AP4/AP5 (SRAM begins right after DTCM), but
+# the bases are listed explicitly rather than derived so the mapping stays
+# obvious and robust to layout changes.
+#
+# AP3 does not share a single family base map the way AP4/AP5 do. apollo3p
+# (Blue Plus) has a real 64 KB low-latency TCM at 0x10000000 (arena-eligible
+# via NSX_MEM_FAST_BSS's dedicated `.tcm_bss` section, nsx-ambiq-sdk#29), a
+# separate 700 KB main SRAM "RWMEM" at 0x10011000 (default .bss/.data home),
+# and "MRAM" is read-only NOR flash (XIP) at 0x0000C000 used for weights.
+# apollo3 (Blue) instead has a flat 384 KB SRAM at 0x10000000 and no separate
+# TCM — it is not currently a registered target, so the AP3 entry below
+# encodes apollo3p only.
+_FAMILY_MEMORY_BASES: dict[SocFamily, dict[Placement, int]] = {
+    SocFamily.AP3: {
+        Placement.TCM: 0x10000000,   # real 64 KB low-latency TCM (NSX_MEM_FAST_BSS, nsx-ambiq-sdk#29)
+        Placement.SRAM: 0x10011000,  # RWMEM main SRAM (default .bss/.data home)
+        Placement.MRAM: 0x00000000,  # NOR flash XIP (ROMEM @ 0x0000C000), weights
+    },
+    SocFamily.AP4: {
+        Placement.TCM: 0x10000000,   # DTCM
+        Placement.SRAM: 0x10060000,  # SHARED_SRAM (right after 384 KB DTCM)
+        Placement.MRAM: 0x00000000,  # MRAM (XIP)
+        Placement.PSRAM: 0x60000000,
+    },
+    SocFamily.AP5: {
+        Placement.TCM: 0x20000000,   # DTCM
+        Placement.SRAM: 0x20080000,  # SSRAM (right after 512 KB DTCM)
+        Placement.MRAM: 0x00000000,  # MRAM (XIP)
+        Placement.PSRAM: 0x60000000,
+    },
+}
+
+# MemoryLayout size field backing each placement region.
+_PLACEMENT_SIZE_FIELD: dict[Placement, str] = {
+    Placement.TCM: "dtcm_kb",
+    Placement.SRAM: "sram_kb",
+    Placement.MRAM: "mram_kb",
+    Placement.PSRAM: "psram_kb",
+}
+
+
+def soc_placement_ranges(soc: SocDef) -> dict[Placement, MemoryRange]:
+    """Return physical address ranges for each arena/weights placement region.
+
+    Maps each :class:`~helia_profiler.placement.Placement` to the concrete
+    ``[start, start+length)`` window on *soc*, derived from the family base
+    addresses and the SoC's ``MemoryLayout`` sizes.  Regions the SoC does not
+    have (size 0) are omitted.  Returns an empty mapping for SoC families whose
+    memory model is not yet characterised, so callers treat verification as
+    best-effort.
+    """
+    bases = _FAMILY_MEMORY_BASES.get(soc.family)
+    if bases is None:
+        return {}
+    ranges: dict[Placement, MemoryRange] = {}
+    for placement, base in bases.items():
+        size_kb = getattr(soc.memory, _PLACEMENT_SIZE_FIELD[placement], 0)
+        if size_kb > 0:
+            ranges[placement] = MemoryRange(base, size_kb * 1024)
+    return ranges
+

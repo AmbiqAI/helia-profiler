@@ -29,7 +29,7 @@ class TestValidateList:
     def test_list_default_shows_full_matrix(self):
         proc = _run_hpx("validate", "--list")
         assert proc.returncode == 0, proc.stderr
-        assert "16 case(s) would run" in proc.stdout
+        assert "480 case(s) would run" in proc.stdout
         assert "kws" in proc.stdout
         assert "vww" in proc.stdout
         assert "ic" in proc.stdout
@@ -38,13 +38,39 @@ class TestValidateList:
     def test_list_engine_alias_aot(self):
         proc = _run_hpx("validate", "--list", "--engines", "aot", "--power", "off")
         assert proc.returncode == 0, proc.stderr
-        assert "4 case(s)" in proc.stdout
+        assert "240 case(s)" in proc.stdout
         assert "helia-aot" in proc.stdout
 
     def test_list_power_off(self):
         proc = _run_hpx("validate", "--list", "--power", "off")
         assert proc.returncode == 0, proc.stderr
-        assert "8 case(s)" in proc.stdout
+        assert "480 case(s)" in proc.stdout
+
+    def test_list_axis_filters_for_two_pass_board_smoke(self):
+        proc = _run_hpx(
+            "validate",
+            "--list",
+            "--boards",
+            "apollo3p_evb",
+            "--models",
+            "kws",
+            "--engines",
+            "rt",
+            "--power",
+            "off",
+            "--toolchains",
+            "gcc",
+            "--interfaces",
+            "rtt",
+            "--memories",
+            "auto",
+            "--repeat",
+            "2",
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert "2 case(s)" in proc.stdout
+        assert "apollo3p_evb-kws-rt-arm-none-eabi-gcc-rtt-auto-run01" in proc.stdout
+        assert "apollo3p_evb-kws-rt-arm-none-eabi-gcc-rtt-auto-run02" in proc.stdout
 
     def test_list_unknown_model_fails(self):
         proc = _run_hpx("validate", "--list", "--models", "nope")
@@ -60,3 +86,68 @@ class TestValidateList:
         proc = _run_hpx("--help")
         assert proc.returncode == 0
         assert "validate" in proc.stdout
+
+
+class TestSuiteSmoke:
+    """--suite smoke fills in unset axes without touching hardware (pytest.main mocked)."""
+
+    def _captured_pytest_args(self, monkeypatch: pytest.MonkeyPatch, *argv: str) -> list[str]:
+        from helia_profiler import cli
+
+        captured: dict = {}
+
+        def fake_pytest_main(args):
+            captured["args"] = list(args)
+            return 0
+
+        monkeypatch.setattr(pytest, "main", fake_pytest_main)
+        with pytest.raises(SystemExit) as excinfo:
+            cli.main(["validate", *argv])
+        assert excinfo.value.code == 0
+        return captured["args"]
+
+    def test_smoke_defaults_unset_axes(self, monkeypatch, tmp_path):
+        args = self._captured_pytest_args(
+            monkeypatch, "--suite", "smoke", "--output-dir", str(tmp_path)
+        )
+
+        def value_of(flag: str) -> str:
+            return args[args.index(flag) + 1]
+
+        assert value_of("--mlperf-models") == "kws"
+        assert value_of("--mlperf-engines") == "helia-rt"
+        assert value_of("--mlperf-toolchains") == "arm-none-eabi-gcc"
+        assert value_of("--mlperf-transports") == "rtt"
+        assert value_of("--mlperf-memories") == "auto"
+
+    def test_explicit_axis_wins_over_smoke_default(self, monkeypatch, tmp_path):
+        args = self._captured_pytest_args(
+            monkeypatch, "--models", "vww", "--suite", "smoke", "--output-dir", str(tmp_path)
+        )
+        assert args[args.index("--mlperf-models") + 1] == "vww"
+        # Other unset axes still get smoke defaults.
+        assert args[args.index("--mlperf-engines") + 1] == "helia-rt"
+
+    def test_models_rt_defaults_to_twelve_case_model_sweep(self, monkeypatch, tmp_path):
+        args = self._captured_pytest_args(
+            monkeypatch, "--suite", "models-rt", "--output-dir", str(tmp_path)
+        )
+
+        def value_of(flag: str) -> str:
+            return args[args.index(flag) + 1]
+
+        assert value_of("--mlperf-models") == "kws,vww,ic,ad"
+        assert value_of("--mlperf-engines") == "helia-rt"
+        assert value_of("--mlperf-boards") == "apollo3p_evb,apollo4p_blue_kxr_evb,apollo510_evb"
+        assert value_of("--mlperf-toolchains") == "arm-none-eabi-gcc"
+        assert value_of("--mlperf-transports") == "rtt"
+        assert value_of("--mlperf-memories") == "auto"
+
+    def test_models_aot_defaults_to_twelve_case_model_sweep(self, monkeypatch, tmp_path):
+        args = self._captured_pytest_args(
+            monkeypatch, "--suite", "models-aot", "--output-dir", str(tmp_path)
+        )
+
+        assert args[args.index("--mlperf-models") + 1] == "kws,vww,ic,ad"
+        assert args[args.index("--mlperf-engines") + 1] == "helia-aot"
+        assert args[args.index("--mlperf-boards") + 1] == "apollo3p_evb,apollo4p_blue_kxr_evb,apollo510_evb"

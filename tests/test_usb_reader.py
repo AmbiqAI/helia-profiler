@@ -162,3 +162,51 @@ def test_resolve_cdc_port_prefers_marker(monkeypatch):
     port = usb_reader._resolve_cdc_port(marker=marker, pre_existing=set(), timeout_s=1)
 
     assert port == "/dev/ttyACM3"
+
+
+def test_find_cdc_port_rejects_foreign_hpx_device(monkeypatch):
+    """A present CDC device carrying a *different* HPX marker is another board.
+
+    It must never be used as the heuristic fallback, otherwise the capture
+    opens the wrong EVB and blocks until the read timeout.
+    """
+    expected = usb_marker_serial("1160001350")
+    foreign = usb_marker_serial("1160002204")
+    monkeypatch.setattr(
+        usb_reader,
+        "_snapshot_cdc_ports",
+        lambda: {"/dev/ttyACM0", "/dev/ttyACM3"},
+    )
+    monkeypatch.setattr(
+        usb_reader.list_ports,
+        "comports",
+        lambda: [
+            _port("/dev/ttyACM0", manufacturer="SEGGER", product="J-Link", serial_number="1160001350"),
+            _port("/dev/ttyACM3", manufacturer="Ambiq", product="NSX HPX Profiler", serial_number=foreign),
+        ],
+    )
+
+    with pytest.raises(CaptureError, match="No application USB CDC device appeared"):
+        usb_reader._find_cdc_port(timeout_s=0, expected_marker=expected)
+
+
+def test_resolve_cdc_port_does_not_fall_back_to_foreign_hpx(monkeypatch):
+    """With a marker set, a stale other-board HPX device is not selected."""
+    expected = usb_marker_serial("1160001350")
+    foreign = usb_marker_serial("1160002204")
+    monkeypatch.setattr(usb_reader.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(
+        usb_reader,
+        "_snapshot_cdc_ports",
+        lambda: {"/dev/ttyACM3"},
+    )
+    monkeypatch.setattr(
+        usb_reader.list_ports,
+        "comports",
+        lambda: [
+            _port("/dev/ttyACM3", manufacturer="Ambiq", product="NSX HPX Profiler", serial_number=foreign),
+        ],
+    )
+
+    with pytest.raises(CaptureError, match="No application USB CDC device appeared"):
+        usb_reader._resolve_cdc_port(marker=expected, pre_existing=set(), timeout_s=0)

@@ -42,77 +42,6 @@ class _FakeCodegenCtx:
             self.memory_plan = plan
 
 
-class TestExtractMemoryPlan:
-    def test_missing_plan_returns_none(self):
-        assert _extract_memory_plan(_FakeCodegenCtx(None)) is None
-
-    def test_empty_plan_returns_empty_regions(self):
-        plan = _FakeAotPlan(arena_usages={}, tensor_allocs={})
-        result = _extract_memory_plan(_FakeCodegenCtx(plan))
-        assert result is not None
-        assert result.engine == "helia-aot"
-        assert result.regions == ()
-
-    def test_arena_region_becomes_consumer(self):
-        plan = _FakeAotPlan(
-            arena_usages={"DTCM": _FakeArenaUsage(total_size=65_536, used=12_000)},
-            tensor_allocs={},
-        )
-        result = _extract_memory_plan(_FakeCodegenCtx(plan))
-        assert result is not None
-        dtcm = result.region("DTCM")
-        assert dtcm is not None
-        assert dtcm.capacity == 65_536
-        assert dtcm.used == 12_000
-        names = [c.name for c in dtcm.consumers]
-        kinds = [c.kind for c in dtcm.consumers]
-        assert "dtcm_arena" in names
-        assert "arena" in kinds
-        assert not dtcm.overflow
-
-    def test_weight_tensors_aggregated_per_region(self):
-        plan = _FakeAotPlan(
-            arena_usages={
-                "MRAM": _FakeArenaUsage(total_size=0, used=0),
-            },
-            tensor_allocs={
-                "w0": _FakeTensorAllocation(memory="MRAM", size=1000),
-                "w1": _FakeTensorAllocation(memory="MRAM", size=2500),
-                "w2": _FakeTensorAllocation(memory="PSRAM", size=4000),
-            },
-        )
-        result = _extract_memory_plan(_FakeCodegenCtx(plan))
-        assert result is not None
-
-        mram = result.region("MRAM")
-        assert mram is not None
-        weight_consumers = [c for c in mram.consumers if c.kind == "weights"]
-        assert len(weight_consumers) == 1
-        assert weight_consumers[0].size == 3500
-        # 2 tensors → consumer name records the count
-        assert weight_consumers[0].name.startswith("2_")
-
-        # PSRAM had no arena_usage entry; weights-only regions are only
-        # surfaced via arena_usages.  Here PSRAM is not in arena_usages so
-        # it will not appear in the plan.
-        assert result.region("PSRAM") is None
-
-    def test_total_weight_bytes_and_overflow(self):
-        plan = _FakeAotPlan(
-            arena_usages={
-                "DTCM": _FakeArenaUsage(total_size=8_192, used=16_384),
-            },
-            tensor_allocs={
-                "w0": _FakeTensorAllocation(memory="DTCM", size=10),
-            },
-        )
-        result = _extract_memory_plan(_FakeCodegenCtx(plan))
-        assert result is not None
-        assert result.model_weight_bytes == 10
-        # DTCM is oversubscribed (used > capacity).
-        assert result.has_overflow is True
-
-
 # ---------------------------------------------------------------------------
 # _extract_arena_regions — placement normalisation
 # ---------------------------------------------------------------------------
@@ -125,6 +54,7 @@ class _FakeArena:
     size: int
     alignment: int
     role: str
+    source_memory: str | None = None
 
 
 @dataclass
@@ -137,6 +67,25 @@ class _FakeRenderPlan:
 class _FakeCodegenCtxWithPlan:
     def __init__(self, render_plan: _FakeRenderPlan | None):
         self.render_plan = render_plan
+
+
+class _FakeCodegenCtxWithMemoryAndRenderPlan:
+    def __init__(self, memory_plan: _FakeAotPlan, render_plan: _FakeRenderPlan):
+        self.memory_plan = memory_plan
+        self.render_plan = render_plan
+
+
+class TestExtractMemoryPlan:
+    def test_missing_plan_returns_none(self):
+        assert _extract_memory_plan(_FakeCodegenCtx(None)) is None
+
+    def test_memory_plan_without_render_plan_returns_none(self):
+        plan = _FakeAotPlan(
+            arena_usages={"DTCM": _FakeArenaUsage(total_size=65_536, used=12_000)},
+            tensor_allocs={"x": _FakeTensorAllocation(memory="DTCM", size=12_000)},
+        )
+
+        assert _extract_memory_plan(_FakeCodegenCtx(plan)) is None
 
 
 class TestExtractArenaRegions:
@@ -214,3 +163,41 @@ class TestExtractArenaRegions:
             assert isinstance(logical, Placement), (
                 f"physical '{phys}' maps to '{logical!r}' which is not a Placement member"
             )
+
+
+class TestExtractMemoryPlanFromRenderPlan:
+    def test_render_plan_arenas_prevent_tensor_double_counting(self):
+        memory_plan = _FakeAotPlan(
+            arena_usages={
+                "DTCM": _FakeArenaUsage(total_size=65_536, used=16_492),
+                "MRAM": _FakeArenaUsage(total_size=2_048_000, used=0),
+            },
+            tensor_allocs={
+                f"tensor_{i}": _FakeTensorAllocation(memory="DTCM", size=1_777)
+                for i in range(58)
+            },
+        )
+        render_plan = _FakeRenderPlan(
+            scratch_arenas=[_FakeArena(0, "DTCM", 16_492, 16, "scratch")],
+            persistent_arenas=[],
+            constant_arenas=[_FakeArena(1, "DTCM", 28_976, 16, "constant", "MRAM")],
+        )
+
+        result = _extract_memory_plan(
+            _FakeCodegenCtxWithMemoryAndRenderPlan(memory_plan, render_plan)
+        )
+
+        assert result is not None
+        dtcm = result.region("DTCM")
+        assert dtcm is not None
+        assert dtcm.used == 45_468
+        assert not dtcm.overflow
+        assert {c.name: c.size for c in dtcm.consumers} == {
+            "dtcm_scratch_arena_0": 16_492,
+            "dtcm_constant_arena_1": 28_976,
+        }
+
+        mram = result.region("MRAM")
+        assert mram is not None
+        assert mram.used == 28_976
+        assert result.model_weight_bytes == 28_976

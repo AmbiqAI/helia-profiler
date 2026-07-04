@@ -25,6 +25,55 @@ def test_load_config_from_cli_overrides():
     assert config.profiling.iterations == 100
 
 
+def test_aggregation_defaults_to_median():
+    config = load_config(None, {"model": {"path": "m.tflite"}, "engine": {"type": "helia-rt"}})
+    assert config.profiling.aggregation == "median"
+
+
+def test_power_stats_rate_hz_default_and_override():
+    base = {"model": {"path": "m.tflite"}, "engine": {"type": "helia-rt"}}
+    config = load_config(None, base)
+    assert config.power.stats_rate_hz == 1000
+
+    cli = {**base, "power": {"stats_rate_hz": 2000}}
+    config = load_config(None, cli)
+    assert config.power.stats_rate_hz == 2000
+
+
+def test_power_stats_rate_hz_must_be_positive():
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "power": {"stats_rate_hz": 0},
+    }
+    with pytest.raises(ValueError, match="stats_rate_hz must be >= 1"):
+        load_config(None, cli)
+
+
+def test_aggregation_cli_override():
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "profiling": {"aggregation": "trimmed"},
+    }
+    config = load_config(None, cli)
+    assert config.profiling.aggregation == "trimmed"
+
+
+def test_invalid_aggregation_rejected():
+    from helia_profiler.config import ProfilingConfig
+
+    with pytest.raises(ValueError, match="Invalid aggregation"):
+        ProfilingConfig(aggregation="bogus")
+
+
+def test_invalid_clean_window_probe_rejected():
+    from helia_profiler.config import ProfilingConfig
+
+    with pytest.raises(ValueError, match="Invalid clean_window_probe"):
+        ProfilingConfig(clean_window_probe="bogus")
+
+
 def test_jlink_serial_from_cli():
     """jlink_serial should be settable via CLI overrides."""
     cli = {

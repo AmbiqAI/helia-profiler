@@ -19,7 +19,7 @@ import jinja2
 import yaml
 
 from .. import nsx as nsx_cli
-from ..config import DEFAULT_ARENA_SIZE_BYTES
+from ..config import DEFAULT_ARENA_SIZE_BYTES, DEFAULT_POWER_WINDOW_TARGET_MS
 from ..counters import (
     CounterPass,
     plan_passes,
@@ -32,7 +32,7 @@ from ..engines import EngineType
 from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
 from ..placement import Placement
-from ..platform import get_soc_for_board
+from ..platform import SocFamily, get_soc_for_board
 from ..usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
 from .op_resolver import build_resolver_plan
 
@@ -41,6 +41,13 @@ if TYPE_CHECKING:
     from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
+
+
+def _effective_window_target_ms(config: ProfileConfig) -> int:
+    target_ms = config.profiling.window_target_ms
+    if config.power.enabled and config.profiling.window_mode == "auto":
+        target_ms = max(target_ms, DEFAULT_POWER_WINDOW_TARGET_MS)
+    return target_ms
 
 # ---------------------------------------------------------------------------
 # Toolchain mapping: config names → nsx CLI --toolchain values
@@ -94,6 +101,27 @@ def _rtt_buffer_size_up(toolchain: str, transport: str, configured_size: int | N
 _AUTO_COMPILER_LAUNCHERS: tuple[str, ...] = ("sccache", "ccache")
 _DISABLED_LAUNCHER_VALUES = frozenset({"", "none", "off", "false", "disabled", "0"})
 
+# Compiler launchers that do not understand a given toolchain's compiler driver.
+# sccache rejects armclang outright ("Compiler not supported"), and because it
+# wraps the driver it also drops ``--target``, which surfaces as the misleading
+# ``armclang: fatal error: no target architecture given``.  Auto-detect must
+# therefore treat sccache as unavailable for these toolchains rather than
+# silently breaking the build.
+_LAUNCHER_UNSUPPORTED_TOOLCHAINS: dict[str, frozenset[str]] = {
+    "sccache": frozenset({"armclang"}),
+}
+
+
+def _launcher_basename(launcher: str) -> str:
+    """Return the bare tool name for a launcher path or command."""
+    return Path(launcher).name.lower()
+
+
+def _launcher_supports_toolchain(launcher: str, toolchain: str) -> bool:
+    """Whether ``launcher`` can wrap ``toolchain``'s compiler driver."""
+    unsupported = _LAUNCHER_UNSUPPORTED_TOOLCHAINS.get(_launcher_basename(launcher))
+    return not (unsupported and toolchain in unsupported)
+
 
 def _resolve_compiler_launcher(config: "ProfileConfig") -> str | None:
     """Resolve the CMake compiler launcher executable for this build.
@@ -103,11 +131,14 @@ def _resolve_compiler_launcher(config: "ProfileConfig") -> str | None:
     ``None`` when caching is disabled or no launcher is available.
 
     * ``"auto"`` — use the first of :data:`_AUTO_COMPILER_LAUNCHERS` found on
-      ``PATH``; do nothing if none are installed (installing the binary is the
-      opt-in).
+      ``PATH`` that supports the active toolchain; do nothing if none are
+      installed (installing the binary is the opt-in).
     * disabled values (``none``/``off``/``false``/empty) — ``None``.
     * an explicit tool name or path — required: raises if it cannot be found.
+      If the named launcher cannot wrap the active toolchain (e.g. sccache with
+      armclang) it is skipped with a warning rather than breaking the build.
     """
+    toolchain = config.target.toolchain
     setting = os.environ.get("HPX_COMPILER_LAUNCHER")
     source = "HPX_COMPILER_LAUNCHER"
     if setting is None:
@@ -121,9 +152,17 @@ def _resolve_compiler_launcher(config: "ProfileConfig") -> str | None:
     if setting.lower() == "auto":
         for name in _AUTO_COMPILER_LAUNCHERS:
             found = shutil.which(name)
-            if found:
-                log.info("Using compiler launcher: %s (auto-detected)", found)
-                return found
+            if not found:
+                continue
+            if not _launcher_supports_toolchain(name, toolchain):
+                log.debug(
+                    "Skipping compiler launcher %s: unsupported for toolchain %s",
+                    name,
+                    toolchain,
+                )
+                continue
+            log.info("Using compiler launcher: %s (auto-detected)", found)
+            return found
         return None
 
     found = shutil.which(setting)
@@ -137,6 +176,15 @@ def _resolve_compiler_launcher(config: "ProfileConfig") -> str | None:
                 "For sccache: https://github.com/mozilla/sccache."
             ),
         )
+    if not _launcher_supports_toolchain(setting, toolchain):
+        log.warning(
+            "Compiler launcher %r (from %s) does not support the %s toolchain; "
+            "disabling it for this build.",
+            setting,
+            source,
+            toolchain,
+        )
+        return None
     log.info("Using compiler launcher: %s (from %s)", found, source)
     return found
 
@@ -278,6 +326,7 @@ def _render_module_registry(
     """
     project_overrides = dict(profile.get("project_overrides") or {})
     module_overrides = dict(profile.get("module_overrides") or {})
+    ref_overrides_by_project: dict[str, str] = {}
     for project, (mode, value) in project_ref_overrides.items():
         if mode != "ref":
             continue
@@ -286,6 +335,21 @@ def _render_module_registry(
             override = nsx_cli.registry_project(project) or {"name": project}
         override["revision"] = value
         project_overrides[project] = override
+        ref_overrides_by_project[project] = value
+    # Align per-module revisions with their owning project's ref override.
+    # The starter profile pins each migrated module's ``revision`` to ``main``;
+    # NSX's lock resolution honours that module-level pin over the project
+    # revision, so an un-aligned module would drag the whole SDK monorepo back
+    # to ``main``. Re-point every module owned by an overridden project.
+    if ref_overrides_by_project:
+        for name, override in list(module_overrides.items()):
+            if not isinstance(override, dict):
+                continue
+            project = override.get("project")
+            if project in ref_overrides_by_project:
+                aligned = dict(override)
+                aligned["revision"] = ref_overrides_by_project[project]
+                module_overrides[name] = aligned
     if not project_overrides and not module_overrides:
         return ""
     registry: dict[str, Any] = {}
@@ -563,18 +627,28 @@ def _copy_segger_rtt(dest_dir: Path) -> None:
         if src.exists():
             shutil.copy2(src, rtt_dest / name)
 
-    # Apollo-class linker scripts place default .bss in MCU_TCM, which makes
-    # SEGGER RTT's large staging buffers consume scarce profiling memory. Move
-    # the control block and channel buffers into shared SRAM instead.
+    # RTT buffer placement is cache-coherency sensitive on the Cortex-M55 parts.
     #
-    # SEGGER RTT already supports this via its own SEGGER_RTT_SECTION hook: when
-    # SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0 (the default on Apollo parts, which
-    # have no data cache that RTT must work around) the control block and
-    # buffers are declared through SEGGER_RTT_PUT_CB_SECTION /
+    # SEGGER RTT supports relocation via its SEGGER_RTT_SECTION hook: when
+    # SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0 (the default on Apollo parts) the
+    # control block and buffers are declared through SEGGER_RTT_PUT_CB_SECTION /
     # SEGGER_RTT_PUT_BUFFER_SECTION, which emit
-    # ``__attribute__((section(SEGGER_RTT_SECTION)))`` for GCC/clang. We point
-    # that section at the NSX ``.sram_bss`` input section (collected into
-    # SHARED_SRAM by the linker scripts) via the generated config header.
+    # ``__attribute__((section(SEGGER_RTT_SECTION)))`` for GCC/clang.
+    #
+    # On the cacheless Cortex-M4 parts (Apollo3/4) there is no coherency hazard,
+    # so we point that section at the NSX ``.sram_bss`` input section (collected
+    # into SHARED_SRAM by the linker scripts) to keep SEGGER's large staging
+    # buffers out of scarce MCU_TCM .bss.
+    #
+    # On the cache-coherent Cortex-M55 parts (Apollo5 / Apollo510 family) shared
+    # SRAM is *cached*, and SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0 tells RTT there is
+    # no cache to work around. That combination is incoherent with J-Link's
+    # asynchronous SWD reads/writes of the ring: the host can observe a stale
+    # ring (old bytes published before the new payload reaches SRAM) or have its
+    # up-buffer RdOff clobbered by the CPU's whole-cache clean, corrupting the
+    # stream. We therefore keep the buffers in *non-cached* TCM (the default .bss
+    # region) on these parts so SWD reads stay coherent with zero cache
+    # maintenance — the configuration SEGGER RTT actually assumes.
     #
     # NOTE: do *not* try to rewrite the ``#if SEGGER_RTT_CPU_CACHE_LINE_SIZE``
     # aligned declarations — that branch is dead code here (the macro is 0), so
@@ -609,13 +683,23 @@ def _copy_segger_rtt(dest_dir: Path) -> None:
 
     sram_placement = (
         "\n"
-        "/* heliaPROFILER: place the RTT control block and channel buffers in\n"
-        " * shared SRAM instead of scarce MCU_TCM .bss. SEGGER's compiled\n"
-        " * (SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0) path honours SEGGER_RTT_SECTION\n"
-        " * via __attribute__((section(...))); the matching .sram_bss input\n"
-        " * section is collected into SHARED_SRAM by the NSX linker scripts. */\n"
+        "/* heliaPROFILER: RTT control block + channel buffer placement.\n"
+        " *\n"
+        " * Cache-coherent Cortex-M55 parts (Apollo5 / Apollo510 family): keep the\n"
+        " * buffers in NON-CACHED TCM (default .bss). Their shared SRAM is cached,\n"
+        " * and SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0 assumes no cache, so .sram_bss\n"
+        " * placement is incoherent with J-Link's async SWD ring access (stale\n"
+        " * reads / clobbered RdOff). TCM is not cached, so SWD stays coherent with\n"
+        " * zero cache maintenance.\n"
+        " *\n"
+        " * Cacheless Cortex-M4 parts (Apollo3/4): no coherency hazard, so move the\n"
+        " * large staging buffers into shared SRAM (.sram_bss) to spare MCU_TCM. */\n"
         '#include "nsx_mem.h"\n'
-        "#if NSX_MEM__HAS_SRAM_BSS\n"
+        "#if defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510B) || \\\n"
+        "    defined(AM_PART_APOLLO5A)  || defined(AM_PART_APOLLO5B)  || \\\n"
+        "    defined(AM_PART_APOLLO510L) || defined(AM_PART_APOLLO330P)\n"
+        "  /* Non-cached TCM: leave SEGGER_RTT_SECTION undefined (default .bss). */\n"
+        "#elif NSX_MEM__HAS_SRAM_BSS\n"
         "  #ifndef SEGGER_RTT_SECTION\n"
         "    #define SEGGER_RTT_SECTION NSX_MEM__SEC_SRAM_BSS\n"
         "  #endif\n"
@@ -724,10 +808,26 @@ def generate_app(ctx: PipelineContext) -> Path:
     if artifacts.engine_type is EngineType.HELIA_AOT:
         adapter = ctx.engine_adapter
         assert adapter is not None  # set by stage 2 before firmware
-        aot_arena_regions = adapter.apply_arena_placement_override(
-            list(artifacts.aot_arena_regions),
-            arena_region,
+        # heliaAOT has finer-grained per-tensor placement control than the
+        # shared --arena-location/--weights-location knobs: a custom AOT
+        # memory config (engine.config_path, or inline
+        # engine.config.aot_args.memory.tensors) already resolves each
+        # tensor's placement correctly (reflected in artifacts.aot_arena_
+        # regions). Only fall back to re-pinning scratch arenas onto the
+        # shared arena_region default when the user did NOT supply one of
+        # those — otherwise this override would silently clobber a custom
+        # yaml's placement (e.g. reporting "tcm" for a scratch arena the
+        # user explicitly placed in "sram").
+        has_custom_aot_memory = config.engine.config_path is not None or bool(
+            config.engine.config.get("aot_args", {}).get("memory", {}).get("tensors")
         )
+        if has_custom_aot_memory:
+            aot_arena_regions = list(artifacts.aot_arena_regions)
+        else:
+            aot_arena_regions = adapter.apply_arena_placement_override(
+                list(artifacts.aot_arena_regions),
+                arena_region,
+            )
 
     # --- Resolve module list ---
     profile_board = getattr(board, "profile_source_board", board.name)
@@ -922,6 +1022,12 @@ def generate_app(ctx: PipelineContext) -> Path:
     clock = ctx.run_metadata.platform
     perf_mode_symbol = clock.cpu_perf_tier
     perf_mode_mhz = clock.cpu_clock_mhz
+    window_target_ms = _effective_window_target_ms(config)
+    # Apollo3/3P reach 96 MHz only through TurboSPOT burst, which NSX never
+    # enables (nsx_platform_set_perf_mode is a no-op on AP3).  When the user
+    # selects a >48 MHz tier on AP3, the firmware enables burst directly via
+    # the AmbiqSuite HAL.  Other families switch via NSX perf mode as usual.
+    apollo3_burst = soc.family is SocFamily.AP3 and perf_mode_mhz > 48
     resource_variable_count = sum(
         1
         for layer in (ctx.model_analysis.layers if ctx.model_analysis else ())
@@ -930,6 +1036,9 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # External power sync
     sync_gpio_pin = config.power.sync_gpio_pin
+    sync_lockstep = config.power.lockstep
+    state_gpio_pin = config.power.state_gpio_pin
+    go_gpio_pin = config.power.go_gpio_pin
     cmsis_device_header = soc.cmsis_header
 
     # --- Heartbeat template vars (shared across engines) ---
@@ -996,11 +1105,24 @@ def generate_app(ctx: PipelineContext) -> Path:
                 aot_op_manifest=ctx.engine_artifacts.aot_op_manifest or [],
                 iterations=config.profiling.iterations,
                 warmup=config.profiling.warmup,
+                clean_warmup=max(1, config.profiling.warmup),
+                clean_iters=max(1, config.profiling.iterations),
+                window_mode=config.profiling.window_mode,
+                window_target_ms=window_target_ms,
+                window_min=config.profiling.window_min,
+                window_max=config.profiling.window_max,
+                clean_window_probe=config.profiling.clean_window_probe,
+                clean_window_trace=config.profiling.clean_window_trace,
+                force_shared_sram=config.profiling.force_shared_sram,
                 pmu_passes=pmu_passes,
                 pmu_pass_names=[p["name"] for p in pmu_passes],
                 power_sync_enabled=power_sync_enabled,
                 sync_gpio_pin=sync_gpio_pin,
+                lockstep=sync_lockstep,
+                state_gpio_pin=state_gpio_pin,
+                go_gpio_pin=go_gpio_pin,
                 cmsis_device_header=cmsis_device_header,
+                soc_family=soc.family.value,
                 transport=transport,
                 usb_serial_marker=usb_serial_marker,
                 usb_serial_product=USB_MARKER_PRODUCT,
@@ -1015,6 +1137,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 arena_regions=aot_arena_regions,
                 perf_mode_symbol=perf_mode_symbol,
                 perf_mode_mhz=perf_mode_mhz,
+                apollo3_burst=apollo3_burst,
                 **heartbeat_vars,
             ),
         )
@@ -1036,11 +1159,24 @@ def generate_app(ctx: PipelineContext) -> Path:
                 arena_size=arena_size,
                 iterations=config.profiling.iterations,
                 warmup=config.profiling.warmup,
+                clean_warmup=max(1, config.profiling.warmup),
+                clean_iters=max(1, config.profiling.iterations),
+                window_mode=config.profiling.window_mode,
+                window_target_ms=window_target_ms,
+                window_min=config.profiling.window_min,
+                window_max=config.profiling.window_max,
+                clean_window_probe=config.profiling.clean_window_probe,
+                clean_window_trace=config.profiling.clean_window_trace,
+                force_shared_sram=config.profiling.force_shared_sram,
                 pmu_passes=pmu_passes,
                 pmu_pass_names=[p["name"] for p in pmu_passes],
                 power_sync_enabled=power_sync_enabled,
                 sync_gpio_pin=sync_gpio_pin,
+                lockstep=sync_lockstep,
+                state_gpio_pin=state_gpio_pin,
+                go_gpio_pin=go_gpio_pin,
                 cmsis_device_header=cmsis_device_header,
+                soc_family=soc.family.value,
                 transport=transport,
                 usb_serial_marker=usb_serial_marker,
                 usb_serial_product=USB_MARKER_PRODUCT,
@@ -1058,6 +1194,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 has_armv8m_pmu=has_armv8m_pmu,
                 perf_mode_symbol=perf_mode_symbol,
                 perf_mode_mhz=perf_mode_mhz,
+                apollo3_burst=apollo3_burst,
                 **heartbeat_vars,
             ),
         )

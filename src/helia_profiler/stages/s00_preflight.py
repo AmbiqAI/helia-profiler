@@ -9,8 +9,8 @@ Checks performed (in order):
 1. **Model file** — exists, is a regular file, non-empty, has a ``.tflite``
    extension, starts with the TFLite ``TFL3`` magic string.
 2. **Arena size** — if specified, is positive.
-3. **Model placement** — ``model_location`` is valid and any runtime-scoped
-    split overrides use supported regions for the selected engine.
+3. **Model placement** — ``model_location`` is valid and any runtime split
+    placement overrides use supported regions for the selected engine.
 4. **Output directory** — can be created + written to.
 5. **Host toolchain** — ``nsx``, ``cmake``, ``ninja``, the selected compiler,
    and ``JLinkExe`` are available. ATfE is located via ``ATFE_ROOT``.
@@ -74,6 +74,7 @@ class PreflightStage:
         _check_rtt_buffer_size(cfg.target.rtt_buffer_size_up)
         _check_runtime_split_locations(cfg)
         _check_pmu_selection(cfg)
+        _check_transport_support(cfg)
         _check_output_dir(cfg.output.dir)
         _check_host_tools(cfg.target.transport, cfg.target.toolchain)
         log.info("Preflight checks passed.")
@@ -165,8 +166,14 @@ def _check_rtt_buffer_size(size: int | None) -> None:
 
 
 def _check_runtime_split_locations(cfg) -> None:
-    runtime_arena = cfg.engine.config.get("runtime_arena_location")
-    runtime_weights = cfg.engine.config.get("runtime_weights_location")
+    runtime_arena = cfg.model.arena_location
+    runtime_weights = cfg.model.weights_location
+    legacy_runtime_arena = cfg.engine.config.get("runtime_arena_location")
+    legacy_runtime_weights = cfg.engine.config.get("runtime_weights_location")
+    if runtime_arena is None:
+        runtime_arena = legacy_runtime_arena
+    if runtime_weights is None:
+        runtime_weights = legacy_runtime_weights
     weights_in_psram = (
         cfg.model.model_location == Placement.PSRAM or runtime_weights == Placement.PSRAM
     )
@@ -184,29 +191,30 @@ def _check_runtime_split_locations(cfg) -> None:
     if not adapter.supports_runtime_split():
         # Engine bakes placement into its compiled module; the
         # profiler-config split overrides cannot influence weights.
-        if runtime_weights is not None:
+        if runtime_arena is not None or runtime_weights is not None:
+            field = "model.weights_location" if runtime_weights is not None else "model.arena_location"
+            if runtime_weights is None and legacy_runtime_arena is not None:
+                field = "engine.config.runtime_arena_location"
+            elif runtime_weights is not None and legacy_runtime_weights is not None:
+                field = "engine.config.runtime_weights_location"
             raise ConfigError(
-                f"engine.config.runtime_weights_location is not supported for engine.type='{cfg.engine.type.value}'.",
+                f"{field} is not supported for engine.type='{cfg.engine.type.value}'.",
                 hint=(
-                    f"{adapter.name} controls weights placement via its own "
-                    "compiler args (e.g. engine.config.aot_args)."
+                    f"{adapter.name} controls tensor placement via its own compiler args. "
+                    "Use engine.config.aot_args.memory.tensors to place constant, "
+                    "persistent, and scratch tensors."
                 ),
             )
-        _check_explicit_location(
-            runtime_arena,
-            name="engine.config.runtime_arena_location",
-            valid=_VALID_RUNTIME_ARENA_LOCATIONS,
-        )
         return
 
     _check_explicit_location(
         runtime_arena,
-        name="engine.config.runtime_arena_location",
+        name="model.arena_location",
         valid=_VALID_RUNTIME_ARENA_LOCATIONS,
     )
     _check_explicit_location(
         runtime_weights,
-        name="engine.config.runtime_weights_location",
+        name="model.weights_location",
         valid=_VALID_RUNTIME_WEIGHTS_LOCATIONS,
     )
 
@@ -237,6 +245,23 @@ def _check_pmu_selection(cfg) -> None:
                 f"{', '.join(supported_groups) if supported_groups else 'none'}."
             ),
         ) from exc
+
+
+def _check_transport_support(cfg) -> None:
+    if cfg.target.transport != "usb_cdc":
+        return
+    try:
+        soc = get_soc_for_board(cfg.target.board, registry=cfg.platform_registry)
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
+    if not soc.has_usb:
+        raise ConfigError(
+            f"Board '{cfg.target.board}' ({soc.name}) has no USB device support.",
+            hint=(
+                "Apollo3/3P has no compatible nsx-ambiq-usb module — use "
+                "transport=uart, swo, or rtt instead."
+            ),
+        )
 
 
 def _check_output_dir(out_dir: Path) -> None:
@@ -284,7 +309,7 @@ def _check_host_tools(transport: str, toolchain: str) -> None:
         )
 
     # Transport-specific.
-    if transport in ("rtt", "swo", "usb_cdc"):
+    if transport in ("rtt", "swo", "usb_cdc", "uart"):
         required.append(
             ("JLinkExe", "SEGGER J-Link commander (https://www.segger.com/downloads/jlink/)"),
         )

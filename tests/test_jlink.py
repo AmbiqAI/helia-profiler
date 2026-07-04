@@ -7,7 +7,12 @@ from unittest.mock import patch
 import pytest
 
 from helia_profiler.errors import ConfigError
-from helia_profiler.jlink import JLinkProbe, JLinkProbeMatch, resolve_probe_serial
+from helia_profiler.jlink import (
+    JLinkProbe,
+    JLinkProbeMatch,
+    inspect_probe_target,
+    resolve_probe_serial,
+)
 from helia_profiler.platform import CoreArch
 
 
@@ -136,3 +141,11 @@ class TestResolveProbeSerial:
                 )
         hint = exc_info.value.hint or ""
         assert "cortex-m4" in hint
+
+
+def test_inspect_probe_target_wraps_private_inspector() -> None:
+    probe = _probe("111111", "Apollo5")
+    match = _match("111111", CoreArch.CORTEX_M55, "Apollo5")
+    with patch("helia_profiler.jlink._inspect_probe_target", return_value=match) as inspect:
+        assert inspect_probe_target(probe, device="AP510NFA-CBR") is match
+    inspect.assert_called_once_with(probe, device="AP510NFA-CBR")

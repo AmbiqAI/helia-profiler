@@ -42,6 +42,16 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("hpx")
 
+
+def _power_summary_to_dict(summary: Any) -> dict[str, Any]:
+    return {
+        "avg_current_a": summary.avg_current_a,
+        "avg_power_w": summary.avg_power_w,
+        "peak_current_a": summary.peak_current_a,
+        "energy_j": summary.energy_j,
+        "capture_duration_s": summary.duration_s,
+    }
+
 # Memory-related PMU counter names used for cache/memory summaries.
 _CACHE_COUNTERS = (
     "ARM_PMU_L1D_CACHE",
@@ -241,16 +251,129 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     # Power summary
     if ctx.power_result is not None:
         ps = ctx.power_result.summary
-        summary["power"] = {
-            "avg_current_a": ps.avg_current_a,
-            "avg_power_w": ps.avg_power_w,
-            "peak_current_a": ps.peak_current_a,
-            "energy_j": ps.energy_j,
-            "capture_duration_s": ps.duration_s,
-            "measurement_scope": "whole_capture_window",
-        }
+        power_meta = ctx.power_result.metadata
+        measurement_scope = power_meta.get("measurement_scope", "whole_capture_window")
+        summary["power"] = _power_summary_to_dict(ps)
+        summary["power"]["measurement_scope"] = measurement_scope
+        # High-level summaries report only the gated (inference) portion. The
+        # non-inference whole-capture window is annotated in the detailed power
+        # CSV, not here, so users compare like-for-like inference energy.
+        if power_meta.get("sync_input_index") is not None:
+            summary["power"]["sync_input_index"] = power_meta["sync_input_index"]
+        if power_meta.get("gating_method") is not None:
+            summary["power"]["gating_method"] = power_meta["gating_method"]
+        if power_meta.get("target_lifecycle") is not None:
+            summary["power"]["target_lifecycle"] = power_meta["target_lifecycle"]
+        if power_meta.get("sync") is not None:
+            summary["power"]["sync"] = power_meta["sync"]
+        if power_meta.get("sync_timing_s") is not None:
+            summary["power"]["sync_timing_s"] = power_meta["sync_timing_s"]
+        if ctx.power_result.gated_windows:
+            summary["power"]["gated_window_count"] = len(ctx.power_result.gated_windows)
         meta = ctx.pmu_result.meta if ctx.pmu_result is not None else None
-        if meta and meta.profiled_infer_total_us is not None:
+        if measurement_scope == "gpio_gated_clean_window":
+            if ctx.power_result.gated_windows:
+                gw = ctx.power_result.gated_windows[0]
+                # Spike-robust distribution: a lone transient sample cannot
+                # define the headline current/power. The peak is reported both
+                # as the raw max and as the p99 of per-packet maxima.
+                summary["power"]["median_current_a"] = round(gw.median_current_a, 9)
+                summary["power"]["p95_current_a"] = round(gw.p95_current_a, 9)
+                summary["power"]["p99_current_a"] = round(gw.p99_current_a, 9)
+                summary["power"]["peak_current_p99_a"] = round(gw.peak_current_p99_a, 9)
+                summary["power"]["median_power_w"] = round(gw.median_power_w, 9)
+                summary["power"]["p95_power_w"] = round(gw.p95_power_w, 9)
+                summary["power"]["p99_power_w"] = round(gw.p99_power_w, 9)
+            if meta and meta.clean_infer_count and meta.clean_infer_count > 0:
+                energy_per_infer = ps.energy_j / meta.clean_infer_count
+                summary["power"]["energy_per_inference_j"] = round(energy_per_infer, 9)
+                if energy_per_infer > 0:
+                    summary["power"]["inferences_per_joule"] = round(
+                        1.0 / energy_per_infer,
+                        6,
+                    )
+                # Sanity-check the gated window's ACTUAL measured duration
+                # against what clean_infer_count inferences should take,
+                # based on the firmware's own reported per-inference time.
+                # energy_per_inference_j always divides by the firmware's
+                # precisely-known clean_infer_count (not by an inferred count
+                # from the measured duration) because that count is exact;
+                # the Joulescope-side gated-window duration is the more
+                # failure-prone side of this equation. If the instrument's
+                # gated capture misses part of the true window (e.g. a
+                # GPI-edge/timing-alignment fluke), the observed duration
+                # will be shorter (or longer) than expected, and dividing
+                # correctly-measured-but-incomplete energy by the full count
+                # silently produces a WRONG per-inference number with no
+                # other symptom. Found 2026-07-02: a UART-transport capture's
+                # gated window was ~10% short, understating energy/inference
+                # by ~6% with no error raised. This check cannot fix the
+                # measurement, only flag it.
+                if meta.clean_infer_avg_us and meta.clean_infer_avg_us > 0 and ps.duration_s > 0:
+                    expected_duration_s = (
+                        meta.clean_infer_count * meta.clean_infer_avg_us
+                    ) / 1_000_000.0
+                    duration_ratio = (
+                        ps.duration_s / expected_duration_s if expected_duration_s > 0 else 0.0
+                    )
+                    summary["power"]["gated_window_expected_duration_s"] = round(
+                        expected_duration_s, 6
+                    )
+                    summary["power"]["gated_window_duration_ratio"] = round(duration_ratio, 4)
+                    # Allow up to half an inference's worth of slack either
+                    # way before flagging -- normal GPIO-edge/packet-boundary
+                    # jitter is well under this.
+                    tolerance = 0.5 / meta.clean_infer_count
+                    if abs(duration_ratio - 1.0) > tolerance:
+                        summary["power"]["gated_window_duration_suspect"] = True
+                        log.warning(
+                            "Joulescope gated window duration (%.4fs) does not match "
+                            "clean_infer_count=%d x clean_infer_avg_us=%dus (expected "
+                            "%.4fs, ratio=%.3f) -- energy_per_inference_j may be "
+                            "systematically wrong. A truncated or extended capture "
+                            "window divided by the full inference count silently "
+                            "biases this number; check the gated-window capture for "
+                            "missed GPIO edges.",
+                            ps.duration_s,
+                            meta.clean_infer_count,
+                            meta.clean_infer_avg_us,
+                            expected_duration_s,
+                            duration_ratio,
+                        )
+                elif meta.clean_infer_avg_cycles is not None or meta.clean_infer_avg_us is not None:
+                    # The firmware counted clean_infer_count > 0 inferences but
+                    # reported a zero (or missing) avg cycle/us figure -- an
+                    # inference cannot take zero time, so this means the
+                    # device-side DWT-based clean-window measurement was
+                    # corrupted (known cause: a debugger/RTT attach racing the
+                    # one-shot DWT->CYCCNT read, freezing/resetting it mid-
+                    # window -- see main.cc.j2's warmup-phase workaround
+                    # comment for the same underlying race). Previously this
+                    # silently skipped the duration sanity check entirely
+                    # (leaving gated_window_duration_ratio absent with no
+                    # warning) instead of flagging the bad reading. Found
+                    # 2026-07-03 while validating an ITCM placement
+                    # experiment. The Joulescope-measured energy/power numbers
+                    # themselves are NOT affected (they don't depend on
+                    # device-reported cycles), only this specific duration
+                    # cross-check is unavailable.
+                    summary["power"]["gated_window_duration_suspect"] = True
+                    log.warning(
+                        "Device reported clean_infer_count=%d but "
+                        "clean_infer_avg_cycles=%r / clean_infer_avg_us=%r -- "
+                        "an inference cannot take zero time, so the device-side "
+                        "clean-window cycle measurement was likely corrupted "
+                        "(e.g. a debugger/RTT attach racing the one-shot DWT "
+                        "read). The duration-consistency sanity check could not "
+                        "run; energy_per_inference_j itself is unaffected (it "
+                        "only depends on Joulescope-measured energy and the "
+                        "exact clean_infer_count), but device-reported timing "
+                        "diagnostics for this run should not be trusted.",
+                        meta.clean_infer_count,
+                        meta.clean_infer_avg_cycles,
+                        meta.clean_infer_avg_us,
+                    )
+        elif meta and meta.profiled_infer_total_us is not None:
             active_duration_s = meta.profiled_infer_total_us / 1_000_000.0
             summary["power"]["active_window_estimated_duration_s"] = round(active_duration_s, 6)
             summary["power"]["active_window_estimated_energy_j"] = round(
@@ -281,17 +404,34 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             timing["hpx_start_latency_s"] = round(ctx.run_metadata.timing.hpx_start_latency_s, 6)
         if ctx.run_metadata.timing.protocol_duration_s is not None:
             timing["protocol_duration_s"] = round(ctx.run_metadata.timing.protocol_duration_s, 6)
+        if ctx.run_metadata.timing.phases:
+            timing["boot_phases_s"] = ctx.run_metadata.timing.phases
         if meta.profiled_infer_count is not None:
             timing["device_profiled_infer_count"] = meta.profiled_infer_count
         if meta.profiled_infer_total_us is not None:
             timing["device_profiled_infer_total_us"] = meta.profiled_infer_total_us
         if meta.profiled_infer_avg_us is not None:
             timing["device_profiled_infer_avg_us"] = meta.profiled_infer_avg_us
+        if meta.clean_infer_count is not None:
+            timing["device_clean_infer_count"] = meta.clean_infer_count
+        if meta.clean_infer_total_cycles is not None:
+            timing["device_clean_infer_total_cycles"] = meta.clean_infer_total_cycles
+        if meta.clean_infer_avg_cycles is not None:
+            timing["device_clean_infer_avg_cycles"] = meta.clean_infer_avg_cycles
+        if meta.clean_infer_avg_us is not None:
+            timing["device_clean_infer_avg_us"] = meta.clean_infer_avg_us
         if timing:
             summary["latency"] = timing
     elif any(
         value is not None
-        for value in (meta.profiled_infer_count, meta.profiled_infer_total_us, meta.profiled_infer_avg_us)
+        for value in (
+            meta.profiled_infer_count,
+            meta.profiled_infer_total_us,
+            meta.profiled_infer_avg_us,
+            meta.clean_infer_count,
+            meta.clean_infer_avg_cycles,
+            meta.clean_infer_avg_us,
+        )
     ):
         summary["latency"] = {
             key: value
@@ -299,6 +439,10 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                 "device_profiled_infer_count": meta.profiled_infer_count,
                 "device_profiled_infer_total_us": meta.profiled_infer_total_us,
                 "device_profiled_infer_avg_us": meta.profiled_infer_avg_us,
+                "device_clean_infer_count": meta.clean_infer_count,
+                "device_clean_infer_total_cycles": meta.clean_infer_total_cycles,
+                "device_clean_infer_avg_cycles": meta.clean_infer_avg_cycles,
+                "device_clean_infer_avg_us": meta.clean_infer_avg_us,
             }.items()
             if value is not None
         }
@@ -308,7 +452,14 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
         ma = ctx.model_analysis
         ps = ctx.power_result.summary
         if ps.avg_power_w and ps.avg_power_w > 0 and ps.duration_s and ps.duration_s > 0:
-            tops = ma.total_ops / 1e12 / ps.duration_s
+            infer_count = 1
+            if (
+                ctx.power_result.metadata.get("measurement_scope") == "gpio_gated_clean_window"
+                and ctx.pmu_result is not None
+                and ctx.pmu_result.meta.clean_infer_count
+            ):
+                infer_count = ctx.pmu_result.meta.clean_infer_count
+            tops = (ma.total_ops * infer_count) / 1e12 / ps.duration_s
             tops_per_watt = tops / ps.avg_power_w
             summary.setdefault("model_analysis", {})["tops"] = round(tops, 6)
             summary.setdefault("model_analysis", {})["tops_per_watt"] = round(tops_per_watt, 6)
@@ -652,18 +803,59 @@ def _write_json(
 
 
 def _write_power_csv(power: PowerResult, output_dir: Path) -> Path:
-    """Write power summary as a separate CSV."""
+    """Write power summary as a separate CSV.
+
+    The high-level summary.json reports only the gated (inference) portion. This
+    detailed CSV is the place where the non-inference whole-capture window is
+    annotated, so it carries both the gated metrics and, when available, the
+    ``whole_capture_window`` rows for reference.
+    """
     out_path = output_dir / "power_summary.csv"
     summary = power.summary
+    meta = power.metadata or {}
+    scope = meta.get("measurement_scope", "whole_capture_window")
     with open(out_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["metric", "value"])
-        writer.writerow(["avg_current_a", summary.avg_current_a])
-        writer.writerow(["avg_power_w", summary.avg_power_w])
-        writer.writerow(["peak_current_a", summary.peak_current_a])
-        writer.writerow(["energy_j", summary.energy_j])
-        writer.writerow(["duration_s", summary.duration_s])
-        writer.writerow(["sample_count", summary.sample_count])
+        writer.writerow(["scope", "metric", "value"])
+        writer.writerow([scope, "avg_current_a", summary.avg_current_a])
+        writer.writerow([scope, "avg_power_w", summary.avg_power_w])
+        writer.writerow([scope, "peak_current_a", summary.peak_current_a])
+        writer.writerow([scope, "energy_j", summary.energy_j])
+        writer.writerow([scope, "duration_s", summary.duration_s])
+        writer.writerow([scope, "sample_count", summary.sample_count])
+
+        # Per-window detail for gated captures.
+        for i, w in enumerate(power.gated_windows):
+            writer.writerow([f"gated_window_{i}", "start_s", w.start_s])
+            writer.writerow([f"gated_window_{i}", "duration_s", w.duration_s])
+            writer.writerow([f"gated_window_{i}", "energy_j", w.energy_j])
+            writer.writerow([f"gated_window_{i}", "charge_c", w.charge_c])
+            writer.writerow([f"gated_window_{i}", "avg_current_a", w.avg_current_a])
+            writer.writerow([f"gated_window_{i}", "avg_power_w", w.avg_power_w])
+            writer.writerow([f"gated_window_{i}", "peak_current_a", w.peak_current_a])
+            writer.writerow([f"gated_window_{i}", "sample_count", w.sample_count])
+            # Spike-robust distribution from per-packet stats.
+            writer.writerow([f"gated_window_{i}", "median_current_a", w.median_current_a])
+            writer.writerow([f"gated_window_{i}", "p95_current_a", w.p95_current_a])
+            writer.writerow([f"gated_window_{i}", "p99_current_a", w.p99_current_a])
+            writer.writerow([f"gated_window_{i}", "peak_current_p99_a", w.peak_current_p99_a])
+            writer.writerow([f"gated_window_{i}", "median_power_w", w.median_power_w])
+            writer.writerow([f"gated_window_{i}", "p95_power_w", w.p95_power_w])
+            writer.writerow([f"gated_window_{i}", "p99_power_w", w.p99_power_w])
+
+        # Non-inference reference: whole captured window (annotation only).
+        whole = meta.get("whole_capture_summary")
+        if isinstance(whole, dict):
+            for key in (
+                "avg_current_a",
+                "avg_power_w",
+                "peak_current_a",
+                "energy_j",
+                "duration_s",
+                "sample_count",
+            ):
+                if key in whole:
+                    writer.writerow(["whole_capture_window", key, whole[key]])
     log.info("Wrote power summary: %s", out_path)
     return out_path
 
@@ -698,7 +890,7 @@ def _metadata_to_dict(meta: RunMetadata) -> dict[str, Any]:
     if meta.toolchain is not None:
         d["toolchain"] = asdict(meta.toolchain)
     if meta.timing is not None:
-        d["timing"] = asdict(meta.timing)
+        d["timing"] = {k: v for k, v in asdict(meta.timing).items() if v is not None}
     return d
 
 
@@ -711,6 +903,10 @@ def _write_run_metadata(ctx: PipelineContext, output_dir: Path) -> Path:
     # Enrich with firmware-reported values from the capture
     if ctx.pmu_result is not None:
         meta_dict["firmware"] = _firmware_meta_to_dict(ctx.pmu_result.meta)
+    if ctx.power_result is not None:
+        lifecycle = ctx.power_result.metadata.get("target_lifecycle")
+        if lifecycle is not None:
+            meta_dict["target_lifecycle"] = lifecycle
 
     out_path.write_text(json.dumps(meta_dict, indent=2, default=str))
     log.info("Wrote run metadata: %s", out_path)

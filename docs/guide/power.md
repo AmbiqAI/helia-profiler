@@ -166,6 +166,8 @@ quantization schemes on the same hardware.
 | `duration_s` | int | `30` | Capture window length |
 | `io_voltage` | float | `1.8` | I/O rail voltage hint for the Joulescope |
 | `sync_gpio_pin` | int | board default (`29` on `apollo510_evb` / `apollo510b_evb`) | GPIO pin the firmware toggles around inference |
+| `sync_input_index` | int | `0` | Joulescope digital INPUT channel wired to the sync GPIO (distinct from `sync_gpio_pin`) |
+| `stats_rate_hz` | int | `1000` | Host stats packet rate for gated capture; the device integrates charge/energy at full rate and reports per-packet integrals plus a spike-robust current/power distribution |
 
 ## Troubleshooting
 

@@ -8,11 +8,15 @@ it succeeded.
 
 Behavior:
 
-* ``target.ensure_board_powered = True`` (default) — best-effort: ask the
-  driver, fall back to "skip" if the driver can't do it.
-* ``target.ensure_board_powered = False`` — skip entirely.
+* ``target.ensure_board_powered = False`` (default) — the stage is skipped
+  unless power capture is requested (``power.enabled = True``). Opt in with
+  ``--ensure-power`` when the board's power genuinely comes from the
+  driver's rail (e.g. Joulescope passthrough) and no measurement is needed.
+* ``target.ensure_board_powered = True`` — best-effort: ask the driver,
+  fall back to "skip" if the driver can't do it.
 * ``power.enabled = True`` implies strict mode: the driver MUST succeed
-  (otherwise downstream power capture can't run).
+  (otherwise downstream power capture can't run) — runs regardless of
+  ``ensure_board_powered``.
 
 If the driver skipped, :attr:`PipelineContext.passthrough_skipped` is set
 to ``True`` so the flash stage can include "is your EVB powered?" in its

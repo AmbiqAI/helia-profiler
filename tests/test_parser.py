@@ -101,6 +101,37 @@ def test_target_profiled_infer_timing_metadata():
     assert result.meta.profiled_infer_avg_us == 8000
 
 
+def test_clean_infer_timing_metadata():
+    lines = _wrap_session(
+        {
+            "presets": "basic_cpu",
+            "clean_infer_count": "5",
+            "clean_infer_total_cycles": "10000",
+            "clean_infer_avg_cycles": "2000",
+            "clean_infer_avg_us": "21",
+        },
+        [_make_preset_block("basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]])],
+    )
+
+    result = parse_firmware_output(lines)
+
+    assert result.meta.clean_infer_count == 5
+    assert result.meta.clean_infer_total_cycles == 10000
+    assert result.meta.clean_infer_avg_cycles == 2000
+    assert result.meta.clean_infer_avg_us == 21
+
+
+def test_system_clock_hz_metadata():
+    lines = _wrap_session(
+        {"presets": "basic_cpu", "system_clock_hz": "48000000"},
+        [_make_preset_block("basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]])],
+    )
+
+    result = parse_firmware_output(lines)
+
+    assert result.meta.system_clock_hz == 48000000
+
+
 # ---------------------------------------------------------------------------
 # Multi-pass parsing (new-style)
 # ---------------------------------------------------------------------------
@@ -186,6 +217,96 @@ def test_iteration_averaging():
 
     # Average of 1000 and 3000 = 2000
     assert result.layers[0].cycles == 2000
+
+
+# ---------------------------------------------------------------------------
+# Robust aggregation + outlier rejection
+# ---------------------------------------------------------------------------
+
+
+def _single_layer_iters(values: list[str]) -> list[str]:
+    """Build a one-layer/one-counter stream with a value per iteration."""
+    lines = ["--- HPX_START ---", "HPX_PRESETS=basic_cpu", "--- HPX_PRESET basic_cpu ---"]
+    for i, v in enumerate(values):
+        lines.append(f"--- HPX_ITER {i} ---")
+        lines.append("Layer,Op,ARM_PMU_CPU_CYCLES")
+        lines.append(f"0,CONV_2D,{v}")
+    lines.append("--- HPX_END ---")
+    return lines
+
+
+def test_median_is_default_and_rejects_wrap_and_frozen():
+    """Default (median) drops a uint32-wrap and a frozen-zero (AP4 artifact)."""
+    # iters: two frozen zeros, one uint32 underflow wrap, three healthy ~600k.
+    lines = _single_layer_iters(
+        ["0", "0", "3221837689", "600000", "601000", "599000"]
+    )
+    result = parse_firmware_output(lines)
+    # Surviving samples: 600000, 601000, 599000 -> median 600000.
+    assert result.layers[0].cycles == 600000
+
+
+def test_mean_aggregation_after_rejection():
+    lines = _single_layer_iters(["0", "3221837689", "1000", "3000"])
+    result = parse_firmware_output(lines, aggregation="mean")
+    # Wrap + frozen-zero rejected; mean(1000, 3000) = 2000.
+    assert result.layers[0].cycles == 2000
+
+
+def test_trimmed_aggregation_drops_extremes():
+    lines = _single_layer_iters(["1", "5", "6", "7", "100"])
+    result = parse_firmware_output(lines, aggregation="trimmed")
+    # Drop low (1) and high (100), mean(5, 6, 7) = 6.
+    assert result.layers[0].cycles == 6
+
+
+def test_all_zero_counter_is_preserved():
+    """A genuinely-zero counter (all iterations zero) stays zero, not rejected."""
+    lines = _single_layer_iters(["0", "0", "0"])
+    result = parse_firmware_output(lines)
+    assert result.layers[0].cycles == 0
+
+
+def _multi_counter_iters(rows: list[tuple[str, str]]) -> list[str]:
+    """One-layer stream with two counters (CPU_CYCLES, STALL) per iteration."""
+    lines = ["--- HPX_START ---", "HPX_PRESETS=basic_cpu", "--- HPX_PRESET basic_cpu ---"]
+    for i, (cyc, stall) in enumerate(rows):
+        lines.append(f"--- HPX_ITER {i} ---")
+        lines.append("Layer,Op,ARM_PMU_CPU_CYCLES,ARM_PMU_STALL")
+        lines.append(f"0,CONV_2D,{cyc},{stall}")
+    lines.append("--- HPX_END ---")
+    return lines
+
+
+def test_sparse_secondary_counter_zero_is_not_frozen():
+    """A secondary counter that is legitimately 0 in some iters is preserved.
+
+    Regression: the cycle counter is healthy every iteration, but a sparse
+    stall counter reads 0 in most iterations and catches a single non-zero
+    tick.  Those zeros are real (no stalls) and must NOT be treated as a
+    frozen-zero readout, or the stall median is biased upward and the user
+    sees a confusing false alert.
+    """
+    lines = _multi_counter_iters(
+        [("600000", "0"), ("601000", "34"), ("599000", "0")]
+    )
+    result = parse_firmware_output(lines)
+    layer = result.layers[0]
+    assert layer.cycles == 600000
+    # Zeros kept: median(0, 34, 0) == 0, not median([34]) == 34.
+    assert layer.counters["ARM_PMU_STALL"] == 0
+
+
+def test_fully_frozen_row_is_dropped_across_all_counters():
+    """An iteration whose entire PMU readout is zero is dropped for every counter."""
+    lines = _multi_counter_iters(
+        [("0", "0"), ("600000", "10"), ("602000", "12")]
+    )
+    result = parse_firmware_output(lines)
+    layer = result.layers[0]
+    # iter0 (all-zero row) dropped: median(600000, 602000) and median(10, 12).
+    assert layer.cycles == 601000
+    assert layer.counters["ARM_PMU_STALL"] == 11
 
 
 # ---------------------------------------------------------------------------

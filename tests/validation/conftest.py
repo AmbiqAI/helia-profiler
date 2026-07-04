@@ -38,9 +38,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
     grp.addoption(
         "--mlperf-power",
-        default="both",
+        default="off",
         choices=("both", "on", "off"),
-        help="Power matrix: both|on|off (default: both).",
+        help="Power matrix: both|on|off (default: off).",
     )
     grp.addoption(
         "--mlperf-boards",
@@ -52,6 +52,26 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         type=int,
         default=1,
         help="Repeat each selected case N times for stress testing (default: 1).",
+    )
+    grp.addoption(
+        "--mlperf-toolchains",
+        default="",
+        help="Comma-separated toolchains to run (default: board defaults).",
+    )
+    grp.addoption(
+        "--mlperf-transports",
+        default="",
+        help="Comma-separated transports/interfaces to run (default: board defaults).",
+    )
+    grp.addoption(
+        "--mlperf-memories",
+        default="",
+        help="Comma-separated model placement presets to run (default: board defaults).",
+    )
+    grp.addoption(
+        "--mlperf-jlink-serials",
+        default="",
+        help="Comma-separated board=serial entries for multi-board validation.",
     )
     grp.addoption(
         "--mlperf-output",
@@ -78,6 +98,22 @@ def _split_csv(raw: str) -> list[str] | None:
     return [p.strip() for p in raw.split(",") if p.strip()]
 
 
+def _split_serial_map(raw: str) -> dict[str, str] | None:
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    mapping: dict[str, str] = {}
+    for item in [p.strip() for p in raw.split(",") if p.strip()]:
+        board, sep, serial = item.partition("=")
+        if not sep or not board.strip() or not serial.strip():
+            raise ValueError(
+                "--mlperf-jlink-serials entries must use board=serial, "
+                f"got {item!r}."
+            )
+        mapping[board.strip()] = serial.strip()
+    return mapping
+
+
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "case" not in metafunc.fixturenames:
         return
@@ -87,6 +123,10 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
         engines=_split_csv(cfg.getoption("--mlperf-engines")),
         power=cfg.getoption("--mlperf-power"),
         boards=_split_csv(cfg.getoption("--mlperf-boards")),
+        toolchains=_split_csv(cfg.getoption("--mlperf-toolchains")),
+        transports=_split_csv(cfg.getoption("--mlperf-transports")),
+        memories=_split_csv(cfg.getoption("--mlperf-memories")),
+        jlink_serials=_split_serial_map(cfg.getoption("--mlperf-jlink-serials")),
         repeat=cfg.getoption("--mlperf-repeat"),
     )
     metafunc.parametrize(
@@ -166,8 +206,8 @@ def _render_markdown(results: list[CaseResult]) -> str:
         f"- fail: **{stats['fail']}**",
         f"- skip: **{stats['skip']}**",
         "",
-        "| Case | Status | Duration (s) | Layers | Cycles | Energy (µJ) | Avg (mA) | Peak (mA) | Notes |",
-        "|------|--------|-------------:|-------:|-------:|------------:|---------:|----------:|-------|",
+        "| Case | Status | Duration (s) | Toolchain | Interface | Memory | Layers | Cycles | Energy (µJ) | Avg (mA) | Peak (mA) | Notes |",
+        "|------|--------|-------------:|-----------|-----------|--------|-------:|-------:|------------:|---------:|----------:|-------|",
     ]
     for r in results:
         status_badge = {
@@ -177,10 +217,13 @@ def _render_markdown(results: list[CaseResult]) -> str:
         }.get(r.status, r.status)
         note = r.error or ""
         lines.append(
-            "| {cid} | {st} | {dur:.1f} | {layers} | {cyc} | {energy} | {avg} | {peak} | {note} |".format(
+            "| {cid} | {st} | {dur:.1f} | {toolchain} | {transport} | {memory} | {layers} | {cyc} | {energy} | {avg} | {peak} | {note} |".format(
                 cid=r.case_id,
                 st=status_badge,
                 dur=r.duration_s,
+                toolchain=r.toolchain,
+                transport=r.transport,
+                memory=r.memory,
                 layers=r.layers if r.layers is not None else "-",
                 cyc=r.total_cycles if r.total_cycles is not None else "-",
                 energy=f"{r.energy_uj:.1f}" if r.energy_uj is not None else "-",

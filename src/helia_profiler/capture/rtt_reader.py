@@ -16,10 +16,13 @@ When ``weights_region="psram"``, the firmware initialises PSRAM and emits
 model flatbuffer to the PSRAM XIP address via ``jlink.memory_write()`` and
 sends ``HPX_GO`` on the RTT down-channel to resume inference.
 
-For ordinary RTT runs, the firmware emits ``HPX_READY`` and waits until the
-host replies with ``HPX_HOST_READY`` on RTT down-channel 0 before emitting
-``HPX_START``. This prevents the host from attaching mid-stream and missing
-the protocol sentinels.
+For ordinary RTT runs, the firmware emits ``HPX_READY`` and then writes the
+``HPX_START`` header in lossless (wait-for-space) mode: it blocks until the
+host drains the up-buffer, so the protocol sentinels are never lost no matter
+when the host attaches.  The host therefore only waits for ``HPX_READY`` as a
+liveness signal and does **not** reply on the down-channel.  (The old
+``HPX_HOST_READY`` down-channel handshake was the fragile path — stale D-cache
+on the target's down-buffer descriptor — that repeatedly regressed.)
 
 Sequence:
   1. Reset the target via JLinkExe (handles Apollo510 SBL correctly).
@@ -75,7 +78,6 @@ _RTT_DISCOVERY_SETTLE_S = 2.0
 _RTT_APP_CHANNEL0_NAME = b"HPX"
 _RTT_NAME_MAX_LEN = 16
 _RTT_READY_LINE = "HPX_READY"
-_RTT_HOST_READY_CMD = b"HPX_HOST_READY"
 
 # Scoring weights.  These are powers of two chosen so the qualitative signals
 # dominate in priority order (name match > live activity > buffer size) while
@@ -455,18 +457,45 @@ def _write_rtt_command_direct(
         )
 
 
+def _write_rtt_command_api(
+    jlink: "pylink.JLink",
+    *,
+    command: bytes,
+    timeout_s: float = _RTT_READY_TIMEOUT_S,
+) -> None:
+    written = 0
+    deadline = time.monotonic() + timeout_s
+
+    while written < len(command) and time.monotonic() < deadline:
+        advanced_raw = jlink.rtt_write(0, list(command[written:]))
+        advanced = len(command) - written if advanced_raw is None else int(advanced_raw)
+        if advanced > 0:
+            written += advanced
+            continue
+        time.sleep(0.005)
+
+    if written < len(command):
+        raise CaptureError(
+            "Timed out sending RTT host-ready command",
+            hint="The firmware did not expose a writable RTT down-buffer in time.",
+        )
+
+
 def _perform_rtt_ready_handshake(
     *,
     read_chunk,
-    write_command,
 ) -> bytes:
-    pending = _wait_for_rtt_line(
+    # Wait for the firmware's HPX_READY liveness line.  We do NOT reply on the
+    # RTT down-channel: the firmware emits HPX_READY and the entire HPX_START
+    # header in lossless (wait-for-space) mode, so it blocks until we drain the
+    # up-buffer and nothing is lost regardless of attach timing.  The old
+    # HPX_HOST_READY down-channel reply was the fragile path (stale D-cache on
+    # the target's down-buffer descriptor) that repeatedly regressed.
+    return _wait_for_rtt_line(
         read_chunk,
         expected_line=_RTT_READY_LINE,
         timeout_s=_RTT_READY_TIMEOUT_S,
     )
-    write_command(_RTT_HOST_READY_CMD)
-    return pending
 
 
 def _prepend_pending_bytes(read_chunk, pending: bytes):
@@ -558,7 +587,7 @@ def _upload_model_to_psram(
     log.info("Model uploaded to PSRAM in %.1fs (%.0f KB/s)", elapsed, rate_kbps)
 
     # --- Send HPX_GO to resume firmware ---
-    jlink.rtt_write(0, list(b"HPX_GO"))
+    _write_rtt_command_api(jlink, command=b"HPX_GO")
     log.info("Sent HPX_GO — firmware resuming")
 
 
@@ -780,11 +809,11 @@ def capture_rtt_output(
         # Probe the SEGGER RTT API directly instead of trusting NumUpBuffers,
         # which is unreliable on some J-Link/Apollo5 DLL combos (it can report 0
         # even while the RTT engine is happily delivering data).  The firmware
-        # has already emitted HPX_READY and is blocked at the host-ready gate, so
-        # a working attach returns those bytes here.  Commit to the J-Link-driven
-        # RTT path on the first byte (or a positive NumUpBuffers) and feed the
-        # probed bytes into the handshake; fall back to direct SWD only if
-        # nothing arrives across the window.
+        # has already emitted HPX_READY and is streaming the HPX_START header in
+        # lossless mode (it blocks until we drain), so a working attach returns
+        # those bytes here.  Commit to the J-Link-driven RTT path on the first
+        # byte (or a positive NumUpBuffers) and feed the probed bytes into the
+        # handshake; fall back to direct SWD only if nothing arrives.
         probe_bytes = b""
         num_up_buffers = 0
         api_attached = False
@@ -878,11 +907,6 @@ def capture_rtt_output(
             handshake_started_s = time.monotonic()
             pending = _perform_rtt_ready_handshake(
                 read_chunk=read_direct_chunk,
-                write_command=lambda command: _write_rtt_command_direct(
-                    jlink,
-                    block_address=active_block_address,
-                    command=command,
-                ),
             )
             record_phase_duration(
                 "ready_handshake_direct",
@@ -928,7 +952,6 @@ def capture_rtt_output(
         handshake_started_s = time.monotonic()
         pending = _perform_rtt_ready_handshake(
             read_chunk=handshake_read,
-            write_command=lambda command: jlink.rtt_write(0, list(command)),
         )
         record_phase_duration(
             "ready_handshake_api",
