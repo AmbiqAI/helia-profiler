@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from .target.probe.jlink import (
+    JLinkFlashBackend,
     JLinkProbe,
     JLinkProbeMatch,
+    JLinkResetController,
+    create_debug_memory_session,
     find_jlink_exe,
     inspect_probe_target,
     list_connected_probes,
@@ -18,6 +21,9 @@ from .target.probe.jlink import _inspect_probe_target
 __all__ = [
     "JLinkProbe",
     "JLinkProbeMatch",
+    "JLinkResetController",
+    "JLinkFlashBackend",
+    "create_debug_memory_session",
     "find_jlink_exe",
     "inspect_probe_target",
     "list_connected_probes",

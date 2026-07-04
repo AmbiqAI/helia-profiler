@@ -20,12 +20,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 import logging
 import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
+from contextlib import AbstractContextManager
 
 from ...errors import CaptureError, ConfigError
 from ...platform import CoreArch
+from .base import DebugMemorySession
 
 log = logging.getLogger("hpx")
 
@@ -466,9 +469,76 @@ def reset_target_poi(
     log.info("SWPOI reset complete")
 
 
+@dataclass(frozen=True)
+class JLinkResetController:
+    """Reset primitives backed by SEGGER J-Link."""
+
+    def debug_reset(self, *, device: str, jlink_serial: str | None = None) -> None:
+        reset_target(device=device, jlink_serial=jlink_serial)
+
+    def swpoi_reset(self, *, device: str, jlink_serial: str | None = None) -> None:
+        reset_target_poi(device=device, jlink_serial=jlink_serial)
+
+    def attached_reset_session(
+        self,
+        *,
+        device: str,
+        jlink_serial: str | None = None,
+        attach_timeout_s: float = 30.0,
+        settle_s: float = 0.25,
+    ) -> AbstractContextManager[DebugMemorySession]:
+        from ...capture.readiness import attached_reset_session
+
+        return attached_reset_session(
+            device=device,
+            jlink_serial=jlink_serial,
+            attach_timeout_s=attach_timeout_s,
+            settle_s=settle_s,
+        )
+
+
+@dataclass(frozen=True)
+class JLinkFlashBackend:
+    """Flash firmware through the NSX J-Link backend."""
+
+    def flash(
+        self,
+        firmware_path: Path,
+        *,
+        toolchain: str,
+        jlink_serial: str | None = None,
+        timeout_s: float,
+        verbose: bool = False,
+    ) -> None:
+        from ... import nsx as nsx_cli
+
+        nsx_cli.flash(
+            firmware_path,
+            toolchain=toolchain,
+            jlink_serial=jlink_serial,
+            timeout_s=timeout_s,
+            verbose=verbose,
+        )
+
+
+def create_debug_memory_session() -> DebugMemorySession:
+    """Create a pylink-backed debug-memory session."""
+    try:
+        import pylink
+    except ImportError as exc:
+        raise CaptureError(
+            "pylink-square package not installed (required for debug probe transports)",
+            hint="pip install pylink-square",
+        ) from exc
+    return pylink.JLink()
+
+
 __all__ = [
+    "JLinkFlashBackend",
     "JLinkProbe",
     "JLinkProbeMatch",
+    "JLinkResetController",
+    "create_debug_memory_session",
     "find_jlink_exe",
     "inspect_probe_target",
     "list_connected_probes",
