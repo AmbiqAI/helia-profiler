@@ -1,14 +1,16 @@
-"""DEPRECATED shim — the HPX wire protocol moved to ``transport.protocol``.
+"""Capture transport backends for heliaPROFILER.
 
-Import from :mod:`helia_profiler.transport.protocol` (or the
-:mod:`helia_profiler.transport` package) instead.  This module re-exports the
-public names so existing imports keep working during the modular refactor.
+This package owns the wire protocol (:mod:`.protocol`) and — added in later
+commits — the :class:`CaptureTransport` backend objects and their registry.
+
+The HPX protocol constants and the shared line-collection loop live in
+:mod:`helia_profiler.transport.protocol`; they are re-exported here for
+convenience.
 """
 
 from __future__ import annotations
 
-# DEPRECATED: re-exported from helia_profiler.transport.protocol
-from ..transport.protocol import (
+from .protocol import (
     CLEAN_WINDOW_BEGIN_PHASE,
     DEFAULT_TIMEOUT_S,
     HEARTBEAT_TIMEOUT_S,
