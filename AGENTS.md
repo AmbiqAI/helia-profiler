@@ -48,7 +48,7 @@ calling the `nsx` CLI. Never use `os.system()` or `shell=True`.
 The `HeliaRTAdapter` generates a temporary NSX module wrapper (nsx-module.yaml
 + CMakeLists.txt) so that heliaRT prebuilt static libraries appear as
 `nsx::helia_rt` to the firmware build. The pinned version lives in
-`engines/helia_rt.py` — bump `HELIART_VERSION` when adopting a new release.
+`engines/helia_rt/artifacts.py` — bump `HELIART_VERSION` when adopting a new release.
 This shim is retired once heliaRT ships a native `nsx-module.yaml`.
 
 ### No Export Mode
@@ -81,7 +81,7 @@ reaching for raw SEGGER Commander sessions:
 
 Avoid raw `JLinkExe` in agent workflows unless HPX lacks the needed operation.
 If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
-`exit`, set a timeout, and prefer adding a wrapper in `jlink.py` afterward.
+`exit`, set a timeout, and prefer adding a wrapper in `target/probe/jlink.py` afterward.
 
 ## Module Responsibilities
 
@@ -100,7 +100,7 @@ If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
 | `report/` | CSV, JSON, terminal summary, Model Explorer overlays |
 | `stages/` | Ordered pipeline stages s01–s08 |
 | `platform.py` | SoC families, board registry, capabilities |
-| `jlink.py` | SEGGER J-Link helpers (discovery, reset, SWO commands) |
+| `target/probe/jlink.py` | SEGGER J-Link helpers (discovery, reset, SWO commands) |
 | `nsx.py` | NSX build-system subprocess wrapper |
 | `errors.py` | Typed error hierarchy with `hint` field |
 

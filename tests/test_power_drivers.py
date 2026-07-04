@@ -13,7 +13,7 @@ import pytest
 
 from helia_profiler.errors import PowerError
 from helia_profiler.power.joulescope.device import _open_device
-from helia_profiler.power.joulescope_driver import JoulescopeDriver
+from helia_profiler.power.joulescope.driver import JoulescopeDriver
 
 
 class TestJoulescopeAvailability:

@@ -24,9 +24,7 @@ from ..errors import CaptureError, PowerError
 from ..transport import (
     HPX_END,
     HPX_START,
-    BaseCaptureTransport,
     CaptureArgs,
-    register_transport,
     resolve_transport,
 )
 from ..usb_identity import usb_marker_serial
@@ -38,59 +36,6 @@ if TYPE_CHECKING:
     from ..target.lifecycle import TargetLifecyclePlan
 
 log = logging.getLogger("hpx")
-
-
-# ---------------------------------------------------------------------------
-# Backend registry re-exports (see helia_profiler.transport)
-# ---------------------------------------------------------------------------
-# The transport dispatch table moved to the ``transport`` package as a
-# ``CaptureTransport`` backend registry (WP5).  ``register_transport`` /
-# ``resolve_transport`` are re-exported above.  The two functions below are
-# DEPRECATED reader-level shims kept so pre-WP5 callers keep working.
-
-
-class _ReaderBackend(BaseCaptureTransport):
-    """DEPRECATED adapter wrapping an old ``(ctx, args) -> list[str]`` reader."""
-
-    def __init__(self, transport: Transport, reader) -> None:
-        super().__init__()
-        self.transport = transport
-        self._reader = reader
-
-    def collect(self, ctx) -> list[str]:
-        return self._reader(ctx, self._args)
-
-
-def register_transport_reader(transport: Transport, reader) -> None:
-    """DEPRECATED: register an old-style ``(ctx, args) -> list[str]`` reader.
-
-    Prefer :func:`helia_profiler.transport.register_transport` with a
-    :class:`~helia_profiler.transport.CaptureTransport` backend.  This wraps the
-    reader in an adapter and registers it with the new backend registry.
-    """
-    register_transport(
-        transport, lambda: _ReaderBackend(Transport(transport), reader)
-    )
-
-
-def resolve_transport_reader(transport: Transport):
-    """DEPRECATED: return a ``(ctx, args) -> list[str]`` reader for ``transport``.
-
-    Prefer :func:`helia_profiler.transport.resolve_transport`.  This drives the
-    resolved backend's ``prepare``/``start``/``collect``/``close`` lifecycle
-    behind the old single-call reader signature.
-    """
-    backend = resolve_transport(transport)
-
-    def _reader(ctx, args):
-        backend.prepare(ctx, args)
-        backend.start(ctx)
-        try:
-            return backend.collect(ctx)
-        finally:
-            backend.close()
-
-    return _reader
 
 
 def capture_pmu(ctx: PipelineContext) -> PmuResult:

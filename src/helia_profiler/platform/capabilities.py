@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from .soc import SocDef
 
 # Reset-strategy tokens.  These equal the corresponding ``ResetStrategy`` /
-# ``ResetAction`` values in :mod:`helia_profiler.target_lifecycle`; kept as
+# ``ResetAction`` values in :mod:`helia_profiler.target.lifecycle`; kept as
 # plain strings here so the platform package does not import the lifecycle layer
 # (which imports the platform package).
 _RESET_DEBUG = "debug_reset"
@@ -37,10 +37,10 @@ class ResetCapabilities:
     """How a target should be reset before a power-capture phase.
 
     ``default_power_reset_strategy`` is the ``auto`` policy resolution owned by
-    ``target_lifecycle`` — ``debug_reset+swpoi_reset`` on Apollo5 (the RSTGEN
+    ``target.lifecycle`` — ``debug_reset+swpoi_reset`` on Apollo5 (the RSTGEN
     SWPOI deep reset also clears PMU/power state), ``debug_reset`` on
     Apollo3/Apollo4.  The value equals a
-    :class:`helia_profiler.target_lifecycle.ResetStrategy` member.
+    :class:`helia_profiler.target.lifecycle.ResetStrategy` member.
     """
 
     default_power_reset_strategy: str

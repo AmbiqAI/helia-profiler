@@ -29,7 +29,7 @@ import contextlib
 import pytest
 
 from helia_profiler.errors import CaptureError
-from helia_profiler.target_lifecycle import (
+from helia_profiler.target.lifecycle import (
     CapturePhase,
     ResetAction,
     prepare_target_for_phase,
@@ -68,8 +68,9 @@ class _FakeDriver:
 def _install_lifecycle_recorder(monkeypatch) -> list[str]:
     """Record ``reset_target`` / ``reset_target_poi`` calls in call order.
 
-    ``target_lifecycle`` imports these lazily from ``helia_profiler.jlink``, so
-    patching the ``jlink`` module namespace is sufficient.
+    ``target.lifecycle`` imports these lazily from
+    ``helia_profiler.target.probe.jlink``, so patching that module namespace
+    is sufficient.
     """
     events: list[str] = []
 

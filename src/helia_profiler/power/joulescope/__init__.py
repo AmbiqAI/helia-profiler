@@ -1,9 +1,9 @@
 """Joulescope external power measurement driver package (unified JS110 + JS220).
 
 Split into focused submodules for maintainability; this ``__init__`` re-exports
-the public surface so callers can keep using
-``helia_profiler.power.joulescope_driver`` (deprecated shim) or the new
-``helia_profiler.power.joulescope`` package path interchangeably.
+the public surface so callers use ``helia_profiler.power.joulescope`` (the
+``power.joulescope_driver`` shim has been removed — it had no external
+consumers).
 
 - :mod:`.device` — shared ``pyjoulescope_driver`` handle, open/close/enumerate.
 - :mod:`.driver` — :class:`JoulescopeDriver` (capture, gating, power-cycle).

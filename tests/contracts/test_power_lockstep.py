@@ -22,7 +22,7 @@ from helia_profiler.capture import capture_power
 from helia_profiler.power.base import PowerResult, PowerSummary
 from helia_profiler.power.sync import DeviceState
 from helia_profiler.results import FirmwareMeta, PmuResult
-from helia_profiler.target_lifecycle import CapturePhase, prepare_target_for_phase
+from helia_profiler.target.lifecycle import CapturePhase, prepare_target_for_phase
 
 from .conftest import make_pmu_ctx
 

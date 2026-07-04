@@ -116,15 +116,26 @@ src/helia_profiler/
 ├── errors.py           # HpxError hierarchy
 ├── platform.py         # SoC/Board registry
 ├── nsx.py              # NSX subprocess wrapper (configure/build/flash)
-├── jlink.py            # J-Link helpers (flash, SWO, reset)
 ├── counters.py         # PMU counter registry and pass planning
 ├── doctor.py           # hpx doctor — tool checks
+│
+├── target/             # Target lifecycle + probe backends
+│   ├── lifecycle.py    # Reset/power-cycle policy before capture phases
+│   └── probe/
+│       └── jlink.py    # J-Link helpers (flash, SWO, reset)
+│
+├── transport/          # CaptureTransport backend registry
+│   ├── protocol.py     # HPX wire protocol (HPX_START/HPX_END framing)
+│   ├── rtt.py          # RTT capture backend
+│   ├── swo.py          # SWO capture via pylink/J-Link API
+│   ├── uart.py         # UART capture backend
+│   └── usb_cdc.py      # USB CDC capture backend
 │
 ├── engines/            # Engine adapters
 │   ├── base.py         # EngineAdapter protocol, EngineArtifacts
 │   ├── tflm.py         # Stock TFLM adapter
-│   ├── helia_rt.py     # heliaRT adapter
-│   └── helia_aot.py    # heliaAOT adapter
+│   ├── helia_rt/       # heliaRT adapter package
+│   └── helia_aot/      # heliaAOT adapter package
 │
 ├── stages/             # Pipeline stages
 │   ├── resolve_platform.py
@@ -140,14 +151,12 @@ src/helia_profiler/
 │   ├── __init__.py     # Template rendering, model→header, build/flash
 │   └── templates/      # Jinja2 templates (CMakeLists, main.cc, etc.)
 │
-├── capture/            # Data acquisition
-│   ├── serial_reader.py  # SWO capture via pylink/J-Link API
+├── capture/            # Data acquisition dispatch (capture_pmu/capture_power)
 │   └── parser.py         # HPX protocol parser → PmuResult
 │
 ├── power/              # Power measurement drivers
 │   ├── base.py         # PowerDriver protocol, PowerResult
-│   ├── joulescope_driver.py   # JS110
-│   └── joulescope_js220.py    # JS220
+│   └── joulescope/     # Joulescope JS110/JS220 driver package
 │
 └── report/             # Output formatting
     ├── __init__.py     # write_report() dispatcher

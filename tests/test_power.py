@@ -443,7 +443,7 @@ class TestPowerConfig:
 
     def test_power_reset_strategy_config(self, tmp_path: Path):
         from helia_profiler.config import load_config
-        from helia_profiler.target_lifecycle import ResetStrategy
+        from helia_profiler.target.lifecycle import ResetStrategy
 
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")
@@ -584,7 +584,7 @@ class TestTargetLifecycle:
     def test_ap4_power_phase_uses_debug_reset_only(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target_lifecycle import (
+        from helia_profiler.target.lifecycle import (
             CapturePhase,
             ResetAction,
             prepare_target_for_phase,
@@ -623,7 +623,7 @@ class TestTargetLifecycle:
     def test_ap5_power_phase_preserves_current_swpoi_policy(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target_lifecycle import (
+        from helia_profiler.target.lifecycle import (
             CapturePhase,
             ResetAction,
             prepare_target_for_phase,
@@ -659,7 +659,7 @@ class TestTargetLifecycle:
     def test_explicit_ap4_swpoi_uses_swpoi_as_replacement(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target_lifecycle import (
+        from helia_profiler.target.lifecycle import (
             CapturePhase,
             ResetAction,
             prepare_target_for_phase,
@@ -696,7 +696,7 @@ class TestTargetLifecycle:
     def test_explicit_no_reset_does_not_touch_hardware(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target_lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
+        from helia_profiler.target.lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
 
         ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
         ctx.config = replace(ctx.config, power=replace(ctx.config.power, reset_strategy="none"))
@@ -729,7 +729,7 @@ class TestTargetLifecycle:
     def test_explicit_power_cycle_requires_rail_toggle_and_skips_jlink_reset(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target_lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
+        from helia_profiler.target.lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
 
         ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
         ctx.config = replace(ctx.config, power=replace(ctx.config.power, reset_strategy="power_cycle"))
@@ -762,7 +762,7 @@ class TestTargetLifecycle:
     def test_explicit_power_cycle_fails_if_rail_toggle_unavailable(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target_lifecycle import CapturePhase, prepare_target_for_phase
+        from helia_profiler.target.lifecycle import CapturePhase, prepare_target_for_phase
 
         ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
         ctx.config = replace(ctx.config, power=replace(ctx.config.power, reset_strategy="power_cycle"))
@@ -790,7 +790,7 @@ class TestTargetLifecycle:
     def test_non_power_phase_does_not_touch_hardware(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target_lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
+        from helia_profiler.target.lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
 
         ctx = self._make_ctx(tmp_path, board="apollo510_evb")
 

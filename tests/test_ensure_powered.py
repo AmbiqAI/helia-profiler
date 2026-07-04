@@ -18,7 +18,7 @@ import pytest
 from helia_profiler.config import load_config
 from helia_profiler.errors import PowerError
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.power.joulescope_driver import JoulescopeDriver
+from helia_profiler.power.joulescope.driver import JoulescopeDriver
 from helia_profiler.stages.ensure_powered import EnsureBoardPoweredStage
 
 

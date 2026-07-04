@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from helia_profiler.errors import ConfigError
-from helia_profiler.jlink import (
+from helia_profiler.target.probe.jlink import (
     JLinkProbe,
     JLinkProbeMatch,
     inspect_probe_target,
