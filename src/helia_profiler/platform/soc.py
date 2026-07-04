@@ -13,8 +13,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from ..placement import Placement
+
+if TYPE_CHECKING:
+    from .capabilities import SocCapabilities
 
 # ---------------------------------------------------------------------------
 # SoC family (determines core, PMU tier, and MVE availability)
@@ -162,6 +166,18 @@ class SocDef:
         return domain
 
     @property
+    def capabilities(self) -> SocCapabilities:
+        """Typed capability records resolved for this SoC.
+
+        All SoC-family policy is expressed once, here (via
+        :func:`~helia_profiler.platform.capabilities.build_soc_capabilities`),
+        so consumers read a named field instead of branching on ``family``.
+        """
+        from .capabilities import build_soc_capabilities
+
+        return build_soc_capabilities(self)
+
+    @property
     def has_full_pmu(self) -> bool:
         return self.pmu_tier is PmuTier.ARMV8M_PMU
 
@@ -187,7 +203,7 @@ class SocDef:
         (Cortex-M55) uses the resettable Armv8-M PMU and its secure bootloader
         prefers the probe released, so it stays False.
         """
-        return self.family in (SocFamily.AP3, SocFamily.AP4)
+        return self.capabilities.transport.requires_attached_probe_for_cycles
 
     @property
     def profiling_backends(self) -> tuple[str, ...]:
@@ -483,40 +499,6 @@ _register_soc(
 # Physical memory address ranges (for build-time placement verification)
 # ---------------------------------------------------------------------------
 
-# Base addresses of the arena/weights-eligible memory regions, per SoC family.
-# Sizes come from each SoC's ``MemoryLayout``; only the bases are family-wide.
-# DTCM and SRAM are contiguous on AP4/AP5 (SRAM begins right after DTCM), but
-# the bases are listed explicitly rather than derived so the mapping stays
-# obvious and robust to layout changes.
-#
-# AP3 does not share a single family base map the way AP4/AP5 do. apollo3p
-# (Blue Plus) has a real 64 KB low-latency TCM at 0x10000000 (arena-eligible
-# via NSX_MEM_FAST_BSS's dedicated `.tcm_bss` section, nsx-ambiq-sdk#29), a
-# separate 700 KB main SRAM "RWMEM" at 0x10011000 (default .bss/.data home),
-# and "MRAM" is read-only NOR flash (XIP) at 0x0000C000 used for weights.
-# apollo3 (Blue) instead has a flat 384 KB SRAM at 0x10000000 and no separate
-# TCM — it is not currently a registered target, so the AP3 entry below
-# encodes apollo3p only.
-_FAMILY_MEMORY_BASES: dict[SocFamily, dict[Placement, int]] = {
-    SocFamily.AP3: {
-        Placement.TCM: 0x10000000,   # real 64 KB low-latency TCM (NSX_MEM_FAST_BSS, nsx-ambiq-sdk#29)
-        Placement.SRAM: 0x10011000,  # RWMEM main SRAM (default .bss/.data home)
-        Placement.MRAM: 0x00000000,  # NOR flash XIP (ROMEM @ 0x0000C000), weights
-    },
-    SocFamily.AP4: {
-        Placement.TCM: 0x10000000,   # DTCM
-        Placement.SRAM: 0x10060000,  # SHARED_SRAM (right after 384 KB DTCM)
-        Placement.MRAM: 0x00000000,  # MRAM (XIP)
-        Placement.PSRAM: 0x60000000,
-    },
-    SocFamily.AP5: {
-        Placement.TCM: 0x20000000,   # DTCM
-        Placement.SRAM: 0x20080000,  # SSRAM (right after 512 KB DTCM)
-        Placement.MRAM: 0x00000000,  # MRAM (XIP)
-        Placement.PSRAM: 0x60000000,
-    },
-}
-
 # MemoryLayout size field backing each placement region.
 _PLACEMENT_SIZE_FIELD: dict[Placement, str] = {
     Placement.TCM: "dtcm_kb",
@@ -530,14 +512,14 @@ def soc_placement_ranges(soc: SocDef) -> dict[Placement, MemoryRange]:
     """Return physical address ranges for each arena/weights placement region.
 
     Maps each :class:`~helia_profiler.placement.Placement` to the concrete
-    ``[start, start+length)`` window on *soc*, derived from the family base
-    addresses and the SoC's ``MemoryLayout`` sizes.  Regions the SoC does not
-    have (size 0) are omitted.  Returns an empty mapping for SoC families whose
-    memory model is not yet characterised, so callers treat verification as
-    best-effort.
+    ``[start, start+length)`` window on *soc*, derived from the placement bases
+    in ``soc.capabilities.memory`` and the SoC's ``MemoryLayout`` sizes.
+    Regions the SoC does not have (size 0) are omitted.  Returns an empty
+    mapping for SoC families whose memory model is not yet characterised, so
+    callers treat verification as best-effort.
     """
-    bases = _FAMILY_MEMORY_BASES.get(soc.family)
-    if bases is None:
+    bases = soc.capabilities.memory.placement_bases
+    if not bases:
         return {}
     ranges: dict[Placement, MemoryRange] = {}
     for placement, base in bases.items():
