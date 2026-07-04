@@ -19,7 +19,7 @@ import jinja2
 import yaml
 
 from .. import nsx as nsx_cli
-from ..config import DEFAULT_ARENA_SIZE_BYTES
+from ..config import DEFAULT_ARENA_SIZE_BYTES, DEFAULT_POWER_WINDOW_TARGET_MS
 from ..counters import (
     CounterPass,
     plan_passes,
@@ -41,6 +41,13 @@ if TYPE_CHECKING:
     from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
+
+
+def _effective_window_target_ms(config: ProfileConfig) -> int:
+    target_ms = config.profiling.window_target_ms
+    if config.power.enabled and config.profiling.window_mode == "auto":
+        target_ms = max(target_ms, DEFAULT_POWER_WINDOW_TARGET_MS)
+    return target_ms
 
 # ---------------------------------------------------------------------------
 # Toolchain mapping: config names → nsx CLI --toolchain values
@@ -1015,6 +1022,7 @@ def generate_app(ctx: PipelineContext) -> Path:
     clock = ctx.run_metadata.platform
     perf_mode_symbol = clock.cpu_perf_tier
     perf_mode_mhz = clock.cpu_clock_mhz
+    window_target_ms = _effective_window_target_ms(config)
     # Apollo3/3P reach 96 MHz only through TurboSPOT burst, which NSX never
     # enables (nsx_platform_set_perf_mode is a no-op on AP3).  When the user
     # selects a >48 MHz tier on AP3, the firmware enables burst directly via
@@ -1100,7 +1108,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 clean_warmup=max(1, config.profiling.warmup),
                 clean_iters=max(1, config.profiling.iterations),
                 window_mode=config.profiling.window_mode,
-                window_target_ms=config.profiling.window_target_ms,
+                window_target_ms=window_target_ms,
                 window_min=config.profiling.window_min,
                 window_max=config.profiling.window_max,
                 clean_window_probe=config.profiling.clean_window_probe,
@@ -1154,7 +1162,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 clean_warmup=max(1, config.profiling.warmup),
                 clean_iters=max(1, config.profiling.iterations),
                 window_mode=config.profiling.window_mode,
-                window_target_ms=config.profiling.window_target_ms,
+                window_target_ms=window_target_ms,
                 window_min=config.profiling.window_min,
                 window_max=config.profiling.window_max,
                 clean_window_probe=config.profiling.clean_window_probe,

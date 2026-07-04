@@ -94,11 +94,13 @@ DEFAULT_WARMUP = 5
 # ``iterations`` for the clean pass (historical behaviour).  ``"auto"`` (default)
 # lets the firmware size the gated window at runtime from the measured
 # clean-inference time so short models run more iterations and big models run
-# fewer — filling a consistent ~1 s wall-clock window so the host can reliably
-# bracket it over a polled GPIO sync even under transport contention.
+# fewer — filling a consistent ~1 s wall-clock window for ordinary profiling.
+# External power capture raises this to a longer minimum window so host-side
+# GPIO polling and Joulescope packet alignment have several seconds to settle.
 WINDOW_MODES = ("fixed", "auto")
 DEFAULT_WINDOW_MODE = "auto"
 DEFAULT_WINDOW_TARGET_MS = 1000
+DEFAULT_POWER_WINDOW_TARGET_MS = 5000
 DEFAULT_WINDOW_MIN = 10
 DEFAULT_WINDOW_MAX = 2000
 CLEAN_WINDOW_PROBES = ("infer", "busy_loop")

@@ -14,14 +14,15 @@ from __future__ import annotations
 
 import logging
 
+from ..config import DEFAULT_POWER_WINDOW_TARGET_MS
 from ..errors import PowerError
 from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
 
 # Guard periods for estimated-duration auto-terminate
-_BOOT_SETTLE_S = 4.0  # power-cycle settle + SBL + firmware init
-_SAFETY_MARGIN_S = 3.0  # extra headroom beyond estimated runtime
+_BOOT_SETTLE_S = 8.0  # power-cycle settle + SBL + firmware init
+_SAFETY_MARGIN_S = 6.0  # extra headroom beyond estimated runtime
 
 
 #: Auto window mode warms the clean pass with 3 hardcoded uninstrumented
@@ -75,7 +76,8 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
     profiled_run_s = profiled_inferences * inference_time_s
 
     if profiling.window_mode == "auto":
-        target_s = profiling.window_target_ms / 1000.0
+        target_ms = max(profiling.window_target_ms, DEFAULT_POWER_WINDOW_TARGET_MS)
+        target_s = target_ms / 1000.0
         clean_iters = target_s / inference_time_s if inference_time_s > 0 else profiling.window_min
         clean_iters = max(profiling.window_min, min(profiling.window_max, clean_iters))
         clean_warmup_reps = _AUTO_WINDOW_WARMUP_REPS
