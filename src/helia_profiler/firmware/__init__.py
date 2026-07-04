@@ -19,22 +19,13 @@ import jinja2
 import yaml
 
 from .. import nsx as nsx_cli
-from ..config import DEFAULT_ARENA_SIZE_BYTES, DEFAULT_POWER_WINDOW_TARGET_MS, Transport
-from ..counters import (
-    CounterPass,
-    plan_passes,
-    resolve_counters,
-    resolve_legacy_presets,
-    supported_groups_for_domains,
-    validate_group_selection,
-)
+from ..config import Transport
 from ..engines import EngineType
 from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
 from ..placement import Placement
 from ..platform import get_soc_for_board
-from ..usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
-from .op_resolver import build_resolver_plan
+from .context import FirmwareRenderContext, _PMU_PRESET_MAP, _resolve_pmu_passes
 
 if TYPE_CHECKING:
     from ..config import ProfileConfig
@@ -42,12 +33,6 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("hpx")
 
-
-def _effective_window_target_ms(config: ProfileConfig) -> int:
-    target_ms = config.profiling.window_target_ms
-    if config.power.enabled and config.profiling.window_mode == "auto":
-        target_ms = max(target_ms, DEFAULT_POWER_WINDOW_TARGET_MS)
-    return target_ms
 
 # ---------------------------------------------------------------------------
 # Toolchain mapping: config names → nsx CLI --toolchain values
@@ -472,104 +457,6 @@ def _copy_local_engine_module(dest: Path, source: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# PMU preset mapping (legacy — used only for backward-compat Init() path)
-# ---------------------------------------------------------------------------
-_PMU_PRESET_MAP: dict[str, str] = {
-    "basic_cpu": "NSX_PMU_PRESET_BASIC_CPU",
-    "memory": "NSX_PMU_PRESET_MEMORY",
-    "mve": "NSX_PMU_PRESET_MVE",
-    "ml_default": "NSX_PMU_PRESET_ML_DEFAULT",
-}
-
-
-def _resolve_pmu_passes(config: Any, soc: Any | None = None) -> list[dict[str, Any]]:
-    """Resolve profiling config into firmware pass descriptors.
-
-    If the new ``pmu_counters`` field is set, resolve and plan passes from
-    the counter registry.  Otherwise fall back to legacy preset behaviour.
-
-    Each returned dict has:
-      - ``name``          — pass name for the SWO protocol
-      - ``custom``        — True if using explicit event IDs
-      - ``event_ids``     — list of hex-literal strings (custom only)
-      - ``counter_names`` — human-readable counter names for host labelling
-      - ``num_counters``  — number of counters
-      - ``c_enum``        — C preset enum name (legacy only)
-      - ``group``         — compute-unit group name
-    """
-    profiling = config.profiling
-    if soc is not None:
-        supported_groups = supported_groups_for_domains(soc.profiling_domains)
-        try:
-            if profiling.pmu_counters is not None:
-                validate_group_selection(
-                    profiling.pmu_counters,
-                    supported_groups=supported_groups,
-                )
-            else:
-                validate_group_selection(
-                    resolve_legacy_presets(profiling.pmu_presets),
-                    supported_groups=supported_groups,
-                )
-        except ValueError as exc:
-            raise FirmwareError(
-                str(exc),
-                hint=(
-                    f"Target '{soc.name}' supports PMU groups: "
-                    f"{', '.join(supported_groups) if supported_groups else 'none'}."
-                ),
-            ) from exc
-
-    # --- New path: explicit counter selection ---
-    if profiling.pmu_counters is not None:
-        counters = resolve_counters(profiling.pmu_counters)
-        passes = plan_passes(counters)
-        return [
-            {
-                "name": p.name,
-                "custom": True,
-                "event_ids": [f"0x{c.event_id:04X}" for c in p.counters],
-                "counter_names": [c.name for c in p.counters],
-                "num_counters": len(p.counters),
-                "c_enum": None,
-                "group": p.group,
-            }
-            for p in passes
-        ]
-
-    # --- Legacy path: named presets ---
-    result: list[dict[str, Any]] = []
-    for preset_name in profiling.pmu_presets:
-        c_enum = _PMU_PRESET_MAP.get(preset_name, "NSX_PMU_PRESET_ML_DEFAULT")
-        counters = resolve_counters(resolve_legacy_presets([preset_name]))
-        result.append(
-            {
-                "name": preset_name,
-                "custom": False,
-                "event_ids": [],
-                "counter_names": [c.name for c in counters],
-                "num_counters": len(counters),
-                "c_enum": c_enum,
-                "group": preset_name,
-            }
-        )
-    if not result:
-        counters = resolve_counters(resolve_legacy_presets(["ml_default"]))
-        result = [
-            {
-                "name": "ml_default",
-                "custom": False,
-                "event_ids": [],
-                "counter_names": [c.name for c in counters],
-                "num_counters": len(counters),
-                "c_enum": "NSX_PMU_PRESET_ML_DEFAULT",
-                "group": "ml_default",
-            }
-        ]
-    return result
-
-
-# ---------------------------------------------------------------------------
 # Jinja2 template environment
 # ---------------------------------------------------------------------------
 
@@ -836,12 +723,6 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # Add transport modules when using USB CDC transport
     transport = config.target.transport
-    # Unique USB serial marker for this build, derived from the J-Link probe
-    # serial so the host can match this exact board's CDC device.  None when no
-    # probe serial is known (firmware keeps its default descriptor).
-    usb_serial_marker = usb_marker_serial(
-        ctx.resolved_jlink_serial or config.target.jlink_serial
-    )
     if transport == Transport.USB_CDC:
         module_names = {m.name for m in module_specs}
         for name in _usb_provider_module_names(module_specs, profile):
@@ -946,8 +827,13 @@ def generate_app(ctx: PipelineContext) -> Path:
     # Engine identity flows through the typed EngineArtifacts field.
     # Templates receive the canonical hyphen-form string (StrEnum value).
     engine_type = artifacts.engine_type
-    profiling_backends = list(soc.profiling_backends)
-    has_armv8m_pmu = _soc_has_backend(soc, "armv8m-pmu")
+    render_context = FirmwareRenderContext.from_pipeline_context(
+        ctx,
+        arena_regions=aot_arena_regions,
+    )
+    template_vars = render_context.to_template_vars()
+    profiling_backends = list(render_context.pmu.profiling_backends)
+    has_armv8m_pmu = render_context.pmu.has_armv8m_pmu
 
     # --- nsx.yml ---
     _write_text(
@@ -1005,58 +891,6 @@ def generate_app(ctx: PipelineContext) -> Path:
     if transport == Transport.RTT:
         _copy_segger_rtt(src_dir)
 
-    # PMU preset
-    first_preset = config.profiling.pmu_presets[0] if config.profiling.pmu_presets else "ml_default"
-    pmu_preset_c = _PMU_PRESET_MAP.get(first_preset, "NSX_PMU_PRESET_ML_DEFAULT")
-
-    # Build pass list for multi-pass firmware loop
-    pmu_passes = _resolve_pmu_passes(config, soc)
-
-    # Arena size: use configured value or default 256KB
-    arena_size = config.model.arena_size or DEFAULT_ARENA_SIZE_BYTES
-    resolver_plan = build_resolver_plan(
-        engine_type=engine_type,
-        engine_config=config.engine.config,
-        model_analysis=ctx.model_analysis,
-    )
-    clock = ctx.run_metadata.platform
-    perf_mode_symbol = clock.cpu_perf_tier
-    perf_mode_mhz = clock.cpu_clock_mhz
-    window_target_ms = _effective_window_target_ms(config)
-    # Apollo3/3P reach 96 MHz only through TurboSPOT burst, which NSX never
-    # enables (nsx_platform_set_perf_mode is a no-op on AP3).  When the user
-    # selects a >48 MHz tier on AP3, the firmware enables burst directly via
-    # the AmbiqSuite HAL.  Other families switch via NSX perf mode as usual.
-    # The base clock above which direct HAL burst applies is a clock capability.
-    burst_base_mhz = soc.capabilities.clock.direct_burst_base_mhz
-    apollo3_burst = burst_base_mhz is not None and perf_mode_mhz > burst_base_mhz
-    resource_variable_count = sum(
-        1
-        for layer in (ctx.model_analysis.layers if ctx.model_analysis else ())
-        if layer.op == "VAR_HANDLE"
-    )
-
-    # External power sync
-    sync_gpio_pin = config.power.sync_gpio_pin
-    sync_lockstep = config.power.lockstep
-    state_gpio_pin = config.power.state_gpio_pin
-    go_gpio_pin = config.power.go_gpio_pin
-    cmsis_device_header = soc.cmsis_header
-    # Cache/SSRAM firmware policy, sourced from platform capabilities rather than
-    # a SoC-family string in the templates: the cache-coherent Cortex-M55
-    # (Apollo5) parts maintain the RTT D-cache and power on the shared SSRAM
-    # domain for SRAM-resident arenas.
-    has_dcache = soc.capabilities.memory.has_dcache
-    manages_shared_ssram_power = soc.capabilities.memory.has_shared_ssram_power_domain
-
-    # --- Heartbeat template vars (shared across engines) ---
-    hb = config.target.heartbeat
-    heartbeat_vars = {
-        "heartbeat_enabled": hb.enabled,
-        "heartbeat_every_n_ops": hb.every_n_ops if hb.enabled else 0,
-        "heartbeat_every_ms": hb.every_ms if hb.enabled else 0,
-    }
-
     extreme_mode_safe = arena_region is Placement.TCM and weights_region is Placement.TCM
     if config.profiling.extreme_mode and not extreme_mode_safe:
         log.warning(
@@ -1109,45 +943,7 @@ def generate_app(ctx: PipelineContext) -> Path:
         _write_text(
             src_dir / "main.cc",
             _jinja_env.get_template("main_aot.cc.j2").render(
-                aot_prefix=aot_prefix,
-                aot_op_manifest=ctx.engine_artifacts.aot_op_manifest or [],
-                iterations=config.profiling.iterations,
-                warmup=config.profiling.warmup,
-                clean_warmup=max(1, config.profiling.warmup),
-                clean_iters=max(1, config.profiling.iterations),
-                window_mode=config.profiling.window_mode,
-                window_target_ms=window_target_ms,
-                window_min=config.profiling.window_min,
-                window_max=config.profiling.window_max,
-                clean_window_probe=config.profiling.clean_window_probe,
-                clean_window_trace=config.profiling.clean_window_trace,
-                force_shared_sram=config.profiling.force_shared_sram,
-                pmu_passes=pmu_passes,
-                pmu_pass_names=[p["name"] for p in pmu_passes],
-                power_sync_enabled=power_sync_enabled,
-                sync_gpio_pin=sync_gpio_pin,
-                lockstep=sync_lockstep,
-                state_gpio_pin=state_gpio_pin,
-                go_gpio_pin=go_gpio_pin,
-                cmsis_device_header=cmsis_device_header,
-                has_dcache=has_dcache,
-                manages_shared_ssram_power=manages_shared_ssram_power,
-                transport=transport,
-                usb_serial_marker=usb_serial_marker,
-                usb_serial_product=USB_MARKER_PRODUCT,
-                printf_linkage="static ",
-                extreme_mode=config.profiling.extreme_mode,
-                model_location=config.model.model_location,
-                arena_region=arena_region,
-                weights_region=weights_region,
-                profiling_backends=profiling_backends,
-                has_armv8m_pmu=has_armv8m_pmu,
-                allocate_arenas=artifacts.aot_allocate_arenas,
-                arena_regions=aot_arena_regions,
-                perf_mode_symbol=perf_mode_symbol,
-                perf_mode_mhz=perf_mode_mhz,
-                apollo3_burst=apollo3_burst,
-                **heartbeat_vars,
+                **template_vars,
             ),
         )
     else:
@@ -1164,48 +960,7 @@ def generate_app(ctx: PipelineContext) -> Path:
         _write_text(
             src_dir / "main.cc",
             _jinja_env.get_template("main.cc.j2").render(
-                engine_header=engine_header,
-                arena_size=arena_size,
-                iterations=config.profiling.iterations,
-                warmup=config.profiling.warmup,
-                clean_warmup=max(1, config.profiling.warmup),
-                clean_iters=max(1, config.profiling.iterations),
-                window_mode=config.profiling.window_mode,
-                window_target_ms=window_target_ms,
-                window_min=config.profiling.window_min,
-                window_max=config.profiling.window_max,
-                clean_window_probe=config.profiling.clean_window_probe,
-                clean_window_trace=config.profiling.clean_window_trace,
-                force_shared_sram=config.profiling.force_shared_sram,
-                pmu_passes=pmu_passes,
-                pmu_pass_names=[p["name"] for p in pmu_passes],
-                power_sync_enabled=power_sync_enabled,
-                sync_gpio_pin=sync_gpio_pin,
-                lockstep=sync_lockstep,
-                state_gpio_pin=state_gpio_pin,
-                go_gpio_pin=go_gpio_pin,
-                cmsis_device_header=cmsis_device_header,
-                has_dcache=has_dcache,
-                manages_shared_ssram_power=manages_shared_ssram_power,
-                transport=transport,
-                usb_serial_marker=usb_serial_marker,
-                usb_serial_product=USB_MARKER_PRODUCT,
-                model_location=model_location,
-                arena_region=arena_region,
-                weights_region=weights_region,
-                model_size=model_size,
-                resolver_mode=resolver_plan.mode,
-                resolver_max_ops=resolver_plan.max_ops,
-                resolver_registrations=resolver_plan.registrations,
-                resource_variable_count=resource_variable_count,
-                printf_linkage="",
-                extreme_mode=config.profiling.extreme_mode,
-                profiling_backends=profiling_backends,
-                has_armv8m_pmu=has_armv8m_pmu,
-                perf_mode_symbol=perf_mode_symbol,
-                perf_mode_mhz=perf_mode_mhz,
-                apollo3_burst=apollo3_burst,
-                **heartbeat_vars,
+                **template_vars,
             ),
         )
 
@@ -1213,7 +968,7 @@ def generate_app(ctx: PipelineContext) -> Path:
         _write_text(
             src_dir / "hpx_pmu_profiler.h",
             _jinja_env.get_template("hpx_pmu_profiler.h.j2").render(
-                cmsis_device_header=cmsis_device_header,
+                cmsis_device_header=render_context.pmu.cmsis_device_header,
                 profiling_backends=profiling_backends,
                 has_armv8m_pmu=has_armv8m_pmu,
             ),
