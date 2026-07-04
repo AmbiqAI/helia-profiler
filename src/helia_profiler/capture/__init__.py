@@ -17,14 +17,19 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from ..config import Transport
 from ..errors import CaptureError, PowerError
-from ..placement import Placement
+from ..transport import (
+    HPX_END,
+    HPX_START,
+    BaseCaptureTransport,
+    CaptureArgs,
+    register_transport,
+    resolve_transport,
+)
 from ..usb_identity import usb_marker_serial
-from .transport import HPX_END, HPX_START
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -35,163 +40,57 @@ if TYPE_CHECKING:
 log = logging.getLogger("hpx")
 
 
-@dataclass
-class _TransportReaderArgs:
-    """Common inputs every transport reader needs from ``capture_pmu``.
-
-    Bundled so the transport → reader registry below can dispatch through a
-    single uniform call signature instead of an if/elif ladder that threads
-    a different kwarg subset through each branch.
-    """
-
-    jlink_serial: str | None
-    jlink_device: str
-    keep_debugger_attached: bool
-    overall_timeout_s: float
-    heartbeat_timeout_s: float
-    build_dir: object
-    timing_raw: dict[str, float] = field(default_factory=dict)
-    reset_controller: object | None = None
-
-
-def _read_usb_cdc(ctx: PipelineContext, args: _TransportReaderArgs) -> list[str]:
-    from .usb_reader import capture_usb_output
-
-    return capture_usb_output(
-        jlink_serial=args.jlink_serial,
-        jlink_device=args.jlink_device,
-        usb_port=ctx.config.target.usb_port,
-        usb_marker=usb_marker_serial(args.jlink_serial),
-        keep_attached=args.keep_debugger_attached,
-        timing_out=args.timing_raw,
-        reset_controller=args.reset_controller,
-    )
-
-
-def _read_rtt(ctx: PipelineContext, args: _TransportReaderArgs) -> list[str]:
-    from .rtt_reader import capture_rtt_output
-    from .rtt_symbol import resolve_rtt_control_block_address
-
-    # Recover the linked RTT control block address from the build artifacts
-    # so capture can attach directly and skip the slow SWD discovery sweep.
-    known_block_address = resolve_rtt_control_block_address(
-        args.build_dir, ctx.config.target.toolchain
-    )
-    if known_block_address is not None:
-        log.info(
-            "Using known RTT control block address 0x%08X (skipping host-side scan)",
-            known_block_address,
-        )
-
-    return capture_rtt_output(
-        jlink_serial=args.jlink_serial,
-        jlink_device=args.jlink_device,
-        rtt_scan_ranges=ctx.soc.rtt_scan_ranges,
-        known_block_address=known_block_address,
-        model_path=ctx.config.model.path,
-        weights_region=ctx.weights_region or Placement.MRAM,
-        timeout_s=args.overall_timeout_s,
-        heartbeat_timeout_s=args.heartbeat_timeout_s,
-        timing_out=args.timing_raw,
-        reset_controller=args.reset_controller,
-    )
-
-
-def _read_uart(ctx: PipelineContext, args: _TransportReaderArgs) -> list[str]:
-    from .uart_reader import capture_uart_output
-
-    return capture_uart_output(
-        jlink_serial=args.jlink_serial,
-        jlink_device=args.jlink_device,
-        timeout_s=args.overall_timeout_s,
-        heartbeat_timeout_s=args.heartbeat_timeout_s,
-        keep_attached=args.keep_debugger_attached,
-        timing_out=args.timing_raw,
-        reset_controller=args.reset_controller,
-    )
-
-
-def _read_swo(ctx: PipelineContext, args: _TransportReaderArgs) -> list[str]:
-    from .serial_reader import capture_swo_output
-
-    # SWO baud is derived from the trace clock, so it MUST come from the
-    # resolved platform — never a hardcoded guess.  A wrong assumption here
-    # halves/doubles the ITM baud and yields an undecodable stream (this is
-    # exactly how the Apollo3 96-vs-48 MHz registry bug manifested).  Most
-    # SoCs clock the TPIU from the CPU, but Apollo3 uses a dedicated,
-    # CPU-independent trace clock that does not change with TurboSPOT burst —
-    # so honor swo_trace_clock_mhz when set.
-    cpu_clock_mhz = ctx.run_metadata.platform.cpu_clock_mhz
-    swo_ref_mhz = ctx.soc.swo_trace_clock_mhz or cpu_clock_mhz
-    if swo_ref_mhz <= 0:
-        raise CaptureError(
-            "SWO capture requires a resolved trace clock, but none was set.",
-            hint=(
-                "Stage 1 (resolve_platform) must run before capture so the "
-                "selected target.clock.cpu frequency (or the SoC's fixed SWO "
-                "trace clock) drives the SWO baud rate."
-            ),
-        )
-    cpu_freq_hz = swo_ref_mhz * 1_000_000
-
-    return capture_swo_output(
-        build_dir=args.build_dir,
-        jlink_serial=args.jlink_serial,
-        jlink_device=args.jlink_device,
-        cpu_freq=cpu_freq_hz,
-        timing_out=args.timing_raw,
-        reset_controller=args.reset_controller,
-    )
-
-
 # ---------------------------------------------------------------------------
-# Transport reader registry
+# Backend registry re-exports (see helia_profiler.transport)
 # ---------------------------------------------------------------------------
-# One entry per Transport enum member — the sole dispatch point for "which
-# reader reads this transport".  Adding a transport means registering a
-# reader here; nothing downstream branches on the transport string again.
-
-_TRANSPORT_READERS: dict[
-    Transport, Callable[["PipelineContext", _TransportReaderArgs], list[str]]
-] = {
-    Transport.USB_CDC: _read_usb_cdc,
-    Transport.RTT: _read_rtt,
-    Transport.UART: _read_uart,
-    Transport.SWO: _read_swo,
-}
+# The transport dispatch table moved to the ``transport`` package as a
+# ``CaptureTransport`` backend registry (WP5).  ``register_transport`` /
+# ``resolve_transport`` are re-exported above.  The two functions below are
+# DEPRECATED reader-level shims kept so pre-WP5 callers keep working.
 
 
-def register_transport_reader(
-    transport: Transport,
-    reader: Callable[["PipelineContext", _TransportReaderArgs], list[str]],
-) -> None:
-    """Register (or override) the reader used for ``transport``.
+class _ReaderBackend(BaseCaptureTransport):
+    """DEPRECATED adapter wrapping an old ``(ctx, args) -> list[str]`` reader."""
 
-    Exposed mainly for tests that need to stub a transport's reader without
-    monkeypatching the underlying module.
+    def __init__(self, transport: Transport, reader) -> None:
+        super().__init__()
+        self.transport = transport
+        self._reader = reader
+
+    def collect(self, ctx) -> list[str]:
+        return self._reader(ctx, self._args)
+
+
+def register_transport_reader(transport: Transport, reader) -> None:
+    """DEPRECATED: register an old-style ``(ctx, args) -> list[str]`` reader.
+
+    Prefer :func:`helia_profiler.transport.register_transport` with a
+    :class:`~helia_profiler.transport.CaptureTransport` backend.  This wraps the
+    reader in an adapter and registers it with the new backend registry.
     """
-    _TRANSPORT_READERS[transport] = reader
+    register_transport(
+        transport, lambda: _ReaderBackend(Transport(transport), reader)
+    )
 
 
-def resolve_transport_reader(
-    transport: Transport,
-) -> Callable[["PipelineContext", _TransportReaderArgs], list[str]]:
-    """Look up the reader registered for ``transport``.
+def resolve_transport_reader(transport: Transport):
+    """DEPRECATED: return a ``(ctx, args) -> list[str]`` reader for ``transport``.
 
-    Raises :class:`CaptureError` if the transport has no registered reader —
-    this should only happen if a new ``Transport`` member is added without a
-    matching reader registration.
+    Prefer :func:`helia_profiler.transport.resolve_transport`.  This drives the
+    resolved backend's ``prepare``/``start``/``collect``/``close`` lifecycle
+    behind the old single-call reader signature.
     """
-    try:
-        return _TRANSPORT_READERS[Transport(transport)]
-    except (KeyError, ValueError) as exc:
-        raise CaptureError(
-            f"Unknown capture transport '{transport}'",
-            hint=(
-                "Available transports: "
-                f"{', '.join(sorted(t.value for t in _TRANSPORT_READERS))}"
-            ),
-        ) from exc
+    backend = resolve_transport(transport)
+
+    def _reader(ctx, args):
+        backend.prepare(ctx, args)
+        backend.start(ctx)
+        try:
+            return backend.collect(ctx)
+        finally:
+            backend.close()
+
+    return _reader
 
 
 def capture_pmu(ctx: PipelineContext) -> PmuResult:
@@ -228,8 +127,8 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     build_dir = ctx.build_dir
     timing_raw: dict[str, float] = {}
 
-    reader = resolve_transport_reader(transport)
-    reader_args = _TransportReaderArgs(
+    backend = resolve_transport(transport)
+    capture_args = CaptureArgs(
         jlink_serial=jlink_serial,
         jlink_device=jlink_device,
         keep_debugger_attached=keep_debugger_attached,
@@ -239,7 +138,12 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         timing_raw=timing_raw,
         reset_controller=ctx.reset_controller,
     )
-    lines = reader(ctx, reader_args)
+    backend.prepare(ctx, capture_args)
+    backend.start(ctx)
+    try:
+        lines = backend.collect(ctx)
+    finally:
+        backend.close()
     if not lines:
         raise CaptureError(
             f"No data captured via {transport} transport",
