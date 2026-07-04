@@ -8,7 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from ..results import RunMetadata
+from ..results import FirmwareMeta, RunMetadata
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -16,10 +16,8 @@ if TYPE_CHECKING:
 log = logging.getLogger("hpx")
 
 
-def _firmware_meta_to_dict(meta: Any) -> dict[str, Any]:
+def _firmware_meta_to_dict(meta: FirmwareMeta) -> dict[str, Any]:
     """Convert FirmwareMeta to a JSON-safe dict, dropping None values."""
-    from ..results import FirmwareMeta
-
     if isinstance(meta, FirmwareMeta):
         return {k: v for k, v in asdict(meta).items() if v is not None}
     return {}

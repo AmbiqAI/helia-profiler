@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
+    from ..results import MemoryPlan
 
 log = logging.getLogger("hpx")
 
@@ -37,7 +38,7 @@ _CACHE_COUNTERS = (
 )
 
 
-def _serialise_memory_plan(plan: Any) -> dict[str, Any]:
+def _serialise_memory_plan(plan: MemoryPlan) -> dict[str, Any]:
     """Serialise a ``MemoryPlan`` into a JSON-friendly dict."""
     return {
         "engine": plan.engine,

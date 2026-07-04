@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ..power.base import PowerResult
+    from ..power.base import PowerResult, PowerSummary
 
 log = logging.getLogger("hpx")
 
 
-def _power_summary_to_dict(summary: Any) -> dict[str, Any]:
+def _power_summary_to_dict(summary: PowerSummary) -> dict[str, Any]:
     return {
         "avg_current_a": summary.avg_current_a,
         "avg_power_w": summary.avg_power_w,
