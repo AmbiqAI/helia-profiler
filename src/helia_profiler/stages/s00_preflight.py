@@ -31,6 +31,7 @@ import shutil
 from importlib.util import find_spec
 from pathlib import Path
 
+from ..config import Transport
 from ..counters import (
     supported_groups_for_domains,
     validate_group_selection,
@@ -178,7 +179,7 @@ def _check_runtime_split_locations(cfg) -> None:
         cfg.model.model_location == Placement.PSRAM or runtime_weights == Placement.PSRAM
     )
 
-    if weights_in_psram and cfg.target.transport != "rtt":
+    if weights_in_psram and cfg.target.transport != Transport.RTT:
         raise ConfigError(
             "PSRAM model weights require target.transport='rtt'.",
             hint=(
@@ -248,7 +249,7 @@ def _check_pmu_selection(cfg) -> None:
 
 
 def _check_transport_support(cfg) -> None:
-    if cfg.target.transport != "usb_cdc":
+    if cfg.target.transport != Transport.USB_CDC:
         return
     try:
         soc = get_soc_for_board(cfg.target.board, registry=cfg.platform_registry)
@@ -286,7 +287,7 @@ def _check_output_dir(out_dir: Path) -> None:
         ) from exc
 
 
-def _check_host_tools(transport: str, toolchain: str) -> None:
+def _check_host_tools(transport: Transport, toolchain: str) -> None:
     required: list[tuple[str, str]] = [
         ("cmake", "CMake >= 3.24 (brew install cmake / apt install cmake)"),
         ("ninja", "Ninja build system (brew install ninja / apt install ninja-build)"),
@@ -309,7 +310,7 @@ def _check_host_tools(transport: str, toolchain: str) -> None:
         )
 
     # Transport-specific.
-    if transport in ("rtt", "swo", "usb_cdc", "uart"):
+    if transport in set(Transport):
         required.append(
             ("JLinkExe", "SEGGER J-Link commander (https://www.segger.com/downloads/jlink/)"),
         )
@@ -336,7 +337,7 @@ def _check_host_tools(transport: str, toolchain: str) -> None:
             hint="Install helia-profiler with its runtime dependencies so the bundled neuralspotx API is available, then re-run 'hpx doctor'.",
         )
 
-    if transport in ("rtt", "swo") and find_spec("pylink") is None:
+    if transport in (Transport.RTT, Transport.SWO) and find_spec("pylink") is None:
         raise ConfigError(
             f"Python package 'pylink' is required for {transport.upper()} transport.",
             hint="Install pylink-square, then re-run 'hpx doctor'.",

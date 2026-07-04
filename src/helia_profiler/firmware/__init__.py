@@ -19,7 +19,7 @@ import jinja2
 import yaml
 
 from .. import nsx as nsx_cli
-from ..config import DEFAULT_ARENA_SIZE_BYTES, DEFAULT_POWER_WINDOW_TARGET_MS
+from ..config import DEFAULT_ARENA_SIZE_BYTES, DEFAULT_POWER_WINDOW_TARGET_MS, Transport
 from ..counters import (
     CounterPass,
     plan_passes,
@@ -86,11 +86,11 @@ def _nsx_toolchain(toolchain: str) -> str | None:
     return nsx_tc if nsx_tc != "gcc" else None
 
 
-def _rtt_buffer_size_up(toolchain: str, transport: str, configured_size: int | None) -> int:
+def _rtt_buffer_size_up(toolchain: str, transport: Transport, configured_size: int | None) -> int:
     """Return the compile-time SEGGER RTT up-buffer size for generated apps."""
     if configured_size is not None:
         return configured_size
-    if transport == "rtt" and toolchain == "atfe":
+    if transport == Transport.RTT and toolchain == "atfe":
         return _ATFE_RTT_BUFFER_SIZE_UP
     return _DEFAULT_RTT_BUFFER_SIZE_UP
 
@@ -842,7 +842,7 @@ def generate_app(ctx: PipelineContext) -> Path:
     usb_serial_marker = usb_marker_serial(
         ctx.resolved_jlink_serial or config.target.jlink_serial
     )
-    if transport == "usb_cdc":
+    if transport == Transport.USB_CDC:
         module_names = {m.name for m in module_specs}
         for name in _usb_provider_module_names(module_specs, profile):
             if name not in module_names:
@@ -1002,7 +1002,7 @@ def generate_app(ctx: PipelineContext) -> Path:
     src_dir.mkdir(parents=True, exist_ok=True)
 
     # --- Copy SEGGER RTT source when using RTT transport ---
-    if transport == "rtt":
+    if transport == Transport.RTT:
         _copy_segger_rtt(src_dir)
 
     # PMU preset
