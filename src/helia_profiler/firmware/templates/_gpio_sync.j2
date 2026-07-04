@@ -82,6 +82,12 @@ static inline void hpx_sync_ready(void) {
     }
 }
 
+static inline void hpx_sync_not_ready(void) {
+    if constexpr (kSyncLockstep) {
+        hpx_pin_set(kStateGpioPin, false);
+    }
+}
+
 static inline void hpx_sync_wait_go(void) {
     if constexpr (kSyncLockstep) {
         // Bounded wait: power capture drives GO within ms, but non-power passes
@@ -89,6 +95,7 @@ static inline void hpx_sync_wait_go(void) {
         for (uint32_t i = 0; i < 3000U && !hpx_pin_get(kGoGpioPin); i++) {
             nsx_delay_us(1000U);
         }
+        hpx_sync_not_ready();
     }
 }
 
@@ -109,6 +116,7 @@ static inline void hpx_sync_fault(uint32_t code) {
 {% else %}
 static inline void hpx_sync_init(void) {}
 static inline void hpx_sync_ready(void) {}
+static inline void hpx_sync_not_ready(void) {}
 static inline void hpx_sync_wait_go(void) {}
 static inline void hpx_sync_window_begin(void) {}
 static inline void hpx_sync_window_end(void) {}

@@ -21,6 +21,7 @@ import contextlib
 import io
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -57,6 +58,10 @@ class CaseResult:
     model_id: str
     board: str
     power: bool
+    toolchain: str
+    transport: str
+    memory: str
+    jlink_serial: str | None = None
 
     # Metrics — populated on success
     layers: int | None = None
@@ -70,6 +75,7 @@ class CaseResult:
     output_dir: str | None = None
     stdout_tail: str | None = None
     stderr_tail: str | None = None
+    log_path: str | None = None
     error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -119,13 +125,15 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
         "model": {
             "path": str((repo_root / case.model.fixture_path).resolve()),
             "arena_size": case.model.arena_size,
+            "model_location": case.memory.value,
         },
         "engine": {
             "type": case.engine.value,
         },
         "target": {
             "board": case.board.id,
-            "toolchain": "arm-none-eabi-gcc",
+            "toolchain": case.toolchain.value,
+            "transport": case.transport.value,
         },
         "profiling": {
             "pmu_presets": ["basic_cpu"],
@@ -152,6 +160,9 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
                 "io_voltage": 1.8,
             }
         )
+
+    if case.jlink_serial:
+        cfg["target"]["jlink_serial"] = case.jlink_serial
 
     if case.engine is EngineType.HELIA_AOT:
         # Point heliaAOT at an explicit or nearby ns-cmsis-nn checkout when one
@@ -342,6 +353,10 @@ def run_case(
                 model_id=case.model.id,
                 board=case.board.id,
                 power=case.power,
+                toolchain=case.toolchain.value,
+                transport=case.transport.value,
+                memory=case.memory.value,
+                jlink_serial=case.jlink_serial,
                 output_dir=str(case_dir),
                 error=f"timeout after {timeout_s:.0f}s",
                 stdout_tail=(exc.stdout or "")[-2000:] if exc.stdout else None,
@@ -366,6 +381,23 @@ def run_case(
     (case_dir / "hpx_stdout.log").write_text(proc.stdout or "")
     (case_dir / "hpx_stderr.log").write_text(proc.stderr or "")
 
+    # Always persist the full child output (final attempt) for diagnostics.
+    log_path: str | None = None
+    log_file = case_dir / "hpx_profile.log"
+    try:
+        log_file.write_text(
+            f"$ {shlex.join(cmd)}\n"
+            "\n"
+            "--- stdout ---\n"
+            f"{proc.stdout or ''}\n"
+            "\n"
+            "--- stderr ---\n"
+            f"{proc.stderr or ''}\n"
+        )
+        log_path = str(log_file)
+    except OSError:
+        pass
+
     if proc.returncode != 0:
         return CaseResult(
             case_id=case.case_id,
@@ -375,10 +407,15 @@ def run_case(
             model_id=case.model.id,
             board=case.board.id,
             power=case.power,
+            toolchain=case.toolchain.value,
+            transport=case.transport.value,
+            memory=case.memory.value,
+            jlink_serial=case.jlink_serial,
             output_dir=str(case_dir),
             error=f"hpx profile exited {proc.returncode}",
             stdout_tail=stdout_tail,
             stderr_tail=stderr_tail,
+            log_path=log_path,
         )
 
     # Parse artifacts.
@@ -390,9 +427,14 @@ def run_case(
         model_id=case.model.id,
         board=case.board.id,
         power=case.power,
+        toolchain=case.toolchain.value,
+        transport=case.transport.value,
+        memory=case.memory.value,
+        jlink_serial=case.jlink_serial,
         output_dir=str(case_dir),
         stdout_tail=stdout_tail,
         stderr_tail=stderr_tail,
+        log_path=log_path,
     )
 
     summary_path = case_dir / "summary.json"

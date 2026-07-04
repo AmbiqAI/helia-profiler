@@ -20,6 +20,7 @@ from typing import Any
 
 from ..errors import PowerError
 from .base import GatedPowerWindow, PowerMode, PowerResult, PowerSample, PowerSummary
+from .diagnostics import GateTransitionTiming, classify_gate_failure
 from .sync import DeviceState, NullSyncController, SyncController, SyncWiring
 
 log = logging.getLogger("hpx")
@@ -489,6 +490,9 @@ class JoulescopeDriver:
         poll_samples: list[tuple[int, int]] = []
         bit = 1 << sync_input_index
         windows_done = 0
+        first_high_at: float | None = None
+        first_low_after_high_at: float | None = None
+        go_release_at: float | None = None
 
         def _on_stats(_topic: str, value: Any) -> None:
             if isinstance(value, dict):
@@ -521,7 +525,7 @@ class JoulescopeDriver:
             fr_volt.append(np.asarray(value["data"], dtype=np.float32).copy())
 
         def _poller() -> None:
-            nonlocal windows_done
+            nonlocal first_high_at, first_low_after_high_at, windows_done
             prev_level = 0
             high_seen = False
             complete_at: float | None = None
@@ -537,7 +541,11 @@ class JoulescopeDriver:
                     poll_samples.append((time64.now(), level))
                     if level and not prev_level:
                         high_seen = True
+                        if first_high_at is None:
+                            first_high_at = time.monotonic()
                     elif prev_level and not level and high_seen:
+                        if first_low_after_high_at is None:
+                            first_low_after_high_at = time.monotonic()
                         windows_done += 1
                         if windows_done >= min_high_windows and complete_at is None:
                             complete_at = time.monotonic()
@@ -581,6 +589,7 @@ class JoulescopeDriver:
                 if on_started is not None:
                     try:
                         on_started()
+                        go_release_at = time.monotonic()
                     except Exception:
                         log.warning("on_started hook failed", exc_info=True)
                 # Block until the poller early-stops or the safety bound elapses.
@@ -614,15 +623,11 @@ class JoulescopeDriver:
                 io_voltage=io_voltage,
             )
             if not windows:
-                raise PowerError(
-                    "No GPIO-high windows detected during Joulescope gated capture",
-                    hint=(
-                        "Check the sync wiring between the target GPIO and Joulescope INPUT"
-                        f"{sync_input_index}, confirm the firmware enabled power sync, and "
-                        "ensure the clean window contains >=1 stat packet at "
-                        f"stats_rate_hz={stats_rate_hz}."
-                    ),
+                failure = classify_gate_failure(
+                    saw_gate_rise=first_high_at is not None,
+                    duration_s=duration_s,
                 )
+                raise PowerError(failure.message, hint=failure.hint)
 
             captured_s = time.monotonic() - capture_start
             metadata: dict[str, Any] = {
@@ -641,6 +646,26 @@ class JoulescopeDriver:
                 "capture_window_s": round(captured_s, 4),
                 "capture_safety_bound_s": duration_s,
             }
+            gate_timing = GateTransitionTiming(
+                capture_to_gate_rise_s=(
+                    round(first_high_at - capture_start, 6)
+                    if first_high_at is not None
+                    else None
+                ),
+                capture_to_gate_fall_s=(
+                    round(first_low_after_high_at - capture_start, 6)
+                    if first_low_after_high_at is not None
+                    else None
+                ),
+                go_release_to_gate_rise_s=(
+                    round(first_high_at - go_release_at, 6)
+                    if go_release_at is not None and first_high_at is not None
+                    else None
+                ),
+            )
+            sync_timing = gate_timing.to_metadata()
+            if sync_timing:
+                metadata["sync_timing_s"] = sync_timing
             if clean_infer_count is not None:
                 metadata["clean_infer_count"] = clean_infer_count
             if fr_xcheck:

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from helia_profiler.config import load_config
 from helia_profiler.engines.helia_aot import (
+    _EXPECTED_PRAGMA_SUFFIXES,
     _resolve_aot_placement_intent,
     _resolve_aot_tensor_rulesets,
 )
@@ -37,7 +38,10 @@ def _by_kind(rulesets):
 class TestPlacementIntent:
     def test_auto_returns_none(self):
         soc = get_soc_for_board("apollo4p_blue_kxr_evb")
-        assert _resolve_aot_placement_intent(_cfg("apollo4p_blue_kxr_evb", "auto"), soc) is None
+        assert _resolve_aot_placement_intent(_cfg("apollo4p_blue_kxr_evb", "auto"), soc) == (
+            Placement.TCM,
+            Placement.MRAM,
+        )
 
     def test_auto_with_aot_args_stays_planner_controlled(self):
         soc = get_soc_for_board("apollo4p_blue_kxr_evb")
@@ -46,15 +50,18 @@ class TestPlacementIntent:
             "auto",
             aot_args={"memory": {"tensors": [{"type": "scratch", "attributes": {"memory": "sram"}}]}},
         )
-        assert _resolve_aot_placement_intent(cfg, soc) is None
+        assert _resolve_aot_placement_intent(cfg, soc) == (Placement.TCM, Placement.MRAM)
 
 
 class TestRulesetsWithDtcm:
     board = "apollo4p_blue_kxr_evb"
 
-    def test_auto_no_rulesets(self):
+    def test_auto_uses_profiler_default_rulesets(self):
         soc = get_soc_for_board(self.board)
-        assert _resolve_aot_tensor_rulesets(_cfg(self.board, "auto"), soc) == []
+        kinds = _by_kind(_resolve_aot_tensor_rulesets(_cfg(self.board, "auto"), soc))
+        assert kinds["scratch"] == {"memory": "dtcm"}
+        assert kinds["persistent"] == {"memory": "dtcm"}
+        assert kinds["constant"] == {"memory": "mram"}
 
     def test_tcm_pins_all_three_to_dtcm(self):
         soc = get_soc_for_board(self.board)
@@ -120,3 +127,9 @@ class TestLegacyPresets:
         assert kinds["scratch"] == {"memory": "sram"}
         assert kinds["persistent"] == {"memory": "sram"}
         assert kinds["constant"] == {"memory": "mram", "constant_destination_memory": "sram"}
+
+
+def test_expected_pragma_suffixes_track_current_heliaaot_platform_header():
+    assert "PUT_IN_DRAM" in _EXPECTED_PRAGMA_SUFFIXES
+    assert "PUT_IN_DRAM_INIT" in _EXPECTED_PRAGMA_SUFFIXES
+    assert "PUT_IN_ITCM_INIT" in _EXPECTED_PRAGMA_SUFFIXES

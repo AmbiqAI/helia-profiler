@@ -694,12 +694,16 @@ int main(void) {
         // g_profiler_enabled=false only gates software instrumentation, it
         // never touches this hardware.  AutoDeploy's power firmware never
         // calls any PMU code, so it never powers this domain at all.
-        // Releasing both for the gated/clean window measured a real,
-        // reproducible ~5% power/energy reduction on AP510 KWS
-        // (2026-07-03) — restored immediately after so the per-layer PMU
-        // passes below still work.
+    // Releasing the PMU counters for the gated/clean window still avoids
+    // PMU traffic during the measurement. Keep the debug domain powered
+    // for the normal inference probe, though: DWT->CYCCNT lives there on
+    // AP510, and gating it off freezes the clean-window cycle reads at
+    // zero.  The fully gated path remains available via the busy_loop
+    // probe below, which never samples DWT inside the measured window.
         nsx_ambiq_pmu_disable();
+{% if clean_window_probe | default("infer") == "busy_loop" %}
         am_hal_debug_disable();
+{% endif %}
 {% endif %}
         // model_operator_cb() is a no-op during this window (guarded by
         // g_profiler_enabled), but the AOT runtime still dispatches it via
@@ -736,7 +740,9 @@ int main(void) {
         {{ aot_prefix }}_model_ctx.callback = model_operator_cb;
 {% if has_armv8m_pmu %}
         // Restore PMU/debug state for the instrumented per-layer passes below.
+{% if clean_window_probe | default("infer") == "busy_loop" %}
         am_hal_debug_enable();
+{% endif %}
         nsx_ambiq_pmu_enable();
 {% endif %}
 {% if transport == "usb_cdc" %}

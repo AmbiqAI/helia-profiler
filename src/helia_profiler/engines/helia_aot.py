@@ -93,6 +93,8 @@ _BOARD_TO_AOT_PLATFORM: dict[str, str] = {
 _EXPECTED_PRAGMA_SUFFIXES = (
     "PUT_IN_DTCM",
     "PUT_IN_DTCM_INIT",
+    "PUT_IN_DRAM",
+    "PUT_IN_DRAM_INIT",
     "PUT_IN_SRAM",
     "PUT_IN_SRAM_INIT",
     "PUT_IN_MRAM",
@@ -100,6 +102,7 @@ _EXPECTED_PRAGMA_SUFFIXES = (
     "PUT_IN_PSRAM",
     "PUT_IN_PSRAM_INIT",
     "PUT_IN_ITCM",
+    "PUT_IN_ITCM_INIT",
 )
 
 
@@ -334,14 +337,15 @@ def _resolve_aot_placement_intent(
     """Resolve ``(arena, weights)`` placement for AOT from the profiler config.
 
     ``arena`` covers the read-write scratch + persistent tensors; ``weights``
-    covers the read-only constants.  Returns ``None`` for ``model_location=auto``
-    so the AOT greedy planner keeps full freedom.
+    covers the read-only constants.
     """
     location = config.model.model_location
     has_tcm = bool(soc and soc.memory.dtcm_kb > 0)
 
     if location == ModelLocation.AUTO:
-        return None
+        arena = Placement.TCM if has_tcm else Placement.SRAM
+        weights = Placement.MRAM
+        return arena, weights
 
     if location == ModelLocation.TCM:
         arena = weights = Placement.TCM
@@ -361,12 +365,8 @@ def _resolve_aot_tensor_rulesets(
     config: ProfileConfig, soc: SocDef | None
 ) -> list[dict[str, Any]]:
     """Build heliaAOT per-kind attribute rulesets (constant/persistent/scratch).
-
-    Returns an empty list when the placement is ``auto`` (planner decides).
     """
     intent = _resolve_aot_placement_intent(config, soc)
-    if intent is None:
-        return []
     arena, weights = intent
     arena_mem = _PLACEMENT_TO_AOT_MEMTYPE[arena]
 
@@ -838,90 +838,122 @@ def _arena_region_id_lookup(codegen_ctx: Any) -> dict[tuple[str, str, str], int]
 def _extract_memory_plan(codegen_ctx: Any) -> MemoryPlan | None:
     """Build a ``MemoryPlan`` from the heliaAOT ``CodeGenContext``.
 
-    The AOT planner attaches ``codegen_ctx.memory_plan`` (itself a
-    ``helia_aot.memory.defines.MemoryPlan``) containing:
+    The AOT render plan is the source of truth for runtime memory: generated C
+    allocates one buffer per scratch / persistent / constant arena.  The lower
+    level ``memory_plan.tensor_allocs`` entries describe tensor assignments into
+    those shared arenas and must not be summed as independent RAM usage.
 
-    * ``arena_usages`` — dict[MemoryType, ArenaUsage] with total_size / used
-    * ``tensor_allocs`` — dict[str, TensorAllocation] with memory + size
-
-    We aggregate tensor allocations per region into named ``MemoryConsumer``
-    entries (arena + weights) so the profiler's plan_memory stage and
-    report can show "what lives where" without the user having to grok
-    the AOT internals.
-
-    Returns ``None`` if the context does not expose a memory plan (older
-    heliaAOT versions, or a mock context in tests).
+    Returns ``None`` when the context does not expose both a memory plan and a
+    render plan.  In that case HPX should avoid presenting a precise AOT memory
+    accounting table rather than falling back to misleading tensor sums.
     """
     aot_plan = getattr(codegen_ctx, "memory_plan", None)
-    if aot_plan is None:
+    render_plan = getattr(codegen_ctx, "render_plan", None)
+    if aot_plan is None or render_plan is None:
         return None
 
     arena_usages = getattr(aot_plan, "arena_usages", None) or {}
-    tensor_allocs = getattr(aot_plan, "tensor_allocs", None) or {}
+    return _extract_memory_plan_from_render_plan(
+        render_plan,
+        arena_usages,
+    )
 
-    # Accumulate per-region weight bytes from constant tensors.
-    region_weights: dict[str, int] = {}
-    region_weight_count: dict[str, int] = {}
+
+def _extract_memory_plan_from_render_plan(
+    render_plan: Any,
+    arena_usages: dict[Any, Any],
+) -> MemoryPlan | None:
+    """Build a MemoryPlan from the AOT render plan's concrete arenas.
+
+    ``memory_plan.tensor_allocs`` lists every tensor assignment, including
+    transient tensors that share arena storage.  Summing those records inflates
+    runtime RAM.  The render plan is the source of truth for what generated C
+    actually allocates: one buffer per scratch/persistent/constant arena.
+    """
+
+    buckets: dict[str, list[MemoryConsumer]] = {}
     total_weights = 0
-    for alloc in tensor_allocs.values():
-        mem = getattr(alloc, "memory", None)
-        size = int(getattr(alloc, "size", 0))
-        if mem is None or size <= 0:
-            continue
-        # heliaAOT uses MemoryType (str enum) — str() yields "MRAM" etc.
-        key = str(mem).upper()
-        # Heuristic: constants live in read-only regions (MRAM/PSRAM).
-        # If we cannot tell, attribute everything to "arena" below.
-        # We still record the raw per-region sum here for reporting.
-        region_weights[key] = region_weights.get(key, 0) + size
-        region_weight_count[key] = region_weight_count.get(key, 0) + 1
-        total_weights += size
 
-    regions: list[MemoryRegionUsage] = []
-    for mem_type, usage in arena_usages.items():
-        key = str(mem_type).upper()
-        total = int(getattr(usage, "total_size", 0))
-        used = int(getattr(usage, "used", 0))
-        consumers: list[MemoryConsumer] = []
-        if used > 0:
-            consumers.append(
+    for arena_list_name in (
+        "scratch_arenas",
+        "persistent_arenas",
+        "constant_arenas",
+    ):
+        for arena in getattr(render_plan, arena_list_name, ()):
+            runtime_key = _aot_memory_region_key(getattr(arena, "memory", None))
+            if runtime_key is None:
+                continue
+
+            size = int(getattr(arena, "size", 0))
+            if size <= 0:
+                continue
+
+            role = str(getattr(arena, "role", arena_list_name.removesuffix("_arenas"))).lower()
+            region_id = int(getattr(arena, "region_id", len(buckets)))
+            kind = "weights" if role == ArenaRole.CONSTANT.value else "arena"
+            buckets.setdefault(runtime_key, []).append(
                 MemoryConsumer(
-                    name=f"{key.lower()}_arena",
-                    size=used,
-                    kind="arena",
+                    name=f"{runtime_key.lower()}_{role}_arena_{region_id}",
+                    size=size,
+                    kind=kind,
                 )
             )
-        # Constant tensors are reported separately from the scratch/
-        # persistent arena since the AOT arena_usages total/used may not
-        # include them. This applies regardless of which region the
-        # constants landed in — a custom aot_args.memory config can place
-        # constants directly in DTCM/SRAM (not just the traditional MRAM/
-        # PSRAM read-only regions), and those bytes must still be counted
-        # here or they'd silently vanish from the reported "used" total.
-        w = region_weights.get(key, 0)
-        if w > 0:
-            consumers.append(
-                MemoryConsumer(
-                    name=f"{region_weight_count.get(key, 0)}_tensors",
-                    size=w,
-                    kind="weights",
+            if role == ArenaRole.CONSTANT.value:
+                total_weights += size
+                source_key = _aot_memory_region_key(
+                    getattr(arena, "source_memory", None)
                 )
-            )
-        regions.append(
-            MemoryRegionUsage(
-                region=key,
-                capacity=total,
-                used=sum(c.size for c in consumers),
-                consumers=tuple(consumers),
-            )
+                if source_key is not None and source_key != runtime_key:
+                    buckets.setdefault(source_key, []).append(
+                        MemoryConsumer(
+                            name=f"{source_key.lower()}_{role}_source_{region_id}",
+                            size=size,
+                            kind="weights",
+                        )
+                    )
+
+    if not buckets:
+        return None
+
+    capacities = {
+        key: int(getattr(usage, "total_size", 0))
+        for mem_type, usage in arena_usages.items()
+        if (key := _aot_memory_region_key(mem_type)) is not None
+    }
+    ordered_keys = ["MRAM", "SRAM", "DTCM", "ITCM", "PSRAM"]
+    keys = [key for key in ordered_keys if key in buckets or key in capacities]
+    keys.extend(sorted((set(buckets) | set(capacities)) - set(keys)))
+
+    regions = tuple(
+        MemoryRegionUsage(
+            region=key,
+            capacity=capacities.get(key, 0),
+            used=sum(c.size for c in buckets.get(key, ())),
+            consumers=tuple(buckets.get(key, ())),
         )
+        for key in keys
+    )
 
     return MemoryPlan(
         engine=EngineType.HELIA_AOT,
-        regions=tuple(regions),
+        regions=regions,
         model_weight_bytes=total_weights,
         has_overflow=any(r.overflow for r in regions),
     )
+
+
+def _aot_memory_region_key(memory: Any) -> str | None:
+    if memory is None:
+        return None
+    key = str(memory).upper()
+    if key == "TCM":
+        return "DTCM"
+    if key == "DRAM":
+        return "SRAM"
+    if key in {"DTCM", "ITCM", "SRAM", "MRAM", "PSRAM"}:
+        return key
+    log.warning("AOT planner emitted unrecognised memory %r — skipping", memory)
+    return None
 
 
 # ---------------------------------------------------------------------------

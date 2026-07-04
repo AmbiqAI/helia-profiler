@@ -29,7 +29,7 @@ from .platform import CoreArch
 
 log = logging.getLogger("hpx")
 
-# --- Apollo5 RSTGEN software power-on-initialization (SWPOI) reset ---------
+# --- RSTGEN software power-on-initialization (SWPOI) reset ------------------
 #
 # ``AM_HAL_RESET_CONTROL_SWPOI`` (am_hal_reset.h): "power on initialization,
 # which results in a reset of all blocks except for registers in clock gen,
@@ -47,6 +47,8 @@ log = logging.getLogger("hpx")
 # failed memory write / non-zero exit code — this is the expected symptom
 # of the reset succeeding, not evidence that it did not happen.  neuralSPOT's
 # own tooling relies on this (it discards the return code of `make reset`).
+# HPX defaults this to Apollo5-family power capture only; other SoCs must opt in
+# through an explicit reset strategy while their board behavior is validated.
 _RSTGEN_SWPOI_ADDR = 0x40000004
 _RSTGEN_SWPOI_VALUE = 0x1B
 
@@ -200,15 +202,21 @@ def resolve_probe_serial(
         raise ConfigError(
             f"{len(matches)} J-Link probes match the requested target.",
             hint=(
-                "Pass --jlink-serial to disambiguate. Matching probes: "
-                f"{_format_probe_matches(matches)}."
+                "Multiple attached probes report the same core, so it can't be "
+                "auto-selected. Disambiguate with: "
+                "`hpx profile --jlink-serial <serial>` (direct profile runs) or "
+                "`hpx validate --jlink-serials <board>=<serial>` (validation suite). "
+                "Run `hpx probes match --board <board>` to find the right serial "
+                f"for a specific board. Matching probes: {_format_probe_matches(matches)}."
             ),
         )
 
     raise ConfigError(
         "Could not find a connected J-Link probe for the requested target.",
         hint=(
-            f"Expected a {expected_core.value} target. Connected probes: "
+            f"Expected a {expected_core.value} target. Run `hpx probes list` to see "
+            "attached probes and `hpx probes match --board <board>` to check "
+            "compatibility. Connected probes: "
             f"{_format_probe_matches([_inspect_probe_target(probe, device=device) for probe in probes])}."
         ),
     )
@@ -245,6 +253,16 @@ def _inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
 
     detected_core = _parse_detected_core((result.stdout or "") + "\n" + (result.stderr or ""))
     return JLinkProbeMatch(probe=probe, detected_core=detected_core)
+
+
+def inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
+    """Inspect the core visible behind a connected probe for *device*.
+
+    This public wrapper exists for diagnostic CLI commands.  It keeps the raw
+    ``JLinkExe`` interaction centralized in this module while letting users and
+    agents ask HPX which target a probe can actually reach.
+    """
+    return _inspect_probe_target(probe, device=device)
 
 
 def _parse_detected_core(output: str) -> CoreArch | None:
@@ -386,7 +404,7 @@ def reset_target_poi(
     interface: str = "SWD",
     timeout_s: int = _DEFAULT_TIMEOUT_S,
 ) -> None:
-    """Trigger an Apollo5 SWPOI (software power-on-initialization) reset.
+    """Trigger an SWPOI (software power-on-initialization) reset.
 
     This is a *deeper* reset than :func:`reset_target`: it additionally
     resets PMU/power-management registers left untouched by a debug-level
@@ -395,16 +413,17 @@ def reset_target_poi(
     reboots the CPU, so the firmware relaunches exactly as it does after
     :func:`reset_target` — this can replace that call, not just follow it.
 
-    Apollo5-family only (Apollo510/510B/5B/330P).  Callers must gate this
-    on ``SocFamily.AP5`` themselves; the RSTGEN register layout has not
-    been validated on Apollo3/Apollo4.
+    HPX's automatic lifecycle policy uses this only on Apollo5-family targets
+    today. Other SoCs may use it through an explicit experimental reset
+    strategy, but should not become defaults until their board-level reset and
+    GPIO lockstep behavior is validated.
 
     The register write intentionally triggers an immediate self-reset, so
     JLinkExe's own memory-write verification fails and it exits non-zero —
     this is expected and is *not* treated as an error here (matching
     neuralSPOT's own ``make reset``, which discards this exit code).
     """
-    log.info("Triggering Apollo5 SWPOI reset via JLinkExe (serial=%s)", jlink_serial or "auto")
+    log.info("Triggering SWPOI reset via JLinkExe (serial=%s)", jlink_serial or "auto")
     jlink_exe = find_jlink_exe()
     cmd = [
         jlink_exe,
@@ -451,6 +470,7 @@ __all__ = [
     "JLinkProbe",
     "JLinkProbeMatch",
     "find_jlink_exe",
+    "inspect_probe_target",
     "list_connected_probes",
     "resolve_probe_serial",
     "reset_target",

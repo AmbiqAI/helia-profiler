@@ -1,18 +1,23 @@
 # heliaPROFILER — Hardware Validation Suite
 
 A pytest-driven hardware-in-the-loop validation suite that runs canonical
-MLPerf Tiny models end-to-end against a real EVB (Apollo510 today; more
-boards later) via `hpx profile`, with optional Joulescope power capture.
+MLPerf Tiny models end-to-end against real EVBs via `hpx profile`.
+The default validation path focuses on reliability across engines,
+toolchains, host interfaces, and memory placements; Joulescope power capture
+is an explicit opt-in axis.
 
 Invoke via the CLI wrapper (recommended):
 
 ```bash
-hpx validate                      # full matrix (4 models × 2 engines × 2 power = 16 cases)
+hpx validate                      # Apollo510 reliability matrix, power off
 hpx validate --list               # preview what would run — no hardware touched
 hpx validate --models kws,ic      # subset by model
 hpx validate --engines aot        # subset by engine (aliases: rt, aot)
 hpx validate --power off          # skip Joulescope runs
 hpx validate --power on           # only Joulescope runs
+hpx validate --boards apollo3p_evb,apollo4p_blue_kxr_evb,apollo510_evb \
+    --models kws --engines rt --toolchains gcc --interfaces rtt --memories auto \
+    --power off --repeat 2        # require two passing iterations per selected case
 hpx validate -k kws-aot           # pytest keyword filter
 hpx validate --junit-xml report.xml --output-dir ./results/validation
 ```
@@ -28,10 +33,11 @@ pytest -m hardware tests/validation/ \
 
 ## Prerequisites
 
-1. **Apollo510 EVB** connected via J-Link (SEGGER)
+1. Supported Ambiq EVB connected via J-Link (SEGGER)
 2. **arm-none-eabi-gcc** toolchain on `PATH`
-3. **Joulescope** (JS110 or JS220) — only required if `--power on`/`both`
-4. **Git LFS** fetched — the TFLite fixtures are stored via LFS:
+3. Additional selected toolchains on `PATH` (`armclang`/ACfE, ATfE) when requested
+4. **Joulescope** (JS110 or JS220) — only required if `--power on`/`both`
+5. **Git LFS** fetched — the TFLite fixtures are stored via LFS:
    ```bash
    git lfs pull
    ```
@@ -46,8 +52,10 @@ pytest -m hardware tests/validation/ \
 | IC       | ResNet (CIFAR-10) int8         | 256KB | `ic/ic_resnet_int8.tflite`             |
 | AD       | DeepAutoEncoder ToyADMX int8   | 128KB | `ad/ad01_int8.tflite`                  |
 
-Each model is crossed with engines `{helia-rt, helia-aot}` and power
-`{off, on}` for 16 default cases per board.
+Each selected model is crossed with engines `{helia-rt, helia-aot}`, selected
+toolchains, board-supported interfaces, and board-supported memory placement
+presets. Power is `off` by default for PR reliability validation; use
+`--power on` or `--power both` only when validating Joulescope capture.
 
 ## Outputs
 
@@ -66,8 +74,8 @@ results/validation/
     └── hpx_stderr.log
 ```
 
-`case_id` format: `<board>-<model>-<engine>[-power]`
-(e.g. `apollo510_evb-kws-aot-power`).
+`case_id` format: `<board>-<model>-<engine>-<toolchain>-<interface>-<memory>[-power][-runNN]`
+(e.g. `apollo510_evb-kws-aot-arm-none-eabi-gcc-rtt-auto-run02`).
 
 ## Assertions per case
 

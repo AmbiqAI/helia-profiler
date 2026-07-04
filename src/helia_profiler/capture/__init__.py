@@ -15,9 +15,11 @@ Supports the following transports for reading profiling data from the target:
 from __future__ import annotations
 
 import logging
+import time
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from ..errors import CaptureError
+from ..errors import CaptureError, PowerError
 from ..placement import Placement
 from ..usb_identity import usb_marker_serial
 from .transport import HPX_END, HPX_START
@@ -26,6 +28,7 @@ if TYPE_CHECKING:
     from ..pipeline import PipelineContext
     from ..power.base import PowerResult
     from ..results import PmuResult
+    from ..target_lifecycle import TargetLifecyclePlan
 
 log = logging.getLogger("hpx")
 
@@ -278,7 +281,12 @@ def _make_sync_controller(ctx: PipelineContext, driver: object):
     return driver.make_sync_controller(wiring)
 
 
-def capture_power(ctx: PipelineContext, *, duration_override_s: float | None = None) -> PowerResult:
+def capture_power(
+    ctx: PipelineContext,
+    *,
+    duration_override_s: float | None = None,
+    prepare_target: Callable[[object, str], "TargetLifecyclePlan"] | None = None,
+) -> PowerResult:
     """Record a power trace using the configured power driver.
 
     Returns a :class:`PowerResult` directly — no intermediate dict wrapping.
@@ -290,6 +298,17 @@ def capture_power(ctx: PipelineContext, *, duration_override_s: float | None = N
 
     # Verify driver is usable
     driver.check_available()
+    lifecycle_plan = None
+
+    def _prepare_target_once() -> None:
+        nonlocal lifecycle_plan
+        if prepare_target is not None and lifecycle_plan is None:
+            lifecycle_plan = prepare_target(driver, driver_name)
+
+    def _attach_lifecycle_metadata(result: PowerResult) -> PowerResult:
+        if lifecycle_plan is not None:
+            result.metadata.setdefault("target_lifecycle", lifecycle_plan.to_metadata())
+        return result
 
     duration = (
         duration_override_s if duration_override_s is not None else ctx.config.power.duration_s
@@ -320,6 +339,38 @@ def capture_power(ctx: PipelineContext, *, duration_override_s: float | None = N
         # release it once the poller is live, chained after any USB DTR open.
         sync = _make_sync_controller(ctx, driver)
         sync.arm()
+        # Reset/relaunch only after GO is held low and the state input is open.
+        # Otherwise a fast boot can pass through the READY barrier before the
+        # host is watching, leaving power capture to fail later as a missing gate.
+        _prepare_target_once()
+        sync_metadata: dict[str, object]
+
+        if sync.lockstep:
+            from ..power.diagnostics import SyncHandshakeMetadata
+
+            ready_started = time.monotonic()
+            ready = sync.wait_ready(timeout_s=duration)
+            ready_wait_s = round(time.monotonic() - ready_started, 6)
+            if not ready:
+                state = sync.read_state()
+                sync.release()
+                raise PowerError(
+                    "Target did not signal READY before gated power capture",
+                    hint=(
+                        "Check the state/go GPIO wiring, reset strategy, and that the firmware "
+                        "is parked in the power sync wait state. "
+                        f"Last observed state: {state.value}; waited {ready_wait_s:.3f}s."
+                    ),
+                )
+            sync_metadata = SyncHandshakeMetadata(
+                lockstep=True,
+                ready_wait_s=ready_wait_s,
+                ready_observed=True,
+            ).to_metadata()
+        else:
+            from ..power.diagnostics import SyncHandshakeMetadata
+
+            sync_metadata = SyncHandshakeMetadata(lockstep=False).to_metadata()
 
         def _release() -> None:
             if dtr_holder is not None:
@@ -327,7 +378,7 @@ def capture_power(ctx: PipelineContext, *, duration_override_s: float | None = N
             sync.signal_go()
 
         try:
-            return driver.capture_gated(
+            result = driver.capture_gated(
                 duration_s=duration,
                 io_voltage=ctx.config.power.io_voltage,
                 sync_input_index=ctx.config.power.sync_input_index,
@@ -335,13 +386,18 @@ def capture_power(ctx: PipelineContext, *, duration_override_s: float | None = N
                 clean_infer_count=clean_count,
                 on_started=_release,
             )
+            result.metadata.setdefault("sync", sync_metadata)
+            return _attach_lifecycle_metadata(result)
         finally:
             sync.release()
             if dtr_holder is not None:
                 dtr_holder.close()
 
 
-    return driver.capture(duration_s=duration, io_voltage=ctx.config.power.io_voltage)
+    _prepare_target_once()
+    return _attach_lifecycle_metadata(
+        driver.capture(duration_s=duration, io_voltage=ctx.config.power.io_voltage)
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,9 @@
 """Stage 7 — Capture power data via configured power driver (optional).
 
-When using an external Joulescope driver, this stage performs a clean
-power-cycle reset (via the Joulescope relay) before capturing.  This
-eliminates the ~300 µA debug-domain overhead that a J-Link reset leaves
-behind, giving accurate baseline power numbers.
+Power capture relaunches firmware through an explicit target lifecycle policy
+before arming the measurement.  The default policy uses reset primitives, not
+instrument rail cycling; Joulescope power cycling remains an explicit recovery
+or bring-up experiment only.
 
 If PMU results are available from a preceding capture stage, the capture
 duration is automatically tightened to `boot_time + firmware_run_time +
@@ -17,11 +17,12 @@ import logging
 from ..config import DEFAULT_POWER_WINDOW_TARGET_MS
 from ..errors import PowerError
 from ..pipeline import PipelineContext
+from ..target_lifecycle import CapturePhase, prepare_target_for_phase
 
 log = logging.getLogger("hpx")
 
 # Guard periods for estimated-duration auto-terminate
-_BOOT_SETTLE_S = 8.0  # power-cycle settle + SBL + firmware init
+_BOOT_SETTLE_S = 8.0  # reset/SBL/firmware init allowance
 _SAFETY_MARGIN_S = 6.0  # extra headroom beyond estimated runtime
 
 
@@ -105,59 +106,30 @@ class CapturePowerStage:
 
     def run(self, ctx: PipelineContext) -> None:
         from ..capture import capture_power
-        from ..power import get_driver
 
         driver_name = ctx.config.power.driver
         mode = ctx.config.power.mode
         log.info("Power driver: %s (mode: %s)", driver_name, mode)
 
-        # --- Power-cycle reset for accurate measurement ---
-        # Let the driver decide whether it supports power cycling.
-        # External Joulescope drivers cut and restore target power,
-        # giving a clean boot with zero debug-domain overhead.
-        # Drivers that can't power-cycle (e.g. ondevice) raise PowerError.
-        driver = get_driver(driver_name, serial=ctx.config.power.serial)
-        try:
-            driver.power_cycle(off_time_s=0.5, settle_time_s=2.0)
-            log.info("Clean power-cycle reset — no debug-domain overhead")
-        except PowerError:
-            log.warning(
-                "Power-cycle reset not available for '%s' — "
-                "power numbers may include ~300 µA debug-domain overhead.",
-                driver_name,
+        def _prepare_target(driver: object, resolved_driver_name: str):
+            lifecycle_plan = prepare_target_for_phase(
+                ctx,
+                phase=CapturePhase.POWER,
+                power_driver=driver,
+                power_driver_name=resolved_driver_name,
             )
-
-        # --- Re-launch the firmware so the gated window fires under the poller ---
-        # PMU/clean capture already consumed the firmware's single gated pass.
-        # Boards that draw bench power from USB are not rebooted by the relay
-        # cut above, so the clean window never re-runs and the Joulescope sees no
-        # GPIO-high strobe.  A J-Link reset restarts the firmware deterministically
-        # (it parks at hpx_sync_wait_go in lock-step), so power capture arms GO
-        # and watches the window from the start.  USB CDC also needs the reset —
-        # DTR release only frees the *first* boot, so after PMU the device is
-        # idle; capture re-opens the CDC port to release the post-reset boot.
-        if ctx.soc and ctx.soc.jlink_device:
-            from ..jlink import reset_target, reset_target_poi
-            from ..platform import SocFamily
-
-            reset_target(
-                device=ctx.soc.jlink_device,
-                jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
+            log.info(
+                "Power lifecycle: power_cycle=%s reset=%s",
+                (
+                    "ok"
+                    if lifecycle_plan.power_cycle_succeeded
+                    else "failed"
+                    if lifecycle_plan.power_cycle_attempted
+                    else "not-requested"
+                ),
+                lifecycle_plan.reset_action.value,
             )
-            # Apollo5-family only: a debug-level reset alone leaves PMU/
-            # power-management registers untouched, which was found
-            # (2026-07-02, AP510 KWS LP) to measurably inflate steady-state
-            # power (~8.2 mW vs ~6.9 mW for identical firmware) relative to
-            # a true power-on-initialization reset.  neuralSPOT AutoDeploy
-            # performs this exact extra reset before every power
-            # measurement; mirror it here so HPX numbers are not biased
-            # high by leftover debug-domain/PMU state.  Not yet validated
-            # on Apollo3/Apollo4, so scoped to AP5 only.
-            if ctx.soc.family is SocFamily.AP5:
-                reset_target_poi(
-                    device=ctx.soc.jlink_device,
-                    jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
-                )
+            return lifecycle_plan
 
         # --- Capture ---
         # Tighten capture window if PMU timing data is available.
@@ -174,7 +146,11 @@ class CapturePowerStage:
             capture_duration = configured
 
         try:
-            power_result = capture_power(ctx, duration_override_s=capture_duration)
+            power_result = capture_power(
+                ctx,
+                duration_override_s=capture_duration,
+                prepare_target=_prepare_target,
+            )
         except PowerError:
             raise
         except Exception as exc:

@@ -94,6 +94,44 @@ class TestPlanMemorySynthesise:
         assert any(c.kind == "arena" and c.size == 256 * 1024 for c in dtcm.consumers)
         assert any(c.kind == "weights" and c.size == 300 * 1024 for c in sram.consumers)
 
+    def test_auto_keeps_weights_in_mram_when_arena_needs_sram(self, tmp_path: Path):
+        model = tmp_path / "large_model.tflite"
+        model.write_bytes(b"\x00" * (300 * 1024))
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {
+                    "path": str(model),
+                    "arena_size": 600 * 1024,
+                },
+            },
+        )
+
+        PlanMemoryStage().run(ctx)
+
+        assert ctx.arena_region == "sram"
+        assert ctx.weights_region == "mram"
+
+    def test_auto_keeps_mid_sized_weights_out_of_tcm_when_headroom_is_tight(
+        self, tmp_path: Path
+    ):
+        model = tmp_path / "mid_model_100k.tflite"
+        model.write_bytes(b"\x00" * (100 * 1024))
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {
+                    "path": str(model),
+                    "arena_size": 256 * 1024,
+                },
+            },
+        )
+
+        PlanMemoryStage().run(ctx)
+
+        assert ctx.arena_region == "tcm"
+        assert ctx.weights_region == "sram"
+
     def test_synth_plan_explicit_mram_keeps_weights_in_mram(self, tmp_path: Path):
         """``model_location=mram`` puts weights in MRAM (rodata) but
         still places the arena in TCM when available."""
@@ -117,6 +155,31 @@ class TestPlanMemorySynthesise:
         assert mram is not None and dtcm is not None
         assert any(c.kind == "weights" for c in mram.consumers)
         assert any(c.kind == "arena" and c.size == 65536 for c in dtcm.consumers)
+
+    def test_synth_plan_explicit_mram_falls_back_to_sram_when_tcm_too_small(
+        self, tmp_path: Path
+    ):
+        """``model_location=mram`` keeps weights cold while avoiding TCM overflow."""
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {
+                    "path": str(tmp_path / "model.tflite"),
+                    "arena_size": 600 * 1024,
+                    "model_location": "mram",
+                },
+            },
+        )
+        PlanMemoryStage().run(ctx)
+
+        assert ctx.arena_region == "sram"
+        assert ctx.weights_region == "mram"
+
+        sram = ctx.memory_plan.region("SRAM")
+        mram = ctx.memory_plan.region("MRAM")
+        assert sram is not None and mram is not None
+        assert any(c.kind == "arena" and c.size == 600 * 1024 for c in sram.consumers)
+        assert any(c.kind == "weights" for c in mram.consumers)
 
     def test_synth_plan_psram_routes_weights(self, tmp_path: Path):
         ctx = _make_ctx(

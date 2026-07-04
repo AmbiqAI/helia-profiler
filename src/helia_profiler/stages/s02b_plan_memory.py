@@ -70,10 +70,11 @@ _LOGICAL_TO_PHYSICAL: dict[Placement, MemoryRegion] = {
 }
 
 
-# Slack we leave unallocated in TCM and SRAM so stack/heap/BSS for the
-# rest of the firmware still fits.  Conservative; can be tuned per-board
-# later if needed.
-_TCM_SLACK_BYTES = 8 * 1024
+# Slack we leave unallocated in TCM and SRAM so stack/heap/BSS/code sections for
+# the rest of the firmware still fit.  TCM needs substantial headroom because
+# Apollo linker profiles reserve fixed TCM windows for runtime state in addition
+# to the model arena/weights accounted for here.
+_TCM_SLACK_BYTES = 128 * 1024
 _SRAM_SLACK_BYTES = 32 * 1024
 
 
@@ -333,8 +334,9 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
         weights_region = Placement.SRAM
     elif location == ModelLocation.MRAM:
         # Legacy default: arena in fastest available, weights in MRAM
-        # (rodata).  Mirrors pre-auto behavior.
-        arena_region = Placement.TCM if tcm_cap > 0 else Placement.SRAM
+        # (rodata).  Mirrors pre-auto behavior, but only uses TCM when the
+        # arena fits there.
+        arena_region = Placement.TCM if 0 < arena_size <= tcm_cap else Placement.SRAM
         weights_region = Placement.MRAM
     # auto -------------------------------------------------------------------
     elif location != ModelLocation.AUTO:
@@ -361,7 +363,8 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
             arena_region = Placement.TCM
             # Subtract arena from the TCM budget when deciding weights.
             remaining_tcm = tcm_budget - arena_size
-            if model_size > 0 and model_size <= remaining_tcm:
+            tcm_weight_budget = max(0, remaining_tcm - _TCM_SLACK_BYTES)
+            if model_size > 0 and model_size <= tcm_weight_budget:
                 weights_region = Placement.TCM
             elif model_size > 0 and model_size <= sram_budget:
                 weights_region = Placement.SRAM
@@ -369,14 +372,7 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
                 weights_region = Placement.MRAM
         elif arena_in_sram:
             arena_region = Placement.SRAM
-            remaining_sram = sram_budget - arena_size
-            # weights in TCM if it fits there alone (TCM is faster than SRAM)
-            if model_size > 0 and model_size <= tcm_budget:
-                weights_region = Placement.TCM
-            elif model_size > 0 and model_size <= remaining_sram:
-                weights_region = Placement.SRAM
-            else:
-                weights_region = Placement.MRAM
+            weights_region = Placement.MRAM
         else:
             # arena doesn't fit in fast memory; weights stay in MRAM
             # (rodata).  Validation pass will fail if even MRAM is short.

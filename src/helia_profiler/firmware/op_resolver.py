@@ -120,6 +120,10 @@ _ALL_REGISTRATIONS: tuple[tuple[str, str], ...] = (
 
 _ALL_BY_NAME = dict(_ALL_REGISTRATIONS)
 
+# heliaRT can require QUANTIZE during its runtime model preparation even when
+# the source flatbuffer operator list does not contain an explicit QUANTIZE op.
+_HELIA_RT_AUTO_REQUIRED_OPS = frozenset({"QUANTIZE", "DEQUANTIZE"})
+
 
 def build_resolver_plan(
     *,
@@ -156,6 +160,8 @@ def build_resolver_plan(
             )
         else:
             model_ops = {layer.op for layer in model_analysis.layers}
+            if engine_type is EngineType.HELIA_RT:
+                model_ops |= _HELIA_RT_AUTO_REQUIRED_OPS
             registrations = tuple(code for name, code in _ALL_REGISTRATIONS if name in model_ops)
             unsupported = sorted(
                 op for op in model_ops if op not in _ALL_BY_NAME and not op.startswith("CUSTOM(")

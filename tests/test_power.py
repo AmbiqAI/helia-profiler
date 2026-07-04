@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -66,6 +67,39 @@ class TestPowerTypes:
         )
         assert window.duration_s == 0.2
         assert window.sample_count == 123
+
+
+class TestPowerDiagnostics:
+    def test_sync_handshake_metadata_serializes_observed_ready(self):
+        from helia_profiler.power.diagnostics import SyncHandshakeMetadata
+
+        metadata = SyncHandshakeMetadata(
+            lockstep=True,
+            ready_wait_s=0.012,
+            ready_observed=True,
+        ).to_metadata()
+
+        assert metadata == {
+            "lockstep": True,
+            "ready_wait_s": 0.012,
+            "ready_observed": True,
+        }
+
+    def test_gate_failure_classifies_missing_rise(self):
+        from helia_profiler.power.diagnostics import GateFailureKind, classify_gate_failure
+
+        failure = classify_gate_failure(saw_gate_rise=False, duration_s=7.0)
+
+        assert failure.kind is GateFailureKind.NO_GATE_RISE
+        assert "rising edge" in failure.message
+
+    def test_gate_failure_classifies_missing_fall(self):
+        from helia_profiler.power.diagnostics import GateFailureKind, classify_gate_failure
+
+        failure = classify_gate_failure(saw_gate_rise=True, duration_s=7.0)
+
+        assert failure.kind is GateFailureKind.NO_GATE_FALL
+        assert "did not fall" in failure.message
 
 
 class TestGatedStatsProcessing:
@@ -353,6 +387,23 @@ class TestPowerConfig:
         assert config.power.sync_gpio_pin == 42
         assert config.power.duration_s == 60
 
+    def test_power_reset_strategy_config(self, tmp_path: Path):
+        from helia_profiler.config import load_config
+        from helia_profiler.target_lifecycle import ResetStrategy
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {"reset_strategy": "swpoi_reset"},
+            },
+        )
+
+        assert config.power.reset_strategy is ResetStrategy.SWPOI_RESET
+
 
 class TestCapturePowerStage:
     def test_skipped_when_disabled(self, tmp_path: Path):
@@ -417,20 +468,297 @@ class TestCapturePowerStage:
 
         class FakeDriver:
             def power_cycle(self, **kwargs):
-                pass
+                raise AssertionError("auto reset must not power-cycle")
 
-        monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: FakeDriver())
         monkeypatch.setattr(
             "helia_profiler.jlink.reset_target",
             lambda **k: reset_calls.update(k),
         )
         monkeypatch.setattr(
+            "helia_profiler.jlink.reset_target_poi",
+            lambda **k: reset_calls.setdefault("swpoi", k),
+        )
+
+        def fake_capture_power(ctx, **kwargs):
+            plan = kwargs["prepare_target"](FakeDriver(), "joulescope-js110")
+            return PowerResult(
+                summary=PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0),
+                metadata={"target_lifecycle": plan.to_metadata()},
+            )
+
+        monkeypatch.setattr(
             "helia_profiler.capture.capture_power",
-            lambda ctx, **k: PowerResult(summary=PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0)),
+            fake_capture_power,
         )
         CapturePowerStage().run(ctx)
         assert reset_calls["jlink_serial"] == "1160002204"
         assert reset_calls["device"] == ctx.soc.jlink_device
+        assert ctx.power_result is not None
+        lifecycle = ctx.power_result.metadata["target_lifecycle"]
+        assert {k: v for k, v in lifecycle.items() if k != "timings_s"} == {
+            "phase": "power",
+            "power_cycle_attempted": False,
+            "power_cycle_succeeded": False,
+            "reset_strategy": "auto",
+            "reset_action": "debug_reset+swpoi_reset",
+            "actions": ["debug_reset+swpoi_reset"],
+        }
+        assert set(lifecycle["timings_s"]) == {"reset"}
+
+
+class TestTargetLifecycle:
+    def _make_ctx(self, tmp_path: Path, *, board: str):
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.platform import get_soc_for_board
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "target": {"board": board, "jlink_serial": "1160002204"},
+                "power": {"enabled": True, "driver": "joulescope-js110"},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.soc = get_soc_for_board(board)
+        return ctx
+
+    def test_ap4_power_phase_uses_debug_reset_only(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.target_lifecycle import (
+            CapturePhase,
+            ResetAction,
+            prepare_target_for_phase,
+        )
+
+        ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
+        calls: list[tuple[str, dict]] = []
+
+        class FakeDriver:
+            def power_cycle(self, **kwargs):
+                raise AssertionError("auto AP4 reset must not power-cycle")
+
+        monkeypatch.setattr(
+            "helia_profiler.jlink.reset_target",
+            lambda **k: calls.append(("reset", k)),
+        )
+        monkeypatch.setattr(
+            "helia_profiler.jlink.reset_target_poi",
+            lambda **k: calls.append(("swpoi", k)),
+        )
+
+        plan = prepare_target_for_phase(
+            ctx,
+            phase=CapturePhase.POWER,
+            power_driver=FakeDriver(),
+            power_driver_name="joulescope-js110",
+        )
+
+        assert plan.phase is CapturePhase.POWER
+        assert plan.power_cycle_attempted is False
+        assert plan.power_cycle_succeeded is False
+        assert plan.reset_action is ResetAction.DEBUG_RESET
+        assert plan.actions == ("debug_reset",)
+        assert [name for name, _ in calls] == ["reset"]
+
+    def test_ap5_power_phase_preserves_current_swpoi_policy(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.target_lifecycle import (
+            CapturePhase,
+            ResetAction,
+            prepare_target_for_phase,
+        )
+
+        ctx = self._make_ctx(tmp_path, board="apollo510_evb")
+        calls: list[tuple[str, dict]] = []
+
+        class FakeDriver:
+            def power_cycle(self, **kwargs):
+                raise AssertionError("auto AP5 reset must not power-cycle")
+
+        monkeypatch.setattr(
+            "helia_profiler.jlink.reset_target",
+            lambda **k: calls.append(("reset", k)),
+        )
+        monkeypatch.setattr(
+            "helia_profiler.jlink.reset_target_poi",
+            lambda **k: calls.append(("swpoi", k)),
+        )
+
+        plan = prepare_target_for_phase(
+            ctx,
+            phase=CapturePhase.POWER,
+            power_driver=FakeDriver(),
+            power_driver_name="joulescope-js110",
+        )
+
+        assert plan.reset_action is ResetAction.DEBUG_RESET_THEN_SWPOI
+        assert plan.actions == ("debug_reset+swpoi_reset",)
+        assert [name for name, _ in calls] == ["reset", "swpoi"]
+
+    def test_explicit_ap4_swpoi_uses_swpoi_as_replacement(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.target_lifecycle import (
+            CapturePhase,
+            ResetAction,
+            prepare_target_for_phase,
+        )
+
+        ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
+        ctx.config = replace(ctx.config, power=replace(ctx.config.power, reset_strategy="swpoi_reset"))
+        calls: list[tuple[str, dict]] = []
+
+        class FakeDriver:
+            def power_cycle(self, **kwargs):
+                raise AssertionError("explicit SWPOI reset must not power-cycle")
+
+        monkeypatch.setattr(
+            "helia_profiler.jlink.reset_target",
+            lambda **k: calls.append(("reset", k)),
+        )
+        monkeypatch.setattr(
+            "helia_profiler.jlink.reset_target_poi",
+            lambda **k: calls.append(("swpoi", k)),
+        )
+
+        plan = prepare_target_for_phase(
+            ctx,
+            phase=CapturePhase.POWER,
+            power_driver=FakeDriver(),
+            power_driver_name="joulescope-js110",
+        )
+
+        assert plan.reset_action is ResetAction.SWPOI_RESET
+        assert plan.actions == ("swpoi_reset",)
+        assert [name for name, _ in calls] == ["swpoi"]
+
+    def test_explicit_no_reset_does_not_touch_hardware(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.target_lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
+
+        ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
+        ctx.config = replace(ctx.config, power=replace(ctx.config.power, reset_strategy="none"))
+        calls: list[tuple[str, dict]] = []
+
+        class FakeDriver:
+            def power_cycle(self, **kwargs):
+                raise AssertionError("none reset must not power-cycle")
+
+        monkeypatch.setattr(
+            "helia_profiler.jlink.reset_target",
+            lambda **k: calls.append(("reset", k)),
+        )
+        monkeypatch.setattr(
+            "helia_profiler.jlink.reset_target_poi",
+            lambda **k: calls.append(("swpoi", k)),
+        )
+
+        plan = prepare_target_for_phase(
+            ctx,
+            phase=CapturePhase.POWER,
+            power_driver=FakeDriver(),
+            power_driver_name="joulescope-js110",
+        )
+
+        assert plan.reset_action is ResetAction.NONE
+        assert plan.actions == ()
+        assert [name for name, _ in calls] == []
+
+    def test_explicit_power_cycle_requires_rail_toggle_and_skips_jlink_reset(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.target_lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
+
+        ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
+        ctx.config = replace(ctx.config, power=replace(ctx.config.power, reset_strategy="power_cycle"))
+        calls: list[tuple[str, dict]] = []
+
+        class FakeDriver:
+            def power_cycle(self, **kwargs):
+                calls.append(("power_cycle", kwargs))
+
+        monkeypatch.setattr(
+            "helia_profiler.jlink.reset_target",
+            lambda **k: calls.append(("reset", k)),
+        )
+        monkeypatch.setattr(
+            "helia_profiler.jlink.reset_target_poi",
+            lambda **k: calls.append(("swpoi", k)),
+        )
+
+        plan = prepare_target_for_phase(
+            ctx,
+            phase=CapturePhase.POWER,
+            power_driver=FakeDriver(),
+            power_driver_name="joulescope-js110",
+        )
+
+        assert plan.reset_action is ResetAction.NONE
+        assert plan.actions == ("power_cycle",)
+        assert [name for name, _ in calls] == ["power_cycle"]
+
+    def test_explicit_power_cycle_fails_if_rail_toggle_unavailable(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.target_lifecycle import CapturePhase, prepare_target_for_phase
+
+        ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
+        ctx.config = replace(ctx.config, power=replace(ctx.config.power, reset_strategy="power_cycle"))
+        calls: list[tuple[str, dict]] = []
+
+        class FakeDriver:
+            def power_cycle(self, **kwargs):
+                raise PowerError("no rail control")
+
+        monkeypatch.setattr(
+            "helia_profiler.jlink.reset_target",
+            lambda **k: calls.append(("reset", k)),
+        )
+
+        with pytest.raises(PowerError, match="no rail control"):
+            prepare_target_for_phase(
+                ctx,
+                phase=CapturePhase.POWER,
+                power_driver=FakeDriver(),
+                power_driver_name="joulescope-js110",
+            )
+
+        assert calls == []
+
+    def test_non_power_phase_does_not_touch_hardware(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.target_lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
+
+        ctx = self._make_ctx(tmp_path, board="apollo510_evb")
+
+        class FakeDriver:
+            def power_cycle(self, **kwargs):
+                raise AssertionError("non-power phase must not power-cycle")
+
+        monkeypatch.setattr(
+            "helia_profiler.jlink.reset_target",
+            lambda **k: (_ for _ in ()).throw(AssertionError("must not reset")),
+        )
+
+        plan = prepare_target_for_phase(
+            ctx,
+            phase=CapturePhase.PMU,
+            power_driver=FakeDriver(),
+            power_driver_name="joulescope-js110",
+        )
+
+        assert plan.phase is CapturePhase.PMU
+        assert plan.power_cycle_attempted is False
+        assert plan.reset_action is ResetAction.NONE
 
 
 class TestEstimateCaptureDuration:
@@ -622,3 +950,93 @@ class TestCapturePowerWrapper:
             "stats_rate_hz": 1000,
             "clean_infer_count": 11,
         }
+
+    def test_capture_power_waits_for_lockstep_ready_before_go(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.capture import capture_power
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {
+                    "enabled": True,
+                    "driver": "joulescope-js110",
+                    "lockstep": True,
+                    "state_gpio_pin": 23,
+                    "go_gpio_pin": 24,
+                },
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[])
+
+        calls: list[str] = []
+        summary = PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6)
+
+        class FakeSync:
+            lockstep = True
+
+            def arm(self):
+                calls.append("arm")
+
+            def wait_ready(self, *, timeout_s: float):
+                calls.append(f"wait_ready:{timeout_s}")
+                return True
+
+            def signal_go(self):
+                calls.append("go")
+
+            def read_state(self):
+                raise AssertionError("read_state should not be called on ready path")
+
+            def release(self):
+                calls.append("release")
+
+        class FakeDriver:
+            def check_available(self):
+                calls.append("check")
+
+            def make_sync_controller(self, wiring):
+                calls.append("make_sync")
+                return FakeSync()
+
+            def capture_gated(self, **kwargs):
+                calls.append("capture_gated")
+                kwargs["on_started"]()
+                return PowerResult(summary=summary)
+
+        monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: FakeDriver())
+
+        def prepare_target(driver, name):
+            calls.append(f"prepare:{name}")
+
+            class Plan:
+                def to_metadata(self):
+                    return {"reset_action": "debug_reset"}
+
+            return Plan()
+
+        result = capture_power(ctx, duration_override_s=7.0, prepare_target=prepare_target)
+
+        assert calls == [
+            "check",
+            "make_sync",
+            "arm",
+            "prepare:joulescope-js110",
+            "wait_ready:7.0",
+            "capture_gated",
+            "go",
+            "release",
+        ]
+        assert result.metadata["sync"]["lockstep"] is True
+        assert result.metadata["sync"]["ready_wait_s"] >= 0.0
+        assert result.metadata["sync"]["ready_observed"] is True
+        assert result.metadata["target_lifecycle"] == {"reset_action": "debug_reset"}

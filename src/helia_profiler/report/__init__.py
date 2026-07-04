@@ -262,6 +262,12 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             summary["power"]["sync_input_index"] = power_meta["sync_input_index"]
         if power_meta.get("gating_method") is not None:
             summary["power"]["gating_method"] = power_meta["gating_method"]
+        if power_meta.get("target_lifecycle") is not None:
+            summary["power"]["target_lifecycle"] = power_meta["target_lifecycle"]
+        if power_meta.get("sync") is not None:
+            summary["power"]["sync"] = power_meta["sync"]
+        if power_meta.get("sync_timing_s") is not None:
+            summary["power"]["sync_timing_s"] = power_meta["sync_timing_s"]
         if ctx.power_result.gated_windows:
             summary["power"]["gated_window_count"] = len(ctx.power_result.gated_windows)
         meta = ctx.pmu_result.meta if ctx.pmu_result is not None else None
@@ -897,6 +903,10 @@ def _write_run_metadata(ctx: PipelineContext, output_dir: Path) -> Path:
     # Enrich with firmware-reported values from the capture
     if ctx.pmu_result is not None:
         meta_dict["firmware"] = _firmware_meta_to_dict(ctx.pmu_result.meta)
+    if ctx.power_result is not None:
+        lifecycle = ctx.power_result.metadata.get("target_lifecycle")
+        if lifecycle is not None:
+            meta_dict["target_lifecycle"] = lifecycle
 
     out_path.write_text(json.dumps(meta_dict, indent=2, default=str))
     log.info("Wrote run metadata: %s", out_path)

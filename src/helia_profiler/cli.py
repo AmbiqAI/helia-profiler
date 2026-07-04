@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
 
 def main(argv: list[str] | None = None) -> None:
     from .config import AGGREGATION_METHODS, Transport
+    from .target_lifecycle import ResetStrategy
 
     parser = argparse.ArgumentParser(
         prog="hpx",
@@ -247,6 +249,14 @@ def main(argv: list[str] | None = None) -> None:
     )
     g_power.add_argument("--power-duration", type=int, help="Power capture seconds (default: 30)")
     g_power.add_argument(
+        "--power-reset-strategy",
+        choices=[strategy.value for strategy in ResetStrategy],
+        help=(
+            "Reset strategy before power capture (default: auto). "
+            "Use explicit values only for board bring-up or controlled experiments."
+        ),
+    )
+    g_power.add_argument(
         "--sync-gpio",
         type=int,
         help=(
@@ -364,6 +374,64 @@ def main(argv: list[str] | None = None) -> None:
     # --- hpx boards ---
     sub.add_parser("boards", help="List supported boards and SoC capabilities")
 
+    # --- hpx probes ---
+    p_probes = sub.add_parser(
+        "probes",
+        help="Inspect connected J-Link probes without opening an interactive JLinkExe session",
+    )
+    probes_sub = p_probes.add_subparsers(dest="probes_action")
+    p_probes_list = probes_sub.add_parser("list", help="List connected J-Link probes")
+    p_probes_list.add_argument(
+        "--board",
+        type=str,
+        help="Inspect each probe against this board's J-Link device string",
+    )
+    p_probes_list.add_argument(
+        "--inspect",
+        action="store_true",
+        help="Inspect target cores. Requires --board.",
+    )
+    p_probes_list.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+    p_probes_match = probes_sub.add_parser(
+        "match",
+        help="Resolve the J-Link serial for a board using HPX's normal selection policy",
+    )
+    p_probes_match.add_argument("--board", required=True, type=str, help="Target board ID")
+    p_probes_match.add_argument(
+        "--jlink-serial",
+        type=str,
+        help="Optional requested serial to validate against the selected board",
+    )
+    p_probes_match.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+
+    # --- hpx ports ---
+    p_ports = sub.add_parser("ports", help="List host serial ports relevant to HPX transports")
+    ports_sub = p_ports.add_subparsers(dest="ports_action")
+    p_ports_list = ports_sub.add_parser("list", help="List serial ports with J-Link/CDC hints")
+    p_ports_list.add_argument(
+        "--all",
+        dest="show_all",
+        action="store_true",
+        help="Show every host serial port, not just HPX-relevant USB/J-Link ports",
+    )
+    p_ports_list.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+
+    # --- hpx target ---
+    p_target = sub.add_parser("target", help="Run explicit target-side utility operations")
+    target_sub = p_target.add_subparsers(dest="target_action")
+    p_target_reset = target_sub.add_parser(
+        "reset",
+        help="Reset a target through HPX's non-interactive J-Link wrapper",
+    )
+    p_target_reset.add_argument("--board", required=True, type=str, help="Target board ID")
+    p_target_reset.add_argument("--jlink-serial", type=str, help="J-Link probe serial number")
+    p_target_reset.add_argument(
+        "--kind",
+        choices=("debug", "swpoi"),
+        default="debug",
+        help="Reset kind: debug r/g reset (default) or SWPOI reset",
+    )
+
     # --- hpx power-on ---
     p_power = sub.add_parser(
         "power-on",
@@ -393,14 +461,17 @@ def main(argv: list[str] | None = None) -> None:
             "Hardware validation — runs canonical MLPerf Tiny models end-to-end\n"
             "against a real EVB + J-Link (and optional Joulescope).\n\n"
             "Examples:\n"
-            "  hpx validate                         # full matrix (4 models × 2 engines × 2 power)\n"
+            "  hpx validate                         # Apollo510 reliability matrix, power off\n"
             "  hpx validate --list                  # preview what would run\n"
             "  hpx validate --models kws,ic         # subset by model\n"
             "  hpx validate --engines aot           # subset by engine\n"
-            "  hpx validate --power off             # skip Joulescope\n"
-            "  hpx validate --repeat 10 --models kws --engines rt --power off\n"
-            "                                       # stress-run the same case 10 times\n"
+            "  hpx validate --power off             # skip Joulescope (default)\n"
+            "  hpx validate --boards apollo3p_evb --repeat 2 --power off\n"
+            "                                       # require two passing iterations per case\n"
             "  hpx validate -k kws-aot              # pytest keyword filter\n"
+            "  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n"
+            "  hpx validate --suite models-rt       # 12-case model sweep: 3 boards x 4 models x RT\n"
+            "  hpx validate --suite models-aot      # 12-case model sweep: 3 boards x 4 models x AOT\n"
         ),
     )
     p_validate.add_argument(
@@ -418,14 +489,52 @@ def main(argv: list[str] | None = None) -> None:
     p_validate.add_argument(
         "--power",
         choices=("both", "on", "off"),
-        default="both",
-        help="Power matrix: both (default) | on (only Joulescope runs) | off.",
+        default="off",
+        help="Power matrix: off (default) | on (only Joulescope runs) | both.",
     )
     p_validate.add_argument(
         "--boards",
         type=str,
-        default="apollo510_evb",
+        default="",
         help="Comma-separated board IDs (default: apollo510_evb).",
+    )
+    p_validate.add_argument(
+        "--toolchains",
+        type=str,
+        default="",
+        help="Comma-separated toolchains: gcc,armclang/acfe,atfe (default: board defaults).",
+    )
+    p_validate.add_argument(
+        "--interfaces",
+        "--transports",
+        dest="transports",
+        type=str,
+        default="",
+        help="Comma-separated interfaces/transports: rtt,uart,swo,usb_cdc (default: board defaults).",
+    )
+    p_validate.add_argument(
+        "--memories",
+        type=str,
+        default="",
+        help="Comma-separated model placement presets: auto,tcm,sram,mram,psram (default: board defaults).",
+    )
+    p_validate.add_argument(
+        "--suite",
+        choices=["smoke", "models-rt", "models-aot"],
+        default=None,
+        help=(
+            "Preset suite. 'smoke' defaults unset axes to models=kws, engines=helia-rt, "
+            "toolchains=arm-none-eabi-gcc, interfaces=rtt, memories=auto. "
+            "'models-rt'/'models-aot' default unset axes to all MLPerf Tiny models, "
+            "all boards, gcc, rtt, auto memory, and the selected engine. "
+            "Explicit axis flags always win."
+        ),
+    )
+    p_validate.add_argument(
+        "--jlink-serials",
+        type=str,
+        default="",
+        help="Comma-separated board=serial entries for multi-board validation.",
     )
     p_validate.add_argument(
         "--repeat",
@@ -523,6 +632,12 @@ def main(argv: list[str] | None = None) -> None:
         _cmd_engines()
     elif args.command == "boards":
         _cmd_boards()
+    elif args.command == "probes":
+        _cmd_probes(args)
+    elif args.command == "ports":
+        _cmd_ports(args)
+    elif args.command == "target":
+        _cmd_target(args)
     elif args.command == "power-on":
         _cmd_power_on(args)
     elif args.command == "validate":
@@ -615,6 +730,8 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         cli.setdefault("power", {})["mode"] = args.power_mode
     if args.power_duration is not None:
         cli.setdefault("power", {})["duration_s"] = args.power_duration
+    if getattr(args, "power_reset_strategy", None) is not None:
+        cli.setdefault("power", {})["reset_strategy"] = args.power_reset_strategy
     if args.sync_gpio is not None:
         cli.setdefault("power", {})["sync_gpio_pin"] = args.sync_gpio
     if getattr(args, "ensure_power", False):
@@ -911,6 +1028,212 @@ def _cmd_boards() -> None:
     console.print_boards(rows)
 
 
+def _cmd_probes(args: argparse.Namespace) -> None:
+    action = getattr(args, "probes_action", None)
+    if action == "list":
+        _cmd_probes_list(args)
+    elif action == "match":
+        _cmd_probes_match(args)
+    else:
+        print("Usage: hpx probes {list|match}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _cmd_probes_list(args: argparse.Namespace) -> None:
+    from .errors import HpxError
+    from .jlink import inspect_probe_target, list_connected_probes
+
+    board_name = getattr(args, "board", None)
+    inspect = bool(getattr(args, "inspect", False) or board_name)
+    if inspect and not board_name:
+        print("Error: hpx probes list --inspect requires --board.", file=sys.stderr)
+        sys.exit(2)
+
+    board = soc = None
+    if board_name:
+        try:
+            from .platform import get_board, get_soc_for_board
+
+            board = get_board(board_name)
+            soc = get_soc_for_board(board_name)
+        except ValueError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(2)
+
+    try:
+        probes = list_connected_probes()
+        rows: list[dict[str, str | bool | None]] = []
+        for probe in probes:
+            row: dict[str, str | bool | None] = {
+                "serial": probe.serial,
+                "product": probe.product,
+                "connection": probe.connection,
+            }
+            if inspect and soc is not None:
+                match = inspect_probe_target(probe, device=soc.jlink_device)
+                row["detected_core"] = match.detected_core.value if match.detected_core else None
+                row["matches_board"] = match.detected_core is soc.core
+                row["board"] = board.name if board is not None else board_name
+                row["jlink_device"] = soc.jlink_device
+            rows.append(row)
+    except HpxError as exc:
+        _print_hpx_error(exc)
+        sys.exit(1)
+
+    if args.json:
+        print(json.dumps({"probes": rows}, indent=2))
+        return
+    if not rows:
+        print("No J-Link probes detected.")
+        return
+    if inspect:
+        _print_rows(rows, ("serial", "product", "connection", "detected_core", "matches_board"))
+    else:
+        _print_rows(rows, ("serial", "product", "connection"))
+
+
+def _cmd_probes_match(args: argparse.Namespace) -> None:
+    from .errors import HpxError
+    from .jlink import resolve_probe_serial
+
+    try:
+        from .platform import get_soc_for_board
+
+        soc = get_soc_for_board(args.board)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(2)
+
+    try:
+        serial = resolve_probe_serial(
+            device=soc.jlink_device,
+            expected_core=soc.core,
+            requested_serial=args.jlink_serial,
+        )
+    except HpxError as exc:
+        _print_hpx_error(exc)
+        sys.exit(1)
+
+    if args.json:
+        print(json.dumps({"board": args.board, "serial": serial}, indent=2))
+    else:
+        print(f"{args.board}: {serial}")
+
+
+def _cmd_ports(args: argparse.Namespace) -> None:
+    action = getattr(args, "ports_action", None)
+    if action == "list":
+        _cmd_ports_list(args)
+    else:
+        print("Usage: hpx ports {list}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _cmd_ports_list(args: argparse.Namespace) -> None:
+    try:
+        from serial.tools import list_ports
+    except ImportError:
+        print("Error: pyserial is required for hpx ports list.", file=sys.stderr)
+        sys.exit(1)
+
+    rows = [_describe_serial_port(info) for info in list_ports.comports()]
+    if not args.show_all:
+        rows = [row for row in rows if _is_relevant_serial_port(row)]
+    if args.json:
+        print(json.dumps({"ports": rows}, indent=2))
+        return
+    if not rows:
+        print("No serial ports detected.")
+        return
+    _print_rows(rows, ("device", "kind", "serial_number", "description", "product"))
+
+
+def _cmd_target(args: argparse.Namespace) -> None:
+    action = getattr(args, "target_action", None)
+    if action == "reset":
+        _cmd_target_reset(args)
+    else:
+        print("Usage: hpx target {reset}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _cmd_target_reset(args: argparse.Namespace) -> None:
+    from .errors import HpxError
+    from .jlink import reset_target, reset_target_poi
+
+    try:
+        from .platform import get_soc_for_board
+
+        soc = get_soc_for_board(args.board)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(2)
+
+    try:
+        if args.kind == "swpoi":
+            reset_target_poi(device=soc.jlink_device, jlink_serial=args.jlink_serial)
+        else:
+            reset_target(device=soc.jlink_device, jlink_serial=args.jlink_serial)
+    except HpxError as exc:
+        _print_hpx_error(exc)
+        sys.exit(1)
+
+    serial = args.jlink_serial or "auto"
+    print(f"Reset {args.board} via {args.kind} reset (serial={serial}).")
+
+
+def _print_hpx_error(exc: Exception) -> None:
+    print(f"Error: {exc}", file=sys.stderr)
+
+
+def _print_rows(rows: list[dict[str, object]], columns: tuple[str, ...]) -> None:
+    widths = {
+        col: max(len(col), *(len(_cell_text(row.get(col))) for row in rows))
+        for col in columns
+    }
+    print("  ".join(col.ljust(widths[col]) for col in columns))
+    print("  ".join("-" * widths[col] for col in columns))
+    for row in rows:
+        print("  ".join(_cell_text(row.get(col)).ljust(widths[col]) for col in columns))
+
+
+def _cell_text(value: object) -> str:
+    if value is None:
+        return "-"
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    return str(value)
+
+
+def _describe_serial_port(info: object) -> dict[str, str]:
+    fields = {
+        "device": str(getattr(info, "device", "") or ""),
+        "description": str(getattr(info, "description", "") or ""),
+        "manufacturer": str(getattr(info, "manufacturer", "") or ""),
+        "product": str(getattr(info, "product", "") or ""),
+        "serial_number": str(getattr(info, "serial_number", "") or ""),
+        "interface": str(getattr(info, "interface", "") or ""),
+        "hwid": str(getattr(info, "hwid", "") or ""),
+    }
+    text = " ".join(fields.values()).lower()
+    is_jlink = "segger" in text or "j-link" in text or "jlink" in text
+    is_hpx_cdc = fields["serial_number"].startswith("HPX-")
+    if is_jlink:
+        kind = "jlink-vcom"
+    elif is_hpx_cdc:
+        kind = "hpx-usb-cdc"
+    else:
+        kind = "serial"
+    return {**fields, "kind": kind}
+
+
+def _is_relevant_serial_port(row: dict[str, str]) -> bool:
+    if row["kind"] in ("jlink-vcom", "hpx-usb-cdc"):
+        return True
+    device = row["device"]
+    return any(token in device for token in ("ttyACM", "ttyUSB", "tty.usbmodem"))
+
+
 def _cmd_power_on(args: argparse.Namespace) -> None:
     """Enable Joulescope current passthrough and hold open until Ctrl-C."""
     from .power import get_driver
@@ -963,20 +1286,106 @@ _ENGINE_ALIASES = {
     "helia-aot": "helia-aot",
 }
 
+_TOOLCHAIN_ALIASES = {
+    "gcc": "arm-none-eabi-gcc",
+    "arm-none-eabi-gcc": "arm-none-eabi-gcc",
+    "armclang": "armclang",
+    "acfe": "armclang",
+    "atfe": "atfe",
+}
+
+_TRANSPORT_ALIASES = {
+    "rtt": "rtt",
+    "uart": "uart",
+    "swo": "swo",
+    "usb": "usb_cdc",
+    "usb_cdc": "usb_cdc",
+}
+
+_MEMORY_ALIASES = {
+    "auto": "auto",
+    "tcm": "tcm",
+    "sram": "sram",
+    "mram": "mram",
+    "psram": "psram",
+}
+
+
+def _parse_jlink_serials(raw: str) -> dict[str, str] | None:
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    mapping: dict[str, str] = {}
+    for item in [p.strip() for p in raw.split(",") if p.strip()]:
+        board, sep, serial = item.partition("=")
+        if not sep or not board.strip() or not serial.strip():
+            print(
+                f"Error: invalid --jlink-serials entry {item!r}; expected board=serial.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        mapping[board.strip()] = serial.strip()
+    return mapping
+
 
 def _normalise_engines(raw: str) -> str:
     """Translate short engine aliases (rt, aot) to canonical names."""
+    return _normalise_csv_aliases(
+        raw,
+        aliases=_ENGINE_ALIASES,
+        label="engine",
+        known="rt, aot, helia-rt, helia-aot",
+    )
+
+
+def _normalise_toolchains(raw: str) -> str:
+    """Translate toolchain aliases (gcc, acfe) to config values."""
+    return _normalise_csv_aliases(
+        raw,
+        aliases=_TOOLCHAIN_ALIASES,
+        label="toolchain",
+        known="gcc, arm-none-eabi-gcc, armclang/acfe, atfe",
+    )
+
+
+def _normalise_transports(raw: str) -> str:
+    """Translate interface aliases (usb) to transport config values."""
+    return _normalise_csv_aliases(
+        raw,
+        aliases=_TRANSPORT_ALIASES,
+        label="interface",
+        known="rtt, uart, swo, usb_cdc",
+    )
+
+
+def _normalise_memories(raw: str) -> str:
+    """Translate memory aliases to model placement presets."""
+    return _normalise_csv_aliases(
+        raw,
+        aliases=_MEMORY_ALIASES,
+        label="memory",
+        known="auto, tcm, sram, mram, psram",
+    )
+
+
+def _normalise_csv_aliases(
+    raw: str,
+    *,
+    aliases: dict[str, str],
+    label: str,
+    known: str,
+) -> str:
     if not raw.strip():
         return ""
     out: list[str] = []
     for token in [t.strip() for t in raw.split(",") if t.strip()]:
-        if token not in _ENGINE_ALIASES:
+        if token not in aliases:
             print(
-                f"Error: unknown engine '{token}'. Known: rt, aot, helia-rt, helia-aot.",
+                f"Error: unknown {label} '{token}'. Known: {known}.",
                 file=sys.stderr,
             )
             sys.exit(2)
-        out.append(_ENGINE_ALIASES[token])
+        out.append(aliases[token])
     return ",".join(out)
 
 
@@ -984,7 +1393,41 @@ def _cmd_validate(args: argparse.Namespace) -> None:
     """Drive the hardware validation suite via pytest."""
     from .validation import MODELS, BOARDS, build_matrix
 
+    # Preset suites fill in defaults for any axis the user did not set.
+    suite = getattr(args, "suite", None)
+    if suite == "smoke":
+        if not args.models.strip():
+            args.models = "kws"
+        if not args.engines.strip():
+            args.engines = "helia-rt"
+        if not args.toolchains.strip():
+            args.toolchains = "arm-none-eabi-gcc"
+        if not args.transports.strip():
+            args.transports = "rtt"
+        if not args.memories.strip():
+            args.memories = "auto"
+    elif suite in {"models-rt", "models-aot"}:
+        if not args.models.strip():
+            args.models = "kws,vww,ic,ad"
+        if not args.engines.strip():
+            args.engines = "helia-rt" if suite == "models-rt" else "helia-aot"
+        if not args.boards.strip():
+            args.boards = "apollo3p_evb,apollo4p_blue_kxr_evb,apollo510_evb"
+        if not args.toolchains.strip():
+            args.toolchains = "arm-none-eabi-gcc"
+        if not args.transports.strip():
+            args.transports = "rtt"
+        if not args.memories.strip():
+            args.memories = "auto"
+
+    if not args.boards.strip():
+        args.boards = "apollo510_evb"
+
     engines_csv = _normalise_engines(args.engines)
+    toolchains_csv = _normalise_toolchains(args.toolchains)
+    transports_csv = _normalise_transports(args.transports)
+    memories_csv = _normalise_memories(args.memories)
+    jlink_serials = _parse_jlink_serials(args.jlink_serials)
 
     # --list mode — preview the matrix, don't touch hardware.
     if args.list:
@@ -994,6 +1437,10 @@ def _cmd_validate(args: argparse.Namespace) -> None:
                 engines=[e.strip() for e in engines_csv.split(",") if e.strip()] or None,
                 power=args.power,
                 boards=[b.strip() for b in args.boards.split(",") if b.strip()] or None,
+                toolchains=[t.strip() for t in toolchains_csv.split(",") if t.strip()] or None,
+                transports=[t.strip() for t in transports_csv.split(",") if t.strip()] or None,
+                memories=[m.strip() for m in memories_csv.split(",") if m.strip()] or None,
+                jlink_serials=jlink_serials,
                 repeat=args.repeat,
             )
         except ValueError as exc:
@@ -1005,7 +1452,10 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         print(f"\n{len(cases)} case(s) would run:\n")
         for c in cases:
             power = "power" if c.power else "     "
-            print(f"  {c.case_id:<48}  {c.engine:<10}  {power}")
+            print(
+                f"  {c.case_id:<82}  {c.engine:<10}  "
+                f"{c.toolchain.value:<18}  {c.transport.value:<7}  {c.memory.value:<5}  {power}"
+            )
         return
 
     # Locate the validation test directory inside the installed package /
@@ -1047,6 +1497,14 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         pytest_args += ["--mlperf-engines", engines_csv]
     if args.boards.strip():
         pytest_args += ["--mlperf-boards", args.boards.strip()]
+    if toolchains_csv:
+        pytest_args += ["--mlperf-toolchains", toolchains_csv]
+    if transports_csv:
+        pytest_args += ["--mlperf-transports", transports_csv]
+    if memories_csv:
+        pytest_args += ["--mlperf-memories", memories_csv]
+    if args.jlink_serials.strip():
+        pytest_args += ["--mlperf-jlink-serials", args.jlink_serials.strip()]
     pytest_args += ["--mlperf-repeat", str(args.repeat)]
     if args.keyword:
         pytest_args += ["-k", args.keyword]

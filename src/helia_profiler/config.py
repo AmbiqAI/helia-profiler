@@ -32,6 +32,7 @@ from .platform import (
     get_default_sync_gpio_pin,
     get_soc,
 )
+from .target_lifecycle import ResetStrategy
 from .power.base import PowerMode
 
 
@@ -416,6 +417,9 @@ class PowerConfig:
     # cadence of on-device-integrated charge/energy stat packets used to bracket
     # the gated window. Higher = finer edge resolution, more (still tiny) packets.
     stats_rate_hz: int = DEFAULT_POWER_STATS_RATE_HZ
+    # Reset strategy before power capture. "auto" keeps board/SoC defaults;
+    # explicit strategies are for bring-up experiments and custom boards.
+    reset_strategy: ResetStrategy = ResetStrategy.AUTO
     # Optional Joulescope serial number (e.g. "004204") to disambiguate
     # when more than one device is plugged in. Leave None to auto-pick the
     # single available device (and fail loudly if multiple are present).
@@ -424,6 +428,8 @@ class PowerConfig:
     def __post_init__(self) -> None:
         if not isinstance(self.mode, PowerMode):
             object.__setattr__(self, "mode", PowerMode(self.mode))
+        if not isinstance(self.reset_strategy, ResetStrategy):
+            object.__setattr__(self, "reset_strategy", ResetStrategy(self.reset_strategy))
         if self.sync_input_index < 0:
             raise ValueError(
                 f"power.sync_input_index must be >= 0, got {self.sync_input_index}."
@@ -694,6 +700,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
                 "go_output_index", DEFAULT_POWER_GO_OUTPUT_INDEX
             ),
             stats_rate_hz=power_d.get("stats_rate_hz", DEFAULT_POWER_STATS_RATE_HZ),
+            reset_strategy=power_d.get("reset_strategy", ResetStrategy.AUTO.value),
             serial=power_d.get("serial"),
         ),
         output=OutputConfig(

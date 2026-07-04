@@ -7,7 +7,13 @@ from pathlib import Path
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
-from helia_profiler.report import _metadata_to_dict, _write_csv, _write_json, _write_summary
+from helia_profiler.report import (
+    _metadata_to_dict,
+    _write_csv,
+    _write_json,
+    _write_run_metadata,
+    _write_summary,
+)
 from helia_profiler.model_analysis import ModelAnalysis
 from helia_profiler.results import (
     FirmwareMeta,
@@ -65,6 +71,39 @@ def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):
         "device_profiled_infer_count": 6,
         "device_profiled_infer_total_us": 48000,
         "device_profiled_infer_avg_us": 8000,
+    }
+
+
+def test_write_run_metadata_includes_target_lifecycle(tmp_path: Path):
+    config = load_config(
+        None,
+        {
+            "model": {"path": "test.tflite"},
+            "engine": {"type": "helia-rt"},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.pmu_result = PmuResult(meta=FirmwareMeta(), layers=[])
+    ctx.power_result = PowerResult(
+        summary=PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0),
+        metadata={
+            "target_lifecycle": {
+                "phase": "power",
+                "power_cycle_attempted": True,
+                "power_cycle_succeeded": True,
+                "reset_action": "debug_reset",
+            },
+        },
+    )
+
+    out_path = _write_run_metadata(ctx, tmp_path)
+    metadata = json.loads(out_path.read_text())
+
+    assert metadata["target_lifecycle"] == {
+        "phase": "power",
+        "power_cycle_attempted": True,
+        "power_cycle_succeeded": True,
+        "reset_action": "debug_reset",
     }
 
 
@@ -157,6 +196,14 @@ def test_write_summary_prefers_gpio_gated_power_when_present(tmp_path: Path):
             "measurement_scope": "gpio_gated_clean_window",
             "sync_input_index": 0,
             "gating_method": "gpi_snapshot_poll",
+            "target_lifecycle": {
+                "phase": "power",
+                "power_cycle_attempted": True,
+                "power_cycle_succeeded": True,
+                "reset_action": "debug_reset",
+            },
+            "sync": {"lockstep": True, "ready_wait_s": 0.012},
+            "sync_timing_s": {"go_release_to_gate_rise_s": 0.004},
             "whole_capture_summary": {
                 "avg_current_a": 0.003,
                 "avg_power_w": 0.006,
@@ -178,6 +225,14 @@ def test_write_summary_prefers_gpio_gated_power_when_present(tmp_path: Path):
     # window must NOT leak into summary.json (it belongs in the detailed CSV).
     assert "whole_capture_window" not in summary["power"]
     assert summary["power"]["sync_input_index"] == 0
+    assert summary["power"]["target_lifecycle"] == {
+        "phase": "power",
+        "power_cycle_attempted": True,
+        "power_cycle_succeeded": True,
+        "reset_action": "debug_reset",
+    }
+    assert summary["power"]["sync"] == {"lockstep": True, "ready_wait_s": 0.012}
+    assert summary["power"]["sync_timing_s"] == {"go_release_to_gate_rise_s": 0.004}
     assert summary["model_analysis"]["tops"] == 0.0
 
 

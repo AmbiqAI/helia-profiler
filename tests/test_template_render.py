@@ -593,6 +593,20 @@ class TestMainAotCcRender:
         assert 'for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++)' in aot_out
         assert 'while ((uint32_t)(DWT->CYCCNT - t0) < (uint32_t)clean_probe_target_cyc)' not in aot_out
         assert 'clean_count = 1;' in aot_out
+        assert 'am_hal_debug_disable();' in tflm_out
+        assert 'am_hal_debug_disable();' in aot_out
+
+    def test_armv8m_infer_probe_keeps_debug_domain_up_for_clean_timing(self):
+        tflm_out = _render_tflm(transport="rtt", has_armv8m_pmu=True)
+        aot_out = _render_aot(transport="rtt", has_armv8m_pmu=True)
+
+        assert 'uint32_t t0 = DWT->CYCCNT;' in tflm_out
+        assert 'clean_cycles += (uint32_t)(DWT->CYCCNT - t0);' in tflm_out
+        assert 'am_hal_debug_disable();' not in tflm_out
+
+        assert 'uint32_t t0 = DWT->CYCCNT;' in aot_out
+        assert 'clean_cycles += (uint32_t)(DWT->CYCCNT - t0);' in aot_out
+        assert 'am_hal_debug_disable();' not in aot_out
 
     def test_dwt_only_aot_render_avoids_armv8m_pmu_api(self):
         out = _render_aot(transport="rtt", has_armv8m_pmu=False)

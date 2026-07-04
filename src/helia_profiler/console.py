@@ -847,6 +847,10 @@ class HpxConsole:
             msg.append(str(exc))
             if exc.hint:
                 msg.append(f"\n  hint: {exc.hint}", style="dim")
+            details = getattr(exc, "details", None)
+            if details:
+                rendered = "\n    ".join(str(details).splitlines())
+                msg.append(f"\n  details: {rendered}", style="dim")
             self._console.print(msg, highlight=False)
         else:
             self._console.print(f"[bold red]Error:[/bold red] {exc}")
