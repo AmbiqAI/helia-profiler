@@ -32,7 +32,7 @@ from ..engines import EngineType
 from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
 from ..placement import Placement
-from ..platform import SocFamily, get_soc_for_board
+from ..platform import get_soc_for_board
 from ..usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
 from .op_resolver import build_resolver_plan
 
@@ -1027,7 +1027,9 @@ def generate_app(ctx: PipelineContext) -> Path:
     # enables (nsx_platform_set_perf_mode is a no-op on AP3).  When the user
     # selects a >48 MHz tier on AP3, the firmware enables burst directly via
     # the AmbiqSuite HAL.  Other families switch via NSX perf mode as usual.
-    apollo3_burst = soc.family is SocFamily.AP3 and perf_mode_mhz > 48
+    # The base clock above which direct HAL burst applies is a clock capability.
+    burst_base_mhz = soc.capabilities.clock.direct_burst_base_mhz
+    apollo3_burst = burst_base_mhz is not None and perf_mode_mhz > burst_base_mhz
     resource_variable_count = sum(
         1
         for layer in (ctx.model_analysis.layers if ctx.model_analysis else ())
@@ -1040,6 +1042,12 @@ def generate_app(ctx: PipelineContext) -> Path:
     state_gpio_pin = config.power.state_gpio_pin
     go_gpio_pin = config.power.go_gpio_pin
     cmsis_device_header = soc.cmsis_header
+    # Cache/SSRAM firmware policy, sourced from platform capabilities rather than
+    # a SoC-family string in the templates: the cache-coherent Cortex-M55
+    # (Apollo5) parts maintain the RTT D-cache and power on the shared SSRAM
+    # domain for SRAM-resident arenas.
+    has_dcache = soc.capabilities.memory.has_dcache
+    manages_shared_ssram_power = soc.capabilities.memory.has_shared_ssram_power_domain
 
     # --- Heartbeat template vars (shared across engines) ---
     hb = config.target.heartbeat
@@ -1122,7 +1130,8 @@ def generate_app(ctx: PipelineContext) -> Path:
                 state_gpio_pin=state_gpio_pin,
                 go_gpio_pin=go_gpio_pin,
                 cmsis_device_header=cmsis_device_header,
-                soc_family=soc.family.value,
+                has_dcache=has_dcache,
+                manages_shared_ssram_power=manages_shared_ssram_power,
                 transport=transport,
                 usb_serial_marker=usb_serial_marker,
                 usb_serial_product=USB_MARKER_PRODUCT,
@@ -1176,7 +1185,8 @@ def generate_app(ctx: PipelineContext) -> Path:
                 state_gpio_pin=state_gpio_pin,
                 go_gpio_pin=go_gpio_pin,
                 cmsis_device_header=cmsis_device_header,
-                soc_family=soc.family.value,
+                has_dcache=has_dcache,
+                manages_shared_ssram_power=manages_shared_ssram_power,
                 transport=transport,
                 usb_serial_marker=usb_serial_marker,
                 usb_serial_product=USB_MARKER_PRODUCT,

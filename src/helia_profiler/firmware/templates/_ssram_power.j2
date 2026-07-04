@@ -33,7 +33,7 @@
 #}
 {% set _aot_sram_resident = ((arena_regions | default([])) | selectattr("placement", "equalto", "sram") | list | length) > 0 %}
 {% set _sram_resident = (arena_region | default("") == "sram") or (weights_region | default("") == "sram") or _aot_sram_resident %}
-{% if (soc_family | default("")) == "ap5" and (_sram_resident or (force_shared_sram | default(false))) %}
+{% if (manages_shared_ssram_power | default(false)) and (_sram_resident or (force_shared_sram | default(false))) %}
 
     // ---------------------------------------------------------------------
     // Shared SSRAM power-on (3 MB).  {{ "Active+retained for SRAM-resident buffers." if _sram_resident else "Retained only - mirrors AutoDeploy ns_power_config(bNeedSharedSRAM=true)." }}

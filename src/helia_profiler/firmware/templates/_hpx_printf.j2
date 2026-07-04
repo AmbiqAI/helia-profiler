@@ -67,7 +67,7 @@ static volatile bool g_hpx_rtt_lossless = false;
 // interpreter.input()/output() returned NULL and inference hung.  TCM arenas
 // were immune (non-cacheable), which is why only Apollo510 SRAM/PSRAM broke.
 static inline void hpx_rtt_invalidate_cb(void) {
-{% if (soc_family | default("")) == "ap5" %}
+{% if (has_dcache | default(false)) %}
 #if defined(__DCACHE_PRESENT) && (__DCACHE_PRESENT == 1U)
     SCB_InvalidateDCache_by_Addr((volatile void *)&_SEGGER_RTT,
                                  (int32_t)sizeof(_SEGGER_RTT));

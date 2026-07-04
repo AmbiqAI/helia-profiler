@@ -155,14 +155,11 @@ def _reset_for_power_phase(ctx: PipelineContext, requested: ResetStrategy) -> Re
 
 
 def _default_power_reset_strategy(ctx: PipelineContext) -> ResetStrategy:
-    from .platform import SocFamily
-
     # Apollo5-family only: a debug-level reset alone leaves PMU/power-management
     # state that was measured to inflate AP510 steady-state power. Keep AP3/AP4
     # on debug reset until their SWPOI behavior is validated as a replacement.
-    if ctx.soc.family is SocFamily.AP5:
-        return ResetStrategy.DEBUG_RESET_THEN_SWPOI
-    return ResetStrategy.DEBUG_RESET
+    # The per-family policy is resolved in the platform capability records.
+    return ResetStrategy(ctx.soc.capabilities.reset.default_power_reset_strategy)
 
 
 def _execute_reset_strategy(ctx: PipelineContext, strategy: ResetStrategy) -> ResetAction:
