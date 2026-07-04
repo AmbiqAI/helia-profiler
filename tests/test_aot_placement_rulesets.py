@@ -10,7 +10,7 @@ that pin each kind to a concrete memory. User-provided
 from __future__ import annotations
 
 from helia_profiler.config import load_config
-from helia_profiler.engines.helia_aot import (
+from helia_profiler.engines.helia_aot.compile import (
     _EXPECTED_PRAGMA_SUFFIXES,
     _resolve_aot_placement_intent,
     _resolve_aot_tensor_rulesets,
