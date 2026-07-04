@@ -67,7 +67,7 @@ def _register_builtins() -> None:
     if _DRIVERS:
         return
 
-    from .joulescope_driver import JoulescopeDriver
+    from .joulescope.driver import JoulescopeDriver
     from .ondevice_driver import OnDeviceDriver
 
     # Single unified Joulescope driver — handles JS110 and JS220.

@@ -12,7 +12,8 @@ from unittest.mock import patch
 import pytest
 
 from helia_profiler.errors import PowerError
-from helia_profiler.power.joulescope_driver import JoulescopeDriver, _open_device
+from helia_profiler.power.joulescope.device import _open_device
+from helia_profiler.power.joulescope_driver import JoulescopeDriver
 
 
 class TestJoulescopeAvailability:
@@ -66,10 +67,10 @@ class TestJoulescopeOpenRetries:
 
         with (
             patch(
-                "helia_profiler.power.joulescope_driver._get_shared_driver",
+                "helia_profiler.power.joulescope.device._get_shared_driver",
                 return_value=fake_driver,
             ),
-            patch("helia_profiler.power.joulescope_driver.time.sleep"),
+            patch("helia_profiler.power.joulescope.device.time.sleep"),
         ):
             drv, device_path, family = _open_device(serial=None)
 

@@ -104,7 +104,7 @@ class TestStageDelegation:
 
 def _patch_devices(devices):
     return patch(
-        "helia_profiler.power.joulescope_driver.enumerate_devices",
+        "helia_profiler.power.joulescope.driver.enumerate_devices",
         return_value=devices,
     )
 

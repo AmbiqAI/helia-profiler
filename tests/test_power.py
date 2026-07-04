@@ -136,7 +136,7 @@ class TestGatedStatsProcessing:
         return packet
 
     def test_gated_window_sums_ondevice_integrals(self):
-        from helia_profiler.power.joulescope_driver import _process_gated_stats
+        from helia_profiler.power.joulescope.stats import _process_gated_stats
 
         ms = _SECOND // 1000
         packets = []
@@ -170,7 +170,7 @@ class TestGatedStatsProcessing:
         assert summary.energy_j == pytest.approx(0.0018, rel=1e-6)
 
     def test_no_windows_returns_empty(self):
-        from helia_profiler.power.joulescope_driver import _process_gated_stats
+        from helia_profiler.power.joulescope.stats import _process_gated_stats
 
         ms = _SECOND // 1000
         packets = [self._packet(0, ms, 0.0001, 0.00018, 0.12)]
@@ -181,7 +181,7 @@ class TestGatedStatsProcessing:
         assert summary.sample_count == 0
 
     def test_gated_diagnostics_separates_selected_packets(self):
-        from helia_profiler.power.joulescope_driver import _gated_stats_diagnostics
+        from helia_profiler.power.joulescope.diagnostics import _gated_stats_diagnostics
 
         ms = _SECOND // 1000
         packets = []
@@ -205,10 +205,8 @@ class TestGatedStatsProcessing:
         assert diagnostics["rejected_median_current_a"] == pytest.approx(0.02, rel=1e-6)
 
     def test_gated_stats_uses_host_packet_time_axis_when_available(self):
-        from helia_profiler.power.joulescope_driver import (
-            _gated_stats_diagnostics,
-            _process_gated_stats,
-        )
+        from helia_profiler.power.joulescope.diagnostics import _gated_stats_diagnostics
+        from helia_profiler.power.joulescope.stats import _process_gated_stats
 
         ms = _SECOND // 1000
         host_base = 10_000 * ms
@@ -239,7 +237,7 @@ class TestGatedStatsProcessing:
         assert diagnostics["selected_packets"] == 10
 
     def test_whole_summary_sums_all_packets(self):
-        from helia_profiler.power.joulescope_driver import _whole_summary_from_stats
+        from helia_profiler.power.joulescope.stats import _whole_summary_from_stats
 
         ms = _SECOND // 1000
         packets = [
