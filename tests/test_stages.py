@@ -9,10 +9,10 @@ import pytest
 from helia_profiler.config import load_config
 from helia_profiler.errors import ConfigError, EngineError, FirmwareError
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.stages.s01_resolve_platform import ResolvePlatformStage
-from helia_profiler.stages.s01a_resolve_jlink import ResolveJLinkProbeStage
-from helia_profiler.stages.s02_prepare_engine import PrepareEngineStage
-from helia_profiler.stages.s03_generate_firmware import GenerateFirmwareStage
+from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+from helia_profiler.stages.resolve_probe import ResolveJLinkProbeStage
+from helia_profiler.stages.prepare_engine import PrepareEngineStage
+from helia_profiler.stages.generate_firmware import GenerateFirmwareStage
 
 
 def _make_ctx(tmp_path: Path, overrides: dict | None = None) -> PipelineContext:
@@ -127,7 +127,7 @@ class TestResolveJLinkProbeStage:
         ctx = _make_ctx(tmp_path)
         ResolvePlatformStage().run(ctx)
         monkeypatch.setattr(
-            "helia_profiler.stages.s01a_resolve_jlink.resolve_probe_serial",
+            "helia_profiler.stages.resolve_probe.resolve_probe_serial",
             lambda **_: "1160002204",
         )
         stage = ResolveJLinkProbeStage()

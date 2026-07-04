@@ -20,9 +20,9 @@ from helia_profiler.firmware import (
     generate_app,
 )
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.stages.s01_resolve_platform import ResolvePlatformStage
-from helia_profiler.stages.s02b_plan_memory import PlanMemoryStage
-from helia_profiler.stages.s02_prepare_engine import PrepareEngineStage
+from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+from helia_profiler.stages.plan_memory import PlanMemoryStage
+from helia_profiler.stages.prepare_engine import PrepareEngineStage
 
 
 def _fake_starter_profiles() -> dict[str, dict]:

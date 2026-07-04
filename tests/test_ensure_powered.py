@@ -19,7 +19,7 @@ from helia_profiler.config import load_config
 from helia_profiler.errors import PowerError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.joulescope_driver import JoulescopeDriver
-from helia_profiler.stages.s00b_ensure_powered import EnsureBoardPoweredStage
+from helia_profiler.stages.ensure_powered import EnsureBoardPoweredStage
 
 
 def _ctx(tmp_path: Path, power: dict | None = None) -> PipelineContext:

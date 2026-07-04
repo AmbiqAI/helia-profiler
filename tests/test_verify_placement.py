@@ -15,8 +15,8 @@ from helia_profiler.platform import (
     get_soc_for_board,
     soc_placement_ranges,
 )
-from helia_profiler.stages import s04b_verify_placement
-from helia_profiler.stages.s04b_verify_placement import VerifyPlacementStage
+from helia_profiler.stages import verify_placement
+from helia_profiler.stages.verify_placement import VerifyPlacementStage
 
 
 # ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ class TestRun:
         ctx = _ctx(tmp_path, arena_region=Placement.SRAM)
         # Arena correctly in SRAM (0x10060000-0x10160000).
         monkeypatch.setattr(
-            s04b_verify_placement, "symbol_address", lambda *a, **k: (0x1006D1F0, "d")
+            verify_placement, "symbol_address", lambda *a, **k: (0x1006D1F0, "d")
         )
         VerifyPlacementStage().run(ctx)  # no raise
 
@@ -131,7 +131,7 @@ class TestRun:
         ctx = _ctx(tmp_path, arena_region=Placement.SRAM)
         # Arena fell into TCM (the armclang scatter-gap bug): 0x10025270.
         monkeypatch.setattr(
-            s04b_verify_placement, "symbol_address", lambda *a, **k: (0x10025270, "b")
+            verify_placement, "symbol_address", lambda *a, **k: (0x10025270, "b")
         )
         with pytest.raises(BuildError) as exc:
             VerifyPlacementStage().run(ctx)
@@ -142,7 +142,7 @@ class TestRun:
     def test_unresolved_symbol_is_best_effort(self, tmp_path, monkeypatch):
         ctx = _ctx(tmp_path, arena_region=Placement.SRAM)
         monkeypatch.setattr(
-            s04b_verify_placement, "symbol_address", lambda *a, **k: None
+            verify_placement, "symbol_address", lambda *a, **k: None
         )
         VerifyPlacementStage().run(ctx)  # no raise
 
@@ -151,9 +151,9 @@ class TestRun:
         # Simulate a SoC family whose memory model is not yet characterised:
         # even a wildly wrong address must not raise when ranges are unknown.
         monkeypatch.setattr(
-            s04b_verify_placement, "soc_placement_ranges", lambda soc: {}
+            verify_placement, "soc_placement_ranges", lambda soc: {}
         )
         monkeypatch.setattr(
-            s04b_verify_placement, "symbol_address", lambda *a, **k: (0x00001234, "b")
+            verify_placement, "symbol_address", lambda *a, **k: (0x00001234, "b")
         )
         VerifyPlacementStage().run(ctx)  # no raise

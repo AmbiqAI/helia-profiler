@@ -17,7 +17,7 @@ import pytest
 
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.stages.s01_resolve_platform import ResolvePlatformStage
+from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
 # A minimal, fully parseable firmware capture: one preset, one iteration,
 # one CONV_2D layer, framed by the protocol sentinels.  Mirrors the canned

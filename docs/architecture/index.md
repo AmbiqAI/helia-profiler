@@ -126,15 +126,15 @@ src/helia_profiler/
 │   ├── helia_rt.py     # heliaRT adapter
 │   └── helia_aot.py    # heliaAOT adapter
 │
-├── stages/             # Pipeline stages (s01–s08)
-│   ├── s01_resolve_platform.py
-│   ├── s02_prepare_engine.py
-│   ├── s03_generate_firmware.py
-│   ├── s04_build_firmware.py
-│   ├── s05_flash_firmware.py
-│   ├── s06_capture_pmu.py
-│   ├── s07_capture_power.py
-│   └── s08_generate_report.py
+├── stages/             # Pipeline stages
+│   ├── resolve_platform.py
+│   ├── prepare_engine.py
+│   ├── generate_firmware.py
+│   ├── build_firmware.py
+│   ├── flash.py
+│   ├── capture_pmu.py
+│   ├── capture_power.py
+│   └── report.py
 │
 ├── firmware/           # Firmware generation
 │   ├── __init__.py     # Template rendering, model→header, build/flash

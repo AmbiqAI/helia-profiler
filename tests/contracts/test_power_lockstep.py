@@ -195,7 +195,7 @@ class TestExplicitFlashRecoveryPath:
         recovered by power-cycling the Joulescope rail, never by the auto reset
         policy.
         """
-        from helia_profiler.stages.s05_flash_firmware import _try_power_cycle
+        from helia_profiler.stages.flash import _try_power_cycle
 
         driver = _FakeRailDriver()
         monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: driver)
@@ -205,7 +205,7 @@ class TestExplicitFlashRecoveryPath:
         assert driver.power_cycle_calls == 1
 
     def test_flash_recovery_skipped_when_power_disabled(self, tmp_path):
-        from helia_profiler.stages.s05_flash_firmware import _try_power_cycle
+        from helia_profiler.stages.flash import _try_power_cycle
 
         ctx = make_pmu_ctx(tmp_path, board="apollo510_evb", power_enabled=False)
         assert _try_power_cycle(ctx) is False

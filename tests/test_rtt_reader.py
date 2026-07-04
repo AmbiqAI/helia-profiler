@@ -19,7 +19,7 @@ from helia_profiler.errors import CaptureError
 from helia_profiler.capture.serial_reader import capture_swo_output
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.stages.s01_resolve_platform import ResolvePlatformStage
+from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
 
 class _FakeJLink:

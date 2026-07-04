@@ -2,7 +2,7 @@
 
 Centralises every shell-out for read-only toolchain info so that:
 
-* ``s04_build_firmware`` does not need ``subprocess`` at all;
+* ``build_firmware`` does not need ``subprocess`` at all;
 * timeout handling, error capture, and output parsing live in one place;
 * tests can monkeypatch a single module to simulate missing toolchains.
 """

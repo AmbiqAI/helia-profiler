@@ -409,7 +409,7 @@ class TestCapturePowerStage:
     def test_skipped_when_disabled(self, tmp_path: Path):
         from helia_profiler.config import load_config
         from helia_profiler.pipeline import PipelineContext
-        from helia_profiler.stages.s07_capture_power import CapturePowerStage
+        from helia_profiler.stages.capture_power import CapturePowerStage
 
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")
@@ -424,7 +424,7 @@ class TestCapturePowerStage:
     def test_not_skipped_when_enabled(self, tmp_path: Path):
         from helia_profiler.config import load_config
         from helia_profiler.pipeline import PipelineContext
-        from helia_profiler.stages.s07_capture_power import CapturePowerStage
+        from helia_profiler.stages.capture_power import CapturePowerStage
 
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")
@@ -449,7 +449,7 @@ class TestCapturePowerStage:
         from helia_profiler.config import load_config
         from helia_profiler.pipeline import PipelineContext
         from helia_profiler.platform import get_soc_for_board
-        from helia_profiler.stages.s07_capture_power import CapturePowerStage
+        from helia_profiler.stages.capture_power import CapturePowerStage
 
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")
@@ -800,7 +800,7 @@ class TestEstimateCaptureDuration:
         return ctx
 
     def test_fixed_window_includes_clean_iterations(self, tmp_path: Path):
-        from helia_profiler.stages.s07_capture_power import (
+        from helia_profiler.stages.capture_power import (
             _BOOT_SETTLE_S,
             _SAFETY_MARGIN_S,
             _estimate_capture_duration,
@@ -823,7 +823,7 @@ class TestEstimateCaptureDuration:
         assert estimated == pytest.approx(expected, rel=1e-6)
 
     def test_auto_window_scales_with_target_ms(self, tmp_path: Path):
-        from helia_profiler.stages.s07_capture_power import (
+        from helia_profiler.stages.capture_power import (
             _BOOT_SETTLE_S,
             _SAFETY_MARGIN_S,
             _estimate_capture_duration,
@@ -855,7 +855,7 @@ class TestEstimateCaptureDuration:
         # detected": a 21.136ms-per-inference model with window_target_ms
         # 8000 needs ~379 clean iterations (~8s), which the old estimate
         # (based only on the 4 profiled PMU passes) undercounted as ~7.1s.
-        from helia_profiler.stages.s07_capture_power import _estimate_capture_duration
+        from helia_profiler.stages.capture_power import _estimate_capture_duration
         from helia_profiler.results import FirmwareMeta, LayerResult, PmuResult
 
         ctx = self._make_ctx(
