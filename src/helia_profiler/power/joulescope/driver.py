@@ -102,6 +102,14 @@ class JoulescopeDriver:
         """
         del sampling_frequency  # streaming stats are at instrument-fixed rate
 
+        try:
+            from pyjoulescope_driver import time64
+        except Exception as exc:
+            raise PowerError(
+                f"Joulescope capture requires pyjoulescope_driver: {exc}",
+                hint="Reinstall pyjoulescope_driver and pyjls in the active environment.",
+            ) from exc
+
         driver, device_path, family = _open_device(self._serial)
 
         stats_topic = f"{device_path}/{_STATS_TOPIC[family]}"

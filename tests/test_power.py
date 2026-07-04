@@ -250,6 +250,62 @@ class TestGatedStatsProcessing:
         assert summary.avg_power_w == pytest.approx(0.18, rel=1e-6)
 
 
+class TestJoulescopeUngatedCapture:
+    """Exercises :meth:`JoulescopeDriver.capture` (the non-gated path).
+
+    Regression test for a real (pre-existing) bug: the ``_on_stats``
+    callback referenced the ``pyjoulescope_driver.time64`` module without
+    importing it in this method's scope (it was only imported in the
+    sibling ``capture_gated`` method), so any stats packet arriving during
+    a plain (non-gated) capture crashed with ``NameError: name 'time64' is
+    not defined``.
+    """
+
+    class _FakeDriver:
+        """Minimal pyjoulescope_driver.Driver stand-in.
+
+        ``subscribe`` invokes the callback synchronously with one fake stat
+        packet so ``capture()``'s ``_on_stats`` closure runs for real.
+        """
+
+        def __init__(self, packet: dict):
+            self._packet = packet
+            self.published: list[tuple[str, object]] = []
+
+        def publish(self, topic, value, **kwargs):
+            self.published.append((topic, value))
+
+        def subscribe(self, topic, _flag, callback):
+            callback(topic, self._packet)
+
+        def unsubscribe(self, topic, callback):
+            pass
+
+    @staticmethod
+    def _stats_packet():
+        return {
+            "signals": {
+                "current": {"avg": {"value": 0.01}, "max": {"value": 0.02}},
+                "voltage": {"avg": {"value": 1.8}},
+            }
+        }
+
+    def test_capture_processes_stats_packet_without_crashing(self, monkeypatch: pytest.MonkeyPatch):
+        from helia_profiler.power.joulescope.driver import JoulescopeDriver
+
+        fake_driver = self._FakeDriver(self._stats_packet())
+        monkeypatch.setattr(
+            "helia_profiler.power.joulescope.driver._open_device",
+            lambda serial: (fake_driver, "u/js220/000123", "js220"),
+        )
+        monkeypatch.setattr("helia_profiler.power.joulescope.driver.time.sleep", lambda _s: None)
+
+        driver = JoulescopeDriver()
+        result = driver.capture(duration_s=0.01, io_voltage=1.8)
+
+        assert result.summary.sample_count == 1
+        assert result.summary.avg_current_a == pytest.approx(0.01, rel=1e-6)
+
 
 class TestPowerMode:
     def test_external(self):
