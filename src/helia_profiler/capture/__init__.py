@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from ..pipeline import PipelineContext
     from ..power.base import PowerResult
     from ..results import PmuResult
-    from ..target_lifecycle import TargetLifecyclePlan
+    from ..target.lifecycle import TargetLifecyclePlan
 
 log = logging.getLogger("hpx")
 
@@ -51,6 +51,7 @@ class _TransportReaderArgs:
     heartbeat_timeout_s: float
     build_dir: object
     timing_raw: dict[str, float] = field(default_factory=dict)
+    reset_controller: object | None = None
 
 
 def _read_usb_cdc(ctx: PipelineContext, args: _TransportReaderArgs) -> list[str]:
@@ -63,6 +64,7 @@ def _read_usb_cdc(ctx: PipelineContext, args: _TransportReaderArgs) -> list[str]
         usb_marker=usb_marker_serial(args.jlink_serial),
         keep_attached=args.keep_debugger_attached,
         timing_out=args.timing_raw,
+        reset_controller=args.reset_controller,
     )
 
 
@@ -91,6 +93,7 @@ def _read_rtt(ctx: PipelineContext, args: _TransportReaderArgs) -> list[str]:
         timeout_s=args.overall_timeout_s,
         heartbeat_timeout_s=args.heartbeat_timeout_s,
         timing_out=args.timing_raw,
+        reset_controller=args.reset_controller,
     )
 
 
@@ -104,6 +107,7 @@ def _read_uart(ctx: PipelineContext, args: _TransportReaderArgs) -> list[str]:
         heartbeat_timeout_s=args.heartbeat_timeout_s,
         keep_attached=args.keep_debugger_attached,
         timing_out=args.timing_raw,
+        reset_controller=args.reset_controller,
     )
 
 
@@ -136,6 +140,7 @@ def _read_swo(ctx: PipelineContext, args: _TransportReaderArgs) -> list[str]:
         jlink_device=args.jlink_device,
         cpu_freq=cpu_freq_hz,
         timing_out=args.timing_raw,
+        reset_controller=args.reset_controller,
     )
 
 
@@ -232,6 +237,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         heartbeat_timeout_s=heartbeat_timeout_s,
         build_dir=build_dir,
         timing_raw=timing_raw,
+        reset_controller=ctx.reset_controller,
     )
     lines = reader(ctx, reader_args)
     if not lines:

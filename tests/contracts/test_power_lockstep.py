@@ -156,8 +156,8 @@ class TestAutoStrategyNeverCyclesRail:
         self, tmp_path, monkeypatch, strategy
     ):
         # J-Link resets are stubbed so only rail cycling is observable.
-        monkeypatch.setattr("helia_profiler.jlink.reset_target", lambda **_k: None)
-        monkeypatch.setattr("helia_profiler.jlink.reset_target_poi", lambda **_k: None)
+        monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", lambda **_k: None)
+        monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target_poi", lambda **_k: None)
         driver = _FakeRailDriver()
         ctx = make_pmu_ctx(
             tmp_path, board="apollo510_evb", power_enabled=True, reset_strategy=strategy
@@ -171,8 +171,8 @@ class TestAutoStrategyNeverCyclesRail:
         assert "power_cycle" not in plan.actions
 
     def test_explicit_power_cycle_strategy_cycles_rail(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("helia_profiler.jlink.reset_target", lambda **_k: None)
-        monkeypatch.setattr("helia_profiler.jlink.reset_target_poi", lambda **_k: None)
+        monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", lambda **_k: None)
+        monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target_poi", lambda **_k: None)
         driver = _FakeRailDriver()
         ctx = make_pmu_ctx(
             tmp_path, board="apollo510_evb", power_enabled=True, reset_strategy="power_cycle"

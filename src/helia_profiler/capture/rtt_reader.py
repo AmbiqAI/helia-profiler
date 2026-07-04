@@ -25,7 +25,7 @@ liveness signal and does **not** reply on the down-channel.  (The old
 on the target's down-buffer descriptor — that repeatedly regressed.)
 
 Sequence:
-  1. Reset the target via JLinkExe (handles Apollo510 SBL correctly).
+  1. Reset the target via SEGGER commander (handles Apollo510 SBL correctly).
   2. Connect pylink and start RTT — locate the RTT control block.
   3. (PSRAM) Wait for HPX_PSRAM_READY, upload model, send HPX_GO.
   4. Collect lines until ``--- HPX_END ---`` or timeout.
@@ -37,11 +37,17 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from ..errors import CaptureError
-from ..jlink import reset_target
-from .readiness import open_jlink_with_retry, resume_if_halted
+from ..target.probe.base import DebugMemorySession, ResetController
+from ..target.probe.jlink import (
+    JLinkResetController,
+    create_debug_memory_session,
+    is_jlink_exception,
+    is_jlink_rtt_exception,
+    open_jlink_with_retry,
+    resume_if_halted,
+)
 from .transport import (
     DEFAULT_TIMEOUT_S,
     HEARTBEAT_TIMEOUT_S,
@@ -52,9 +58,6 @@ from .transport import (
 from .timing import SBL_SETTLE_S
 
 log = logging.getLogger("hpx")
-
-if TYPE_CHECKING:
-    import pylink
 
 _RTT_CB_TIMEOUT_S = 30  # max time to wait for RTT control block discovery
 _RTT_PRECLEAN_TIMEOUT_S = 10  # bound the pre-reset connect used to wipe stale blocks
@@ -87,7 +90,7 @@ _RTT_ACTIVITY_BONUS = 1 << 26
 
 
 def _read_rtt_up_channel0_name(
-    jlink: "pylink.JLink",
+    jlink: DebugMemorySession,
     block_address: int,
     max_len: int = _RTT_NAME_MAX_LEN,
 ) -> bytes:
@@ -108,7 +111,7 @@ def _read_rtt_up_channel0_name(
     return raw[:nul] if nul >= 0 else raw
 
 
-def _score_rtt_control_block(jlink: "pylink.JLink", block_address: int) -> int:
+def _score_rtt_control_block(jlink: DebugMemorySession, block_address: int) -> int:
     """Rank an RTT control-block candidate by how likely it is *our* live block.
 
     A raw "SEGGER RTT" magic match is too weak on its own: Apollo5 parts retain
@@ -155,7 +158,7 @@ def _score_rtt_control_block(jlink: "pylink.JLink", block_address: int) -> int:
 
 
 def _direct_rtt_read(
-    jlink: "pylink.JLink",
+    jlink: DebugMemorySession,
     *,
     block_address: int,
     buffer_index: int = 0,
@@ -198,7 +201,7 @@ def _direct_rtt_read(
 
 
 def _direct_rtt_write(
-    jlink: "pylink.JLink",
+    jlink: DebugMemorySession,
     *,
     block_address: int,
     data: bytes,
@@ -248,7 +251,7 @@ def _direct_rtt_write(
 
 
 def _scan_rtt_control_blocks(
-    jlink: "pylink.JLink",
+    jlink: DebugMemorySession,
     ranges: tuple[tuple[int, int], ...],
 ) -> list[tuple[int, int]]:
     """Return every valid RTT control block as ``(address, score)``, best-first.
@@ -286,7 +289,7 @@ def _scan_rtt_control_blocks(
 
 
 def _scan_for_rtt_control_block(
-    jlink: "pylink.JLink",
+    jlink: DebugMemorySession,
     ranges: tuple[tuple[int, int], ...],
 ) -> tuple[int, int] | None:
     """Return the best-scoring RTT control block and its score, or None.
@@ -312,7 +315,7 @@ def _scan_for_rtt_control_block(
 
 
 def _wipe_rtt_control_blocks(
-    jlink: "pylink.JLink",
+    jlink: DebugMemorySession,
     ranges: tuple[tuple[int, int], ...],
 ) -> int:
     """Blank the "SEGGER RTT" magic of every control block found in SRAM.
@@ -363,7 +366,7 @@ def _wipe_rtt_control_blocks(
 
 
 def _direct_rtt_read_any(
-    jlink: "pylink.JLink",
+    jlink: DebugMemorySession,
     *,
     ranges: tuple[tuple[int, int], ...],
     preferred_block_address: int | None = None,
@@ -430,7 +433,7 @@ def _wait_for_rtt_line(
 
 
 def _write_rtt_command_direct(
-    jlink: "pylink.JLink",
+    jlink: DebugMemorySession,
     *,
     block_address: int,
     command: bytes,
@@ -458,7 +461,7 @@ def _write_rtt_command_direct(
 
 
 def _write_rtt_command_api(
-    jlink: "pylink.JLink",
+    jlink: DebugMemorySession,
     *,
     command: bytes,
     timeout_s: float = _RTT_READY_TIMEOUT_S,
@@ -514,7 +517,7 @@ def _prepend_pending_bytes(read_chunk, pending: bytes):
 
 
 def _upload_model_to_psram(
-    jlink: "pylink.JLink",
+    jlink: DebugMemorySession,
     model_path: Path,
     timeout_s: float = _PSRAM_READY_TIMEOUT_S,
     initial_buf: bytes = b"",
@@ -602,6 +605,7 @@ def capture_rtt_output(
     model_path: Path | None = None,
     weights_region: str = "mram",
     timing_out: dict[str, float] | None = None,
+    reset_controller: ResetController | None = None,
 ) -> list[str]:
     """Capture firmware output via SEGGER RTT until HPX_END or hang detection.
 
@@ -660,15 +664,8 @@ def capture_rtt_output(
         if hpx_start_s is not None and hpx_end_s is not None:
             timing_out["protocol_duration_s"] = hpx_end_s - hpx_start_s
 
-    try:
-        import pylink
-    except ImportError as exc:
-        raise CaptureError(
-            "pylink-square package not installed (required for RTT transport)",
-            hint="pip install pylink-square",
-        ) from exc
-
-    jlink = pylink.JLink()
+    controller = reset_controller or JLinkResetController()
+    jlink = create_debug_memory_session()
 
     try:
         # --- Phase 0: pre-clean stale RTT control blocks ---
@@ -714,11 +711,11 @@ def capture_rtt_output(
                 except Exception:  # noqa: BLE001 — close errors are non-fatal
                     pass
 
-        # --- Step 1: reset the target via JLinkExe subprocess ---
-        # JLinkExe handles the Apollo510 secure bootloader (SBL) correctly;
+        # --- Step 1: reset the target via SEGGER commander subprocess ---
+        # SEGGER commander handles the Apollo510 secure bootloader (SBL) correctly;
         # pylink's reset() does not trigger the vendor-specific handler.
         reset_started_s = time.monotonic()
-        reset_target(device=jlink_device, jlink_serial=jlink_serial)
+        controller.debug_reset(device=jlink_device, jlink_serial=jlink_serial)
         record_phase_duration("reset", reset_started_s)
 
         # --- Step 2: connect pylink and wait for RTT readiness ---
@@ -822,11 +819,15 @@ def capture_rtt_output(
         while time.monotonic() < probe_deadline:
             try:
                 num_up_buffers = jlink.rtt_get_status().NumUpBuffers
-            except pylink.errors.JLinkRTTException:
+            except Exception as exc:
+                if not is_jlink_rtt_exception(exc):
+                    raise
                 num_up_buffers = 0
             try:
                 chunk = bytes(jlink.rtt_read(0, 4096))
-            except pylink.errors.JLinkRTTException:
+            except Exception as exc:
+                if not is_jlink_rtt_exception(exc):
+                    raise
                 chunk = b""
             if chunk:
                 probe_bytes += chunk
@@ -875,7 +876,7 @@ def capture_rtt_output(
             # SEGGER RTT API attach. Reopen a fresh SWD session before the
             # manual control-block polling path so direct reads/writes behave
             # like a standalone memory-access session.
-            jlink = pylink.JLink()
+            jlink = create_debug_memory_session()
             fallback_attach_started_s = time.monotonic()
             open_jlink_with_retry(
                 jlink,
@@ -983,12 +984,12 @@ def capture_rtt_output(
 
     except CaptureError:
         raise
-    except pylink.errors.JLinkException as exc:
-        raise CaptureError(
-            f"J-Link RTT error: {exc}",
-            hint="Check J-Link probe connection and that the probe is not in use.",
-        ) from exc
     except Exception as exc:
+        if is_jlink_exception(exc):
+            raise CaptureError(
+                f"J-Link RTT error: {exc}",
+                hint="Check J-Link probe connection and that the probe is not in use.",
+            ) from exc
         raise CaptureError(
             f"RTT capture failed: {exc}",
             hint="Check J-Link connection to the board.",

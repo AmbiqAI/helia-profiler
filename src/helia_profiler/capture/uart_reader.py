@@ -14,7 +14,7 @@ target to avoid racing the firmware's boot-time attach delay.
 Sequence:
   1. Locate the J-Link VCOM serial port for this probe.
   2. Open the port (115200 8N1) and flush stale bytes.
-  3. Reset the target via JLinkExe.
+  3. Reset the target via SEGGER commander.
   4. Collect lines until ``--- HPX_END ---`` or timeout.
   5. Close the port.
 
@@ -31,8 +31,8 @@ import serial  # pyserial
 from serial.tools import list_ports
 
 from ..errors import CaptureError
-from ..jlink import reset_target
-from .readiness import attached_reset_session
+from ..target.probe.base import ResetController
+from ..target.probe.jlink import JLinkResetController
 from .transport import (
     DEFAULT_TIMEOUT_S,
     HEARTBEAT_TIMEOUT_S,
@@ -120,6 +120,7 @@ def capture_uart_output(
     heartbeat_timeout_s: float = HEARTBEAT_TIMEOUT_S,
     keep_attached: bool = False,
     timing_out: dict[str, float] | None = None,
+    reset_controller: ResetController | None = None,
 ) -> list[str]:
     """Capture firmware output via the J-Link OB VCOM UART.
 
@@ -150,6 +151,7 @@ def capture_uart_output(
             hpx_end_s = line_ts
 
     port = _find_jlink_vcom_port(jlink_serial)
+    controller = reset_controller or JLinkResetController()
 
     log.info("Opening J-Link VCOM port: %s @ %d 8N1", port, _BAUD)
     ser: serial.Serial | None = None
@@ -179,12 +181,12 @@ def capture_uart_output(
             # powered while a debugger is attached.  Hold a pylink session open
             # across the capture instead of releasing the probe, or every
             # per-layer cycle reads back 0.
-            with attached_reset_session(
+            with controller.attached_reset_session(
                 device=jlink_device, jlink_serial=jlink_serial
             ):
                 lines = _collect()
         else:
-            reset_target(device=jlink_device, jlink_serial=jlink_serial)
+            controller.debug_reset(device=jlink_device, jlink_serial=jlink_serial)
             lines = _collect()
     except CaptureError:
         raise

@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import logging
 
-from ..jlink import resolve_probe_serial
 from ..pipeline import PipelineContext
+from ..target.probe.jlink import (
+    JLinkFlashBackend,
+    JLinkProbe,
+    JLinkResetController,
+    resolve_probe_serial,
+)
 
 log = logging.getLogger("hpx")
 
@@ -26,4 +31,7 @@ class ResolveJLinkProbeStage:
             requested_serial=ctx.config.target.jlink_serial,
         )
         ctx.resolved_jlink_serial = serial
+        ctx.probe = JLinkProbe(serial=serial)
+        ctx.flash_backend = JLinkFlashBackend()
+        ctx.reset_controller = JLinkResetController()
         log.info("Using J-Link serial: %s", serial)

@@ -471,11 +471,11 @@ class TestCapturePowerStage:
                 raise AssertionError("auto reset must not power-cycle")
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: reset_calls.update(k),
         )
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target_poi",
+            "helia_profiler.target.probe.jlink.reset_target_poi",
             lambda **k: reset_calls.setdefault("swpoi", k),
         )
 
@@ -544,11 +544,11 @@ class TestTargetLifecycle:
                 raise AssertionError("auto AP4 reset must not power-cycle")
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: calls.append(("reset", k)),
         )
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target_poi",
+            "helia_profiler.target.probe.jlink.reset_target_poi",
             lambda **k: calls.append(("swpoi", k)),
         )
 
@@ -583,11 +583,11 @@ class TestTargetLifecycle:
                 raise AssertionError("auto AP5 reset must not power-cycle")
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: calls.append(("reset", k)),
         )
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target_poi",
+            "helia_profiler.target.probe.jlink.reset_target_poi",
             lambda **k: calls.append(("swpoi", k)),
         )
 
@@ -620,11 +620,11 @@ class TestTargetLifecycle:
                 raise AssertionError("explicit SWPOI reset must not power-cycle")
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: calls.append(("reset", k)),
         )
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target_poi",
+            "helia_profiler.target.probe.jlink.reset_target_poi",
             lambda **k: calls.append(("swpoi", k)),
         )
 
@@ -653,11 +653,11 @@ class TestTargetLifecycle:
                 raise AssertionError("none reset must not power-cycle")
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: calls.append(("reset", k)),
         )
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target_poi",
+            "helia_profiler.target.probe.jlink.reset_target_poi",
             lambda **k: calls.append(("swpoi", k)),
         )
 
@@ -686,11 +686,11 @@ class TestTargetLifecycle:
                 calls.append(("power_cycle", kwargs))
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: calls.append(("reset", k)),
         )
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target_poi",
+            "helia_profiler.target.probe.jlink.reset_target_poi",
             lambda **k: calls.append(("swpoi", k)),
         )
 
@@ -719,7 +719,7 @@ class TestTargetLifecycle:
                 raise PowerError("no rail control")
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: calls.append(("reset", k)),
         )
 
@@ -745,7 +745,7 @@ class TestTargetLifecycle:
                 raise AssertionError("non-power phase must not power-cycle")
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: (_ for _ in ()).throw(AssertionError("must not reset")),
         )
 

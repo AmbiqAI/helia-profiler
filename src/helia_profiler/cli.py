@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 def main(argv: list[str] | None = None) -> None:
     from .config import AGGREGATION_METHODS, Transport
-    from .target_lifecycle import ResetStrategy
+    from .target.lifecycle import ResetStrategy
 
     parser = argparse.ArgumentParser(
         prog="hpx",
@@ -377,7 +377,7 @@ def main(argv: list[str] | None = None) -> None:
     # --- hpx probes ---
     p_probes = sub.add_parser(
         "probes",
-        help="Inspect connected J-Link probes without opening an interactive JLinkExe session",
+        help="Inspect connected J-Link probes without opening an interactive SEGGER commander session",
     )
     probes_sub = p_probes.add_subparsers(dest="probes_action")
     p_probes_list = probes_sub.add_parser("list", help="List connected J-Link probes")
@@ -1041,7 +1041,7 @@ def _cmd_probes(args: argparse.Namespace) -> None:
 
 def _cmd_probes_list(args: argparse.Namespace) -> None:
     from .errors import HpxError
-    from .jlink import inspect_probe_target, list_connected_probes
+    from .target.probe.jlink import inspect_probe_target, list_connected_probes
 
     board_name = getattr(args, "board", None)
     inspect = bool(getattr(args, "inspect", False) or board_name)
@@ -1094,7 +1094,7 @@ def _cmd_probes_list(args: argparse.Namespace) -> None:
 
 def _cmd_probes_match(args: argparse.Namespace) -> None:
     from .errors import HpxError
-    from .jlink import resolve_probe_serial
+    from .target.probe.jlink import resolve_probe_serial
 
     try:
         from .platform import get_soc_for_board
@@ -1159,7 +1159,7 @@ def _cmd_target(args: argparse.Namespace) -> None:
 
 def _cmd_target_reset(args: argparse.Namespace) -> None:
     from .errors import HpxError
-    from .jlink import reset_target, reset_target_poi
+    from .target.probe.jlink import reset_target, reset_target_poi
 
     try:
         from .platform import get_soc_for_board

@@ -32,7 +32,7 @@ from .platform import (
     get_default_sync_gpio_pin,
     get_soc,
 )
-from .target_lifecycle import ResetStrategy
+from .target.lifecycle import ResetStrategy
 from .power.base import PowerMode
 
 

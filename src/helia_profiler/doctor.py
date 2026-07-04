@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib.util
 import shutil
 
+from .target.probe.jlink import JLINK_COMMANDER
+
 
 def collect_checks() -> tuple[
     list[tuple[str, str, str | None]],
@@ -22,7 +24,7 @@ def collect_checks() -> tuple[
         ("ARM GCC toolchain", "arm-none-eabi-gcc"),
         ("CMake (>= 3.24)", "cmake"),
         ("Ninja build system", "ninja"),
-        ("SEGGER J-Link commander", "JLinkExe"),
+        ("SEGGER J-Link commander", JLINK_COMMANDER),
     ]
 
     checks: list[tuple[str, str, str | None]] = []

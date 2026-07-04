@@ -9,7 +9,7 @@ PMU measurement, timer bracketing pauses/resumes Timer 3 to eliminate
 ISR noise from the counters.
 
 Sequence:
-  1. Reset the target via JLinkExe.
+  1. Reset the target via SEGGER commander.
   2. Wait for USB CDC device to enumerate on the host.
   3. Open the serial port and assert DTR.
   4. Collect lines until ``--- HPX_END ---`` or timeout.
@@ -27,9 +27,9 @@ import serial  # pyserial
 from serial.tools import list_ports
 
 from ..errors import CaptureError
-from ..jlink import reset_target
+from ..target.probe.base import ResetController
+from ..target.probe.jlink import JLinkResetController
 from ..usb_identity import USB_MARKER_PREFIX
-from .readiness import attached_reset_session
 from .timing import READINESS_POLL_INTERVAL_S, USB_REENUM_FLOOR_S
 from .transport import (
     DEFAULT_TIMEOUT_S,
@@ -258,6 +258,7 @@ def capture_usb_output(
     usb_marker: str | None = None,
     keep_attached: bool = False,
     timing_out: dict[str, float] | None = None,
+    reset_controller: ResetController | None = None,
 ) -> list[str]:
     """Capture firmware output via USB CDC until HPX_END or timeout.
 
@@ -299,16 +300,17 @@ def capture_usb_output(
     # per-layer cycle reads back 0.  Hold the pylink session open across reset,
     # re-enumeration, and the read; it is released in the finally block.
     reset_stack = contextlib.ExitStack()
+    controller = reset_controller or JLinkResetController()
 
     try:
         if keep_attached:
             reset_stack.enter_context(
-                attached_reset_session(
+                controller.attached_reset_session(
                     device=jlink_device, jlink_serial=jlink_serial
                 )
             )
         else:
-            reset_target(device=jlink_device, jlink_serial=jlink_serial)
+            controller.debug_reset(device=jlink_device, jlink_serial=jlink_serial)
 
         # --- Step 2: locate the target's USB CDC port ---
         # An explicit --usb-port always wins.  Otherwise prefer the unique USB

@@ -10,7 +10,7 @@ this module (rather than ``neuralspotx`` directly) so that:
   API in any given release.
 
 Timeout enforcement is *robust*: NSX's underlying ``cmake`` / ``ninja`` /
-``git`` / ``JLinkExe`` subprocesses are spawned in their own process group,
+``git`` / ``SEGGER commander`` subprocesses are spawned in their own process group,
 and the whole group is SIGTERM/SIGKILL'd when ``timeout_s`` elapses
 (see :mod:`neuralspotx.subprocess_utils`).  No daemon-thread leak on
 hang.
@@ -73,7 +73,7 @@ def _suppress_output() -> Iterator[None]:
     """Redirect fd 1 & 2 to ``/dev/null`` for the duration of the block.
 
     This silences subprocess output that neuralspotx streams directly to the
-    terminal (cmake, ninja, JLinkExe).  Python-level writes to sys.stdout /
+    terminal (cmake, ninja, SEGGER commander).  Python-level writes to sys.stdout /
     sys.stderr are also suppressed since the underlying fds are redirected.
     """
     devnull_fd = os.open(os.devnull, os.O_WRONLY)

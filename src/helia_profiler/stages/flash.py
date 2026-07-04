@@ -5,7 +5,9 @@ from __future__ import annotations
 import logging
 
 from ..errors import BuildError, PowerError
+from ..firmware import _nsx_toolchain
 from ..pipeline import PipelineContext
+from ..target.probe.jlink import JLinkFlashBackend
 
 log = logging.getLogger("hpx")
 
@@ -41,16 +43,29 @@ class FlashFirmwareStage:
         if ctx.binary_path is None:
             raise BuildError("No binary to flash — build stage did not run.")
 
-        from ..firmware import flash_app
+        if ctx.firmware_dir is None:
+            raise BuildError("No firmware directory to flash — firmware generation did not run.")
+        backend = ctx.flash_backend or JLinkFlashBackend()
+        toolchain = _nsx_toolchain(ctx.config.target.toolchain)
+        jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
+
+        def flash_firmware() -> None:
+            backend.flash(
+                ctx.firmware_dir,
+                toolchain=toolchain,
+                jlink_serial=jlink_serial,
+                timeout_s=ctx.config.timeouts.flash_s,
+                verbose=ctx.config.verbose,
+            )
 
         try:
-            flash_app(ctx)
+            flash_firmware()
         except BuildError as first_exc:
             # Flash can fail when the debug domain is locked (e.g. after a
             # previous run put the chip to sleep).  If a Joulescope is
             # available, power-cycle to recover and retry once.
             if _try_power_cycle(ctx):
-                flash_app(ctx)  # raises BuildError on second failure
+                flash_firmware()  # raises BuildError on second failure
             else:
                 if ctx.passthrough_skipped:
                     raise BuildError(

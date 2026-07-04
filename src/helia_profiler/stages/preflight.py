@@ -13,7 +13,7 @@ Checks performed (in order):
     placement overrides use supported regions for the selected engine.
 4. **Output directory** — can be created + written to.
 5. **Host toolchain** — ``nsx``, ``cmake``, ``ninja``, the selected compiler,
-   and ``JLinkExe`` are available. ATfE is located via ``ATFE_ROOT``.
+   and ``SEGGER commander`` are available. ATfE is located via ``ATFE_ROOT``.
 6. **Transport-specific tools** — e.g. ``pylink`` when ``transport=swo``;
     the Python ``pyocd`` module isn't required because heliaPROFILER uses
     J-Link directly.
@@ -42,6 +42,7 @@ from ..errors import ConfigError
 from ..pipeline import PipelineContext
 from ..placement import ModelLocation, Placement
 from ..platform import get_soc_for_board
+from ..target.probe.jlink import JLINK_COMMANDER
 
 log = logging.getLogger("hpx")
 
@@ -312,7 +313,7 @@ def _check_host_tools(transport: Transport, toolchain: str) -> None:
     # Transport-specific.
     if transport in set(Transport):
         required.append(
-            ("JLinkExe", "SEGGER J-Link commander (https://www.segger.com/downloads/jlink/)"),
+            (JLINK_COMMANDER, "SEGGER J-Link commander (https://www.segger.com/downloads/jlink/)"),
         )
 
     missing: list[str] = []

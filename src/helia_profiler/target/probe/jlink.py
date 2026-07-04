@@ -17,6 +17,8 @@ elsewhere.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+import contextlib
 from dataclasses import dataclass
 import logging
 import os
@@ -24,6 +26,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import time
 from contextlib import AbstractContextManager
 
 from ...errors import CaptureError, ConfigError
@@ -59,6 +62,9 @@ _RSTGEN_SWPOI_VALUE = 0x1B
 # Reset/erase scripts complete in well under 5s on healthy hardware; 15s
 # leaves room for slow USB enumeration on macOS.
 _DEFAULT_TIMEOUT_S = 15
+_READINESS_POLL_INTERVAL_S = 0.1
+_SBL_SETTLE_S = 0.2
+JLINK_COMMANDER = "JLinkExe"
 
 _JLINK_NOT_FOUND_HINT = (
     "Install the SEGGER J-Link package and ensure JLinkExe is in PATH, "
@@ -107,7 +113,7 @@ def find_jlink_exe() -> str:
             hint="Set JLINK_PATH to the full path of JLinkExe.",
         )
     # 2. PATH lookup
-    exe = shutil.which("JLinkExe")
+    exe = shutil.which(JLINK_COMMANDER)
     if exe:
         return exe
     # 3. Common install locations
@@ -485,10 +491,8 @@ class JLinkResetController:
         device: str,
         jlink_serial: str | None = None,
         attach_timeout_s: float = 30.0,
-        settle_s: float = 0.25,
+        settle_s: float = _SBL_SETTLE_S,
     ) -> AbstractContextManager[DebugMemorySession]:
-        from ...capture.readiness import attached_reset_session
-
         return attached_reset_session(
             device=device,
             jlink_serial=jlink_serial,
@@ -533,16 +537,134 @@ def create_debug_memory_session() -> DebugMemorySession:
     return pylink.JLink()
 
 
+def _pylink_module():
+    try:
+        import pylink
+    except ImportError as exc:
+        raise CaptureError(
+            "pylink-square package not installed (required for debug probe transports)",
+            hint="pip install pylink-square",
+        ) from exc
+    return pylink
+
+
+def is_jlink_exception(exc: BaseException) -> bool:
+    """Return True when *exc* is a pylink J-Link exception."""
+    try:
+        pylink = _pylink_module()
+    except CaptureError:
+        return False
+    return isinstance(exc, pylink.errors.JLinkException)
+
+
+def is_jlink_rtt_exception(exc: BaseException) -> bool:
+    """Return True when *exc* is a pylink RTT exception."""
+    try:
+        pylink = _pylink_module()
+    except CaptureError:
+        return False
+    return isinstance(exc, pylink.errors.JLinkRTTException)
+
+
+def resume_if_halted(jlink: DebugMemorySession, *, settle_s: float = 0.1) -> bool:
+    """Restart the target if the debug attach left it halted."""
+    if not jlink.halted():
+        return False
+    jlink.restart()
+    if settle_s > 0:
+        time.sleep(settle_s)
+    log.info("Resumed target after debug attach")
+    return True
+
+
+def open_jlink_with_retry(
+    jlink: DebugMemorySession,
+    *,
+    device: str,
+    jlink_serial: str | None = None,
+    timeout_s: float,
+    interval_s: float = _READINESS_POLL_INTERVAL_S,
+    interface: object | None = None,
+    speed_khz: int = 4000,
+) -> None:
+    """Open and connect a pylink session, retrying until the target is ready."""
+    pylink = _pylink_module()
+    if interface is None:
+        interface = pylink.JLinkInterfaces.SWD
+
+    deadline = time.monotonic() + timeout_s
+    attempt = 0
+    last_exc: Exception | None = None
+
+    while True:
+        attempt += 1
+        try:
+            if jlink_serial:
+                jlink.open(serial_no=int(jlink_serial))
+            else:
+                jlink.open()
+            jlink.disable_dialog_boxes()
+            jlink.set_tif(interface)
+            jlink.connect(device, speed_khz)
+            log.info("pylink connected to %s (attempt %d)", device, attempt)
+            return
+        except pylink.errors.JLinkException as exc:
+            last_exc = exc
+            try:
+                jlink.close()
+            except Exception:  # noqa: BLE001 — close errors are non-fatal
+                pass
+            if time.monotonic() >= deadline:
+                raise CaptureError(
+                    f"Timed out attaching J-Link session to {device} after {timeout_s:.0f}s",
+                    hint="Check target power and that the probe is not in use.",
+                ) from last_exc
+            time.sleep(interval_s)
+
+
+@contextlib.contextmanager
+def attached_reset_session(
+    *,
+    device: str,
+    jlink_serial: str | None = None,
+    attach_timeout_s: float = 30.0,
+    settle_s: float = _SBL_SETTLE_S,
+) -> Iterator[DebugMemorySession]:
+    """Reset the target and hold the debugger attached for the whole capture."""
+    jlink = create_debug_memory_session()
+    open_jlink_with_retry(
+        jlink, device=device, jlink_serial=jlink_serial, timeout_s=attach_timeout_s
+    )
+    try:
+        jlink.reset(halt=True)
+        jlink.restart()
+        if settle_s > 0:
+            time.sleep(settle_s)
+        log.info("Holding J-Link attached during capture (debug domain kept powered)")
+        yield jlink
+    finally:
+        try:
+            jlink.close()
+        except Exception:  # noqa: BLE001 — close errors are non-fatal
+            pass
+
+
 __all__ = [
     "JLinkFlashBackend",
+    "JLINK_COMMANDER",
     "JLinkProbe",
     "JLinkProbeMatch",
     "JLinkResetController",
+    "attached_reset_session",
     "create_debug_memory_session",
     "find_jlink_exe",
     "inspect_probe_target",
+    "is_jlink_exception",
+    "is_jlink_rtt_exception",
     "list_connected_probes",
+    "open_jlink_with_retry",
     "resolve_probe_serial",
+    "resume_if_halted",
     "reset_target",
     "reset_target_poi",
     "run_jlink_script",

@@ -7,13 +7,13 @@ import pytest
 
 from helia_profiler import cli
 from helia_profiler.errors import CaptureError
-from helia_profiler.jlink import JLinkProbe, JLinkProbeMatch
+from helia_profiler.target.probe.jlink import JLinkProbe, JLinkProbeMatch
 from helia_profiler.platform import CoreArch
 
 
 def test_probes_list_prints_connected_probes(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
-        "helia_profiler.jlink.list_connected_probes",
+        "helia_profiler.target.probe.jlink.list_connected_probes",
         lambda: [JLinkProbe(serial="1160002204", product="J-Link OB", connection="USB")],
     )
 
@@ -26,9 +26,9 @@ def test_probes_list_prints_connected_probes(monkeypatch, capsys) -> None:
 
 def test_probes_list_inspects_against_board(monkeypatch, capsys) -> None:
     probe = JLinkProbe(serial="1160002204", product="J-Link OB", connection="USB")
-    monkeypatch.setattr("helia_profiler.jlink.list_connected_probes", lambda: [probe])
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.list_connected_probes", lambda: [probe])
     monkeypatch.setattr(
-        "helia_profiler.jlink.inspect_probe_target",
+        "helia_profiler.target.probe.jlink.inspect_probe_target",
         lambda probe, *, device: JLinkProbeMatch(probe=probe, detected_core=CoreArch.CORTEX_M55),
     )
 
@@ -40,7 +40,7 @@ def test_probes_list_inspects_against_board(monkeypatch, capsys) -> None:
 
 
 def test_probes_match_prints_resolved_serial(monkeypatch, capsys) -> None:
-    monkeypatch.setattr("helia_profiler.jlink.resolve_probe_serial", lambda **kwargs: "1160002204")
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.resolve_probe_serial", lambda **kwargs: "1160002204")
 
     cli._cmd_probes_match(
         Namespace(board="apollo510_evb", jlink_serial=None, json=False)
@@ -55,7 +55,7 @@ def test_target_reset_uses_noninteractive_wrapper(monkeypatch, capsys) -> None:
     def fake_reset_target(*, device: str, jlink_serial: str | None = None) -> None:
         calls.append({"device": device, "jlink_serial": jlink_serial})
 
-    monkeypatch.setattr("helia_profiler.jlink.reset_target", fake_reset_target)
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", fake_reset_target)
 
     cli._cmd_target_reset(
         Namespace(board="apollo4p_blue_kxr_evb", jlink_serial="1160001481", kind="debug")
@@ -132,7 +132,7 @@ def test_probe_cli_reports_hpx_errors(monkeypatch, capsys) -> None:
     def fail() -> list[JLinkProbe]:
         raise CaptureError("JLinkExe not found", hint="install SEGGER tools")
 
-    monkeypatch.setattr("helia_profiler.jlink.list_connected_probes", fail)
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.list_connected_probes", fail)
 
     with pytest.raises(SystemExit) as exc_info:
         cli._cmd_probes_list(Namespace(board=None, inspect=False, json=False))

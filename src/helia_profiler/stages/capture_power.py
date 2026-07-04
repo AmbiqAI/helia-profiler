@@ -17,7 +17,7 @@ import logging
 from ..config import DEFAULT_POWER_WINDOW_TARGET_MS
 from ..errors import PowerError
 from ..pipeline import PipelineContext
-from ..target_lifecycle import CapturePhase, prepare_target_for_phase
+from ..target.lifecycle import CapturePhase, prepare_target_for_phase
 
 log = logging.getLogger("hpx")
 

@@ -12,7 +12,7 @@ SWD debug connection.
    Prefer RTT (``--transport rtt``) for reliable, lossless capture.
 
 Sequence:
-  1. Reset the target via JLinkExe.
+  1. Reset the target via SEGGER commander.
   2. Connect pylink and enable SWO reception.
   3. Collect lines until ``--- HPX_END ---`` or timeout.
   4. Stop SWO and close the connection.
@@ -24,8 +24,14 @@ import logging
 import time
 
 from ..errors import CaptureError
-from ..jlink import reset_target
-from .readiness import open_jlink_with_retry, resume_if_halted
+from ..target.probe.base import ResetController
+from ..target.probe.jlink import (
+    JLinkResetController,
+    create_debug_memory_session,
+    is_jlink_exception,
+    open_jlink_with_retry,
+    resume_if_halted,
+)
 from .timing import SBL_SETTLE_S
 from .transport import DEFAULT_TIMEOUT_S, collect_lines
 
@@ -59,6 +65,7 @@ def capture_swo_output(
     cpu_freq: int = 96_000_000,
     swo_freq: int = 1_000_000,
     timing_out: dict[str, float] | None = None,
+    reset_controller: ResetController | None = None,
 ) -> list[str]:
     """Capture firmware output via SWO/ITM until HPX_END or timeout.
 
@@ -91,18 +98,12 @@ def capture_swo_output(
         if hpx_start_s is not None and hpx_end_s is not None:
             timing_out["protocol_duration_s"] = hpx_end_s - hpx_start_s
 
-    try:
-        import pylink
-    except ImportError as exc:
-        raise CaptureError(
-            "pylink-square package not installed (required for SWO transport)",
-            hint="pip install pylink-square",
-        ) from exc
+    controller = reset_controller or JLinkResetController()
 
     for attempt in range(1, _MAX_CAPTURE_ATTEMPTS + 1):
         # --- Step 1: reset the target BEFORE connecting pylink ---
-        # JLinkExe disconnects on exit so the SBL does not detect a debugger.
-        reset_target(device=jlink_device, jlink_serial=jlink_serial)
+        # SEGGER commander disconnects on exit so the SBL does not detect a debugger.
+        controller.debug_reset(device=jlink_device, jlink_serial=jlink_serial)
 
         # --- Step 2: small SBL settle floor, then retry the host attach ---
         # The SBL bring-up is not observable from the host, so wait a short floor
@@ -111,7 +112,7 @@ def capture_swo_output(
         time.sleep(SBL_SETTLE_S)
 
         # --- Step 3: connect pylink and enable SWO ---
-        jlink = pylink.JLink()
+        jlink = create_debug_memory_session()
 
         try:
             open_jlink_with_retry(
@@ -160,12 +161,12 @@ def capture_swo_output(
 
         except CaptureError:
             raise
-        except pylink.errors.JLinkException as exc:
-            raise CaptureError(
-                f"J-Link SWO error: {exc}",
-                hint="Check J-Link probe connection and that the probe is not in use.",
-            ) from exc
         except Exception as exc:
+            if is_jlink_exception(exc):
+                raise CaptureError(
+                    f"J-Link SWO error: {exc}",
+                    hint="Check J-Link probe connection and that the probe is not in use.",
+                ) from exc
             raise CaptureError(
                 f"SWO capture failed: {exc}",
                 hint="Check that the J-Link probe is connected and not in use.",

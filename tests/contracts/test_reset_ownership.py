@@ -79,8 +79,8 @@ def _install_lifecycle_recorder(monkeypatch) -> list[str]:
     def _swpoi_reset(**_kwargs) -> None:
         events.append("swpoi_reset")
 
-    monkeypatch.setattr("helia_profiler.jlink.reset_target", _debug_reset)
-    monkeypatch.setattr("helia_profiler.jlink.reset_target_poi", _swpoi_reset)
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", _debug_reset)
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target_poi", _swpoi_reset)
     return events
 
 
@@ -105,8 +105,8 @@ def _install_reader_reset_recorder(monkeypatch, module: str) -> list[str]:
         raise _ResetStop("attached reset recorded")
         yield  # pragma: no cover - unreachable
 
-    monkeypatch.setattr(f"{module}.reset_target", _reset_target, raising=False)
-    monkeypatch.setattr(f"{module}.attached_reset_session", _attached, raising=False)
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", _reset_target)
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.attached_reset_session", _attached)
     return events
 
 
