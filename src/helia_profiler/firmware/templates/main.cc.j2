@@ -693,6 +693,14 @@ int main(void) {
     // Boot header was captured losslessly; restore droppable writes for the
     // timed window so an in-flight heartbeat can never stall interpreter.Invoke().
     hpx_rtt_set_nonblocking();
+{% if power_sync_enabled %}
+    // This build ran a gated power/clean window (external power capture): the
+    // host is watching the GPIO gate via a separate instrument, not draining
+    // RTT, so treat "host absent" as the expected case for everything printed
+    // from here on, not a rare dead-host edge case.  See
+    // HPX_RTT_LOSSLESS_TIMEOUT_POST_WINDOW_MS in _hpx_printf.j2.
+    hpx_rtt_shorten_lossless_timeout();
+{% endif %}
 {% endif %}
     // --- Multi-pass PMU profiling ---
     // Each pass configures a specific set of PMU counters.  When the user
