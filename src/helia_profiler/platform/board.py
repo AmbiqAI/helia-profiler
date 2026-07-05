@@ -59,17 +59,23 @@ def _register_board(board: BoardDef) -> BoardDef:
     return board
 
 
-# Power-capture GPIOs mirror neuralSPOT AutoDeploy AP3 wiring:
-# state bus GPIO 22/23 (device->JS GPI0/GPI1) + trigger GPIO 24 (JS GPO0->device).
+# Power-capture GPIOs: gate GPIO 26 / state GPIO 24 (device->JS GPI0/GPI1)
+# + trigger GPIO 25 (JS GPO0->device).
+#
+# The AutoDeploy-style 22/23/24 wiring is NOT usable on Apollo3 EVBs: pads
+# 22/23 are the J-Link OB virtual-COM UART (AM_BSP_GPIO_COM_UART_TX/RX), so
+# muxing them to GPIO kills the `uart` transport (22) and contends with the
+# J-Link OB driver (23). Pads 24/25/26 carry only dormant MSPI0/IOM2 claims,
+# which means power sync still conflicts with PSRAM placement on this board.
 _register_board(
     BoardDef(
         "apollo3p_evb",
         soc="apollo3p",
         channel="stable",
         psram_kb=8192,
-        default_sync_gpio_pin=22,
-        default_state_gpio_pin=23,
-        default_go_gpio_pin=24,
+        default_sync_gpio_pin=26,
+        default_state_gpio_pin=24,
+        default_go_gpio_pin=25,
     )
 )
 _register_board(
@@ -78,9 +84,9 @@ _register_board(
         soc="apollo3p",
         channel="preview",
         psram_kb=8192,
-        default_sync_gpio_pin=22,
-        default_state_gpio_pin=23,
-        default_go_gpio_pin=24,
+        default_sync_gpio_pin=26,
+        default_state_gpio_pin=24,
+        default_go_gpio_pin=25,
     )
 )
 
