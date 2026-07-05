@@ -1,0 +1,25 @@
+{# _stimer_init.j2 — STIMER (XTAL 32.768 kHz) clean-window clock.
+
+   Used instead of DWT->CYCCNT to time the silent clean/power window on
+   families where DWT lives in the CoreSight debug power domain (PD_DBG) --
+   Apollo5 (see ClockCapabilities.clean_window_timer == "stimer").  STIMER is
+   clock-mode-independent (own XTAL) and, critically, keeps ticking with
+   PD_DBG powered off, so the clean window can run debug-domain-free for the
+   default ``infer`` probe, not just the opt-in ``busy_loop`` probe.
+#}
+// STIMER cycle-independent wall clock for the clean/power window.
+#define HPX_STIMER_HZ 32768U
+
+static inline void hpx_stimer_init(void) {
+    am_hal_stimer_config(AM_HAL_STIMER_CFG_CLEAR);
+    am_hal_stimer_config(AM_HAL_STIMER_XTAL_32KHZ | AM_HAL_STIMER_CFG_RUN);
+}
+
+static inline uint32_t hpx_stimer_ticks(void) {
+    return am_hal_stimer_counter_get();
+}
+
+// ticks -> microseconds.  32768 ticks/s -> us = ticks * 1,000,000 / 32768.
+static inline uint64_t hpx_stimer_ticks_to_us(uint64_t ticks) {
+    return (ticks * 1000000ULL) / (uint64_t)HPX_STIMER_HZ;
+}

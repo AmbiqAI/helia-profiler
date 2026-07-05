@@ -51,6 +51,27 @@ static nsx_usb_config_t g_usb_cfg = {
 #define HPX_RTT_LOSSLESS_TIMEOUT_MS 2000U
 #endif
 
+// Shortened per-line timeout used for writes issued AFTER the gated
+// power/clean window has completed (see hpx_rtt_shorten_lossless_timeout).
+// A power-only capture never has a host reading RTT during/after the gated
+// window — the host is watching the GPIO gate via a separate instrument, not
+// draining the ring buffer — so hitting a slow host is actually the *expected*
+// steady state there, not a rare dead-host edge case.  Spinning the full 2s
+// budget per queued line (found 2026-07-05: forensics showed the firmware
+// parked in hpx_rtt_write_lossless for the entire post-window CSV dump with
+// no host attached) turns a handful of trailing lines into many seconds of
+// silent, pointless spin.  100ms is enough for a host that *is* still
+// attached (e.g. a PMU-then-power run in the same session) to keep draining
+// promptly, without paying the full dead-host budget by default.
+#ifndef HPX_RTT_LOSSLESS_TIMEOUT_POST_WINDOW_MS
+#define HPX_RTT_LOSSLESS_TIMEOUT_POST_WINDOW_MS 100U
+#endif
+
+// Runtime-adjustable copy of the lossless timeout so a single build can use
+// the generous default normally and the short post-window budget only after
+// a gated power window has actually run (see hpx_rtt_shorten_lossless_timeout).
+static volatile uint32_t g_hpx_rtt_lossless_timeout_ms = HPX_RTT_LOSSLESS_TIMEOUT_MS;
+
 // When true, hpx_printf writes losslessly (waits for ring-buffer space) instead
 // of dropping on overflow.  Set around CSV dumps / HPX_END; cleared during the
 // timed inference window where droppable heartbeats must never stall the CPU.
@@ -89,7 +110,7 @@ static inline void hpx_rtt_invalidate_cb(void) {
 // the host sees our bytes.  CSV/HPX_END phase only — never inside a timed window.
 static void hpx_rtt_write_lossless(const char *buf, unsigned len) {
     const uint32_t spins_per_ms = SystemCoreClock / 2000U;
-    uint32_t budget = HPX_RTT_LOSSLESS_TIMEOUT_MS * spins_per_ms;
+    uint32_t budget = g_hpx_rtt_lossless_timeout_ms * spins_per_ms;
     for (;;) {
         hpx_rtt_invalidate_cb();  // refresh host-advanced RdOff (CB only, not the arena)
         if (SEGGER_RTT_GetAvailWriteSpace(0) >= len) {
@@ -151,6 +172,13 @@ static void hpx_rtt_set_blocking(void) {
 }
 static void hpx_rtt_set_nonblocking(void) {
     g_hpx_rtt_lossless = false;
+}
+
+// Call once, right after a gated power/clean window completes (see
+// main.cc.j2), before any subsequent hpx_rtt_set_blocking()/hpx_printf() call.
+// See HPX_RTT_LOSSLESS_TIMEOUT_POST_WINDOW_MS above for why.
+static void hpx_rtt_shorten_lossless_timeout(void) {
+    g_hpx_rtt_lossless_timeout_ms = HPX_RTT_LOSSLESS_TIMEOUT_POST_WINDOW_MS;
 }
 {% elif transport == "swo" %}
 {{ _linkage }}void hpx_printf(const char *fmt, ...) {

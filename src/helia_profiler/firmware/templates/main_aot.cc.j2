@@ -78,6 +78,10 @@
 // ---------------------------------------------------------------------------
 {% include "_dwt_init.j2" %}
 
+{% if clean_window_timer | default("dwt") == "stimer" %}
+{% include "_stimer_init.j2" %}
+{% endif %}
+
 // ---------------------------------------------------------------------------
 // GPIO sync for external power measurement
 // ---------------------------------------------------------------------------
@@ -686,6 +690,8 @@ int main(void) {
         // ~+18% latency tax on AP4.  The PMU window below already does this.
         usb_timer_pause();
 {% endif %}
+{% set gate_dbg = (clean_window_probe | default("infer") == "busy_loop") or (gate_debug_domain_in_window | default(false)) %}
+{% set use_stimer_window = (clean_window_timer | default("dwt") == "stimer") and (clean_window_probe | default("infer") != "busy_loop") %}
 {% if has_armv8m_pmu %}
         // nsx_pmu_init() (already called above to configure the per-layer PMU
         // presets) leaves the ARM PMU counters running and the
@@ -694,16 +700,25 @@ int main(void) {
         // g_profiler_enabled=false only gates software instrumentation, it
         // never touches this hardware.  AutoDeploy's power firmware never
         // calls any PMU code, so it never powers this domain at all.
-    // Releasing the PMU counters for the gated/clean window still avoids
-    // PMU traffic during the measurement. Keep the debug domain powered
-    // for the normal inference probe, though: DWT->CYCCNT lives there on
-    // AP510, and gating it off freezes the clean-window cycle reads at
-    // zero.  The fully gated path remains available via the busy_loop
-    // probe below, which never samples DWT inside the measured window.
+        //
+        // Releasing the PMU counters for the gated/clean window still avoids
+        // PMU traffic during the measurement.  On families where
+        // clean_window_timer=="stimer" (Apollo5), the in-window timer no
+        // longer lives in the debug power domain (STIMER runs off its own
+        // XTAL), so PD_DBG can be gated off for the *default* infer probe
+        // too, not just the opt-in busy_loop probe — closing most of the
+        // measured +7-9% current gap vs AutoDeploy (which never powers this
+        // domain at all).  Families still timing the window with DWT
+        // (clean_window_timer=="dwt": Apollo3/Apollo4) keep the domain
+        // powered for the infer probe, same as before.
         nsx_ambiq_pmu_disable();
-{% if clean_window_probe | default("infer") == "busy_loop" %}
+{% if gate_dbg %}
         am_hal_debug_disable();
 {% endif %}
+{% endif %}
+{% if use_stimer_window %}
+        hpx_stimer_init();
+        uint32_t clean_stimer_t0 = hpx_stimer_ticks();
 {% endif %}
         // model_operator_cb() is a no-op during this window (guarded by
         // g_profiler_enabled), but the AOT runtime still dispatches it via
@@ -722,6 +737,26 @@ int main(void) {
         }
         clean_cycles = clean_probe_target_cyc;
         clean_count = 1;
+{% elif use_stimer_window %}
+        // Timed via STIMER (see hpx_stimer_init above), not DWT->CYCCNT: PD_DBG
+        // (and DWT with it) is disabled for this whole loop on this family, so
+        // an in-window DWT read would read frozen.  A single before/after
+        // STIMER read brackets the whole window rather than reading every
+        // iteration — fewer peripheral accesses inside the timed loop and no
+        // resolution concern at this scale (XTAL 32.768 kHz ticks are ~30.5us,
+        // negligible against a multi-ms clean window).
+        for (int iter = 0; iter < clean_iters_n; iter++) {
+            {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
+            clean_count++;
+{% if clean_window_trace | default(false) and transport != "swo" %}
+            // Sanity-check trace: prove the device is looping inferences for
+            // the whole gated window.  Perturbs power — diagnostic use only.
+            // Never emitted on SWO builds here: PD_DBG is disabled for this
+            // whole loop, and a TPIU/ITM write while PD_DBG is off hangs the
+            // part unconditionally (DS510 erratum ERR003).
+            hpx_printf("HPX_CLEAN_ITER=%d\n", iter);
+{% endif %}
+        }
 {% else %}
         for (int iter = 0; iter < clean_iters_n; iter++) {
             uint32_t t0 = DWT->CYCCNT;
@@ -736,11 +771,15 @@ int main(void) {
         }
 {% endif %}
         hpx_sync_window_end();
+{% if use_stimer_window %}
+        uint64_t clean_stimer_total_us =
+            hpx_stimer_ticks_to_us((uint64_t)(uint32_t)(hpx_stimer_ticks() - clean_stimer_t0));
+{% endif %}
         // Restore the per-op callback for the instrumented per-layer passes below.
         {{ aot_prefix }}_model_ctx.callback = model_operator_cb;
 {% if has_armv8m_pmu %}
         // Restore PMU/debug state for the instrumented per-layer passes below.
-{% if clean_window_probe | default("infer") == "busy_loop" %}
+{% if gate_dbg %}
         am_hal_debug_enable();
 {% endif %}
         nsx_ambiq_pmu_enable();
@@ -749,6 +788,27 @@ int main(void) {
         usb_timer_resume();
 {% endif %}
         if (clean_count > 0) {
+{% if use_stimer_window %}
+            // Derive avg_us directly from the device-independent STIMER
+            // measurement (native protocol unit); back-derive avg/total
+            // cycles from SystemCoreClock so the HPX_CLEAN_INFER_* wire
+            // protocol and host parser (capture/parser.py) stay unchanged —
+            // those two fields are informational/derived on this path, not
+            // independently measured.
+            const uint32_t clean_avg_us =
+                (uint32_t)((clean_stimer_total_us + (clean_count / 2U)) / clean_count);
+            const uint32_t clean_avg_cycles = (uint32_t)(
+                ((uint64_t)clean_avg_us * (uint64_t)SystemCoreClock) / 1000000ULL);
+            const uint64_t clean_cycles_reported =
+                (uint64_t)clean_avg_cycles * (uint64_t)clean_count;
+            hpx_printf("HPX_CLEAN_INFER_COUNT=%lu\n", (unsigned long)clean_count);
+            hpx_printf("HPX_CLEAN_INFER_TOTAL_CYCLES=%llu\n",
+                       (unsigned long long)clean_cycles_reported);
+            hpx_printf("HPX_CLEAN_INFER_AVG_CYCLES=%lu\n",
+                       (unsigned long)clean_avg_cycles);
+            hpx_printf("HPX_CLEAN_INFER_AVG_US=%lu\n",
+                       (unsigned long)clean_avg_us);
+{% else %}
             const uint32_t clean_avg_cycles =
                 (uint32_t)((clean_cycles + (clean_count / 2U)) / clean_count);
             hpx_printf("HPX_CLEAN_INFER_COUNT=%lu\n", (unsigned long)clean_count);
@@ -764,6 +824,7 @@ int main(void) {
                 hpx_printf("HPX_CLEAN_INFER_AVG_US=%lu\n",
                            (unsigned long)clean_avg_us);
             }
+{% endif %}
         }
     }
 
@@ -771,6 +832,14 @@ int main(void) {
     // Boot header was captured losslessly; restore droppable writes for the
     // timed window so an in-flight heartbeat can never stall model_run().
     hpx_rtt_set_nonblocking();
+{% if power_sync_enabled %}
+    // This build ran a gated power/clean window (external power capture): the
+    // host is watching the GPIO gate via a separate instrument, not draining
+    // RTT, so treat "host absent" as the expected case for everything printed
+    // from here on, not a rare dead-host edge case.  See
+    // HPX_RTT_LOSSLESS_TIMEOUT_POST_WINDOW_MS in _hpx_printf.j2.
+    hpx_rtt_shorten_lossless_timeout();
+{% endif %}
 {% endif %}
     // --- Multi-pass PMU profiling ---
 {% for pass in pmu_passes %}

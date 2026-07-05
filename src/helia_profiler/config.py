@@ -381,9 +381,7 @@ class ProfilingConfig:
                 f"window_max ({self.window_max}) must be >= window_min ({self.window_min})."
             )
         if self.window_target_ms < 1:
-            raise ValueError(
-                f"window_target_ms must be >= 1, got {self.window_target_ms}."
-            )
+            raise ValueError(f"window_target_ms must be >= 1, got {self.window_target_ms}.")
         if self.clean_window_probe not in CLEAN_WINDOW_PROBES:
             raise ValueError(
                 f"Invalid clean_window_probe '{self.clean_window_probe}'. "
@@ -398,7 +396,11 @@ class PowerConfig:
     enabled: bool = False
     driver: str = DEFAULT_POWER_DRIVER
     mode: PowerMode = DEFAULT_POWER_MODE
-    duration_s: int = DEFAULT_POWER_DURATION_S
+    # ``None`` means "not explicitly set": consumers use
+    # DEFAULT_POWER_DURATION_S and may auto-tune the bound from PMU-phase
+    # timing.  An explicit value (YAML or --power-duration, even if equal to
+    # the default) always wins and disables auto-tuning.
+    duration_s: int | None = None
     io_voltage: float = DEFAULT_IO_VOLTAGE
     sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN  # GPIO for external sync
     # Host-side sync input index on external instruments. For Joulescope this
@@ -408,7 +410,13 @@ class PowerConfig:
     # gate=sync_gpio_pin (device->host), state_gpio_pin (device->host),
     # go_gpio_pin (host->device). 0 disables a wire; lockstep stays off until
     # the monitor exposes a GO output and both extra pins are configured.
-    lockstep: bool = False
+    # ``None`` means "not explicitly set": callers resolve the effective value
+    # via ``target.lifecycle.resolve_power_lockstep``, which auto-enables
+    # lock-step when the board is wired for it and the SoC family's default
+    # power reset policy needs it to stay race-free (e.g. Apollo5's
+    # debug_reset+swpoi_reset combo -- see the AP510 combo+RTT gate-race
+    # investigation). An explicit ``true``/``false`` here always wins.
+    lockstep: bool | None = None
     state_gpio_pin: int = DEFAULT_STATE_GPIO_PIN
     go_gpio_pin: int = DEFAULT_GO_GPIO_PIN
     state_input_index: int = DEFAULT_POWER_STATE_INPUT_INDEX
@@ -431,17 +439,11 @@ class PowerConfig:
         if not isinstance(self.reset_strategy, ResetStrategy):
             object.__setattr__(self, "reset_strategy", ResetStrategy(self.reset_strategy))
         if self.sync_input_index < 0:
-            raise ValueError(
-                f"power.sync_input_index must be >= 0, got {self.sync_input_index}."
-            )
+            raise ValueError(f"power.sync_input_index must be >= 0, got {self.sync_input_index}.")
         if self.stats_rate_hz < 1:
-            raise ValueError(
-                f"power.stats_rate_hz must be >= 1, got {self.stats_rate_hz}."
-            )
+            raise ValueError(f"power.stats_rate_hz must be >= 1, got {self.stats_rate_hz}.")
         if self.lockstep and (self.state_gpio_pin <= 0 or self.go_gpio_pin <= 0):
-            raise ValueError(
-                "power.lockstep requires both state_gpio_pin and go_gpio_pin > 0."
-            )
+            raise ValueError("power.lockstep requires both state_gpio_pin and go_gpio_pin > 0.")
 
 
 @dataclass(frozen=True)
@@ -673,9 +675,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             window_target_ms=profiling_d.get("window_target_ms", DEFAULT_WINDOW_TARGET_MS),
             window_min=profiling_d.get("window_min", DEFAULT_WINDOW_MIN),
             window_max=profiling_d.get("window_max", DEFAULT_WINDOW_MAX),
-            clean_window_probe=profiling_d.get(
-                "clean_window_probe", DEFAULT_CLEAN_WINDOW_PROBE
-            ),
+            clean_window_probe=profiling_d.get("clean_window_probe", DEFAULT_CLEAN_WINDOW_PROBE),
             clean_window_trace=bool(profiling_d.get("clean_window_trace", False)),
             force_shared_sram=bool(profiling_d.get("force_shared_sram", False)),
             extreme_mode=bool(profiling_d.get("extreme_mode", False)),
@@ -684,21 +684,15 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             enabled=power_d.get("enabled", False),
             driver=power_d.get("driver", DEFAULT_POWER_DRIVER),
             mode=power_d.get("mode", DEFAULT_POWER_MODE),
-            duration_s=power_d.get("duration_s", DEFAULT_POWER_DURATION_S),
+            duration_s=(int(power_d["duration_s"]) if "duration_s" in power_d else None),
             io_voltage=power_d.get("io_voltage", DEFAULT_IO_VOLTAGE),
             sync_gpio_pin=sync_gpio_pin,
-            sync_input_index=power_d.get(
-                "sync_input_index", DEFAULT_POWER_SYNC_INPUT_INDEX
-            ),
-            lockstep=bool(power_d.get("lockstep", False)),
+            sync_input_index=power_d.get("sync_input_index", DEFAULT_POWER_SYNC_INPUT_INDEX),
+            lockstep=(bool(power_d["lockstep"]) if "lockstep" in power_d else None),
             state_gpio_pin=state_gpio_pin,
             go_gpio_pin=go_gpio_pin,
-            state_input_index=power_d.get(
-                "state_input_index", DEFAULT_POWER_STATE_INPUT_INDEX
-            ),
-            go_output_index=power_d.get(
-                "go_output_index", DEFAULT_POWER_GO_OUTPUT_INDEX
-            ),
+            state_input_index=power_d.get("state_input_index", DEFAULT_POWER_STATE_INPUT_INDEX),
+            go_output_index=power_d.get("go_output_index", DEFAULT_POWER_GO_OUTPUT_INDEX),
             stats_rate_hz=power_d.get("stats_rate_hz", DEFAULT_POWER_STATS_RATE_HZ),
             reset_strategy=power_d.get("reset_strategy", ResetStrategy.AUTO.value),
             serial=power_d.get("serial"),
@@ -828,7 +822,9 @@ def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, Boar
             name=name,
             soc=str(soc),
             channel=str(channel),
-            psram_kb=_optional_int(spec.get("psram_kb", base_board.psram_kb if base_board else None)),
+            psram_kb=_optional_int(
+                spec.get("psram_kb", base_board.psram_kb if base_board else None)
+            ),
             default_sync_gpio_pin=int(
                 spec.get(
                     "default_sync_gpio_pin",
@@ -910,9 +906,7 @@ def _build_clock_domains(
         speeds: list[ClockSpeed] = []
         for speed_index, speed in enumerate(speeds_raw):
             if not isinstance(speed, dict):
-                raise ConfigError(
-                    f"{field_name}[{index}].speeds[{speed_index}] must be a mapping"
-                )
+                raise ConfigError(f"{field_name}[{index}].speeds[{speed_index}] must be a mapping")
             perf_tier = speed.get("perf_tier")
             speeds.append(
                 ClockSpeed(
@@ -922,9 +916,7 @@ def _build_clock_domains(
                         _enum_value(
                             PerfTier,
                             perf_tier,
-                            field_name=(
-                                f"{field_name}[{index}].speeds[{speed_index}].perf_tier"
-                            ),
+                            field_name=(f"{field_name}[{index}].speeds[{speed_index}].perf_tier"),
                         )
                         if perf_tier is not None
                         else None

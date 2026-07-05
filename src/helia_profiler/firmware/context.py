@@ -16,6 +16,7 @@ from ..counters import (
 from ..engines import EngineType
 from ..errors import FirmwareError
 from ..placement import Placement
+from ..target.lifecycle import resolve_power_lockstep
 from ..usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
 from .op_resolver import build_resolver_plan
 
@@ -109,6 +110,8 @@ class PowerWindowContext:
     heartbeat_enabled: bool
     heartbeat_every_n_ops: int
     heartbeat_every_ms: int
+    clean_window_timer: str
+    gate_debug_domain_in_window: bool
 
 
 @dataclass(frozen=True)
@@ -177,7 +180,7 @@ class FirmwareRenderContext:
             sync=SyncContext(
                 power_sync_enabled=power_sync_enabled,
                 sync_gpio_pin=config.power.sync_gpio_pin,
-                lockstep=config.power.lockstep,
+                lockstep=resolve_power_lockstep(ctx),
                 state_gpio_pin=config.power.state_gpio_pin,
                 go_gpio_pin=config.power.go_gpio_pin,
             ),
@@ -230,6 +233,8 @@ class FirmwareRenderContext:
                 heartbeat_every_ms=(
                     config.target.heartbeat.every_ms if config.target.heartbeat.enabled else 0
                 ),
+                clean_window_timer=soc.capabilities.clock.clean_window_timer,
+                gate_debug_domain_in_window=soc.capabilities.clock.gate_debug_domain_in_window,
             ),
             engine=EngineContext(
                 engine_type=engine_type,
@@ -287,6 +292,8 @@ class FirmwareRenderContext:
             "heartbeat_enabled": self.power_window.heartbeat_enabled,
             "heartbeat_every_n_ops": self.power_window.heartbeat_every_n_ops,
             "heartbeat_every_ms": self.power_window.heartbeat_every_ms,
+            "clean_window_timer": self.power_window.clean_window_timer,
+            "gate_debug_domain_in_window": self.power_window.gate_debug_domain_in_window,
             "engine_header": self.engine.engine_header,
             "resolver_mode": self.engine.resolver_mode,
             "resolver_max_ops": self.engine.resolver_max_ops,

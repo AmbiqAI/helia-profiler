@@ -1084,13 +1084,16 @@ class TestCapturePowerWrapper:
 
         result = capture_power(ctx, duration_override_s=7.0, prepare_target=prepare_target)
 
+        # Revised ordering (AP510 combo-reset gate-race fix): capture_gated
+        # starts the GPI poller first; prepare/wait_ready/go run inside its
+        # on_started hook so no reset can race an unobserved gate window.
         assert calls == [
             "check",
             "make_sync",
             "arm",
+            "capture_gated",
             "prepare:joulescope-js110",
             "wait_ready:7.0",
-            "capture_gated",
             "go",
             "release",
         ]
@@ -1163,8 +1166,16 @@ class TestCapturePowerWrapper:
                 calls.append("make_sync")
                 return FakeSync()
 
-            def capture_gated(self, **kwargs):  # pragma: no cover - unreachable
-                raise AssertionError("capture_gated should not be reached")
+            def capture_gated(self, **kwargs):
+                # Mirrors JoulescopeDriver.capture_gated: the prepare/handshake
+                # now runs inside on_started, whose exceptions the driver
+                # swallows (logs) — the capture wrapper re-raises them after.
+                calls.append("capture_gated")
+                try:
+                    kwargs["on_started"]()
+                except Exception:
+                    pass
+                return PowerResult(summary=PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0))
 
         monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: FakeDriver())
 
@@ -1175,7 +1186,7 @@ class TestCapturePowerWrapper:
         with pytest.raises(RuntimeError, match="reset failed"):
             capture_power(ctx, duration_override_s=7.0, prepare_target=prepare_target)
 
-        assert calls == ["check", "make_sync", "arm", "prepare", "release"]
+        assert calls == ["check", "make_sync", "arm", "capture_gated", "prepare", "release"]
 
 
 class TestGatedCaptureCapabilityDetection:

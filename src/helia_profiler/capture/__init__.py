@@ -19,7 +19,7 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from ..config import Transport
+from ..config import DEFAULT_POWER_DURATION_S, Transport
 from ..errors import CaptureError, PowerError
 from ..transport import (
     HPX_END,
@@ -149,7 +149,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         # Collect the attributed boot/attach phase breakdown (RTT records
         # reset / sbl_settle / attach / control_block_scan / line_collection).
         phases = {
-            key[len("rtt_phase_"): -len("_s")]: round(value, 6)
+            key[len("rtt_phase_") : -len("_s")]: round(value, 6)
             for key, value in timing_raw.items()
             if key.startswith("rtt_phase_") and key.endswith("_s")
         }
@@ -208,12 +208,26 @@ class _UsbDtrHolder:
 def _make_sync_controller(ctx: PipelineContext, driver: object):
     """Build a host sync controller from config, or a gate-only fallback.
 
-    Lock-step is opt-in (``power.lockstep``); without it, or on drivers that
-    cannot drive a GO output, the controller is a no-op and the device free-runs.
+    Lock-step is resolved via ``target.lifecycle.resolve_power_lockstep``: an
+    explicit ``power.lockstep`` setting always wins, otherwise it is
+    auto-enabled when the board is wired for it and the SoC family's default
+    reset policy needs it to stay race-free (see that function's docstring
+    for the AP510 combo+RTT race it closes). Without lock-step, or on
+    drivers that cannot drive a GO output, the controller is a no-op and the
+    device free-runs.
     """
     from ..power.sync import NullSyncController, SyncWiring
+    from ..target.lifecycle import resolve_power_lockstep
 
-    if not ctx.config.power.lockstep or not hasattr(driver, "make_sync_controller"):
+    resolved_lockstep = resolve_power_lockstep(ctx)
+    log.debug(
+        "gate-race timeline: resolve_power_lockstep=%s (configured=%s, "
+        "has_make_sync_controller=%s)",
+        resolved_lockstep,
+        ctx.config.power.lockstep,
+        hasattr(driver, "make_sync_controller"),
+    )
+    if not resolved_lockstep or not hasattr(driver, "make_sync_controller"):
         return NullSyncController()
     wiring = SyncWiring(
         lockstep=True,
@@ -254,7 +268,13 @@ def capture_power(
         return result
 
     duration = (
-        duration_override_s if duration_override_s is not None else ctx.config.power.duration_s
+        duration_override_s
+        if duration_override_s is not None
+        else (
+            ctx.config.power.duration_s
+            if ctx.config.power.duration_s is not None
+            else DEFAULT_POWER_DURATION_S
+        )
     )
 
     clean_count = None
@@ -275,52 +295,67 @@ def capture_power(
                 usb_port=ctx.config.target.usb_port,
                 usb_marker=usb_marker_serial(jlink_serial),
             )
-        # 3-wire lock-step: arm the host GO line before the device may run and
-        # release it once the poller is live, chained after any USB DTR open.
-        # The whole arm -> prepare -> wait_ready -> capture_gated sequence is
-        # one try/finally so that any exception raised anywhere in it (e.g.
-        # ``_prepare_target_once`` failing after GO has been driven low)
-        # still unconditionally releases the sync controller.
+        # 3-wire lock-step: arm the host GO line before anything may run.
+        # ORDERING (revised after the AP510 combo-reset gate-race root cause,
+        # see experiments/ap5-phase-d/t2-gate-race/): the GPI poller must be
+        # watching BEFORE the lifecycle reset fires.  The combo strategy
+        # (debug_reset then swpoi_reset) spends ~5-6s in two JLinkExe
+        # invocations; a firmware without lock-step (or whose GO wait has a
+        # bounded free-run) can raise — and nearly finish — its gated window
+        # in that gap, which the poller then observes as already-high /
+        # stale, mis-segmented as "rose but did not fall".  capture_gated
+        # invokes ``on_started`` exactly once the poller thread is sampling
+        # GPI, so the reset + READY handshake now lives inside that callback:
+        #   arm -> [poller live] -> reset -> wait READY -> (DTR) -> GO
+        # The capture duration budget is unaffected: the driver starts its
+        # wait clock after ``on_started`` returns.
+        # The whole sequence stays under one try/finally so any exception
+        # (e.g. reset failure after GO was driven low) still releases sync.
         sync = _make_sync_controller(ctx, driver)
+        prepare_error: list[BaseException] = []
         try:
             sync.arm()
-            # Reset/relaunch only after GO is held low and the state input is
-            # open. Otherwise a fast boot can pass through the READY barrier
-            # before the host is watching, leaving power capture to fail
-            # later as a missing gate.
-            _prepare_target_once()
-            sync_metadata: dict[str, object]
-
-            if sync.lockstep:
-                from ..power.diagnostics import SyncHandshakeMetadata
-
-                ready_started = time.monotonic()
-                ready = sync.wait_ready(timeout_s=duration)
-                ready_wait_s = round(time.monotonic() - ready_started, 6)
-                if not ready:
-                    state = sync.read_state()
-                    raise PowerError(
-                        "Target did not signal READY before gated power capture",
-                        hint=(
-                            "Check the state/go GPIO wiring, reset strategy, and that the "
-                            "firmware is parked in the power sync wait state. "
-                            f"Last observed state: {state.value}; waited {ready_wait_s:.3f}s."
-                        ),
-                    )
-                sync_metadata = SyncHandshakeMetadata(
-                    lockstep=True,
-                    ready_wait_s=ready_wait_s,
-                    ready_observed=True,
-                ).to_metadata()
-            else:
-                from ..power.diagnostics import SyncHandshakeMetadata
-
-                sync_metadata = SyncHandshakeMetadata(lockstep=False).to_metadata()
+            sync_metadata_holder: dict[str, object] = {}
 
             def _release() -> None:
-                if dtr_holder is not None:
-                    dtr_holder.open()
-                sync.signal_go()
+                try:
+                    # Reset/relaunch only after GO is held low, the state
+                    # input is open, and the GPI poller is live.
+                    _prepare_target_once()
+                    from ..power.diagnostics import SyncHandshakeMetadata
+
+                    if sync.lockstep:
+                        ready_started = time.monotonic()
+                        ready = sync.wait_ready(timeout_s=duration)
+                        ready_wait_s = round(time.monotonic() - ready_started, 6)
+                        if not ready:
+                            state = sync.read_state()
+                            raise PowerError(
+                                "Target did not signal READY before gated power capture",
+                                hint=(
+                                    "Check the state/go GPIO wiring, reset strategy, and "
+                                    "that the firmware is parked in the power sync wait "
+                                    f"state. Last observed state: {state.value}; waited "
+                                    f"{ready_wait_s:.3f}s."
+                                ),
+                            )
+                        sync_metadata_holder.update(
+                            SyncHandshakeMetadata(
+                                lockstep=True,
+                                ready_wait_s=ready_wait_s,
+                                ready_observed=True,
+                            ).to_metadata()
+                        )
+                    else:
+                        sync_metadata_holder.update(
+                            SyncHandshakeMetadata(lockstep=False).to_metadata()
+                        )
+                    if dtr_holder is not None:
+                        dtr_holder.open()
+                    sync.signal_go()
+                except BaseException as exc:  # propagate through the driver thread boundary
+                    prepare_error.append(exc)
+                    raise
 
             result = driver.capture_gated(
                 duration_s=duration,
@@ -330,8 +365,14 @@ def capture_power(
                 clean_infer_count=clean_count,
                 on_started=_release,
             )
-            result.metadata.setdefault("sync", sync_metadata)
+            if prepare_error:
+                raise prepare_error[0]
+            result.metadata.setdefault("sync", dict(sync_metadata_holder))
             return _attach_lifecycle_metadata(result)
+        except PowerError:
+            if prepare_error and isinstance(prepare_error[0], PowerError):
+                raise prepare_error[0] from None
+            raise
         finally:
             sync.release()
             if dtr_holder is not None:

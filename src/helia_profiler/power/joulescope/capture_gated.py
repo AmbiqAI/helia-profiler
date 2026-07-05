@@ -78,7 +78,9 @@ def capture_gated(
             hint="Reinstall pyjoulescope_driver and pyjls in the active environment.",
         ) from exc
 
+    log.debug("gate-race timeline: _open_device() start t=%.3f", time.time())
     driver, device_path, family = _open_device(self._serial)
+    log.debug("gate-race timeline: _open_device() done t=%.3f", time.time())
 
     cycle_topic, _off_value, on_value = _POWER_CYCLE[family]
     native_rate = _NATIVE_SAMPLE_RATE[family]
@@ -143,9 +145,15 @@ def capture_gated(
                     high_seen = True
                     if first_high_at is None:
                         first_high_at = time.monotonic()
+                        log.debug(
+                            "gate-race timeline: GPI rise detected t=%.3f (first poll sample=%s)",
+                            time.time(),
+                            len(poll_samples) == 1,
+                        )
                 elif prev_level and not level and high_seen:
                     if first_low_after_high_at is None:
                         first_low_after_high_at = time.monotonic()
+                        log.debug("gate-race timeline: GPI fall detected t=%.3f", time.time())
                     windows_done += 1
                     if windows_done >= min_high_windows and complete_at is None:
                         complete_at = time.monotonic()
@@ -182,6 +190,7 @@ def capture_gated(
         try:
             thread = threading.Thread(target=_poller, daemon=True)
             thread.start()
+            log.debug("gate-race timeline: GPI poller thread started t=%.3f", time.time())
             # The poller is now sampling GPI.  For transports whose firmware
             # blocks until the host attaches (USB CDC waits on DTR), release
             # it now — *after* the poller is watching — so the gated GPIO
