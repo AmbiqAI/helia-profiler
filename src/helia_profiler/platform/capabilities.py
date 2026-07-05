@@ -87,6 +87,23 @@ class ClockCapabilities:
     #: (Apollo3/3P TurboSPOT).  ``None`` means NSX handles perf switching.
     direct_burst_base_mhz: int | None
 
+    #: Timer source the firmware uses to time the silent clean/power window.
+    #: ``"stimer"`` (Apollo5): DWT->CYCCNT lives in the CoreSight debug power
+    #: domain (PD_DBG) on this family, so timing the window with it forces
+    #: PD_DBG to stay powered for the whole measured window — a real,
+    #: measured +7-9% current cost vs AutoDeploy (PD_DBG never powered).
+    #: STIMER (XTAL 32.768 kHz) is clock-mode- and debug-domain-independent,
+    #: so it can be read with PD_DBG off.  ``"dwt"`` (Apollo3/Apollo4): DWT
+    #: lives in a different, cheaper-to-hold domain there; keep the existing
+    #: behavior unless a family-specific case for STIMER is made later.
+    clean_window_timer: str
+    #: Whether the firmware should call am_hal_debug_disable()/enable() around
+    #: the *default* ``infer`` clean-window probe (not just the opt-in
+    #: ``busy_loop`` probe).  True only where ``clean_window_timer`` is
+    #: debug-domain-independent (Apollo5) so gating PD_DBG off cannot freeze
+    #: the in-window timer.  See ``experiments/ap5-reset-power-matrix.md`` §4.
+    gate_debug_domain_in_window: bool
+
 
 @dataclass(frozen=True)
 class SocCapabilities:
@@ -176,6 +193,8 @@ def build_soc_capabilities(soc: SocDef) -> SocCapabilities:
     )
     clock = ClockCapabilities(
         direct_burst_base_mhz=48 if family is SocFamily.AP3 else None,
+        clean_window_timer="stimer" if is_ap5 else "dwt",
+        gate_debug_domain_in_window=is_ap5,
     )
     return SocCapabilities(
         reset=reset,

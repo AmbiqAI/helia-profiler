@@ -107,6 +107,8 @@ def _common_kwargs(soc_name: str, transport: str) -> dict:
         "cmsis_device_header": soc.cmsis_header,
         "has_dcache": soc.capabilities.memory.has_dcache,
         "manages_shared_ssram_power": soc.capabilities.memory.has_shared_ssram_power_domain,
+        "clean_window_timer": soc.capabilities.clock.clean_window_timer,
+        "gate_debug_domain_in_window": soc.capabilities.clock.gate_debug_domain_in_window,
         "transport": transport,
         "usb_serial_marker": None,
         "usb_serial_product": "NSX HPX Profiler",
