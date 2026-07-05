@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.errors import PowerError
-from helia_profiler.power import get_driver, list_drivers
+from helia_profiler.power import get_driver, list_drivers, register_driver
 from helia_profiler.power.base import (
     GatedPowerWindow,
     PowerMode,
@@ -966,6 +966,8 @@ class TestCapturePowerWrapper:
         called: dict[str, object] = {}
 
         class FakeDriver:
+            supports_gated_capture = True
+
             def check_available(self):
                 called["checked"] = True
 
@@ -1055,6 +1057,8 @@ class TestCapturePowerWrapper:
                 calls.append("release")
 
         class FakeDriver:
+            supports_gated_capture = True
+
             def check_available(self):
                 calls.append("check")
 
@@ -1150,6 +1154,8 @@ class TestCapturePowerWrapper:
                 calls.append("release")
 
         class FakeDriver:
+            supports_gated_capture = True
+
             def check_available(self):
                 calls.append("check")
 
@@ -1170,3 +1176,111 @@ class TestCapturePowerWrapper:
             capture_power(ctx, duration_override_s=7.0, prepare_target=prepare_target)
 
         assert calls == ["check", "make_sync", "arm", "prepare", "release"]
+
+
+class TestGatedCaptureCapabilityDetection:
+    """``capture_power`` selects the gated path via ``supports_gated_capture``.
+
+    Any driver — built-in or registered via ``register_driver`` — that sets
+    ``supports_gated_capture = True`` and implements a working
+    ``capture_gated`` gets the gated path automatically; the decision is no
+    longer a hardcoded driver-name allowlist.
+    """
+
+    def test_custom_registered_driver_with_gated_capture_uses_gated_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.capture import capture_power
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        summary = PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6)
+        calls: list[str] = []
+
+        class CustomGatedDriver:
+            """A third-party driver registered via ``register_driver``."""
+
+            supports_gated_capture = True
+
+            def __init__(self, *, serial: str | None = None) -> None:
+                del serial
+
+            def check_available(self) -> None:
+                calls.append("check")
+
+            def capture(self, **kwargs):  # pragma: no cover - unreachable
+                raise AssertionError("ungated capture should not be reached")
+
+            def capture_gated(self, **kwargs):
+                calls.append("capture_gated")
+                return PowerResult(
+                    summary=summary, metadata={"measurement_scope": "custom_gated"}
+                )
+
+        register_driver("custom-gated-test-driver", CustomGatedDriver)
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {"enabled": True, "driver": "custom-gated-test-driver"},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=5), layers=[])
+
+        result = capture_power(ctx, duration_override_s=3.0)
+
+        assert "capture_gated" in calls
+        assert "check" in calls
+        assert result.metadata["measurement_scope"] == "custom_gated"
+
+    def test_driver_without_capability_flag_uses_ungated_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """A driver that doesn't set ``supports_gated_capture`` (even if it
+        happens to implement ``capture_gated``) is treated as ungated —
+        matches the ``getattr(..., False)`` default at the call site.
+        """
+        from helia_profiler.capture import capture_power
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        summary = PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6)
+        calls: list[str] = []
+
+        class UngatedDriver:
+            def check_available(self) -> None:
+                calls.append("check")
+
+            def capture(self, **kwargs):
+                calls.append("capture")
+                return PowerResult(summary=summary, metadata={"measurement_scope": "ungated"})
+
+            def capture_gated(self, **kwargs):  # pragma: no cover - unreachable
+                raise AssertionError("gated capture should not be reached")
+
+        monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: UngatedDriver())
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {"enabled": True, "driver": "joulescope-js110"},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=5), layers=[])
+
+        result = capture_power(ctx, duration_override_s=3.0)
+
+        assert calls == ["check", "capture"]
+        assert result.metadata["measurement_scope"] == "ungated"

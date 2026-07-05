@@ -70,6 +70,8 @@ class _RecordingSyncController:
 class _FakeGatedDriver:
     """Joulescope-like driver whose gated capture invokes the release hook."""
 
+    supports_gated_capture = True
+
     def __init__(self, events: list[str]) -> None:
         self._events = events
         self.power_cycle_calls = 0

@@ -42,7 +42,6 @@ __all__ = [
     "PowerResult",
     "PowerSample",
     "PowerSummary",
-    "GATED_CAPTURE_DRIVER_NAMES",
     "get_driver",
     "list_drivers",
     "register_driver",
@@ -55,11 +54,6 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 _DRIVERS: dict[str, type[PowerDriver]] = {}
-
-#: Names that resolve to a driver supporting host-side GPIO-gated capture
-#: (Joulescope family). ``capture_power`` uses this — instead of duplicating
-#: the alias list — to decide whether to arm the sync/DTR gating path.
-GATED_CAPTURE_DRIVER_NAMES = frozenset({"joulescope", "joulescope-js110", "joulescope-js220"})
 
 
 def _register_builtins() -> None:

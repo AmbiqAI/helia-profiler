@@ -35,6 +35,11 @@ class JoulescopeDriver:
     def __init__(self, *, serial: str | None = None) -> None:
         self._serial = serial
 
+    #: This driver implements a real ``capture_gated`` (host-side GPI
+    #: polling + on-instrument stats integration) — see ``supports_gated_
+    #: capture`` on :class:`~helia_profiler.power.base.PowerDriver`.
+    supports_gated_capture = True
+
     @property
     def name(self) -> str:
         return "Joulescope"

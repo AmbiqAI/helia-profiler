@@ -234,7 +234,7 @@ def capture_power(
 
     Returns a :class:`PowerResult` directly — no intermediate dict wrapping.
     """
-    from ..power import GATED_CAPTURE_DRIVER_NAMES, get_driver
+    from ..power import get_driver
 
     driver_name = ctx.config.power.driver
     driver = get_driver(driver_name, serial=ctx.config.power.serial)
@@ -261,7 +261,7 @@ def capture_power(
     if ctx.pmu_result is not None:
         clean_count = ctx.pmu_result.meta.clean_infer_count
 
-    if driver_name in GATED_CAPTURE_DRIVER_NAMES and clean_count is not None:
+    if getattr(driver, "supports_gated_capture", False) and clean_count is not None:
         # USB CDC firmware blocks in nsx_usb_connected() until the host asserts
         # DTR.  Unlike SWO/UART/RTT (which free-run after reset), it will never
         # reach the gated clean window — and the Joulescope would see no
