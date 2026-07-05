@@ -538,23 +538,30 @@ def _upload_model_to_psram(
     expected_size: int | None = None
 
     # --- Read RTT until HPX_PSRAM_READY ---
-    while time.monotonic() < deadline:
+    # Scan the buffer before demanding new bytes: on fast-booting targets the
+    # HPX_PSRAM_READY line may already be fully contained in ``initial_buf``
+    # (drained during the attach probe), after which the firmware goes silent
+    # waiting for HPX_GO — no further chunk ever arrives.
+    while True:
+        text = buf.decode("ascii", errors="replace")
+        m = re.search(r"HPX_PSRAM_READY=0x([0-9a-fA-F]+),(\d+)", text)
+        if m:
+            psram_addr = int(m.group(1), 16)
+            expected_size = int(m.group(2))
+            break
+        # Check for init errors
+        if "HPX_ERROR=" in text:
+            raise CaptureError(
+                f"Firmware error during PSRAM init: {text.strip()}",
+                hint="Check that the board has PSRAM and it is connected.",
+            )
+        if time.monotonic() >= deadline:
+            break
         chunk = bytes(jlink.rtt_read(0, 4096))
         if chunk:
             buf += chunk
-            text = buf.decode("ascii", errors="replace")
-            m = re.search(r"HPX_PSRAM_READY=0x([0-9a-fA-F]+),(\d+)", text)
-            if m:
-                psram_addr = int(m.group(1), 16)
-                expected_size = int(m.group(2))
-                break
-            # Check for init errors
-            if "HPX_ERROR=" in text:
-                raise CaptureError(
-                    f"Firmware error during PSRAM init: {text.strip()}",
-                    hint="Check that the board has PSRAM and it is connected.",
-                )
-        time.sleep(0.01)
+        else:
+            time.sleep(0.01)
 
     if psram_addr is None:
         raise CaptureError(

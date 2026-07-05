@@ -1330,3 +1330,89 @@ def test_capture_swo_output_returns_partial_after_final_attempt(monkeypatch):
 
     assert lines == ["0,CONV_2D,1", "--- HPX_END ---"]
     assert collect_call_count["count"] == _MAX_CAPTURE_ATTEMPTS
+
+
+# ---------------------------------------------------------------------------
+# PSRAM model upload — HPX_PSRAM_READY handoff
+# ---------------------------------------------------------------------------
+
+
+class _FakePsramSession:
+    """Minimal DebugMemorySession fake for the PSRAM upload path."""
+
+    def __init__(self, rtt_chunks=()):
+        self._chunks = list(rtt_chunks)
+        self.memory_writes = []
+        self.rtt_written = b""
+
+    def rtt_read(self, buffer_index, num_bytes):
+        if self._chunks:
+            return self._chunks.pop(0)
+        return []
+
+    def rtt_write(self, buffer_index, data):
+        self.rtt_written += bytes(data)
+        return len(data)
+
+    def memory_write(self, addr, data, nbits=8):
+        self.memory_writes.append((addr, bytes(data)))
+
+
+def test_psram_upload_ready_line_already_in_initial_buf(tmp_path):
+    """HPX_PSRAM_READY consumed during the attach probe must still be honoured.
+
+    On fast-booting targets (seen on apollo510b_evb) the firmware prints the
+    ready line before the host attaches; the attach probe drains it into
+    ``initial_buf`` and the firmware then blocks silently on HPX_GO.  The
+    wait loop must scan the initial buffer without requiring fresh RTT bytes.
+    """
+    from helia_profiler.transport.rtt import _upload_model_to_psram
+
+    model = tmp_path / "m.tflite"
+    model.write_bytes(b"\xAA" * 100)
+
+    session = _FakePsramSession()  # rtt_read always returns nothing
+    _upload_model_to_psram(
+        session,
+        model,
+        timeout_s=0.5,
+        initial_buf=b"HPX_READY\nHPX_PSRAM_READY=0x60000000,100\n",
+    )
+
+    assert session.memory_writes, "model bytes were not written to PSRAM"
+    assert session.memory_writes[0][0] == 0x60000000
+    assert b"".join(d for _, d in session.memory_writes) == b"\xAA" * 100
+    assert b"HPX_GO" in session.rtt_written
+
+
+def test_psram_upload_ready_line_arrives_in_later_chunk(tmp_path):
+    """Ready line split across the probe buffer and a later RTT chunk."""
+    from helia_profiler.transport.rtt import _upload_model_to_psram
+
+    model = tmp_path / "m.tflite"
+    model.write_bytes(b"\xBB" * 10)
+
+    session = _FakePsramSession(
+        rtt_chunks=[list(b"READY=0x60000000,10\n")],
+    )
+    _upload_model_to_psram(
+        session,
+        model,
+        timeout_s=0.5,
+        initial_buf=b"HPX_PSRAM_",
+    )
+
+    assert session.memory_writes[0][0] == 0x60000000
+    assert b"HPX_GO" in session.rtt_written
+
+
+def test_psram_upload_times_out_without_ready_line(tmp_path):
+    from helia_profiler.capture import CaptureError
+    from helia_profiler.transport.rtt import _upload_model_to_psram
+
+    model = tmp_path / "m.tflite"
+    model.write_bytes(b"\xCC")
+
+    session = _FakePsramSession()
+    with pytest.raises(CaptureError, match="HPX_PSRAM_READY"):
+        _upload_model_to_psram(session, model, timeout_s=0.05, initial_buf=b"")
