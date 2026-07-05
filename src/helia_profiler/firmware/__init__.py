@@ -425,7 +425,9 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # --- Resolve module list ---
     profile_board = getattr(board, "profile_source_board", board.name)
-    module_specs = _resolve_module_specs(board.name, profile_board=profile_board)
+    module_specs = _resolve_module_specs(
+        board.name, profile_board=profile_board, registry=config.platform_registry
+    )
     profile = _get_starter_profile(board.name, profile_board=profile_board)
 
     # Add transport modules when using USB CDC transport

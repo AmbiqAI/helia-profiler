@@ -281,7 +281,7 @@ def _run_aot_compiler(
     # and appended after so they take precedence (equal-specificity ties resolve
     # to the later rule; explicit per-id rules are strictly more specific).
     profiler_rulesets = _resolve_aot_tensor_rulesets(
-        config, get_soc_for_board(config.target.board)
+        config, get_soc_for_board(config.target.board, registry=config.platform_registry)
     )
     if profiler_rulesets:
         mem = base_data.setdefault("memory", {})

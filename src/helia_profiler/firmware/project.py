@@ -20,7 +20,7 @@ from .render import _jinja_env, _write_text
 if TYPE_CHECKING:
     from ..config import ProfileConfig
     from ..engines.base import EngineArtifacts, ArenaRegion
-    from ..platform import BoardDef, SocDef
+    from ..platform import BoardDef, PlatformRegistry, SocDef
 
 log = logging.getLogger("hpx")
 
@@ -129,7 +129,9 @@ def _get_starter_profile(board: str, *, profile_board: str | None = None) -> dic
     return profile
 
 
-def _needs_armv8m_pmu_module(board: str, *, profile_board: str | None = None) -> bool:
+def _needs_armv8m_pmu_module(
+    board: str, *, profile_board: str | None = None, registry: PlatformRegistry | None = None
+) -> bool:
     """Return whether this board needs the standalone Armv8-M PMU module.
 
     Some installed NSX starter profiles still omit ``nsx-pmu-armv8m`` for AP5
@@ -140,7 +142,7 @@ def _needs_armv8m_pmu_module(board: str, *, profile_board: str | None = None) ->
         if candidate is None:
             continue
         try:
-            soc = get_soc_for_board(candidate)
+            soc = get_soc_for_board(candidate, registry=registry)
         except ValueError:
             continue
         return _soc_has_backend(soc, "armv8m-pmu")
@@ -222,7 +224,12 @@ def _default_nsx_channel(board_channel: str, configured_channel: str | None) -> 
     return board_channel
 
 
-def _resolve_module_specs(board: str, *, profile_board: str | None = None) -> list[NsxModuleSpec]:
+def _resolve_module_specs(
+    board: str,
+    *,
+    profile_board: str | None = None,
+    registry: PlatformRegistry | None = None,
+) -> list[NsxModuleSpec]:
     """Build the ordered typed module list for a profiler app.
 
     Module selection and ownership are both derived from the board's NSX
@@ -232,7 +239,7 @@ def _resolve_module_specs(board: str, *, profile_board: str | None = None) -> li
 
     ordered_names: list[str] = _starter_profile_module_names(profile)
     if (
-        _needs_armv8m_pmu_module(board, profile_board=profile_board)
+        _needs_armv8m_pmu_module(board, profile_board=profile_board, registry=registry)
         and "nsx-pmu-armv8m" not in ordered_names
     ):
         ordered_names.append("nsx-pmu-armv8m")
@@ -240,9 +247,17 @@ def _resolve_module_specs(board: str, *, profile_board: str | None = None) -> li
     return [NsxModuleSpec(name, _module_project(name, profile)) for name in ordered_names]
 
 
-def _resolve_module_list(board: str, *, profile_board: str | None = None) -> list[str]:
+def _resolve_module_list(
+    board: str,
+    *,
+    profile_board: str | None = None,
+    registry: PlatformRegistry | None = None,
+) -> list[str]:
     """Backward-compatible wrapper returning only module names."""
-    return [spec.name for spec in _resolve_module_specs(board, profile_board=profile_board)]
+    return [
+        spec.name
+        for spec in _resolve_module_specs(board, profile_board=profile_board, registry=registry)
+    ]
 
 
 def _resolve_project_overrides(
