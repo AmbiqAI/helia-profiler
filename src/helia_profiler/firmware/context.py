@@ -16,6 +16,7 @@ from ..counters import (
 from ..engines import EngineType
 from ..errors import FirmwareError
 from ..placement import Placement
+from ..target.lifecycle import resolve_power_lockstep
 from ..usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
 from .op_resolver import build_resolver_plan
 
@@ -179,7 +180,7 @@ class FirmwareRenderContext:
             sync=SyncContext(
                 power_sync_enabled=power_sync_enabled,
                 sync_gpio_pin=config.power.sync_gpio_pin,
-                lockstep=config.power.lockstep,
+                lockstep=resolve_power_lockstep(ctx),
                 state_gpio_pin=config.power.state_gpio_pin,
                 go_gpio_pin=config.power.go_gpio_pin,
             ),

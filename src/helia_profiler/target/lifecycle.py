@@ -126,10 +126,17 @@ def prepare_target_for_phase(
 
 def _time_action(timings_s: dict[str, float], key: str, action):
     started = time.monotonic()
+    log.debug("gate-race timeline: lifecycle action '%s' start t=%.3f", key, time.time())
     try:
         return action()
     finally:
         timings_s[key] = round(time.monotonic() - started, 6)
+        log.debug(
+            "gate-race timeline: lifecycle action '%s' done t=%.3f (%.3fs)",
+            key,
+            time.time(),
+            timings_s[key],
+        )
 
 
 def _try_power_cycle(power_driver: object, power_driver_name: str) -> bool:
@@ -162,6 +169,40 @@ def _default_power_reset_strategy(ctx: PipelineContext) -> ResetStrategy:
     return ResetStrategy(ctx.soc.capabilities.reset.default_power_reset_strategy)
 
 
+def resolve_power_lockstep(ctx: PipelineContext) -> bool:
+    """Resolve whether gated power capture should use 3-wire GPIO lock-step.
+
+    An explicit ``power.lockstep`` setting always wins. When left unset
+    (``None``), lock-step is recommended -- and auto-enabled -- exactly when
+    the board is wired for it (``state_gpio_pin``/``go_gpio_pin`` > 0) *and*
+    the SoC family's default power reset policy needs it to stay race-free
+    (see ``ResetCapabilities.requires_lockstep_for_gated_power``).
+
+    This closes the AP510 ``debug_reset+swpoi_reset``+RTT race: that combo
+    issues two sequential JLinkExe invocations (several seconds of extra
+    host-side wall time versus a single reset). Without lock-step, the
+    un-synchronized firmware gate window can rise -- and, on a slow host,
+    nearly finish -- before the Joulescope GPI poller starts watching, which
+    the diff-based edge segmenter then reports as "rose but did not fall"
+    even though the device completed a normal window. With lock-step, the
+    firmware parks in ``hpx_sync_wait_go()`` until the host has confirmed the
+    poller is armed and asserts GO, so reset latency can no longer race the
+    gated window regardless of how slow the chosen reset strategy is.
+
+    This is the one place both the firmware generator (which must bake
+    ``kSyncLockstep`` in at build time) and the host-side capture path (which
+    must arm/wait/signal accordingly) resolve the *same* answer -- callers
+    must not read ``config.power.lockstep`` directly.
+    """
+    configured = ctx.config.power.lockstep
+    if configured is not None:
+        return configured
+    if ctx.soc is None:
+        return False
+    wired = ctx.config.power.state_gpio_pin > 0 and ctx.config.power.go_gpio_pin > 0
+    return wired and ctx.soc.capabilities.reset.requires_lockstep_for_gated_power
+
+
 def _execute_reset_strategy(ctx: PipelineContext, strategy: ResetStrategy) -> ResetAction:
     if strategy is ResetStrategy.NONE:
         return ResetAction.NONE
@@ -178,8 +219,11 @@ def _execute_reset_strategy(ctx: PipelineContext, strategy: ResetStrategy) -> Re
         reset_controller.swpoi_reset(device=ctx.soc.jlink_device, jlink_serial=jlink_serial)
         return ResetAction.SWPOI_RESET
     if strategy is ResetStrategy.DEBUG_RESET_THEN_SWPOI:
+        log.debug("gate-race timeline: debug_reset() start t=%.3f", time.time())
         reset_controller.debug_reset(device=ctx.soc.jlink_device, jlink_serial=jlink_serial)
+        log.debug("gate-race timeline: debug_reset() done t=%.3f", time.time())
         reset_controller.swpoi_reset(device=ctx.soc.jlink_device, jlink_serial=jlink_serial)
+        log.debug("gate-race timeline: swpoi_reset() done t=%.3f", time.time())
         return ResetAction.DEBUG_RESET_THEN_SWPOI
 
     raise AssertionError(f"Unhandled reset strategy: {strategy}")
@@ -200,4 +244,5 @@ __all__ = [
     "ResetStrategy",
     "TargetLifecyclePlan",
     "prepare_target_for_phase",
+    "resolve_power_lockstep",
 ]

@@ -41,10 +41,24 @@ class ResetCapabilities:
     SWPOI deep reset also clears PMU/power state), ``debug_reset`` on
     Apollo3/Apollo4.  The value equals a
     :class:`helia_profiler.target.lifecycle.ResetStrategy` member.
+
+    ``requires_lockstep_for_gated_power`` flags families whose default reset
+    policy needs the 3-wire GPIO lock-step handshake for gated power capture
+    to be race-free.  ``debug_reset+swpoi_reset`` issues *two* sequential
+    JLinkExe invocations (several seconds of extra host-side wall time versus
+    a single reset); without lock-step, the un-synchronized firmware gate
+    window can rise -- and, on a slow host, nearly finish -- before the
+    Joulescope GPI poller starts watching, which the diff-based edge
+    segmenter then reports as "rose but did not fall" even though the device
+    completed a normal window (confirmed via AP510 combo+RTT hardware
+    investigation; see the ``t2-gate-race`` report).  ``True`` only means
+    "recommend lock-step when this board is wired for it"; it never
+    overrides an explicit ``power.lockstep`` setting.
     """
 
     default_power_reset_strategy: str
     supports_swpoi: bool
+    requires_lockstep_for_gated_power: bool = False
 
 
 @dataclass(frozen=True)
@@ -140,18 +154,18 @@ class PowerCaptureCapabilities:
 # encodes apollo3p only.
 _FAMILY_MEMORY_BASES: dict[SocFamily, dict[Placement, int]] = {
     SocFamily.AP3: {
-        Placement.TCM: 0x10000000,   # real 64 KB low-latency TCM (NSX_MEM_FAST_BSS, nsx-ambiq-sdk#29)
+        Placement.TCM: 0x10000000,  # real 64 KB low-latency TCM (NSX_MEM_FAST_BSS, nsx-ambiq-sdk#29)
         Placement.SRAM: 0x10011000,  # RWMEM main SRAM (default .bss/.data home)
         Placement.MRAM: 0x00000000,  # NOR flash XIP (ROMEM @ 0x0000C000), weights
     },
     SocFamily.AP4: {
-        Placement.TCM: 0x10000000,   # DTCM
+        Placement.TCM: 0x10000000,  # DTCM
         Placement.SRAM: 0x10060000,  # SHARED_SRAM (right after 384 KB DTCM)
         Placement.MRAM: 0x00000000,  # MRAM (XIP)
         Placement.PSRAM: 0x60000000,
     },
     SocFamily.AP5: {
-        Placement.TCM: 0x20000000,   # DTCM
+        Placement.TCM: 0x20000000,  # DTCM
         Placement.SRAM: 0x20080000,  # SSRAM (right after 512 KB DTCM)
         Placement.MRAM: 0x00000000,  # MRAM (XIP)
         Placement.PSRAM: 0x60000000,
@@ -175,10 +189,9 @@ def build_soc_capabilities(soc: SocDef) -> SocCapabilities:
     is_cortex_m4f = family in (SocFamily.AP3, SocFamily.AP4)
 
     reset = ResetCapabilities(
-        default_power_reset_strategy=(
-            _RESET_DEBUG_THEN_SWPOI if is_ap5 else _RESET_DEBUG
-        ),
+        default_power_reset_strategy=(_RESET_DEBUG_THEN_SWPOI if is_ap5 else _RESET_DEBUG),
         supports_swpoi=is_ap5,
+        requires_lockstep_for_gated_power=is_ap5,
     )
     transport = TransportCapabilities(
         requires_attached_probe_for_cycles=is_cortex_m4f,
