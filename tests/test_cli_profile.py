@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from helia_profiler import cli
+from helia_profiler.cli import profile_cmd as cli
 
 
 def _profile_args(**overrides):

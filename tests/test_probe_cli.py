@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from helia_profiler import cli
+from helia_profiler.cli import inspect_cmds as cli
 from helia_profiler.errors import CaptureError
 from helia_profiler.target.probe.jlink import JLinkProbe, JLinkProbeMatch
 from helia_profiler.platform import CoreArch

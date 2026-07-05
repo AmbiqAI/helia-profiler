@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
-from helia_profiler import cli
+from helia_profiler.cli import cache_cmd as cli
 
 
 def test_cache_purge_removes_workspace_cache(tmp_path: Path, monkeypatch, capsys) -> None:
