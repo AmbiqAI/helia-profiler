@@ -501,22 +501,6 @@ int main(void) {
     // power sync is disabled, hpx_sync_window_begin/end compile to no-ops.
     {
         g_profiler.SetEnabled(false);
-{% if has_dcache | default(false) %}
-        // Defensive cache re-assert.  Phase D hardware finding (AP510,
-        // debug_reset+swpoi_reset + debug transport): the boot-time
-        // sys_cfg.enable_cache=true (nsx_system_init -> nsx_cache_enable())
-        // can leave I/D cache OFF specifically after the double-reset
-        // sequence even though nsx_system_init() reports success — measured
-        // via a live J-Link SCB->CCR read mid-clean-window (IC=DC=0 on the
-        // failing combo run vs IC=DC=1 on a plain swpoi_reset run, same
-        // firmware image, same LP/96MHz clock mode in both). A cache-off
-        // clean window is memory-bound on every MRAM/flash fetch, which is
-        // consistent in magnitude with the ~6.4x clean-window slowdown seen
-        // in forensics.  Re-enabling here is cheap and idempotent (a no-op
-        // if the cache is already on) and runs before the warmup loop below
-        // so the timed window is warmed with cache actually live.
-        nsx_cache_enable();
-{% endif %}
 {% if window_mode | default("fixed") == "auto" %}
         // Adaptive clean-window sizing.  Warm caches / branch predictor / MRAM
         // prefetch (uninstrumented) and capture the warm per-inference cycle
