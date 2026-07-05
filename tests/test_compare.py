@@ -4,9 +4,19 @@ from __future__ import annotations
 
 import csv
 import json
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 
-from helia_profiler.compare import compare_runs, render_compare, write_compare_artifacts
+import pytest
+
+from helia_profiler.compare import (
+    ConfigDiffRow,
+    CounterDiff,
+    LayerDiffRow,
+    compare_runs,
+    render_compare,
+    write_compare_artifacts,
+)
 
 
 def _write_run(
@@ -149,9 +159,31 @@ def test_compare_runs_computes_run_and_layer_deltas(tmp_path: Path):
     total = next(m for m in result.metrics if m.name == "total_cycles")
     assert total.delta == -250
     assert total.delta_pct == -25
-    assert result.layer_rows[0]["delta_cycles"] == -200
-    assert result.layer_rows[0]["speedup"] == 800 / 600
-    assert any(row["field"] == "Toolchain" and row["status"] == "diff" for row in result.config_rows)
+    assert isinstance(result.layer_rows[0], LayerDiffRow)
+    assert result.layer_rows[0].delta_cycles == -200
+    assert result.layer_rows[0].speedup == 800 / 600
+    assert isinstance(result.config_rows[0], ConfigDiffRow)
+    assert any(row.field == "Toolchain" and row.status == "diff" for row in result.config_rows)
+
+
+def test_compare_layer_rows_type_dynamic_pmu_counters_as_counter_diffs(tmp_path: Path):
+    baseline = tmp_path / "gcc"
+    candidate = tmp_path / "atfe"
+    _write_run(baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800, 200])
+    _write_run(candidate, toolchain="atfe", total_cycles=750, avg_us=8, layer_cycles=[600, 150])
+
+    result = compare_runs(baseline, candidate)
+
+    row = result.layer_rows[0]
+    assert "ARM_PMU_CPU_CYCLES" in row.counters
+    counter = row.counters["ARM_PMU_CPU_CYCLES"]
+    assert isinstance(counter, CounterDiff)
+    assert counter.baseline == 800
+    assert counter.candidate == 600
+    assert counter.delta == -200
+    # Rows with no memory placement data leave the memory fields unset.
+    assert row.baseline_memory is None
+    assert row.memory_changed is None
 
 
 def test_render_compare_starts_with_config_then_run_then_layers(tmp_path: Path):
@@ -196,13 +228,34 @@ def test_compare_includes_aot_memory_placement_diffs(tmp_path: Path):
     result = compare_runs(baseline, candidate)
 
     row = result.layer_rows[0]
-    assert row["memory_changed"] is True
-    assert "constants: 1 buffer in DTCM" in row["baseline_memory"]
-    assert "constants: 1 buffer staged MRAM to SRAM" in row["candidate_memory"]
-    assert "->" in row["memory_diff"]
+    assert row.memory_changed is True
+    assert "constants: 1 buffer in DTCM" in row.baseline_memory
+    assert "constants: 1 buffer staged MRAM to SRAM" in row.candidate_memory
+    assert "->" in row.memory_diff
 
     paths = write_compare_artifacts(result, tmp_path / "diff")
     assert {p.name for p in paths} == {"compare_summary.json", "layer_diff.csv"}
     rows = list(csv.DictReader(open(tmp_path / "diff" / "layer_diff.csv")))
     assert rows[0]["memory_changed"] == "True"
     assert "staged MRAM to SRAM" in rows[0]["candidate_memory"]
+
+
+def test_layer_diff_row_is_frozen_and_flattens_for_csv(tmp_path: Path):
+    """LayerDiffRow is immutable and its to_flat_dict() output drives the CSV writer."""
+    baseline = tmp_path / "gcc"
+    candidate = tmp_path / "atfe"
+    _write_run(baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+    _write_run(candidate, toolchain="atfe", total_cycles=900, avg_us=9, layer_cycles=[700])
+
+    result = compare_runs(baseline, candidate)
+    row = result.layer_rows[0]
+
+    with pytest.raises(FrozenInstanceError):
+        row.delta_cycles = 0  # type: ignore[misc]
+
+    flat = row.to_flat_dict()
+    assert flat["delta_cycles"] == row.delta_cycles
+    assert flat["baseline_ARM_PMU_CPU_CYCLES"] == row.counters["ARM_PMU_CPU_CYCLES"].baseline
+    # Rows without memory placement data omit the memory_* keys entirely,
+    # matching the original dict-based producer's conditional insertion.
+    assert "baseline_memory" not in flat

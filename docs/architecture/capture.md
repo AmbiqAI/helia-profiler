@@ -9,7 +9,7 @@ USB CDC, or SWO, and optionally power measurements via Joulescope.
 graph LR
     A[Firmware<br/>SWO printf] -->|ITM Channel 0| B[J-Link probe]
     B -->|USB| C[pylink]
-    C --> D[serial_reader.py]
+    C --> D[transport/swo.py]
     D -->|raw lines| E[parser.py]
     E -->|PmuResult| F[Pipeline context]
 ```

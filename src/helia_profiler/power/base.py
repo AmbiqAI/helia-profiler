@@ -85,6 +85,16 @@ class PowerResult:
 class PowerDriver(Protocol):
     """Interface that each power measurement driver must implement."""
 
+    #: Whether this driver implements a working host-side GPIO-gated capture
+    #: (:meth:`capture_gated`). ``capture_power`` uses this — rather than a
+    #: hardcoded driver-name allowlist — to decide whether to arm the
+    #: sync/DTR gating path, so any driver (built-in or registered via
+    #: :func:`register_driver`) that sets this ``True`` gets the gated path
+    #: automatically. Defaults to ``False``; drivers that don't set it are
+    #: treated as ungated (matches ``getattr(driver, "supports_gated_capture",
+    #: False)`` at the call site).
+    supports_gated_capture: bool = False
+
     @property
     def name(self) -> str:
         """Human-readable driver name."""

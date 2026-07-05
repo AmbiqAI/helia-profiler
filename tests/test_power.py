@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.errors import PowerError
-from helia_profiler.power import get_driver, list_drivers
+from helia_profiler.power import get_driver, list_drivers, register_driver
 from helia_profiler.power.base import (
     GatedPowerWindow,
     PowerMode,
@@ -136,7 +136,7 @@ class TestGatedStatsProcessing:
         return packet
 
     def test_gated_window_sums_ondevice_integrals(self):
-        from helia_profiler.power.joulescope_driver import _process_gated_stats
+        from helia_profiler.power.joulescope.stats import _process_gated_stats
 
         ms = _SECOND // 1000
         packets = []
@@ -170,7 +170,7 @@ class TestGatedStatsProcessing:
         assert summary.energy_j == pytest.approx(0.0018, rel=1e-6)
 
     def test_no_windows_returns_empty(self):
-        from helia_profiler.power.joulescope_driver import _process_gated_stats
+        from helia_profiler.power.joulescope.stats import _process_gated_stats
 
         ms = _SECOND // 1000
         packets = [self._packet(0, ms, 0.0001, 0.00018, 0.12)]
@@ -181,7 +181,7 @@ class TestGatedStatsProcessing:
         assert summary.sample_count == 0
 
     def test_gated_diagnostics_separates_selected_packets(self):
-        from helia_profiler.power.joulescope_driver import _gated_stats_diagnostics
+        from helia_profiler.power.joulescope.diagnostics import _gated_stats_diagnostics
 
         ms = _SECOND // 1000
         packets = []
@@ -205,10 +205,8 @@ class TestGatedStatsProcessing:
         assert diagnostics["rejected_median_current_a"] == pytest.approx(0.02, rel=1e-6)
 
     def test_gated_stats_uses_host_packet_time_axis_when_available(self):
-        from helia_profiler.power.joulescope_driver import (
-            _gated_stats_diagnostics,
-            _process_gated_stats,
-        )
+        from helia_profiler.power.joulescope.diagnostics import _gated_stats_diagnostics
+        from helia_profiler.power.joulescope.stats import _process_gated_stats
 
         ms = _SECOND // 1000
         host_base = 10_000 * ms
@@ -239,7 +237,7 @@ class TestGatedStatsProcessing:
         assert diagnostics["selected_packets"] == 10
 
     def test_whole_summary_sums_all_packets(self):
-        from helia_profiler.power.joulescope_driver import _whole_summary_from_stats
+        from helia_profiler.power.joulescope.stats import _whole_summary_from_stats
 
         ms = _SECOND // 1000
         packets = [
@@ -251,6 +249,62 @@ class TestGatedStatsProcessing:
         assert summary.duration_s == pytest.approx(0.01, rel=1e-6)
         assert summary.avg_power_w == pytest.approx(0.18, rel=1e-6)
 
+
+class TestJoulescopeUngatedCapture:
+    """Exercises :meth:`JoulescopeDriver.capture` (the non-gated path).
+
+    Regression test for a real (pre-existing) bug: the ``_on_stats``
+    callback referenced the ``pyjoulescope_driver.time64`` module without
+    importing it in this method's scope (it was only imported in the
+    sibling ``capture_gated`` method), so any stats packet arriving during
+    a plain (non-gated) capture crashed with ``NameError: name 'time64' is
+    not defined``.
+    """
+
+    class _FakeDriver:
+        """Minimal pyjoulescope_driver.Driver stand-in.
+
+        ``subscribe`` invokes the callback synchronously with one fake stat
+        packet so ``capture()``'s ``_on_stats`` closure runs for real.
+        """
+
+        def __init__(self, packet: dict):
+            self._packet = packet
+            self.published: list[tuple[str, object]] = []
+
+        def publish(self, topic, value, **kwargs):
+            self.published.append((topic, value))
+
+        def subscribe(self, topic, _flag, callback):
+            callback(topic, self._packet)
+
+        def unsubscribe(self, topic, callback):
+            pass
+
+    @staticmethod
+    def _stats_packet():
+        return {
+            "signals": {
+                "current": {"avg": {"value": 0.01}, "max": {"value": 0.02}},
+                "voltage": {"avg": {"value": 1.8}},
+            }
+        }
+
+    def test_capture_processes_stats_packet_without_crashing(self, monkeypatch: pytest.MonkeyPatch):
+        from helia_profiler.power.joulescope.driver import JoulescopeDriver
+
+        fake_driver = self._FakeDriver(self._stats_packet())
+        monkeypatch.setattr(
+            "helia_profiler.power.joulescope.driver._open_device",
+            lambda serial: (fake_driver, "u/js220/000123", "js220"),
+        )
+        monkeypatch.setattr("helia_profiler.power.joulescope.driver.time.sleep", lambda _s: None)
+
+        driver = JoulescopeDriver()
+        result = driver.capture(duration_s=0.01, io_voltage=1.8)
+
+        assert result.summary.sample_count == 1
+        assert result.summary.avg_current_a == pytest.approx(0.01, rel=1e-6)
 
 
 class TestPowerMode:
@@ -389,7 +443,7 @@ class TestPowerConfig:
 
     def test_power_reset_strategy_config(self, tmp_path: Path):
         from helia_profiler.config import load_config
-        from helia_profiler.target_lifecycle import ResetStrategy
+        from helia_profiler.target.lifecycle import ResetStrategy
 
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")
@@ -409,7 +463,7 @@ class TestCapturePowerStage:
     def test_skipped_when_disabled(self, tmp_path: Path):
         from helia_profiler.config import load_config
         from helia_profiler.pipeline import PipelineContext
-        from helia_profiler.stages.s07_capture_power import CapturePowerStage
+        from helia_profiler.stages.capture_power import CapturePowerStage
 
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")
@@ -424,7 +478,7 @@ class TestCapturePowerStage:
     def test_not_skipped_when_enabled(self, tmp_path: Path):
         from helia_profiler.config import load_config
         from helia_profiler.pipeline import PipelineContext
-        from helia_profiler.stages.s07_capture_power import CapturePowerStage
+        from helia_profiler.stages.capture_power import CapturePowerStage
 
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")
@@ -449,7 +503,7 @@ class TestCapturePowerStage:
         from helia_profiler.config import load_config
         from helia_profiler.pipeline import PipelineContext
         from helia_profiler.platform import get_soc_for_board
-        from helia_profiler.stages.s07_capture_power import CapturePowerStage
+        from helia_profiler.stages.capture_power import CapturePowerStage
 
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")
@@ -471,11 +525,11 @@ class TestCapturePowerStage:
                 raise AssertionError("auto reset must not power-cycle")
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: reset_calls.update(k),
         )
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target_poi",
+            "helia_profiler.target.probe.jlink.reset_target_poi",
             lambda **k: reset_calls.setdefault("swpoi", k),
         )
 
@@ -530,7 +584,7 @@ class TestTargetLifecycle:
     def test_ap4_power_phase_uses_debug_reset_only(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target_lifecycle import (
+        from helia_profiler.target.lifecycle import (
             CapturePhase,
             ResetAction,
             prepare_target_for_phase,
@@ -544,11 +598,11 @@ class TestTargetLifecycle:
                 raise AssertionError("auto AP4 reset must not power-cycle")
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: calls.append(("reset", k)),
         )
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target_poi",
+            "helia_profiler.target.probe.jlink.reset_target_poi",
             lambda **k: calls.append(("swpoi", k)),
         )
 
@@ -569,7 +623,7 @@ class TestTargetLifecycle:
     def test_ap5_power_phase_preserves_current_swpoi_policy(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target_lifecycle import (
+        from helia_profiler.target.lifecycle import (
             CapturePhase,
             ResetAction,
             prepare_target_for_phase,
@@ -583,11 +637,11 @@ class TestTargetLifecycle:
                 raise AssertionError("auto AP5 reset must not power-cycle")
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: calls.append(("reset", k)),
         )
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target_poi",
+            "helia_profiler.target.probe.jlink.reset_target_poi",
             lambda **k: calls.append(("swpoi", k)),
         )
 
@@ -605,7 +659,7 @@ class TestTargetLifecycle:
     def test_explicit_ap4_swpoi_uses_swpoi_as_replacement(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target_lifecycle import (
+        from helia_profiler.target.lifecycle import (
             CapturePhase,
             ResetAction,
             prepare_target_for_phase,
@@ -620,11 +674,11 @@ class TestTargetLifecycle:
                 raise AssertionError("explicit SWPOI reset must not power-cycle")
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: calls.append(("reset", k)),
         )
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target_poi",
+            "helia_profiler.target.probe.jlink.reset_target_poi",
             lambda **k: calls.append(("swpoi", k)),
         )
 
@@ -642,7 +696,7 @@ class TestTargetLifecycle:
     def test_explicit_no_reset_does_not_touch_hardware(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target_lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
+        from helia_profiler.target.lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
 
         ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
         ctx.config = replace(ctx.config, power=replace(ctx.config.power, reset_strategy="none"))
@@ -653,11 +707,11 @@ class TestTargetLifecycle:
                 raise AssertionError("none reset must not power-cycle")
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: calls.append(("reset", k)),
         )
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target_poi",
+            "helia_profiler.target.probe.jlink.reset_target_poi",
             lambda **k: calls.append(("swpoi", k)),
         )
 
@@ -675,7 +729,7 @@ class TestTargetLifecycle:
     def test_explicit_power_cycle_requires_rail_toggle_and_skips_jlink_reset(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target_lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
+        from helia_profiler.target.lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
 
         ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
         ctx.config = replace(ctx.config, power=replace(ctx.config.power, reset_strategy="power_cycle"))
@@ -686,11 +740,11 @@ class TestTargetLifecycle:
                 calls.append(("power_cycle", kwargs))
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: calls.append(("reset", k)),
         )
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target_poi",
+            "helia_profiler.target.probe.jlink.reset_target_poi",
             lambda **k: calls.append(("swpoi", k)),
         )
 
@@ -708,7 +762,7 @@ class TestTargetLifecycle:
     def test_explicit_power_cycle_fails_if_rail_toggle_unavailable(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target_lifecycle import CapturePhase, prepare_target_for_phase
+        from helia_profiler.target.lifecycle import CapturePhase, prepare_target_for_phase
 
         ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
         ctx.config = replace(ctx.config, power=replace(ctx.config.power, reset_strategy="power_cycle"))
@@ -719,7 +773,7 @@ class TestTargetLifecycle:
                 raise PowerError("no rail control")
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: calls.append(("reset", k)),
         )
 
@@ -736,7 +790,7 @@ class TestTargetLifecycle:
     def test_non_power_phase_does_not_touch_hardware(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target_lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
+        from helia_profiler.target.lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
 
         ctx = self._make_ctx(tmp_path, board="apollo510_evb")
 
@@ -745,7 +799,7 @@ class TestTargetLifecycle:
                 raise AssertionError("non-power phase must not power-cycle")
 
         monkeypatch.setattr(
-            "helia_profiler.jlink.reset_target",
+            "helia_profiler.target.probe.jlink.reset_target",
             lambda **k: (_ for _ in ()).throw(AssertionError("must not reset")),
         )
 
@@ -800,7 +854,7 @@ class TestEstimateCaptureDuration:
         return ctx
 
     def test_fixed_window_includes_clean_iterations(self, tmp_path: Path):
-        from helia_profiler.stages.s07_capture_power import (
+        from helia_profiler.stages.capture_power import (
             _BOOT_SETTLE_S,
             _SAFETY_MARGIN_S,
             _estimate_capture_duration,
@@ -823,7 +877,7 @@ class TestEstimateCaptureDuration:
         assert estimated == pytest.approx(expected, rel=1e-6)
 
     def test_auto_window_scales_with_target_ms(self, tmp_path: Path):
-        from helia_profiler.stages.s07_capture_power import (
+        from helia_profiler.stages.capture_power import (
             _BOOT_SETTLE_S,
             _SAFETY_MARGIN_S,
             _estimate_capture_duration,
@@ -855,7 +909,7 @@ class TestEstimateCaptureDuration:
         # detected": a 21.136ms-per-inference model with window_target_ms
         # 8000 needs ~379 clean iterations (~8s), which the old estimate
         # (based only on the 4 profiled PMU passes) undercounted as ~7.1s.
-        from helia_profiler.stages.s07_capture_power import _estimate_capture_duration
+        from helia_profiler.stages.capture_power import _estimate_capture_duration
         from helia_profiler.results import FirmwareMeta, LayerResult, PmuResult
 
         ctx = self._make_ctx(
@@ -912,6 +966,8 @@ class TestCapturePowerWrapper:
         called: dict[str, object] = {}
 
         class FakeDriver:
+            supports_gated_capture = True
+
             def check_available(self):
                 called["checked"] = True
 
@@ -1001,6 +1057,8 @@ class TestCapturePowerWrapper:
                 calls.append("release")
 
         class FakeDriver:
+            supports_gated_capture = True
+
             def check_available(self):
                 calls.append("check")
 
@@ -1040,3 +1098,189 @@ class TestCapturePowerWrapper:
         assert result.metadata["sync"]["ready_wait_s"] >= 0.0
         assert result.metadata["sync"]["ready_observed"] is True
         assert result.metadata["target_lifecycle"] == {"reset_action": "debug_reset"}
+
+    def test_capture_power_releases_sync_when_prepare_raises_after_arm(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """``sync.release()`` must run even if prepare_target raises after arm().
+
+        Regression test: previously ``sync.arm()`` and ``_prepare_target_once()``
+        executed before the try/finally that guarantees ``sync.release()``, so a
+        prepare-time exception (e.g. a failed reset) left the host GO line held
+        low with no release.
+        """
+        from helia_profiler.capture import capture_power
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {
+                    "enabled": True,
+                    "driver": "joulescope-js110",
+                    "lockstep": True,
+                    "state_gpio_pin": 23,
+                    "go_gpio_pin": 24,
+                },
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[])
+
+        calls: list[str] = []
+
+        class FakeSync:
+            lockstep = True
+
+            def arm(self):
+                calls.append("arm")
+
+            def wait_ready(self, *, timeout_s: float):  # pragma: no cover - unreachable
+                raise AssertionError("wait_ready should not be reached")
+
+            def signal_go(self):  # pragma: no cover - unreachable
+                raise AssertionError("signal_go should not be reached")
+
+            def read_state(self):  # pragma: no cover - unreachable
+                raise AssertionError("read_state should not be reached")
+
+            def release(self):
+                calls.append("release")
+
+        class FakeDriver:
+            supports_gated_capture = True
+
+            def check_available(self):
+                calls.append("check")
+
+            def make_sync_controller(self, wiring):
+                calls.append("make_sync")
+                return FakeSync()
+
+            def capture_gated(self, **kwargs):  # pragma: no cover - unreachable
+                raise AssertionError("capture_gated should not be reached")
+
+        monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: FakeDriver())
+
+        def prepare_target(driver, name):
+            calls.append("prepare")
+            raise RuntimeError("reset failed")
+
+        with pytest.raises(RuntimeError, match="reset failed"):
+            capture_power(ctx, duration_override_s=7.0, prepare_target=prepare_target)
+
+        assert calls == ["check", "make_sync", "arm", "prepare", "release"]
+
+
+class TestGatedCaptureCapabilityDetection:
+    """``capture_power`` selects the gated path via ``supports_gated_capture``.
+
+    Any driver — built-in or registered via ``register_driver`` — that sets
+    ``supports_gated_capture = True`` and implements a working
+    ``capture_gated`` gets the gated path automatically; the decision is no
+    longer a hardcoded driver-name allowlist.
+    """
+
+    def test_custom_registered_driver_with_gated_capture_uses_gated_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.capture import capture_power
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        summary = PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6)
+        calls: list[str] = []
+
+        class CustomGatedDriver:
+            """A third-party driver registered via ``register_driver``."""
+
+            supports_gated_capture = True
+
+            def __init__(self, *, serial: str | None = None) -> None:
+                del serial
+
+            def check_available(self) -> None:
+                calls.append("check")
+
+            def capture(self, **kwargs):  # pragma: no cover - unreachable
+                raise AssertionError("ungated capture should not be reached")
+
+            def capture_gated(self, **kwargs):
+                calls.append("capture_gated")
+                return PowerResult(
+                    summary=summary, metadata={"measurement_scope": "custom_gated"}
+                )
+
+        register_driver("custom-gated-test-driver", CustomGatedDriver)
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {"enabled": True, "driver": "custom-gated-test-driver"},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=5), layers=[])
+
+        result = capture_power(ctx, duration_override_s=3.0)
+
+        assert "capture_gated" in calls
+        assert "check" in calls
+        assert result.metadata["measurement_scope"] == "custom_gated"
+
+    def test_driver_without_capability_flag_uses_ungated_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """A driver that doesn't set ``supports_gated_capture`` (even if it
+        happens to implement ``capture_gated``) is treated as ungated —
+        matches the ``getattr(..., False)`` default at the call site.
+        """
+        from helia_profiler.capture import capture_power
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        summary = PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6)
+        calls: list[str] = []
+
+        class UngatedDriver:
+            def check_available(self) -> None:
+                calls.append("check")
+
+            def capture(self, **kwargs):
+                calls.append("capture")
+                return PowerResult(summary=summary, metadata={"measurement_scope": "ungated"})
+
+            def capture_gated(self, **kwargs):  # pragma: no cover - unreachable
+                raise AssertionError("gated capture should not be reached")
+
+        monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: UngatedDriver())
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {"enabled": True, "driver": "joulescope-js110"},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=5), layers=[])
+
+        result = capture_power(ctx, duration_override_s=3.0)
+
+        assert calls == ["check", "capture"]
+        assert result.metadata["measurement_scope"] == "ungated"

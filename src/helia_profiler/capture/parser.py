@@ -35,7 +35,7 @@ import statistics
 from typing import Any
 
 from ..results import FirmwareMeta, LayerResult, PmuResult, PresetResult
-from .transport import HPX_PROTOCOL_VERSION
+from ..transport.protocol import HPX_PROTOCOL_VERSION
 
 log = logging.getLogger("hpx")
 

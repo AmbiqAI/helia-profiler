@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from helia_profiler.engines.helia_aot import (
+from helia_profiler.engines.helia_aot.manifest import (
     _AOT_MEMORY_TO_PLACEMENT,
     _extract_arena_regions,
     _extract_memory_plan,

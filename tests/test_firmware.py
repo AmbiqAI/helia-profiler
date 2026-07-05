@@ -20,9 +20,9 @@ from helia_profiler.firmware import (
     generate_app,
 )
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.stages.s01_resolve_platform import ResolvePlatformStage
-from helia_profiler.stages.s02b_plan_memory import PlanMemoryStage
-from helia_profiler.stages.s02_prepare_engine import PrepareEngineStage
+from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+from helia_profiler.stages.plan_memory import PlanMemoryStage
+from helia_profiler.stages.prepare_engine import PrepareEngineStage
 
 
 def _fake_starter_profiles() -> dict[str, dict]:
@@ -318,6 +318,60 @@ class TestResolveModuleList:
         by_name = {module.name: module for module in modules}
         assert by_name["nsx-board-apollo510-evb"].project == "neuralspotx"
         assert by_name["nsx-core"].project == "nsx-ambiq-sdk"
+
+    def test_armv8m_pmu_module_uses_config_registry_for_custom_board_soc(self):
+        """The PMU-module fallback must resolve the custom board's *own* SoC
+        (via ``registry=``), not silently fall through to the built-in
+        ``profile_board``'s SoC.
+
+        ``apollo3p`` has no ``armv8m-pmu`` backend while the reused
+        ``apollo510_evb`` starter profile's board does. Without threading the
+        config's platform registry through, ``get_soc_for_board`` cannot
+        resolve the custom board name at all and falls back to
+        ``profile_board``'s (apollo510) SoC — wrongly appending
+        ``nsx-pmu-armv8m`` for an AP3-family board.
+        """
+        from helia_profiler.config import load_config
+
+        config = load_config(
+            None,
+            {
+                "model": {"path": "m.tflite"},
+                "engine": {"type": "helia-rt"},
+                "target": {
+                    "board": "apollo3p_custom_board",
+                    "custom_socs": {
+                        "apollo3p_custom": {"based_on": "apollo3p"},
+                    },
+                    "custom_boards": {
+                        "apollo3p_custom_board": {
+                            "soc": "apollo3p_custom",
+                            "channel": "dev",
+                            "starter_profile_board": "apollo510_evb",
+                        }
+                    },
+                },
+            },
+        )
+
+        # With the config's platform registry threaded through, the custom
+        # board's own (AP3) SoC is used and the PMU module is *not* added.
+        modules_with_registry = _resolve_module_specs(
+            "apollo3p_custom_board",
+            profile_board="apollo510_evb",
+            registry=config.platform_registry,
+        )
+        names_with_registry = {m.name for m in modules_with_registry}
+        assert "nsx-pmu-armv8m" not in names_with_registry
+
+        # Without a registry, the custom board name cannot resolve at all and
+        # the fallback wrongly picks up the reused apollo510_evb SoC's PMU
+        # requirement.
+        modules_without_registry = _resolve_module_specs(
+            "apollo3p_custom_board", profile_board="apollo510_evb"
+        )
+        names_without_registry = {m.name for m in modules_without_registry}
+        assert "nsx-pmu-armv8m" in names_without_registry
 
 
 class TestModelToHeader:

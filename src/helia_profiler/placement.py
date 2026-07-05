@@ -2,7 +2,7 @@
 
 These enums are the single vocabulary used by:
 
-* the placement resolver in :mod:`helia_profiler.stages.s02b_plan_memory`
+* the placement resolver in :mod:`helia_profiler.stages.plan_memory`
 * the firmware Jinja templates (via the ``StrEnum`` ``__str__`` /
   ``__eq__`` semantics — no ``.value`` unwrapping needed)
 * engine adapters that emit arena regions

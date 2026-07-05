@@ -11,6 +11,7 @@ from helia_profiler.capture.readiness import (
     resume_if_halted,
 )
 from helia_profiler.errors import CaptureError
+from helia_profiler.target.probe import jlink as target_jlink
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +72,7 @@ class _FakeJLink:
 
 
 def test_resume_if_halted_restarts_when_halted(monkeypatch):
-    monkeypatch.setattr(readiness.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(target_jlink.time, "sleep", lambda _s: None)
     jlink = _FakeJLink(halted=True)
 
     assert resume_if_halted(jlink) is True
@@ -79,7 +80,7 @@ def test_resume_if_halted_restarts_when_halted(monkeypatch):
 
 
 def test_resume_if_halted_noop_when_running(monkeypatch):
-    monkeypatch.setattr(readiness.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(target_jlink.time, "sleep", lambda _s: None)
     jlink = _FakeJLink(halted=False)
 
     assert resume_if_halted(jlink) is False
@@ -132,7 +133,7 @@ class _RetryJLink:
 
 def test_open_jlink_with_retry_succeeds_first_try(monkeypatch):
     _install_fake_pylink(monkeypatch)
-    monkeypatch.setattr(readiness.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(target_jlink.time, "sleep", lambda _s: None)
     jlink = _RetryJLink(fail_first=0)
 
     open_jlink_with_retry(jlink, device="AP510NFA-CBR", timeout_s=5.0)
@@ -143,7 +144,7 @@ def test_open_jlink_with_retry_succeeds_first_try(monkeypatch):
 
 def test_open_jlink_with_retry_retries_until_ready(monkeypatch):
     _install_fake_pylink(monkeypatch)
-    monkeypatch.setattr(readiness.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(target_jlink.time, "sleep", lambda _s: None)
     jlink = _RetryJLink(fail_first=2)
 
     open_jlink_with_retry(jlink, device="AP510NFA-CBR", timeout_s=10.0, interval_s=0.01)
@@ -155,12 +156,12 @@ def test_open_jlink_with_retry_retries_until_ready(monkeypatch):
 def test_open_jlink_with_retry_raises_capture_error_on_timeout(monkeypatch):
     _install_fake_pylink(monkeypatch)
     clock = {"t": 0.0}
-    monkeypatch.setattr(readiness.time, "monotonic", lambda: clock["t"])
+    monkeypatch.setattr(target_jlink.time, "monotonic", lambda: clock["t"])
 
     def fake_sleep(s: float) -> None:
         clock["t"] += s
 
-    monkeypatch.setattr(readiness.time, "sleep", fake_sleep)
+    monkeypatch.setattr(target_jlink.time, "sleep", fake_sleep)
     jlink = _RetryJLink(fail_first=10_000)  # never succeeds
 
     with pytest.raises(CaptureError, match="Timed out attaching"):

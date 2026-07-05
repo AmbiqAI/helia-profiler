@@ -42,7 +42,7 @@ class BuildError(HpxError):
     """NSX configure / build / flash / lock / sync failure.
 
     Carries the underlying tool's diagnostic output (cmake / ninja /
-    JLinkExe / git stderr, NSX exception message, etc.) in
+    SEGGER commander / git stderr, NSX exception message, etc.) in
     :attr:`details`.  When the source is a real subprocess, the original
     return code is also captured in :attr:`returncode`.
 

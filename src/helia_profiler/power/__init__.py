@@ -44,6 +44,8 @@ __all__ = [
     "PowerSummary",
     "get_driver",
     "list_drivers",
+    "register_driver",
+    "resolve_driver_class",
 ]
 
 
@@ -59,15 +61,39 @@ def _register_builtins() -> None:
     if _DRIVERS:
         return
 
-    from .joulescope_driver import JoulescopeDriver
+    from .joulescope.driver import JoulescopeDriver
     from .ondevice_driver import OnDeviceDriver
 
     # Single unified Joulescope driver — handles JS110 and JS220.
-    _DRIVERS["joulescope"] = JoulescopeDriver
+    register_driver("joulescope", JoulescopeDriver)
     # Back-compat aliases so existing configs / docs keep working.
-    _DRIVERS["joulescope-js110"] = JoulescopeDriver
-    _DRIVERS["joulescope-js220"] = JoulescopeDriver
-    _DRIVERS["ondevice"] = OnDeviceDriver
+    register_driver("joulescope-js110", JoulescopeDriver)
+    register_driver("joulescope-js220", JoulescopeDriver)
+    register_driver("ondevice", OnDeviceDriver)
+
+
+def register_driver(name: str, driver_cls: type[PowerDriver]) -> None:
+    """Register (or override) the driver class used for ``name``.
+
+    Exposed so tests (or future built-ins) can add a driver without reaching
+    into the private ``_DRIVERS`` dict.
+    """
+    _DRIVERS[name] = driver_cls
+
+
+def resolve_driver_class(name: str) -> type[PowerDriver]:
+    """Look up the driver class registered for ``name``.
+
+    Raises :class:`PowerError` if the name is unknown.
+    """
+    _register_builtins()
+    cls = _DRIVERS.get(name)
+    if cls is None:
+        raise PowerError(
+            f"Unknown power driver '{name}'",
+            hint=f"Available drivers: {', '.join(sorted(_DRIVERS))}",
+        )
+    return cls
 
 
 def get_driver(name: str, *, serial: str | None = None) -> PowerDriver:
@@ -78,13 +104,7 @@ def get_driver(name: str, *, serial: str | None = None) -> PowerDriver:
     accepted as aliases for backwards compatibility.
     Raises :class:`PowerError` if the name is unknown.
     """
-    _register_builtins()
-    cls = _DRIVERS.get(name)
-    if cls is None:
-        raise PowerError(
-            f"Unknown power driver '{name}'",
-            hint=f"Available drivers: {', '.join(sorted(_DRIVERS))}",
-        )
+    cls = resolve_driver_class(name)
     try:
         return cls(serial=serial)  # type: ignore[call-arg]
     except TypeError:

@@ -8,9 +8,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from helia_profiler.engines.helia_aot import (
+from helia_profiler.engines.helia_aot.compile import _BOARD_TO_AOT_PLATFORM
+from helia_profiler.engines.helia_aot.manifest import (
     _arena_region_id_lookup,
-    _BOARD_TO_AOT_PLATFORM,
     _extract_operator_manifest,
     _tensor_metadata,
 )

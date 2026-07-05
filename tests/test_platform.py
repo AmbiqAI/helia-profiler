@@ -91,10 +91,14 @@ def test_every_soc_declares_cmsis_header_and_rtt_scan_ranges():
 
 
 
-def test_all_ap5_socs_expose_32mb_psram():
+def test_ap5_socs_expose_expected_psram_capacity():
+    # apollo510b_evb populates a 64 MB APS512XXN part (hardware-proven via
+    # XIP address-aliasing, 2026-07-05); other AP5 boards assume 32 MB until
+    # validated on hardware.
+    expected_kb = {"apollo510b": 65536}
     for soc in list_socs():
         if soc.family is SocFamily.AP5:
-            assert soc.memory.psram_kb == 32768
+            assert soc.memory.psram_kb == expected_kb.get(soc.name, 32768)
 
 
 def test_apollo330_is_ap5_family():

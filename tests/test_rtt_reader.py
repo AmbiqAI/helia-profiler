@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.capture import capture_pmu
-from helia_profiler.capture.rtt_reader import (
+from helia_profiler.transport.rtt import (
     _direct_rtt_write,
     _direct_rtt_read,
     _scan_for_rtt_control_block,
@@ -16,10 +16,10 @@ from helia_profiler.capture.rtt_reader import (
     capture_rtt_output,
 )
 from helia_profiler.errors import CaptureError
-from helia_profiler.capture.serial_reader import capture_swo_output
+from helia_profiler.transport.swo import capture_swo_output
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.stages.s01_resolve_platform import ResolvePlatformStage
+from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
 
 class _FakeJLink:
@@ -119,7 +119,7 @@ def test_api_rtt_write_retries_until_full_command_sent(monkeypatch):
             self.calls.append(data)
             return next(self._returns)
 
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.sleep", lambda _s: None)
+    monkeypatch.setattr("helia_profiler.transport.rtt.time.sleep", lambda _s: None)
     jlink = _FakeApiRttWriteJLink()
 
     _write_rtt_command_api(jlink, command=b"READY", timeout_s=0.1)
@@ -143,8 +143,8 @@ def test_api_rtt_write_times_out_when_down_buffer_never_accepts_bytes(monkeypatc
         sleeps["count"] += 1
 
     times = iter([0.0, 0.0, 0.02, 0.04, 0.06])
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.sleep", fake_sleep)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.monotonic", lambda: next(times))
+    monkeypatch.setattr("helia_profiler.transport.rtt.time.sleep", fake_sleep)
+    monkeypatch.setattr("helia_profiler.transport.rtt.time.monotonic", lambda: next(times))
 
     with pytest.raises(CaptureError, match="Timed out sending RTT host-ready command"):
         _write_rtt_command_api(_FakeApiRttWriteJLink(), command=b"READY", timeout_s=0.05)
@@ -222,7 +222,7 @@ def test_capture_pmu_passes_soc_rtt_scan_ranges(tmp_path: Path, monkeypatch):
             timing_out["rtt_phase_attach_s"] = 0.1
         return ["--- HPX_START ---", "--- HPX_PRESET basic_cpu ---", "--- HPX_ITER 0 ---", "Layer,Op,ARM_PMU_CPU_CYCLES", "0,CONV_2D,1", "--- HPX_END ---"]
 
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.capture_rtt_output", fake_capture_rtt_output)
+    monkeypatch.setattr("helia_profiler.transport.rtt.capture_rtt_output", fake_capture_rtt_output)
 
     result = capture_pmu(ctx)
 
@@ -266,7 +266,7 @@ def test_capture_pmu_passes_known_block_address_from_map(tmp_path: Path, monkeyp
         captured.update(kwargs)
         return ["--- HPX_START ---", "--- HPX_PRESET basic_cpu ---", "--- HPX_ITER 0 ---", "Layer,Op,ARM_PMU_CPU_CYCLES", "0,CONV_2D,1", "--- HPX_END ---"]
 
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.capture_rtt_output", fake_capture_rtt_output)
+    monkeypatch.setattr("helia_profiler.transport.rtt.capture_rtt_output", fake_capture_rtt_output)
 
     capture_pmu(ctx)
 
@@ -304,7 +304,7 @@ def test_capture_pmu_passes_resolved_cpu_clock_to_swo(tmp_path: Path, monkeypatc
             "--- HPX_END ---",
         ]
 
-    monkeypatch.setattr("helia_profiler.capture.serial_reader.capture_swo_output", fake_capture_swo_output)
+    monkeypatch.setattr("helia_profiler.transport.swo.capture_swo_output", fake_capture_swo_output)
 
     result = capture_pmu(ctx)
 
@@ -377,7 +377,7 @@ def test_capture_pmu_swo_uses_fixed_trace_clock_on_apollo3(tmp_path: Path, monke
         ]
 
     monkeypatch.setattr(
-        "helia_profiler.capture.serial_reader.capture_swo_output", fake_capture_swo_output
+        "helia_profiler.transport.swo.capture_swo_output", fake_capture_swo_output
     )
 
     capture_pmu(ctx)
@@ -420,7 +420,7 @@ def test_capture_pmu_warns_when_device_clock_disagrees(tmp_path: Path, monkeypat
         ]
 
     monkeypatch.setattr(
-        "helia_profiler.capture.serial_reader.capture_swo_output", fake_capture_swo_output
+        "helia_profiler.transport.swo.capture_swo_output", fake_capture_swo_output
     )
 
     with caplog.at_level(logging.WARNING, logger="hpx"):
@@ -461,7 +461,7 @@ def test_capture_pmu_no_clock_warning_when_device_clock_matches(tmp_path: Path, 
         ]
 
     monkeypatch.setattr(
-        "helia_profiler.capture.serial_reader.capture_swo_output", fake_capture_swo_output
+        "helia_profiler.transport.swo.capture_swo_output", fake_capture_swo_output
     )
 
     with caplog.at_level(logging.WARNING, logger="hpx"):
@@ -500,7 +500,7 @@ def test_capture_pmu_passes_resolved_jlink_device_to_usb(tmp_path: Path, monkeyp
             "--- HPX_END ---",
         ]
 
-    monkeypatch.setattr("helia_profiler.capture.usb_reader.capture_usb_output", fake_capture_usb_output)
+    monkeypatch.setattr("helia_profiler.transport.usb_cdc.capture_usb_output", fake_capture_usb_output)
 
     result = capture_pmu(ctx)
 
@@ -535,7 +535,7 @@ def test_capture_pmu_rejects_rtt_protocol_without_hpx_start(tmp_path: Path, monk
             "--- HPX_END ---",
         ]
 
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.capture_rtt_output", fake_capture_rtt_output)
+    monkeypatch.setattr("helia_profiler.transport.rtt.capture_rtt_output", fake_capture_rtt_output)
 
     from helia_profiler.errors import CaptureError
 
@@ -616,10 +616,10 @@ def test_capture_rtt_output_does_not_send_down_channel_command(monkeypatch):
     )
 
     monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.reset_target", lambda **kwargs: None)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", lambda **kwargs: None)
+    monkeypatch.setattr("helia_profiler.transport.rtt.time.sleep", lambda _: None)
     monkeypatch.setattr(
-        "helia_profiler.capture.rtt_reader.collect_lines",
+        "helia_profiler.transport.rtt.collect_lines",
         lambda *args, **kwargs: ["--- HPX_START ---", "--- HPX_END ---"],
     )
 
@@ -706,8 +706,8 @@ def test_capture_rtt_output_preserves_bytes_after_hpx_ready(monkeypatch):
     )
 
     monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.reset_target", lambda **kwargs: None)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", lambda **kwargs: None)
+    monkeypatch.setattr("helia_profiler.transport.rtt.time.sleep", lambda _: None)
 
     lines = capture_rtt_output(
         jlink_serial="1160002204",
@@ -799,9 +799,9 @@ def test_capture_rtt_output_restarts_halted_target(monkeypatch):
     )
 
     monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.reset_target", lambda **kwargs: None)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.sleep", lambda _: None)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.collect_lines", lambda *args, **kwargs: [])
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", lambda **kwargs: None)
+    monkeypatch.setattr("helia_profiler.transport.rtt.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.transport.rtt.collect_lines", lambda *args, **kwargs: [])
 
     capture_rtt_output(
         jlink_serial="1160002204",
@@ -887,9 +887,9 @@ def test_capture_rtt_output_retries_attach_until_target_ready(monkeypatch):
     )
 
     monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.reset_target", lambda **kwargs: None)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.sleep", lambda _: None)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.collect_lines", lambda *args, **kwargs: [])
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", lambda **kwargs: None)
+    monkeypatch.setattr("helia_profiler.transport.rtt.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.transport.rtt.collect_lines", lambda *args, **kwargs: [])
 
     capture_rtt_output(
         jlink_serial="1160002204",
@@ -973,11 +973,11 @@ def test_capture_rtt_output_tolerates_preclean_attach_failure(monkeypatch):
         return None
 
     monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.open_jlink_with_retry", fake_open)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.reset_target", lambda **kwargs: None)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.sleep", lambda _: None)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader._RTT_DISCOVERY_SETTLE_S", 0.0)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.collect_lines", lambda *args, **kwargs: [])
+    monkeypatch.setattr("helia_profiler.transport.rtt.open_jlink_with_retry", fake_open)
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", lambda **kwargs: None)
+    monkeypatch.setattr("helia_profiler.transport.rtt.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.transport.rtt._RTT_DISCOVERY_SETTLE_S", 0.0)
+    monkeypatch.setattr("helia_profiler.transport.rtt.collect_lines", lambda *args, **kwargs: [])
 
     capture_rtt_output(
         jlink_serial="1160002204",
@@ -1051,23 +1051,23 @@ def test_capture_rtt_output_direct_fallback_rescans_only_after_idle_backoff(monk
         return ["--- HPX_START ---", "--- HPX_END ---"]
 
     monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.reset_target", lambda **kwargs: None)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", lambda **kwargs: None)
+    monkeypatch.setattr("helia_profiler.transport.rtt.time.sleep", lambda _: None)
     monkeypatch.setattr(
-        "helia_profiler.capture.rtt_reader._scan_for_rtt_control_block",
+        "helia_profiler.transport.rtt._scan_for_rtt_control_block",
         lambda *_args, **_kwargs: (0x20000000, 123),
     )
     monkeypatch.setattr(
-        "helia_profiler.capture.rtt_reader._direct_rtt_read_any",
+        "helia_profiler.transport.rtt._direct_rtt_read_any",
         fake_direct_rtt_read_any,
     )
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader._RTT_CB_TIMEOUT_S", 0.1)
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader._RTT_DISCOVERY_SETTLE_S", 0.0)
+    monkeypatch.setattr("helia_profiler.transport.rtt._RTT_CB_TIMEOUT_S", 0.1)
+    monkeypatch.setattr("helia_profiler.transport.rtt._RTT_DISCOVERY_SETTLE_S", 0.0)
     monkeypatch.setattr(
-        "helia_profiler.capture.rtt_reader._write_rtt_command_direct",
+        "helia_profiler.transport.rtt._write_rtt_command_direct",
         lambda *args, **kwargs: None,
     )
-    monkeypatch.setattr("helia_profiler.capture.rtt_reader.collect_lines", fake_collect_lines)
+    monkeypatch.setattr("helia_profiler.transport.rtt.collect_lines", fake_collect_lines)
 
     capture_rtt_output(
         jlink_serial="1160002204",
@@ -1126,9 +1126,9 @@ def test_capture_swo_output_restarts_halted_target(monkeypatch):
     )
 
     monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
-    monkeypatch.setattr("helia_profiler.capture.serial_reader.reset_target", lambda **kwargs: None)
-    monkeypatch.setattr("helia_profiler.capture.serial_reader.time.sleep", lambda _: None)
-    monkeypatch.setattr("helia_profiler.capture.serial_reader.collect_lines", lambda *args, **kwargs: [])
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", lambda **kwargs: None)
+    monkeypatch.setattr("helia_profiler.transport.swo.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.transport.swo.collect_lines", lambda *args, **kwargs: [])
 
     capture_swo_output(
         jlink_serial="1160002204",
@@ -1184,11 +1184,11 @@ def test_capture_swo_output_retries_once_after_empty_capture(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
     monkeypatch.setattr(
-        "helia_profiler.capture.serial_reader.reset_target",
+        "helia_profiler.target.probe.jlink.reset_target",
         lambda **kwargs: reset_calls.append((kwargs["device"], kwargs.get("jlink_serial"))),
     )
-    monkeypatch.setattr("helia_profiler.capture.serial_reader.time.sleep", lambda _: None)
-    monkeypatch.setattr("helia_profiler.capture.serial_reader.collect_lines", fake_collect_lines)
+    monkeypatch.setattr("helia_profiler.transport.swo.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.transport.swo.collect_lines", fake_collect_lines)
 
     lines = capture_swo_output(
         jlink_serial="1160002204",
@@ -1252,11 +1252,11 @@ def test_capture_swo_output_retries_when_start_sentinel_missing(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
     monkeypatch.setattr(
-        "helia_profiler.capture.serial_reader.reset_target",
+        "helia_profiler.target.probe.jlink.reset_target",
         lambda **kwargs: reset_calls.append((kwargs["device"], kwargs.get("jlink_serial"))),
     )
-    monkeypatch.setattr("helia_profiler.capture.serial_reader.time.sleep", lambda _: None)
-    monkeypatch.setattr("helia_profiler.capture.serial_reader.collect_lines", fake_collect_lines)
+    monkeypatch.setattr("helia_profiler.transport.swo.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.transport.swo.collect_lines", fake_collect_lines)
 
     lines = capture_swo_output(
         jlink_serial="1160002204",
@@ -1316,12 +1316,12 @@ def test_capture_swo_output_returns_partial_after_final_attempt(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
     monkeypatch.setattr(
-        "helia_profiler.capture.serial_reader.reset_target", lambda **kwargs: None
+        "helia_profiler.target.probe.jlink.reset_target", lambda **kwargs: None
     )
-    monkeypatch.setattr("helia_profiler.capture.serial_reader.time.sleep", lambda _: None)
-    monkeypatch.setattr("helia_profiler.capture.serial_reader.collect_lines", fake_collect_lines)
+    monkeypatch.setattr("helia_profiler.transport.swo.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.transport.swo.collect_lines", fake_collect_lines)
 
-    from helia_profiler.capture.serial_reader import _MAX_CAPTURE_ATTEMPTS
+    from helia_profiler.transport.swo import _MAX_CAPTURE_ATTEMPTS
 
     lines = capture_swo_output(
         jlink_serial="1160002204",
@@ -1330,3 +1330,89 @@ def test_capture_swo_output_returns_partial_after_final_attempt(monkeypatch):
 
     assert lines == ["0,CONV_2D,1", "--- HPX_END ---"]
     assert collect_call_count["count"] == _MAX_CAPTURE_ATTEMPTS
+
+
+# ---------------------------------------------------------------------------
+# PSRAM model upload — HPX_PSRAM_READY handoff
+# ---------------------------------------------------------------------------
+
+
+class _FakePsramSession:
+    """Minimal DebugMemorySession fake for the PSRAM upload path."""
+
+    def __init__(self, rtt_chunks=()):
+        self._chunks = list(rtt_chunks)
+        self.memory_writes = []
+        self.rtt_written = b""
+
+    def rtt_read(self, buffer_index, num_bytes):
+        if self._chunks:
+            return self._chunks.pop(0)
+        return []
+
+    def rtt_write(self, buffer_index, data):
+        self.rtt_written += bytes(data)
+        return len(data)
+
+    def memory_write(self, addr, data, nbits=8):
+        self.memory_writes.append((addr, bytes(data)))
+
+
+def test_psram_upload_ready_line_already_in_initial_buf(tmp_path):
+    """HPX_PSRAM_READY consumed during the attach probe must still be honoured.
+
+    On fast-booting targets (seen on apollo510b_evb) the firmware prints the
+    ready line before the host attaches; the attach probe drains it into
+    ``initial_buf`` and the firmware then blocks silently on HPX_GO.  The
+    wait loop must scan the initial buffer without requiring fresh RTT bytes.
+    """
+    from helia_profiler.transport.rtt import _upload_model_to_psram
+
+    model = tmp_path / "m.tflite"
+    model.write_bytes(b"\xAA" * 100)
+
+    session = _FakePsramSession()  # rtt_read always returns nothing
+    _upload_model_to_psram(
+        session,
+        model,
+        timeout_s=0.5,
+        initial_buf=b"HPX_READY\nHPX_PSRAM_READY=0x60000000,100\n",
+    )
+
+    assert session.memory_writes, "model bytes were not written to PSRAM"
+    assert session.memory_writes[0][0] == 0x60000000
+    assert b"".join(d for _, d in session.memory_writes) == b"\xAA" * 100
+    assert b"HPX_GO" in session.rtt_written
+
+
+def test_psram_upload_ready_line_arrives_in_later_chunk(tmp_path):
+    """Ready line split across the probe buffer and a later RTT chunk."""
+    from helia_profiler.transport.rtt import _upload_model_to_psram
+
+    model = tmp_path / "m.tflite"
+    model.write_bytes(b"\xBB" * 10)
+
+    session = _FakePsramSession(
+        rtt_chunks=[list(b"READY=0x60000000,10\n")],
+    )
+    _upload_model_to_psram(
+        session,
+        model,
+        timeout_s=0.5,
+        initial_buf=b"HPX_PSRAM_",
+    )
+
+    assert session.memory_writes[0][0] == 0x60000000
+    assert b"HPX_GO" in session.rtt_written
+
+
+def test_psram_upload_times_out_without_ready_line(tmp_path):
+    from helia_profiler.capture import CaptureError
+    from helia_profiler.transport.rtt import _upload_model_to_psram
+
+    model = tmp_path / "m.tflite"
+    model.write_bytes(b"\xCC")
+
+    session = _FakePsramSession()
+    with pytest.raises(CaptureError, match="HPX_PSRAM_READY"):
+        _upload_model_to_psram(session, model, timeout_s=0.05, initial_buf=b"")

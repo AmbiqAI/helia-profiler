@@ -23,7 +23,10 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Union
+from typing import TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    from ..pipeline import PipelineContext
 
 Num = Union[float, int]
 
@@ -178,3 +181,53 @@ def _strip_none(d: dict) -> dict:
         else:
             cleaned[k] = v
     return cleaned
+
+
+# ---------------------------------------------------------------------------
+# Report-stage entry point — builds and saves overlays into model_explorer/
+# ---------------------------------------------------------------------------
+
+
+def _write_model_explorer_overlays(
+    ctx: PipelineContext,
+    me_dir: Path,
+    paths: list[Path],
+) -> None:
+    """Build and save Model Explorer overlay files from PMU data."""
+    assert ctx.pmu_result is not None
+    layers = ctx.pmu_result.layers
+    if not layers:
+        return
+
+    # Extract per-metric node_key→value dicts from layer data.
+    #
+    # Model Explorer matches nodes by ID (integer string).  For TFLite
+    # models the node ID is the sequential operator index in the graph.
+    #
+    # AOT firmware emits "TYPE:id" in the Op column (e.g. "CONV_2D:3")
+    # where `id` is the original TFLite operator index preserved through
+    # AOT transforms.  We extract that suffix as the node key.
+    #
+    # TFLM firmware emits just the type string (e.g. "CONV_2D").  Since
+    # multiple layers can share the same type, we fall back to the
+    # sequential layer index, which matches TFLite graph operator order.
+    metrics: dict[str, dict[str, float]] = {}
+    for layer in layers:
+        op_str = str(layer.op) if layer.op else ""
+        if ":" in op_str:
+            # AOT format — "CONV_2D:3" → use "3" as node key
+            node_key = op_str.rsplit(":", 1)[1]
+        else:
+            # TFLM / generic — use sequential layer index
+            node_key = str(layer.id)
+        for key, val in layer.counters.items():
+            metrics.setdefault(key, {})[node_key] = val
+
+    if not metrics:
+        return
+
+    overlays = build_multi_metric_overlays(metrics)
+    for metric_name, overlay in overlays.items():
+        out_path = me_dir / f"me_overlay_{metric_name}.json"
+        overlay.save(out_path)
+        paths.append(out_path)

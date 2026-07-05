@@ -24,6 +24,7 @@ from .model_analysis import ModelAnalysis
 from .placement import Placement
 from .power.base import PowerResult
 from .results import MemoryPlan, PmuResult, RunMetadata, BinarySections
+from .target.probe.base import FlashBackend, Probe, ResetController
 
 log = logging.getLogger("hpx")
 
@@ -48,6 +49,9 @@ class PipelineContext:
     soc: SocDef | None = None
     board: BoardDef | None = None
     resolved_jlink_serial: str | None = None
+    probe: Probe | None = None
+    flash_backend: FlashBackend | None = None
+    reset_controller: ResetController | None = None
 
     # Engine preparation (stage: prepare_engine)
     engine_adapter: EngineAdapter | None = None

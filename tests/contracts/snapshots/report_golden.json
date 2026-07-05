@@ -1,0 +1,46 @@
+{
+  "helia_aot": {
+    "aot_memory_layers.csv": "daafeefec44ece89648cfc4e1177a6441fcc3a0cc873257f4bbbbe6cf1425ef6",
+    "aot_operator_manifest.json": "c7dd83e0b9e87cf1f9ee4d5b165633d6fa931ea888fe97b81b69cc8f8f09de53",
+    "detailed/memory.json": "2a5fc0774535e17a752fbd3714770e6fc66a1fd32df481af39d78874e3b5291f",
+    "detailed/power_summary.csv": "9a7e43f70bf1112ab3f6e65876a55d26cb1c8b52e01e83038d9453c6e524a05b",
+    "detailed/profile_basic_cpu.csv": "a81a5bd1745cbae244f0ee64acaefef6596beb9d0899ea04c4314144886c634c",
+    "detailed/profile_cpu.csv": "a81a5bd1745cbae244f0ee64acaefef6596beb9d0899ea04c4314144886c634c",
+    "detailed/profile_memory.csv": "a81a5bd1745cbae244f0ee64acaefef6596beb9d0899ea04c4314144886c634c",
+    "model_explorer/me_overlay_ARM_PMU_CPU_CYCLES.json": "5bbf6843579080445c74fca799758cb27b4612ece950fe3b8f3bb371a3005fac",
+    "model_explorer/me_overlay_ARM_PMU_INST_RETIRED.json": "565b41ca40d5dcbed9c6ff29ce429262df398faaea01151c92d209bb5a9b2f02",
+    "model_explorer/me_overlay_ARM_PMU_L1D_CACHE_MISS_RD.json": "56540f9c07bbc21c6e1dbaa6c09dfc2ec42992839e224585babd9f7c59f229bb",
+    "model_explorer/me_overlay_ARM_PMU_L1D_CACHE_RD.json": "9b964d519af8a2a62042b832dfd4da41397ab02927f9ea9b5442fbf2fb9fec53",
+    "profile_results.csv": "955790bed004d5b012f7c8f4be09817f9a2a84b085e42257e4398bf01a141651",
+    "run_metadata.json": "57f5245632bce84c11f15536946eed7651277a01ae497362339fd3d623df2733",
+    "summary.json": "bd8ca585a7daafb648ffbce802ee98b28e8597daecc94da27041fe5d21de81ef"
+  },
+  "helia_rt_csv": {
+    "detailed/memory.json": "bab19de2093395427de470579c6453d6fb45df02b6c23e47eeea9eb246e57e99",
+    "detailed/power_summary.csv": "9a7e43f70bf1112ab3f6e65876a55d26cb1c8b52e01e83038d9453c6e524a05b",
+    "detailed/profile_basic_cpu.csv": "a81a5bd1745cbae244f0ee64acaefef6596beb9d0899ea04c4314144886c634c",
+    "detailed/profile_cpu.csv": "a81a5bd1745cbae244f0ee64acaefef6596beb9d0899ea04c4314144886c634c",
+    "detailed/profile_memory.csv": "a81a5bd1745cbae244f0ee64acaefef6596beb9d0899ea04c4314144886c634c",
+    "model_explorer/me_overlay_ARM_PMU_CPU_CYCLES.json": "5bbf6843579080445c74fca799758cb27b4612ece950fe3b8f3bb371a3005fac",
+    "model_explorer/me_overlay_ARM_PMU_INST_RETIRED.json": "565b41ca40d5dcbed9c6ff29ce429262df398faaea01151c92d209bb5a9b2f02",
+    "model_explorer/me_overlay_ARM_PMU_L1D_CACHE_MISS_RD.json": "56540f9c07bbc21c6e1dbaa6c09dfc2ec42992839e224585babd9f7c59f229bb",
+    "model_explorer/me_overlay_ARM_PMU_L1D_CACHE_RD.json": "9b964d519af8a2a62042b832dfd4da41397ab02927f9ea9b5442fbf2fb9fec53",
+    "profile_results.csv": "955790bed004d5b012f7c8f4be09817f9a2a84b085e42257e4398bf01a141651",
+    "run_metadata.json": "57f5245632bce84c11f15536946eed7651277a01ae497362339fd3d623df2733",
+    "summary.json": "a5bafd790dffc81695c88313e0793c7096a5fb57f6749df7c1e09b99db9c1b06"
+  },
+  "helia_rt_json": {
+    "detailed/memory.json": "bab19de2093395427de470579c6453d6fb45df02b6c23e47eeea9eb246e57e99",
+    "detailed/power_summary.csv": "9a7e43f70bf1112ab3f6e65876a55d26cb1c8b52e01e83038d9453c6e524a05b",
+    "detailed/profile_basic_cpu.csv": "a81a5bd1745cbae244f0ee64acaefef6596beb9d0899ea04c4314144886c634c",
+    "detailed/profile_cpu.csv": "a81a5bd1745cbae244f0ee64acaefef6596beb9d0899ea04c4314144886c634c",
+    "detailed/profile_memory.csv": "a81a5bd1745cbae244f0ee64acaefef6596beb9d0899ea04c4314144886c634c",
+    "model_explorer/me_overlay_ARM_PMU_CPU_CYCLES.json": "5bbf6843579080445c74fca799758cb27b4612ece950fe3b8f3bb371a3005fac",
+    "model_explorer/me_overlay_ARM_PMU_INST_RETIRED.json": "565b41ca40d5dcbed9c6ff29ce429262df398faaea01151c92d209bb5a9b2f02",
+    "model_explorer/me_overlay_ARM_PMU_L1D_CACHE_MISS_RD.json": "56540f9c07bbc21c6e1dbaa6c09dfc2ec42992839e224585babd9f7c59f229bb",
+    "model_explorer/me_overlay_ARM_PMU_L1D_CACHE_RD.json": "9b964d519af8a2a62042b832dfd4da41397ab02927f9ea9b5442fbf2fb9fec53",
+    "profile_results.json": "2f84e3fee1aec3abacfba7cc2f5a7846150e00edeee1606e9210243c6fc9d79f",
+    "run_metadata.json": "57f5245632bce84c11f15536946eed7651277a01ae497362339fd3d623df2733",
+    "summary.json": "a5bafd790dffc81695c88313e0793c7096a5fb57f6749df7c1e09b99db9c1b06"
+  }
+}

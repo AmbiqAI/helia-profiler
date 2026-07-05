@@ -9,8 +9,10 @@ that pin each kind to a concrete memory. User-provided
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from helia_profiler.config import load_config
-from helia_profiler.engines.helia_aot import (
+from helia_profiler.engines.helia_aot.compile import (
     _EXPECTED_PRAGMA_SUFFIXES,
     _resolve_aot_placement_intent,
     _resolve_aot_tensor_rulesets,
@@ -133,3 +135,120 @@ def test_expected_pragma_suffixes_track_current_heliaaot_platform_header():
     assert "PUT_IN_DRAM" in _EXPECTED_PRAGMA_SUFFIXES
     assert "PUT_IN_DRAM_INIT" in _EXPECTED_PRAGMA_SUFFIXES
     assert "PUT_IN_ITCM_INIT" in _EXPECTED_PRAGMA_SUFFIXES
+
+
+class TestRunAotCompilerUsesConfigRegistry:
+    """``_run_aot_compiler`` must resolve the SoC via ``config.platform_registry``.
+
+    A custom board registered only in the profiler config (not the built-in
+    platform registry) previously resolved to the wrong SoC or raised
+    ``ValueError`` because ``get_soc_for_board`` was called without
+    ``registry=config.platform_registry``.
+    """
+
+    def _install_fake_helia_aot(self, monkeypatch):
+        import sys
+        import types
+
+        class _FakeSection:
+            def __init__(self):
+                self.path = None
+                self.name = None
+                self.prefix = None
+                self.type = None
+
+        class _FakeConvertArgs:
+            def __init__(self, **_kwargs):
+                self.model = _FakeSection()
+                self.module = _FakeSection()
+                self.platform = _FakeSection()
+                self.force = False
+
+        class _FakeCodegenCtx:
+            pass
+
+        class _FakeAotConverter:
+            def __init__(self, config):
+                self._config = config
+
+            def convert(self):
+                module_dir = Path(self._config.module.path) / self._config.module.name
+                (module_dir / "src").mkdir(parents=True, exist_ok=True)
+                (module_dir / "includes-api").mkdir(parents=True, exist_ok=True)
+                return _FakeCodegenCtx()
+
+        fake_defines = types.ModuleType("helia_aot.cli.defines")
+        fake_defines.ConvertArgs = _FakeConvertArgs
+        fake_cli = types.ModuleType("helia_aot.cli")
+        fake_cli.defines = fake_defines
+        fake_converter_mod = types.ModuleType("helia_aot.converter")
+        fake_converter_mod.AotConverter = _FakeAotConverter
+        fake_top_defines = types.ModuleType("helia_aot.defines")
+
+        class _ModuleTypeEnum:
+            nsx = "nsx"
+
+        fake_top_defines.ModuleType = _ModuleTypeEnum
+        fake_helia_aot = types.ModuleType("helia_aot")
+        fake_helia_aot.cli = fake_cli
+        fake_helia_aot.converter = fake_converter_mod
+        fake_helia_aot.defines = fake_top_defines
+
+        monkeypatch.setitem(sys.modules, "helia_aot", fake_helia_aot)
+        monkeypatch.setitem(sys.modules, "helia_aot.cli", fake_cli)
+        monkeypatch.setitem(sys.modules, "helia_aot.cli.defines", fake_defines)
+        monkeypatch.setitem(sys.modules, "helia_aot.converter", fake_converter_mod)
+        monkeypatch.setitem(sys.modules, "helia_aot.defines", fake_top_defines)
+
+    def test_custom_board_resolves_soc_via_config_registry(self, tmp_path, monkeypatch):
+        from helia_profiler.engines.helia_aot import compile as compile_mod
+
+        self._install_fake_helia_aot(monkeypatch)
+
+        cli = {
+            "model": {"path": "m.tflite", "model_location": "tcm"},
+            "engine": {"type": "helia-aot"},
+            "target": {
+                "board": "apollo510_custom_board",
+                "custom_socs": {
+                    "apollo510_custom": {
+                        "based_on": "apollo510",
+                        "jlink_device": "AP510-CUSTOM",
+                    }
+                },
+                "custom_boards": {
+                    "apollo510_custom_board": {
+                        "soc": "apollo510_custom",
+                        "channel": "dev",
+                        "starter_profile_board": "apollo510_evb",
+                    }
+                },
+            },
+        }
+        config = load_config(None, cli)
+
+        seen: dict[str, object] = {}
+        real_get_soc_for_board = compile_mod.get_soc_for_board
+
+        def spy_get_soc_for_board(board, *, registry=None):
+            seen["board"] = board
+            seen["registry"] = registry
+            return real_get_soc_for_board(board, registry=registry)
+
+        monkeypatch.setattr(compile_mod, "get_soc_for_board", spy_get_soc_for_board)
+
+        codegen_ctx = compile_mod._run_aot_compiler(
+            config,
+            output_dir=tmp_path / "out",
+            module_name="profiler_module",
+            prefix="hpx",
+            aot_platform="apollo510_evb",
+        )
+
+        assert codegen_ctx is not None
+        # The custom board only exists in config.platform_registry; without
+        # threading it through, get_soc_for_board would raise ValueError.
+        assert seen["board"] == "apollo510_custom_board"
+        assert seen["registry"] is config.platform_registry
+        soc = config.platform_registry.socs["apollo510_custom"]
+        assert soc.jlink_device == "AP510-CUSTOM"

@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from helia_profiler.errors import ConfigError
-from helia_profiler.jlink import (
+from helia_profiler.target.probe.jlink import (
     JLinkProbe,
     JLinkProbeMatch,
     inspect_probe_target,
@@ -27,7 +27,7 @@ def _match(serial: str, core: CoreArch | None, product: str = "J-Link") -> JLink
 class TestResolveProbeSerial:
     def test_requested_serial_must_exist(self) -> None:
         probes = [_probe("111111", "Probe A"), _probe("222222", "Probe B")]
-        with patch("helia_profiler.jlink.list_connected_probes", return_value=probes):
+        with patch("helia_profiler.target.probe.jlink.list_connected_probes", return_value=probes):
             with pytest.raises(ConfigError, match="was not found") as exc_info:
                 resolve_probe_serial(
                     device="AP510NFA-CBR",
@@ -41,9 +41,9 @@ class TestResolveProbeSerial:
     def test_requested_serial_must_match_target_core(self) -> None:
         probe = _probe("111111", "Apollo4")
         with (
-            patch("helia_profiler.jlink.list_connected_probes", return_value=[probe]),
+            patch("helia_profiler.target.probe.jlink.list_connected_probes", return_value=[probe]),
             patch(
-                "helia_profiler.jlink._inspect_probe_target",
+                "helia_profiler.target.probe.jlink._inspect_probe_target",
                 return_value=_match("111111", CoreArch.CORTEX_M4, "Apollo4"),
             ),
         ):
@@ -57,9 +57,9 @@ class TestResolveProbeSerial:
     def test_requested_serial_returns_when_target_matches(self) -> None:
         probe = _probe("111111", "Apollo5")
         with (
-            patch("helia_profiler.jlink.list_connected_probes", return_value=[probe]),
+            patch("helia_profiler.target.probe.jlink.list_connected_probes", return_value=[probe]),
             patch(
-                "helia_profiler.jlink._inspect_probe_target",
+                "helia_profiler.target.probe.jlink._inspect_probe_target",
                 return_value=_match("111111", CoreArch.CORTEX_M55, "Apollo5"),
             ),
         ):
@@ -83,9 +83,9 @@ class TestResolveProbeSerial:
             )
 
         with (
-            patch("helia_profiler.jlink.list_connected_probes", return_value=probes),
+            patch("helia_profiler.target.probe.jlink.list_connected_probes", return_value=probes),
             patch(
-                "helia_profiler.jlink._inspect_probe_target",
+                "helia_profiler.target.probe.jlink._inspect_probe_target",
                 side_effect=inspect,
             ),
         ):
@@ -104,9 +104,9 @@ class TestResolveProbeSerial:
             return _match(probe.serial, CoreArch.CORTEX_M55, probe.product)
 
         with (
-            patch("helia_profiler.jlink.list_connected_probes", return_value=probes),
+            patch("helia_profiler.target.probe.jlink.list_connected_probes", return_value=probes),
             patch(
-                "helia_profiler.jlink._inspect_probe_target",
+                "helia_profiler.target.probe.jlink._inspect_probe_target",
                 side_effect=inspect,
             ),
         ):
@@ -126,9 +126,9 @@ class TestResolveProbeSerial:
             return _match(probe.serial, CoreArch.CORTEX_M4, probe.product)
 
         with (
-            patch("helia_profiler.jlink.list_connected_probes", return_value=probes),
+            patch("helia_profiler.target.probe.jlink.list_connected_probes", return_value=probes),
             patch(
-                "helia_profiler.jlink._inspect_probe_target",
+                "helia_profiler.target.probe.jlink._inspect_probe_target",
                 side_effect=inspect,
             ),
         ):
@@ -146,6 +146,6 @@ class TestResolveProbeSerial:
 def test_inspect_probe_target_wraps_private_inspector() -> None:
     probe = _probe("111111", "Apollo5")
     match = _match("111111", CoreArch.CORTEX_M55, "Apollo5")
-    with patch("helia_profiler.jlink._inspect_probe_target", return_value=match) as inspect:
+    with patch("helia_profiler.target.probe.jlink._inspect_probe_target", return_value=match) as inspect:
         assert inspect_probe_target(probe, device="AP510NFA-CBR") is match
     inspect.assert_called_once_with(probe, device="AP510NFA-CBR")

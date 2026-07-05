@@ -53,7 +53,7 @@ it's been set.
 
 ### S01: Resolve Platform
 
-**File:** `stages/s01_resolve_platform.py`
+**File:** `stages/resolve_platform.py`
 **Sets:** `ctx.platform_info`, `ctx.run_metadata.platform`, `ctx.run_metadata.model`
 
 Validates the board name, resolves the SoC definition, computes the model file
@@ -64,7 +64,7 @@ captured.
 
 ### S02: Prepare Engine
 
-**File:** `stages/s02_prepare_engine.py`
+**File:** `stages/prepare_engine.py`
 **Sets:** `ctx.engine_artifacts`
 
 Instantiates the engine adapter (TFLM, heliaRT, or heliaAOT) and calls its
@@ -84,7 +84,7 @@ model NSX modules.
 
 ### S03: Generate Firmware
 
-**File:** `stages/s03_generate_firmware.py`
+**File:** `stages/generate_firmware.py`
 **Reads:** `ctx.engine_artifacts`, `ctx.config`
 **Sets:** writes firmware app to `ctx.config.work_dir`
 
@@ -101,7 +101,7 @@ for AOT, library path for RT).
 
 ### S04: Build Firmware
 
-**File:** `stages/s04_build_firmware.py`
+**File:** `stages/build_firmware.py`
 **Sets:** `ctx.build_dir`, `ctx.binary_path`, `ctx.binary_sections`, `ctx.run_metadata.toolchain`
 
 Runs the NSX build pipeline:
@@ -115,7 +115,7 @@ After building, captures:
 
 ### S05: Flash Firmware
 
-**File:** `stages/s05_flash_firmware.py`
+**File:** `stages/flash.py`
 **Reads:** `ctx.binary_path`
 
 Flashes the built firmware to the target via `nsx flash` (which uses JLinkExe).
@@ -125,7 +125,7 @@ power-cycle reset via the Joulescope (if available).
 
 ### S06: Capture PMU
 
-**File:** `stages/s06_capture_pmu.py`
+**File:** `stages/capture_pmu.py`
 **Sets:** `ctx.pmu_result`
 
 The core data collection stage:
@@ -146,7 +146,7 @@ multiple PMU counter sets in sequence).
 
 ### S07: Capture Power
 
-**File:** `stages/s07_capture_power.py`
+**File:** `stages/capture_power.py`
 **Sets:** `ctx.power_result`
 
 Skipped if `power.enabled` is false. Otherwise:
@@ -157,7 +157,7 @@ Skipped if `power.enabled` is false. Otherwise:
 
 ### S08: Generate Report
 
-**File:** `stages/s08_generate_report.py`
+**File:** `stages/report.py`
 **Reads:** everything from `ctx`
 
 Delegates to `report.write_report()` which produces:

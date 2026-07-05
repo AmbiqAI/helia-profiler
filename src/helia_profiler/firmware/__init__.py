@@ -15,26 +15,36 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import jinja2
 import yaml
 
 from .. import nsx as nsx_cli
-from ..config import DEFAULT_ARENA_SIZE_BYTES, DEFAULT_POWER_WINDOW_TARGET_MS
-from ..counters import (
-    CounterPass,
-    plan_passes,
-    resolve_counters,
-    resolve_legacy_presets,
-    supported_groups_for_domains,
-    validate_group_selection,
-)
+from ..config import Transport
 from ..engines import EngineType
 from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
 from ..placement import Placement
-from ..platform import SocFamily, get_soc_for_board
-from ..usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
-from .op_resolver import build_resolver_plan
+from ..platform import get_soc_for_board
+from .context import FirmwareRenderContext, _PMU_PRESET_MAP, _resolve_pmu_passes
+from .project import (
+    NsxModuleSpec,
+    ProjectRenderContext,
+    _board_module_name,
+    _copy_local_engine_module,
+    _default_nsx_channel,
+    _get_starter_profile,
+    _install_local_module_override,
+    _module_names_by_project,
+    _module_project,
+    _POWER_SYNC_MODULE_NAMES,
+    _render_module_registry,
+    _resolve_module_list,
+    _resolve_module_specs,
+    _resolve_project_overrides,
+    _soc_has_backend,
+    _usb_provider_module_names,
+    render_project_files,
+)
+from .render import _jinja_env, _write_text
 
 if TYPE_CHECKING:
     from ..config import ProfileConfig
@@ -42,12 +52,6 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("hpx")
 
-
-def _effective_window_target_ms(config: ProfileConfig) -> int:
-    target_ms = config.profiling.window_target_ms
-    if config.power.enabled and config.profiling.window_mode == "auto":
-        target_ms = max(target_ms, DEFAULT_POWER_WINDOW_TARGET_MS)
-    return target_ms
 
 # ---------------------------------------------------------------------------
 # Toolchain mapping: config names → nsx CLI --toolchain values
@@ -63,20 +67,6 @@ _DEFAULT_RTT_BUFFER_SIZE_UP = 32768
 _ATFE_RTT_BUFFER_SIZE_UP = 12288
 
 
-@dataclass(frozen=True)
-class NsxModuleSpec:
-    """Resolved NSX module identity for firmware generation.
-
-    ``name`` is the module name used in ``NSX_APP_MODULES``. ``project`` is the
-    owning NSX project/repository used for lock resolution. Keeping them
-    separate avoids assuming that ``project == module`` for monorepo-backed SDK
-    modules.
-    """
-
-    name: str
-    project: str
-
-
 def _nsx_toolchain(toolchain: str) -> str | None:
     """Convert a config toolchain name to the ``nsx --toolchain`` value.
 
@@ -86,11 +76,11 @@ def _nsx_toolchain(toolchain: str) -> str | None:
     return nsx_tc if nsx_tc != "gcc" else None
 
 
-def _rtt_buffer_size_up(toolchain: str, transport: str, configured_size: int | None) -> int:
+def _rtt_buffer_size_up(toolchain: str, transport: Transport, configured_size: int | None) -> int:
     """Return the compile-time SEGGER RTT up-buffer size for generated apps."""
     if configured_size is not None:
         return configured_size
-    if transport == "rtt" and toolchain == "atfe":
+    if transport == Transport.RTT and toolchain == "atfe":
         return _ATFE_RTT_BUFFER_SIZE_UP
     return _DEFAULT_RTT_BUFFER_SIZE_UP
 
@@ -187,402 +177,6 @@ def _resolve_compiler_launcher(config: "ProfileConfig") -> str | None:
         return None
     log.info("Using compiler launcher: %s (from %s)", found, source)
     return found
-
-
-# ---------------------------------------------------------------------------
-# SDK tier → module set mapping
-#
-# hpx owns the *selection* of modules a profiler app needs (a deliberately lean
-# set — e.g. it uses nsx-core's runtime helpers directly rather than the legacy
-# nsx-harness / nsx-utils modules). The *ownership* of each module (which NSX
-# project vendors it) is NOT hand-maintained here: it is derived from the NSX
-# starter profile for the target board so it always tracks the upstream
-# registry (which repoints migrated Ambiq modules onto the unified
-# nsx-ambiq-sdk project). See ``_module_project``.
-# ---------------------------------------------------------------------------
-
-
-def _soc_has_backend(soc: Any, backend: str) -> bool:
-    return backend in getattr(soc, "profiling_backends", ())
-
-
-_POWER_SYNC_MODULE_NAMES: tuple[str, ...] = (
-    "nsx-interrupt",
-    "nsx-gpio",
-)
-
-_DEFAULT_MAIN_PROJECT_REFS: dict[str, str] = {
-    "neuralspotx": "main",
-    "nsx-ambiq-sdk": "main",
-}
-
-
-def _usb_provider_module_names(module_specs: list[NsxModuleSpec], profile: dict[str, Any]) -> list[str]:
-    """Return provider-specific USB support modules implied by the SDK tier."""
-    present = {spec.name for spec in module_specs}
-    overrides = profile.get("module_overrides") or {}
-    required: list[str] = []
-    for name in sorted(present):
-        if name == "nsx-ambiqsuite":
-            candidate = "nsx-ambiq-usb"
-        elif name.startswith("nsx-ambiqsuite-"):
-            candidate = name.replace("nsx-ambiqsuite-", "nsx-ambiq-usb-", 1)
-        else:
-            continue
-        if candidate in present or candidate in required:
-            continue
-        if candidate in overrides or nsx_cli.registry_module_project(candidate) is not None:
-            required.append(candidate)
-    return required
-
-
-def _board_module_name(board: str) -> str:
-    """Derive the NSX board module name from a board name."""
-    return f"nsx-board-{board.replace('_', '-')}"
-
-
-def _starter_profile_module_names(profile: dict[str, Any]) -> list[str]:
-    """Return the starter profile's authoritative direct module list.
-
-    hpx trusts the profile as the source of truth for the board/provider stack
-    and direct runtime consumers.
-    """
-    modules = profile.get("modules") or []
-    if not isinstance(modules, list) or not all(isinstance(name, str) for name in modules):
-        raise FirmwareError(
-            "NSX starter profile is missing a valid module list",
-            hint="Update neuralspotx so the board starter profile declares its modules.",
-        )
-    # hpx intentionally does not consume these legacy helpers directly.
-    return [name for name in modules if name not in {"nsx-harness", "nsx-utils"}]
-
-
-def _get_starter_profile(board: str, *, profile_board: str | None = None) -> dict[str, Any]:
-    """Return the NSX starter profile for *board*.
-
-    The profile is the single source of truth for module/project ownership.
-    hpx follows the installed NSX starter profile's module and project map
-    rather than maintaining a parallel SDK-tier table.
-    """
-    lookup_board = profile_board or board
-    profile = nsx_cli.starter_profile(lookup_board)
-    if profile is None:
-        raise FirmwareError(
-            f"No NSX starter profile for board '{lookup_board}'",
-            hint=(
-                "The board must be registered in the NSX registry "
-                "(registry.lock.yaml ships with neuralspotx). Check the board "
-                "name or update neuralspotx."
-            ),
-        )
-    return profile
-
-
-def _needs_armv8m_pmu_module(board: str, *, profile_board: str | None = None) -> bool:
-    """Return whether this board needs the standalone Armv8-M PMU module.
-
-    Some installed NSX starter profiles still omit ``nsx-pmu-armv8m`` for AP5
-    boards even though hpx's generated firmware links ``nsx::pmu_armv8m``.
-    Keep a narrow compatibility fallback until those profiles are updated.
-    """
-    for candidate in (board, profile_board):
-        if candidate is None:
-            continue
-        try:
-            soc = get_soc_for_board(candidate)
-        except ValueError:
-            continue
-        return _soc_has_backend(soc, "armv8m-pmu")
-    return False
-
-
-def _module_project(name: str, profile: dict[str, Any]) -> str:
-    """Resolve the owning NSX project for a module name.
-
-    Resolution order, mirroring ``nsx``'s own manifest generation:
-
-    0. The starter profile's ``module_overrides`` — authoritative repoint of a
-       module onto the SDK monorepo for tiers that have migrated.
-    1. The base registry entry (standalone project) for everything else.
-    2. The module name itself as a last resort (opaque / local modules).
-    """
-    override = profile.get("module_overrides", {}).get(name)
-    if isinstance(override, dict) and override.get("project"):
-        return override["project"]
-    return nsx_cli.registry_module_project(name) or name
-
-
-def _render_module_registry(
-    profile: dict[str, Any],
-    project_ref_overrides: dict[str, tuple[str, str]],
-) -> str:
-    """Render the ``module_registry`` block for nsx.yml from the profile.
-
-    Emitting the profile's full ``project_overrides`` / ``module_overrides``
-    makes the app's effective registry agree with the per-module project pins
-    in the manifest (so ``nsx`` alignment passes) and ensures transitive
-    dependencies pulled in during closure resolution resolve to the same SDK
-    monorepo as the explicitly listed modules.
-    """
-    project_overrides = dict(profile.get("project_overrides") or {})
-    module_overrides = dict(profile.get("module_overrides") or {})
-    ref_overrides_by_project: dict[str, str] = {}
-    for project, (mode, value) in project_ref_overrides.items():
-        if mode != "ref":
-            continue
-        override = dict(project_overrides.get(project) or {})
-        if not override:
-            override = nsx_cli.registry_project(project) or {"name": project}
-        override["revision"] = value
-        project_overrides[project] = override
-        ref_overrides_by_project[project] = value
-    # Align per-module revisions with their owning project's ref override.
-    # The starter profile pins each migrated module's ``revision`` to ``main``;
-    # NSX's lock resolution honours that module-level pin over the project
-    # revision, so an un-aligned module would drag the whole SDK monorepo back
-    # to ``main``. Re-point every module owned by an overridden project.
-    if ref_overrides_by_project:
-        for name, override in list(module_overrides.items()):
-            if not isinstance(override, dict):
-                continue
-            project = override.get("project")
-            if project in ref_overrides_by_project:
-                aligned = dict(override)
-                aligned["revision"] = ref_overrides_by_project[project]
-                module_overrides[name] = aligned
-    if not project_overrides and not module_overrides:
-        return ""
-    registry: dict[str, Any] = {}
-    if project_overrides:
-        registry["projects"] = dict(project_overrides)
-    if module_overrides:
-        registry["modules"] = dict(module_overrides)
-    return yaml.safe_dump({"module_registry": registry}, sort_keys=False, default_flow_style=False)
-
-
-def _default_nsx_channel(board_channel: str, configured_channel: str | None) -> str:
-    """Resolve the NSX channel for a generated app.
-
-    An explicit config override wins. Otherwise we use the board's registered
-    default so preview-only boards naturally follow the matching NSX channel.
-    """
-    if configured_channel is not None:
-        return configured_channel
-    return board_channel
-
-
-def _resolve_module_specs(board: str, *, profile_board: str | None = None) -> list[NsxModuleSpec]:
-    """Build the ordered typed module list for a profiler app.
-
-    Module selection and ownership are both derived from the board's NSX
-    starter profile.
-    """
-    profile = _get_starter_profile(board, profile_board=profile_board)
-
-    ordered_names: list[str] = _starter_profile_module_names(profile)
-    if (
-        _needs_armv8m_pmu_module(board, profile_board=profile_board)
-        and "nsx-pmu-armv8m" not in ordered_names
-    ):
-        ordered_names.append("nsx-pmu-armv8m")
-
-    return [NsxModuleSpec(name, _module_project(name, profile)) for name in ordered_names]
-
-
-def _resolve_module_list(board: str, *, profile_board: str | None = None) -> list[str]:
-    """Backward-compatible wrapper returning only module names."""
-    return [spec.name for spec in _resolve_module_specs(board, profile_board=profile_board)]
-
-
-def _resolve_project_overrides(
-    module_specs: list[NsxModuleSpec],
-    nsx_overrides: dict[str, Any],
-) -> dict[str, tuple[str, str]]:
-    """Collapse module-targeted ref/version overrides onto owning projects.
-
-    Monorepo-backed SDK modules share a project, so ref/version overrides must
-    resolve coherently at the project level. ``path`` overrides remain module-
-    local because they install a concrete local module directory.
-    """
-    by_name = {spec.name: spec for spec in module_specs}
-    project_overrides: dict[str, tuple[str, str]] = {}
-    for name, override in nsx_overrides.items():
-        spec = by_name.get(name)
-        if spec is None or override.path is not None:
-            continue
-        mode = "ref" if override.ref is not None else "version"
-        value = override.ref if override.ref is not None else override.version
-        if value is None:
-            continue
-        existing = project_overrides.get(spec.project)
-        if existing is not None and existing != (mode, value):
-            raise ConfigError(
-                f"Conflicting build.nsx_modules overrides for project '{spec.project}'",
-                hint=(
-                    "Modules from the same NSX project must use the same ref/version. "
-                    f"Conflicting module names: '{name}' and another module in '{spec.project}'."
-                ),
-            )
-        project_overrides[spec.project] = (mode, value)
-    for project, ref in _DEFAULT_MAIN_PROJECT_REFS.items():
-        if project in project_overrides:
-            continue
-        if any(spec.project == project for spec in module_specs):
-            project_overrides[project] = ("ref", ref)
-    return project_overrides
-
-
-def _module_names_by_project(module_specs: list[NsxModuleSpec]) -> dict[str, set[str]]:
-    """Index generated module names by owning NSX project."""
-
-    names_by_project: dict[str, set[str]] = {}
-    for spec in module_specs:
-        names_by_project.setdefault(spec.project, set()).add(spec.name)
-    return names_by_project
-
-
-def _install_local_module_override(dest: Path, source: Path) -> None:
-    """Copy a local NSX module directory into the app's ``modules/`` tree.
-
-    Validates that the source contains an ``nsx-module.yaml`` (required by
-    NSX for any local module).
-    """
-    source = source.expanduser().resolve()
-    if not source.is_dir():
-        raise FirmwareError(
-            f"NSX module override path is not a directory: {source}",
-            hint="Provide a directory containing nsx-module.yaml.",
-        )
-    if not (source / "nsx-module.yaml").is_file():
-        raise FirmwareError(
-            f"NSX module override at {source} is missing nsx-module.yaml",
-            hint="A valid NSX module must contain nsx-module.yaml at its root.",
-        )
-    if dest.is_dir():
-        shutil.rmtree(dest)
-    shutil.copytree(source, dest)
-    log.info("Installed local module override: %s → %s", source, dest)
-
-
-def _copy_local_engine_module(dest: Path, source: Path) -> None:
-    """Copy a prepared local engine module into the generated app tree."""
-    if dest.is_dir():
-        shutil.rmtree(dest)
-    shutil.copytree(source, dest)
-
-
-# ---------------------------------------------------------------------------
-# PMU preset mapping (legacy — used only for backward-compat Init() path)
-# ---------------------------------------------------------------------------
-_PMU_PRESET_MAP: dict[str, str] = {
-    "basic_cpu": "NSX_PMU_PRESET_BASIC_CPU",
-    "memory": "NSX_PMU_PRESET_MEMORY",
-    "mve": "NSX_PMU_PRESET_MVE",
-    "ml_default": "NSX_PMU_PRESET_ML_DEFAULT",
-}
-
-
-def _resolve_pmu_passes(config: Any, soc: Any | None = None) -> list[dict[str, Any]]:
-    """Resolve profiling config into firmware pass descriptors.
-
-    If the new ``pmu_counters`` field is set, resolve and plan passes from
-    the counter registry.  Otherwise fall back to legacy preset behaviour.
-
-    Each returned dict has:
-      - ``name``          — pass name for the SWO protocol
-      - ``custom``        — True if using explicit event IDs
-      - ``event_ids``     — list of hex-literal strings (custom only)
-      - ``counter_names`` — human-readable counter names for host labelling
-      - ``num_counters``  — number of counters
-      - ``c_enum``        — C preset enum name (legacy only)
-      - ``group``         — compute-unit group name
-    """
-    profiling = config.profiling
-    if soc is not None:
-        supported_groups = supported_groups_for_domains(soc.profiling_domains)
-        try:
-            if profiling.pmu_counters is not None:
-                validate_group_selection(
-                    profiling.pmu_counters,
-                    supported_groups=supported_groups,
-                )
-            else:
-                validate_group_selection(
-                    resolve_legacy_presets(profiling.pmu_presets),
-                    supported_groups=supported_groups,
-                )
-        except ValueError as exc:
-            raise FirmwareError(
-                str(exc),
-                hint=(
-                    f"Target '{soc.name}' supports PMU groups: "
-                    f"{', '.join(supported_groups) if supported_groups else 'none'}."
-                ),
-            ) from exc
-
-    # --- New path: explicit counter selection ---
-    if profiling.pmu_counters is not None:
-        counters = resolve_counters(profiling.pmu_counters)
-        passes = plan_passes(counters)
-        return [
-            {
-                "name": p.name,
-                "custom": True,
-                "event_ids": [f"0x{c.event_id:04X}" for c in p.counters],
-                "counter_names": [c.name for c in p.counters],
-                "num_counters": len(p.counters),
-                "c_enum": None,
-                "group": p.group,
-            }
-            for p in passes
-        ]
-
-    # --- Legacy path: named presets ---
-    result: list[dict[str, Any]] = []
-    for preset_name in profiling.pmu_presets:
-        c_enum = _PMU_PRESET_MAP.get(preset_name, "NSX_PMU_PRESET_ML_DEFAULT")
-        counters = resolve_counters(resolve_legacy_presets([preset_name]))
-        result.append(
-            {
-                "name": preset_name,
-                "custom": False,
-                "event_ids": [],
-                "counter_names": [c.name for c in counters],
-                "num_counters": len(counters),
-                "c_enum": c_enum,
-                "group": preset_name,
-            }
-        )
-    if not result:
-        counters = resolve_counters(resolve_legacy_presets(["ml_default"]))
-        result = [
-            {
-                "name": "ml_default",
-                "custom": False,
-                "event_ids": [],
-                "counter_names": [c.name for c in counters],
-                "num_counters": len(counters),
-                "c_enum": "NSX_PMU_PRESET_ML_DEFAULT",
-                "group": "ml_default",
-            }
-        ]
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Jinja2 template environment
-# ---------------------------------------------------------------------------
-
-_jinja_env = jinja2.Environment(
-    loader=jinja2.PackageLoader("helia_profiler.firmware", "templates"),
-    keep_trailing_newline=True,
-    undefined=jinja2.StrictUndefined,
-)
-
-
-def _write_text(path: Path, text: str) -> None:
-    """Write generated source text with deterministic cross-platform encoding."""
-    path.write_text(text, encoding="utf-8")
 
 
 def _find_segger_rtt_dir() -> Path:
@@ -831,18 +425,14 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # --- Resolve module list ---
     profile_board = getattr(board, "profile_source_board", board.name)
-    module_specs = _resolve_module_specs(board.name, profile_board=profile_board)
+    module_specs = _resolve_module_specs(
+        board.name, profile_board=profile_board, registry=config.platform_registry
+    )
     profile = _get_starter_profile(board.name, profile_board=profile_board)
 
     # Add transport modules when using USB CDC transport
     transport = config.target.transport
-    # Unique USB serial marker for this build, derived from the J-Link probe
-    # serial so the host can match this exact board's CDC device.  None when no
-    # probe serial is known (firmware keeps its default descriptor).
-    usb_serial_marker = usb_marker_serial(
-        ctx.resolved_jlink_serial or config.target.jlink_serial
-    )
-    if transport == "usb_cdc":
+    if transport == Transport.USB_CDC:
         module_names = {m.name for m in module_specs}
         for name in _usb_provider_module_names(module_specs, profile):
             if name not in module_names:
@@ -946,55 +536,34 @@ def generate_app(ctx: PipelineContext) -> Path:
     # Engine identity flows through the typed EngineArtifacts field.
     # Templates receive the canonical hyphen-form string (StrEnum value).
     engine_type = artifacts.engine_type
-    profiling_backends = list(soc.profiling_backends)
-    has_armv8m_pmu = _soc_has_backend(soc, "armv8m-pmu")
+    render_context = FirmwareRenderContext.from_pipeline_context(
+        ctx,
+        arena_regions=aot_arena_regions,
+    )
+    template_vars = render_context.to_template_vars()
+    profiling_backends = list(render_context.pmu.profiling_backends)
+    has_armv8m_pmu = render_context.pmu.has_armv8m_pmu
 
-    # --- nsx.yml ---
-    _write_text(
-        app_dir / "nsx.yml",
-        _jinja_env.get_template("nsx.yml.j2").render(
-            board=board.name,
-            soc=soc.name,
-            toolchain=config.target.toolchain,
-            channel=_default_nsx_channel(board.channel, config.build.channel),
+    compiler_launcher = _resolve_compiler_launcher(config)
+    render_project_files(
+        ProjectRenderContext(
+            app_dir=app_dir,
+            board=board,
+            soc=soc,
+            config=config,
+            artifacts=artifacts,
             modules=modules,
             module_registry_yaml=_render_module_registry(profile, project_overrides),
-        ),
-    )
-
-    # --- cmake/nsx/modules.cmake ---
-    cmake_nsx_dir = app_dir / "cmake" / "nsx"
-    cmake_nsx_dir.mkdir(parents=True, exist_ok=True)
-    _write_text(
-        cmake_nsx_dir / "modules.cmake",
-        _jinja_env.get_template("modules.cmake.j2").render(modules=modules),
-    )
-
-    # --- CMakeLists.txt (engine-aware) ---
-    compiler_launcher = _resolve_compiler_launcher(config)
-    _write_text(
-        app_dir / "CMakeLists.txt",
-        _jinja_env.get_template("CMakeLists.txt.j2").render(
-            board=board.name,
-            engine_type=engine_type,
-            cmake_vars=artifacts.cmake_vars,
+            render_context=render_context,
+            arena_regions=aot_arena_regions,
             compiler_launcher=compiler_launcher or "",
-            aot_cmake_target=artifacts.aot_cmake_target or "",
-            transport=transport,
-            toolchain=config.target.toolchain,
+            channel=_default_nsx_channel(board.channel, config.build.channel),
             rtt_buffer_size_up=_rtt_buffer_size_up(
                 config.target.toolchain,
                 transport,
                 config.target.rtt_buffer_size_up,
             ),
-            model_location=config.model.model_location,
-            arena_region=arena_region,
-            weights_region=weights_region,
-            profiling_backends=profiling_backends,
-            has_armv8m_pmu=has_armv8m_pmu,
-            power_sync_enabled=power_sync_enabled,
-            arena_regions=aot_arena_regions,
-        ),
+        )
     )
 
     # --- Source files ---
@@ -1002,52 +571,8 @@ def generate_app(ctx: PipelineContext) -> Path:
     src_dir.mkdir(parents=True, exist_ok=True)
 
     # --- Copy SEGGER RTT source when using RTT transport ---
-    if transport == "rtt":
+    if transport == Transport.RTT:
         _copy_segger_rtt(src_dir)
-
-    # PMU preset
-    first_preset = config.profiling.pmu_presets[0] if config.profiling.pmu_presets else "ml_default"
-    pmu_preset_c = _PMU_PRESET_MAP.get(first_preset, "NSX_PMU_PRESET_ML_DEFAULT")
-
-    # Build pass list for multi-pass firmware loop
-    pmu_passes = _resolve_pmu_passes(config, soc)
-
-    # Arena size: use configured value or default 256KB
-    arena_size = config.model.arena_size or DEFAULT_ARENA_SIZE_BYTES
-    resolver_plan = build_resolver_plan(
-        engine_type=engine_type,
-        engine_config=config.engine.config,
-        model_analysis=ctx.model_analysis,
-    )
-    clock = ctx.run_metadata.platform
-    perf_mode_symbol = clock.cpu_perf_tier
-    perf_mode_mhz = clock.cpu_clock_mhz
-    window_target_ms = _effective_window_target_ms(config)
-    # Apollo3/3P reach 96 MHz only through TurboSPOT burst, which NSX never
-    # enables (nsx_platform_set_perf_mode is a no-op on AP3).  When the user
-    # selects a >48 MHz tier on AP3, the firmware enables burst directly via
-    # the AmbiqSuite HAL.  Other families switch via NSX perf mode as usual.
-    apollo3_burst = soc.family is SocFamily.AP3 and perf_mode_mhz > 48
-    resource_variable_count = sum(
-        1
-        for layer in (ctx.model_analysis.layers if ctx.model_analysis else ())
-        if layer.op == "VAR_HANDLE"
-    )
-
-    # External power sync
-    sync_gpio_pin = config.power.sync_gpio_pin
-    sync_lockstep = config.power.lockstep
-    state_gpio_pin = config.power.state_gpio_pin
-    go_gpio_pin = config.power.go_gpio_pin
-    cmsis_device_header = soc.cmsis_header
-
-    # --- Heartbeat template vars (shared across engines) ---
-    hb = config.target.heartbeat
-    heartbeat_vars = {
-        "heartbeat_enabled": hb.enabled,
-        "heartbeat_every_n_ops": hb.every_n_ops if hb.enabled else 0,
-        "heartbeat_every_ms": hb.every_ms if hb.enabled else 0,
-    }
 
     extreme_mode_safe = arena_region is Placement.TCM and weights_region is Placement.TCM
     if config.profiling.extreme_mode and not extreme_mode_safe:
@@ -1101,44 +626,7 @@ def generate_app(ctx: PipelineContext) -> Path:
         _write_text(
             src_dir / "main.cc",
             _jinja_env.get_template("main_aot.cc.j2").render(
-                aot_prefix=aot_prefix,
-                aot_op_manifest=ctx.engine_artifacts.aot_op_manifest or [],
-                iterations=config.profiling.iterations,
-                warmup=config.profiling.warmup,
-                clean_warmup=max(1, config.profiling.warmup),
-                clean_iters=max(1, config.profiling.iterations),
-                window_mode=config.profiling.window_mode,
-                window_target_ms=window_target_ms,
-                window_min=config.profiling.window_min,
-                window_max=config.profiling.window_max,
-                clean_window_probe=config.profiling.clean_window_probe,
-                clean_window_trace=config.profiling.clean_window_trace,
-                force_shared_sram=config.profiling.force_shared_sram,
-                pmu_passes=pmu_passes,
-                pmu_pass_names=[p["name"] for p in pmu_passes],
-                power_sync_enabled=power_sync_enabled,
-                sync_gpio_pin=sync_gpio_pin,
-                lockstep=sync_lockstep,
-                state_gpio_pin=state_gpio_pin,
-                go_gpio_pin=go_gpio_pin,
-                cmsis_device_header=cmsis_device_header,
-                soc_family=soc.family.value,
-                transport=transport,
-                usb_serial_marker=usb_serial_marker,
-                usb_serial_product=USB_MARKER_PRODUCT,
-                printf_linkage="static ",
-                extreme_mode=config.profiling.extreme_mode,
-                model_location=config.model.model_location,
-                arena_region=arena_region,
-                weights_region=weights_region,
-                profiling_backends=profiling_backends,
-                has_armv8m_pmu=has_armv8m_pmu,
-                allocate_arenas=artifacts.aot_allocate_arenas,
-                arena_regions=aot_arena_regions,
-                perf_mode_symbol=perf_mode_symbol,
-                perf_mode_mhz=perf_mode_mhz,
-                apollo3_burst=apollo3_burst,
-                **heartbeat_vars,
+                **template_vars,
             ),
         )
     else:
@@ -1155,47 +643,7 @@ def generate_app(ctx: PipelineContext) -> Path:
         _write_text(
             src_dir / "main.cc",
             _jinja_env.get_template("main.cc.j2").render(
-                engine_header=engine_header,
-                arena_size=arena_size,
-                iterations=config.profiling.iterations,
-                warmup=config.profiling.warmup,
-                clean_warmup=max(1, config.profiling.warmup),
-                clean_iters=max(1, config.profiling.iterations),
-                window_mode=config.profiling.window_mode,
-                window_target_ms=window_target_ms,
-                window_min=config.profiling.window_min,
-                window_max=config.profiling.window_max,
-                clean_window_probe=config.profiling.clean_window_probe,
-                clean_window_trace=config.profiling.clean_window_trace,
-                force_shared_sram=config.profiling.force_shared_sram,
-                pmu_passes=pmu_passes,
-                pmu_pass_names=[p["name"] for p in pmu_passes],
-                power_sync_enabled=power_sync_enabled,
-                sync_gpio_pin=sync_gpio_pin,
-                lockstep=sync_lockstep,
-                state_gpio_pin=state_gpio_pin,
-                go_gpio_pin=go_gpio_pin,
-                cmsis_device_header=cmsis_device_header,
-                soc_family=soc.family.value,
-                transport=transport,
-                usb_serial_marker=usb_serial_marker,
-                usb_serial_product=USB_MARKER_PRODUCT,
-                model_location=model_location,
-                arena_region=arena_region,
-                weights_region=weights_region,
-                model_size=model_size,
-                resolver_mode=resolver_plan.mode,
-                resolver_max_ops=resolver_plan.max_ops,
-                resolver_registrations=resolver_plan.registrations,
-                resource_variable_count=resource_variable_count,
-                printf_linkage="",
-                extreme_mode=config.profiling.extreme_mode,
-                profiling_backends=profiling_backends,
-                has_armv8m_pmu=has_armv8m_pmu,
-                perf_mode_symbol=perf_mode_symbol,
-                perf_mode_mhz=perf_mode_mhz,
-                apollo3_burst=apollo3_burst,
-                **heartbeat_vars,
+                **template_vars,
             ),
         )
 
@@ -1203,7 +651,7 @@ def generate_app(ctx: PipelineContext) -> Path:
         _write_text(
             src_dir / "hpx_pmu_profiler.h",
             _jinja_env.get_template("hpx_pmu_profiler.h.j2").render(
-                cmsis_device_header=cmsis_device_header,
+                cmsis_device_header=render_context.pmu.cmsis_device_header,
                 profiling_backends=profiling_backends,
                 has_armv8m_pmu=has_armv8m_pmu,
             ),

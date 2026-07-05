@@ -11,7 +11,7 @@ import pytest
 from helia_profiler.config import load_config
 from helia_profiler.errors import ConfigError
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.stages.s00_preflight import PreflightStage
+from helia_profiler.stages.preflight import PreflightStage
 
 
 # A minimal valid TFLite flatbuffer header is just the 'TFL3' magic in the
@@ -222,7 +222,7 @@ class TestPreflightHostTools:
         with (
             patch("shutil.which", side_effect=_all_tools_present),
             patch(
-                "helia_profiler.stages.s00_preflight.find_spec",
+                "helia_profiler.stages.preflight.find_spec",
                 return_value=None,
             ),
         ):
@@ -259,7 +259,7 @@ class TestPreflightHostTools:
 
         with (
             patch("shutil.which", side_effect=_all_tools_present),
-            patch("helia_profiler.stages.s00_preflight.find_spec", side_effect=fake_find_spec),
+            patch("helia_profiler.stages.preflight.find_spec", side_effect=fake_find_spec),
         ):
             with pytest.raises(ConfigError, match="pylink"):
                 PreflightStage().run(ctx)
@@ -276,7 +276,7 @@ class TestPreflightHostTools:
 
         with (
             patch("shutil.which", side_effect=_all_tools_present),
-            patch("helia_profiler.stages.s00_preflight.find_spec", side_effect=fake_find_spec),
+            patch("helia_profiler.stages.preflight.find_spec", side_effect=fake_find_spec),
         ):
             PreflightStage().run(ctx)
 
