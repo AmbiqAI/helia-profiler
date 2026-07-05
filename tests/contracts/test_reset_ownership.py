@@ -25,6 +25,7 @@ verbatim) so no pylink/pyserial I/O is reached.
 from __future__ import annotations
 
 import contextlib
+from unittest import mock
 
 import pytest
 
@@ -36,6 +37,20 @@ from helia_profiler.target.lifecycle import (
 )
 
 from .conftest import BOARD_FOR_FAMILY, make_pmu_ctx
+
+
+@pytest.fixture(autouse=True)
+def _fake_pylink_dll(monkeypatch):
+    """Make pylink.JLink construction hermetic.
+
+    The RTT reader constructs ``pylink.JLink()`` before reaching the recorded
+    reset primitive.  The constructor loads the SEGGER J-Link DLL, which
+    exists on hardware benches but not on CI runners — and a contract test
+    must never depend on (or touch) the real DLL either way.  The recorder
+    raises ``_ResetStop`` at the reset primitive, so a permissive mock handle
+    is never exercised beyond construction/attach setup.
+    """
+    monkeypatch.setattr("pylink.JLink", lambda *a, **k: mock.MagicMock())
 
 
 class _ResetStop(CaptureError):
