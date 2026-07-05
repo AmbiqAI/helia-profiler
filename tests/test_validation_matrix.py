@@ -177,3 +177,46 @@ class TestBuildMatrix:
         a = build_matrix()
         b = build_matrix()
         assert [c.case_id for c in a] == [c.case_id for c in b]
+
+
+class TestCaseValidityGuards:
+    def _case(self, **overrides):
+        from helia_profiler.validation.matrix import BOARDS, MODELS, CaseSpec
+        from helia_profiler.engines import EngineType
+
+        defaults = dict(
+            model=MODELS["kws"],
+            engine=EngineType.HELIA_RT,
+            power=False,
+            board=BOARDS["apollo3p_evb"],
+            transport=Transport.RTT,
+            memory=ModelLocation.AUTO,
+        )
+        defaults.update(overrides)
+        return CaseSpec(**defaults)
+
+    def test_tcm_arena_too_large_for_dtcm_is_skipped(self):
+        # KWS arena (128 KB) cannot fit Apollo3's 64 KB DTCM.
+        case = self._case(memory=ModelLocation.TCM)
+        reason = case_validity(case)
+        assert reason is not None and "DTCM" in reason
+
+    def test_tcm_fits_on_larger_dtcm(self):
+        from helia_profiler.validation.matrix import BOARDS
+
+        # Apollo510 has 512 KB DTCM — same arena fits.
+        case = self._case(board=BOARDS["apollo510_evb"], memory=ModelLocation.TCM)
+        assert case_validity(case) is None
+
+    def test_ap3_psram_power_pin_conflict_is_skipped(self):
+        case = self._case(power=True, memory=ModelLocation.PSRAM)
+        reason = case_validity(case)
+        assert reason is not None and "MSPI0" in reason
+
+    def test_ap5_psram_power_is_allowed(self):
+        from helia_profiler.validation.matrix import BOARDS
+
+        case = self._case(
+            board=BOARDS["apollo510_evb"], power=True, memory=ModelLocation.PSRAM
+        )
+        assert case_validity(case) is None

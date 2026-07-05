@@ -16,7 +16,7 @@ from pathlib import Path
 from ..config import Toolchain, Transport
 from ..engines import EngineType
 from ..placement import ModelLocation
-from ..platform import get_soc_for_board
+from ..platform import SocFamily, get_soc_for_board
 
 # ---------------------------------------------------------------------------
 # Registry types
@@ -92,6 +92,31 @@ def case_validity(case: CaseSpec) -> str | None:
         return "psram weights require the rtt transport"
     if case.transport is Transport.USB_CDC and case.transport not in case.board.transports:
         return "usb_cdc not supported on this board"
+    soc = get_soc_for_board(case.board.id)
+    # Statically infeasible TCM placement: model_location=tcm forces arena
+    # AND weights into DTCM, which cannot fit when their combined size
+    # exceeds it (e.g. KWS's 32 KB arena + ~53 KB weights vs Apollo3's
+    # 64 KB DTCM). Weights are approximated by the fixture file size; if the
+    # fixture is missing (LFS not pulled) the guard stays silent — the
+    # harness already skips missing fixtures with its own reason.
+    if case.memory is ModelLocation.TCM:
+        fixture = Path(case.model.fixture_path)
+        if not fixture.is_absolute():
+            # matrix.py lives at src/helia_profiler/validation/ — repo root is
+            # three levels up from the package dir.
+            fixture = Path(__file__).resolve().parents[3] / case.model.fixture_path
+        weights = fixture.stat().st_size if fixture.exists() else 0
+        needed = case.model.arena_size + weights
+        if weights and needed > soc.memory.dtcm_kb * 1024:
+            return (
+                f"arena+weights (~{needed // 1024} KB) cannot fit "
+                f"{soc.memory.dtcm_kb} KB DTCM"
+            )
+    # Apollo3 EVBs: the power-sync GPIOs (24/25/26, moved off the J-Link VCOM
+    # UART pads) sit on the MSPI0 pads that external PSRAM needs, so PSRAM
+    # placement and gated power capture are electrically exclusive there.
+    if case.power and case.memory is ModelLocation.PSRAM and soc.family is SocFamily.AP3:
+        return "apollo3 power-sync GPIOs share the MSPI0 (PSRAM) pads"
     return None
 
 
