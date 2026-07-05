@@ -129,12 +129,18 @@ class TestLockstepArmBeforeReset:
         assert result is not None
         # The arm must happen before the reset that starts the measured run.
         assert events.index("arm") < events.index("lifecycle_reset")
-        # And the whole handshake is ordered: arm, reset, wait_ready, go, release.
+        # Revised ordering (AP510 combo-reset gate-race fix, 2026-07-05): the
+        # GPI poller must be live BEFORE the lifecycle reset, so the reset +
+        # READY handshake now happen inside capture_gated's on_started hook:
+        #   arm -> capture_gated(poller live) -> reset -> wait_ready -> go.
+        # Previously the reset preceded capture_gated, which let a slow
+        # multi-step reset strategy race the firmware's gated window past the
+        # not-yet-started poller ("gate rose but did not fall").
         assert events == [
             "arm",
+            "capture_gated",
             "lifecycle_reset",
             "wait_ready",
-            "capture_gated",
             "signal_go",
             "release",
         ]
