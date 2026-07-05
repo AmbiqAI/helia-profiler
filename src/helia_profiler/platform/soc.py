@@ -407,7 +407,12 @@ _register_soc(
             sram_kb=3072,
             dtcm_kb=512,
             itcm_kb=256,
-            psram_kb=32768,
+            # apollo510b_evb populates an AP Memory APS512XXN (512 Mbit =
+            # 64 MB) hex PSRAM on MSPI0 — proven by XIP address-aliasing on
+            # real hardware (+32 MB is distinct storage, +64 MB wraps) during
+            # the 2026-07-05 PSRAM bring-up. The 32 MB value was inherited
+            # from the apollo510_evb assumption and under-reported capacity.
+            psram_kb=65536,
         ),
         clocks=(
             ClockDomain(
