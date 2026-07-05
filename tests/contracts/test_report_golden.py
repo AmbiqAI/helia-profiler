@@ -344,7 +344,11 @@ def _make_aot_ctx(tmp_path: Path) -> PipelineContext:
 
 
 def _digest_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    # Normalise CRLF -> LF before hashing: the report writers open files in
+    # text mode, so Windows newline translation would otherwise change every
+    # digest. The golden contract pins content, not platform line endings.
+    data = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
 
 
 def _build_digests() -> dict[str, dict[str, str]]:
