@@ -195,11 +195,29 @@ class TestCaseValidityGuards:
         defaults.update(overrides)
         return CaseSpec(**defaults)
 
-    def test_tcm_arena_too_large_for_dtcm_is_skipped(self):
-        # KWS arena (128 KB) cannot fit Apollo3's 64 KB DTCM.
-        case = self._case(memory=ModelLocation.TCM)
+    def test_tcm_arena_plus_weights_too_large_for_dtcm_is_skipped(self, tmp_path):
+        # Hermetic: a synthetic 53 KB "model" whose weights + KWS's 32 KB
+        # arena exceed Apollo3's 64 KB DTCM (the real fixture is LFS-managed
+        # and absent on CI runners, where the guard deliberately stays silent).
+        import dataclasses
+
+        fixture = tmp_path / "model.tflite"
+        fixture.write_bytes(b"\x00" * (53 * 1024))
+        model = dataclasses.replace(
+            self._case().model, fixture_path=str(fixture)
+        )
+        case = self._case(memory=ModelLocation.TCM, model=model)
         reason = case_validity(case)
         assert reason is not None and "DTCM" in reason
+
+    def test_tcm_guard_silent_when_fixture_missing(self):
+        import dataclasses
+
+        model = dataclasses.replace(
+            self._case().model, fixture_path="does/not/exist.tflite"
+        )
+        case = self._case(memory=ModelLocation.TCM, model=model)
+        assert case_validity(case) is None
 
     def test_tcm_fits_on_larger_dtcm(self):
         from helia_profiler.validation.matrix import BOARDS
