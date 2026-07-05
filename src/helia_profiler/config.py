@@ -396,7 +396,11 @@ class PowerConfig:
     enabled: bool = False
     driver: str = DEFAULT_POWER_DRIVER
     mode: PowerMode = DEFAULT_POWER_MODE
-    duration_s: int = DEFAULT_POWER_DURATION_S
+    # ``None`` means "not explicitly set": consumers use
+    # DEFAULT_POWER_DURATION_S and may auto-tune the bound from PMU-phase
+    # timing.  An explicit value (YAML or --power-duration, even if equal to
+    # the default) always wins and disables auto-tuning.
+    duration_s: int | None = None
     io_voltage: float = DEFAULT_IO_VOLTAGE
     sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN  # GPIO for external sync
     # Host-side sync input index on external instruments. For Joulescope this
@@ -680,7 +684,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             enabled=power_d.get("enabled", False),
             driver=power_d.get("driver", DEFAULT_POWER_DRIVER),
             mode=power_d.get("mode", DEFAULT_POWER_MODE),
-            duration_s=power_d.get("duration_s", DEFAULT_POWER_DURATION_S),
+            duration_s=(int(power_d["duration_s"]) if "duration_s" in power_d else None),
             io_voltage=power_d.get("io_voltage", DEFAULT_IO_VOLTAGE),
             sync_gpio_pin=sync_gpio_pin,
             sync_input_index=power_d.get("sync_input_index", DEFAULT_POWER_SYNC_INPUT_INDEX),

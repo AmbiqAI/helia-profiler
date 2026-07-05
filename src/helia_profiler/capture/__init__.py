@@ -19,7 +19,7 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from ..config import Transport
+from ..config import DEFAULT_POWER_DURATION_S, Transport
 from ..errors import CaptureError, PowerError
 from ..transport import (
     HPX_END,
@@ -268,7 +268,13 @@ def capture_power(
         return result
 
     duration = (
-        duration_override_s if duration_override_s is not None else ctx.config.power.duration_s
+        duration_override_s
+        if duration_override_s is not None
+        else (
+            ctx.config.power.duration_s
+            if ctx.config.power.duration_s is not None
+            else DEFAULT_POWER_DURATION_S
+        )
     )
 
     clean_count = None

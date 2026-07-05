@@ -133,16 +133,20 @@ class CapturePowerStage:
 
         # --- Capture ---
         # Tighten capture window if PMU timing data is available — but only
-        # when the user left duration at its default.  An explicit
-        # --power-duration / power.duration_s is an operator override and must
-        # win over the estimate: the estimate is derived from PMU-phase
-        # timing, which the AP5 combo-reset investigation showed can be wildly
-        # wrong about the power-phase boot (clean window running ~6x slower
-        # than estimated), and a silently-shrunk bound made the override
-        # impossible to apply during diagnosis.
+        # when the user left duration unset.  An explicit --power-duration /
+        # power.duration_s (even one equal to the default value) is an
+        # operator override and must win over the estimate: the estimate is
+        # derived from PMU-phase timing, which the AP5 combo-reset
+        # investigation showed can be wildly wrong about the power-phase
+        # boot, and a silently-shrunk bound made the override impossible to
+        # apply during diagnosis.  duration_s is None when not explicitly set.
         estimated = _estimate_capture_duration(ctx)
-        configured = ctx.config.power.duration_s
-        user_overrode_duration = configured != DEFAULT_POWER_DURATION_S
+        user_overrode_duration = ctx.config.power.duration_s is not None
+        configured = (
+            ctx.config.power.duration_s
+            if user_overrode_duration
+            else DEFAULT_POWER_DURATION_S
+        )
         if estimated is not None and estimated < configured and not user_overrode_duration:
             log.info(
                 "Auto-tuned capture duration: %.1fs (estimated) vs %.1fs (configured)",
