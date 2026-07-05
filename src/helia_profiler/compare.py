@@ -35,14 +35,95 @@ class MetricDiff:
 
 
 @dataclass(frozen=True)
+class ConfigDiffRow:
+    """One row of the config/provenance comparison table.
+
+    ``baseline``/``candidate`` hold whatever value was found at the
+    corresponding path in ``run_metadata.json`` (string, number, list, or
+    ``None``) — inherently dynamic, same rationale as ``MetricDiff``.
+    """
+
+    field: str
+    baseline: Any
+    candidate: Any
+    status: str  # "same" | "diff"
+
+
+@dataclass(frozen=True)
+class CounterDiff:
+    """Baseline/candidate/delta for one dynamic per-layer PMU counter column."""
+
+    baseline: float
+    candidate: float
+    delta: float
+    delta_pct: float | None
+
+
+@dataclass(frozen=True)
+class LayerDiffRow:
+    """One row of the index-aligned per-layer comparison."""
+
+    id: Any
+    baseline_id: Any
+    candidate_id: Any
+    baseline_op: str
+    candidate_op: str
+    op_match: bool
+    baseline_cycles: float | None
+    candidate_cycles: float | None
+    delta_cycles: float | None
+    delta_pct: float | None
+    speedup: float | None
+    baseline_overflow: Any
+    candidate_overflow: Any
+    baseline_memory: str | None = None
+    candidate_memory: str | None = None
+    memory_changed: bool | None = None
+    memory_diff: str | None = None
+    # PMU counter columns are dynamic (whatever counters/presets were
+    # enabled for the run) — mirrors the LayerResult.counters escape hatch.
+    counters: dict[str, CounterDiff] = field(default_factory=dict)
+
+    def to_flat_dict(self) -> dict[str, Any]:
+        """Flatten to the legacy dict shape used for CSV serialization."""
+
+        out: dict[str, Any] = {
+            "id": self.id,
+            "baseline_id": self.baseline_id,
+            "candidate_id": self.candidate_id,
+            "baseline_op": self.baseline_op,
+            "candidate_op": self.candidate_op,
+            "op_match": self.op_match,
+            "baseline_cycles": self.baseline_cycles,
+            "candidate_cycles": self.candidate_cycles,
+            "delta_cycles": self.delta_cycles,
+            "delta_pct": self.delta_pct,
+            "speedup": self.speedup,
+            "baseline_overflow": self.baseline_overflow,
+            "candidate_overflow": self.candidate_overflow,
+        }
+        if self.baseline_memory is not None or self.candidate_memory is not None:
+            out["baseline_memory"] = self.baseline_memory
+            out["candidate_memory"] = self.candidate_memory
+            out["memory_changed"] = self.memory_changed
+            out["memory_diff"] = self.memory_diff
+        for key, counter in self.counters.items():
+            out[f"baseline_{key}"] = counter.baseline
+            out[f"candidate_{key}"] = counter.candidate
+            out[f"delta_{key}"] = counter.delta
+            out[f"delta_pct_{key}"] = counter.delta_pct
+        return out
+
+
+@dataclass(frozen=True)
 class CompareResult:
     """Full comparison between two profile runs."""
 
     baseline: RunArtifacts
     candidate: RunArtifacts
-    config_rows: list[dict[str, Any]]
+    config_rows: list[ConfigDiffRow]
     metrics: list[MetricDiff]
-    layer_rows: list[dict[str, Any]]
+    layer_rows: list[LayerDiffRow]
     warnings: list[str] = field(default_factory=list)
 
 
@@ -142,7 +223,15 @@ def write_compare_artifacts(result: CompareResult, output_dir: Path) -> list[Pat
         "baseline_dir": str(result.baseline.path),
         "candidate_dir": str(result.candidate.path),
         "warnings": result.warnings,
-        "config": result.config_rows,
+        "config": [
+            {
+                "field": row.field,
+                "baseline": row.baseline,
+                "candidate": row.candidate,
+                "status": row.status,
+            }
+            for row in result.config_rows
+        ],
         "metrics": [
             {
                 "name": m.name,
@@ -157,11 +246,12 @@ def write_compare_artifacts(result: CompareResult, output_dir: Path) -> list[Pat
     }
     paths[0].write_text(json.dumps(summary, indent=2, default=str) + "\n")
 
-    fieldnames = _layer_fieldnames(result.layer_rows)
+    flat_layer_rows = [row.to_flat_dict() for row in result.layer_rows]
+    fieldnames = _layer_fieldnames(flat_layer_rows)
     with open(paths[1], "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(result.layer_rows)
+        writer.writerows(flat_layer_rows)
 
     return paths
 
@@ -183,7 +273,11 @@ def render_compare(result: CompareResult, *, top_layers: int = 10) -> str:
         lines.append("")
 
     lines.append("Config")
-    lines.extend(_format_table(["field", "baseline", "candidate", "status"], result.config_rows))
+    config_dicts = [
+        {"field": row.field, "baseline": row.baseline, "candidate": row.candidate, "status": row.status}
+        for row in result.config_rows
+    ]
+    lines.extend(_format_table(["field", "baseline", "candidate", "status"], config_dicts))
     lines.append("")
 
     lines.append("Run")
@@ -203,18 +297,18 @@ def render_compare(result: CompareResult, *, top_layers: int = 10) -> str:
     lines.append(f"Layers: top {top_layers} by absolute cycle delta")
     top = sorted(
         result.layer_rows,
-        key=lambda row: abs(_to_float(row.get("delta_cycles")) or 0.0),
+        key=lambda row: abs(row.delta_cycles or 0.0),
         reverse=True,
     )[:top_layers]
     layer_rows = [
         {
-            "id": row["id"],
-            "op": row["candidate_op"] if row["op_match"] else f"{row['baseline_op']} -> {row['candidate_op']}",
-            "baseline": _format_number(row.get("baseline_cycles")),
-            "candidate": _format_number(row.get("candidate_cycles")),
+            "id": row.id,
+            "op": row.candidate_op if row.op_match else f"{row.baseline_op} -> {row.candidate_op}",
+            "baseline": _format_number(row.baseline_cycles),
+            "candidate": _format_number(row.candidate_cycles),
             "delta": _format_layer_delta(row),
-            "speedup": _format_speedup(row.get("speedup")),
-            "memory": row.get("memory_diff", ""),
+            "speedup": _format_speedup(row.speedup),
+            "memory": row.memory_diff or "",
         }
         for row in top
     ]
@@ -258,18 +352,20 @@ def _coerce_csv_value(value: str | None) -> Any:
         return value
 
 
-def _compare_config(base: dict[str, Any], cand: dict[str, Any]) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+def _compare_config(base: dict[str, Any], cand: dict[str, Any]) -> list[ConfigDiffRow]:
+    rows: list[ConfigDiffRow] = []
     for label, path in _CONFIG_FIELDS:
         b = _get_nested(base, path)
         c = _get_nested(cand, path)
+        stable_b = _stable_value(b)
+        stable_c = _stable_value(c)
         rows.append(
-            {
-                "field": label,
-                "baseline": _stable_value(b),
-                "candidate": _stable_value(c),
-                "status": "same" if _stable_value(b) == _stable_value(c) else "diff",
-            }
+            ConfigDiffRow(
+                field=label,
+                baseline=stable_b,
+                candidate=stable_c,
+                status="same" if stable_b == stable_c else "diff",
+            )
         )
     return rows
 
@@ -291,10 +387,10 @@ def _compare_metrics(base: dict[str, Any], cand: dict[str, Any]) -> list[MetricD
     return metrics
 
 
-def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[dict[str, Any]]:
+def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[LayerDiffRow]:
     base = base_run.layers
     cand = cand_run.layers
-    rows: list[dict[str, Any]] = []
+    rows: list[LayerDiffRow] = []
     max_len = max(len(base), len(cand))
     for idx in range(max_len):
         b = base[idx] if idx < len(base) else {}
@@ -311,21 +407,10 @@ def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[dict
             if candidate_cycles != 0:
                 speedup = baseline_cycles / candidate_cycles
 
-        row: dict[str, Any] = {
-            "id": c.get("id", b.get("id", idx)),
-            "baseline_id": b.get("id"),
-            "candidate_id": c.get("id"),
-            "baseline_op": b.get("op", "<missing>"),
-            "candidate_op": c.get("op", "<missing>"),
-            "op_match": b.get("op") == c.get("op"),
-            "baseline_cycles": baseline_cycles,
-            "candidate_cycles": candidate_cycles,
-            "delta_cycles": delta_cycles,
-            "delta_pct": delta_pct,
-            "speedup": speedup,
-            "baseline_overflow": b.get("overflow"),
-            "candidate_overflow": c.get("overflow"),
-        }
+        baseline_memory: str | None = None
+        candidate_memory: str | None = None
+        memory_changed: bool | None = None
+        memory_diff: str | None = None
         base_mem = _memory_rows_for_layer(base_run.layer_memory, b, idx)
         cand_mem = _memory_rows_for_layer(cand_run.layer_memory, c, idx)
         base_mem_counts = _layer_memory_counts(base_mem)
@@ -333,42 +418,66 @@ def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[dict
         base_mem_summary = _format_memory_summary(base_mem_counts)
         cand_mem_summary = _format_memory_summary(cand_mem_counts)
         if base_mem_summary or cand_mem_summary:
-            row["baseline_memory"] = base_mem_summary
-            row["candidate_memory"] = cand_mem_summary
-            row["memory_changed"] = base_mem_summary != cand_mem_summary
-            row["memory_diff"] = _format_memory_diff(base_mem_counts, cand_mem_counts)
+            baseline_memory = base_mem_summary
+            candidate_memory = cand_mem_summary
+            memory_changed = base_mem_summary != cand_mem_summary
+            memory_diff = _format_memory_diff(base_mem_counts, cand_mem_counts)
 
+        counters: dict[str, CounterDiff] = {}
         for key in sorted((set(b) & set(c)) - {"id", "op", "cycles", "overflow"}):
             bf = _to_float(b.get(key))
             cf = _to_float(c.get(key))
             if bf is None or cf is None:
                 continue
-            row[f"baseline_{key}"] = bf
-            row[f"candidate_{key}"] = cf
-            row[f"delta_{key}"] = cf - bf
-            row[f"delta_pct_{key}"] = ((cf - bf) / bf * 100) if bf else None
+            counters[key] = CounterDiff(
+                baseline=bf,
+                candidate=cf,
+                delta=cf - bf,
+                delta_pct=((cf - bf) / bf * 100) if bf else None,
+            )
 
-        rows.append(row)
+        rows.append(
+            LayerDiffRow(
+                id=c.get("id", b.get("id", idx)),
+                baseline_id=b.get("id"),
+                candidate_id=c.get("id"),
+                baseline_op=b.get("op", "<missing>"),
+                candidate_op=c.get("op", "<missing>"),
+                op_match=b.get("op") == c.get("op"),
+                baseline_cycles=baseline_cycles,
+                candidate_cycles=candidate_cycles,
+                delta_cycles=delta_cycles,
+                delta_pct=delta_pct,
+                speedup=speedup,
+                baseline_overflow=b.get("overflow"),
+                candidate_overflow=c.get("overflow"),
+                baseline_memory=baseline_memory,
+                candidate_memory=candidate_memory,
+                memory_changed=memory_changed,
+                memory_diff=memory_diff,
+                counters=counters,
+            )
+        )
     return rows
 
 
 def _build_warnings(
     baseline: RunArtifacts,
     candidate: RunArtifacts,
-    config_rows: list[dict[str, Any]],
+    config_rows: list[ConfigDiffRow],
     metrics: list[MetricDiff],
-    layer_rows: list[dict[str, Any]],
+    layer_rows: list[LayerDiffRow],
 ) -> list[str]:
     warnings: list[str] = []
     important = {"Model SHA256", "Board", "SoC", "Engine", "Iterations", "Warmup", "Arena size"}
-    changed = [row["field"] for row in config_rows if row["status"] == "diff" and row["field"] in important]
+    changed = [row.field for row in config_rows if row.status == "diff" and row.field in important]
     if changed:
         warnings.append("Important provenance differs: " + ", ".join(changed))
     if baseline.summary.get("overflow_detected") or candidate.summary.get("overflow_detected"):
         warnings.append("PMU overflow detected in at least one run; counter values may be unreliable.")
     if len(baseline.layers) != len(candidate.layers):
         warnings.append(f"Layer counts differ: baseline={len(baseline.layers)}, candidate={len(candidate.layers)}")
-    mismatches = sum(1 for row in layer_rows if not row.get("op_match"))
+    mismatches = sum(1 for row in layer_rows if not row.op_match)
     if mismatches:
         warnings.append(f"{mismatches} layer op name(s) differ; index-aligned layer diffs may be approximate.")
     missing_metrics = [m.name for m in metrics if m.baseline is None or m.candidate is None]
@@ -535,11 +644,11 @@ def _format_delta(metric: MetricDiff) -> str:
     return f"{_format_number(metric.delta)} {metric.unit}{pct}".strip()
 
 
-def _format_layer_delta(row: dict[str, Any]) -> str:
-    delta = _to_float(row.get("delta_cycles"))
+def _format_layer_delta(row: LayerDiffRow) -> str:
+    delta = row.delta_cycles
     if delta is None:
         return "n/a"
-    pct = row.get("delta_pct")
+    pct = row.delta_pct
     pct_s = f" ({pct:+.1f}%)" if isinstance(pct, (int, float)) else ""
     return f"{_format_number(delta)}{pct_s}"
 

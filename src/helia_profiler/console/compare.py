@@ -15,7 +15,7 @@ from rich.text import Text
 from .tables import _to_float as _to_compare_float
 
 if TYPE_CHECKING:
-    from ..compare import CompareResult, MetricDiff
+    from ..compare import CompareResult, LayerDiffRow, MetricDiff
     from .base import HpxConsole
 
 
@@ -40,13 +40,13 @@ def _build_compare_config_table(result: CompareResult) -> Table:
     table.add_column("Status", justify="center", width=8)
 
     for row in result.config_rows:
-        changed = row.get("status") == "diff"
+        changed = row.status == "diff"
         status = "[yellow]diff[/yellow]" if changed else "[green]same[/green]"
         value_style = "yellow" if changed else ""
         table.add_row(
-            str(row.get("field", "")),
-            _style_compare_value(row.get("baseline"), value_style),
-            _style_compare_value(row.get("candidate"), value_style),
+            str(row.field or ""),
+            _style_compare_value(row.baseline, value_style),
+            _style_compare_value(row.candidate, value_style),
             status,
         )
 
@@ -78,7 +78,7 @@ def _build_compare_run_table(metrics: list[MetricDiff]) -> Table:
     return table
 
 
-def _build_compare_layer_table(layer_rows: list[dict[str, Any]], *, top_layers: int) -> Table:
+def _build_compare_layer_table(layer_rows: list[LayerDiffRow], *, top_layers: int) -> Table:
     top_layers = max(0, top_layers)
     table = Table(
         title=f"[bold]Layers[/bold] [dim](top {top_layers} by absolute cycle delta)[/dim]",
@@ -95,23 +95,23 @@ def _build_compare_layer_table(layer_rows: list[dict[str, Any]], *, top_layers: 
 
     top = sorted(
         layer_rows,
-        key=lambda row: abs(_to_compare_float(row.get("delta_cycles")) or 0.0),
+        key=lambda row: abs(_to_compare_float(row.delta_cycles) or 0.0),
         reverse=True,
     )[:top_layers]
     for row in top:
-        op = str(row.get("candidate_op", ""))
-        if not row.get("op_match", True):
-            op = f"{row.get('baseline_op', '<missing>')} -> {row.get('candidate_op', '<missing>')}"
-        overflow = row.get("baseline_overflow") or row.get("candidate_overflow")
+        op = str(row.candidate_op or "")
+        if not row.op_match:
+            op = f"{row.baseline_op or '<missing>'} -> {row.candidate_op or '<missing>'}"
+        overflow = row.baseline_overflow or row.candidate_overflow
         op_cell = escape(op)
         if overflow:
             op_cell = f"{op_cell} [yellow]OVF[/yellow]"
 
         row_values = [
-            str(row.get("id", "")),
+            str(row.id or ""),
             op_cell,
-            _format_compact_number(row.get("baseline_cycles")),
-            _format_compact_number(row.get("candidate_cycles")),
+            _format_compact_number(row.baseline_cycles),
+            _format_compact_number(row.candidate_cycles),
             _format_layer_change_compact(row),
         ]
         table.add_row(*row_values)
@@ -119,15 +119,15 @@ def _build_compare_layer_table(layer_rows: list[dict[str, Any]], *, top_layers: 
     return table
 
 
-def _build_compare_placement_table(layer_rows: list[dict[str, Any]], *, top_layers: int) -> Table | None:
-    changed = [row for row in layer_rows if row.get("memory_changed")]
+def _build_compare_placement_table(layer_rows: list[LayerDiffRow], *, top_layers: int) -> Table | None:
+    changed = [row for row in layer_rows if row.memory_changed]
     if not changed:
         return None
 
     top_layers = max(0, top_layers)
     rows = sorted(
         changed,
-        key=lambda row: abs(_to_compare_float(row.get("delta_cycles")) or 0.0),
+        key=lambda row: abs(_to_compare_float(row.delta_cycles) or 0.0),
         reverse=True,
     )[:top_layers]
 
@@ -145,14 +145,14 @@ def _build_compare_placement_table(layer_rows: list[dict[str, Any]], *, top_laye
     table.add_column("After", min_width=26, ratio=1, overflow="fold")
 
     for row in rows:
-        op = str(row.get("candidate_op", ""))
-        if not row.get("op_match", True):
-            op = f"{row.get('baseline_op', '<missing>')} -> {row.get('candidate_op', '<missing>')}"
+        op = str(row.candidate_op or "")
+        if not row.op_match:
+            op = f"{row.baseline_op or '<missing>'} -> {row.candidate_op or '<missing>'}"
         table.add_row(
-            str(row.get("id", "")),
+            str(row.id or ""),
             escape(op),
-            escape(str(row.get("baseline_memory", ""))),
-            f"[yellow]{escape(str(row.get('candidate_memory', '')))}[/yellow]",
+            escape(str(row.baseline_memory or "")),
+            f"[yellow]{escape(str(row.candidate_memory or ''))}[/yellow]",
         )
 
     return table
@@ -244,13 +244,13 @@ def _format_compare_change_compact(metric: MetricDiff, *, lower_is_better: bool)
     return f"[{style}]{body}[/{style}]" if style else body
 
 
-def _format_layer_change_compact(row: dict[str, Any]) -> str:
-    delta = _to_compare_float(row.get("delta_cycles"))
+def _format_layer_change_compact(row: LayerDiffRow) -> str:
+    delta = _to_compare_float(row.delta_cycles)
     if delta is None:
         return "—"
     parts = [_format_compact_number(delta)]
-    pct = row.get("delta_pct")
-    speedup = _to_compare_float(row.get("speedup"))
+    pct = row.delta_pct
+    speedup = _to_compare_float(row.speedup)
     extras: list[str] = []
     if isinstance(pct, (int, float)):
         extras.append(f"{pct:+.1f}%")
