@@ -92,6 +92,17 @@ def _family_from_path(device_path: str) -> str:
 
 _shared_driver: Any = None
 
+#: Per-device-path open refcount.  Several callers can hold a logical "open"
+#: on the same device path at once (e.g. the sync controller opens it for
+#: GPI/GPO access while ``capture_gated`` independently opens/closes it for
+#: the measured window). ``drv.open``/``drv.close`` on the underlying
+#: ``pyjoulescope_driver`` handle are idempotent, but the *path* must only be
+#: closed once nobody holds it, or a still-active caller's handle would be
+#: torn down. ``_open_device`` increments this on every successful open;
+#: ``_close_device`` decrements it and only calls ``drv.close`` once the
+#: count reaches zero.
+_open_refcounts: dict[str, int] = {}
+
 
 def _get_shared_driver() -> Any:
     global _shared_driver
@@ -215,10 +226,23 @@ def _open_device(serial: str | None) -> tuple[Any, str, str]:
             ) from exc
 
     log.info("Joulescope opened: %s (%s)", device_path, family.upper())
+    _open_refcounts[device_path] = _open_refcounts.get(device_path, 0) + 1
     return drv, device_path, family
 
 
 def _close_device(drv: Any, device_path: str) -> None:
+    """Release one logical open on *device_path*.
+
+    Only calls ``drv.close`` once every :func:`_open_device` caller for this
+    path has released it, so one caller finishing early (e.g. a sync
+    controller during an active gated capture) never tears down another
+    caller's still-active handle.
+    """
+    remaining = _open_refcounts.get(device_path, 0) - 1
+    if remaining > 0:
+        _open_refcounts[device_path] = remaining
+        return
+    _open_refcounts.pop(device_path, None)
     try:
         drv.close(device_path)
     except Exception:

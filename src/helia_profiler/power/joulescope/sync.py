@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 from ..sync import DeviceState, SyncWiring
-from .device import _open_device
+from .device import _close_device, _open_device
 
 
 class JoulescopeSyncController:
@@ -69,3 +69,15 @@ class JoulescopeSyncController:
             self._write_go(False)
         except Exception:  # pragma: no cover - defensive
             pass
+        # Close only the handle *this* controller opened via ``_ensure``.
+        # ``_close_device`` decrements the shared per-path refcount, so if
+        # another caller (e.g. an in-flight ``capture_gated``) still holds
+        # the same device path open, the underlying handle stays alive.
+        if self._driver is not None:
+            driver, path = self._driver, self._path
+            self._driver = None
+            self._path = None
+            try:
+                _close_device(driver, str(path))
+            except Exception:  # pragma: no cover - defensive
+                pass

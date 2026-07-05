@@ -277,47 +277,51 @@ def capture_power(
             )
         # 3-wire lock-step: arm the host GO line before the device may run and
         # release it once the poller is live, chained after any USB DTR open.
+        # The whole arm -> prepare -> wait_ready -> capture_gated sequence is
+        # one try/finally so that any exception raised anywhere in it (e.g.
+        # ``_prepare_target_once`` failing after GO has been driven low)
+        # still unconditionally releases the sync controller.
         sync = _make_sync_controller(ctx, driver)
-        sync.arm()
-        # Reset/relaunch only after GO is held low and the state input is open.
-        # Otherwise a fast boot can pass through the READY barrier before the
-        # host is watching, leaving power capture to fail later as a missing gate.
-        _prepare_target_once()
-        sync_metadata: dict[str, object]
-
-        if sync.lockstep:
-            from ..power.diagnostics import SyncHandshakeMetadata
-
-            ready_started = time.monotonic()
-            ready = sync.wait_ready(timeout_s=duration)
-            ready_wait_s = round(time.monotonic() - ready_started, 6)
-            if not ready:
-                state = sync.read_state()
-                sync.release()
-                raise PowerError(
-                    "Target did not signal READY before gated power capture",
-                    hint=(
-                        "Check the state/go GPIO wiring, reset strategy, and that the firmware "
-                        "is parked in the power sync wait state. "
-                        f"Last observed state: {state.value}; waited {ready_wait_s:.3f}s."
-                    ),
-                )
-            sync_metadata = SyncHandshakeMetadata(
-                lockstep=True,
-                ready_wait_s=ready_wait_s,
-                ready_observed=True,
-            ).to_metadata()
-        else:
-            from ..power.diagnostics import SyncHandshakeMetadata
-
-            sync_metadata = SyncHandshakeMetadata(lockstep=False).to_metadata()
-
-        def _release() -> None:
-            if dtr_holder is not None:
-                dtr_holder.open()
-            sync.signal_go()
-
         try:
+            sync.arm()
+            # Reset/relaunch only after GO is held low and the state input is
+            # open. Otherwise a fast boot can pass through the READY barrier
+            # before the host is watching, leaving power capture to fail
+            # later as a missing gate.
+            _prepare_target_once()
+            sync_metadata: dict[str, object]
+
+            if sync.lockstep:
+                from ..power.diagnostics import SyncHandshakeMetadata
+
+                ready_started = time.monotonic()
+                ready = sync.wait_ready(timeout_s=duration)
+                ready_wait_s = round(time.monotonic() - ready_started, 6)
+                if not ready:
+                    state = sync.read_state()
+                    raise PowerError(
+                        "Target did not signal READY before gated power capture",
+                        hint=(
+                            "Check the state/go GPIO wiring, reset strategy, and that the "
+                            "firmware is parked in the power sync wait state. "
+                            f"Last observed state: {state.value}; waited {ready_wait_s:.3f}s."
+                        ),
+                    )
+                sync_metadata = SyncHandshakeMetadata(
+                    lockstep=True,
+                    ready_wait_s=ready_wait_s,
+                    ready_observed=True,
+                ).to_metadata()
+            else:
+                from ..power.diagnostics import SyncHandshakeMetadata
+
+                sync_metadata = SyncHandshakeMetadata(lockstep=False).to_metadata()
+
+            def _release() -> None:
+                if dtr_holder is not None:
+                    dtr_holder.open()
+                sync.signal_go()
+
             result = driver.capture_gated(
                 duration_s=duration,
                 io_voltage=ctx.config.power.io_voltage,
@@ -332,7 +336,6 @@ def capture_power(
             sync.release()
             if dtr_holder is not None:
                 dtr_holder.close()
-
 
     _prepare_target_once()
     return _attach_lifecycle_metadata(

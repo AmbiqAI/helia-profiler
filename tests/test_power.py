@@ -1094,3 +1094,79 @@ class TestCapturePowerWrapper:
         assert result.metadata["sync"]["ready_wait_s"] >= 0.0
         assert result.metadata["sync"]["ready_observed"] is True
         assert result.metadata["target_lifecycle"] == {"reset_action": "debug_reset"}
+
+    def test_capture_power_releases_sync_when_prepare_raises_after_arm(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """``sync.release()`` must run even if prepare_target raises after arm().
+
+        Regression test: previously ``sync.arm()`` and ``_prepare_target_once()``
+        executed before the try/finally that guarantees ``sync.release()``, so a
+        prepare-time exception (e.g. a failed reset) left the host GO line held
+        low with no release.
+        """
+        from helia_profiler.capture import capture_power
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {
+                    "enabled": True,
+                    "driver": "joulescope-js110",
+                    "lockstep": True,
+                    "state_gpio_pin": 23,
+                    "go_gpio_pin": 24,
+                },
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[])
+
+        calls: list[str] = []
+
+        class FakeSync:
+            lockstep = True
+
+            def arm(self):
+                calls.append("arm")
+
+            def wait_ready(self, *, timeout_s: float):  # pragma: no cover - unreachable
+                raise AssertionError("wait_ready should not be reached")
+
+            def signal_go(self):  # pragma: no cover - unreachable
+                raise AssertionError("signal_go should not be reached")
+
+            def read_state(self):  # pragma: no cover - unreachable
+                raise AssertionError("read_state should not be reached")
+
+            def release(self):
+                calls.append("release")
+
+        class FakeDriver:
+            def check_available(self):
+                calls.append("check")
+
+            def make_sync_controller(self, wiring):
+                calls.append("make_sync")
+                return FakeSync()
+
+            def capture_gated(self, **kwargs):  # pragma: no cover - unreachable
+                raise AssertionError("capture_gated should not be reached")
+
+        monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: FakeDriver())
+
+        def prepare_target(driver, name):
+            calls.append("prepare")
+            raise RuntimeError("reset failed")
+
+        with pytest.raises(RuntimeError, match="reset failed"):
+            capture_power(ctx, duration_override_s=7.0, prepare_target=prepare_target)
+
+        assert calls == ["check", "make_sync", "arm", "prepare", "release"]
