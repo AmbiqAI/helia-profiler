@@ -95,7 +95,7 @@ def test_ap5_socs_expose_expected_psram_capacity():
     # apollo510b_evb populates a 64 MB APS512XXN part (hardware-proven via
     # XIP address-aliasing, 2026-07-05); other AP5 boards assume 32 MB until
     # validated on hardware.
-    expected_kb = {"apollo510b": 65536}
+    expected_kb = {"apollo510": 65536, "apollo510b": 65536}
     for soc in list_socs():
         if soc.family is SocFamily.AP5:
             assert soc.memory.psram_kb == expected_kb.get(soc.name, 32768)
