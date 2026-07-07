@@ -148,6 +148,72 @@ ambient conditions.
 
 A flat CSV of all power scalar metrics for spreadsheet ingest.
 
+## Dedicated power firmware
+
+PMU capture needs a host transport (`rtt`, `uart`, `swo`, or `usb_cdc`) to get
+per-layer counters off the target. That same transport, if still initialized
+during the power capture window, contaminates the current reading — measured
+on an Apollo510 EVB (KWS DS-CNN int8, TCM/TCM, LP 96 MHz, GCC):
+
+| Transport left active during capture | Current inflation vs. trusted baseline |
+|---|---|
+| UART | +17% (UART0-3 peripherals stay powered) |
+| SWO | +33% (debug power domain stays powered) |
+| USB CDC | +60% (PHY + enumeration) |
+
+Tearing the transport down at runtime right before the window only partially
+helps — pad/pinmux configuration residue still shifts the current draw.
+
+To eliminate this, heliaPROFILER renders the same firmware template a second
+time with `power_only=true` into `src/main_power.cc`. This build has no
+transport at all: the system debug transport is `NSX_DEBUG_NONE`, `hpx_printf`
+compiles to a no-op, and there is no RTT/UART/USB/SWO code in the binary. It
+does model init, warmup, a GPIO 3-wire lockstep sync, and the gated clean
+inference window, then parks. Both executables — `hpx_profiler` (PMU capture)
+and `hpx_profiler_power` (power capture) — build from one NSX/CMake project,
+adding about 0.2 s to incremental builds; the power binary is roughly 7.6%
+smaller than the transport-carrying one.
+
+During the power stage, hpx flashes `hpx_profiler_power` (via the
+NSX-generated per-target J-Link flash script) right before arming the gated
+capture, then runs the existing race-free arm → reset → `READY` → `GO`
+lockstep flow against it.
+
+With the dedicated binary, all four transports converge to the same power
+number — measured on the same Apollo510 EVB/model:
+
+| Transport used for the PMU phase | Current | Energy/inference |
+|---|---|---|
+| RTT | 3.679 mA | 140.79 µJ |
+| UART | 3.668 mA | 139.90 µJ |
+| SWO | 3.668 mA | 139.82 µJ |
+| USB CDC | 3.671 mA | 140.03 µJ |
+
+All four are within 0.3% of each other and within ~1% of the trusted legacy
+AutoDeploy baseline (138.7 µJ). This is controlled by `power.firmware`
+(default `dedicated`); `summary.json`'s `power.power_firmware` field records
+which mode produced the result.
+
+Because the dedicated binary's auto-sized clean window can run a different
+iteration count than the PMU phase (its warmup timing differs slightly
+without transport overhead), energy-per-inference is derived from the
+measured gate duration when the counts disagree by more than half an
+inference. When that happens, `summary.json` also sets
+`power.clean_infer_count_source: "derived_from_gate_duration"`.
+
+### Escape hatch: `shared` firmware
+
+```yaml
+power:
+  firmware: shared
+```
+
+or `--power-firmware shared`. This reverts to the pre-existing behavior of
+measuring current on the already-flashed transport binary — useful for
+bring-up or for reproducing historical numbers — but it carries the
+transport-dependent contamination described above. Prefer `dedicated`
+(the default) for any number you intend to report or compare across runs.
+
 ## TOPS / TOPS-per-Watt
 
 When power is enabled and the engine is heliaAOT, `summary.json` also
@@ -168,6 +234,7 @@ quantization schemes on the same hardware.
 | `sync_gpio_pin` | int | board default (`29` on `apollo510_evb` / `apollo510b_evb`) | GPIO pin the firmware toggles around inference |
 | `sync_input_index` | int | `0` | Joulescope digital INPUT channel wired to the sync GPIO (distinct from `sync_gpio_pin`) |
 | `stats_rate_hz` | int | `1000` | Host stats packet rate for gated capture; the device integrates charge/energy at full rate and reports per-packet integrals plus a spike-robust current/power distribution |
+| `firmware` | string | `dedicated` | `dedicated` flashes a transport-free `hpx_profiler_power` binary before capture (see [Dedicated power firmware](#dedicated-power-firmware)); `shared` reuses the already-flashed transport binary |
 
 ## Troubleshooting
 
@@ -187,3 +254,13 @@ quantization schemes on the same hardware.
 ??? failure "TOPS-per-Watt missing from summary"
     Only emitted for heliaAOT runs with power enabled. heliaRT/TFLM
     don't expose the MAC count needed for the TOPS calculation.
+
+??? failure "Power numbers differ between transports"
+    This should not happen with the default `power.firmware: dedicated` —
+    all transports converge to within ~0.3% on Apollo510 EVB testing. If
+    you still see transport-dependent drift, check whether
+    `power.firmware: shared` is set (explicitly or via `--power-firmware
+    shared`); `shared` measures the transport-carrying binary directly and
+    is expected to show the contamination described in
+    [Dedicated power firmware](#dedicated-power-firmware). Switch back to
+    `dedicated` for comparable numbers.

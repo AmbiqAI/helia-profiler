@@ -181,6 +181,7 @@ Compiler-launcher notes:
 | `sync_gpio_pin` | int | board default (`29` on `apollo510_evb` / `apollo510b_evb`) | GPIO pin for inference sync |
 | `sync_input_index` | int | `0` | Joulescope digital INPUT channel wired to the sync GPIO |
 | `stats_rate_hz` | int | `1000` | Host stats rate for gated power capture |
+| `firmware` | string | `dedicated` | `dedicated` flashes a transport-free power binary before capture; `shared` reuses the transport binary. See [Power](power.md#dedicated-power-firmware) |
 
 ### `output`
 
