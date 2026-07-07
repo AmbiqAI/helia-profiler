@@ -669,6 +669,75 @@ class TestGenerateApp:
         assert "nsx-interrupt" in nsx_yml
         assert "nsx::gpio" in cmake
 
+    def test_power_binary_generated_when_power_enabled(self, tmp_path: Path, fake_dist: Path):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb"},
+                "power": {"enabled": True},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        main_power_cc = (app_dir / "src" / "main_power.cc").read_text()
+        cmake = (app_dir / "CMakeLists.txt").read_text()
+        assert "hpx_profiler_power" in cmake
+        assert "nsx_finalize_app(hpx_profiler_power)" in cmake
+        assert "src/main_power.cc" in cmake
+        # power_only render never brings up a transport.
+        assert "SEGGER_RTT" not in main_power_cc
+        assert "nsx_uart_printf_enable();" not in main_power_cc
+        assert "nsx_itm_printf_enable();" not in main_power_cc
+
+    def test_power_binary_not_generated_when_power_disabled(
+        self, tmp_path: Path, fake_dist: Path
+    ):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        cmake = (app_dir / "CMakeLists.txt").read_text()
+        assert not (app_dir / "src" / "main_power.cc").exists()
+        assert "hpx_profiler_power" not in cmake
+
+    def test_power_binary_not_generated_when_firmware_shared(
+        self, tmp_path: Path, fake_dist: Path
+    ):
+        """WP3: power.firmware=shared skips the dedicated-binary render/build."""
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb"},
+                "power": {"enabled": True, "firmware": "shared"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        cmake = (app_dir / "CMakeLists.txt").read_text()
+        assert not (app_dir / "src" / "main_power.cc").exists()
+        assert "hpx_profiler_power" not in cmake
+
     def test_rtt_generation_flushes_cache_after_buffer_config(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)
         ResolvePlatformStage().run(ctx)
@@ -886,6 +955,124 @@ class TestBuildApp:
         assert sync_calls == [{"timeout_s": ctx.config.timeouts.configure_s, "verbose": 0}]
         assert out_build_dir == build_dir
         assert out_binary == binary
+
+    def test_power_enabled_builds_and_locates_power_binary(
+        self, tmp_path: Path, fake_dist: Path, monkeypatch
+    ):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb"},
+                "power": {"enabled": True},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        app_dir = tmp_path / "app"
+        build_dir = app_dir / "build" / "apollo510_evb"
+        build_dir.mkdir(parents=True, exist_ok=True)
+        binary = build_dir / "hpx_profiler.bin"
+        binary.write_bytes(b"bin")
+        power_binary = build_dir / "hpx_profiler_power.bin"
+        power_binary.write_bytes(b"powerbin")
+        object.__setattr__(ctx, "firmware_dir", app_dir)
+
+        build_calls: list[dict] = []
+
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.lock", lambda *a, **kw: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.sync", lambda *a, **kw: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.configure", lambda *a, **kw: None)
+        monkeypatch.setattr(
+            "helia_profiler.firmware.nsx_cli.build",
+            lambda *a, **kw: build_calls.append(kw),
+        )
+
+        out_build_dir, out_binary = build_app(ctx)
+
+        # One build() call for hpx_profiler (default target) and a second
+        # explicit call for hpx_profiler_power (same configure/module-sync).
+        assert len(build_calls) == 2
+        assert build_calls[0].get("target") is None
+        assert build_calls[1]["target"] == "hpx_profiler_power"
+        assert out_build_dir == build_dir
+        assert out_binary == binary
+        assert ctx.power_binary_path == power_binary
+
+    def test_power_disabled_does_not_build_power_target(
+        self, tmp_path: Path, fake_dist: Path, monkeypatch
+    ):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        app_dir = tmp_path / "app"
+        build_dir = app_dir / "build" / "apollo510_evb"
+        build_dir.mkdir(parents=True, exist_ok=True)
+        binary = build_dir / "hpx_profiler.bin"
+        binary.write_bytes(b"bin")
+        object.__setattr__(ctx, "firmware_dir", app_dir)
+
+        build_calls: list[dict] = []
+
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.lock", lambda *a, **kw: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.sync", lambda *a, **kw: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.configure", lambda *a, **kw: None)
+        monkeypatch.setattr(
+            "helia_profiler.firmware.nsx_cli.build",
+            lambda *a, **kw: build_calls.append(kw),
+        )
+
+        build_app(ctx)
+
+        assert len(build_calls) == 1
+        assert ctx.power_binary_path is None
+
+    def test_power_firmware_shared_does_not_build_power_target(
+        self, tmp_path: Path, fake_dist: Path, monkeypatch
+    ):
+        """WP3: power.firmware=shared skips the second hpx_profiler_power build."""
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb"},
+                "power": {"enabled": True, "firmware": "shared"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        app_dir = tmp_path / "app"
+        build_dir = app_dir / "build" / "apollo510_evb"
+        build_dir.mkdir(parents=True, exist_ok=True)
+        binary = build_dir / "hpx_profiler.bin"
+        binary.write_bytes(b"bin")
+        object.__setattr__(ctx, "firmware_dir", app_dir)
+
+        build_calls: list[dict] = []
+
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.lock", lambda *a, **kw: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.sync", lambda *a, **kw: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.configure", lambda *a, **kw: None)
+        monkeypatch.setattr(
+            "helia_profiler.firmware.nsx_cli.build",
+            lambda *a, **kw: build_calls.append(kw),
+        )
+
+        build_app(ctx)
+
+        assert len(build_calls) == 1
+        assert ctx.power_binary_path is None
 
 
 class TestFlashApp:

@@ -187,16 +187,25 @@ def build(
     app_dir: Path,
     *,
     toolchain: str | None = None,
+    target: str | None = None,
     timeout_s: int = _DEFAULT_BUILD_TIMEOUT_S,
     verbose: int = 0,
 ) -> None:
-    """Run ``nsx build`` on the given app directory."""
-    log.info("nsx build: %s (toolchain=%s)", app_dir, toolchain or "default")
+    """Run ``nsx build`` on the given app directory.
+
+    ``target`` defaults (via the underlying nsx API) to the CMake project
+    name — i.e. only ``hpx_profiler``. Pass an explicit target (e.g.
+    ``hpx_profiler_power``) to build additional executables from the same
+    NSX/CMake project without a second configure.
+    """
+    log.info("nsx build: %s (toolchain=%s, target=%s)", app_dir, toolchain or "default", target or "default")
     emit = emitter_for_verbosity(verbose)
     with _quiet_context(verbose):
         _translate(
             "nsx build",
-            lambda: nsx_api.build_app(app_dir, toolchain=toolchain, timeout_s=timeout_s, emit=emit),
+            lambda: nsx_api.build_app(
+                app_dir, toolchain=toolchain, target=target, timeout_s=timeout_s, emit=emit
+            ),
         )
 
 

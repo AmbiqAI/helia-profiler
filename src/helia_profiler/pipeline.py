@@ -64,6 +64,10 @@ class PipelineContext:
     build_dir: Path | None = None
     binary_path: Path | None = None
     binary_sections: BinarySections | None = None
+    #: Path to the dedicated transport-free power binary (hpx_profiler_power),
+    #: built alongside hpx_profiler only when config.power.enabled. WP3 wires
+    #: this into the power-capture flash/run path; this stage only exposes it.
+    power_binary_path: Path | None = None
 
     # Model analysis (stage: analyze_model — optional)
     model_analysis: ModelAnalysis | None = None
