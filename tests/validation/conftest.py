@@ -10,13 +10,13 @@ Responsibilities:
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
 from helia_profiler.validation import build_matrix
 from helia_profiler.validation.runner import CaseResult
+from helia_profiler.validation.report import write_validation_reports
 
 
 # ---------------------------------------------------------------------------
@@ -83,6 +83,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         type=float,
         default=900.0,
         help="Per-case timeout in seconds (default: 900).",
+    )
+    grp.addoption(
+        "--mlperf-suite",
+        default="",
+        help="Optional named validation suite selected by hpx validate.",
     )
 
 
@@ -171,65 +176,25 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     out_dir = Path(session.config.getoption("--mlperf-output")).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # JSON
-    (out_dir / "validation_report.json").write_text(
-        json.dumps(
-            {
-                "cases": [r.to_dict() for r in results],
-                "summary": _summary_stats(results),
-            },
-            indent=2,
-            default=str,
-        )
+    write_validation_reports(
+        results,
+        out_dir,
+        validation_options=_validation_options(session.config),
+        repo_root=Path(__file__).resolve().parents[2],
     )
 
-    # Markdown
-    (out_dir / "validation_report.md").write_text(_render_markdown(results))
-
-
-def _summary_stats(results: list[CaseResult]) -> dict[str, int]:
+def _validation_options(config: pytest.Config) -> dict[str, object]:
     return {
-        "total": len(results),
-        "pass": sum(1 for r in results if r.status == "pass"),
-        "fail": sum(1 for r in results if r.status == "fail"),
-        "skip": sum(1 for r in results if r.status == "skip"),
+        "suite": config.getoption("--mlperf-suite"),
+        "models": config.getoption("--mlperf-models"),
+        "engines": config.getoption("--mlperf-engines"),
+        "power": config.getoption("--mlperf-power"),
+        "boards": config.getoption("--mlperf-boards"),
+        "repeat": config.getoption("--mlperf-repeat"),
+        "toolchains": config.getoption("--mlperf-toolchains"),
+        "transports": config.getoption("--mlperf-transports"),
+        "memories": config.getoption("--mlperf-memories"),
+        "jlink_serials": config.getoption("--mlperf-jlink-serials"),
+        "output_dir": config.getoption("--mlperf-output"),
+        "timeout_s": config.getoption("--mlperf-timeout"),
     }
-
-
-def _render_markdown(results: list[CaseResult]) -> str:
-    stats = _summary_stats(results)
-    lines = [
-        "# heliaPROFILER — Hardware Validation Report",
-        "",
-        f"- total: **{stats['total']}**",
-        f"- pass: **{stats['pass']}**",
-        f"- fail: **{stats['fail']}**",
-        f"- skip: **{stats['skip']}**",
-        "",
-        "| Case | Status | Duration (s) | Toolchain | Interface | Memory | Layers | Cycles | Energy (µJ) | Avg (mA) | Peak (mA) | Notes |",
-        "|------|--------|-------------:|-----------|-----------|--------|-------:|-------:|------------:|---------:|----------:|-------|",
-    ]
-    for r in results:
-        status_badge = {
-            "pass": "✅ pass",
-            "fail": "❌ fail",
-            "skip": "⏭ skip",
-        }.get(r.status, r.status)
-        note = r.error or ""
-        lines.append(
-            "| {cid} | {st} | {dur:.1f} | {toolchain} | {transport} | {memory} | {layers} | {cyc} | {energy} | {avg} | {peak} | {note} |".format(
-                cid=r.case_id,
-                st=status_badge,
-                dur=r.duration_s,
-                toolchain=r.toolchain,
-                transport=r.transport,
-                memory=r.memory,
-                layers=r.layers if r.layers is not None else "-",
-                cyc=r.total_cycles if r.total_cycles is not None else "-",
-                energy=f"{r.energy_uj:.1f}" if r.energy_uj is not None else "-",
-                avg=f"{r.avg_current_ma:.2f}" if r.avg_current_ma is not None else "-",
-                peak=f"{r.peak_current_ma:.2f}" if r.peak_current_ma is not None else "-",
-                note=note.replace("|", r"\|") if note else "",
-            )
-        )
-    return "\n".join(lines) + "\n"

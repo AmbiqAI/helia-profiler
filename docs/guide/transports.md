@@ -39,6 +39,8 @@ clean.
 
 - J-Link probe connected via SWD to the target.
 - The same USB connection used for flashing — no extra cables.
+- SEGGER RTT source checkout available at `SEGGER_RTT_PATH` or in a common
+  local location such as repo-local `segger-rtt/`.
 
 ### How heliaPROFILER uses it
 

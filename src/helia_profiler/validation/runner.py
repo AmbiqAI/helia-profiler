@@ -149,6 +149,7 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
             "dir": str(output_dir),
             "model_explorer": False,
         },
+        "work_dir": str(output_dir / "work"),
     }
 
     if case.power:

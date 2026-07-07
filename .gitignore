@@ -35,6 +35,10 @@ hpx_*/
 experiments/
 results/
 
+# Local SEGGER RTT checkouts used by RTT firmware generation
+segger-rtt/
+RTT/
+
 # uv
 uv.lock
 site/

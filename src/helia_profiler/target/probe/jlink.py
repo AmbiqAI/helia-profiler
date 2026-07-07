@@ -26,6 +26,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import time
 from contextlib import AbstractContextManager
 
@@ -75,6 +76,10 @@ _EMU_LIST_RE = re.compile(
     r"\s*ProductName:\s*(?P<product>[^,]+)"
 )
 _FOUND_CORE_RE = re.compile(r"Found\s+Cortex-M(?P<core>\d+)", re.IGNORECASE)
+_JLINK_DLL_ENV_VARS = ("HPX_JLINK_DLL", "JLINK_DLL_PATH", "JLINKARM_DLL")
+_JLINK_WRAPPER_LIB_PATH_RE = re.compile(
+    r"(?:DYLD_LIBRARY_PATH|LD_LIBRARY_PATH)=['\"](?P<path>[^'\"]+)['\"]"
+)
 
 
 @dataclass(frozen=True)
@@ -534,7 +539,110 @@ def create_debug_memory_session() -> DebugMemorySession:
             "pylink-square package not installed (required for debug probe transports)",
             hint="pip install pylink-square",
         ) from exc
-    return pylink.JLink()
+    try:
+        return pylink.JLink()
+    except TypeError as exc:
+        msg = str(exc).lower()
+        if "dll" not in msg and "dylib" not in msg and "shared library" not in msg:
+            raise
+    jlink = _create_jlink_with_discovered_dll(pylink)
+    if jlink is not None:
+        return jlink
+
+    raise CaptureError(
+        "pylink could not load the SEGGER J-Link shared library.",
+        hint=(
+            "Install the SEGGER J-Link package in a standard location, or set "
+            "HPX_JLINK_DLL/JLINK_DLL_PATH to libjlinkarm.dylib. If using Nix, "
+            "ensure the JLinkExe wrapper is on PATH so hpx can discover its "
+            "DYLD_LIBRARY_PATH."
+        ),
+    )
+
+
+def _create_jlink_with_discovered_dll(pylink_module):
+    """Create ``pylink.JLink`` from a fallback DLL path, or return None.
+
+    Standard SEGGER installs are handled by ``pylink.JLink()`` above. This
+    fallback covers non-standard package managers (notably Nix on macOS) where
+    ``JLinkExe`` is a wrapper that sets DYLD_LIBRARY_PATH for itself but Python
+    cannot see the J-Link SDK library.
+    """
+    try:
+        from pylink import library as pylink_library
+    except ImportError:
+        return None
+
+    for path in _jlink_dll_candidates():
+        try:
+            lib = pylink_library.Library(str(path))
+            if lib.dll() is None:
+                continue
+            log.info("Using J-Link shared library for pylink: %s", path)
+            return pylink_module.JLink(lib=lib)
+        except (OSError, TypeError):
+            continue
+    return None
+
+
+def _jlink_dll_candidates() -> list[Path]:
+    """Return candidate J-Link SDK shared libraries in precedence order."""
+    candidates: list[Path] = []
+    for env_name in _JLINK_DLL_ENV_VARS:
+        raw = os.environ.get(env_name)
+        if raw:
+            candidates.append(Path(raw).expanduser())
+
+    candidates.extend(_jlink_dll_candidates_from_wrapper())
+    return _dedupe_existing_paths(candidates)
+
+
+def _jlink_dll_candidates_from_wrapper() -> list[Path]:
+    try:
+        exe = Path(find_jlink_exe())
+    except CaptureError:
+        return []
+
+    candidates: list[Path] = []
+    candidates.extend(_jlink_dlls_in_dir(exe.parent))
+
+    try:
+        text = exe.read_text(errors="ignore")
+    except OSError:
+        text = ""
+
+    for match in _JLINK_WRAPPER_LIB_PATH_RE.finditer(text):
+        for raw_dir in match.group("path").split(":"):
+            if raw_dir:
+                candidates.extend(_jlink_dlls_in_dir(Path(raw_dir).expanduser()))
+    return candidates
+
+
+def _jlink_dlls_in_dir(path: Path) -> list[Path]:
+    names: tuple[str, ...]
+    if sys.platform.startswith("darwin"):
+        names = ("libjlinkarm.dylib", "libjlinkarm*.dylib")
+    elif sys.platform.startswith("win"):
+        names = ("JLink_x64.dll", "JLinkARM.dll")
+    else:
+        names = ("libjlinkarm.so", "libjlinkarm.so.*")
+
+    found: list[Path] = []
+    for pattern in names:
+        found.extend(path.glob(pattern))
+    return found
+
+
+def _dedupe_existing_paths(paths: list[Path]) -> list[Path]:
+    out: list[Path] = []
+    seen: set[Path] = set()
+    for path in paths:
+        resolved = path.resolve()
+        if resolved in seen or not resolved.is_file():
+            continue
+        seen.add(resolved)
+        out.append(resolved)
+    return out
 
 
 def _pylink_module():

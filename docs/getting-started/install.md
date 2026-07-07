@@ -72,6 +72,7 @@ You need:
 
 - **JLinkExe** — flash firmware to the EVB
 - **`pylink-square`** — Python bindings used for RTT and SWO capture
+- **SEGGER RTT sources** — copied into generated RTT firmware
 
 Install `pylink-square` with your Python environment if you plan to use the
 default RTT transport or SWO:
@@ -79,6 +80,17 @@ default RTT transport or SWO:
 ```bash
 pip install pylink-square
 ```
+
+For local development, clone the RTT sources into the repo-local ignored
+`segger-rtt/` directory:
+
+```bash
+git clone https://github.com/SEGGERMicro/RTT.git segger-rtt
+```
+
+Alternatively, set `SEGGER_RTT_PATH` to a shared checkout. hpx also checks
+common local locations such as `./segger-rtt`, `./RTT`, `~/src/segger-rtt`,
+and `~/src/RTT`.
 
 ## neuralspotx (nsx)
 

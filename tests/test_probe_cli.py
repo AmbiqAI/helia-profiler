@@ -2,12 +2,17 @@ from __future__ import annotations
 
 from argparse import Namespace
 from types import SimpleNamespace
+import sys
 
 import pytest
 
 from helia_profiler.cli import inspect_cmds as cli
 from helia_profiler.errors import CaptureError
-from helia_profiler.target.probe.jlink import JLinkProbe, JLinkProbeMatch
+from helia_profiler.target.probe.jlink import (
+    JLinkProbe,
+    JLinkProbeMatch,
+    create_debug_memory_session,
+)
 from helia_profiler.platform import CoreArch
 
 
@@ -139,3 +144,65 @@ def test_probe_cli_reports_hpx_errors(monkeypatch, capsys) -> None:
 
     assert exc_info.value.code == 1
     assert "JLinkExe not found" in capsys.readouterr().err
+
+
+def test_create_debug_memory_session_uses_default_pylink_first(monkeypatch) -> None:
+    calls: list[str] = []
+
+    class FakeJLink:
+        def __init__(self, lib=None):
+            assert lib is None
+            calls.append("default")
+
+    fake_pylink = SimpleNamespace(JLink=FakeJLink)
+    monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
+
+    session = create_debug_memory_session()
+
+    assert isinstance(session, FakeJLink)
+    assert calls == ["default"]
+
+
+def test_create_debug_memory_session_falls_back_to_jlinkexe_wrapper_dll(
+    tmp_path, monkeypatch
+) -> None:
+    dll_dir = tmp_path / "JLink_V874"
+    dll_dir.mkdir()
+    if sys.platform.startswith("win"):
+        dll = dll_dir / "JLink_x64.dll"
+    elif sys.platform.startswith("darwin"):
+        dll = dll_dir / "libjlinkarm.dylib"
+    else:
+        dll = dll_dir / "libjlinkarm.so"
+    dll.write_bytes(b"fake")
+    wrapper = tmp_path / "JLinkExe"
+    wrapper.write_text(f"export DYLD_LIBRARY_PATH='{dll_dir}'\n")
+
+    loaded: list[str] = []
+
+    class FakeLibrary:
+        def __init__(self, path):
+            loaded.append(path)
+
+        def dll(self):
+            return object()
+
+    class FakeJLink:
+        def __init__(self, lib=None):
+            if lib is None:
+                raise TypeError("Expected to be given a valid DLL.")
+            self.lib = lib
+
+    fake_pylink = SimpleNamespace(
+        JLink=FakeJLink,
+        library=SimpleNamespace(Library=FakeLibrary),
+    )
+    monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
+    monkeypatch.setitem(sys.modules, "pylink.library", fake_pylink.library)
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.find_jlink_exe", lambda: str(wrapper))
+
+    session = create_debug_memory_session()
+
+    assert isinstance(session, FakeJLink)
+    assert session.lib is not None
+    assert loaded == [str(dll.resolve())]

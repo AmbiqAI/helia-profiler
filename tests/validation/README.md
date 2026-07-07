@@ -22,6 +22,17 @@ hpx validate -k kws-aot           # pytest keyword filter
 hpx validate --junit-xml report.xml --output-dir ./results/validation
 ```
 
+Local Mac smoke check with a connected board:
+
+```bash
+uv run hpx validate --list --suite smoke --boards apollo510_evb
+uv run hpx validate \
+    --suite smoke \
+    --boards apollo510_evb \
+    --power off \
+    --output-dir results/local-validation
+```
+
 Or drive pytest directly:
 
 ```bash
@@ -63,19 +74,29 @@ All artifacts land under `--output-dir` (default `./results/validation`):
 
 ```
 results/validation/
+├── validation_manifest.json            # portable bundle index for CI/dashboard consumers
 ├── validation_report.md                # human-readable pass/fail table
 ├── validation_report.json              # machine-readable full report
 └── <case_id>/                          # one subfolder per case
     ├── config.yml                      # generated hpx profile config
+    ├── work/                           # generated firmware/build state for this case
     ├── summary.json                    # raw hpx summary
     ├── profile_results.csv             # per-layer PMU CSV
+    ├── run_metadata.json               # config, git/model/toolchain/platform metadata
     ├── aot_operator_manifest.json      # AOT cases only
+    ├── hpx_profile.log                 # full child command/stdout/stderr
     ├── hpx_stdout.log
     └── hpx_stderr.log
 ```
 
 `case_id` format: `<board>-<model>-<engine>-<toolchain>-<interface>-<memory>[-power][-runNN]`
 (e.g. `apollo510_evb-kws-aot-arm-none-eabi-gcc-rtt-auto-run02`).
+
+`validation_manifest.json` contains schema version, generation time, hpx
+version, best-effort git metadata, selected validation options, summary counts,
+and per-case relative artifact paths. Relative paths let the same bundle work
+locally, in downloaded GitHub Actions artifacts, and in future dashboard
+publishing.
 
 ## Assertions per case
 
