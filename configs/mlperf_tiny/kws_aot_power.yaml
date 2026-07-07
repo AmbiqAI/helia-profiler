@@ -1,0 +1,49 @@
+# KWS (DS-CNN int8) on Apollo510 EVB via heliaAOT — PMU + Joulescope power capture.
+#
+# Same axis as kws_rt_power.yaml (GCC / RTT / TCM/TCM placement / LP clock /
+# extended iterations+duration) so the two engines are directly comparable
+# to each other and to the AutoDeploy baseline row (Latest_AI_Results.xlsx,
+# Results!KWS, apollo510b_evb, gcc, TCM/TCM, LP = 96 MHz: 138.71 uJ/inf).
+model:
+  path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
+  arena_size: 32768
+  model_location: tcm
+
+engine:
+  type: helia-aot
+  config:
+    prefix: hpx
+    module_name: hpx_model
+
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+  jlink_serial: "1160002204"
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+    mve: default
+    memory: default
+  per_layer: true
+  iterations: 200
+  warmup: 10
+  aggregation: median
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+
+output:
+  format: json
+  dir: ./results/mlperf_tiny/kws_aot_power
+  model_explorer: false
+  detailed: true
+
+keep_work_dir: true
