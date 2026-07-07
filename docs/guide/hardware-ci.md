@@ -1,9 +1,9 @@
 # Hardware Validation Artifacts
 
 `hpx validate` is the local-first entry point for hardware profiling suites.
-Run it from a developer machine with boards attached first; a later
-self-hosted GitHub Actions runner should execute the same command and upload
-the same output directory.
+Run it from a developer machine with boards attached first. The manual
+`Hardware Validation` GitHub Actions workflow runs the same command on a
+self-hosted runner and uploads the same output directory.
 
 ## Local smoke run
 
@@ -89,11 +89,64 @@ The initial schema includes:
 Git metadata is best-effort. Missing git, source archives, or non-repository
 directories do not fail validation report generation.
 
-## Future CI usage
+## Manual GitHub Actions workflow
 
-A self-hosted GitHub Actions workflow should run the same `hpx validate`
-command after installing toolchains, fetching LFS fixtures, and confirming the
-runner has board, J-Link, and optional Joulescope access. The workflow should
-upload the whole validation output directory as an artifact; baseline
-comparison and dashboards should consume `validation_manifest.json` rather
-than infer paths.
+The repository includes a manually triggered `Hardware Validation` workflow.
+It runs on self-hosted runners labeled:
+
+```text
+self-hosted
+hpx-hardware
+```
+
+Use this label for a machine that has HPX-compatible hardware attached. For
+the first bench, label the local Mac runner with `hpx-hardware` and attach the
+Apollo510 EVB. When an Apollo330 board is available, select its board ID in the
+workflow input; no new workflow is required.
+
+The workflow exposes only the core validation inputs:
+
+- `suite`: `smoke`, `models-rt`, or `models-aot`
+- `boards`: comma-separated board IDs, default `apollo510_evb`
+- `power`: `off`, `on`, or `both`
+- `jlink_serials`: optional comma-separated `board=serial` entries
+- `repeat`: repeat count per selected case
+- `timeout`: per-case timeout in seconds
+
+Default inputs run the same smoke shape as the local command:
+
+```bash
+uv run hpx validate \
+  --suite smoke \
+  --boards apollo510_evb \
+  --power off \
+  --output-dir results/validation \
+  --junit-xml results/validation/junit.xml
+```
+
+Before the real run, the workflow installs test dependencies, fetches Git LFS
+fixtures, runs `hpx doctor`, and previews the selected cases with
+`hpx validate --list`. The validation output directory is uploaded with
+`actions/upload-artifact` even if the hardware run fails, so logs and partial
+case artifacts are still available for debugging.
+
+The runner must already provide:
+
+- supported EVB access for the selected `boards` input
+- SEGGER J-Link access, including `JLinkExe` and `pylink-square`
+- ARM toolchain, CMake, Ninja, and NSX on `PATH`
+- SEGGER RTT sources through `SEGGER_RTT_PATH` or a discovered checkout
+- Git LFS support for model fixtures
+- optional Joulescope access and wiring when `power` is `on` or `both`
+
+Use explicit `jlink_serials` on runners with more than one probe attached, for
+example:
+
+```text
+apollo510_evb=1160002204
+```
+
+The workflow serializes runs by the selected board string so two manual jobs do
+not intentionally target the same board selection at once. Baseline comparison,
+threshold enforcement, and dashboards should consume `validation_manifest.json`
+later rather than infer paths from the artifact layout.
