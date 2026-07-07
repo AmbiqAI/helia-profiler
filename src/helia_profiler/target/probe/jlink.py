@@ -542,9 +542,9 @@ def create_debug_memory_session() -> DebugMemorySession:
     try:
         return pylink.JLink()
     except TypeError as exc:
-        if "valid DLL" not in str(exc):
+        msg = str(exc).lower()
+        if "dll" not in msg and "dylib" not in msg and "shared library" not in msg:
             raise
-
     jlink = _create_jlink_with_discovered_dll(pylink)
     if jlink is not None:
         return jlink
