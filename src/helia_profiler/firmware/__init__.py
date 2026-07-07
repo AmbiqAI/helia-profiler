@@ -182,8 +182,9 @@ def _resolve_compiler_launcher(config: "ProfileConfig") -> str | None:
 def _find_segger_rtt_dir() -> Path:
     """Locate the SEGGER RTT source directory.
 
-    The ``SEGGER_RTT_PATH`` environment variable must point to the root
-    directory of a SEGGER RTT source checkout (the folder containing
+    ``SEGGER_RTT_PATH`` takes precedence when set. Otherwise, hpx checks a
+    small set of common local checkout locations. The path must point to the
+    root directory of a SEGGER RTT source checkout (the folder containing
     ``RTT/`` and ``Config/`` subdirs).
 
     Returns the validated path.
@@ -191,20 +192,54 @@ def _find_segger_rtt_dir() -> Path:
     env_path = os.environ.get("SEGGER_RTT_PATH")
     if env_path:
         p = Path(env_path)
-        if (p / "RTT" / "SEGGER_RTT.c").exists():
+        if _is_segger_rtt_root(p):
             return p
         raise FirmwareError(
             f"SEGGER_RTT_PATH={env_path} does not contain RTT/SEGGER_RTT.c",
             hint="Set SEGGER_RTT_PATH to the root dir containing RTT/ and Config/ subdirs.",
         )
 
+    for candidate in _segger_rtt_candidates():
+        if _is_segger_rtt_root(candidate):
+            resolved = candidate.expanduser().resolve()
+            log.info("Auto-detected SEGGER RTT source at %s", resolved)
+            return resolved
+
     raise FirmwareError(
-        "SEGGER RTT source files not found — SEGGER_RTT_PATH is not set.",
+        "SEGGER RTT source files not found.",
         hint=(
-            "Clone the SEGGER RTT sources and set the environment variable:\n"
-            "  git clone https://github.com/SEGGERMicro/RTT.git /path/to/segger-rtt\n"
-            "  export SEGGER_RTT_PATH=/path/to/segger-rtt"
+            "Clone the SEGGER RTT sources into a common local path, or set "
+            "SEGGER_RTT_PATH explicitly:\n"
+            "  git clone https://github.com/SEGGERMicro/RTT.git ~/src/segger-rtt\n"
+            "  export SEGGER_RTT_PATH=~/src/segger-rtt"
         ),
+    )
+
+
+def _segger_rtt_candidates() -> tuple[Path, ...]:
+    """Return deterministic local paths that may contain SEGGER RTT sources."""
+    repo_root = Path(__file__).resolve().parents[3]
+    cwd = Path.cwd()
+    home = Path.home()
+    return (
+        repo_root / "RTT",
+        repo_root / "segger-rtt",
+        repo_root / "examples" / "quickstart" / "RTT",
+        cwd / "RTT",
+        cwd / "segger-rtt",
+        cwd / "examples" / "quickstart" / "RTT",
+        home / "src" / "segger-rtt",
+        home / "src" / "RTT",
+        home / "SEGGER" / "RTT",
+    )
+
+
+def _is_segger_rtt_root(path: Path) -> bool:
+    root = path.expanduser()
+    return (
+        (root / "RTT" / "SEGGER_RTT.c").is_file()
+        and (root / "RTT" / "SEGGER_RTT.h").is_file()
+        and (root / "Config" / "SEGGER_RTT_Conf.h").is_file()
     )
 
 

@@ -124,6 +124,7 @@ nav:
       - Power Measurement: guide/power.md
       - Model Explorer Overlays: guide/model-explorer.md
       - Output & Results: guide/output.md
+      - Hardware Validation Artifacts: guide/hardware-ci.md
   - Examples:
       - Overview: examples/index.md
       - Basic Profiling: examples/basic-profiling.md

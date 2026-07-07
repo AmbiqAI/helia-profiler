@@ -51,10 +51,12 @@ def test_mlperf_tiny_case(
     # cleanly instead of as a cryptic pipeline error.
     fixture = repo_root / case.model.fixture_path
     if not fixture.exists() or fixture.stat().st_size < 1024:
-        pytest.skip(
+        reason = (
             f"fixture missing / LFS not fetched: {fixture} "
             f"(run `git lfs pull` in the helia-profiler checkout)"
         )
+        results_accumulator.append(_skip_result(case, reason))
+        pytest.skip(reason)
 
     reason = case_validity(case)
     if reason:

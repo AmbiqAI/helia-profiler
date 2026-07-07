@@ -119,6 +119,7 @@ class TestSuiteSmoke:
         assert value_of("--mlperf-toolchains") == "arm-none-eabi-gcc"
         assert value_of("--mlperf-transports") == "rtt"
         assert value_of("--mlperf-memories") == "auto"
+        assert value_of("--mlperf-suite") == "smoke"
 
     def test_explicit_axis_wins_over_smoke_default(self, monkeypatch, tmp_path):
         args = self._captured_pytest_args(

@@ -39,6 +39,8 @@ def test_build_config_includes_reliability_axes(tmp_path: Path):
     assert cfg["target"]["jlink_serial"] == "1160001481"
     assert cfg["model"]["model_location"] == "sram"
     assert cfg["power"]["enabled"] is False
+    assert cfg["output"]["dir"] == str(output_dir)
+    assert cfg["work_dir"] == str(output_dir / "work")
 
 
 def test_build_config_aot_prefers_explicit_cmsis_nn_env(

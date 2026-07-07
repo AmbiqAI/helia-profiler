@@ -225,6 +225,8 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         "--mlperf-timeout",
         str(args.timeout),
     ]
+    if suite:
+        pytest_args += ["--mlperf-suite", suite]
     if args.models.strip():
         pytest_args += ["--mlperf-models", args.models.strip()]
     if engines_csv:

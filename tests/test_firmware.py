@@ -12,6 +12,7 @@ from helia_profiler.config import load_config
 from helia_profiler.errors import FirmwareError
 from helia_profiler.firmware import (
     _board_module_name,
+    _find_segger_rtt_dir,
     _model_to_header,
     _resolve_module_list,
     _resolve_module_specs,
@@ -220,6 +221,49 @@ def fake_segger_rtt_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     (rtt_dir / "SEGGER_RTT_ConfDefaults.h").write_text("// fake RTT conf defaults\n")
     (config_dir / "SEGGER_RTT_Conf.h").write_text("// fake RTT config\n")
     monkeypatch.setenv("SEGGER_RTT_PATH", str(rtt_root))
+
+
+def _make_fake_rtt_root(path: Path) -> Path:
+    rtt_dir = path / "RTT"
+    config_dir = path / "Config"
+    rtt_dir.mkdir(parents=True)
+    config_dir.mkdir()
+    (rtt_dir / "SEGGER_RTT.c").write_text("// fake RTT source\n")
+    (rtt_dir / "SEGGER_RTT.h").write_text("// fake RTT header\n")
+    (config_dir / "SEGGER_RTT_Conf.h").write_text("// fake RTT config\n")
+    return path
+
+
+def test_find_segger_rtt_dir_prefers_explicit_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    explicit = _make_fake_rtt_root(tmp_path / "explicit")
+    auto = _make_fake_rtt_root(tmp_path / "auto")
+    monkeypatch.setenv("SEGGER_RTT_PATH", str(explicit))
+    monkeypatch.setattr("helia_profiler.firmware._segger_rtt_candidates", lambda: (auto,))
+
+    assert _find_segger_rtt_dir() == explicit
+
+
+def test_find_segger_rtt_dir_auto_detects_common_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    candidate = _make_fake_rtt_root(tmp_path / "examples" / "quickstart" / "RTT")
+    monkeypatch.delenv("SEGGER_RTT_PATH", raising=False)
+    monkeypatch.setattr("helia_profiler.firmware._segger_rtt_candidates", lambda: (candidate,))
+
+    assert _find_segger_rtt_dir() == candidate.resolve()
+
+
+def test_find_segger_rtt_dir_rejects_invalid_explicit_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    invalid = tmp_path / "not-rtt"
+    invalid.mkdir()
+    auto = _make_fake_rtt_root(tmp_path / "auto")
+    monkeypatch.setenv("SEGGER_RTT_PATH", str(invalid))
+    monkeypatch.setattr("helia_profiler.firmware._segger_rtt_candidates", lambda: (auto,))
+
+    with pytest.raises(FirmwareError, match="SEGGER_RTT_PATH"):
+        _find_segger_rtt_dir()
 
 
 def _make_ctx(
