@@ -364,6 +364,12 @@ def capture_power(
                 stats_rate_hz=ctx.config.power.stats_rate_hz,
                 clean_infer_count=clean_count,
                 on_started=_release,
+                # Drop GO the instant the gate is observed high: a GPO held
+                # high through the measured window backfeeds the target via
+                # the GO pad network (AP510 EVB: ~5.8 mA), displacing real
+                # supply current around the shunt. The firmware only
+                # level-samples GO before the window, so this is lossless.
+                on_gate_rise=sync.release_go,
             )
             if prepare_error:
                 raise prepare_error[0]

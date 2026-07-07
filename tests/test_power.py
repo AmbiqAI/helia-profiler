@@ -180,6 +180,40 @@ class TestGatedStatsProcessing:
         assert windows == []
         assert summary.sample_count == 0
 
+    def test_net_negative_gated_current_raises(self):
+        """Backfeed/reversed-wiring corruption must fail loudly, not abs()."""
+        from helia_profiler.errors import PowerError
+        from helia_profiler.power.joulescope.stats import _process_gated_stats
+
+        ms = _SECOND // 1000
+        packets = [
+            self._packet(i * ms, (i + 1) * ms, -0.0001, 0.00018, 0.12)
+            for i in range(20)
+        ]
+        poll_samples = [(0, 0), (5 * ms, 1), (15 * ms, 0)]
+
+        with pytest.raises(PowerError, match="net NEGATIVE"):
+            _process_gated_stats(
+                packets=packets, poll_samples=poll_samples, io_voltage=1.8
+            )
+
+    def test_net_negative_gated_current_env_escape_hatch(self, monkeypatch):
+        from helia_profiler.power.joulescope.stats import _process_gated_stats
+
+        monkeypatch.setenv("HPX_POWER_ALLOW_NEGATIVE", "1")
+        ms = _SECOND // 1000
+        packets = [
+            self._packet(i * ms, (i + 1) * ms, -0.0001, 0.00018, 0.12)
+            for i in range(20)
+        ]
+        poll_samples = [(0, 0), (5 * ms, 1), (15 * ms, 0)]
+
+        windows, summary = _process_gated_stats(
+            packets=packets, poll_samples=poll_samples, io_voltage=1.8
+        )
+        assert len(windows) == 1
+        assert summary.avg_current_a == pytest.approx(0.1, rel=1e-6)
+
     def test_gated_diagnostics_separates_selected_packets(self):
         from helia_profiler.power.joulescope.diagnostics import _gated_stats_diagnostics
 
@@ -999,6 +1033,10 @@ class TestCapturePowerWrapper:
         gated = dict(called["capture_gated"])
         on_started = gated.pop("on_started")
         assert callable(on_started)
+        # GO backfeed fix: the gate-rise hook must be wired so the GO line is
+        # dropped as soon as the window is observed high.
+        on_gate_rise = gated.pop("on_gate_rise")
+        assert callable(on_gate_rise)
         assert gated == {
             "duration_s": 7.0,
             "io_voltage": 1.8,
@@ -1049,6 +1087,9 @@ class TestCapturePowerWrapper:
 
             def signal_go(self):
                 calls.append("go")
+
+            def release_go(self):
+                calls.append("release_go")
 
             def read_state(self):
                 raise AssertionError("read_state should not be called on ready path")
@@ -1149,6 +1190,9 @@ class TestCapturePowerWrapper:
 
             def signal_go(self):  # pragma: no cover - unreachable
                 raise AssertionError("signal_go should not be reached")
+
+            def release_go(self):  # pragma: no cover - unreachable
+                raise AssertionError("release_go should not be reached")
 
             def read_state(self):  # pragma: no cover - unreachable
                 raise AssertionError("read_state should not be reached")
