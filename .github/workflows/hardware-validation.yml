@@ -65,10 +65,8 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+      - name: Install Python
+        run: uv python install 3.11
 
       - name: Configure GitHub auth (higher API rate limits)
         env:
@@ -79,7 +77,7 @@ jobs:
             "https://github.com/"
 
       - name: Install test dependencies
-        run: uv sync --group test
+        run: uv sync --python 3.11 --group test
 
       - name: Fetch LFS fixtures
         run: git lfs pull
