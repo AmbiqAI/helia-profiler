@@ -29,6 +29,7 @@ def _profile_args(**overrides):
         warmup=None,
         power=False,
         power_driver=None,
+        power_firmware=None,
         power_mode=None,
         power_duration=None,
         sync_gpio=None,
@@ -67,6 +68,25 @@ def test_profile_cli_forwards_rtt_buffer_size(monkeypatch) -> None:
 
     assert seen["overrides"] == {
         "target": {"rtt_buffer_size_up": 16384},
+        "verbose": False,
+    }
+
+
+def test_profile_cli_forwards_power_firmware(monkeypatch) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_load_config(path, overrides):
+        seen["path"] = path
+        seen["overrides"] = overrides
+        return SimpleNamespace(verbose=False)
+
+    monkeypatch.setattr("helia_profiler.config.load_config", fake_load_config)
+    monkeypatch.setattr("helia_profiler.api.profile", lambda config: None)
+
+    cli._cmd_profile(_profile_args(power=True, power_firmware="shared"))
+
+    assert seen["overrides"] == {
+        "power": {"enabled": True, "firmware": "shared"},
         "verbose": False,
     }
 

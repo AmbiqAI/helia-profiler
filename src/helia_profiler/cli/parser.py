@@ -17,7 +17,7 @@ from ..placement import ModelLocation, Placement
 
 def build_parser() -> argparse.ArgumentParser:
     """Construct the top-level ``hpx`` argument parser."""
-    from ..config import AGGREGATION_METHODS, Transport
+    from ..config import AGGREGATION_METHODS, POWER_FIRMWARE_MODES, Transport
     from ..target.lifecycle import ResetStrategy
 
     parser = argparse.ArgumentParser(
@@ -28,7 +28,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command")
 
     _add_profile_subparser(
-        sub, Transport=Transport, AGGREGATION_METHODS=AGGREGATION_METHODS, ResetStrategy=ResetStrategy
+        sub,
+        Transport=Transport,
+        AGGREGATION_METHODS=AGGREGATION_METHODS,
+        ResetStrategy=ResetStrategy,
+        POWER_FIRMWARE_MODES=POWER_FIRMWARE_MODES,
     )
     _add_doctor_subparser(sub)
     _add_analyze_subparser(sub)
@@ -45,7 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _add_profile_subparser(sub, *, Transport, AGGREGATION_METHODS, ResetStrategy):
+def _add_profile_subparser(sub, *, Transport, AGGREGATION_METHODS, ResetStrategy, POWER_FIRMWARE_MODES):
     """Build the ``hpx profile`` subparser."""
     p_profile = sub.add_parser(
         "profile",
@@ -67,7 +71,9 @@ def _add_profile_subparser(sub, *, Transport, AGGREGATION_METHODS, ResetStrategy
     _add_profile_target_args(p_profile, Transport=Transport)
     _add_profile_build_args(p_profile)
     _add_profile_pmu_args(p_profile, AGGREGATION_METHODS=AGGREGATION_METHODS)
-    _add_profile_power_args(p_profile, ResetStrategy=ResetStrategy)
+    _add_profile_power_args(
+        p_profile, ResetStrategy=ResetStrategy, POWER_FIRMWARE_MODES=POWER_FIRMWARE_MODES
+    )
     _add_profile_output_args(p_profile)
     _add_profile_advanced_args(p_profile)
     return p_profile
@@ -271,7 +277,7 @@ def _add_profile_pmu_args(p_profile: argparse.ArgumentParser, *, AGGREGATION_MET
     )
 
 
-def _add_profile_power_args(p_profile: argparse.ArgumentParser, *, ResetStrategy) -> None:
+def _add_profile_power_args(p_profile: argparse.ArgumentParser, *, ResetStrategy, POWER_FIRMWARE_MODES) -> None:
     """Build the ``hpx profile power`` subparser."""
     # -- Power measurement --
     g_power = p_profile.add_argument_group("power measurement")
@@ -289,6 +295,17 @@ def _add_profile_power_args(p_profile: argparse.ArgumentParser, *, ResetStrategy
         help="Power mode (default: external)",
     )
     g_power.add_argument("--power-duration", type=int, help="Power capture seconds (default: 30)")
+    g_power.add_argument(
+        "--power-firmware",
+        choices=list(POWER_FIRMWARE_MODES),
+        help=(
+            "Which binary is on target during power capture (default: "
+            "dedicated). 'dedicated' flashes the transport-free "
+            "hpx_profiler_power image to avoid SWO/UART/RTT/USB current "
+            "contamination (+17%%/+33%%/+60%% measured on AP510); 'shared' "
+            "reuses the already-flashed transport binary."
+        ),
+    )
     g_power.add_argument(
         "--power-reset-strategy",
         choices=[strategy.value for strategy in ResetStrategy],

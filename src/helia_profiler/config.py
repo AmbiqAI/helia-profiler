@@ -116,6 +116,17 @@ DEFAULT_PMU_PRESETS = ("basic_cpu",)
 DEFAULT_POWER_DURATION_S = 30
 DEFAULT_IO_VOLTAGE = 1.8
 DEFAULT_POWER_DRIVER = "joulescope"
+# Which binary is on the target during power capture. "dedicated" flashes the
+# transport-free hpx_profiler_power image (see firmware/__init__.py WP2)
+# before capture; SWO/UART/RTT/USB traffic on the shared transport binary was
+# measured to add +17%/+33%/+60% current contamination into the GPIO-gated
+# Joulescope window on AP510 depending on transport, so "dedicated" is the
+# default. "shared" restores the pre-WP2 behavior of reusing the
+# already-flashed transport binary for power capture (useful when no J-Link
+# is free to reflash, or for bring-up comparisons against the contaminated
+# baseline).
+POWER_FIRMWARE_MODES = ("dedicated", "shared")
+DEFAULT_POWER_FIRMWARE = "dedicated"
 DEFAULT_POWER_MODE = PowerMode.EXTERNAL
 DEFAULT_POWER_SYNC_INPUT_INDEX = 0
 # 3-wire lock-step sync: extra host-side digital channels. gate=INPUT0,
@@ -395,6 +406,10 @@ class PowerConfig:
 
     enabled: bool = False
     driver: str = DEFAULT_POWER_DRIVER
+    # "dedicated" flashes hpx_profiler_power (transport-free) before capture;
+    # "shared" reuses the already-flashed transport binary. See
+    # POWER_FIRMWARE_MODES above for the +17/+33/+60% contamination rationale.
+    firmware: str = DEFAULT_POWER_FIRMWARE
     mode: PowerMode = DEFAULT_POWER_MODE
     # ``None`` means "not explicitly set": consumers use
     # DEFAULT_POWER_DURATION_S and may auto-tune the bound from PMU-phase
@@ -444,6 +459,11 @@ class PowerConfig:
             raise ValueError(f"power.stats_rate_hz must be >= 1, got {self.stats_rate_hz}.")
         if self.lockstep and (self.state_gpio_pin <= 0 or self.go_gpio_pin <= 0):
             raise ValueError("power.lockstep requires both state_gpio_pin and go_gpio_pin > 0.")
+        if self.firmware not in POWER_FIRMWARE_MODES:
+            raise ValueError(
+                f"Unknown power.firmware '{self.firmware}'. "
+                f"Choose one of: {', '.join(POWER_FIRMWARE_MODES)}."
+            )
 
 
 @dataclass(frozen=True)
@@ -683,6 +703,7 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
         power=PowerConfig(
             enabled=power_d.get("enabled", False),
             driver=power_d.get("driver", DEFAULT_POWER_DRIVER),
+            firmware=power_d.get("firmware", DEFAULT_POWER_FIRMWARE),
             mode=power_d.get("mode", DEFAULT_POWER_MODE),
             duration_s=(int(power_d["duration_s"]) if "duration_s" in power_d else None),
             io_voltage=power_d.get("io_voltage", DEFAULT_IO_VOLTAGE),

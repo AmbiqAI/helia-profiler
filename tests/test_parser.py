@@ -121,6 +121,43 @@ def test_clean_infer_timing_metadata():
     assert result.meta.clean_infer_avg_us == 21
 
 
+def test_clean_infer_count_falls_back_to_announced_iters():
+    """The authoritative HPX_CLEAN_INFER_COUNT line prints right after the
+    transport peripheral is re-enabled post-window and can be lost on lossy
+    transports (observed on SWO: ITM re-sync dropped the whole result block,
+    silently downgrading power capture to the ungated whole-capture path).
+    The clean_window_begin heartbeat announces the same count BEFORE the
+    window while the transport is reliably alive — it must serve as the
+    fallback."""
+    lines = _wrap_session({"presets": "basic_cpu"}, [
+        _make_preset_block(
+            "basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]]
+        )
+    ])
+    # Inject the heartbeat inside the session, no HPX_CLEAN_INFER_COUNT line.
+    lines.insert(1, "HPX_HEARTBEAT phase=clean_window_begin iters=236 est_ms=4980")
+
+    result = parse_firmware_output(lines)
+
+    assert result.meta.clean_infer_count == 236
+
+
+def test_clean_infer_count_authoritative_line_wins_over_heartbeat():
+    lines = _wrap_session(
+        {"presets": "basic_cpu", "clean_infer_count": "5"},
+        [
+            _make_preset_block(
+                "basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]]
+            )
+        ],
+    )
+    lines.insert(1, "HPX_HEARTBEAT phase=clean_window_begin iters=236 est_ms=4980")
+
+    result = parse_firmware_output(lines)
+
+    assert result.meta.clean_infer_count == 5
+
+
 def test_system_clock_hz_metadata():
     lines = _wrap_session(
         {"presets": "basic_cpu", "system_clock_hz": "48000000"},

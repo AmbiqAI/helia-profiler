@@ -424,6 +424,37 @@ class TestPowerConfig:
         assert config.power.driver == "joulescope"
         assert config.power.mode == "external"
         assert config.power.sync_gpio_pin == 29
+        assert config.power.firmware == "dedicated"
+
+    def test_power_firmware_yaml_round_trip(self, tmp_path: Path):
+        from helia_profiler.config import load_config
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {"enabled": True, "firmware": "shared"},
+            },
+        )
+        assert config.power.firmware == "shared"
+
+    def test_power_firmware_invalid_value_raises(self, tmp_path: Path):
+        from helia_profiler.config import load_config
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        with pytest.raises(ValueError, match="power.firmware"):
+            load_config(
+                None,
+                {
+                    "model": {"path": str(model)},
+                    "engine": {"type": "helia-rt"},
+                    "power": {"firmware": "bogus"},
+                },
+            )
 
     def test_default_sync_gpio_pin_uses_board_metadata(self, tmp_path: Path):
         from helia_profiler.config import load_config
@@ -1231,6 +1262,170 @@ class TestCapturePowerWrapper:
             capture_power(ctx, duration_override_s=7.0, prepare_target=prepare_target)
 
         assert calls == ["check", "make_sync", "arm", "capture_gated", "prepare", "release"]
+
+
+class TestPowerFirmwareSelection:
+    """WP3: flashing the dedicated power binary before gated power capture."""
+
+    def _make_ctx(self, tmp_path: Path, *, firmware: str, transport: str = "rtt"):
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.results import FirmwareMeta, PmuResult
+        from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "target": {"board": "apollo510_evb", "transport": transport},
+                "power": {
+                    "enabled": True,
+                    "driver": "joulescope-js110",
+                    "firmware": firmware,
+                    "sync_input_index": 0,
+                },
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ResolvePlatformStage().run(ctx)
+        ctx.resolved_jlink_serial = "1160002204"
+        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[])
+        return ctx
+
+    class _FakeDriver:
+        supports_gated_capture = True
+
+        def __init__(self, calls: list[str]):
+            self._calls = calls
+
+        def check_available(self):
+            self._calls.append("check")
+
+        def capture_gated(self, **kwargs):
+            self._calls.append("capture_gated")
+            kwargs["on_started"]()
+            return PowerResult(summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6))
+
+        def capture(self, **kwargs):  # pragma: no cover - gated path used
+            return PowerResult(summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6))
+
+    def test_dedicated_flashes_power_binary_before_capture_gated(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.capture import capture_power
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        power_bin = tmp_path / "hpx_profiler_power"
+        power_bin.write_bytes(b"\x00")
+        ctx.power_binary_path = power_bin
+
+        calls: list[str] = []
+        flash_calls: list[dict] = []
+
+        monkeypatch.setattr(
+            "helia_profiler.power.get_driver", lambda *a, **k: self._FakeDriver(calls)
+        )
+
+        def fake_flash_binary(binary_path, **kwargs):
+            flash_calls.append({"binary_path": binary_path, **kwargs})
+            calls.append("flash")
+
+        monkeypatch.setattr("helia_profiler.target.probe.jlink.flash_binary", fake_flash_binary)
+
+        result = capture_power(ctx, duration_override_s=7.0)
+
+        # Flash happens before capture_gated is armed -- ordering contract:
+        # flash (its own reset+free-run) precedes arm/capture_gated, which
+        # itself still resets race-free inside on_started (PR#27 ordering
+        # unchanged).
+        assert calls == ["check", "flash", "capture_gated"]
+        assert flash_calls[0]["binary_path"] == power_bin
+        assert flash_calls[0]["jlink_serial"] == "1160002204"
+        assert result.metadata["power_firmware"] == "dedicated"
+
+    def test_shared_mode_does_not_flash_and_uses_dtr_holder_for_usb_cdc(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.capture import capture_power
+
+        ctx = self._make_ctx(tmp_path, firmware="shared", transport="usb_cdc")
+        # Even if a power binary happens to be present, shared mode must not
+        # touch it.
+        power_bin = tmp_path / "hpx_profiler_power"
+        power_bin.write_bytes(b"\x00")
+        ctx.power_binary_path = power_bin
+
+        calls: list[str] = []
+        flash_calls: list[dict] = []
+        dtr_calls: list[str] = []
+
+        monkeypatch.setattr(
+            "helia_profiler.power.get_driver", lambda *a, **k: self._FakeDriver(calls)
+        )
+        monkeypatch.setattr(
+            "helia_profiler.target.probe.jlink.flash_binary",
+            lambda *a, **k: flash_calls.append({}),
+        )
+
+        class FakeDtrHolder:
+            def __init__(self, **kwargs):
+                dtr_calls.append("init")
+
+            def open(self):
+                dtr_calls.append("open")
+
+            def close(self):
+                dtr_calls.append("close")
+
+        monkeypatch.setattr("helia_profiler.capture._UsbDtrHolder", FakeDtrHolder)
+
+        result = capture_power(ctx, duration_override_s=7.0)
+
+        assert flash_calls == []
+        assert dtr_calls == ["init", "open", "close"]
+        assert result.metadata["power_firmware"] == "shared"
+
+    def test_dedicated_requested_without_binary_falls_back_to_shared_with_warning(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        from helia_profiler.capture import capture_power
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        assert ctx.power_binary_path is None
+
+        calls: list[str] = []
+        flash_calls: list[dict] = []
+
+        monkeypatch.setattr(
+            "helia_profiler.power.get_driver", lambda *a, **k: self._FakeDriver(calls)
+        )
+        monkeypatch.setattr(
+            "helia_profiler.target.probe.jlink.flash_binary",
+            lambda *a, **k: flash_calls.append({}),
+        )
+
+        with caplog.at_level("WARNING", logger="hpx"):
+            result = capture_power(ctx, duration_override_s=7.0)
+
+        assert flash_calls == []
+        assert result.metadata["power_firmware"] == "shared"
+        assert any("dedicated" in rec.message for rec in caplog.records)
+
+    def test_shared_result_metadata_records_firmware(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.capture import capture_power
+
+        ctx = self._make_ctx(tmp_path, firmware="shared")
+        calls: list[str] = []
+        monkeypatch.setattr(
+            "helia_profiler.power.get_driver", lambda *a, **k: self._FakeDriver(calls)
+        )
+        result = capture_power(ctx, duration_override_s=7.0)
+        assert result.metadata["power_firmware"] == "shared"
 
 
 class TestGatedCaptureCapabilityDetection:

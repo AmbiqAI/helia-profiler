@@ -238,6 +238,38 @@ def _make_sync_controller(ctx: PipelineContext, driver: object):
     return driver.make_sync_controller(wiring)
 
 
+def _flash_power_binary(ctx: PipelineContext) -> None:
+    """Flash the dedicated power binary before arming the gated power capture.
+
+    ORDERING: this runs BEFORE ``driver.capture_gated`` is called, not inside
+    its ``on_started`` hook. ``JLinkExe`` flashing (erase + program + reset +
+    go) costs several seconds of J-Link work; doing that inside
+    ``on_started`` would burn into the capture-window budget (the driver
+    starts its wait clock only after ``on_started`` returns) and would risk
+    reintroducing the exact gate-race PR#27 fixed, where the GPI poller must
+    already be live before any reset/relaunch happens.
+
+    The power binary necessarily starts free-running the instant this flash
+    completes (its bounded ~3s GO wait times out with no host watching) --
+    that is unavoidable and harmless, because it is a throwaway boot: the
+    existing ``arm -> capture_gated(on_started: reset -> READY -> GO)`` flow
+    immediately below resets the (now power) firmware again, race-free, once
+    the poller is live. That second reset is what actually starts the
+    measured run.
+    """
+    from ..target.probe.jlink import flash_binary
+
+    assert ctx.power_binary_path is not None
+    assert ctx.soc is not None
+    jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
+    flash_binary(
+        ctx.power_binary_path,
+        device=ctx.soc.jlink_device,
+        jlink_serial=jlink_serial,
+        timeout_s=ctx.config.timeouts.flash_s,
+    )
+
+
 def capture_power(
     ctx: PipelineContext,
     *,
@@ -257,12 +289,35 @@ def capture_power(
     driver.check_available()
     lifecycle_plan = None
 
+    # Resolve which firmware will actually be measured. "dedicated" is the
+    # default (see config.DEFAULT_POWER_FIRMWARE for the +17/+33/+60%
+    # transport-contamination rationale) but requires a built power binary;
+    # fall back to "shared" with a loud warning if one isn't available (e.g.
+    # generation/build were skipped, or a ctx was hand-built without running
+    # the full pipeline) rather than failing the whole capture.
+    effective_firmware = ctx.config.power.firmware
+    if effective_firmware == "dedicated":
+        if ctx.power_binary_path is not None:
+            _flash_power_binary(ctx)
+        else:
+            log.warning(
+                "power.firmware=dedicated requested but no dedicated power "
+                "binary is available (ctx.power_binary_path is None) -- "
+                "falling back to shared mode (measuring the transport "
+                "binary already on the target). This can happen if firmware "
+                "generation/build ran with power.firmware=shared, or if "
+                "capture_power() was invoked without running the full "
+                "pipeline."
+            )
+            effective_firmware = "shared"
+
     def _prepare_target_once() -> None:
         nonlocal lifecycle_plan
         if prepare_target is not None and lifecycle_plan is None:
             lifecycle_plan = prepare_target(driver, driver_name)
 
     def _attach_lifecycle_metadata(result: PowerResult) -> PowerResult:
+        result.metadata.setdefault("power_firmware", effective_firmware)
         if lifecycle_plan is not None:
             result.metadata.setdefault("target_lifecycle", lifecycle_plan.to_metadata())
         return result
@@ -288,13 +343,18 @@ def capture_power(
         # GPIO-high window — unless we open its CDC port.  Hand capture_gated an
         # on_started hook that opens the port *after* the GPI poller is live, so
         # the firmware is released only once we are watching for the window.
+        # The dedicated power binary has no USB stack at all and never blocks
+        # on DTR (see firmware WP1's power_only render), so the holder is
+        # skipped entirely in that mode -- it would otherwise try (and fail)
+        # to resolve/open a CDC port the power firmware never enumerates.
         dtr_holder: _UsbDtrHolder | None = None
-        if ctx.config.target.transport == Transport.USB_CDC:
+        if effective_firmware == "shared" and ctx.config.target.transport == Transport.USB_CDC:
             jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
             dtr_holder = _UsbDtrHolder(
                 usb_port=ctx.config.target.usb_port,
                 usb_marker=usb_marker_serial(jlink_serial),
             )
+
         # 3-wire lock-step: arm the host GO line before anything may run.
         # ORDERING (revised after the AP510 combo-reset gate-race root cause,
         # see experiments/ap5-phase-d/t2-gate-race/): the GPI poller must be

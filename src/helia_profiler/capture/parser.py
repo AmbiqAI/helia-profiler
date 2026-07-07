@@ -91,6 +91,18 @@ def parse_firmware_output(
         if line.startswith("HPX_HEARTBEAT"):
             meta_kv["heartbeat_count"] = meta_kv.get("heartbeat_count", 0) + 1
             meta_kv["last_heartbeat"] = line
+            # The clean_window_begin heartbeat announces the iteration count
+            # BEFORE the window runs, while the transport is still reliably
+            # alive.  Keep it as a fallback for clean_infer_count: the
+            # authoritative HPX_CLEAN_INFER_COUNT line is printed right after
+            # the transport peripheral is re-enabled post-window and can be
+            # lost on lossy transports (observed on SWO: ITM re-sync after
+            # nsx_itm_printf_disable/enable dropped the whole result block,
+            # silently downgrading the power capture to the ungated
+            # whole-capture path).
+            m_iters = re.search(r"phase=clean_window_begin iters=(\d+)", line)
+            if m_iters:
+                meta_kv["announced_clean_iters"] = int(m_iters.group(1))
             continue
 
         # HPX_KEY=value metadata lines
@@ -150,7 +162,9 @@ def parse_firmware_output(
         profiled_infer_count=meta_kv.get("profiled_infer_count"),
         profiled_infer_total_us=meta_kv.get("profiled_infer_total_us"),
         profiled_infer_avg_us=meta_kv.get("profiled_infer_avg_us"),
-        clean_infer_count=meta_kv.get("clean_infer_count"),
+        clean_infer_count=meta_kv.get(
+            "clean_infer_count", meta_kv.get("announced_clean_iters")
+        ),
         clean_infer_total_cycles=meta_kv.get("clean_infer_total_cycles"),
         clean_infer_avg_cycles=meta_kv.get("clean_infer_avg_cycles"),
         clean_infer_avg_us=meta_kv.get("clean_infer_avg_us"),

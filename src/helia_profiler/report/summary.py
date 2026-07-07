@@ -119,6 +119,8 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             summary["power"]["sync_input_index"] = power_meta["sync_input_index"]
         if power_meta.get("gating_method") is not None:
             summary["power"]["gating_method"] = power_meta["gating_method"]
+        if power_meta.get("power_firmware") is not None:
+            summary["power"]["power_firmware"] = power_meta["power_firmware"]
         if power_meta.get("target_lifecycle") is not None:
             summary["power"]["target_lifecycle"] = power_meta["target_lifecycle"]
         if power_meta.get("sync") is not None:
@@ -142,7 +144,40 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                 summary["power"]["p95_power_w"] = round(gw.p95_power_w, 9)
                 summary["power"]["p99_power_w"] = round(gw.p99_power_w, 9)
             if meta and meta.clean_infer_count and meta.clean_infer_count > 0:
-                energy_per_infer = ps.energy_j / meta.clean_infer_count
+                # The PMU phase's clean_infer_count is exact for the binary
+                # that produced it.  With power_firmware="dedicated" the
+                # power phase runs a DIFFERENT binary whose auto-sized clean
+                # window recomputes its own iteration count at runtime (its
+                # warmup timing differs slightly without transport overhead
+                # -- observed +18% iterations on a USB-transport run), so
+                # the PMU-phase count can be the wrong denominator.  The
+                # per-inference TIME is binary-independent (same model,
+                # same clock), so when the measured gate duration disagrees
+                # with count x avg_us by more than half an inference,
+                # re-derive the effective count from the measured duration.
+                effective_count = meta.clean_infer_count
+                if (
+                    power_meta.get("power_firmware") == "dedicated"
+                    and meta.clean_infer_avg_us
+                    and meta.clean_infer_avg_us > 0
+                    and ps.duration_s > 0
+                ):
+                    derived = ps.duration_s * 1_000_000.0 / meta.clean_infer_avg_us
+                    if abs(derived - meta.clean_infer_count) > 0.5:
+                        effective_count = int(round(derived))
+                        summary["power"]["clean_infer_count_source"] = (
+                            "derived_from_gate_duration"
+                        )
+                        log.info(
+                            "Dedicated power binary ran %d clean inferences "
+                            "(derived from gate %.4fs / %dus per inference); "
+                            "PMU-phase count was %d",
+                            effective_count,
+                            ps.duration_s,
+                            meta.clean_infer_avg_us,
+                            meta.clean_infer_count,
+                        )
+                energy_per_infer = ps.energy_j / effective_count
                 summary["power"]["energy_per_inference_j"] = round(energy_per_infer, 9)
                 if energy_per_infer > 0:
                     summary["power"]["inferences_per_joule"] = round(
@@ -167,8 +202,10 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                 # by ~6% with no error raised. This check cannot fix the
                 # measurement, only flag it.
                 if meta.clean_infer_avg_us and meta.clean_infer_avg_us > 0 and ps.duration_s > 0:
+                    # Use effective_count: in dedicated mode the power binary
+                    # may have run a re-derived iteration count (see above).
                     expected_duration_s = (
-                        meta.clean_infer_count * meta.clean_infer_avg_us
+                        effective_count * meta.clean_infer_avg_us
                     ) / 1_000_000.0
                     duration_ratio = (
                         ps.duration_s / expected_duration_s if expected_duration_s > 0 else 0.0
@@ -180,7 +217,7 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                     # Allow up to half an inference's worth of slack either
                     # way before flagging -- normal GPIO-edge/packet-boundary
                     # jitter is well under this.
-                    tolerance = 0.5 / meta.clean_infer_count
+                    tolerance = 0.5 / effective_count
                     if abs(duration_ratio - 1.0) > tolerance:
                         summary["power"]["gated_window_duration_suspect"] = True
                         log.warning(
@@ -192,7 +229,7 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                             "biases this number; check the gated-window capture for "
                             "missed GPIO edges.",
                             ps.duration_s,
-                            meta.clean_infer_count,
+                            effective_count,
                             meta.clean_infer_avg_us,
                             expected_duration_s,
                             duration_ratio,
