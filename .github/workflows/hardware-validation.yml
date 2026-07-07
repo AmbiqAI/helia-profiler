@@ -1,0 +1,142 @@
+name: Hardware Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "Validation suite preset"
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - models-rt
+          - models-aot
+      boards:
+        description: "Comma-separated board IDs"
+        required: true
+        default: apollo510_evb
+        type: string
+      power:
+        description: "Power validation mode"
+        required: true
+        default: off
+        type: choice
+        options:
+          - off
+          - on
+          - both
+      jlink_serials:
+        description: "Optional comma-separated board=serial entries"
+        required: false
+        default: ""
+        type: string
+      repeat:
+        description: "Repeat each selected case N times"
+        required: true
+        default: "1"
+        type: string
+      timeout:
+        description: "Per-case timeout in seconds"
+        required: true
+        default: "900"
+        type: string
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: hardware-validation-${{ inputs.boards }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: [self-hosted, hpx-hardware]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Configure GitHub auth (higher API rate limits)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          git config --global \
+            url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf \
+            "https://github.com/"
+
+      - name: Install test dependencies
+        run: uv sync --group test
+
+      - name: Fetch LFS fixtures
+        run: git lfs pull
+
+      - name: Check host dependencies
+        run: uv run hpx doctor
+
+      - name: Preview validation cases
+        env:
+          HPX_VALIDATION_SUITE: ${{ inputs.suite }}
+          HPX_VALIDATION_BOARDS: ${{ inputs.boards }}
+          HPX_VALIDATION_POWER: ${{ inputs.power }}
+          HPX_VALIDATION_JLINK_SERIALS: ${{ inputs.jlink_serials }}
+          HPX_VALIDATION_REPEAT: ${{ inputs.repeat }}
+          HPX_VALIDATION_TIMEOUT: ${{ inputs.timeout }}
+        run: |
+          args=(
+            --list
+            --suite "${HPX_VALIDATION_SUITE}"
+            --boards "${HPX_VALIDATION_BOARDS}"
+            --power "${HPX_VALIDATION_POWER}"
+            --repeat "${HPX_VALIDATION_REPEAT}"
+            --timeout "${HPX_VALIDATION_TIMEOUT}"
+          )
+          if [[ -n "${HPX_VALIDATION_JLINK_SERIALS}" ]]; then
+            args+=(--jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}")
+          fi
+          uv run hpx validate "${args[@]}"
+
+      - name: Run hardware validation
+        env:
+          HPX_VALIDATION_SUITE: ${{ inputs.suite }}
+          HPX_VALIDATION_BOARDS: ${{ inputs.boards }}
+          HPX_VALIDATION_POWER: ${{ inputs.power }}
+          HPX_VALIDATION_JLINK_SERIALS: ${{ inputs.jlink_serials }}
+          HPX_VALIDATION_REPEAT: ${{ inputs.repeat }}
+          HPX_VALIDATION_TIMEOUT: ${{ inputs.timeout }}
+        run: |
+          mkdir -p results/validation
+          args=(
+            --suite "${HPX_VALIDATION_SUITE}"
+            --boards "${HPX_VALIDATION_BOARDS}"
+            --power "${HPX_VALIDATION_POWER}"
+            --repeat "${HPX_VALIDATION_REPEAT}"
+            --timeout "${HPX_VALIDATION_TIMEOUT}"
+            --output-dir results/validation
+            --junit-xml results/validation/junit.xml
+          )
+          if [[ -n "${HPX_VALIDATION_JLINK_SERIALS}" ]]; then
+            args+=(--jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}")
+          fi
+          uv run hpx validate "${args[@]}"
+
+      - name: Upload validation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardware-validation-${{ github.run_id }}
+          path: results/validation/
+          if-no-files-found: warn
