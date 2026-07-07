@@ -46,6 +46,10 @@ defaults:
   run:
     shell: bash
 
+env:
+  UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
+  UV_PYTHON_INSTALL_DIR: ${{ github.workspace }}/.uv-python
+
 concurrency:
   group: hardware-validation-${{ inputs.boards }}
   cancel-in-progress: false
@@ -67,14 +71,6 @@ jobs:
 
       - name: Install Python
         run: uv python install 3.11
-
-      - name: Configure GitHub auth (higher API rate limits)
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          git config --global \
-            url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf \
-            "https://github.com/"
 
       - name: Install test dependencies
         run: uv sync --python 3.11 --group test
