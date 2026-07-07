@@ -19,7 +19,8 @@
 {% if (extreme_mode and arena_region == "tcm" and weights_region == "tcm") or ((manages_shared_ssram_power | default(false)) and (_sram_resident or (force_shared_sram | default(false)))) %}
 #include "am_hal_pwrctrl.h"
 {% endif %}
-{% if transport == "usb_cdc" %}
+{% if power_only | default(false) %}
+{% elif transport == "usb_cdc" %}
 #include "nsx_usb.h"
 #include "am_hal_timer.h"
 {% elif transport == "rtt" %}

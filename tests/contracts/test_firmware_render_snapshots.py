@@ -126,8 +126,10 @@ def _common_kwargs(soc_name: str, transport: str) -> dict:
     }
 
 
-def _render(soc_name: str, transport: str, engine: str) -> str:
+def _render(soc_name: str, transport: str, engine: str, power_only: bool = False) -> str:
     kwargs = _common_kwargs(soc_name, transport)
+    if power_only:
+        kwargs["power_only"] = True
     if engine == "helia-aot":
         kwargs.update(
             aot_prefix="fake",
@@ -169,15 +171,37 @@ def _all_combos() -> list[tuple[str, str, str]]:
     ]
 
 
-def _key(soc: str, transport: str, engine: str) -> str:
-    return f"{soc}|{transport}|{engine}"
+# power_only variant matrix (WP1): dedicated power binary, no transport ever
+# initialized.  Only rendered for "rtt" — power_only forces NSX_DEBUG_NONE
+# regardless of the requested transport, so varying transport here would not
+# exercise any additional code path (see main.cc.j2/main_aot.cc.j2 power_only
+# guards).  Covers every SoC family x engine per the WP1 verification matrix.
+_POWER_TRANSPORT = "rtt"
+
+
+def _power_combos() -> list[tuple[str, str, str]]:
+    return [(soc, _POWER_TRANSPORT, engine) for soc in _SOCS for engine in _ENGINES]
+
+
+def _key(soc: str, transport: str, engine: str, power_only: bool = False) -> str:
+    suffix = "|power" if power_only else ""
+    return f"{soc}|{transport}|{engine}{suffix}"
 
 
 def _build_all() -> dict:
-    return {
+    result = {
         _key(soc, transport, engine): _digest(_render(soc, transport, engine))
         for soc, transport, engine in _all_combos()
     }
+    result.update(
+        {
+            _key(soc, transport, engine, power_only=True): _digest(
+                _render(soc, transport, engine, power_only=True)
+            )
+            for soc, transport, engine in _power_combos()
+        }
+    )
+    return result
 
 
 def _maybe_regenerate() -> None:
@@ -225,9 +249,78 @@ def test_render_matches_snapshot(soc, transport, engine):
     assert current["sha256"] == expected["sha256"], f"[{key}] render hash changed. {_REGEN_HINT}"
 
 
+@pytest.mark.parametrize(
+    "soc,transport,engine",
+    _power_combos(),
+    ids=[_key(*c, power_only=True) for c in _power_combos()],
+)
+def test_power_only_render_matches_snapshot(soc, transport, engine):
+    """WP1: dedicated power binary (power_only=true) render snapshots.
+
+    Rendered from the SAME main.cc.j2 / main_aot.cc.j2 templates as the
+    regular (non-power) matrix above — power_only never introduces a new
+    template, only a new Jinja variable — so this exercises the identical
+    template files, just with the power_only branches taken.
+    """
+    assert _SNAPSHOTS, (
+        "no firmware render snapshot committed — generate it with "
+        "HPX_UPDATE_SNAPSHOTS=1"
+    )
+    key = _key(soc, transport, engine, power_only=True)
+    assert key in _SNAPSHOTS, f"{key} missing from snapshot. {_REGEN_HINT}"
+
+    current = _digest(_render(soc, transport, engine, power_only=True))
+    expected = _SNAPSHOTS[key]
+
+    assert current["markers"] == expected["markers"], (
+        f"[{key}] active feature blocks changed:\n"
+        f"  expected: {expected['markers']}\n"
+        f"  actual:   {current['markers']}\n{_REGEN_HINT}"
+    )
+    assert current["sha256"] == expected["sha256"], f"[{key}] render hash changed. {_REGEN_HINT}"
+
+
+def test_power_only_never_initializes_transport():
+    """WP1 content contract: power_only firmware never brings up UART/SWO/USB,
+    never emits the per-layer PMU pass loop / CSV dump / HPX_START/HPX_END
+    sentinels, but still runs the shared model-init + gated clean window.
+    """
+    import re
+
+    def _strip_line_comments(src: str) -> str:
+        return "\n".join(re.sub(r"//.*$", "", line) for line in src.splitlines())
+
+    for soc, transport, engine in _power_combos():
+        rendered = _render(soc, transport, engine, power_only=True)
+        code_only = _strip_line_comments(rendered)
+
+        assert "NSX_DEBUG_NONE" in rendered, (soc, transport, engine)
+        assert "hpx_sync_window_begin" in rendered, (soc, transport, engine)
+        assert "hpx_sync_window_end" in rendered, (soc, transport, engine)
+        if engine == "helia-aot":
+            assert "_model_init(" in rendered, (soc, transport, engine)
+        else:
+            assert "InitializeTarget" in rendered, (soc, transport, engine)
+            assert "GetModel" in rendered, (soc, transport, engine)
+
+        for forbidden in (
+            "nsx_uart_printf_enable(",
+            "nsx_itm_printf_enable(",
+            "SEGGER_RTT",
+            "usb_timer_",
+            "HPX_PRESET",
+            "HPX_START",
+            "HPX_END",
+        ):
+            assert forbidden not in code_only, (soc, transport, engine, forbidden)
+
+
 def test_snapshot_covers_exactly_the_current_matrix():
     """The committed snapshot must match the code's supported matrix exactly."""
-    assert set(_SNAPSHOTS) == {_key(*c) for c in _all_combos()}, _REGEN_HINT
+    expected_keys = {_key(*c) for c in _all_combos()} | {
+        _key(*c, power_only=True) for c in _power_combos()
+    }
+    assert set(_SNAPSHOTS) == expected_keys, _REGEN_HINT
 
 
 def test_transport_specific_blocks_are_pinned():

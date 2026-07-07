@@ -62,6 +62,15 @@
 #define HPX_SWO_SYNC_GAP_US          (20U * 1000U) // gap per sync line (~800ms total grace)
 #define HPX_USB_POLL_DELAY_US     (10U * 1000U)   // re-poll cadence while waiting for DTR
 #define HPX_USB_SETTLE_DELAY_US   (200U * 1000U)  // settle after host asserts DTR
+// UART/ITM re-enable settle: nsx_uart_printf_enable()/nsx_itm_printf_enable()
+// re-powers the peripheral (clock/FIFO bring-up) right before the very next
+// hpx_printf() call reports the clean-window results -- with zero settle
+// margin that first line (HPX_CLEAN_INFER_COUNT=...) can be dropped or
+// garbled, silently losing clean_infer_count and falling the host back to
+// an unrelated whole-capture-window power estimate (found 2026-07-06 on the
+// first hardware test of the UART teardown fix). 5ms is generous versus a
+// UART/ITM clock-domain-crossing settle.
+#define HPX_DEBUG_REENABLE_SETTLE_US (5U * 1000U)
 
 {% include "_newlib_syscalls.j2" %}
 
@@ -122,7 +131,7 @@ static int      g_hb_iter = 0;
 
 {% include "_hpx_printf.j2" with context %}
 
-{% if transport == "usb_cdc" %}
+{% if transport == "usb_cdc" and not power_only | default(false) %}
 {% include "_usb_timer.j2" %}
 {% endif %}
 
@@ -320,15 +329,17 @@ int main(void) {
     sys_cfg.perf_mode = {{ perf_mode_symbol }};  // {{ perf_mode_mhz }} MHz — target.clock.cpu
     sys_cfg.enable_cache = true;
     sys_cfg.enable_sram = true;
-    sys_cfg.debug.transport = {% if transport == "swo" %}NSX_DEBUG_ITM{% elif transport == "uart" %}NSX_DEBUG_UART{% else %}NSX_DEBUG_NONE{% endif %};
+    sys_cfg.debug.transport = {% if power_only | default(false) %}NSX_DEBUG_NONE{% elif transport == "swo" %}NSX_DEBUG_ITM{% elif transport == "uart" %}NSX_DEBUG_UART{% else %}NSX_DEBUG_NONE{% endif %};
     sys_cfg.skip_bsp_init = false;
     sys_cfg.spot_mgr_profile = true;
     NSX_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
+{% if not power_only | default(false) -%}
 {% if transport == "swo" %}
     nsx_itm_printf_enable();
 {% elif transport == "uart" %}
     nsx_uart_printf_enable();
 {% endif %}
+{%- endif %}
     dwt_init();
     hpx_sync_init();
     hpx_sync_ready();
@@ -366,7 +377,12 @@ int main(void) {
 {% endif %}
 {% include "_ssram_power.j2" %}
 {% include "_extreme_mode.j2" %}
-{% if transport == "usb_cdc" %}
+{% if power_only | default(false) %}
+
+    // power_only: no transport init/attach preamble at all -- there is no
+    // host-attach race to close because no transport is ever brought up.
+    // See sys_cfg.debug.transport (forced NSX_DEBUG_NONE) above.
+{% elif transport == "usb_cdc" %}
 
     // Initialize USB CDC and wait for host to connect (DTR)
     NSX_TRY(nsx_usb_init(&g_usb_cfg), "USB CDC init failed\n");
@@ -415,7 +431,7 @@ int main(void) {
     }
 {% endif %}
 
-    hpx_printf("\n--- HPX_START ---\n");
+{% if not power_only | default(false) %}    hpx_printf("\n--- HPX_START ---\n");
     hpx_printf("HPX_VERSION=1\n");
     hpx_printf("HPX_ENGINE=helia_aot\n");
     hpx_printf("HPX_EXTREME_MODE=%d\n", {{ 1 if extreme_mode and arena_region == "tcm" and weights_region == "tcm" else 0 }});
@@ -440,7 +456,7 @@ int main(void) {
         : 0U;
     g_hb_every_ops = kHbEnabled ? kHbEveryNOps : 0;
 
-    hpx_printf("HPX_HEARTBEAT phase=init\n");
+    hpx_printf("HPX_HEARTBEAT phase=init\n");{% endif %}
 
 {% if not allocate_arenas and arena_regions %}
     // External arena mode: allocate and bind arena buffers before model_init.
@@ -553,8 +569,8 @@ int main(void) {
     }
 
     // Target-side profiled inference timing (excludes CSV/transport output).
-    uint64_t profiled_infer_cycles = 0;
-    uint32_t profiled_infer_count = 0;
+{% if not power_only | default(false) %}    uint64_t profiled_infer_cycles = 0;
+    uint32_t profiled_infer_count = 0;{% endif %}
 
     // --- Clean end-to-end inference timing (no per-layer instrumentation) ---
     // The per-layer PMU passes below bracket every op (the model operator
@@ -683,7 +699,7 @@ int main(void) {
             busy_loop_iters = (scaled > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)scaled;
         }
 {% endif %}
-{% if transport == "usb_cdc" %}
+{% if transport == "usb_cdc" and not power_only | default(false) %}
         // Silence the 1 kHz tud_task() polling timer for the duration of the
         // clean window.  Its ISR otherwise fires mid-inference and pollutes the
         // E2E cycle count (and the external-power window) — measured as a flat
@@ -692,6 +708,24 @@ int main(void) {
 {% endif %}
 {% set gate_dbg = (clean_window_probe | default("infer") == "busy_loop") or (gate_debug_domain_in_window | default(false)) %}
 {% set use_stimer_window = (clean_window_timer | default("dwt") == "stimer") and (clean_window_probe | default("infer") != "busy_loop") %}
+{% if transport == "uart" and not power_only | default(false) %}
+        // The UART peripheral (PWRSTUART0-3) lives in the peripheral device
+        // power domain, NOT the debug domain am_hal_debug_disable() below
+        // gates -- it stays powered for the whole run otherwise.  Measured
+        // ~+17% current on an AP510 EVB (UART0-3 all ON during the gated
+        // window per a live PWRCTRL->DEVPWRSTATUS snapshot) vs RTT's
+        // zero-peripheral window.  AutoDeploy's power firmware has
+        // bNeedAlternativeUART=false and never enables this at all.
+        nsx_uart_printf_disable();
+{% elif transport == "swo" and not power_only | default(false) %}
+        // ITM/SWO's own enable request can hold PD_DBG powered independently
+        // of am_hal_debug_disable() below, the same way the ARM PMU's
+        // counters do (see the has_armv8m_pmu comment) -- measured ~+1.2 mA
+        // on an AP510 EVB, matching the known PD_DBG cost, even though
+        // am_hal_debug_disable() already runs for this family/probe.
+        // Dropping ITM here lets that call actually release the domain.
+        nsx_itm_printf_disable();
+{% endif %}
 {% if has_armv8m_pmu %}
         // nsx_pmu_init() (already called above to configure the per-layer PMU
         // presets) leaves the ARM PMU counters running and the
@@ -748,12 +782,14 @@ int main(void) {
         for (int iter = 0; iter < clean_iters_n; iter++) {
             {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
             clean_count++;
-{% if clean_window_trace | default(false) and transport != "swo" %}
+{% if clean_window_trace | default(false) and transport not in ["swo", "uart"] %}
             // Sanity-check trace: prove the device is looping inferences for
             // the whole gated window.  Perturbs power — diagnostic use only.
             // Never emitted on SWO builds here: PD_DBG is disabled for this
             // whole loop, and a TPIU/ITM write while PD_DBG is off hangs the
-            // part unconditionally (DS510 erratum ERR003).
+            // part unconditionally (DS510 erratum ERR003).  Never emitted on
+            // UART builds either: nsx_uart_printf_disable() above powers off
+            // the UART peripheral for the same window.
             hpx_printf("HPX_CLEAN_ITER=%d\n", iter);
 {% endif %}
         }
@@ -763,9 +799,11 @@ int main(void) {
             {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
             clean_cycles += (uint32_t)(DWT->CYCCNT - t0);
             clean_count++;
-{% if clean_window_trace | default(false) %}
+{% if clean_window_trace | default(false) and transport not in ["swo", "uart"] %}
             // Sanity-check trace: prove the device is looping inferences for
             // the whole gated window.  Perturbs power — diagnostic use only.
+            // Excluded on SWO/UART: their printf peripherals are disabled
+            // above for the same window (nsx_itm/uart_printf_disable()).
             hpx_printf("HPX_CLEAN_ITER=%d\n", iter);
 {% endif %}
         }
@@ -775,7 +813,7 @@ int main(void) {
         uint64_t clean_stimer_total_us =
             hpx_stimer_ticks_to_us((uint64_t)(uint32_t)(hpx_stimer_ticks() - clean_stimer_t0));
 {% endif %}
-        // Restore the per-op callback for the instrumented per-layer passes below.
+{% if not power_only | default(false) %}        // Restore the per-op callback for the instrumented per-layer passes below.
         {{ aot_prefix }}_model_ctx.callback = model_operator_cb;
 {% if has_armv8m_pmu %}
         // Restore PMU/debug state for the instrumented per-layer passes below.
@@ -784,9 +822,16 @@ int main(void) {
 {% endif %}
         nsx_ambiq_pmu_enable();
 {% endif %}
+{% if transport == "uart" %}
+        nsx_uart_printf_enable();
+        nsx_delay_us(HPX_DEBUG_REENABLE_SETTLE_US);
+{% elif transport == "swo" %}
+        nsx_itm_printf_enable();
+        nsx_delay_us(HPX_DEBUG_REENABLE_SETTLE_US);
+{% endif %}
 {% if transport == "usb_cdc" %}
         usb_timer_resume();
-{% endif %}
+{% endif %}{% endif %}
         if (clean_count > 0) {
 {% if use_stimer_window %}
             // Derive avg_us directly from the device-independent STIMER
@@ -828,7 +873,12 @@ int main(void) {
         }
     }
 
-{% if transport == "rtt" %}
+{% if power_only | default(false) %}
+    // power_only: no per-layer PMU passes, no CSV dump, no HPX_END sentinel --
+    // the gated clean window above is the whole measurement.  The host reads
+    // completion off the GPIO gate falling, not off any transport, so simply
+    // park once the clean window closes.
+{% else %}{% if transport == "rtt" %}
     // Boot header was captured losslessly; restore droppable writes for the
     // timed window so an in-flight heartbeat can never stall model_run().
     hpx_rtt_set_nonblocking();
@@ -946,7 +996,7 @@ int main(void) {
 {% if transport == "rtt" %}
     HPX_CLEAN_DCACHE();
     hpx_rtt_drain(500 /* ms */);
-{% endif %}
+{% endif %}{% endif %}
     hpx_park();
     return 0;
 }

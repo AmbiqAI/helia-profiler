@@ -3,12 +3,22 @@
    Variables:
      transport         : "usb_cdc" | "rtt" | other (stdio fallback)
      printf_linkage    : "" (extern, e.g. main.cc) or "static " (internal, main_aot.cc)
+     power_only        : true for the dedicated power binary (no transport at all)
 #}
 // ---------------------------------------------------------------------------
 // hpx_printf — transport-aware printf used by all profiler output
 // ---------------------------------------------------------------------------
 {% set _linkage = printf_linkage | default("") %}
-{% if transport == "usb_cdc" %}
+{% if power_only | default(false) %}
+// power_only: no transport is ever initialized on this binary (see the
+// design note in AGENTS.md / WP1) -- UART leaves UART0-3 powered (+17%
+// current on an AP510 EVB), SWO holds PD_DBG (+33%), USB PHY (+60%).  The
+// dedicated power binary must be clean by construction, so hpx_printf
+// compiles away to nothing rather than merely disabling a transport at
+// runtime (which still leaves pad/pinmux/clock residue).  The host observes
+// completion via the GPIO gate, not via any transport.
+{{ _linkage }}void hpx_printf(const char *, ...) {}
+{% elif transport == "usb_cdc" %}
 static uint8_t usb_tx_buf[4096];
 static uint8_t usb_rx_buf[NSX_USB_MIN_CDC_RX_BUFSIZE];
 
@@ -216,7 +226,7 @@ static void hpx_rtt_shorten_lossless_timeout(void) {
 // park.  Non-RTT transports (SWO/USB/stdio) send synchronously, so they simply
 // park.  This keeps the failure diagnostics observable regardless of toolchain.
 // ---------------------------------------------------------------------------
-{% if transport == "rtt" %}
+{% if transport == "rtt" and not power_only | default(false) %}
 #ifndef HPX_RTT_FAIL_DRAIN_MS
 // Generous: if no host has attached yet, hpx_rtt_drain() spins the full window
 // (RdOff never advances), giving a late-attaching host time to read the buffer.
@@ -225,7 +235,10 @@ static void hpx_rtt_shorten_lossless_timeout(void) {
 {% endif %}
 
 {{ _linkage }}void hpx_park(void) {
-{% if transport == "rtt" %}
+{% if power_only | default(false) %}
+    // power_only: no transport, so no ring buffer to drain -- just halt.  The
+    // host observes completion via the GPIO gate falling, not via RTT/SWO/USB.
+{% elif transport == "rtt" %}
     hpx_rtt_set_blocking();
     HPX_CLEAN_DCACHE();
     hpx_rtt_drain(HPX_RTT_FAIL_DRAIN_MS);
