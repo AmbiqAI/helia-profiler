@@ -191,7 +191,7 @@ def _find_segger_rtt_dir() -> Path:
     """
     env_path = os.environ.get("SEGGER_RTT_PATH")
     if env_path:
-        p = Path(env_path)
+        p = Path(env_path).expanduser().resolve()
         if _is_segger_rtt_root(p):
             return p
         raise FirmwareError(

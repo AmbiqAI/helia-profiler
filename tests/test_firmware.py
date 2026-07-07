@@ -243,6 +243,18 @@ def test_find_segger_rtt_dir_prefers_explicit_env(tmp_path: Path, monkeypatch: p
     assert _find_segger_rtt_dir() == explicit
 
 
+def test_find_segger_rtt_dir_expands_explicit_env_user_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    home = tmp_path / "home"
+    home.mkdir()
+    explicit = _make_fake_rtt_root(home / "explicit")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("SEGGER_RTT_PATH", "~/explicit")
+
+    assert _find_segger_rtt_dir() == explicit.resolve()
+
+
 def test_find_segger_rtt_dir_auto_detects_common_candidate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
