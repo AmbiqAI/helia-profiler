@@ -73,7 +73,7 @@ _JLINK_NOT_FOUND_HINT = (
 )
 _EMU_LIST_RE = re.compile(
     r"Connection:\s*(?P<connection>[^,]+),\s*Serial number:\s*(?P<serial>\d+),"
-    r"\s*ProductName:\s*(?P<product>[^,]+)"
+    r"\s*ProductName:\s*(?P<product>[^\r\n,]+)"
 )
 _FOUND_CORE_RE = re.compile(r"Found\s+Cortex-M(?P<core>\d+)", re.IGNORECASE)
 _JLINK_DLL_ENV_VARS = ("HPX_JLINK_DLL", "JLINK_DLL_PATH", "JLINKARM_DLL")
@@ -133,7 +133,7 @@ def list_connected_probes() -> list[JLinkProbe]:
     jlink_exe = find_jlink_exe()
     try:
         result = subprocess.run(
-            [jlink_exe],
+            [jlink_exe, "-NoGui", "1"],
             input="ShowEmuList\nexit\n",
             capture_output=True,
             text=True,

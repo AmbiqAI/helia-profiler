@@ -31,6 +31,11 @@ class TestRegistry:
         assert BOARDS["apollo510_evb"].jlink_device == "AP510NFA-CBR"
         assert BOARDS["apollo510_evb"].has_psram is True
 
+    def test_apollo330_registered(self):
+        assert "apollo330mP_evb" in BOARDS
+        assert BOARDS["apollo330mP_evb"].jlink_device == "Apollo330P_510L"
+        assert BOARDS["apollo330mP_evb"].has_psram is True
+
     def test_ap3_and_ap4_blue_registered(self):
         assert "apollo3p_evb" in BOARDS
         assert "apollo4p_blue_kxr_evb" in BOARDS
@@ -69,29 +74,29 @@ class TestBuildMatrix:
         cases = build_matrix()
         # Power is intentionally off by default for PR reliability validation:
         # AP3: 4 models × 2 engines × 3 toolchains × 3 transports × 5 memories = 360
-        # AP4/AP5: each 4 × 2 × 3 × 4 transports × 5 memories = 480
-        assert len(cases) == 1320
+        # AP4/AP5 boards: each 4 × 2 × 3 × 4 transports × 5 memories = 480
+        assert len(cases) == 1800
 
     def test_power_off_halves_matrix(self):
-        assert len(build_matrix(power="off")) == 1320
+        assert len(build_matrix(power="off")) == 1800
 
     def test_power_on_halves_matrix(self):
-        assert len(build_matrix(power="on")) == 1320
+        assert len(build_matrix(power="on")) == 1800
 
     def test_power_both_doubles_matrix(self):
-        assert len(build_matrix(power="both")) == 2640
+        assert len(build_matrix(power="both")) == 3600
 
     def test_repeat_multiplies_matrix(self):
-        assert len(build_matrix(power="off", repeat=3)) == 3960
+        assert len(build_matrix(power="off", repeat=3)) == 5400
 
     def test_model_filter(self):
         cases = build_matrix(models=["kws"], power="off")
-        assert len(cases) == 330
+        assert len(cases) == 450
         assert {c.model.id for c in cases} == {"kws"}
 
     def test_engine_filter(self):
         cases = build_matrix(engines=["helia-aot"], power="off")
-        assert len(cases) == 660
+        assert len(cases) == 900
         assert all(c.engine is EngineType.HELIA_AOT for c in cases)
 
     def test_axis_filters_can_select_one_board_case_with_two_passes(self):
