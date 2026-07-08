@@ -125,17 +125,17 @@ uv run hpx validate \
 ```
 
 Before the real run, the workflow installs test dependencies, fetches Git LFS
-fixtures, runs `hpx doctor`, and previews the selected cases with
-`hpx validate --list`. The validation output directory is uploaded with
-`actions/upload-artifact` even if the hardware run fails, so logs and partial
-case artifacts are still available for debugging.
+fixtures, fetches SEGGER RTT sources into the workflow workspace, runs
+`hpx doctor`, and previews the selected cases with `hpx validate --list`. The
+validation output directory is uploaded with `actions/upload-artifact` even if
+the hardware run fails, so logs and partial case artifacts are still available
+for debugging.
 
 The runner must already provide:
 
 - supported EVB access for the selected `boards` input
 - SEGGER J-Link access, including `JLinkExe` and `pylink-square`
 - ARM toolchain, CMake, Ninja, and NSX on `PATH`
-- SEGGER RTT sources through `SEGGER_RTT_PATH` or a discovered checkout
 - Git LFS support for model fixtures
 - optional Joulescope access and wiring when `power` is `on` or `both`
 
