@@ -20,12 +20,12 @@ on:
       power:
         description: "Power validation mode"
         required: true
-        default: off
+        default: "off"
         type: choice
         options:
-          - off
-          - on
-          - both
+          - "off"
+          - "on"
+          - "both"
       jlink_serials:
         description: "Optional comma-separated board=serial entries"
         required: false
