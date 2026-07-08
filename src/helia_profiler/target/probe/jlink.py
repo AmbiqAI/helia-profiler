@@ -703,10 +703,32 @@ def _jlink_dll_candidates_from_wrapper() -> list[Path]:
         text = ""
 
     for match in _JLINK_WRAPPER_LIB_PATH_RE.finditer(text):
-        for raw_dir in match.group("path").split(":"):
+        for raw_dir in _split_posix_path_list(match.group("path")):
             if raw_dir:
                 candidates.extend(_jlink_dlls_in_dir(Path(raw_dir).expanduser()))
     return candidates
+
+
+def _split_posix_path_list(raw: str) -> list[str]:
+    """Split a ``:``-delimited POSIX path list (as used in DYLD_LIBRARY_PATH/
+    LD_LIBRARY_PATH wrapper-script assignments).
+
+    A naive ``raw.split(":")`` mis-splits any Windows-style absolute path
+    (e.g. ``C:\\JLink_V874``), because the drive-letter colon is
+    indistinguishable from a path-list separator to a plain split. Treat a
+    single leading letter followed by ``:`` as part of a drive letter rather
+    than a separator.
+    """
+    parts: list[str] = []
+    current: list[str] = []
+    for ch in raw:
+        if ch == ":" and not (len(current) == 1 and current[0].isalpha()):
+            parts.append("".join(current))
+            current = []
+            continue
+        current.append(ch)
+    parts.append("".join(current))
+    return parts
 
 
 def _jlink_dlls_in_dir(path: Path) -> list[Path]:
