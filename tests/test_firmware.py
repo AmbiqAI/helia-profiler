@@ -1117,6 +1117,13 @@ class TestFlashApp:
     def test_frozen_skips_lock_and_uses_frozen_sync(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
     ):
+        """First frozen build for a board/toolchain (no build.ninja yet):
+
+        still needs one verify-only sync + a real configure, since nothing
+        has been materialised here before. See
+        test_frozen_with_existing_build_skips_lock_sync_and_configure for
+        the fast "offline incremental rebuild" path.
+        """
         ctx = _make_ctx(tmp_path, fake_dist)
         ResolvePlatformStage().run(ctx)
         app_dir = tmp_path / "app"
@@ -1129,6 +1136,7 @@ class TestFlashApp:
 
         lock_calls: list[tuple] = []
         sync_calls: list[dict] = []
+        configure_calls: list[dict] = []
 
         monkeypatch.setattr(
             "helia_profiler.firmware.nsx_cli.lock",
@@ -1139,7 +1147,8 @@ class TestFlashApp:
             lambda *args, **kwargs: sync_calls.append(kwargs),
         )
         monkeypatch.setattr(
-            "helia_profiler.firmware.nsx_cli.configure", lambda *args, **kwargs: None
+            "helia_profiler.firmware.nsx_cli.configure",
+            lambda *args, **kwargs: configure_calls.append(kwargs),
         )
         monkeypatch.setattr("helia_profiler.firmware.nsx_cli.build", lambda *args, **kwargs: None)
 
@@ -1149,6 +1158,61 @@ class TestFlashApp:
         assert sync_calls == [
             {"frozen": True, "timeout_s": ctx.config.timeouts.configure_s, "verbose": 0}
         ]
+        assert len(configure_calls) == 1
+        assert out_build_dir == build_dir
+        assert out_binary == binary
+
+    def test_frozen_with_existing_build_skips_lock_sync_and_configure(
+        self, tmp_path: Path, fake_dist: Path, monkeypatch
+    ):
+        """Offline incremental rebuild: frozen + an already-configured build
+
+        directory (build.ninja present) skips nsx lock, nsx sync, AND the
+        nsx configure() round-trip entirely -- CMake's own
+        --regenerate-during-build ninja rule picks up any regenerated
+        template changes on its own, with zero module-tree verification.
+        This is the fast path for iterating on a hand-patched vendored NSX
+        module without every rebuild silently reverting it.
+        """
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        app_dir = tmp_path / "app"
+        build_dir = app_dir / "build" / "apollo510_evb"
+        build_dir.mkdir(parents=True, exist_ok=True)
+        (build_dir / "build.ninja").write_text("# pre-existing configured build\n")
+        binary = build_dir / "hpx_profiler.bin"
+        binary.write_bytes(b"bin")
+        object.__setattr__(ctx, "firmware_dir", app_dir)
+        object.__setattr__(ctx.config, "frozen", True)
+
+        lock_calls: list[tuple] = []
+        sync_calls: list[dict] = []
+        configure_calls: list[dict] = []
+        build_calls: list[dict] = []
+
+        monkeypatch.setattr(
+            "helia_profiler.firmware.nsx_cli.lock",
+            lambda *args, **kwargs: lock_calls.append((args, kwargs)),
+        )
+        monkeypatch.setattr(
+            "helia_profiler.firmware.nsx_cli.sync",
+            lambda *args, **kwargs: sync_calls.append(kwargs),
+        )
+        monkeypatch.setattr(
+            "helia_profiler.firmware.nsx_cli.configure",
+            lambda *args, **kwargs: configure_calls.append(kwargs),
+        )
+        monkeypatch.setattr(
+            "helia_profiler.firmware.nsx_cli.build",
+            lambda *args, **kwargs: build_calls.append(kwargs),
+        )
+
+        out_build_dir, out_binary = build_app(ctx)
+
+        assert lock_calls == []
+        assert sync_calls == []
+        assert configure_calls == []
+        assert len(build_calls) == 1
         assert out_build_dir == build_dir
         assert out_binary == binary
 

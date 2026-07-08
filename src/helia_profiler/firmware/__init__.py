@@ -791,6 +791,8 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
 
     # Map config toolchain names to nsx CLI values
     nsx_tc = _nsx_toolchain(toolchain)
+    build_dir = app_dir / "build" / board
+    ninja_already_configured = (build_dir / "build.ninja").exists()
 
     # Lock-aware flow: refresh nsx.lock for normal runs, then materialise
     # modules/ from it before invoking the toolchain. When frozen, skip
@@ -798,7 +800,30 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     # reused as-is.
     modules_dir = app_dir / "modules"
     if ctx.config.frozen:
-        nsx_cli.sync(app_dir, frozen=True, timeout_s=timeouts.configure_s, verbose=verbose)
+        if not ninja_already_configured:
+            # First build for this board/toolchain combo: still need one
+            # verify-only sync (raises loudly on drift or a missing lock —
+            # see nsx_cli.sync's frozen docstring) plus a real `nsx
+            # configure`, since nothing has been materialised/configured
+            # here yet.
+            nsx_cli.sync(app_dir, frozen=True, timeout_s=timeouts.configure_s, verbose=verbose)
+            nsx_cli.configure(
+                app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s, verbose=verbose
+            )
+        # else: fully offline incremental rebuild. Skip nsx lock (no
+        # network resolve of the "main" branch constraint), nsx sync's
+        # module content-hash verification (a full tree hash over
+        # modules/ — real CPU/IO cost for large vendored trees), and the
+        # nsx configure() round-trip entirely. CMake's own
+        # --regenerate-during-build ninja rule transparently re-runs
+        # `cmake` if CMakeLists.txt (or any other tracked input,
+        # including hpx's freshly re-rendered templates from
+        # generate_app()) changed, with ZERO module-tree verification —
+        # so a hand-patched vendored NSX module under modules/ survives
+        # untouched across every subsequent build. This is the fast path
+        # for "I'm iterating on a local NSX module fix and want every
+        # rebuild to keep using it" (see AGENTS.md / the AP330 bring-up
+        # session that motivated this).
     else:
         nsx_cli.lock(app_dir, update=True, timeout_s=timeouts.configure_s, verbose=verbose)
         try:
@@ -808,8 +833,8 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
             if modules_dir.exists():
                 shutil.rmtree(modules_dir, ignore_errors=True)
             raise
+        nsx_cli.configure(app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s, verbose=verbose)
 
-    nsx_cli.configure(app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s, verbose=verbose)
     nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose)
     # Same gate as generate_app()'s power_binary_enabled: only build the
     # dedicated power binary when it was actually rendered into
@@ -833,7 +858,6 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
 
     # Locate build output. Prefer the ELF-form executable because later
     # reporting stages run size tools against it to capture text/data/bss.
-    build_dir = app_dir / "build" / board
     binary_path = _find_target_binary(build_dir, "hpx_profiler")
     if binary_path is None:
         raise BuildError(
