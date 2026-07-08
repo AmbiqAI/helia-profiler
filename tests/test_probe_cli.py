@@ -11,6 +11,7 @@ from helia_profiler.errors import CaptureError
 from helia_profiler.target.probe.jlink import (
     JLinkProbe,
     JLinkProbeMatch,
+    _split_posix_path_list,
     create_debug_memory_session,
 )
 from helia_profiler.platform import CoreArch
@@ -206,3 +207,17 @@ def test_create_debug_memory_session_falls_back_to_jlinkexe_wrapper_dll(
     assert isinstance(session, FakeJLink)
     assert session.lib is not None
     assert loaded == [str(dll.resolve())]
+
+
+def test_split_posix_path_list_preserves_windows_drive_letters() -> None:
+    # A naive ``str.split(":")`` mis-splits Windows absolute paths because
+    # the drive-letter colon looks identical to a path-list separator.
+    assert _split_posix_path_list(r"C:\JLink_V874") == [r"C:\JLink_V874"]
+    assert _split_posix_path_list("/usr/lib:/usr/local/lib") == [
+        "/usr/lib",
+        "/usr/local/lib",
+    ]
+    assert _split_posix_path_list(r"C:\a\dir:/usr/local/lib") == [
+        r"C:\a\dir",
+        "/usr/local/lib",
+    ]

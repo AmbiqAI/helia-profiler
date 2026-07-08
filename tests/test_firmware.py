@@ -249,7 +249,14 @@ def test_find_segger_rtt_dir_expands_explicit_env_user_home(
     home = tmp_path / "home"
     home.mkdir()
     explicit = _make_fake_rtt_root(home / "explicit")
+    # ``~`` expansion is platform-dependent: POSIX's expanduser() consults
+    # $HOME, but Windows' ntpath.expanduser() checks %USERPROFILE% first
+    # and never looks at $HOME at all. Set whichever variable(s) the
+    # current platform's expanduser() actually reads so this test exercises
+    # the real expansion path on every CI runner instead of silently
+    # resolving against the runner's own home directory on Windows.
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.setenv("SEGGER_RTT_PATH", "~/explicit")
 
     assert _find_segger_rtt_dir() == explicit.resolve()
