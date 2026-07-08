@@ -1,0 +1,45 @@
+# KWS (DS-CNN int8) on Apollo510 EVB (non-B variant) via heliaRT — MINIMAL
+# setup-cost benchmark variant. Power capture DISABLED (no dedicated power
+# binary/Joulescope round-trip) and iterations kept small so wall-clock time
+# is dominated by nsx lock/sync/configure/build/flash, not by the actual
+# inference capture loop. Used to isolate compiler-cache (sccache/ccache)
+# speedup from everything else.
+#
+# Toolchain-agnostic: pass --toolchain armclang / atfe on the CLI to reuse
+# this same config for cross-toolchain compiler-launcher checks (e.g.
+# confirming sccache is correctly skipped for armclang but still active
+# for ATfE/gcc — see build.compiler_launcher docs).
+model:
+  path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
+  arena_size: 32768
+  model_location: tcm
+
+engine:
+  type: helia-rt
+
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+  jlink_serial: "1160002204"
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+  per_layer: true
+  iterations: 20
+  warmup: 5
+  aggregation: median
+
+power:
+  enabled: false
+
+output:
+  format: json
+  dir: ./results/mlperf_tiny/kws_rt_setup_cost
+  model_explorer: false
+  detailed: false
+
+keep_work_dir: true
