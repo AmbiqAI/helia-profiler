@@ -49,6 +49,7 @@ defaults:
 env:
   UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
   UV_PYTHON_INSTALL_DIR: ${{ github.workspace }}/.uv-python
+  SEGGER_RTT_PATH: ${{ github.workspace }}/segger-rtt
 
 concurrency:
   group: hardware-validation-${{ inputs.boards }}
@@ -77,6 +78,13 @@ jobs:
 
       - name: Fetch LFS fixtures
         run: git lfs pull
+
+      - name: Fetch SEGGER RTT sources
+        run: |
+          if [[ ! -f "${SEGGER_RTT_PATH}/RTT/SEGGER_RTT.c" || ! -f "${SEGGER_RTT_PATH}/RTT/SEGGER_RTT.h" || ! -f "${SEGGER_RTT_PATH}/Config/SEGGER_RTT_Conf.h" ]]; then
+            rm -rf "${SEGGER_RTT_PATH}"
+            git clone --depth 1 https://github.com/SEGGERMicro/RTT.git "${SEGGER_RTT_PATH}"
+          fi
 
       - name: Check host dependencies
         run: uv run hpx doctor
