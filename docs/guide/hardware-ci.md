@@ -135,7 +135,8 @@ The workflow exposes only the core validation inputs:
 - `suite`: `smoke`, `models-rt`, or `models-aot`
 - `boards`: comma-separated board IDs, default `apollo510_evb,apollo330mP_evb`
 - `power`: `off`, `on`, or `both`
-- `jlink_serials`: optional comma-separated `board=serial` entries
+- `jlink_serials`: optional comma-separated `board=serial` entries, default
+  `apollo510_evb=1160003180,apollo330mP_evb=1160003409`
 - `repeat`: repeat count per selected case
 - `timeout`: per-case timeout in seconds
 
@@ -167,7 +168,8 @@ The runner must already provide:
 - optional Joulescope access and wiring when `power` is `on` or `both`
 
 Use explicit `jlink_serials` on runners with more than one probe attached, for
-example:
+or override the default mapping when moving the workflow to a different
+self-hosted runner:
 
 ```text
 apollo510_evb=1160003180,apollo330mP_evb=1160003409
