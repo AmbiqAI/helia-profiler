@@ -40,6 +40,12 @@
 // Apollo3/3P TurboSPOT (burst) control lives in the AmbiqSuite HAL umbrella.
 #include "am_mcu_apollo.h"
 {% endif %}
+{% if power_only | default(false) and (broad_peripheral_shutdown | default(false) or crypto_otp_shutdown | default(false)) and not apollo3_burst and not has_armv8m_pmu %}
+// Broad peripheral power-down (_peripheral_power_down.j2) / crypto-otp
+// shutdown (_crypto_otp_shutdown.j2) needs VCOMP/_VAL2FLD register
+// definitions from the same AmbiqSuite HAL umbrella.
+#include "am_mcu_apollo.h"
+{% endif %}
 
 {% include "_cache_shims.j2" %}
 
@@ -100,8 +106,12 @@
 // PMU profiler — per-operator recording via AOT callback
 // ---------------------------------------------------------------------------
 // Large proxy models can compile to well over 2048 operators; keep enough
-// headroom here to avoid silently truncating the capture stream.
-static constexpr int kMaxLayers = 4096;
+// headroom here to avoid silently truncating the capture stream. Templated
+// from soc.pmu_max_ops (not hardcoded -- see hpx_pmu_profiler.h.j2's
+// kMaxLayers for the analogous heliaRT constant and the same 2026-07
+// AP330 finding: a fixed 4096 here is ~96 KB of g_layers[] alone,
+// meaningful on 240 KB-TCM parts).
+static constexpr int kMaxLayers = {{ pmu_max_ops }};
 static constexpr int kMaxEvents = 4;
 
 struct HpxLayerRecord {
@@ -114,7 +124,20 @@ static nsx_pmu_config_t g_pmu_cfg;
 {% else %}
 static uint32_t g_op_start_cyccnt = 0;
 {% endif %}
+{% if not power_only | default(false) %}
+// g_layers is plain-old-data (no vtable), so unlike heliaRT's polymorphic
+// HpxPmuProfiler (main.cc.j2) it's safe in a NOLOAD/zero-init section --
+// no initialized image needs preserving. Moved off TCM for the same
+// reason as that fix: this array alone is kMaxLayers*(4*4+1, padded to
+// 20) bytes -- 80 KB at the default 4096 -- a meaningful bite out of
+// AP330's 240 KB TCM budget when combined with the arena and any
+// per-tensor TCM placement overrides. power_only builds never run
+// per-layer profiling, so this only needs the SRAM move in the
+// transport-attached binary.
+NSX_MEM_SRAM_BSS static HpxLayerRecord g_layers[kMaxLayers];
+{% else %}
 static HpxLayerRecord g_layers[kMaxLayers];
+{% endif %}
 static int g_num_layers = 0;
 static int g_num_counters = 0;
 static bool g_profiler_enabled = false;
@@ -333,13 +356,14 @@ int main(void) {
     sys_cfg.skip_bsp_init = false;
     sys_cfg.spot_mgr_profile = true;
     NSX_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
-{% if not power_only | default(false) -%}
-{% if transport == "swo" %}
-    nsx_itm_printf_enable();
-{% elif transport == "uart" %}
-    nsx_uart_printf_enable();
-{% endif %}
-{%- endif %}
+    // NOTE: do NOT call nsx_itm_printf_enable()/nsx_uart_printf_enable()
+    // here -- nsx_system_init() already brought the transport up via
+    // sys_cfg.debug.transport above.  A second enable double-increments
+    // the AmbiqSuite TPIU/ITM refcount on BSP-managed parts (e.g.
+    // apollo330P), so the single pre-window nsx_itm_printf_disable()
+    // below only decrements it to 1, am_hal_tpiu_disable() returns
+    // AM_HAL_STATUS_IN_USE, and am_bsp_itm_printf_disable()'s error
+    // path is while(1) -- firmware hangs forever at clean_window_begin.
     dwt_init();
     hpx_sync_init();
     hpx_sync_ready();
@@ -377,6 +401,9 @@ int main(void) {
 {% endif %}
 {% include "_ssram_power.j2" %}
 {% include "_extreme_mode.j2" %}
+{% include "_ble_reset.j2" %}
+{% include "_peripheral_power_down.j2" %}
+{% include "_crypto_otp_shutdown.j2" %}
 {% if power_only | default(false) %}
 
     // power_only: no transport init/attach preamble at all -- there is no

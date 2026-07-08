@@ -50,6 +50,12 @@
 // the same AmbiqSuite HAL umbrella header as the other MCU peripherals.
 #include "am_mcu_apollo.h"
 {% endif %}
+{% if power_only | default(false) and (broad_peripheral_shutdown | default(false) or crypto_otp_shutdown | default(false)) and not apollo3_burst and not has_armv8m_pmu and not (clean_window_timer | default("dwt") == "stimer") %}
+// Broad peripheral power-down (_peripheral_power_down.j2) / crypto-otp
+// shutdown (_crypto_otp_shutdown.j2) needs VCOMP/_VAL2FLD register
+// definitions from the same AmbiqSuite HAL umbrella.
+#include "am_mcu_apollo.h"
+{% endif %}
 
 {% include "_cache_shims.j2" %}
 
@@ -138,7 +144,53 @@ static uint8_t *g_arena = nullptr;
 alignas(16) static uint8_t g_arena_storage[kArenaSize];
 static uint8_t *g_arena = g_arena_storage;
 {% endif %}
+{# HpxPmuProfiler (g_profiler) is placed in NSX_MEM_SRAM rather than
+   default .bss, but ONLY in the transport-attached PMU-phase binary
+   (power_only=false): TCM is scarce there and should go to the model
+   (arena/weights), not per-layer instrumentation accumulators that don't
+   need TCM's single-cycle latency (write-once-per-layer, read out once
+   at the end of a run).
+
+   NSX_MEM_SRAM (initialized .shared section, copied from MRAM by startup)
+   and NOT NSX_MEM_SRAM_BSS (NOLOAD, zero-filled): HpxPmuProfiler is a
+   POLYMORPHIC C++ object whose vtable pointer lives in its constant-
+   initialized data image. Placing it in a zero-filled section discards
+   that image, so the first virtual BeginEvent() call dereferences a NULL
+   vptr and bus-faults (vtable slot read at address 0x8). Found 2026-07 on
+   real Apollo330mP hardware: firmware hung at the first inference invoke
+   (fault frame: ScopedMicroProfiler ctor, BFAR=0x8, CFSR=0x8200 precise
+   bus fault, R0=0x20080000 = the zeroed g_profiler).
+
+   Left in default .bss for the dedicated power binary (power_only=true)
+   deliberately, even though g_profiler is never actually used there
+   (BeginEvent/EndEvent are inert no-ops) -- moving it to SRAM there would
+   require also powering on the AP5 shared SSRAM domain in that binary
+   (see _ssram_power.j2), which would perturb the very power measurement
+   this binary exists to keep minimal. The power binary doesn't have the
+   PMU-phase binary's TCM pressure to begin with (no CSV/transport/per-
+   layer-pass code), so there's nothing to gain by moving it there anyway.
+   (Default .bss is zero-filled too, but the power binary never invokes a
+   virtual method on g_profiler -- TFLM's profiler hooks only run inside
+   the per-layer PMU passes that binary omits entirely.)
+
+   Declared unconditionally (both branches) because MicroInterpreter's
+   constructor takes &g_profiler unconditionally below.
+
+   Falls back gracefully on SoCs without a distinct SRAM section (see
+   nsx_mem.h) -- e.g. AP3, where the default .bss already targets its
+   large main SRAM, not TCM, so there is nothing to move there in the
+   first place.
+
+   AP5 family requires the shared SSRAM power domain to be explicitly
+   powered on for this to be safely readable/writable (see
+   _ssram_power.j2) -- extended there to fire whenever this profiler is
+   SRAM-resident (power_only=false), not just when the user's own
+   arena/weights are SRAM-resident. #}
+{% if power_only | default(false) %}
 static HpxPmuProfiler g_profiler;
+{% else %}
+NSX_MEM_SRAM static HpxPmuProfiler g_profiler;
+{% endif %}
 
 // Register builtin ops using the selected resolver strategy.
 static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
@@ -167,13 +219,14 @@ int main(void) {
     sys_cfg.skip_bsp_init = false;
     sys_cfg.spot_mgr_profile = true;
     NSX_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
-{% if not power_only | default(false) -%}
-{% if transport == "swo" %}
-    nsx_itm_printf_enable();
-{% elif transport == "uart" %}
-    nsx_uart_printf_enable();
-{% endif %}
-{%- endif %}
+    // NOTE: do NOT call nsx_itm_printf_enable()/nsx_uart_printf_enable()
+    // here -- nsx_system_init() already brought the transport up via
+    // sys_cfg.debug.transport above.  A second enable double-increments
+    // the AmbiqSuite TPIU/ITM refcount on BSP-managed parts (e.g.
+    // apollo330P), so the single pre-window nsx_itm_printf_disable()
+    // below only decrements it to 1, am_hal_tpiu_disable() returns
+    // AM_HAL_STATUS_IN_USE, and am_bsp_itm_printf_disable()'s error
+    // path is while(1) -- firmware hangs forever at clean_window_begin.
     dwt_init();
     hpx_sync_init();
     hpx_sync_ready();
@@ -209,8 +262,12 @@ int main(void) {
     // clock.  Harmless when it already matches (lp tiers).
     SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
 {% endif %}
+{% set pmu_profiler_sram_resident = not (power_only | default(false)) %}
 {% include "_ssram_power.j2" %}
 {% include "_extreme_mode.j2" %}
+{% include "_ble_reset.j2" %}
+{% include "_peripheral_power_down.j2" %}
+{% include "_crypto_otp_shutdown.j2" %}
 {% if power_only | default(false) %}
 
     // power_only: no transport init/attach preamble at all -- there is no

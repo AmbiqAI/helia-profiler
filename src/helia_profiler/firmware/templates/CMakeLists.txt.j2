@@ -34,6 +34,25 @@ nsx_bootstrap_app(
     MODULES ${NSX_APP_MODULES}
 )
 
+# Force the linker to resolve _sbrk from nsx-core's bounded sbrk.c
+# (libnsx_system.a) instead of the WEAK 2-instruction stub that ships inside
+# the prebuilt AmbiqSuite libam_hal.a (`movs r0, #0x58; bx lr` — returns the
+# constant address 0x58 as the heap break).  Without this, newlib's
+# _sbrk_r binds to the already-loaded HAL weak stub (classic static-archive
+# ordering trap: nsx sbrk.o is never pulled because nothing references _sbrk
+# until libc is scanned last), so every malloc — including libstdc++'s
+# exception-pool STATIC CONSTRUCTOR that runs before main() — writes to
+# address 0x58.  On Apollo510 that lands in ITCM (base 0x0) and silently
+# "works"; on Apollo330P there is no memory there and the firmware
+# HardFaults before main(), producing zero output on every transport.
+# Found 2026-07 on real Apollo330mP Rev1 hardware (stacked-fault-frame
+# analysis: _malloc_r -> _sbrk_r during __libc_init_array).
+# armclang uses ARM_LIB_HEAP + the Arm runtime instead of newlib _sbrk
+# (see nsx-core CMakeLists.txt — sbrk.c is GCC/ATfE-only), so skip it there.
+if(NOT CMAKE_C_COMPILER_ID STREQUAL "ARMClang")
+    add_link_options("-Wl,-u,_sbrk")
+endif()
+
 # --- Profiler application ---
 {% if engine_type == "helia-aot" %}
 add_executable(hpx_profiler

@@ -117,6 +117,30 @@ class ClockCapabilities:
     #: debug-domain-independent (Apollo5) so gating PD_DBG off cannot freeze
     #: the in-window timer.  See ``experiments/ap5-reset-power-matrix.md`` §4.
     gate_debug_domain_in_window: bool
+    #: Mirrors AutoDeploy's ns_power_down_peripherals(): AP4's implementation
+    #: explicitly powers down IOM/UART/ADC/MSPI(-when-unused)/GFX/DISP/USB/
+    #: PDM/I2S/SDIO/AUDADC/Crypto/VCOMP and the DEBUG power domain at boot;
+    #: AP3's and AP5's implementations are near-empty (AP3:
+    #: ns_power_down_peripherals() is a no-op; AP5 only clears XTAL/VCOMP) --
+    #: those families already read within ~1-7% of AutoDeploy without this,
+    #: so this is scoped to AP4 only rather than applied everywhere
+    #: speculatively (see AGENTS.md AP4 power-parity investigation, 2026-07).
+    broad_peripheral_shutdown: bool
+    #: Mirrors AutoDeploy's ns_power_platform_config(): on every AP5-family
+    #: run (both AP510 and AP330P -- confirmed identical between
+    #: neuralspot's apollo5/ns_power.c and apollo330/ns_power.c) AutoDeploy
+    #: unconditionally disables the CRYPTO and OTP power domains and the
+    #: voltage comparator (VCOMP) before running the model, since none of
+    #: MLPerf-Tiny-style inference needs them. hpx never did this on any
+    #: board -- confirmed by an audit showing NSX's own nsx_system_init()
+    #: only *transiently* powers CRYPTO/OTP on/off during the SWO
+    #: DCU-unlock handshake, never leaving them off persistently. This is
+    #: deliberately narrower than ``broad_peripheral_shutdown`` (no
+    #: IOM/UART/GFX/etc, no full-SRAM power-off -- those are either
+    #: AP4-specific already-validated behavior or belong in extreme_mode,
+    #: not a normal-use default) and only touches domains no user-facing
+    #: hpx feature (any transport, any engine) ever needs powered.
+    crypto_otp_shutdown: bool
 
 
 @dataclass(frozen=True)
@@ -208,6 +232,8 @@ def build_soc_capabilities(soc: SocDef) -> SocCapabilities:
         direct_burst_base_mhz=48 if family is SocFamily.AP3 else None,
         clean_window_timer="stimer" if is_ap5 else "dwt",
         gate_debug_domain_in_window=is_ap5,
+        broad_peripheral_shutdown=family is SocFamily.AP4,
+        crypto_otp_shutdown=is_ap5,
     )
     return SocCapabilities(
         reset=reset,

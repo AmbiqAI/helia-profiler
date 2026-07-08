@@ -505,6 +505,15 @@ def generate_app(ctx: PipelineContext) -> Path:
                 module_specs.append(NsxModuleSpec(name, _module_project(name, profile)))
                 module_names.add(name)
 
+    # BLE-controller-reset GPIO drive (Blue-variant boards, dedicated power
+    # binary only — see _ble_reset.j2) needs nsx-gpio even when power_sync
+    # itself is off (e.g. power.mode == "internal").
+    if power_binary_enabled and board.ble_reset_gpio_pin is not None:
+        module_names = {m.name for m in module_specs}
+        if "nsx-gpio" not in module_names:
+            module_specs.append(NsxModuleSpec("nsx-gpio", _module_project("nsx-gpio", profile)))
+            module_names.add("nsx-gpio")
+
     # Build module descriptors (name + local flag + optional overrides)
     nsx_overrides = config.build.nsx_modules
     board_mod = _board_module_name(board.name)
@@ -669,6 +678,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             src_dir / "main.cc",
             _jinja_env.get_template("main_aot.cc.j2").render(
                 **template_vars,
+                pmu_max_ops=soc.pmu_max_ops,
             ),
         )
         if power_binary_enabled:
@@ -678,6 +688,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 src_dir / "main_power.cc",
                 _jinja_env.get_template("main_aot.cc.j2").render(
                     **{**template_vars, "power_only": True},
+                    pmu_max_ops=soc.pmu_max_ops,
                 ),
             )
     else:
@@ -714,6 +725,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 cmsis_device_header=render_context.pmu.cmsis_device_header,
                 profiling_backends=profiling_backends,
                 has_armv8m_pmu=has_armv8m_pmu,
+                pmu_max_ops=soc.pmu_max_ops,
             ),
         )
         _write_text(

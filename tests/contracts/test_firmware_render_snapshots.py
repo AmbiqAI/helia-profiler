@@ -62,6 +62,7 @@ _MARKERS: dict[str, str] = {
     "heartbeat": "HPX_HEARTBEAT",
     "ssram_power_ap5": "ns_power",
     "newlib_syscalls": "_sbrk",
+    "peripheral_power_down": "AM_HAL_PWRCTRL_PERIPH_IOM0",
 }
 
 
@@ -107,8 +108,13 @@ def _common_kwargs(soc_name: str, transport: str) -> dict:
         "cmsis_device_header": soc.cmsis_header,
         "has_dcache": soc.capabilities.memory.has_dcache,
         "manages_shared_ssram_power": soc.capabilities.memory.has_shared_ssram_power_domain,
+        "ssram_full_power_enum": soc.ssram_full_power_enum,
         "clean_window_timer": soc.capabilities.clock.clean_window_timer,
         "gate_debug_domain_in_window": soc.capabilities.clock.gate_debug_domain_in_window,
+        "broad_peripheral_shutdown": soc.capabilities.clock.broad_peripheral_shutdown,
+        "crypto_otp_shutdown": soc.capabilities.clock.crypto_otp_shutdown,
+        "has_radio_subsystem": soc.has_radio_subsystem,
+        "pmu_max_ops": soc.pmu_max_ops,
         "transport": transport,
         "usb_serial_marker": None,
         "usb_serial_product": "NSX HPX Profiler",
@@ -334,3 +340,223 @@ def test_transport_specific_blocks_are_pinned():
     # AP5 has the Armv8-M PMU; AP3/AP4 are DWT-only.
     assert _digest(_render("apollo510", "rtt", "tflm"))["markers"]["armv8m_pmu"] is True
     assert _digest(_render("apollo3p", "rtt", "tflm"))["markers"]["armv8m_pmu"] is False
+
+
+def test_ble_reset_only_in_power_only_binary_for_blue_boards():
+    """Blue-variant boards (Cooper BLE SiP) hold the radio in hardware reset
+    -- but ONLY in the dedicated power binary (power_only=True). The
+    transport-attached PMU-phase binary is untouched, and non-Blue boards
+    (ble_reset_gpio_pin unset) never emit this code at all.
+    """
+    kwargs = _common_kwargs("apollo4p", "rtt")
+    kwargs.update(
+        engine_header=TFLM_ENGINE_HEADER,
+        arena_size=65_536,
+        model_location="mram",
+        model_size=1024,
+        resolver_mode="all",
+        resolver_max_ops=2,
+        resolver_registrations=["r.AddConv2D();", "r.AddSoftmax();"],
+        resource_variable_count=0,
+        printf_linkage="",
+        ble_reset_gpio_pin=55,
+    )
+
+    power_rendered = _jinja_env.get_template("main.cc.j2").render(**{**kwargs, "power_only": True})
+    assert "bleResetCfg" in power_rendered
+    assert "NSX_GPIO_LEVEL_LOW" in power_rendered
+    assert "nsx_gpio.h" in power_rendered
+
+    transport_rendered = _jinja_env.get_template("main.cc.j2").render(
+        **{**kwargs, "power_only": False}
+    )
+    assert "bleResetCfg" not in transport_rendered
+
+    # A board with no Cooper radio (ble_reset_gpio_pin unset) never emits it,
+    # even in the power_only binary.
+    no_ble_kwargs = dict(kwargs)
+    no_ble_kwargs.pop("ble_reset_gpio_pin")
+    no_ble_rendered = _jinja_env.get_template("main.cc.j2").render(
+        **{**no_ble_kwargs, "power_only": True}
+    )
+    assert "bleResetCfg" not in no_ble_rendered
+
+
+def test_peripheral_power_down_ap4_power_only_only():
+    """AP4's broad peripheral power-down (mirrors AutoDeploy's
+    ns_power_down_peripherals()) only fires in the dedicated power binary,
+    and only for the AP4 family -- AP3's AutoDeploy implementation is an
+    empty no-op and AP5's only clears XTAL/VCOMP, so neither needs (or gets)
+    this block.
+    """
+    ap4_power = _render("apollo4p", "rtt", "tflm", power_only=True)
+    assert "AM_HAL_PWRCTRL_PERIPH_IOM0" in ap4_power
+    assert "AM_HAL_PWRCTRL_PERIPH_DEBUG" in ap4_power
+    assert "AM_HAL_PWRCTRL_PERIPH_MSPI0" in ap4_power  # no PSRAM in _common_kwargs
+
+    ap4_transport = _render("apollo4p", "rtt", "tflm", power_only=False)
+    assert "AM_HAL_PWRCTRL_PERIPH_IOM0" not in ap4_transport
+
+
+def test_crypto_otp_shutdown_ap5_power_only_only():
+    """AP5's narrow crypto/OTP/VCOMP power-down (mirrors the unconditional
+    part of AutoDeploy's ns_power_platform_config()) only fires in the
+    dedicated power binary, and only for AP5-family SoCs. This is
+    deliberately separate from/narrower than AP4's broad_peripheral_shutdown
+    (no IOM/UART/memory changes -- see _crypto_otp_shutdown.j2 docstring).
+    apollo330P additionally emits am_hal_pwrctrl_rss_pwroff() (its HAL
+    exposes the internal radio-subsystem power-down AutoDeploy also calls);
+    apollo510 does not, since its HAL variant lacks the symbol.
+    """
+    ap510_power = _render("apollo510", "rtt", "tflm", power_only=True)
+    assert "AM_HAL_PWRCTRL_PERIPH_CRYPTO" in ap510_power
+    assert "AM_HAL_PWRCTRL_PERIPH_OTP" in ap510_power
+    assert "am_hal_pwrctrl_rss_pwroff" not in ap510_power  # not on plain apollo510's HAL
+
+    ap510_transport = _render("apollo510", "rtt", "tflm", power_only=False)
+    assert "AM_HAL_PWRCTRL_PERIPH_CRYPTO" not in ap510_transport
+
+    ap330_power = _render("apollo330P", "rtt", "tflm", power_only=True)
+    assert "am_hal_pwrctrl_rss_pwroff" in ap330_power
+
+    # AP4 doesn't get this narrow block -- broad_peripheral_shutdown already
+    # covers crypto/VCOMP there.
+    ap4_power = _render("apollo4p", "rtt", "tflm", power_only=True)
+    assert "am_hal_pwrctrl_rss_pwroff" not in ap4_power
+
+
+def test_extreme_mode_power_only_only():
+    """extreme_mode (SSRAM off + MRAM collapsed to a single NVM bank) only
+    fires in the dedicated power binary (2026-07 finding: it used to fire
+    unconditionally in both binaries, risking a firmware-size overflow
+    crash in the larger transport-attached PMU-phase binary for zero
+    measurement benefit -- DWT/PMU cycle counts don't depend on SSRAM/NVM
+    power state). Requires arena+weights both in TCM.
+    """
+    kwargs = _common_kwargs("apollo510", "rtt")
+    kwargs.update(
+        engine_header=TFLM_ENGINE_HEADER,
+        arena_size=65_536,
+        model_location="mram",
+        model_size=1024,
+        resolver_mode="all",
+        resolver_max_ops=2,
+        resolver_registrations=["r.AddConv2D();", "r.AddSoftmax();"],
+        resource_variable_count=0,
+        printf_linkage="",
+        arena_region="tcm",
+        weights_region="tcm",
+        extreme_mode=True,
+    )
+    power_rendered = _jinja_env.get_template("main.cc.j2").render(**{**kwargs, "power_only": True})
+    assert "AM_HAL_PWRCTRL_NVM0_ONLY" in power_rendered
+    assert "EXTREME MODE" in power_rendered
+
+    transport_rendered = _jinja_env.get_template("main.cc.j2").render(
+        **{**kwargs, "power_only": False}
+    )
+    assert "AM_HAL_PWRCTRL_NVM0_ONLY" not in transport_rendered
+    assert "EXTREME MODE" not in transport_rendered
+
+    # Still requires TCM/TCM even in the power_only binary.
+    non_tcm_kwargs = {**kwargs, "arena_region": "sram", "weights_region": "mram"}
+    non_tcm_rendered = _jinja_env.get_template("main.cc.j2").render(
+        **{**non_tcm_kwargs, "power_only": True}
+    )
+    assert "AM_HAL_PWRCTRL_NVM0_ONLY" not in non_tcm_rendered
+
+
+def test_pmu_profiler_sram_placement_transport_only_on_ap5():
+    """HpxPmuProfiler (g_profiler) moves to NSX_MEM_SRAM (freeing TCM
+    for the model) only in the transport-attached PMU-phase binary, and
+    only takes effect where it matters (AP5 family, which needs the
+    shared SSRAM domain explicitly powered). The dedicated power binary
+    keeps g_profiler in default .bss unconditionally -- even though it's
+    unused there -- to avoid adding an SSRAM power-on step that would
+    perturb the very power measurement that binary exists to keep clean.
+    """
+    ap510_transport = _render("apollo510", "rtt", "tflm", power_only=False)
+    # NSX_MEM_SRAM (initialized .shared, copied from MRAM), NOT SRAM_BSS
+    # (NOLOAD zero-fill would discard the polymorphic object's vtable
+    # pointer image -- NULL-vptr bus fault at the first virtual call,
+    # found on real Apollo330mP hardware 2026-07).
+    assert "NSX_MEM_SRAM static HpxPmuProfiler g_profiler;" in ap510_transport
+    assert "AM_HAL_PWRCTRL_SRAM_3M" in ap510_transport  # SSRAM powered on
+
+    ap510_power = _render("apollo510", "rtt", "tflm", power_only=True)
+    assert "NSX_MEM_SRAM static HpxPmuProfiler g_profiler;" not in ap510_power
+    assert "static HpxPmuProfiler g_profiler;" in ap510_power
+    assert "Shared SSRAM power-on" not in ap510_power
+
+    # AP3 has no shared-SSRAM concept at all -- NSX_MEM_SRAM_BSS still
+    # applies (falls back gracefully per nsx_mem.h), but there is no
+    # SSRAM power-on step to add since manages_shared_ssram_power is
+    # AP5-only.
+    ap3_transport = _render("apollo3p", "rtt", "tflm", power_only=False)
+    assert "NSX_MEM_SRAM static HpxPmuProfiler g_profiler;" in ap3_transport
+    assert "Shared SSRAM power-on" not in ap3_transport
+
+
+def test_ssram_full_power_enum_is_per_soc():
+    """The AmbiqSuite HAL enum for "power on the entire shared SSRAM array"
+    varies by SoC (it encodes each part's actual SSRAM capacity) even
+    though it maps to the same underlying register value on every AP5
+    part. AP510 has 3 MB (AM_HAL_PWRCTRL_SRAM_3M); apollo330P's real
+    SSRAM is only ~1.75 MB and its HAL does not define SRAM_3M at all
+    (confirmed 2026-07 against the real synced HAL headers) -- it must
+    use AM_HAL_PWRCTRL_SRAM_1P75M instead, or the generated firmware
+    fails to compile on that board.
+    """
+    kwargs = _common_kwargs("apollo330P", "rtt")
+    kwargs.update(
+        engine_header=TFLM_ENGINE_HEADER,
+        arena_size=65_536,
+        model_location="mram",
+        model_size=1024,
+        resolver_mode="all",
+        resolver_max_ops=2,
+        resolver_registrations=["r.AddConv2D();", "r.AddSoftmax();"],
+        resource_variable_count=0,
+        printf_linkage="",
+        arena_region="sram",
+        weights_region="mram",
+    )
+    ap330_rendered = _jinja_env.get_template("main.cc.j2").render(**kwargs)
+    assert "AM_HAL_PWRCTRL_SRAM_1P75M" in ap330_rendered
+    assert "AM_HAL_PWRCTRL_SRAM_3M" not in ap330_rendered
+
+    ap510_rendered = _render("apollo510", "rtt", "tflm")
+    assert "AM_HAL_PWRCTRL_SRAM_3M" in ap510_rendered
+    assert "AM_HAL_PWRCTRL_SRAM_1P75M" not in ap510_rendered
+
+
+    # AP3/AP5 never emit this block, even in the power_only binary --
+    # matches AutoDeploy's own per-family ns_power_down_peripherals().
+    ap3_power = _render("apollo3p", "rtt", "tflm", power_only=True)
+    assert "AM_HAL_PWRCTRL_PERIPH_IOM0" not in ap3_power
+    ap510_power = _render("apollo510", "rtt", "tflm", power_only=True)
+    assert "AM_HAL_PWRCTRL_PERIPH_IOM0" not in ap510_power
+
+
+def test_peripheral_power_down_skips_mspi_when_psram_in_use():
+    """MSPI0-2 must stay enabled when PSRAM actually backs the arena/weights
+    -- disabling them would break a live PSRAM-resident power capture.
+    """
+    kwargs = _common_kwargs("apollo4p", "rtt")
+    kwargs.update(
+        engine_header=TFLM_ENGINE_HEADER,
+        arena_size=65_536,
+        model_location="mram",
+        model_size=1024,
+        resolver_mode="all",
+        resolver_max_ops=2,
+        resolver_registrations=["r.AddConv2D();", "r.AddSoftmax();"],
+        resource_variable_count=0,
+        printf_linkage="",
+        arena_region="psram",
+        power_only=True,
+    )
+    rendered = _jinja_env.get_template("main.cc.j2").render(**kwargs)
+    assert "AM_HAL_PWRCTRL_PERIPH_IOM0" in rendered  # rest of the block still fires
+    assert "AM_HAL_PWRCTRL_PERIPH_MSPI0" not in rendered
+

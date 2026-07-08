@@ -1,0 +1,41 @@
+{# _ble_reset.j2 — hold the onboard Cooper BLE controller in hardware reset
+   for the duration of a dedicated power capture.
+
+   "Blue"-variant SiP boards (apollo4p_blue_kxr_evb, apollo4p_blue_kbr_evb,
+   apollo4l_blue_evb, ...) package a companion Cooper BLE radio alongside the
+   Apollo die. If left un-reset it free-runs and idles at non-trivial standby
+   current -- current a non-Blue board of the same family simply doesn't
+   have, since it has no BLE radio present at all. AutoDeploy's power
+   template (ns_power_down_peripherals(), bNeedBluetooth=false) always drives
+   this pin low-high-low to force the controller into reset before a power
+   capture; hpx did not replicate this until now (see AGENTS.md power-parity
+   investigation, 2026-07 AP4 KXR run).
+
+   Only rendered when the board actually has a Cooper BLE controller
+   (board.ble_reset_gpio_pin is set) -- a plain, non-Blue board leaves this
+   block out entirely. Scoped to power_only: the dedicated power binary is
+   the one this measurably affects; the transport-attached PMU-phase binary
+   is left untouched to avoid perturbing existing snapshot/render
+   contracts. #}
+{% if power_only | default(false) and (ble_reset_gpio_pin | default(none)) %}
+
+    // ---------------------------------------------------------------------
+    // Hold the onboard Cooper BLE controller in hardware reset (mirrors
+    // AutoDeploy's ns_power_down_peripherals() with bNeedBluetooth=false).
+    // The Cooper reset line is active-low: driving/holding it LOW keeps the
+    // radio held in reset (no clock, minimal standby current).
+    // ---------------------------------------------------------------------
+    {
+        nsx_gpio_config_t bleResetCfg = {
+            .api = &nsx_gpio_current_version,
+            .pin = {{ ble_reset_gpio_pin }},
+            .mode = NSX_GPIO_MODE_OUTPUT,
+            .initial_level = NSX_GPIO_LEVEL_LOW,
+            .trigger = NSX_GPIO_TRIGGER_NONE,
+            .irq_cb = nullptr,
+            .irq_ctx = nullptr,
+        };
+        (void)nsx_gpio_init(&bleResetCfg);
+        (void)nsx_gpio_write({{ ble_reset_gpio_pin }}, NSX_GPIO_LEVEL_LOW);
+    }
+{% endif %}

@@ -153,6 +153,29 @@ class SocDef:
     #: at preflight with a clear message instead of failing at nsx lock.
     has_usb: bool = True
 
+    #: AmbiqSuite HAL enum literal for "power on the entire shared SSRAM
+    #: array" (AM_HAL_PWRCTRL_SRAM_config's eSRAMCfg/eActiveWithMCU/
+    #: eSRAMRetain full-power value). AP5-family only (see
+    #: capabilities.has_shared_ssram_power_domain) -- the enum NAME varies
+    #: by SoC because it encodes each part's actual SSRAM capacity, even
+    #: though it maps to the same "power everything" register value
+    #: (PWRENSSRAM_ALL) on every AP5 part: AP510/AP510B/AP5B have 3 MB of
+    #: SSRAM (AM_HAL_PWRCTRL_SRAM_3M), while apollo330P has only ~1.75 MB
+    #: (AM_HAL_PWRCTRL_SRAM_1P75M) -- confirmed 2026-07 against the real
+    #: synced HAL headers for each part; the two are NOT interchangeable
+    #: (apollo330P's am_hal_pwrctrl.h does not define SRAM_3M at all).
+    ssram_full_power_enum: str = "AM_HAL_PWRCTRL_SRAM_3M"
+
+    #: Whether this part's HAL exposes am_hal_pwrctrl_rss_pwroff() (the
+    #: internal radio subsystem / BLE-radio power-down AutoDeploy calls in
+    #: ns_power_platform_config() when the app doesn't need Bluetooth).
+    #: Confirmed 2026-07 by checking the synced AmbiqSuite HAL headers
+    #: directly: apollo330P and apollo510L define it; the plain apollo510
+    #: (non-L) HAL this project's "apollo510"/"apollo510b" SocDefs use does
+    #: NOT -- calling it there would be a link error, so this must stay
+    #: per-part rather than assumed true for the whole AP5 family.
+    has_radio_subsystem: bool = False
+
     def clock_domain(self, name: str) -> ClockDomain | None:
         """Return the named clock domain, or ``None`` if not present."""
         return next((d for d in self.clocks if d.name == name), None)
@@ -479,10 +502,30 @@ _register_soc(
         pmu_tier=PmuTier.ARMV8M_PMU,
         has_mve=True,
         memory=MemoryLayout(
-            mram_kb=4096,
-            sram_kb=3072,
-            dtcm_kb=512,
-            itcm_kb=256,
+            # Corrected 2026-07 against the actual synced NSX linker script
+            # (nsx-core/src/apollo330P/gcc/linker_script_sbl.ld) for this
+            # Rev1 EVB -- the previous values were copy-pasted from
+            # apollo510 (same address map/family) but this SoC's real
+            # memory regions are substantially smaller:
+            #   MCU_TCM     0x20000000, LENGTH=245760  ->  240 KB (was 512)
+            #   SHARED_SRAM 0x20080000, LENGTH=1835008 -> 1792 KB (was 3072)
+            #   MCU_MRAM    0x00410000, LENGTH=2031616 -> 1984 KB app-usable
+            #               (post-SBL; was 4096, the AP510 full-part value)
+            # This board's linker script does not declare a separate ITCM
+            # region at all (unlike AP510's split ITCM/DTCM banks) -- TCM is
+            # unified into the single MCU_TCM region above, so itcm_kb=0
+            # rather than carrying over AP510's 256.
+            # dtcm_kb/sram_kb/mram_kb are direct arena/weights placement
+            # CAPACITY CHECKS (plan_memory.py, validation/matrix.py) --
+            # the previous inflated values would have silently accepted
+            # placements that overflow the real linked memory and only
+            # fail at build/link time (confirmed on real hardware: a KWS
+            # capture's .bss+.data overflowed the true 240 KB MCU_TCM by
+            # 776 bytes while claiming to fit comfortably under 512 KB).
+            mram_kb=1984,
+            sram_kb=1792,
+            dtcm_kb=240,
+            itcm_kb=0,
             psram_kb=32768,
         ),
         clocks=(
@@ -497,10 +540,56 @@ _register_soc(
         ),
         c_define="AM_PART_APOLLO330P",
         cmsis_header="apollo330P.h",
-        # See apollo510: M55 RTT lives in non-cached TCM (.bss), DTCM @ 0x20000000.
-        rtt_scan_ranges=((0x20000000, 0x80000),),
-        jlink_device="AP330NFA-CBR",
-        pmu_max_ops=4096,
+        # See apollo510: M55 RTT lives in non-cached TCM (.bss), DTCM @
+        # 0x20000000.  Scan length matches this part's REAL 240 KB MCU_TCM
+        # (0x3C000, from the linker script — see the MemoryLayout comment
+        # above), not AP510's 512 KB (0x80000): scanning past the end of
+        # physical TCM risks bus-faulting the debug read or matching
+        # garbage in unmapped space.
+        rtt_scan_ranges=((0x20000000, 0x3C000),),
+        # J-Link device string for AP330 is NOT in JLinkExe's stock device
+        # database -- it's a custom Ambiq-provided entry
+        # ("Apollo330P_510L", inheriting AP510NFA-CBR's debug/reset
+        # sequence in ~/.config/SEGGER/JLinkDevices/AmbiqMicro/JLinkDevices.xml).
+        # "AP330NFA-CBR" (the datasheet part number) is NOT a registered
+        # device string at all and silently fails core identification
+        # (JLinkExe still resets generically via -autoconnect without
+        # full device-DB knowledge, but never prints the "Cortex-M55
+        # identified" banner _inspect_probe_target()/probes match parses,
+        # so probe resolution always reports "unknown target"). Confirmed
+        # 2026-07 against real Apollo330mP Rev1 EVB hardware.
+        jlink_device="Apollo330P_510L",
+        # Corrected 2026-07 alongside the memory-layout fix above: heliaRT's
+        # per-layer PMU profiler (HpxPmuProfiler/g_profiler) statically
+        # reserves ~24 bytes per pmu_max_ops entry regardless of the actual
+        # model's layer count -- at 4096 (copied from apollo510, which has
+        # over 2x this board's real TCM) that alone is ~96 KB, over a third
+        # of this board's real 240 KB MCU_TCM budget, for models that only
+        # use a small fraction of it (KWS: 13 layers, VWW/heliaAOT: 31).
+        # 512 keeps ~16x headroom over the largest layer count seen in this
+        # profiler's own MLPerf Tiny fixtures while freeing ~84 KB of the
+        # real budget back for the arena/model/RTT buffers that actually
+        # need it on this more memory-constrained board.
+        pmu_max_ops=512,
+        # This board's real SSRAM capacity is ~1.75 MB (confirmed via the
+        # linker script fix above), not AP510's 3 MB -- its HAL only
+        # defines AM_HAL_PWRCTRL_SRAM_1P75M (does not have SRAM_3M at all).
+        ssram_full_power_enum="AM_HAL_PWRCTRL_SRAM_1P75M",
+        # AP330P's TPIU trace clock is a FIXED 48 MHz XTAL_HS, NOT the CPU
+        # clock -- unlike apollo510/5B (core-clocked HFRC_96MHz path).
+        # Ground truth: NSX's nsx_system_platform.c groups APOLLO330P with
+        # APOLLO510L ("Trace clock on these parts = XTAL_HS 48 MHz.  JLink
+        # SWO viewer: -cpufreq 48000000") and NSX's
+        # cmake/socs/facts/apollo330P.cmake sets NSX_SEGGER_CPUFREQ=48000000.
+        # Without this the host programs the SWO prescaler against the CPU
+        # clock (96/250 MHz) and decodes garbage -> "no data" on the swo
+        # transport even though the firmware is printing. Same quirk (and
+        # same field/comment pattern) as apollo3p above.
+        swo_trace_clock_mhz=48,
+        # apollo330P's HAL defines am_hal_pwrctrl_rss_pwroff() (unlike the
+        # plain apollo510/apollo510b HAL variants this project builds
+        # against) -- see SocDef.has_radio_subsystem docstring.
+        has_radio_subsystem=True,
     )
 )
 

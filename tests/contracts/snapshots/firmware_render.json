@@ -13,11 +13,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": true,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "86dcbd327a345bf4d99e88add1a9b18520eea587d6cd3edc85909c690782a666"
+    "sha256": "7a995f6e31457f1bb357767a37853f1e7d316265dd103b972173691370a732c1"
   },
   "apollo3p|rtt|helia-aot|power": {
     "markers": {
@@ -33,11 +34,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "36ddae83431201681fa994bccaa5813eee8665c8cfd105e6e44fd69c788b4f9c"
+    "sha256": "3eee1e36109836faecda7cda98ea337cd674eca096eac0d4b7604375cb373953"
   },
   "apollo3p|rtt|helia-rt": {
     "markers": {
@@ -53,11 +55,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": true,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "583583c6e7a2d7d9173ca8434b4520661909030ff76a5514757215744984fa8e"
+    "sha256": "dc028272d34c0ee167fa1381601699dc9d4b222cd17b9fd4c3f50fa27e4e665c"
   },
   "apollo3p|rtt|helia-rt|power": {
     "markers": {
@@ -73,11 +76,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "a8a84ad446bb1125cfa0d153117d0a5b1935f8c964c56f44dc4ee1d4c7f95ebe"
+    "sha256": "e9ffe3c37222bd35a1284e4cd98ad20b8f58087e5078bcde5cec4c501c2f93b2"
   },
   "apollo3p|rtt|tflm": {
     "markers": {
@@ -93,11 +97,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": true,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "583583c6e7a2d7d9173ca8434b4520661909030ff76a5514757215744984fa8e"
+    "sha256": "dc028272d34c0ee167fa1381601699dc9d4b222cd17b9fd4c3f50fa27e4e665c"
   },
   "apollo3p|rtt|tflm|power": {
     "markers": {
@@ -113,11 +118,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "a8a84ad446bb1125cfa0d153117d0a5b1935f8c964c56f44dc4ee1d4c7f95ebe"
+    "sha256": "e9ffe3c37222bd35a1284e4cd98ad20b8f58087e5078bcde5cec4c501c2f93b2"
   },
   "apollo3p|swo|helia-aot": {
     "markers": {
@@ -133,11 +139,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "51a1fcae84d83ad1aa7f159a8f4655a192cbb10d8bf060dbcfe8dc8d031407c8"
+    "sha256": "81d9273b90fcd8725239f7b75ab92fe1569f28a285d675117dbe199cc3e4e201"
   },
   "apollo3p|swo|helia-rt": {
     "markers": {
@@ -153,11 +160,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "e4b32fd1f0e2bbecb34d38efe4cf590343c27d427b9ca4f9e224d037ecf3d9ad"
+    "sha256": "1023a31bc846a7c5ae0245bcc4432ce24404410be743d4786c910ecc3dbd983e"
   },
   "apollo3p|swo|tflm": {
     "markers": {
@@ -173,11 +181,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "e4b32fd1f0e2bbecb34d38efe4cf590343c27d427b9ca4f9e224d037ecf3d9ad"
+    "sha256": "1023a31bc846a7c5ae0245bcc4432ce24404410be743d4786c910ecc3dbd983e"
   },
   "apollo3p|uart|helia-aot": {
     "markers": {
@@ -193,11 +202,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "83e7d03baa2adc1ab8c264c62fc19fa21a3270abb3c76781ed026fe7e3d24c01"
+    "sha256": "9572b2504ca68162d293914f9fd0bb5297c67901adb0d32462449a5fdf434be4"
   },
   "apollo3p|uart|helia-rt": {
     "markers": {
@@ -213,11 +223,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "70b6c5da4ae2685c4681c918178c7b9c3b20a35ecff411f3e61d9d299e800c2f"
+    "sha256": "7d3b09cad8d5c9fee9b0caa4aea9931987b2291bdc211314dc67b5ecb79df080"
   },
   "apollo3p|uart|tflm": {
     "markers": {
@@ -233,11 +244,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "70b6c5da4ae2685c4681c918178c7b9c3b20a35ecff411f3e61d9d299e800c2f"
+    "sha256": "7d3b09cad8d5c9fee9b0caa4aea9931987b2291bdc211314dc67b5ecb79df080"
   },
   "apollo3p|usb_cdc|helia-aot": {
     "markers": {
@@ -253,11 +265,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": true
     },
-    "sha256": "62f1145833ccb93499c566dbad953754a71ad1bf190a97e68344549e0b20f7a1"
+    "sha256": "31469cc5c4a001ad5e59dceabfab68a85967b37737df7c71bfa8c5bac616168e"
   },
   "apollo3p|usb_cdc|helia-rt": {
     "markers": {
@@ -273,11 +286,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": true
     },
-    "sha256": "4c84300d20663a691301452726e355a457fa5f9565fb8c58d3d8cd00c9c2284d"
+    "sha256": "d6bac979efc40120e14687fa7e1753140654d0bdf76b3475946f00052664aebe"
   },
   "apollo3p|usb_cdc|tflm": {
     "markers": {
@@ -293,11 +307,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": true
     },
-    "sha256": "4c84300d20663a691301452726e355a457fa5f9565fb8c58d3d8cd00c9c2284d"
+    "sha256": "d6bac979efc40120e14687fa7e1753140654d0bdf76b3475946f00052664aebe"
   },
   "apollo4p|rtt|helia-aot": {
     "markers": {
@@ -313,11 +328,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": true,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "c03cc3437896b87c52125dda6515371d20732bec915ece402a7d8798a9eb528d"
+    "sha256": "454bb45a1a0ec0c35a2ad7b64649232f892bce39ac849db323fe9e81ad61768c"
   },
   "apollo4p|rtt|helia-aot|power": {
     "markers": {
@@ -333,11 +349,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": true,
       "rtt_config": false,
-      "ssram_power_ap5": false,
+      "ssram_power_ap5": true,
       "usb_timer": false
     },
-    "sha256": "fb19bef8bcd54c61db7003cde4cad818372fe0d384e349f25b2b0397fb991b41"
+    "sha256": "ae0519a041704103792242b1afd2f694a461f38f54cc595f9424624f86b6d7e4"
   },
   "apollo4p|rtt|helia-rt": {
     "markers": {
@@ -353,11 +370,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": true,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "6f7e8269f0be742abe3174add2760939c9b8f8309f34014fe9c3d6a5309dcc04"
+    "sha256": "bd6fc3cc903daf3c7f5fbd4e5e4b0fdcfeef5308da42e4a0218a341712eb2633"
   },
   "apollo4p|rtt|helia-rt|power": {
     "markers": {
@@ -373,11 +391,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": true,
       "rtt_config": false,
-      "ssram_power_ap5": false,
+      "ssram_power_ap5": true,
       "usb_timer": false
     },
-    "sha256": "525e7881a20806b6e37458fe0b43274d778fc80d40645f2fe0bc2758130f065f"
+    "sha256": "b7f8420ce6e373f35aeee91b4d9f0a72e673f3424a3824380366c03dc70c6eff"
   },
   "apollo4p|rtt|tflm": {
     "markers": {
@@ -393,11 +412,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": true,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "6f7e8269f0be742abe3174add2760939c9b8f8309f34014fe9c3d6a5309dcc04"
+    "sha256": "bd6fc3cc903daf3c7f5fbd4e5e4b0fdcfeef5308da42e4a0218a341712eb2633"
   },
   "apollo4p|rtt|tflm|power": {
     "markers": {
@@ -413,11 +433,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": true,
       "rtt_config": false,
-      "ssram_power_ap5": false,
+      "ssram_power_ap5": true,
       "usb_timer": false
     },
-    "sha256": "525e7881a20806b6e37458fe0b43274d778fc80d40645f2fe0bc2758130f065f"
+    "sha256": "b7f8420ce6e373f35aeee91b4d9f0a72e673f3424a3824380366c03dc70c6eff"
   },
   "apollo4p|swo|helia-aot": {
     "markers": {
@@ -433,11 +454,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "0f2f6bf2e7eb09446f2406b5e82f80fdfa70a1fb77a22968a43d4dd92293aeb6"
+    "sha256": "525824cc791ee89bfba1d2a50a66a271b14e81e2d1c5e679cea6782d86df18e7"
   },
   "apollo4p|swo|helia-rt": {
     "markers": {
@@ -453,11 +475,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "be640bc582664e41e21f3d9f3ca690ee270e6e17e4b5ba21dbc86918cd5f0e5d"
+    "sha256": "7d4185c4b2c259edafbfc8f31b510f05515f949b1bd21597185be2907344fd54"
   },
   "apollo4p|swo|tflm": {
     "markers": {
@@ -473,11 +496,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "be640bc582664e41e21f3d9f3ca690ee270e6e17e4b5ba21dbc86918cd5f0e5d"
+    "sha256": "7d4185c4b2c259edafbfc8f31b510f05515f949b1bd21597185be2907344fd54"
   },
   "apollo4p|uart|helia-aot": {
     "markers": {
@@ -493,11 +517,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "fceb3ec7ab0b0b3b6e0ab5018d1ba9f4ddd63ccabf880f1768eda5016da0c48a"
+    "sha256": "29ce9b34accfb0d35eb40bb76743e4373e2f543ca7f0affa9d93a250333bba8a"
   },
   "apollo4p|uart|helia-rt": {
     "markers": {
@@ -513,11 +538,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "3ba7a7f89a1dabe520ce6b5a2aaf6c334947e84b1f11ccdd02c84deca3b5a8a0"
+    "sha256": "4c20f08531cf6a5dace7f03242a4d892017192b33cd6c1f9adaf244c7f348440"
   },
   "apollo4p|uart|tflm": {
     "markers": {
@@ -533,11 +559,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "3ba7a7f89a1dabe520ce6b5a2aaf6c334947e84b1f11ccdd02c84deca3b5a8a0"
+    "sha256": "4c20f08531cf6a5dace7f03242a4d892017192b33cd6c1f9adaf244c7f348440"
   },
   "apollo4p|usb_cdc|helia-aot": {
     "markers": {
@@ -553,11 +580,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": true
     },
-    "sha256": "3b385a5889d77258827404c70b212c1f9e7d2a6e3d3e2e837d388d5b6c2b1d2a"
+    "sha256": "6bf78184a408f8433c456d6e23e4cd234974472755cae8335f8da3b3f77e793e"
   },
   "apollo4p|usb_cdc|helia-rt": {
     "markers": {
@@ -573,11 +601,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": true
     },
-    "sha256": "47e8e7734bdab7d532ddf952eb61b7739781c5a33aaffa6b09fce35543c90660"
+    "sha256": "298e954b9202e024c1a8b66b9f84339c25a22992e902f97eb694f42e144550fe"
   },
   "apollo4p|usb_cdc|tflm": {
     "markers": {
@@ -593,11 +622,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": true,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": true
     },
-    "sha256": "47e8e7734bdab7d532ddf952eb61b7739781c5a33aaffa6b09fce35543c90660"
+    "sha256": "298e954b9202e024c1a8b66b9f84339c25a22992e902f97eb694f42e144550fe"
   },
   "apollo510|rtt|helia-aot": {
     "markers": {
@@ -613,11 +643,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": true,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "b0a679784798f6b1fa8de686aff68d58a14eee30c88c63f129d5d55572e64689"
+    "sha256": "c5265fc715f5c4e9d4004b41253bb40d057542b286f67c0324eb31987433d619"
   },
   "apollo510|rtt|helia-aot|power": {
     "markers": {
@@ -633,11 +664,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": false,
-      "ssram_power_ap5": false,
+      "ssram_power_ap5": true,
       "usb_timer": false
     },
-    "sha256": "a9038b44ebd9c1cbef2c28ca3ce288ac97ffa5e6c171420e96245bb0026bb32e"
+    "sha256": "030015ab178fcb0c58fdfbcf565f7d342b69789311f10b88e946d7bf3cdb5b73"
   },
   "apollo510|rtt|helia-rt": {
     "markers": {
@@ -653,11 +685,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": true,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "cba421f99a52c89ef4f60d99178e27453d9d69f9d11d471bdf01c0543a1f917a"
+    "sha256": "30f15dde7668aec5e395a0a13741315a40d10641e1c81b76a59f178d7e661754"
   },
   "apollo510|rtt|helia-rt|power": {
     "markers": {
@@ -673,11 +706,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": false,
-      "ssram_power_ap5": false,
+      "ssram_power_ap5": true,
       "usb_timer": false
     },
-    "sha256": "23c4e7b9c48af2289e2f77c0f5d7a95fc5970f5e3fc47f9f6b81bbe99cfb412d"
+    "sha256": "204b6c996e3784cd5ca1007f40880720a5ccd732545d0e3abc61cbfa7942b6ec"
   },
   "apollo510|rtt|tflm": {
     "markers": {
@@ -693,11 +727,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": true,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "cba421f99a52c89ef4f60d99178e27453d9d69f9d11d471bdf01c0543a1f917a"
+    "sha256": "30f15dde7668aec5e395a0a13741315a40d10641e1c81b76a59f178d7e661754"
   },
   "apollo510|rtt|tflm|power": {
     "markers": {
@@ -713,11 +748,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": false,
-      "ssram_power_ap5": false,
+      "ssram_power_ap5": true,
       "usb_timer": false
     },
-    "sha256": "23c4e7b9c48af2289e2f77c0f5d7a95fc5970f5e3fc47f9f6b81bbe99cfb412d"
+    "sha256": "204b6c996e3784cd5ca1007f40880720a5ccd732545d0e3abc61cbfa7942b6ec"
   },
   "apollo510|swo|helia-aot": {
     "markers": {
@@ -733,11 +769,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "b0a6453b676150f02a0bbef76c25a05ab7da4bd084ac1d06779f9934fba60101"
+    "sha256": "b4e92360f7dedc79cdc2a1c9ec0912d331c2ddbeccecae9a9f9403019210d67a"
   },
   "apollo510|swo|helia-rt": {
     "markers": {
@@ -753,11 +790,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "421cf679ed6d8e8b786eb920c51dcce591ae953cc535415fa1d4592253d1d1f1"
+    "sha256": "ce7d65e0d9483226d2c40831b8660f60fc837e9ecd2076ff1fc80486181a8ee8"
   },
   "apollo510|swo|tflm": {
     "markers": {
@@ -773,11 +811,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "421cf679ed6d8e8b786eb920c51dcce591ae953cc535415fa1d4592253d1d1f1"
+    "sha256": "ce7d65e0d9483226d2c40831b8660f60fc837e9ecd2076ff1fc80486181a8ee8"
   },
   "apollo510|uart|helia-aot": {
     "markers": {
@@ -793,11 +832,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "b1beb993550c5851679f5c887c091ff071881fefef944e639cea477889f09f31"
+    "sha256": "56531d5cedd1824457a044ab58499fdbb07fcd0bddbd28d3d2f0c2ff0497b12b"
   },
   "apollo510|uart|helia-rt": {
     "markers": {
@@ -813,11 +853,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "598290daf3b07b3132e6dedadb9bc7543556c475dbb060b3878054ec7fd00e44"
+    "sha256": "f4f14547485e418d36a76b3902cf6464216a9d985735a394c5b5de4e21d91bd9"
   },
   "apollo510|uart|tflm": {
     "markers": {
@@ -833,11 +874,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": false
     },
-    "sha256": "598290daf3b07b3132e6dedadb9bc7543556c475dbb060b3878054ec7fd00e44"
+    "sha256": "f4f14547485e418d36a76b3902cf6464216a9d985735a394c5b5de4e21d91bd9"
   },
   "apollo510|usb_cdc|helia-aot": {
     "markers": {
@@ -853,11 +895,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": true
     },
-    "sha256": "42c47cfc9e32769ccf1fa04327f9ec35cbe003d857215c196c57178d4b6d21d2"
+    "sha256": "32ad2aea4320eb32e641457c6337af524d4529027199deea79e26754ae5facb5"
   },
   "apollo510|usb_cdc|helia-rt": {
     "markers": {
@@ -873,11 +916,12 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": true
     },
-    "sha256": "0f571f66a34327b976fc4ca18d695227374ad0bff1293f5239eec1def0fe84a6"
+    "sha256": "9da5a3614d8d902d1f6eb029ba08385365c75ee339efa7f45b20be23419cf39b"
   },
   "apollo510|usb_cdc|tflm": {
     "markers": {
@@ -893,10 +937,11 @@
       "heartbeat": true,
       "itm_swo": true,
       "newlib_syscalls": false,
+      "peripheral_power_down": false,
       "rtt_config": false,
       "ssram_power_ap5": false,
       "usb_timer": true
     },
-    "sha256": "0f571f66a34327b976fc4ca18d695227374ad0bff1293f5239eec1def0fe84a6"
+    "sha256": "9da5a3614d8d902d1f6eb029ba08385365c75ee339efa7f45b20be23419cf39b"
   }
 }
