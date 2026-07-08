@@ -13,6 +13,16 @@ Preview the selected cases without touching hardware:
 uv run hpx validate --list --suite smoke --boards apollo510_evb
 ```
 
+Preview the two-board smoke run used by the hardware validation workflow:
+
+```bash
+uv run hpx validate --list \
+  --suite smoke \
+  --boards apollo510_evb,apollo330mP_evb \
+  --power off \
+  --jlink-serials apollo510_evb=1160003180,apollo330mP_evb=1160003409
+```
+
 Run the smoke suite against a connected board:
 
 ```bash
@@ -21,6 +31,18 @@ uv run hpx validate \
   --boards apollo510_evb \
   --power off \
   --output-dir results/local-validation
+```
+
+Run the same KWS smoke model on Apollo510 and Apollo330mP with explicit probe
+pinning:
+
+```bash
+uv run hpx validate \
+  --suite smoke \
+  --boards apollo510_evb,apollo330mP_evb \
+  --power off \
+  --jlink-serials apollo510_evb=1160003180,apollo330mP_evb=1160003409 \
+  --output-dir results/local-validation-dual
 ```
 
 The smoke suite uses RTT. For local development, put a SEGGER RTT checkout at
@@ -101,15 +123,20 @@ hpx-hardware
 
 Use this label for a machine that has HPX-compatible hardware attached. For
 the first bench, label the local Mac runner with `hpx-hardware` and attach the
-Apollo510 EVB. When an Apollo330 board is available, select its board ID in the
-workflow input; no new workflow is required.
+Apollo510 EVB and Apollo330mP EVB. The workflow default board input runs the
+same smoke model on both boards:
+
+```text
+apollo510_evb,apollo330mP_evb
+```
 
 The workflow exposes only the core validation inputs:
 
 - `suite`: `smoke`, `models-rt`, or `models-aot`
-- `boards`: comma-separated board IDs, default `apollo510_evb`
+- `boards`: comma-separated board IDs, default `apollo510_evb,apollo330mP_evb`
 - `power`: `off`, `on`, or `both`
-- `jlink_serials`: optional comma-separated `board=serial` entries
+- `jlink_serials`: optional comma-separated `board=serial` entries, default
+  `apollo510_evb=1160003180,apollo330mP_evb=1160003409`
 - `repeat`: repeat count per selected case
 - `timeout`: per-case timeout in seconds
 
@@ -118,7 +145,7 @@ Default inputs run the same smoke shape as the local command:
 ```bash
 uv run hpx validate \
   --suite smoke \
-  --boards apollo510_evb \
+  --boards apollo510_evb,apollo330mP_evb \
   --power off \
   --output-dir results/validation \
   --junit-xml results/validation/junit.xml
@@ -135,15 +162,17 @@ The runner must already provide:
 
 - supported EVB access for the selected `boards` input
 - SEGGER J-Link access, including `JLinkExe` and `pylink-square`
+- SEGGER custom device files for Apollo330mP, including `Apollo330P_510L`
 - ARM toolchain, CMake, Ninja, and NSX on `PATH`
 - Git LFS support for model fixtures
 - optional Joulescope access and wiring when `power` is `on` or `both`
 
 Use explicit `jlink_serials` on runners with more than one probe attached, for
-example:
+or override the default mapping when moving the workflow to a different
+self-hosted runner:
 
 ```text
-apollo510_evb=1160002204
+apollo510_evb=1160003180,apollo330mP_evb=1160003409
 ```
 
 The workflow serializes runs by the selected board string so two manual jobs do

@@ -15,7 +15,7 @@ on:
       boards:
         description: "Comma-separated board IDs"
         required: true
-        default: apollo510_evb
+        default: apollo510_evb,apollo330mP_evb
         type: string
       power:
         description: "Power validation mode"
@@ -29,7 +29,7 @@ on:
       jlink_serials:
         description: "Optional comma-separated board=serial entries"
         required: false
-        default: ""
+        default: "apollo510_evb=1160003180,apollo330mP_evb=1160003409"
         type: string
       repeat:
         description: "Repeat each selected case N times"
