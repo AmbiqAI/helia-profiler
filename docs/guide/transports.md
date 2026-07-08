@@ -28,6 +28,15 @@ target:
 The choice is global across the run — every PMU pass and metadata block
 flows over the same transport.
 
+!!! note "Transport choice no longer affects power numbers"
+    With the default `power.firmware: dedicated` (see
+    [Dedicated power firmware](power.md#dedicated-power-firmware)), power
+    capture flashes a separate transport-free binary, so the transport you
+    pick here only affects **PMU capture reliability and throughput** — it
+    no longer biases current/energy results. That transport-dependent power
+    contamination (measured up to +60% with USB CDC) only applies if you
+    opt into `power.firmware: shared`.
+
 ## RTT (recommended)
 
 [Segger Real-Time Transfer](https://www.segger.com/products/debug-probes/j-link/technology/about-real-time-transfer/)

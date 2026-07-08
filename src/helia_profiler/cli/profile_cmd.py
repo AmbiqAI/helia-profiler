@@ -119,6 +119,8 @@ def _apply_power_overrides(args: argparse.Namespace, cli: dict) -> None:
         cli.setdefault("power", {})["enabled"] = True
     if args.power_driver is not None:
         cli.setdefault("power", {})["driver"] = args.power_driver
+    if getattr(args, "power_firmware", None) is not None:
+        cli.setdefault("power", {})["firmware"] = args.power_firmware
     if args.power_mode is not None:
         cli.setdefault("power", {})["mode"] = args.power_mode
     if args.power_duration is not None:

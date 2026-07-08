@@ -1,0 +1,65 @@
+# AD (Anomaly Detection, autoencoder int8) on Apollo330mP EVB (Rev 1) via
+# heliaRT — PMU + Joulescope power capture.
+#
+# apollo330mP_evb has no board-specific GPIO sync wiring registered in
+# board.py yet -- explicit overrides here use the same J8 header pins
+# validated on the KWS/VWW/IC AP330 runs: GP5 (sync/gate), GP6 (state),
+# GP7 (go).
+#
+# AutoDeploy's own AP330P baseline (Latest_AI_Results.xlsx, sheet
+# AP330P, AD row) places weights in MRAM / arena in TCM (NOT TCM/TCM
+# like AP510's AD baseline) -- match that placement explicitly.
+#
+# GCC toolchain, RTT transport, LP (96 MHz) clock. AD baseline (gcc,
+# LP): 2.203ms, 19.508uJ/inf, 8.855mW.
+model:
+  path: tests/fixtures/mlperf_tiny/ad/ad01_int8.tflite
+  arena_size: 10240
+  weights_location: mram
+  arena_location: tcm
+
+engine:
+  type: helia-rt
+
+target:
+  board: apollo330mP_evb
+  toolchain: arm-none-eabi-gcc
+  jlink_serial: "1160003058"
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+    mve: default
+    memory: default
+  per_layer: true
+  iterations: 200
+  warmup: 10
+  aggregation: median
+  # AD's inference is extremely short (see ad_rt_power_ap510.yaml note),
+  # so widen the gated window to reduce GPIO-edge/gate-boundary timing
+  # jitter as a fraction of total capture.
+  window_target_ms: 8000
+  window_max: 10000
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  firmware: dedicated
+  lockstep: true
+  sync_gpio_pin: 5
+  state_gpio_pin: 6
+  go_gpio_pin: 7
+
+output:
+  format: json
+  dir: ./results/mlperf_tiny/ad_rt_power_ap330
+  model_explorer: false
+  detailed: true
+
+keep_work_dir: true

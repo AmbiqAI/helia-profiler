@@ -26,10 +26,19 @@ as ``list[str]`` for the protocol parser.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from collections.abc import Callable
 
 log = logging.getLogger("hpx")
+
+#: Matches a run of non-ASCII/control characters at the start of a line --
+#: the shape of a UART/ITM peripheral re-enable glitch (see
+#: ``collect_lines``), not a real character range strip (``str.lstrip``
+#: treats its argument as a character *set*, not a range, so "\\x00-\\x1f"
+#: would wrongly include a literal '-' while still missing most control
+#: chars -- a regex is used here instead for correctness).
+_LEADING_GLITCH_RE = re.compile(r"^[^\x20-\x7e]+")
 
 
 # ---------------------------------------------------------------------------
@@ -195,6 +204,31 @@ def collect_lines(
                 line = raw_line.decode("utf-8", errors="replace").strip()
                 if not line:
                     continue
+                # A UART/ITM peripheral re-enabled mid-run (e.g. released
+                # around a gated power window and restored afterward) can
+                # glitch a single leading byte on its first transmission --
+                # observed as a stray U+FFFD replacement char (or other
+                # non-printable) prepended to an otherwise-clean protocol
+                # line, e.g. "\ufffdHPX_CLEAN_INFER_COUNT=236".  That silently
+                # broke every ``^HPX_...`` / ``^--- HPX_...`` anchored match
+                # downstream, dropping the clean-window result and falling
+                # back to a whole-capture power estimate (found 2026-07-06).
+                # Strip any run of non-ASCII/control characters before the
+                # first recognisable HPX marker; a genuinely garbled/empty
+                # line degrades no further than before (still fails to
+                # match, just for a different reason).
+                if line and not line[0].isascii():
+                    stripped = _LEADING_GLITCH_RE.sub("", line)
+                    if stripped != line:
+                        log.debug(
+                            "%s: stripped %d leading non-ASCII byte(s) from line "
+                            "(peripheral re-enable glitch)",
+                            transport_name,
+                            len(line) - len(stripped),
+                        )
+                        line = stripped
+                    if not line:
+                        continue
                 line_ts = time.monotonic()
 
                 lines.append(line)

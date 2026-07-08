@@ -1,0 +1,54 @@
+# VWW (Visual Wake Words, MobileNet-based int8) on Apollo510 EVB (non-B
+# variant) via heliaAOT — PMU + Joulescope power capture.
+#
+# First cut: try FULL TCM/TCM placement (weights + arena both in DTCM).
+# heliaRT's actual runtime footprint for this model was 333,584B weights +
+# 112,640B arena = 446,224B, comfortably under this board's 512KB (524,288B)
+# DTCM -- so it should fit for heliaAOT too, unlike smaller-DTCM boards
+# (AP3/AP4) where AutoDeploy's own MRAM/TCM split is mandatory, not just
+# a choice. If this fails to fit/build, fall back to weights_location: mram.
+model:
+  path: tests/fixtures/mlperf_tiny/vww/vww_96_int8.tflite
+  arena_size: 112640
+  model_location: tcm
+
+engine:
+  type: helia-aot
+  config:
+    prefix: hpx
+    module_name: hpx_model
+
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+  jlink_serial: "1160002204"
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+    mve: default
+    memory: default
+  per_layer: true
+  iterations: 200
+  warmup: 10
+  aggregation: median
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  firmware: dedicated
+  lockstep: true
+
+output:
+  format: json
+  dir: ./results/mlperf_tiny/vww_aot_power_ap510_tcm
+  model_explorer: false
+  detailed: true
+
+keep_work_dir: true

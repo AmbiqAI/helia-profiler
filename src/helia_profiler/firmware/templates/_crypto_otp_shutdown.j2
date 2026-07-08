@@ -1,0 +1,35 @@
+{# _crypto_otp_shutdown.j2 — narrow, always-safe power-down for the
+   dedicated power binary on AP5-family parts (AP510/AP510B/AP330P),
+   mirroring the part of AutoDeploy's ns_power_platform_config() that
+   applies unconditionally on every run: CRYPTO/OTP power domains off,
+   VCOMP off, and (only where the HAL exposes it) the internal radio
+   subsystem (BLE) powered off.
+
+   Deliberately scoped narrower than _peripheral_power_down.j2's AP4-only
+   broad shutdown: no IOM/UART/GFX/etc, and NO memory power-off (SRAM/DTCM
+   changes belong in extreme_mode -- a user turning off entire memory
+   blocks is not "normal default" behavior). Only touches domains no hpx
+   feature -- any engine, any transport -- ever needs powered:
+     - CRYPTO, OTP: unused by every hpx engine/transport.
+     - VCOMP: unused by profiling.
+     - Radio subsystem (am_hal_pwrctrl_rss_pwroff): the internal BLE
+       radio, not the external Cooper IC the ble_reset feature targets
+       (_ble_reset.j2) -- gated per-SoC (has_radio_subsystem) since only
+       some AP5 HAL variants define the symbol at all (apollo510's plain,
+       non-L HAL does not -- see SocDef.has_radio_subsystem). #}
+{% if power_only | default(false) and (crypto_otp_shutdown | default(false)) %}
+
+    // ---------------------------------------------------------------------
+    // Crypto/OTP/VCOMP (and, where available, radio subsystem) power-down
+    // (mirrors the unconditional part of AutoDeploy's
+    // ns_power_platform_config() for this SoC family).
+    // ---------------------------------------------------------------------
+    {
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_CRYPTO);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_OTP);
+        VCOMP->PWDKEY = _VAL2FLD(VCOMP_PWDKEY_PWDKEY, VCOMP_PWDKEY_PWDKEY_Key);
+{% if has_radio_subsystem | default(false) %}
+        am_hal_pwrctrl_rss_pwroff();
+{% endif %}
+    }
+{% endif %}

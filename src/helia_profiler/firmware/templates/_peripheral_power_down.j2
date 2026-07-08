@@ -1,0 +1,73 @@
+{# _peripheral_power_down.j2 — broad peripheral power-down for the dedicated
+   power binary, mirroring AutoDeploy's ns_power_down_peripherals()
+   (apollo4/ns_power.c). AP4-only: AP3's implementation is an empty no-op
+   and AP5's only clears XTAL/VCOMP -- see ClockCapabilities.
+   broad_peripheral_shutdown docstring for why this isn't applied to every
+   family speculatively.
+
+   Peripherals are only powered down here when hpx itself never needs them
+   during a power_only capture:
+     - IOM0-7, ADC, GFX, DISP/DISPPHY, PDM0-3, I2S0/1, SDIO, AUDREC/AUDPB/
+       AUDADC: never used by any hpx engine/transport.
+     - UART0-3: power_only never brings up a transport (NSX_DEBUG_NONE is
+       forced regardless of the requested transport -- see main.cc.j2), so
+       all four are always safe to disable here.
+     - USB/USBPHY: same reasoning -- power_only never enumerates USB.
+     - MSPI0-2: skipped when PSRAM is actually in use for the arena/weights
+       (arena_region/weights_region == "psram"), since that traffic needs
+       the MSPI peripheral alive.
+     - Crypto, VCOMP: not used by profiling; powered down like AutoDeploy.
+     - DEBUG power domain: explicit HAL-level disable (not just relying on
+       debugger-detach timing) -- safe here because the dedicated power
+       binary never needs the debugger attached once flashed (WP4: it
+       free-runs, unwatched, until the gated measurement window). #}
+{% set _psram_needed = (arena_region | default("") == "psram") or (weights_region | default("") == "psram") %}
+{% if power_only | default(false) and (broad_peripheral_shutdown | default(false)) %}
+
+    // ---------------------------------------------------------------------
+    // Broad peripheral power-down (mirrors AutoDeploy's
+    // ns_power_down_peripherals() for this SoC family).
+    // ---------------------------------------------------------------------
+    {
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM0);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM1);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM2);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM3);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM4);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM5);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM6);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM7);
+
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_UART0);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_UART1);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_UART2);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_UART3);
+
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_ADC);
+{% if not _psram_needed %}
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_MSPI0);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_MSPI1);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_MSPI2);
+{% endif %}
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_GFX);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_DISP);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_DISPPHY);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_USB);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_USBPHY);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_PDM0);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_PDM1);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_PDM2);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_PDM3);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_I2S0);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_I2S1);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_SDIO);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_AUDREC);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_AUDPB);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_AUDADC);
+        am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_DEBUG);
+
+        // Crypto / voltage comparator -- not used during profiling.
+        am_hal_pwrctrl_control(AM_HAL_PWRCTRL_CONTROL_CRYPTO_POWERDOWN, 0);
+        VCOMP->PWDKEY = _VAL2FLD(VCOMP_PWDKEY_PWDKEY, VCOMP_PWDKEY_PWDKEY_Key);
+    }
+{% endif %}

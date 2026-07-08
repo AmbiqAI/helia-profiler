@@ -79,6 +79,7 @@ class MemoryContext:
     allocate_arenas: bool
     has_dcache: bool
     manages_shared_ssram_power: bool
+    ssram_full_power_enum: str
     force_shared_sram: bool
 
 
@@ -112,6 +113,10 @@ class PowerWindowContext:
     heartbeat_every_ms: int
     clean_window_timer: str
     gate_debug_domain_in_window: bool
+    broad_peripheral_shutdown: bool
+    crypto_otp_shutdown: bool
+    has_radio_subsystem: bool
+    ble_reset_gpio_pin: int | None
 
 
 @dataclass(frozen=True)
@@ -202,6 +207,7 @@ class FirmwareRenderContext:
                 allocate_arenas=artifacts.aot_allocate_arenas,
                 has_dcache=soc.capabilities.memory.has_dcache,
                 manages_shared_ssram_power=soc.capabilities.memory.has_shared_ssram_power_domain,
+                ssram_full_power_enum=soc.ssram_full_power_enum,
                 force_shared_sram=config.profiling.force_shared_sram,
             ),
             pmu=PmuContext(
@@ -235,6 +241,10 @@ class FirmwareRenderContext:
                 ),
                 clean_window_timer=soc.capabilities.clock.clean_window_timer,
                 gate_debug_domain_in_window=soc.capabilities.clock.gate_debug_domain_in_window,
+                broad_peripheral_shutdown=soc.capabilities.clock.broad_peripheral_shutdown,
+                crypto_otp_shutdown=soc.capabilities.clock.crypto_otp_shutdown,
+                has_radio_subsystem=soc.has_radio_subsystem,
+                ble_reset_gpio_pin=ctx.board.ble_reset_gpio_pin,
             ),
             engine=EngineContext(
                 engine_type=engine_type,
@@ -269,6 +279,7 @@ class FirmwareRenderContext:
             "allocate_arenas": self.memory.allocate_arenas,
             "has_dcache": self.memory.has_dcache,
             "manages_shared_ssram_power": self.memory.manages_shared_ssram_power,
+            "ssram_full_power_enum": self.memory.ssram_full_power_enum,
             "force_shared_sram": self.memory.force_shared_sram,
             "pmu_passes": self.pmu.pmu_passes,
             "pmu_pass_names": self.pmu.pmu_pass_names,
@@ -294,6 +305,10 @@ class FirmwareRenderContext:
             "heartbeat_every_ms": self.power_window.heartbeat_every_ms,
             "clean_window_timer": self.power_window.clean_window_timer,
             "gate_debug_domain_in_window": self.power_window.gate_debug_domain_in_window,
+            "broad_peripheral_shutdown": self.power_window.broad_peripheral_shutdown,
+            "crypto_otp_shutdown": self.power_window.crypto_otp_shutdown,
+            "has_radio_subsystem": self.power_window.has_radio_subsystem,
+            "ble_reset_gpio_pin": self.power_window.ble_reset_gpio_pin,
             "engine_header": self.engine.engine_header,
             "resolver_mode": self.engine.resolver_mode,
             "resolver_max_ops": self.engine.resolver_max_ops,

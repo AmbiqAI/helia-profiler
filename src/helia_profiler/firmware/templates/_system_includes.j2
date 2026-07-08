@@ -3,7 +3,7 @@
 #include "nsx_core.h"
 #include "nsx_mem.h"
 #include "nsx_system.h"
-{% if power_sync_enabled %}
+{% if power_sync_enabled or (power_only | default(false) and ble_reset_gpio_pin | default(none)) %}
 #include "nsx_gpio.h"
 {% endif %}
 
@@ -16,10 +16,11 @@
 
 {% set _aot_sram_resident = ((arena_regions | default([])) | selectattr("placement", "equalto", "sram") | list | length) > 0 %}
 {% set _sram_resident = (arena_region | default("") == "sram") or (weights_region | default("") == "sram") or _aot_sram_resident %}
-{% if (extreme_mode and arena_region == "tcm" and weights_region == "tcm") or ((manages_shared_ssram_power | default(false)) and (_sram_resident or (force_shared_sram | default(false)))) %}
+{% if (extreme_mode and arena_region == "tcm" and weights_region == "tcm") or ((manages_shared_ssram_power | default(false)) and (_sram_resident or (force_shared_sram | default(false)))) or (power_only | default(false) and (broad_peripheral_shutdown | default(false))) %}
 #include "am_hal_pwrctrl.h"
 {% endif %}
-{% if transport == "usb_cdc" %}
+{% if power_only | default(false) %}
+{% elif transport == "usb_cdc" %}
 #include "nsx_usb.h"
 #include "am_hal_timer.h"
 {% elif transport == "rtt" %}

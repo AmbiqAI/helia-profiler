@@ -7,10 +7,15 @@ JS220 ``s/stats/value`` shape, both of which expose
 
 from __future__ import annotations
 
+import logging
+import os
 from typing import Any
 
+from ...errors import PowerError
 from ..base import GatedPowerWindow, PowerSample, PowerSummary
 from .device import _extract_scalar
+
+log = logging.getLogger("hpx")
 
 
 def _process_stats(
@@ -128,6 +133,14 @@ def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
         "cur_min": abs_min,
         "cur_peak": np.maximum(abs_max, abs_min),
         "cur_int": np.abs(np.asarray(cur_int, dtype=np.float64)),
+        # Signed charge integral, kept alongside the magnitude-normalized
+        # arrays: a *net negative* gated charge is physically impossible for
+        # a load and means the measurement itself is corrupt (reversed IN/OUT
+        # wiring, or current backfed into the target around the shunt — e.g.
+        # a host-driven GO GPIO held high during the window, observed at
+        # ~5.8 mA on an AP510 EVB).  ``_process_gated_stats`` raises on it
+        # instead of letting abs() launder it into a plausible number.
+        "cur_int_signed": np.asarray(cur_int, dtype=np.float64),
         "pwr_avg": np.abs(np.asarray(pwr_avg, dtype=np.float64)),
         "pwr_int": np.abs(np.asarray(pwr_int, dtype=np.float64)),
     }
@@ -308,6 +321,7 @@ def _process_gated_stats(
     t0 = float(mask_axis.min())
     gated_windows: list[GatedPowerWindow] = []
     total_charge = 0.0
+    total_signed_charge = 0.0
     total_energy = 0.0
     total_duration = 0.0
     total_samples = 0
@@ -321,6 +335,7 @@ def _process_gated_stats(
         if duration_s <= 0:
             continue
         charge_c = float(a["cur_int"][mask].sum())
+        signed_charge_c = float(a["cur_int_signed"][mask].sum())
         energy_j = float(a["pwr_int"][mask].sum())
         seg_cur_avg = a["cur_avg"][mask]
         seg_cur_max = a["cur_peak"][mask]
@@ -329,6 +344,7 @@ def _process_gated_stats(
         avg_power_w = energy_j / duration_s
         peak_current_a = float(seg_cur_max.max())
         total_charge += charge_c
+        total_signed_charge += signed_charge_c
         total_energy += energy_j
         total_duration += duration_s
         total_samples += int(seg_cur_avg.size)
@@ -356,6 +372,38 @@ def _process_gated_stats(
 
     if total_duration <= 0 or not gated_windows:
         return [], PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0)
+
+    # A net-negative gated charge is physically impossible for a powered
+    # load: it means current flowed *backwards* through the sense path for
+    # the majority of the window.  Known causes: reversed IN/OUT wiring, or
+    # the target being backfed around the shunt (e.g. a host-driven GO GPIO
+    # held high during the window — measured at ~5.8 mA into an AP510 EVB,
+    # which flipped the sensed window current to -2.2 mA while the older
+    # magnitude-normalization silently reported it as +2.2 mA).  Refuse to
+    # launder it: fail loudly with the physical causes.  The 10% threshold
+    # ignores noise-dominated near-zero windows on idle targets.
+    if total_signed_charge < 0 and abs(total_signed_charge) > 0.1 * total_charge:
+        if os.environ.get("HPX_POWER_ALLOW_NEGATIVE") != "1":
+            raise PowerError(
+                f"Gated window current is net NEGATIVE "
+                f"({total_signed_charge / total_duration * 1e3:.3f} mA over "
+                f"{total_duration:.3f} s) — the measurement is corrupt, not "
+                "just polarity-flipped.",
+                hint=(
+                    "Check for (1) reversed Joulescope IN/OUT wiring, or "
+                    "(2) current backfed into the target around the shunt — "
+                    "e.g. a host-driven sync/GO GPIO held high during the "
+                    "window, another power source attached (USB, debug "
+                    "probe supply), or a shared rail. Set "
+                    "HPX_POWER_ALLOW_NEGATIVE=1 to bypass this check for "
+                    "diagnostic runs."
+                ),
+            )
+        log.warning(
+            "Gated window current is net negative (%.3f mA) but "
+            "HPX_POWER_ALLOW_NEGATIVE=1 — reporting magnitudes anyway.",
+            total_signed_charge / total_duration * 1e3,
+        )
 
     summary = PowerSummary(
         avg_current_a=total_charge / total_duration,

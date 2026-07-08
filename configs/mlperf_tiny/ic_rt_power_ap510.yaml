@@ -1,0 +1,48 @@
+# IC (Image Classification, ResNet int8) on Apollo510 EVB (non-B variant)
+# via heliaRT — PMU + Joulescope power capture.
+#
+# GCC toolchain, RTT transport, TCM/TCM placement, LP (96 MHz) clock, to
+# match the AutoDeploy baseline (Perfresults.xlsx, sheet AP510, gcc,
+# ns_tflm_2025_02_14, IC row): 55.332ms, 521.21uJ/inf, 9.420mW.
+model:
+  path: tests/fixtures/mlperf_tiny/ic/ic_resnet_int8.tflite
+  arena_size: 57344
+  model_location: tcm
+
+engine:
+  type: helia-rt
+
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+  jlink_serial: "1160002204"
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+    mve: default
+    memory: default
+  per_layer: true
+  iterations: 200
+  warmup: 10
+  aggregation: median
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  firmware: dedicated
+  lockstep: true
+
+output:
+  format: json
+  dir: ./results/mlperf_tiny/ic_rt_power_ap510
+  model_explorer: false
+  detailed: true
+
+keep_work_dir: true

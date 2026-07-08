@@ -410,6 +410,95 @@ def reset_target(
     log.info("Reset complete")
 
 
+def flash_binary(
+    binary_path: Path,
+    *,
+    device: str,
+    jlink_serial: str | None = None,
+    speed_khz: int = 4000,
+    interface: str = "SWD",
+    timeout_s: int = _DEFAULT_TIMEOUT_S,
+) -> None:
+    """Flash a second NSX target's image via its NSX-generated JLink script.
+
+    This exists for the dedicated power binary (``hpx_profiler_power``): it
+    is a *second* executable in the same NSX/CMake project as the transport
+    binary and has no ``nsx flash`` entry point of its own (``nsx flash`` /
+    :class:`JLinkFlashBackend` always target the project's primary
+    executable).
+
+    The NSX build generates a ready-made commander script per target at
+    ``<build_dir>/jlink/<target>/flash_cmds.jlink`` containing the exact
+    proven flash recipe (``LoadFile <target>.bin, <mram_base>`` -- the
+    address-explicit ``.bin`` form the primary flash path uses).  Prefer
+    executing that script verbatim.  Hand-rolling ``loadfile`` on the
+    extension-less ELF was tried first and SILENTLY programmed nothing on
+    Apollo510 (measured window current stayed byte-identical to the previous
+    firmware), so this must stay on the NSX-generated recipe.
+
+    Falls back to an explicit ``.bin``-sibling load only if the script is
+    missing, and raises if neither is available -- a silent no-op flash is
+    the worst possible failure mode for a power measurement (the wrong,
+    transport-enabled firmware gets measured while metadata claims
+    "dedicated").
+
+    The target free-runs immediately after this returns -- see
+    ``capture._flash_power_binary`` for why that is fine (a race-free reset
+    happens again later, right before the gated capture window is armed).
+    """
+    target_name = binary_path.stem if binary_path.suffix else binary_path.name
+    script_path = binary_path.parent / "jlink" / target_name / "flash_cmds.jlink"
+    if script_path.is_file():
+        script = script_path.read_text()
+        # The generated script ends with Exit; run it verbatim.
+        log.info(
+            "Flashing %s via NSX-generated JLink script %s (serial=%s)",
+            target_name,
+            script_path,
+            jlink_serial or "auto",
+        )
+    else:
+        # Fallback: explicit .bin + base address, mirroring the generated
+        # script's shape.  A raw ELF loadfile is NOT a safe fallback (see
+        # docstring); require the .bin sibling.
+        bin_path = binary_path if binary_path.suffix == ".bin" else binary_path.with_suffix(".bin")
+        if not bin_path.is_file():
+            raise CaptureError(
+                f"No flashable image for {target_name}: neither the NSX flash "
+                f"script ({script_path}) nor a .bin sibling ({bin_path}) exists.",
+                hint="Re-run the build; the NSX build emits both per target.",
+            )
+        log.warning(
+            "NSX flash script missing for %s; falling back to explicit .bin "
+            "load of %s",
+            target_name,
+            bin_path,
+        )
+        script = f"ExitOnError 1\nReset\nLoadFile {bin_path}, 0x00410000\nReset\nGo\nExit\n"
+
+    proc = run_jlink_script(
+        script,
+        device=device,
+        jlink_serial=jlink_serial,
+        speed_khz=speed_khz,
+        interface=interface,
+        timeout_s=timeout_s,
+        op_label="JLinkExe flash",
+    )
+    # Verify the program step actually ran.  JLinkExe reports a successful
+    # flash with an explicit summary line; require it rather than trusting
+    # the exit code alone.
+    output = (proc.stdout or "") + (proc.stderr or "")
+    if "Flash download: Total" not in output and "O.K." not in output:
+        raise CaptureError(
+            f"JLinkExe flash of {target_name} produced no flash-download "
+            "confirmation — the image was likely NOT programmed.",
+            hint="Inspect the JLinkExe output; check the probe connection "
+            "and that the .bin/base-address recipe matches the board.",
+        )
+    log.info("Flash complete: %s", target_name)
+
+
 def reset_target_poi(
     *,
     device: str,
@@ -516,6 +605,7 @@ class JLinkFlashBackend:
         *,
         toolchain: str,
         jlink_serial: str | None = None,
+        frozen: bool = False,
         timeout_s: float,
         verbose: bool = False,
     ) -> None:
@@ -525,6 +615,7 @@ class JLinkFlashBackend:
             firmware_path,
             toolchain=toolchain,
             jlink_serial=jlink_serial,
+            frozen=frozen,
             timeout_s=timeout_s,
             verbose=verbose,
         )

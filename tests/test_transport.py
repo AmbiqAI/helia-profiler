@@ -34,6 +34,27 @@ def test_collect_lines_returns_on_hpx_end():
     assert len(lines) == 3
 
 
+def test_collect_lines_strips_leading_peripheral_reenable_glitch():
+    """A UART/ITM peripheral re-enabled mid-run (e.g. released around a gated
+    power window and restored afterward) can glitch a single leading byte on
+    its first transmission -- observed as a stray non-ASCII byte prepended to
+    an otherwise-clean protocol line.  That silently broke the
+    ``^HPX_KEY=value$`` metadata parser downstream, dropping the clean-window
+    result and falling back to a whole-capture power estimate.
+    """
+    read = _canned_reader(
+        [
+            "--- HPX_START ---\n".encode(),
+            "\ufffdHPX_CLEAN_INFER_COUNT=236\n".encode("utf-8"),
+            b"HPX_CLEAN_INFER_AVG_US=21116\n",
+            b"--- HPX_END ---\n",
+        ]
+    )
+    lines = collect_lines(read, transport_name="TEST")
+    assert "HPX_CLEAN_INFER_COUNT=236" in lines
+    assert "HPX_CLEAN_INFER_AVG_US=21116" in lines
+
+
 def test_heartbeat_refreshes_inactivity_timer(monkeypatch):
     """Heartbeat lines should reset the inactivity deadline."""
     # Feed: START, then pause, then HEARTBEAT, then pause, then END.

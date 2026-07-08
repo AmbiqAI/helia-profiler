@@ -51,6 +51,7 @@ def capture_gated(
     min_high_windows: int = 1,
     guard_s: float = 0.15,
     on_started: Callable[[], None] | None = None,
+    on_gate_rise: Callable[[], None] | None = None,
     **kwargs: Any,
 ) -> PowerResult:
     """Capture GPIO-gated power using on-device-integrated host stats.
@@ -150,6 +151,20 @@ def capture_gated(
                             time.time(),
                             len(poll_samples) == 1,
                         )
+                        # Drop the GO line the moment the gate is observed
+                        # high: the firmware has latched GO, and a GPO held
+                        # high through the window backfeeds the target around
+                        # the current shunt (AP510 EVB: ~5.8 mA — enough to
+                        # drive the measured window current negative).
+                        if on_gate_rise is not None:
+                            try:
+                                on_gate_rise()
+                                log.debug(
+                                    "gate-race timeline: on_gate_rise (GO drop) done t=%.3f",
+                                    time.time(),
+                                )
+                            except Exception:
+                                log.warning("on_gate_rise hook failed", exc_info=True)
                 elif prev_level and not level and high_seen:
                     if first_low_after_high_at is None:
                         first_low_after_high_at = time.monotonic()

@@ -30,21 +30,32 @@
       when a custom AOT memory YAML places individual tensors (scratch,
       persistent, constant) in SRAM independently of arena_region/
       weights_region, which a hand-written --config can bypass entirely.
+
+   A third, independent trigger: main.cc.j2's HpxPmuProfiler (g_profiler)
+   is itself placed in NSX_MEM_SRAM_BSS in the transport-attached PMU-phase
+   binary (not the dedicated power binary -- see main.cc.j2's g_profiler
+   comment) to free TCM for the model instead of per-layer instrumentation
+   accumulators. Set via pmu_profiler_sram_resident (main.cc.j2 only;
+   undefined/false for main_aot.cc.j2, which has no such profiler). This
+   needs eActiveWithMCU like arena/weights residency (1), NOT the
+   retain-only mode of lever (2), since the profiler is actively written
+   to throughout every profiled inference, not just parked for a static-
+   power comparison.
 #}
 {% set _aot_sram_resident = ((arena_regions | default([])) | selectattr("placement", "equalto", "sram") | list | length) > 0 %}
-{% set _sram_resident = (arena_region | default("") == "sram") or (weights_region | default("") == "sram") or _aot_sram_resident %}
+{% set _sram_resident = (arena_region | default("") == "sram") or (weights_region | default("") == "sram") or _aot_sram_resident or (pmu_profiler_sram_resident | default(false)) %}
 {% if (manages_shared_ssram_power | default(false)) and (_sram_resident or (force_shared_sram | default(false))) %}
 
     // ---------------------------------------------------------------------
-    // Shared SSRAM power-on (3 MB).  {{ "Active+retained for SRAM-resident buffers." if _sram_resident else "Retained only - mirrors AutoDeploy ns_power_config(bNeedSharedSRAM=true)." }}
+    // Shared SSRAM power-on.  {{ "Active+retained for SRAM-resident buffers." if _sram_resident else "Retained only - mirrors AutoDeploy ns_power_config(bNeedSharedSRAM=true)." }}
     // ---------------------------------------------------------------------
     {
         am_hal_pwrctrl_sram_memcfg_t sramCfg = {
-            .eSRAMCfg        = AM_HAL_PWRCTRL_SRAM_3M,
-            .eActiveWithMCU  = {% if _sram_resident %}AM_HAL_PWRCTRL_SRAM_3M{% else %}AM_HAL_PWRCTRL_SRAM_NONE{% endif %},
+            .eSRAMCfg        = {{ ssram_full_power_enum }},
+            .eActiveWithMCU  = {% if _sram_resident %}{{ ssram_full_power_enum }}{% else %}AM_HAL_PWRCTRL_SRAM_NONE{% endif %},
             .eActiveWithGFX  = AM_HAL_PWRCTRL_SRAM_NONE,
             .eActiveWithDISP = AM_HAL_PWRCTRL_SRAM_NONE,
-            .eSRAMRetain     = AM_HAL_PWRCTRL_SRAM_3M,
+            .eSRAMRetain     = {{ ssram_full_power_enum }},
         };
         am_hal_pwrctrl_sram_config(&sramCfg);
     }

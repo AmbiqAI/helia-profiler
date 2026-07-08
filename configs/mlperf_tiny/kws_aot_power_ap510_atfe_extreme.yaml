@@ -1,0 +1,57 @@
+# KWS (DS-CNN int8) on Apollo510 EVB (non-B variant) via heliaAOT — full
+# TCM/TCM placement, ATfE toolchain, EXTREME MODE trial.
+#
+# extreme_mode powers off the 3MB shared SSRAM entirely and collapses MRAM
+# to a single 1MB NVM bank, in the dedicated power binary only (power_only
+# scoping fixed 2026-07 -- previously fired unconditionally in both the
+# PMU-phase and power-phase binaries, which risked a firmware-size
+# overflow crash in the larger PMU-phase binary for zero measurement
+# benefit). This is the FIRST hardware test of extreme_mode in this repo
+# -- it was previously implemented but never exercised (no test or config
+# enabled it with True).
+model:
+  path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
+  arena_size: 32768
+  model_location: tcm
+
+engine:
+  type: helia-aot
+  config:
+    prefix: hpx
+    module_name: hpx_model
+
+target:
+  board: apollo510_evb
+  toolchain: atfe
+  jlink_serial: "1160002204"
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+    mve: default
+    memory: default
+  per_layer: true
+  iterations: 200
+  warmup: 10
+  aggregation: median
+  extreme_mode: true
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  firmware: dedicated
+  lockstep: true
+
+output:
+  format: json
+  dir: ./results/mlperf_tiny/kws_aot_power_ap510_atfe_extreme
+  model_explorer: false
+  detailed: true
+
+keep_work_dir: true

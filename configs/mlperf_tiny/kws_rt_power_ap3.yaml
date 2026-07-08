@@ -1,0 +1,59 @@
+# KWS (DS-CNN int8) on Apollo3 Blue Plus EVB via heliaRT — PMU + Joulescope
+# power capture, using the dedicated transport-free power binary.
+#
+# Placement matches the AutoDeploy baseline exactly (Latest_AI_Results.xlsx,
+# sheet 'ap3p', KWS/apollo3p_evb/gcc row): MRAM weights / SRAM arena, LP
+# (48 MHz) clock. AP3's 64 KB DTCM cannot hold the KWS arena (~23 KB) +
+# weights (53 KB) together, so TCM/TCM (used on AP510) is infeasible here —
+# this is the same placement AutoDeploy itself uses on this board.
+#
+# GPIO sync wiring for this board (non-standard vs AutoDeploy's 22/23/24 —
+# see src/helia_profiler/platform/board.py): pads 22/23 are the J-Link OB
+# virtual-COM UART on this EVB, so sync moved to 26 (gate) / 24 (state) /
+# 25 (go). Wire Joulescope GPI0->GPIO26, GPI1->GPIO24, GPO0->GPIO25.
+model:
+  path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
+  arena_size: 23552
+  model_location: mram
+  arena_location: sram
+
+engine:
+  type: helia-rt
+
+target:
+  board: apollo3p_evb
+  toolchain: arm-none-eabi-gcc
+  jlink_serial: "1160000174"
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+  per_layer: true
+  iterations: 200
+  warmup: 10
+  aggregation: median
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  firmware: dedicated
+  # Force the 3-wire GPIO lock-step handshake (state+go) rather than the
+  # gate-only free-run. lockstep currently auto-enables only on Apollo5
+  # (requires_lockstep_for_gated_power); forcing it here on AP3 lets us
+  # validate GPIO-sequenced firmware-health confirmation ahead of making
+  # it the cross-family default for Joulescope captures.
+  lockstep: true
+
+output:
+  format: json
+  dir: ./results/mlperf_tiny/kws_rt_power_ap3
+  model_explorer: false
+  detailed: true
+
+keep_work_dir: true

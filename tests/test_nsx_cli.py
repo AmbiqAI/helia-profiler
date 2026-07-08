@@ -29,7 +29,21 @@ class TestNsxBuild:
         with patch("helia_profiler.nsx.nsx_api.build_app") as build_mock:
             nsx.build(tmp_path, toolchain="armclang", timeout_s=42)
         build_mock.assert_called_once_with(
-            tmp_path, toolchain="armclang", timeout_s=42, emit=nsx._quiet_emitter
+            tmp_path, toolchain="armclang", target=None, timeout_s=42, emit=nsx._quiet_emitter
+        )
+
+    def test_target_forwarded_to_api(self, tmp_path: Path) -> None:
+        # WP2: the dedicated power binary is built via a second
+        # `cmake --build --target hpx_profiler_power` from the same
+        # configure — verify the target kwarg reaches the nsx API.
+        with patch("helia_profiler.nsx.nsx_api.build_app") as build_mock:
+            nsx.build(tmp_path, toolchain="armclang", target="hpx_profiler_power", timeout_s=42)
+        build_mock.assert_called_once_with(
+            tmp_path,
+            toolchain="armclang",
+            target="hpx_profiler_power",
+            timeout_s=42,
+            emit=nsx._quiet_emitter,
         )
 
     def test_nsxerror_raises_build_error(self, tmp_path: Path) -> None:
@@ -74,6 +88,20 @@ class TestNsxFlash:
         with patch("helia_profiler.nsx.nsx_api.flash_app", side_effect=fake_flash):
             nsx.flash(tmp_path)
         assert captured["probe_serial"] is None
+
+    def test_flash_forwards_frozen(self, tmp_path: Path) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_flash(_app, **kwargs) -> None:  # noqa: ANN401
+            captured["frozen"] = kwargs.get("frozen")
+
+        with patch("helia_profiler.nsx.nsx_api.flash_app", side_effect=fake_flash):
+            nsx.flash(tmp_path, frozen=True)
+        assert captured["frozen"] is True
+
+        with patch("helia_profiler.nsx.nsx_api.flash_app", side_effect=fake_flash):
+            nsx.flash(tmp_path)
+        assert captured["frozen"] is False
 
     def test_flash_does_not_touch_sncode_env(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

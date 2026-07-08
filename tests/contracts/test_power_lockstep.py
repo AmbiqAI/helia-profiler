@@ -60,6 +60,9 @@ class _RecordingSyncController:
     def signal_go(self) -> None:
         self._events.append("signal_go")
 
+    def release_go(self) -> None:
+        self._events.append("release_go")
+
     def read_state(self) -> DeviceState:  # pragma: no cover - not hit on success
         return DeviceState.READY
 

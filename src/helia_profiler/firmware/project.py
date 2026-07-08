@@ -350,6 +350,10 @@ class ProjectRenderContext:
     compiler_launcher: str
     channel: str
     rtt_buffer_size_up: int
+    #: Whether to also generate the dedicated hpx_profiler_power CMake target
+    #: (src/main_power.cc). Gated on config.power.enabled so non-power runs'
+    #: CMakeLists.txt — and firmware-render digests — stay byte-identical.
+    power_binary_enabled: bool = False
 
 
 def render_project_files(ctx: ProjectRenderContext) -> None:
@@ -391,5 +395,6 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
             has_armv8m_pmu=ctx.render_context.pmu.has_armv8m_pmu,
             power_sync_enabled=ctx.render_context.sync.power_sync_enabled,
             arena_regions=ctx.arena_regions,
+            power_binary_enabled=ctx.power_binary_enabled,
         ),
     )

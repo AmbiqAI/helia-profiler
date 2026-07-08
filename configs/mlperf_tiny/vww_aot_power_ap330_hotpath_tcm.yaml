@@ -1,0 +1,112 @@
+# VWW on Apollo330mP EVB (Rev 1) via heliaAOT — fine-grained per-tensor
+# placement experiment.
+#
+# Baseline (vww_aot_power_ap330.yaml, matched to the RT/AD placement):
+# weights MRAM (cold XIP reads), arena SRAM. This config asks a different
+# question: rather than an all-or-nothing MRAM/SRAM/TCM choice, can AOT's
+# per-tensor `memory.tensors` overrides let us move the ARENA (scratch +
+# persistent) to TCM and pin only the highest-cycle-share CONSTANT
+# (weight) tensors into TCM as well, leaving the rest of the weights cold
+# in MRAM -- something heliaRT's engine-level model_location/
+# arena_location knobs cannot express at all (it's TCM-for-everything or
+# nothing).
+#
+# Tensor selection (from a real per-layer PMU capture of the MRAM/SRAM
+# baseline, results/mlperf_tiny/vww_aot_power_ap330/{aot_operator_manifest.json,
+# detailed/profile_cpu.csv}): VWW (a MobileNet-style depthwise-separable
+# CNN) has NO significant FULLY_CONNECTED cost (the classifier head is
+# 727 cycles, 0.02% of total) -- so "FCs" aren't the lever here. Instead,
+# the 13 pointwise (1x1) CONV_2D ops collectively cost 42.7% of total
+# cycles (3.29M/7.69M), while the two largest are individually cheap to
+# store (128B, 1KB...). Picked the TOP 10 pointwise-conv weight tensors
+# ranked by measured cycle share (not by size) -- 87.6KB total -- so the
+# TCM budget is spent on the ops that actually dominate runtime, not on
+# whichever happens to be biggest.  Combined with the 112KB arena, that's
+# ~202KB of AP330's 240KB TCM (real headroom checked: NOT a hardcoded
+# guess). These 10 ops alone account for 37.3% of total model cycles.
+#
+# GCC toolchain (same as the baseline AOT run -- only tensor placement
+# varies here).
+model:
+  path: tests/fixtures/mlperf_tiny/vww/vww_96_int8.tflite
+  arena_size: 112640
+
+engine:
+  type: helia-aot
+  config:
+    prefix: hpx
+    module_name: hpx_model
+    aot_args:
+      memory:
+        tensors:
+          # Base: arena (scratch+persistent) in TCM; all constants cold
+          # in MRAM by default.
+          - type: scratch
+            attributes: {memory: dtcm}
+          - type: persistent
+            attributes: {memory: dtcm}
+          - type: constant
+            attributes: {memory: mram}
+          # Override: pin the top-10-by-cycle-share 1x1 conv weight
+          # tensors into TCM (more specific than the constant/* rule
+          # above -- id+type match wins).
+          - type: constant
+            id:
+              - "45"   # tensor_45 -> CONV_2D:2  (9.0% of total cycles)
+              - "47"   # tensor_47 -> CONV_2D:6  (5.3%)
+              - "46"   # tensor_46 -> CONV_2D:4  (4.5%)
+              - "49"   # tensor_49 -> CONV_2D:10 (3.2%)
+              - "48"   # tensor_48 -> CONV_2D:8  (2.6%)
+              - "54"   # tensor_54 -> CONV_2D:20 (2.6%)
+              - "51"   # tensor_51 -> CONV_2D:14 (2.6%)
+              - "53"   # tensor_53 -> CONV_2D:18 (2.6%)
+              - "52"   # tensor_52 -> CONV_2D:16 (2.6%)
+              - "55"   # tensor_55 -> CONV_2D:22 (2.6%)
+            # NOTE: cold source stays "mram" (constants must have a
+            # non-volatile source -- see _resolve_aot_tensor_rulesets in
+            # engines/helia_aot/compile.py); constant_destination_memory
+            # is what actually stages a runtime copy into TCM. Setting
+            # memory: dtcm directly here (an earlier mistake) treats
+            # DTCM itself as if it were non-volatile constant storage --
+            # the compiler tried to place uninitialized/unstaged data
+            # there, which blew the linker script's DTCM budget
+            # ("cannot move location counter backwards").
+            attributes: {memory: mram, constant_destination_memory: dtcm}
+
+target:
+  board: apollo330mP_evb
+  toolchain: arm-none-eabi-gcc
+  jlink_serial: "1160003058"
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+    mve: default
+    memory: default
+  per_layer: true
+  iterations: 200
+  warmup: 10
+  aggregation: median
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  firmware: dedicated
+  lockstep: true
+  sync_gpio_pin: 5
+  state_gpio_pin: 6
+  go_gpio_pin: 7
+
+output:
+  format: json
+  dir: ./results/mlperf_tiny/vww_aot_power_ap330_hotpath_tcm
+  model_explorer: false
+  detailed: true
+
+keep_work_dir: true

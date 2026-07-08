@@ -1,0 +1,51 @@
+# KWS (DS-CNN int8) on Apollo4 Blue Plus KXR EVB via heliaRT — PMU (DWT) +
+# Joulescope power capture.
+#
+# Same methodology as the Apollo510 captures (GCC toolchain, RTT transport,
+# TCM/TCM placement, LP/96MHz clock) so results are directly comparable
+# across boards. AP4 (cortex-m4) only exposes the DWT cycle-counter backend
+# (no MVE / armv8m PMU), so only the cpu counter group is requested.
+model:
+  path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
+  arena_size: 32768
+  model_location: tcm
+
+engine:
+  type: helia-rt
+
+target:
+  board: apollo4p_blue_kxr_evb
+  toolchain: arm-none-eabi-gcc
+  jlink_serial: "1160001481"
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+  per_layer: true
+  iterations: 200
+  warmup: 10
+  aggregation: median
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  firmware: dedicated
+  # Force the 3-wire GPIO lock-step handshake (state+go) instead of the
+  # gate-only free-run. lockstep currently auto-enables only on Apollo5
+  # (requires_lockstep_for_gated_power); forcing it here validates it on
+  # AP4 ahead of making it the cross-family default.
+  lockstep: true
+
+output:
+  format: json
+  dir: ./results/mlperf_tiny/kws_rt_power_ap4_kxr
+  model_explorer: false
+  detailed: true
+
+keep_work_dir: true

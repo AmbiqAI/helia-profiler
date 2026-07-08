@@ -33,6 +33,14 @@ class BoardDef:
     default_go_gpio_pin: int = DEFAULT_GO_GPIO_PIN  # go (host -> device)
     starter_profile_board: str | None = None  # derive NSX profile/modules from this board
     description: str = ""
+    # GPIO that drives the onboard Cooper BLE controller's hardware RESET
+    # line (SiP "Blue" packages only). Mirrors AutoDeploy's
+    # AM_DEVICES_BLECTRLR_RESET_PIN / ns_power_down_peripherals(): held low
+    # (in reset) whenever a power capture doesn't need Bluetooth, since an
+    # un-reset Cooper radio idles at non-trivial standby current that a
+    # non-Blue board doesn't have to begin with. None = no onboard BLE
+    # radio on this board (nothing to hold in reset).
+    ble_reset_gpio_pin: int | None = None
 
     @property
     def profile_source_board(self) -> str:
@@ -124,6 +132,8 @@ _register_board(
         default_sync_gpio_pin=61,
         default_state_gpio_pin=23,
         default_go_gpio_pin=24,
+        # AM_DEVICES_BLECTRLR_RESET_PIN (AmbiqSuite BSP am_bsp.h for this board).
+        ble_reset_gpio_pin=55,
     )
 )
 _register_board(
@@ -135,6 +145,8 @@ _register_board(
         default_sync_gpio_pin=22,
         default_state_gpio_pin=23,
         default_go_gpio_pin=24,
+        # AM_DEVICES_BLECTRLR_RESET_PIN (AmbiqSuite BSP am_bsp.h for this board).
+        ble_reset_gpio_pin=42,
     )
 )
 _register_board(
@@ -146,6 +158,8 @@ _register_board(
         default_sync_gpio_pin=22,
         default_state_gpio_pin=23,
         default_go_gpio_pin=24,
+        # AM_DEVICES_BLECTRLR_RESET_PIN (AmbiqSuite BSP am_bsp.h for this board).
+        ble_reset_gpio_pin=55,
     )
 )
 

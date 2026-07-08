@@ -73,6 +73,18 @@ class SyncController(Protocol):
         """Tell the device the host is armed and observing; release the window."""
         ...
 
+    def release_go(self) -> None:
+        """Drop the GO wire once the device has latched it (gate observed high).
+
+        A host-driven GO line held high through the measured window can
+        parasitically backfeed the target through the GPIO pad network,
+        displacing real supply current around the instrument's sense path
+        (observed at ~5.8 mA on an AP510 EVB — enough to drive the net
+        measured current negative).  The firmware only level-samples GO
+        before the window, so dropping it at gate-rise is always safe.
+        """
+        ...
+
     def read_state(self) -> DeviceState:
         """Sample the device state wire (ready/fault) outside the window."""
         ...
@@ -96,6 +108,9 @@ class NullSyncController:
         return True
 
     def signal_go(self) -> None:  # pragma: no cover - trivial
+        pass
+
+    def release_go(self) -> None:  # pragma: no cover - trivial
         pass
 
     def read_state(self) -> DeviceState:  # pragma: no cover - trivial

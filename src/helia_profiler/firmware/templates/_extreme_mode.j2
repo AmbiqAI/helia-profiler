@@ -1,7 +1,22 @@
 {# _extreme_mode.j2 — optional power-floor reduction for benchmarking.
 
     Activated when profiling.extreme_mode is true AND both arena+weights live
-    in TCM.
+    in TCM AND this is the dedicated power binary (power_only).
+
+    Scoped to power_only only (2026-07 finding): this file used to be
+    included unconditionally in both the transport-attached PMU-phase
+    binary and the dedicated power binary. That's the wrong scope for two
+    reasons: (1) it never actually benefits PMU/cycle counting -- DWT/PMU
+    counts CPU cycles regardless of SSRAM/NVM-bank power state, so there is
+    no measurement value in paying the risk during that phase; (2)
+    AM_HAL_PWRCTRL_NVM0_ONLY assumes the running firmware fits inside the
+    first 1 MB MRAM bank -- the PMU-phase binary is the LARGER of the two
+    (full transport init/teardown + per-layer PMU passes + CSV dump code),
+    so it is the one most likely to silently overflow into the now-dead
+    second bank and crash. The dedicated power binary is smaller and has
+    no such transport/CSV code to begin with. Matches the same power_only
+    scoping already used by _ble_reset.j2 and _peripheral_power_down.j2.
+
    Code keeps running from MRAM (.text); the transport (RTT/USB/SWO) keeps
    working.  The two levers we pull here are:
 
@@ -21,7 +36,7 @@
    read garbage from the second bank and crash.  Build-time .map inspection
    covers this.
 #}
-{% if extreme_mode and arena_region == "tcm" and weights_region == "tcm" %}
+{% if power_only | default(false) and extreme_mode and arena_region == "tcm" and weights_region == "tcm" %}
 
     // ---------------------------------------------------------------------
     // EXTREME MODE — collapse unused memory power

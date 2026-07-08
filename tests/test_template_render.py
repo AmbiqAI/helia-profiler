@@ -143,6 +143,7 @@ def _render_aot(
         heartbeat_enabled=True,
         heartbeat_every_n_ops=4,
         heartbeat_every_ms=0,
+        pmu_max_ops=4096,
     )
 
 
@@ -615,3 +616,29 @@ class TestMainAotCcRender:
         assert "ARM_PMU_CPU_CYCLES" in out
         assert "nsx_pmu_reset_counters" not in out
         assert "g_op_start_cyccnt" in out
+
+    def test_hpx_pmu_profiler_kmax_layers_from_pmu_max_ops(self):
+        """kMaxLayers is templated from the target SoC's pmu_max_ops, not a
+        hardcoded constant -- this static array's footprint (~24 bytes/entry)
+        must fit inside the real, sometimes much smaller, TCM budget of the
+        target board (2026-07 finding: apollo330P's real 240 KB TCM vs
+        apollo510's ~496 KB; a hardcoded 4096 alone reserved ~96 KB on
+        apollo330P, over a third of its actual budget).
+        """
+        template = _env.get_template("hpx_pmu_profiler.h.j2")
+
+        small = template.render(
+            cmsis_device_header="apollo330P.h",
+            profiling_backends=["dwt", "armv8m-pmu"],
+            has_armv8m_pmu=True,
+            pmu_max_ops=512,
+        )
+        assert "kMaxLayers = 512;" in small
+
+        large = template.render(
+            cmsis_device_header="apollo510.h",
+            profiling_backends=["dwt", "armv8m-pmu"],
+            has_armv8m_pmu=True,
+            pmu_max_ops=4096,
+        )
+        assert "kMaxLayers = 4096;" in large

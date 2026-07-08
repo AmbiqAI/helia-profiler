@@ -433,6 +433,12 @@ def generate_app(ctx: PipelineContext) -> Path:
     weights_region = ctx.weights_region or Placement.MRAM
     arena_region = ctx.arena_region or Placement.TCM
     power_sync_enabled = config.power.enabled and config.power.mode == "external"
+    # Dedicated power binary (hpx_profiler_power): rendered/built only when
+    # power capture is actually requested AND the dedicated firmware mode is
+    # selected, so non-power runs (and "shared"-mode power runs, which reuse
+    # the transport binary and never touch hpx_profiler_power) keep an
+    # unchanged CMakeLists.txt / firmware-render digest (see AGENTS.md WP2).
+    power_binary_enabled = config.power.enabled and config.power.firmware == "dedicated"
     aot_arena_regions = []
     if artifacts.engine_type is EngineType.HELIA_AOT:
         adapter = ctx.engine_adapter
@@ -498,6 +504,15 @@ def generate_app(ctx: PipelineContext) -> Path:
             if name not in module_names:
                 module_specs.append(NsxModuleSpec(name, _module_project(name, profile)))
                 module_names.add(name)
+
+    # BLE-controller-reset GPIO drive (Blue-variant boards, dedicated power
+    # binary only — see _ble_reset.j2) needs nsx-gpio even when power_sync
+    # itself is off (e.g. power.mode == "internal").
+    if power_binary_enabled and board.ble_reset_gpio_pin is not None:
+        module_names = {m.name for m in module_specs}
+        if "nsx-gpio" not in module_names:
+            module_specs.append(NsxModuleSpec("nsx-gpio", _module_project("nsx-gpio", profile)))
+            module_names.add("nsx-gpio")
 
     # Build module descriptors (name + local flag + optional overrides)
     nsx_overrides = config.build.nsx_modules
@@ -598,6 +613,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 transport,
                 config.target.rtt_buffer_size_up,
             ),
+            power_binary_enabled=power_binary_enabled,
         )
     )
 
@@ -662,8 +678,19 @@ def generate_app(ctx: PipelineContext) -> Path:
             src_dir / "main.cc",
             _jinja_env.get_template("main_aot.cc.j2").render(
                 **template_vars,
+                pmu_max_ops=soc.pmu_max_ops,
             ),
         )
+        if power_binary_enabled:
+            # Same template, power_only=True: no transport init, no per-layer
+            # PMU passes -- see main_aot.cc.j2's power_only branches (WP1).
+            _write_text(
+                src_dir / "main_power.cc",
+                _jinja_env.get_template("main_aot.cc.j2").render(
+                    **{**template_vars, "power_only": True},
+                    pmu_max_ops=soc.pmu_max_ops,
+                ),
+            )
     else:
         # --- TFLM / heliaRT: embed model as byte array, use TFLM profiler ---
         model_location = config.model.model_location
@@ -681,6 +708,15 @@ def generate_app(ctx: PipelineContext) -> Path:
                 **template_vars,
             ),
         )
+        if power_binary_enabled:
+            # Same template, power_only=True: no transport init, no per-layer
+            # PMU passes -- see main.cc.j2's power_only branches (WP1).
+            _write_text(
+                src_dir / "main_power.cc",
+                _jinja_env.get_template("main.cc.j2").render(
+                    **{**template_vars, "power_only": True},
+                ),
+            )
 
         # PMU profiler (TFLM-specific C++ class)
         _write_text(
@@ -689,6 +725,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 cmsis_device_header=render_context.pmu.cmsis_device_header,
                 profiling_backends=profiling_backends,
                 has_armv8m_pmu=has_armv8m_pmu,
+                pmu_max_ops=soc.pmu_max_ops,
             ),
         )
         _write_text(
@@ -754,6 +791,8 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
 
     # Map config toolchain names to nsx CLI values
     nsx_tc = _nsx_toolchain(toolchain)
+    build_dir = app_dir / "build" / board
+    ninja_already_configured = (build_dir / "build.ninja").exists()
 
     # Lock-aware flow: refresh nsx.lock for normal runs, then materialise
     # modules/ from it before invoking the toolchain. When frozen, skip
@@ -761,7 +800,30 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     # reused as-is.
     modules_dir = app_dir / "modules"
     if ctx.config.frozen:
-        nsx_cli.sync(app_dir, frozen=True, timeout_s=timeouts.configure_s, verbose=verbose)
+        if not ninja_already_configured:
+            # First build for this board/toolchain combo: still need one
+            # verify-only sync (raises loudly on drift or a missing lock —
+            # see nsx_cli.sync's frozen docstring) plus a real `nsx
+            # configure`, since nothing has been materialised/configured
+            # here yet.
+            nsx_cli.sync(app_dir, frozen=True, timeout_s=timeouts.configure_s, verbose=verbose)
+            nsx_cli.configure(
+                app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s, verbose=verbose
+            )
+        # else: fully offline incremental rebuild. Skip nsx lock (no
+        # network resolve of the "main" branch constraint), nsx sync's
+        # module content-hash verification (a full tree hash over
+        # modules/ — real CPU/IO cost for large vendored trees), and the
+        # nsx configure() round-trip entirely. CMake's own
+        # --regenerate-during-build ninja rule transparently re-runs
+        # `cmake` if CMakeLists.txt (or any other tracked input,
+        # including hpx's freshly re-rendered templates from
+        # generate_app()) changed, with ZERO module-tree verification —
+        # so a hand-patched vendored NSX module under modules/ survives
+        # untouched across every subsequent build. This is the fast path
+        # for "I'm iterating on a local NSX module fix and want every
+        # rebuild to keep using it" (see AGENTS.md / the AP330 bring-up
+        # session that motivated this).
     else:
         nsx_cli.lock(app_dir, update=True, timeout_s=timeouts.configure_s, verbose=verbose)
         try:
@@ -771,36 +833,76 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
             if modules_dir.exists():
                 shutil.rmtree(modules_dir, ignore_errors=True)
             raise
+        nsx_cli.configure(app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s, verbose=verbose)
 
-    nsx_cli.configure(app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s, verbose=verbose)
     nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose)
+    # Same gate as generate_app()'s power_binary_enabled: only build the
+    # dedicated power binary when it was actually rendered into
+    # CMakeLists.txt (power.enabled AND firmware == "dedicated"). "shared"
+    # mode never adds the hpx_profiler_power target, so building it here
+    # would fail.
+    power_binary_enabled = ctx.config.power.enabled and ctx.config.power.firmware == "dedicated"
+    if power_binary_enabled:
+        # ``nsx build`` targets the CMake project name (hpx_profiler) by
+        # default — the dedicated power binary needs an explicit second
+        # `cmake --build --target hpx_profiler_power` from the SAME
+        # configure/module-sync (see generate_app: it is only added to
+        # CMakeLists.txt when power.enabled, so this never runs otherwise).
+        nsx_cli.build(
+            app_dir,
+            toolchain=nsx_tc,
+            target="hpx_profiler_power",
+            timeout_s=timeouts.build_s,
+            verbose=verbose,
+        )
 
     # Locate build output. Prefer the ELF-form executable because later
     # reporting stages run size tools against it to capture text/data/bss.
-    build_dir = app_dir / "build" / board
-    artifact_patterns = [
-        str(build_dir / "hpx_profiler"),
-        str(build_dir / "**" / "hpx_profiler"),
-        str(build_dir / "**" / "hpx_profiler.axf"),
-        str(build_dir / "**" / "hpx_profiler.elf"),
-        str(build_dir / "hpx_profiler.bin"),
-        str(build_dir / "**" / "hpx_profiler.bin"),
-    ]
-    binary_path = None
-    for pattern in artifact_patterns:
-        matches = glob.glob(pattern, recursive=True)
-        if matches:
-            binary_path = Path(matches[0])
-            break
-
+    binary_path = _find_target_binary(build_dir, "hpx_profiler")
     if binary_path is None:
         raise BuildError(
             "Build succeeded but binary not found",
             hint=f"Searched in {build_dir}",
         )
-
     log.info("Binary: %s", binary_path)
+
+    # The dedicated power binary is only ever generated (and added to
+    # CMakeLists.txt) when power.enabled AND power.firmware == "dedicated" —
+    # see generate_app(). Its path is stashed on ctx for later stages (WP3
+    # wires it into the power-capture flash/run flow; this stage only
+    # exposes it).
+    if power_binary_enabled:
+        power_binary_path = _find_target_binary(build_dir, "hpx_profiler_power")
+        if power_binary_path is None:
+            raise BuildError(
+                "Build succeeded but power binary (hpx_profiler_power) not found",
+                hint=f"Searched in {build_dir}",
+            )
+        log.info("Power binary: %s", power_binary_path)
+        ctx.power_binary_path = power_binary_path
+
     return build_dir, binary_path
+
+
+def _find_target_binary(build_dir: Path, target_name: str) -> Path | None:
+    """Locate a built NSX target's executable/binary under ``build_dir``.
+
+    Mirrors the existing hpx_profiler artifact search so hpx_profiler_power
+    (or any future target) resolves the same way across toolchains/layouts.
+    """
+    artifact_patterns = [
+        str(build_dir / target_name),
+        str(build_dir / "**" / target_name),
+        str(build_dir / "**" / f"{target_name}.axf"),
+        str(build_dir / "**" / f"{target_name}.elf"),
+        str(build_dir / f"{target_name}.bin"),
+        str(build_dir / "**" / f"{target_name}.bin"),
+    ]
+    for pattern in artifact_patterns:
+        matches = [m for m in glob.glob(pattern, recursive=True) if Path(m).is_file()]
+        if matches:
+            return Path(matches[0])
+    return None
 
 
 def flash_app(ctx: PipelineContext) -> None:
@@ -812,6 +914,7 @@ def flash_app(ctx: PipelineContext) -> None:
         ctx.firmware_dir,
         toolchain=nsx_tc,
         jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
+        frozen=ctx.config.frozen,
         timeout_s=ctx.config.timeouts.flash_s,
         verbose=ctx.config.verbose,
     )
