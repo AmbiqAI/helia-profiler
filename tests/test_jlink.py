@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -11,6 +12,7 @@ from helia_profiler.target.probe.jlink import (
     JLinkProbe,
     JLinkProbeMatch,
     inspect_probe_target,
+    list_connected_probes,
     resolve_probe_serial,
 )
 from helia_profiler.platform import CoreArch
@@ -22,6 +24,29 @@ def _probe(serial: str, product: str = "J-Link") -> JLinkProbe:
 
 def _match(serial: str, core: CoreArch | None, product: str = "J-Link") -> JLinkProbeMatch:
     return JLinkProbeMatch(probe=_probe(serial, product), detected_core=core)
+
+
+def test_list_connected_probes_is_nongui_and_parses_multiple_products() -> None:
+    output = """
+J-Link[0]: Connection: USB, Serial number: 1160003180, ProductName: J-Link-OB-Apollo4-CortexM
+J-Link[1]: Connection: USB, Serial number: 1160003409, ProductName: J-Link-OB-Apollo4-CortexM
+"""
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        calls.append(list(args))
+        assert kwargs["input"] == "ShowEmuList\nexit\n"
+        return SimpleNamespace(returncode=0, stdout=output, stderr="")
+
+    with (
+        patch("helia_profiler.target.probe.jlink.find_jlink_exe", return_value="JLinkExe"),
+        patch("subprocess.run", side_effect=fake_run),
+    ):
+        probes = list_connected_probes()
+
+    assert calls == [["JLinkExe", "-NoGui", "1"]]
+    assert [probe.serial for probe in probes] == ["1160003180", "1160003409"]
+    assert {probe.product for probe in probes} == {"J-Link-OB-Apollo4-CortexM"}
 
 
 class TestResolveProbeSerial:

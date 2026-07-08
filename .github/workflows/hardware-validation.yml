@@ -15,7 +15,7 @@ on:
       boards:
         description: "Comma-separated board IDs"
         required: true
-        default: apollo510_evb
+        default: apollo510_evb,apollo330mP_evb
         type: string
       power:
         description: "Power validation mode"
