@@ -214,6 +214,7 @@ def flash(
     *,
     toolchain: str | None = None,
     jlink_serial: str | None = None,
+    frozen: bool = False,
     timeout_s: int = _DEFAULT_FLASH_TIMEOUT_S,
     verbose: int = 0,
 ) -> None:
@@ -222,6 +223,15 @@ def flash(
     When *jlink_serial* is provided it is forwarded to ``flash_app`` as the
     ``probe_serial`` so the underlying J-Link tool selects the correct probe
     (required when multiple probes are attached).
+
+    ``frozen`` verifies ``modules/`` against ``nsx.lock`` and raises on any
+    drift instead of silently re-vendoring, when a (re)configure is
+    triggered (requires neuralspotx>=0.7.5, AmbiqAI/neuralspotx#178). Note
+    that passing *jlink_serial* always forces a reconfigure regardless of
+    *frozen* — the probe serial is baked into the CMake cache, so a stale
+    build must not be flashed against a different probe. *frozen* only
+    changes how the accompanying module sync behaves when a reconfigure is
+    already happening, not whether it happens.
     """
     log.info("nsx flash: %s (toolchain=%s)", app_dir, toolchain or "default")
     emit = emitter_for_verbosity(verbose)
@@ -235,6 +245,7 @@ def flash(
                 app_dir,
                 toolchain=toolchain,
                 probe_serial=jlink_serial,
+                frozen=frozen,
                 timeout_s=timeout_s,
                 emit=emit,
             ),

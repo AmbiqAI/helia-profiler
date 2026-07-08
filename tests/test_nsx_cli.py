@@ -89,6 +89,20 @@ class TestNsxFlash:
             nsx.flash(tmp_path)
         assert captured["probe_serial"] is None
 
+    def test_flash_forwards_frozen(self, tmp_path: Path) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_flash(_app, **kwargs) -> None:  # noqa: ANN401
+            captured["frozen"] = kwargs.get("frozen")
+
+        with patch("helia_profiler.nsx.nsx_api.flash_app", side_effect=fake_flash):
+            nsx.flash(tmp_path, frozen=True)
+        assert captured["frozen"] is True
+
+        with patch("helia_profiler.nsx.nsx_api.flash_app", side_effect=fake_flash):
+            nsx.flash(tmp_path)
+        assert captured["frozen"] is False
+
     def test_flash_does_not_touch_sncode_env(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

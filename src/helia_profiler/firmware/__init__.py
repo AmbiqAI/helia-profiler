@@ -914,6 +914,7 @@ def flash_app(ctx: PipelineContext) -> None:
         ctx.firmware_dir,
         toolchain=nsx_tc,
         jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
+        frozen=ctx.config.frozen,
         timeout_s=ctx.config.timeouts.flash_s,
         verbose=ctx.config.verbose,
     )

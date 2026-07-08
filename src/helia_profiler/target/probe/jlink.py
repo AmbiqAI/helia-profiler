@@ -605,6 +605,7 @@ class JLinkFlashBackend:
         *,
         toolchain: str,
         jlink_serial: str | None = None,
+        frozen: bool = False,
         timeout_s: float,
         verbose: bool = False,
     ) -> None:
@@ -614,6 +615,7 @@ class JLinkFlashBackend:
             firmware_path,
             toolchain=toolchain,
             jlink_serial=jlink_serial,
+            frozen=frozen,
             timeout_s=timeout_s,
             verbose=verbose,
         )

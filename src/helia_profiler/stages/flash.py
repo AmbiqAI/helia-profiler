@@ -54,6 +54,7 @@ class FlashFirmwareStage:
                 ctx.firmware_dir,
                 toolchain=toolchain,
                 jlink_serial=jlink_serial,
+                frozen=ctx.config.frozen,
                 timeout_s=ctx.config.timeouts.flash_s,
                 verbose=ctx.config.verbose,
             )
