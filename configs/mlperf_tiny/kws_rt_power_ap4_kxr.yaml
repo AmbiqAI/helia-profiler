@@ -35,6 +35,12 @@ power:
   mode: external
   duration_s: 45
   io_voltage: 1.8
+  firmware: dedicated
+  # Force the 3-wire GPIO lock-step handshake (state+go) instead of the
+  # gate-only free-run. lockstep currently auto-enables only on Apollo5
+  # (requires_lockstep_for_gated_power); forcing it here validates it on
+  # AP4 ahead of making it the cross-family default.
+  lockstep: true
 
 output:
   format: json

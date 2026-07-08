@@ -1,0 +1,60 @@
+# KWS (DS-CNN int8) on Apollo330mP EVB (Rev 1) via heliaRT — PMU +
+# Joulescope power capture.
+#
+# apollo330mP_evb has no board-specific GPIO sync wiring registered in
+# board.py yet (falls back to a generic, unverified default) -- explicit
+# overrides here use J8 header pins the user chose to avoid the Click
+# module: GP5 (sync/gate), GP6 (state), GP7 (go). First-ever hardware test
+# of this wiring; if the READY handshake times out, the wiring or pin
+# choice is the first thing to double check.
+#
+# GCC toolchain, RTT transport, TCM/TCM placement (matches AutoDeploy's
+# own AP330 baseline exactly: Latest_AI_Results.xlsx, sheet AP330P,
+# gcc 14.2.Rel1, KWS row, TCM/TCM), LP (96 MHz) clock:
+#   LP: 19.657ms, 124.35uJ/inf, 6.326mW
+#   HP: 7.475ms,  164.60uJ/inf, 22.02mW
+model:
+  path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
+  arena_size: 32768
+  model_location: tcm
+
+engine:
+  type: helia-rt
+
+target:
+  board: apollo330mP_evb
+  toolchain: arm-none-eabi-gcc
+  jlink_serial: "1160003058"
+  transport: swo
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+    mve: default
+    memory: default
+  per_layer: false
+  iterations: 200
+  warmup: 10
+  aggregation: median
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  firmware: dedicated
+  lockstep: true
+  sync_gpio_pin: 5
+  state_gpio_pin: 6
+  go_gpio_pin: 7
+
+output:
+  format: json
+  dir: ./results/mlperf_tiny/kws_rt_power_ap330_noprofile
+  model_explorer: false
+  detailed: true
+
+keep_work_dir: true

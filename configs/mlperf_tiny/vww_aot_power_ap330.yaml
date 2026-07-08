@@ -1,0 +1,73 @@
+# VWW (Visual Wake Words, MobileNet-based int8) on Apollo330mP EVB (Rev 1)
+# via heliaAOT — MRAM weights / SRAM arena placement (matches the current
+# heliaRT baseline in vww_rt_power_ap330.yaml, and AutoDeploy's own AP330P
+# convention), GCC toolchain (same toolchain as the RT baseline -- only the
+# engine varies here, per one-variable-at-a-time methodology).
+#
+# Purpose: (1) verify heliaAOT builds/boots/profiles correctly on AP330 at
+# all (first AOT attempt on this board); (2) give an RT-vs-AOT delta at
+# matched placement before any per-tensor placement tuning.
+#
+# Note: heliaAOT has no dedicated apollo330P platform profile yet --
+# engines/helia_aot/compile.py maps apollo330mP_evb -> the apollo510_evb
+# AOT platform name (Cortex-M55, AP5 family). This affects AOT codegen
+# assumptions only; the actual firmware build/link/memory layout still
+# uses this project's real apollo330P SocDef (240KB TCM, not AP510's
+# 512KB), so this should not silently produce an oversized binary --
+# but flag if anything looks wrong on first boot.
+model:
+  path: tests/fixtures/mlperf_tiny/vww/vww_96_int8.tflite
+  arena_size: 112640
+
+engine:
+  type: helia-aot
+  config:
+    prefix: hpx
+    module_name: hpx_model
+    aot_args:
+      memory:
+        tensors:
+          - type: scratch
+            attributes: {memory: sram}
+          - type: persistent
+            attributes: {memory: sram}
+          - type: constant
+            attributes: {memory: mram}
+
+target:
+  board: apollo330mP_evb
+  toolchain: arm-none-eabi-gcc
+  jlink_serial: "1160003058"
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+    mve: default
+    memory: default
+  per_layer: true
+  iterations: 200
+  warmup: 10
+  aggregation: median
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  firmware: dedicated
+  lockstep: true
+  sync_gpio_pin: 5
+  state_gpio_pin: 6
+  go_gpio_pin: 7
+
+output:
+  format: json
+  dir: ./results/mlperf_tiny/vww_aot_power_ap330
+  model_explorer: false
+  detailed: true
+
+keep_work_dir: true

@@ -1,0 +1,54 @@
+# KWS (DS-CNN int8) on Apollo4 Plus EVB (non-Blue -- no onboard Cooper BLE
+# radio) via heliaRT — PMU (DWT) + Joulescope power capture.
+#
+# Same methodology as the KXR (Blue-variant) capture, but on the actual
+# board AutoDeploy's own AP4 baseline was captured on (ns_platform.yaml:
+# apollo4p_evb features=[mcu, usb], no "ble" -- unlike apollo4p_blue_kxr_evb's
+# [mcu, usb, ble]). This is the true same-board comparison against AD's
+# apollo4p_evb gcc/LP row (97.7ms / 511.4uJ / 5.236mW), isolating whether the
+# BLE-reset + broad-peripheral-shutdown fixes generalize cleanly to a board
+# with no BLE hardware at all (ble_reset_gpio_pin is None here, so that
+# template block never renders; broad_peripheral_shutdown still fires,
+# it's AP4-family-wide).
+model:
+  path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
+  arena_size: 32768
+  model_location: tcm
+
+engine:
+  type: helia-rt
+
+target:
+  board: apollo4p_evb
+  toolchain: arm-none-eabi-gcc
+  jlink_serial: "900030204"
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+  per_layer: true
+  iterations: 200
+  warmup: 10
+  aggregation: median
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  firmware: dedicated
+  # Force the 3-wire GPIO lock-step handshake (state+go) instead of the
+  # gate-only free-run, matching the KXR capture methodology.
+  lockstep: true
+
+output:
+  format: json
+  dir: ./results/mlperf_tiny/kws_rt_power_ap4_evb
+  model_explorer: false
+  detailed: true
+
+keep_work_dir: true
