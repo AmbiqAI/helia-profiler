@@ -48,7 +48,7 @@ Inference engine selection and passthrough config.
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `type` | tflm \| helia-rt \| helia-aot | `helia-rt` |  |
+| `type` | tflm \| helia-rt \| helia-aot | `helia-rt` | `tflm` is temporarily unavailable — use `helia-rt` for the interpreter runtime. |
 | `backend` | str \| null | `null` |  |
 | `config` | dict[str, Any] | `{}` | free-form engine-specific mapping (not strictly validated). |
 | `config_path` | Path \| null | `null` |  |
@@ -92,29 +92,6 @@ Liveness / progress-reporting settings.
 The firmware emits ``HPX_HEARTBEAT`` lines at configurable intervals so
 the host can (a) detect a hung run without using a large wall-clock
 timeout, and (b) show the user live progress.
-
-Attributes
-----------
-enabled:
-    Master switch.  When ``False``, no heartbeats are emitted or
-    expected and the host falls back to the legacy line-gap timeout.
-every_n_ops:
-    Emit a heartbeat after this many profiled ops.  ``0`` disables this
-    trigger.  Lower values add more PMU/inter-op overhead but give
-    finer-grained progress.
-every_ms:
-    Emit a heartbeat when at least this many wall-clock milliseconds
-    have elapsed since the last heartbeat.  ``0`` disables this
-    trigger.  Useful for engines with a single large invocation (e.g.
-    AOT command streams) where ``every_n_ops`` does
-    not fire.
-host_timeout_s:
-    Maximum time the host will wait without receiving *any* line from
-    the firmware before declaring the run hung.
-overall_timeout_s:
-    Hard ceiling on total capture time, in seconds.  ``None`` means
-    unbounded (rely on heartbeats).  Set to a positive int for a safety
-    net in CI or unattended runs.
 
 | Key | Type | Default | Notes |
 |---|---|---|---|

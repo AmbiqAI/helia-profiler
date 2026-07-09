@@ -36,6 +36,7 @@ _EXPLICIT_NOTES: dict[str, str] = {
     ),
     "profiling.pmu_presets": "**Deprecated** — prefer `pmu_counters`.",
     "keep_work_dir": "**Deprecated** — no-op, the cache work directory is always kept.",
+    "engine.type": "`tflm` is temporarily unavailable — use `helia-rt` for the interpreter runtime.",
     "engine.config": "free-form engine-specific mapping (not strictly validated).",
     "target.custom_socs": "advanced raw mapping validated by the platform layer.",
     "target.custom_boards": "advanced raw mapping validated by the platform layer.",
@@ -68,8 +69,23 @@ def _section_title(path: tuple[str, ...]) -> str:
 
 
 def _docstring(cls: type) -> str:
+    """Class docstring as Markdown prose.
+
+    Numpydoc-style ``Attributes`` blocks are stripped: their setext-style
+    underline renders as a broken heading in Markdown, and the per-field
+    details are already covered by the generated table.
+    """
     doc = inspect.getdoc(cls)
-    return doc.strip() if doc else ""
+    if not doc:
+        return ""
+    lines = doc.strip().splitlines()
+    for i in range(len(lines) - 1):
+        if lines[i].strip() in ("Attributes", "Attributes:") and set(
+            lines[i + 1].strip()
+        ) == {"-"}:
+            lines = lines[:i]
+            break
+    return "\n".join(lines).rstrip()
 
 
 def _is_enum(tp: object) -> bool:
