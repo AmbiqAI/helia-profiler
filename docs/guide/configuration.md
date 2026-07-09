@@ -3,6 +3,9 @@
 heliaPROFILER uses a layered configuration system: a YAML file merged with CLI
 flags, resolved once at startup into an immutable config object.
 
+For the complete key-by-key schema, see the
+[Configuration Reference](../reference/configuration.md).
+
 ## Config file
 
 Create an `hpx.yml` (any name works — pass it with `--config`):
@@ -90,21 +93,11 @@ hpx profile my_model.tflite --board apollo510_evb
 After this point, the config is **never mutated**. Every stage reads from the
 same frozen object.
 
-## Full field reference
+## Field notes
 
-### `model`
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `path` | string | *(required)* | Path to `.tflite` model file |
-| `arena_size` | int | `131072` | Tensor arena size in bytes |
-
-### `engine`
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `type` | string | `helia-rt` | Engine: `helia-rt` or `helia-aot` |
-| `config` | dict | `{}` | Engine-specific configuration (see [Engines](engines.md)) |
+The complete key-by-key schema (types, defaults, deprecations) lives in the
+generated [Configuration Reference](../reference/configuration.md). The notes
+below cover behavior that a schema table can't express.
 
 ### heliaRT config notes
 
@@ -122,72 +115,33 @@ same frozen object.
 - If a `helia-rt` run succeeds, use the reported `allocated_arena` to tighten
   `model.arena_size` instead of growing the arena blindly.
 
-### `target`
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `board` | string | `apollo510_evb` | Target board name |
-| `toolchain` | string | `arm-none-eabi-gcc` | Compiler toolchain prefix |
-| `jlink_serial` | string | `""` | J-Link serial (empty = auto-detect) |
-| `clock.cpu` | string | board default | CPU clock speed name, e.g. `lp`/`hp` (rejected if the board has no such speed) |
-
-Advanced target overrides:
+### Advanced target overrides
 
 - `target.custom_boards` adds config-scoped board definitions without editing the built-in platform registry.
 - `target.custom_socs` adds config-scoped SoC definitions for bring-up cases where the built-in SoC metadata is not sufficient.
 - `target.custom_boards.<name>.based_on` clones an existing built-in board and lets you override fields like `channel`, `psram_kb`, and `default_sync_gpio_pin`.
 - `target.custom_boards.<name>.starter_profile_board` reuses the NSX starter profile from a built-in board when the custom board should inherit its module graph.
 
-### `build`
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `channel` | string | board default | NSX channel recorded in the generated app manifest |
-| `nsx_modules` | dict | `{}` | Per-module NSX source overrides (`path`, `ref`, or `version`) |
-| `compiler_launcher` | string | `auto` | CMake compiler launcher used to cache compiles. `auto`, `none`, or a tool name/path (`sccache`, `ccache`). |
-
-Build-resolution notes:
+### Build-resolution notes
 
 - By default, generated profiler apps keep the board's normal NSX `channel`, but HPX explicitly resolves both `neuralspotx` and `nsx-ambiq-sdk` from `main`.
 - `build.nsx_modules.<module>.ref` or `.version` overrides win over that default for the owning project.
 - `build.nsx_modules.<module>.path` installs a local module checkout into the generated app and bypasses registry resolution for that module only.
 
-Compiler-launcher notes:
+### Compiler-launcher notes
 
 - `auto` (the default) wraps every compile with [`sccache`](https://github.com/mozilla/sccache) or [`ccache`](https://ccache.dev) if either is found on `PATH`, and does nothing otherwise — so simply installing the binary opts you in. Caching is correctness-safe (the launcher hashes the full compile inputs) and only accelerates the compile step, not NSX lock/sync/configure or flash.
 - `none` (also `off`/`false`) disables the launcher.
 - An explicit tool name or path (e.g. `sccache`) is **required**: the build fails if it cannot be found.
 - The `HPX_COMPILER_LAUNCHER` environment variable overrides this field, and the `--compiler-launcher` / `--no-compiler-launcher` CLI flags override both.
 
-### `profiling`
+## Validation
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `pmu_counters` | dict | `{cpu: [basic]}` | Counter group selections |
-| `pmu_presets` | list | — | Legacy preset names (prefer `pmu_counters`) |
-| `per_layer` | bool | `true` | Per-layer breakdown |
-| `iterations` | int | `100` | Inference iterations per PMU pass |
-| `warmup` | int | `5` | Warmup iterations before measurement |
-
-### `power`
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `enabled` | bool | `false` | Enable power capture |
-| `driver` | string | `joulescope` | Power driver name |
-| `mode` | string | `external` | `external` (Joulescope) or `internal` |
-| `duration_s` | int | `30` | Capture duration in seconds |
-| `io_voltage` | float | `1.8` | I/O voltage for Joulescope |
-| `sync_gpio_pin` | int | board default (`29` on `apollo510_evb` / `apollo510b_evb`) | GPIO pin for inference sync |
-| `sync_input_index` | int | `0` | Joulescope digital INPUT channel wired to the sync GPIO |
-| `stats_rate_hz` | int | `1000` | Host stats rate for gated power capture |
-| `firmware` | string | `dedicated` | `dedicated` flashes a transport-free power binary before capture; `shared` reuses the transport binary. See [Power](power.md#dedicated-power-firmware) |
-
-### `output`
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `format` | string | `csv` | Output format: `csv` or `json` |
-| `dir` | string | `./results` | Output directory |
-| `model_explorer` | bool | `true` | Generate Model Explorer overlays |
-| `detailed` | bool | `false` | Emit detailed breakdowns (per-preset CSVs, memory.json) |
+- Unknown keys anywhere in the config tree are rejected at load time, with
+  did-you-mean suggestions based on the real field names.
+- Every config error raised is a `ConfigError` carrying a `hint` describing
+  how to fix it.
+- Three keys are deprecated but still work, emitting a warning: `model.model_location`
+  (prefer `arena_location`/`weights_location`), `profiling.pmu_presets`
+  (prefer `pmu_counters`), and `keep_work_dir` (no-op — the cache work
+  directory is always kept).

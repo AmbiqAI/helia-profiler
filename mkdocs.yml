@@ -141,6 +141,7 @@ nav:
       - Contributing an Engine: architecture/adding-an-engine.md
   - CLI Reference:
       - Overview: reference/index.md
+      - Configuration Reference: reference/configuration.md
       - hpx profile: reference/profile.md
       - hpx doctor: reference/doctor.md
       - hpx boards: reference/boards.md
