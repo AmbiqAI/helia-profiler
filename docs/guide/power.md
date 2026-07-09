@@ -254,18 +254,15 @@ settle than a plain PMU capture does.
 
 For models whose single inference takes only a couple of milliseconds, even
 a multi-second window is dominated by GPIO-edge/gate-boundary timing jitter
-as a fraction of the total. Widening the window further reduces that jitter.
-`configs/mlperf_tiny/ad_rt_power_ap510.yaml` documents this pattern for an
-autoencoder whose inference is ~0.7–1.4 ms:
+as a fraction of the total. Widening the window further reduces that jitter:
 
 ```yaml
 profiling:
-  # AD's inference is extremely short (~0.7-1.4ms), so the default 1s
-  # auto-sized clean/power window (~1000-2000 inferences) is dominated by
-  # GPIO-edge/gate-boundary timing jitter as a fraction of the total. Push
-  # the gated window out to several seconds (thousands more inferences) to
-  # sanity-check whether the large hpx-vs-AD latency/energy gap for this
-  # model is a real effect or a short-window measurement artifact.
+  # This model's inference is extremely short, so the default auto-sized
+  # clean/power window contains relatively few milliseconds of gated signal
+  # per gate edge. Push the gated window out to several seconds (thousands
+  # of inferences) so gate-boundary jitter becomes negligible as a fraction
+  # of the measured total.
   window_target_ms: 8000
   window_max: 10000
 ```
@@ -327,7 +324,7 @@ The terminal prints a compact power table at the end of a run:
 │ Avg current    │   12.345 mA  │
 │ Avg power      │   22.222 mW  │
 │ Peak current   │   14.567 mA  │
-│ Energy         │   13.050 µJ  │
+│ Energy         │  666.630 µJ  │
 └────────────────┴──────────────┘
 ```
 
