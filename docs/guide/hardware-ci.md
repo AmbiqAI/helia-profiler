@@ -140,7 +140,7 @@ The workflow exposes the validation axes as manual inputs. Leave an optional
 axis empty to use the selected suite's defaults; set it explicitly to override
 only that axis.
 
-- `suite`: `smoke`, `models-rt`, or `models-aot`
+- `suite`: `smoke`, `models-rt`, `models-aot`, or `complete`
 - `boards`: comma-separated board IDs, default `apollo510_evb,apollo330mP_evb`
 - `models`: optional comma-separated model IDs such as `kws` or `kws,vww`
 - `engines`: optional comma-separated engines such as `helia-rt` or `helia-aot`
@@ -205,6 +205,17 @@ uv run hpx validate --list \
 ```
 
 This expands to 16 cases: `4 models × 2 boards × 2 toolchains`.
+
+For the equivalent heliaAOT model regression, select `suite=models-aot` and
+leave the optional axes empty. It uses the same model, board, toolchain,
+transport, and memory axes as `models-rt`, but runs `helia-aot`.
+
+For the full hardware regression, select `suite=complete`. It combines
+`models-rt` and `models-aot` into a 32-case sweep:
+
+```text
+4 models × 2 boards × 2 toolchains × 2 engines
+```
 
 To compare runtime engines on the same smoke model, keep `suite=smoke` and set:
 

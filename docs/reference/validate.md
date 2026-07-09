@@ -34,7 +34,7 @@ See [Validating a Board Setup](../guides/validating-a-board-setup.md) and
 | `--interfaces`, `--transports` | Comma-separated transports: `rtt`, `uart`, `swo`, `usb_cdc` (default: board defaults). |
 | `--memories` | Comma-separated placement presets: `auto`, `tcm`, `sram`, `mram`, `psram` (default: board defaults). |
 | `--power` | Power matrix: `off` (default), `on` (only Joulescope runs), or `both`. |
-| `--suite` | Preset suite: `smoke`, `models-rt`, or `models-aot`. Explicit axis flags always win. |
+| `--suite` | Preset suite: `smoke`, `models-rt`, `models-aot`, or `complete`. Explicit axis flags always win. |
 | `--jlink-serials` | `board=serial` entries for multi-board validation. |
 | `--repeat` | Repeat each selected case N times for stress testing (default: 1). |
 | `--timeout` | Per-case timeout in seconds (default: 900). |
@@ -48,8 +48,10 @@ See [Validating a Board Setup](../guides/validating-a-board-setup.md) and
 - `smoke` — quick single-case check: KWS, heliaRT, gcc, RTT, auto memory.
 - `models-rt` — RT sweep across all MLPerf Tiny models on Apollo510 +
   Apollo330mP with gcc + ATfE.
-- `models-aot` — model sweep across all AOT validation boards with
-  heliaAOT.
+- `models-aot` — AOT sweep across all MLPerf Tiny models on Apollo510 +
+  Apollo330mP with gcc + ATfE.
+- `complete` — combined RT + AOT sweep across all MLPerf Tiny models on
+  Apollo510 + Apollo330mP with gcc + ATfE.
 
 ## Examples
 
@@ -58,6 +60,7 @@ hpx validate                          # default reliability matrix, power off
 hpx validate --list                   # preview what would run
 hpx validate --models kws,ic          # subset by model
 hpx validate --suite smoke            # quick single-case sanity check
+hpx validate --suite complete         # full RT + AOT hardware sweep
 hpx validate -k kws-aot               # pytest-style keyword filter
 hpx validate --boards apollo3p_evb --repeat 2
 ```

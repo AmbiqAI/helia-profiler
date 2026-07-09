@@ -144,11 +144,22 @@ class TestSuiteSmoke:
         assert value_of("--mlperf-transports") == "rtt"
         assert value_of("--mlperf-memories") == "auto"
 
-    def test_models_aot_defaults_to_twelve_case_model_sweep(self, monkeypatch, tmp_path):
+    def test_models_aot_defaults_to_two_board_gcc_atfe_model_sweep(self, monkeypatch, tmp_path):
         args = self._captured_pytest_args(
             monkeypatch, "--suite", "models-aot", "--output-dir", str(tmp_path)
         )
 
         assert args[args.index("--mlperf-models") + 1] == "kws,vww,ic,ad"
         assert args[args.index("--mlperf-engines") + 1] == "helia-aot"
-        assert args[args.index("--mlperf-boards") + 1] == "apollo3p_evb,apollo4p_blue_kxr_evb,apollo510_evb"
+        assert args[args.index("--mlperf-boards") + 1] == "apollo510_evb,apollo330mP_evb"
+        assert args[args.index("--mlperf-toolchains") + 1] == "arm-none-eabi-gcc,atfe"
+
+    def test_complete_defaults_to_rt_and_aot_two_board_gcc_atfe_sweep(self, monkeypatch, tmp_path):
+        args = self._captured_pytest_args(
+            monkeypatch, "--suite", "complete", "--output-dir", str(tmp_path)
+        )
+
+        assert args[args.index("--mlperf-models") + 1] == "kws,vww,ic,ad"
+        assert args[args.index("--mlperf-engines") + 1] == "helia-rt,helia-aot"
+        assert args[args.index("--mlperf-boards") + 1] == "apollo510_evb,apollo330mP_evb"
+        assert args[args.index("--mlperf-toolchains") + 1] == "arm-none-eabi-gcc,atfe"

@@ -12,6 +12,7 @@ on:
           - smoke
           - models-rt
           - models-aot
+          - complete
       boards:
         description: "Comma-separated board IDs"
         required: true
