@@ -153,6 +153,27 @@ nav:
       - Engine Comparison: examples/engine-comparison.md
       - Toolchain Comparison: examples/toolchain-comparison.md
       - Power Profiling: examples/power-profiling.md
+  - In-Depth Guides:
+      - Overview: guides/index.md
+      - Memory Placement Tuning: guides/memory-placement-tuning.md
+      - Validating a Board Setup: guides/validating-a-board-setup.md
+  - Reference:
+      - Overview: reference/index.md
+      - CLI:
+          - hpx profile: reference/profile.md
+          - hpx doctor: reference/doctor.md
+          - hpx boards: reference/boards.md
+          - hpx engines: reference/engines.md
+          - hpx probes: reference/probes.md
+          - hpx ports: reference/ports.md
+          - hpx target: reference/target.md
+      - Configuration Reference: reference/configuration.md
+      - Python API:
+          - Overview: reference/api/index.md
+          - profile(): reference/api/profile.md
+          - Configuration: reference/api/config.md
+          - Results: reference/api/results.md
+          - Errors: reference/api/errors.md
   - Architecture:
       - Overview: architecture/index.md
       - Pipeline & Stages: architecture/pipeline.md
@@ -160,19 +181,3 @@ nav:
       - Firmware Generation: architecture/firmware.md
       - Data Capture: architecture/capture.md
       - Contributing an Engine: architecture/adding-an-engine.md
-  - CLI Reference:
-      - Overview: reference/index.md
-      - Configuration Reference: reference/configuration.md
-      - hpx profile: reference/profile.md
-      - hpx doctor: reference/doctor.md
-      - hpx boards: reference/boards.md
-      - hpx engines: reference/engines.md
-      - hpx probes: reference/probes.md
-      - hpx ports: reference/ports.md
-      - hpx target: reference/target.md
-      - Python API:
-          - Overview: reference/api/index.md
-          - profile(): reference/api/profile.md
-          - Configuration: reference/api/config.md
-          - Results: reference/api/results.md
-          - Errors: reference/api/errors.md
