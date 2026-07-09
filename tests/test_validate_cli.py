@@ -129,7 +129,7 @@ class TestSuiteSmoke:
         # Other unset axes still get smoke defaults.
         assert args[args.index("--mlperf-engines") + 1] == "helia-rt"
 
-    def test_models_rt_defaults_to_twelve_case_model_sweep(self, monkeypatch, tmp_path):
+    def test_models_rt_defaults_to_two_board_gcc_atfe_model_sweep(self, monkeypatch, tmp_path):
         args = self._captured_pytest_args(
             monkeypatch, "--suite", "models-rt", "--output-dir", str(tmp_path)
         )
@@ -139,8 +139,8 @@ class TestSuiteSmoke:
 
         assert value_of("--mlperf-models") == "kws,vww,ic,ad"
         assert value_of("--mlperf-engines") == "helia-rt"
-        assert value_of("--mlperf-boards") == "apollo3p_evb,apollo4p_blue_kxr_evb,apollo510_evb"
-        assert value_of("--mlperf-toolchains") == "arm-none-eabi-gcc"
+        assert value_of("--mlperf-boards") == "apollo510_evb,apollo330mP_evb"
+        assert value_of("--mlperf-toolchains") == "arm-none-eabi-gcc,atfe"
         assert value_of("--mlperf-transports") == "rtt"
         assert value_of("--mlperf-memories") == "auto"
 
