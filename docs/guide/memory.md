@@ -124,7 +124,7 @@ Apollo510 has DTCM 512 KB, SRAM 3 MB, MRAM 4 MB, PSRAM up to 32 MB.
 ### Tiny KWS model (~50 KB weights, ~30 KB arena)
 
 ```bash
-heliaprofile run --model kws.tflite --arena-size 30720
+hpx profile kws.tflite --arena-size 30720
 ```
 
 `auto` policy → both fit in DTCM with room to spare → arena=TCM,
@@ -194,6 +194,6 @@ model flatbuffer (50 KB) goes in SRAM.
 
 ## See also
 
-* [`heliaprofile run` reference](../reference/profile.md) — full CLI flags
+* [`hpx profile` reference](../reference/profile.md) — full CLI flags
 * [Boards and SoCs](boards.md) — per-SoC memory capacities
 * [Engines](engines.md) — heliaRT vs heliaAOT trade-offs

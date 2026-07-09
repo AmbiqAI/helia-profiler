@@ -24,7 +24,7 @@ Walkthroughs for common profiling scenarios.
 
     ---
 
-    Compare TFLM, heliaRT, and heliaAOT on the same model.
+    Compare heliaRT and heliaAOT on the same model.
 
     [:octicons-arrow-right-24: Read](engine-comparison.md)
 

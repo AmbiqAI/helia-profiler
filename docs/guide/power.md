@@ -179,18 +179,18 @@ NSX-generated per-target J-Link flash script) right before arming the gated
 capture, then runs the existing race-free arm → reset → `READY` → `GO`
 lockstep flow against it.
 
-With the dedicated binary, all four transports converge to the same power
-number — measured on the same Apollo510 EVB/model:
+With the dedicated binary, all four transports converge on effectively the
+same power number — measured on the same Apollo510 EVB/model:
 
-| Transport used for the PMU phase | Current | Energy/inference |
+| Transport used for the PMU phase | Current (relative to RTT baseline) | Energy/inference (relative to RTT baseline) |
 |---|---|---|
-| RTT | 3.679 mA | 140.79 µJ |
-| UART | 3.668 mA | 139.90 µJ |
-| SWO | 3.668 mA | 139.82 µJ |
-| USB CDC | 3.671 mA | 140.03 µJ |
+| RTT | 1.00× (baseline) | 1.00× (baseline) |
+| UART | ~1.00× | ~0.99× |
+| SWO | ~1.00× | ~0.99× |
+| USB CDC | ~1.00× | ~1.00× |
 
 All four are within 0.3% of each other and within ~1% of the trusted legacy
-AutoDeploy baseline (138.7 µJ). This is controlled by `power.firmware`
+AutoDeploy baseline. This is controlled by `power.firmware`
 (default `dedicated`); `summary.json`'s `power.power_firmware` field records
 which mode produced the result.
 
@@ -240,8 +240,10 @@ quantization schemes on the same hardware.
 
 ??? failure "`joulescope: device not found`"
     Joulescope USB driver not installed, or device claimed by another
-    process. On Linux check udev rules. Install power extras:
-    `pip install 'helia-profiler[power]'`.
+    process. On Linux, confirm the udev rule for the device is installed
+    and replug it (see [Installation](../getting-started/install.md)).
+    `pyjoulescope_driver` ships as a core dependency of `helia-profiler`,
+    so no extra install is needed.
 
 ??? failure "Current reads negative or implausibly high"
     Another power source is also feeding the EVB. Disconnect target USB,

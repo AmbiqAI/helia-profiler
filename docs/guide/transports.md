@@ -1,13 +1,14 @@
 # Capture Transports
 
-heliaPROFILER supports three ways to get profiling data off the target.
+heliaPROFILER supports four ways to get profiling data off the target.
 The transport affects reliability, throughput, and what hardware you need
 plugged in. **RTT is the default and is recommended.**
 
 | `target.transport` | Hardware | Reliability | Throughput | When to use |
 |---|---|---|---|---|
 | `rtt` *(default)* | J-Link only | Lossless | High | Almost always |
-| `usb_cdc` | USB cable + J-Link for reset | Lossless (CRC + flow control) | Medium | When RTT isn't available; large data |
+| `usb_cdc` | Target USB cable + J-Link | Lossless (CRC + flow control) | Medium | When RTT isn't available; large data |
+| `uart` | J-Link OB VCOM | Best-effort | Low (~11.5 KB/s) | Fallback when USB CDC isn't available |
 | `swo` | J-Link only | Lossy | ~1 Mbps | Diagnostics only — drops data silently |
 
 ## How transport selection works
@@ -15,6 +16,7 @@ plugged in. **RTT is the default and is recommended.**
 ```bash
 hpx profile model.tflite --transport rtt       # default
 hpx profile model.tflite --transport usb_cdc
+hpx profile model.tflite --transport uart
 hpx profile model.tflite --transport swo
 ```
 
@@ -26,7 +28,8 @@ target:
 ```
 
 The choice is global across the run — every PMU pass and metadata block
-flows over the same transport.
+flows over the same transport. `uart` uses the J-Link OB virtual COM port at
+115200 8N1, so it is the low-throughput fallback when USB CDC is unavailable.
 
 !!! note "Transport choice no longer affects power numbers"
     With the default `power.firmware: dedicated` (see
@@ -122,13 +125,13 @@ Captured via the J-Link probe using the `pylink` API.
 
 ```mermaid
 graph TD
-    A[Start] --> B{Have a J-Link?}
-    B -->|No| C[usb_cdc]
-    B -->|Yes| D{Is RTT working?}
-    D -->|Yes| E[rtt — default]
-    D -->|No| F{Need lossless?}
-    F -->|Yes| C
-    F -->|No| G[swo]
+    A[Start] --> B{Is RTT working?}
+    B -->|Yes| C[rtt — default]
+    B -->|No| D{Need lossless?}
+    D -->|No| E[swo]
+    D -->|Yes| F{Target USB CDC available?}
+    F -->|Yes| G[usb_cdc]
+    F -->|No| H[uart]
 ```
 
 For 95% of runs, the default `rtt` is correct. Switch to `usb_cdc` when:
@@ -137,6 +140,8 @@ For 95% of runs, the default `rtt` is correct. Switch to `usb_cdc` when:
   iteration, every layer) and the 32 KB RTT buffer is filling.
 - Your host has flaky `pylink`/J-Link RTT support but the target USB
   works fine.
+- Your board does not expose a usable target USB CDC path, but the J-Link OB
+  virtual COM port is available — use `uart` as the fallback.
 
 ## Troubleshooting
 

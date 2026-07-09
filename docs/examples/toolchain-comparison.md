@@ -1,13 +1,13 @@
 # Toolchain Comparison
 
-Run the same model and engine through GCC, armclang, and ATfE, then
-compare cycle counts.
+Run the same model through GCC, armclang, and ATfE for heliaRT and
+heliaAOT, then compare cycle counts.
 
 ## Goal
 
-Isolate the effect of toolchain choice on inference latency. Engine,
-counters, transport, and board are held constant; only `--toolchain`
-changes between runs.
+Compare toolchain choice within a fixed engine/board setup. Counters,
+transport, and board are held constant; within each engine subgroup, only
+`--toolchain` changes between runs.
 
 ## Prerequisites
 
@@ -16,11 +16,11 @@ changes between runs.
 - A model, e.g. the bundled `examples/quickstart/kws_model.tflite`.
 - Apollo510 EVB connected via J-Link.
 
-Run `hpx doctor` first to confirm armclang / atfe show ✓.
+Run `hpx doctor` first to confirm the baseline tool checks pass, and verify `atfe --version` separately before using ATfE.
 
 ## Run all three
 
-Three commands, three result directories:
+Six commands, six result directories:
 
 ```bash
 MODEL=examples/quickstart/kws_model.tflite
@@ -31,6 +31,9 @@ hpx profile $MODEL --engine helia-rt --toolchain gcc      \
 hpx profile $MODEL --engine helia-rt --toolchain armclang \
     --output-dir results_compare/rt_armclang
 
+hpx profile $MODEL --engine helia-rt --toolchain atfe     \
+    --output-dir results_compare/rt_atfe
+
 hpx profile $MODEL --engine helia-aot --toolchain gcc      \
     --engine-config configs/aot.yml \
     --output-dir results_compare/aot_gcc
@@ -38,6 +41,10 @@ hpx profile $MODEL --engine helia-aot --toolchain gcc      \
 hpx profile $MODEL --engine helia-aot --toolchain armclang \
     --engine-config configs/aot.yml \
     --output-dir results_compare/aot_armclang
+
+hpx profile $MODEL --engine helia-aot --toolchain atfe     \
+    --engine-config configs/aot.yml \
+    --output-dir results_compare/aot_atfe
 ```
 
 (`configs/aot.yml` should set `cmsis_nn_path`. See
@@ -52,7 +59,8 @@ for dir in results_compare/*/; do
 done
 ```
 
-Reference numbers from this repo's `results/results_*`:
+Current checked-in reference results in `results/results_*` cover the
+GCC/armclang pairs:
 
 | Run | Total cycles | vs heliaRT/GCC |
 |---|---|---|
@@ -90,7 +98,7 @@ softmax layers are largely identical across toolchains.
 This example does **not** isolate the engine choice from the toolchain
 choice — it varies both. To isolate the engine effect, hold toolchain
 constant and only flip `--engine`. To isolate placement effects,
-also hold `--model-location` constant.
+also hold `--arena-location` / `--weights-location` constant.
 
 ## Next
 

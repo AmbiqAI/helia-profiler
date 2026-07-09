@@ -10,19 +10,14 @@ letting the pipeline treat them uniformly.
 class EngineAdapter(Protocol):
     """Prepares engine-specific build artifacts for NSX firmware."""
 
-    name: str  # e.g. "helia-rt", "helia-aot", "tflm"
+    name: str
+    engine_type: EngineType
 
     def prepare(
         self,
-        model_path: Path,
-        config: EngineConfig,
-        platform_info: PlatformInfo,
+        config: ProfileConfig,
         work_dir: Path,
     ) -> EngineArtifacts:
-        """
-        Produce NSX module references and template variables
-        needed to build the profiling firmware.
-        """
         ...
 ```
 
@@ -30,9 +25,7 @@ Every adapter receives:
 
 | Parameter | Purpose |
 |---|---|
-| `model_path` | Absolute path to the `.tflite` model |
-| `config` | Engine-specific config (variant, dist_path, etc.) |
-| `platform_info` | Resolved SoC/board with features like MVE, DSP |
+| `config` | Resolved profile config, including engine-specific settings |
 | `work_dir` | Writable directory for generated files |
 
 And returns `EngineArtifacts`:
@@ -40,14 +33,15 @@ And returns `EngineArtifacts`:
 ```python
 @dataclass(frozen=True)
 class EngineArtifacts:
-    modules: list[NsxModuleRef]       # NSX modules to include in build
-    template_vars: dict[str, Any]     # Variables injected into Jinja templates
+    engine_type: EngineType
     extra_modules: list[NsxModuleRef] = field(default_factory=list)
+    static_libs: list[Path] = field(default_factory=list)
+    memory_plan: MemoryPlan | None = None
 ```
 
 ## heliaRT adapter
 
-**File:** `engines/helia_rt.py`
+**File:** `engines/helia_rt/adapter.py`
 
 heliaRT is Ambiq's optimized TFLM fork, distributed as a pre-built static
 library (`libhelia-rt.a`).
@@ -58,7 +52,7 @@ library (`libhelia-rt.a`).
 2. Creates a local NSX module (`helia-rt-local/`) that wraps the static lib:
     - Writes `nsx.yml` pointing to the `.a` file
     - Sets include paths for the RT headers
-3. Returns module refs for `helia-rt-local` + `ns-cmsis-nn` + `nsx-core`
+3. Returns an artifact bundle pointing at `helia-rt-local` plus the metadata the firmware renderer needs
 
 ### Template variables
 
@@ -79,7 +73,7 @@ library (`libhelia-rt.a`).
 
 ## heliaAOT adapter
 
-**File:** `engines/helia_aot.py`
+**File:** `engines/helia_aot/adapter.py`
 
 heliaAOT compiles the TFLite model into optimized C code at build time,
 eliminating the interpreter overhead.
@@ -93,7 +87,7 @@ eliminating the interpreter overhead.
 2. Creates two local NSX modules:
     - **aot-model/** — the generated C code
     - **ns-cmsis-nn/** — AmbiqAI's CMSIS-NN fork (required — not upstream)
-3. Returns module refs and template variables
+3. Returns the artifact bundle and AOT-specific metadata
 
 ### Template variables
 
@@ -113,11 +107,12 @@ eliminating the interpreter overhead.
 - Uses a different `main.cc` template (`main_aot.cc.j2`) because AOT
   inference calls are direct function invocations, not interpreter runs
 
-## TFLM adapter
+## TFLM adapter (internal)
 
 **File:** `engines/tflm.py`
 
-Stock TensorFlow Lite for Microcontrollers — useful as a baseline comparison.
+Stock TensorFlow Lite for Microcontrollers adapter retained in source for the
+shared interpreter path. It is not currently exposed by `hpx engines` / `--engine`.
 
 ### What `prepare()` does
 
@@ -140,9 +135,9 @@ The engine choice affects three things in the generated firmware:
 
 | Engine | Main template | Includes |
 |---|---|---|
-| heliaRT | `main_rt.cc.j2` | Interpreter setup, arena allocation |
+| heliaRT | `main.cc.j2` | Interpreter setup, arena allocation |
 | heliaAOT | `main_aot.cc.j2` | Direct function calls, `arm_mve.h` pre-include |
-| TFLM | `main_tflm.cc.j2` | Standard TFLM interpreter |
+| TFLM | `main.cc.j2` | Standard TFLM interpreter path |
 
 ### 2. NSX module graph
 

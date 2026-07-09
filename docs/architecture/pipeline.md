@@ -1,13 +1,14 @@
 # Pipeline & Stages
 
-The profiling pipeline is a sequence of 8 stages executed in order. Each stage
-has a single responsibility, reads from the shared `PipelineContext`, and
-writes its outputs back.
+The profiling pipeline is a sequence of stages executed in order. The
+summary below collapses some setup and verification work into the major
+phases most contributors interact with. Each phase reads from the shared
+`PipelineContext` and writes its outputs back.
 
 ## Stage execution
 
 ```python
-# From profiler.py
+# High-level phase grouping
 def build_default_pipeline() -> list[Stage]:
     return [
         ResolvePlatform(),      # S01
@@ -21,9 +22,11 @@ def build_default_pipeline() -> list[Stage]:
     ]
 ```
 
-The `PipelineRunner` calls each stage's `run(ctx)` method sequentially. If any
-stage raises an exception, the pipeline stops and reports the error with its
-typed hint.
+The concrete pipeline also runs preflight, board-power, probe-resolution,
+model-analysis, memory-planning, and placement-verification stages around
+these major phases. `PipelineRunner` still executes everything sequentially;
+if any stage raises an exception, the pipeline stops and reports the error
+with its typed hint.
 
 ## PipelineContext
 
@@ -32,17 +35,20 @@ The `PipelineContext` is a mutable state bag passed through all stages:
 ```python
 @dataclass
 class PipelineContext:
-    config: ProfileConfig          # Frozen — never mutated
-    run_metadata: RunMetadata      # Accumulated across stages
-
-    # Set by individual stages:
-    platform_info: PlatformInfo | None = None
+    config: ProfileConfig
+    work_dir: Path
+    soc: SocDef | None = None
+    board: BoardDef | None = None
+    resolved_jlink_serial: str | None = None
     engine_artifacts: EngineArtifacts | None = None
+    firmware_dir: Path | None = None
     build_dir: Path | None = None
     binary_path: Path | None = None
     binary_sections: BinarySections | None = None
     pmu_result: PmuResult | None = None
     power_result: PowerResult | None = None
+    report_paths: list[Path] = field(default_factory=list)
+    run_metadata: RunMetadata = field(default_factory=RunMetadata)
 ```
 
 Stages are expected to **set** their designated fields and **read** fields
@@ -54,7 +60,7 @@ it's been set.
 ### S01: Resolve Platform
 
 **File:** `stages/resolve_platform.py`
-**Sets:** `ctx.platform_info`, `ctx.run_metadata.platform`, `ctx.run_metadata.model`
+**Sets:** `ctx.soc`, `ctx.board`, `ctx.run_metadata.platform`, `ctx.run_metadata.model`
 
 Validates the board name, resolves the SoC definition, computes the model file
 hash (SHA-256), and populates platform and model metadata.
@@ -67,16 +73,10 @@ captured.
 **File:** `stages/prepare_engine.py`
 **Sets:** `ctx.engine_artifacts`
 
-Instantiates the engine adapter (TFLM, heliaRT, or heliaAOT) and calls its
-`prepare()` method. The adapter produces `EngineArtifacts`:
-
-```python
-@dataclass
-class EngineArtifacts:
-    modules: list[NsxModuleRef]   # NSX modules to link
-    template_vars: dict[str, Any] # Jinja template variables
-    extra_modules: list[NsxModuleRef] = field(default_factory=list)
-```
+Instantiates the engine adapter (heliaRT/heliaAOT, plus the internal TFLM path) and calls its
+`prepare()` method. The adapter produces an `EngineArtifacts` bundle that records
+engine identity plus any local NSX modules, static libraries, and memory-planning
+metadata needed by later stages.
 
 For **heliaRT**, this creates a local NSX module wrapping the pre-built static
 library. For **heliaAOT**, this runs the AOT compiler and creates CMSIS-NN +
@@ -86,13 +86,13 @@ model NSX modules.
 
 **File:** `stages/generate_firmware.py`
 **Reads:** `ctx.engine_artifacts`, `ctx.config`
-**Sets:** writes firmware app to `ctx.config.work_dir`
+**Sets:** writes firmware app to `ctx.firmware_dir`
 
 Renders Jinja2 templates into a complete NSX application:
 
 - `CMakeLists.txt` — project build config
 - `nsx.yml` — NSX module manifest
-- `src/main.cc` — entry point (different template for AOT vs RT/TFLM)
+- `src/main.cc` — entry point (`main_aot.cc.j2` for AOT, `main.cc.j2` for the shared interpreter path)
 - `src/hpx_pmu_profiler.cc/.h` — PMU capture harness
 - `modules.cmake` — local module paths
 
@@ -110,7 +110,7 @@ Runs the NSX build pipeline:
 2. `nsx build --app-dir <app>` — compile and link
 
 After building, captures:
-- **Binary section sizes** via `arm-none-eabi-size` (text, data, bss)
+- **Binary section sizes** via the toolchain-specific size probe (`arm-none-eabi-size` or `fromelf`)
 - **Toolchain info** — compiler and CMake versions
 
 ### S05: Flash Firmware
@@ -132,12 +132,12 @@ The core data collection stage:
 
 1. **Reset the target** — J-Link reset to start firmware from the beginning
 2. **Attach the selected transport reader** — `pylink` drives RTT/SWO capture
-    and `pyserial` reads USB CDC when selected
+    and `pyserial` reads USB CDC / UART when selected
 3. **Parse HPX protocol** — firmware prints structured data over the selected transport:
     - `HPX_START` / `HPX_END` markers
     - Metadata key-value pairs (arena size, model size, tensor count)
     - CSV rows: one row per layer per iteration with counter values
-4. **Average iterations** — counter values are averaged across iterations
+4. **Aggregate iterations** — counter values are combined across iterations using the selected aggregation mode
 5. **Merge presets** — if multi-pass, layers from each pass are merged into
    unified results with all counters
 
@@ -173,8 +173,8 @@ See [Output & Results](../guide/output.md) for file format details.
 ## Multi-pass profiling
 
 When the requested PMU counters exceed the 8-counter hardware limit, the
-pipeline runs stages S03–S06 **multiple times** — once per counter pass.
-The counter planning is handled by `counters.py`:
+firmware runs **multiple counter passes** within one profiling session. The
+counter planning is handled by `counters.py`:
 
 ```
 Pass 1: [CPU_CYCLES, INST_RETIRED, LD_RETIRED, ST_RETIRED, BR_RETIRED, ...]

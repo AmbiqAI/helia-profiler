@@ -250,14 +250,16 @@ graph TD
 
 KWS reference model (`examples/quickstart/kws_model.tflite`),
 Apollo510 EVB, default counter set, 100 iterations. Cycles are the mean
-across iterations.
+across iterations, shown relative to the heliaRT/GCC baseline (absolute
+cycle counts depend on your board, model, and clock configuration — see
+[First Profile](../getting-started/first-profile.md) to get your own).
 
-| Engine | Toolchain | Total cycles | vs heliaRT/GCC |
-|---|---|---|---|
-| heliaRT | gcc | 2,014,841 | 1.00× (baseline) |
-| heliaRT | armclang | 1,874,429 | 0.93× |
-| heliaAOT | gcc | 1,965,501 | 0.98× |
-| heliaAOT | armclang | 1,869,210 | 0.93× |
+| Engine | Toolchain | Total cycles vs heliaRT/GCC |
+|---|---|---|
+| heliaRT | gcc | 1.00× (baseline) |
+| heliaRT | armclang | ~0.93× |
+| heliaAOT | gcc | ~0.98× |
+| heliaAOT | armclang | ~0.93× |
 
 The engine-vs-engine spread on this model is small; the toolchain spread
 is comparable. Bigger differences appear on convolution-heavy models with

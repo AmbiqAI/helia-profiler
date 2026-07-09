@@ -143,7 +143,7 @@ fromelf --version
     When `target.toolchain: atfe` is selected, the heliaRT adapter falls
     back to `libhelia-rt-gcc.a` (with a warning). This works but means
     the heliaRT static library itself was GCC-built; only the surrounding
-    profiler firmware is built with ATfE. heliaAOT and TFLM build cleanly
+    profiler firmware is built with ATfE. heliaAOT builds cleanly
     with ATfE end-to-end.
 
 ## Toolchain comparison
