@@ -65,6 +65,12 @@ starting point.
 
 </div>
 
+## Python API
+
+Calling heliaPROFILER from Python instead of the shell? See the
+[Python API reference](api/index.md) for `profile()`, `ProfileConfig`, and
+the typed result and error types.
+
 ## Common conventions
 
 - **Positional arg vs `--config`** — `hpx profile model.tflite` is a
