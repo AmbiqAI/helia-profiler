@@ -127,7 +127,7 @@ DEFAULT_POWER_DRIVER = "joulescope"
 # Which binary is on the target during power capture. "dedicated" flashes the
 # transport-free hpx_profiler_power image (see firmware/__init__.py WP2)
 # before capture; SWO/UART/RTT/USB traffic on the shared transport binary was
-# measured to add +17%/+33%/+60% current contamination into the GPIO-gated
+# measured to add significant current contamination into the GPIO-gated
 # Joulescope window on AP510 depending on transport, so "dedicated" is the
 # default. "shared" restores the pre-WP2 behavior of reusing the
 # already-flashed transport binary for power capture (useful when no J-Link
@@ -469,7 +469,7 @@ class PowerConfig:
     driver: str = DEFAULT_POWER_DRIVER
     # "dedicated" flashes hpx_profiler_power (transport-free) before capture;
     # "shared" reuses the already-flashed transport binary. See
-    # POWER_FIRMWARE_MODES above for the +17/+33/+60% contamination rationale.
+    # POWER_FIRMWARE_MODES above for the contamination rationale.
     firmware: str = DEFAULT_POWER_FIRMWARE
     mode: PowerMode = DEFAULT_POWER_MODE
     # ``None`` means "not explicitly set": consumers use
@@ -714,7 +714,7 @@ def load_config(yaml_path: Path | None, cli_overrides: dict[str, Any]) -> Profil
     CLI values take precedence over YAML values. Missing values fall back to
     dataclass defaults.
 
-    Raises :class:`ConfigError` (never a raw exception) for any problem with
+    Raises `ConfigError` (never a raw exception) for any problem with
     the YAML file or the merged configuration values.
     """
     import yaml

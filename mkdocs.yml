@@ -161,12 +161,17 @@ nav:
       - Overview: reference/index.md
       - CLI:
           - hpx profile: reference/profile.md
+          - hpx analyze: reference/analyze.md
+          - hpx compare: reference/compare.md
+          - hpx validate: reference/validate.md
           - hpx doctor: reference/doctor.md
           - hpx boards: reference/boards.md
           - hpx engines: reference/engines.md
           - hpx probes: reference/probes.md
           - hpx ports: reference/ports.md
           - hpx target: reference/target.md
+          - hpx power-on: reference/power-on.md
+          - hpx cache: reference/cache.md
       - Configuration Reference: reference/configuration.md
       - Python API:
           - Overview: reference/api/index.md

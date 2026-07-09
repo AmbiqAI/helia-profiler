@@ -142,7 +142,10 @@ The important fields are still the same platform facts as the built-in registry:
 - Board name and SoC family
 - J-Link device string
 - Memory layout (MRAM/SRAM/TCM/PSRAM sizes)
-- Default sync GPIO pin (`29` for `apollo510_evb` / `apollo510b_evb`; `10` for most other built-in EVBs)
+- Default sync GPIO pin (most built-in EVBs register a board-specific pin,
+  e.g. `29` for `apollo510_evb` / `apollo510b_evb`, `22` for the Apollo4
+  Plus EVBs, `61` for the Apollo4 Lite EVBs, and `26` for the Apollo3 Plus
+  EVBs; `10` is only the fallback for boards without a registered override)
 
 `starter_profile_board` lets a custom board reuse the NSX starter-profile module
 graph from a built-in board while keeping its own board ID, channel, sync pin,
