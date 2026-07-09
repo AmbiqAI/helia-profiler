@@ -140,5 +140,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hardware-validation-${{ github.run_id }}
-          path: results/validation/
+          path: |
+            results/validation/
+            !results/validation/**/work/**
           if-no-files-found: warn
