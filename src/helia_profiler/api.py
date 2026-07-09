@@ -2,7 +2,7 @@
 
 This is the primary entry point for library users::
 
-    from helia_profiler import profile, ProfileConfig, ModelConfig, EngineConfig
+    from helia_profiler import profile, ProfileConfig, ModelConfig, EngineConfig, EngineType
 
     config = ProfileConfig(
         model=ModelConfig(path=Path("my_model.tflite")),

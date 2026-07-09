@@ -443,10 +443,11 @@ class TestPowerConfig:
 
     def test_power_firmware_invalid_value_raises(self, tmp_path: Path):
         from helia_profiler.config import load_config
+        from helia_profiler.errors import ConfigError
 
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")
-        with pytest.raises(ValueError, match="power.firmware"):
+        with pytest.raises(ConfigError, match="power.firmware"):
             load_config(
                 None,
                 {

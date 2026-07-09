@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from .engines import EngineType
+from .power.base import PowerResult
 from .placement import MemoryRegion
 
 
@@ -305,7 +306,7 @@ class ProfileResult:
     """
 
     pmu: PmuResult
-    power: Any | None = None  # PowerResult when power capture is enabled
+    power: PowerResult | None = None
     metadata: RunMetadata = field(default_factory=RunMetadata)
     report_paths: list[Path] = field(default_factory=list)
 
