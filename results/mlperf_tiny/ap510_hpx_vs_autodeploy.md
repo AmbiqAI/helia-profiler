@@ -22,20 +22,26 @@ heliaAOT: ATfE (LLVM-based Arm Toolchain for Embedded) toolchain, full TCM
 residency (weights hydrated into DTCM rather than cold-read from MRAM;
 confirmed to fit for all 4 models, e.g. VWW = 289.3KB/512KB DTCM used).
 
-| Model | Metric | AD | hpx RT (gcc) | Δ RT | hpx AOT (ATfE/TCM) | Δ AOT |
-|---|---|---:|---:|---:|---:|---:|
-| **VWW** | Latency (ms) | 80.783 | 76.799 | -4.9% | 65.470 | -19.0% |
-| | Power (mW) | 8.360 | 6.328 | -24.3% | 6.508 | -22.2% |
-| | Energy (µJ) | 675.34 | 482.48 | -28.6% | 423.69 | -37.3% |
-| **KWS** | Latency (ms) | 22.673 | 21.159 | -6.7% | 18.535 | -18.3% |
-| | Power (mW) | 8.642 | 6.630 | -23.3% | 6.912 | -20.0% |
-| | Energy (µJ) | 195.96 | 140.42 | -28.3% | 127.98 | -34.7% |
-| **IC** | Latency (ms) | 55.332 | 53.161 | -3.9% | 45.862 | -17.1% |
-| | Power (mW) | 9.420 | 7.169 | -23.9% | 7.521 | -20.2% |
-| | Energy (µJ) | 521.21 | 382.52 | -26.6% | 346.47 | -33.5% |
-| **AD** (anomaly detection model) | Latency (ms) | 1.428 | 0.767 | -46.3% | 0.663 | -53.6% |
-| | Power (mW) | 9.136 | 8.329 | -8.8% | 8.681 | -5.0% |
-| | Energy (µJ) | 13.05 | 6.389 | -51.0% | 5.755 | -55.9% |
+| Model | Placement (AD / RT / AOT) | Metric | AD | hpx RT (gcc) | Δ RT | hpx AOT (ATfE/TCM) | Δ AOT |
+|---|---|---|---:|---:|---:|---:|---:|
+| **VWW** | MRAM/TCM · MRAM/TCM · TCM/TCM | Latency (ms) | 80.783 | 76.799 | -4.9% | 65.470 | -19.0% |
+| | | Power (mW) | 8.360 | 6.328 | -24.3% | 6.508 | -22.2% |
+| | | Energy (µJ) | 675.34 | 482.48 | -28.6% | 423.69 | -37.3% |
+| **KWS** | TCM/TCM · TCM/TCM · TCM/TCM | Latency (ms) | 22.673 | 21.159 | -6.7% | 18.535 | -18.3% |
+| | | Power (mW) | 8.642 | 6.630 | -23.3% | 6.912 | -20.0% |
+| | | Energy (µJ) | 195.96 | 140.42 | -28.3% | 127.98 | -34.7% |
+| **IC** | TCM/TCM · TCM/TCM · TCM/TCM | Latency (ms) | 55.332 | 53.161 | -3.9% | 45.862 | -17.1% |
+| | | Power (mW) | 9.420 | 7.169 | -23.9% | 7.521 | -20.2% |
+| | | Energy (µJ) | 521.21 | 382.52 | -26.6% | 346.47 | -33.5% |
+| **AD** (anomaly detection model) | TCM/TCM · TCM/TCM · TCM/TCM | Latency (ms) | 1.428 | 0.767 | -46.3% | 0.663 | -53.6% |
+| | | Power (mW) | 9.136 | 8.329 | -8.8% | 8.681 | -5.0% |
+| | | Energy (µJ) | 13.05 | 6.389 | -51.0% | 5.755 | -55.9% |
+
+Placement format is `weights/arena`. AD/RT match on all 4 models (apples-to-
+apples); AOT upgrades VWW from MRAM/TCM to full TCM/TCM (weights hydrated
+into DTCM), so VWW's Δ AOT column reflects both the AOT toolchain *and* a
+placement change, not toolchain alone — see the "full TCM" note above the
+table.
 
 Note: "AD" appears twice above — once as the AutoDeploy baseline column
 header, once as the 4th MLPerf Tiny model name ("Anomaly Detection"). The
@@ -78,6 +84,9 @@ measurement artifact on either side.
 
 ### KWS toolchain comparison (LP, heliaRT)
 
+Placement: TCM/TCM (weights/arena) for all three toolchains and the AD
+baseline — apples-to-apples, no placement variable in this comparison.
+
 | Toolchain | hpx Latency | AD Latency | Δ Lat | hpx Energy/inf | AD Energy/inf | Δ Energy | hpx Power | AD Power | Δ Power |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | gcc | 21.16 ms | 22.67 ms | -6.7% | 140.4 µJ | 196.0 µJ | -28.3% | 6.63 mW | 8.64 mW | -23.3% |
@@ -88,20 +97,27 @@ measurement artifact on either side.
 
 ## HP clock (192 MHz) — heliaAOT (ATfE, full TCM)
 
-| Model | Metric | AD (gcc, HP) | hpx (AOT/ATfE/TCM, HP) | Δ |
-|---|---|---:|---:|---:|
-| **VWW** | Latency (ms) | 31.408 | 25.120 | -20.0% |
-| | Power (mW) | 27.780 | 21.738 | -21.7% |
-| | Energy (µJ) | 872.51 | 546.17 | -37.4% |
-| **KWS** | Latency (ms) | 8.693 | 7.113 | -18.2% |
-| | Power (mW) | 28.927 | 23.518 | -18.7% |
-| | Energy (µJ) | 251.47 | 167.38 | -33.4% |
-| **IC** | Latency (ms) | 21.211 | 17.598 | -17.0% |
-| | Power (mW) | 33.136 | 25.719 | -22.4% |
-| | Energy (µJ) | 702.85 | 452.71 | -35.6% |
-| **AD** (anomaly detection model) | Latency (ms) | 0.552 | 0.254 | -54.0% |
-| | Power (mW) | 27.779 | 30.206 | **+8.7%** |
-| | Energy (µJ) | 15.336 | 7.672 | -50.0% |
+hpx placement is full TCM/TCM (weights+arena) for all 4 models at HP clock
+(same as the LP AOT table above). AD baseline placement per model matches
+the gcc reference table below (`AutoDeploy baseline reference data`) —
+VWW is MRAM/TCM there while hpx AOT is TCM/TCM, so VWW's Δ column again
+reflects a placement change alongside the toolchain/clock change, not a
+toolchain-only comparison.
+
+| Model | Placement (AD / hpx AOT) | Metric | AD (gcc, HP) | hpx (AOT/ATfE/TCM, HP) | Δ |
+|---|---|---|---:|---:|---:|
+| **VWW** | MRAM/TCM · TCM/TCM | Latency (ms) | 31.408 | 25.120 | -20.0% |
+| | | Power (mW) | 27.780 | 21.738 | -21.7% |
+| | | Energy (µJ) | 872.51 | 546.17 | -37.4% |
+| **KWS** | TCM/TCM · TCM/TCM | Latency (ms) | 8.693 | 7.113 | -18.2% |
+| | | Power (mW) | 28.927 | 23.518 | -18.7% |
+| | | Energy (µJ) | 251.47 | 167.38 | -33.4% |
+| **IC** | TCM/TCM · TCM/TCM | Latency (ms) | 21.211 | 17.598 | -17.0% |
+| | | Power (mW) | 33.136 | 25.719 | -22.4% |
+| | | Energy (µJ) | 702.85 | 452.71 | -35.6% |
+| **AD** (anomaly detection model) | TCM/TCM · TCM/TCM | Latency (ms) | 0.552 | 0.254 | -54.0% |
+| | | Power (mW) | 27.779 | 30.206 | **+8.7%** |
+| | | Energy (µJ) | 15.336 | 7.672 | -50.0% |
 
 Note: AD's power reads *above* AD-baseline here (+8.7%) — the only
 above-baseline power result across all 8 model×clock combinations in this
@@ -115,14 +131,20 @@ clock.
 
 ### LP, heliaRT (gcc)
 
-| Model | Latency (ms) | Energy/inf (µJ) | Avg Power (mW) | ready_observed | duration_ratio |
-|---|---:|---:|---:|---|---:|
-| VWW | 76.799 | 482.481 | 6.328 | true | 0.9928 |
-| KWS | 21.159 | 140.422 | 6.630 | true | 1.0009 |
-| IC | 53.161 | 382.523 | 7.169 | true | 1.0036 |
-| AD | 0.767 | 6.389 | 8.329 | true | 1.0000 |
+Placement (weights/arena): VWW MRAM/TCM, KWS/IC/AD TCM/TCM — matches AD
+baseline placement per model (see `AutoDeploy baseline reference data`
+below).
+
+| Model | Placement | Latency (ms) | Energy/inf (µJ) | Avg Power (mW) | ready_observed | duration_ratio |
+|---|---|---:|---:|---:|---|---:|
+| VWW | MRAM/TCM | 76.799 | 482.481 | 6.328 | true | 0.9928 |
+| KWS | TCM/TCM | 21.159 | 140.422 | 6.630 | true | 1.0009 |
+| IC | TCM/TCM | 53.161 | 382.523 | 7.169 | true | 1.0036 |
+| AD | TCM/TCM | 0.767 | 6.389 | 8.329 | true | 1.0000 |
 
 ### LP, heliaRT — KWS toolchain sweep
+
+Placement: TCM/TCM (weights/arena) for all three toolchains.
 
 | Toolchain | Latency (ms) | Energy/inf (µJ) | Avg Power (mW) | ready_observed | duration_ratio |
 |---|---:|---:|---:|---|---:|
@@ -132,21 +154,29 @@ clock.
 
 ### LP, heliaAOT (ATfE, full TCM)
 
-| Model | Latency (ms) | Energy/inf (µJ) | Avg Power (mW) | ready_observed | duration_ratio |
-|---|---:|---:|---:|---|---:|
-| KWS | 18.535 | 127.975 | 6.912 | true | 0.9989 |
-| VWW | 65.470 | 423.689 | 6.508 | true | 0.9944 |
-| IC | 45.862 | 346.465 | 7.521 | true | 1.0044 |
-| AD | 0.663 | 5.755 | 8.681 | true | 1.0000 |
+Placement: full TCM/TCM (weights hydrated into DTCM) for all 4 models —
+note this differs from the AD baseline's MRAM/TCM placement for VWW (see
+`AutoDeploy baseline reference data` below), so VWW here is not
+apples-to-apples with the VWW AD baseline row.
+
+| Model | Placement | Latency (ms) | Energy/inf (µJ) | Avg Power (mW) | ready_observed | duration_ratio |
+|---|---|---:|---:|---:|---|---:|
+| KWS | TCM/TCM | 18.535 | 127.975 | 6.912 | true | 0.9989 |
+| VWW | TCM/TCM | 65.470 | 423.689 | 6.508 | true | 0.9944 |
+| IC | TCM/TCM | 45.862 | 346.465 | 7.521 | true | 1.0044 |
+| AD | TCM/TCM | 0.663 | 5.755 | 8.681 | true | 1.0000 |
 
 ### HP, heliaAOT (ATfE, full TCM)
 
-| Model | Latency (ms) | Energy/inf (µJ) | Avg Power (mW) | ready_observed | duration_ratio |
-|---|---:|---:|---:|---|---:|
-| KWS | 7.113 | 167.384 | 23.518 | true | 1.0006 |
-| VWW | 25.120 | 546.174 | 21.738 | true | 1.0002 |
-| IC | 17.598 | 452.714 | 25.719 | true | 1.0002 |
-| AD | 0.254 | 7.672 | 30.206 | true | 1.0000 |
+Placement: full TCM/TCM (weights/arena) for all 4 models, same caveat as
+the LP heliaAOT table above (VWW differs from its AD-baseline placement).
+
+| Model | Placement | Latency (ms) | Energy/inf (µJ) | Avg Power (mW) | ready_observed | duration_ratio |
+|---|---|---:|---:|---:|---|---:|
+| KWS | TCM/TCM | 7.113 | 167.384 | 23.518 | true | 1.0006 |
+| VWW | TCM/TCM | 25.120 | 546.174 | 21.738 | true | 1.0002 |
+| IC | TCM/TCM | 17.598 | 452.714 | 25.719 | true | 1.0002 |
+| AD | TCM/TCM | 0.254 | 7.672 | 30.206 | true | 1.0000 |
 
 ---
 

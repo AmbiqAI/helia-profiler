@@ -29,12 +29,20 @@ full bug-by-bug detail.
 
 ## Results
 
-| Model | hpx lat (ms) | AD lat (ms) | Δ lat | hpx E (µJ/inf) | AD E (µJ/inf) | Δ E | hpx P (mW) | AD P (mW) | Δ P | window ratio |
-|-------|-------------:|------------:|------:|---------------:|--------------:|----:|-----------:|----------:|----:|-------------:|
-| KWS   | 21.144       | 19.657      | +7.6% | 131.12         | 124.35        | +5.4% | 6.205    | 6.326     | -1.9% | 0.9994 |
-| VWW   | 81.173       | 73.145      | +11.0%| 509.24         | 479.12        | +6.3% | 6.254    | 6.550     | -4.5% | 1.0031 |
-| IC    | 54.071       | 48.174      | +12.2%| 369.82         | 343.06        | +7.8% | 6.854    | 7.121     | -3.7% | 0.9979 |
-| AD    | 2.244        | 2.203       | +1.9% | 19.51          | 19.51         | +0.0% | 8.695    | 8.855     | -1.8% | 1.0001 |
+Placement (weights/arena, hpx and AD both match): KWS TCM/TCM; VWW MRAM/SRAM;
+IC MRAM/TCM; AD MRAM/TCM. **AP510 placement differs for 3 of 4 models**
+(AP510: VWW MRAM/TCM, IC TCM/TCM, AD TCM/TCM — AP330's smaller 240 KB unified
+TCM, vs AP510's 512 KB DTCM, can't fit IC/AD weights alongside arena+overhead,
+forcing MRAM residency there). Only KWS has matching placement on both
+boards, so it's the sole apples-to-apples model for AP510-vs-AP330
+comparisons; see `ap510_hpx_vs_autodeploy.md` for the AP510 side.
+
+| Model | Placement | hpx lat (ms) | AD lat (ms) | Δ lat | hpx E (µJ/inf) | AD E (µJ/inf) | Δ E | hpx P (mW) | AD P (mW) | Δ P | window ratio |
+|-------|-----------|-------------:|------------:|------:|---------------:|--------------:|----:|-----------:|----------:|----:|-------------:|
+| KWS   | TCM/TCM   | 21.144       | 19.657      | +7.6% | 131.12         | 124.35        | +5.4% | 6.205    | 6.326     | -1.9% | 0.9994 |
+| VWW   | MRAM/SRAM | 81.173       | 73.145      | +11.0%| 509.24         | 479.12        | +6.3% | 6.254    | 6.550     | -4.5% | 1.0031 |
+| IC    | MRAM/TCM  | 54.071       | 48.174      | +12.2%| 369.82         | 343.06        | +7.8% | 6.854    | 7.121     | -3.7% | 0.9979 |
+| AD    | MRAM/TCM  | 2.244        | 2.203       | +1.9% | 19.51          | 19.51         | +0.0% | 8.695    | 8.855     | -1.8% | 1.0001 |
 
 Δ = (hpx − AD) / AD. This table reflects the crypto/OTP/radio-subsystem
 shutdown fix below (CRYPTO/OTP/VCOMP disabled + `am_hal_pwrctrl_rss_pwroff()`
@@ -74,12 +82,15 @@ explain the remaining gap. Findings:
 
 ## Results (pre crypto/OTP/RSS-shutdown fix, kept for reference)
 
-| Model | hpx lat (ms) | AD lat (ms) | Δ lat | hpx E (µJ/inf) | AD E (µJ/inf) | Δ E | hpx P (mW) | AD P (mW) | Δ P | window ratio |
-|-------|-------------:|------------:|------:|---------------:|--------------:|----:|-----------:|----------:|----:|-------------:|
-| KWS   | 21.140       | 19.657      | +7.5% | 133.74         | 124.35        | +7.5% | 6.331    | 6.326     | +0.1% | 0.9992 |
-| VWW   | 81.172       | 73.145      | +11.0%| 517.13         | 479.12        | +7.9% | 6.343    | 6.550     | -3.2% | 1.0043 |
-| IC    | 54.064       | 48.174      | +12.2%| 368.67         | 343.06        | +7.5% | 6.816    | 7.121     | -4.3% | 1.0004 |
-| AD    | 2.243        | 2.203       | +1.8% | 19.63          | 19.51         | +0.6% | 8.751    | 8.855     | -1.2% | 1.0000 |
+Same placement as the primary results table above (KWS TCM/TCM; VWW
+MRAM/SRAM; IC/AD MRAM/TCM).
+
+| Model | Placement | hpx lat (ms) | AD lat (ms) | Δ lat | hpx E (µJ/inf) | AD E (µJ/inf) | Δ E | hpx P (mW) | AD P (mW) | Δ P | window ratio |
+|-------|-----------|-------------:|------------:|------:|---------------:|--------------:|----:|-----------:|----------:|----:|-------------:|
+| KWS   | TCM/TCM   | 21.140       | 19.657      | +7.5% | 133.74         | 124.35        | +7.5% | 6.331    | 6.326     | +0.1% | 0.9992 |
+| VWW   | MRAM/SRAM | 81.172       | 73.145      | +11.0%| 517.13         | 479.12        | +7.9% | 6.343    | 6.550     | -3.2% | 1.0043 |
+| IC    | MRAM/TCM  | 54.064       | 48.174      | +12.2%| 368.67         | 343.06        | +7.5% | 6.816    | 7.121     | -4.3% | 1.0004 |
+| AD    | MRAM/TCM  | 2.243        | 2.203       | +1.8% | 19.63          | 19.51         | +0.6% | 8.751    | 8.855     | -1.2% | 1.0000 |
 
 Δ = (hpx − AD) / AD.
 
@@ -109,11 +120,33 @@ explain the remaining gap. Findings:
 
 - Why is the AP330-vs-AD relationship (power tracks/slightly beats AD;
   latency/energy consistently worse) essentially the *inverse* of the
-  AP510-vs-AD relationship? Candidate hypotheses not yet investigated:
-  differences in per-model AD firmware/config between the two boards'
-  baseline sheets, HP vs LP MCU-mode transition overhead, or a genuine
-  hpx-vs-AD instruction-count/scheduling difference that happens to
-  net out differently per platform.
-- AP510 KWS numbers have not yet been re-verified after the `-u _sbrk`
-  linker fix (which changed malloc behavior on AP510 as well — it was
-  previously silently writing into ITCM@0x0).
+  AP510-vs-AD relationship?
+  **Partially resolved (2026-07-08):** memory placement is a real,
+  hardware-forced contributor for 3 of 4 models. AP330's TCM is a single
+  unified 240 KB region (vs AP510's 512 KB DTCM + 256 KB separate ITCM);
+  IC (152 KB weights+arena) and AD (280 KB weights alone) don't fit in
+  AP330's 240 KB budget once PMU-profiler/RTT/stack overhead is
+  accounted for, forcing their weights into MRAM there — while AP510 fits
+  both in TCM. AD's weights (277 KB) exceed AP330's *entire* TCM region
+  outright, and AD/IC are FC-layer-dominated (weight-bandwidth-bound), so
+  MRAM-resident weights plausibly explain most of their latency/energy
+  regression. VWW's arena also lands in SRAM on AP330 vs TCM on AP510
+  (see the SRAM-vs-TCM discrepancy noted above), a second placement-driven
+  contributor for that model.
+  **Still unexplained:** KWS has *identical* placement on both boards
+  (TCM/TCM) yet still shows the same inverted pattern on AP330 (+7.6%
+  latency, +5.4% energy, -1.9% power vs AD) — smaller in magnitude than
+  IC/AD/VWW, but present despite placement being controlled for. This
+  means placement is not the whole story; a genuine board-level
+  difference remains (e.g. MRAM/TCM wait-state or bus-fabric differences
+  even when TCM-resident, HP/LP clock-domain transition overhead, cache/
+  prefetch configuration differences between the two M55 implementations,
+  or a per-model AD firmware/config difference between the two boards'
+  baseline spreadsheets) and has not yet been investigated.
+- ~~AP510 KWS numbers have not yet been re-verified after the `-u _sbrk`
+  linker fix~~ **Resolved**: see `ap510_hpx_vs_autodeploy.md`'s
+  "Re-verification after AP330 bring-up fixes" section — KWS/RT/gcc
+  re-run after `_sbrk` + `crypto_otp_shutdown` landed, result essentially
+  unchanged (21.140ms vs 21.159ms, within ~0.5-1% run-to-run noise),
+  confirming AP510's power/energy advantage over AD is real and not an
+  artifact of either fix.
