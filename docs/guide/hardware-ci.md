@@ -227,13 +227,14 @@ You can combine axes when needed, for example `engines=helia-rt,helia-aot` and
 `toolchains=arm-none-eabi-gcc,armclang`, but preview with `hpx validate --list`
 first so the manual run size is explicit.
 
-Before the real run, the workflow installs test dependencies, fetches Git LFS
-fixtures, fetches SEGGER RTT sources into the workflow workspace, runs
-`hpx doctor`, and previews the selected cases with `hpx validate --list`. The
-validation output directory is uploaded with `actions/upload-artifact` even if
-the hardware run fails, so logs and partial case artifacts are still available
-for debugging. The upload excludes per-case `work/` directories to avoid
-storing generated NSX build trees in every run artifact.
+Before the real run, the workflow installs validation dependencies, including
+the profiler's `aot` extra for `helia-aot` suites, fetches Git LFS fixtures,
+fetches SEGGER RTT sources into the workflow workspace, runs `hpx doctor`, and
+previews the selected cases with `hpx validate --list`. The validation output
+directory is uploaded with `actions/upload-artifact` even if the hardware run
+fails, so logs and partial case artifacts are still available for debugging.
+The upload excludes per-case `work/` directories to avoid storing generated NSX
+build trees in every run artifact.
 
 The runner must already provide:
 
