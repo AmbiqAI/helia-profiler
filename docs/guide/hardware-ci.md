@@ -91,6 +91,12 @@ results/local-validation/
 collisions when matrix cases run concurrently later, and it keeps generated
 firmware artifacts next to the profile results for local debugging.
 
+GitHub Actions uploads the same validation result files but excludes
+`<case_id>/work/` from the downloadable artifact. The self-hosted runner
+workspace still retains `work/` after the run; the uploaded artifact keeps the
+reports, configs, logs, summaries, metadata, and CSV results without carrying
+the generated firmware build tree.
+
 ## Manifest contract
 
 `validation_manifest.json` is the machine-readable bundle index. It is
@@ -156,7 +162,8 @@ fixtures, fetches SEGGER RTT sources into the workflow workspace, runs
 `hpx doctor`, and previews the selected cases with `hpx validate --list`. The
 validation output directory is uploaded with `actions/upload-artifact` even if
 the hardware run fails, so logs and partial case artifacts are still available
-for debugging.
+for debugging. The upload excludes per-case `work/` directories to avoid
+storing generated NSX build trees in every run artifact.
 
 The runner must already provide:
 
@@ -167,8 +174,8 @@ The runner must already provide:
 - Git LFS support for model fixtures
 - optional Joulescope access and wiring when `power` is `on` or `both`
 
-Use explicit `jlink_serials` on runners with more than one probe attached, for
-or override the default mapping when moving the workflow to a different
+Use explicit `jlink_serials` on runners with more than one probe attached, or
+override the default mapping when moving the workflow to a different
 self-hosted runner:
 
 ```text
