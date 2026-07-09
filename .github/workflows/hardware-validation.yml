@@ -104,8 +104,8 @@ jobs:
       - name: Install Python
         run: uv python install 3.11
 
-      - name: Install test dependencies
-        run: uv sync --python 3.11 --group test
+      - name: Install validation dependencies
+        run: uv sync --python 3.11 --group test --extra aot
 
       - name: Fetch LFS fixtures
         run: git lfs pull
