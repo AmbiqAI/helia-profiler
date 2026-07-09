@@ -189,6 +189,20 @@ uv run hpx validate \
 That expands to six cases: one KWS heliaRT smoke case for each
 `board × toolchain` combination.
 
+For the broader heliaRT model regression, select `suite=models-rt` and leave the
+optional axes empty. That suite runs all four MLPerf Tiny models with
+`helia-rt`, `arm-none-eabi-gcc,atfe`, `rtt`, and `auto` memory on both default
+boards:
+
+```bash
+uv run hpx validate --list \
+  --suite models-rt \
+  --power off \
+  --jlink-serials apollo510_evb=1160003180,apollo330mP_evb=1160003409
+```
+
+This expands to 16 cases: `4 models × 2 boards × 2 toolchains`.
+
 To compare runtime engines on the same smoke model, keep `suite=smoke` and set:
 
 ```text

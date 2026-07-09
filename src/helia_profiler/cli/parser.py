@@ -552,7 +552,7 @@ def _add_validate_subparser(sub) -> None:
             "                                       # require two passing iterations per case\n"
             "  hpx validate -k kws-aot              # pytest keyword filter\n"
             "  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n"
-            "  hpx validate --suite models-rt       # 12-case model sweep: 3 boards x 4 models x RT\n"
+            "  hpx validate --suite models-rt       # 16-case RT sweep: 2 boards x 4 models x 2 toolchains\n"
             "  hpx validate --suite models-aot      # 12-case model sweep: 3 boards x 4 models x AOT\n"
         ),
     )
@@ -613,8 +613,9 @@ def _add_validate_axis_args(p_validate: argparse.ArgumentParser) -> None:
         help=(
             "Preset suite. 'smoke' defaults unset axes to models=kws, engines=helia-rt, "
             "toolchains=arm-none-eabi-gcc, interfaces=rtt, memories=auto. "
-            "'models-rt'/'models-aot' default unset axes to all MLPerf Tiny models, "
-            "all boards, gcc, rtt, auto memory, and the selected engine. "
+            "'models-rt' defaults unset axes to all MLPerf Tiny models, Apollo510 + Apollo330mP, "
+            "gcc + atfe, rtt, auto memory, and helia-rt. 'models-aot' defaults unset axes to "
+            "all MLPerf Tiny models, all AOT validation boards, gcc, rtt, auto memory, and helia-aot. "
             "Explicit axis flags always win."
         ),
     )

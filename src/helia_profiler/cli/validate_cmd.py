@@ -146,9 +146,17 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         if not args.engines.strip():
             args.engines = "helia-rt" if suite == "models-rt" else "helia-aot"
         if not args.boards.strip():
-            args.boards = "apollo3p_evb,apollo4p_blue_kxr_evb,apollo510_evb"
+            args.boards = (
+                "apollo510_evb,apollo330mP_evb"
+                if suite == "models-rt"
+                else "apollo3p_evb,apollo4p_blue_kxr_evb,apollo510_evb"
+            )
         if not args.toolchains.strip():
-            args.toolchains = "arm-none-eabi-gcc"
+            args.toolchains = (
+                "arm-none-eabi-gcc,atfe"
+                if suite == "models-rt"
+                else "arm-none-eabi-gcc"
+            )
         if not args.transports.strip():
             args.transports = "rtt"
         if not args.memories.strip():
