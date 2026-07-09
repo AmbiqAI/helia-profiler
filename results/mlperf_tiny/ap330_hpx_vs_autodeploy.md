@@ -120,11 +120,33 @@ MRAM/SRAM; IC/AD MRAM/TCM).
 
 - Why is the AP330-vs-AD relationship (power tracks/slightly beats AD;
   latency/energy consistently worse) essentially the *inverse* of the
-  AP510-vs-AD relationship? Candidate hypotheses not yet investigated:
-  differences in per-model AD firmware/config between the two boards'
-  baseline sheets, HP vs LP MCU-mode transition overhead, or a genuine
-  hpx-vs-AD instruction-count/scheduling difference that happens to
-  net out differently per platform.
-- AP510 KWS numbers have not yet been re-verified after the `-u _sbrk`
-  linker fix (which changed malloc behavior on AP510 as well — it was
-  previously silently writing into ITCM@0x0).
+  AP510-vs-AD relationship?
+  **Partially resolved (2026-07-08):** memory placement is a real,
+  hardware-forced contributor for 3 of 4 models. AP330's TCM is a single
+  unified 240 KB region (vs AP510's 512 KB DTCM + 256 KB separate ITCM);
+  IC (152 KB weights+arena) and AD (280 KB weights alone) don't fit in
+  AP330's 240 KB budget once PMU-profiler/RTT/stack overhead is
+  accounted for, forcing their weights into MRAM there — while AP510 fits
+  both in TCM. AD's weights (277 KB) exceed AP330's *entire* TCM region
+  outright, and AD/IC are FC-layer-dominated (weight-bandwidth-bound), so
+  MRAM-resident weights plausibly explain most of their latency/energy
+  regression. VWW's arena also lands in SRAM on AP330 vs TCM on AP510
+  (see the SRAM-vs-TCM discrepancy noted above), a second placement-driven
+  contributor for that model.
+  **Still unexplained:** KWS has *identical* placement on both boards
+  (TCM/TCM) yet still shows the same inverted pattern on AP330 (+7.6%
+  latency, +5.4% energy, -1.9% power vs AD) — smaller in magnitude than
+  IC/AD/VWW, but present despite placement being controlled for. This
+  means placement is not the whole story; a genuine board-level
+  difference remains (e.g. MRAM/TCM wait-state or bus-fabric differences
+  even when TCM-resident, HP/LP clock-domain transition overhead, cache/
+  prefetch configuration differences between the two M55 implementations,
+  or a per-model AD firmware/config difference between the two boards'
+  baseline spreadsheets) and has not yet been investigated.
+- ~~AP510 KWS numbers have not yet been re-verified after the `-u _sbrk`
+  linker fix~~ **Resolved**: see `ap510_hpx_vs_autodeploy.md`'s
+  "Re-verification after AP330 bring-up fixes" section — KWS/RT/gcc
+  re-run after `_sbrk` + `crypto_otp_shutdown` landed, result essentially
+  unchanged (21.140ms vs 21.159ms, within ~0.5-1% run-to-run noise),
+  confirming AP510's power/energy advantage over AD is real and not an
+  artifact of either fix.
