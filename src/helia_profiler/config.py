@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 import re
-from dataclasses import dataclass, field
+import warnings
+from dataclasses import field, replace
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
+import difflib
+
+from pydantic import ConfigDict, TypeAdapter, ValidationError, field_validator, model_validator
+from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 from .engines import EngineType
 from .errors import ConfigError
@@ -32,8 +38,10 @@ from .platform import (
     get_default_sync_gpio_pin,
     get_soc,
 )
-from .target.lifecycle import ResetStrategy
 from .power.base import PowerMode
+from .target.lifecycle import ResetStrategy
+
+log = logging.getLogger("helia_profiler.config")
 
 
 # Shared default used when the user leaves model.arena_size unset.
@@ -65,7 +73,7 @@ class Transport(StrEnum):
     UART = "uart"
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class ClockSelection:
     """Per-domain clock speed selection for the generated firmware.
 
@@ -162,7 +170,7 @@ DEFAULT_DOWNLOAD_API_S = 30
 DEFAULT_DOWNLOAD_ASSET_S = 300
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class ModelConfig:
     """Model file and arena sizing.
 
@@ -191,38 +199,55 @@ class ModelConfig:
 
     path: Path
     arena_size: int | None = None  # bytes; None = let engine/firmware report
-    model_location: ModelLocation = ModelLocation.AUTO
-    arena_location: Placement | None = None
-    weights_location: Placement | None = None
+    model_location: ModelLocation | str = ModelLocation.AUTO
+    arena_location: Placement | str | None = None
+    weights_location: Placement | str | None = None
 
-    def __post_init__(self) -> None:
-        # Tolerate invalid raw strings here — :class:`PreflightStage`
-        # produces a friendlier ``ConfigError`` for unknown values.
-        if not isinstance(self.model_location, ModelLocation):
-            try:
-                object.__setattr__(self, "model_location", ModelLocation(self.model_location))
-            except ValueError:
-                pass
-        for field_name in ("arena_location", "weights_location"):
-            raw = getattr(self, field_name)
-            if raw is not None and not isinstance(raw, Placement):
-                try:
-                    object.__setattr__(self, field_name, Placement(raw))
-                except ValueError:
-                    pass
+    @field_validator("model_location", mode="before")
+    @classmethod
+    def _coerce_model_location(cls, value: Any) -> Any:
+        if isinstance(value, ModelLocation):
+            return value
+        try:
+            return ModelLocation(value)
+        except ValueError:
+            return value
+
+    @field_validator("arena_location", "weights_location", mode="before")
+    @classmethod
+    def _coerce_placement(cls, value: Any) -> Any:
+        if value is None or isinstance(value, Placement):
+            return value
+        try:
+            return Placement(value)
+        except ValueError:
+            return value
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class EngineConfig:
     """Inference engine selection and passthrough config."""
 
-    type: EngineType
+    type: EngineType = EngineType.HELIA_RT
     backend: str | None = None  # engine-specific (e.g. helia-rt backend)
     config: dict[str, Any] = field(default_factory=dict)
     config_path: Path | None = None  # path to engine-specific YAML
 
+    @field_validator("type", mode="before")
+    @classmethod
+    def _coerce_type(cls, value: Any) -> Any:
+        if isinstance(value, EngineType):
+            return value
+        try:
+            return EngineType(value)
+        except ValueError as exc:
+            supported = ", ".join(
+                engine.value for engine in (EngineType.HELIA_RT, EngineType.HELIA_AOT)
+            )
+            raise ValueError(f"Invalid engine.type: {value!r}. Supported: {supported}") from exc
 
-@dataclass(frozen=True)
+
+@pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class HeartbeatConfig:
     """Liveness / progress-reporting settings.
 
@@ -261,7 +286,7 @@ class HeartbeatConfig:
     overall_timeout_s: int | None = DEFAULT_OVERALL_TIMEOUT_S
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class TimeoutsConfig:
     """Subprocess and network timeouts (seconds).
 
@@ -283,7 +308,7 @@ class TimeoutsConfig:
     download_asset_s: int = DEFAULT_DOWNLOAD_ASSET_S
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class TargetConfig:
     """Hardware target."""
 
@@ -295,6 +320,8 @@ class TargetConfig:
     rtt_buffer_size_up: int | None = None
     clock: ClockSelection = field(default_factory=ClockSelection)
     heartbeat: HeartbeatConfig = field(default_factory=HeartbeatConfig)
+    custom_socs: dict[str, Any] | None = None
+    custom_boards: dict[str, Any] | None = None
     # When True, scan for a Joulescope at the start of `hpx profile` and
     # enable current passthrough so the board powers on before flashing.
     # Default is False (opt-in): most boards are powered independently of
@@ -305,18 +332,31 @@ class TargetConfig:
     # capture requires the driver regardless.
     ensure_board_powered: bool = False
 
-    def __post_init__(self) -> None:
-        if not isinstance(self.toolchain, Toolchain):
-            object.__setattr__(self, "toolchain", Toolchain(self.toolchain))
-        if self.toolchain is Toolchain.GCC:
-            object.__setattr__(self, "toolchain", Toolchain.ARM_NONE_EABI_GCC)
-        if not isinstance(self.transport, Transport):
-            object.__setattr__(self, "transport", Transport(self.transport))
-        if not isinstance(self.clock, ClockSelection):
-            object.__setattr__(self, "clock", ClockSelection(**self.clock))
+    @field_validator("toolchain", mode="before")
+    @classmethod
+    def _coerce_toolchain(cls, value: Any) -> Any:
+        if isinstance(value, Toolchain):
+            return value
+        try:
+            return Toolchain(value)
+        except ValueError:
+            supported = ", ".join(t.value for t in Toolchain)
+            raise ValueError(f"Unknown toolchain '{value}'. Supported: {supported}") from None
+
+    @field_validator("toolchain")
+    @classmethod
+    def _normalize_gcc_alias(cls, value: Toolchain) -> Toolchain:
+        return Toolchain.ARM_NONE_EABI_GCC if value is Toolchain.GCC else value
+
+    @field_validator("clock", mode="before")
+    @classmethod
+    def _coerce_clock(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            return ClockSelection(**value)
+        return value
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class ProfilingConfig:
     """PMU capture settings.
 
@@ -376,7 +416,25 @@ class ProfilingConfig:
     # transports (RTT/USB/SWO) and printf remain available throughout the run.
     extreme_mode: bool = False
 
-    def __post_init__(self) -> None:
+    @field_validator("pmu_presets", mode="before")
+    @classmethod
+    def _coerce_pmu_presets(cls, value: Any) -> Any:
+        if isinstance(value, list):
+            return tuple(value)
+        return value
+
+    @field_validator("pmu_counters", mode="before")
+    @classmethod
+    def _normalize_pmu_counters(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        normalized: dict[str, str | list[str]] = {}
+        for group, selection in value.items():
+            normalized[str(group)] = selection if isinstance(selection, list) else str(selection)
+        return normalized
+
+    @model_validator(mode="after")
+    def _validate(self) -> ProfilingConfig:
         if self.aggregation not in AGGREGATION_METHODS:
             raise ValueError(
                 f"Invalid aggregation '{self.aggregation}'. "
@@ -400,9 +458,10 @@ class ProfilingConfig:
                 f"Invalid clean_window_probe '{self.clean_window_probe}'. "
                 f"Choose one of: {', '.join(CLEAN_WINDOW_PROBES)}."
             )
+        return self
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class PowerConfig:
     """Power measurement settings."""
 
@@ -450,11 +509,8 @@ class PowerConfig:
     # single available device (and fail loudly if multiple are present).
     serial: str | None = None
 
-    def __post_init__(self) -> None:
-        if not isinstance(self.mode, PowerMode):
-            object.__setattr__(self, "mode", PowerMode(self.mode))
-        if not isinstance(self.reset_strategy, ResetStrategy):
-            object.__setattr__(self, "reset_strategy", ResetStrategy(self.reset_strategy))
+    @model_validator(mode="after")
+    def _validate(self) -> PowerConfig:
         if self.sync_input_index < 0:
             raise ValueError(f"power.sync_input_index must be >= 0, got {self.sync_input_index}.")
         if self.stats_rate_hz < 1:
@@ -466,9 +522,10 @@ class PowerConfig:
                 f"Unknown power.firmware '{self.firmware}'. "
                 f"Choose one of: {', '.join(POWER_FIRMWARE_MODES)}."
             )
+        return self
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class OutputConfig:
     """Report output settings."""
 
@@ -477,9 +534,8 @@ class OutputConfig:
     model_explorer: bool = True  # always emit ME overlay alongside primary format
     detailed: bool = False  # emit per-preset/group CSVs and memory breakdown
 
-    def __post_init__(self) -> None:
-        if not isinstance(self.format, OutputFormat):
-            object.__setattr__(self, "format", OutputFormat(self.format))
+    @model_validator(mode="after")
+    def _validate(self) -> OutputConfig:
         if self.format is OutputFormat.MODEL_EXPLORER:
             raise ConfigError(
                 "output.format: model-explorer is not a valid primary report format",
@@ -488,9 +544,10 @@ class OutputConfig:
                     "controlled separately via output.model_explorer: true."
                 ),
             )
+        return self
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class NsxModuleOverride:
     """Override resolution for a single NSX module.
 
@@ -504,7 +561,8 @@ class NsxModuleOverride:
     ref: str | None = None
     version: str | None = None
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def _validate(self) -> NsxModuleOverride:
         modes = sum(x is not None for x in (self.path, self.ref, self.version))
         if modes == 0:
             raise ConfigError("NsxModuleOverride requires exactly one of path, ref, or version")
@@ -513,9 +571,13 @@ class NsxModuleOverride:
                 f"NsxModuleOverride accepts only one of path, ref, or version (got {modes})",
                 hint="Remove the extra keys so only one override mode is set.",
             )
+        return self
 
 
-@dataclass(frozen=True)
+_CHANNEL_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]*$")
+
+
+@pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class BuildConfig:
     """NSX build-system overrides.
 
@@ -540,13 +602,54 @@ class BuildConfig:
     nsx_modules: dict[str, NsxModuleOverride] = field(default_factory=dict)
     compiler_launcher: str = "auto"
 
+    @field_validator("channel")
+    @classmethod
+    def _validate_channel(cls, value: str | None) -> str | None:
+        if value is not None and not _CHANNEL_RE.match(value):
+            raise ConfigError(
+                f"Invalid build.channel value: {value!r}",
+                hint="Channel must be an identifier (letters, digits, hyphens, underscores).",
+            )
+        return value
 
-@dataclass(frozen=True)
+    @field_validator("nsx_modules", mode="before")
+    @classmethod
+    def _validate_nsx_modules(cls, value: Any) -> Any:
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            return value
+        for name, spec in value.items():
+            if isinstance(spec, NsxModuleOverride) or isinstance(spec, dict):
+                continue
+            raise ConfigError(
+                f"build.nsx_modules.{name} must be a mapping (got {type(spec).__name__})",
+                hint="Use path: /dir, ref: branch, or version: X.Y.Z",
+            )
+        return value
+
+    @field_validator("compiler_launcher", mode="before")
+    @classmethod
+    def _normalize_compiler_launcher(cls, value: Any) -> Any:
+        if value is None or value is False:
+            return "none"
+        if not isinstance(value, str):
+            raise ConfigError(
+                f"build.compiler_launcher must be a string (got {type(value).__name__})",
+                hint="Use 'auto', 'none', or a tool name/path like 'sccache' or 'ccache'.",
+            )
+        return value
+
+
+@pydantic_dataclass(
+    frozen=True,
+    config=ConfigDict(extra="forbid", arbitrary_types_allowed=True),
+)
 class ProfileConfig:
     """Top-level immutable configuration for a profiling run."""
 
     model: ModelConfig
-    engine: EngineConfig
+    engine: EngineConfig = field(default_factory=lambda: EngineConfig(type=EngineType.HELIA_RT))
     target: TargetConfig = field(default_factory=TargetConfig)
     profiling: ProfilingConfig = field(default_factory=ProfilingConfig)
     power: PowerConfig = field(default_factory=PowerConfig)
@@ -559,6 +662,50 @@ class ProfileConfig:
     keep_work_dir: bool = False  # legacy — cache dir is always kept
     clean: bool = False  # wipe cached work dir before building
     verbose: int = 0
+
+
+_PROFILE_CONFIG_ADAPTER = TypeAdapter(ProfileConfig)
+
+
+def _build_valid_field_names() -> dict[tuple[str, ...], tuple[str, ...]]:
+    """Derive the did-you-mean lookup table from the config dataclasses.
+
+    Walks the ``ProfileConfig`` tree so suggestions can never drift from the
+    real field names.  Dict-of-dataclass fields (``build.nsx_modules``) get a
+    ``"*"`` wildcard segment standing in for the free-form key.
+    """
+    import dataclasses as _dc
+    import typing as _t
+
+    result: dict[tuple[str, ...], tuple[str, ...]] = {}
+
+    def visit(cls: type, path: tuple[str, ...]) -> None:
+        names = tuple(f.name for f in _dc.fields(cls))
+        if path == ():
+            names = tuple(n for n in names if n != "platform_registry")
+        result[path] = names
+        hints = _t.get_type_hints(cls)
+        for f in _dc.fields(cls):
+            if path == () and f.name == "platform_registry":
+                continue  # resolved runtime object, never user-settable
+            tp = hints.get(f.name)
+            for cand in (tp, *_t.get_args(tp)):
+                if _dc.is_dataclass(cand):
+                    visit(cand, (*path, f.name))
+                    break
+                if _t.get_origin(cand) is dict:
+                    value_args = _t.get_args(cand)
+                    if len(value_args) == 2 and _dc.is_dataclass(value_args[1]):
+                        visit(value_args[1], (*path, f.name, "*"))
+                        break
+
+    visit(ProfileConfig, ())
+    return result
+
+
+_VALID_FIELD_NAMES = _build_valid_field_names()
+
+_GENERIC_CONFIG_HINT = "Run with --help or see the config reference."
 
 
 def load_config(yaml_path: Path | None, cli_overrides: dict[str, Any]) -> ProfileConfig:
@@ -595,15 +742,29 @@ def load_config(yaml_path: Path | None, cli_overrides: dict[str, Any]) -> Profil
                 hint="Top-level YAML must be a mapping with keys like model, engine, target.",
             )
 
-    # Deep merge: CLI overrides win
     merged = _deep_merge(base, cli_overrides)
+    _check_reserved_user_keys(merged)
+    _check_required_model_path(merged)
+    _emit_deprecation_warnings(merged)
+    prepared, platform_registry = _prepare_merged_config(merged)
 
     try:
-        return _build_config(merged)
+        config = _PROFILE_CONFIG_ADAPTER.validate_python(prepared)
     except ConfigError:
         raise
+    except ValidationError as exc:
+        message, hint = _format_validation_error(exc)
+        raise ConfigError(message, hint=hint) from exc
     except ValueError as exc:
         raise ConfigError(str(exc)) from exc
+
+    if config.engine.type is EngineType.TFLM:
+        raise ConfigError(
+            "engine.type='tflm' is temporarily unavailable",
+            hint="Use engine.type='helia-rt' for the interpreter runtime.",
+        )
+
+    return replace(config, platform_registry=platform_registry)
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -617,20 +778,19 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
-def _build_config(d: dict[str, Any]) -> ProfileConfig:
-    """Construct a ProfileConfig from a merged dict."""
-    model_d = d.get("model", {})
-    engine_d = d.get("engine", {})
-    target_d = d.get("target", {})
-    profiling_d = d.get("profiling", {})
-    power_d = d.get("power", {})
-    output_d = d.get("output", {})
-    timeouts_d = d.get("timeouts", {}) or {}
-    build_d = d.get("build", {}) or {}
-    platform_registry = _build_platform_registry(target_d)
+def _check_reserved_user_keys(merged: dict[str, Any]) -> None:
+    if "platform_registry" in merged:
+        raise ConfigError(
+            "platform_registry is not a user-configurable field",
+            hint="Remove platform_registry from the YAML/CLI input; it is resolved automatically.",
+        )
 
-    model_path_raw = model_d.get("path")
-    if not model_path_raw:
+
+def _check_required_model_path(merged: dict[str, Any]) -> None:
+    model = merged.get("model")
+    if isinstance(model, dict) and model.get("path"):
+        return
+    if model is None or (isinstance(model, dict) and not model.get("path")):
         raise ConfigError(
             "model.path is required",
             hint=(
@@ -638,158 +798,149 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
                 "(model: path: ...), or the model.path key."
             ),
         )
-    model = ModelConfig(
-        path=Path(model_path_raw),
-        arena_size=model_d.get("arena_size"),
-        model_location=model_d.get("model_location", "auto"),
-        arena_location=model_d.get("arena_location"),
-        weights_location=model_d.get("weights_location"),
-    )
 
-    engine_type_raw = engine_d.get("type", EngineType.HELIA_RT.value)
-    if engine_type_raw == EngineType.TFLM.value:
-        raise ConfigError(
-            "engine.type='tflm' is temporarily unavailable",
-            hint="Use engine.type='helia-rt' for the interpreter runtime.",
+
+def _emit_deprecation_warnings(merged: dict[str, Any]) -> None:
+    model = merged.get("model")
+    if isinstance(model, dict) and "model_location" in model:
+        model_location = model.get("model_location")
+        if model_location not in (None, ModelLocation.AUTO, ModelLocation.AUTO.value, "auto"):
+            _warn_deprecated(
+                "model.model_location is deprecated; prefer model.arena_location and "
+                "model.weights_location for placement control.",
+                stacklevel=3,
+            )
+
+    profiling = merged.get("profiling")
+    if isinstance(profiling, dict) and "pmu_presets" in profiling:
+        raw = profiling.get("pmu_presets")
+        normalized = tuple(raw) if isinstance(raw, list) else raw
+        if normalized != DEFAULT_PMU_PRESETS:
+            _warn_deprecated(
+                "profiling.pmu_presets is deprecated; prefer profiling.pmu_counters.",
+                stacklevel=3,
+            )
+
+    if "keep_work_dir" in merged:
+        _warn_deprecated(
+            "keep_work_dir is deprecated and has no effect; the cache work directory is always kept.",
+            stacklevel=3,
         )
-    try:
-        engine_type = EngineType(engine_type_raw)
-    except ValueError as exc:
-        supported = ", ".join(
-            engine.value for engine in (EngineType.HELIA_RT, EngineType.HELIA_AOT)
-        )
-        raise ConfigError(
-            f"Invalid engine.type: {engine_type_raw!r}. Supported: {supported}"
-        ) from exc
-    engine = EngineConfig(
-        type=engine_type,
-        backend=engine_d.get("backend"),
-        config=engine_d.get("config", {}),
-        config_path=Path(engine_d["config_path"]) if engine_d.get("config_path") else None,
-    )
 
-    pmu_presets = profiling_d.get("pmu_presets", DEFAULT_PMU_PRESETS)
-    if isinstance(pmu_presets, list):
-        pmu_presets = tuple(pmu_presets)
 
-    pmu_counters_raw = profiling_d.get("pmu_counters")
-    pmu_counters: dict[str, str | list[str]] | None = None
-    if isinstance(pmu_counters_raw, dict):
-        pmu_counters = {}
-        for grp, sel in pmu_counters_raw.items():
-            if isinstance(sel, list):
-                pmu_counters[grp] = sel
-            else:
-                pmu_counters[grp] = str(sel)
+def _warn_deprecated(message: str, *, stacklevel: int) -> None:
+    warnings.warn(message, DeprecationWarning, stacklevel=stacklevel)
+    log.warning(message)
 
-    tc_raw = target_d.get("toolchain", DEFAULT_TOOLCHAIN)
-    try:
-        tc = Toolchain(tc_raw)
-    except ValueError:
-        supported = ", ".join(t.value for t in Toolchain)
-        raise ConfigError(
-            f"Unknown toolchain '{tc_raw}'. Supported: {supported}"
-        ) from None
 
-    board_name = target_d.get("board", DEFAULT_BOARD)
-    sync_gpio_pin = power_d.get(
-        "sync_gpio_pin",
-        get_default_sync_gpio_pin(
-            board_name,
-            fallback=DEFAULT_SYNC_GPIO_PIN,
-            registry=platform_registry,
-        ),
-    )
-    state_gpio_pin = power_d.get(
-        "state_gpio_pin",
-        get_default_state_gpio_pin(
-            board_name,
-            fallback=DEFAULT_STATE_GPIO_PIN,
-            registry=platform_registry,
-        ),
-    )
-    go_gpio_pin = power_d.get(
-        "go_gpio_pin",
-        get_default_go_gpio_pin(
-            board_name,
-            fallback=DEFAULT_GO_GPIO_PIN,
-            registry=platform_registry,
-        ),
-    )
+def _prepare_merged_config(merged: dict[str, Any]) -> tuple[dict[str, Any], PlatformRegistry]:
+    prepared = dict(merged)
+    raw_target = prepared.get("target")
+    target = dict(raw_target) if isinstance(raw_target, dict) else raw_target
+    raw_power = prepared.get("power")
+    power = dict(raw_power) if isinstance(raw_power, dict) else raw_power
 
-    return ProfileConfig(
-        model=model,
-        engine=engine,
-        target=TargetConfig(
-            board=board_name,
-            toolchain=tc,
-            jlink_serial=target_d.get("jlink_serial"),
-            transport=target_d.get("transport", DEFAULT_TRANSPORT),
-            usb_port=target_d.get("usb_port"),
-            rtt_buffer_size_up=target_d.get("rtt_buffer_size_up"),
-            clock=ClockSelection(**(target_d.get("clock") or {})),
-            heartbeat=_build_heartbeat(target_d.get("heartbeat")),
-            ensure_board_powered=bool(target_d.get("ensure_board_powered", False)),
-        ),
-        profiling=ProfilingConfig(
-            pmu_presets=pmu_presets,
-            pmu_counters=pmu_counters,
-            per_layer=profiling_d.get("per_layer", True),
-            iterations=profiling_d.get("iterations", DEFAULT_ITERATIONS),
-            warmup=profiling_d.get("warmup", DEFAULT_WARMUP),
-            aggregation=profiling_d.get("aggregation", DEFAULT_AGGREGATION),
-            window_mode=profiling_d.get("window_mode", DEFAULT_WINDOW_MODE),
-            window_target_ms=profiling_d.get("window_target_ms", DEFAULT_WINDOW_TARGET_MS),
-            window_min=profiling_d.get("window_min", DEFAULT_WINDOW_MIN),
-            window_max=profiling_d.get("window_max", DEFAULT_WINDOW_MAX),
-            clean_window_probe=profiling_d.get("clean_window_probe", DEFAULT_CLEAN_WINDOW_PROBE),
-            clean_window_trace=bool(profiling_d.get("clean_window_trace", False)),
-            force_shared_sram=bool(profiling_d.get("force_shared_sram", False)),
-            extreme_mode=bool(profiling_d.get("extreme_mode", False)),
-        ),
-        power=PowerConfig(
-            enabled=power_d.get("enabled", False),
-            driver=power_d.get("driver", DEFAULT_POWER_DRIVER),
-            firmware=power_d.get("firmware", DEFAULT_POWER_FIRMWARE),
-            mode=power_d.get("mode", DEFAULT_POWER_MODE),
-            duration_s=(
-                int(power_d["duration_s"]) if power_d.get("duration_s") is not None else None
+    if isinstance(target, dict):
+        platform_registry = _build_platform_registry(target)
+        board_name = target.get("board", DEFAULT_BOARD)
+        prepared["target"] = target
+    else:
+        platform_registry = build_platform_registry()
+        board_name = DEFAULT_BOARD
+
+    if power is None:
+        power = {}
+    if isinstance(power, dict):
+        power.setdefault(
+            "sync_gpio_pin",
+            get_default_sync_gpio_pin(
+                board_name,
+                fallback=DEFAULT_SYNC_GPIO_PIN,
+                registry=platform_registry,
             ),
-            io_voltage=power_d.get("io_voltage", DEFAULT_IO_VOLTAGE),
-            sync_gpio_pin=sync_gpio_pin,
-            sync_input_index=power_d.get("sync_input_index", DEFAULT_POWER_SYNC_INPUT_INDEX),
-            lockstep=(bool(power_d["lockstep"]) if "lockstep" in power_d else None),
-            state_gpio_pin=state_gpio_pin,
-            go_gpio_pin=go_gpio_pin,
-            state_input_index=power_d.get("state_input_index", DEFAULT_POWER_STATE_INPUT_INDEX),
-            go_output_index=power_d.get("go_output_index", DEFAULT_POWER_GO_OUTPUT_INDEX),
-            stats_rate_hz=power_d.get("stats_rate_hz", DEFAULT_POWER_STATS_RATE_HZ),
-            reset_strategy=power_d.get("reset_strategy", ResetStrategy.AUTO.value),
-            serial=power_d.get("serial"),
-        ),
-        output=OutputConfig(
-            format=output_d.get("format", "csv"),
-            dir=Path(output_d.get("dir", "./results")),
-            model_explorer=output_d.get("model_explorer", True),
-            detailed=output_d.get("detailed", False),
-        ),
-        timeouts=TimeoutsConfig(
-            configure_s=int(timeouts_d.get("configure_s", DEFAULT_CONFIGURE_TIMEOUT_S)),
-            build_s=int(timeouts_d.get("build_s", DEFAULT_BUILD_TIMEOUT_S)),
-            flash_s=int(timeouts_d.get("flash_s", DEFAULT_FLASH_TIMEOUT_S)),
-            toolchain_probe_s=int(timeouts_d.get("toolchain_probe_s", DEFAULT_TOOLCHAIN_PROBE_S)),
-            binary_probe_s=int(timeouts_d.get("binary_probe_s", DEFAULT_BINARY_PROBE_S)),
-            download_api_s=int(timeouts_d.get("download_api_s", DEFAULT_DOWNLOAD_API_S)),
-            download_asset_s=int(timeouts_d.get("download_asset_s", DEFAULT_DOWNLOAD_ASSET_S)),
-        ),
-        build=_build_build_config(build_d),
-        platform_registry=platform_registry,
-        frozen=bool(d.get("frozen", False)),
-        work_dir=Path(d["work_dir"]) if d.get("work_dir") else None,
-        keep_work_dir=d.get("keep_work_dir", False),
-        clean=bool(d.get("clean", False)),
-        verbose=d.get("verbose", 0),
-    )
+        )
+        power.setdefault(
+            "state_gpio_pin",
+            get_default_state_gpio_pin(
+                board_name,
+                fallback=DEFAULT_STATE_GPIO_PIN,
+                registry=platform_registry,
+            ),
+        )
+        power.setdefault(
+            "go_gpio_pin",
+            get_default_go_gpio_pin(
+                board_name,
+                fallback=DEFAULT_GO_GPIO_PIN,
+                registry=platform_registry,
+            ),
+        )
+        prepared["power"] = power
+
+    return prepared, platform_registry
+
+
+def _format_validation_error(exc: ValidationError) -> tuple[str, str]:
+    lines: list[str] = []
+    hints: list[str] = []
+
+    for error in exc.errors(include_url=False):
+        loc = tuple(str(part) for part in error.get("loc", ()))
+        path = _format_error_path(loc)
+        msg = _normalize_validation_message(error.get("msg", "Invalid value"))
+        suggestion = _suggest_field_name(loc, error.get("type", ""))
+        if suggestion:
+            msg = f"{msg}. Did you mean '{suggestion}'?"
+            hints.append(f"{path}: did you mean '{suggestion}'?")
+        lines.append(f"{path}: {msg}")
+
+    hint = " ; ".join(hints) if hints else _GENERIC_CONFIG_HINT
+    return "\n".join(lines), hint
+
+
+def _normalize_validation_message(message: str) -> str:
+    for prefix in ("Value error, ", "Assertion failed, "):
+        if message.startswith(prefix):
+            return message[len(prefix) :]
+    return message
+
+
+def _format_error_path(loc: tuple[str, ...]) -> str:
+    if not loc:
+        return "<root>"
+    parts: list[str] = []
+    for part in loc:
+        if part.isdigit():
+            if parts:
+                parts[-1] = f"{parts[-1]}[{part}]"
+            else:
+                parts.append(f"[{part}]")
+        else:
+            parts.append(part)
+    return ".".join(parts)
+
+
+def _suggest_field_name(loc: tuple[str, ...], error_type: str) -> str | None:
+    if error_type not in {"extra_forbidden", "unexpected_keyword_argument"} or not loc:
+        return None
+    parent = loc[:-1]
+    field_names = _valid_field_names_for_path(parent)
+    if not field_names:
+        return None
+    matches = difflib.get_close_matches(loc[-1], field_names, n=1)
+    return matches[0] if matches else None
+
+
+def _valid_field_names_for_path(path: tuple[str, ...]) -> tuple[str, ...]:
+    if path in _VALID_FIELD_NAMES:
+        return _VALID_FIELD_NAMES[path]
+    # Dict-of-dataclass levels (e.g. build.nsx_modules.<name>) are keyed with a
+    # "*" wildcard standing in for the free-form dict key.
+    if path:
+        wildcard = (*path[:-1], "*")
+        if wildcard in _VALID_FIELD_NAMES:
+            return _VALID_FIELD_NAMES[wildcard]
+    return ()
 
 
 def _build_platform_registry(target_d: dict[str, Any]) -> PlatformRegistry:
@@ -892,9 +1043,7 @@ def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, Boar
             name=name,
             soc=str(soc),
             channel=str(channel),
-            psram_kb=_optional_int(
-                spec.get("psram_kb", base_board.psram_kb if base_board else None)
-            ),
+            psram_kb=_optional_int(spec.get("psram_kb", base_board.psram_kb if base_board else None)),
             default_sync_gpio_pin=int(
                 spec.get(
                     "default_sync_gpio_pin",
@@ -1022,63 +1171,3 @@ def _optional_int(raw: Any) -> int | None:
     if raw is None:
         return None
     return int(raw)
-
-
-def _build_heartbeat(raw: Any) -> HeartbeatConfig:
-    """Build a ``HeartbeatConfig`` from YAML/CLI dict (or ``None``)."""
-    if raw is None:
-        return HeartbeatConfig()
-    if not isinstance(raw, dict):
-        return HeartbeatConfig()
-    overall = raw.get("overall_timeout_s", DEFAULT_OVERALL_TIMEOUT_S)
-    if overall is not None:
-        overall = int(overall)
-    return HeartbeatConfig(
-        enabled=bool(raw.get("enabled", True)),
-        every_n_ops=int(raw.get("every_n_ops", DEFAULT_HB_EVERY_N_OPS)),
-        every_ms=int(raw.get("every_ms", DEFAULT_HB_EVERY_MS)),
-        host_timeout_s=int(raw.get("host_timeout_s", DEFAULT_HB_HOST_TIMEOUT_S)),
-        overall_timeout_s=overall,
-    )
-
-
-_CHANNEL_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]*$")
-
-
-def _build_build_config(raw: dict[str, Any]) -> BuildConfig:
-    """Build a ``BuildConfig`` from YAML/CLI dict."""
-    if not raw:
-        return BuildConfig()
-    channel = raw.get("channel")
-    if channel is not None and not _CHANNEL_RE.match(channel):
-        raise ConfigError(
-            f"Invalid build.channel value: {channel!r}",
-            hint="Channel must be an identifier (letters, digits, hyphens, underscores).",
-        )
-    nsx_modules_raw = raw.get("nsx_modules", {})
-    nsx_modules: dict[str, NsxModuleOverride] = {}
-    if isinstance(nsx_modules_raw, dict):
-        for name, spec in nsx_modules_raw.items():
-            if not isinstance(spec, dict):
-                raise ConfigError(
-                    f"build.nsx_modules.{name} must be a mapping (got {type(spec).__name__})",
-                    hint="Use path: /dir, ref: branch, or version: X.Y.Z",
-                )
-            nsx_modules[name] = NsxModuleOverride(
-                path=Path(spec["path"]) if spec.get("path") else None,
-                ref=spec.get("ref"),
-                version=spec.get("version"),
-            )
-    compiler_launcher = raw.get("compiler_launcher", "auto")
-    if compiler_launcher is None or compiler_launcher is False:
-        compiler_launcher = "none"
-    if not isinstance(compiler_launcher, str):
-        raise ConfigError(
-            f"build.compiler_launcher must be a string (got {type(compiler_launcher).__name__})",
-            hint="Use 'auto', 'none', or a tool name/path like 'sccache' or 'ccache'.",
-        )
-    return BuildConfig(
-        channel=channel,
-        nsx_modules=nsx_modules,
-        compiler_launcher=compiler_launcher,
-    )

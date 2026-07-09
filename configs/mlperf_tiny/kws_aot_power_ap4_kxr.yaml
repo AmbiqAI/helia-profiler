@@ -8,8 +8,8 @@
 model:
   path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
   arena_size: 32768
-  model_location: tcm
-
+  weights_location: tcm
+  arena_location: tcm
 engine:
   type: helia-aot
   config:
@@ -48,4 +48,3 @@ output:
   model_explorer: false
   detailed: true
 
-keep_work_dir: true

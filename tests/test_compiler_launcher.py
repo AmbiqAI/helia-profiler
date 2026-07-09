@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from helia_profiler.config import _build_build_config
+from helia_profiler.config import BuildConfig
 from helia_profiler.errors import ConfigError, FirmwareError
 from helia_profiler.firmware import _resolve_compiler_launcher
 
@@ -26,23 +26,23 @@ def _config_with_launcher(value: str, toolchain: str = "arm-none-eabi-gcc") -> S
 
 class TestBuildConfigParsing:
     def test_defaults_to_auto(self):
-        assert _build_build_config({}).compiler_launcher == "auto"
+        assert BuildConfig().compiler_launcher == "auto"
 
     def test_explicit_tool(self):
-        cfg = _build_build_config({"compiler_launcher": "sccache"})
+        cfg = BuildConfig(compiler_launcher="sccache")
         assert cfg.compiler_launcher == "sccache"
 
     def test_false_maps_to_none(self):
-        cfg = _build_build_config({"compiler_launcher": False})
+        cfg = BuildConfig(compiler_launcher=False)
         assert cfg.compiler_launcher == "none"
 
     def test_null_maps_to_none(self):
-        cfg = _build_build_config({"compiler_launcher": None})
+        cfg = BuildConfig(compiler_launcher=None)
         assert cfg.compiler_launcher == "none"
 
     def test_non_string_rejected(self):
         with pytest.raises(ConfigError):
-            _build_build_config({"compiler_launcher": 123})
+            BuildConfig(compiler_launcher=123)
 
 
 class TestResolveCompilerLauncher:

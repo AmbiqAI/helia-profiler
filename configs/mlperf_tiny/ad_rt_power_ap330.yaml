@@ -62,4 +62,3 @@ output:
   model_explorer: false
   detailed: true
 
-keep_work_dir: true
