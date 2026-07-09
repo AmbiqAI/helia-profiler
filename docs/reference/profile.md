@@ -52,8 +52,8 @@ hpx profile [MODEL] [--config FILE] [options]
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
-| `--pmu-counters NAME=SEL ...` | list | `cpu=default` | Counter selection per group. `SEL` is `default`, `all`, or a comma-separated counter list. |
-| `--pmu-presets NAME ...` | list | `basic_cpu` | Legacy preset names (kept for backward compatibility). |
+| `--pmu-counters NAME=SEL` (repeatable) | list | `cpu=default` | Counter selection per group. `SEL` is `default`, `all`, or a comma-separated counter list. Repeat the flag for multiple groups, e.g. `--pmu-counters cpu:default --pmu-counters mve:all`. |
+| `--pmu-presets NAME` (repeatable) | list | `basic_cpu` | Legacy preset names (kept for backward compatibility). Repeat the flag for multiple presets. |
 | `--per-layer` | flag | on | Per-layer breakdown (default). |
 | `--no-per-layer` | flag | — | Disable per-layer breakdown; capture whole-model only. |
 | `--iterations` | int | 100 | Inference iterations averaged in the report. |

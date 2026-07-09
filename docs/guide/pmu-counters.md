@@ -114,7 +114,7 @@ profiling:
 Or via CLI:
 
 ```bash
-hpx profile model.tflite --pmu-counters cpu:all memory:all mve:all
+hpx profile model.tflite --pmu-counters cpu:all --pmu-counters memory:all --pmu-counters mve:all
 ```
 
 ## Multi-pass profiling
