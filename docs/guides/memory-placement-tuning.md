@@ -11,7 +11,7 @@ the *workflow*, not the reference.
 
 ## 1. Start with `auto` and read the Memory Plan
 
-Run once with the default `model_location: auto` (or no placement fields at
+Run once with the default `auto` placement (no placement fields at
 all):
 
 ```bash
@@ -22,7 +22,7 @@ The terminal report prints a **Memory Plan** table — every consumer
 (arena, weights) by physical region, against the SoC's capacity:
 
 ```
-Memory plan (tflm):
+Memory plan (helia-rt):
   DTCM     65,536 /  512,000 B (12.8%)
   SRAM     50,176 / 3,145,728 B ( 1.6%)
   MRAM          0 / 4,194,304 B ( 0.0%)
