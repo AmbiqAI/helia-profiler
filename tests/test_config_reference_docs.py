@@ -36,7 +36,10 @@ def test_configuration_reference_matches_generator():
         f"{DOCS_PATH} is missing. Generate it with: "
         "uv run python tools/gen_config_reference.py"
     )
-    actual = DOCS_PATH.read_text()
+    actual = DOCS_PATH.read_text(encoding="utf-8")
+    # Tolerate CRLF checkouts on Windows (git core.autocrlf); the semantic
+    # content is what must match, not the platform line endings.
+    actual = actual.replace("\r\n", "\n")
 
     assert actual == expected, (
         "docs/reference/configuration.md is stale relative to the ProfileConfig models. "

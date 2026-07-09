@@ -316,7 +316,7 @@ def render() -> str:
 
 def main() -> None:
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_PATH.write_text(render())
+    OUTPUT_PATH.write_text(render(), encoding="utf-8", newline="\n")
     print(f"Wrote {OUTPUT_PATH}")
 
 
