@@ -11,13 +11,16 @@ hpx engines
 ## Output
 
 ```
-Supported engines:
-
-  helia-rt    AmbiqAI heliaRT — optimized TFLM fork (HELIA / CMSIS-NN / reference backends)
-  helia-aot   AmbiqAI heliaAOT — ahead-of-time compiler (no interpreter at runtime)
+  helia-rt
+  helia-aot
 ```
 
-Use any of these names with `--engine` or `engine.type:` in YAML.
+- `helia-rt` — AmbiqAI heliaRT, an optimized TFLM fork (HELIA / CMSIS-NN /
+  reference backends).
+- `helia-aot` — AmbiqAI heliaAOT, an ahead-of-time compiler (no interpreter
+  at runtime).
+
+Use either name with `--engine` or `engine.type:` in YAML.
 
 Stock `tflm` is temporarily unavailable in the public CLI/config surface.
 

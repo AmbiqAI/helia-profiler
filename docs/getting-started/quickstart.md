@@ -48,7 +48,8 @@ fields you care about; delete the rest.
 model:
   path: kws_model.tflite
   arena_size: 131072            # (1)!
-  model_location: auto          # (2)!
+  arena_location: tcm           # (2)!
+  weights_location: mram        # (2)!
 
 engine:
   type: helia-rt
@@ -76,8 +77,9 @@ output:
 
 1.  Tensor arena size in bytes. Required for TFLM/heliaRT. Set to ~1.5× the
     `allocated_arena` value reported in your first run's `summary.json`.
-2.  `auto` (default — greedy fastest-fit), or pin explicitly to `tcm`,
-    `sram`, `mram`, or `psram`. See [Memory Placement](../guide/memory.md).
+2.  Arena and weights placement. Pin explicitly to `tcm`, `sram`, `mram`, or
+    `psram` independently, or omit both for `auto` (greedy fastest-fit).
+    See [Memory Placement](../guide/memory.md).
 3.  heliaRT library variant. `release-with-logs` keeps SWO printf available
     for debugging; `release` is leaner.
 4.  Toolchain. See [Toolchains](../guide/toolchains.md) for `armclang` and

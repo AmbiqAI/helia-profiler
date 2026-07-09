@@ -31,7 +31,7 @@ palette (green → yellow → red). One overlay file is generated per PMU counte
 4. Nodes are colored by the counter value — red = highest, green = lowest
 
 !!! tip "Node ID matching"
-    For **heliaRT/TFLM** models, nodes are matched by sequential operator
+    For **heliaRT** models, nodes are matched by sequential operator
     index (0, 1, 2, ...). For **heliaAOT**, nodes use the original TFLite
     operator index preserved through AOT compilation (e.g. the `3` in
     `CONV_2D:3`).

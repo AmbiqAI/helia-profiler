@@ -6,7 +6,9 @@ a Joulescope instrument.
 ## Prerequisites
 
 - Joulescope JS110 or JS220 connected in series with the EVB
-- Power extras installed: `pip install 'helia-profiler[power]'`
+- `pyjoulescope_driver` is a core dependency of `helia-profiler` — just
+  make sure the device is USB-accessible (udev rule on Linux). See
+  [Installation](../getting-started/install.md).
 
 ## Config
 

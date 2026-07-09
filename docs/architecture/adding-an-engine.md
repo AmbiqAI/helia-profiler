@@ -173,11 +173,9 @@ In `firmware/__init__.py`, add your template to the selection logic:
 ```python
 def _get_main_template(engine: str) -> str:
     return {
-        "helia-rt": "main_rt.cc.j2",
         "helia-aot": "main_aot.cc.j2",
-        "tflm": "main_tflm.cc.j2",
         "your-engine": "main_your_engine.cc.j2",
-    }[engine]
+    }.get(engine, "main.cc.j2")
 ```
 
 ## Step 5: Add tests

@@ -2,7 +2,7 @@
 
 heliaPROFILER generates temporary, disposable firmware for each profiling run.
 The firmware is a thin harness that runs the model, captures PMU counters, and
-prints structured data over SWO.
+prints structured data over the selected transport.
 
 ## Template system
 
@@ -15,7 +15,7 @@ Firmware source files are generated from Jinja2 templates stored in
 |---|---|
 | `CMakeLists.txt.j2` | Top-level CMake project file |
 | `nsx.yml.j2` | NSX module manifest (lists dependencies) |
-| `main_rt.cc.j2` | Main for heliaRT/TFLM (interpreter path) |
+| `main.cc.j2` | Main for heliaRT / TFLM-style interpreter path |
 | `main_aot.cc.j2` | Main for heliaAOT (direct function calls) |
 | `hpx_pmu_profiler.cc.j2` | PMU capture harness |
 | `hpx_pmu_profiler.h.j2` | PMU capture header |
@@ -60,7 +60,7 @@ work_dir/
 ├── nsx.yml
 ├── modules.cmake
 ├── src/
-│   ├── main.cc              ← from main_rt.cc.j2 or main_aot.cc.j2
+│   ├── main.cc              ← from main.cc.j2 or main_aot.cc.j2
 │   ├── hpx_pmu_profiler.cc  ← PMU capture harness
 │   └── hpx_pmu_profiler.h
 └── local_modules/           ← engine-created NSX modules
@@ -107,7 +107,7 @@ work directory and referenced via `modules.cmake`.
 At a high level, the generated firmware does:
 
 ```
-1. Initialize SoC (clocks, cache, SWO)
+1. Initialize SoC (clocks, cache, selected transport)
 2. Print "HPX_START"
 3. For each PMU preset:
    a. Configure PMU with this preset's counter IDs
@@ -117,13 +117,13 @@ At a high level, the generated firmware does:
         - Reset PMU counters
         - Execute layer
         - Read PMU counters
-        - Print CSV row over SWO
+        - Print CSV row over the selected transport
    d. Print "HPX_PRESET_DONE"
 4. Print "HPX_END"
 5. Enter sleep (wait for reset)
 ```
 
-The SWO output is captured by the host and parsed into `PmuResult`.
+The transport output is captured by the host and parsed into `PmuResult`.
 
 ## The arm_mve.h workaround
 

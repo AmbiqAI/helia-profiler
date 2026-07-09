@@ -15,8 +15,13 @@ Run `hpx boards` to see the live list. As of this release:
 | `apollo510b_evb` | apollo510b | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
 | `apollo5b_evb` | apollo5b | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
 | `apollo330mP_evb` | apollo330P | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
-| `apollo4p_evb` | apollo4p | Cortex-M4 | DWT only | No | No | Stable |
-| `apollo3p_evb` | apollo3p | Cortex-M4 | DWT only | No | No | Stable |
+| `apollo4p_evb` | apollo4p | Cortex-M4 | DWT only | No | Yes | Preview |
+| `apollo4l_evb` | apollo4l | Cortex-M4 | DWT only | No | Yes | Preview |
+| `apollo4l_blue_evb` | apollo4l | Cortex-M4 | DWT only | No | Yes | Preview |
+| `apollo4p_blue_kbr_evb` | apollo4p | Cortex-M4 | DWT only | No | Yes | Preview |
+| `apollo4p_blue_kxr_evb` | apollo4p | Cortex-M4 | DWT only | No | Yes | Preview |
+| `apollo3p_evb` | apollo3p | Cortex-M4 | DWT only | No | Yes | Stable |
+| `apollo3p_evb_cygnus` | apollo3p | Cortex-M4 | DWT only | No | Yes | Preview |
 
 !!! tip "Apollo510 EVB is the default"
     If `--board` is not specified, the profiler targets `apollo510_evb`.
@@ -56,7 +61,7 @@ Run `hpx boards` to see the live list. As of this release:
 | Per-layer cycle counts | ✓ | ✓ |
 | Per-layer PMU counter detail | ✓ | (cycles only) |
 | MVE counter group | ✓ | (rejected at preflight) |
-| `model_location: psram` | ✓ (board-dependent) | ✗ |
+| `weights_location: psram` | ✓ | ✓ (all built-in EVBs ship PSRAM) |
 | Power capture | ✓ | ✓ |
 
 When you target an AP4/AP3 board, the profiler **warns** about ignored
@@ -83,11 +88,16 @@ For reference:
 | Board | J-Link device |
 |---|---|
 | `apollo510_evb` | `AP510NFA-CBR` |
-| `apollo510b_evb` | `AP510L1-CBR` |
-| `apollo5b_evb` | `AP5B-CBR` |
-| `apollo330mP_evb` | `AP330P-CBR` |
-| `apollo4p_evb` | `AMA4B2KP-KXR` |
-| `apollo3p_evb` | `AMAP3B-KBR` |
+| `apollo510b_evb` | `AP510BFA-CBR` |
+| `apollo5b_evb` | `AP510NFA-CBR` |
+| `apollo330mP_evb` | `Apollo330P_510L` |
+| `apollo4p_evb` | `AMAP42KP-KBR` |
+| `apollo4l_evb` | `AMAP42KL-KBR` |
+| `apollo4l_blue_evb` | `AMAP42KL-KBR` |
+| `apollo4p_blue_kbr_evb` | `AMAP42KP-KBR` |
+| `apollo4p_blue_kxr_evb` | `AMAP42KP-KBR` |
+| `apollo3p_evb` | `AMA3B2KK-KBR` |
+| `apollo3p_evb_cygnus` | `AMA3B2KK-KBR` |
 
 If you have multiple probes connected, pin one with
 `--jlink-serial <SN>` or `target.jlink_serial: "<SN>"`.

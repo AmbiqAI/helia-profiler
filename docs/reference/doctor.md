@@ -10,12 +10,10 @@ hpx doctor
 
 ## Behavior
 
-Probes for, and reports the version of, every external dependency the
-profiler invokes:
+Reports the current status of the host tools and Python packages that
+`hpx` checks before or alongside profiling:
 
-- `arm-none-eabi-gcc` (and `arm-none-eabi-size`)
-- `armclang`, `fromelf` (when present)
-- `atfe` (when present)
+- `arm-none-eabi-gcc`
 - `cmake`
 - `ninja`
 - `JLinkExe`
@@ -23,7 +21,8 @@ profiler invokes:
 - `pylink` Python package (required for RTT/SWO transport, including the
   default RTT flow)
 - `helia-aot` Python package (optional)
-- `armclang`, `fromelf` (optional)
+- `armclang` (optional)
+- `fromelf` (optional)
 
 ## Output
 
@@ -34,27 +33,26 @@ profiler invokes:
 ✓ SEGGER J-Link commander: /usr/bin/JLinkExe
 ✓ neuralspotx Python package: installed
 ✓ pylink Python package (RTT/SWO transport): installed
-○ heliaAOT compiler: not installed
-○ ARM Compiler (armclang): not installed
-○ ARM fromelf (armclang): not installed
+– heliaAOT compiler: not installed
+– ARM Compiler (armclang): not installed
+– ARM fromelf (armclang): not installed
 ```
 
 | Symbol | Meaning |
 |---|---|
 | `✓` | Present and functional |
 | `✗` | **Required** binary missing — `hpx profile` will fail until installed |
-| `○` | Optional binary missing — only matters if you opt into that feature |
+| `–` | Optional dependency missing — only matters if you opt into that feature |
 
-## Exit codes
+## Exit code
 
 | Code | Meaning |
 |---|---|
-| 0 | All required dependencies present |
-| 1 | At least one required dependency is missing |
+| 0 | Prints the status table. Missing required tools are shown as `✗`, but `hpx doctor` does not currently fail its exit status. |
 
-`doctor` flags **required** dependencies as failures. Missing optional
-capabilities (for example `helia-aot` or Arm Compiler binaries) report
-`○` and exit 0.
+`doctor` flags **required** dependencies as failures in the table. Missing
+optional capabilities (for example `helia-aot` or Arm Compiler binaries)
+report `–`.
 
 ## See also
 

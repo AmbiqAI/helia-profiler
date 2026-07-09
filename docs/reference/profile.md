@@ -47,6 +47,7 @@ hpx profile [MODEL] [--config FILE] [options]
 | `--toolchain` | `arm-none-eabi-gcc` \| `gcc` \| `armclang` \| `atfe` | `arm-none-eabi-gcc` | Cross-compiler. See [Toolchains](../guide/toolchains.md). |
 | `--jlink-serial` | string | auto-detect | Pin a specific J-Link probe by serial number. |
 | `--transport` | `rtt` \| `usb_cdc` \| `swo` | `rtt` | Capture transport. See [Transports](../guide/transports.md). |
+| `--frozen` | flag | off | Use the existing `nsx.lock`/module state as-is instead of re-running dependency resolution/sync. Useful for fast, reproducible offline reruns once a build has already succeeded. |
 
 ## Profiling
 

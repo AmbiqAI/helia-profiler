@@ -1,127 +1,217 @@
 # Installation
 
+heliaPROFILER (`hpx`) needs Python plus a small set of embedded-development
+tools: an ARM cross-compiler, CMake/Ninja, and SEGGER J-Link software. Power
+capture additionally needs a Joulescope JS110/JS220 and, on Linux, a udev
+rule for non-root USB access.
+
+!!! warning "Alpha"
+    heliaPROFILER is pre-1.0. Breaking changes may land on **minor**
+    versions until v1.0 — pin an exact version (`pip install
+    helia-profiler==0.1.0`) for anything long-lived.
+
 ## Requirements
 
 | Dependency | Version | Purpose |
 |---|---|---|
-| Python | >= 3.11, < 3.13 | Runtime |
-| `arm-none-eabi-gcc` | 13.x or 14.x | ARM cross-compiler |
-| CMake | >= 3.24 | Build system |
+| Python | `>= 3.11, < 3.13` | Runtime |
+| `arm-none-eabi-gcc` | 13.x or 14.x | Default ARM cross-compiler |
+| CMake | `>= 3.24` | Build system |
 | Ninja | any | Build backend |
-| SEGGER J-Link | >= 7.80 | Flash and SWO capture |
-| `nsx` CLI | latest | [neuralspotx](https://github.com/AmbiqAI/neuralspotx) build system |
+| SEGGER J-Link software | `>= 7.80` | Flash and RTT/SWO capture |
+| `neuralspotx` (`nsx`) | latest `0.7.x` | Firmware build pipeline (installed automatically as a dependency) |
 
-## Install heliaPROFILER
+`armclang` and ATfE are optional alternative toolchains — see
+[Toolchains](../guide/toolchains.md). A Joulescope JS110/JS220 is optional
+and only needed for power capture — see [Power Measurement](../guide/power.md).
 
-=== "pip"
+## 1. Install heliaPROFILER
+
+=== "Linux"
 
     ```bash
+    # pip
     pip install helia-profiler
+
+    # or uv (recommended for isolated tool installs)
+    uv tool install helia-profiler
     ```
-
-=== "uv (recommended)"
-
-    ```bash
-    uv add helia-profiler
-    ```
-
-=== "From source"
-
-    ```bash
-    git clone https://github.com/AmbiqAI/helia-profiler.git
-    cd helia-profiler
-    uv sync
-    ```
-
-### Optional extras
-
-Power-measurement support (`pyjoulescope_driver`) is now installed by
-default with `helia-profiler`. You only need a Joulescope JS110/JS220
-plugged in and the appropriate udev rules (Linux) to start capturing.
-
-For **heliaAOT** engine support:
-
-```bash
-pip install 'helia-profiler[aot]'
-```
-
-## ARM GCC Toolchain
 
 === "macOS"
 
-    Download from [Arm GNU Toolchain Downloads](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
-    and install to `/Applications/ArmGNUToolchain/`. Ensure the `bin/` directory
-    is on your `PATH`:
-
     ```bash
-    export PATH="/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin:$PATH"
+    pip install helia-profiler
+    # or
+    uv tool install helia-profiler
     ```
 
-=== "Linux (apt)"
+=== "Windows"
+
+    ```powershell
+    pip install helia-profiler
+    # or
+    uv tool install helia-profiler
+    ```
+
+Extras:
+
+```bash
+pip install 'helia-profiler[aot]'        # heliaAOT compiler support
+pip install 'helia-profiler[analysis]'   # model compute/parameter analysis, no hardware needed
+```
+
+Power-measurement support (`pyjoulescope_driver`) ships as a core
+dependency — no extra install needed, just the udev rule below on Linux.
+
+## 2. ARM GNU Toolchain (`arm-none-eabi-gcc`)
+
+=== "Linux"
 
     ```bash
     sudo apt install gcc-arm-none-eabi
     ```
 
-    Or download the latest release from the Arm website for a newer version.
+    For a newer compiler than your distro packages, download the
+    [Arm GNU Toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
+    tarball and put its `bin/` directory on `PATH`:
 
-## SEGGER J-Link
+    ```bash
+    export PATH="$HOME/arm-gnu-toolchain-14.3.rel1/bin:$PATH"
+    ```
 
-Download and install from [segger.com/jlink](https://www.segger.com/downloads/jlink/).
-You need:
+=== "macOS"
 
-- **JLinkExe** — flash firmware to the EVB
-- **`pylink-square`** — Python bindings used for RTT and SWO capture
-- **SEGGER RTT sources** — copied into generated RTT firmware
+    Download the macOS package from the
+    [Arm GNU Toolchain Downloads](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
+    page and install it (default location
+    `/Applications/ArmGNUToolchain/`), then add it to `PATH`:
 
-Install `pylink-square` with your Python environment if you plan to use the
-default RTT transport or SWO:
+    ```bash
+    export PATH="/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin:$PATH"
+    ```
 
-```bash
-pip install pylink-square
-```
+=== "Windows"
 
-For local development, clone the RTT sources into the repo-local ignored
-`segger-rtt/` directory:
+    Download the Windows installer from the
+    [Arm GNU Toolchain Downloads](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
+    page and run it — check **"Add path to environment variable"** during
+    setup. Verify in a new terminal:
+
+    ```powershell
+    arm-none-eabi-gcc --version
+    ```
+
+## 3. CMake and Ninja
+
+=== "Linux"
+
+    ```bash
+    sudo apt install cmake ninja-build
+    ```
+
+=== "macOS"
+
+    ```bash
+    brew install cmake ninja
+    ```
+
+=== "Windows"
+
+    ```powershell
+    winget install Kitware.CMake Ninja-build.Ninja
+    ```
+
+    Or install both via `pip install cmake ninja` if you prefer not to use
+    winget.
+
+## 4. SEGGER J-Link software
+
+hpx drives J-Link through `JLinkExe` (flashing) and `pylink-square`
+(RTT/SWO capture, installed automatically with heliaPROFILER).
+
+=== "Linux"
+
+    Download the `.deb`/`.tgz` installer from
+    [segger.com/downloads/jlink](https://www.segger.com/downloads/jlink/)
+    and install it. The SEGGER installer sets up the udev rules needed for
+    non-root USB access to the J-Link probe; reboot or replug the probe
+    afterward if `hpx probes list` doesn't see it.
+
+=== "macOS"
+
+    Download and run the `.pkg` installer from
+    [segger.com/downloads/jlink](https://www.segger.com/downloads/jlink/).
+
+=== "Windows"
+
+    Download and run the `.exe` installer from
+    [segger.com/downloads/jlink](https://www.segger.com/downloads/jlink/).
+    Drivers are installed automatically.
+
+For local firmware development, hpx looks for SEGGER RTT sources at
+`./segger-rtt`, `./RTT`, `~/src/segger-rtt`, `~/src/RTT`, or the
+`SEGGER_RTT_PATH` environment variable:
 
 ```bash
 git clone https://github.com/SEGGERMicro/RTT.git segger-rtt
 ```
 
-Alternatively, set `SEGGER_RTT_PATH` to a shared checkout. hpx also checks
-common local locations such as `./segger-rtt`, `./RTT`, `~/src/segger-rtt`,
-and `~/src/RTT`.
+## 5. Joulescope (optional, for power capture)
 
-## neuralspotx (nsx)
+`pyjoulescope_driver` is a core dependency, so no extra `pip install` is
+needed — just make the USB device accessible:
 
-```bash
-pip install 'neuralspotx>=0.6.7,<0.7'
-```
+=== "Linux"
 
-Verify `nsx` is available:
+    Joulescope needs a udev rule granting your user access to its USB
+    device before `hpx profile --power` will find it without root. Follow
+    the udev setup instructions from the
+    [Joulescope project](https://github.com/jetperch/joulescope), then
+    replug the device.
 
-```bash
-nsx --version
-```
+=== "macOS"
 
-## Verify Everything
+    No extra driver setup — plug in the Joulescope and it should enumerate.
 
-Run the built-in dependency checker:
+=== "Windows"
+
+    Some Windows configurations need a WinUSB driver bound to the
+    Joulescope's USB interface (for example via
+    [Zadig](https://zadig.akeo.ie/)) before `pyjoulescope_driver` can open
+    it. If `hpx profile --power` reports the device isn't found, check
+    Device Manager for an unbound interface first.
+
+See [Power Measurement](../guide/power.md) for wiring and sync-GPIO setup.
+
+## Verify everything: `hpx doctor`
 
 ```bash
 hpx doctor
 ```
 
-Expected output:
+Expected output (columns will vary by platform; a dash `–` means an
+optional tool wasn't found):
 
-```
-✓ arm-none-eabi-gcc   14.3.1
-✓ cmake               3.31.6
-✓ ninja               1.12.1
-✓ JLinkExe            V8.12a
-✓ neuralspotx Python package  installed
-✓ pylink Python package (RTT/SWO transport)  installed
-✓ nsx                 <version>
+```text
+Toolchain Check
+╭────┬────────────────────────────────────┬────────────────────────────────╮
+│    │ Tool                               │ Path                           │
+├────┼────────────────────────────────────┼────────────────────────────────┤
+│ ✓  │ ARM GCC toolchain                  │ /usr/bin/arm-none-eabi-gcc     │
+│ ✓  │ CMake (>= 3.24)                    │ /usr/bin/cmake                 │
+│ ✓  │ Ninja build system                 │ /usr/bin/ninja                 │
+│ ✓  │ SEGGER J-Link commander            │ /usr/bin/JLinkExe              │
+│ ✓  │ neuralspotx Python package         │ installed                      │
+│ ✓  │ pylink Python package (RTT/SWO     │ installed                      │
+│    │ transport)                         │                                │
+│ –  │ heliaAOT compiler                  │ not installed                  │
+│ –  │ ARM Compiler (armclang)            │ not installed                  │
+│ –  │ ARM fromelf (armclang)             │ not installed                  │
+╰────┴────────────────────────────────────┴────────────────────────────────╯
+
+All required tools found.
 ```
 
-All required tools show ✓. Optional tools show ○ when not installed.
+`✓` rows are required; `–` rows are optional (only needed for heliaAOT or
+armclang). Once every required row shows `✓`, continue to
+[First Profile](first-profile.md).

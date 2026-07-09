@@ -10,8 +10,8 @@ and conventions you need to understand before modifying the codebase.
 hardware performance data, and writes reports. It is:
 
 - A CLI tool (`hpx profile`) and a Python API (`helia_profiler.profile()`)
-- Pipeline-based: 8 sequential stages, each with a single responsibility
-- Engine-agnostic: the same pipeline works for TFLM, heliaRT, and heliaAOT
+- Pipeline-based: sequential stages, each with a single responsibility
+- Engine-agnostic: the same pipeline serves heliaRT and heliaAOT, with an internal TFLM adapter path retained in source
 
 ## What heliaPROFILER is NOT
 
@@ -107,14 +107,14 @@ raises a typed error and the pipeline stops with a clear message.
 
 ```
 src/helia_profiler/
-├── cli.py              # argparse CLI → calls api.profile()
+├── cli/                # Typer CLI package
 ├── api.py              # profile() entry point → PipelineRunner
 ├── config.py           # ProfileConfig (frozen dataclasses)
 ├── profiler.py         # build_default_pipeline(), run_profile()
 ├── pipeline.py         # PipelineContext, Stage protocol, PipelineRunner
 ├── results.py          # LayerResult, PmuResult, ProfileResult, etc.
 ├── errors.py           # HpxError hierarchy
-├── platform.py         # SoC/Board registry
+├── platform/           # SoC/Board registry
 ├── nsx.py              # NSX subprocess wrapper (configure/build/flash)
 ├── counters.py         # PMU counter registry and pass planning
 ├── doctor.py           # hpx doctor — tool checks
@@ -138,10 +138,16 @@ src/helia_profiler/
 │   └── helia_aot/      # heliaAOT adapter package
 │
 ├── stages/             # Pipeline stages
+│   ├── preflight.py
+│   ├── ensure_powered.py
 │   ├── resolve_platform.py
+│   ├── resolve_probe.py
 │   ├── prepare_engine.py
+│   ├── analyze_model.py
+│   ├── plan_memory.py
 │   ├── generate_firmware.py
 │   ├── build_firmware.py
+│   ├── verify_placement.py
 │   ├── flash.py
 │   ├── capture_pmu.py
 │   ├── capture_power.py
