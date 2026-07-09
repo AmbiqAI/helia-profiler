@@ -136,10 +136,20 @@ same smoke model on both boards:
 apollo510_evb,apollo330mP_evb
 ```
 
-The workflow exposes only the core validation inputs:
+The workflow exposes the validation axes as manual inputs. Leave an optional
+axis empty to use the selected suite's defaults; set it explicitly to override
+only that axis.
 
 - `suite`: `smoke`, `models-rt`, or `models-aot`
 - `boards`: comma-separated board IDs, default `apollo510_evb,apollo330mP_evb`
+- `models`: optional comma-separated model IDs such as `kws` or `kws,vww`
+- `engines`: optional comma-separated engines such as `helia-rt` or `helia-aot`
+- `toolchains`: optional comma-separated toolchains such as
+  `arm-none-eabi-gcc,armclang,atfe`
+- `transports`: optional comma-separated transports such as `rtt`, `uart`, `swo`,
+  or `usb_cdc`
+- `memories`: optional comma-separated placement presets such as `auto`, `tcm`,
+  `sram`, `mram`, or `psram`
 - `power`: `off`, `on`, or `both`
 - `jlink_serials`: optional comma-separated `board=serial` entries, default
   `apollo510_evb=1160003180,apollo330mP_evb=1160003409`
@@ -156,6 +166,38 @@ uv run hpx validate \
   --output-dir results/validation \
   --junit-xml results/validation/junit.xml
 ```
+
+To run a one-model toolchain regression on both attached boards, keep
+`suite=smoke` and set only the toolchain axis:
+
+```text
+toolchains=arm-none-eabi-gcc,armclang,atfe
+```
+
+The equivalent local command is:
+
+```bash
+uv run hpx validate \
+  --suite smoke \
+  --boards apollo510_evb,apollo330mP_evb \
+  --power off \
+  --toolchains arm-none-eabi-gcc,armclang,atfe \
+  --jlink-serials apollo510_evb=1160003180,apollo330mP_evb=1160003409 \
+  --output-dir results/local-validation-toolchains
+```
+
+That expands to six cases: one KWS heliaRT smoke case for each
+`board × toolchain` combination.
+
+To compare runtime engines on the same smoke model, keep `suite=smoke` and set:
+
+```text
+engines=helia-rt,helia-aot
+```
+
+You can combine axes when needed, for example `engines=helia-rt,helia-aot` and
+`toolchains=arm-none-eabi-gcc,armclang`, but preview with `hpx validate --list`
+first so the manual run size is explicit.
 
 Before the real run, the workflow installs test dependencies, fetches Git LFS
 fixtures, fetches SEGGER RTT sources into the workflow workspace, runs

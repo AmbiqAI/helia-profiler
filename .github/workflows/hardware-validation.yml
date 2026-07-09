@@ -17,6 +17,31 @@ on:
         required: true
         default: apollo510_evb,apollo330mP_evb
         type: string
+      models:
+        description: "Optional comma-separated model IDs; empty uses suite defaults"
+        required: false
+        default: ""
+        type: string
+      engines:
+        description: "Optional comma-separated engines: helia-rt,helia-aot; empty uses suite defaults"
+        required: false
+        default: ""
+        type: string
+      toolchains:
+        description: "Optional comma-separated toolchains: arm-none-eabi-gcc,armclang,atfe; empty uses suite defaults"
+        required: false
+        default: ""
+        type: string
+      transports:
+        description: "Optional comma-separated transports: rtt,uart,swo,usb_cdc; empty uses suite defaults"
+        required: false
+        default: ""
+        type: string
+      memories:
+        description: "Optional comma-separated memory placements: auto,tcm,sram,mram,psram; empty uses suite defaults"
+        required: false
+        default: ""
+        type: string
       power:
         description: "Power validation mode"
         required: true
@@ -93,6 +118,11 @@ jobs:
         env:
           HPX_VALIDATION_SUITE: ${{ inputs.suite }}
           HPX_VALIDATION_BOARDS: ${{ inputs.boards }}
+          HPX_VALIDATION_MODELS: ${{ inputs.models }}
+          HPX_VALIDATION_ENGINES: ${{ inputs.engines }}
+          HPX_VALIDATION_TOOLCHAINS: ${{ inputs.toolchains }}
+          HPX_VALIDATION_TRANSPORTS: ${{ inputs.transports }}
+          HPX_VALIDATION_MEMORIES: ${{ inputs.memories }}
           HPX_VALIDATION_POWER: ${{ inputs.power }}
           HPX_VALIDATION_JLINK_SERIALS: ${{ inputs.jlink_serials }}
           HPX_VALIDATION_REPEAT: ${{ inputs.repeat }}
@@ -106,6 +136,21 @@ jobs:
             --repeat "${HPX_VALIDATION_REPEAT}"
             --timeout "${HPX_VALIDATION_TIMEOUT}"
           )
+          if [[ -n "${HPX_VALIDATION_MODELS}" ]]; then
+            args+=(--models "${HPX_VALIDATION_MODELS}")
+          fi
+          if [[ -n "${HPX_VALIDATION_ENGINES}" ]]; then
+            args+=(--engines "${HPX_VALIDATION_ENGINES}")
+          fi
+          if [[ -n "${HPX_VALIDATION_TOOLCHAINS}" ]]; then
+            args+=(--toolchains "${HPX_VALIDATION_TOOLCHAINS}")
+          fi
+          if [[ -n "${HPX_VALIDATION_TRANSPORTS}" ]]; then
+            args+=(--transports "${HPX_VALIDATION_TRANSPORTS}")
+          fi
+          if [[ -n "${HPX_VALIDATION_MEMORIES}" ]]; then
+            args+=(--memories "${HPX_VALIDATION_MEMORIES}")
+          fi
           if [[ -n "${HPX_VALIDATION_JLINK_SERIALS}" ]]; then
             args+=(--jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}")
           fi
@@ -115,6 +160,11 @@ jobs:
         env:
           HPX_VALIDATION_SUITE: ${{ inputs.suite }}
           HPX_VALIDATION_BOARDS: ${{ inputs.boards }}
+          HPX_VALIDATION_MODELS: ${{ inputs.models }}
+          HPX_VALIDATION_ENGINES: ${{ inputs.engines }}
+          HPX_VALIDATION_TOOLCHAINS: ${{ inputs.toolchains }}
+          HPX_VALIDATION_TRANSPORTS: ${{ inputs.transports }}
+          HPX_VALIDATION_MEMORIES: ${{ inputs.memories }}
           HPX_VALIDATION_POWER: ${{ inputs.power }}
           HPX_VALIDATION_JLINK_SERIALS: ${{ inputs.jlink_serials }}
           HPX_VALIDATION_REPEAT: ${{ inputs.repeat }}
@@ -130,6 +180,21 @@ jobs:
             --output-dir results/validation
             --junit-xml results/validation/junit.xml
           )
+          if [[ -n "${HPX_VALIDATION_MODELS}" ]]; then
+            args+=(--models "${HPX_VALIDATION_MODELS}")
+          fi
+          if [[ -n "${HPX_VALIDATION_ENGINES}" ]]; then
+            args+=(--engines "${HPX_VALIDATION_ENGINES}")
+          fi
+          if [[ -n "${HPX_VALIDATION_TOOLCHAINS}" ]]; then
+            args+=(--toolchains "${HPX_VALIDATION_TOOLCHAINS}")
+          fi
+          if [[ -n "${HPX_VALIDATION_TRANSPORTS}" ]]; then
+            args+=(--transports "${HPX_VALIDATION_TRANSPORTS}")
+          fi
+          if [[ -n "${HPX_VALIDATION_MEMORIES}" ]]; then
+            args+=(--memories "${HPX_VALIDATION_MEMORIES}")
+          fi
           if [[ -n "${HPX_VALIDATION_JLINK_SERIALS}" ]]; then
             args+=(--jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}")
           fi
