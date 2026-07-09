@@ -1,73 +1,84 @@
 # heliaPROFILER
 
-**`hpx`** — Profile LiteRT models on Ambiq Apollo hardware.
+**`hpx`** profiles LiteRT (`.tflite`) models on real Ambiq Apollo silicon —
+one command builds temporary firmware, flashes it, and returns per-layer PMU
+counter breakdowns plus optional Joulescope power/energy per inference.
 
-Captures per-layer PMU counter breakdowns and optional power measurements
-for a single explicitly-chosen inference engine per run.
+> **Alpha.** heliaPROFILER is pre-1.0. Breaking changes may land on **minor**
+> versions until v1.0. Pin an exact version in production pipelines.
+
+📖 Full docs: **https://ambiqai.github.io/helia-profiler/**
+
+## Why hpx
+
+- **Per-layer PMU breakdowns** — cycles, instructions, cache, and (on
+  Cortex-M55 boards) MVE and memory counter groups, one row per layer.
+- **Power & energy per inference** — GPIO-gated Joulescope capture
+  (JS110/JS220) isolates the inference window from setup/teardown noise.
+- **Two engines** — `helia-rt` (Ambiq's optimized TFLM interpreter) and
+  `helia-aot` (Ambiq's ahead-of-time model compiler), selected explicitly
+  per run.
+- **Multiple toolchains** — `arm-none-eabi-gcc`, `armclang`, and ATfE, so you
+  can compare build/runtime trade-offs without changing your model.
+- **Memory placement control** — pin the tensor arena and model weights to
+  TCM, SRAM, MRAM, or PSRAM independently.
+- **Model Explorer overlays** — export per-layer metrics as JSON overlays
+  for Google's [Model Explorer](https://github.com/nicholasjng/model-explorer).
+- **Config-file driven** — a frozen, immutable `hpx.yml` schema merges with
+  CLI flags, with strict validation and did-you-mean suggestions for typos.
+- **Multi-board** — Apollo3, Apollo4, and Apollo5-family EVBs. Run
+  `hpx boards` for the exact list your install supports.
 
 ## Install
 
 ```bash
-pipx install helia-profiler
+pip install helia-profiler
+# or
+uv tool install helia-profiler
 ```
 
-## Quick Start
+Extras: `helia-profiler[aot]` adds the heliaAOT compiler;
+`helia-profiler[analysis]` enables model compute/parameter analysis without
+hardware.
+
+Hardware prerequisites (ARM toolchain, SEGGER J-Link, and optional
+Joulescope drivers) are covered step by step in
+[Getting Started](https://ambiqai.github.io/helia-profiler/getting-started/).
+
+## Quick taste
 
 ```bash
-# Check toolchain and dependencies
-hpx doctor
-
-# Profile a model with heliaRT (default interpreter path)
-hpx profile model.tflite --arena-size 65536
-
-# Profile with heliaAOT
-hpx profile model.tflite --engine helia-aot --engine-config aot_config.yml
-
-# Use a config file for reproducible runs
-hpx profile --config hpx.yml
+hpx doctor                                   # check toolchain + dependencies
+hpx profile model.tflite                     # profile with defaults
+hpx profile model.tflite --power             # add Joulescope power capture
+hpx profile --config hpx.yml                 # reproducible, config-driven run
 ```
 
-## Supported Engines
+```text
+  Layer  Op                  ARM_PMU_CPU_CYCLES  ARM_PMU_INST_RETIRED
+  0      CONV_2D                        123,456                98,765
+  1      DEPTHWISE_CONV_2D               45,678                34,567
+  ...
+  Power:  1.234 mA avg   12.345 mW avg   x.xxx µJ / inference
+```
 
-| Engine | Description |
-| --- | --- |
-| `helia-rt` | Ambiq's optimized TFLM fork with HELIA/CMSIS-NN/reference backends |
-| `helia-aot` | Ambiq's ahead-of-time model compiler |
+*(Illustrative sample only — see
+[Getting Started](https://ambiqai.github.io/helia-profiler/getting-started/)
+for a real walkthrough.)*
 
-Stock `tflm` is temporarily unavailable in the public CLI/config surface.
-Use `helia-rt` for interpreter-based profiling.
+## What it does NOT do
 
-## What It Does
-
-1. Generates a temporary NSX profiler firmware for your model and engine
-2. Builds and flashes it to the target board
-3. Captures per-layer PMU counters (cycles, instructions, cache, MVE, etc.)
-4. Optionally captures power measurements via Joulescope
-5. Outputs results as CSV, JSON, or terminal summary
-
-## What It Does NOT Do
-
+- Run multiple inference engines in a single invocation
 - Export AmbiqSuite examples or static libraries
-- Run multiple inference engines in one invocation
-- Auto-detect arena sizes via recompilation
-- Transfer models over RPC
-- Provide a GUI (future scope)
-
-## Configuration
-
-See [SPEC.md](SPEC.md) for the full `hpx.yml` schema and CLI reference.
+- Provide a GUI
 
 ## Development
 
 ```bash
-# Install in development mode
 uv sync --all-groups
-
-# Run linter
-uv run --group lint ruff check .
-
-# Run tests
-uv run --group test pytest -q
+uv run ruff check src tests tools
+uv run pytest -q
+uv run mkdocs build --strict
 ```
 
 ## License

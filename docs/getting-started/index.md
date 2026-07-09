@@ -17,7 +17,7 @@ Three short steps. Each one builds on the previous.
 
     ---
 
-    Plug in an Apollo510 EVB, run one command, see cycle counts.
+    Plug in an Apollo EVB, run one command, see cycle counts.
 
     [:octicons-arrow-right-24: First Profile](first-profile.md)
 

@@ -15,13 +15,17 @@ hide:
 # Profile LiteRT models on Ambiq hardware.
 
 One command to build, flash, capture PMU counters, and generate reports —
-across TFLM, heliaRT, and heliaAOT.
+with heliaRT or heliaAOT.
 { .hero-sub }
 
 [Get Started :material-arrow-right:](getting-started/index.md){ .md-button .md-button--primary }
 [GitHub](https://github.com/AmbiqAI/helia-profiler){ .md-button }
 
 </div>
+
+!!! warning "Alpha"
+    heliaPROFILER is pre-1.0. Breaking changes may land on **minor**
+    versions until v1.0 — pin an exact version for anything long-lived.
 
 ---
 
@@ -36,12 +40,12 @@ across TFLM, heliaRT, and heliaAOT.
     Cycle counts, instruction counts, cache stats, and per-layer PMU
     breakdowns — all from a single `hpx profile` command.
 
--   :material-engine:{ .lg .middle } __Multi-engine support__
+-   :material-engine:{ .lg .middle } __Two engines__
 
     ---
 
-    Profile the same model across stock TFLM, heliaRT, and heliaAOT to
-    compare inference performance.
+    Profile the same model with heliaRT (interpreter) or heliaAOT
+    (ahead-of-time compiler) — one explicitly-chosen engine per run.
 
 -   :material-chip:{ .lg .middle } __Apollo 3 / 4 / 5__
 
@@ -133,5 +137,11 @@ report output. Each step is a modular
     [:octicons-arrow-right-24: Reference](reference/index.md)
 
 </div>
+
+!!! note "About the numbers in these docs"
+    Sample power, energy, and latency values shown throughout this site
+    (mA, mW, µJ, cycle counts) are illustrative placeholders, not real
+    captured measurements. Your own hardware, model, and configuration
+    will produce different numbers — run `hpx profile` to get yours.
 
 </div>
