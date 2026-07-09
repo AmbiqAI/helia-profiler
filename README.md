@@ -66,12 +66,6 @@ hpx profile --config hpx.yml                 # reproducible, config-driven run
 [Getting Started](https://ambiqai.github.io/helia-profiler/getting-started/)
 for a real walkthrough.)*
 
-## What it does NOT do
-
-- Run multiple inference engines in a single invocation
-- Export AmbiqSuite examples or static libraries
-- Provide a GUI
-
 ## Development
 
 ```bash
