@@ -117,8 +117,8 @@ def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
     # trough (closest to zero).  Taking ``|max|`` alone therefore reports the
     # trough as the peak — the tell is a "peak" that comes out *below* the p99 of
     # the per-window averages, which is physically impossible (max >= mean
-    # always).  We saw exactly that on AP510 (peak measured below the p99 of
-# the per-window averages, which is physically impossible).
+    # always).  We saw exactly that on AP510 (a measured peak below the p99 of
+    # the per-window averages).
     # ``max(|max|, |min|)`` recovers the real peak regardless of wiring polarity;
     # it also leaves the correctly-wired (positive) case unchanged.  The window
     # average is unaffected — it comes from the abs'd charge integral, which is

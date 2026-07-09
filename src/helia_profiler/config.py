@@ -714,7 +714,7 @@ def load_config(yaml_path: Path | None, cli_overrides: dict[str, Any]) -> Profil
     CLI values take precedence over YAML values. Missing values fall back to
     dataclass defaults.
 
-    Raises `ConfigError` (never a raw exception) for any problem with
+    Raises :class:`ConfigError` (never a raw exception) for any problem with
     the YAML file or the merged configuration values.
     """
     import yaml
