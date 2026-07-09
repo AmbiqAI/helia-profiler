@@ -146,6 +146,9 @@ only that axis.
 - `engines`: optional comma-separated engines such as `helia-rt` or `helia-aot`
 - `toolchains`: optional comma-separated toolchains such as
   `arm-none-eabi-gcc,armclang,atfe`
+- `atfe_root`: optional ATfE install directory; when empty, the workflow uses
+  a GitHub variable named `ATFE_ROOT` if present and otherwise leaves the
+  runner's existing environment untouched
 - `transports`: optional comma-separated transports such as `rtt`, `uart`, `swo`,
   or `usb_cdc`
 - `memories`: optional comma-separated placement presets such as `auto`, `tcm`,
@@ -227,8 +230,17 @@ The runner must already provide:
 - SEGGER J-Link access, including `JLinkExe` and `pylink-square`
 - SEGGER custom device files for Apollo330mP, including `Apollo330P_510L`
 - ARM toolchain, CMake, Ninja, and NSX on `PATH`
+- ATfE plus `ATFE_ROOT` when selected toolchains include `atfe`
 - Git LFS support for model fixtures
 - optional Joulescope access and wiring when `power` is `on` or `both`
+
+ATfE runs require `ATFE_ROOT` to point at the Arm Toolchain for Embedded install
+directory. Configure it as the workflow `atfe_root` input for a manual run, as
+a GitHub repository/environment variable named `ATFE_ROOT`, or in the
+self-hosted runner's service environment. The workflow only exports an override
+when the input or GitHub variable is non-empty; otherwise HPX sees the runner's
+native environment. If `ATFE_ROOT` is missing, ATfE cases fail during HPX
+preflight before firmware generation.
 
 Use explicit `jlink_serials` on runners with more than one probe attached, or
 override the default mapping when moving the workflow to a different

@@ -32,6 +32,11 @@ on:
         required: false
         default: ""
         type: string
+      atfe_root:
+        description: "Optional ATFE_ROOT path; falls back to repository/environment variable ATFE_ROOT"
+        required: false
+        default: ""
+        type: string
       transports:
         description: "Optional comma-separated transports: rtt,uart,swo,usb_cdc; empty uses suite defaults"
         required: false
@@ -109,6 +114,14 @@ jobs:
           if [[ ! -f "${SEGGER_RTT_PATH}/RTT/SEGGER_RTT.c" || ! -f "${SEGGER_RTT_PATH}/RTT/SEGGER_RTT.h" || ! -f "${SEGGER_RTT_PATH}/Config/SEGGER_RTT_Conf.h" ]]; then
             rm -rf "${SEGGER_RTT_PATH}"
             git clone --depth 1 https://github.com/SEGGERMicro/RTT.git "${SEGGER_RTT_PATH}"
+          fi
+
+      - name: Configure ATFE_ROOT override
+        env:
+          HPX_ATFE_ROOT_OVERRIDE: ${{ inputs.atfe_root || vars.ATFE_ROOT }}
+        run: |
+          if [[ -n "${HPX_ATFE_ROOT_OVERRIDE}" ]]; then
+            echo "ATFE_ROOT=${HPX_ATFE_ROOT_OVERRIDE}" >> "${GITHUB_ENV}"
           fi
 
       - name: Check host dependencies
