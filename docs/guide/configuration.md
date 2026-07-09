@@ -3,6 +3,9 @@
 heliaPROFILER uses a layered configuration system: a YAML file merged with CLI
 flags, resolved once at startup into an immutable config object.
 
+For the complete key-by-key schema, see the
+[Configuration Reference](../reference/configuration.md).
+
 ## Config file
 
 Create an `hpx.yml` (any name works — pass it with `--config`):
@@ -191,3 +194,14 @@ Compiler-launcher notes:
 | `dir` | string | `./results` | Output directory |
 | `model_explorer` | bool | `true` | Generate Model Explorer overlays |
 | `detailed` | bool | `false` | Emit detailed breakdowns (per-preset CSVs, memory.json) |
+
+## Validation
+
+- Unknown keys anywhere in the config tree are rejected at load time, with
+  did-you-mean suggestions based on the real field names.
+- Every config error raised is a `ConfigError` carrying a `hint` describing
+  how to fix it.
+- Three keys are deprecated but still work, emitting a warning: `model.model_location`
+  (prefer `arena_location`/`weights_location`), `profiling.pmu_presets`
+  (prefer `pmu_counters`), and `keep_work_dir` (no-op — the cache work
+  directory is always kept).
