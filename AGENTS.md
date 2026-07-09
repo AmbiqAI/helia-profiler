@@ -68,7 +68,7 @@ projects. It generates temporary firmware, profiles, and reports results.
 Run HPX through the project environment, preferably from any directory as:
 
 ```bash
-uv --directory /home/adamp/Ambiq/tools/helia-profiler run hpx ...
+uv --directory <repo-root> run hpx ...
 ```
 
 For probe and target diagnostics, prefer HPX's non-interactive helpers before

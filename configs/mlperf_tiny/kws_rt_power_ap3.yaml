@@ -1,8 +1,7 @@
 # KWS (DS-CNN int8) on Apollo3 Blue Plus EVB via heliaRT — PMU + Joulescope
 # power capture, using the dedicated transport-free power binary.
 #
-# Placement matches the AutoDeploy baseline exactly (Latest_AI_Results.xlsx,
-# sheet 'ap3p', KWS/apollo3p_evb/gcc row): MRAM weights / SRAM arena, LP
+# Placement matches the AutoDeploy baseline exactly: MRAM weights / SRAM arena, LP
 # (48 MHz) clock. AP3's 64 KB DTCM cannot hold the KWS arena (~23 KB) +
 # weights (53 KB) together, so TCM/TCM (used on AP510) is infeasible here —
 # this is the same placement AutoDeploy itself uses on this board.

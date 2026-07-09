@@ -216,7 +216,7 @@ engine:
 target:
   board: apollo510_evb
   toolchain: arm-none-eabi-gcc
-  # jlink_serial: "1160002255"  # select J-Link probe by serial number
+  # jlink_serial: "801000001"  # select J-Link probe by serial number
 
 profiling:
   pmu_presets:                  # which PMU counter groups to capture
@@ -336,9 +336,9 @@ the instrument's current shunt relay. This serves two purposes:
    proceed. Automatic — retry once on failure, transparent to the user.
 
 2. **Accurate power measurement** (stage 7): A J-Link reset leaves the debug
-   access port (DAP) powered, adding ~300 µA overhead. A power-cycle reset
-   clears this, so stage 7 power numbers reflect true firmware consumption
-   with no debug artefacts.
+   access port (DAP) powered, adding measurable current overhead. A
+   power-cycle reset clears this, so stage 7 power numbers reflect true
+   firmware consumption with no debug artefacts.
 
 This is why PMU capture (stage 6) and power capture (stage 7) are separate
 stages. Stage 6 uses a J-Link reset (debug overhead doesn't affect cycle
@@ -378,7 +378,7 @@ Results are written as:
   instruction counts, cache stats, and (if enabled) power/energy.
 - **CSV:** One row per layer per PMU preset, suitable for spreadsheet analysis.
 - **JSON:** Structured output for programmatic consumption.
-- **Model Explorer overlay:** Per-metric JSON files compatible with Google's
+- **Model Explorer overlay:** Per-metric JSON files compatible with the
   [Model Explorer](https://github.com/google-ai-edge/model-explorer) custom
   node data format. Load alongside the source `.tflite` to color-code nodes by
   cycles, instructions, cache misses, MVE operations, etc.

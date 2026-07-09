@@ -149,7 +149,7 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                 # power phase runs a DIFFERENT binary whose auto-sized clean
                 # window recomputes its own iteration count at runtime (its
                 # warmup timing differs slightly without transport overhead
-                # -- observed +18% iterations on a USB-transport run), so
+                # -- observed on USB-transport runs), so
                 # the PMU-phase count can be the wrong denominator.  The
                 # per-inference TIME is binary-independent (same model,
                 # same clock), so when the measured gate duration disagrees

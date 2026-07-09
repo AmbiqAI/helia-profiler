@@ -66,6 +66,46 @@ starting point.
 
   [:octicons-arrow-right-24: target](target.md)
 
+-   :material-chart-bar:{ .lg .middle } __`hpx analyze`__
+
+  ---
+
+  Static model analysis, no hardware.
+
+  [:octicons-arrow-right-24: analyze](analyze.md)
+
+-   :material-compare:{ .lg .middle } __`hpx compare`__
+
+  ---
+
+  Diff two profile result directories.
+
+  [:octicons-arrow-right-24: compare](compare.md)
+
+-   :material-check-decagram:{ .lg .middle } __`hpx validate`__
+
+  ---
+
+  Hardware-in-the-loop validation suite.
+
+  [:octicons-arrow-right-24: validate](validate.md)
+
+-   :material-power:{ .lg .middle } __`hpx power-on`__
+
+  ---
+
+  Hold Joulescope passthrough power on.
+
+  [:octicons-arrow-right-24: power-on](power-on.md)
+
+-   :material-folder-cog:{ .lg .middle } __`hpx cache`__
+
+  ---
+
+  Inspect or purge local build caches.
+
+  [:octicons-arrow-right-24: cache](cache.md)
+
 </div>
 
 ## Configuration Reference

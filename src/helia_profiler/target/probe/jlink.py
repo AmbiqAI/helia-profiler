@@ -45,8 +45,9 @@ log = logging.getLogger("hpx")
 # AIRCR/SWPOR, which additionally leaves PMU registers untouched).  SWPOI
 # also resets PMU/power-management state, which was empirically found
 # (2026-07-02, AP510 KWS LP) to change steady-state measured power by
-# ~15-20% (~8.2 mW debug-reset-only vs ~6.9 mW after SWPOI) for identical
-# firmware — matching neuralSPOT AutoDeploy's own ``make reset`` step,
+# a measurable amount (a measurable difference between debug-reset-only
+# and post-SWPOI power) for identical firmware — matching neuralSPOT
+# AutoDeploy's own ``make reset`` step,
 # which performs this exact register write after every deploy.
 #
 # Writing this register triggers an immediate chip reset, so the write

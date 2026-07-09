@@ -79,7 +79,7 @@ class SyncController(Protocol):
         A host-driven GO line held high through the measured window can
         parasitically backfeed the target through the GPIO pad network,
         displacing real supply current around the instrument's sense path
-        (observed at ~5.8 mA on an AP510 EVB — enough to drive the net
+        (several mA observed on an AP510 EVB — enough to drive the net
         measured current negative).  The firmware only level-samples GO
         before the window, so dropping it at gate-rise is always safe.
         """

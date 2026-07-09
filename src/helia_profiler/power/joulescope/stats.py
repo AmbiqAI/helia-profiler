@@ -117,7 +117,8 @@ def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
     # trough (closest to zero).  Taking ``|max|`` alone therefore reports the
     # trough as the peak — the tell is a "peak" that comes out *below* the p99 of
     # the per-window averages, which is physically impossible (max >= mean
-    # always).  We saw exactly that on AP510 (peak 1.34 mA < p99-avg 1.55 mA).
+    # always).  We saw exactly that on AP510 (a measured peak below the p99 of
+    # the per-window averages).
     # ``max(|max|, |min|)`` recovers the real peak regardless of wiring polarity;
     # it also leaves the correctly-wired (positive) case unchanged.  The window
     # average is unaffected — it comes from the abs'd charge integral, which is
@@ -138,7 +139,7 @@ def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
         # a load and means the measurement itself is corrupt (reversed IN/OUT
         # wiring, or current backfed into the target around the shunt — e.g.
         # a host-driven GO GPIO held high during the window, observed at
-        # ~5.8 mA on an AP510 EVB).  ``_process_gated_stats`` raises on it
+        # several mA on an AP510 EVB).  ``_process_gated_stats`` raises on it
         # instead of letting abs() launder it into a plausible number.
         "cur_int_signed": np.asarray(cur_int, dtype=np.float64),
         "pwr_avg": np.abs(np.asarray(pwr_avg, dtype=np.float64)),
@@ -377,9 +378,9 @@ def _process_gated_stats(
     # load: it means current flowed *backwards* through the sense path for
     # the majority of the window.  Known causes: reversed IN/OUT wiring, or
     # the target being backfed around the shunt (e.g. a host-driven GO GPIO
-    # held high during the window — measured at ~5.8 mA into an AP510 EVB,
-    # which flipped the sensed window current to -2.2 mA while the older
-    # magnitude-normalization silently reported it as +2.2 mA).  Refuse to
+    # held high during the window — several mA measured into an AP510 EVB,
+    # which flipped the sensed window current negative while the older
+    # magnitude-normalization silently reported it as positive).  Refuse to
     # launder it: fail loudly with the physical causes.  The 10% threshold
     # ignores noise-dominated near-zero windows on idle targets.
     if total_signed_charge < 0 and abs(total_signed_charge) > 0.1 * total_charge:

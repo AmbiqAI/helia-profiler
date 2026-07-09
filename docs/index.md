@@ -65,8 +65,8 @@ with heliaRT or heliaAOT.
 
     ---
 
-    Export per-layer metrics as JSON overlays for Google's
-    [Model Explorer](https://github.com/nicholasjng/model-explorer) —
+    Export per-layer metrics as JSON overlays for
+    [Model Explorer](https://github.com/google-ai-edge/model-explorer) —
     see hot operators at a glance.
 
 -   :material-file-cog:{ .lg .middle } __YAML + CLI config__

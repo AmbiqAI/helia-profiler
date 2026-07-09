@@ -972,9 +972,10 @@ class TestEstimateCaptureDuration:
         self, tmp_path: Path
     ):
         # This mirrors the real config that triggered "No GPIO-high windows
-        # detected": a 21.136ms-per-inference model with window_target_ms
-        # 8000 needs ~379 clean iterations (~8s), which the old estimate
-        # (based only on the 4 profiled PMU passes) undercounted as ~7.1s.
+        # detected": a model with representative per-inference timing and
+        # window_target_ms 8000 needs ~379 clean iterations (~8s), which the
+        # old estimate (based only on the 4 profiled PMU passes) undercounted
+        # as ~7.1s.
         from helia_profiler.stages.capture_power import _estimate_capture_duration
         from helia_profiler.results import FirmwareMeta, LayerResult, PmuResult
 
@@ -989,7 +990,7 @@ class TestEstimateCaptureDuration:
                 "warmup": 1,
             },
         )
-        # 2,029,073 cycles at 96 MHz == ~21.136ms/inference (real AP510 KWS values).
+        # 2,029,073 cycles at 96 MHz == ~21.136ms/inference (representative values).
         ctx.pmu_result = PmuResult(
             meta=FirmwareMeta(presets=("basic_cpu",)),
             layers=[LayerResult(id=0, op="CONV_2D", cycles=2_029_073.0)],

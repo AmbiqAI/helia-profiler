@@ -154,8 +154,9 @@ def capture_gated(
                         # Drop the GO line the moment the gate is observed
                         # high: the firmware has latched GO, and a GPO held
                         # high through the window backfeeds the target around
-                        # the current shunt (AP510 EVB: ~5.8 mA — enough to
-                        # drive the measured window current negative).
+                        # the current shunt (several mA measured on an AP510
+                        # EVB — enough to drive the measured window current
+                        # negative).
                         if on_gate_rise is not None:
                             try:
                                 on_gate_rise()

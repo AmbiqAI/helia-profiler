@@ -184,14 +184,14 @@ power:
 
 PMU capture needs a host transport (`rtt`, `uart`, `swo`, or `usb_cdc`) to get
 per-layer counters off the target. That same transport, if still initialized
-during the power capture window, contaminates the current reading — measured
-on an Apollo510 EVB (KWS DS-CNN int8, TCM/TCM, LP 96 MHz, GCC):
+during the power capture window, contaminates the current reading with
+power draw that has nothing to do with the model:
 
-| Transport left active during capture | Current inflation vs. trusted baseline |
+| Transport left active during capture | Contamination source |
 |---|---|
-| UART | +17% (UART0-3 peripherals stay powered) |
-| SWO | +33% (debug power domain stays powered) |
-| USB CDC | +60% (PHY + enumeration) |
+| UART | UART peripherals stay clocked and powered |
+| SWO | debug power domain stays powered |
+| USB CDC | USB PHY stays powered for enumeration (largest effect) |
 
 Tearing the transport down at runtime right before the window only partially
 helps — pad/pinmux configuration residue still shifts the current draw.

@@ -37,8 +37,8 @@ flows over the same transport. `uart` uses the J-Link OB virtual COM port at
     capture flashes a separate transport-free binary, so the transport you
     pick here only affects **PMU capture reliability and throughput** — it
     no longer biases current/energy results. That transport-dependent power
-    contamination (measured up to +60% with USB CDC) only applies if you
-    opt into `power.firmware: shared`.
+    contamination (largest with USB CDC) only applies if you opt into
+    `power.firmware: shared`.
 
 ## RTT (recommended)
 

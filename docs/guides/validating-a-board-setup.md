@@ -36,7 +36,7 @@ hpx probes list
 ```
 serial      product                    connection
 ----------  -------------------------  ----------
-1160000174  J-Link-OB-Apollo4-CortexM  USB
+801000001  J-Link-OB-Apollo4-CortexM  USB
 ```
 
 If you have more than one probe connected and need to know which one HPX
@@ -129,7 +129,7 @@ runner doesn't have to guess:
 
 ```bash
 hpx validate --boards apollo510_evb,apollo3p_evb \
-    --jlink-serials apollo510_evb=1160000174,apollo3p_evb=1160001481
+    --jlink-serials apollo510_evb=801000001,apollo3p_evb=801000002
 ```
 
 ## 6. Use `--repeat` for stability checks

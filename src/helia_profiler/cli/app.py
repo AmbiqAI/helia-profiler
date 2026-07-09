@@ -344,7 +344,7 @@ def profile_command(
             "Which binary is on target during power capture (default: "
             "dedicated). 'dedicated' flashes the transport-free "
             "hpx_profiler_power image to avoid SWO/UART/RTT/USB current "
-            "contamination (+17%/+33%/+60%% measured on AP510); 'shared' "
+            "contamination (measured on AP510 EVBs); 'shared' "
             "reuses the already-flashed transport binary."
         ),
         rich_help_panel=G_POWER,

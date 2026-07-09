@@ -33,7 +33,7 @@ hpx probes match --board apollo510_evb
 Validate a known serial before a hardware run:
 
 ```bash
-hpx probes match --board apollo510_evb --jlink-serial 1160002204
+hpx probes match --board apollo510_evb --jlink-serial 801000001
 ```
 
 Use `--json` when scripting lab setup or generating validation inputs.
