@@ -1,17 +1,27 @@
 """Basic tests for ProfileConfig construction."""
 
 import importlib
+import json
 from pathlib import Path
 
 import pytest
 
 from helia_profiler.config import (
+    EngineConfig,
+    EngineType,
+    ModelConfig,
+    NsxModuleOverride,
+    PowerConfig,
     ProfileConfig,
+    ProfilingConfig,
+    TargetConfig,
     Toolchain,
     load_config,
-    NsxModuleOverride,
 )
 from helia_profiler.errors import ConfigError
+from helia_profiler.pipeline import _serialize_config
+from helia_profiler.placement import ModelLocation
+from helia_profiler.power.base import PowerMode
 
 
 def test_load_config_from_cli_overrides():
@@ -560,3 +570,150 @@ def test_profile_result_power_accepts_power_result_and_none():
     power_result = PowerResult(summary=summary)
     result_power = ProfileResult(pmu=pmu, power=power_result)
     assert isinstance(result_power.power, PowerResult)
+
+
+
+def test_unknown_top_level_key_includes_path_and_suggestion():
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "verbsoe": 2,
+    }
+
+    with pytest.raises(ConfigError) as exc_info:
+        load_config(None, cli)
+
+    message = str(exc_info.value)
+    assert "verbsoe" in message
+    assert "verbose" in message
+
+
+
+def test_unknown_nested_key_includes_dotted_path_and_suggestion():
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "profiling": {"iterrations": 5},
+    }
+
+    with pytest.raises(ConfigError) as exc_info:
+        load_config(None, cli)
+
+    message = str(exc_info.value)
+    assert "profiling.iterrations" in message
+    assert "iterations" in message
+
+
+
+def test_unknown_section_name_includes_suggestion():
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "profilng": {"iterations": 5},
+    }
+
+    with pytest.raises(ConfigError) as exc_info:
+        load_config(None, cli)
+
+    message = str(exc_info.value)
+    assert "profilng" in message
+    assert "profiling" in message
+
+
+
+def test_multiple_validation_errors_are_reported_together():
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "profilng": {"iterations": 5},
+        "profiling": {"iterrations": 5},
+        "power": {"stats_rate_hz": 0},
+    }
+
+    with pytest.raises(ConfigError) as exc_info:
+        load_config(None, cli)
+
+    message = str(exc_info.value)
+    assert "profilng" in message
+    assert "profiling.iterrations" in message
+    assert "power.stats_rate_hz must be >= 1" in message
+
+
+
+def test_model_location_deprecation_warning_still_flows_value():
+    cli = {
+        "model": {"path": "m.tflite", "model_location": "mram"},
+        "engine": {"type": "helia-rt"},
+    }
+
+    with pytest.warns(DeprecationWarning, match=r"model\.model_location is deprecated"):
+        config = load_config(None, cli)
+
+    assert config.model.model_location is ModelLocation.MRAM
+
+
+
+def test_pmu_presets_deprecation_warning_still_flows_value():
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "profiling": {"pmu_presets": ["basic_cpu", "memory"]},
+    }
+
+    with pytest.warns(DeprecationWarning, match=r"profiling\.pmu_presets is deprecated"):
+        config = load_config(None, cli)
+
+    assert config.profiling.pmu_presets == ("basic_cpu", "memory")
+
+
+
+def test_keep_work_dir_deprecation_warning_still_flows_value():
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "keep_work_dir": True,
+    }
+
+    with pytest.warns(DeprecationWarning, match="keep_work_dir is deprecated"):
+        config = load_config(None, cli)
+
+    assert config.keep_work_dir is True
+
+
+
+def test_non_dict_heartbeat_is_rejected():
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "target": {"heartbeat": "always"},
+    }
+
+    with pytest.raises(ConfigError, match="target.heartbeat"):
+        load_config(None, cli)
+
+
+
+def test_direct_construction_still_coerces_strings():
+    profiling = ProfilingConfig(aggregation="median")
+    target = TargetConfig(toolchain="gcc")
+    power = PowerConfig(mode="external")
+
+    assert profiling.aggregation == "median"
+    assert target.toolchain is Toolchain.ARM_NONE_EABI_GCC
+    assert power.mode is PowerMode.EXTERNAL
+
+
+
+def test_config_snapshot_serialization_is_json_safe():
+    config = ProfileConfig(
+        model=ModelConfig(path=Path("m.tflite"), model_location="auto"),
+        engine=EngineConfig(type=EngineType.HELIA_RT, config={"backend_mode": "fast"}),
+        target=TargetConfig(clock={"cpu": "hp"}),
+    )
+
+    snapshot = _serialize_config(config)
+
+    assert snapshot["model"]["path"] == "m.tflite"
+    assert snapshot["engine"]["type"] == "helia-rt"
+    assert snapshot["target"]["clock"]["cpu"] == "hp"
+    json.dumps(snapshot)
