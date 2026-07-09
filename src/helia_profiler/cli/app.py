@@ -742,7 +742,7 @@ def power_on_command(
 # ---------------------------------------------------------------------------
 
 _VALIDATE_POWER_CHOICE = click.Choice(["both", "on", "off"])
-_VALIDATE_SUITE_CHOICE = click.Choice(["smoke", "models-rt", "models-aot"])
+_VALIDATE_SUITE_CHOICE = click.Choice(["smoke", "models-rt", "models-aot", "complete"])
 
 
 @app.command(
@@ -762,7 +762,8 @@ _VALIDATE_SUITE_CHOICE = click.Choice(["smoke", "models-rt", "models-aot"])
         "  hpx validate -k kws-aot              # pytest keyword filter\n\n"
         "  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n\n"
         "  hpx validate --suite models-rt       # 16-case RT sweep: 2 boards x 4 models x 2 toolchains\n\n"
-        "  hpx validate --suite models-aot      # 12-case model sweep: 3 boards x 4 models x AOT"
+        "  hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains\n\n"
+        "  hpx validate --suite complete        # 32-case RT + AOT sweep"
     ),
 )
 def validate_command(
@@ -806,9 +807,9 @@ def validate_command(
         help=(
             "Preset suite. 'smoke' defaults unset axes to models=kws, engines=helia-rt, "
             "toolchains=arm-none-eabi-gcc, interfaces=rtt, memories=auto. "
-            "'models-rt' defaults unset axes to all MLPerf Tiny models, Apollo510 + Apollo330mP, "
-            "gcc + atfe, rtt, auto memory, and helia-rt. 'models-aot' defaults unset axes to "
-            "all MLPerf Tiny models, all AOT validation boards, gcc, rtt, auto memory, and helia-aot. "
+            "'models-rt' and 'models-aot' default unset axes to all MLPerf Tiny models, "
+            "Apollo510 + Apollo330mP, gcc + atfe, rtt, auto memory, and the selected engine. "
+            "'complete' runs the same axes for both helia-rt and helia-aot. "
             "Explicit axis flags always win."
         ),
     ),
