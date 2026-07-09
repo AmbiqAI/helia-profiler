@@ -1,11 +1,18 @@
 ## heliaAOT config for tiny_wav2letter_int8 — constrain DTCM to avoid TCM overflow.
 ## The Apollo510 TCM is 496KB; stack/heap/BSS take ~50KB, leaving ~450KB for model data.
 ## Provide all memory tiers so the planner can spill large tensors to SRAM/MRAM.
-memory:
-  constraints:
-    - name: dtcm
-      max_size: 262144    # 256 KB — force large weight tensors out of TCM
-    - name: sram
-      max_size: 3145728   # 3 MB shared SRAM
-    - name: mram
-      max_size: 4128768   # ~4 MB MRAM (read-only / const)
+model:
+  path: tiny_wav2letter_int8.tflite
+
+engine:
+  type: helia-aot
+  config:
+    aot_args:
+      memory:
+        constraints:
+          - name: dtcm
+            max_size: 262144    # 256 KB — force large weight tensors out of TCM
+          - name: sram
+            max_size: 3145728   # 3 MB shared SRAM
+          - name: mram
+            max_size: 4128768   # ~4 MB MRAM (read-only / const)
