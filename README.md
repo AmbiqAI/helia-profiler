@@ -23,7 +23,7 @@ counter breakdowns plus optional Joulescope power/energy per inference.
 - **Memory placement control** — pin the tensor arena and model weights to
   TCM, SRAM, MRAM, or PSRAM independently.
 - **Model Explorer overlays** — export per-layer metrics as JSON overlays
-  for Google's [Model Explorer](https://github.com/nicholasjng/model-explorer).
+  for Google's [Model Explorer](https://github.com/google-ai-edge/model-explorer).
 - **Config-file driven** — a frozen, immutable `hpx.yml` schema merges with
   CLI flags, with strict validation and did-you-mean suggestions for typos.
 - **Multi-board** — Apollo3, Apollo4, and Apollo5-family EVBs. Run
