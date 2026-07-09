@@ -19,7 +19,10 @@ def print_error(console: HpxConsole, exc: Exception) -> None:
     if isinstance(exc, HpxError):
         msg = Text()
         msg.append("Error: ", style="bold red")
-        msg.append(str(exc))
+        # Use the bare message (args[0]) rather than str(exc): HpxError.__str__
+        # embeds the hint for logs/tracebacks, but this renderer emits its own
+        # styled hint line below and would otherwise print the hint twice.
+        msg.append(str(exc.args[0]) if exc.args else str(exc))
         if exc.hint:
             msg.append(f"\n  hint: {exc.hint}", style="dim")
         details = getattr(exc, "details", None)
