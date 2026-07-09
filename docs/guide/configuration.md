@@ -4,7 +4,10 @@ heliaPROFILER uses a layered configuration system: a YAML file merged with CLI
 flags, resolved once at startup into an immutable config object.
 
 For the complete key-by-key schema, see the
-[Configuration Reference](../reference/configuration.md).
+[Configuration Reference](../reference/configuration.md). Calling
+heliaPROFILER from Python directly? See the
+[Python API configuration reference](../reference/api/config.md) for
+`ProfileConfig` and its section classes.
 
 ## Config file
 
