@@ -9,6 +9,7 @@ import sys
 def _cmd_profile(args: argparse.Namespace) -> None:
     """Run the profiling pipeline."""
     from ..config import load_config
+    from ..console import HpxConsole
     from ..errors import HpxError
 
     # Build CLI overrides dict from parsed args
@@ -21,12 +22,19 @@ def _cmd_profile(args: argparse.Namespace) -> None:
     _apply_workdir_overrides(args, cli)
     _apply_build_overrides(args, cli)
 
-    config = load_config(args.config, cli)
+    # Use the CLI's own --verbose flag for error reporting during config load,
+    # since a ConfigError means we never get a resolved ProfileConfig.verbose.
+    console = HpxConsole(args.verbose)
 
-    from ..api import profile
-    from ..console import HpxConsole
+    try:
+        config = load_config(args.config, cli)
+    except HpxError as exc:
+        console.print_error(exc)
+        sys.exit(1)
 
     console = HpxConsole(config.verbose)
+
+    from ..api import profile
 
     try:
         profile(config)

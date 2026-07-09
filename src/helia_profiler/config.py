@@ -308,6 +308,8 @@ class TargetConfig:
     def __post_init__(self) -> None:
         if not isinstance(self.toolchain, Toolchain):
             object.__setattr__(self, "toolchain", Toolchain(self.toolchain))
+        if self.toolchain is Toolchain.GCC:
+            object.__setattr__(self, "toolchain", Toolchain.ARM_NONE_EABI_GCC)
         if not isinstance(self.transport, Transport):
             object.__setattr__(self, "transport", Transport(self.transport))
         if not isinstance(self.clock, ClockSelection):
@@ -478,6 +480,14 @@ class OutputConfig:
     def __post_init__(self) -> None:
         if not isinstance(self.format, OutputFormat):
             object.__setattr__(self, "format", OutputFormat(self.format))
+        if self.format is OutputFormat.MODEL_EXPLORER:
+            raise ConfigError(
+                "output.format: model-explorer is not a valid primary report format",
+                hint=(
+                    "Use output.format: csv or json; Model Explorer overlays are "
+                    "controlled separately via output.model_explorer: true."
+                ),
+            )
 
 
 @dataclass(frozen=True)
@@ -556,18 +566,44 @@ def load_config(yaml_path: Path | None, cli_overrides: dict[str, Any]) -> Profil
 
     CLI values take precedence over YAML values. Missing values fall back to
     dataclass defaults.
+
+    Raises :class:`ConfigError` (never a raw exception) for any problem with
+    the YAML file or the merged configuration values.
     """
     import yaml
 
     base: dict[str, Any] = {}
     if yaml_path is not None:
-        with open(yaml_path) as f:
-            base = yaml.safe_load(f) or {}
+        try:
+            with open(yaml_path) as f:
+                base = yaml.safe_load(f) or {}
+        except FileNotFoundError as exc:
+            raise ConfigError(
+                f"Config file not found: {yaml_path}",
+                hint="Check the --config path, or omit --config to use CLI-only configuration.",
+            ) from exc
+        except yaml.YAMLError as exc:
+            raise ConfigError(
+                f"Malformed YAML in config file {yaml_path}: {exc}",
+                hint="Check the file for YAML syntax errors (indentation, colons, quoting).",
+            ) from exc
+
+        if not isinstance(base, dict):
+            raise ConfigError(
+                f"Config file {yaml_path} must contain a YAML mapping (key: value pairs), "
+                f"got {type(base).__name__}.",
+                hint="Top-level YAML must be a mapping with keys like model, engine, target.",
+            )
 
     # Deep merge: CLI overrides win
     merged = _deep_merge(base, cli_overrides)
 
-    return _build_config(merged)
+    try:
+        return _build_config(merged)
+    except ConfigError:
+        raise
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -593,8 +629,17 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
     build_d = d.get("build", {}) or {}
     platform_registry = _build_platform_registry(target_d)
 
+    model_path_raw = model_d.get("path")
+    if not model_path_raw:
+        raise ConfigError(
+            "model.path is required",
+            hint=(
+                "Provide a model via the CLI positional argument, --config YAML "
+                "(model: path: ...), or the model.path key."
+            ),
+        )
     model = ModelConfig(
-        path=Path(model_d["path"]),
+        path=Path(model_path_raw),
         arena_size=model_d.get("arena_size"),
         model_location=model_d.get("model_location", "auto"),
         arena_location=model_d.get("arena_location"),
@@ -642,7 +687,9 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
         tc = Toolchain(tc_raw)
     except ValueError:
         supported = ", ".join(t.value for t in Toolchain)
-        raise ValueError(f"Unknown toolchain '{tc_raw}'. Supported: {supported}") from None
+        raise ConfigError(
+            f"Unknown toolchain '{tc_raw}'. Supported: {supported}"
+        ) from None
 
     board_name = target_d.get("board", DEFAULT_BOARD)
     sync_gpio_pin = power_d.get(
@@ -705,7 +752,9 @@ def _build_config(d: dict[str, Any]) -> ProfileConfig:
             driver=power_d.get("driver", DEFAULT_POWER_DRIVER),
             firmware=power_d.get("firmware", DEFAULT_POWER_FIRMWARE),
             mode=power_d.get("mode", DEFAULT_POWER_MODE),
-            duration_s=(int(power_d["duration_s"]) if "duration_s" in power_d else None),
+            duration_s=(
+                int(power_d["duration_s"]) if power_d.get("duration_s") is not None else None
+            ),
             io_voltage=power_d.get("io_voltage", DEFAULT_IO_VOLTAGE),
             sync_gpio_pin=sync_gpio_pin,
             sync_input_index=power_d.get("sync_input_index", DEFAULT_POWER_SYNC_INPUT_INDEX),

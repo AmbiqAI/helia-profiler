@@ -1,10 +1,16 @@
 """Basic tests for ProfileConfig construction."""
 
+import importlib
 from pathlib import Path
 
 import pytest
 
-from helia_profiler.config import ProfileConfig, load_config, NsxModuleOverride
+from helia_profiler.config import (
+    ProfileConfig,
+    Toolchain,
+    load_config,
+    NsxModuleOverride,
+)
 from helia_profiler.errors import ConfigError
 
 
@@ -46,7 +52,7 @@ def test_power_stats_rate_hz_must_be_positive():
         "engine": {"type": "helia-rt"},
         "power": {"stats_rate_hz": 0},
     }
-    with pytest.raises(ValueError, match="stats_rate_hz must be >= 1"):
+    with pytest.raises(ConfigError, match="stats_rate_hz must be >= 1"):
         load_config(None, cli)
 
 
@@ -413,3 +419,144 @@ def test_custom_soc_and_board_are_available_via_platform_registry():
     assert soc.jlink_device == "AP510-CUSTOM"
     assert soc.rtt_scan_ranges == ((553648128, 1048576),)
     assert board.profile_source_board == "apollo510_evb"
+
+
+# ---------------------------------------------------------------------------
+# load_config error wrapping (FIX 3)
+# ---------------------------------------------------------------------------
+
+
+def test_load_config_missing_file_raises_config_error(tmp_path: Path):
+    """A --config path that doesn't exist should raise ConfigError, not FileNotFoundError."""
+    missing = tmp_path / "does-not-exist.yaml"
+    with pytest.raises(ConfigError, match="Config file not found"):
+        load_config(missing, {"model": {"path": "m.tflite"}, "engine": {"type": "helia-rt"}})
+
+
+def test_load_config_malformed_yaml_raises_config_error(tmp_path: Path):
+    """Malformed YAML should raise ConfigError, not yaml.YAMLError."""
+    bad = tmp_path / "bad.yaml"
+    bad.write_text("model: [unterminated\n")
+    with pytest.raises(ConfigError, match="Malformed YAML"):
+        load_config(bad, {})
+
+
+def test_load_config_non_dict_yaml_raises_config_error(tmp_path: Path):
+    """A YAML file whose top-level value is not a mapping should raise ConfigError."""
+    not_a_dict = tmp_path / "list.yaml"
+    not_a_dict.write_text("- one\n- two\n")
+    with pytest.raises(ConfigError, match="must contain a YAML mapping"):
+        load_config(not_a_dict, {})
+
+    scalar = tmp_path / "scalar.yaml"
+    scalar.write_text("just a string\n")
+    with pytest.raises(ConfigError, match="must contain a YAML mapping"):
+        load_config(scalar, {})
+
+
+def test_load_config_missing_model_path_raises_config_error():
+    """Missing model.path should raise a clear ConfigError, not KeyError."""
+    cli = {"engine": {"type": "helia-rt"}}
+    with pytest.raises(ConfigError, match="model.path is required"):
+        load_config(None, cli)
+
+
+def test_load_config_bad_toolchain_raises_config_error():
+    """An unknown toolchain should raise ConfigError, not ValueError."""
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "target": {"toolchain": "bogus-toolchain"},
+    }
+    with pytest.raises(ConfigError, match="Unknown toolchain"):
+        load_config(None, cli)
+
+
+def test_load_config_duration_s_explicit_null_is_none():
+    """power.duration_s: null should behave like an absent key (None), not crash."""
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "power": {"duration_s": None},
+    }
+    config = load_config(None, cli)
+    assert config.power.duration_s is None
+
+
+def test_load_config_profiling_value_error_wrapped_as_config_error():
+    """A bad ProfilingConfig value (e.g. aggregation) surfaces as ConfigError via load_config."""
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "profiling": {"aggregation": "bogus"},
+    }
+    with pytest.raises(ConfigError, match="Invalid aggregation"):
+        load_config(None, cli)
+
+
+# ---------------------------------------------------------------------------
+# Output format restrictions (FIX 5)
+# ---------------------------------------------------------------------------
+
+
+def test_model_explorer_rejected_as_primary_output_format():
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "output": {"format": "model-explorer"},
+    }
+    with pytest.raises(ConfigError, match="model-explorer"):
+        load_config(None, cli)
+
+
+# ---------------------------------------------------------------------------
+# Toolchain gcc alias normalization (FIX 6)
+# ---------------------------------------------------------------------------
+
+
+def test_gcc_toolchain_alias_normalized_to_arm_none_eabi_gcc():
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "target": {"toolchain": "gcc"},
+    }
+    config = load_config(None, cli)
+    assert config.target.toolchain is Toolchain.ARM_NONE_EABI_GCC
+
+
+# ---------------------------------------------------------------------------
+# Public exports (FIX 1)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", importlib.import_module("helia_profiler").__all__)
+def test_public_export_resolvable(name: str):
+    """Every name in helia_profiler.__all__ must be importable from the package root."""
+    pkg = importlib.import_module("helia_profiler")
+    assert hasattr(pkg, name), f"helia_profiler.{name} is not resolvable"
+
+
+# ---------------------------------------------------------------------------
+# ProfileResult.power typing (FIX 2)
+# ---------------------------------------------------------------------------
+
+
+def test_profile_result_power_accepts_power_result_and_none():
+    from helia_profiler.power.base import PowerResult, PowerSummary
+    from helia_profiler.results import FirmwareMeta, PmuResult, ProfileResult
+
+    pmu = PmuResult(meta=FirmwareMeta())
+    result_none = ProfileResult(pmu=pmu, power=None)
+    assert result_none.power is None
+
+    summary = PowerSummary(
+        avg_current_a=0.01,
+        avg_power_w=0.033,
+        peak_current_a=0.02,
+        energy_j=0.1,
+        duration_s=1.0,
+        sample_count=100,
+    )
+    power_result = PowerResult(summary=summary)
+    result_power = ProfileResult(pmu=pmu, power=power_result)
+    assert isinstance(result_power.power, PowerResult)
