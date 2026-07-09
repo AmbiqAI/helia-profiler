@@ -15,6 +15,7 @@ dependencies = [
     "pyjoulescope_driver>=1.0",
     "pydantic>=2.7,<3",
     "typer>=0.16",
+    "click>=8.2",
 ]
 
 [project.optional-dependencies]
