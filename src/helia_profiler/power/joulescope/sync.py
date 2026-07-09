@@ -61,8 +61,8 @@ class JoulescopeSyncController:
         """Drop GO as soon as the firmware has latched it (gate rise seen).
 
         Holding the Joulescope GPO high through the measured window
-        parasitically backfeeds the EVB through the GO pad network (measured
-        ~5.8 mA on an AP510 EVB — more than the board's own inference draw),
+        parasitically backfeeds the EVB through the GO pad network (several mA
+        measured on an AP510 EVB — more than the board's own inference draw),
         displacing real VBAT current around the shunt and corrupting the
         gated measurement.  The firmware's GO wait is a pre-window level
         sample only, so releasing at gate-rise loses nothing.

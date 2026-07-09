@@ -2,8 +2,7 @@
 # Joulescope power capture.
 #
 # GCC toolchain, RTT transport, TCM/TCM placement, LP (96 MHz) clock, to
-# match the AutoDeploy baseline (Perfresults.xlsx, sheet AP510, gcc,
-# ns_tflm_2025_02_14, KWS row): 22.673ms, 195.96uJ/inf, 8.642mW.
+# match the AutoDeploy baseline.
 model:
   path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
   arena_size: 32768

@@ -2,8 +2,7 @@
 # variant) via heliaRT — PMU + Joulescope power capture.
 #
 # GCC toolchain, RTT transport, MRAM weights / TCM arena placement, LP
-# (96 MHz) clock, to match the AutoDeploy baseline (Perfresults.xlsx, sheet
-# AP510, gcc, ns_tflm_2025_02_14, VWW row): 80.783ms, 675.34uJ/inf, 8.360mW.
+# (96 MHz) clock, to match the AutoDeploy baseline.
 model:
   path: tests/fixtures/mlperf_tiny/vww/vww_96_int8.tflite
   arena_size: 112640

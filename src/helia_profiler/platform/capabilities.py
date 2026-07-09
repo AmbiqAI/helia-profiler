@@ -105,7 +105,8 @@ class ClockCapabilities:
     #: ``"stimer"`` (Apollo5): DWT->CYCCNT lives in the CoreSight debug power
     #: domain (PD_DBG) on this family, so timing the window with it forces
     #: PD_DBG to stay powered for the whole measured window — a real,
-    #: measured +7-9% current cost vs AutoDeploy (PD_DBG never powered).
+    #: measurable current cost vs the reference baseline (PD_DBG never
+    #: powered).
     #: STIMER (XTAL 32.768 kHz) is clock-mode- and debug-domain-independent,
     #: so it can be read with PD_DBG off.  ``"dwt"`` (Apollo3/Apollo4): DWT
     #: lives in a different, cheaper-to-hold domain there; keep the existing
@@ -115,14 +116,15 @@ class ClockCapabilities:
     #: the *default* ``infer`` clean-window probe (not just the opt-in
     #: ``busy_loop`` probe).  True only where ``clean_window_timer`` is
     #: debug-domain-independent (Apollo5) so gating PD_DBG off cannot freeze
-    #: the in-window timer.  See ``experiments/ap5-reset-power-matrix.md`` §4.
+    #: the in-window timer.
     gate_debug_domain_in_window: bool
     #: Mirrors AutoDeploy's ns_power_down_peripherals(): AP4's implementation
     #: explicitly powers down IOM/UART/ADC/MSPI(-when-unused)/GFX/DISP/USB/
     #: PDM/I2S/SDIO/AUDADC/Crypto/VCOMP and the DEBUG power domain at boot;
     #: AP3's and AP5's implementations are near-empty (AP3:
     #: ns_power_down_peripherals() is a no-op; AP5 only clears XTAL/VCOMP) --
-    #: those families already read within ~1-7% of AutoDeploy without this,
+    #: those families already read close to the reference baseline without
+    #: this,
     #: so this is scoped to AP4 only rather than applied everywhere
     #: speculatively (see AGENTS.md AP4 power-parity investigation, 2026-07).
     broad_peripheral_shutdown: bool

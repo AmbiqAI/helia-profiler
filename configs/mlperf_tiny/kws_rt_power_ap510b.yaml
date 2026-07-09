@@ -1,10 +1,8 @@
 # KWS (DS-CNN int8) on Apollo510 EVB via heliaRT — PMU + Joulescope power capture.
 #
-# Purpose: reproduce/verify the 4-7% higher power+energy previously observed
+# Purpose: reproduce/verify a measurable power+energy difference
 # vs. the older NeuralSPOT AutoDeploy toolchain. GCC toolchain, RTT transport,
-# TCM/TCM placement + LP (96 MHz) clock to match the AutoDeploy baseline row
-# (Latest_AI_Results.xlsx, Results!KWS, apollo510b_evb, gcc, TCM/TCM, LP),
-# extended iterations/duration for statistically clean Joulescope stats.
+# TCM/TCM placement + LP (96 MHz) clock to match the AutoDeploy baseline row, extended iterations/duration for statistically clean Joulescope stats.
 model:
   path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
   arena_size: 32768

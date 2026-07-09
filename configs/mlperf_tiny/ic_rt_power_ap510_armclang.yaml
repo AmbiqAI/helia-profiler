@@ -2,8 +2,7 @@
 # via heliaRT — PMU + Joulescope power capture.
 #
 # GCC toolchain, RTT transport, TCM/TCM placement, LP (96 MHz) clock, to
-# match the AutoDeploy baseline (Perfresults.xlsx, sheet AP510, gcc,
-# ns_tflm_2025_02_14, IC row): 55.332ms, 521.21uJ/inf, 9.420mW.
+# match the AutoDeploy baseline.
 model:
   path: tests/fixtures/mlperf_tiny/ic/ic_resnet_int8.tflite
   arena_size: 57344

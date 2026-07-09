@@ -290,8 +290,8 @@ def capture_power(
     lifecycle_plan = None
 
     # Resolve which firmware will actually be measured. "dedicated" is the
-    # default (see config.DEFAULT_POWER_FIRMWARE for the +17/+33/+60%
-    # transport-contamination rationale) but requires a built power binary;
+    # default (see config.DEFAULT_POWER_FIRMWARE for the transport
+    # contamination rationale) but requires a built power binary;
     # fall back to "shared" with a loud warning if one isn't available (e.g.
     # generation/build were skipped, or a ctx was hand-built without running
     # the full pipeline) rather than failing the whole capture.
@@ -426,7 +426,8 @@ def capture_power(
                 on_started=_release,
                 # Drop GO the instant the gate is observed high: a GPO held
                 # high through the measured window backfeeds the target via
-                # the GO pad network (AP510 EVB: ~5.8 mA), displacing real
+                # the GO pad network (several mA observed on an AP510 EVB),
+                # displacing real
                 # supply current around the shunt. The firmware only
                 # level-samples GO before the window, so this is lossless.
                 on_gate_rise=sync.release_go,

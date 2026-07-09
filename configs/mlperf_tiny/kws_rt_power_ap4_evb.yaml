@@ -5,7 +5,7 @@
 # board AutoDeploy's own AP4 baseline was captured on (ns_platform.yaml:
 # apollo4p_evb features=[mcu, usb], no "ble" -- unlike apollo4p_blue_kxr_evb's
 # [mcu, usb, ble]). This is the true same-board comparison against AD's
-# apollo4p_evb gcc/LP row (97.7ms / 511.4uJ / 5.236mW), isolating whether the
+# apollo4p_evb gcc/LP row, isolating whether the
 # BLE-reset + broad-peripheral-shutdown fixes generalize cleanly to a board
 # with no BLE hardware at all (ble_reset_gpio_pin is None here, so that
 # template block never renders; broad_peripheral_shutdown still fires,

@@ -1,7 +1,7 @@
 # Model Explorer Overlays
 
 heliaPROFILER exports per-layer profiling metrics as JSON overlays compatible
-with [Google's Model Explorer](https://github.com/google-ai-edge/model-explorer).
+with [Model Explorer](https://github.com/google-ai-edge/model-explorer).
 This lets you visually inspect which operators are hot spots.
 
 ## How it works

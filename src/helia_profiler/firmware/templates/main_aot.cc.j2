@@ -693,7 +693,7 @@ int main(void) {
         // iteration — AutoDeploy's power loop re-invokes on the same fixed
         // input every run rather than re-zeroing it each time, and
         // re-memset()ing per iteration adds real, avoidable overhead inside
-        // the timed/measured window (empirically ~2-3% of per-inference
+        // the timed/measured window (a measurable share of per-inference
         // energy for a small KWS model; found 2026-07-02 while diagnosing
         // the HPX-vs-AutoDeploy power gap).
         for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
@@ -729,8 +729,9 @@ int main(void) {
 {% if transport == "usb_cdc" and not power_only | default(false) %}
         // Silence the 1 kHz tud_task() polling timer for the duration of the
         // clean window.  Its ISR otherwise fires mid-inference and pollutes the
-        // E2E cycle count (and the external-power window) — measured as a flat
-        // ~+18% latency tax on AP4.  The PMU window below already does this.
+        // E2E cycle count (and the external-power window) — this adds measurable
+        // per-inference latency overhead on DWT-timer parts (AP4).  The PMU
+        // window below already does this.
         usb_timer_pause();
 {% endif %}
 {% set gate_dbg = (clean_window_probe | default("infer") == "busy_loop") or (gate_debug_domain_in_window | default(false)) %}
@@ -738,17 +739,18 @@ int main(void) {
 {% if transport == "uart" and not power_only | default(false) %}
         // The UART peripheral (PWRSTUART0-3) lives in the peripheral device
         // power domain, NOT the debug domain am_hal_debug_disable() below
-        // gates -- it stays powered for the whole run otherwise.  Measured
-        // ~+17% current on an AP510 EVB (UART0-3 all ON during the gated
-        // window per a live PWRCTRL->DEVPWRSTATUS snapshot) vs RTT's
+        // gates -- it stays powered for the whole run otherwise.  This
+        // measurably inflates current on AP5 EVBs (UART0-3 all ON during the
+        // gated window per a live PWRCTRL->DEVPWRSTATUS snapshot) vs RTT's
         // zero-peripheral window.  AutoDeploy's power firmware has
         // bNeedAlternativeUART=false and never enables this at all.
         nsx_uart_printf_disable();
 {% elif transport == "swo" and not power_only | default(false) %}
         // ITM/SWO's own enable request can hold PD_DBG powered independently
         // of am_hal_debug_disable() below, the same way the ARM PMU's
-        // counters do (see the has_armv8m_pmu comment) -- measured ~+1.2 mA
-        // on an AP510 EVB, matching the known PD_DBG cost, even though
+        // counters do (see the has_armv8m_pmu comment) -- this is a measurable
+        // current increase on an AP510 EVB, matching the known PD_DBG cost,
+        // even though
         // am_hal_debug_disable() already runs for this family/probe.
         // Dropping ITM here lets that call actually release the domain.
         nsx_itm_printf_disable();
@@ -767,8 +769,8 @@ int main(void) {
         // clean_window_timer=="stimer" (Apollo5), the in-window timer no
         // longer lives in the debug power domain (STIMER runs off its own
         // XTAL), so PD_DBG can be gated off for the *default* infer probe
-        // too, not just the opt-in busy_loop probe — closing most of the
-        // measured +7-9% current gap vs AutoDeploy (which never powers this
+        // too, not just the opt-in busy_loop probe — closing most of a
+        // measurable current gap vs the reference baseline (which never powers this
         // domain at all).  Families still timing the window with DWT
         // (clean_window_timer=="dwt": Apollo3/Apollo4) keep the domain
         // powered for the infer probe, same as before.

@@ -20,7 +20,7 @@ uv run hpx validate --list \
   --suite smoke \
   --boards apollo510_evb,apollo330mP_evb \
   --power off \
-  --jlink-serials apollo510_evb=1160003180,apollo330mP_evb=1160003409
+  --jlink-serials apollo510_evb=801000001,apollo330mP_evb=801000002
 ```
 
 Run the smoke suite against a connected board:
@@ -41,7 +41,7 @@ uv run hpx validate \
   --suite smoke \
   --boards apollo510_evb,apollo330mP_evb \
   --power off \
-  --jlink-serials apollo510_evb=1160003180,apollo330mP_evb=1160003409 \
+  --jlink-serials apollo510_evb=801000001,apollo330mP_evb=801000002 \
   --output-dir results/local-validation-dual
 ```
 
@@ -155,7 +155,7 @@ only that axis.
   `sram`, `mram`, or `psram`
 - `power`: `off`, `on`, or `both`
 - `jlink_serials`: optional comma-separated `board=serial` entries, default
-  `apollo510_evb=1160003180,apollo330mP_evb=1160003409`
+  `apollo510_evb=801000001,apollo330mP_evb=801000002`
 - `repeat`: repeat count per selected case
 - `timeout`: per-case timeout in seconds
 
@@ -185,7 +185,7 @@ uv run hpx validate \
   --boards apollo510_evb,apollo330mP_evb \
   --power off \
   --toolchains arm-none-eabi-gcc,armclang,atfe \
-  --jlink-serials apollo510_evb=1160003180,apollo330mP_evb=1160003409 \
+  --jlink-serials apollo510_evb=801000001,apollo330mP_evb=801000002 \
   --output-dir results/local-validation-toolchains
 ```
 
@@ -201,7 +201,7 @@ boards:
 uv run hpx validate --list \
   --suite models-rt \
   --power off \
-  --jlink-serials apollo510_evb=1160003180,apollo330mP_evb=1160003409
+  --jlink-serials apollo510_evb=801000001,apollo330mP_evb=801000002
 ```
 
 This expands to 16 cases: `4 models × 2 boards × 2 toolchains`.
@@ -247,7 +247,7 @@ override the default mapping when moving the workflow to a different
 self-hosted runner:
 
 ```text
-apollo510_evb=1160003180,apollo330mP_evb=1160003409
+apollo510_evb=801000001,apollo330mP_evb=801000002
 ```
 
 The workflow serializes runs by the selected board string so two manual jobs do

@@ -33,7 +33,7 @@ hpx probes list
 ```text
 serial      product                    connection
 ----------  -------------------------  ----------
-1160000174  J-Link-OB-Apollo4-CortexM  USB
+801000001  J-Link-OB-Apollo4-CortexM  USB
 ```
 
 If nothing is listed, check the USB cable and that the SEGGER J-Link

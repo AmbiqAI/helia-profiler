@@ -9,10 +9,7 @@
 # choice is the first thing to double check.
 #
 # GCC toolchain, RTT transport, TCM/TCM placement (matches AutoDeploy's
-# own AP330 baseline exactly: Latest_AI_Results.xlsx, sheet AP330P,
-# gcc 14.2.Rel1, KWS row, TCM/TCM), LP (96 MHz) clock:
-#   LP: 19.657ms, 124.35uJ/inf, 6.326mW
-#   HP: 7.475ms,  164.60uJ/inf, 22.02mW
+# own AP330 baseline exactly, TCM/TCM), LP (96 MHz) clock.
 model:
   path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
   arena_size: 32768

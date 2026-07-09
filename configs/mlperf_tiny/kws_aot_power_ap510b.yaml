@@ -2,8 +2,7 @@
 #
 # Same axis as kws_rt_power.yaml (GCC / RTT / TCM/TCM placement / LP clock /
 # extended iterations+duration) so the two engines are directly comparable
-# to each other and to the AutoDeploy baseline row (Latest_AI_Results.xlsx,
-# Results!KWS, apollo510b_evb, gcc, TCM/TCM, LP = 96 MHz: 138.71 uJ/inf).
+# to each other and to the AutoDeploy baseline row.
 model:
   path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
   arena_size: 32768

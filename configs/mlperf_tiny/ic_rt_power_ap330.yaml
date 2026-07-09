@@ -6,13 +6,11 @@
 # validated on the KWS/VWW AP330 runs: GP5 (sync/gate), GP6 (state),
 # GP7 (go).
 #
-# AutoDeploy's own AP330P baseline (Latest_AI_Results.xlsx, sheet
-# AP330P, IC row) places weights in MRAM / arena in TCM (NOT TCM/TCM
+# AutoDeploy's own AP330P baseline places weights in MRAM / arena in TCM (NOT TCM/TCM
 # like AP510's IC baseline) -- match that placement explicitly rather
 # than assuming AP510's convention.
 #
-# GCC toolchain, RTT transport, LP (96 MHz) clock. AD baseline (gcc,
-# LP): 48.174ms, 343.06uJ/inf, 7.121mW.
+# GCC toolchain, RTT transport, LP (96 MHz) clock, matching the AutoDeploy baseline.
 model:
   path: tests/fixtures/mlperf_tiny/ic/ic_resnet_int8.tflite
   arena_size: 57344
