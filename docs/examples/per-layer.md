@@ -1,11 +1,9 @@
 # Per-Layer Breakdown
 
-Analyze operator-level cycle counts, cache behavior, and MVE utilization
-across all layers of a model.
+**Goal:** capture every available PMU counter (CPU, memory, MVE) for each
+layer in a model, not just the default `basic_cpu` set.
 
-## Full counter sweep
-
-To capture every available PMU counter per layer:
+## Setup
 
 ```yaml title="hpx_full.yml"
 model:
@@ -37,76 +35,44 @@ output:
   detailed: true             # get per-preset CSVs and memory.json
 ```
 
+## Run
+
 ```bash
 hpx profile --config hpx_full.yml
 ```
 
-This will run approximately 20 PMU passes to cover all 70+ counters.
+Requesting `all` for three groups runs multiple PMU passes to cover every
+counter — see [Multi-pass profiling](../guide/pmu-counters.md#multi-pass-profiling)
+for how passes are scheduled and merged.
 
-## Analyzing the results
-
-### 1. Start with the summary
+## What you get
 
 ```bash
 cat results/full_sweep/summary.json | python -m json.tool
 ```
 
-Look at `top_layers` to find hot spots, then check `cache.l1d_hit_rate_pct`
-for memory efficiency.
-
-### 2. Dive into per-layer data
-
-Open `profile_results.csv` in a spreadsheet or use pandas:
-
-```python
-import pandas as pd
-
-df = pd.read_csv("results/full_sweep/profile_results.csv")
-
-# Top layers by cycle count
-print(df.sort_values("cycles", ascending=False)[["op", "cycles"]].head())
-
-# Cache efficiency per layer
-df["l1d_hit_rate"] = 1 - df["ARM_PMU_L1D_CACHE_MISS_RD"] / df["ARM_PMU_L1D_CACHE_RD"]
-print(df[["op", "l1d_hit_rate", "ARM_PMU_DTCM_ACCESS"]])
+```json
+{
+  "layers": 13,
+  "total_cycles": 2016376,
+  "cache": {
+    "l1d_hit_rate_pct": 91.2
+  },
+  "top_layers": [
+    {"op": "CONV_2D", "cycles": 338176, "pct": 16.8}
+  ]
+}
 ```
 
-### 3. Check MVE utilization
+`profile_results.csv` has one row per layer with every requested counter as
+a column. With `--detailed`, `detailed/memory.json` adds per-layer cache
+counters and arena allocation.
 
-```python
-# MVE instruction mix per layer
-mve_cols = [c for c in df.columns if "MVE" in c]
-print(df[["op"] + mve_cols])
+## Where to go deeper
 
-# What fraction of instructions are MVE?
-df["mve_pct"] = df["ARM_PMU_MVE_INST_RETIRED"] / df["ARM_PMU_INST_RETIRED"] * 100
-print(df[["op", "mve_pct"]])
-```
-
-### 4. Detailed memory breakdown
-
-With `--detailed`, check `detailed/memory.json`:
-
-```bash
-cat results/full_sweep/detailed/memory.json | python -m json.tool
-```
-
-This shows per-layer cache counter values, arena allocation, and aggregate
-cache totals with the derived L1D hit rate.
-
-## Interpreting key metrics
-
-| Metric | What it tells you |
-|---|---|
-| `cycles` | Total wall-clock cycles for the layer |
-| `ARM_PMU_INST_RETIRED` | Instruction count — higher = more work |
-| `ARM_PMU_STALL_BACKEND` | Cycles stalled on data dependencies / memory |
-| `ARM_PMU_L1D_CACHE_MISS_RD` | Cache misses — triggers slow memory fetches |
-| `ARM_PMU_DTCM_ACCESS` | TCM hits — fast on-chip SRAM accesses |
-| `ARM_PMU_MVE_INST_RETIRED` | MVE/Helium instructions — vectorized computation |
-| `ARM_PMU_MVE_STALL` | MVE pipeline stalls |
-
-!!! tip "Look for stalls"
-    High `STALL_BACKEND` relative to `cycles` means the layer is
-    memory-bound. Check `L1D_CACHE_MISS_RD` and `BUS_ACCESS` to understand
-    where the bottleneck is.
+- [PMU Counters](../guide/pmu-counters.md) — counter groups, aggregation,
+  derived metrics (L1D hit rate, MVE instruction share), and how to read
+  `profile_results.csv` with pandas.
+- [Model Explorer Overlays](../guide/model-explorer.md) — visualize
+  per-layer hot spots on the model graph.
+- [Basic Profiling](basic-profiling.md) — the minimal-counter starting point.

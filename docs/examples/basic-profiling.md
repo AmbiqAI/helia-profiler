@@ -1,20 +1,19 @@
 # Basic Profiling
 
-Profile a TFLite model with default settings — the simplest way to get
-cycle counts and per-layer breakdowns.
+**Goal:** profile a TFLite model with default settings to get total cycle
+counts and a per-layer breakdown.
 
-## Minimal command
+## Setup
+
+The minimal command needs only a model and a board — it uses the default
+engine (heliaRT), default PMU counters (`basic_cpu`), and writes results to
+`./results/`:
 
 ```bash
 hpx profile my_model.tflite --board apollo510_evb
 ```
 
-This uses the default engine (heliaRT), default PMU counters (basic CPU),
-and writes results to `./results/`.
-
-## With a config file
-
-For repeatable runs, use a YAML config:
+For repeatable runs, use a YAML config instead:
 
 ```yaml title="hpx_basic.yml"
 model:
@@ -42,13 +41,13 @@ output:
   dir: ./results/basic
 ```
 
+## Run
+
 ```bash
 hpx profile --config hpx_basic.yml
 ```
 
-## Understanding the output
-
-### Terminal summary
+## What you get
 
 ```
 ============================================================
@@ -67,22 +66,19 @@ heliaPROFILER Results
 ============================================================
 ```
 
-### Key files
-
 | File | What to look at |
 |---|---|
 | `summary.json` | Total cycles, top layers, memory usage |
 | `profile_results.csv` | Open in a spreadsheet — sort by `cycles` column |
 | `run_metadata.json` | Verify board, toolchain, model hash |
 
-## Tips
-
 !!! tip "Arena sizing"
     If the firmware reports OOM, increase `arena_size`. The `allocated_arena`
     field in `summary.json` shows actual usage — set `arena_size` to at least
     1.5× that value.
 
-!!! tip "Iteration count"
-    More iterations = more accurate averaging but slower runs. For quick
-    checks use `iterations: 3`. For publication-quality data, use
-    `iterations: 100`.
+## Where to go deeper
+
+- [Configuration](../guide/configuration.md) — full YAML schema and CLI merge rules.
+- [Output & Results](../guide/output.md) — every result file and field.
+- [Per-Layer Breakdown](per-layer.md) — capture more PMU counters per layer.
