@@ -16,8 +16,8 @@
 model:
   path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
   arena_size: 32768
-  model_location: sram
-
+  weights_location: sram
+  arena_location: sram
 engine:
   type: helia-rt
 
@@ -57,4 +57,3 @@ output:
   model_explorer: false
   detailed: true
 
-keep_work_dir: true

@@ -7,8 +7,8 @@
 model:
   path: tests/fixtures/mlperf_tiny/ad/ad01_int8.tflite
   arena_size: 10240
-  model_location: tcm
-
+  weights_location: tcm
+  arena_location: tcm
 engine:
   type: helia-rt
 
@@ -45,4 +45,3 @@ output:
   model_explorer: false
   detailed: true
 
-keep_work_dir: true

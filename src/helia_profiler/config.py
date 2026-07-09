@@ -666,92 +666,44 @@ class ProfileConfig:
 
 _PROFILE_CONFIG_ADAPTER = TypeAdapter(ProfileConfig)
 
-_VALID_FIELD_NAMES: dict[tuple[str, ...], tuple[str, ...]] = {
-    (): (
-        "model",
-        "engine",
-        "target",
-        "profiling",
-        "power",
-        "output",
-        "timeouts",
-        "build",
-        "frozen",
-        "work_dir",
-        "keep_work_dir",
-        "clean",
-        "verbose",
-    ),
-    ("model",): ("path", "arena_size", "model_location", "arena_location", "weights_location"),
-    ("engine",): ("type", "backend", "config", "config_path"),
-    ("target",): (
-        "board",
-        "toolchain",
-        "jlink_serial",
-        "transport",
-        "usb_port",
-        "rtt_buffer_size_up",
-        "clock",
-        "heartbeat",
-        "custom_socs",
-        "custom_boards",
-        "ensure_board_powered",
-    ),
-    ("target", "clock"): ("cpu",),
-    ("target", "heartbeat"): (
-        "enabled",
-        "every_n_ops",
-        "every_ms",
-        "host_timeout_s",
-        "overall_timeout_s",
-    ),
-    ("profiling",): (
-        "pmu_presets",
-        "pmu_counters",
-        "per_layer",
-        "iterations",
-        "warmup",
-        "window_mode",
-        "window_target_ms",
-        "window_min",
-        "window_max",
-        "clean_window_probe",
-        "clean_window_trace",
-        "force_shared_sram",
-        "aggregation",
-        "extreme_mode",
-    ),
-    ("power",): (
-        "enabled",
-        "driver",
-        "firmware",
-        "mode",
-        "duration_s",
-        "io_voltage",
-        "sync_gpio_pin",
-        "sync_input_index",
-        "lockstep",
-        "state_gpio_pin",
-        "go_gpio_pin",
-        "state_input_index",
-        "go_output_index",
-        "stats_rate_hz",
-        "reset_strategy",
-        "serial",
-    ),
-    ("output",): ("format", "dir", "model_explorer", "detailed"),
-    ("timeouts",): (
-        "configure_s",
-        "build_s",
-        "flash_s",
-        "toolchain_probe_s",
-        "binary_probe_s",
-        "download_api_s",
-        "download_asset_s",
-    ),
-    ("build",): ("channel", "nsx_modules", "compiler_launcher"),
-    ("build", "nsx_modules", "*"): ("path", "ref", "version"),
-}
+
+def _build_valid_field_names() -> dict[tuple[str, ...], tuple[str, ...]]:
+    """Derive the did-you-mean lookup table from the config dataclasses.
+
+    Walks the ``ProfileConfig`` tree so suggestions can never drift from the
+    real field names.  Dict-of-dataclass fields (``build.nsx_modules``) get a
+    ``"*"`` wildcard segment standing in for the free-form key.
+    """
+    import dataclasses as _dc
+    import typing as _t
+
+    result: dict[tuple[str, ...], tuple[str, ...]] = {}
+
+    def visit(cls: type, path: tuple[str, ...]) -> None:
+        names = tuple(f.name for f in _dc.fields(cls))
+        if path == ():
+            names = tuple(n for n in names if n != "platform_registry")
+        result[path] = names
+        hints = _t.get_type_hints(cls)
+        for f in _dc.fields(cls):
+            if path == () and f.name == "platform_registry":
+                continue  # resolved runtime object, never user-settable
+            tp = hints.get(f.name)
+            for cand in (tp, *_t.get_args(tp)):
+                if _dc.is_dataclass(cand):
+                    visit(cand, (*path, f.name))
+                    break
+                if _t.get_origin(cand) is dict:
+                    value_args = _t.get_args(cand)
+                    if len(value_args) == 2 and _dc.is_dataclass(value_args[1]):
+                        visit(value_args[1], (*path, f.name, "*"))
+                        break
+
+    visit(ProfileConfig, ())
+    return result
+
+
+_VALID_FIELD_NAMES = _build_valid_field_names()
 
 _GENERIC_CONFIG_HINT = "Run with --help or see the config reference."
 
@@ -982,8 +934,12 @@ def _suggest_field_name(loc: tuple[str, ...], error_type: str) -> str | None:
 def _valid_field_names_for_path(path: tuple[str, ...]) -> tuple[str, ...]:
     if path in _VALID_FIELD_NAMES:
         return _VALID_FIELD_NAMES[path]
-    if len(path) >= 3 and path[:2] == ("build", "nsx_modules"):
-        return _VALID_FIELD_NAMES.get(("build", "nsx_modules", "*"), ())
+    # Dict-of-dataclass levels (e.g. build.nsx_modules.<name>) are keyed with a
+    # "*" wildcard standing in for the free-form dict key.
+    if path:
+        wildcard = (*path[:-1], "*")
+        if wildcard in _VALID_FIELD_NAMES:
+            return _VALID_FIELD_NAMES[wildcard]
     return ()
 
 
