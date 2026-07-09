@@ -29,12 +29,20 @@ full bug-by-bug detail.
 
 ## Results
 
-| Model | hpx lat (ms) | AD lat (ms) | Δ lat | hpx E (µJ/inf) | AD E (µJ/inf) | Δ E | hpx P (mW) | AD P (mW) | Δ P | window ratio |
-|-------|-------------:|------------:|------:|---------------:|--------------:|----:|-----------:|----------:|----:|-------------:|
-| KWS   | 21.144       | 19.657      | +7.6% | 131.12         | 124.35        | +5.4% | 6.205    | 6.326     | -1.9% | 0.9994 |
-| VWW   | 81.173       | 73.145      | +11.0%| 509.24         | 479.12        | +6.3% | 6.254    | 6.550     | -4.5% | 1.0031 |
-| IC    | 54.071       | 48.174      | +12.2%| 369.82         | 343.06        | +7.8% | 6.854    | 7.121     | -3.7% | 0.9979 |
-| AD    | 2.244        | 2.203       | +1.9% | 19.51          | 19.51         | +0.0% | 8.695    | 8.855     | -1.8% | 1.0001 |
+Placement (weights/arena, hpx and AD both match): KWS TCM/TCM; VWW MRAM/SRAM;
+IC MRAM/TCM; AD MRAM/TCM. **AP510 placement differs for 3 of 4 models**
+(AP510: VWW MRAM/TCM, IC TCM/TCM, AD TCM/TCM — AP330's smaller 240 KB unified
+TCM, vs AP510's 512 KB DTCM, can't fit IC/AD weights alongside arena+overhead,
+forcing MRAM residency there). Only KWS has matching placement on both
+boards, so it's the sole apples-to-apples model for AP510-vs-AP330
+comparisons; see `ap510_hpx_vs_autodeploy.md` for the AP510 side.
+
+| Model | Placement | hpx lat (ms) | AD lat (ms) | Δ lat | hpx E (µJ/inf) | AD E (µJ/inf) | Δ E | hpx P (mW) | AD P (mW) | Δ P | window ratio |
+|-------|-----------|-------------:|------------:|------:|---------------:|--------------:|----:|-----------:|----------:|----:|-------------:|
+| KWS   | TCM/TCM   | 21.144       | 19.657      | +7.6% | 131.12         | 124.35        | +5.4% | 6.205    | 6.326     | -1.9% | 0.9994 |
+| VWW   | MRAM/SRAM | 81.173       | 73.145      | +11.0%| 509.24         | 479.12        | +6.3% | 6.254    | 6.550     | -4.5% | 1.0031 |
+| IC    | MRAM/TCM  | 54.071       | 48.174      | +12.2%| 369.82         | 343.06        | +7.8% | 6.854    | 7.121     | -3.7% | 0.9979 |
+| AD    | MRAM/TCM  | 2.244        | 2.203       | +1.9% | 19.51          | 19.51         | +0.0% | 8.695    | 8.855     | -1.8% | 1.0001 |
 
 Δ = (hpx − AD) / AD. This table reflects the crypto/OTP/radio-subsystem
 shutdown fix below (CRYPTO/OTP/VCOMP disabled + `am_hal_pwrctrl_rss_pwroff()`
@@ -74,12 +82,15 @@ explain the remaining gap. Findings:
 
 ## Results (pre crypto/OTP/RSS-shutdown fix, kept for reference)
 
-| Model | hpx lat (ms) | AD lat (ms) | Δ lat | hpx E (µJ/inf) | AD E (µJ/inf) | Δ E | hpx P (mW) | AD P (mW) | Δ P | window ratio |
-|-------|-------------:|------------:|------:|---------------:|--------------:|----:|-----------:|----------:|----:|-------------:|
-| KWS   | 21.140       | 19.657      | +7.5% | 133.74         | 124.35        | +7.5% | 6.331    | 6.326     | +0.1% | 0.9992 |
-| VWW   | 81.172       | 73.145      | +11.0%| 517.13         | 479.12        | +7.9% | 6.343    | 6.550     | -3.2% | 1.0043 |
-| IC    | 54.064       | 48.174      | +12.2%| 368.67         | 343.06        | +7.5% | 6.816    | 7.121     | -4.3% | 1.0004 |
-| AD    | 2.243        | 2.203       | +1.8% | 19.63          | 19.51         | +0.6% | 8.751    | 8.855     | -1.2% | 1.0000 |
+Same placement as the primary results table above (KWS TCM/TCM; VWW
+MRAM/SRAM; IC/AD MRAM/TCM).
+
+| Model | Placement | hpx lat (ms) | AD lat (ms) | Δ lat | hpx E (µJ/inf) | AD E (µJ/inf) | Δ E | hpx P (mW) | AD P (mW) | Δ P | window ratio |
+|-------|-----------|-------------:|------------:|------:|---------------:|--------------:|----:|-----------:|----------:|----:|-------------:|
+| KWS   | TCM/TCM   | 21.140       | 19.657      | +7.5% | 133.74         | 124.35        | +7.5% | 6.331    | 6.326     | +0.1% | 0.9992 |
+| VWW   | MRAM/SRAM | 81.172       | 73.145      | +11.0%| 517.13         | 479.12        | +7.9% | 6.343    | 6.550     | -3.2% | 1.0043 |
+| IC    | MRAM/TCM  | 54.064       | 48.174      | +12.2%| 368.67         | 343.06        | +7.5% | 6.816    | 7.121     | -4.3% | 1.0004 |
+| AD    | MRAM/TCM  | 2.243        | 2.203       | +1.8% | 19.63          | 19.51         | +0.6% | 8.751    | 8.855     | -1.2% | 1.0000 |
 
 Δ = (hpx − AD) / AD.
 
