@@ -102,9 +102,11 @@ report output. Each step is a modular
 
 ## Where to start
 
+Pick the path that matches what you're trying to do:
+
 <div class="grid cards" markdown>
 
--   :material-rocket-launch:{ .lg .middle } __New here?__
+-   :material-rocket-launch:{ .lg .middle } __First time here?__
 
     ---
 
@@ -112,27 +114,32 @@ report output. Each step is a modular
 
     [:octicons-arrow-right-24: Getting Started](getting-started/index.md)
 
--   :material-book-open-variant:{ .lg .middle } __Configuration__
+-   :material-book-open-variant:{ .lg .middle } __Configuring a run__
 
     ---
 
-    YAML config, CLI flags, engine options, and board selection.
+    YAML config, CLI flags, engine options, board selection, memory
+    placement, PMU counters, and power measurement.
 
     [:octicons-arrow-right-24: User Guide](guide/configuration.md)
 
--   :material-flask-outline:{ .lg .middle } __Examples__
+-   :material-flask-outline:{ .lg .middle } __Doing a specific task__
 
     ---
 
-    Walkthroughs for common profiling scenarios.
+    Short recipes for common scenarios (basic profiling, engine
+    comparison, power capture), plus worked patterns for multi-feature
+    workflows.
 
-    [:octicons-arrow-right-24: Examples](examples/index.md)
+    [:octicons-arrow-right-24: Examples](examples/index.md) ·
+    [:octicons-arrow-right-24: In-Depth Guides](guides/index.md)
 
--   :material-console-line:{ .lg .middle } __CLI Reference__
+-   :material-console-line:{ .lg .middle } __Integrating or automating__
 
     ---
 
-    Every `hpx` subcommand, flag, and option.
+    Every `hpx` subcommand and flag, the configuration schema, and the
+    `profile()` Python API for calling heliaPROFILER programmatically.
 
     [:octicons-arrow-right-24: Reference](reference/index.md)
 

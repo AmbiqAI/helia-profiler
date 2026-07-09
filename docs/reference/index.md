@@ -1,9 +1,12 @@
-# CLI Reference
+# Reference
 
-Every `hpx` subcommand and its flags. For learning the tool, the
+Every `hpx` subcommand and flag, the full configuration schema, and the
+Python API. For learning the tool, the
 [Getting Started](../getting-started/index.md) and
 [User Guide](../guide/configuration.md) pages are usually a better
 starting point.
+
+## CLI
 
 <div class="grid cards" markdown>
 
@@ -64,6 +67,11 @@ starting point.
   [:octicons-arrow-right-24: target](target.md)
 
 </div>
+
+## Configuration Reference
+
+Every `ProfileConfig` field, its YAML path, CLI flag, default, and type —
+see the [Configuration Reference](configuration.md).
 
 ## Python API
 

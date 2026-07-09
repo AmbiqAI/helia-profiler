@@ -1,16 +1,13 @@
 # Power Profiling
 
-Capture current, voltage, and energy measurements alongside PMU data using
-a Joulescope instrument.
+**Goal:** capture current, voltage, and energy alongside PMU data using a
+Joulescope, in addition to the normal cycle-count profile.
 
-## Prerequisites
+## Setup
 
-- Joulescope JS110 or JS220 connected in series with the EVB
-- `pyjoulescope_driver` is a core dependency of `helia-profiler` — just
-  make sure the device is USB-accessible (udev rule on Linux). See
-  [Installation](../getting-started/install.md).
-
-## Config
+A Joulescope JS110 or JS220 wired in series with the EVB (`pyjoulescope_driver`
+ships as a core dependency — see [Installation](../getting-started/install.md)
+for udev/USB setup).
 
 ```yaml title="hpx_power.yml"
 model:
@@ -38,8 +35,6 @@ power:
   driver: joulescope          # auto-detects JS110 or JS220
   mode: external
   duration_s: 30
-  io_voltage: 1.8
-  sync_gpio_pin: 29           # Apollo510 EVB: known-good sync GPIO to JS110 INPUT0
 
 output:
   format: csv
@@ -53,16 +48,11 @@ output:
 hpx profile --config hpx_power.yml
 ```
 
-The profiler will:
+The profiler runs the normal PMU passes, then power-cycles the EVB and
+captures current/voltage for `duration_s` seconds during a clean,
+uninstrumented inference window.
 
-1. Run the normal PMU profiling passes
-2. Power-cycle the EVB via the Joulescope
-3. Capture current/voltage for 30 seconds while inference runs
-4. Write both PMU and power results
-
-## Results
-
-### Terminal output
+## What you get
 
 ```
   Power:
@@ -72,43 +62,16 @@ The profiler will:
     energy:       666.630 µJ
 ```
 
-### summary.json includes power section
-
-```json
-{
-  "power": {
-    "avg_current_a": 0.012345,
-    "avg_power_w": 0.022221,
-    "peak_current_a": 0.045678,
-    "energy_j": 0.00066663
-  }
-}
-```
-
-### detailed/power_summary.csv
-
-With `--detailed`, a dedicated CSV is written:
-
-```csv
-metric,value
-avg_current_a,0.012345
-avg_power_w,0.022221
-peak_current_a,0.045678
-energy_j,0.00066663
-duration_s,30.0
-sample_count,300000
-```
-
-## Interpreting power results
-
-| Metric | Description |
-|---|---|
-| `avg_current` | Mean current draw during capture — primary efficiency metric |
-| `avg_power` | Mean power (voltage × current) |
-| `peak_current` | Maximum instantaneous current — important for power supply sizing |
-| `energy` | Total energy consumed during capture window |
+`summary.json` gets a matching `power` section (`avg_current_a`,
+`avg_power_w`, `peak_current_a`, `energy_j`), and `--detailed` adds
+`detailed/power_summary.csv`.
 
 !!! tip "Comparing engines"
     Run the same power config with different engines to compare energy
-    efficiency. heliaAOT may show lower average current due to smaller
-    code size (less flash reads) and tighter memory access patterns.
+    efficiency — see [Engine Comparison](engine-comparison.md).
+
+## Where to go deeper
+
+- [Power Measurement](../guide/power.md) — wiring, sync GPIO, dedicated
+  power firmware, window sizing, and troubleshooting a bad capture.
+- [Output & Results](../guide/output.md) — every result file and field.
