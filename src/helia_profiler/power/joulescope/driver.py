@@ -1,4 +1,4 @@
-"""Joulescope external power measurement driver (unified JS110 + JS220)."""
+"""Joulescope external power measurement driver (JS110, JS220, and JS320)."""
 
 from __future__ import annotations
 
@@ -26,10 +26,11 @@ log = logging.getLogger("hpx")
 
 
 class JoulescopeDriver:
-    """External power driver for Joulescope JS110 and JS220.
+    """External power driver for Joulescope JS110, JS220, and JS320.
 
     Always uses :mod:`pyjoulescope_driver`.  The device family is auto-
-    detected from the enumerated device path.
+    detected from the enumerated device path. JS320 uses the JS220
+    publish/subscribe topic protocol.
     """
 
     def __init__(self, *, serial: str | None = None) -> None:
@@ -50,11 +51,23 @@ class JoulescopeDriver:
 
     @property
     def num_gpi(self) -> int:
-        return 2  # JS110/JS220 expose 2 general-purpose inputs
+        return 2  # JS110/JS220/JS320 expose 2 general-purpose inputs
 
     @property
     def has_gpo(self) -> bool:
-        return True  # JS110/JS220 expose 2 general-purpose outputs
+        # JS320 exposes GPI but no Joulescope GPO topic.  Keep discovery
+        # lightweight and avoid opening a device just to choose the sync
+        # controller; an unknown family remains optimistic until the normal
+        # serial/device selection path resolves it.
+        return self._selected_family() != "js320"
+
+    def _selected_family(self) -> str | None:
+        devices = enumerate_devices()
+        if self._serial is not None:
+            wanted = str(self._serial).lstrip("0") or "0"
+            matched = [family for path, family in devices if wanted in path]
+            return matched[0] if matched else None
+        return devices[0][1] if len(devices) == 1 else None
 
     def make_sync_controller(self, wiring: SyncWiring) -> SyncController:
         """Return a 3-wire lock-step controller, or a gate-only fallback."""
@@ -304,7 +317,7 @@ class JoulescopeDriver:
         if not devices:
             return _bail(
                 "No Joulescope detected",
-                hint="Plug in a JS110 or JS220 and ensure it is powered on.",
+                hint="Plug in a JS110, JS220, or JS320 and ensure it is powered on.",
                 level=logging.DEBUG,
             )
 

@@ -16,7 +16,7 @@ return a real controller; monitors with gate-only (1-wire) wiring return a
 :class:`NullSyncController` that degrades to the historical free-run behaviour.
 
 The contract is deliberately monitor- and engine-agnostic: Joulescope JS110 /
-JS220 wire it to GPI/GPO, but a UART-only or another instrument can implement
+JS220/JS320 wire it to GPI/GPO, but a UART-only or another instrument can implement
 the same protocol. The matching firmware side lives in the ``_sync.j2`` macros.
 """
 

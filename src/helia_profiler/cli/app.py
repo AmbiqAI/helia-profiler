@@ -73,7 +73,7 @@ _CORE_OVERRIDE_CHOICE = click.Choice(["cm4", "cm55"])
 _TRANSPORT_CHOICE = click.Choice([t.value for t in Transport])
 _AGGREGATION_CHOICE = click.Choice(list(AGGREGATION_METHODS))
 _POWER_DRIVER_CHOICE = click.Choice(
-    ["joulescope", "joulescope-js110", "joulescope-js220", "ondevice"]
+    ["joulescope", "joulescope-js110", "joulescope-js220", "joulescope-js320", "ondevice"]
 )
 _POWER_MODE_CHOICE = click.Choice(["external", "internal"])
 _POWER_FIRMWARE_CHOICE = click.Choice(list(POWER_FIRMWARE_MODES))
@@ -320,7 +320,7 @@ def profile_command(
         None,
         "--power-driver",
         click_type=_POWER_DRIVER_CHOICE,
-        help="Power driver (default: joulescope = auto-detect JS110/JS220)",
+        help="Power driver (default: joulescope = auto-detect JS110/JS220/JS320)",
         rich_help_panel=G_POWER,
     ),
     power_mode: Optional[str] = typer.Option(
@@ -710,7 +710,9 @@ app.add_typer(target_app, name="target")
 # hpx power-on
 # ---------------------------------------------------------------------------
 
-_POWER_ON_DRIVER_CHOICE = click.Choice(["joulescope", "joulescope-js110", "joulescope-js220"])
+_POWER_ON_DRIVER_CHOICE = click.Choice(
+    ["joulescope", "joulescope-js110", "joulescope-js220", "joulescope-js320"]
+)
 
 
 @app.command(

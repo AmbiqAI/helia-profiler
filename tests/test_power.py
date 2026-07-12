@@ -340,6 +340,22 @@ class TestJoulescopeUngatedCapture:
         assert result.summary.sample_count == 1
         assert result.summary.avg_current_a == pytest.approx(0.01, rel=1e-6)
 
+    def test_capture_processes_js320_stats_packet(self, monkeypatch: pytest.MonkeyPatch):
+        from helia_profiler.power.joulescope.driver import JoulescopeDriver
+
+        fake_driver = self._FakeDriver(self._stats_packet())
+        monkeypatch.setattr(
+            "helia_profiler.power.joulescope.driver._open_device",
+            lambda serial: (fake_driver, "u/js320/25QG", "js320"),
+        )
+        monkeypatch.setattr("helia_profiler.power.joulescope.driver.time.sleep", lambda _s: None)
+
+        driver = JoulescopeDriver(serial="25QG")
+        result = driver.capture(duration_s=0.01, io_voltage=1.8)
+
+        assert result.summary.sample_count == 1
+        assert result.summary.avg_current_a == pytest.approx(0.01, rel=1e-6)
+
 
 class TestPowerMode:
     def test_external(self):
