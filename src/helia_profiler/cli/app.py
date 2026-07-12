@@ -65,7 +65,7 @@ def _hpx_callback(
 # ---------------------------------------------------------------------------
 
 
-_ENGINE_CHOICE = click.Choice([EngineType.HELIA_RT.value, EngineType.HELIA_AOT.value])
+_ENGINE_CHOICE = click.Choice([engine.value for engine in EngineType])
 _MODEL_LOCATION_CHOICE = click.Choice([loc.value for loc in ModelLocation])
 _ARENA_LOCATION_CHOICE = click.Choice([p.value for p in Placement if p is not Placement.MRAM])
 _WEIGHTS_LOCATION_CHOICE = click.Choice([p.value for p in Placement])
