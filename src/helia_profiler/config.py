@@ -758,12 +758,6 @@ def load_config(yaml_path: Path | None, cli_overrides: dict[str, Any]) -> Profil
     except ValueError as exc:
         raise ConfigError(str(exc)) from exc
 
-    if config.engine.type is EngineType.TFLM:
-        raise ConfigError(
-            "engine.type='tflm' is temporarily unavailable",
-            hint="Use engine.type='helia-rt' for the interpreter runtime.",
-        )
-
     return replace(config, platform_registry=platform_registry)
 
 

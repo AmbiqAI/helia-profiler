@@ -614,6 +614,17 @@ class TestGenerateApp:
         cmake = (app_dir / "CMakeLists.txt").read_text()
         assert "nsx::helia_rt" in cmake
 
+    def test_cmakelists_links_tflite_micro(self, tmp_path: Path, fake_dist: Path):
+        ctx = _make_ctx(tmp_path, fake_dist, engine="tflm")
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        cmake = (app_dir / "CMakeLists.txt").read_text()
+        modules = (app_dir / "cmake" / "nsx" / "modules.cmake").read_text()
+        assert "nsx::tflite_micro" in cmake
+        assert "nsx-tflite-micro" in modules
+
     def test_idempotent(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)
         ResolvePlatformStage().run(ctx)

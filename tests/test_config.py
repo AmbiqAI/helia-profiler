@@ -209,14 +209,15 @@ def test_engine_defaults_to_helia_rt():
     assert config.engine.type.value == "helia-rt"
 
 
-def test_tflm_engine_rejected():
+def test_tflm_engine_is_accepted():
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "tflm"},
     }
 
-    with pytest.raises(ConfigError, match="temporarily unavailable"):
-        load_config(None, cli)
+    config = load_config(None, cli)
+
+    assert config.engine.type.value == "tflm"
 
 
 def test_build_config_channel_override():
