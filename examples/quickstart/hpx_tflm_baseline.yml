@@ -1,0 +1,29 @@
+# heliaPROFILER baseline — vanilla TFLM port
+#
+# This is intended as a reference baseline for comparison with heliaRT and
+# heliaAOT. It uses the nsx-tflite-micro port and does not enable Ambiq's
+# HELIA kernels. Select upstream CMSIS-NN explicitly when desired.
+model:
+  path: examples/quickstart/kws_model.tflite
+  arena_size: 131072
+
+engine:
+  type: tflm
+  backend: cmsis_nn    # reference or cmsis_nn
+
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+
+profiling:
+  pmu_presets: [basic_cpu, memory]
+  per_layer: true
+  iterations: 3
+  warmup: 1
+
+power:
+  enabled: false
+
+output:
+  format: csv
+  dir: ./results/results_tflm_baseline

@@ -13,7 +13,7 @@ set(NSX_BOARD "{{ board }}" CACHE STRING "Target board")
 set(NSX_AMBIQ_BSP_LIB_SUBDIR "{{ board }}" CACHE STRING "AmbiqSuite BSP lib subdir")
 
 {% for var_name, var_value in cmake_vars.items() %}
-set({{ var_name }} "{{ var_value }}")
+set({{ var_name }} "{{ var_value }}" CACHE STRING "Profiler engine option" FORCE)
 {% endfor %}
 
 {% if compiler_launcher %}
@@ -128,6 +128,9 @@ target_link_libraries(hpx_profiler PRIVATE
 {% if engine_type == "helia-rt" %}
     nsx::helia_rt
 {% endif %}
+{% if engine_type == "tflm" %}
+    nsx::tflite_micro
+{% endif %}
 {% if transport == "usb_cdc" %}
     nsx::usb
 {% endif %}
@@ -174,6 +177,9 @@ target_link_libraries(hpx_profiler_power PRIVATE
 {% if engine_type == "helia-rt" %}
     nsx::helia_rt
 {% endif %}
+{% if engine_type == "tflm" %}
+    nsx::tflite_micro
+{% endif %}
 {% if psram_needed %}
     nsx::psram
 {% endif %}
@@ -213,4 +219,3 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     )
 {% endif %}
 endif()
-

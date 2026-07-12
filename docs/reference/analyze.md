@@ -5,7 +5,7 @@ Analyze a model's compute and parameter breakdown without hardware.
 ## Synopsis
 
 ```bash
-hpx analyze MODEL [--engine helia-rt|helia-aot] [--compare]
+hpx analyze MODEL [--engine tflm|helia-rt|helia-aot] [--compare]
             [--format table|csv|json] [--output FILE] [--board BOARD]
 ```
 

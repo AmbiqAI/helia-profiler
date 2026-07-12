@@ -149,6 +149,7 @@ nav:
   - Examples:
       - Overview: examples/index.md
       - Basic Profiling: examples/basic-profiling.md
+      - Vanilla TFLM Baseline: examples/tflm-baseline.md
       - Per-Layer Breakdown: examples/per-layer.md
       - Engine Comparison: examples/engine-comparison.md
       - Toolchain Comparison: examples/toolchain-comparison.md

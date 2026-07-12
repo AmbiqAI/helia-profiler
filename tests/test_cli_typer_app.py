@@ -74,6 +74,22 @@ def test_pmu_presets_repeatable_option_builds_list(monkeypatch) -> None:
     assert seen["args"].pmu_presets == ["basic_cpu", "mve_all"]
 
 
+def test_profile_accepts_tflm_engine(monkeypatch) -> None:
+    import helia_profiler.cli.profile_cmd as profile_cmd
+
+    seen: dict[str, object] = {}
+
+    def fake_cmd_profile(args: SimpleNamespace) -> None:
+        seen["args"] = args
+
+    monkeypatch.setattr(profile_cmd, "_cmd_profile", fake_cmd_profile)
+
+    result = runner.invoke(app, ["profile", "model.tflite", "--engine", "tflm"])
+
+    assert result.exit_code == 0, result.output
+    assert seen["args"].engine == "tflm"
+
+
 def test_per_layer_tri_state_true_false_and_absent(monkeypatch) -> None:
     import helia_profiler.cli.profile_cmd as profile_cmd
 

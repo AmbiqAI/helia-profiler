@@ -11,6 +11,7 @@ hpx engines
 ## Output
 
 ```
+  tflm
   helia-rt
   helia-aot
 ```
@@ -19,10 +20,10 @@ hpx engines
   reference backends).
 - `helia-aot` — AmbiqAI heliaAOT, an ahead-of-time compiler (no interpreter
   at runtime).
+- `tflm` — vanilla TFLM baseline through the `nsx-tflite-micro` port;
+  supports `reference` and upstream `cmsis_nn` backends.
 
 Use either name with `--engine` or `engine.type:` in YAML.
-
-Stock `tflm` is temporarily unavailable in the public CLI/config surface.
 
 ## See also
 
