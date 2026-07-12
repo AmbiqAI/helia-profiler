@@ -1,0 +1,53 @@
+# Oura workshop: KWS on Apollo330 Plus EVB via heliaRT.
+#
+# First single-model baseline. Explicit RT placement keeps both the model
+# weights and tensor arena in the fastest available AP330 memory. The arena
+# starts at the known MLPerf Tiny requirement; hpx reports actual linker and
+# runtime usage in the result metadata.
+model:
+  path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
+  arena_size: 32768
+  weights_location: tcm
+  arena_location: tcm
+
+engine:
+  type: helia-rt
+
+target:
+  board: apollo330mP_evb
+  toolchain: arm-none-eabi-gcc
+  jlink_serial: "1160003058"
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+    mve: default
+    memory: default
+  per_layer: true
+  iterations: 200
+  warmup: 10
+  aggregation: median
+
+power:
+  enabled: true
+  driver: joulescope
+  serial: "004204"
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  firmware: dedicated
+  lockstep: true
+  sync_gpio_pin: 5
+  state_gpio_pin: 6
+  go_gpio_pin: 7
+
+output:
+  format: json
+  dir: ./experiments/oura-workshop/results/kws_rt_ap330_js110
+  model_explorer: false
+  detailed: true
+
+keep_work_dir: true
