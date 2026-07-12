@@ -30,7 +30,7 @@ def _cmd_engines() -> None:
     from ..console import HpxConsole
 
     console = HpxConsole()
-    console.print_engines([EngineType.HELIA_RT.value, EngineType.HELIA_AOT.value])
+    console.print_engines([engine.value for engine in EngineType])
 
 
 def _cmd_boards() -> None:
@@ -257,4 +257,3 @@ def _is_relevant_serial_port(row: dict[str, str]) -> bool:
         return True
     device = row["device"]
     return any(token in device for token in ("ttyACM", "ttyUSB", "tty.usbmodem"))
-

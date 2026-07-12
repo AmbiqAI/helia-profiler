@@ -40,12 +40,12 @@ with heliaRT or heliaAOT.
     Cycle counts, instruction counts, cache stats, and per-layer PMU
     breakdowns — all from a single `hpx profile` command.
 
--   :material-engine:{ .lg .middle } __Two engines__
+-   :material-engine:{ .lg .middle } __Three engines__
 
     ---
 
-    Profile the same model with heliaRT (interpreter) or heliaAOT
-    (ahead-of-time compiler) — one explicitly-chosen engine per run.
+    Profile the same model with vanilla TFLM, heliaRT (interpreter), or
+    heliaAOT (ahead-of-time compiler) — one explicitly-chosen engine per run.
 
 -   :material-chip:{ .lg .middle } __Apollo 3 / 4 / 5__
 

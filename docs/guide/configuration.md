@@ -54,7 +54,7 @@ output:
 
 1. Path to the `.tflite` model file.
 2. Tensor arena size in bytes. Required for heliaRT. heliaAOT can auto-size.
-3. Engine: `helia-rt` or `helia-aot`.
+3. Engine: `tflm`, `helia-rt`, or `helia-aot`.
 4. Engine-specific config (passed through to the adapter).
 5. Target board — run `hpx boards` to see options.
 6. Toolchain prefix (must be on PATH).

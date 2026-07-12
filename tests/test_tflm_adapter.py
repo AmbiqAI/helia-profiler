@@ -9,7 +9,7 @@ import pytest
 from helia_profiler.config import load_config
 from helia_profiler.engines import EngineType
 from helia_profiler.engines.tflm import TFLMAdapter
-from helia_profiler.errors import EngineError
+from helia_profiler.errors import ConfigError, EngineError
 
 
 def _config(tmp_path: Path, backend: str | None = None):
@@ -44,3 +44,19 @@ def test_cmsis_nn_backend_adds_kernel_module_before_tflm(tmp_path: Path):
 def test_invalid_backend_fails_with_actionable_error(tmp_path: Path):
     with pytest.raises(EngineError, match="Invalid TFLM backend 'helia'"):
         TFLMAdapter().prepare(_config(tmp_path, "helia"), tmp_path)
+
+
+def test_nested_backend_is_rejected_with_top_level_hint(tmp_path: Path):
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+
+    with pytest.raises(
+        ConfigError, match="engine.config.backend is not supported; use engine.backend instead"
+    ):
+        load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "tflm", "config": {"backend": "cmsis_nn"}},
+            },
+        )

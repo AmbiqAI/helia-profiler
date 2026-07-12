@@ -48,8 +48,8 @@ Inference engine selection and passthrough config.
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `type` | tflm \| helia-rt \| helia-aot | `helia-rt` | `tflm` is temporarily unavailable — use `helia-rt` for the interpreter runtime. |
-| `backend` | str \| null | `null` |  |
+| `type` | tflm \| helia-rt \| helia-aot | `helia-rt` | `tflm` is the vanilla TFLM baseline engine; use `engine.backend` to select `reference` or `cmsis_nn`. |
+| `backend` | str \| null | `null` | TFLM: `reference` or `cmsis_nn`. |
 | `config` | dict[str, Any] | `{}` | free-form engine-specific mapping (not strictly validated). |
 | `config_path` | Path \| null | `null` |  |
 

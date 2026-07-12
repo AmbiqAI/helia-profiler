@@ -37,6 +37,14 @@ Every recipe follows the same shape:
 
     [:octicons-arrow-right-24: Read](per-layer.md)
 
+-   :material-scale-balance:{ .lg .middle } __Vanilla TFLM Baseline__
+
+    ---
+
+    Measure the vanilla TFLM port with reference kernels or upstream CMSIS-NN.
+
+    [:octicons-arrow-right-24: Read](tflm-baseline.md)
+
 -   :material-swap-horizontal:{ .lg .middle } __Engine Comparison__
 
     ---

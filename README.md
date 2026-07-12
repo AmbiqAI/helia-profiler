@@ -15,8 +15,9 @@ counter breakdowns plus optional Joulescope power/energy per inference.
   Cortex-M55 boards) MVE and memory counter groups, one row per layer.
 - **Power & energy per inference** — GPIO-gated Joulescope capture
   (JS110/JS220) isolates the inference window from setup/teardown noise.
-- **Two engines** — `helia-rt` (Ambiq's optimized TFLM interpreter) and
-  `helia-aot` (Ambiq's ahead-of-time model compiler), selected explicitly
+- **Three engines** — `tflm` (vanilla TFLM baseline), `helia-rt` (Ambiq's
+  optimized TFLM interpreter), and `helia-aot` (Ambiq's ahead-of-time model
+  compiler), selected explicitly
   per run.
 - **Multiple toolchains** — `arm-none-eabi-gcc`, `armclang`, and ATfE, so you
   can compare build/runtime trade-offs without changing your model.

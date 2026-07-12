@@ -233,6 +233,16 @@ class EngineConfig:
     config: dict[str, Any] = field(default_factory=dict)
     config_path: Path | None = None  # path to engine-specific YAML
 
+    @field_validator("config")
+    @classmethod
+    def _reject_nested_backend(cls, value: dict[str, Any]) -> dict[str, Any]:
+        """Keep the backend selector unambiguous across engine adapters."""
+        if "backend" in value:
+            raise ValueError(
+                "engine.config.backend is not supported; use engine.backend instead"
+            )
+        return value
+
     @field_validator("type", mode="before")
     @classmethod
     def _coerce_type(cls, value: Any) -> Any:

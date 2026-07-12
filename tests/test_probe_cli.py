@@ -17,6 +17,15 @@ from helia_profiler.target.probe.jlink import (
 from helia_profiler.platform import CoreArch
 
 
+def test_engines_lists_tflm(capsys) -> None:
+    cli._cmd_engines()
+
+    out = capsys.readouterr().out
+    assert "tflm" in out
+    assert "helia-rt" in out
+    assert "helia-aot" in out
+
+
 def test_probes_list_prints_connected_probes(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         "helia_profiler.target.probe.jlink.list_connected_probes",

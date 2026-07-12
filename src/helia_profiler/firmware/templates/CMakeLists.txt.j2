@@ -13,7 +13,7 @@ set(NSX_BOARD "{{ board }}" CACHE STRING "Target board")
 set(NSX_AMBIQ_BSP_LIB_SUBDIR "{{ board }}" CACHE STRING "AmbiqSuite BSP lib subdir")
 
 {% for var_name, var_value in cmake_vars.items() %}
-set({{ var_name }} "{{ var_value }}")
+set({{ var_name }} "{{ var_value }}" CACHE STRING "Profiler engine option" FORCE)
 {% endfor %}
 
 {% if compiler_launcher %}

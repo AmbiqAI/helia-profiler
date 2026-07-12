@@ -1,6 +1,6 @@
 # Inference Engines
 
-heliaPROFILER currently exposes two inference engines. Each profiling run uses
+heliaPROFILER currently exposes three inference engines. Each profiling run uses
 **exactly one** engine — you choose which at configuration time. There is
 no "run all" mode; comparison is done by running the profiler more than
 once with different configs.
@@ -9,15 +9,16 @@ once with different configs.
 
 | Engine | `--engine` | Interpreter? | Best for | Typical binary |
 |---|---|---|---|---|
+| Vanilla TFLM | `tflm` | Yes | Baseline interpreter measurement | varies |
 | heliaRT | `helia-rt` | Yes | Optimized interpreter performance | ~570 KB |
 | heliaAOT | `helia-aot` | No | Maximum performance, smallest code | ~96 KB |
 
-The pipeline, capture protocol, and report format are identical for both
+The pipeline, capture protocol, and report format are identical for all three
 engines. Only the firmware payload changes.
 
-Stock TFLM is temporarily unavailable in the public CLI/config surface.
-Use `helia-rt` for interpreter-based profiling until the stock adapter is
-restored.
+Vanilla TFLM is intended as a baseline. It uses the separate
+`nsx-tflite-micro` port and can select either reference kernels or upstream
+CMSIS-NN. It does not enable heliaRT's Ambiq-tuned HELIA backend.
 
 ## heliaRT
 

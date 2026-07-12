@@ -27,7 +27,7 @@ hpx profile [MODEL] [--config FILE] [options]
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
-| `--engine` | `helia-rt` \| `helia-aot` | `helia-rt` | Inference engine. See [Engines](../guide/engines.md). |
+| `--engine` | `tflm` \| `helia-rt` \| `helia-aot` | `helia-rt` | Inference engine. See [Engines](../guide/engines.md). TFLM backend is selected with `engine.backend` in YAML. |
 | `--engine-config FILE` | path | — | Engine-specific YAML loaded into `engine.config`. |
 
 ## Model
