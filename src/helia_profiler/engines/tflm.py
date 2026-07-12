@@ -20,11 +20,11 @@ _SUPPORTED_BACKENDS = frozenset(("reference", "cmsis_nn"))
 
 
 class TFLMAdapter:
-    """Adapter for stock TensorFlow Lite for Microcontrollers with CMSIS-NN."""
+    """Adapter for stock TensorFlow Lite for Microcontrollers."""
 
     @property
     def name(self) -> str:
-        return "Stock TFLM (CMSIS-NN)"
+        return "Stock TFLM"
 
     @property
     def engine_type(self) -> EngineType:
