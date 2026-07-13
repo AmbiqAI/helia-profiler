@@ -160,6 +160,13 @@ _METRIC_FIELDS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     ("memory.arena_size", ("memory", "arena_size"), "bytes"),
     ("memory.allocated_arena", ("memory", "allocated_arena"), "bytes"),
     ("memory.model_size", ("memory", "model_size"), "bytes"),
+    ("power.avg_current_a", ("power", "avg_current_a"), "A"),
+    ("power.avg_power_w", ("power", "avg_power_w"), "W"),
+    ("power.peak_current_a", ("power", "peak_current_a"), "A"),
+    ("power.energy_j", ("power", "energy_j"), "J"),
+    ("power.duration_s", ("power", "duration_s"), "s"),
+    ("power.energy_per_inference_j", ("power", "energy_per_inference_j"), "J"),
+    ("power.inferences_per_joule", ("power", "inferences_per_joule"), "inferences/J"),
 )
 
 
@@ -212,16 +219,24 @@ def load_run_artifacts(path: Path) -> RunArtifacts:
     )
 
 
-def write_compare_artifacts(result: CompareResult, output_dir: Path) -> list[Path]:
+def write_compare_artifacts(
+    result: CompareResult,
+    output_dir: Path,
+    *,
+    source_dirs: tuple[str, str] | None = None,
+    omit_empty_layers: bool = False,
+) -> list[Path]:
     """Write ``compare_summary.json`` and ``layer_diff.csv``."""
 
     out = output_dir.expanduser().resolve()
     out.mkdir(parents=True, exist_ok=True)
-    paths = [out / "compare_summary.json", out / "layer_diff.csv"]
+    paths = [out / "compare_summary.json"]
+    if result.layer_rows or not omit_empty_layers:
+        paths.append(out / "layer_diff.csv")
 
     summary = {
-        "baseline_dir": str(result.baseline.path),
-        "candidate_dir": str(result.candidate.path),
+        "baseline_dir": source_dirs[0] if source_dirs else str(result.baseline.path),
+        "candidate_dir": source_dirs[1] if source_dirs else str(result.candidate.path),
         "warnings": result.warnings,
         "config": [
             {
@@ -246,12 +261,13 @@ def write_compare_artifacts(result: CompareResult, output_dir: Path) -> list[Pat
     }
     paths[0].write_text(json.dumps(summary, indent=2, default=str) + "\n")
 
-    flat_layer_rows = [row.to_flat_dict() for row in result.layer_rows]
-    fieldnames = _layer_fieldnames(flat_layer_rows)
-    with open(paths[1], "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(flat_layer_rows)
+    if len(paths) > 1:
+        flat_layer_rows = [row.to_flat_dict() for row in result.layer_rows]
+        fieldnames = _layer_fieldnames(flat_layer_rows)
+        with open(paths[1], "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(flat_layer_rows)
 
     return paths
 
@@ -274,7 +290,12 @@ def render_compare(result: CompareResult, *, top_layers: int = 10) -> str:
 
     lines.append("Config")
     config_dicts = [
-        {"field": row.field, "baseline": row.baseline, "candidate": row.candidate, "status": row.status}
+        {
+            "field": row.field,
+            "baseline": row.baseline,
+            "candidate": row.candidate,
+            "status": row.status,
+        }
         for row in result.config_rows
     ]
     lines.extend(_format_table(["field", "baseline", "candidate", "status"], config_dicts))
@@ -375,6 +396,8 @@ def _compare_metrics(base: dict[str, Any], cand: dict[str, Any]) -> list[MetricD
     for name, path, unit in _METRIC_FIELDS:
         b = _get_nested(base, path)
         c = _get_nested(cand, path)
+        if name.startswith("power.") and b is None and c is None:
+            continue
         bf = _to_float(b)
         cf = _to_float(c)
         delta = None
@@ -383,13 +406,19 @@ def _compare_metrics(base: dict[str, Any], cand: dict[str, Any]) -> list[MetricD
             delta = cf - bf
             if bf != 0:
                 delta_pct = delta / bf * 100
-        metrics.append(MetricDiff(name=name, baseline=b, candidate=c, delta=delta, delta_pct=delta_pct, unit=unit))
+        metrics.append(
+            MetricDiff(
+                name=name, baseline=b, candidate=c, delta=delta, delta_pct=delta_pct, unit=unit
+            )
+        )
     return metrics
 
 
 def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[LayerDiffRow]:
     base = base_run.layers
     cand = cand_run.layers
+    if len(base) != len(cand) or [row.get("op") for row in base] != [row.get("op") for row in cand]:
+        return []
     rows: list[LayerDiffRow] = []
     max_len = max(len(base), len(cand))
     for idx in range(max_len):
@@ -474,16 +503,24 @@ def _build_warnings(
     if changed:
         warnings.append("Important provenance differs: " + ", ".join(changed))
     if baseline.summary.get("overflow_detected") or candidate.summary.get("overflow_detected"):
-        warnings.append("PMU overflow detected in at least one run; counter values may be unreliable.")
+        warnings.append(
+            "PMU overflow detected in at least one run; counter values may be unreliable."
+        )
     if len(baseline.layers) != len(candidate.layers):
-        warnings.append(f"Layer counts differ: baseline={len(baseline.layers)}, candidate={len(candidate.layers)}")
-    mismatches = sum(1 for row in layer_rows if not row.op_match)
-    if mismatches:
-        warnings.append(f"{mismatches} layer op name(s) differ; index-aligned layer diffs may be approximate.")
+        warnings.append(
+            "Per-layer deltas omitted: layer counts differ "
+            f"(baseline={len(baseline.layers)}, candidate={len(candidate.layers)})."
+        )
+    elif [row.get("op") for row in baseline.layers] != [row.get("op") for row in candidate.layers]:
+        warnings.append("Per-layer deltas omitted: operation sequence differs.")
     missing_metrics = [m.name for m in metrics if m.baseline is None or m.candidate is None]
     if missing_metrics:
-        warnings.append("Some run-level metrics are missing in one run: " + ", ".join(missing_metrics))
-    if (baseline.layer_memory or candidate.layer_memory) and not (baseline.layer_memory and candidate.layer_memory):
+        warnings.append(
+            "Some run-level metrics are missing in one run: " + ", ".join(missing_metrics)
+        )
+    if (baseline.layer_memory or candidate.layer_memory) and not (
+        baseline.layer_memory and candidate.layer_memory
+    ):
         warnings.append(
             "AOT memory placement artifacts are present in only one run; placement diffs may be partial."
         )
@@ -520,7 +557,12 @@ def _layer_memory_counts(rows: list[dict[str, Any]]) -> dict[str, dict[str, int]
     counts: dict[str, dict[str, int]] = {}
     for row in rows:
         kind = _friendly_memory_role(
-            str(row.get("tensor_kind") or row.get("arena_role") or row.get("tensor_role") or "tensor")
+            str(
+                row.get("tensor_kind")
+                or row.get("arena_role")
+                or row.get("tensor_role")
+                or "tensor"
+            )
         )
         placement = _format_placement(row)
         counts.setdefault(kind, {})[placement] = counts.setdefault(kind, {}).get(placement, 0) + 1

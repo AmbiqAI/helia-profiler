@@ -91,3 +91,7 @@ class PowerError(HpxError):
 
 class ReportError(HpxError):
     """Report generation failure — output path not writable, format error."""
+
+
+class ValidationBundleError(ReportError):
+    """Malformed, unsupported, or unsafe validation bundle."""

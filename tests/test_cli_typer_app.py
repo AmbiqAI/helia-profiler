@@ -90,6 +90,33 @@ def test_profile_accepts_tflm_engine(monkeypatch) -> None:
     assert seen["args"].engine == "tflm"
 
 
+def test_compare_validation_option_reaches_command_adapter(monkeypatch) -> None:
+    import helia_profiler.cli.compare_cmd as compare_cmd
+
+    seen: dict[str, object] = {}
+
+    def fake_cmd_compare(args: SimpleNamespace) -> None:
+        seen["args"] = args
+
+    monkeypatch.setattr(compare_cmd, "_cmd_compare", fake_cmd_compare)
+
+    result = runner.invoke(
+        app,
+        [
+            "compare",
+            "baseline",
+            "candidate",
+            "--validation",
+            "--output-dir",
+            "comparison",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert seen["args"].validation is True
+    assert str(seen["args"].output_dir) == "comparison"
+
+
 def test_per_layer_tri_state_true_false_and_absent(monkeypatch) -> None:
     import helia_profiler.cli.profile_cmd as profile_cmd
 

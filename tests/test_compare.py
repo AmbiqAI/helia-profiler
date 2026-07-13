@@ -26,6 +26,7 @@ def _write_run(
     total_cycles: float,
     avg_us: int,
     layer_cycles: list[float],
+    power: dict[str, float] | None = None,
 ) -> None:
     path.mkdir(parents=True)
     (path / "summary.json").write_text(
@@ -50,6 +51,7 @@ def _write_run(
                     "device_profiled_infer_avg_us": avg_us,
                     "device_profiled_infer_total_us": avg_us * 100,
                 },
+                "power": power,
             }
         )
     )
@@ -151,7 +153,13 @@ def _write_aot_memory_layers(path: Path, memory: str, source_memory: str | None 
 def test_compare_runs_computes_run_and_layer_deltas(tmp_path: Path):
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
-    _write_run(baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800, 200])
+    _write_run(
+        baseline,
+        toolchain="arm-none-eabi-gcc",
+        total_cycles=1000,
+        avg_us=10,
+        layer_cycles=[800, 200],
+    )
     _write_run(candidate, toolchain="atfe", total_cycles=750, avg_us=8, layer_cycles=[600, 150])
 
     result = compare_runs(baseline, candidate)
@@ -166,10 +174,68 @@ def test_compare_runs_computes_run_and_layer_deltas(tmp_path: Path):
     assert any(row.field == "Toolchain" and row.status == "diff" for row in result.config_rows)
 
 
+def test_compare_includes_power_metrics_when_available(tmp_path: Path):
+    baseline = tmp_path / "baseline"
+    candidate = tmp_path / "candidate"
+    _write_run(
+        baseline,
+        toolchain="arm-none-eabi-gcc",
+        total_cycles=1000,
+        avg_us=10,
+        layer_cycles=[800],
+        power={"energy_per_inference_j": 0.002, "inferences_per_joule": 500},
+    )
+    _write_run(
+        candidate,
+        toolchain="arm-none-eabi-gcc",
+        total_cycles=900,
+        avg_us=9,
+        layer_cycles=[700],
+        power={"energy_per_inference_j": 0.0015, "inferences_per_joule": 600},
+    )
+
+    result = compare_runs(baseline, candidate)
+
+    energy = next(
+        metric for metric in result.metrics if metric.name == "power.energy_per_inference_j"
+    )
+    assert energy.delta == pytest.approx(-0.0005)
+    throughput = next(
+        metric for metric in result.metrics if metric.name == "power.inferences_per_joule"
+    )
+    assert throughput.delta == 100
+
+
+def test_compare_omits_layers_when_operation_sequence_differs(tmp_path: Path):
+    baseline = tmp_path / "baseline"
+    candidate = tmp_path / "candidate"
+    _write_run(
+        baseline,
+        toolchain="arm-none-eabi-gcc",
+        total_cycles=1000,
+        avg_us=10,
+        layer_cycles=[800, 200],
+    )
+    _write_run(
+        candidate, toolchain="arm-none-eabi-gcc", total_cycles=900, avg_us=9, layer_cycles=[700]
+    )
+
+    result = compare_runs(baseline, candidate)
+
+    assert result.layer_rows == []
+    assert any("Per-layer deltas omitted" in warning for warning in result.warnings)
+
+
 def test_compare_layer_rows_type_dynamic_pmu_counters_as_counter_diffs(tmp_path: Path):
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
-    _write_run(baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800, 200])
+    _write_run(
+        baseline,
+        toolchain="arm-none-eabi-gcc",
+        total_cycles=1000,
+        avg_us=10,
+        layer_cycles=[800, 200],
+    )
     _write_run(candidate, toolchain="atfe", total_cycles=750, avg_us=8, layer_cycles=[600, 150])
 
     result = compare_runs(baseline, candidate)
@@ -189,7 +255,9 @@ def test_compare_layer_rows_type_dynamic_pmu_counters_as_counter_diffs(tmp_path:
 def test_render_compare_starts_with_config_then_run_then_layers(tmp_path: Path):
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
-    _write_run(baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+    _write_run(
+        baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
+    )
     _write_run(candidate, toolchain="atfe", total_cycles=900, avg_us=9, layer_cycles=[700])
 
     text = render_compare(compare_runs(baseline, candidate), top_layers=1)
@@ -203,7 +271,9 @@ def test_render_compare_starts_with_config_then_run_then_layers(tmp_path: Path):
 def test_write_compare_artifacts(tmp_path: Path):
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
-    _write_run(baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+    _write_run(
+        baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
+    )
     _write_run(candidate, toolchain="atfe", total_cycles=900, avg_us=9, layer_cycles=[700])
 
     paths = write_compare_artifacts(compare_runs(baseline, candidate), tmp_path / "diff")
@@ -220,8 +290,12 @@ def test_write_compare_artifacts(tmp_path: Path):
 def test_compare_includes_aot_memory_placement_diffs(tmp_path: Path):
     baseline = tmp_path / "dtcm"
     candidate = tmp_path / "sram"
-    _write_run(baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
-    _write_run(candidate, toolchain="arm-none-eabi-gcc", total_cycles=900, avg_us=9, layer_cycles=[700])
+    _write_run(
+        baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
+    )
+    _write_run(
+        candidate, toolchain="arm-none-eabi-gcc", total_cycles=900, avg_us=9, layer_cycles=[700]
+    )
     _write_aot_memory_layers(baseline, "dtcm")
     _write_aot_memory_layers(candidate, "sram", source_memory="mram")
 
@@ -244,7 +318,9 @@ def test_layer_diff_row_is_frozen_and_flattens_for_csv(tmp_path: Path):
     """LayerDiffRow is immutable and its to_flat_dict() output drives the CSV writer."""
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
-    _write_run(baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+    _write_run(
+        baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
+    )
     _write_run(candidate, toolchain="atfe", total_cycles=900, avg_us=9, layer_cycles=[700])
 
     result = compare_runs(baseline, candidate)

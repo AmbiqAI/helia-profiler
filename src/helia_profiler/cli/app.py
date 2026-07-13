@@ -875,23 +875,34 @@ def validate_command(
     epilog=(
         "Examples:\n\n"
         "  hpx compare results/rt_gcc results/rt_atfe\n\n"
-        "  hpx compare results/rt results/aot --output-dir results/rt_vs_aot"
+        "  hpx compare results/rt results/aot --output-dir results/rt_vs_aot\n\n"
+        "  hpx compare results/baseline-validation results/candidate-validation "
+        "--validation --output-dir results/validation-compare"
     ),
 )
 def compare_command(
     baseline: Path = typer.Argument(..., help="Baseline hpx result directory"),
     candidate: Path = typer.Argument(..., help="Candidate hpx result directory"),
     output_dir: Optional[Path] = typer.Option(
-        None, "--output-dir", help="Write compare_summary.json and layer_diff.csv to this directory"
+        None, "--output-dir", help="Write comparison artifacts to this directory"
+    ),
+    validation: bool = typer.Option(
+        False, "--validation", help="Compare portable validation bundles instead of profile runs"
     ),
     top_layers: int = typer.Option(
         10, "--top-layers", help="Number of layer deltas to show in terminal output (default: 10)"
     ),
 ) -> None:
-    """Compare two completed hpx profile output directories."""
+    """Compare two completed profile runs or validation bundles."""
     from .compare_cmd import _cmd_compare
 
-    args = SimpleNamespace(baseline=baseline, candidate=candidate, output_dir=output_dir, top_layers=top_layers)
+    args = SimpleNamespace(
+        baseline=baseline,
+        candidate=candidate,
+        output_dir=output_dir,
+        top_layers=top_layers,
+        validation=validation,
+    )
     _cmd_compare(args)
 
 
