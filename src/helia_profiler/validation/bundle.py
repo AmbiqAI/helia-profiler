@@ -229,8 +229,12 @@ def _load_case(
 def resolve_artifact(bundle: ValidationBundle, artifact: ArtifactRef) -> Path:
     """Resolve an already-validated artifact reference within its bundle."""
 
-    return (bundle.root / PurePosixPath(artifact.path)).resolve()
-
+    resolved = (bundle.root / PurePosixPath(artifact.path)).resolve()
+    try:
+        resolved.relative_to(bundle.root)
+    except ValueError as exc:
+        raise ValidationBundleError(f"Artifact path escapes bundle root: {artifact.path!r}") from exc
+    return resolved
 
 def _resolve_safe_artifact(root: Path, raw: str, *, case_id: str, name: str) -> Path:
     if not raw or "\x00" in raw or "\\" in raw or _WINDOWS_ABSOLUTE.match(raw):
