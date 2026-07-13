@@ -5,14 +5,16 @@ from __future__ import annotations
 import json
 import subprocess
 from datetime import UTC, datetime
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from .._version import __version__
+from ..errors import ReportError
 from .runner import CaseResult
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def write_validation_reports(
@@ -128,30 +130,68 @@ def render_markdown(results: list[CaseResult]) -> str:
 
 
 def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
-    case_dir = Path(result.output_dir).expanduser().resolve() if result.output_dir else output_dir / result.case_id
+    case_dir = (
+        Path(result.output_dir).expanduser().resolve()
+        if result.output_dir
+        else output_dir / result.case_id
+    )
+    artifact_paths = {
+        "case_dir": case_dir,
+        "config": case_dir / "config.yml",
+        "work_dir": case_dir / "work",
+        "summary": case_dir / "summary.json",
+        "run_metadata": case_dir / "run_metadata.json",
+        "profile_results": case_dir / "profile_results.csv",
+        "hpx_profile_log": case_dir / "hpx_profile.log",
+        "stdout_log": case_dir / "hpx_stdout.log",
+        "stderr_log": case_dir / "hpx_stderr.log",
+        "aot_memory_layers": case_dir / "aot_memory_layers.csv",
+        "aot_operator_manifest": case_dir / "aot_operator_manifest.json",
+        "power_summary": case_dir / "power_summary.csv",
+    }
     artifacts = {
-        "case_dir": _rel(case_dir, output_dir),
-        "config": _rel(case_dir / "config.yml", output_dir),
-        "work_dir": _rel(case_dir / "work", output_dir),
-        "summary": _rel(case_dir / "summary.json", output_dir),
-        "run_metadata": _rel(case_dir / "run_metadata.json", output_dir),
-        "profile_results": _rel(case_dir / "profile_results.csv", output_dir),
-        "hpx_profile_log": _rel(case_dir / "hpx_profile.log", output_dir),
-        "stdout_log": _rel(case_dir / "hpx_stdout.log", output_dir),
-        "stderr_log": _rel(case_dir / "hpx_stderr.log", output_dir),
+        name: {
+            "path": _bundle_relative(path, output_dir),
+            "available": path.exists(),
+        }
+        for name, path in artifact_paths.items()
+    }
+    metadata = _read_optional_json(case_dir / "run_metadata.json")
+    summary = _read_optional_json(case_dir / "summary.json")
+    model_config = _nested_dict(metadata, "config", "model")
+    requested_memory = {
+        "preset": result.memory,
+        "arena_location": model_config.get("arena_location"),
+        "weights_location": model_config.get("weights_location"),
+    }
+    requested_memory = _strip_none(requested_memory)
+    engine = _enum_value(result.engine)
+    identity = {
+        "model_id": result.model_id,
+        "engine": engine,
+        "board": result.board,
+        "toolchain": result.toolchain,
+        "transport": result.transport,
+        "requested_memory": requested_memory,
+        "requested_power": {"enabled": result.power},
+        "attempt": result.attempt,
     }
     case_data: dict[str, Any] = {
         "case_id": result.case_id,
         "status": result.status,
         "duration_s": result.duration_s,
-        "model_id": result.model_id,
-        "engine": result.engine,
-        "board": result.board,
-        "toolchain": result.toolchain,
-        "transport": result.transport,
-        "memory": result.memory,
-        "power": result.power,
-        "jlink_serial": result.jlink_serial,
+        "identity": identity,
+        "repeat": {"attempt": result.attempt, "total": result.repeat_total},
+        "health_issues": list(result.health_issues),
+        "provenance": _strip_none(
+            {
+                "jlink_serial": result.jlink_serial,
+                "model_sha256": _nested(metadata, "model", "sha256"),
+                "compiler": _nested(metadata, "toolchain", "compiler"),
+                "compiler_version": _nested(metadata, "toolchain", "compiler_version"),
+                "effective_memory": summary.get("memory_plan"),
+            }
+        ),
         "metrics": {
             "layers": result.layers,
             "total_cycles": result.total_cycles,
@@ -217,10 +257,43 @@ def _git_dirty(repo_root: Path) -> bool | None:
 
 
 def _rel(path: Path, root: Path) -> str:
+    return _bundle_relative(path, root)
+
+
+def _bundle_relative(path: Path, root: Path) -> str:
+    """Return a portable bundle-relative path, rejecting writer escapes."""
+
     try:
-        return path.resolve().relative_to(root.resolve()).as_posix()
-    except ValueError:
-        return str(path)
+        relative = path.resolve().relative_to(root.resolve())
+    except ValueError as exc:
+        raise ReportError(f"Validation artifact escapes bundle root: {path}") from exc
+    return relative.as_posix()
+
+
+def _read_optional_json(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _nested(value: dict[str, Any], *parts: str) -> Any:
+    current: Any = value
+    for part in parts:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(part)
+    return current
+
+
+def _nested_dict(value: dict[str, Any], *parts: str) -> dict[str, Any]:
+    nested = _nested(value, *parts)
+    return nested if isinstance(nested, dict) else {}
+
+
+def _enum_value(value: Any) -> Any:
+    return value.value if isinstance(value, Enum) else value
 
 
 def _json_safe(value: Any) -> Any:

@@ -48,19 +48,23 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(tmp_path
         "validation_manifest.json",
     }
     manifest = json.loads((tmp_path / "validation_manifest.json").read_text())
-    assert manifest["schema_version"] == 1
+    assert manifest["schema_version"] == 2
     assert manifest["validation"]["suite"] == "smoke"
     assert manifest["summary"] == {"total": 1, "pass": 1, "fail": 0, "skip": 0}
     assert manifest["repo"] == {"sha": None, "branch": None, "dirty": None}
 
     case = manifest["cases"][0]
     assert case["metrics"]["total_cycles"] == 123456
-    assert case["artifacts"]["case_dir"] == result.case_id
-    assert case["artifacts"]["config"] == f"{result.case_id}/config.yml"
-    assert case["artifacts"]["work_dir"] == f"{result.case_id}/work"
-    assert case["artifacts"]["summary"] == f"{result.case_id}/summary.json"
-    assert case["artifacts"]["run_metadata"] == f"{result.case_id}/run_metadata.json"
-    assert case["artifacts"]["profile_results"] == f"{result.case_id}/profile_results.csv"
+    assert case["identity"]["attempt"] == 1
+    assert case["identity"]["requested_memory"] == {"preset": "auto"}
+    assert case["identity"]["requested_power"] == {"enabled": False}
+    assert case["health_issues"] == []
+    assert case["artifacts"]["case_dir"]["path"] == result.case_id
+    assert case["artifacts"]["config"]["path"] == f"{result.case_id}/config.yml"
+    assert case["artifacts"]["work_dir"]["path"] == f"{result.case_id}/work"
+    assert case["artifacts"]["summary"]["path"] == f"{result.case_id}/summary.json"
+    assert case["artifacts"]["run_metadata"]["path"] == f"{result.case_id}/run_metadata.json"
+    assert case["artifacts"]["profile_results"]["path"] == f"{result.case_id}/profile_results.csv"
 
 
 def test_build_manifest_omits_none_metrics_and_tolerates_missing_git(tmp_path: Path):
@@ -83,6 +87,6 @@ def test_build_manifest_omits_none_metrics_and_tolerates_missing_git(tmp_path: P
     assert manifest["repo"]["sha"] is None
     assert manifest["repo"]["dirty"] is None
     assert manifest["summary"]["skip"] == 1
-    assert manifest["cases"][0]["artifacts"]["case_dir"] == "skipped-case"
+    assert manifest["cases"][0]["artifacts"]["case_dir"]["path"] == "skipped-case"
     assert "total_cycles" not in manifest["cases"][0]["metrics"]
     assert manifest["cases"][0]["error"] == "unsupported combination"

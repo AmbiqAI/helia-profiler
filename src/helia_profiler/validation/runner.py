@@ -62,6 +62,9 @@ class CaseResult:
     transport: str
     memory: str
     jlink_serial: str | None = None
+    attempt: int = 1
+    repeat_total: int = 1
+    health_issues: tuple[str, ...] = ()
 
     # Metrics — populated on success
     layers: int | None = None
@@ -358,6 +361,8 @@ def run_case(
                 transport=case.transport.value,
                 memory=case.memory.value,
                 jlink_serial=case.jlink_serial,
+                attempt=case.attempt,
+                repeat_total=case.repeat_total,
                 output_dir=str(case_dir),
                 error=f"timeout after {timeout_s:.0f}s",
                 stdout_tail=(exc.stdout or "")[-2000:] if exc.stdout else None,
@@ -412,6 +417,8 @@ def run_case(
             transport=case.transport.value,
             memory=case.memory.value,
             jlink_serial=case.jlink_serial,
+            attempt=case.attempt,
+            repeat_total=case.repeat_total,
             output_dir=str(case_dir),
             error=f"hpx profile exited {proc.returncode}",
             stdout_tail=stdout_tail,
@@ -432,6 +439,8 @@ def run_case(
         transport=case.transport.value,
         memory=case.memory.value,
         jlink_serial=case.jlink_serial,
+        attempt=case.attempt,
+        repeat_total=case.repeat_total,
         output_dir=str(case_dir),
         stdout_tail=stdout_tail,
         stderr_tail=stderr_tail,
@@ -485,6 +494,7 @@ def run_case(
             except ValueError:
                 pass
 
+    result.health_issues = validation_health_issues(result)
     return result
 
 
@@ -495,16 +505,26 @@ def run_case(
 
 def assert_healthy(result: CaseResult) -> None:
     """Raise AssertionError if ``result`` does not meet minimum bar."""
-    assert result.status == "pass", f"{result.case_id}: run failed — {result.error}"
-    assert result.layers and result.layers >= 1, f"{result.case_id}: summary.json reports no layers"
-    assert result.total_cycles and result.total_cycles > 0, (
-        f"{result.case_id}: total_cycles == 0 (PMU capture looks broken)"
-    )
-    if result.engine == EngineType.HELIA_AOT.value:
-        assert result.aot_operator_count and result.aot_operator_count >= 1, (
-            f"{result.case_id}: AOT manifest empty or missing"
-        )
-    if result.power:
-        assert result.energy_uj and result.energy_uj > 0.0, (
-            f"{result.case_id}: power enabled but zero energy captured"
-        )
+    issues = validation_health_issues(result)
+    assert not issues, f"{result.case_id}: " + "; ".join(issues)
+
+
+def validation_health_issues(result: CaseResult) -> tuple[str, ...]:
+    """Return validation-health failures separately from execution status."""
+
+    issues: list[str] = []
+    if result.status != "pass":
+        issues.append(f"run failed — {result.error}")
+        return tuple(issues)
+    if not result.layers or result.layers < 1:
+        issues.append("summary.json reports no layers")
+    if not result.total_cycles or result.total_cycles <= 0:
+        issues.append("total_cycles == 0 (PMU capture looks broken)")
+    engine = result.engine.value if isinstance(result.engine, EngineType) else result.engine
+    if engine == EngineType.HELIA_AOT.value and (
+        not result.aot_operator_count or result.aot_operator_count < 1
+    ):
+        issues.append("AOT manifest empty or missing")
+    if result.power and (not result.energy_uj or result.energy_uj <= 0.0):
+        issues.append("power enabled but zero energy captured")
+    return tuple(issues)

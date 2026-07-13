@@ -34,6 +34,8 @@ def _skip_result(case: CaseSpec, reason: str) -> CaseResult:
         transport=case.transport.value,
         memory=case.memory.value,
         jlink_serial=case.jlink_serial,
+        attempt=case.attempt,
+        repeat_total=case.repeat_total,
         error=reason,
     )
 
