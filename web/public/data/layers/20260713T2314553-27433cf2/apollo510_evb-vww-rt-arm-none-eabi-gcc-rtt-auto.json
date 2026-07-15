@@ -1,0 +1,486 @@
+{
+  "case_id": "apollo510_evb-vww-rt-arm-none-eabi-gcc-rtt-auto",
+  "identity": {
+    "attempt": 1,
+    "board": "apollo510_evb",
+    "engine": "helia-rt",
+    "model_id": "vww",
+    "requested_memory": {
+      "preset": "auto"
+    },
+    "requested_power": {
+      "enabled": false
+    },
+    "toolchain": "arm-none-eabi-gcc",
+    "transport": "rtt"
+  },
+  "layers": [
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 1260658.0,
+        "ARM_PMU_INST_RETIRED": 948509.0,
+        "ARM_PMU_STALL_BACKEND": 160428.0,
+        "ARM_PMU_STALL_FRONTEND": 20760.0
+      },
+      "cycles": 1260658.0,
+      "cycles_pct": 16.7,
+      "index": 0,
+      "macs": 497664.0,
+      "op": "CONV_2D",
+      "ops": 995328.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 1047197.0,
+        "ARM_PMU_INST_RETIRED": 900042.0,
+        "ARM_PMU_STALL_BACKEND": 126447.0,
+        "ARM_PMU_STALL_FRONTEND": 7753.0
+      },
+      "cycles": 1047197.0,
+      "cycles_pct": 13.8,
+      "index": 1,
+      "macs": 165888.0,
+      "op": "DEPTHWISE_CONV_2D",
+      "ops": 331776.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 689802.0,
+        "ARM_PMU_INST_RETIRED": 517152.0,
+        "ARM_PMU_STALL_BACKEND": 107079.0,
+        "ARM_PMU_STALL_FRONTEND": 7.0
+      },
+      "cycles": 689802.0,
+      "cycles_pct": 9.1,
+      "index": 2,
+      "macs": 294912.0,
+      "op": "CONV_2D",
+      "ops": 589824.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 351149.0,
+        "ARM_PMU_INST_RETIRED": 289733.0,
+        "ARM_PMU_STALL_BACKEND": 53758.0,
+        "ARM_PMU_STALL_FRONTEND": 2199.0
+      },
+      "cycles": 351149.0,
+      "cycles_pct": 4.6,
+      "index": 3,
+      "macs": 82944.0,
+      "op": "DEPTHWISE_CONV_2D",
+      "ops": 165888.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 341271.0,
+        "ARM_PMU_INST_RETIRED": 254064.0,
+        "ARM_PMU_STALL_BACKEND": 54345.0,
+        "ARM_PMU_STALL_FRONTEND": 7.0
+      },
+      "cycles": 341271.0,
+      "cycles_pct": 4.5,
+      "index": 4,
+      "macs": 294912.0,
+      "op": "CONV_2D",
+      "ops": 589824.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 556569.0,
+        "ARM_PMU_INST_RETIRED": 429190.0,
+        "ARM_PMU_STALL_BACKEND": 99294.0,
+        "ARM_PMU_STALL_FRONTEND": 16398.0
+      },
+      "cycles": 556569.0,
+      "cycles_pct": 7.4,
+      "index": 5,
+      "macs": 165888.0,
+      "op": "DEPTHWISE_CONV_2D",
+      "ops": 331776.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 397816.0,
+        "ARM_PMU_INST_RETIRED": 295536.0,
+        "ARM_PMU_STALL_BACKEND": 55860.0,
+        "ARM_PMU_STALL_FRONTEND": 7.0
+      },
+      "cycles": 397816.0,
+      "cycles_pct": 5.3,
+      "index": 6,
+      "macs": 589824.0,
+      "op": "CONV_2D",
+      "ops": 1179648.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 140559.0,
+        "ARM_PMU_INST_RETIRED": 107670.0,
+        "ARM_PMU_STALL_BACKEND": 25705.0,
+        "ARM_PMU_STALL_FRONTEND": 4110.0
+      },
+      "cycles": 140559.0,
+      "cycles_pct": 1.9,
+      "index": 7,
+      "macs": 41472.0,
+      "op": "DEPTHWISE_CONV_2D",
+      "ops": 82944.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 198462.0,
+        "ARM_PMU_INST_RETIRED": 146820.0,
+        "ARM_PMU_STALL_BACKEND": 28291.0,
+        "ARM_PMU_STALL_FRONTEND": 7.0
+      },
+      "cycles": 198462.0,
+      "cycles_pct": 2.6,
+      "index": 8,
+      "macs": 294912.0,
+      "op": "CONV_2D",
+      "ops": 589824.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 241628.0,
+        "ARM_PMU_INST_RETIRED": 177174.0,
+        "ARM_PMU_STALL_BACKEND": 54753.0,
+        "ARM_PMU_STALL_FRONTEND": 4484.0
+      },
+      "cycles": 241628.0,
+      "cycles_pct": 3.2,
+      "index": 9,
+      "macs": 82944.0,
+      "op": "DEPTHWISE_CONV_2D",
+      "ops": 165888.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 244585.0,
+        "ARM_PMU_INST_RETIRED": 188292.0,
+        "ARM_PMU_STALL_BACKEND": 32913.0,
+        "ARM_PMU_STALL_FRONTEND": 7.0
+      },
+      "cycles": 244585.0,
+      "cycles_pct": 3.2,
+      "index": 10,
+      "macs": 589824.0,
+      "op": "CONV_2D",
+      "ops": 1179648.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 61546.0,
+        "ARM_PMU_INST_RETIRED": 44753.0,
+        "ARM_PMU_STALL_BACKEND": 14242.0,
+        "ARM_PMU_STALL_FRONTEND": 1131.0
+      },
+      "cycles": 61546.0,
+      "cycles_pct": 0.8,
+      "index": 11,
+      "macs": 20736.0,
+      "op": "DEPTHWISE_CONV_2D",
+      "ops": 41472.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 131690.0,
+        "ARM_PMU_INST_RETIRED": 94089.0,
+        "ARM_PMU_STALL_BACKEND": 25779.0,
+        "ARM_PMU_STALL_FRONTEND": 7.0
+      },
+      "cycles": 131690.0,
+      "cycles_pct": 1.7,
+      "index": 12,
+      "macs": 294912.0,
+      "op": "CONV_2D",
+      "ops": 589824.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 123502.0,
+        "ARM_PMU_INST_RETIRED": 89355.0,
+        "ARM_PMU_STALL_BACKEND": 30071.0,
+        "ARM_PMU_STALL_FRONTEND": 1464.0
+      },
+      "cycles": 123502.0,
+      "cycles_pct": 1.6,
+      "index": 13,
+      "macs": 41472.0,
+      "op": "DEPTHWISE_CONV_2D",
+      "ops": 82944.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 179589.0,
+        "ARM_PMU_INST_RETIRED": 135561.0,
+        "ARM_PMU_STALL_BACKEND": 32194.0,
+        "ARM_PMU_STALL_FRONTEND": 7.0
+      },
+      "cycles": 179589.0,
+      "cycles_pct": 2.4,
+      "index": 14,
+      "macs": 589824.0,
+      "op": "CONV_2D",
+      "ops": 1179648.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 123168.0,
+        "ARM_PMU_INST_RETIRED": 89355.0,
+        "ARM_PMU_STALL_BACKEND": 29745.0,
+        "ARM_PMU_STALL_FRONTEND": 1465.0
+      },
+      "cycles": 123168.0,
+      "cycles_pct": 1.6,
+      "index": 15,
+      "macs": 41472.0,
+      "op": "DEPTHWISE_CONV_2D",
+      "ops": 82944.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 179968.0,
+        "ARM_PMU_INST_RETIRED": 135561.0,
+        "ARM_PMU_STALL_BACKEND": 32528.0,
+        "ARM_PMU_STALL_FRONTEND": 7.0
+      },
+      "cycles": 179968.0,
+      "cycles_pct": 2.4,
+      "index": 16,
+      "macs": 589824.0,
+      "op": "CONV_2D",
+      "ops": 1179648.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 123098.0,
+        "ARM_PMU_INST_RETIRED": 89355.0,
+        "ARM_PMU_STALL_BACKEND": 29670.0,
+        "ARM_PMU_STALL_FRONTEND": 1466.0
+      },
+      "cycles": 123098.0,
+      "cycles_pct": 1.6,
+      "index": 17,
+      "macs": 41472.0,
+      "op": "DEPTHWISE_CONV_2D",
+      "ops": 82944.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 179612.0,
+        "ARM_PMU_INST_RETIRED": 135561.0,
+        "ARM_PMU_STALL_BACKEND": 32243.0,
+        "ARM_PMU_STALL_FRONTEND": 7.0
+      },
+      "cycles": 179612.0,
+      "cycles_pct": 2.4,
+      "index": 18,
+      "macs": 589824.0,
+      "op": "CONV_2D",
+      "ops": 1179648.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 123185.0,
+        "ARM_PMU_INST_RETIRED": 89355.0,
+        "ARM_PMU_STALL_BACKEND": 29765.0,
+        "ARM_PMU_STALL_FRONTEND": 1464.0
+      },
+      "cycles": 123185.0,
+      "cycles_pct": 1.6,
+      "index": 19,
+      "macs": 41472.0,
+      "op": "DEPTHWISE_CONV_2D",
+      "ops": 82944.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 179709.0,
+        "ARM_PMU_INST_RETIRED": 135561.0,
+        "ARM_PMU_STALL_BACKEND": 32253.0,
+        "ARM_PMU_STALL_FRONTEND": 7.0
+      },
+      "cycles": 179709.0,
+      "cycles_pct": 2.4,
+      "index": 20,
+      "macs": 589824.0,
+      "op": "CONV_2D",
+      "ops": 1179648.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 123195.0,
+        "ARM_PMU_INST_RETIRED": 89355.0,
+        "ARM_PMU_STALL_BACKEND": 29770.0,
+        "ARM_PMU_STALL_FRONTEND": 1462.0
+      },
+      "cycles": 123195.0,
+      "cycles_pct": 1.6,
+      "index": 21,
+      "macs": 41472.0,
+      "op": "DEPTHWISE_CONV_2D",
+      "ops": 82944.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 180138.0,
+        "ARM_PMU_INST_RETIRED": 135561.0,
+        "ARM_PMU_STALL_BACKEND": 32769.0,
+        "ARM_PMU_STALL_FRONTEND": 7.0
+      },
+      "cycles": 180138.0,
+      "cycles_pct": 2.4,
+      "index": 22,
+      "macs": 589824.0,
+      "op": "CONV_2D",
+      "ops": 1179648.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 33898.0,
+        "ARM_PMU_INST_RETIRED": 23724.0,
+        "ARM_PMU_STALL_BACKEND": 8745.0,
+        "ARM_PMU_STALL_FRONTEND": 460.0
+      },
+      "cycles": 33898.0,
+      "cycles_pct": 0.4,
+      "index": 23,
+      "macs": 10368.0,
+      "op": "DEPTHWISE_CONV_2D",
+      "ops": 20736.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 108561.0,
+        "ARM_PMU_INST_RETIRED": 72838.0,
+        "ARM_PMU_STALL_BACKEND": 29284.0,
+        "ARM_PMU_STALL_FRONTEND": 7.0
+      },
+      "cycles": 108561.0,
+      "cycles_pct": 1.4,
+      "index": 24,
+      "macs": 294912.0,
+      "op": "CONV_2D",
+      "ops": 589824.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 63716.0,
+        "ARM_PMU_INST_RETIRED": 44075.0,
+        "ARM_PMU_STALL_BACKEND": 16930.0,
+        "ARM_PMU_STALL_FRONTEND": 942.0
+      },
+      "cycles": 63716.0,
+      "cycles_pct": 0.8,
+      "index": 25,
+      "macs": 20736.0,
+      "op": "DEPTHWISE_CONV_2D",
+      "ops": 41472.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 170293.0,
+        "ARM_PMU_INST_RETIRED": 115846.0,
+        "ARM_PMU_STALL_BACKEND": 48004.0,
+        "ARM_PMU_STALL_FRONTEND": 7.0
+      },
+      "cycles": 170293.0,
+      "cycles_pct": 2.3,
+      "index": 26,
+      "macs": 589824.0,
+      "op": "CONV_2D",
+      "ops": 1179648.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 9312.0,
+        "ARM_PMU_INST_RETIRED": 5371.0,
+        "ARM_PMU_STALL_BACKEND": 3031.0,
+        "ARM_PMU_STALL_FRONTEND": 9.0
+      },
+      "cycles": 9312.0,
+      "cycles_pct": 0.1,
+      "index": 27,
+      "macs": 0.0,
+      "op": "AVERAGE_POOL_2D",
+      "ops": 2304.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 402.0,
+        "ARM_PMU_INST_RETIRED": 241.0,
+        "ARM_PMU_STALL_BACKEND": 68.0,
+        "ARM_PMU_STALL_FRONTEND": 9.0
+      },
+      "cycles": 402.0,
+      "cycles_pct": 0.0,
+      "index": 28,
+      "macs": 0.0,
+      "op": "RESHAPE",
+      "ops": 0.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 1207.0,
+        "ARM_PMU_INST_RETIRED": 626.0,
+        "ARM_PMU_STALL_BACKEND": 403.0,
+        "ARM_PMU_STALL_FRONTEND": 51.0
+      },
+      "cycles": 1207.0,
+      "cycles_pct": 0.0,
+      "index": 29,
+      "macs": 512.0,
+      "op": "FULLY_CONNECTED",
+      "ops": 1024.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 1882.0,
+        "ARM_PMU_INST_RETIRED": 1486.0,
+        "ARM_PMU_STALL_BACKEND": 255.0,
+        "ARM_PMU_STALL_FRONTEND": 15.0
+      },
+      "cycles": 1882.0,
+      "cycles_pct": 0.0,
+      "index": 30,
+      "macs": 0.0,
+      "op": "SOFTMAX",
+      "ops": 10.0,
+      "overflow": false
+    }
+  ],
+  "run_id": "20260713T2314553-27433cf2",
+  "schema_version": 1
+}

@@ -42,6 +42,11 @@ RTT/
 # uv
 uv.lock
 site/
+web/node_modules/
+web/.next/
+web/.wrangler/
+web/dist/
+.pnpm-store/
 
 # Profiling outputs (any location) — consolidate under results/ when possible
 **/results_*/

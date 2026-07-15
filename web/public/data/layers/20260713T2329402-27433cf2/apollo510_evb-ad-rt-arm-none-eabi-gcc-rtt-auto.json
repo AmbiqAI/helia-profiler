@@ -1,0 +1,171 @@
+{
+  "case_id": "apollo510_evb-ad-rt-arm-none-eabi-gcc-rtt-auto",
+  "identity": {
+    "attempt": 1,
+    "board": "apollo510_evb",
+    "engine": "helia-rt",
+    "model_id": "ad",
+    "requested_memory": {
+      "preset": "auto"
+    },
+    "requested_power": {
+      "enabled": false
+    },
+    "toolchain": "arm-none-eabi-gcc",
+    "transport": "rtt"
+  },
+  "layers": [
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 49602.0,
+        "ARM_PMU_INST_RETIRED": 13558.0,
+        "ARM_PMU_STALL_BACKEND": 35672.0,
+        "ARM_PMU_STALL_FRONTEND": 70.0
+      },
+      "cycles": 49602.0,
+      "cycles_pct": 27.3,
+      "index": 0,
+      "macs": 81920.0,
+      "op": "FULLY_CONNECTED",
+      "ops": 163840.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 12143.0,
+        "ARM_PMU_INST_RETIRED": 4342.0,
+        "ARM_PMU_STALL_BACKEND": 7515.0,
+        "ARM_PMU_STALL_FRONTEND": 15.0
+      },
+      "cycles": 12143.0,
+      "cycles_pct": 6.7,
+      "index": 1,
+      "macs": 16384.0,
+      "op": "FULLY_CONNECTED",
+      "ops": 32768.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 12054.0,
+        "ARM_PMU_INST_RETIRED": 4342.0,
+        "ARM_PMU_STALL_BACKEND": 7433.0,
+        "ARM_PMU_STALL_FRONTEND": 12.0
+      },
+      "cycles": 12054.0,
+      "cycles_pct": 6.6,
+      "index": 2,
+      "macs": 16384.0,
+      "op": "FULLY_CONNECTED",
+      "ops": 32768.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 12143.0,
+        "ARM_PMU_INST_RETIRED": 4342.0,
+        "ARM_PMU_STALL_BACKEND": 7528.0,
+        "ARM_PMU_STALL_FRONTEND": 12.0
+      },
+      "cycles": 12143.0,
+      "cycles_pct": 6.7,
+      "index": 3,
+      "macs": 16384.0,
+      "op": "FULLY_CONNECTED",
+      "ops": 32768.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 1438.0,
+        "ARM_PMU_INST_RETIRED": 742.0,
+        "ARM_PMU_STALL_BACKEND": 552.0,
+        "ARM_PMU_STALL_FRONTEND": 12.0
+      },
+      "cycles": 1438.0,
+      "cycles_pct": 0.8,
+      "index": 4,
+      "macs": 1024.0,
+      "op": "FULLY_CONNECTED",
+      "ops": 2048.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 3033.0,
+        "ARM_PMU_INST_RETIRED": 2326.0,
+        "ARM_PMU_STALL_BACKEND": 474.0,
+        "ARM_PMU_STALL_FRONTEND": 12.0
+      },
+      "cycles": 3033.0,
+      "cycles_pct": 1.7,
+      "index": 5,
+      "macs": 1024.0,
+      "op": "FULLY_CONNECTED",
+      "ops": 2048.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 11979.0,
+        "ARM_PMU_INST_RETIRED": 4342.0,
+        "ARM_PMU_STALL_BACKEND": 7369.0,
+        "ARM_PMU_STALL_FRONTEND": 12.0
+      },
+      "cycles": 11979.0,
+      "cycles_pct": 6.6,
+      "index": 6,
+      "macs": 16384.0,
+      "op": "FULLY_CONNECTED",
+      "ops": 32768.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 10582.0,
+        "ARM_PMU_INST_RETIRED": 4342.0,
+        "ARM_PMU_STALL_BACKEND": 5974.0,
+        "ARM_PMU_STALL_FRONTEND": 12.0
+      },
+      "cycles": 10582.0,
+      "cycles_pct": 5.8,
+      "index": 7,
+      "macs": 16384.0,
+      "op": "FULLY_CONNECTED",
+      "ops": 32768.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 11260.0,
+        "ARM_PMU_INST_RETIRED": 4342.0,
+        "ARM_PMU_STALL_BACKEND": 6602.0,
+        "ARM_PMU_STALL_FRONTEND": 48.0
+      },
+      "cycles": 11260.0,
+      "cycles_pct": 6.2,
+      "index": 8,
+      "macs": 16384.0,
+      "op": "FULLY_CONNECTED",
+      "ops": 32768.0,
+      "overflow": false
+    },
+    {
+      "counters": {
+        "ARM_PMU_CPU_CYCLES": 57478.0,
+        "ARM_PMU_INST_RETIRED": 19702.0,
+        "ARM_PMU_STALL_BACKEND": 36897.0,
+        "ARM_PMU_STALL_FRONTEND": 44.0
+      },
+      "cycles": 57478.0,
+      "cycles_pct": 31.6,
+      "index": 9,
+      "macs": 81920.0,
+      "op": "FULLY_CONNECTED",
+      "ops": 163840.0,
+      "overflow": false
+    }
+  ],
+  "run_id": "20260713T2329402-27433cf2",
+  "schema_version": 1
+}
