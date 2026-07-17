@@ -1,4 +1,4 @@
-"""Joulescope external power measurement driver (unified JS110 + JS220)."""
+"""Joulescope external power measurement driver (JS110, JS220, and JS320)."""
 
 from __future__ import annotations
 
@@ -26,10 +26,11 @@ log = logging.getLogger("hpx")
 
 
 class JoulescopeDriver:
-    """External power driver for Joulescope JS110 and JS220.
+    """External power driver for Joulescope JS110, JS220, and JS320.
 
     Always uses :mod:`pyjoulescope_driver`.  The device family is auto-
-    detected from the enumerated device path.
+    detected from the enumerated device path. JS320 uses the JS220
+    publish/subscribe topic protocol.
     """
 
     def __init__(self, *, serial: str | None = None) -> None:
@@ -50,11 +51,11 @@ class JoulescopeDriver:
 
     @property
     def num_gpi(self) -> int:
-        return 2  # JS110/JS220 expose 2 general-purpose inputs
+        return 2  # JS110/JS220/JS320 expose 2 general-purpose inputs
 
     @property
     def has_gpo(self) -> bool:
-        return True  # JS110/JS220 expose 2 general-purpose outputs
+        return True
 
     def make_sync_controller(self, wiring: SyncWiring) -> SyncController:
         """Return a 3-wire lock-step controller, or a gate-only fallback."""
@@ -81,7 +82,7 @@ class JoulescopeDriver:
             raise PowerError(
                 f"pyjoulescope_driver failed to import: {exc}",
                 hint="Likely a numpy ABI mismatch. Try: "
-                "pip install --force-reinstall 'pyjoulescope_driver' 'pyjls'.",
+                "pip install --force-reinstall 'pyjoulescope-driver' 'pyjls'.",
             ) from exc
 
     # ------------------------------------------------------------------
@@ -112,14 +113,14 @@ class JoulescopeDriver:
         except Exception as exc:
             raise PowerError(
                 f"Joulescope capture requires pyjoulescope_driver: {exc}",
-                hint="Reinstall pyjoulescope_driver and pyjls in the active environment.",
+                hint="Reinstall pyjoulescope-driver and pyjls in the active environment.",
             ) from exc
 
         driver, device_path, family = _open_device(self._serial)
 
         stats_topic = f"{device_path}/{_STATS_TOPIC[family]}"
         ctrl = _STATS_CTRL[family]
-        cycle_topic, off_value, on_value = _POWER_CYCLE[family]
+        cycle_topic, _off_value, on_value = _POWER_CYCLE[family]
 
         packets: list[dict[str, Any]] = []
 
@@ -304,7 +305,7 @@ class JoulescopeDriver:
         if not devices:
             return _bail(
                 "No Joulescope detected",
-                hint="Plug in a JS110 or JS220 and ensure it is powered on.",
+                hint="Plug in a JS110, JS220, or JS320 and ensure it is powered on.",
                 level=logging.DEBUG,
             )
 

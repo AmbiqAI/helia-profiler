@@ -140,7 +140,7 @@ class PowerDriver(Protocol):
 
         This is only meaningful for external host instruments that can sample
         current/voltage while also observing a sync input (for example,
-        Joulescope JS110/JS220). Drivers without host-side GPIO visibility
+        Joulescope JS110/JS220/JS320). Drivers without host-side GPIO visibility
         should raise :class:`PowerError`.
         """
         ...

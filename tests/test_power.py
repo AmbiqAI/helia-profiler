@@ -270,6 +270,48 @@ class TestGatedStatsProcessing:
         assert diagnostics["mask_time_axis"] == "host_packet_arrival_time64"
         assert diagnostics["selected_packets"] == 10
 
+    def test_maps_gpi_polls_to_instrument_packet_timeline(self):
+        from helia_profiler.power.joulescope.stats import (
+            _map_poll_samples_to_packet_time,
+            _process_gated_stats,
+        )
+
+        ms = _SECOND // 1000
+        packets = [
+            self._packet_with_host_time(
+                i * ms,
+                (i + 1) * ms,
+                0.0001,
+                0.00018,
+                0.12,
+                host_time64=(100 + i) * ms,
+            )
+            for i in range(20)
+        ]
+
+        mapped = _map_poll_samples_to_packet_time(
+            packets=packets,
+            poll_samples=[
+                (100 * ms, 0),
+                ((209 * ms) // 2, 1),
+                ((229 * ms) // 2, 0),
+            ],
+        )
+
+        assert [level for _tick, level in mapped] == [0, 1, 0]
+        assert abs(mapped[0][0] - (ms // 2)) <= 1
+        assert abs(mapped[1][0] - (5 * ms)) <= 1
+        assert abs(mapped[2][0] - (15 * ms)) <= 1
+        windows, summary = _process_gated_stats(
+            packets=packets,
+            poll_samples=mapped,
+            io_voltage=1.8,
+            prefer_device_time=True,
+        )
+        assert len(windows) == 1
+        assert windows[0].sample_count == 10
+        assert summary.avg_current_a == pytest.approx(0.1, rel=1e-6)
+
     def test_whole_summary_sums_all_packets(self):
         from helia_profiler.power.joulescope.stats import _whole_summary_from_stats
 
@@ -339,6 +381,23 @@ class TestJoulescopeUngatedCapture:
 
         assert result.summary.sample_count == 1
         assert result.summary.avg_current_a == pytest.approx(0.01, rel=1e-6)
+
+    def test_capture_processes_js320_stats_packet(self, monkeypatch: pytest.MonkeyPatch):
+        from helia_profiler.power.joulescope.driver import JoulescopeDriver
+
+        fake_driver = self._FakeDriver(self._stats_packet())
+        monkeypatch.setattr(
+            "helia_profiler.power.joulescope.driver._open_device",
+            lambda serial: (fake_driver, "u/js320/25QG", "js320"),
+        )
+        monkeypatch.setattr("helia_profiler.power.joulescope.driver.time.sleep", lambda _s: None)
+
+        driver = JoulescopeDriver(serial="25QG")
+        result = driver.capture(duration_s=0.01, io_voltage=1.8)
+
+        assert result.summary.sample_count == 1
+        assert result.summary.avg_current_a == pytest.approx(0.01, rel=1e-6)
+        assert ("u/js320/25QG/s/i/range/mode", "auto") in fake_driver.published
 
 
 class TestPowerMode:

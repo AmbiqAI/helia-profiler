@@ -28,6 +28,7 @@ from .device import (
 from .diagnostics import _gated_stats_diagnostics
 from .stats import (
     _fullrate_energy_over_windows,
+    _map_poll_samples_to_packet_time,
     _process_gated_stats,
     _summary_to_dict,
     _whole_summary_from_stats,
@@ -76,7 +77,7 @@ def capture_gated(
     except Exception as exc:
         raise PowerError(
             f"Joulescope gated capture requires pyjoulescope_driver: {exc}",
-            hint="Reinstall pyjoulescope_driver and pyjls in the active environment.",
+            hint="Reinstall pyjoulescope-driver and pyjls in the active environment.",
         ) from exc
 
     log.debug("gate-race timeline: _open_device() start t=%.3f", time.time())
@@ -99,7 +100,9 @@ def capture_gated(
 
     def _on_stats(_topic: str, value: Any) -> None:
         if isinstance(value, dict):
-            packets.append(value)
+            packet = dict(value)
+            packet["_host_time64"] = time64.now()
+            packets.append(packet)
 
     # Opt-in full-rate cross-check (AutoDeploy-equivalent reference method).
     # Set HPX_POWER_FULLRATE_XCHECK=1 to also stream raw s/i + s/v at the
@@ -242,10 +245,19 @@ def capture_gated(
                 except Exception:
                     pass
 
+        aligned_poll_samples = poll_samples
+        use_device_time_axis = family in ("js220", "js320")
+        if use_device_time_axis:
+            aligned_poll_samples = _map_poll_samples_to_packet_time(
+                packets=packets,
+                poll_samples=poll_samples,
+            )
+
         windows, gated_summary = _process_gated_stats(
             packets=packets,
-            poll_samples=poll_samples,
+            poll_samples=aligned_poll_samples,
             io_voltage=io_voltage,
+            prefer_device_time=use_device_time_axis,
         )
         if not windows:
             failure = classify_gate_failure(
@@ -298,7 +310,7 @@ def capture_gated(
                 cur_chunks=fr_cur,
                 volt_chunks=fr_volt,
                 anchors=fr_anchors,
-                poll_samples=poll_samples,
+                poll_samples=aligned_poll_samples,
             )
             if fr:
                 metadata["fullrate_xcheck"] = fr
@@ -332,7 +344,8 @@ def capture_gated(
             metadata["whole_capture_summary"] = _summary_to_dict(whole_summary)
             diagnostics = _gated_stats_diagnostics(
                 packets=packets,
-                poll_samples=poll_samples,
+                poll_samples=aligned_poll_samples,
+                prefer_device_time=use_device_time_axis,
             )
             metadata["gating_diagnostics"] = diagnostics
             sane_window = gated_summary.avg_current_a > whole_summary.avg_current_a

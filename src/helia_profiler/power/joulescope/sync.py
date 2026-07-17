@@ -22,6 +22,7 @@ class JoulescopeSyncController:
         self._wiring = wiring
         self._driver: Any = None
         self._path: str | None = None
+        self._family: str | None = None
 
     @property
     def lockstep(self) -> bool:
@@ -29,7 +30,7 @@ class JoulescopeSyncController:
 
     def _ensure(self) -> tuple[Any, str]:
         if self._driver is None:
-            self._driver, self._path, _family = _open_device(self._serial)
+            self._driver, self._path, self._family = _open_device(self._serial)
         return self._driver, str(self._path)
 
     def _read_input(self, index: int) -> bool:
@@ -41,7 +42,11 @@ class JoulescopeSyncController:
 
     def _write_go(self, high: bool) -> None:
         driver, path = self._ensure()
-        driver.publish(f"{path}/s/gpo/{self._wiring.go_output_index}/value", 1 if high else 0)
+        if self._family in ("js220", "js320"):
+            topic = "s/gpo/+/!set" if high else "s/gpo/+/!clr"
+            driver.publish(f"{path}/{topic}", 1 << self._wiring.go_output_index)
+        else:
+            driver.publish(f"{path}/s/gpo/{self._wiring.go_output_index}/value", 1 if high else 0)
 
     def arm(self) -> None:
         self._write_go(False)
@@ -89,6 +94,7 @@ class JoulescopeSyncController:
             driver, path = self._driver, self._path
             self._driver = None
             self._path = None
+            self._family = None
             try:
                 _close_device(driver, str(path))
             except Exception:  # pragma: no cover - defensive

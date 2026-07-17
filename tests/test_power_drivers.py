@@ -83,13 +83,14 @@ class TestJoulescopeOpenRetries:
 class _FakeJsDriver:
     """Minimal fake ``pyjoulescope_driver.Driver`` for open/close refcounting."""
 
-    def __init__(self) -> None:
+    def __init__(self, device_path: str = "u/js110/004204") -> None:
+        self.device_path = device_path
         self.open_calls = 0
         self.close_calls = 0
         self.published: dict[str, object] = {}
 
     def device_paths(self):
-        return ["u/js110/004204"]
+        return [self.device_path]
 
     def open(self, device_path):
         self.open_calls += 1
@@ -168,3 +169,22 @@ class TestJoulescopeSyncControllerRelease:
         _close_device(capture_drv, capture_path)
         assert fake_drv.close_calls == 1
         assert "u/js110/004204" not in device_mod._open_refcounts
+
+    def test_js320_uses_bitmap_gpo_commands(self, monkeypatch: pytest.MonkeyPatch):
+        from helia_profiler.power.joulescope import device as device_mod
+
+        device_mod._open_refcounts.clear()
+        fake_drv = _FakeJsDriver("u/js320/25QG")
+        controller = self._make_controller(monkeypatch, fake_drv)
+
+        controller.arm()
+        controller.signal_go()
+
+        assert fake_drv.published == {
+            "u/js320/25QG/s/gpo/+/!clr": 1,
+            "u/js320/25QG/s/gpo/+/!set": 1,
+        }
+
+        controller.release()
+        assert fake_drv.close_calls == 1
+        assert "u/js320/25QG" not in device_mod._open_refcounts
