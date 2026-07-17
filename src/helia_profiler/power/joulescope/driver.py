@@ -55,19 +55,7 @@ class JoulescopeDriver:
 
     @property
     def has_gpo(self) -> bool:
-        # JS320 exposes GPI but no Joulescope GPO topic.  Keep discovery
-        # lightweight and avoid opening a device just to choose the sync
-        # controller; an unknown family remains optimistic until the normal
-        # serial/device selection path resolves it.
-        return self._selected_family() != "js320"
-
-    def _selected_family(self) -> str | None:
-        devices = enumerate_devices()
-        if self._serial is not None:
-            wanted = str(self._serial).lstrip("0") or "0"
-            matched = [family for path, family in devices if wanted in path]
-            return matched[0] if matched else None
-        return devices[0][1] if len(devices) == 1 else None
+        return True
 
     def make_sync_controller(self, wiring: SyncWiring) -> SyncController:
         """Return a 3-wire lock-step controller, or a gate-only fallback."""
