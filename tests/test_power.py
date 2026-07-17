@@ -270,6 +270,29 @@ class TestGatedStatsProcessing:
         assert diagnostics["mask_time_axis"] == "host_packet_arrival_time64"
         assert diagnostics["selected_packets"] == 10
 
+    def test_maps_gpi_polls_to_instrument_packet_timeline(self):
+        from helia_profiler.power.joulescope.stats import _map_poll_samples_to_packet_time
+
+        ms = _SECOND // 1000
+        packets = [
+            self._packet_with_host_time(
+                i * ms,
+                (i + 1) * ms,
+                0.0001,
+                0.00018,
+                0.12,
+                host_time64=(100 + i) * ms,
+            )
+            for i in range(20)
+        ]
+
+        mapped = _map_poll_samples_to_packet_time(
+            packets=packets,
+            poll_samples=[(105 * ms, 1), (115 * ms, 0)],
+        )
+
+        assert mapped == [((11 * ms) // 2, 1), ((31 * ms) // 2, 0)]
+
     def test_whole_summary_sums_all_packets(self):
         from helia_profiler.power.joulescope.stats import _whole_summary_from_stats
 

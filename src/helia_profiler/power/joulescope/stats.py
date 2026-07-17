@@ -158,6 +158,44 @@ def _gated_mask_axis(a: dict[str, Any]) -> tuple[Any, str]:
     return a["mid"], "device_packet_midpoint_time64"
 
 
+def _map_poll_samples_to_packet_time(
+    *,
+    packets: list[dict[str, Any]],
+    poll_samples: list[tuple[int, int]],
+) -> list[tuple[int, int]]:
+    """Map host-timestamped GPI polls onto the instrument stats timeline.
+
+    JS220/JS320 ``s/stats`` callbacks can arrive in USB bursts. Selecting
+    packets by callback arrival time therefore truncates a correctly observed
+    GPIO window. Each packet includes both its instrument midpoint and the
+    host timestamp captured at callback arrival, which provides the conversion
+    needed to express GPI poll instants on the instrument timeline.
+    """
+    import numpy as np
+
+    if len(poll_samples) < 1:
+        return poll_samples
+
+    a = _stats_arrays(packets)
+    host_time = a["host_time"]
+    device_time = a["mid"]
+    if host_time.size < 2 or np.isnan(host_time).any():
+        return poll_samples
+
+    order = np.argsort(host_time)
+    host_time = host_time[order]
+    device_time = device_time[order]
+    unique = np.concatenate(([True], np.diff(host_time) > 0))
+    host_time = host_time[unique]
+    device_time = device_time[unique]
+    if host_time.size < 2:
+        return poll_samples
+
+    polls = np.asarray([tick for tick, _level in poll_samples], dtype=np.float64)
+    mapped = np.interp(polls, host_time, device_time)
+    return [(int(tick), level) for tick, (_host_tick, level) in zip(mapped, poll_samples)]
+
+
 def _whole_summary_from_stats(packets: list[dict[str, Any]]) -> PowerSummary:
     """Summarise the entire captured window from on-device stat integrals."""
     from pyjoulescope_driver import time64

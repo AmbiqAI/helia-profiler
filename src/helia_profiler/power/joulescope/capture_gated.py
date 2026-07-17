@@ -28,6 +28,7 @@ from .device import (
 from .diagnostics import _gated_stats_diagnostics
 from .stats import (
     _fullrate_energy_over_windows,
+    _map_poll_samples_to_packet_time,
     _process_gated_stats,
     _summary_to_dict,
     _whole_summary_from_stats,
@@ -242,9 +243,16 @@ def capture_gated(
                 except Exception:
                     pass
 
+        aligned_poll_samples = poll_samples
+        if family in ("js220", "js320"):
+            aligned_poll_samples = _map_poll_samples_to_packet_time(
+                packets=packets,
+                poll_samples=poll_samples,
+            )
+
         windows, gated_summary = _process_gated_stats(
             packets=packets,
-            poll_samples=poll_samples,
+            poll_samples=aligned_poll_samples,
             io_voltage=io_voltage,
         )
         if not windows:
@@ -298,7 +306,7 @@ def capture_gated(
                 cur_chunks=fr_cur,
                 volt_chunks=fr_volt,
                 anchors=fr_anchors,
-                poll_samples=poll_samples,
+                poll_samples=aligned_poll_samples,
             )
             if fr:
                 metadata["fullrate_xcheck"] = fr
@@ -332,7 +340,7 @@ def capture_gated(
             metadata["whole_capture_summary"] = _summary_to_dict(whole_summary)
             diagnostics = _gated_stats_diagnostics(
                 packets=packets,
-                poll_samples=poll_samples,
+                poll_samples=aligned_poll_samples,
             )
             metadata["gating_diagnostics"] = diagnostics
             sane_window = gated_summary.avg_current_a > whole_summary.avg_current_a
