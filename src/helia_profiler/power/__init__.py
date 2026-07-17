@@ -71,7 +71,6 @@ def _register_builtins() -> None:
     register_driver("joulescope-js110", JoulescopeDriver)
     register_driver("joulescope-js220", JoulescopeDriver)
     register_driver("joulescope-js320", JoulescopeDriver)
-    register_driver("joulescope-js320", JoulescopeDriver)
     register_driver("ondevice", OnDeviceDriver)
 
 
