@@ -271,7 +271,10 @@ class TestGatedStatsProcessing:
         assert diagnostics["selected_packets"] == 10
 
     def test_maps_gpi_polls_to_instrument_packet_timeline(self):
-        from helia_profiler.power.joulescope.stats import _map_poll_samples_to_packet_time
+        from helia_profiler.power.joulescope.stats import (
+            _map_poll_samples_to_packet_time,
+            _process_gated_stats,
+        )
 
         ms = _SECOND // 1000
         packets = [
@@ -288,10 +291,26 @@ class TestGatedStatsProcessing:
 
         mapped = _map_poll_samples_to_packet_time(
             packets=packets,
-            poll_samples=[(105 * ms, 1), (115 * ms, 0)],
+            poll_samples=[
+                (100 * ms, 0),
+                ((209 * ms) // 2, 1),
+                ((229 * ms) // 2, 0),
+            ],
         )
 
-        assert mapped == [((11 * ms) // 2, 1), ((31 * ms) // 2, 0)]
+        assert [level for _tick, level in mapped] == [0, 1, 0]
+        assert abs(mapped[0][0] - (ms // 2)) <= 1
+        assert abs(mapped[1][0] - (5 * ms)) <= 1
+        assert abs(mapped[2][0] - (15 * ms)) <= 1
+        windows, summary = _process_gated_stats(
+            packets=packets,
+            poll_samples=mapped,
+            io_voltage=1.8,
+            prefer_device_time=True,
+        )
+        assert len(windows) == 1
+        assert windows[0].sample_count == 10
+        assert summary.avg_current_a == pytest.approx(0.1, rel=1e-6)
 
     def test_whole_summary_sums_all_packets(self):
         from helia_profiler.power.joulescope.stats import _whole_summary_from_stats

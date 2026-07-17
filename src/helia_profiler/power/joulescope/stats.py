@@ -147,8 +147,10 @@ def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _gated_mask_axis(a: dict[str, Any]) -> tuple[Any, str]:
+def _gated_mask_axis(a: dict[str, Any], *, prefer_device_time: bool = False) -> tuple[Any, str]:
     """Return the timestamp axis used to align packets with GPI polls."""
+    if prefer_device_time:
+        return a["mid"], "device_packet_midpoint_time64"
     host_time = a.get("host_time")
     if host_time is not None and getattr(host_time, "size", 0) and not bool(host_time.size == 0):
         import numpy as np
@@ -336,6 +338,7 @@ def _process_gated_stats(
     packets: list[dict[str, Any]],
     poll_samples: list[tuple[int, int]],
     io_voltage: float,
+    prefer_device_time: bool = False,
 ) -> tuple[list[GatedPowerWindow], PowerSummary]:
     """Integrate the gated window(s) from on-device stat-packet integrals.
 
@@ -356,7 +359,7 @@ def _process_gated_stats(
     if a["mid"].size == 0 or not windows:
         return [], PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0)
 
-    mask_axis, _axis_name = _gated_mask_axis(a)
+    mask_axis, _axis_name = _gated_mask_axis(a, prefer_device_time=prefer_device_time)
     t0 = float(mask_axis.min())
     gated_windows: list[GatedPowerWindow] = []
     total_charge = 0.0

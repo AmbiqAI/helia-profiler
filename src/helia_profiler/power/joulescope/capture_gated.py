@@ -100,7 +100,9 @@ def capture_gated(
 
     def _on_stats(_topic: str, value: Any) -> None:
         if isinstance(value, dict):
-            packets.append(value)
+            packet = dict(value)
+            packet["_host_time64"] = time64.now()
+            packets.append(packet)
 
     # Opt-in full-rate cross-check (AutoDeploy-equivalent reference method).
     # Set HPX_POWER_FULLRATE_XCHECK=1 to also stream raw s/i + s/v at the
@@ -244,7 +246,8 @@ def capture_gated(
                     pass
 
         aligned_poll_samples = poll_samples
-        if family in ("js220", "js320"):
+        use_device_time_axis = family in ("js220", "js320")
+        if use_device_time_axis:
             aligned_poll_samples = _map_poll_samples_to_packet_time(
                 packets=packets,
                 poll_samples=poll_samples,
@@ -254,6 +257,7 @@ def capture_gated(
             packets=packets,
             poll_samples=aligned_poll_samples,
             io_voltage=io_voltage,
+            prefer_device_time=use_device_time_axis,
         )
         if not windows:
             failure = classify_gate_failure(
@@ -341,6 +345,7 @@ def capture_gated(
             diagnostics = _gated_stats_diagnostics(
                 packets=packets,
                 poll_samples=aligned_poll_samples,
+                prefer_device_time=use_device_time_axis,
             )
             metadata["gating_diagnostics"] = diagnostics
             sane_window = gated_summary.avg_current_a > whole_summary.avg_current_a
