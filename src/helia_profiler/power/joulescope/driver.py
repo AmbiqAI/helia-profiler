@@ -82,7 +82,7 @@ class JoulescopeDriver:
             raise PowerError(
                 f"pyjoulescope_driver failed to import: {exc}",
                 hint="Likely a numpy ABI mismatch. Try: "
-                "pip install --force-reinstall 'pyjoulescope_driver' 'pyjls'.",
+                "pip install --force-reinstall 'pyjoulescope-driver' 'pyjls'.",
             ) from exc
 
     # ------------------------------------------------------------------
@@ -113,7 +113,7 @@ class JoulescopeDriver:
         except Exception as exc:
             raise PowerError(
                 f"Joulescope capture requires pyjoulescope_driver: {exc}",
-                hint="Reinstall pyjoulescope_driver and pyjls in the active environment.",
+                hint="Reinstall pyjoulescope-driver and pyjls in the active environment.",
             ) from exc
 
         driver, device_path, family = _open_device(self._serial)

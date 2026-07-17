@@ -122,7 +122,7 @@ def _get_shared_driver() -> Any:
     except ImportError as exc:
         raise PowerError(
             "pyjoulescope_driver package not installed",
-            hint="pip install pyjoulescope_driver",
+            hint="pip install pyjoulescope-driver",
         ) from exc
 
     try:

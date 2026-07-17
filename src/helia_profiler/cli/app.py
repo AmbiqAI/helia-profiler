@@ -732,11 +732,17 @@ def power_on_command(
         click_type=_POWER_ON_DRIVER_CHOICE,
         help="Joulescope driver (default: auto-detect)",
     ),
+    power_serial: Optional[str] = typer.Option(
+        None,
+        "--power-serial",
+        "--js-serial",
+        help="Joulescope serial number to select when multiple are connected",
+    ),
 ) -> None:
     """Enable Joulescope current passthrough and hold open until Ctrl-C."""
     from .power_cmd import _cmd_power_on
 
-    _cmd_power_on(SimpleNamespace(driver=driver))
+    _cmd_power_on(SimpleNamespace(driver=driver, power_serial=power_serial))
 
 
 # ---------------------------------------------------------------------------

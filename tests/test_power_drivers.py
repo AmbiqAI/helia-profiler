@@ -184,3 +184,7 @@ class TestJoulescopeSyncControllerRelease:
             "u/js320/25QG/s/gpo/+/!clr": 1,
             "u/js320/25QG/s/gpo/+/!set": 1,
         }
+
+        controller.release()
+        assert fake_drv.close_calls == 1
+        assert "u/js320/25QG" not in device_mod._open_refcounts

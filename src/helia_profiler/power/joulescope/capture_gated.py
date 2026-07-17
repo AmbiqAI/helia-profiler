@@ -76,7 +76,7 @@ def capture_gated(
     except Exception as exc:
         raise PowerError(
             f"Joulescope gated capture requires pyjoulescope_driver: {exc}",
-            hint="Reinstall pyjoulescope_driver and pyjls in the active environment.",
+            hint="Reinstall pyjoulescope-driver and pyjls in the active environment.",
         ) from exc
 
     log.debug("gate-race timeline: _open_device() start t=%.3f", time.time())
