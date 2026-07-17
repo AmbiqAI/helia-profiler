@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import threading
 
 
 def _cmd_power_on(args: argparse.Namespace) -> None:
@@ -34,9 +35,7 @@ def _cmd_power_on(args: argparse.Namespace) -> None:
 
     print("Board powered — press Ctrl-C to release.")
     try:
-        import signal
-
-        signal.pause()
+        threading.Event().wait()
     except KeyboardInterrupt:
         pass
     finally:

@@ -12,7 +12,7 @@ def test_power_on_passes_selected_joulescope_serial():
     driver = MagicMock()
     with (
         patch("helia_profiler.power.get_driver", return_value=driver) as get_driver,
-        patch("signal.pause", side_effect=KeyboardInterrupt),
+        patch("threading.Event.wait", side_effect=KeyboardInterrupt),
     ):
         _cmd_power_on(SimpleNamespace(driver="joulescope-js320", power_serial="25QG"))
 
