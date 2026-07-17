@@ -120,7 +120,7 @@ class JoulescopeDriver:
 
         stats_topic = f"{device_path}/{_STATS_TOPIC[family]}"
         ctrl = _STATS_CTRL[family]
-        power_control = _POWER_CYCLE[family]
+        cycle_topic, _off_value, on_value = _POWER_CYCLE[family]
 
         packets: list[dict[str, Any]] = []
 
@@ -131,14 +131,12 @@ class JoulescopeDriver:
                 packets.append(packet)
 
         try:
-            if power_control is not None:
-                # Make sure current is flowing through the shunt (auto range).
-                cycle_topic, _off_value, on_value = power_control
-                try:
-                    driver.publish(f"{device_path}/{cycle_topic}", on_value)
-                except Exception:
-                    # Some drivers reject re-setting the same value; ignore.
-                    pass
+            # Make sure current is flowing through the shunt (auto range).
+            try:
+                driver.publish(f"{device_path}/{cycle_topic}", on_value)
+            except Exception:
+                # Some drivers reject re-setting the same value; ignore.
+                pass
 
             driver.subscribe(stats_topic, "pub", _on_stats)
             try:
@@ -219,14 +217,7 @@ class JoulescopeDriver:
         )
 
         driver, device_path, family = _open_device(self._serial)
-        power_control = _POWER_CYCLE[family]
-        if power_control is None:
-            _close_device(driver, device_path)
-            raise PowerError(
-                f"Joulescope {family.upper()} cannot power-cycle the target",
-                hint="Use a debug reset or a power monitor with relay control.",
-            )
-        topic, off_value, on_value = power_control
+        topic, off_value, on_value = _POWER_CYCLE[family]
 
         try:
             driver.publish(f"{device_path}/{topic}", off_value)
@@ -254,14 +245,7 @@ class JoulescopeDriver:
     def enable_passthrough(self) -> None:
         """Open the Joulescope and enable current passthrough (close relay)."""
         driver, device_path, family = _open_device(self._serial)
-        power_control = _POWER_CYCLE[family]
-        if power_control is None:
-            _close_device(driver, device_path)
-            raise PowerError(
-                f"Joulescope {family.upper()} cannot ensure target power",
-                hint="Power the target separately or use a monitor with relay control.",
-            )
-        topic, _off_value, on_value = power_control
+        topic, _off_value, on_value = _POWER_CYCLE[family]
         try:
             driver.publish(f"{device_path}/{topic}", on_value)
         except Exception as exc:

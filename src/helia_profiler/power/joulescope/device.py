@@ -45,12 +45,11 @@ _STATS_CTRL = {
 
 #: ``(topic, off_value, on_value)`` for cutting / restoring target power.
 #: JS110: ``s/i/range/select`` (0 = off, 128 = auto).
-#: JS220: ``s/i/range/mode`` ('off' / 'auto'). JS320 has no relay-control
-#: topic, so it supports measurement but not target power control.
+#: JS220/JS320: ``s/i/range/mode`` ('off' / 'auto').
 _POWER_CYCLE = {
     "js110": ("s/i/range/select", 0, 128),
     "js220": ("s/i/range/mode", "off", "auto"),
-    "js320": None,
+    "js320": ("s/i/range/mode", "off", "auto"),
 }
 
 #: Native full-rate sampling frequency per family (Hz).  Used to convert a

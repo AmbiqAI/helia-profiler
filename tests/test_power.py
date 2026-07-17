@@ -339,25 +339,6 @@ class TestJoulescopeUngatedCapture:
 
         assert result.summary.sample_count == 1
         assert result.summary.avg_current_a == pytest.approx(0.01, rel=1e-6)
-        assert ("u/js320/25QG/s/i/range/mode", "auto") not in fake_driver.published
-
-    def test_js320_power_cycle_is_rejected(self, monkeypatch: pytest.MonkeyPatch):
-        from helia_profiler.power.joulescope.driver import JoulescopeDriver
-
-        fake_driver = self._FakeDriver(self._stats_packet())
-        monkeypatch.setattr(
-            "helia_profiler.power.joulescope.driver._open_device",
-            lambda serial: (fake_driver, "u/js320/25QG", "js320"),
-        )
-        monkeypatch.setattr(
-            "helia_profiler.power.joulescope.driver._close_device",
-            lambda driver, path: None,
-        )
-
-        with pytest.raises(PowerError, match="cannot power-cycle"):
-            JoulescopeDriver(serial="25QG").power_cycle()
-
-        assert fake_driver.published == []
 
     def test_capture_processes_js320_stats_packet(self, monkeypatch: pytest.MonkeyPatch):
         from helia_profiler.power.joulescope.driver import JoulescopeDriver
@@ -374,6 +355,7 @@ class TestJoulescopeUngatedCapture:
 
         assert result.summary.sample_count == 1
         assert result.summary.avg_current_a == pytest.approx(0.01, rel=1e-6)
+        assert ("u/js320/25QG/s/i/range/mode", "auto") in fake_driver.published
 
 
 class TestPowerMode:

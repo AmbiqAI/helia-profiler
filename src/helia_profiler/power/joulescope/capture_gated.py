@@ -83,7 +83,7 @@ def capture_gated(
     driver, device_path, family = _open_device(self._serial)
     log.debug("gate-race timeline: _open_device() done t=%.3f", time.time())
 
-    power_control = _POWER_CYCLE[family]
+    cycle_topic, _off_value, on_value = _POWER_CYCLE[family]
     native_rate = _NATIVE_SAMPLE_RATE[family]
     scnt_topic, sctrl_topic, sval_topic = _HOST_STATS[family]
     scnt = max(1, round(native_rate / max(1, int(stats_rate_hz))))
@@ -186,9 +186,7 @@ def capture_gated(
     capture_start = time.monotonic()
     try:
         try:
-            if power_control is not None:
-                cycle_topic, _off_value, on_value = power_control
-                driver.publish(f"{device_path}/{cycle_topic}", on_value)
+            driver.publish(f"{device_path}/{cycle_topic}", on_value)
         except Exception:
             pass
 
