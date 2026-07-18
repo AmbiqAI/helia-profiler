@@ -56,3 +56,6 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
     assert "helia_profiler/data/run_metadata.schema.v1.json" in names
     assert "helia_profiler/data/profile_results.schema.v1.json" in names
     assert "helia_profiler/data/session_intent.schema.v1.json" in names
+    assert "helia_profiler/vendor/segger_rtt/RTT/SEGGER_RTT.c" in names
+    assert "helia_profiler/vendor/segger_rtt/RTT/SEGGER_RTT.h" in names
+    assert "helia_profiler/vendor/segger_rtt/RTT/SEGGER_RTT_ConfDefaults.h" in names

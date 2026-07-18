@@ -38,7 +38,7 @@ examples/notebooks/results/
 
 # Local SEGGER RTT checkouts used by RTT firmware generation
 segger-rtt/
-RTT/
+/RTT/
 
 # uv
 uv.lock
