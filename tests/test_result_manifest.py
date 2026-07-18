@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.errors import ReportError
-from helia_profiler.result_manifest import (
+from helia_profiler.results import (
     ResultArtifact,
     ResultManifest,
     ResultValidity,

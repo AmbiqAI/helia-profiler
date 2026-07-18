@@ -2,8 +2,8 @@
 
 from ._version import __version__
 from .api import profile
-from .compare import CompareResult
 from .evaluation import (
+    CompareResult,
     ComparabilityAssessment,
     ComparabilityIssue,
     ComparabilitySeverity,
@@ -17,6 +17,7 @@ from .evaluation import (
     assess_comparability,
     evaluate_comparison_profile,
     RunEvaluation,
+    ModelAnalysis,
     evaluate_run,
 )
 from .config import (
@@ -53,11 +54,9 @@ from .errors import (
     ReportError,
 )
 from .placement import Placement
-from .model_analysis import ModelAnalysis
 from .pipeline import ProgressUpdate
 from .platform import BoardDef
 from .power.base import PowerMode, PowerResult
-from .artifacts import OnDevicePowerSummary, PowerObservation, PowerTerminalRecord
 from .results import (
     FirmwareMeta,
     LayerResult,
@@ -66,8 +65,9 @@ from .results import (
     PresetResult,
     ProfileResult,
     RunMetadata,
-)
-from .result_manifest import (
+    OnDevicePowerSummary,
+    PowerObservation,
+    PowerTerminalRecord,
     ResultArtifact,
     ResultIssue,
     ResultManifest,

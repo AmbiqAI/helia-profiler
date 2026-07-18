@@ -18,8 +18,7 @@ SESSION_INTENT_SCHEMA = "hpx.session-intent"
 SESSION_INTENT_SCHEMA_VERSION = 1
 
 if TYPE_CHECKING:
-    from .compare import CompareResult
-    from .evaluation import ComparisonProfile
+    from .evaluation import CompareResult, ComparisonProfile
     from .counters import PmuCounter
     from .doctor import DoctorResult
     from .engines import EngineType
@@ -269,7 +268,7 @@ class Session:
 
     def analyze(self, model: str | Path | None = None) -> ModelAnalysis:
         """Analyze the configured model without building or flashing firmware."""
-        from .model_analysis import analyze_for_engine
+        from .evaluation import analyze_for_engine
 
         config = self.resolve(model)
         return analyze_for_engine(
@@ -287,7 +286,7 @@ class Session:
         profile: str | Path | ComparisonProfile | None = None,
     ) -> CompareResult:
         """Compare two completed profiles and optionally write diff artifacts."""
-        from .compare import compare_runs, write_compare_artifacts
+        from .evaluation import compare_runs, write_compare_artifacts
 
         resolved_profile = profile
         if isinstance(profile, (str, Path)):

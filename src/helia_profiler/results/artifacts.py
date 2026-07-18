@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from .power.base import PowerResult
-from .results import BinarySections, PmuResult
+from ..power.base import PowerResult
+from .models import BinarySections, PmuResult
 
 
 @dataclass(frozen=True)

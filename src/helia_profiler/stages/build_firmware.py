@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ..artifacts import FirmwareArtifact
+from ..results import FirmwareArtifact
 from ..errors import BuildError
 from ..pipeline import PipelineContext
 from ..results import ToolchainInfo

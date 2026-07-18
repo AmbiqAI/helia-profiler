@@ -11,14 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.model_analysis import (
+from helia_profiler.evaluation import analyze_model, is_available
+from helia_profiler.evaluation.model_analysis import (
     _conv2d_macs,
     _depthwise_conv2d_macs,
     _elementwise_ops,
     _fully_connected_macs,
     _transpose_conv_macs,
-    analyze_model,
-    is_available,
 )
 
 

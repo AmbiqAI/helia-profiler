@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.artifacts import FirmwareArtifact
+from helia_profiler.results import FirmwareArtifact
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.stages.flash import FlashFirmwareStage

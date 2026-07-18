@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from ..model_analysis import analyze_model, is_available
+from ..evaluation import analyze_model, is_available
 from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")

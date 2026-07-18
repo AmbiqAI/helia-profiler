@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import pytest
 
-from helia_profiler.artifacts import DeploymentRecord, FirmwareArtifact, PowerRunPlan
+from helia_profiler.results import DeploymentRecord, FirmwareArtifact, PowerRunPlan
 from helia_profiler.capture import capture_power
 from helia_profiler.power.base import PowerResult, PowerSummary
 from helia_profiler.power.sync import DeviceState

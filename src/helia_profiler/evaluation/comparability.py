@@ -6,10 +6,10 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
-from ..result_manifest import ResultValidity, RunStatus
+from ..results import ResultValidity, RunStatus
 
 if TYPE_CHECKING:
-    from ..compare import RunArtifacts
+    from .compare import RunArtifacts
 
 
 class ComparabilitySeverity(StrEnum):

@@ -6,7 +6,7 @@ import logging
 from dataclasses import replace
 from pathlib import Path
 
-from ..artifacts import FirmwareArtifact
+from ..results import FirmwareArtifact
 from ..errors import BuildError, FirmwareError
 from ..pipeline import PipelineContext
 

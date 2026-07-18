@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.compare import (
+from helia_profiler.evaluation import (
     ConfigDiffRow,
     CounterDiff,
     LayerDiffRow,
@@ -23,7 +23,7 @@ from helia_profiler.evaluation import (
     MetricPolicy,
 )
 from helia_profiler.errors import ReportError
-from helia_profiler.result_manifest import (
+from helia_profiler.results import (
     ResultArtifact,
     ResultManifest,
     ResultValidity,

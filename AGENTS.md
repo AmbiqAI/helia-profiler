@@ -90,9 +90,8 @@ If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
 | `api.py` | `profile()` — public programmatic entry point, returns `ProfileResult` |
 | `cli.py` | Thin argparse CLI, delegates to `api.profile()` |
 | `config.py` | `ProfileConfig` dataclass, YAML + CLI merge |
-| `results.py` | Typed result models (`PmuResult`, `ProfileResult`, `RunMetadata`, etc.) |
-| `evaluation/` | Run validity, comparability, and versioned regression profiles |
-| `compare.py` | Verified result loading, diffs, verdicts, and compare artifacts |
+| `results/` | Typed result models, workflow artifacts, and bundle manifests |
+| `evaluation/` | Model analysis, verified comparison, validity, and regression profiles |
 | `profiler.py` | Pipeline composition and logging setup |
 | `pipeline.py` | `PipelineContext`, `Stage` protocol, `PipelineRunner` |
 | `engines/` | One adapter per inference engine; `NsxModuleRef` in `base.py` |
@@ -110,7 +109,7 @@ If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
 ### Data Contract
 
 All structured data between pipeline stages uses frozen dataclasses from
-`results.py`, never bare `dict[str, Any]`. The sole exception is
+the `results/` package, never bare `dict[str, Any]`. The main exception is
 `LayerResult.counters: dict[str, float]` — PMU counter names are dynamic.
 
 ## Working Rules

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.artifacts import (
+from helia_profiler.results import (
     DeploymentRecord,
     FirmwareArtifact,
     PowerObservation,

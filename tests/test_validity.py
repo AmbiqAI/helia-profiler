@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from helia_profiler.artifacts import (
+from helia_profiler.results import (
     OnDevicePowerSummary,
     PowerObservation,
     PowerRun,
@@ -13,7 +13,7 @@ from helia_profiler.artifacts import (
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import PowerResult, PowerSummary
-from helia_profiler.result_manifest import ResultValidity
+from helia_profiler.results import ResultValidity
 from helia_profiler.results import FirmwareMeta, PmuResult
 from helia_profiler.evaluation import evaluate_run
 

@@ -18,9 +18,9 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .engines import EngineType
-from .power.base import PowerResult
-from .placement import MemoryRegion
+from ..engines import EngineType
+from ..power.base import PowerResult
+from ..placement import MemoryRegion
 
 if TYPE_CHECKING:
     from .artifacts import OnDevicePowerSummary, PowerObservation, PowerTerminalRecord

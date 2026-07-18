@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Literal, Protocol, runtime_checkable
 
 from ._version import __version__
-from .artifacts import (
+from .results import (
     DeploymentRecord,
     FirmwareArtifact,
     PowerObservation,
@@ -31,7 +31,7 @@ from .config import ProfileConfig
 from .engines.base import EngineAdapter, EngineArtifacts
 from .errors import HpxError
 from .platform import BoardDef, SocDef
-from .model_analysis import ModelAnalysis
+from .evaluation import ModelAnalysis
 from .placement import Placement
 from .power.base import PowerResult
 from .results import MemoryPlan, PmuResult, RunMetadata, BinarySections

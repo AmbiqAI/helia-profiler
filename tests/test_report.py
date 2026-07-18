@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.config import load_config
-from helia_profiler.artifacts import (
+from helia_profiler.results import (
     OnDevicePowerSummary,
     PowerRun,
     PowerRunPlan,
@@ -24,8 +24,8 @@ from helia_profiler.report import (
     _write_summary,
     write_report,
 )
-from helia_profiler.result_manifest import load_result_manifest
-from helia_profiler.model_analysis import ModelAnalysis
+from helia_profiler.results import load_result_manifest
+from helia_profiler.evaluation import ModelAnalysis
 from helia_profiler.results import (
     FirmwareMeta,
     LayerResult,

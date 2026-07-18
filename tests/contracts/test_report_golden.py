@@ -36,7 +36,7 @@ import pytest
 from helia_profiler.config import load_config
 from helia_profiler.engines.base import EngineArtifacts
 from helia_profiler.engines import EngineType
-from helia_profiler.model_analysis import LayerOps, ModelAnalysis
+from helia_profiler.evaluation import LayerOps, ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import MemoryRegion
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary

@@ -15,7 +15,7 @@ from rich.text import Text
 from .tables import _to_float as _to_compare_float
 
 if TYPE_CHECKING:
-    from ..compare import CompareResult, LayerDiffRow, MetricDiff
+    from ..evaluation import CompareResult, LayerDiffRow, MetricDiff
     from .base import HpxConsole
 
 

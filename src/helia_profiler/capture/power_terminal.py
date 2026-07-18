@@ -6,7 +6,7 @@ import time
 from collections.abc import Iterable
 from pathlib import Path
 
-from ..artifacts import (
+from ..results import (
     OnDevicePowerSummary,
     PowerTerminalEnvelope,
     PowerTerminalRecord,

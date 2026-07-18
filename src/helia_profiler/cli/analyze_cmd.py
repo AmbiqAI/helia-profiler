@@ -10,12 +10,12 @@ from typing import TYPE_CHECKING
 from ..engines import EngineType
 
 if TYPE_CHECKING:
-    from ..model_analysis import ModelAnalysis
+    from ..evaluation import ModelAnalysis
 
 
 def _cmd_analyze(args: argparse.Namespace) -> None:
     """Analyze model compute/parameter breakdown without hardware."""
-    from ..model_analysis import ModelAnalysis, analyze_for_engine, analyze_model, is_available
+    from ..evaluation import ModelAnalysis, analyze_for_engine, analyze_model, is_available
     from ..console import HpxConsole
 
     console = HpxConsole(verbosity=1)  # always show output

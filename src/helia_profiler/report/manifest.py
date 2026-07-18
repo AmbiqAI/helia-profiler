@@ -8,14 +8,14 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from ..result_manifest import (
+from ..results import (
     RESULT_MANIFEST_SCHEMA,
     RESULT_MANIFEST_SCHEMA_VERSION,
     ResultArtifact,
     ResultManifest,
     RunStatus,
-    _sha256,
 )
+from ..results.manifest import _sha256
 from ..evaluation import evaluate_run
 from .contracts import (
     PROFILE_RESULTS_SCHEMA,

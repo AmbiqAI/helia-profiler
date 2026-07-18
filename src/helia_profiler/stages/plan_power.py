@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ..artifacts import PowerRunPlan
+from ..results import PowerRunPlan
 from ..config import DEFAULT_POWER_WINDOW_TARGET_MS
 from ..errors import PowerError
 from ..pipeline import PipelineContext

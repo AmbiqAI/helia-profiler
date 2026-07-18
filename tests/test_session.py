@@ -220,7 +220,7 @@ def test_session_analyze_uses_resolved_engine_and_board() -> None:
     )
 
     with patch(
-        "helia_profiler.model_analysis.analyze_for_engine", return_value=expected
+        "helia_profiler.evaluation.analyze_for_engine", return_value=expected
     ) as analyze:
         result = session.analyze()
 
@@ -246,8 +246,8 @@ def test_session_compare_accepts_profile_results(tmp_path: Path) -> None:
     expected = object()
 
     with (
-        patch("helia_profiler.compare.compare_runs", return_value=expected) as compare,
-        patch("helia_profiler.compare.write_compare_artifacts") as write,
+        patch("helia_profiler.evaluation.compare_runs", return_value=expected) as compare,
+        patch("helia_profiler.evaluation.write_compare_artifacts") as write,
     ):
         result = hpx.Session().compare(
             baseline,

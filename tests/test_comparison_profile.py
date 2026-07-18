@@ -13,7 +13,7 @@ from helia_profiler.evaluation import (
     VerdictStatus,
     evaluate_comparison_profile,
 )
-from helia_profiler.compare import CompareResult, ConfigDiffRow, MetricDiff, RunArtifacts
+from helia_profiler.evaluation import CompareResult, ConfigDiffRow, MetricDiff, RunArtifacts
 from helia_profiler.errors import ReportError
 
 

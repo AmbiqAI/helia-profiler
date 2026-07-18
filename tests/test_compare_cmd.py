@@ -27,7 +27,7 @@ def test_compare_command_loads_and_forwards_profile():
     result = SimpleNamespace(verdict=SimpleNamespace(status=VerdictStatus.PASS))
     with (
         patch("helia_profiler.evaluation.ComparisonProfile.load", return_value=profile),
-        patch("helia_profiler.compare.compare_runs", return_value=result) as compare,
+        patch("helia_profiler.evaluation.compare_runs", return_value=result) as compare,
         patch("helia_profiler.console.HpxConsole.print_compare") as render,
     ):
         _cmd_compare(_args(profile="policy.json"))
@@ -39,7 +39,7 @@ def test_compare_command_loads_and_forwards_profile():
 def test_compare_command_exits_one_for_failed_verdict():
     result = SimpleNamespace(verdict=SimpleNamespace(status=VerdictStatus.FAIL))
     with (
-        patch("helia_profiler.compare.compare_runs", return_value=result),
+        patch("helia_profiler.evaluation.compare_runs", return_value=result),
         patch("helia_profiler.console.HpxConsole.print_compare"),
         pytest.raises(SystemExit) as exc,
     ):
@@ -51,7 +51,7 @@ def test_compare_command_exits_one_for_failed_verdict():
 def test_compare_command_keeps_warn_verdict_successful():
     result = SimpleNamespace(verdict=SimpleNamespace(status=VerdictStatus.WARN))
     with (
-        patch("helia_profiler.compare.compare_runs", return_value=result),
+        patch("helia_profiler.evaluation.compare_runs", return_value=result),
         patch("helia_profiler.console.HpxConsole.print_compare") as render,
     ):
         _cmd_compare(_args())

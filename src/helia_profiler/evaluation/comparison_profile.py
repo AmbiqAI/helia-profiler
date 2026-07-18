@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, Self
 from ..errors import ReportError
 
 if TYPE_CHECKING:
-    from ..compare import CompareResult, MetricDiff
+    from .compare import CompareResult, MetricDiff
 
 COMPARISON_PROFILE_SCHEMA = "hpx.comparison-profile"
 COMPARISON_PROFILE_SCHEMA_VERSION = 1

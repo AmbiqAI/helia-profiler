@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from typing import Protocol, runtime_checkable
 
-from ..artifacts import PowerTerminalEnvelope
+from ..results import PowerTerminalEnvelope
 from ..config import Transport
 from ..errors import PowerError
 from ..pipeline import PipelineContext

@@ -8,7 +8,7 @@ import sys
 
 def _cmd_compare(args: argparse.Namespace) -> None:
     """Compare two completed hpx profile output directories."""
-    from ..compare import compare_runs, write_compare_artifacts
+    from ..evaluation import compare_runs, write_compare_artifacts
     from ..console import HpxConsole
     from ..errors import HpxError
 

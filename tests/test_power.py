@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.errors import PowerError
-from helia_profiler.artifacts import DeploymentRecord, FirmwareArtifact, PowerRunPlan
+from helia_profiler.results import DeploymentRecord, FirmwareArtifact, PowerRunPlan
 from helia_profiler.power import get_driver, list_drivers, register_driver
 from helia_profiler.power.base import (
     GatedPowerWindow,

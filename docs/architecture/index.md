@@ -47,7 +47,7 @@ Compare engines by running `hpx profile` twice with different configs.
 
 ### 3. Typed stage boundaries
 
-All data flowing between stages uses frozen dataclasses from `results.py`.
+Structured stage outputs use typed dataclasses from the `results/` package.
 The one exception is `LayerResult.counters: dict[str, float]` — PMU counter
 names are dynamic and can't be enumerated as fields.
 
@@ -112,9 +112,8 @@ src/helia_profiler/
 ├── config.py           # ProfileConfig (frozen dataclasses)
 ├── profiler.py         # build_default_pipeline(), run_profile()
 ├── pipeline.py         # PipelineContext, Stage protocol, PipelineRunner
-├── results.py          # LayerResult, PmuResult, ProfileResult, etc.
-├── evaluation/         # Validity, comparability, regression profile policy
-├── compare.py          # Result loading, metric/layer diffs, compare artifacts
+├── results/            # Result models, workflow artifacts, bundle manifests
+├── evaluation/         # Analysis, comparison, validity, regression policy
 ├── errors.py           # HpxError hierarchy
 ├── platform/           # SoC/Board registry + custom config overlays
 ├── nsx.py              # NSX subprocess wrapper (configure/build/flash)

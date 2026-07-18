@@ -76,8 +76,8 @@ def analyze_for_engine(
     board: str = "apollo510_evb",
 ) -> ModelAnalysis:
     """Analyze a model as the selected inference engine executes it."""
-    from .engines import EngineType
-    from .errors import ConfigError, EngineError
+    from ..engines import EngineType
+    from ..errors import ConfigError, EngineError
 
     path = Path(model_path)
     if not path.is_file():

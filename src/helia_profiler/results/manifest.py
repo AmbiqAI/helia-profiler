@@ -9,7 +9,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Self
 
-from .errors import ReportError
+from ..errors import ReportError
 
 RESULT_MANIFEST_SCHEMA = "hpx.result-manifest"
 RESULT_MANIFEST_SCHEMA_VERSION = 1

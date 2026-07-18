@@ -10,7 +10,7 @@ from helia_profiler import (
     PowerTerminalRecord,
 )
 from helia_profiler.api import profile
-from helia_profiler.artifacts import PowerRun, PowerRunPlan
+from helia_profiler.results import PowerRun, PowerRunPlan
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import PowerResult, PowerSummary

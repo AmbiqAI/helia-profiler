@@ -23,7 +23,7 @@ from rich.console import Console
 from . import analysis, compare, doctor, progress, results
 
 if TYPE_CHECKING:
-    from ..compare import CompareResult
+    from ..evaluation import CompareResult
     from ..pipeline import PipelineContext, ProgressUpdate
 
 # Module-level console — reused everywhere.

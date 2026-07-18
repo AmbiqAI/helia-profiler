@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from ..artifacts import PowerObservation
+from ..results import PowerObservation
 from ..config import DEFAULT_POWER_DURATION_S, DEFAULT_POWER_WINDOW_TARGET_MS
 from ..errors import PowerError
 from ..pipeline import PipelineContext

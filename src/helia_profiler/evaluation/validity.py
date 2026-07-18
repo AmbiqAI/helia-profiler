@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from ..power.diagnostics import assess_gate_duration
-from ..result_manifest import ResultIssue, ResultValidity
+from ..results import ResultIssue, ResultValidity
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext

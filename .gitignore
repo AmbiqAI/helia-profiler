@@ -33,7 +33,8 @@ hpx_*/
 
 # Repo-local scratch areas (never tracked)
 experiments/
-results/
+/results/
+examples/notebooks/results/
 
 # Local SEGGER RTT checkouts used by RTT firmware generation
 segger-rtt/

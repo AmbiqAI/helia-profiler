@@ -8,15 +8,14 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-from .evaluation import (
-    ComparabilityAssessment,
+from .comparability import ComparabilityAssessment, assess_comparability
+from .comparison_profile import (
     ComparisonProfile,
     ComparisonVerdict,
-    assess_comparability,
     evaluate_comparison_profile,
 )
-from .errors import ReportError
-from .result_manifest import ResultManifest, load_result_manifest
+from ..errors import ReportError
+from ..results import ResultManifest, load_result_manifest
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from ..artifacts import DeploymentRecord
+from ..results import DeploymentRecord
 from ..errors import BuildError
 from ..firmware import _nsx_toolchain
 from ..pipeline import PipelineContext

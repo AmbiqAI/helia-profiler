@@ -4,7 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from helia_profiler.evaluation import ComparabilitySeverity, assess_comparability
-from helia_profiler.compare import RunArtifacts
+from helia_profiler.evaluation import RunArtifacts
 
 
 def _run(
@@ -80,7 +80,7 @@ def test_cross_machine_provenance_differences_are_structured():
 def test_partial_manifest_dimensions_fall_back_to_metadata():
     baseline = _run(model="abc")
     candidate = _run(model="def")
-    from helia_profiler.result_manifest import ResultManifest, ResultValidity, RunStatus
+    from helia_profiler.results import ResultManifest, ResultValidity, RunStatus
 
     candidate = replace(
         candidate,
