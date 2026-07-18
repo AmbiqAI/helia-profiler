@@ -105,12 +105,6 @@ class TestPreflightConfig:
             with pytest.raises(ConfigError, match="arena_size"):
                 PreflightStage().run(ctx)
 
-    def test_invalid_model_location_raises(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {"model": {"model_location": "flash"}})
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="model_location"):
-                PreflightStage().run(ctx)
-
     def test_zero_rtt_buffer_size_raises(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path, {"target": {"rtt_buffer_size_up": 0}})
         with patch("shutil.which", side_effect=_all_tools_present):
@@ -141,7 +135,7 @@ class TestPreflightConfig:
             with pytest.raises(ConfigError, match="weights_location"):
                 PreflightStage().run(ctx)
 
-    def test_runtime_split_overrides_rejected_for_helia_aot(self, tmp_path: Path):
+    def test_split_placement_is_accepted_for_helia_aot(self, tmp_path: Path):
         ctx = _make_ctx(
             tmp_path,
             {
@@ -152,14 +146,13 @@ class TestPreflightConfig:
             },
         )
         with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="weights_location is not supported"):
-                PreflightStage().run(ctx)
+            PreflightStage().run(ctx)
 
-    def test_psram_model_location_requires_rtt_transport(self, tmp_path: Path):
+    def test_psram_weights_require_rtt_transport(self, tmp_path: Path):
         ctx = _make_ctx(
             tmp_path,
             {
-                "model": {"model_location": "psram"},
+                "model": {"weights_location": "psram"},
                 "target": {"transport": "usb_cdc"},
             },
         )
@@ -167,23 +160,11 @@ class TestPreflightConfig:
             with pytest.raises(ConfigError, match="PSRAM model weights require"):
                 PreflightStage().run(ctx)
 
-    def test_psram_runtime_weights_require_rtt_transport(self, tmp_path: Path):
+    def test_psram_weights_allow_rtt_transport(self, tmp_path: Path):
         ctx = _make_ctx(
             tmp_path,
             {
-                "engine": {"type": "helia-rt", "config": {"runtime_weights_location": "psram"}},
-                "target": {"transport": "usb_cdc"},
-            },
-        )
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="PSRAM model weights require"):
-                PreflightStage().run(ctx)
-
-    def test_psram_model_location_allows_rtt_transport(self, tmp_path: Path):
-        ctx = _make_ctx(
-            tmp_path,
-            {
-                "model": {"model_location": "psram"},
+                "model": {"weights_location": "psram"},
                 "target": {"transport": "rtt"},
             },
         )
@@ -202,19 +183,6 @@ class TestPreflightConfig:
             with pytest.raises(ConfigError, match="not supported"):
                 PreflightStage().run(ctx)
 
-    def test_ap3_rejects_legacy_mve_preset(self, tmp_path: Path):
-        ctx = _make_ctx(
-            tmp_path,
-            {
-                "target": {"board": "apollo3p_evb"},
-                "profiling": {"pmu_presets": ["mve"]},
-            },
-        )
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="not supported"):
-                PreflightStage().run(ctx)
-
-
 class TestPreflightHostTools:
     def test_missing_neuralspotx_package_raises_with_hint(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
@@ -222,7 +190,7 @@ class TestPreflightHostTools:
         with (
             patch("shutil.which", side_effect=_all_tools_present),
             patch(
-                "helia_profiler.stages.preflight.find_spec",
+                "helia_profiler.doctor.find_spec",
                 return_value=None,
             ),
         ):
@@ -259,7 +227,7 @@ class TestPreflightHostTools:
 
         with (
             patch("shutil.which", side_effect=_all_tools_present),
-            patch("helia_profiler.stages.preflight.find_spec", side_effect=fake_find_spec),
+            patch("helia_profiler.doctor.find_spec", side_effect=fake_find_spec),
         ):
             with pytest.raises(ConfigError, match="pylink"):
                 PreflightStage().run(ctx)
@@ -276,7 +244,7 @@ class TestPreflightHostTools:
 
         with (
             patch("shutil.which", side_effect=_all_tools_present),
-            patch("helia_profiler.stages.preflight.find_spec", side_effect=fake_find_spec),
+            patch("helia_profiler.doctor.find_spec", side_effect=fake_find_spec),
         ):
             PreflightStage().run(ctx)
 
@@ -285,7 +253,14 @@ class TestPreflightHostTools:
         atfe_root = tmp_path / "atfe"
         bin_dir = atfe_root / "bin"
         bin_dir.mkdir(parents=True)
-        for tool in ("clang", "clang++", "llvm-ar", "llvm-objcopy", "llvm-size"):
+        for tool in (
+            "clang",
+            "clang++",
+            "llvm-ar",
+            "llvm-objcopy",
+            "llvm-size",
+            "llvm-nm",
+        ):
             (bin_dir / tool).write_text("")
 
         def which_no_atfe_binary(name: str) -> str | None:

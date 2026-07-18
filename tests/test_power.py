@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.errors import PowerError
+from helia_profiler.artifacts import DeploymentRecord, FirmwareArtifact, PowerRunPlan
 from helia_profiler.power import get_driver, list_drivers, register_driver
 from helia_profiler.power.base import (
     GatedPowerWindow,
@@ -19,6 +20,30 @@ from helia_profiler.power.base import (
 
 #: time64 tick rate (2**30 ticks per second), mirrors ``pyjoulescope_driver.time64.SECOND``.
 _SECOND = 1 << 30
+
+
+def _mark_power_firmware_deployed(ctx, tmp_path: Path) -> None:
+    """Mark a synthetic dedicated artifact as deployed for capture-only tests."""
+    binary = tmp_path / "hpx_profiler_power"
+    binary.touch()
+    artifact = FirmwareArtifact(
+        role="power",
+        target_name="hpx_profiler_power",
+        app_dir=tmp_path,
+        build_dir=tmp_path,
+        binary_path=binary,
+    )
+    ctx.publish_power_plan(PowerRunPlan(
+        firmware_mode="dedicated",
+        inference_count=5,
+        count_source="configured",
+    ))
+    ctx.publish_power_firmware(artifact)
+    ctx.publish_power_deployment(DeploymentRecord(
+        firmware=artifact,
+        target_id=ctx.config.target.board,
+        deployed_at="2026-07-18T00:00:00+00:00",
+    ))
 
 
 class TestPowerTypes:
@@ -169,6 +194,16 @@ class TestGatedStatsProcessing:
         assert w.median_current_a == pytest.approx(0.1, rel=1e-6)
         assert summary.energy_j == pytest.approx(0.0018, rel=1e-6)
 
+    def test_window_segmentation_rejects_ambiguous_capture_starting_high(self):
+        from helia_profiler.power.joulescope.stats import _segment_gpi_windows
+
+        ms = _SECOND // 1000
+        windows = _segment_gpi_windows(
+            [(0 * ms, 1), (1 * ms, 1), (2 * ms, 0)]
+        )
+
+        assert windows == []
+
     def test_no_windows_returns_empty(self):
         from helia_profiler.power.joulescope.stats import _process_gated_stats
 
@@ -312,6 +347,122 @@ class TestGatedStatsProcessing:
         assert windows[0].sample_count == 10
         assert summary.avg_current_a == pytest.approx(0.1, rel=1e-6)
 
+    def test_js320_burst_timestamps_still_map_to_device_time(self):
+        from helia_profiler.power.joulescope.stats import _map_poll_samples_to_packet_time
+
+        ms = _SECOND // 1000
+        packets = [
+            self._packet_with_host_time(
+                i * ms,
+                (i + 1) * ms,
+                0.0001,
+                0.00018,
+                0.12,
+                host_time64=(100 if i < 10 else 110) * ms,
+            )
+            for i in range(20)
+        ]
+
+        mapped = _map_poll_samples_to_packet_time(
+            packets=packets,
+            poll_samples=[(100 * ms, 0), (105 * ms, 1), (110 * ms, 0)],
+        )
+
+        assert [level for _tick, level in mapped] == [0, 1, 0]
+        assert mapped[0][0] < mapped[1][0] < mapped[2][0]
+
+    def test_gated_stats_filters_short_gpio_glitch(self):
+        from helia_profiler.power.joulescope.stats import _process_gated_stats
+
+        ms = _SECOND // 1000
+        packets = [
+            self._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12)
+            for i in range(30)
+        ]
+        poll_samples = [
+            (0, 0),
+            (2 * ms, 1),
+            (3 * ms, 0),
+            (10 * ms, 1),
+            (25 * ms, 0),
+        ]
+
+        windows, summary = _process_gated_stats(
+            packets=packets,
+            poll_samples=poll_samples,
+            io_voltage=1.8,
+            minimum_window_s=0.005,
+        )
+
+        assert len(windows) == 1
+        assert windows[0].duration_s == pytest.approx(0.015, rel=1e-6)
+        assert summary.energy_j == pytest.approx(0.0027, rel=1e-6)
+
+    def test_gate_duration_integrity_allows_js_packet_jitter(self):
+        from helia_profiler.power.diagnostics import assess_gate_duration
+
+        integrity = assess_gate_duration(
+            measured_s=4.954,
+            clean_infer_count=235,
+            clean_infer_avg_us=21079,
+            stats_rate_hz=1000,
+            minimum_s=1.0,
+        )
+
+        assert integrity.valid is True
+        assert integrity.ratio == pytest.approx(1.0004, rel=1e-3)
+
+    def test_gate_duration_integrity_rejects_sub_inference_pulse(self):
+        from helia_profiler.power.diagnostics import assess_gate_duration
+
+        integrity = assess_gate_duration(
+            measured_s=0.0074,
+            clean_infer_count=235,
+            clean_infer_avg_us=21156,
+            stats_rate_hz=1000,
+            minimum_s=1.0,
+        )
+
+        assert integrity.valid is False
+        assert integrity.ratio < 0.002
+
+    def test_gate_duration_integrity_rejects_consistent_but_short_window(self):
+        from helia_profiler.power.diagnostics import assess_gate_duration
+
+        integrity = assess_gate_duration(
+            measured_s=0.04,
+            clean_infer_count=2000,
+            clean_infer_avg_us=20,
+            stats_rate_hz=1000,
+            minimum_s=1.0,
+        )
+
+        assert integrity.ratio == pytest.approx(1.0)
+        assert integrity.valid is False
+
+    @pytest.mark.parametrize(
+        ("measured_s", "clean_infer_count", "clean_infer_avg_us"),
+        [
+            (4.978970, 93, 53206),
+            (4.886971, 2596, 1870),
+        ],
+    )
+    def test_gate_duration_integrity_allows_bounded_dedicated_binary_drift(
+        self, measured_s, clean_infer_count, clean_infer_avg_us
+    ):
+        from helia_profiler.power.diagnostics import assess_gate_duration
+
+        integrity = assess_gate_duration(
+            measured_s=measured_s,
+            clean_infer_count=clean_infer_count,
+            clean_infer_avg_us=clean_infer_avg_us,
+            stats_rate_hz=1000,
+            minimum_s=1.0,
+        )
+
+        assert 1.0 < integrity.ratio < 1.01
+        assert integrity.valid is True
+
     def test_whole_summary_sums_all_packets(self):
         from helia_profiler.power.joulescope.stats import _whole_summary_from_stats
 
@@ -324,6 +475,51 @@ class TestGatedStatsProcessing:
         assert summary.energy_j == pytest.approx(0.0018, rel=1e-6)
         assert summary.duration_s == pytest.approx(0.01, rel=1e-6)
         assert summary.avg_power_w == pytest.approx(0.18, rel=1e-6)
+
+    @pytest.mark.parametrize(
+        ("saw_rise", "saw_fall", "failure_kind"),
+        [
+            (False, False, "no_gate_rise"),
+            (True, False, "no_gate_fall"),
+        ],
+    )
+    def test_missing_gate_returns_degraded_whole_capture(
+        self, saw_rise: bool, saw_fall: bool, failure_kind: str
+    ):
+        from helia_profiler.power.joulescope.capture_gated import (
+            _degraded_observation_result,
+        )
+
+        ms = _SECOND // 1000
+        packets = [
+            self._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12)
+            for i in range(10)
+        ]
+
+        result = _degraded_observation_result(
+            packets=packets,
+            family="js320",
+            device_path="u/js320/test",
+            io_voltage=1.8,
+            sync_input_index=0,
+            stats_rate_hz=1000,
+            scnt=1000,
+            poll_count=20,
+            duration_s=7.0,
+            captured_s=7.1,
+            saw_gate_rise=saw_rise,
+            saw_gate_fall=saw_fall,
+            short_pulses_ignored=0,
+        )
+
+        assert result.gated_windows == []
+        assert result.summary.sample_count == 10
+        assert result.metadata["measurement_scope"] == "free_form_capture"
+        assert result.metadata["observation_mode"] == "free_form"
+        assert result.metadata["integrity"] == "degraded"
+        assert result.metadata["gate_failure"]["kind"] == failure_kind
+        assert result.metadata["gate_rise_observed"] is saw_rise
+        assert result.metadata["gate_fall_observed"] is saw_fall
 
 
 class TestJoulescopeUngatedCapture:
@@ -638,11 +834,12 @@ class TestCapturePowerStage:
                 "model": {"path": str(model)},
                 "engine": {"type": "helia-rt"},
                 "target": {"transport": "uart", "jlink_serial": "1160002204"},
-                "power": {"enabled": True, "driver": "joulescope-js110"},
+                "power": {"enabled": True, "driver": "joulescope"},
             },
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         ctx.soc = get_soc_for_board("apollo510_evb")
+        ctx.publish_power_plan(PowerRunPlan(firmware_mode="shared"))
         reset_calls: dict[str, object] = {}
 
         class FakeDriver:
@@ -659,7 +856,7 @@ class TestCapturePowerStage:
         )
 
         def fake_capture_power(ctx, **kwargs):
-            plan = kwargs["prepare_target"](FakeDriver(), "joulescope-js110")
+            plan = kwargs["prepare_target"](FakeDriver(), "joulescope")
             return PowerResult(
                 summary=PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0),
                 metadata={"target_lifecycle": plan.to_metadata()},
@@ -684,6 +881,101 @@ class TestCapturePowerStage:
         }
         assert set(lifecycle["timings_s"]) == {"reset"}
 
+    def test_degraded_driver_result_publishes_free_form_observation(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.stages.capture_power import CapturePowerStage
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {"enabled": True, "firmware": "shared"},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.publish_power_plan(PowerRunPlan(firmware_mode="shared"))
+        degraded = PowerResult(
+            summary=PowerSummary(0.01, 0.018, 0.02, 0.18, 10.0, 10000),
+            metadata={
+                "measurement_scope": "free_form_capture",
+                "observation_mode": "free_form",
+                "gate_rise_observed": False,
+                "gate_fall_observed": False,
+                "integrity": "degraded",
+            },
+        )
+        monkeypatch.setattr(
+            "helia_profiler.capture.capture_power",
+            lambda *_args, **_kwargs: degraded,
+        )
+
+        CapturePowerStage().run(ctx)
+
+        assert ctx.power_run is not None
+        assert ctx.power_run.observation is not None
+        assert ctx.power_run.observation.mode == "free_form"
+        assert ctx.power_run.observation.integrity == "degraded"
+        assert ctx.power_result is degraded
+
+    def test_internal_mode_skips_host_capture(self, tmp_path: Path):
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.stages.capture_power import CapturePowerStage
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {
+                    "enabled": True,
+                    "driver": "ondevice",
+                    "mode": "internal",
+                },
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+
+        assert CapturePowerStage().should_skip(ctx) is True
+
+    def test_unknown_driver_scope_is_degraded_by_default(self, tmp_path: Path):
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {"enabled": True, "firmware": "shared"},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.publish_power_plan(PowerRunPlan(firmware_mode="shared"))
+        result = PowerResult(
+            summary=PowerSummary(0.01, 0.018, 0.02, 0.18, 10.0, 10000),
+            metadata={"measurement_scope": "custom_gated"},
+        )
+
+        ctx.publish_power_result(result)
+
+        assert ctx.power_run is not None
+        assert ctx.power_run.observation is not None
+        assert ctx.power_run.observation.mode == "free_form"
+        assert ctx.power_run.observation.integrity == "degraded"
+        assert result.metadata["observation_mode"] == "free_form"
+        assert result.metadata["integrity"] == "degraded"
+
 
 class TestTargetLifecycle:
     def _make_ctx(self, tmp_path: Path, *, board: str):
@@ -699,7 +991,7 @@ class TestTargetLifecycle:
                 "model": {"path": str(model)},
                 "engine": {"type": "helia-rt"},
                 "target": {"board": board, "jlink_serial": "1160002204"},
-                "power": {"enabled": True, "driver": "joulescope-js110"},
+                "power": {"enabled": True, "driver": "joulescope"},
             },
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
@@ -735,7 +1027,7 @@ class TestTargetLifecycle:
             ctx,
             phase=CapturePhase.POWER,
             power_driver=FakeDriver(),
-            power_driver_name="joulescope-js110",
+            power_driver_name="joulescope",
         )
 
         assert plan.phase is CapturePhase.POWER
@@ -774,7 +1066,7 @@ class TestTargetLifecycle:
             ctx,
             phase=CapturePhase.POWER,
             power_driver=FakeDriver(),
-            power_driver_name="joulescope-js110",
+            power_driver_name="joulescope",
         )
 
         assert plan.reset_action is ResetAction.DEBUG_RESET_THEN_SWPOI
@@ -811,7 +1103,7 @@ class TestTargetLifecycle:
             ctx,
             phase=CapturePhase.POWER,
             power_driver=FakeDriver(),
-            power_driver_name="joulescope-js110",
+            power_driver_name="joulescope",
         )
 
         assert plan.reset_action is ResetAction.SWPOI_RESET
@@ -844,7 +1136,7 @@ class TestTargetLifecycle:
             ctx,
             phase=CapturePhase.POWER,
             power_driver=FakeDriver(),
-            power_driver_name="joulescope-js110",
+            power_driver_name="joulescope",
         )
 
         assert plan.reset_action is ResetAction.NONE
@@ -877,7 +1169,7 @@ class TestTargetLifecycle:
             ctx,
             phase=CapturePhase.POWER,
             power_driver=FakeDriver(),
-            power_driver_name="joulescope-js110",
+            power_driver_name="joulescope",
         )
 
         assert plan.reset_action is ResetAction.NONE
@@ -907,7 +1199,7 @@ class TestTargetLifecycle:
                 ctx,
                 phase=CapturePhase.POWER,
                 power_driver=FakeDriver(),
-                power_driver_name="joulescope-js110",
+                power_driver_name="joulescope",
             )
 
         assert calls == []
@@ -932,7 +1224,7 @@ class TestTargetLifecycle:
             ctx,
             phase=CapturePhase.PMU,
             power_driver=FakeDriver(),
-            power_driver_name="joulescope-js110",
+            power_driver_name="joulescope",
         )
 
         assert plan.phase is CapturePhase.PMU
@@ -1027,6 +1319,26 @@ class TestEstimateCaptureDuration:
         expected = _BOOT_SETTLE_S + (0.004 + 0.503) + _SAFETY_MARGIN_S
         assert estimated == pytest.approx(expected, rel=1e-6)
 
+    def test_fixed_power_plan_controls_capture_duration(self, tmp_path: Path):
+        from helia_profiler.stages.capture_power import (
+            _BOOT_SETTLE_S,
+            _SAFETY_MARGIN_S,
+            _estimate_capture_duration,
+        )
+
+        ctx = self._make_ctx(tmp_path, profiling_overrides={})
+        ctx.power_plan = PowerRunPlan(
+            firmware_mode="dedicated",
+            inference_count=2247,
+            reference_inference_us=2226,
+            count_source="profile_guided",
+        )
+
+        estimated = _estimate_capture_duration(ctx)
+
+        expected = _BOOT_SETTLE_S + (2247 * 2226 / 1_000_000) + _SAFETY_MARGIN_S
+        assert estimated == pytest.approx(expected, rel=1e-6)
+
     def test_auto_window_regression_reproduces_prior_underestimate_bug(
         self, tmp_path: Path
     ):
@@ -1079,7 +1391,7 @@ class TestCapturePowerWrapper:
                 "engine": {"type": "helia-rt"},
                 "power": {
                     "enabled": True,
-                    "driver": "joulescope-js110",
+                    "driver": "joulescope",
                     "serial": "004204",
                     "sync_input_index": 0,
                 },
@@ -1087,6 +1399,7 @@ class TestCapturePowerWrapper:
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[])
+        _mark_power_firmware_deployed(ctx, tmp_path)
 
         summary = PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6)
         called: dict[str, object] = {}
@@ -1118,7 +1431,7 @@ class TestCapturePowerWrapper:
         result = capture_power(ctx, duration_override_s=7.0)
 
         assert result.metadata["measurement_scope"] == "gpio_gated_clean_window"
-        assert called["name"] == "joulescope-js110"
+        assert called["name"] == "joulescope"
         assert called["serial"] == "004204"
         assert called["checked"] is True
         assert "capture" not in called
@@ -1129,12 +1442,18 @@ class TestCapturePowerWrapper:
         # dropped as soon as the window is observed high.
         on_gate_rise = gated.pop("on_gate_rise")
         assert callable(on_gate_rise)
+        phase_getter = gated.pop("phase_getter")
+        assert callable(phase_getter)
         assert gated == {
             "duration_s": 7.0,
             "io_voltage": 1.8,
             "sync_input_index": 0,
+            "state_input_index": 1,
             "stats_rate_hz": 1000,
-            "clean_infer_count": 11,
+            "clean_infer_count": 5,
+            "clean_infer_avg_us": None,
+            "minimum_gate_s": 1.0,
+            "gate_relative_tolerance": 0.10,
         }
 
     def test_capture_power_waits_for_lockstep_ready_before_go(
@@ -1154,7 +1473,7 @@ class TestCapturePowerWrapper:
                 "engine": {"type": "helia-rt"},
                 "power": {
                     "enabled": True,
-                    "driver": "joulescope-js110",
+                    "driver": "joulescope",
                     "lockstep": True,
                     "state_gpio_pin": 23,
                     "go_gpio_pin": 24,
@@ -1163,6 +1482,7 @@ class TestCapturePowerWrapper:
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[])
+        _mark_power_firmware_deployed(ctx, tmp_path)
 
         calls: list[str] = []
         summary = PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6)
@@ -1225,7 +1545,7 @@ class TestCapturePowerWrapper:
             "make_sync",
             "arm",
             "capture_gated",
-            "prepare:joulescope-js110",
+            "prepare:joulescope",
             "wait_ready:7.0",
             "go",
             "release",
@@ -1259,7 +1579,7 @@ class TestCapturePowerWrapper:
                 "engine": {"type": "helia-rt"},
                 "power": {
                     "enabled": True,
-                    "driver": "joulescope-js110",
+                    "driver": "joulescope",
                     "lockstep": True,
                     "state_gpio_pin": 23,
                     "go_gpio_pin": 24,
@@ -1268,6 +1588,7 @@ class TestCapturePowerWrapper:
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[])
+        _mark_power_firmware_deployed(ctx, tmp_path)
 
         calls: list[str] = []
 
@@ -1344,7 +1665,7 @@ class TestPowerFirmwareSelection:
                 "target": {"board": "apollo510_evb", "transport": transport},
                 "power": {
                     "enabled": True,
-                    "driver": "joulescope-js110",
+                    "driver": "joulescope",
                     "firmware": firmware,
                     "sync_input_index": 0,
                 },
@@ -1354,6 +1675,8 @@ class TestPowerFirmwareSelection:
         ResolvePlatformStage().run(ctx)
         ctx.resolved_jlink_serial = "1160002204"
         ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[])
+        if firmware == "shared":
+            ctx.publish_power_plan(PowerRunPlan(firmware_mode="shared"))
         return ctx
 
     class _FakeDriver:
@@ -1373,15 +1696,28 @@ class TestPowerFirmwareSelection:
         def capture(self, **kwargs):  # pragma: no cover - gated path used
             return PowerResult(summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6))
 
-    def test_dedicated_flashes_power_binary_before_capture_gated(
+    def test_dedicated_flash_stage_deploys_before_capture(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
         from helia_profiler.capture import capture_power
+        from helia_profiler.stages.flash_power import FlashPowerFirmwareStage
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         power_bin = tmp_path / "hpx_profiler_power"
         power_bin.write_bytes(b"\x00")
         ctx.power_binary_path = power_bin
+        ctx.publish_power_plan(PowerRunPlan(
+            firmware_mode="dedicated",
+            inference_count=5,
+            count_source="configured",
+        ))
+        ctx.publish_power_firmware(FirmwareArtifact(
+            role="power",
+            target_name="hpx_profiler_power",
+            app_dir=tmp_path,
+            build_dir=tmp_path,
+            binary_path=power_bin,
+        ))
 
         calls: list[str] = []
         flash_calls: list[dict] = []
@@ -1396,16 +1732,16 @@ class TestPowerFirmwareSelection:
 
         monkeypatch.setattr("helia_profiler.target.probe.jlink.flash_binary", fake_flash_binary)
 
+        FlashPowerFirmwareStage().run(ctx)
         result = capture_power(ctx, duration_override_s=7.0)
 
-        # Flash happens before capture_gated is armed -- ordering contract:
-        # flash (its own reset+free-run) precedes arm/capture_gated, which
-        # itself still resets race-free inside on_started (PR#27 ordering
-        # unchanged).
-        assert calls == ["check", "flash", "capture_gated"]
+        assert calls == ["flash", "check", "capture_gated"]
         assert flash_calls[0]["binary_path"] == power_bin
         assert flash_calls[0]["jlink_serial"] == "1160002204"
         assert result.metadata["power_firmware"] == "dedicated"
+        assert ctx.power_run is not None
+        assert ctx.power_run.deployment is not None
+        assert ctx.power_run.deployment.firmware is ctx.power_firmware
 
     def test_shared_mode_does_not_flash_and_uses_dtr_holder_for_usb_cdc(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1449,31 +1785,70 @@ class TestPowerFirmwareSelection:
         assert dtr_calls == ["init", "open", "close"]
         assert result.metadata["power_firmware"] == "shared"
 
-    def test_dedicated_requested_without_binary_falls_back_to_shared_with_warning(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
-    ):
-        from helia_profiler.capture import capture_power
+    def test_dedicated_flash_stage_requires_built_artifact(self, tmp_path: Path):
+        from helia_profiler.errors import BuildError
+        from helia_profiler.stages.flash_power import FlashPowerFirmwareStage
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         assert ctx.power_binary_path is None
 
-        calls: list[str] = []
-        flash_calls: list[dict] = []
+        with pytest.raises(BuildError, match="no power artifact"):
+            FlashPowerFirmwareStage().run(ctx)
 
+    def test_dedicated_flash_rejects_legacy_path_without_artifact(self, tmp_path: Path):
+        from helia_profiler.errors import BuildError
+        from helia_profiler.stages.flash_power import FlashPowerFirmwareStage
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        power_bin = tmp_path / "hpx_profiler_power"
+        power_bin.write_bytes(b"\x00")
+        ctx.power_binary_path = power_bin
+
+        with pytest.raises(BuildError, match="no power artifact"):
+            FlashPowerFirmwareStage().run(ctx)
+
+    def test_direct_dedicated_capture_requires_deployment(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.capture import capture_power
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        ctx.publish_power_plan(PowerRunPlan(
+            firmware_mode="dedicated",
+            inference_count=5,
+            count_source="configured",
+        ))
         monkeypatch.setattr(
-            "helia_profiler.power.get_driver", lambda *a, **k: self._FakeDriver(calls)
+            "helia_profiler.power.get_driver",
+            lambda *a, **k: self._FakeDriver([]),
         )
+
+        with pytest.raises(PowerError, match="has not been deployed"):
+            capture_power(ctx, duration_override_s=7.0)
+
+    def test_dedicated_capture_requires_authoritative_count(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.capture import capture_power
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        _mark_power_firmware_deployed(ctx, tmp_path)
+        artifact = ctx.power_run.firmware
+        assert artifact is not None
+        ctx.publish_power_plan(PowerRunPlan(firmware_mode="dedicated"))
+        ctx.publish_power_firmware(artifact)
+        ctx.publish_power_deployment(DeploymentRecord(
+            firmware=artifact,
+            target_id=ctx.config.target.board,
+            deployed_at="2026-07-18T00:00:00+00:00",
+        ))
         monkeypatch.setattr(
-            "helia_profiler.target.probe.jlink.flash_binary",
-            lambda *a, **k: flash_calls.append({}),
+            "helia_profiler.power.get_driver",
+            lambda *a, **k: self._FakeDriver([]),
         )
 
-        with caplog.at_level("WARNING", logger="hpx"):
-            result = capture_power(ctx, duration_override_s=7.0)
-
-        assert flash_calls == []
-        assert result.metadata["power_firmware"] == "shared"
-        assert any("dedicated" in rec.message for rec in caplog.records)
+        with pytest.raises(PowerError, match="no authoritative inference count"):
+            capture_power(ctx, duration_override_s=7.0)
 
     def test_shared_result_metadata_records_firmware(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1487,6 +1862,228 @@ class TestPowerFirmwareSelection:
         )
         result = capture_power(ctx, duration_override_s=7.0)
         assert result.metadata["power_firmware"] == "shared"
+
+    def test_power_plan_accepts_external_count_without_pmu_result(self, tmp_path: Path):
+        from helia_profiler.stages.plan_power import plan_power_run
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        ctx.pmu_result = None
+
+        plan = plan_power_run(ctx, inference_count=123)
+
+        assert plan.inference_count == 123
+        assert plan.reference_inference_us is None
+        assert plan.count_source == "configured"
+
+    def test_power_plan_derives_count_from_profile_timing(self, tmp_path: Path):
+        from helia_profiler.stages.plan_power import plan_power_run
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(clean_infer_avg_us=2226),
+            layers=[],
+        )
+
+        plan = plan_power_run(ctx)
+
+        assert plan.inference_count == 2247
+        assert plan.reference_inference_us == 2226
+        assert plan.target_duration_ms == 5000
+        assert plan.count_source == "profile_guided"
+
+    def test_power_build_replaces_stale_output_and_publishes_artifact(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.stages.build_power_firmware import BuildPowerFirmwareStage
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        ctx.firmware_dir = tmp_path / "app"
+        ctx.build_dir = ctx.firmware_dir / "build" / "apollo510_evb"
+        ctx.build_dir.mkdir(parents=True)
+        stale_binary = ctx.build_dir / "hpx_profiler_power"
+        stale_binary.write_bytes(b"stale")
+        stale_artifact = FirmwareArtifact(
+            role="power",
+            target_name="hpx_profiler_power",
+            app_dir=ctx.firmware_dir,
+            build_dir=ctx.build_dir,
+            binary_path=stale_binary,
+        )
+        ctx.publish_power_plan(PowerRunPlan(
+            firmware_mode="dedicated",
+            inference_count=123,
+            reference_inference_us=1000,
+            count_source="profile_guided",
+        ))
+        ctx.publish_power_firmware(stale_artifact)
+        ctx.publish_power_deployment(DeploymentRecord(
+            firmware=stale_artifact,
+            target_id="apollo510_evb",
+            deployed_at="2026-07-18T00:00:00+00:00",
+        ))
+        rendered: list[int] = []
+        build_calls: list[dict] = []
+
+        monkeypatch.setattr(
+            "helia_profiler.firmware.render_power_source",
+            lambda _ctx, *, inference_count: rendered.append(inference_count),
+        )
+
+        def fake_build(*args, **kwargs):
+            assert not stale_binary.exists()
+            build_calls.append({"args": args, **kwargs})
+            stale_binary.write_bytes(b"fresh")
+
+        monkeypatch.setattr("helia_profiler.nsx.build", fake_build)
+
+        BuildPowerFirmwareStage().run(ctx)
+
+        assert rendered == [123]
+        assert build_calls[0]["target"] == "hpx_profiler_power"
+        assert ctx.power_binary_path == stale_binary
+        assert ctx.power_firmware is not None
+        assert ctx.power_firmware.binary_path == stale_binary
+        assert stale_binary.read_bytes() == b"fresh"
+        assert ctx.deployed_power_firmware is None
+        assert ctx.power_run is not None
+        assert ctx.power_run.deployment is None
+
+    def test_failed_power_rebuild_invalidates_prior_artifact_state(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.errors import BuildError
+        from helia_profiler.power.base import PowerResult, PowerSummary
+        from helia_profiler.stages.build_power_firmware import BuildPowerFirmwareStage
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        ctx.firmware_dir = tmp_path / "app"
+        ctx.build_dir = ctx.firmware_dir / "build" / "apollo510_evb"
+        ctx.build_dir.mkdir(parents=True)
+        binary = ctx.build_dir / "hpx_profiler_power"
+        binary.write_bytes(b"old")
+        artifact = FirmwareArtifact(
+            role="power",
+            target_name="hpx_profiler_power",
+            app_dir=ctx.firmware_dir,
+            build_dir=ctx.build_dir,
+            binary_path=binary,
+        )
+        ctx.publish_power_plan(PowerRunPlan(
+            firmware_mode="dedicated",
+            inference_count=12,
+            count_source="configured",
+        ))
+        ctx.publish_power_firmware(artifact)
+        ctx.publish_power_deployment(DeploymentRecord(
+            firmware=artifact,
+            target_id="apollo510_evb",
+            deployed_at="2026-07-18T00:00:00+00:00",
+        ))
+        ctx.power_result = PowerResult(
+            summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 1.0, 10)
+        )
+        ctx.power_binary_path = binary
+
+        monkeypatch.setattr(
+            "helia_profiler.firmware.render_power_source",
+            lambda *_args, **_kwargs: None,
+        )
+        monkeypatch.setattr(
+            "helia_profiler.nsx.build",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(BuildError("compile failed")),
+        )
+
+        with pytest.raises(BuildError, match="compile failed"):
+            BuildPowerFirmwareStage().run(ctx)
+
+        assert not binary.exists()
+        assert ctx.power_run is not None
+        assert ctx.power_run.firmware is None
+        assert ctx.power_run.deployment is None
+        assert ctx.power_run.observation is None
+        assert ctx.power_firmware is None
+        assert ctx.deployed_power_firmware is None
+        assert ctx.power_binary_path is None
+        assert ctx.power_result is None
+
+    def test_shared_power_plan_does_not_claim_unbuilt_fixed_count(self, tmp_path: Path):
+        from helia_profiler.results import FirmwareMeta, PmuResult
+        from helia_profiler.stages.plan_power import plan_power_run
+
+        ctx = self._make_ctx(tmp_path, firmware="shared")
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(clean_infer_avg_us=2226),
+            layers=[],
+        )
+
+        plan = plan_power_run(ctx)
+
+        assert plan.inference_count is None
+        assert plan.count_source == "firmware_auto"
+
+    def test_power_plan_rejects_driver_mode_mismatch(self, tmp_path: Path):
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.stages.plan_power import PlanPowerRunStage
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {
+                    "enabled": True,
+                    "driver": "joulescope",
+                    "mode": "internal",
+                },
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+
+        with pytest.raises(PowerError, match="uses mode 'external'"):
+            PlanPowerRunStage().run(ctx)
+
+    def test_internal_power_rejects_driver_without_firmware_producer(
+        self, tmp_path: Path
+    ):
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.stages.plan_power import PlanPowerRunStage
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {
+                    "enabled": True,
+                    "driver": "ondevice",
+                    "mode": "internal",
+                },
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+
+        with pytest.raises(PowerError, match="no firmware-side measurement producer"):
+            PlanPowerRunStage().run(ctx)
+
+    @pytest.mark.parametrize("enabled,firmware", [(False, "dedicated"), (True, "shared")])
+    def test_power_flash_stage_skips_without_dedicated_run(
+        self, tmp_path: Path, enabled: bool, firmware: str
+    ):
+        from dataclasses import replace
+        from helia_profiler.stages.flash_power import FlashPowerFirmwareStage
+
+        ctx = self._make_ctx(tmp_path, firmware=firmware)
+        if not enabled:
+            ctx.config = replace(ctx.config, power=replace(ctx.config.power, enabled=False))
+
+        assert FlashPowerFirmwareStage().should_skip(ctx) is True
 
 
 class TestGatedCaptureCapabilityDetection:
@@ -1543,6 +2140,7 @@ class TestGatedCaptureCapabilityDetection:
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=5), layers=[])
+        _mark_power_firmware_deployed(ctx, tmp_path)
 
         result = capture_power(ctx, duration_override_s=3.0)
 
@@ -1585,11 +2183,12 @@ class TestGatedCaptureCapabilityDetection:
             {
                 "model": {"path": str(model)},
                 "engine": {"type": "helia-rt"},
-                "power": {"enabled": True, "driver": "joulescope-js110"},
+                "power": {"enabled": True, "driver": "joulescope"},
             },
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=5), layers=[])
+        _mark_power_firmware_deployed(ctx, tmp_path)
 
         result = capture_power(ctx, duration_override_s=3.0)
 

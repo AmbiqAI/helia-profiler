@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from ..artifacts import FirmwareArtifact
 from ..errors import BuildError
 from ..pipeline import PipelineContext
 from ..results import ToolchainInfo
@@ -23,6 +24,8 @@ class BuildFirmwareStage:
     def run(self, ctx: PipelineContext) -> None:
         if ctx.firmware_dir is None:
             raise BuildError("No firmware directory — firmware generation stage did not run.")
+
+        ctx.report_progress("Configuring and compiling the profile target")
 
         from ..firmware import build_app
 
@@ -47,7 +50,19 @@ class BuildFirmwareStage:
             toolchain,
             timeout_s=ctx.config.timeouts.binary_probe_s,
         )
-
+        ctx.publish_profile_firmware(FirmwareArtifact(
+            role="profile",
+            target_name="hpx_profiler",
+            app_dir=ctx.firmware_dir,
+            build_dir=build_dir,
+            binary_path=binary_path,
+            binary_sections=ctx.binary_sections,
+        ))
+        ctx.report_progress(
+            f"Profile firmware ready · {ctx.binary_sections.total:,} bytes",
+            kind="checkpoint",
+            min_verbosity=1,
+        )
         # Capture compiler + cmake version banners for run metadata
         probe_s = ctx.config.timeouts.toolchain_probe_s
         ctx.run_metadata.toolchain = ToolchainInfo(

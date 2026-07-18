@@ -30,9 +30,6 @@ class TFLMAdapter:
     def engine_type(self) -> EngineType:
         return EngineType.TFLM
 
-    def supports_runtime_split(self) -> bool:
-        return True
-
     def default_auto_placement(
         self, *, tcm_cap: int, sram_cap: int
     ) -> tuple[Placement, Placement] | None:

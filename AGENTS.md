@@ -91,6 +91,8 @@ If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
 | `cli.py` | Thin argparse CLI, delegates to `api.profile()` |
 | `config.py` | `ProfileConfig` dataclass, YAML + CLI merge |
 | `results.py` | Typed result models (`PmuResult`, `ProfileResult`, `RunMetadata`, etc.) |
+| `evaluation/` | Run validity, comparability, and versioned regression profiles |
+| `compare.py` | Verified result loading, diffs, verdicts, and compare artifacts |
 | `profiler.py` | Pipeline composition and logging setup |
 | `pipeline.py` | `PipelineContext`, `Stage` protocol, `PipelineRunner` |
 | `engines/` | One adapter per inference engine; `NsxModuleRef` in `base.py` |
@@ -99,7 +101,8 @@ If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
 | `power/` | Power measurement drivers, `PowerResult` in `base.py` |
 | `report/` | CSV, JSON, terminal summary, Model Explorer overlays |
 | `stages/` | Ordered pipeline stages s01–s08 |
-| `platform.py` | SoC families, board registry, capabilities |
+| `platform/` | SoC families, board registry, capabilities, and custom overlays |
+| `transport/rtt.py` | RTT capture lifecycle; direct control-block access and low-level test patch points live in `rtt_control.py` |
 | `target/probe/jlink.py` | SEGGER J-Link helpers (discovery, reset, SWO commands) |
 | `nsx.py` | NSX build-system subprocess wrapper |
 | `errors.py` | Typed error hierarchy with `hint` field |

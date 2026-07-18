@@ -69,6 +69,67 @@ def is_aot_available() -> bool:
     return _HAS_AOT
 
 
+def analyze_for_engine(
+    model_path: str | Path,
+    *,
+    engine: str = "tflite",
+    board: str = "apollo510_evb",
+) -> ModelAnalysis:
+    """Analyze a model as the selected inference engine executes it."""
+    from .engines import EngineType
+    from .errors import ConfigError, EngineError
+
+    path = Path(model_path)
+    if not path.is_file():
+        raise ConfigError(f"Model file not found: {path}")
+    if not is_available():
+        raise ConfigError(
+            "ai-edge-litert is not installed.",
+            hint="Install with: pip install 'helia-profiler[analysis]'",
+        )
+
+    engine_type = EngineType(engine)
+    if engine_type is not EngineType.HELIA_AOT:
+        result = analyze_model(path)
+        if result is None:
+            raise EngineError(f"Failed to analyze model: {path}")
+        return result
+
+    if not is_aot_available():
+        raise ConfigError(
+            "helia-aot is not installed.",
+            hint="Install with: pip install 'helia-profiler[aot]'",
+        )
+
+    import tempfile
+
+    try:
+        from helia_aot.cli.defines import ConvertArgs  # type: ignore[import-untyped]
+        from helia_aot.converter import AotConverter  # type: ignore[import-untyped]
+        from helia_aot.defines import ModuleType  # type: ignore[import-untyped]
+    except ImportError as exc:
+        raise ConfigError(
+            "helia-aot import failed.",
+            hint="Install with: pip install 'helia-profiler[aot]'",
+        ) from exc
+
+    with tempfile.TemporaryDirectory(prefix="hpx_aot_") as tmp:
+        convert_args = ConvertArgs(
+            model={"path": str(path)},
+            module={"path": tmp, "type": ModuleType.nsx.value},
+            platform={"name": board},
+        )
+        try:
+            context = AotConverter(config=convert_args).convert()
+        except Exception as exc:
+            raise EngineError(f"AOT compilation failed: {exc}") from exc
+
+        result = analyze_air_model(context.model)
+        if result is None:
+            raise EngineError(f"Failed to analyze AOT-transformed model: {path}")
+        return result
+
+
 # ---------------------------------------------------------------------------
 # Result dataclasses
 # ---------------------------------------------------------------------------

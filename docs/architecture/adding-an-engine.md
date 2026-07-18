@@ -92,12 +92,12 @@ int main(void) {
     // 3. Print HPX_START
     hpx_start();
 
-    // 4. For each PMU preset
-    {% for preset in pmu_presets %}
+    // 4. For each PMU counter pass
+    {% for pass in pmu_passes %}
     {
-        hpx_configure_pmu({{ preset.counter_ids }});
-        hpx_print_preset("{{ preset.name }}");
-        hpx_print_counters({{ preset.counter_names }});
+        hpx_configure_pmu({{ pass.event_ids }});
+        hpx_print_preset("{{ pass.name }}");
+        hpx_print_counters({{ pass.counter_names }});
 
         // Warmup
         for (int w = 0; w < {{ warmup }}; w++) {

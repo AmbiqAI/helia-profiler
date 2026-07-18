@@ -148,12 +148,29 @@ hpx drives J-Link through `JLinkExe` (flashing) and `pylink-square`
     [segger.com/downloads/jlink](https://www.segger.com/downloads/jlink/).
     Drivers are installed automatically.
 
-For local firmware development, hpx looks for SEGGER RTT sources at
-`./segger-rtt`, `./RTT`, `~/src/segger-rtt`, `~/src/RTT`, or the
-`SEGGER_RTT_PATH` environment variable:
+heliaPROFILER bundles a pinned, tested copy of the permissively licensed SEGGER
+RTT target sources. No separate RTT source checkout is required for normal use.
+The SEGGER J-Link host software remains a separate installation.
+
+For testing another RTT release, hpx resolves explicit overrides in this order:
+
+1. `target.segger_rtt_path` in configuration or `Session.with_target()`
+2. The `SEGGER_RTT_PATH` environment variable
+3. The bundled RTT target sources
+
+An override directory must contain both `RTT/SEGGER_RTT.c` and
+`Config/SEGGER_RTT_Conf.h`:
 
 ```bash
-git clone https://github.com/SEGGERMicro/RTT.git segger-rtt
+git clone --branch V8.58.0 https://github.com/SEGGERMicro/RTT.git segger-rtt
+```
+
+Prefer explicit profile configuration over modifying `PATH`:
+
+```yaml
+target:
+    transport: rtt
+    segger_rtt_path: /path/to/SEGGER_RTT
 ```
 
 ## 5. Joulescope (optional, for power capture)

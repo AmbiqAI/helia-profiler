@@ -37,3 +37,8 @@ class GenerateReportStage:
         ctx.report_paths = paths
         for p in paths:
             log.info("Report: %s", p)
+        ctx.report_progress(
+            f"Reports written · {len(paths)} files",
+            kind="checkpoint",
+            min_verbosity=1,
+        )

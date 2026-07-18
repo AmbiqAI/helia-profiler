@@ -94,6 +94,9 @@ class PowerDriver(Protocol):
     #: treated as ungated (matches ``getattr(driver, "supports_gated_capture",
     #: False)`` at the call site).
     supports_gated_capture: bool = False
+    #: True only when firmware generation emits a complete on-device
+    #: PowerTerminalEnvelope measurement for this driver.
+    supports_firmware_measurement: bool = False
 
     @property
     def name(self) -> str:

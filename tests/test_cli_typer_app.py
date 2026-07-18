@@ -55,25 +55,6 @@ def test_pmu_counters_repeatable_option_builds_list(monkeypatch) -> None:
     assert seen["args"].pmu_counters == ["cpu:default", "mve:all"]
 
 
-def test_pmu_presets_repeatable_option_builds_list(monkeypatch) -> None:
-    import helia_profiler.cli.profile_cmd as profile_cmd
-
-    seen: dict[str, object] = {}
-
-    def fake_cmd_profile(args: SimpleNamespace) -> None:
-        seen["args"] = args
-
-    monkeypatch.setattr(profile_cmd, "_cmd_profile", fake_cmd_profile)
-
-    result = runner.invoke(
-        app,
-        ["profile", "model.tflite", "--pmu-presets", "basic_cpu", "--pmu-presets", "mve_all"],
-    )
-
-    assert result.exit_code == 0, result.output
-    assert seen["args"].pmu_presets == ["basic_cpu", "mve_all"]
-
-
 def test_profile_accepts_tflm_engine(monkeypatch) -> None:
     import helia_profiler.cli.profile_cmd as profile_cmd
 
@@ -88,6 +69,27 @@ def test_profile_accepts_tflm_engine(monkeypatch) -> None:
 
     assert result.exit_code == 0, result.output
     assert seen["args"].engine == "tflm"
+
+
+def test_profile_uses_canonical_placement_options(monkeypatch) -> None:
+    import helia_profiler.cli.profile_cmd as profile_cmd
+
+    seen: dict[str, object] = {}
+    monkeypatch.setattr(profile_cmd, "_cmd_profile", lambda args: seen.setdefault("args", args))
+
+    result = runner.invoke(
+        app,
+        ["profile", "model.tflite", "--arena-location", "sram", "--weights-location", "mram"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert seen["args"].runtime_arena_location == "sram"
+    assert seen["args"].runtime_weights_location == "mram"
+    removed = runner.invoke(
+        app,
+        ["profile", "model.tflite", "--runtime-arena-location", "sram"],
+    )
+    assert removed.exit_code == 2
 
 
 def test_compare_validation_option_reaches_command_adapter(monkeypatch) -> None:
@@ -140,28 +142,28 @@ def test_per_layer_tri_state_true_false_and_absent(monkeypatch) -> None:
     assert seen["args"].per_layer is None
 
 
-def test_probes_no_subcommand_prints_usage_and_exits_one() -> None:
+def test_probes_no_subcommand_prints_help_and_exits_zero() -> None:
     result = runner.invoke(app, ["probes"])
-    assert result.exit_code == 1
-    assert "Usage: hpx probes {list|match}" in result.output
+    assert result.exit_code == 0
+    assert "Usage: hpx probes" in result.output
 
 
-def test_target_no_subcommand_prints_usage_and_exits_one() -> None:
+def test_target_no_subcommand_prints_help_and_exits_zero() -> None:
     result = runner.invoke(app, ["target"])
-    assert result.exit_code == 1
-    assert "Usage: hpx target {reset}" in result.output
+    assert result.exit_code == 0
+    assert "Usage: hpx target" in result.output
 
 
-def test_cache_no_subcommand_prints_usage_and_exits_one() -> None:
+def test_cache_no_subcommand_prints_help_and_exits_zero() -> None:
     result = runner.invoke(app, ["cache"])
-    assert result.exit_code == 1
-    assert "Usage: hpx cache {purge|info}" in result.output
+    assert result.exit_code == 0
+    assert "Usage: hpx cache" in result.output
 
 
-def test_ports_no_subcommand_prints_usage_and_exits_one() -> None:
+def test_ports_no_subcommand_prints_help_and_exits_zero() -> None:
     result = runner.invoke(app, ["ports"])
-    assert result.exit_code == 1
-    assert "Usage: hpx ports {list}" in result.output
+    assert result.exit_code == 0
+    assert "Usage: hpx ports" in result.output
 
 
 def test_bare_invocation_prints_help_and_exits_zero() -> None:

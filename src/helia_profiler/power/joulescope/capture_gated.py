@@ -24,6 +24,7 @@ from .device import (
     _POWER_CYCLE,
     _close_device,
     _open_device,
+    _read_gpi_snapshot,
 )
 from .diagnostics import _gated_stats_diagnostics
 from .stats import (
@@ -40,19 +41,72 @@ if TYPE_CHECKING:
 log = logging.getLogger("hpx")
 
 
+def _degraded_observation_result(
+    *,
+    packets: list[dict[str, Any]],
+    family: str,
+    device_path: str,
+    io_voltage: float,
+    sync_input_index: int,
+    stats_rate_hz: int,
+    scnt: int,
+    poll_count: int,
+    duration_s: float,
+    captured_s: float,
+    saw_gate_rise: bool,
+    saw_gate_fall: bool,
+    short_pulses_ignored: int,
+) -> PowerResult:
+    failure = classify_gate_failure(
+        saw_gate_rise=saw_gate_rise,
+        duration_s=duration_s,
+    )
+    whole_summary = _whole_summary_from_stats(packets)
+    return PowerResult(
+        summary=whole_summary,
+        metadata={
+            "driver": f"joulescope-{family}",
+            "device": device_path,
+            "io_voltage": io_voltage,
+            "measurement_scope": "free_form_capture",
+            "gating_method": "gpi_snapshot_poll+host_stats_integral",
+            "observation_mode": "free_form",
+            "integrity": "degraded",
+            "gate_rise_observed": saw_gate_rise,
+            "gate_fall_observed": saw_gate_fall,
+            "gate_failure": failure.to_metadata(),
+            "sync_input_index": sync_input_index,
+            "stats_rate_hz": stats_rate_hz,
+            "stats_scnt": scnt,
+            "window_count": 0,
+            "gpi_poll_count": poll_count,
+            "stat_packets": len(packets),
+            "capture_window_s": round(captured_s, 4),
+            "capture_safety_bound_s": duration_s,
+            "short_gate_pulses_ignored": short_pulses_ignored,
+            "whole_capture_summary": _summary_to_dict(whole_summary),
+        },
+    )
+
+
 def capture_gated(
     self: "JoulescopeDriver",
     *,
     duration_s: float,
     io_voltage: float,
     sync_input_index: int,
+    state_input_index: int = 1,
     stats_rate_hz: int = 1000,
     clean_infer_count: int | None = None,
+    clean_infer_avg_us: int | None = None,
+    minimum_gate_s: float = 0.0,
+    gate_relative_tolerance: float = 0.01,
     poll_interval_s: float = 0.004,
     min_high_windows: int = 1,
     guard_s: float = 0.15,
-    on_started: Callable[[], None] | None = None,
+    on_started: Callable[..., None] | None = None,
     on_gate_rise: Callable[[], None] | None = None,
+    phase_getter: Callable[[], str] | None = None,
     **kwargs: Any,
 ) -> PowerResult:
     """Capture GPIO-gated power using on-device-integrated host stats.
@@ -96,7 +150,38 @@ def capture_gated(
     windows_done = 0
     first_high_at: float | None = None
     first_low_after_high_at: float | None = None
+    saw_any_gate_rise = False
+    saw_any_gate_fall = False
     go_release_at: float | None = None
+    short_pulses_ignored = 0
+    short_pulse_phases: dict[str, int] = {}
+    short_pulse_first_s: float | None = None
+    short_pulse_last_s: float | None = None
+    gpi_condition = threading.Condition()
+    latest_gpi_value: int | None = None
+    gpi_sample_sequence = 0
+
+    def _wait_gpi_state(index: int, high: bool, timeout_s: float) -> bool:
+        bit_mask = 1 << index
+        deadline = time.monotonic() + timeout_s
+        consecutive = 0
+        with gpi_condition:
+            observed_sequence = gpi_sample_sequence
+            while time.monotonic() < deadline:
+                remaining = deadline - time.monotonic()
+                if not gpi_condition.wait_for(
+                    lambda: gpi_sample_sequence > observed_sequence,
+                    timeout=max(0.0, remaining),
+                ):
+                    return False
+                observed_sequence = gpi_sample_sequence
+                if latest_gpi_value is not None and bool(latest_gpi_value & bit_mask) is high:
+                    consecutive += 1
+                    if consecutive >= 3:
+                        return True
+                else:
+                    consecutive = 0
+        return False
 
     def _on_stats(_topic: str, value: Any) -> None:
         if isinstance(value, dict):
@@ -131,22 +216,39 @@ def capture_gated(
         fr_volt.append(np.asarray(value["data"], dtype=np.float32).copy())
 
     def _poller() -> None:
-        nonlocal first_high_at, first_low_after_high_at, windows_done
+        nonlocal first_high_at, first_low_after_high_at, short_pulse_first_s
+        nonlocal saw_any_gate_rise, saw_any_gate_fall
+        nonlocal gpi_sample_sequence, latest_gpi_value, short_pulse_last_s
+        nonlocal short_pulses_ignored, windows_done
         prev_level = 0
         high_seen = False
+        high_phase = "unknown"
         complete_at: float | None = None
         while not stop.is_set():
             try:
-                gpi_value = driver.publish_and_wait(
-                    f"{device_path}/s/gpi/+/!req",
-                    0,
-                    f"{device_path}/s/gpi/+/!value",
-                    timeout=0.5,
-                )
+                gpi_value = _read_gpi_snapshot(driver, device_path)
+                with gpi_condition:
+                    latest_gpi_value = gpi_value
+                    gpi_sample_sequence += 1
+                    gpi_condition.notify_all()
                 level = 1 if (int(gpi_value) & bit) else 0
+                phase = phase_getter() if phase_getter is not None else "go_signaled"
+                if phase != "go_signaled":
+                    # Flash/reset pin levels are not protocol events. Keep the
+                    # latest bitfield for READY qualification, but establish a
+                    # fresh low/high gate history only after GO is sent.
+                    poll_samples.clear()
+                    high_seen = False
+                    first_high_at = None
+                    first_low_after_high_at = None
+                    prev_level = level
+                    time.sleep(poll_interval_s)
+                    continue
                 poll_samples.append((time64.now(), level))
                 if level and not prev_level:
                     high_seen = True
+                    saw_any_gate_rise = True
+                    high_phase = phase
                     if first_high_at is None:
                         first_high_at = time.monotonic()
                         log.debug(
@@ -170,12 +272,38 @@ def capture_gated(
                             except Exception:
                                 log.warning("on_gate_rise hook failed", exc_info=True)
                 elif prev_level and not level and high_seen:
+                    saw_any_gate_fall = True
                     if first_low_after_high_at is None:
                         first_low_after_high_at = time.monotonic()
                         log.debug("gate-race timeline: GPI fall detected t=%.3f", time.time())
-                    windows_done += 1
-                    if windows_done >= min_high_windows and complete_at is None:
-                        complete_at = time.monotonic()
+                    high_duration_s = (
+                        time.monotonic() - first_high_at if first_high_at is not None else 0.0
+                    )
+                    if high_duration_s >= minimum_gate_s:
+                        windows_done += 1
+                        if windows_done >= min_high_windows and complete_at is None:
+                            complete_at = time.monotonic()
+                    else:
+                        short_pulses_ignored += 1
+                        short_pulse_phases[high_phase] = short_pulse_phases.get(high_phase, 0) + 1
+                        pulse_start_s = (
+                            first_high_at - capture_start if first_high_at is not None else 0.0
+                        )
+                        short_pulse_first_s = (
+                            pulse_start_s
+                            if short_pulse_first_s is None
+                            else min(short_pulse_first_s, pulse_start_s)
+                        )
+                        short_pulse_last_s = max(short_pulse_last_s or 0.0, pulse_start_s)
+                        log.debug(
+                            "Ignoring %.6fs GPIO-high pulse shorter than the %.3fs "
+                            "minimum power gate",
+                            high_duration_s,
+                            minimum_gate_s,
+                        )
+                        first_high_at = None
+                        first_low_after_high_at = None
+                        high_seen = False
                 prev_level = level
             except Exception:
                 pass
@@ -216,7 +344,7 @@ def capture_gated(
             # window cannot fire before we are ready to see it.
             if on_started is not None:
                 try:
-                    on_started()
+                    on_started(_wait_gpi_state)
                     go_release_at = time.monotonic()
                 except Exception:
                     log.warning("on_started hook failed", exc_info=True)
@@ -258,13 +386,79 @@ def capture_gated(
             poll_samples=aligned_poll_samples,
             io_voltage=io_voltage,
             prefer_device_time=use_device_time_axis,
+            minimum_window_s=minimum_gate_s,
         )
         if not windows:
             failure = classify_gate_failure(
-                saw_gate_rise=first_high_at is not None,
+                saw_gate_rise=saw_any_gate_rise,
                 duration_s=duration_s,
             )
-            raise PowerError(failure.message, hint=failure.hint)
+            if not packets:
+                raise PowerError(failure.message, hint=failure.hint)
+            captured_s = time.monotonic() - capture_start
+            result = _degraded_observation_result(
+                packets=packets,
+                family=family,
+                device_path=device_path,
+                io_voltage=io_voltage,
+                sync_input_index=sync_input_index,
+                stats_rate_hz=stats_rate_hz,
+                scnt=scnt,
+                poll_count=len(poll_samples),
+                duration_s=duration_s,
+                captured_s=captured_s,
+                saw_gate_rise=saw_any_gate_rise,
+                saw_gate_fall=saw_any_gate_fall,
+                short_pulses_ignored=short_pulses_ignored,
+            )
+            log.warning(
+                "%s; retaining %.3fs free-form capture for post-run diagnostics",
+                failure.message,
+                result.summary.duration_s,
+            )
+            return result
+        if short_pulses_ignored:
+            log.warning(
+                "Ignored %d GPIO-high pulse(s) shorter than the %.3fs minimum "
+                "before the valid power gate (phases=%s, first=%.3fs, last=%.3fs)",
+                short_pulses_ignored,
+                minimum_gate_s,
+                short_pulse_phases,
+                short_pulse_first_s or 0.0,
+                short_pulse_last_s or 0.0,
+            )
+
+        gate_integrity = None
+        if (
+            clean_infer_count is not None
+            and clean_infer_count > 0
+            and clean_infer_avg_us is not None
+            and clean_infer_avg_us > 0
+        ):
+            from ..diagnostics import assess_gate_duration
+
+            gate_integrity = assess_gate_duration(
+                measured_s=gated_summary.duration_s,
+                clean_infer_count=clean_infer_count,
+                clean_infer_avg_us=clean_infer_avg_us,
+                stats_rate_hz=stats_rate_hz,
+                minimum_s=minimum_gate_s,
+                relative_tolerance=gate_relative_tolerance,
+            )
+            if not gate_integrity.valid:
+                raise PowerError(
+                    "GPIO-gated power window duration does not match the requested "
+                    "clean inference count",
+                    hint=(
+                        f"Measured {gate_integrity.measured_s:.6f}s, expected "
+                        f"{gate_integrity.expected_s:.6f}s for {clean_infer_count} "
+                        f"inferences at {clean_infer_avg_us}us each "
+                        f"(allowed jitter {gate_integrity.tolerance_s:.6f}s). "
+                        f"The minimum accepted power gate is {minimum_gate_s:.3f}s. "
+                        "Rejecting the capture because its energy-per-inference "
+                        "denominator is not trustworthy."
+                    ),
+                )
 
         captured_s = time.monotonic() - capture_start
         metadata: dict[str, Any] = {
@@ -282,7 +476,14 @@ def capture_gated(
             "early_stopped": windows_done >= min_high_windows,
             "capture_window_s": round(captured_s, 4),
             "capture_safety_bound_s": duration_s,
+            "short_gate_pulses_ignored": short_pulses_ignored,
         }
+        if short_pulses_ignored:
+            metadata["short_gate_pulse_diagnostics"] = {
+                "by_phase": dict(short_pulse_phases),
+                "first_rise_s": round(short_pulse_first_s or 0.0, 6),
+                "last_rise_s": round(short_pulse_last_s or 0.0, 6),
+            }
         gate_timing = GateTransitionTiming(
             capture_to_gate_rise_s=(
                 round(first_high_at - capture_start, 6)
@@ -305,6 +506,16 @@ def capture_gated(
             metadata["sync_timing_s"] = sync_timing
         if clean_infer_count is not None:
             metadata["clean_infer_count"] = clean_infer_count
+        if gate_integrity is not None:
+            metadata["gate_duration_integrity"] = {
+                "measured_s": round(gate_integrity.measured_s, 6),
+                "expected_s": round(gate_integrity.expected_s, 6),
+                "tolerance_s": round(gate_integrity.tolerance_s, 6),
+                "minimum_s": round(gate_integrity.minimum_s, 6),
+                "relative_tolerance": gate_relative_tolerance,
+                "ratio": round(gate_integrity.ratio, 6),
+                "valid": True,
+            }
         if fr_xcheck:
             fr = _fullrate_energy_over_windows(
                 cur_chunks=fr_cur,

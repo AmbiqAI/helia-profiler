@@ -241,6 +241,8 @@ def _inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
     jlink_exe = find_jlink_exe()
     cmd = [
         jlink_exe,
+        "-NoGui",
+        "1",
         "-device",
         device,
         "-if",
@@ -348,6 +350,8 @@ def run_jlink_script(
     jlink_exe = find_jlink_exe()
     cmd = [
         jlink_exe,
+        "-NoGui",
+        "1",
         "-device",
         device,
         "-if",
@@ -531,6 +535,8 @@ def reset_target_poi(
     jlink_exe = find_jlink_exe()
     cmd = [
         jlink_exe,
+        "-NoGui",
+        "1",
         "-device",
         device,
         "-if",
@@ -845,6 +851,27 @@ def open_jlink_with_retry(
 
 
 @contextlib.contextmanager
+def attached_session(
+    *,
+    device: str,
+    jlink_serial: str | None = None,
+    attach_timeout_s: float = 30.0,
+) -> Iterator[DebugMemorySession]:
+    """Attach to a running target without resetting or halting it."""
+    jlink = create_debug_memory_session()
+    open_jlink_with_retry(
+        jlink, device=device, jlink_serial=jlink_serial, timeout_s=attach_timeout_s
+    )
+    try:
+        yield jlink
+    finally:
+        try:
+            jlink.close()
+        except Exception:  # noqa: BLE001 — close errors are non-fatal
+            pass
+
+
+@contextlib.contextmanager
 def attached_reset_session(
     *,
     device: str,
@@ -878,6 +905,7 @@ __all__ = [
     "JLinkProbeMatch",
     "JLinkResetController",
     "attached_reset_session",
+    "attached_session",
     "create_debug_memory_session",
     "find_jlink_exe",
     "inspect_probe_target",

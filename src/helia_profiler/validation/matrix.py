@@ -11,16 +11,26 @@ benchmark is one entry in ``MODELS`` — nothing else needs to change.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 
 from ..config import Toolchain, Transport
 from ..engines import EngineType
-from ..placement import ModelLocation
 from ..platform import SocFamily, get_soc_for_board
 
 # ---------------------------------------------------------------------------
 # Registry types
 # ---------------------------------------------------------------------------
+
+
+class MemoryProfile(StrEnum):
+    """Coarse placement profiles exercised by the hardware validation matrix."""
+
+    AUTO = "auto"
+    TCM = "tcm"
+    SRAM = "sram"
+    MRAM = "mram"
+    PSRAM = "psram"
 
 
 @dataclass(frozen=True)
@@ -49,11 +59,11 @@ class BoardSpec:
         Toolchain.ARMCLANG,
         Toolchain.ATFE,
     )
-    memories: tuple[ModelLocation, ...] = (
-        ModelLocation.AUTO,
-        ModelLocation.TCM,
-        ModelLocation.SRAM,
-        ModelLocation.MRAM,
+    memories: tuple[MemoryProfile, ...] = (
+        MemoryProfile.AUTO,
+        MemoryProfile.TCM,
+        MemoryProfile.SRAM,
+        MemoryProfile.MRAM,
     )
     description: str = ""
 
@@ -68,7 +78,7 @@ class CaseSpec:
     board: BoardSpec
     toolchain: Toolchain = Toolchain.ARM_NONE_EABI_GCC
     transport: Transport = Transport.RTT
-    memory: ModelLocation = ModelLocation.AUTO
+    memory: MemoryProfile = MemoryProfile.AUTO
     jlink_serial: str | None = None
     attempt: int = 1
     repeat_total: int = 1
@@ -88,18 +98,18 @@ class CaseSpec:
 
 def case_validity(case: CaseSpec) -> str | None:
     """Return a skip reason if the case is a known-unsupported combination."""
-    if case.memory is ModelLocation.PSRAM and case.transport is not Transport.RTT:
+    if case.memory is MemoryProfile.PSRAM and case.transport is not Transport.RTT:
         return "psram weights require the rtt transport"
     if case.transport is Transport.USB_CDC and case.transport not in case.board.transports:
         return "usb_cdc not supported on this board"
     soc = get_soc_for_board(case.board.id)
-    # Statically infeasible TCM placement: model_location=tcm forces arena
+    # Statically infeasible TCM profile: arena and weights both use DTCM,
     # AND weights into DTCM, which cannot fit when their combined size
     # exceeds it (e.g. KWS's 32 KB arena + ~53 KB weights vs Apollo3's
     # 64 KB DTCM). Weights are approximated by the fixture file size; if the
     # fixture is missing (LFS not pulled) the guard stays silent — the
     # harness already skips missing fixtures with its own reason.
-    if case.memory is ModelLocation.TCM:
+    if case.memory is MemoryProfile.TCM:
         fixture = Path(case.model.fixture_path)
         if not fixture.is_absolute():
             # matrix.py lives at src/helia_profiler/validation/ — repo root is
@@ -115,7 +125,7 @@ def case_validity(case: CaseSpec) -> str | None:
     # Apollo3 EVBs: the power-sync GPIOs (24/25/26, moved off the J-Link VCOM
     # UART pads) sit on the MSPI0 pads that external PSRAM needs, so PSRAM
     # placement and gated power capture are electrically exclusive there.
-    if case.power and case.memory is ModelLocation.PSRAM and soc.family is SocFamily.AP3:
+    if case.power and case.memory is MemoryProfile.PSRAM and soc.family is SocFamily.AP3:
         return "apollo3 power-sync GPIOs share the MSPI0 (PSRAM) pads"
     return None
 
@@ -126,9 +136,9 @@ def _board_spec(board_id: str, display_name: str, description: str = "") -> Boar
     transports = [Transport.RTT, Transport.SWO, Transport.UART]
     if soc.has_usb:
         transports.append(Transport.USB_CDC)
-    memories = [ModelLocation.AUTO, ModelLocation.TCM, ModelLocation.SRAM, ModelLocation.MRAM]
+    memories = [MemoryProfile.AUTO, MemoryProfile.TCM, MemoryProfile.SRAM, MemoryProfile.MRAM]
     if soc.memory.psram_kb > 0:
-        memories.append(ModelLocation.PSRAM)
+        memories.append(MemoryProfile.PSRAM)
     return BoardSpec(
         id=board_id,
         display_name=display_name,
@@ -226,7 +236,7 @@ def build_matrix(
     boards: list[str] | None = None,
     toolchains: list[str | Toolchain] | None = None,
     transports: list[str | Transport] | None = None,
-    memories: list[str | ModelLocation] | None = None,
+    memories: list[str | MemoryProfile] | None = None,
     jlink_serials: dict[str, str] | None = None,
     repeat: int = 1,
 ) -> list[CaseSpec]:
@@ -314,8 +324,8 @@ def build_matrix(
     )
     memory_filter = _coerce_filter(
         memories,
-        enum_type=ModelLocation,
-        known=tuple(ModelLocation),
+        enum_type=MemoryProfile,
+        known=tuple(MemoryProfile),
         label="memory",
     )
 

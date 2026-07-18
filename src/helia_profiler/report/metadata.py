@@ -56,6 +56,10 @@ def _write_run_metadata(ctx: PipelineContext, output_dir: Path) -> Path:
         lifecycle = ctx.power_result.metadata.get("target_lifecycle")
         if lifecycle is not None:
             meta_dict["target_lifecycle"] = lifecycle
+    if ctx.power_run is not None and ctx.power_run.terminal is not None:
+        meta_dict["power_terminal"] = asdict(ctx.power_run.terminal)
+    if ctx.power_run is not None and ctx.power_run.on_device_summary is not None:
+        meta_dict["on_device_power"] = asdict(ctx.power_run.on_device_summary)
 
     out_path.write_text(json.dumps(meta_dict, indent=2, default=str))
     log.info("Wrote run metadata: %s", out_path)

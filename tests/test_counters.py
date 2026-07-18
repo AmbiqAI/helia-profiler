@@ -10,13 +10,10 @@ from helia_profiler.counters import (
     MAX_COUNTERS_PER_PASS,
     get_counter,
     list_counters,
-    resolve_counters,
     plan_passes,
-    resolve_legacy_presets,
-    LEGACY_PRESET_MAP,
+    resolve_counters,
     supported_groups_for_domains,
     validate_group_selection,
-    validate_legacy_presets,
 )
 
 
@@ -104,18 +101,6 @@ def test_plan_passes_mixed_groups():
     assert "mve" in groups
 
 
-def test_legacy_preset_map():
-    sel = resolve_legacy_presets(["basic_cpu"])
-    assert "cpu" in sel
-    counters = resolve_counters(sel)
-    assert len(counters) > 0
-
-
-def test_legacy_preset_unknown():
-    with pytest.raises(ValueError):
-        resolve_legacy_presets(["nonexistent_preset"])
-
-
 def test_supported_groups_for_domains_filters_unknown_domains():
     groups = supported_groups_for_domains(("cpu", "memory", "mve", "custom"))
     assert groups == ("cpu", "memory", "mve")
@@ -124,8 +109,3 @@ def test_supported_groups_for_domains_filters_unknown_domains():
 def test_validate_group_selection_rejects_unsupported_groups():
     with pytest.raises(ValueError, match="not supported"):
         validate_group_selection({"mve": "default"}, supported_groups=("cpu",))
-
-
-def test_validate_legacy_presets_rejects_unsupported_groups():
-    with pytest.raises(ValueError, match="not supported"):
-        validate_legacy_presets(["mve"], supported_groups=("cpu",))

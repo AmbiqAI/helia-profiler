@@ -22,7 +22,7 @@ import json
 import importlib.resources as resources
 import math
 from dataclasses import dataclass
-from typing import Collection, Mapping, Sequence
+from typing import Collection, Mapping
 
 # ---------------------------------------------------------------------------
 # Counter descriptor
@@ -103,20 +103,6 @@ MAX_COUNTERS_PER_PASS = 4
 
 
 # ---------------------------------------------------------------------------
-# Legacy preset → new counter selection mapping
-# ---------------------------------------------------------------------------
-
-#: Maps old ``pmu_presets`` names to ``(group, selection)`` tuples so the
-#: new system is fully backward-compatible.
-LEGACY_PRESET_MAP: dict[str, tuple[str, str]] = {
-    "basic_cpu": ("cpu", "default"),
-    "memory": ("memory", "default"),
-    "mve": ("mve", "default"),
-    "ml_default": ("cpu", "default"),  # legacy alias
-}
-
-
-# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -192,16 +178,6 @@ def validate_group_selection(
     )
 
 
-def validate_legacy_presets(
-    presets: Sequence[str],
-    *,
-    supported_groups: Collection[str],
-) -> None:
-    """Validate legacy preset names against the target's supported groups."""
-    selection = resolve_legacy_presets(presets)
-    validate_group_selection(selection, supported_groups=supported_groups)
-
-
 def resolve_counters(
     selection: dict[str, str | list[str]],
 ) -> list[PmuCounter]:
@@ -275,25 +251,3 @@ def plan_passes(
             )
 
     return passes
-
-
-def resolve_legacy_presets(
-    preset_names: tuple[str, ...] | list[str],
-) -> dict[str, str | list[str]]:
-    """Convert legacy ``pmu_presets`` list into the new selection format.
-
-    Returns a selection dict suitable for :func:`resolve_counters`.
-    """
-    selection: dict[str, str | list[str]] = {}
-    for name in preset_names:
-        mapping = LEGACY_PRESET_MAP.get(name)
-        if mapping is None:
-            raise ValueError(
-                f"Unknown legacy preset '{name}'.  "
-                f"Known presets: {', '.join(sorted(LEGACY_PRESET_MAP))}"
-            )
-        group, sel = mapping
-        # If already present, don't downgrade "all" to "default"
-        if group not in selection:
-            selection[group] = sel
-    return selection

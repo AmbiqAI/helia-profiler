@@ -2,10 +2,9 @@
 
 Two responsibilities:
 
-1. **Resolve placement** — translate split ``model.arena_location`` /
-    ``model.weights_location`` controls, or compatibility ``model_location``
-    presets, plus the SoC memory layout into concrete ``arena_region`` and
-    ``weights_region``
+1. **Resolve placement** — translate optional ``model.arena_location`` /
+    ``model.weights_location`` controls plus the SoC memory layout into
+    concrete ``arena_region`` and ``weights_region``
    values written to ``ctx``.  These drive the section attributes the
    firmware template applies to ``model_data[]`` and ``g_arena[]``.
 
@@ -40,7 +39,7 @@ from ..config import DEFAULT_ARENA_SIZE_BYTES
 from ..errors import PlatformError
 from ..engines import get_adapter
 from ..pipeline import PipelineContext
-from ..placement import MemoryRegion, ModelLocation, Placement
+from ..placement import MemoryRegion, Placement, resolve_fastest_fit_placement
 from ..platform import MemoryLayout, SocDef
 from ..results import MemoryConsumer, MemoryPlan, MemoryRegionUsage
 
@@ -70,14 +69,6 @@ _LOGICAL_TO_PHYSICAL: dict[Placement, MemoryRegion] = {
 }
 
 
-# Slack we leave unallocated in TCM and SRAM so stack/heap/BSS/code sections for
-# the rest of the firmware still fit.  TCM needs substantial headroom because
-# Apollo linker profiles reserve fixed TCM windows for runtime state in addition
-# to the model arena/weights accounted for here.
-_TCM_SLACK_BYTES = 128 * 1024
-_SRAM_SLACK_BYTES = 32 * 1024
-
-
 class PlanMemoryStage:
     @property
     def name(self) -> str:
@@ -93,10 +84,9 @@ class PlanMemoryStage:
         ctx.arena_region = arena_region
         ctx.weights_region = weights_region
         log.info(
-            "Placement: arena=%s, weights=%s (model_location=%s)",
+            "Placement: arena=%s, weights=%s",
             arena_region,
             weights_region,
-            ctx.config.model.model_location,
         )
 
         # 2. Build / select the memory plan.
@@ -257,8 +247,8 @@ class PlanMemoryStage:
             f"{first.region} is over capacity.  Try one of:\n"
             "  * shrink the tensor arena (--arena-size);\n"
             "  * pick a less-aggressive placement\n"
-            "    (--model-location auto / mram);\n"
-            "  * move weights to PSRAM (--model-location psram) if the\n"
+            "    (--weights-location mram);\n"
+            "  * move weights to PSRAM (--weights-location psram) if the\n"
             "    board has PSRAM;\n"
             "  * reduce model size (quantise / prune); or\n"
             "  * pick a larger-memory board."
@@ -286,8 +276,6 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
     """
     cfg = ctx.config
     soc = ctx.soc
-    location = cfg.model.model_location
-
     # The engine adapter owns engine-specific placement policy.  Stage 2
     # populates ctx.engine_adapter; for the rare early-call path where
     # soc/adapter aren't yet available we fall back to a fresh adapter
@@ -310,74 +298,18 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
     arena_region: Placement
     weights_region: Placement
 
-    # Policy selections ------------------------------------------------------
-    if location == ModelLocation.PSRAM:
-        if psram_cap == 0:
-            raise PlatformError(
-                f"model_location=psram requested, but board {cfg.target.board} has no PSRAM.",
-                hint="Use --model-location auto | mram | sram | tcm, "
-                "or pick a PSRAM-capable board.",
-            )
-        # weights uploaded to PSRAM at runtime; arena lives in SRAM.
-        arena_region = Placement.SRAM
-        weights_region = Placement.PSRAM
-    elif location == ModelLocation.TCM:
-        if tcm_cap == 0:
-            raise PlatformError(
-                f"model_location=tcm requested, but board {cfg.target.board} has no DTCM.",
-                hint="Use --model-location auto, or pick a board with DTCM.",
-            )
-        arena_region = Placement.TCM
-        weights_region = Placement.TCM
-    elif location == ModelLocation.SRAM:
-        arena_region = Placement.SRAM
-        weights_region = Placement.SRAM
-    elif location == ModelLocation.MRAM:
-        # Legacy default: arena in fastest available, weights in MRAM
-        # (rodata).  Mirrors pre-auto behavior, but only uses TCM when the
-        # arena fits there.
-        arena_region = Placement.TCM if 0 < arena_size <= tcm_cap else Placement.SRAM
-        weights_region = Placement.MRAM
-    # auto -------------------------------------------------------------------
-    elif location != ModelLocation.AUTO:
-        # Should be caught by preflight, but belt-and-braces.
-        raise PlatformError(
-            f"Unknown model_location: {location!r}",
-            hint="Valid: auto, tcm, sram, mram, psram.",
-        )
-
     # Engine-specific auto policy (e.g. AOT pins arena=TCM, weights=MRAM).
-    elif (
+    if (
         engine_default := adapter.default_auto_placement(tcm_cap=tcm_cap, sram_cap=sram_cap)
     ) is not None:
         arena_region, weights_region = engine_default
     else:
-        # Greedy fastest-fit, arena first.
-        tcm_budget = max(0, tcm_cap - _TCM_SLACK_BYTES)
-        sram_budget = max(0, sram_cap - _SRAM_SLACK_BYTES)
-
-        arena_in_tcm = arena_size > 0 and arena_size <= tcm_budget
-        arena_in_sram = (not arena_in_tcm) and arena_size > 0 and arena_size <= sram_budget
-
-        if arena_in_tcm:
-            arena_region = Placement.TCM
-            # Subtract arena from the TCM budget when deciding weights.
-            remaining_tcm = tcm_budget - arena_size
-            tcm_weight_budget = max(0, remaining_tcm - _TCM_SLACK_BYTES)
-            if model_size > 0 and model_size <= tcm_weight_budget:
-                weights_region = Placement.TCM
-            elif model_size > 0 and model_size <= sram_budget:
-                weights_region = Placement.SRAM
-            else:
-                weights_region = Placement.MRAM
-        elif arena_in_sram:
-            arena_region = Placement.SRAM
-            weights_region = Placement.MRAM
-        else:
-            # arena doesn't fit in fast memory; weights stay in MRAM
-            # (rodata).  Validation pass will fail if even MRAM is short.
-            arena_region = Placement.SRAM if arena_size <= sram_cap else Placement.MRAM
-            weights_region = Placement.MRAM
+        arena_region, weights_region = resolve_fastest_fit_placement(
+            arena_size=arena_size,
+            weights_size=model_size,
+            tcm_cap=tcm_cap,
+            sram_cap=sram_cap,
+        )
 
     arena_region, weights_region = _apply_explicit_overrides(
         cfg,
@@ -401,35 +333,28 @@ def _apply_explicit_overrides(
     requested_arena = cfg.model.arena_location
     requested_weights = cfg.model.weights_location
 
-    # Backwards compatibility for configs written before model.arena_location
-    # and model.weights_location existed.
-    if requested_arena is None:
-        requested_arena = cfg.engine.config.get("runtime_arena_location")
-    if requested_weights is None:
-        requested_weights = cfg.engine.config.get("runtime_weights_location")
-
     if requested_arena == Placement.TCM and tcm_cap == 0:
         raise PlatformError(
             f"model.arena_location=tcm requested, but board {cfg.target.board} has no DTCM.",
-            hint="Use --runtime-arena-location sram, or pick a board with DTCM.",
+            hint="Use --arena-location sram, or pick a board with DTCM.",
         )
 
     if requested_arena == Placement.PSRAM and psram_cap == 0:
         raise PlatformError(
             f"model.arena_location=psram requested, but board {cfg.target.board} has no PSRAM.",
-            hint="Use --runtime-arena-location tcm | sram, or pick a PSRAM-capable board.",
+            hint="Use --arena-location tcm | sram, or pick a PSRAM-capable board.",
         )
 
     if requested_weights == Placement.TCM and tcm_cap == 0:
         raise PlatformError(
             f"model.weights_location=tcm requested, but board {cfg.target.board} has no DTCM.",
-            hint="Use --runtime-weights-location sram | mram, or pick a board with DTCM.",
+            hint="Use --weights-location sram | mram, or pick a board with DTCM.",
         )
 
     if requested_weights == Placement.PSRAM and psram_cap == 0:
         raise PlatformError(
             f"model.weights_location=psram requested, but board {cfg.target.board} has no PSRAM.",
-            hint="Use --runtime-weights-location tcm | sram | mram, or pick a PSRAM-capable board.",
+            hint="Use --weights-location tcm | sram | mram, or pick a PSRAM-capable board.",
         )
 
     if requested_arena is not None:

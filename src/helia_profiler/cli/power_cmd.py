@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-import argparse
 import sys
 import threading
 
 
-def _cmd_power_on(args: argparse.Namespace) -> None:
+def _cmd_power_on(driver_name: str, *, power_serial: str | None = None) -> None:
     """Enable Joulescope current passthrough and hold open until Ctrl-C."""
     from ..power import get_driver
     from ..errors import PowerError
-
-    driver_name = args.driver
-    power_serial = getattr(args, "power_serial", None)
 
     try:
         driver = get_driver(driver_name, serial=power_serial)

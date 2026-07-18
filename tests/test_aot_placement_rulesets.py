@@ -2,8 +2,8 @@
 
 The AOT greedy planner splits the model into three AIR tensor kinds —
 ``constant`` / ``persistent`` / ``scratch``.  ``_resolve_aot_tensor_rulesets``
-maps compatibility ``model_location`` presets onto wildcard attribute rulesets
-that pin each kind to a concrete memory. User-provided
+maps coarse arena/weights placement onto wildcard attribute rulesets that pin
+each kind to a concrete memory. User-provided
 ``engine.config.aot_args.memory.tensors`` rules remain the precise AOT control.
 """
 
@@ -25,8 +25,15 @@ def _cfg(board: str, location: str, **engine_overrides):
     engine: dict = {"type": "helia-aot"}
     if engine_overrides:
         engine["config"] = engine_overrides
+    placement = {
+        "auto": {},
+        "tcm": {"arena_location": "tcm", "weights_location": "tcm"},
+        "sram": {"arena_location": "sram", "weights_location": "sram"},
+        "mram": {"weights_location": "mram"},
+        "psram": {"arena_location": "sram", "weights_location": "psram"},
+    }[location]
     cli = {
-        "model": {"path": "m.tflite", "model_location": location},
+        "model": {"path": "m.tflite", **placement},
         "engine": engine,
         "target": {"board": board},
     }
@@ -53,6 +60,29 @@ class TestPlacementIntent:
             aot_args={"memory": {"tensors": [{"type": "scratch", "attributes": {"memory": "sram"}}]}},
         )
         assert _resolve_aot_placement_intent(cfg, soc) == (Placement.TCM, Placement.MRAM)
+
+    def test_ap510_auto_stages_ad_sized_weights_in_sram(self, tmp_path: Path):
+        model = tmp_path / "ad.tflite"
+        model.write_bytes(b"\x00" * 276_848)
+        cfg = load_config(
+            None,
+            {
+                "model": {"path": str(model), "arena_size": 131_072},
+                "engine": {"type": "helia-aot"},
+                "target": {"board": "apollo510_evb"},
+            },
+        )
+        soc = get_soc_for_board("apollo510_evb")
+
+        assert _resolve_aot_placement_intent(cfg, soc) == (
+            Placement.TCM,
+            Placement.SRAM,
+        )
+        kinds = _by_kind(_resolve_aot_tensor_rulesets(cfg, soc))
+        assert kinds["constant"] == {
+            "memory": "mram",
+            "constant_destination_memory": "sram",
+        }
 
 
 class TestRulesetsWithDtcm:
@@ -111,24 +141,12 @@ class TestRulesetsWithDtcmAp3:
         assert kinds["persistent"] == {"memory": "dtcm"}
         assert kinds["constant"] == {"memory": "mram", "constant_destination_memory": "dtcm"}
 
-    def test_mram_arena_prefers_dtcm(self):
+    def test_mram_weights_use_capacity_aware_sram_arena(self):
         soc = get_soc_for_board(self.board)
         kinds = _by_kind(_resolve_aot_tensor_rulesets(_cfg(self.board, "mram"), soc))
-        assert kinds["scratch"] == {"memory": "dtcm"}
-        assert kinds["persistent"] == {"memory": "dtcm"}
-        assert kinds["constant"] == {"memory": "mram"}  # cold XIP, no staging
-
-
-class TestLegacyPresets:
-    board = "apollo4p_blue_kxr_evb"
-
-    def test_model_location_preset_sets_all_kinds(self):
-        soc = get_soc_for_board(self.board)
-        cfg = _cfg(self.board, "sram")
-        kinds = _by_kind(_resolve_aot_tensor_rulesets(cfg, soc))
         assert kinds["scratch"] == {"memory": "sram"}
         assert kinds["persistent"] == {"memory": "sram"}
-        assert kinds["constant"] == {"memory": "mram", "constant_destination_memory": "sram"}
+        assert kinds["constant"] == {"memory": "mram"}  # cold XIP, no staging
 
 
 def test_expected_pragma_suffixes_track_current_heliaaot_platform_header():
@@ -206,7 +224,11 @@ class TestRunAotCompilerUsesConfigRegistry:
         self._install_fake_helia_aot(monkeypatch)
 
         cli = {
-            "model": {"path": "m.tflite", "model_location": "tcm"},
+            "model": {
+                "path": "m.tflite",
+                "arena_location": "tcm",
+                "weights_location": "tcm",
+            },
             "engine": {"type": "helia-aot"},
             "target": {
                 "board": "apollo510_custom_board",

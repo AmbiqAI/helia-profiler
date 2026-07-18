@@ -30,6 +30,8 @@ target:
 The choice is global across the run — every PMU pass and metadata block
 flows over the same transport. `uart` uses the J-Link OB virtual COM port at
 115200 8N1, so it is the low-throughput fallback when USB CDC is unavailable.
+HPX does not automatically retry with another transport after failure because
+the transport changes both generated firmware and capture reliability.
 
 !!! note "Transport choice no longer affects power numbers"
     With the default `power.firmware: dedicated` (see
@@ -51,8 +53,9 @@ clean.
 
 - J-Link probe connected via SWD to the target.
 - The same USB connection used for flashing — no extra cables.
-- SEGGER RTT source checkout available at `SEGGER_RTT_PATH` or in a common
-  local location such as repo-local `segger-rtt/`.
+- SEGGER RTT target sources bundled with heliaPROFILER. Use
+  `target.segger_rtt_path` or `SEGGER_RTT_PATH` only to test an explicit
+  alternate checkout.
 
 ### How heliaPROFILER uses it
 

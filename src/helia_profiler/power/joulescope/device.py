@@ -10,6 +10,7 @@ protocol.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from typing import Any
 
@@ -109,6 +110,26 @@ _shared_driver: Any = None
 #: ``_close_device`` decrements it and only calls ``drv.close`` once the
 #: count reaches zero.
 _open_refcounts: dict[str, int] = {}
+_device_open_lock = threading.Lock()
+_gpi_request_lock = threading.Lock()
+
+
+def _read_gpi_snapshot(driver: Any, device_path: str, *, timeout: float = 0.5) -> int:
+    """Read the aggregate GPI bitfield with one request in flight per process.
+
+    JS220/JS320 publish all aggregate GPI responses on one topic. Concurrent
+    ``publish_and_wait`` calls can consume each other's responses, so gate and
+    lock-step state polling serialize this request/response exchange.
+    """
+    with _gpi_request_lock:
+        return int(
+            driver.publish_and_wait(
+                f"{device_path}/s/gpi/+/!req",
+                0,
+                f"{device_path}/s/gpi/+/!value",
+                timeout=timeout,
+            )
+        )
 
 
 def _get_shared_driver() -> Any:
@@ -199,41 +220,43 @@ def _open_device(serial: str | None) -> tuple[Any, str, str]:
 
     family = _family_from_path(device_path)
 
-    deadline = time.monotonic() + _OPEN_RETRY_TIMEOUT_S
-    while True:
-        try:
-            drv.open(device_path)
-            break
-        except Exception as exc:
-            msg = str(exc).lower()
-            if _is_device_busy_error(msg):
-                if time.monotonic() < deadline:
-                    log.warning(
-                        "Joulescope %s busy during open; retrying in %.2fs",
-                        device_path,
-                        _OPEN_RETRY_INTERVAL_S,
-                    )
-                    time.sleep(_OPEN_RETRY_INTERVAL_S)
-                    continue
-                raise PowerError(
-                    f"Joulescope {device_path} is already in use by another process",
-                    hint=(
-                        "Close the Joulescope desktop app or any other process "
-                        "holding the device, then retry. On macOS you can also "
-                        "run 'pkill -f jsdrv' to release stuck handles."
-                    ),
-                ) from exc
-            # Idempotent re-open is OK; treat "already open" as success.
-            if "already" in msg or "open" in msg:
-                log.debug("Joulescope %s already open — reusing handle", device_path)
-                break
-            raise PowerError(
-                f"Failed to open Joulescope {device_path}: {exc}",
-                hint="Check USB connection and re-plug the device if needed.",
-            ) from exc
+    with _device_open_lock:
+        if _open_refcounts.get(device_path, 0) > 0:
+            _open_refcounts[device_path] += 1
+            log.debug("Joulescope %s already open — reusing handle", device_path)
+            return drv, device_path, family
 
-    log.info("Joulescope opened: %s (%s)", device_path, family.upper())
-    _open_refcounts[device_path] = _open_refcounts.get(device_path, 0) + 1
+        deadline = time.monotonic() + _OPEN_RETRY_TIMEOUT_S
+        while True:
+            try:
+                drv.open(device_path)
+                break
+            except Exception as exc:
+                msg = str(exc).lower()
+                if _is_device_busy_error(msg):
+                    if time.monotonic() < deadline:
+                        log.warning(
+                            "Joulescope %s busy during open; retrying in %.2fs",
+                            device_path,
+                            _OPEN_RETRY_INTERVAL_S,
+                        )
+                        time.sleep(_OPEN_RETRY_INTERVAL_S)
+                        continue
+                    raise PowerError(
+                        f"Joulescope {device_path} is already in use by another process",
+                        hint=(
+                            "Close the Joulescope desktop app or any other process "
+                            "holding the device, then retry. On macOS you can also "
+                            "run 'pkill -f jsdrv' to release stuck handles."
+                        ),
+                    ) from exc
+                raise PowerError(
+                    f"Failed to open Joulescope {device_path}: {exc}",
+                    hint="Check USB connection and re-plug the device if needed.",
+                ) from exc
+
+        _open_refcounts[device_path] = 1
+        log.info("Joulescope opened: %s (%s)", device_path, family.upper())
     return drv, device_path, family
 
 
@@ -245,15 +268,16 @@ def _close_device(drv: Any, device_path: str) -> None:
     controller during an active gated capture) never tears down another
     caller's still-active handle.
     """
-    remaining = _open_refcounts.get(device_path, 0) - 1
-    if remaining > 0:
-        _open_refcounts[device_path] = remaining
-        return
-    _open_refcounts.pop(device_path, None)
-    try:
-        drv.close(device_path)
-    except Exception:
-        pass
+    with _device_open_lock:
+        remaining = _open_refcounts.get(device_path, 0) - 1
+        if remaining > 0:
+            _open_refcounts[device_path] = remaining
+            return
+        _open_refcounts.pop(device_path, None)
+        try:
+            drv.close(device_path)
+        except Exception:
+            pass
 
 
 def enumerate_devices() -> list[tuple[str, str]]:

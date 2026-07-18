@@ -17,6 +17,18 @@ from helia_profiler.compare import (
     render_compare,
     write_compare_artifacts,
 )
+from helia_profiler.evaluation import (
+    ComparisonProfile,
+    MetricDirection,
+    MetricPolicy,
+)
+from helia_profiler.errors import ReportError
+from helia_profiler.result_manifest import (
+    ResultArtifact,
+    ResultManifest,
+    ResultValidity,
+    RunStatus,
+)
 
 
 def _write_run(
@@ -68,7 +80,6 @@ def _write_run(
                     "model": {
                         "path": "model.tflite",
                         "arena_size": 131072,
-                        "model_location": "auto",
                     },
                     "engine": {"type": "helia-rt", "backend": None},
                     "target": {
@@ -79,8 +90,7 @@ def _write_run(
                     "profiling": {
                         "iterations": 100,
                         "warmup": 5,
-                        "pmu_counters": None,
-                        "pmu_presets": ["basic_cpu"],
+                        "pmu_counters": {"cpu": "default"},
                     },
                 },
             }
@@ -150,6 +160,44 @@ def _write_aot_memory_layers(path: Path, memory: str, source_memory: str | None 
         )
 
 
+def _replace_csv_with_json(path: Path) -> None:
+    csv_path = path / "profile_results.csv"
+    with open(csv_path, newline="") as stream:
+        layers = [dict(row) for row in csv.DictReader(stream)]
+    (path / "profile_results.json").write_text(json.dumps({"layers": layers}))
+    csv_path.unlink()
+
+
+def _publish_manifest(path: Path) -> Path:
+    import hashlib
+
+    artifacts = []
+    for artifact_path in sorted(item for item in path.iterdir() if item.is_file()):
+        artifacts.append(
+            ResultArtifact(
+                path=artifact_path.name,
+                media_type=(
+                    "application/json" if artifact_path.suffix == ".json" else "text/csv"
+                ),
+                size_bytes=artifact_path.stat().st_size,
+                sha256=hashlib.sha256(artifact_path.read_bytes()).hexdigest(),
+            )
+        )
+    return ResultManifest(
+        schema="hpx.result-manifest",
+        schema_version=1,
+        run_id=path.name,
+        timestamp="2026-07-18T00:00:00+00:00",
+        hpx_version="0.1.0",
+        status=RunStatus.COMPLETE,
+        validity=ResultValidity.VALID,
+        issues=(),
+        provenance={},
+        comparability={},
+        artifacts=tuple(artifacts),
+    ).write(path / "result_manifest.json")
+
+
 def test_compare_runs_computes_run_and_layer_deltas(tmp_path: Path):
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
@@ -172,6 +220,51 @@ def test_compare_runs_computes_run_and_layer_deltas(tmp_path: Path):
     assert result.layer_rows[0].speedup == 800 / 600
     assert isinstance(result.config_rows[0], ConfigDiffRow)
     assert any(row.field == "Toolchain" and row.status == "diff" for row in result.config_rows)
+
+
+def test_compare_loads_json_profile_results(tmp_path: Path):
+    baseline = tmp_path / "baseline"
+    candidate = tmp_path / "candidate"
+    _write_run(
+        baseline,
+        toolchain="arm-none-eabi-gcc",
+        total_cycles=1000,
+        avg_us=10,
+        layer_cycles=[800, 200],
+    )
+    _write_run(
+        candidate,
+        toolchain="arm-none-eabi-gcc",
+        total_cycles=900,
+        avg_us=9,
+        layer_cycles=[700, 200],
+    )
+    _replace_csv_with_json(baseline)
+    _replace_csv_with_json(candidate)
+    _publish_manifest(baseline)
+    _publish_manifest(candidate)
+
+    result = compare_runs(baseline, candidate)
+
+    assert result.layer_rows[0].delta_cycles == -100
+
+
+def test_compare_verifies_manifest_before_loading(tmp_path: Path):
+    baseline = tmp_path / "baseline"
+    candidate = tmp_path / "candidate"
+    for path in (baseline, candidate):
+        _write_run(
+            path,
+            toolchain="arm-none-eabi-gcc",
+            total_cycles=1000,
+            avg_us=10,
+            layer_cycles=[800],
+        )
+        _publish_manifest(path)
+    (candidate / "summary.json").write_text('{"total_cycles": 1}')
+
+    with pytest.raises(ReportError, match="size mismatch|digest mismatch"):
+        compare_runs(baseline, candidate)
 
 
 def test_compare_includes_power_metrics_when_available(tmp_path: Path):
@@ -204,6 +297,42 @@ def test_compare_includes_power_metrics_when_available(tmp_path: Path):
         metric for metric in result.metrics if metric.name == "power.inferences_per_joule"
     )
     assert throughput.delta == 100
+
+
+def test_compare_suppresses_power_metrics_when_scope_differs(tmp_path: Path):
+    baseline = tmp_path / "baseline"
+    candidate = tmp_path / "candidate"
+    _write_run(
+        baseline,
+        toolchain="arm-none-eabi-gcc",
+        total_cycles=1000,
+        avg_us=10,
+        layer_cycles=[800],
+        power={
+            "measurement_scope": "gpio_gated_clean_window",
+            "integrity": "valid",
+            "energy_j": 0.002,
+        },
+    )
+    _write_run(
+        candidate,
+        toolchain="arm-none-eabi-gcc",
+        total_cycles=900,
+        avg_us=9,
+        layer_cycles=[700],
+        power={
+            "measurement_scope": "free_form_capture",
+            "integrity": "degraded",
+            "energy_j": 0.1,
+        },
+    )
+
+    result = compare_runs(baseline, candidate)
+
+    assert result.comparability.run_metrics_comparable
+    assert not result.comparability.power_metrics_comparable
+    assert not any(metric.name.startswith("power.") for metric in result.metrics)
+    assert any("Power metrics omitted" in warning for warning in result.warnings)
 
 
 def test_compare_omits_layers_when_operation_sequence_differs(tmp_path: Path):
@@ -281,10 +410,43 @@ def test_write_compare_artifacts(tmp_path: Path):
     assert {p.name for p in paths} == {"compare_summary.json", "layer_diff.csv"}
     summary = json.loads((tmp_path / "diff" / "compare_summary.json").read_text())
     assert summary["metrics"][0]["name"] == "total_cycles"
+    assert "verdict" not in summary
+    assert summary["comparability"]["run_metrics_comparable"] is True
+    assert isinstance(summary["comparability"]["issues"], list)
     with open(tmp_path / "diff" / "layer_diff.csv", newline="") as f:
         rows = list(csv.DictReader(f))
     assert rows[0]["baseline_op"] == "CONV_2D"
     assert rows[0]["delta_cycles"] == "-100.0"
+
+
+def test_compare_profile_verdict_is_serialized_with_identity(tmp_path: Path):
+    baseline = tmp_path / "gcc"
+    candidate = tmp_path / "atfe"
+    _write_run(
+        baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
+    )
+    _write_run(candidate, toolchain="atfe", total_cycles=1100, avg_us=11, layer_cycles=[900])
+    profile = ComparisonProfile(
+        schema="hpx.comparison-profile",
+        schema_version=1,
+        name="cycles-smoke",
+        metrics={
+            "total_cycles": MetricPolicy(
+                direction=MetricDirection.SMALLER,
+                unit="cycles",
+                max_regression_pct=5,
+            )
+        },
+    )
+
+    result = compare_runs(baseline, candidate, profile=profile)
+    write_compare_artifacts(result, tmp_path / "diff")
+    summary = json.loads((tmp_path / "diff" / "compare_summary.json").read_text())
+
+    assert summary["verdict"]["status"] == "fail"
+    assert summary["verdict"]["profile_name"] == "cycles-smoke"
+    assert summary["verdict"]["profile_schema"] == "hpx.comparison-profile"
+    assert len(summary["verdict"]["profile_sha256"]) == 64
 
 
 def test_compare_includes_aot_memory_placement_diffs(tmp_path: Path):

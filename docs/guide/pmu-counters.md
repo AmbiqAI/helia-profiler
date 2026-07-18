@@ -54,12 +54,6 @@ hpx profile model.tflite \
   --pmu-counters mve:ARM_PMU_MVE_INST_RETIRED,ARM_PMU_MVE_STALL
 ```
 
-!!! note "Legacy `pmu_presets`"
-    An older `profiling.pmu_presets` list (`basic_cpu`, `memory`, `mve`,
-    `ml_default`) is still accepted and converted internally (each preset
-    maps to a `(group, "default")` pair), but emits a deprecation warning.
-    Prefer `pmu_counters`.
-
 ## Counter groups and tiers
 
 Counters are organized by **compute-unit group**. Which groups are

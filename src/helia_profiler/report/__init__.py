@@ -28,6 +28,7 @@ Detailed (``detailed/`` subfolder, only with ``--detailed``):
 from __future__ import annotations
 
 import logging
+from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -35,6 +36,7 @@ from ..errors import ReportError
 from .aot import _write_aot_manifest, _write_aot_memory_layers
 from .csv_writer import _layer_to_flat_dict, _write_csv, _write_preset_csv
 from .json_writer import _write_json
+from .manifest import _write_result_manifest
 from .memory import _serialise_memory_plan, _write_memory_breakdown
 from .metadata import _firmware_meta_to_dict, _metadata_to_dict, _write_run_metadata
 from .model_explorer import _write_model_explorer_overlays
@@ -58,6 +60,8 @@ def write_report(ctx: PipelineContext) -> list[Path]:
 
     output_dir = ctx.config.output.dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    # Invalidate any previous publication before overwriting a reused directory.
+    (output_dir / "result_manifest.json").unlink(missing_ok=True)
     paths: list[Path] = []
 
     fmt = ctx.config.output.format
@@ -70,7 +74,23 @@ def write_report(ctx: PipelineContext) -> list[Path]:
         p = _write_csv(pmu, output_dir, analysis)
         paths.append(p)
     elif fmt == "json":
-        p = _write_json(pmu, ctx.power_result, ctx.run_metadata, output_dir)
+        p = _write_json(
+            pmu,
+            ctx.power_result,
+            ctx.run_metadata,
+            output_dir,
+            power_terminal=(
+                asdict(ctx.power_run.terminal)
+                if ctx.power_run is not None and ctx.power_run.terminal is not None
+                else None
+            ),
+            on_device_summary=(
+                asdict(ctx.power_run.on_device_summary)
+                if ctx.power_run is not None
+                and ctx.power_run.on_device_summary is not None
+                else None
+            ),
+        )
         paths.append(p)
     else:
         raise ReportError(f"Unknown output format: '{fmt}'")
@@ -129,5 +149,8 @@ def write_report(ctx: PipelineContext) -> list[Path]:
         if ctx.power_result is not None:
             p = _write_power_csv(ctx.power_result, detail_dir)
             paths.append(p)
+
+    # Publication marker: written last so an interrupted report cannot appear complete.
+    paths.append(_write_result_manifest(ctx, paths, output_dir))
 
     return paths

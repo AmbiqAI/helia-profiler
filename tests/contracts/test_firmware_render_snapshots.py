@@ -141,7 +141,6 @@ def _render(soc_name: str, transport: str, engine: str, power_only: bool = False
             aot_prefix="fake",
             aot_op_manifest=[{"id": 0, "op_type": "CONV_2D"}],
             printf_linkage="static ",
-            model_location="mram",
             allocate_arenas=False,
             arena_regions=[],
         )
@@ -149,7 +148,6 @@ def _render(soc_name: str, transport: str, engine: str, power_only: bool = False
     kwargs.update(
         engine_header=TFLM_ENGINE_HEADER,
         arena_size=65_536,
-        model_location="mram",
         model_size=1024,
         resolver_mode="all",
         resolver_max_ops=2,
@@ -312,7 +310,6 @@ def test_power_only_never_initializes_transport():
         for forbidden in (
             "nsx_uart_printf_enable(",
             "nsx_itm_printf_enable(",
-            "SEGGER_RTT",
             "usb_timer_",
             "HPX_PRESET",
             "HPX_START",
@@ -352,7 +349,6 @@ def test_ble_reset_only_in_power_only_binary_for_blue_boards():
     kwargs.update(
         engine_header=TFLM_ENGINE_HEADER,
         arena_size=65_536,
-        model_location="mram",
         model_size=1024,
         resolver_mode="all",
         resolver_max_ops=2,
@@ -437,7 +433,6 @@ def test_extreme_mode_power_only_only():
     kwargs.update(
         engine_header=TFLM_ENGINE_HEADER,
         arena_size=65_536,
-        model_location="mram",
         model_size=1024,
         resolver_mode="all",
         resolver_max_ops=2,
@@ -511,7 +506,6 @@ def test_ssram_full_power_enum_is_per_soc():
     kwargs.update(
         engine_header=TFLM_ENGINE_HEADER,
         arena_size=65_536,
-        model_location="mram",
         model_size=1024,
         resolver_mode="all",
         resolver_max_ops=2,
@@ -546,7 +540,6 @@ def test_peripheral_power_down_skips_mspi_when_psram_in_use():
     kwargs.update(
         engine_header=TFLM_ENGINE_HEADER,
         arena_size=65_536,
-        model_location="mram",
         model_size=1024,
         resolver_mode="all",
         resolver_max_ops=2,
@@ -559,4 +552,3 @@ def test_peripheral_power_down_skips_mspi_when_psram_in_use():
     rendered = _jinja_env.get_template("main.cc.j2").render(**kwargs)
     assert "AM_HAL_PWRCTRL_PERIPH_IOM0" in rendered  # rest of the block still fires
     assert "AM_HAL_PWRCTRL_PERIPH_MSPI0" not in rendered
-

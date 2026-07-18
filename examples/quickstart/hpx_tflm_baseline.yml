@@ -16,7 +16,9 @@ target:
   toolchain: arm-none-eabi-gcc
 
 profiling:
-  pmu_presets: [basic_cpu, memory]
+  pmu_counters:
+    cpu: default
+    memory: default
   per_layer: true
   iterations: 3
   warmup: 1

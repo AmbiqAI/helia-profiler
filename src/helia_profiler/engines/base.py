@@ -117,7 +117,7 @@ class EngineArtifacts:
     # Optional memory plan built from engine-specific internals (e.g.
     # heliaAOT's ``codegen_ctx.memory_plan``).  If None, ``plan_memory``
     # stage synthesises a conservative plan from ``model.arena_size`` and
-    # ``model.model_location``.
+    # the resolved split placement.
     memory_plan: MemoryPlan | None = None
 
 
@@ -154,19 +154,10 @@ class EngineAdapter(Protocol):
 
     # -- Capability hooks (called by shared stages) --
 
-    def supports_runtime_split(self) -> bool:
-        """Whether ``runtime_arena_location`` / ``runtime_weights_location``
-        config overrides are honoured by this engine.
-
-        AOT engines bake placement into the compiled module, so overrides
-        from the profiler config are rejected with a hint.
-        """
-        ...
-
     def default_auto_placement(
         self, *, tcm_cap: int, sram_cap: int
     ) -> tuple[Placement, Placement] | None:
-        """Engine-specific default for ``model_location=auto``.
+        """Engine-specific default when split placement fields are omitted.
 
         Returns a ``(arena, weights)`` pair, or ``None`` to fall through
         to the shared greedy fastest-fit policy in ``plan_memory``.

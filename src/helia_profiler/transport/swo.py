@@ -132,7 +132,7 @@ def capture_swo_output(
             lines = collect_lines(
                 lambda: bytes(jlink.swo_read_stimulus(0, 4096)),
                 transport_name="SWO",
-                timeout_s=timeout_s,
+                overall_timeout_s=timeout_s,
                 poll_interval_s=_SWO_POLL_INTERVAL_S,
                 on_line=on_line,
             )

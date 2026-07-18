@@ -36,7 +36,7 @@ def _write_bundle(root: Path, cycles: int, *, attempt: int = 1, repeat_total: in
                 "model": {"sha256": "abc"},
                 "toolchain": {"compiler": "gcc", "compiler_version": "1"},
                 "config": {
-                    "model": {"model_location": "auto"},
+                    "model": {},
                     "engine": {"type": "helia-rt"},
                     "target": {
                         "board": "apollo510_evb",

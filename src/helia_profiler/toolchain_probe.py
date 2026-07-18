@@ -15,6 +15,7 @@ import subprocess
 from pathlib import Path
 
 from .results import BinarySections
+from .toolchains import get_toolchain_spec, resolve_toolchain_executable
 
 log = logging.getLogger("hpx")
 
@@ -30,11 +31,8 @@ def _compiler_command(toolchain: str) -> str:
     Maps profile toolchain names ("armclang", "atfe", "arm-none-eabi-gcc")
     onto the actual binary that will respond to ``--version``.
     """
-    if toolchain in ("armclang", "atfe"):
-        return toolchain
-    if "gcc" in toolchain:
-        return toolchain if toolchain.endswith("-gcc") else f"{toolchain}-gcc"
-    return toolchain
+    spec = get_toolchain_spec(toolchain)
+    return resolve_toolchain_executable(toolchain, spec.compiler)
 
 
 def _run_version(cmd: str, *, timeout_s: int) -> str:
@@ -167,11 +165,11 @@ def binary_sections(
     for GCC binaries.  Returns ``None`` if the size tool is unavailable
     or its output cannot be parsed.
     """
-    if toolchain in ("armclang", "atfe"):
+    spec = get_toolchain_spec(toolchain)
+    if spec.section_probe == "fromelf":
         return _sections_via_fromelf(binary_path, timeout_s=timeout_s)
-
-    prefix = toolchain.rsplit("-gcc", 1)[0] if toolchain.endswith("-gcc") else toolchain
-    return _sections_via_size(binary_path, size_cmd=f"{prefix}-size", timeout_s=timeout_s)
+    assert spec.size is not None
+    return _sections_via_size(binary_path, size_cmd=spec.size, timeout_s=timeout_s)
 
 
 # ---------------------------------------------------------------------------
@@ -185,10 +183,8 @@ def _nm_command(toolchain: str) -> str:
     armclang / ATfE ship the LLVM binutils (``llvm-nm``); GCC uses the
     cross-prefixed ``<prefix>-nm`` (e.g. ``arm-none-eabi-nm``).
     """
-    if toolchain in ("armclang", "atfe"):
-        return "llvm-nm"
-    prefix = toolchain.rsplit("-gcc", 1)[0] if toolchain.endswith("-gcc") else toolchain
-    return f"{prefix}-nm"
+    spec = get_toolchain_spec(toolchain)
+    return resolve_toolchain_executable(toolchain, spec.nm)
 
 
 def symbol_address(

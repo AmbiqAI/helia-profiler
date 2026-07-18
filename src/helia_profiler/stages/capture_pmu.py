@@ -19,10 +19,12 @@ class CapturePmuStage:
         return False
 
     def run(self, ctx: PipelineContext) -> None:
-        if ctx.binary_path is None:
-            raise CaptureError("No binary deployed — build/flash stages did not run.")
+        if ctx.profile_run is None or ctx.profile_run.deployment is None:
+            raise CaptureError("No profile firmware deployed — build/flash stages did not run.")
 
         from ..capture import capture_pmu
+
+        ctx.report_progress("Resetting target and waiting for profile output")
 
         try:
             pmu_result = capture_pmu(ctx)
@@ -34,5 +36,12 @@ class CapturePmuStage:
                 hint="Check serial/SWO connection to the target board.",
             ) from exc
 
-        ctx.pmu_result = pmu_result
+        ctx.publish_profile_result(pmu_result)
         log.info("Captured PMU data: %d layers", len(pmu_result.layers))
+        clean_us = pmu_result.meta.clean_infer_avg_us
+        timing = f" · {clean_us / 1000:.3f} ms/inference" if clean_us else ""
+        ctx.report_progress(
+            f"Profile captured · {len(pmu_result.layers)} layers{timing}",
+            kind="checkpoint",
+            min_verbosity=0,
+        )

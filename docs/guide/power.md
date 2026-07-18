@@ -48,15 +48,23 @@ page:
 3. Connect J-Link USB for flashing, and the Joulescope to the host via its
    own USB.
 4. Wire the sync GPIO from [Wiring reference](#wiring-reference).
+5. For JS320 digital I/O, connect `Vref` to the target MCU I/O rail on the
+  EVB side of Joulescope passthrough (1.8 V for the registered Apollo510
+  wiring), and connect digital ground to EVB ground. Do not reference the
+  upstream supply when it differs from the MCU GPIO voltage.
+
+When JS320 `Vref` comes from the target-side I/O rail, normal capture keeps
+passthrough enabled through flash, reset, handshake, and measurement. Cycling
+passthrough would remove both target power and the digital logic reference, so
+it is reserved for explicit recovery. GPIO observations made during flash/reset
+are discarded; only fresh stable samples after a short reset grace period
+participate in the READY/GO/GATE protocol.
 
 ### Choosing a Joulescope
 
 | `power.driver` | Instrument | Status |
 |---|---|---|
 | `joulescope` *(default)* | Auto-detect JS110, JS220, or JS320 | Stable |
-| `joulescope-js110` | Legacy unified-driver alias | Stable |
-| `joulescope-js220` | Legacy unified-driver alias | Stable |
-| `joulescope-js320` | Unified-driver alias | Stable |
 | `ondevice` | Apollo SoC internal power monitoring | Not yet implemented — see [Troubleshooting](#troubleshooting) |
 
 | Aspect | JS110 | JS220 | JS320 |
@@ -283,6 +291,14 @@ target to at least 5000 ms (`max(profiling.window_target_ms, 5000)`), because
 host-side GPIO polling and Joulescope packet alignment need more time to
 settle than a plain PMU capture does.
 
+External captures enforce the window contract before reporting
+energy-per-inference. The measured gate must be at least one second and agree
+with `clean_infer_count * clean_infer_avg_us` within the larger of two stats
+packets, half an inference, or 1% cross-binary timing drift. Short GPIO pulses
+are ignored as glitches; a capture with no qualifying window fails rather than
+publishing a plausible but invalid power number. The accepted ratio and any
+ignored pulse count are recorded in `summary.json`.
+
 ### Very short inferences
 
 For models whose single inference takes only a couple of milliseconds, even
@@ -426,7 +442,7 @@ comparison.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `enabled` | bool | `false` | Enable power capture |
-| `driver` | string | `joulescope` | `joulescope` (auto-detect), `joulescope-js110`, `joulescope-js220`, `joulescope-js320`, or `ondevice` (see note below) |
+| `driver` | string | `joulescope` | `joulescope` (auto-detects JS110, JS220, or JS320), or `ondevice` (see note below) |
 | `mode` | string | `external` | `external` (Joulescope inline) or `internal` (on-device) |
 | `duration_s` | int \| null | `null` | Host-side safety bound; `null` auto-tunes from PMU-phase timing |
 | `io_voltage` | float | `1.8` | Joulescope GPI reference voltage — must match the board's I/O rail |
@@ -448,7 +464,7 @@ comparison.
 |---|---|---|---|
 | `profiling.window_mode` | string | `auto` | `auto` sizes the clean window at runtime; `fixed` runs exactly `iterations` |
 | `profiling.window_target_ms` | int | `1000` | Target wall-time for the clean window (auto-raised to ≥ 5000 when power is enabled) |
-| `profiling.window_min` / `window_max` | int | `10` / `2000` | Clamp bounds for the auto-sized clean-window iteration count |
+| `profiling.window_min` / `window_max` | int | `10` / `500000` | Clamp bounds for the auto-sized clean-window iteration count |
 | `profiling.extreme_mode` | bool | `false` | See [Advanced power floors](#advanced-power-floors) |
 | `profiling.force_shared_sram` | bool | `false` | See [Advanced power floors](#advanced-power-floors) |
 | `profiling.clean_window_trace` | bool | `false` | See [Diagnostics for bring-up](#diagnostics-for-bring-up) |
@@ -458,7 +474,7 @@ comparison.
 ### `hpx power-on`
 
 ```bash
-hpx power-on [--driver joulescope|joulescope-js110|joulescope-js220|joulescope-js320] \
+hpx power-on [--driver joulescope] \
     [--power-serial SERIAL]
 ```
 
@@ -468,7 +484,7 @@ want the board powered for manual debugging (JLinkExe, a serial console,
 etc.) without running a profiling session.
 
 When multiple Joulescopes are attached, `--power-serial` is required. For
-example, use `hpx power-on --driver joulescope-js320 --power-serial 25QG` for
+example, use `hpx power-on --driver joulescope --power-serial 25QG` for
 the JS320 bench.
 
 ## Troubleshooting

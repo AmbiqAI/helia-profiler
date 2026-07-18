@@ -17,12 +17,11 @@ from .common import _print_hpx_error
 
 def _cmd_doctor() -> None:
     """Check toolchain and dependencies."""
-    from ..doctor import collect_checks
+    from ..doctor import inspect_environment
     from ..console import HpxConsole
 
-    checks, required_python, optional = collect_checks()
     console = HpxConsole()
-    console.print_doctor(checks, required_python, optional)
+    console.print_doctor(inspect_environment())
 
 
 def _cmd_engines() -> None:
@@ -160,14 +159,25 @@ def _cmd_ports(args: argparse.Namespace) -> None:
 
 def _cmd_ports_list(args: argparse.Namespace) -> None:
     try:
-        from serial.tools import list_ports
+        from ..transport.ports import list_serial_ports
     except ImportError:
         print("Error: pyserial is required for hpx ports list.", file=sys.stderr)
         sys.exit(1)
 
-    rows = [_describe_serial_port(info) for info in list_ports.comports()]
-    if not args.show_all:
-        rows = [row for row in rows if _is_relevant_serial_port(row)]
+    ports = list_serial_ports(include_all=args.show_all)
+    rows = [
+        {
+            "device": port.device,
+            "kind": port.kind,
+            "description": port.description,
+            "manufacturer": port.manufacturer,
+            "product": port.product,
+            "serial_number": port.serial_number,
+            "interface": port.interface,
+            "hwid": port.hwid,
+        }
+        for port in ports
+    ]
     if args.json:
         print(json.dumps({"ports": rows}, indent=2))
         return
@@ -213,8 +223,7 @@ def _cmd_target_reset(args: argparse.Namespace) -> None:
 
 def _print_rows(rows: list[dict[str, object]], columns: tuple[str, ...]) -> None:
     widths = {
-        col: max(len(col), *(len(_cell_text(row.get(col))) for row in rows))
-        for col in columns
+        col: max(len(col), *(len(_cell_text(row.get(col))) for row in rows)) for col in columns
     }
     print("  ".join(col.ljust(widths[col]) for col in columns))
     print("  ".join("-" * widths[col] for col in columns))
@@ -228,32 +237,3 @@ def _cell_text(value: object) -> str:
     if isinstance(value, bool):
         return "yes" if value else "no"
     return str(value)
-
-
-def _describe_serial_port(info: object) -> dict[str, str]:
-    fields = {
-        "device": str(getattr(info, "device", "") or ""),
-        "description": str(getattr(info, "description", "") or ""),
-        "manufacturer": str(getattr(info, "manufacturer", "") or ""),
-        "product": str(getattr(info, "product", "") or ""),
-        "serial_number": str(getattr(info, "serial_number", "") or ""),
-        "interface": str(getattr(info, "interface", "") or ""),
-        "hwid": str(getattr(info, "hwid", "") or ""),
-    }
-    text = " ".join(fields.values()).lower()
-    is_jlink = "segger" in text or "j-link" in text or "jlink" in text
-    is_hpx_cdc = fields["serial_number"].startswith("HPX-")
-    if is_jlink:
-        kind = "jlink-vcom"
-    elif is_hpx_cdc:
-        kind = "hpx-usb-cdc"
-    else:
-        kind = "serial"
-    return {**fields, "kind": kind}
-
-
-def _is_relevant_serial_port(row: dict[str, str]) -> bool:
-    if row["kind"] in ("jlink-vcom", "hpx-usb-cdc"):
-        return True
-    device = row["device"]
-    return any(token in device for token in ("ttyACM", "ttyUSB", "tty.usbmodem"))

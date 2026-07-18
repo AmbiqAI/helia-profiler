@@ -339,6 +339,7 @@ def _process_gated_stats(
     poll_samples: list[tuple[int, int]],
     io_voltage: float,
     prefer_device_time: bool = False,
+    minimum_window_s: float = 0.0,
 ) -> tuple[list[GatedPowerWindow], PowerSummary]:
     """Integrate the gated window(s) from on-device stat-packet integrals.
 
@@ -355,7 +356,11 @@ def _process_gated_stats(
     del io_voltage  # voltage is folded into the on-device power integral
 
     a = _stats_arrays(packets)
-    windows = _segment_gpi_windows(poll_samples)
+    windows = [
+        (rise, fall)
+        for rise, fall in _segment_gpi_windows(poll_samples)
+        if (fall - rise) / time64.SECOND >= minimum_window_s
+    ]
     if a["mid"].size == 0 or not windows:
         return [], PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0)
 

@@ -27,7 +27,7 @@ Templates receive a merged context combining:
 
 1. **Config values** — board name, SoC, arena size, iteration count
 2. **Engine variables** — from `EngineArtifacts.template_vars`
-3. **Counter presets** — PMU counter IDs grouped into passes
+3. **Counter passes** — PMU counter IDs grouped by compute unit and hardware capacity
 4. **Platform features** — DSP, MVE, FPU flags
 
 Example context for a heliaRT run:
@@ -40,9 +40,9 @@ Example context for a heliaRT run:
     "iterations": 10,
     "warmup": 5,
     "engine": "helia-rt",
-    "pmu_presets": [
-        {"name": "cpu", "counters": ["CPU_CYCLES", "INST_RETIRED", ...]},
-        {"name": "cache", "counters": ["L1D_CACHE", "L1D_CACHE_RD", ...]},
+    "pmu_passes": [
+        {"name": "cpu_0", "event_ids": ["0x0011", "0x0008"], "counter_names": ["ARM_PMU_CPU_CYCLES", "ARM_PMU_INST_RETIRED"]},
+        {"name": "memory_0", "event_ids": ["0x0004", "0x0003"], "counter_names": ["ARM_PMU_L1D_CACHE", "ARM_PMU_L1D_CACHE_REFILL"]},
     ],
     "has_mve": True,
     "has_dsp": True,

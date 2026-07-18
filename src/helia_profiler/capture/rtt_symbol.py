@@ -19,6 +19,8 @@ import re
 import subprocess
 from pathlib import Path
 
+from ..toolchains import get_toolchain_spec, resolve_toolchain_executable
+
 log = logging.getLogger("hpx")
 
 _RTT_SYMBOL = "_SEGGER_RTT"
@@ -37,10 +39,10 @@ _NM_SYMBOL_RE = re.compile(
 )
 
 
-def _address_from_map(build_dir: Path) -> int | None:
+def _address_from_map(build_dir: Path, target_name: str) -> int | None:
     """Parse the linker map for the ``_SEGGER_RTT`` symbol address."""
-    candidates = sorted(build_dir.glob("hpx_profiler*.map")) or sorted(
-        build_dir.glob("**/hpx_profiler*.map")
+    candidates = sorted(build_dir.glob(f"{target_name}.map")) or sorted(
+        build_dir.glob(f"**/{target_name}.map")
     )
     for map_path in candidates:
         try:
@@ -58,25 +60,28 @@ def _address_from_map(build_dir: Path) -> int | None:
 
 def _nm_command(toolchain: str) -> str | None:
     """Return the ``nm`` executable matching *toolchain*, or ``None``."""
-    if toolchain in ("armclang", "atfe"):
-        # ATfE/armclang ship the LLVM binutils.
-        return "llvm-nm"
-    if toolchain.endswith("-gcc"):
-        return f"{toolchain.rsplit('-gcc', 1)[0]}-nm"
-    if "gcc" in toolchain:
-        return f"{toolchain}-nm"
-    return None
+    try:
+        spec = get_toolchain_spec(toolchain)
+        return resolve_toolchain_executable(toolchain, spec.nm)
+    except ValueError:
+        return None
 
 
-def _address_from_nm(build_dir: Path, toolchain: str, *, timeout_s: int) -> int | None:
+def _address_from_nm(
+    build_dir: Path,
+    toolchain: str,
+    *,
+    target_name: str,
+    timeout_s: int,
+) -> int | None:
     """Read the ``_SEGGER_RTT`` address from the ELF via ``nm``."""
     nm = _nm_command(toolchain)
     if nm is None:
         return None
     elf_candidates = (
-        sorted(build_dir.glob("hpx_profiler.elf"))
-        or sorted(build_dir.glob("hpx_profiler.axf"))
-        or sorted(build_dir.glob("hpx_profiler"))
+        sorted(build_dir.glob(f"{target_name}.elf"))
+        or sorted(build_dir.glob(f"{target_name}.axf"))
+        or sorted(build_dir.glob(target_name))
     )
     for elf in elf_candidates:
         try:
@@ -104,6 +109,7 @@ def resolve_rtt_control_block_address(
     build_dir: Path | None,
     toolchain: str,
     *,
+    target_name: str = "hpx_profiler",
     timeout_s: int = 10,
 ) -> int | None:
     """Return the linked address of ``_SEGGER_RTT`` for this build, or ``None``.
@@ -118,9 +124,14 @@ def resolve_rtt_control_block_address(
     if not build_dir.exists():
         return None
 
-    address = _address_from_map(build_dir)
+    address = _address_from_map(build_dir, target_name)
     if address is None:
-        address = _address_from_nm(build_dir, toolchain, timeout_s=timeout_s)
+        address = _address_from_nm(
+            build_dir,
+            toolchain,
+            target_name=target_name,
+            timeout_s=timeout_s,
+        )
     return address
 
 

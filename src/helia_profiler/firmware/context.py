@@ -7,9 +7,8 @@ from typing import TYPE_CHECKING, Any
 
 from ..config import DEFAULT_ARENA_SIZE_BYTES, DEFAULT_POWER_WINDOW_TARGET_MS, Transport
 from ..counters import (
-    resolve_counters,
-    resolve_legacy_presets,
     plan_passes,
+    resolve_counters,
     supported_groups_for_domains,
     validate_group_selection,
 )
@@ -24,14 +23,6 @@ if TYPE_CHECKING:
     from ..config import ProfileConfig
     from ..pipeline import PipelineContext
     from ..engines.base import ArenaRegion
-
-
-_PMU_PRESET_MAP: dict[str, str] = {
-    "basic_cpu": "NSX_PMU_PRESET_BASIC_CPU",
-    "memory": "NSX_PMU_PRESET_MEMORY",
-    "mve": "NSX_PMU_PRESET_MVE",
-    "ml_default": "NSX_PMU_PRESET_ML_DEFAULT",
-}
 
 
 @dataclass(frozen=True)
@@ -70,7 +61,6 @@ class TransportContext:
 
 @dataclass(frozen=True)
 class MemoryContext:
-    model_location: str
     arena_region: Placement
     weights_region: Placement
     arena_size: int
@@ -198,7 +188,6 @@ class FirmwareRenderContext:
                 printf_linkage=printf_linkage,
             ),
             memory=MemoryContext(
-                model_location=config.model.model_location,
                 arena_region=arena_region,
                 weights_region=weights_region,
                 arena_size=config.model.arena_size or DEFAULT_ARENA_SIZE_BYTES,
@@ -270,7 +259,6 @@ class FirmwareRenderContext:
             "usb_serial_marker": self.transport.usb_serial_marker,
             "usb_serial_product": self.transport.usb_serial_product,
             "printf_linkage": self.transport.printf_linkage,
-            "model_location": self.memory.model_location,
             "arena_region": self.memory.arena_region,
             "weights_region": self.memory.weights_region,
             "arena_size": self.memory.arena_size,
@@ -331,13 +319,7 @@ def _resolve_pmu_passes(config: Any, soc: Any | None = None) -> list[PmuPassCont
     if soc is not None:
         supported_groups = supported_groups_for_domains(soc.profiling_domains)
         try:
-            if profiling.pmu_counters is not None:
-                validate_group_selection(profiling.pmu_counters, supported_groups=supported_groups)
-            else:
-                validate_group_selection(
-                    resolve_legacy_presets(profiling.pmu_presets),
-                    supported_groups=supported_groups,
-                )
+            validate_group_selection(profiling.pmu_counters, supported_groups=supported_groups)
         except ValueError as exc:
             raise FirmwareError(
                 str(exc),
@@ -347,48 +329,17 @@ def _resolve_pmu_passes(config: Any, soc: Any | None = None) -> list[PmuPassCont
                 ),
             ) from exc
 
-    if profiling.pmu_counters is not None:
-        counters = resolve_counters(profiling.pmu_counters)
-        passes = plan_passes(counters)
-        return [
-            PmuPassContext(
-                name=p.name,
-                custom=True,
-                event_ids=tuple(f"0x{c.event_id:04X}" for c in p.counters),
-                counter_names=tuple(c.name for c in p.counters),
-                num_counters=len(p.counters),
-                c_enum=None,
-                group=p.group,
-            )
-            for p in passes
-        ]
-
-    result: list[PmuPassContext] = []
-    for preset_name in profiling.pmu_presets:
-        c_enum = _PMU_PRESET_MAP.get(preset_name, "NSX_PMU_PRESET_ML_DEFAULT")
-        counters = resolve_counters(resolve_legacy_presets([preset_name]))
-        result.append(
-            PmuPassContext(
-                name=preset_name,
-                custom=False,
-                event_ids=(),
-                counter_names=tuple(c.name for c in counters),
-                num_counters=len(counters),
-                c_enum=c_enum,
-                group=preset_name,
-            )
+    counters = resolve_counters(profiling.pmu_counters)
+    passes = plan_passes(counters)
+    return [
+        PmuPassContext(
+            name=p.name,
+            custom=True,
+            event_ids=tuple(f"0x{c.event_id:04X}" for c in p.counters),
+            counter_names=tuple(c.name for c in p.counters),
+            num_counters=len(p.counters),
+            c_enum=None,
+            group=p.group,
         )
-    if not result:
-        counters = resolve_counters(resolve_legacy_presets(["ml_default"]))
-        result = [
-            PmuPassContext(
-                name="ml_default",
-                custom=False,
-                event_ids=(),
-                counter_names=tuple(c.name for c in counters),
-                num_counters=len(counters),
-                c_enum="NSX_PMU_PRESET_ML_DEFAULT",
-                group="ml_default",
-            )
-        ]
-    return result
+        for p in passes
+    ]

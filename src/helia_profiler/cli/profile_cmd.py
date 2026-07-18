@@ -52,8 +52,6 @@ def _apply_model_engine_overrides(args: argparse.Namespace, cli: dict) -> None:
         cli.setdefault("model", {})["path"] = str(args.model)
     if args.arena_size is not None:
         cli.setdefault("model", {})["arena_size"] = args.arena_size
-    if args.model_location is not None:
-        cli.setdefault("model", {})["model_location"] = args.model_location
     if args.runtime_arena_location is not None:
         cli.setdefault("model", {})["arena_location"] = args.runtime_arena_location
     if args.runtime_weights_location is not None:
@@ -92,8 +90,6 @@ def _apply_target_overrides(args: argparse.Namespace, cli: dict) -> None:
 
 def _apply_pmu_overrides(args: argparse.Namespace, cli: dict) -> None:
     """Apply PMU-profiling CLI flags onto the config overrides dict."""
-    if args.pmu_presets is not None:
-        cli.setdefault("profiling", {})["pmu_presets"] = args.pmu_presets
     if args.pmu_counters is not None:
         # Parse GROUP:SELECT pairs into a dict
         pmu_counters: dict[str, str | list[str]] = {}
@@ -161,8 +157,6 @@ def _apply_workdir_overrides(args: argparse.Namespace, cli: dict) -> None:
     """Apply working-directory/advanced CLI flags onto the config overrides dict."""
     if args.work_dir is not None:
         cli["work_dir"] = str(args.work_dir)
-    if args.keep_work_dir:
-        cli["keep_work_dir"] = True
     if args.clean:
         cli["clean"] = True
     cli["verbose"] = args.verbose

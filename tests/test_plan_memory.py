@@ -50,7 +50,7 @@ class TestMemoryRegionUsage:
 
 class TestPlanMemorySynthesise:
     def test_synth_plan_default_auto_places_both_in_tcm(self, tmp_path: Path):
-        """With ``model_location=auto`` (the default), both arena and
+        """With automatic placement (the default), both arena and
         a tiny model fit comfortably in DTCM on Apollo510."""
         ctx = _make_ctx(tmp_path)
         PlanMemoryStage().run(ctx)
@@ -133,15 +133,14 @@ class TestPlanMemorySynthesise:
         assert ctx.weights_region == "sram"
 
     def test_synth_plan_explicit_mram_keeps_weights_in_mram(self, tmp_path: Path):
-        """``model_location=mram`` puts weights in MRAM (rodata) but
-        still places the arena in TCM when available."""
+        """Explicit MRAM weights retain automatic fast arena placement."""
         ctx = _make_ctx(
             tmp_path,
             {
                 "model": {
                     "path": str(tmp_path / "model.tflite"),
                     "arena_size": 65536,
-                    "model_location": "mram",
+                    "weights_location": "mram",
                 },
             },
         )
@@ -159,14 +158,14 @@ class TestPlanMemorySynthesise:
     def test_synth_plan_explicit_mram_falls_back_to_sram_when_tcm_too_small(
         self, tmp_path: Path
     ):
-        """``model_location=mram`` keeps weights cold while avoiding TCM overflow."""
+        """MRAM weights retain automatic SRAM fallback for a large arena."""
         ctx = _make_ctx(
             tmp_path,
             {
                 "model": {
                     "path": str(tmp_path / "model.tflite"),
                     "arena_size": 600 * 1024,
-                    "model_location": "mram",
+                    "weights_location": "mram",
                 },
             },
         )
@@ -188,7 +187,8 @@ class TestPlanMemorySynthesise:
                 "model": {
                     "path": str(tmp_path / "model.tflite"),
                     "arena_size": 65536,
-                    "model_location": "psram",
+                    "arena_location": "sram",
+                    "weights_location": "psram",
                 },
             },
         )
@@ -217,22 +217,6 @@ class TestPlanMemorySynthesise:
         assert ctx.arena_region == "tcm"
         assert ctx.weights_region == "sram"
 
-    def test_legacy_explicit_weights_override_is_applied(self, tmp_path: Path):
-        ctx = _make_ctx(
-            tmp_path,
-            {
-                "engine": {
-                    "config": {
-                        "runtime_weights_location": "sram",
-                    },
-                },
-            },
-        )
-        PlanMemoryStage().run(ctx)
-
-        assert ctx.arena_region == "tcm"
-        assert ctx.weights_region == "sram"
-
     def test_explicit_arena_override_is_applied(self, tmp_path: Path):
         ctx = _make_ctx(
             tmp_path,
@@ -248,29 +232,13 @@ class TestPlanMemorySynthesise:
 
         assert ctx.arena_region == "sram"
 
-    def test_legacy_explicit_arena_override_is_applied(self, tmp_path: Path):
-        ctx = _make_ctx(
-            tmp_path,
-            {
-                "engine": {
-                    "config": {
-                        "runtime_arena_location": "sram",
-                    },
-                },
-            },
-        )
-        PlanMemoryStage().run(ctx)
-
-        assert ctx.arena_region == "sram"
-
     def test_explicit_weights_psram_requires_psram_board(self, tmp_path: Path):
         ctx = _make_ctx(
             tmp_path,
             {
-                "engine": {
-                    "config": {
-                        "runtime_weights_location": "psram",
-                    },
+                "model": {
+                    "path": str(tmp_path / "model.tflite"),
+                    "weights_location": "psram",
                 },
             },
         )

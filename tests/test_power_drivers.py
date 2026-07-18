@@ -7,6 +7,8 @@ import failures (missing package OR binary/ABI mismatch) into actionable
 
 from __future__ import annotations
 
+import threading
+import time
 from unittest.mock import patch
 
 import pytest
@@ -78,6 +80,37 @@ class TestJoulescopeOpenRetries:
         assert device_path == "u/js110/004204"
         assert family == "js110"
         assert fake_driver.open_calls == 2
+
+
+def test_aggregate_gpi_reads_are_serialized():
+    from helia_profiler.power.joulescope.device import _read_gpi_snapshot
+
+    class FakeDriver:
+        def __init__(self):
+            self.active = 0
+            self.max_active = 0
+            self.lock = threading.Lock()
+
+        def publish_and_wait(self, *_args, **_kwargs):
+            with self.lock:
+                self.active += 1
+                self.max_active = max(self.max_active, self.active)
+            time.sleep(0.01)
+            with self.lock:
+                self.active -= 1
+            return 2
+
+    driver = FakeDriver()
+    threads = [
+        threading.Thread(target=_read_gpi_snapshot, args=(driver, "u/js320/test"))
+        for _ in range(2)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert driver.max_active == 1
 
 
 class _FakeJsDriver:

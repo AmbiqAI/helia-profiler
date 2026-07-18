@@ -9,6 +9,7 @@ from rich.table import Table
 from rich.text import Text
 
 if TYPE_CHECKING:
+    from ..doctor import DoctorResult
     from .base import HpxConsole
 
 
@@ -42,16 +43,9 @@ def print_interrupted(console: HpxConsole) -> None:
 
 def print_doctor(
     console: HpxConsole,
-    checks: list[tuple[str, str, str | None]],
-    required_python: list[tuple[str, str, bool]],
-    optional: list[tuple[str, str, bool]],
+    result: DoctorResult,
 ) -> None:
-    """Render ``hpx doctor`` results.
-
-    *checks*: list of ``(label, binary_name, path_or_none)``
-    *required_python*: list of ``(label, package_name, available)``
-    *optional*: list of ``(label, package_name, available)``
-    """
+    """Render a typed ``hpx doctor`` result."""
     console._console.print()
     table = Table(
         title="[bold]Toolchain Check[/bold]",
@@ -63,31 +57,27 @@ def print_doctor(
     table.add_column("Tool", min_width=28)
     table.add_column("Path", style="dim")
 
-    all_ok = True
-    for label, _binary, path in checks:
-        if path:
-            table.add_row("[green]✓[/green]", label, path)
+    for check in result.checks:
+        if check.available:
+            label = check.label if check.required else f"[dim]{check.label}[/dim]"
+            table.add_row("[green]✓[/green]", label, check.path or "installed")
+        elif check.required:
+            table.add_row(
+                "[red]✗[/red]",
+                f"[red]{check.label}[/red]",
+                "[red]not found[/red]",
+            )
         else:
-            table.add_row("[red]✗[/red]", f"[red]{label}[/red]", "[red]not found[/red]")
-            all_ok = False
-
-    for label, _pkg, available in required_python:
-        if available:
-            table.add_row("[green]✓[/green]", label, "installed")
-        else:
-            table.add_row("[red]✗[/red]", f"[red]{label}[/red]", "[red]not installed[/red]")
-            all_ok = False
-
-    for label, _pkg, available in optional:
-        if available:
-            table.add_row("[green]✓[/green]", f"[dim]{label}[/dim]", "[dim]installed[/dim]")
-        else:
-            table.add_row("[dim]–[/dim]", f"[dim]{label}[/dim]", "[dim]not installed[/dim]")
+            table.add_row(
+                "[dim]–[/dim]",
+                f"[dim]{check.label}[/dim]",
+                "[dim]not installed[/dim]",
+            )
 
     console._console.print(table)
     console._console.print()
 
-    if all_ok:
+    if result.ok:
         console._console.print("  [green]All required tools found.[/green]")
     else:
         console._console.print(

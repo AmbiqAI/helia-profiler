@@ -9,7 +9,6 @@ def _profile_args(**overrides):
     args = SimpleNamespace(
         model=None,
         arena_size=None,
-        model_location=None,
         runtime_arena_location=None,
         runtime_weights_location=None,
         core_override=None,
@@ -22,7 +21,6 @@ def _profile_args(**overrides):
         rtt_buffer_size_up=None,
         cpu_clock=None,
         frozen=False,
-        pmu_presets=None,
         pmu_counters=None,
         per_layer=None,
         iterations=None,
@@ -41,7 +39,6 @@ def _profile_args(**overrides):
         no_model_explorer=False,
         detailed=False,
         work_dir=None,
-        keep_work_dir=False,
         clean=False,
         verbose=False,
         nsx_channel=None,

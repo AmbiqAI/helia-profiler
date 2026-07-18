@@ -35,8 +35,8 @@ hpx profile [MODEL] [--config FILE] [options]
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--arena-size` | int | (engine-specific) | Tensor arena size in bytes. |
-| `--arena-location` | `tcm` \| `sram` \| `psram` | — | Runtime tensor arena placement for heliaRT. Alias: `--runtime-arena-location`. |
-| `--weights-location` | `tcm` \| `sram` \| `mram` \| `psram` | — | Runtime model/weights placement for heliaRT. Alias: `--runtime-weights-location`. |
+| `--arena-location` | `tcm` \| `sram` \| `psram` | — | Runtime tensor arena placement for heliaRT. |
+| `--weights-location` | `tcm` \| `sram` \| `mram` \| `psram` | — | Runtime model/weights placement for heliaRT. |
 | `--model-location` | `auto` \| `tcm` \| `sram` \| `mram` \| `psram` | `auto` | Compatibility preset for arena + weights. Prefer split placement flags. See [Memory](../guide/memory.md). |
 
 ## Target hardware
@@ -65,7 +65,7 @@ hpx profile [MODEL] [--config FILE] [options]
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--power` | flag | off | Enable power capture. See [Power](../guide/power.md). |
-| `--power-driver` | `joulescope` \| `joulescope-js110` \| `joulescope-js220` \| `ondevice` | `joulescope` | Power instrument driver. |
+| `--power-driver` | `joulescope` \| `ondevice` | `joulescope` | Power instrument driver. The unified Joulescope driver auto-detects JS110, JS220, and JS320 devices. |
 | `--power-mode` | `external` \| `internal` | `external` | External Joulescope vs on-device measurement. |
 | `--power-duration` | int | 30 | Capture window length in seconds. |
 | `--power-firmware` | `dedicated` \| `shared` | `dedicated` | Binary flashed during power capture. `dedicated` uses a transport-free image to avoid transport current contamination; `shared` reuses the transport binary. See [Power](../guide/power.md#dedicated-power-firmware). |
@@ -85,7 +85,6 @@ hpx profile [MODEL] [--config FILE] [options]
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--work-dir DIR` | path | tempdir | Working directory for generated firmware. Useful for debugging the generated NSX project. |
-| `--keep-work-dir` | flag | off | Don't delete the work directory at exit. |
 | `--compiler-launcher NAME` | string | `auto` | CMake compiler launcher to cache compiles. `auto` uses `sccache`/`ccache` if installed; a name/path requires it to be found. Overridden by `HPX_COMPILER_LAUNCHER`. |
 | `--no-compiler-launcher` | flag | — | Disable the compiler launcher (same as `--compiler-launcher none`). |
 
@@ -149,6 +148,6 @@ hpx profile model.tflite --power --power-duration 10
 ### Inspect generated firmware
 
 ```bash
-hpx profile model.tflite --keep-work-dir --work-dir ./build
+hpx profile model.tflite --work-dir ./build
 ls ./build/firmware/
 ```

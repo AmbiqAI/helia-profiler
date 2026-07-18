@@ -5,10 +5,9 @@
     between releases without a deprecation period. Pin a version if you
     depend on it in automation.
 
-The entire public API is one function: [`profile()`](profile.md). It takes a
-frozen [`ProfileConfig`](config.md#helia_profiler.ProfileConfig) and returns a
-typed [`ProfileResult`](results.md#helia_profiler.ProfileResult). The `hpx`
-CLI is a thin wrapper around this same call.
+The explicit API is [`profile()`](profile.md). For notebooks, IPython, and
+exploratory scripts, [`Session`](session.md) provides immutable configuration
+branching over the same profiling pipeline.
 
 ```python
 from pathlib import Path
@@ -30,6 +29,7 @@ The installed package version is available as `helia_profiler.__version__`.
 
 ## Pages
 
+- [Interactive sessions](session.md) — immutable, branchable configuration
 - [`profile()`](profile.md) — the entry point function
 - [Configuration](config.md) — `ProfileConfig` and its section classes
 - [Results](results.md) — `ProfileResult` and the typed data it carries

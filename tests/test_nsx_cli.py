@@ -52,7 +52,7 @@ class TestNsxBuild:
                 nsx.build(tmp_path)
         err = exc_info.value
         assert "nsx build" in str(err)
-        assert "boom" in (err.stderr or "")
+        assert "boom" in (err.details or "")
 
     def test_timeout_surfaces_as_build_error(self, tmp_path: Path) -> None:
         # The real subprocess-tree watchdog lives in
@@ -65,7 +65,7 @@ class TestNsxBuild:
             with pytest.raises(BuildError) as exc_info:
                 nsx.build(tmp_path, timeout_s=1)
         assert "nsx build" in str(exc_info.value)
-        assert "timed out" in (exc_info.value.stderr or "")
+        assert "timed out" in (exc_info.value.details or "")
 
 
 class TestNsxFlash:

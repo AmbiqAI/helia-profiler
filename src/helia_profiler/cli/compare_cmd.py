@@ -15,6 +15,8 @@ def _cmd_compare(args: argparse.Namespace) -> None:
     console = HpxConsole()
     try:
         if getattr(args, "validation", False):
+            if getattr(args, "profile", None) is not None:
+                raise HpxError("--profile is not yet supported with --validation")
             if args.output_dir is None:
                 raise HpxError("--output-dir is required with --validation")
             from ..validation.compare import (
@@ -31,11 +33,18 @@ def _cmd_compare(args: argparse.Namespace) -> None:
             print(f"JSON report:     {paths[0]}")
             print(f"Markdown report: {paths[1]}")
             return
-        result = compare_runs(args.baseline, args.candidate)
+        profile = None
+        if getattr(args, "profile", None) is not None:
+            from ..evaluation import ComparisonProfile
+
+            profile = ComparisonProfile.load(args.profile)
+        result = compare_runs(args.baseline, args.candidate, profile=profile)
         paths = None
         if args.output_dir is not None:
             paths = write_compare_artifacts(result, args.output_dir)
         console.print_compare(result, top_layers=args.top_layers, output_paths=paths)
+        if result.verdict is not None and result.verdict.status.value == "fail":
+            sys.exit(1)
     except HpxError as exc:
         console.print_error(exc)
         sys.exit(1)

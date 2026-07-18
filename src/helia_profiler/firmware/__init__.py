@@ -20,11 +20,12 @@ import yaml
 from .. import nsx as nsx_cli
 from ..config import Transport
 from ..engines import EngineType
+from ..engines.base import ArenaRegion
 from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
 from ..placement import Placement
 from ..platform import get_soc_for_board
-from .context import FirmwareRenderContext, _PMU_PRESET_MAP, _resolve_pmu_passes
+from .context import FirmwareRenderContext, _resolve_pmu_passes
 from .project import (
     NsxModuleSpec,
     ProjectRenderContext,
@@ -53,18 +54,7 @@ if TYPE_CHECKING:
 log = logging.getLogger("hpx")
 
 
-# ---------------------------------------------------------------------------
-# Toolchain mapping: config names → nsx CLI --toolchain values
-# ---------------------------------------------------------------------------
-_TOOLCHAIN_MAP: dict[str, str] = {
-    "arm-none-eabi-gcc": "gcc",
-    "gcc": "gcc",
-    "armclang": "armclang",
-    "atfe": "atfe",
-}
-
 _DEFAULT_RTT_BUFFER_SIZE_UP = 32768
-_ATFE_RTT_BUFFER_SIZE_UP = 12288
 
 
 def _nsx_toolchain(toolchain: str) -> str | None:
@@ -72,16 +62,19 @@ def _nsx_toolchain(toolchain: str) -> str | None:
 
     Returns *None* for the default (GCC) so the flag is omitted.
     """
-    nsx_tc = _TOOLCHAIN_MAP.get(toolchain, toolchain)
-    return nsx_tc if nsx_tc != "gcc" else None
+    from ..toolchains import get_toolchain_spec
+
+    return get_toolchain_spec(toolchain).nsx_name
 
 
 def _rtt_buffer_size_up(toolchain: str, transport: Transport, configured_size: int | None) -> int:
     """Return the compile-time SEGGER RTT up-buffer size for generated apps."""
     if configured_size is not None:
         return configured_size
-    if transport == Transport.RTT and toolchain == "atfe":
-        return _ATFE_RTT_BUFFER_SIZE_UP
+    if transport == Transport.RTT:
+        from ..toolchains import get_toolchain_spec
+
+        return get_toolchain_spec(toolchain).default_rtt_buffer_size_up
     return _DEFAULT_RTT_BUFFER_SIZE_UP
 
 
@@ -179,16 +172,25 @@ def _resolve_compiler_launcher(config: "ProfileConfig") -> str | None:
     return found
 
 
-def _find_segger_rtt_dir() -> Path:
+def _find_segger_rtt_dir(configured_path: Path | None = None) -> Path:
     """Locate the SEGGER RTT source directory.
 
-    ``SEGGER_RTT_PATH`` takes precedence when set. Otherwise, hpx checks a
-    small set of common local checkout locations. The path must point to the
-    root directory of a SEGGER RTT source checkout (the folder containing
-    ``RTT/`` and ``Config/`` subdirs).
+    An explicit config path takes precedence, followed by ``SEGGER_RTT_PATH``
+    and the pinned sources bundled with heliaPROFILER. Override paths must point
+    to the root directory of a SEGGER RTT source checkout (the folder containing
+    ``RTT/`` and ``Config/`` subdirectories).
 
     Returns the validated path.
     """
+    if configured_path is not None:
+        path = Path(configured_path).expanduser().resolve()
+        if _is_segger_rtt_root(path):
+            return path
+        raise FirmwareError(
+            f"target.segger_rtt_path={configured_path} does not contain RTT/SEGGER_RTT.c",
+            hint="Point target.segger_rtt_path to the root containing RTT/ and Config/.",
+        )
+
     env_path = os.environ.get("SEGGER_RTT_PATH")
     if env_path:
         p = Path(env_path).expanduser().resolve()
@@ -199,39 +201,20 @@ def _find_segger_rtt_dir() -> Path:
             hint="Set SEGGER_RTT_PATH to the root dir containing RTT/ and Config/ subdirs.",
         )
 
-    for candidate in _segger_rtt_candidates():
-        if _is_segger_rtt_root(candidate):
-            resolved = candidate.expanduser().resolve()
-            log.info("Auto-detected SEGGER RTT source at %s", resolved)
-            return resolved
+    bundled = _bundled_segger_rtt_dir()
+    if _is_segger_rtt_root(bundled):
+        log.info("Using bundled SEGGER RTT target sources at %s", bundled)
+        return bundled
 
     raise FirmwareError(
-        "SEGGER RTT source files not found.",
-        hint=(
-            "Clone the SEGGER RTT sources into a common local path, or set "
-            "SEGGER_RTT_PATH explicitly:\n"
-            "  git clone https://github.com/SEGGERMicro/RTT.git ~/src/segger-rtt\n"
-            "  export SEGGER_RTT_PATH=~/src/segger-rtt"
-        ),
+        "Bundled SEGGER RTT target sources are missing or incomplete.",
+        hint="Reinstall helia-profiler or provide target.segger_rtt_path explicitly.",
     )
 
 
-def _segger_rtt_candidates() -> tuple[Path, ...]:
-    """Return deterministic local paths that may contain SEGGER RTT sources."""
-    repo_root = Path(__file__).resolve().parents[3]
-    cwd = Path.cwd()
-    home = Path.home()
-    return (
-        repo_root / "RTT",
-        repo_root / "segger-rtt",
-        repo_root / "examples" / "quickstart" / "RTT",
-        cwd / "RTT",
-        cwd / "segger-rtt",
-        cwd / "examples" / "quickstart" / "RTT",
-        home / "src" / "segger-rtt",
-        home / "src" / "RTT",
-        home / "SEGGER" / "RTT",
-    )
+def _bundled_segger_rtt_dir() -> Path:
+    """Return the pinned RTT target-source root shipped with heliaPROFILER."""
+    return Path(__file__).resolve().parent.parent / "vendor" / "segger_rtt"
 
 
 def _is_segger_rtt_root(path: Path) -> bool:
@@ -243,9 +226,9 @@ def _is_segger_rtt_root(path: Path) -> bool:
     )
 
 
-def _copy_segger_rtt(dest_dir: Path) -> None:
+def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> None:
     """Copy SEGGER RTT source files into *dest_dir*/rtt/."""
-    rtt_root = _find_segger_rtt_dir()
+    rtt_root = _find_segger_rtt_dir(configured_path)
     rtt_dest = dest_dir / "rtt"
     rtt_dest.mkdir(parents=True, exist_ok=True)
 
@@ -439,30 +422,7 @@ def generate_app(ctx: PipelineContext) -> Path:
     # the transport binary and never touch hpx_profiler_power) keep an
     # unchanged CMakeLists.txt / firmware-render digest (see AGENTS.md WP2).
     power_binary_enabled = config.power.enabled and config.power.firmware == "dedicated"
-    aot_arena_regions = []
-    if artifacts.engine_type is EngineType.HELIA_AOT:
-        adapter = ctx.engine_adapter
-        assert adapter is not None  # set by stage 2 before firmware
-        # heliaAOT has finer-grained per-tensor placement control than the
-        # shared --arena-location/--weights-location knobs: a custom AOT
-        # memory config (engine.config_path, or inline
-        # engine.config.aot_args.memory.tensors) already resolves each
-        # tensor's placement correctly (reflected in artifacts.aot_arena_
-        # regions). Only fall back to re-pinning scratch arenas onto the
-        # shared arena_region default when the user did NOT supply one of
-        # those — otherwise this override would silently clobber a custom
-        # yaml's placement (e.g. reporting "tcm" for a scratch arena the
-        # user explicitly placed in "sram").
-        has_custom_aot_memory = config.engine.config_path is not None or bool(
-            config.engine.config.get("aot_args", {}).get("memory", {}).get("tensors")
-        )
-        if has_custom_aot_memory:
-            aot_arena_regions = list(artifacts.aot_arena_regions)
-        else:
-            aot_arena_regions = adapter.apply_arena_placement_override(
-                list(artifacts.aot_arena_regions),
-                arena_region,
-            )
+    aot_arena_regions = _resolved_aot_arena_regions(ctx)
 
     # --- Resolve module list ---
     profile_board = getattr(board, "profile_source_board", board.name)
@@ -623,7 +583,7 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # --- Copy SEGGER RTT source when using RTT transport ---
     if transport == Transport.RTT:
-        _copy_segger_rtt(src_dir)
+        _copy_segger_rtt(src_dir, config.target.segger_rtt_path)
 
     extreme_mode_safe = arena_region is Placement.TCM and weights_region is Placement.TCM
     if config.profiling.extreme_mode and not extreme_mode_safe:
@@ -693,8 +653,6 @@ def generate_app(ctx: PipelineContext) -> Path:
             )
     else:
         # --- TFLM / heliaRT: embed model as byte array, use TFLM profiler ---
-        model_location = config.model.model_location
-
         if weights_region != "psram":
             model_header = _model_to_header(config.model.path, weights_region)
             _write_text(src_dir / "model_data.h", model_header)
@@ -775,6 +733,59 @@ def generate_app(ctx: PipelineContext) -> Path:
     return app_dir
 
 
+def _resolved_aot_arena_regions(ctx: PipelineContext) -> list[ArenaRegion]:
+    """Return the same effective AOT arena placement for every render pass."""
+    assert ctx.engine_artifacts is not None
+    if ctx.engine_artifacts.engine_type is not EngineType.HELIA_AOT:
+        return []
+    assert ctx.engine_adapter is not None
+    has_custom_aot_memory = ctx.config.engine.config_path is not None or bool(
+        ctx.config.engine.config.get("aot_args", {}).get("memory", {}).get("tensors")
+    )
+    if has_custom_aot_memory:
+        return list(ctx.engine_artifacts.aot_arena_regions)
+    return ctx.engine_adapter.apply_arena_placement_override(
+        list(ctx.engine_artifacts.aot_arena_regions),
+        ctx.arena_region or Placement.TCM,
+    )
+
+
+def render_power_source(ctx: PipelineContext, *, inference_count: int) -> Path:
+    """Rewrite only the dedicated power source with a host-selected fixed N."""
+    if inference_count < 1:
+        raise FirmwareError("Power inference count must be at least 1.")
+    if ctx.firmware_dir is None or ctx.soc is None or ctx.engine_artifacts is None:
+        raise FirmwareError(
+            "Cannot render power firmware before application generation and engine preparation."
+        )
+
+    render_context = FirmwareRenderContext.from_pipeline_context(
+        ctx,
+        arena_regions=_resolved_aot_arena_regions(ctx),
+    )
+    template_vars = render_context.to_template_vars()
+    template_vars.update(
+        power_only=True,
+        window_mode="fixed",
+        clean_iters=inference_count,
+    )
+    template_name = (
+        "main_aot.cc.j2"
+        if ctx.engine_artifacts.engine_type is EngineType.HELIA_AOT
+        else "main.cc.j2"
+    )
+    destination = ctx.firmware_dir / "src" / "main_power.cc"
+    _write_text(
+        destination,
+        _jinja_env.get_template(template_name).render(
+            **template_vars,
+            pmu_max_ops=ctx.soc.pmu_max_ops,
+        ),
+    )
+    log.info("Rendered fixed-N power source: %s (N=%d)", destination, inference_count)
+    return destination
+
+
 def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     """Invoke ``nsx configure`` + ``nsx build`` on the generated app.
 
@@ -836,25 +847,6 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
         nsx_cli.configure(app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s, verbose=verbose)
 
     nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose)
-    # Same gate as generate_app()'s power_binary_enabled: only build the
-    # dedicated power binary when it was actually rendered into
-    # CMakeLists.txt (power.enabled AND firmware == "dedicated"). "shared"
-    # mode never adds the hpx_profiler_power target, so building it here
-    # would fail.
-    power_binary_enabled = ctx.config.power.enabled and ctx.config.power.firmware == "dedicated"
-    if power_binary_enabled:
-        # ``nsx build`` targets the CMake project name (hpx_profiler) by
-        # default — the dedicated power binary needs an explicit second
-        # `cmake --build --target hpx_profiler_power` from the SAME
-        # configure/module-sync (see generate_app: it is only added to
-        # CMakeLists.txt when power.enabled, so this never runs otherwise).
-        nsx_cli.build(
-            app_dir,
-            toolchain=nsx_tc,
-            target="hpx_profiler_power",
-            timeout_s=timeouts.build_s,
-            verbose=verbose,
-        )
 
     # Locate build output. Prefer the ELF-form executable because later
     # reporting stages run size tools against it to capture text/data/bss.
@@ -865,21 +857,6 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
             hint=f"Searched in {build_dir}",
         )
     log.info("Binary: %s", binary_path)
-
-    # The dedicated power binary is only ever generated (and added to
-    # CMakeLists.txt) when power.enabled AND power.firmware == "dedicated" —
-    # see generate_app(). Its path is stashed on ctx for later stages (WP3
-    # wires it into the power-capture flash/run flow; this stage only
-    # exposes it).
-    if power_binary_enabled:
-        power_binary_path = _find_target_binary(build_dir, "hpx_profiler_power")
-        if power_binary_path is None:
-            raise BuildError(
-                "Build succeeded but power binary (hpx_profiler_power) not found",
-                hint=f"Searched in {build_dir}",
-            )
-        log.info("Power binary: %s", power_binary_path)
-        ctx.power_binary_path = power_binary_path
 
     return build_dir, binary_path
 

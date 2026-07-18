@@ -22,6 +22,8 @@ def _write_json(
     power: PowerResult | None,
     run_metadata: RunMetadata,
     output_dir: Path,
+    power_terminal: dict[str, Any] | None = None,
+    on_device_summary: dict[str, Any] | None = None,
 ) -> Path:
     """Write full profiling results as JSON."""
     out_path = output_dir / "profile_results.json"
@@ -56,6 +58,26 @@ def _write_json(
             "duration_s": power.summary.duration_s,
             "sample_count": power.summary.sample_count,
         }
+        observation = {
+            key: power.metadata[key]
+            for key in (
+                "measurement_scope",
+                "observation_mode",
+                "integrity",
+                "gate_rise_observed",
+                "gate_fall_observed",
+                "observation_deadline_s",
+            )
+            if key in power.metadata
+        }
+        if "gate_failure" in power.metadata:
+            observation["gate_failure"] = power.metadata["gate_failure"]
+        if observation:
+            data["power"]["observation"] = observation
+        if power_terminal is not None:
+            data["power"]["terminal"] = power_terminal
+        if on_device_summary is not None:
+            data["power"]["on_device_summary"] = on_device_summary
 
     out_path.write_text(json.dumps(data, indent=2, default=str))
     log.info("Wrote JSON report: %s", out_path)

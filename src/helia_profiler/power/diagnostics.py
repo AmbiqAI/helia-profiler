@@ -75,6 +75,49 @@ class GateFailure:
         }
 
 
+@dataclass(frozen=True)
+class GateDurationIntegrity:
+    """Agreement between a measured gate and the expected inference window."""
+
+    measured_s: float
+    expected_s: float
+    tolerance_s: float
+    minimum_s: float = 0.0
+
+    @property
+    def valid(self) -> bool:
+        return (
+            self.measured_s >= self.minimum_s
+            and abs(self.measured_s - self.expected_s) <= self.tolerance_s
+        )
+
+    @property
+    def ratio(self) -> float:
+        return self.measured_s / self.expected_s if self.expected_s > 0 else 0.0
+
+
+def assess_gate_duration(
+    *,
+    measured_s: float,
+    clean_infer_count: int,
+    clean_infer_avg_us: int,
+    stats_rate_hz: int,
+    minimum_s: float = 0.0,
+    relative_tolerance: float = 0.01,
+) -> GateDurationIntegrity:
+    """Compare a gate against ``N * inference_time`` with instrument jitter allowance."""
+    expected_s = clean_infer_count * clean_infer_avg_us / 1_000_000.0
+    inference_slack_s = clean_infer_avg_us / 2_000_000.0
+    packet_slack_s = 2.0 / max(1, stats_rate_hz)
+    cross_binary_slack_s = expected_s * relative_tolerance
+    return GateDurationIntegrity(
+        measured_s=measured_s,
+        expected_s=expected_s,
+        tolerance_s=max(inference_slack_s, packet_slack_s, cross_binary_slack_s),
+        minimum_s=minimum_s,
+    )
+
+
 def classify_gate_failure(*, saw_gate_rise: bool, duration_s: float) -> GateFailure:
     """Classify why a gated capture produced no complete high window."""
     if not saw_gate_rise:
@@ -99,9 +142,11 @@ def classify_gate_failure(*, saw_gate_rise: bool, duration_s: float) -> GateFail
 
 
 __all__ = [
+    "GateDurationIntegrity",
     "GateFailure",
     "GateFailureKind",
     "GateTransitionTiming",
     "SyncHandshakeMetadata",
+    "assess_gate_duration",
     "classify_gate_failure",
 ]

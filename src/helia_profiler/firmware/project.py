@@ -388,7 +388,6 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
             transport=ctx.config.target.transport,
             toolchain=ctx.config.target.toolchain,
             rtt_buffer_size_up=ctx.rtt_buffer_size_up,
-            model_location=ctx.render_context.memory.model_location,
             arena_region=ctx.render_context.memory.arena_region,
             weights_region=ctx.render_context.memory.weights_region,
             profiling_backends=list(ctx.render_context.pmu.profiling_backends),

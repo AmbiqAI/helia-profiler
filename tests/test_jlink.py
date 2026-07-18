@@ -11,6 +11,7 @@ from helia_profiler.errors import ConfigError
 from helia_profiler.target.probe.jlink import (
     JLinkProbe,
     JLinkProbeMatch,
+    attached_session,
     inspect_probe_target,
     list_connected_probes,
     resolve_probe_serial,
@@ -24,6 +25,41 @@ def _probe(serial: str, product: str = "J-Link") -> JLinkProbe:
 
 def _match(serial: str, core: CoreArch | None, product: str = "J-Link") -> JLinkProbeMatch:
     return JLinkProbeMatch(probe=_probe(serial, product), detected_core=core)
+
+
+def test_attached_session_does_not_reset_or_restart(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeSession:
+        def __init__(self) -> None:
+            self.reset_calls = 0
+            self.restart_calls = 0
+            self.close_calls = 0
+
+        def reset(self, halt: bool = False) -> None:
+            del halt
+            self.reset_calls += 1
+
+        def restart(self) -> None:
+            self.restart_calls += 1
+
+        def close(self) -> None:
+            self.close_calls += 1
+
+    session = FakeSession()
+    monkeypatch.setattr(
+        "helia_profiler.target.probe.jlink.create_debug_memory_session",
+        lambda: session,
+    )
+    monkeypatch.setattr(
+        "helia_profiler.target.probe.jlink.open_jlink_with_retry",
+        lambda *args, **kwargs: None,
+    )
+
+    with attached_session(device="AP510NFA-CBR", attach_timeout_s=1.0) as attached:
+        assert attached is session
+
+    assert session.reset_calls == 0
+    assert session.restart_calls == 0
+    assert session.close_calls == 1
 
 
 def test_list_connected_probes_is_nongui_and_parses_multiple_products() -> None:

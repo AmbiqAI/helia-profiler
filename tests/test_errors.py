@@ -81,17 +81,9 @@ class TestBuildError:
         )
         assert err.returncode == 2
         assert err.details == "fatal: missing header"
-        # Back-compat: ``stderr`` is an alias for ``details``.
-        assert err.stderr == "fatal: missing header"
         assert isinstance(err, HpxError)
-
-    def test_legacy_stderr_kwarg_still_works(self):
-        err = BuildError("build failed", stderr="legacy text")
-        assert err.details == "legacy text"
-        assert err.stderr == "legacy text"
 
     def test_defaults_to_none(self):
         err = BuildError("build failed")
         assert err.returncode is None
         assert err.details is None
-        assert err.stderr is None

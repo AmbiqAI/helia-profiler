@@ -238,38 +238,6 @@ def _make_sync_controller(ctx: PipelineContext, driver: object):
     return driver.make_sync_controller(wiring)
 
 
-def _flash_power_binary(ctx: PipelineContext) -> None:
-    """Flash the dedicated power binary before arming the gated power capture.
-
-    ORDERING: this runs BEFORE ``driver.capture_gated`` is called, not inside
-    its ``on_started`` hook. ``JLinkExe`` flashing (erase + program + reset +
-    go) costs several seconds of J-Link work; doing that inside
-    ``on_started`` would burn into the capture-window budget (the driver
-    starts its wait clock only after ``on_started`` returns) and would risk
-    reintroducing the exact gate-race PR#27 fixed, where the GPI poller must
-    already be live before any reset/relaunch happens.
-
-    The power binary necessarily starts free-running the instant this flash
-    completes (its bounded ~3s GO wait times out with no host watching) --
-    that is unavoidable and harmless, because it is a throwaway boot: the
-    existing ``arm -> capture_gated(on_started: reset -> READY -> GO)`` flow
-    immediately below resets the (now power) firmware again, race-free, once
-    the poller is live. That second reset is what actually starts the
-    measured run.
-    """
-    from ..target.probe.jlink import flash_binary
-
-    assert ctx.power_binary_path is not None
-    assert ctx.soc is not None
-    jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
-    flash_binary(
-        ctx.power_binary_path,
-        device=ctx.soc.jlink_device,
-        jlink_serial=jlink_serial,
-        timeout_s=ctx.config.timeouts.flash_s,
-    )
-
-
 def capture_power(
     ctx: PipelineContext,
     *,
@@ -282,34 +250,27 @@ def capture_power(
     """
     from ..power import get_driver
 
+    # Deployment is an explicit preceding stage. Validate that contract before
+    # touching the physical instrument.
+    if ctx.power_run is None:
+        raise PowerError(
+            "Power run has not been planned.",
+            hint="Run the power planning stage before capture.",
+        )
+    plan = ctx.power_run.plan
+    effective_firmware = plan.firmware_mode
+    if effective_firmware == "dedicated" and ctx.power_run.deployment is None:
+        raise PowerError(
+            "Dedicated power firmware has not been deployed.",
+            hint="Run the plan/build/flash power stages before capture.",
+        )
+
     driver_name = ctx.config.power.driver
     driver = get_driver(driver_name, serial=ctx.config.power.serial)
 
     # Verify driver is usable
     driver.check_available()
     lifecycle_plan = None
-
-    # Resolve which firmware will actually be measured. "dedicated" is the
-    # default (see config.DEFAULT_POWER_FIRMWARE for the transport
-    # contamination rationale) but requires a built power binary;
-    # fall back to "shared" with a loud warning if one isn't available (e.g.
-    # generation/build were skipped, or a ctx was hand-built without running
-    # the full pipeline) rather than failing the whole capture.
-    effective_firmware = ctx.config.power.firmware
-    if effective_firmware == "dedicated":
-        if ctx.power_binary_path is not None:
-            _flash_power_binary(ctx)
-        else:
-            log.warning(
-                "power.firmware=dedicated requested but no dedicated power "
-                "binary is available (ctx.power_binary_path is None) -- "
-                "falling back to shared mode (measuring the transport "
-                "binary already on the target). This can happen if firmware "
-                "generation/build ran with power.firmware=shared, or if "
-                "capture_power() was invoked without running the full "
-                "pipeline."
-            )
-            effective_firmware = "shared"
 
     def _prepare_target_once() -> None:
         nonlocal lifecycle_plan
@@ -332,11 +293,26 @@ def capture_power(
         )
     )
 
-    clean_count = None
-    if ctx.pmu_result is not None:
+    clean_count = plan.inference_count
+    clean_avg_us = plan.reference_inference_us
+    may_use_profile_metadata = effective_firmware == "shared"
+    if clean_count is None and may_use_profile_metadata and ctx.pmu_result is not None:
         clean_count = ctx.pmu_result.meta.clean_infer_count
+    if clean_avg_us is None and may_use_profile_metadata and ctx.pmu_result is not None:
+        clean_avg_us = ctx.pmu_result.meta.clean_infer_avg_us
+
+    if effective_firmware == "dedicated" and clean_count is None:
+        raise PowerError(
+            "Dedicated power run has no authoritative inference count.",
+            hint=(
+                "Provide a fixed inference count or run profile capture first so "
+                "the power planning stage can derive one."
+            ),
+        )
 
     if getattr(driver, "supports_gated_capture", False) and clean_count is not None:
+        from ..config import DEFAULT_POWER_MIN_WINDOW_MS
+
         # USB CDC firmware blocks in nsx_usb_connected() until the host asserts
         # DTR.  Unlike SWO/UART/RTT (which free-run after reset), it will never
         # reach the gated clean window — and the Joulescope would see no
@@ -376,17 +352,29 @@ def capture_power(
         try:
             sync.arm()
             sync_metadata_holder: dict[str, object] = {}
+            capture_phase = {"name": "poller_armed"}
 
-            def _release() -> None:
+            def _release(wait_gpi_state=None) -> None:
                 try:
                     # Reset/relaunch only after GO is held low, the state
                     # input is open, and the GPI poller is live.
+                    capture_phase["name"] = "resetting_target"
                     _prepare_target_once()
                     from ..power.diagnostics import SyncHandshakeMetadata
 
                     if sync.lockstep:
+                        # GPIO levels during flash/reset are undefined protocol
+                        # state. Discard them, then allow the target and JS320
+                        # digital input path to settle before qualifying READY.
+                        capture_phase["name"] = "reset_grace"
+                        time.sleep(0.5)
+                        capture_phase["name"] = "waiting_ready"
                         ready_started = time.monotonic()
-                        ready = sync.wait_ready(timeout_s=duration)
+                        ready = (
+                            wait_gpi_state(ctx.config.power.state_input_index, True, duration)
+                            if wait_gpi_state is not None
+                            else sync.wait_ready(timeout_s=duration)
+                        )
                         ready_wait_s = round(time.monotonic() - ready_started, 6)
                         if not ready:
                             state = sync.read_state()
@@ -413,6 +401,7 @@ def capture_power(
                     if dtr_holder is not None:
                         dtr_holder.open()
                     sync.signal_go()
+                    capture_phase["name"] = "go_signaled"
                 except BaseException as exc:  # propagate through the driver thread boundary
                     prepare_error.append(exc)
                     raise
@@ -421,20 +410,35 @@ def capture_power(
                 duration_s=duration,
                 io_voltage=ctx.config.power.io_voltage,
                 sync_input_index=ctx.config.power.sync_input_index,
+                state_input_index=ctx.config.power.state_input_index,
                 stats_rate_hz=ctx.config.power.stats_rate_hz,
                 clean_infer_count=clean_count,
+                clean_infer_avg_us=clean_avg_us,
+                minimum_gate_s=DEFAULT_POWER_MIN_WINDOW_MS / 1000.0,
+                gate_relative_tolerance=(
+                    0.10
+                    if plan.count_source in {"configured", "profile_guided"}
+                    else 0.01
+                ),
                 on_started=_release,
-                # Drop GO the instant the gate is observed high: a GPO held
-                # high through the measured window backfeeds the target via
-                # the GO pad network (several mA observed on an AP510 EVB),
-                # displacing real
-                # supply current around the shunt. The firmware only
-                # level-samples GO before the window, so this is lossless.
+                # The dedicated JS320 GPI stream provides the authoritative
+                # gate edge. Release GO there to avoid backfeeding the target
+                # during the measured window.
                 on_gate_rise=sync.release_go,
+                phase_getter=lambda: capture_phase["name"],
             )
             if prepare_error:
                 raise prepare_error[0]
             result.metadata.setdefault("sync", dict(sync_metadata_holder))
+            result.metadata.setdefault(
+                "power_plan",
+                {
+                    "inference_count": plan.inference_count,
+                    "reference_inference_us": plan.reference_inference_us,
+                    "target_duration_ms": plan.target_duration_ms,
+                    "count_source": plan.count_source,
+                },
+            )
             return _attach_lifecycle_metadata(result)
         except PowerError:
             if prepare_error and isinstance(prepare_error[0], PowerError):

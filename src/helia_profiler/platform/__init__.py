@@ -26,6 +26,7 @@ from .capabilities import (
     SocCapabilities,
     TransportCapabilities,
 )
+from .custom import build_custom_platform_registry
 from .registry import (
     PlatformRegistry,
     build_platform_registry,
@@ -73,6 +74,7 @@ __all__ = [
     "SocFamily",
     "TransportCapabilities",
     "build_platform_registry",
+    "build_custom_platform_registry",
     "get_board",
     "get_default_go_gpio_pin",
     "get_default_state_gpio_pin",

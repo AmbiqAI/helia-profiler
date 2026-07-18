@@ -116,9 +116,9 @@ def _sample_pmu() -> PmuResult:
         profiled_infer_total_us=80_000,
         profiled_infer_avg_us=8000,
         clean_infer_count=8,
-        clean_infer_total_cycles=152_000,
-        clean_infer_avg_cycles=19000,
-        clean_infer_avg_us=198,
+        clean_infer_total_cycles=7_680_000,
+        clean_infer_avg_cycles=960_000,
+        clean_infer_avg_us=10_000,
         presets=("basic_cpu", "memory"),
     )
     presets = {
@@ -371,7 +371,7 @@ def _build_digests() -> dict[str, dict[str, str]]:
             paths = write_report(ctx)
             digests = {}
             for p in sorted(paths):
-                rel = p.relative_to(out_dir).as_posix()
+                rel = p.relative_to(out_dir.resolve()).as_posix()
                 digests[rel] = _digest_file(p)
             result[scenario] = digests
     return result

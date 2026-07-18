@@ -15,11 +15,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .engines import EngineType
 from .power.base import PowerResult
 from .placement import MemoryRegion
+
+if TYPE_CHECKING:
+    from .artifacts import OnDevicePowerSummary, PowerObservation, PowerTerminalRecord
 
 
 class ConsumerKind(StrEnum):
@@ -307,6 +310,9 @@ class ProfileResult:
 
     pmu: PmuResult
     power: PowerResult | None = None
+    power_observation: PowerObservation | None = None
+    power_terminal: PowerTerminalRecord | None = None
+    on_device_power: OnDevicePowerSummary | None = None
     metadata: RunMetadata = field(default_factory=RunMetadata)
     report_paths: list[Path] = field(default_factory=list)
 

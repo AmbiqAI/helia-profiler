@@ -19,29 +19,9 @@
 // runtime (which still leaves pad/pinmux/clock residue).  The host observes
 // completion via the GPIO gate, not via any transport.
 {{ _linkage }}void hpx_printf(const char *, ...) {}
+{% include "_power_terminal.j2" with context %}
 {% elif transport == "usb_cdc" %}
-static uint8_t usb_tx_buf[4096];
-static uint8_t usb_rx_buf[NSX_USB_MIN_CDC_RX_BUFSIZE];
-
-{% if usb_serial_marker | default(false) %}
-// Unique USB identity stamped by hpx at firmware-generation time so the host
-// can match this exact board's CDC device (pyserial serial_number) even when
-// several Ambiq boards are attached.  Derived from the J-Link probe serial.
-static const nsx_usb_device_desc_t g_hpx_usb_desc = {
-    .product = "{{ usb_serial_product | default("NSX HPX Profiler") }}",
-    .serial  = "{{ usb_serial_marker }}",
-};
-{% endif %}
-
-static nsx_usb_config_t g_usb_cfg = {
-    .tx_buffer     = usb_tx_buf,
-    .tx_buffer_len = sizeof(usb_tx_buf),
-    .rx_buffer     = usb_rx_buf,
-    .rx_buffer_len = sizeof(usb_rx_buf),
-{% if usb_serial_marker | default(false) %}
-    .device_desc   = &g_hpx_usb_desc,
-{% endif %}
-};
+{% include "_usb_config.j2" with context %}
 
 {{ _linkage }}void hpx_printf(const char *fmt, ...) {
     static char line_buf[512];

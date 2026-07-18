@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 from ..sync import DeviceState, SyncWiring
-from .device import _close_device, _open_device
+from .device import _close_device, _open_device, _read_gpi_snapshot
 
 
 class JoulescopeSyncController:
@@ -35,9 +35,7 @@ class JoulescopeSyncController:
 
     def _read_input(self, index: int) -> bool:
         driver, path = self._ensure()
-        value = driver.publish_and_wait(
-            f"{path}/s/gpi/+/!req", 0, f"{path}/s/gpi/+/!value", timeout=0.5
-        )
+        value = _read_gpi_snapshot(driver, path)
         return bool(int(value) & (1 << index))
 
     def _write_go(self, high: bool) -> None:

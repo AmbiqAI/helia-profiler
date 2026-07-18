@@ -10,6 +10,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from helia_profiler.artifacts import FirmwareArtifact
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.stages.flash import FlashFirmwareStage
@@ -35,6 +38,13 @@ def _make_ctx(tmp_path: Path, *, frozen: bool = False) -> PipelineContext:
     ctx.firmware_dir.mkdir(parents=True, exist_ok=True)
     ctx.binary_path = tmp_path / "app" / "hpx_profiler.bin"
     ctx.binary_path.write_bytes(b"bin")
+    ctx.publish_profile_firmware(FirmwareArtifact(
+        role="profile",
+        target_name="hpx_profiler",
+        app_dir=ctx.firmware_dir,
+        build_dir=ctx.firmware_dir,
+        binary_path=ctx.binary_path,
+    ))
     return ctx
 
 
@@ -56,6 +66,9 @@ class TestFlashFirmwareStageFrozen:
 
         assert len(backend.calls) == 1
         assert backend.calls[0]["frozen"] is True
+        assert ctx.profile_run is not None
+        assert ctx.profile_run.deployment is not None
+        assert ctx.profile_run.deployment.firmware is ctx.profile_firmware
 
     def test_frozen_false_by_default(self, tmp_path: Path) -> None:
         ctx = _make_ctx(tmp_path, frozen=False)
@@ -66,3 +79,13 @@ class TestFlashFirmwareStageFrozen:
 
         assert len(backend.calls) == 1
         assert backend.calls[0]["frozen"] is False
+
+    def test_legacy_binary_path_without_artifact_is_rejected(self, tmp_path: Path) -> None:
+        from helia_profiler.errors import BuildError
+
+        ctx = _make_ctx(tmp_path)
+        ctx.profile_firmware = None
+        ctx.profile_run = None
+
+        with pytest.raises(BuildError, match="No profile artifact"):
+            FlashFirmwareStage().run(ctx)

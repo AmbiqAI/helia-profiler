@@ -1,0 +1,103 @@
+{# Post-GATE terminal reporting for dedicated power firmware. #}
+{% if power_only | default(false) %}
+static void hpx_power_terminal_park(void);
+
+static void hpx_power_terminal_report(
+    bool success,
+    uint32_t requested_count,
+    uint32_t completed_count,
+    uint64_t elapsed_us,
+    const char *final_phase,
+    uint32_t error_code,
+    bool gate_asserted,
+    bool gate_lowered) {
+    char record[512];
+    int length = snprintf(
+        record,
+        sizeof(record),
+        "--- HPX_POWER_TERMINAL_START ---\n"
+        "HPX_POWER_TERMINAL_VERSION=1\n"
+        "HPX_POWER_STATUS=%s\n"
+        "HPX_POWER_REQUESTED_COUNT=%lu\n"
+        "HPX_POWER_COMPLETED_COUNT=%lu\n"
+        "HPX_POWER_ELAPSED_US=%llu\n"
+        "HPX_POWER_FINAL_PHASE=%s\n"
+        "HPX_POWER_ERROR_CODE=%lu\n"
+        "HPX_POWER_GATE_ASSERTED=%d\n"
+        "HPX_POWER_GATE_LOWERED=%d\n"
+        "--- HPX_POWER_TERMINAL_END ---\n",
+        success ? "ok" : "error",
+        (unsigned long)requested_count,
+        (unsigned long)completed_count,
+        (unsigned long long)elapsed_us,
+        final_phase,
+        (unsigned long)error_code,
+        gate_asserted ? 1 : 0,
+        gate_lowered ? 1 : 0);
+{% if transport == "rtt" %}
+    SEGGER_RTT_Init();
+    SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0, SEGGER_RTT_MODE_NO_BLOCK_TRIM);
+    if (length > 0 && (unsigned)length < sizeof(record)) {
+        unsigned write_length = (unsigned)length;
+        unsigned written = SEGGER_RTT_Write(0, record, write_length);
+        if (written == write_length) {
+            HPX_CLEAN_DCACHE();
+        }
+    }
+{% elif transport == "uart" %}
+    nsx_uart_printf_enable();
+    nsx_delay_us(HPX_DEBUG_REENABLE_SETTLE_US);
+    if (length > 0 && (unsigned)length < sizeof(record)) {
+        for (;;) {
+            nsx_printf("%s", record);
+            nsx_delay_us(250000U);
+        }
+    }
+{% elif transport == "swo" %}
+    nsx_itm_printf_enable();
+    nsx_delay_us(HPX_DEBUG_REENABLE_SETTLE_US);
+    if (length > 0 && (unsigned)length < sizeof(record)) {
+        for (;;) {
+            nsx_printf("%s", record);
+            nsx_delay_us(250000U);
+        }
+    }
+{% elif transport == "usb_cdc" %}
+    if (nsx_usb_init(&g_usb_cfg) == 0) {
+        while (!nsx_usb_connected(&g_usb_cfg)) {
+            nsx_delay_us(10000U);
+        }
+        nsx_delay_us(200000U);
+        if (length > 0 && (unsigned)length < sizeof(record)) {
+            for (;;) {
+                uint32_t sent = 0U;
+                nsx_usb_send(&g_usb_cfg, record, (uint32_t)length, &sent);
+                nsx_delay_us(250000U);
+            }
+        }
+    }
+{% else %}
+    (void)record;
+    (void)length;
+{% endif %}
+}
+
+static void hpx_power_terminal_fail(const char *phase, uint32_t error_code) {
+    hpx_sync_window_end();
+    hpx_sync_not_ready();
+    hpx_power_terminal_report(
+        false,
+        (uint32_t){{ clean_iters | default(1) }},
+        0U,
+        0ULL,
+        phase,
+        error_code,
+        false,
+        true);
+    hpx_power_terminal_park();
+}
+
+static void hpx_power_terminal_park(void) {
+    for (;;) { __NOP(); }
+}
+{% endif %}

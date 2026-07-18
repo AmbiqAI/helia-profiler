@@ -58,6 +58,17 @@ from .protocol import (
     collect_lines,
 )
 from .timing import SBL_SETTLE_S
+from .rtt_control import (
+    RTT_LIVE_NAMED_SCORE,
+    direct_rtt_read as _direct_rtt_read,
+    direct_rtt_read_any as _direct_rtt_read_any,
+    direct_rtt_write as _direct_rtt_write,
+    read_rtt_up_channel0_name as _read_rtt_up_channel0_name,
+    scan_for_rtt_control_block as _scan_for_rtt_control_block,
+    scan_rtt_control_blocks as _scan_rtt_control_blocks,
+    score_rtt_control_block as _score_rtt_control_block,
+    wipe_rtt_control_blocks as _wipe_rtt_control_blocks,
+)
 
 log = logging.getLogger("hpx")
 
@@ -67,12 +78,6 @@ _PSRAM_READY_TIMEOUT_S = 15  # wait for PSRAM init + ready signal
 _PSRAM_WRITE_CHUNK = 65536  # bytes per J-Link memory_write call
 _RTT_READY_TIMEOUT_S = 15  # wait for firmware/host RTT startup handshake
 
-_RTT_SCAN_CHUNK = 0x4000  # 16 KB per memory_read call
-_RTT_MAGIC = b"SEGGER RTT"
-_RTT_DESC_WORDS = 6
-_RTT_CB_HEADER_SIZE = 24
-_RTT_DESC_SIZE = _RTT_DESC_WORDS * 4
-_RTT_ID_SIZE = 16  # bytes of the acID magic field at the start of a control block
 _RTT_DISCOVERY_SETTLE_S = 2.0
 
 # The firmware always names up-channel 0 "HPX" (see firmware/templates/
@@ -80,317 +85,7 @@ _RTT_DISCOVERY_SETTLE_S = 2.0
 # strongest, board-agnostic way to tell *our* RTT control block apart from
 # unrelated ones (e.g. a bootloader/monitor's default "Terminal" block, or a
 # stale block left in retained SRAM by a previous firmware).
-_RTT_APP_CHANNEL0_NAME = b"HPX"
-_RTT_NAME_MAX_LEN = 16
 _RTT_READY_LINE = "HPX_READY"
-
-# Scoring weights.  These are powers of two chosen so the qualitative signals
-# dominate in priority order (name match > live activity > buffer size) while
-# still letting buffer size act as a final tiebreaker.
-_RTT_NAME_MATCH_BONUS = 1 << 28
-_RTT_ACTIVITY_BONUS = 1 << 26
-
-
-def _read_rtt_up_channel0_name(
-    jlink: DebugMemorySession,
-    block_address: int,
-    max_len: int = _RTT_NAME_MAX_LEN,
-) -> bytes:
-    """Return the NUL-terminated name string of up-channel 0, or ``b""``.
-
-    The name lives behind the ``sName`` pointer in the channel-0 buffer
-    descriptor.  Any probe error degrades gracefully to an empty name so the
-    caller simply falls back to the other (size/activity) signals.
-    """
-    try:
-        name_ptr = jlink.memory_read32(block_address + _RTT_CB_HEADER_SIZE, 1)[0]
-        if name_ptr == 0:
-            return b""
-        raw = bytes(jlink.memory_read8(name_ptr, max_len))
-    except Exception:  # noqa: BLE001 — name probing is best-effort
-        return b""
-    nul = raw.find(0)
-    return raw[:nul] if nul >= 0 else raw
-
-
-def _score_rtt_control_block(jlink: DebugMemorySession, block_address: int) -> int:
-    """Rank an RTT control-block candidate by how likely it is *our* live block.
-
-    A raw "SEGGER RTT" magic match is too weak on its own: Apollo5 parts retain
-    SRAM across reset/reflash, so a structurally-valid but stale control block
-    from a previous firmware can survive alongside the current one.  This ranks
-    candidates by, in order: (1) up-channel 0 named "HPX", (2) the block has
-    unread data (it is actively producing output, not a drained leftover),
-    (3) larger plausible buffer.  Returns -1 for unusable candidates.
-    """
-    try:
-        max_up_buffers = jlink.memory_read32(block_address + 16, 1)[0]
-        if max_up_buffers <= 0:
-            return -1
-        desc_addr = block_address + _RTT_CB_HEADER_SIZE
-        name_ptr, buf_ptr, size, wr_off, rd_off, _flags = jlink.memory_read32(desc_addr, _RTT_DESC_WORDS)
-    except Exception:  # noqa: BLE001 — invalid candidates are ignored
-        return -1
-
-    # Structural validity: a usable up-channel 0 must point at a real buffer
-    # with sane read/write offsets.  Reject clearly-broken candidates outright.
-    if buf_ptr == 0 or size <= 0:
-        return -1
-    if wr_off > size or rd_off > size:
-        return -1
-
-    score = 0
-    if name_ptr != 0:
-        score += 1
-
-    # Strongest signal: the firmware names up-channel 0 "HPX".  This filters out
-    # unrelated RTT blocks regardless of SoC (Apollo510, Apollo510B, ...).
-    if _read_rtt_up_channel0_name(jlink, block_address) == _RTT_APP_CHANNEL0_NAME:
-        score += _RTT_NAME_MATCH_BONUS
-
-    # Next strongest: a block with unread data (wr_off != rd_off) is live.  A
-    # drained stale block left in retained SRAM has wr_off == rd_off and so
-    # scores lower than the block actively emitting HPX output.
-    if wr_off != rd_off:
-        score += _RTT_ACTIVITY_BONUS
-
-    # Final tiebreaker: prefer the larger plausible buffer.
-    score += min(size, 1 << 20)
-    return score
-
-
-def _direct_rtt_read(
-    jlink: DebugMemorySession,
-    *,
-    block_address: int,
-    buffer_index: int = 0,
-    max_bytes: int = 4096,
-) -> bytes:
-    """Read directly from an RTT up-buffer via SWD memory accesses.
-
-    Some Apollo5 setups expose a valid RTT control block in RAM but SEGGER's
-    RTT control API never transitions to a discovered state. This helper polls
-    the control block and advances ``RdOff`` manually so host capture can still
-    proceed.
-    """
-    max_up_buffers = jlink.memory_read32(block_address + 16, 1)[0]
-    if buffer_index >= max_up_buffers:
-        return b""
-
-    desc_addr = block_address + _RTT_CB_HEADER_SIZE + (buffer_index * _RTT_DESC_SIZE)
-    name_ptr, buf_ptr, size, wr_off, rd_off, _flags = jlink.memory_read32(desc_addr, _RTT_DESC_WORDS)
-    if name_ptr == 0 or buf_ptr == 0 or size == 0 or wr_off == rd_off:
-        return b""
-
-    if wr_off > size or rd_off > size:
-        return b""
-
-    if wr_off > rd_off:
-        count = min(wr_off - rd_off, max_bytes)
-        data = bytes(jlink.memory_read8(buf_ptr + rd_off, count))
-        new_rd_off = rd_off + count
-    else:
-        first_count = min(size - rd_off, max_bytes)
-        first = bytes(jlink.memory_read8(buf_ptr + rd_off, first_count))
-        remain = max_bytes - len(first)
-        second = bytes(jlink.memory_read8(buf_ptr, min(wr_off, remain)))
-        data = first + second
-        new_rd_off = (rd_off + len(data)) % size
-
-    if data:
-        jlink.memory_write32(desc_addr + 16, [new_rd_off])
-    return data
-
-
-def _direct_rtt_write(
-    jlink: DebugMemorySession,
-    *,
-    block_address: int,
-    data: bytes,
-    buffer_index: int = 0,
-) -> int:
-    """Write directly to an RTT down-buffer via SWD memory accesses."""
-    if not data:
-        return 0
-
-    max_up_buffers = jlink.memory_read32(block_address + 16, 1)[0]
-    max_down_buffers = jlink.memory_read32(block_address + 20, 1)[0]
-    if buffer_index >= max_down_buffers:
-        return 0
-
-    desc_addr = (
-        block_address
-        + _RTT_CB_HEADER_SIZE
-        + (max_up_buffers * _RTT_DESC_SIZE)
-        + (buffer_index * _RTT_DESC_SIZE)
-    )
-    _name_ptr, buf_ptr, size, wr_off, rd_off, _flags = jlink.memory_read32(
-        desc_addr,
-        _RTT_DESC_WORDS,
-    )
-    if buf_ptr == 0 or size <= 1:
-        return 0
-    if wr_off > size or rd_off > size:
-        return 0
-
-    if rd_off <= wr_off:
-        free = size - (wr_off - rd_off) - 1
-    else:
-        free = rd_off - wr_off - 1
-    if free <= 0:
-        return 0
-
-    payload = data[:free]
-    first_count = min(len(payload), size - wr_off)
-    if first_count:
-        jlink.memory_write8(buf_ptr + wr_off, list(payload[:first_count]))
-    second_count = len(payload) - first_count
-    if second_count:
-        jlink.memory_write8(buf_ptr, list(payload[first_count:]))
-    new_wr_off = (wr_off + len(payload)) % size
-    jlink.memory_write32(desc_addr + 12, [new_wr_off])
-    return len(payload)
-
-
-def _scan_rtt_control_blocks(
-    jlink: DebugMemorySession,
-    ranges: tuple[tuple[int, int], ...],
-) -> list[tuple[int, int]]:
-    """Return every valid RTT control block as ``(address, score)``, best-first.
-
-    Single pass over the SRAM ranges: each "SEGGER RTT" magic match is scored
-    once and de-duplicated, then the survivors are sorted by score.  This is a
-    deterministic fallback for J-Link's built-in RTT auto-scan, which on some
-    devices fails to cover the relevant SRAM region.
-    """
-    candidates: list[tuple[int, int]] = []
-    seen: set[int] = set()
-
-    for base, length in ranges:
-        for offset in range(0, length, _RTT_SCAN_CHUNK):
-            chunk_len = min(_RTT_SCAN_CHUNK, length - offset)
-            try:
-                chunk = bytes(jlink.memory_read8(base + offset, chunk_len))
-            except Exception:  # noqa: BLE001 — probe errors are non-fatal
-                continue
-            start = 0
-            while True:
-                idx = chunk.find(_RTT_MAGIC, start)
-                if idx < 0:
-                    break
-                block_address = base + offset + idx
-                if block_address not in seen:
-                    seen.add(block_address)
-                    score = _score_rtt_control_block(jlink, block_address)
-                    if score >= 0:
-                        candidates.append((block_address, score))
-                start = idx + 1
-
-    candidates.sort(key=lambda item: item[1], reverse=True)
-    return candidates
-
-
-def _scan_for_rtt_control_block(
-    jlink: DebugMemorySession,
-    ranges: tuple[tuple[int, int], ...],
-) -> tuple[int, int] | None:
-    """Return the best-scoring RTT control block and its score, or None.
-
-    Thin wrapper over :func:`_scan_rtt_control_blocks` for callers that only
-    need the single best candidate.
-    """
-    candidates = _scan_rtt_control_blocks(jlink, ranges)
-    if not candidates:
-        return None
-    best_addr, best_score = candidates[0]
-    if len(candidates) > 1:
-        second_addr, second_score = candidates[1]
-        log.debug(
-            "RTT scan found %d control blocks; selected 0x%08X (score=%d) over 0x%08X (score=%d)",
-            len(candidates),
-            best_addr,
-            best_score,
-            second_addr,
-            second_score,
-        )
-    return best_addr, best_score
-
-
-def _wipe_rtt_control_blocks(
-    jlink: DebugMemorySession,
-    ranges: tuple[tuple[int, int], ...],
-) -> int:
-    """Blank the "SEGGER RTT" magic of every control block found in SRAM.
-
-    Apollo5 parts retain SRAM across reset/reflash, so a control block written
-    by a *previously* flashed firmware (often a different buffer size, at a
-    different link address) can survive and race the live block during
-    discovery.  Zeroing the leading acID field makes those blocks invisible to
-    both the J-Link auto-scan and our own scan.
-
-    This is intended as a pre-reset clean: the currently flashed firmware
-    re-establishes its single control block on the next reset, while the stale
-    locations stay dead because no running code ever rewrites them.
-
-    Returns the number of control blocks blanked.
-    """
-    zeros = [0] * _RTT_ID_SIZE
-    wiped = 0
-    seen: set[int] = set()
-    for base, length in ranges:
-        for offset in range(0, length, _RTT_SCAN_CHUNK):
-            chunk_len = min(_RTT_SCAN_CHUNK, length - offset)
-            try:
-                chunk = bytes(jlink.memory_read8(base + offset, chunk_len))
-            except Exception:  # noqa: BLE001 — probe errors are non-fatal
-                continue
-            start = 0
-            while True:
-                idx = chunk.find(_RTT_MAGIC, start)
-                if idx < 0:
-                    break
-                addr = base + offset + idx
-                if addr in seen:
-                    start = idx + 1
-                    continue
-                seen.add(addr)
-                try:
-                    if _score_rtt_control_block(jlink, addr) < 0:
-                        start = idx + 1
-                        continue
-                    jlink.memory_write8(addr, zeros)
-                    wiped += 1
-                    log.debug("pre-clean blanked RTT control block at 0x%08X", addr)
-                except Exception:  # noqa: BLE001 — a failed wipe is non-fatal
-                    pass
-                start = idx + 1
-    return wiped
-
-
-def _direct_rtt_read_any(
-    jlink: DebugMemorySession,
-    *,
-    ranges: tuple[tuple[int, int], ...],
-    preferred_block_address: int | None = None,
-    max_bytes: int = 4096,
-    allow_rescan: bool = True,
-) -> tuple[bytes, int | None]:
-    """Read from whichever RTT control block is actually publishing bytes."""
-    if preferred_block_address is not None:
-        data = _direct_rtt_read(jlink, block_address=preferred_block_address, max_bytes=max_bytes)
-        if data:
-            return data, preferred_block_address
-
-    if not allow_rescan:
-        return b"", preferred_block_address
-
-    for block_address, _score in _scan_rtt_control_blocks(jlink, ranges):
-        if preferred_block_address is not None and block_address == preferred_block_address:
-            continue
-        data = _direct_rtt_read(jlink, block_address=block_address, max_bytes=max_bytes)
-        if data:
-            return data, block_address
-    return b"", preferred_block_address
 
 
 def _wait_for_rtt_line(
@@ -780,7 +475,7 @@ def capture_rtt_output(
             block_address = None
             best_score = -1
             first_candidate_s: float | None = None
-            live_named_score = _RTT_NAME_MATCH_BONUS + _RTT_ACTIVITY_BONUS
+            live_named_score = RTT_LIVE_NAMED_SCORE
             scan_started_s = time.monotonic()
             while time.monotonic() < cb_deadline:
                 candidate = _scan_for_rtt_control_block(jlink, rtt_scan_ranges)

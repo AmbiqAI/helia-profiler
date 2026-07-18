@@ -6,7 +6,6 @@ import pytest
 
 from helia_profiler.config import Toolchain, Transport
 from helia_profiler.engines import EngineType
-from helia_profiler.placement import ModelLocation
 from helia_profiler.validation import (
     BOARDS,
     ENGINES,
@@ -15,6 +14,7 @@ from helia_profiler.validation import (
     build_matrix,
     case_validity,
 )
+from helia_profiler.validation.matrix import MemoryProfile
 
 
 class TestRegistry:
@@ -58,11 +58,11 @@ class TestCaseValidity:
         return CaseSpec(**kwargs)
 
     def test_psram_with_swo_gives_reason(self):
-        case = self._case(memory=ModelLocation.PSRAM, transport=Transport.SWO)
+        case = self._case(memory=MemoryProfile.PSRAM, transport=Transport.SWO)
         assert case_validity(case) == "psram weights require the rtt transport"
 
     def test_psram_with_rtt_is_valid(self):
-        case = self._case(memory=ModelLocation.PSRAM, transport=Transport.RTT)
+        case = self._case(memory=MemoryProfile.PSRAM, transport=Transport.RTT)
         assert case_validity(case) is None
 
     def test_ordinary_case_is_valid(self):
@@ -115,7 +115,7 @@ class TestBuildMatrix:
         assert len(cases) == 2
         assert {c.toolchain for c in cases} == {Toolchain.ARM_NONE_EABI_GCC}
         assert {c.transport for c in cases} == {Transport.RTT}
-        assert {c.memory for c in cases} == {ModelLocation.AUTO}
+        assert {c.memory for c in cases} == {MemoryProfile.AUTO}
         assert {c.jlink_serial for c in cases} == {"1160000174"}
 
     def test_unknown_model_raises(self):
@@ -195,7 +195,7 @@ class TestCaseValidityGuards:
             power=False,
             board=BOARDS["apollo3p_evb"],
             transport=Transport.RTT,
-            memory=ModelLocation.AUTO,
+            memory=MemoryProfile.AUTO,
         )
         defaults.update(overrides)
         return CaseSpec(**defaults)
@@ -211,7 +211,7 @@ class TestCaseValidityGuards:
         model = dataclasses.replace(
             self._case().model, fixture_path=str(fixture)
         )
-        case = self._case(memory=ModelLocation.TCM, model=model)
+        case = self._case(memory=MemoryProfile.TCM, model=model)
         reason = case_validity(case)
         assert reason is not None and "DTCM" in reason
 
@@ -221,18 +221,18 @@ class TestCaseValidityGuards:
         model = dataclasses.replace(
             self._case().model, fixture_path="does/not/exist.tflite"
         )
-        case = self._case(memory=ModelLocation.TCM, model=model)
+        case = self._case(memory=MemoryProfile.TCM, model=model)
         assert case_validity(case) is None
 
     def test_tcm_fits_on_larger_dtcm(self):
         from helia_profiler.validation.matrix import BOARDS
 
         # Apollo510 has 512 KB DTCM — same arena fits.
-        case = self._case(board=BOARDS["apollo510_evb"], memory=ModelLocation.TCM)
+        case = self._case(board=BOARDS["apollo510_evb"], memory=MemoryProfile.TCM)
         assert case_validity(case) is None
 
     def test_ap3_psram_power_pin_conflict_is_skipped(self):
-        case = self._case(power=True, memory=ModelLocation.PSRAM)
+        case = self._case(power=True, memory=MemoryProfile.PSRAM)
         reason = case_validity(case)
         assert reason is not None and "MSPI0" in reason
 
@@ -240,6 +240,6 @@ class TestCaseValidityGuards:
         from helia_profiler.validation.matrix import BOARDS
 
         case = self._case(
-            board=BOARDS["apollo510_evb"], power=True, memory=ModelLocation.PSRAM
+            board=BOARDS["apollo510_evb"], power=True, memory=MemoryProfile.PSRAM
         )
         assert case_validity(case) is None

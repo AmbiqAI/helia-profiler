@@ -19,9 +19,9 @@ from typing import Any
 
 import jinja2
 
-from ...config import ProfileConfig
+from ...config import DEFAULT_ARENA_SIZE_BYTES, ProfileConfig
 from ...errors import EngineError
-from ...placement import ModelLocation, Placement
+from ...placement import Placement, resolve_fastest_fit_placement
 from ...platform import SocDef, get_soc_for_board
 
 log = logging.getLogger("hpx")
@@ -137,10 +137,9 @@ def _resolve_aot_platform(config: ProfileConfig) -> str:
 #
 # heliaAOT splits the model into three AIR tensor kinds — ``constant``
 # (read-only weights), ``persistent`` (read-write state) and ``scratch``
-# (transient activations) — each planned into its own arena.  Compatibility
-# ``model_location`` presets map onto these three kinds, but precise AOT
-# placement belongs in ``engine.config.aot_args.memory.tensors`` where users can
-# specify constant/persistent/scratch rules directly.
+# (transient activations) — each planned into its own arena. Coarse model
+# arena/weights controls map onto these kinds, while precise AOT placement
+# belongs in ``engine.config.aot_args.memory.tensors``.
 # ---------------------------------------------------------------------------
 
 _PLACEMENT_TO_AOT_MEMTYPE: dict[Placement, str] = {
@@ -167,25 +166,18 @@ def _resolve_aot_placement_intent(
     ``arena`` covers the read-write scratch + persistent tensors; ``weights``
     covers the read-only constants.
     """
-    location = config.model.model_location
-    has_tcm = bool(soc and soc.memory.dtcm_kb > 0)
-
-    if location == ModelLocation.AUTO:
-        arena = Placement.TCM if has_tcm else Placement.SRAM
-        weights = Placement.MRAM
-        return arena, weights
-
-    if location == ModelLocation.TCM:
-        arena = weights = Placement.TCM
-    elif location == ModelLocation.SRAM:
-        arena = weights = Placement.SRAM
-    elif location == ModelLocation.PSRAM:
-        arena = Placement.SRAM
-        weights = Placement.PSRAM
-    else:  # AUTO (with override) or MRAM: arena in fastest RAM, weights in MRAM
-        arena = Placement.TCM if has_tcm else Placement.SRAM
-        weights = Placement.MRAM
-
+    try:
+        weights_size = config.model.path.stat().st_size
+    except OSError:
+        weights_size = 0
+    arena, weights = resolve_fastest_fit_placement(
+        arena_size=config.model.arena_size or DEFAULT_ARENA_SIZE_BYTES,
+        weights_size=weights_size,
+        tcm_cap=soc.memory.dtcm_kb * 1024 if soc else 1 << 31,
+        sram_cap=soc.memory.sram_kb * 1024 if soc else 1 << 31,
+    )
+    arena = config.model.arena_location or arena
+    weights = config.model.weights_location or weights
     return arena, weights
 
 

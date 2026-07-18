@@ -22,8 +22,6 @@ dependencies = [
 [project.optional-dependencies]
 aot = ["helia-aot>=0.18.0"]
 analysis = ["ai-edge-litert>=1.0", "flatbuffers>=24.0"]
-# Kept for backward compatibility — pyjoulescope_driver is now a core dep.
-power = []
 
 [project.scripts]
 hpx = "helia_profiler.cli:main"
@@ -31,11 +29,12 @@ hpx = "helia_profiler.cli:main"
 [dependency-groups]
 lint = ["ruff>=0.11.0,<0.12"]
 test = ["pytest>=8.0", "pytest-timeout>=2.3"]
+notebook = ["ipykernel>=6,<8"]
 docs = [
     "mkdocs-material>=9.0",
     "mkdocstrings[python]>=0.27",
     "pymdown-extensions>=10.15",
-    "zensical>=0.0.11",
+    "zensical>=0.0.51,<0.1",
 ]
 
 [build-system]
@@ -51,7 +50,14 @@ where = ["src"]
 include = ["helia_profiler", "helia_profiler.*"]
 
 [tool.setuptools.package-data]
-helia_profiler = ["firmware/templates/**/*", "engines/templates/**/*", "data/*.json"]
+helia_profiler = [
+    "firmware/templates/**/*",
+    "engines/templates/**/*",
+    "data/*.json",
+    "data/models/*.json",
+    "data/models/*.tflite",
+    "vendor/segger_rtt/**/*",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
