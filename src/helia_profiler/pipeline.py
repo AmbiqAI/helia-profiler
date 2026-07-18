@@ -150,6 +150,11 @@ class PipelineContext:
     #: when failures look connection-related.
     passthrough_skipped: bool = False
 
+    #: True only when EnsureBoardPoweredStage successfully energized the target
+    #: during this run. Probe discovery uses this to tolerate bounded USB
+    #: re-enumeration after a Joulescope relay closes.
+    target_power_ensured: bool = False
+
     progress_sink: ProgressSink | None = field(default=None, repr=False, compare=False)
 
     def publish_profile_firmware(self, firmware: FirmwareArtifact) -> None:

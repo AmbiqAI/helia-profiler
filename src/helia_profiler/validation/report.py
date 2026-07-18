@@ -187,8 +187,12 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
             {
                 "jlink_serial": result.jlink_serial,
                 "model_sha256": _nested(metadata, "model", "sha256"),
+                "hpx_version": metadata.get("hpx_version"),
                 "compiler": _nested(metadata, "toolchain", "compiler"),
                 "compiler_version": _nested(metadata, "toolchain", "compiler_version"),
+                "system_clock_hz": _nested(metadata, "firmware", "system_clock_hz"),
+                "run_metadata_schema_version": metadata.get("schema_version"),
+                "run_summary_schema_version": summary.get("schema_version"),
                 "effective_memory": summary.get("memory_plan"),
             }
         ),

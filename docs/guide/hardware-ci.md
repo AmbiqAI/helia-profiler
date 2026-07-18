@@ -114,8 +114,35 @@ The initial schema includes:
 - `summary` pass/fail/skip counts
 - `cases` with identity, status, headline metrics, and artifact paths
 
+Each case also carries cross-machine provenance when available: model SHA-256,
+HPX version, compiler name/version, firmware-reported `system_clock_hz`, and
+the summary/metadata schema versions. These values are not folded into case
+identity because doing so would prevent useful pairing; comparison and
+regression profiles surface differences and can require exact matches.
+
 Git metadata is best-effort. Missing git, source archives, or non-repository
 directories do not fail validation report generation.
+
+## Cross-machine release sweep
+
+Before transferring a bundle or comparing another machine's results:
+
+1. Commit or record the exact HPX revision and use a clean worktree.
+2. Run `hpx doctor`, `hpx probes match`, and `hpx ports list` on that bench.
+3. Pin every board to a J-Link serial and every power run to an instrument
+  serial when multiple instruments are attached.
+4. Preview the matrix with `hpx validate --list` and save that output.
+5. Use `--repeat 3` or more for release performance/power sweeps.
+6. Retain `validation_manifest.json`, reports, logs, and all per-case result
+  manifests. Generated `work/` trees are useful for local diagnosis but are
+  not required for portable comparison.
+
+For AP3/AP4/AP5 coverage, run separate board-appropriate matrices rather than
+forcing unsupported transport/memory combinations into one command. Include
+at least one non-power smoke per board family, then power runs with both JS110
+and JS320 where bench wiring supports them. JS320 digital synchronization
+requires valid target I/O reference wiring; a missing reference can otherwise
+look like a READY/GATE timeout.
 
 ## Manual GitHub Actions workflow
 

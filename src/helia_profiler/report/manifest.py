@@ -17,6 +17,14 @@ from ..result_manifest import (
     _sha256,
 )
 from ..evaluation import evaluate_run
+from .contracts import (
+    PROFILE_RESULTS_SCHEMA,
+    PROFILE_RESULTS_SCHEMA_VERSION,
+    RUN_METADATA_SCHEMA,
+    RUN_METADATA_SCHEMA_VERSION,
+    RUN_SUMMARY_SCHEMA,
+    RUN_SUMMARY_SCHEMA_VERSION,
+)
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -72,10 +80,30 @@ def _artifact_metadata(relative: str) -> dict[str, Any]:
     """Classify known products without closing the manifest to new artifacts."""
     name = Path(relative).name
     if name == "summary.json":
-        return _artifact_fields("core", "hpx.summary", optional=False)
+        return _artifact_fields(
+            "core",
+            "hpx.summary",
+            schema=RUN_SUMMARY_SCHEMA,
+            schema_version=RUN_SUMMARY_SCHEMA_VERSION,
+            optional=False,
+        )
     if name == "run_metadata.json":
-        return _artifact_fields("core", "hpx.run-metadata", optional=False)
-    if name in {"profile_results.csv", "profile_results.json"}:
+        return _artifact_fields(
+            "core",
+            "hpx.run-metadata",
+            schema=RUN_METADATA_SCHEMA,
+            schema_version=RUN_METADATA_SCHEMA_VERSION,
+            optional=False,
+        )
+    if name == "profile_results.json":
+        return _artifact_fields(
+            "core",
+            "hpx.profile-layers",
+            schema=PROFILE_RESULTS_SCHEMA,
+            schema_version=PROFILE_RESULTS_SCHEMA_VERSION,
+            optional=False,
+        )
+    if name == "profile_results.csv":
         return _artifact_fields("core", "hpx.profile-layers", optional=False)
     if relative.startswith("model_explorer/"):
         return _artifact_fields(
@@ -99,17 +127,20 @@ def _artifact_fields(
     role: str,
     name: str | None,
     *,
+    schema: str | None = None,
+    schema_version: int | None = None,
     producer: str = "hpx",
     optional: bool,
 ) -> dict[str, Any]:
     return {
         "role": role,
         "name": name,
-        "schema": None,
-        "schema_version": None,
+        "schema": schema,
+        "schema_version": schema_version,
         "producer": producer,
         "optional": optional,
     }
+
 
 def _provenance(ctx: PipelineContext) -> dict[str, Any]:
     config_json = json.dumps(
@@ -132,13 +163,20 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
     config = ctx.run_metadata.config_snapshot
     model = ctx.run_metadata.model
     platform = ctx.run_metadata.platform
+    toolchain = ctx.run_metadata.toolchain
+    firmware = ctx.pmu_result.meta if ctx.pmu_result is not None else None
     dimensions = {
         "model_sha256": model.sha256 if model is not None else None,
+        "hpx_version": ctx.run_metadata.hpx_version,
         "engine": _nested(config, "engine", "type"),
         "board": platform.board if platform is not None else None,
         "soc": platform.soc if platform is not None else None,
         "cpu_clock": platform.cpu_clock_name if platform is not None else None,
         "toolchain": _nested(config, "target", "toolchain"),
+        "compiler_version": toolchain.compiler_version if toolchain is not None else None,
+        "system_clock_hz": firmware.system_clock_hz if firmware is not None else None,
+        "run_summary_schema_version": RUN_SUMMARY_SCHEMA_VERSION,
+        "run_metadata_schema_version": RUN_METADATA_SCHEMA_VERSION,
         "transport": _nested(config, "target", "transport"),
         "arena_location": _nested(config, "model", "arena_location"),
         "weights_location": _nested(config, "model", "weights_location"),

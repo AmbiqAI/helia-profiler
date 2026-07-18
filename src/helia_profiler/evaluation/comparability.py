@@ -57,11 +57,16 @@ class ComparabilityAssessment:
 
 
 _INFORMATIVE_DIMENSIONS = (
+    "hpx_version",
     "engine",
     "board",
     "soc",
     "cpu_clock",
     "toolchain",
+    "compiler_version",
+    "system_clock_hz",
+    "run_summary_schema_version",
+    "run_metadata_schema_version",
     "transport",
     "arena_location",
     "weights_location",
@@ -197,13 +202,20 @@ def _dimensions(run: RunArtifacts) -> dict[str, Any]:
     config = metadata.get("config", {})
     platform = metadata.get("platform", {})
     model = metadata.get("model", {})
+    toolchain = metadata.get("toolchain", {})
+    firmware = metadata.get("firmware", {})
     dimensions = {
         "model_sha256": model.get("sha256"),
+        "hpx_version": metadata.get("hpx_version"),
         "engine": _nested(config, "engine", "type"),
         "board": _nested(config, "target", "board"),
         "soc": platform.get("soc"),
         "cpu_clock": platform.get("cpu_clock_name"),
         "toolchain": _nested(config, "target", "toolchain"),
+        "compiler_version": toolchain.get("compiler_version"),
+        "system_clock_hz": firmware.get("system_clock_hz"),
+        "run_summary_schema_version": run.summary.get("schema_version"),
+        "run_metadata_schema_version": metadata.get("schema_version"),
         "transport": _nested(config, "target", "transport"),
         "arena_location": _nested(config, "model", "arena_location"),
         "weights_location": _nested(config, "model", "weights_location"),

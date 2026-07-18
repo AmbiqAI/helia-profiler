@@ -150,6 +150,16 @@ def test_session_intent_round_trips_without_expanding_defaults(tmp_path: Path) -
     assert "profiling" not in data["intent"]
     assert data["intent"]["model"]["path"] == "models/model.tflite"
 
+    schema_path = (
+        Path(__file__).parents[1]
+        / "src"
+        / "helia_profiler"
+        / "data"
+        / "session_intent.schema.v1.json"
+    )
+    schema = json.loads(schema_path.read_text())
+    assert schema["properties"]["intent"]["additionalProperties"] is True
+
 
 def test_session_resolved_dict_expands_validated_defaults() -> None:
     session = hpx.Session().with_model("model.tflite")

@@ -156,6 +156,9 @@ _CONFIG_FIELDS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("arena_location", "Arena location", ("config", "model", "arena_location")),
     ("weights_location", "Weights location", ("config", "model", "weights_location")),
     ("hpx_version", "hpx version", ("hpx_version",)),
+    ("compiler_version", "Compiler version", ("toolchain", "compiler_version")),
+    ("system_clock_hz", "System clock", ("firmware", "system_clock_hz")),
+    ("run_metadata_schema_version", "Metadata schema", ("schema_version",)),
 )
 
 _METRIC_FIELDS: tuple[tuple[str, tuple[str, ...], str], ...] = (

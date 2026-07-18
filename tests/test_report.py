@@ -50,6 +50,8 @@ def test_metadata_to_dict_includes_timing():
 
     data = _metadata_to_dict(meta)
 
+    assert data["schema"] == "hpx.run-metadata"
+    assert data["schema_version"] == 1
     assert data["timing"] == {
         "capture_duration_s": 1.5,
         "hpx_start_latency_s": 0.25,
@@ -83,6 +85,8 @@ def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):
         "device_profiled_infer_total_us": 48000,
         "device_profiled_infer_avg_us": 8000,
     }
+    assert summary["schema"] == "hpx.run-summary"
+    assert summary["schema_version"] == 1
     assert summary["validity"] == "valid"
     assert summary["issues"] == []
 
@@ -161,6 +165,8 @@ def test_write_json_includes_layer_cycle_percentages(tmp_path: Path):
     out_path = _write_json(pmu, None, RunMetadata(), tmp_path)
     data = json.loads(out_path.read_text())
 
+    assert data["schema"] == "hpx.profile-results"
+    assert data["schema_version"] == 1
     assert data["layers"][0]["cycles_pct"] == 40.0
     assert data["layers"][1]["cycles_pct"] == 60.0
     assert data["presets"]["cpu_0"]["layers"][0]["cycles_pct"] == 25.0
@@ -199,9 +205,11 @@ def test_write_report_publishes_verifiable_manifest_last(tmp_path: Path):
     assert manifest.bundle_type == "profile"
     assert artifacts["summary.json"].role == "core"
     assert artifacts["summary.json"].name == "hpx.summary"
-    assert artifacts["summary.json"].schema is None
+    assert artifacts["summary.json"].schema == "hpx.run-summary"
+    assert artifacts["summary.json"].schema_version == 1
     assert artifacts["summary.json"].optional is False
     assert artifacts["profile_results.csv"].name == "hpx.profile-layers"
+    assert artifacts["profile_results.csv"].schema is None
 
 
 def test_manifest_classifies_model_explorer_as_optional_export(tmp_path: Path):

@@ -66,3 +66,4 @@ class EnsureBoardPoweredStage:
         # pipeline stays driver-agnostic.
         powered = driver.ensure_target_powered(required=cfg.power.enabled)
         ctx.passthrough_skipped = not powered
+        ctx.target_power_ensured = powered

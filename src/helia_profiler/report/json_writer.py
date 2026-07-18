@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .csv_writer import _layer_to_flat_dict
+from .contracts import PROFILE_RESULTS_SCHEMA, PROFILE_RESULTS_SCHEMA_VERSION
 from .metadata import _firmware_meta_to_dict, _metadata_to_dict
 
 if TYPE_CHECKING:
@@ -33,6 +34,8 @@ def _write_json(
     }
 
     data: dict[str, Any] = {
+        "schema": PROFILE_RESULTS_SCHEMA,
+        "schema_version": PROFILE_RESULTS_SCHEMA_VERSION,
         "metadata": _metadata_to_dict(run_metadata),
         "summary": _firmware_meta_to_dict(pmu.meta),
         "layers": [_layer_to_flat_dict(l, total_cycles=total_cycles) for l in pmu.layers],

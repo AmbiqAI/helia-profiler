@@ -71,6 +71,7 @@ class TestStageDelegation:
             EnsureBoardPoweredStage().run(ctx)
         driver.ensure_target_powered.assert_called_once_with(required=False)
         assert ctx.passthrough_skipped is False
+        assert ctx.target_power_ensured is True
 
     def test_delegates_to_driver_and_records_skip(self, tmp_path: Path):
         ctx = _ctx(tmp_path)
@@ -79,6 +80,7 @@ class TestStageDelegation:
         with patch("helia_profiler.power.get_driver", return_value=driver):
             EnsureBoardPoweredStage().run(ctx)
         assert ctx.passthrough_skipped is True
+        assert ctx.target_power_ensured is False
 
     def test_strict_mode_passes_required_true(self, tmp_path: Path):
         ctx = _ctx(tmp_path, power={"enabled": True})

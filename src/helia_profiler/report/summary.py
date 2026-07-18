@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from .memory import _CACHE_COUNTERS, _serialise_memory_plan
 from .power import _power_summary_to_dict
+from .contracts import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION
 from ..evaluation import evaluate_run
 
 if TYPE_CHECKING:
@@ -29,6 +30,8 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     sorted_layers = sorted(layers, key=lambda l: l.cycles or 0, reverse=True)
 
     summary: dict[str, Any] = {
+        "schema": RUN_SUMMARY_SCHEMA,
+        "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
         "engine": ctx.config.engine.type.value,
         "layers": len(layers),
         "total_cycles": total_cycles,

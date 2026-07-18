@@ -50,6 +50,9 @@ default. Pass `progress_sink=updates.append` to receive typed `ProgressUpdate`
 events without enabling terminal presentation. The `hpx` CLI owns Rich progress
 and final result rendering.
 
+The versioned envelope is described by the packaged permissive schema
+`helia_profiler/data/session_intent.schema.v1.json`.
+
 For a newcomer-oriented walkthrough of discovery, immutable experiment
 branches, profiling, filtering, comparisons, overlays, and power, see
 [Interactive Python](../../examples/interactive-python.md).

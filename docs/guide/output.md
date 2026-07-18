@@ -81,12 +81,27 @@ declared in a manifest, verification still requires its file and digest.
 The permissive JSON Schema is shipped as
 `helia_profiler/data/result_manifest.schema.v1.json`.
 
+HPX-owned JSON artifacts carry independent schema identities and versions so
+consumers can evolve parsers without coupling every file to the bundle schema:
+
+| Artifact | Schema | Packaged JSON Schema |
+| --- | --- | --- |
+| `summary.json` | `hpx.run-summary` v1 | `run_summary.schema.v1.json` |
+| `run_metadata.json` | `hpx.run-metadata` v1 | `run_metadata.schema.v1.json` |
+| `profile_results.json` | `hpx.profile-results` v1 | `profile_results.schema.v1.json` |
+
+These schemas require the stable interpretation fields and remain open to
+additive measurements and extensions. CSV output retains its semantic artifact
+name but does not claim a formal content schema yet.
+
 ### summary.json
 
 The top-level summary — start here for a quick overview.
 
 ```json
 {
+  "schema": "hpx.run-summary",
+  "schema_version": 1,
   "engine": "helia-rt",
   "layers": 13,
   "total_cycles": 2016376,

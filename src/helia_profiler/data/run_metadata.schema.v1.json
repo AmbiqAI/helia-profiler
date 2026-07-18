@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ambiqai.github.io/helia-profiler/schemas/run-metadata/v1.json",
+  "title": "heliaPROFILER run metadata",
+  "type": "object",
+  "required": ["schema", "schema_version", "hpx_version", "run_id", "timestamp"],
+  "properties": {
+    "schema": {"const": "hpx.run-metadata"},
+    "schema_version": {"const": 1},
+    "hpx_version": {"type": "string"},
+    "run_id": {"type": "string"},
+    "timestamp": {"type": "string"},
+    "config": {"type": "object", "additionalProperties": true},
+    "platform": {"type": "object", "additionalProperties": true},
+    "model": {"type": "object", "additionalProperties": true},
+    "toolchain": {"type": "object", "additionalProperties": true},
+    "firmware": {"type": "object", "additionalProperties": true}
+  },
+  "additionalProperties": true
+}

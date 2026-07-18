@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ..results import FirmwareMeta, RunMetadata
+from .contracts import RUN_METADATA_SCHEMA, RUN_METADATA_SCHEMA_VERSION
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -26,6 +27,8 @@ def _firmware_meta_to_dict(meta: FirmwareMeta) -> dict[str, Any]:
 def _metadata_to_dict(meta: RunMetadata) -> dict[str, Any]:
     """Convert RunMetadata to a JSON-safe dict."""
     d: dict[str, Any] = {
+        "schema": RUN_METADATA_SCHEMA,
+        "schema_version": RUN_METADATA_SCHEMA_VERSION,
         "hpx_version": meta.hpx_version,
         "run_id": meta.run_id,
         "timestamp": meta.timestamp,

@@ -29,6 +29,22 @@ def _case(output_dir: Path) -> CaseResult:
 
 def test_write_validation_reports_includes_manifest_with_relative_paths(tmp_path: Path):
     result = _case(tmp_path)
+    case_dir = Path(result.output_dir)
+    case_dir.mkdir(parents=True)
+    (case_dir / "summary.json").write_text(
+        json.dumps({"schema": "hpx.run-summary", "schema_version": 1})
+    )
+    (case_dir / "run_metadata.json").write_text(
+        json.dumps(
+            {
+                "schema": "hpx.run-metadata",
+                "schema_version": 1,
+                "hpx_version": "0.1.0",
+                "toolchain": {"compiler": "gcc", "compiler_version": "12.2.1"},
+                "firmware": {"system_clock_hz": 96_000_000},
+            }
+        )
+    )
 
     paths = write_validation_reports(
         [result],
@@ -64,6 +80,11 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(tmp_path
     assert case["artifacts"]["work_dir"]["path"] == f"{result.case_id}/work"
     assert case["artifacts"]["summary"]["path"] == f"{result.case_id}/summary.json"
     assert case["artifacts"]["run_metadata"]["path"] == f"{result.case_id}/run_metadata.json"
+    assert case["provenance"]["hpx_version"] == "0.1.0"
+    assert case["provenance"]["compiler_version"] == "12.2.1"
+    assert case["provenance"]["system_clock_hz"] == 96_000_000
+    assert case["provenance"]["run_metadata_schema_version"] == 1
+    assert case["provenance"]["run_summary_schema_version"] == 1
     assert case["artifacts"]["profile_results"]["path"] == f"{result.case_id}/profile_results.csv"
 
 
