@@ -450,3 +450,21 @@ def test_default_pipeline_exposes_profile_then_power_steps():
     assert names.index("build_power_firmware") < names.index("flash_power_firmware")
     assert names.index("flash_power_firmware") < names.index("capture_power")
     assert names.index("capture_power") < names.index("collect_power_terminal")
+
+
+def test_pipeline_runner_installs_progress_sink_before_stages(tmp_path: Path):
+    config = _make_config(tmp_path)
+    updates: list[ProgressUpdate] = []
+
+    class ProgressStage:
+        name = "progress_probe"
+
+        def should_skip(self, ctx):
+            return False
+
+        def run(self, ctx):
+            ctx.report_progress("stage running")
+
+    PipelineRunner([ProgressStage()], progress_sink=updates.append).run(config)
+
+    assert updates == [ProgressUpdate(message="stage running")]

@@ -1,13 +1,14 @@
 """Typed result models for profiling data.
 
-Every piece of structured data that flows between pipeline stages, the
-capture layer, and the report module is represented as a frozen dataclass
-here.  No ``dict[str, Any]`` at the boundary — consumers get IDE completion,
-type-checking, and clear contracts.
+Structured data flowing between pipeline stages, capture, and reports uses
+typed dataclasses. Core measurement records are frozen against field
+reassignment, while run metadata is intentionally enriched by pipeline stages.
 
-The models are intentionally flat and simple.  ``LayerResult.counters`` is the
-one deliberate ``dict`` — PMU counter names are dynamic (varies by preset) and
-enumerating every possible ARM PMU event as a field would be impractical.
+Nested dynamic collections remain mutable for compatibility and efficient
+capture assembly. In particular, PMU counter names, engine extensions, power
+samples, and metadata are open-ended. Public consumers should treat returned
+collections as read-only; structural deep immutability is not currently part
+of the API contract.
 """
 
 from __future__ import annotations

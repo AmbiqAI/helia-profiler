@@ -27,6 +27,25 @@ subclass — see [Errors](errors.md).
 
 The installed package version is available as `helia_profiler.__version__`.
 
+## Stability tiers
+
+Every package-root export is classified in `helia_profiler.__api_stability__`:
+
+- `stable` — intended 1.0 contracts. Breaking changes require deprecation or a
+    major version.
+- `experimental` — public and documented, but still evolving before 1.0. Pin an
+    HPX version when using these types in automation.
+- `implementation` — currently available because typed Session discovery or
+    configuration surfaces expose them, but they are not an endorsed extension
+    boundary. Prefer `Session` and high-level configuration methods.
+
+The registry is descriptive during the alpha period; it does not emit runtime
+warnings or remove existing symbols.
+
+CI currently guards complete tier coverage plus the core `profile()`,
+`Session.profile()`, and `Session.compare()` call shapes. Broader constructor
+and annotation snapshots remain a release-candidate task.
+
 ## Pages
 
 - [Interactive sessions](session.md) — immutable, branchable configuration

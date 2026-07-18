@@ -214,9 +214,9 @@ Deliverables:
 - Separate execution from presentation. Programmatic profiling should be silent
   by default and accept optional progress/event and logging hooks; the CLI owns
   Rich rendering.
-- Finish deep immutability or use validated immutable models for nested public
-  collections. Do not advertise a frozen contract whose lists and dictionaries
-  remain mutable.
+- Decide the 1.0 deep-immutability boundary for nested public collections. The
+  alpha API now documents dynamic collections as mutable/read-only-by-convention;
+  changing them to tuples or mapping proxies requires an explicit migration.
 - Give `Session` explicit snapshot/export/import operations for unresolved intent
   and resolved configuration, with clear naming for each.
 - Align CLI and session operations (`profile`, `analyze`, `compare`, `doctor`,

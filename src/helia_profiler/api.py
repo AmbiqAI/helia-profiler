@@ -17,10 +17,15 @@ The CLI (``hpx``) is a thin wrapper around this same function.
 from __future__ import annotations
 
 from .config import ProfileConfig
+from .pipeline import ProgressSink
 from .results import ProfileResult
 
 
-def profile(config: ProfileConfig) -> ProfileResult:
+def profile(
+    config: ProfileConfig,
+    *,
+    progress_sink: ProgressSink | None = None,
+) -> ProfileResult:
     """Run a full profiling session.
 
     This is the main programmatic entry point.  It builds the default pipeline,
@@ -30,7 +35,10 @@ def profile(config: ProfileConfig) -> ProfileResult:
     """
     from .profiler import run_profile
 
-    ctx = run_profile(config)
+    if progress_sink is None:
+        ctx = run_profile(config)
+    else:
+        ctx = run_profile(config, progress_sink=progress_sink)
 
     assert ctx.pmu_result is not None
 

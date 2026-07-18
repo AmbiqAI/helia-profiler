@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import json
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
+from enum import Enum
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, Self
@@ -12,6 +14,9 @@ from .config import ProfileConfig, load_config
 from .errors import ConfigError
 from .results import ProfileResult
 
+SESSION_INTENT_SCHEMA = "hpx.session-intent"
+SESSION_INTENT_SCHEMA_VERSION = 1
+
 if TYPE_CHECKING:
     from .compare import CompareResult
     from .evaluation import ComparisonProfile
@@ -19,6 +24,7 @@ if TYPE_CHECKING:
     from .doctor import DoctorResult
     from .engines import EngineType
     from .model_analysis import ModelAnalysis
+    from .pipeline import ProgressUpdate
     from .platform import BoardDef
     from .target.probe.jlink import JLinkProbe, JLinkProbeMatch
     from .transport.ports import SerialPortInfo
@@ -71,6 +77,23 @@ def _without_none(values: Mapping[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in values.items() if value is not None}
 
 
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        converted: dict[str, Any] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ConfigError("Session intent mapping keys must be strings.")
+            converted[key] = _json_safe(item)
+        return converted
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, Path):
+        return str(value)
+    return value
+
+
 @dataclass(frozen=True)
 class Session:
     """Immutable, branchable configuration for interactive HPX operations.
@@ -117,6 +140,66 @@ class Session:
                 f"Config file {yaml_path} must contain a YAML mapping, got {type(data).__name__}.",
             )
         return cls(_base=data)
+
+    @classmethod
+    def from_dict(cls, intent: Mapping[str, Any]) -> Self:
+        """Create a session from unresolved configuration intent."""
+        if not isinstance(intent, Mapping):
+            raise ConfigError("Session intent must be a mapping.")
+        return cls(_base=_json_safe(intent))
+
+    @classmethod
+    def load(cls, path: str | Path) -> Self:
+        """Load a versioned unresolved-intent snapshot from JSON."""
+        snapshot_path = Path(path).expanduser()
+        try:
+            data = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        except FileNotFoundError as exc:
+            raise ConfigError(f"Session snapshot not found: {snapshot_path}") from exc
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ConfigError(f"Cannot load session snapshot {snapshot_path}: {exc}") from exc
+        if not isinstance(data, dict):
+            raise ConfigError("Session snapshot must contain a JSON object.")
+        if data.get("schema") != SESSION_INTENT_SCHEMA:
+            raise ConfigError(f"Unsupported session snapshot schema: {data.get('schema')!r}")
+        version = data.get("schema_version")
+        if (
+            not isinstance(version, int)
+            or isinstance(version, bool)
+            or version != SESSION_INTENT_SCHEMA_VERSION
+        ):
+            raise ConfigError(
+                f"Unsupported session snapshot version: {version!r}"
+            )
+        intent = data.get("intent")
+        if not isinstance(intent, dict):
+            raise ConfigError("Session snapshot intent must be a JSON object.")
+        return cls.from_dict(intent)
+
+    def intent_dict(self) -> dict[str, Any]:
+        """Return JSON-safe unresolved intent without expanding defaults."""
+        return _json_safe(_merge(self._base, self._overrides))
+
+    def resolved_dict(self, model: str | Path | None = None) -> dict[str, Any]:
+        """Return the fully resolved and validated configuration snapshot."""
+        from .pipeline import _serialize_config
+
+        return _serialize_config(self.resolve(model))
+
+    def save(self, path: str | Path) -> Path:
+        """Persist unresolved intent as a versioned JSON snapshot."""
+        snapshot_path = Path(path).expanduser()
+        snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+        data = {
+            "schema": SESSION_INTENT_SCHEMA,
+            "schema_version": SESSION_INTENT_SCHEMA_VERSION,
+            "intent": self.intent_dict(),
+        }
+        snapshot_path.write_text(
+            json.dumps(data, indent=2, sort_keys=True, allow_nan=False) + "\n",
+            encoding="utf-8",
+        )
+        return snapshot_path
 
     def with_overrides(self, overrides: Mapping[str, Any]) -> Self:
         """Return a session with advanced raw configuration overrides merged in."""
@@ -173,11 +256,16 @@ class Session:
             overrides = _merge(overrides, {"model": {"path": model}})
         return load_config(None, overrides)
 
-    def profile(self, model: str | Path | None = None) -> ProfileResult:
+    def profile(
+        self,
+        model: str | Path | None = None,
+        *,
+        progress_sink: Callable[[ProgressUpdate], None] | None = None,
+    ) -> ProfileResult:
         """Run a profile using this session's resolved configuration."""
         from .api import profile
 
-        return profile(self.resolve(model))
+        return profile(self.resolve(model), progress_sink=progress_sink)
 
     def analyze(self, model: str | Path | None = None) -> ModelAnalysis:
         """Analyze the configured model without building or flashing firmware."""

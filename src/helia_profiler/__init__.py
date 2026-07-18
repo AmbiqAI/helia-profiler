@@ -54,6 +54,7 @@ from .errors import (
 )
 from .placement import Placement
 from .model_analysis import ModelAnalysis
+from .pipeline import ProgressUpdate
 from .platform import BoardDef
 from .power.base import PowerMode, PowerResult
 from .artifacts import OnDevicePowerSummary, PowerObservation, PowerTerminalRecord
@@ -84,6 +85,7 @@ __all__ = [
     # Public API
     "profile",
     "Session",
+    "ProgressUpdate",
     "examples",
     # Config
     "ProfileConfig",
@@ -158,3 +160,92 @@ __all__ = [
     "PowerError",
     "ReportError",
 ]
+
+_STABLE_API = {
+    "__version__",
+    "profile",
+    "Session",
+    "ProgressUpdate",
+    "examples",
+    "ProfileConfig",
+    "ModelConfig",
+    "EngineConfig",
+    "EngineType",
+    "TargetConfig",
+    "ProfilingConfig",
+    "PowerConfig",
+    "OutputConfig",
+    "Toolchain",
+    "Transport",
+    "ClockSelection",
+    "OutputFormat",
+    "HeartbeatConfig",
+    "TimeoutsConfig",
+    "BuildConfig",
+    "Placement",
+    "PowerMode",
+    "ResetStrategy",
+    "ProfileResult",
+    "PmuResult",
+    "PresetResult",
+    "LayerResult",
+    "FirmwareMeta",
+    "RunMetadata",
+    "PowerResult",
+    "HpxError",
+    "ConfigError",
+    "PlatformError",
+    "EngineError",
+    "FirmwareError",
+    "BuildError",
+    "NetworkError",
+    "CaptureError",
+    "PowerError",
+    "ReportError",
+}
+
+_EXPERIMENTAL_API = {
+    "PowerObservation",
+    "PowerTerminalRecord",
+    "OnDevicePowerSummary",
+    "ModelAnalysis",
+    "CompareResult",
+    "ComparabilityAssessment",
+    "ComparabilityIssue",
+    "ComparabilitySeverity",
+    "assess_comparability",
+    "ComparisonProfile",
+    "ComparisonVerdict",
+    "MetricDirection",
+    "MetricPolicy",
+    "MetricVerdict",
+    "MissingMetricPolicy",
+    "VerdictStatus",
+    "evaluate_comparison_profile",
+    "RunEvaluation",
+    "evaluate_run",
+    "ResultManifest",
+    "ResultArtifact",
+    "ResultIssue",
+    "ResultValidity",
+    "RunStatus",
+    "load_result_manifest",
+}
+
+_IMPLEMENTATION_API = {
+    "NsxModuleOverride",
+    "NsxModuleRef",
+    "DoctorCheck",
+    "DoctorResult",
+    "BoardDef",
+    "PmuCounter",
+    "JLinkProbe",
+    "JLinkProbeMatch",
+    "SerialPortInfo",
+}
+
+__api_stability__ = {
+    **{name: "stable" for name in _STABLE_API},
+    **{name: "experimental" for name in _EXPERIMENTAL_API},
+    **{name: "implementation" for name in _IMPLEMENTATION_API},
+}

@@ -34,10 +34,10 @@ def _cmd_profile(args: argparse.Namespace) -> None:
 
     console = HpxConsole(config.verbose)
 
-    from ..api import profile
+    from ..profiler import run_profile
 
     try:
-        profile(config)
+        run_profile(config, console=console)
     except KeyboardInterrupt:
         console.print_interrupted()
         sys.exit(130)

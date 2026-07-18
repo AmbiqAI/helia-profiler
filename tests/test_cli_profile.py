@@ -59,7 +59,7 @@ def test_profile_cli_forwards_rtt_buffer_size(monkeypatch) -> None:
         return SimpleNamespace(verbose=False)
 
     monkeypatch.setattr("helia_profiler.config.load_config", fake_load_config)
-    monkeypatch.setattr("helia_profiler.api.profile", lambda config: None)
+    monkeypatch.setattr("helia_profiler.profiler.run_profile", lambda config, **kwargs: None)
 
     cli._cmd_profile(_profile_args(rtt_buffer_size_up=16384))
 
@@ -78,7 +78,7 @@ def test_profile_cli_forwards_power_firmware(monkeypatch) -> None:
         return SimpleNamespace(verbose=False)
 
     monkeypatch.setattr("helia_profiler.config.load_config", fake_load_config)
-    monkeypatch.setattr("helia_profiler.api.profile", lambda config: None)
+    monkeypatch.setattr("helia_profiler.profiler.run_profile", lambda config, **kwargs: None)
 
     cli._cmd_profile(_profile_args(power=True, power_firmware="shared"))
 
@@ -97,7 +97,7 @@ def test_profile_cli_forwards_split_placement_to_model(monkeypatch) -> None:
         return SimpleNamespace(verbose=False)
 
     monkeypatch.setattr("helia_profiler.config.load_config", fake_load_config)
-    monkeypatch.setattr("helia_profiler.api.profile", lambda config: None)
+    monkeypatch.setattr("helia_profiler.profiler.run_profile", lambda config, **kwargs: None)
 
     cli._cmd_profile(
         _profile_args(runtime_arena_location="sram", runtime_weights_location="mram")
@@ -107,3 +107,20 @@ def test_profile_cli_forwards_split_placement_to_model(monkeypatch) -> None:
         "model": {"arena_location": "sram", "weights_location": "mram"},
         "verbose": False,
     }
+
+
+def test_profile_cli_owns_console_presentation(monkeypatch) -> None:
+    config = SimpleNamespace(verbose=1)
+    seen: dict[str, object] = {}
+    monkeypatch.setattr("helia_profiler.config.load_config", lambda *_args: config)
+
+    def fake_run_profile(received_config, **kwargs):
+        seen["config"] = received_config
+        seen.update(kwargs)
+
+    monkeypatch.setattr("helia_profiler.profiler.run_profile", fake_run_profile)
+
+    cli._cmd_profile(_profile_args(verbose=1))
+
+    assert seen["config"] is config
+    assert seen["console"].verbosity == 1

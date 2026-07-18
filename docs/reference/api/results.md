@@ -1,9 +1,10 @@
 # Results
 
-The typed data returned by [`profile()`](profile.md). All result types are
-frozen dataclasses — see the [architecture overview](../../architecture/index.md)
-for why bare dicts aren't used between pipeline stages (the one exception is
-`LayerResult.counters`, whose keys are dynamic PMU counter names).
+The typed data returned by [`profile()`](profile.md). Core measurement records
+are frozen against field reassignment, while run metadata is enriched as the
+pipeline executes. Dynamic nested collections such as counters, engine
+extensions, power samples, and metadata remain mutable for compatibility and
+efficient capture assembly. Treat collections on returned results as read-only.
 
 ::: helia_profiler.ProfileResult
 

@@ -78,3 +78,23 @@ def test_profile_result_exposes_grouped_power_contract(
     assert result.power_observation is observation
     assert result.power_terminal is terminal
     assert result.on_device_power is on_device
+
+
+def test_profile_forwards_optional_progress_sink(tmp_path: Path, monkeypatch) -> None:
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(None, {"model": {"path": str(model)}})
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.pmu_result = PmuResult(meta=FirmwareMeta(), layers=[])
+    seen: dict[str, object] = {}
+
+    def fake_run_profile(_config, **kwargs):
+        seen.update(kwargs)
+        return ctx
+
+    monkeypatch.setattr("helia_profiler.profiler.run_profile", fake_run_profile)
+    updates = []
+
+    profile(config, progress_sink=updates.append)
+
+    assert seen == {"progress_sink": updates.append}

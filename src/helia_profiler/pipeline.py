@@ -326,15 +326,19 @@ class PipelineRunner:
         self,
         stages: list[Stage],
         console: Any | None = None,
+        progress_sink: ProgressSink | None = None,
     ) -> None:
         self._stages = list(stages)
         self._console = console  # Optional HpxConsole — avoids circular import
+        self._progress_sink = progress_sink
 
     def run(self, config: ProfileConfig) -> PipelineContext:
         """Set up the working directory, run all stages, and clean up."""
         work_dir, should_cleanup = _resolve_work_dir(config)
         ctx = PipelineContext(config=config, work_dir=work_dir)
-        if self._console is not None:
+        if self._progress_sink is not None:
+            ctx.progress_sink = self._progress_sink
+        elif self._console is not None:
             ctx.progress_sink = self._console.progress_update
 
         # Seed run metadata with immutable fields

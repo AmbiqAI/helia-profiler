@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from io import StringIO
 from unittest.mock import patch
@@ -128,6 +129,59 @@ def test_session_uses_existing_config_coercion() -> None:
     assert config.model.path == Path("model.tflite")
     assert config.target.toolchain is hpx.Toolchain.ARM_NONE_EABI_GCC
     assert config.target.transport is hpx.Transport.USB_CDC
+
+
+def test_session_intent_round_trips_without_expanding_defaults(tmp_path: Path) -> None:
+    session = (
+        hpx.Session()
+        .with_model(Path("models/model.tflite"))
+        .with_engine(hpx.EngineType.HELIA_RT)
+        .with_target(board="apollo510_evb")
+    )
+    snapshot = session.save(tmp_path / "session.json")
+
+    restored = hpx.Session.load(snapshot)
+    data = json.loads(snapshot.read_text())
+
+    assert restored.intent_dict() == session.intent_dict()
+    assert restored.resolve() == session.resolve()
+    assert data["schema"] == "hpx.session-intent"
+    assert data["schema_version"] == 1
+    assert "profiling" not in data["intent"]
+    assert data["intent"]["model"]["path"] == "models/model.tflite"
+
+
+def test_session_resolved_dict_expands_validated_defaults() -> None:
+    session = hpx.Session().with_model("model.tflite")
+
+    resolved = session.resolved_dict()
+
+    assert resolved["model"]["path"] == "model.tflite"
+    assert resolved["profiling"]["iterations"] > 0
+    assert resolved["target"]["board"]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"schema": "other", "schema_version": 1, "intent": {}},
+        {"schema": "hpx.session-intent", "schema_version": True, "intent": {}},
+        {"schema": "hpx.session-intent", "schema_version": 2, "intent": {}},
+        {"schema": "hpx.session-intent", "schema_version": 1, "intent": []},
+    ],
+)
+def test_session_load_rejects_invalid_envelopes(tmp_path: Path, payload) -> None:
+    path = tmp_path / "session.json"
+    path.write_text(json.dumps(payload))
+
+    with pytest.raises(ConfigError):
+        hpx.Session.load(path)
+
+
+def test_session_intent_rejects_non_string_mapping_keys() -> None:
+    with pytest.raises(ConfigError, match="mapping keys must be strings"):
+        hpx.Session.from_dict({1: "numeric", "1": "string"})
 
 
 def test_session_requires_model() -> None:
