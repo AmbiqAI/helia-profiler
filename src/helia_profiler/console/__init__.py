@@ -8,6 +8,6 @@ can keep doing ``from helia_profiler.console import HpxConsole``.
 
 from __future__ import annotations
 
-from .base import HpxConsole, _console
+from .base import HpxConsole, _console, _status_console
 
 __all__ = ["HpxConsole"]

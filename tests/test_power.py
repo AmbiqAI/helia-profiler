@@ -1485,6 +1485,7 @@ class TestCapturePowerWrapper:
         _mark_power_firmware_deployed(ctx, tmp_path)
 
         calls: list[str] = []
+        hooks: dict[str, object] = {}
         summary = PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6)
 
         class FakeSync:
@@ -1498,6 +1499,7 @@ class TestCapturePowerWrapper:
                 return True
 
             def signal_go(self):
+                assert hooks["phase_getter"]() == "go_signaled"
                 calls.append("go")
 
             def release_go(self):
@@ -1521,6 +1523,7 @@ class TestCapturePowerWrapper:
 
             def capture_gated(self, **kwargs):
                 calls.append("capture_gated")
+                hooks["phase_getter"] = kwargs["phase_getter"]
                 kwargs["on_started"]()
                 return PowerResult(summary=summary)
 
@@ -1742,6 +1745,46 @@ class TestPowerFirmwareSelection:
         assert ctx.power_run is not None
         assert ctx.power_run.deployment is not None
         assert ctx.power_run.deployment.firmware is ctx.power_firmware
+
+    def test_dedicated_flash_retries_after_power_cycle(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.errors import CaptureError
+        from helia_profiler.stages.flash_power import FlashPowerFirmwareStage
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        power_bin = tmp_path / "hpx_profiler_power"
+        power_bin.write_bytes(b"\x00")
+        ctx.publish_power_plan(
+            PowerRunPlan(firmware_mode="dedicated", inference_count=5, count_source="configured")
+        )
+        ctx.publish_power_firmware(
+            FirmwareArtifact(
+                role="power",
+                target_name="hpx_profiler_power",
+                app_dir=tmp_path,
+                build_dir=tmp_path,
+                binary_path=power_bin,
+            )
+        )
+        attempts = 0
+
+        def flash_binary(*_args, **_kwargs):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise CaptureError("debug domain unavailable")
+
+        monkeypatch.setattr("helia_profiler.target.probe.jlink.flash_binary", flash_binary)
+        monkeypatch.setattr(
+            "helia_profiler.stages.flash_power.try_power_cycle_for_context",
+            lambda _ctx: True,
+        )
+
+        FlashPowerFirmwareStage().run(ctx)
+
+        assert attempts == 2
+        assert ctx.power_run is not None and ctx.power_run.deployment is not None
 
     def test_shared_mode_does_not_flash_and_uses_dtr_holder_for_usb_cdc(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

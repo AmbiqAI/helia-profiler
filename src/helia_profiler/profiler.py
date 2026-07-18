@@ -97,7 +97,7 @@ def _cli_logging(verbosity: int) -> Iterator[None]:
     """Temporarily configure the ``hpx`` logger for one CLI-owned run."""
     from rich.logging import RichHandler
 
-    from .console import _console
+    from .console import _status_console
 
     level = logging.WARNING
     if verbosity >= 2:
@@ -110,7 +110,7 @@ def _cli_logging(verbosity: int) -> Iterator[None]:
     previous_level = logger.level
     if not previous_handlers:
         handler = RichHandler(
-            console=_console,
+            console=_status_console,
             show_time=False,
             show_path=False,
             markup=False,

@@ -18,14 +18,9 @@ hang.
 
 from __future__ import annotations
 
-import contextlib
 import functools
 import logging
-import os
-import sys
-import threading
 import time
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Callable
 
@@ -47,12 +42,6 @@ _DEFAULT_LOCK_TIMEOUT_S = 180
 _DEFAULT_SYNC_TIMEOUT_S = 300
 
 
-# Quiet mode temporarily swaps the process stdio file descriptors so noisy NSX
-# subprocesses inherit /dev/null. Serialize that swap so concurrent quiet-mode
-# calls cannot race and restore each other's stdout/stderr handles incorrectly.
-_QUIET_OUTPUT_LOCK = threading.RLock()
-
-
 def _quiet_emitter(event: Event) -> None:
     """Swallow NSX output — used at default verbosity (no ``-v``)."""
 
@@ -66,46 +55,6 @@ def emitter_for_verbosity(verbose: int) -> Emitter | None:
     if verbose >= 1:
         return None
     return _quiet_emitter
-
-
-@contextlib.contextmanager
-def _suppress_output() -> Iterator[None]:
-    """Redirect fd 1 & 2 to ``/dev/null`` for the duration of the block.
-
-    This silences subprocess output that neuralspotx streams directly to the
-    terminal (cmake, ninja, SEGGER commander).  Python-level writes to sys.stdout /
-    sys.stderr are also suppressed since the underlying fds are redirected.
-    """
-    devnull_fd = os.open(os.devnull, os.O_WRONLY)
-    saved_stdout_fd = os.dup(1)
-    saved_stderr_fd = os.dup(2)
-    try:
-        # Flush Python buffers before redirecting the underlying fds.
-        sys.stdout.flush()
-        sys.stderr.flush()
-        os.dup2(devnull_fd, 1)
-        os.dup2(devnull_fd, 2)
-        yield
-    finally:
-        # Flush again (any buffered writes during the block go to devnull).
-        sys.stdout.flush()
-        sys.stderr.flush()
-        os.dup2(saved_stdout_fd, 1)
-        os.dup2(saved_stderr_fd, 2)
-        os.close(saved_stdout_fd)
-        os.close(saved_stderr_fd)
-        os.close(devnull_fd)
-
-
-@contextlib.contextmanager
-def _quiet_context(verbose: int) -> Iterator[None]:
-    """Yield a context that suppresses subprocess output when *verbose* == 0."""
-    if verbose >= 1:
-        yield
-    else:
-        with _QUIET_OUTPUT_LOCK:
-            with _suppress_output():
-                yield
 
 
 def _translate(label: str, func: Callable[[], Any]) -> Any:
@@ -174,13 +123,12 @@ def configure(
     """Run ``nsx configure`` on the given app directory."""
     log.info("nsx configure: %s (toolchain=%s)", app_dir, toolchain or "default")
     emit = emitter_for_verbosity(verbose)
-    with _quiet_context(verbose):
-        _translate(
-            "nsx configure",
-            lambda: nsx_api.configure_app(
-                app_dir, toolchain=toolchain, timeout_s=timeout_s, emit=emit
-            ),
-        )
+    _translate(
+        "nsx configure",
+        lambda: nsx_api.configure_app(
+            app_dir, toolchain=toolchain, timeout_s=timeout_s, emit=emit
+        ),
+    )
 
 
 def build(
@@ -200,13 +148,12 @@ def build(
     """
     log.info("nsx build: %s (toolchain=%s, target=%s)", app_dir, toolchain or "default", target or "default")
     emit = emitter_for_verbosity(verbose)
-    with _quiet_context(verbose):
-        _translate(
-            "nsx build",
-            lambda: nsx_api.build_app(
-                app_dir, toolchain=toolchain, target=target, timeout_s=timeout_s, emit=emit
-            ),
-        )
+    _translate(
+        "nsx build",
+        lambda: nsx_api.build_app(
+            app_dir, toolchain=toolchain, target=target, timeout_s=timeout_s, emit=emit
+        ),
+    )
 
 
 def flash(
@@ -238,18 +185,17 @@ def flash(
 
     if jlink_serial:
         log.info("  J-Link serial: %s", jlink_serial)
-    with _quiet_context(verbose):
-        _translate(
-            "nsx flash",
-            lambda: nsx_api.flash_app(
-                app_dir,
-                toolchain=toolchain,
-                probe_serial=jlink_serial,
-                frozen=frozen,
-                timeout_s=timeout_s,
-                emit=emit,
-            ),
-        )
+    _translate(
+        "nsx flash",
+        lambda: nsx_api.flash_app(
+            app_dir,
+            toolchain=toolchain,
+            probe_serial=jlink_serial,
+            frozen=frozen,
+            timeout_s=timeout_s,
+            emit=emit,
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -270,18 +216,17 @@ def lock(
     """Resolve module constraints and write ``nsx.lock``."""
     log.info("nsx lock: %s (update=%s)", app_dir, update)
     emit = emitter_for_verbosity(verbose)
-    with _quiet_context(verbose):
-        return _translate(
-            "nsx lock",
-            lambda: nsx_api.lock_app(
-                app_dir,
-                update=update,
-                quiet=True,
-                timeout_s=timeout_s,
-                resolve_ttl_s=_RESOLVE_TTL_S,
-                emit=emit,
-            ),
-        )
+    return _translate(
+        "nsx lock",
+        lambda: nsx_api.lock_app(
+            app_dir,
+            update=update,
+            quiet=True,
+            timeout_s=timeout_s,
+            resolve_ttl_s=_RESOLVE_TTL_S,
+            emit=emit,
+        ),
+    )
 
 
 def sync(
@@ -303,13 +248,12 @@ def sync(
     last_exc: NetworkError | None = None
     for attempt in range(1, retries + 1):
         try:
-            with _quiet_context(verbose):
-                _translate(
-                    "nsx sync",
-                    lambda: nsx_api.sync_app(
-                        app_dir, frozen=frozen, force=force, timeout_s=timeout_s, emit=emit
-                    ),
-                )
+            _translate(
+                "nsx sync",
+                lambda: nsx_api.sync_app(
+                    app_dir, frozen=frozen, force=force, timeout_s=timeout_s, emit=emit
+                ),
+            )
             return
         except NetworkError as exc:
             last_exc = exc

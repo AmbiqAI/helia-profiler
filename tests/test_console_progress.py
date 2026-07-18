@@ -40,6 +40,7 @@ class _FakeHpxConsole:
     def __init__(self, verbosity: int) -> None:
         self.verbosity = verbosity
         self._console = _FakeRichConsole()
+        self._status_console = _FakeRichConsole()
         self._spinner = None
         self._stage_name = "capture_power"
         self._stage_index = 17
@@ -101,4 +102,4 @@ def test_verbose_checkpoint_is_durable_line() -> None:
     )
 
     assert console._spinner is None
-    assert any("Profile captured" in line for line in console._console.printed)
+    assert any("Profile captured" in line for line in console._status_console.printed)

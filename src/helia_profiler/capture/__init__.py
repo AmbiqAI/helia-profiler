@@ -400,8 +400,12 @@ def capture_power(
                         )
                     if dtr_holder is not None:
                         dtr_holder.open()
-                    sync.signal_go()
+                    # Make the poller accept a fresh GATE edge before GO is
+                    # released. A fast target can raise GATE inside
+                    # signal_go(); updating the phase afterward would let the
+                    # poller discard that edge while retaining prev_level=1.
                     capture_phase["name"] = "go_signaled"
+                    sync.signal_go()
                 except BaseException as exc:  # propagate through the driver thread boundary
                     prepare_error.append(exc)
                     raise

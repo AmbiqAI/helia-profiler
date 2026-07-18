@@ -80,6 +80,11 @@ hpx profile [MODEL] [--config FILE] [options]
 | `--no-model-explorer` | flag | — | Skip Model Explorer overlay generation. |
 | `--detailed` | flag | off | Emit per-preset CSVs and a memory plan dump. |
 
+Final human-readable result tables are written to stdout. Progress spinners,
+stage logs, warnings, interruptions, and errors are written to stderr. This
+keeps stdout available for durable command results and future machine-output
+modes; JSON/CSV profile data is currently written to files in `--output-dir`.
+
 ## Build / debug
 
 | Flag | Type | Default | Description |
@@ -93,14 +98,12 @@ hpx profile [MODEL] [--config FILE] [options]
 | Code | Meaning |
 |---|---|
 | 0 | Success |
-| 1 | `ConfigError` — bad YAML or invalid CLI combination |
-| 2 | `PlatformError` — unsupported board/SoC |
-| 3 | `EngineError` — engine adapter failure (download, AOT compile, etc.) |
-| 4 | `FirmwareError` — template rendering failure |
-| 5 | `BuildError` — NSX build failure |
-| 6 | `CaptureError` — flash, transport, or PMU capture failure |
-| 7 | `PowerError` — Joulescope driver failure |
-| 8 | `ReportError` — report generation failure |
+| 1 | HPX configuration, platform, engine, build, capture, power, or report failure |
+| 2 | Typer/Click command-line usage error |
+| 130 | Interrupted with Ctrl-C |
+
+Typed category-specific exit codes are not yet part of the CLI contract. Error
+types remain available to programmatic callers through the `HpxError` hierarchy.
 
 ## Examples
 

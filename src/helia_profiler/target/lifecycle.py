@@ -167,6 +167,31 @@ def try_power_cycle(
         return False
 
 
+def try_power_cycle_for_context(
+    ctx: PipelineContext,
+    *,
+    off_time_s: float = 1.0,
+    settle_time_s: float = 2.0,
+) -> bool:
+    """Best-effort rail-cycle recovery for a failed target deployment."""
+    if not ctx.config.power.enabled:
+        return False
+    from ..power import get_driver
+
+    try:
+        driver = get_driver(ctx.config.power.driver, serial=ctx.config.power.serial)
+    except Exception as exc:
+        log.debug("Power-cycle recovery driver unavailable: %s", exc)
+        return False
+    return try_power_cycle(
+        driver,
+        ctx.config.power.driver,
+        strict=False,
+        off_time_s=off_time_s,
+        settle_time_s=settle_time_s,
+    )
+
+
 def _reset_for_power_phase(ctx: PipelineContext, requested: ResetStrategy) -> ResetAction:
     if requested is ResetStrategy.POWER_CYCLE:
         return ResetAction.NONE

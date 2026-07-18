@@ -73,10 +73,10 @@ def print_banner(console: HpxConsole) -> None:
         return
     from .._version import __version__
 
-    console._console.print(
+    console._status_console.print(
         f"[bold]heliaPROFILER[/bold] [dim]v{__version__}[/dim]",
     )
-    console._console.print()
+    console._status_console.print()
 
 
 def stage_start(console: HpxConsole, name: str, index: int = 0, total: int = 0) -> None:
@@ -92,8 +92,8 @@ def stage_start(console: HpxConsole, name: str, index: int = 0, total: int = 0) 
         # Verbose: one line per stage with a live spinner while running.
         stop_spinner(console)
         if phase != console._phase_name:
-            console._console.print(f"[bold cyan]{phase}[/bold cyan]")
-        console._spinner = console._console.status(
+            console._status_console.print(f"[bold cyan]{phase}[/bold cyan]")
+        console._spinner = console._status_console.status(
             f"  {icon}  [bold]{label}[/bold]",
             spinner="dots",
             spinner_style="cyan",
@@ -109,7 +109,7 @@ def stage_start(console: HpxConsole, name: str, index: int = 0, total: int = 0) 
             f"[dim]({done}/{total})[/dim]"
         )
         if console._spinner is None:
-            console._spinner = console._console.status(
+            console._spinner = console._status_console.status(
                 status_text,
                 spinner="dots",
                 spinner_style="cyan",
@@ -143,7 +143,7 @@ def progress_update(console: HpxConsole, update: ProgressUpdate) -> None:
 
     if update.kind == "checkpoint" and console.verbosity >= 1:
         stop_spinner(console)
-        console._console.print(f"  {icon}  [bold]{update.message}[/bold]{suffix}")
+        console._status_console.print(f"  {icon}  [bold]{update.message}[/bold]{suffix}")
         return
 
     position = ""
@@ -155,7 +155,7 @@ def progress_update(console: HpxConsole, update: ProgressUpdate) -> None:
         f"{update.message}{suffix}{position}"
     )
     if console._spinner is None:
-        console._spinner = console._console.status(
+        console._spinner = console._status_console.status(
             text,
             spinner="dots",
             spinner_style="cyan",
@@ -173,7 +173,7 @@ def stage_done(console: HpxConsole, name: str) -> None:
 
     if console.verbosity >= 1:
         stop_spinner(console)
-        console._console.print(
+        console._status_console.print(
             f"  {icon}  [bold]{label}[/bold] [green]✓[/green] [dim]{elapsed:.1f}s[/dim]"
         )
 
@@ -185,7 +185,7 @@ def stage_skip(console: HpxConsole, name: str) -> None:
         return
     stop_spinner(console)
     label, icon = _STAGE_LABELS.get(name, (name, "▸"))
-    console._console.print(f"  {icon}  [dim]{label} — skipped[/dim]")
+    console._status_console.print(f"  {icon}  [dim]{label} — skipped[/dim]")
 
 
 def pipeline_done(console: HpxConsole) -> None:
@@ -194,7 +194,7 @@ def pipeline_done(console: HpxConsole) -> None:
     if console.verbosity < 1:
         done = len(console._completed_stages)
         bar = _mini_progress_bar(done, console._stage_total or done or 1)
-        console._console.print(f"  {bar}  [green]Done[/green]")
+        console._status_console.print(f"  {bar}  [green]Done[/green]")
 
 
 def stop_spinner(console: HpxConsole) -> None:

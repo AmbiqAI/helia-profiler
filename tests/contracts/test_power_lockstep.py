@@ -225,24 +225,24 @@ class TestAutoStrategyNeverCyclesRail:
 
 class TestExplicitFlashRecoveryPath:
     def test_flash_recovery_is_the_other_rail_cycle_entry(self, tmp_path, monkeypatch):
-        """Stage-5 flash recovery is the only *other* place the rail cycles.
+        """Flash recovery is the only *other* place the rail cycles.
 
         This is the explicit bring-up/recovery path referenced by the auto-vs-
         rail-cycle invariant: a locked debug domain after a failed flash is
         recovered by power-cycling the Joulescope rail, never by the auto reset
         policy.
         """
-        from helia_profiler.stages.flash import _try_power_cycle
+        from helia_profiler.target.lifecycle import try_power_cycle_for_context
 
         driver = _FakeRailDriver()
         monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: driver)
         ctx = make_pmu_ctx(tmp_path, board="apollo510_evb", power_enabled=True)
 
-        assert _try_power_cycle(ctx) is True
+        assert try_power_cycle_for_context(ctx) is True
         assert driver.power_cycle_calls == 1
 
     def test_flash_recovery_skipped_when_power_disabled(self, tmp_path):
-        from helia_profiler.stages.flash import _try_power_cycle
+        from helia_profiler.target.lifecycle import try_power_cycle_for_context
 
         ctx = make_pmu_ctx(tmp_path, board="apollo510_evb", power_enabled=False)
-        assert _try_power_cycle(ctx) is False
+        assert try_power_cycle_for_context(ctx) is False

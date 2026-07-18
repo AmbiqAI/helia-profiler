@@ -67,6 +67,7 @@ _DEFAULT_TIMEOUT_S = 15
 _READINESS_POLL_INTERVAL_S = 0.1
 _SBL_SETTLE_S = 0.2
 JLINK_COMMANDER = "JLinkExe"
+_JLINK_COMMANDER_NAMES = ("JLinkExe", "JLink.exe")
 
 _JLINK_NOT_FOUND_HINT = (
     "Install the SEGGER J-Link package and ensure JLinkExe is in PATH, "
@@ -119,11 +120,20 @@ def find_jlink_exe() -> str:
             hint="Set JLINK_PATH to the full path of JLinkExe.",
         )
     # 2. PATH lookup
-    exe = shutil.which(JLINK_COMMANDER)
-    if exe:
-        return exe
+    for name in _JLINK_COMMANDER_NAMES:
+        exe = shutil.which(name)
+        if exe:
+            return exe
     # 3. Common install locations
-    for candidate in ("/usr/local/bin/JLinkExe",):
+    program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+    program_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+    candidates = [
+        "/usr/local/bin/JLinkExe",
+        "/Applications/SEGGER/JLink/JLinkExe",
+        os.path.join(program_files, "SEGGER", "JLink", "JLink.exe"),
+        os.path.join(program_files_x86, "SEGGER", "JLink", "JLink.exe"),
+    ]
+    for candidate in candidates:
         if os.path.isfile(candidate):
             return candidate
     raise CaptureError("JLinkExe not found", hint=_JLINK_NOT_FOUND_HINT)

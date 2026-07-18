@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from ..results import DeploymentRecord
 from ..errors import BuildError, CaptureError
 from ..pipeline import PipelineContext
+from ..target.lifecycle import try_power_cycle_for_context
 
 log = logging.getLogger("hpx")
 
@@ -44,18 +45,30 @@ class FlashPowerFirmwareStage:
         ctx.report_progress(f"Deploying power firmware to {ctx.config.target.board}")
 
         jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
-        try:
+        def deploy() -> None:
             flash_binary(
                 binary_path,
                 device=ctx.soc.jlink_device,
                 jlink_serial=jlink_serial,
                 timeout_s=ctx.config.timeouts.flash_s,
             )
+
+        try:
+            deploy()
         except CaptureError as exc:
-            raise BuildError(
-                f"Power firmware deployment failed: {exc}",
-                hint=exc.hint,
-            ) from exc
+            if try_power_cycle_for_context(ctx):
+                try:
+                    deploy()
+                except CaptureError as retry_exc:
+                    raise BuildError(
+                        f"Power firmware deployment failed after power-cycle recovery: {retry_exc}",
+                        hint=retry_exc.hint,
+                    ) from retry_exc
+            else:
+                raise BuildError(
+                    f"Power firmware deployment failed: {exc}",
+                    hint=exc.hint,
+                ) from exc
         ctx.publish_power_deployment(
             DeploymentRecord(
                 firmware=artifact,

@@ -13,6 +13,7 @@ from helia_profiler.target.probe.jlink import (
     JLinkProbeMatch,
     attached_session,
     inspect_probe_target,
+    find_jlink_exe,
     list_connected_probes,
     resolve_probe_serial,
 )
@@ -83,6 +84,26 @@ J-Link[1]: Connection: USB, Serial number: 1160003409, ProductName: J-Link-OB-Ap
     assert calls == [["JLinkExe", "-NoGui", "1"]]
     assert [probe.serial for probe in probes] == ["1160003180", "1160003409"]
     assert {probe.product for probe in probes} == {"J-Link-OB-Apollo4-CortexM"}
+
+
+def test_find_jlink_exe_accepts_windows_executable_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("JLINK_PATH", raising=False)
+    monkeypatch.setattr(
+        "helia_profiler.target.probe.jlink.shutil.which",
+        lambda name: r"C:\SEGGER\JLink.exe" if name == "JLink.exe" else None,
+    )
+
+    assert find_jlink_exe() == r"C:\SEGGER\JLink.exe"
+
+
+def test_find_jlink_exe_prefers_explicit_path(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    explicit = tmp_path / "custom-jlink"
+    explicit.write_text("")
+    monkeypatch.setenv("JLINK_PATH", str(explicit))
+
+    assert find_jlink_exe() == str(explicit)
 
 
 class TestResolveProbeSerial:

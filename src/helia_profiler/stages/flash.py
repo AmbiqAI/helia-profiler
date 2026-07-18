@@ -10,32 +10,9 @@ from ..errors import BuildError
 from ..firmware import _nsx_toolchain
 from ..pipeline import PipelineContext
 from ..target.probe.jlink import JLinkFlashBackend
+from ..target.lifecycle import try_power_cycle_for_context
 
 log = logging.getLogger("hpx")
-
-
-def _try_power_cycle(ctx: PipelineContext) -> bool:
-    """Attempt a Joulescope power-cycle reset to recover the debug domain.
-
-    Returns *True* if the power cycle succeeded, *False* otherwise.
-    """
-    if not ctx.config.power.enabled:
-        return False
-    from ..power import get_driver
-    from ..target.lifecycle import try_power_cycle
-
-    try:
-        driver = get_driver(ctx.config.power.driver, serial=ctx.config.power.serial)
-    except Exception as exc:
-        log.debug("Power-cycle recovery driver unavailable: %s", exc)
-        return False
-    return try_power_cycle(
-        driver,
-        ctx.config.power.driver,
-        strict=False,
-        off_time_s=1.0,
-        settle_time_s=2.0,
-    )
 
 
 class FlashFirmwareStage:
@@ -74,7 +51,7 @@ class FlashFirmwareStage:
             # Flash can fail when the debug domain is locked (e.g. after a
             # previous run put the chip to sleep).  If a Joulescope is
             # available, power-cycle to recover and retry once.
-            if _try_power_cycle(ctx):
+            if try_power_cycle_for_context(ctx):
                 flash_firmware()  # raises BuildError on second failure
             else:
                 if ctx.passthrough_skipped:

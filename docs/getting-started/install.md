@@ -126,8 +126,13 @@ dependency — no extra install needed, just the udev rule below on Linux.
 
 ## 4. SEGGER J-Link software
 
-hpx drives J-Link through `JLinkExe` (flashing) and `pylink-square`
+hpx drives J-Link through SEGGER Commander (`JLinkExe` on Linux/macOS,
+`JLink.exe` on Windows) for flashing and `pylink-square`
 (RTT/SWO capture, installed automatically with heliaPROFILER).
+
+Discovery checks `JLINK_PATH` first, then both executable names on `PATH`, then
+common SEGGER install locations. Set `JLINK_PATH` to the full executable path
+for non-standard installations.
 
 === "Linux"
 
