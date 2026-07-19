@@ -85,17 +85,73 @@ jobs:
         run: uv run --group test pytest tests/ -q
 
   # ---------------------------------------------------------------
+  # Package — validate the exact wheel/sdist release boundaries
+  # ---------------------------------------------------------------
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Build and validate distributions
+        run: |
+          uv python install 3.11 3.12
+          uv sync --locked --python 3.11 --group release
+          uv build --out-dir dist
+          package_version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          source_version=$(python3 -c 'import runpy; print(runpy.run_path("src/helia_profiler/_version.py")["__version__"])')
+          if [[ "${source_version}" != "${package_version}" ]]; then
+            echo "Source version ${source_version} does not match package version ${package_version}."
+            exit 1
+          fi
+          echo "PACKAGE_VERSION=${package_version}" >> "${GITHUB_ENV}"
+          uv run --group release twine check --strict dist/*
+          uv run --group release python tools/verify_distribution.py \
+            dist --expected-version "${package_version}"
+
+      - name: Clean-install wheel and sdist
+        run: |
+          smoke_install() {
+            python_version="$1"
+            distribution="$2"
+            package="$3"
+            environment=".release-${python_version}-${distribution}"
+            uv venv --python "${python_version}" "${environment}"
+            uv pip install --python "${environment}/bin/python" "${package}"
+            "${environment}/bin/hpx" --version | grep -F "hpx ${PACKAGE_VERSION}"
+            env -u SEGGER_RTT_PATH "${environment}/bin/python" -c \
+              'from helia_profiler.firmware import _find_segger_rtt_dir; assert _find_segger_rtt_dir().name == "segger_rtt"'
+          }
+
+          wheel=(dist/*.whl)
+          sdist=(dist/*.tar.gz)
+          if [[ "${#wheel[@]}" -ne 1 || "${#sdist[@]}" -ne 1 ]]; then
+            echo "Expected exactly one wheel and one sdist."
+            exit 1
+          fi
+          for python_version in 3.11 3.12; do
+            smoke_install "${python_version}" wheel "${wheel[0]}"
+            smoke_install "${python_version}" sdist "${sdist[0]}"
+          done
+
+  # ---------------------------------------------------------------
   # Gate — single required-check for branch protection
   # ---------------------------------------------------------------
   lint-and-test:
     if: always()
-    needs: [lint, unit-tests]
+    needs: [lint, unit-tests, package]
     runs-on: ubuntu-latest
     steps:
       - name: Decide status
         run: |
           if [[ "${{ needs.lint.result }}" != "success" ]] ||
-             [[ "${{ needs.unit-tests.result }}" != "success" ]]; then
+             [[ "${{ needs.unit-tests.result }}" != "success" ]] ||
+             [[ "${{ needs.package.result }}" != "success" ]]; then
             echo "One or more CI jobs failed."
             exit 1
           fi
