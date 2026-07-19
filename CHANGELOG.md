@@ -6,7 +6,7 @@ This project follows [Semantic Versioning](https://semver.org/) and uses
 [Release Please](https://github.com/googleapis/release-please) to prepare
 release pull requests from Conventional Commits.
 
-## [0.1.1](https://github.com/AmbiqAI/helia-profiler/compare/v0.1.0...v0.1.1) (2026-07-19)
+## 0.1.1 (2026-07-19)
 
 
 ### Features
