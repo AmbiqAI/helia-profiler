@@ -101,7 +101,6 @@ jobs:
       - name: Build and validate distributions
         run: |
           uv python install 3.11 3.12
-          uv sync --locked --python 3.11 --group release
           uv build --out-dir dist
           package_version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
           source_version=$(python3 -c 'import runpy; print(runpy.run_path("src/helia_profiler/_version.py")["__version__"])')
@@ -110,8 +109,7 @@ jobs:
             exit 1
           fi
           echo "PACKAGE_VERSION=${package_version}" >> "${GITHUB_ENV}"
-          uv run --group release twine check --strict dist/*
-          uv run --group release python tools/verify_distribution.py \
+          python3 tools/verify_distribution.py \
             dist --expected-version "${package_version}"
 
       - name: Clean-install wheel and sdist

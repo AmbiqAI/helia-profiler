@@ -60,7 +60,6 @@ Repository = "https://github.com/AmbiqAI/helia-profiler"
 lint = ["ruff>=0.11.0,<0.12"]
 test = ["pytest>=8.0", "pytest-timeout>=2.3"]
 notebook = ["ipykernel>=6,<8"]
-release = ["twine>=6.2,<7"]
 docs = [
     "mkdocs-material>=9.0",
     "mkdocstrings[python]>=0.27",
