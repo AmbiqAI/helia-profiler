@@ -70,11 +70,15 @@ for a real walkthrough.)*
 ## Development
 
 ```bash
-uv sync --all-groups
+uv sync --locked --all-groups
 uv run ruff check src tests tools
 uv run pytest -q
 uv run mkdocs build --strict
 ```
+
+Repository workflows use the committed `uv.lock` for reproducibility. PyPI
+installations continue to resolve the compatible dependency ranges published in
+`pyproject.toml`.
 
 ## License
 

@@ -16,7 +16,7 @@ NOTEBOOK = (
 
 
 def test_walkthrough_uses_typed_session_api() -> None:
-    notebook = json.loads(NOTEBOOK.read_text())
+    notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
     cells = notebook["cells"]
     cell_ids = [cell.get("id") or cell.get("metadata", {}).get("id") for cell in cells]
 

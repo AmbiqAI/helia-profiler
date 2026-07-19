@@ -123,6 +123,16 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             summary["power"]["integrity"] = power_meta["integrity"]
         if power_meta.get("gate_failure") is not None:
             summary["power"]["gate_failure"] = power_meta["gate_failure"]
+        for key in (
+            "gate_rise_observed",
+            "gate_fall_observed",
+            "gpi_poll_count",
+            "stat_packets",
+            "capture_window_s",
+            "gating_diagnostics",
+        ):
+            if key in power_meta:
+                summary["power"][key] = power_meta[key]
         if ctx.power_run is not None and ctx.power_run.terminal is not None:
             summary["power"]["terminal"] = asdict(ctx.power_run.terminal)
         if ctx.power_run is not None and ctx.power_run.on_device_summary is not None:
@@ -361,6 +371,10 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     summary["issues"] = [issue.to_dict() for issue in evaluation.issues]
 
     out_path = output_dir / "summary.json"
-    out_path.write_text(json.dumps(summary, indent=2, default=str))
+    out_path.write_text(
+        json.dumps(summary, indent=2, default=str),
+        encoding="utf-8",
+        newline="\n",
+    )
     log.info("Wrote summary: %s", out_path)
     return out_path

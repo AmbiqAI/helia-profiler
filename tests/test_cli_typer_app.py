@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from click import unstyle
 from typer.testing import CliRunner
 
 from helia_profiler._version import __version__
@@ -145,25 +146,25 @@ def test_per_layer_tri_state_true_false_and_absent(monkeypatch) -> None:
 def test_probes_no_subcommand_prints_help_and_exits_zero() -> None:
     result = runner.invoke(app, ["probes"])
     assert result.exit_code == 0
-    assert "Usage: hpx probes" in result.output
+    assert "Usage: hpx probes" in unstyle(result.output)
 
 
 def test_target_no_subcommand_prints_help_and_exits_zero() -> None:
     result = runner.invoke(app, ["target"])
     assert result.exit_code == 0
-    assert "Usage: hpx target" in result.output
+    assert "Usage: hpx target" in unstyle(result.output)
 
 
 def test_cache_no_subcommand_prints_help_and_exits_zero() -> None:
     result = runner.invoke(app, ["cache"])
     assert result.exit_code == 0
-    assert "Usage: hpx cache" in result.output
+    assert "Usage: hpx cache" in unstyle(result.output)
 
 
 def test_ports_no_subcommand_prints_help_and_exits_zero() -> None:
     result = runner.invoke(app, ["ports"])
     assert result.exit_code == 0
-    assert "Usage: hpx ports" in result.output
+    assert "Usage: hpx ports" in unstyle(result.output)
 
 
 def test_bare_invocation_prints_help_and_exits_zero() -> None:

@@ -82,6 +82,10 @@ def _write_json(
         if on_device_summary is not None:
             data["power"]["on_device_summary"] = on_device_summary
 
-    out_path.write_text(json.dumps(data, indent=2, default=str))
+    out_path.write_text(
+        json.dumps(data, indent=2, default=str),
+        encoding="utf-8",
+        newline="\n",
+    )
     log.info("Wrote JSON report: %s", out_path)
     return out_path

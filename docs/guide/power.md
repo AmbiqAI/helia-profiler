@@ -171,6 +171,18 @@ match the EVB GPIO rail.
 | Apollo510 EVB + JS320 | GPIO 29 → `INPUT0` | GPIO 36 → `INPUT1` | `OUTPUT0` → GPIO 14 |
 | Apollo330 Plus EVB + JS110 | J8 GP5 → `INPUT0` | J8 GP6 → `INPUT1` | `OUTPUT0` → J8 GP7 |
 
+For Apollo330 Plus, `5:6:7` are **Apollo device GPIO pin numbers**, not
+Joulescope channel numbers. The matching JS110 channels are always
+`INPUT0:INPUT1:OUTPUT0` (`0:1:0` internally). With both instruments attached,
+pin the JS110 explicitly and provide the device-pin mapping to validation:
+
+```bash
+hpx validate --suite smoke --boards apollo330mP_evb \
+  --jlink-serials apollo330mP_evb=<AP330_JLINK> \
+  --power-serials apollo330mP_evb=004204 \
+  --power-gpios apollo330mP_evb=5:6:7 --power on
+```
+
 ### `io_voltage`
 
 `power.io_voltage` (default `1.8`) tells the Joulescope's GPI reference what

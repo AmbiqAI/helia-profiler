@@ -8,7 +8,8 @@ Run the hardware-in-the-loop validation suite (MLPerf Tiny models).
 hpx validate [--models IDS] [--engines LIST] [--boards LIST]
              [--toolchains LIST] [--interfaces LIST] [--memories LIST]
              [--power off|on|both] [--suite NAME] [--repeat N]
-             [--jlink-serials BOARD=SERIAL,...] [--timeout SECONDS]
+             [--jlink-serials BOARD=SERIAL,...] [--power-serials BOARD=SERIAL,...]
+             [--power-gpios BOARD=GATE:STATE:GO,...] [--timeout SECONDS]
              [--output-dir DIR] [--junit-xml FILE] [-k EXPR] [--list]
 ```
 
@@ -36,6 +37,8 @@ See [Validating a Board Setup](../guides/validating-a-board-setup.md) and
 | `--power` | Power matrix: `off` (default), `on` (only Joulescope runs), or `both`. |
 | `--suite` | Preset suite: `smoke`, `models-rt`, `models-aot`, or `complete`. Explicit axis flags always win. |
 | `--jlink-serials` | `board=serial` entries for multi-board validation. |
+| `--power-serials` | `board=Joulescope-serial` entries for powered multi-board validation; required when multiple Joulescopes are visible. |
+| `--power-gpios` | `board=gate:state:go` entries for boards without registered power-sync wiring (for example, `apollo330mP_evb=5:6:7`). |
 | `--repeat` | Repeat each selected case N times for stress testing (default: 1). |
 | `--timeout` | Per-case timeout in seconds (default: 900). |
 | `--output-dir` | Per-case artifacts + summary report location (default: `./results/validation`). |

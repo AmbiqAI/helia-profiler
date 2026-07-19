@@ -89,7 +89,7 @@ def _json_safe(value: Any) -> Any:
     if isinstance(value, Enum):
         return value.value
     if isinstance(value, Path):
-        return str(value)
+        return value.as_posix()
     return value
 
 
@@ -197,6 +197,7 @@ class Session:
         snapshot_path.write_text(
             json.dumps(data, indent=2, sort_keys=True, allow_nan=False) + "\n",
             encoding="utf-8",
+            newline="\n",
         )
         return snapshot_path
 

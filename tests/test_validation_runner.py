@@ -119,6 +119,43 @@ def test_build_config_includes_reliability_axes(tmp_path: Path):
     assert cfg["work_dir"] == str(output_dir / "work")
 
 
+def test_build_config_pins_power_serial_for_multi_instrument_bench(tmp_path: Path):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_dir = tmp_path / "out"
+    case = CaseSpec(
+        model=MODELS["kws"],
+        engine=EngineType.HELIA_RT,
+        power=True,
+        board=BOARDS["apollo510_evb"],
+        power_serial="25QG",
+    )
+
+    cfg = _build_config(case, repo_root=repo_root, output_dir=output_dir)
+
+    assert cfg["power"]["enabled"] is True
+    assert cfg["power"]["serial"] == "25QG"
+
+
+def test_build_config_pins_explicit_power_gpio_wiring(tmp_path: Path):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_dir = tmp_path / "out"
+    case = CaseSpec(
+        model=MODELS["kws"],
+        engine=EngineType.HELIA_RT,
+        power=True,
+        board=BOARDS["apollo330mP_evb"],
+        power_gpio_pins=(5, 6, 7),
+    )
+
+    cfg = _build_config(case, repo_root=repo_root, output_dir=output_dir)
+
+    assert cfg["power"]["sync_gpio_pin"] == 5
+    assert cfg["power"]["state_gpio_pin"] == 6
+    assert cfg["power"]["go_gpio_pin"] == 7
+
+
 def test_build_config_aot_prefers_explicit_cmsis_nn_env(
     tmp_path: Path,
     fake_cmsis_nn: Path,

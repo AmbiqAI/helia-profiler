@@ -40,8 +40,6 @@ examples/notebooks/results/
 segger-rtt/
 /RTT/
 
-# uv
-uv.lock
 site/
 
 # Profiling outputs (any location) — consolidate under results/ when possible

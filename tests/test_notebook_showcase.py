@@ -17,7 +17,7 @@ def test_showcase_is_separate_safe_and_programmatic() -> None:
     assert CANDIDATE.is_file()
     assert CANDIDATE != ORIGINAL
 
-    notebook = json.loads(CANDIDATE.read_text())
+    notebook = json.loads(CANDIDATE.read_text(encoding="utf-8"))
     cells = notebook["cells"]
     cell_ids = [cell.get("id") or cell.get("metadata", {}).get("id") for cell in cells]
 

@@ -41,6 +41,11 @@ if TYPE_CHECKING:
 log = logging.getLogger("hpx")
 
 
+def _host_monotonic_time64(time64: Any) -> int:
+    """Return a strictly monotonic host timestamp in Joulescope time64 ticks."""
+    return time.monotonic_ns() * time64.SECOND // 1_000_000_000
+
+
 def _degraded_observation_result(
     *,
     packets: list[dict[str, Any]],
@@ -56,9 +61,11 @@ def _degraded_observation_result(
     saw_gate_rise: bool,
     saw_gate_fall: bool,
     short_pulses_ignored: int,
+    gating_diagnostics: dict[str, Any] | None = None,
 ) -> PowerResult:
     failure = classify_gate_failure(
         saw_gate_rise=saw_gate_rise,
+        saw_gate_fall=saw_gate_fall,
         duration_s=duration_s,
     )
     whole_summary = _whole_summary_from_stats(packets)
@@ -85,6 +92,7 @@ def _degraded_observation_result(
             "capture_safety_bound_s": duration_s,
             "short_gate_pulses_ignored": short_pulses_ignored,
             "whole_capture_summary": _summary_to_dict(whole_summary),
+            **({"gating_diagnostics": gating_diagnostics} if gating_diagnostics else {}),
         },
     )
 
@@ -186,7 +194,7 @@ def capture_gated(
     def _on_stats(_topic: str, value: Any) -> None:
         if isinstance(value, dict):
             packet = dict(value)
-            packet["_host_time64"] = time64.now()
+            packet["_host_time64"] = _host_monotonic_time64(time64)
             packets.append(packet)
 
     # Opt-in full-rate cross-check (AutoDeploy-equivalent reference method).
@@ -244,7 +252,15 @@ def capture_gated(
                     prev_level = level
                     time.sleep(poll_interval_s)
                     continue
-                poll_samples.append((time64.now(), level))
+                sample_tick = _host_monotonic_time64(time64)
+                # GO may be asserted between poll iterations.  In that case
+                # the first retained post-GO sample is already high, while
+                # ``prev_level`` correctly carries the known pre-GO low
+                # state.  Preserve that state in the segmenter input so the
+                # real falling edge can close a complete window.
+                if not poll_samples and not prev_level and level:
+                    poll_samples.append((sample_tick - 1, 0))
+                poll_samples.append((sample_tick, level))
                 if level and not prev_level:
                     high_seen = True
                     saw_any_gate_rise = True
@@ -381,6 +397,12 @@ def capture_gated(
                 poll_samples=poll_samples,
             )
 
+        gating_diagnostics = _gated_stats_diagnostics(
+            packets=packets,
+            poll_samples=aligned_poll_samples,
+            prefer_device_time=use_device_time_axis,
+        )
+
         windows, gated_summary = _process_gated_stats(
             packets=packets,
             poll_samples=aligned_poll_samples,
@@ -391,6 +413,7 @@ def capture_gated(
         if not windows:
             failure = classify_gate_failure(
                 saw_gate_rise=saw_any_gate_rise,
+                saw_gate_fall=saw_any_gate_fall,
                 duration_s=duration_s,
             )
             if not packets:
@@ -410,6 +433,7 @@ def capture_gated(
                 saw_gate_rise=saw_any_gate_rise,
                 saw_gate_fall=saw_any_gate_fall,
                 short_pulses_ignored=short_pulses_ignored,
+                gating_diagnostics=gating_diagnostics,
             )
             log.warning(
                 "%s; retaining %.3fs free-form capture for post-run diagnostics",

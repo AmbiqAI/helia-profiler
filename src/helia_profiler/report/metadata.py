@@ -64,6 +64,10 @@ def _write_run_metadata(ctx: PipelineContext, output_dir: Path) -> Path:
     if ctx.power_run is not None and ctx.power_run.on_device_summary is not None:
         meta_dict["on_device_power"] = asdict(ctx.power_run.on_device_summary)
 
-    out_path.write_text(json.dumps(meta_dict, indent=2, default=str))
+    out_path.write_text(
+        json.dumps(meta_dict, indent=2, default=str),
+        encoding="utf-8",
+        newline="\n",
+    )
     log.info("Wrote run metadata: %s", out_path)
     return out_path

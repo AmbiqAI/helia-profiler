@@ -118,6 +118,40 @@ class TestBuildMatrix:
         assert {c.memory for c in cases} == {MemoryProfile.AUTO}
         assert {c.jlink_serial for c in cases} == {"1160000174"}
 
+    def test_power_serial_mapping_is_applied_only_to_powered_cases(self):
+        cases = build_matrix(
+            models=["kws"],
+            engines=["helia-rt"],
+            power="both",
+            boards=["apollo510_evb"],
+            toolchains=["gcc"],
+            transports=["rtt"],
+            memories=["auto"],
+            power_serials={"apollo510_evb": "25QG"},
+        )
+
+        powered = next(case for case in cases if case.power)
+        unpowered = next(case for case in cases if not case.power)
+        assert powered.power_serial == "25QG"
+        assert unpowered.power_serial is None
+
+    def test_power_gpio_mapping_is_applied_only_to_powered_cases(self):
+        cases = build_matrix(
+            models=["kws"],
+            engines=["helia-rt"],
+            power="both",
+            boards=["apollo330mP_evb"],
+            toolchains=["gcc"],
+            transports=["rtt"],
+            memories=["auto"],
+            power_gpio_pins={"apollo330mP_evb": (5, 6, 7)},
+        )
+
+        powered = next(case for case in cases if case.power)
+        unpowered = next(case for case in cases if not case.power)
+        assert powered.power_gpio_pins == (5, 6, 7)
+        assert unpowered.power_gpio_pins is None
+
     def test_unknown_model_raises(self):
         with pytest.raises(ValueError, match="Unknown model"):
             build_matrix(models=["nope"])

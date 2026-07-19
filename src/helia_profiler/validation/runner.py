@@ -62,6 +62,7 @@ class CaseResult:
     transport: str
     memory: str
     jlink_serial: str | None = None
+    power_serial: str | None = None
     attempt: int = 1
     repeat_total: int = 1
     health_issues: tuple[str, ...] = ()
@@ -179,6 +180,17 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
                 "io_voltage": 1.8,
             }
         )
+        if case.power_serial:
+            cfg["power"]["serial"] = case.power_serial
+        if case.power_gpio_pins:
+            sync, state, go = case.power_gpio_pins
+            cfg["power"].update(
+                {
+                    "sync_gpio_pin": sync,
+                    "state_gpio_pin": state,
+                    "go_gpio_pin": go,
+                }
+            )
 
     if case.jlink_serial:
         cfg["target"]["jlink_serial"] = case.jlink_serial
@@ -376,6 +388,7 @@ def run_case(
                 transport=case.transport.value,
                 memory=case.memory.value,
                 jlink_serial=case.jlink_serial,
+                power_serial=case.power_serial,
                 attempt=case.attempt,
                 repeat_total=case.repeat_total,
                 output_dir=str(case_dir),
@@ -432,6 +445,7 @@ def run_case(
             transport=case.transport.value,
             memory=case.memory.value,
             jlink_serial=case.jlink_serial,
+            power_serial=case.power_serial,
             attempt=case.attempt,
             repeat_total=case.repeat_total,
             output_dir=str(case_dir),
@@ -454,6 +468,7 @@ def run_case(
         transport=case.transport.value,
         memory=case.memory.value,
         jlink_serial=case.jlink_serial,
+        power_serial=case.power_serial,
         attempt=case.attempt,
         repeat_total=case.repeat_total,
         output_dir=str(case_dir),

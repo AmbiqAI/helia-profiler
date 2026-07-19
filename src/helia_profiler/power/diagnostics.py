@@ -18,6 +18,7 @@ class GateFailureKind(StrEnum):
 
     NO_GATE_RISE = "no_gate_rise"
     NO_GATE_FALL = "no_gate_fall"
+    NO_STATS_WINDOW = "no_stats_window"
 
 
 @dataclass(frozen=True)
@@ -118,7 +119,9 @@ def assess_gate_duration(
     )
 
 
-def classify_gate_failure(*, saw_gate_rise: bool, duration_s: float) -> GateFailure:
+def classify_gate_failure(
+    *, saw_gate_rise: bool, saw_gate_fall: bool = False, duration_s: float
+) -> GateFailure:
     """Classify why a gated capture produced no complete high window."""
     if not saw_gate_rise:
         return GateFailure(
@@ -128,6 +131,16 @@ def classify_gate_failure(*, saw_gate_rise: bool, duration_s: float) -> GateFail
                 "Check GO/state/gate wiring, confirm the firmware reached the power "
                 "window wait state, and verify the selected reset strategy relaunches "
                 "the firmware before capture."
+            ),
+        )
+    if saw_gate_fall:
+        return GateFailure(
+            kind=GateFailureKind.NO_STATS_WINDOW,
+            message="GPIO gate edges were observed but no Joulescope stats window was selected",
+            hint=(
+                "The device completed its gated window, but host GPIO timestamps did not "
+                "overlap the instrument stats timeline. Retain the diagnostic artifact and "
+                "check Joulescope callback timing before trusting power data."
             ),
         )
     return GateFailure(

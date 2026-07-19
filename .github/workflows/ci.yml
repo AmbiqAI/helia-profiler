@@ -40,7 +40,7 @@ jobs:
             "https://github.com/"
 
       - name: Install lint dependencies
-        run: uv sync --group lint
+        run: uv sync --locked --group lint
 
       - name: Run ruff lint
         run: uv run --group lint ruff check .
@@ -79,7 +79,7 @@ jobs:
             "https://github.com/"
 
       - name: Install test dependencies
-        run: uv sync --group test
+        run: uv sync --locked --group test
 
       - name: Run pytest
         run: uv run --group test pytest tests/ -q
