@@ -789,6 +789,16 @@ def validate_command(
     jlink_serials: str = typer.Option(
         "", "--jlink-serials", help="Comma-separated board=serial entries for multi-board validation."
     ),
+    power_serials: str = typer.Option(
+        "",
+        "--power-serials",
+        help="Comma-separated board=Joulescope-serial entries for powered multi-board validation.",
+    ),
+    power_gpios: str = typer.Option(
+        "",
+        "--power-gpios",
+        help="Comma-separated board=gate:state:go entries for powered boards without default sync wiring.",
+    ),
     repeat: int = typer.Option(
         1, "--repeat", help="Repeat each selected case N times for stress testing (default: 1)."
     ),
@@ -826,6 +836,8 @@ def validate_command(
         memories=memories,
         suite=suite,
         jlink_serials=jlink_serials,
+        power_serials=power_serials,
+        power_gpios=power_gpios,
         repeat=repeat,
         output_dir=output_dir,
         timeout=timeout,

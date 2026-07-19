@@ -481,6 +481,7 @@ class TestGatedStatsProcessing:
         [
             (False, False, "no_gate_rise"),
             (True, False, "no_gate_fall"),
+            (True, True, "no_stats_window"),
         ],
     )
     def test_missing_gate_returns_degraded_whole_capture(

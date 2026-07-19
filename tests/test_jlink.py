@@ -231,3 +231,21 @@ def test_inspect_probe_target_wraps_private_inspector() -> None:
     with patch("helia_profiler.target.probe.jlink._inspect_probe_target", return_value=match) as inspect:
         assert inspect_probe_target(probe, device="AP510NFA-CBR") is match
     inspect.assert_called_once_with(probe, device="AP510NFA-CBR")
+
+
+def test_inspect_probe_target_retries_unknown_target() -> None:
+    probe = _probe("111111", "Apollo5")
+    results = [
+        SimpleNamespace(returncode=0, stdout="Connecting to target...", stderr=""),
+        SimpleNamespace(returncode=0, stdout="Found Cortex-M55", stderr=""),
+    ]
+    with (
+        patch("helia_profiler.target.probe.jlink.find_jlink_exe", return_value="JLinkExe"),
+        patch("helia_profiler.target.probe.jlink.subprocess.run", side_effect=results) as run,
+        patch("helia_profiler.target.probe.jlink.time.sleep") as sleep,
+    ):
+        match = inspect_probe_target(probe, device="AP510NFA-CBR")
+
+    assert match.detected_core is CoreArch.CORTEX_M55
+    assert run.call_count == 2
+    sleep.assert_called_once()

@@ -74,6 +74,16 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Comma-separated board=serial entries for multi-board validation.",
     )
     grp.addoption(
+        "--mlperf-power-serials",
+        default="",
+        help="Comma-separated board=Joulescope-serial entries for powered multi-board validation.",
+    )
+    grp.addoption(
+        "--mlperf-power-gpios",
+        default="",
+        help="Comma-separated board=gate:state:go entries for powered boards without default sync wiring.",
+    )
+    grp.addoption(
         "--mlperf-output",
         default="results/validation",
         help="Where to write per-case artifacts + summary report.",
@@ -119,6 +129,26 @@ def _split_serial_map(raw: str) -> dict[str, str] | None:
     return mapping
 
 
+def _split_power_gpio_map(raw: str) -> dict[str, tuple[int, int, int]] | None:
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    mapping: dict[str, tuple[int, int, int]] = {}
+    for item in [p.strip() for p in raw.split(",") if p.strip()]:
+        board, sep, pins_raw = item.partition("=")
+        pins = [value.strip() for value in pins_raw.split(":")]
+        if not sep or not board.strip() or len(pins) != 3:
+            raise ValueError(
+                "--mlperf-power-gpios entries must use board=gate:state:go, "
+                f"got {item!r}."
+            )
+        try:
+            mapping[board.strip()] = tuple(int(value, 0) for value in pins)  # type: ignore[assignment]
+        except ValueError as exc:
+            raise ValueError(f"--mlperf-power-gpios GPIO pins must be integers, got {item!r}.") from exc
+    return mapping
+
+
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "case" not in metafunc.fixturenames:
         return
@@ -132,6 +162,8 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
         transports=_split_csv(cfg.getoption("--mlperf-transports")),
         memories=_split_csv(cfg.getoption("--mlperf-memories")),
         jlink_serials=_split_serial_map(cfg.getoption("--mlperf-jlink-serials")),
+        power_serials=_split_serial_map(cfg.getoption("--mlperf-power-serials")),
+        power_gpio_pins=_split_power_gpio_map(cfg.getoption("--mlperf-power-gpios")),
         repeat=cfg.getoption("--mlperf-repeat"),
     )
     metafunc.parametrize(
@@ -195,6 +227,8 @@ def _validation_options(config: pytest.Config) -> dict[str, object]:
         "transports": config.getoption("--mlperf-transports"),
         "memories": config.getoption("--mlperf-memories"),
         "jlink_serials": config.getoption("--mlperf-jlink-serials"),
+        "power_serials": config.getoption("--mlperf-power-serials"),
+        "power_gpios": config.getoption("--mlperf-power-gpios"),
         "output_dir": config.getoption("--mlperf-output"),
         "timeout_s": config.getoption("--mlperf-timeout"),
     }

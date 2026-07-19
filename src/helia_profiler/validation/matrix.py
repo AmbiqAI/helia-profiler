@@ -80,6 +80,8 @@ class CaseSpec:
     transport: Transport = Transport.RTT
     memory: MemoryProfile = MemoryProfile.AUTO
     jlink_serial: str | None = None
+    power_serial: str | None = None
+    power_gpio_pins: tuple[int, int, int] | None = None
     attempt: int = 1
     repeat_total: int = 1
 
@@ -238,6 +240,8 @@ def build_matrix(
     transports: list[str | Transport] | None = None,
     memories: list[str | MemoryProfile] | None = None,
     jlink_serials: dict[str, str] | None = None,
+    power_serials: dict[str, str] | None = None,
+    power_gpio_pins: dict[str, tuple[int, int, int]] | None = None,
     repeat: int = 1,
 ) -> list[CaseSpec]:
     """Expand user filters into a concrete list of :class:`CaseSpec`.
@@ -262,6 +266,12 @@ def build_matrix(
         Model placement presets to include (default: each board's supported placements).
     jlink_serials:
         Optional mapping of board ID to J-Link serial number for multi-board labs.
+    power_serials:
+        Optional mapping of board ID to Joulescope serial number for powered
+        cases. This permits several instruments to remain connected.
+    power_gpio_pins:
+        Optional mapping of board ID to ``(gate, state, go)`` GPIO pins for
+        powered cases on boards without registered power-sync wiring.
 
     Returns
     -------
@@ -361,6 +371,8 @@ def build_matrix(
                                             transport=transport,
                                             memory=memory,
                                             jlink_serial=(jlink_serials or {}).get(board_id),
+                                            power_serial=(power_serials or {}).get(board_id) if p else None,
+                                            power_gpio_pins=(power_gpio_pins or {}).get(board_id) if p else None,
                                             attempt=attempt,
                                             repeat_total=repeat,
                                         )

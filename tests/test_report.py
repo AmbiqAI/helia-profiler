@@ -501,6 +501,8 @@ def test_degraded_free_form_capture_suppresses_derived_efficiency(tmp_path: Path
             "observation_mode": "free_form",
             "integrity": "degraded",
             "gate_failure": {"kind": "no_gate_rise"},
+            "gate_rise_observed": False,
+            "gate_fall_observed": False,
         },
     )
     path = _write_summary(ctx, tmp_path)
@@ -509,6 +511,8 @@ def test_degraded_free_form_capture_suppresses_derived_efficiency(tmp_path: Path
     assert summary["power"]["observation_mode"] == "free_form"
     assert summary["power"]["integrity"] == "degraded"
     assert summary["power"]["gate_failure"]["kind"] == "no_gate_rise"
+    assert summary["power"]["gate_rise_observed"] is False
+    assert summary["power"]["gate_fall_observed"] is False
     assert "energy_per_inference_j" not in summary["power"]
     assert "active_window_estimated_energy_j" not in summary["power"]
     assert "tops_per_watt" not in summary.get("model_analysis", {})
@@ -524,6 +528,8 @@ def test_degraded_free_form_capture_suppresses_derived_efficiency(tmp_path: Path
         "observation_mode": "free_form",
         "integrity": "degraded",
         "gate_failure": {"kind": "no_gate_rise"},
+        "gate_rise_observed": False,
+        "gate_fall_observed": False,
     }
 
 

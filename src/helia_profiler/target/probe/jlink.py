@@ -66,6 +66,8 @@ _RSTGEN_SWPOI_VALUE = 0x1B
 _DEFAULT_TIMEOUT_S = 15
 _READINESS_POLL_INTERVAL_S = 0.1
 _SBL_SETTLE_S = 0.2
+_PROBE_INSPECTION_ATTEMPTS = 2
+_PROBE_INSPECTION_RETRY_S = 0.1
 JLINK_COMMANDER = "JLinkExe"
 _JLINK_COMMANDER_NAMES = ("JLinkExe", "JLink.exe")
 
@@ -264,22 +266,33 @@ def _inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
         "-SelectEmuBySN",
         probe.serial,
     ]
-    try:
-        result = subprocess.run(
-            cmd,
-            input="exit\n",
-            capture_output=True,
-            text=True,
-            timeout=_DEFAULT_TIMEOUT_S,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise ConfigError(
-            f"Timed out while querying J-Link serial '{probe.serial}'.",
-            hint="Check that the probe is connected and not in use by another process.",
-        ) from exc
+    for attempt in range(_PROBE_INSPECTION_ATTEMPTS):
+        try:
+            result = subprocess.run(
+                cmd,
+                input="exit\n",
+                capture_output=True,
+                text=True,
+                timeout=_DEFAULT_TIMEOUT_S,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise ConfigError(
+                f"Timed out while querying J-Link serial '{probe.serial}'.",
+                hint="Check that the probe is connected and not in use by another process.",
+            ) from exc
 
-    detected_core = _parse_detected_core((result.stdout or "") + "\n" + (result.stderr or ""))
-    return JLinkProbeMatch(probe=probe, detected_core=detected_core)
+        detected_core = _parse_detected_core(
+            (result.stdout or "") + "\n" + (result.stderr or "")
+        )
+        if detected_core is not None or attempt + 1 == _PROBE_INSPECTION_ATTEMPTS:
+            return JLinkProbeMatch(probe=probe, detected_core=detected_core)
+        log.debug(
+            "J-Link serial %s did not identify a target; retrying probe inspection",
+            probe.serial,
+        )
+        time.sleep(_PROBE_INSPECTION_RETRY_S)
+
+    raise AssertionError("unreachable")
 
 
 def inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
