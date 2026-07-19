@@ -49,6 +49,10 @@ Before merging it:
 
 The existing `v0.1.0` tag predates this workflow. Release Please starts from
 the tracked `0.1.0` manifest and will create a new immutable version and tag.
+The top-level `bootstrap-sha` in `release-please-config.json` deliberately
+anchors the first release to the current `main` history instead of that
+unrelated legacy tag. Remove the bootstrap setting only after the first Release
+Please release pull request has been merged.
 
 ## Publish to PyPI
 
