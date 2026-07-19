@@ -55,7 +55,7 @@ jobs:
           CI: ""
           PUBLIC_URL: "${{ steps.pages.outputs.base_url }}/"
         run: |
-          uv sync --group docs
+          uv sync --locked --group docs
           uv run --group docs zensical build
 
       - name: Upload artifact

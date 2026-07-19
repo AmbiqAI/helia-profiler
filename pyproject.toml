@@ -3,7 +3,7 @@ name = "helia-profiler"
 version = "0.1.0"
 description = "Profile LiteRT models on Ambiq Apollo hardware"
 requires-python = ">=3.11,<3.13"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 dependencies = [
     "Jinja2>=3.1",
     "PyYAML>=6.0",
@@ -20,8 +20,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-aot = ["helia-aot>=0.18.0"]
-analysis = ["ai-edge-litert>=1.0", "flatbuffers>=24.0"]
+aot = [
+    "helia-aot>=0.18.0",
+    "ai-edge-litert>=2.1.6,<2.2",
+    "backports-strenum<1.3",
+]
+analysis = [
+    "ai-edge-litert>=2.1.6,<2.2",
+    "backports-strenum<1.3",
+    "flatbuffers>=24.0",
+]
 
 [project.scripts]
 hpx = "helia_profiler.cli:main"

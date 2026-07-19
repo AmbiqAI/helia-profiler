@@ -145,7 +145,10 @@ class TestPreflightConfig:
                 },
             },
         )
-        with patch("shutil.which", side_effect=_all_tools_present):
+        with (
+            patch("shutil.which", side_effect=_all_tools_present),
+            patch("helia_profiler.doctor.find_spec", return_value=object()),
+        ):
             PreflightStage().run(ctx)
 
     def test_psram_weights_require_rtt_transport(self, tmp_path: Path):
