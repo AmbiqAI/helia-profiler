@@ -5,32 +5,25 @@ Releases. `uv` builds, verifies, and publishes the wheel and source
 distribution through PyPI trusted publishing. No long-lived package-index
 credential is stored in GitHub.
 
-The workflow has two paths:
-
-- pushes to `main` update a Release Please pull request; merging that pull
-  request creates the version tag and GitHub Release, then publishes to PyPI;
-- a manual run from the Release Please branch builds the same candidate and
-  publishes it only to TestPyPI.
-
-Both paths validate package metadata and resources and clean-install the wheel
-and sdist on Python 3.11 and 3.12 before upload.
+Pushes to `main` update a Release Please pull request. Merging that pull request
+creates the version tag and GitHub Release, validates package metadata and
+resources, clean-installs the wheel and sdist on Python 3.11 and 3.12, and then
+publishes to PyPI.
 
 ## One-time repository setup
 
-Create GitHub environments named `testpypi` and `pypi`. Add required reviewers
-and deployment-branch rules where the repository plan supports them. The
-environment names are part of the trusted-publisher identity and must match the
-workflow exactly.
+Create a GitHub environment named `pypi`. Add required reviewers and
+deployment-branch rules where the repository plan supports them.
 
-The `helia-profiler` project does not yet exist on either package index. Create
-pending trusted publishers with these values:
+Until the first successful upload creates the project, configure the pending
+PyPI trusted publisher with these values:
 
-| Setting | TestPyPI and PyPI value |
+| Setting | PyPI value |
 | --- | --- |
 | Owner | `AmbiqAI` |
 | Repository | `helia-profiler` |
 | Workflow | `publish.yml` |
-| Environment | `testpypi` on TestPyPI; `pypi` on PyPI |
+| Environment | `pypi` recommended; an unset environment accepts any environment |
 
 Trusted publisher setup is security-sensitive. Follow the official
 [PyPI trusted-publisher instructions](https://docs.pypi.org/trusted-publishers/)
@@ -53,28 +46,9 @@ Before merging it:
 2. Require all normal CI and package checks to pass.
 3. Run the appropriate hardware release matrix against the release branch and
    archive its validation bundle.
-4. Optionally rehearse the candidate on TestPyPI.
 
 The existing `v0.1.0` tag predates this workflow. Release Please starts from
 the tracked `0.1.0` manifest and will create a new immutable version and tag.
-
-## Rehearse on TestPyPI
-
-In GitHub Actions, run **Release** manually and select the Release Please pull
-request branch. Manual runs never publish to production.
-
-Check the rendered metadata and perform a clean installation without allowing
-PyPI to satisfy the HPX package itself:
-
-```bash
-uv tool install --index-url https://test.pypi.org/simple/ \
-  --index-strategy unsafe-best-match helia-profiler==<version>
-hpx --version
-```
-
-TestPyPI does not mirror all dependencies. If dependency resolution from that
-command fails, download the HPX wheel from TestPyPI and install it while using
-PyPI for dependencies; do not weaken the production publishing workflow.
 
 ## Publish to PyPI
 
