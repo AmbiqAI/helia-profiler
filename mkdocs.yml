@@ -146,6 +146,7 @@ nav:
       - Model Explorer Overlays: guide/model-explorer.md
       - Output & Results: guide/output.md
       - Hardware Validation Artifacts: guide/hardware-ci.md
+      - Release Process: guide/releasing.md
   - Examples:
       - Overview: examples/index.md
       - Interactive Python: examples/interactive-python.md

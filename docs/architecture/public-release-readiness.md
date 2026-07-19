@@ -304,7 +304,7 @@ Deliverables:
   package requirement.
 - Add wheel/sdist build, metadata validation, clean-environment install, CLI
   smoke tests, and packaged-resource tests to CI.
-- Add a trusted-publishing release workflow with TestPyPI rehearsal, signed or
+- Add a trusted-publishing release workflow with a protected PyPI environment,
   attestable artifacts, changelog/version checks, and rollback guidance.
 - Define the support matrix for boards, engines, transports, toolchains, power
   instruments, operating systems, and optional dependencies.
@@ -314,7 +314,8 @@ Deliverables:
 Exit criteria:
 
 - Wheel and sdist install and run from clean supported environments.
-- Package metadata renders correctly on TestPyPI and includes license files.
+- Package metadata passes distribution validation, includes license files, and
+  renders correctly on PyPI after publication.
 - CI covers every declared Python/platform combination or narrows the declared
   support policy accordingly.
 - A release candidate has a published hardware validation bundle with no

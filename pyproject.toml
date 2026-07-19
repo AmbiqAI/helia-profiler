@@ -2,8 +2,25 @@
 name = "helia-profiler"
 version = "0.1.0"
 description = "Profile LiteRT models on Ambiq Apollo hardware"
+readme = "README.md"
 requires-python = ">=3.11,<3.13"
 license = "Apache-2.0"
+license-files = [
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "src/helia_profiler/vendor/segger_rtt/LICENSE.md",
+]
+keywords = ["ambiq", "apollo", "embedded", "joulescope", "litert", "profiling"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Embedded Systems",
+]
 dependencies = [
     "Jinja2>=3.1",
     "PyYAML>=6.0",
@@ -34,6 +51,11 @@ analysis = [
 [project.scripts]
 hpx = "helia_profiler.cli:main"
 
+[project.urls]
+Documentation = "https://ambiqai.github.io/helia-profiler/"
+Issues = "https://github.com/AmbiqAI/helia-profiler/issues"
+Repository = "https://github.com/AmbiqAI/helia-profiler"
+
 [dependency-groups]
 lint = ["ruff>=0.11.0,<0.12"]
 test = ["pytest>=8.0", "pytest-timeout>=2.3"]
@@ -46,7 +68,7 @@ docs = [
 ]
 
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
