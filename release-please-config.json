@@ -12,11 +12,7 @@
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         "src/helia_profiler/_version.py",
-        {
-          "type": "toml",
-          "path": "uv.lock",
-          "jsonpath": "$.package[?(@.name=='helia-profiler')].version"
-        }
+        "uv.lock"
       ]
     }
   }

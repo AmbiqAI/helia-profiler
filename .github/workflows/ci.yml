@@ -104,8 +104,17 @@ jobs:
           uv build --out-dir dist
           package_version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
           source_version=$(python3 -c 'import runpy; print(runpy.run_path("src/helia_profiler/_version.py")["__version__"])')
+          lock_version=$(python3 -c 'import tomllib; data = tomllib.load(open("uv.lock", "rb")); print(next(p["version"] for p in data["package"] if p["name"] == "helia-profiler"))')
           if [[ "${source_version}" != "${package_version}" ]]; then
             echo "Source version ${source_version} does not match package version ${package_version}."
+            exit 1
+          fi
+          if [[ "${lock_version}" != "${package_version}" ]]; then
+            echo "Lockfile version ${lock_version} does not match package version ${package_version}."
+            exit 1
+          fi
+          if [[ "$(grep -c 'x-release-please-version' uv.lock)" -ne 1 ]]; then
+            echo "uv.lock must contain exactly one Release Please version marker."
             exit 1
           fi
           echo "PACKAGE_VERSION=${package_version}" >> "${GITHUB_ENV}"
