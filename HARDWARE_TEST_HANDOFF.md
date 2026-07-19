@@ -8,7 +8,7 @@ Validate the hardware-facing changes delivered in commit
 Run from the repository root through the project environment:
 
 ```bash
-uv sync
+uv sync --locked
 uv run hpx --help
 ```
 
@@ -52,6 +52,7 @@ Minimum target families:
 | AP3 | `apollo3p_evb` | GATE GPIO 26, STATE GPIO 24, GO GPIO 25 |
 | AP4 | `apollo4p_evb` | GATE GPIO 22, STATE GPIO 23, GO GPIO 24 |
 | AP5 | `apollo510_evb` | GATE GPIO 29, STATE GPIO 36, GO GPIO 14 |
+| AP330P | `apollo330mP_evb` | J8 GP5 (GATE), J8 GP6 (STATE), J8 GP7 (GO) |
 
 Apollo330P is also AP5-family coverage and may be added as
 `apollo330mP_evb`, but it does not replace the Apollo510 regression because
@@ -62,10 +63,22 @@ Power instruments:
 - JS110
 - JS320
 
-`hpx validate` currently auto-selects the Joulescope and has no power-serial
-option. Connect or expose exactly one Joulescope while running each power case.
-Record its model and serial alongside the output directory. Do not run with a
-JS110 and JS320 simultaneously visible.
+`hpx validate` supports explicit per-board Joulescope selection through
+`--power-serials board=serial` and board device-pin selection through
+`--power-gpios board=gate:state:go`. Keep both instruments connected when that
+matches the normal bench topology; never rely on auto-selection with more than
+one visible instrument.
+
+The validated AP330P + JS110 mapping is:
+
+| Apollo330 Plus J8 signal | Direction | JS110 channel | HPX setting |
+| --- | --- | --- | --- |
+| GP5 | GATE, device → host | INPUT0 | `sync_gpio_pin: 5` |
+| GP6 | STATE, device → host | INPUT1 | `state_gpio_pin: 6` |
+| GP7 | GO, host → device | OUTPUT0 | `go_gpio_pin: 7` |
+
+The `5:6:7` values are Apollo GPIO pins; JS110 channel indices remain
+INPUT0/INPUT1/OUTPUT0 (0/1/0).
 
 ## 1. Record Provenance
 
@@ -119,11 +132,11 @@ case before proceeding to power.
 Test JS320 first because it was used for the last known-good local result, then
 repeat with JS110. For each instrument:
 
-1. Make only that Joulescope visible to the host.
-2. Connect its power output and GATE/STATE/GO lines using the board table.
-3. Enable the target rail if required by the bench.
-4. Confirm the pinned J-Link appears after rail power-up.
-5. Run the command with a fresh output directory.
+1. Connect its power output and GATE/STATE/GO lines using the board table.
+2. Enable the target rail if required by the bench.
+3. Confirm the pinned J-Link appears after rail power-up.
+4. Pin the target Joulescope with `--power-serials` and run with a fresh
+   output directory.
 
 Optional explicit rail/probe check, with the instrument's real serial:
 
@@ -137,7 +150,8 @@ JS320 run:
 
 ```bash
 uv run hpx validate --suite smoke --boards apollo510_evb \
-  --jlink-serials apollo510_evb=<AP510_JLINK> --power on \
+  --jlink-serials apollo510_evb=<AP510_JLINK> \
+  --power-serials apollo510_evb=<JS320_SERIAL> --power on \
   --output-dir "$HPX_HW_OUT/ap510-js320" -v
 ```
 
@@ -145,7 +159,8 @@ JS110 run:
 
 ```bash
 uv run hpx validate --suite smoke --boards apollo510_evb \
-  --jlink-serials apollo510_evb=<AP510_JLINK> --power on \
+  --jlink-serials apollo510_evb=<AP510_JLINK> \
+  --power-serials apollo510_evb=<JS110_SERIAL> --power on \
   --output-dir "$HPX_HW_OUT/ap510-js110" -v
 ```
 
@@ -153,20 +168,33 @@ After both single passes succeed, run `--repeat 3` for Apollo510 with each
 instrument. Use new `ap510-js320-repeat3` and `ap510-js110-repeat3` output
 directories so the single-pass evidence remains intact.
 
-## 4. AP3/AP4/AP5 Sweep
+## 4. Cross-family confidence sweep
 
-Run the same isolated-instrument power smoke for:
+Run no-power smoke and then powered smoke for:
 
 - `apollo3p_evb` with JS110, then JS320;
 - `apollo4p_evb` with JS110, then JS320;
-- `apollo510_evb` with JS110, then JS320.
+- `apollo510_evb` with JS110, then JS320;
+- `apollo330mP_evb` with JS110 (GP5/GP6/GP7), plus a three-repeat stability run.
 
 Use one board per invocation and pin its J-Link serial. Example template:
 
 ```bash
 uv run hpx validate --suite smoke --boards <BOARD_ID> \
-  --jlink-serials <BOARD_ID>=<JLINK_SERIAL> --power on \
+  --jlink-serials <BOARD_ID>=<JLINK_SERIAL> \
+  --power-serials <BOARD_ID>=<JS_SERIAL> --power on \
   --output-dir "$HPX_HW_OUT/<BOARD>-<JS_MODEL>" -v
+```
+
+After individual cases pass, run one simultaneous-instrument regression that
+uses the normal bench topology (AP510 on JS320 and AP330P on JS110):
+
+```bash
+uv run hpx validate --suite smoke --boards apollo510_evb,apollo330mP_evb \
+  --jlink-serials apollo510_evb=<AP510_JLINK>,apollo330mP_evb=<AP330_JLINK> \
+  --power-serials apollo510_evb=<JS320_SERIAL>,apollo330mP_evb=<JS110_SERIAL> \
+  --power-gpios apollo330mP_evb=5:6:7 --power on --repeat 3 \
+  --output-dir "$HPX_HW_OUT/ap510-js320-ap330-js110-repeat3" -v
 ```
 
 AP3 note: its GPIO 24/25/26 power wiring conflicts with PSRAM claims. The smoke
