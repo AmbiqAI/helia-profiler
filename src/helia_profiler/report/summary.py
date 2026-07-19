@@ -371,6 +371,10 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     summary["issues"] = [issue.to_dict() for issue in evaluation.issues]
 
     out_path = output_dir / "summary.json"
-    out_path.write_text(json.dumps(summary, indent=2, default=str))
+    out_path.write_text(
+        json.dumps(summary, indent=2, default=str),
+        encoding="utf-8",
+        newline="\n",
+    )
     log.info("Wrote summary: %s", out_path)
     return out_path

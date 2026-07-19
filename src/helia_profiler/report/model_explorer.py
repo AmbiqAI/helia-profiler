@@ -78,7 +78,11 @@ class ModelNodeData:
         """Write JSON overlay file."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(self.to_json(indent=indent))
+        path.write_text(
+            self.to_json(indent=indent),
+            encoding="utf-8",
+            newline="\n",
+        )
 
 
 # ---------------------------------------------------------------------------

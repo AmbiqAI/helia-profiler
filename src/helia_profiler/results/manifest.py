@@ -203,6 +203,7 @@ class ResultManifest:
         temporary_path.write_text(
             json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
+            newline="\n",
         )
         temporary_path.replace(manifest_path)
         return manifest_path

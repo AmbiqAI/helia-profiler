@@ -127,6 +127,10 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
         data["cache_totals"] = totals
 
     out_path = detail_dir / "memory.json"
-    out_path.write_text(json.dumps(data, indent=2, default=str))
+    out_path.write_text(
+        json.dumps(data, indent=2, default=str),
+        encoding="utf-8",
+        newline="\n",
+    )
     log.info("Wrote memory breakdown: %s", out_path)
     return out_path
