@@ -29,7 +29,7 @@ See [Validating a Board Setup](../guides/validating-a-board-setup.md) and
 | Flag | Description |
 | --- | --- |
 | `--models` | Comma-separated model IDs (default: all). See `hpx validate --list`. |
-| `--engines` | Comma-separated engines: `helia-rt`, `helia-aot` (aliases `rt`, `aot`). Default: both. |
+| `--engines` | Comma-separated engines: `helia-rt`, `helia-aot`, `tflm` (aliases `rt`, `aot`). Default: all. TFLM validation uses upstream CMSIS-NN. |
 | `--boards` | Comma-separated board IDs (default: `apollo510_evb`). |
 | `--toolchains` | Comma-separated toolchains: `gcc`, `armclang`/`acfe`, `atfe` (default: board defaults). |
 | `--interfaces`, `--transports` | Comma-separated transports: `rtt`, `uart`, `swo`, `usb_cdc` (default: board defaults). |
@@ -53,7 +53,7 @@ See [Validating a Board Setup](../guides/validating-a-board-setup.md) and
   Apollo330mP with gcc + ATfE.
 - `models-aot` — AOT sweep across all MLPerf Tiny models on Apollo510 +
   Apollo330mP with gcc + ATfE.
-- `complete` — combined RT + AOT sweep across all MLPerf Tiny models on
+- `complete` — combined RT + AOT + TFLM/CMSIS-NN sweep across all MLPerf Tiny models on
   Apollo510 + Apollo330mP with gcc + ATfE.
 
 ## Examples
@@ -63,7 +63,7 @@ hpx validate                          # default reliability matrix, power off
 hpx validate --list                   # preview what would run
 hpx validate --models kws,ic          # subset by model
 hpx validate --suite smoke            # quick single-case sanity check
-hpx validate --suite complete         # full RT + AOT hardware sweep
+hpx validate --suite complete         # full RT + AOT + TFLM/CMSIS-NN hardware sweep
 hpx validate -k kws-aot               # pytest-style keyword filter
 hpx validate --boards apollo3p_evb --repeat 2
 ```
