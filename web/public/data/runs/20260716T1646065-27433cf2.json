@@ -1,0 +1,3090 @@
+{
+  "cases": [
+    {
+      "case_id": "apollo330mP_evb-ad-aot-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 27.05846908300009,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-aot",
+        "model_id": "ad",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-aot\",\"model_id\":\"ad\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-ad-aot-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 212832.0,
+        "clean_infer_avg_us": 2217.0,
+        "layers": 10,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 2400.0,
+        "total_cycles": 216426.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 270880,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 270880
+                }
+              ],
+              "free": 1760736,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 270880
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [],
+              "free": 1835008,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 245760,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 896
+                }
+              ],
+              "free": 244864,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 896
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "457a734cc380b9052aa383fc1daf005e1d721e3dc5b4c87b6f8ff62a613c6f20"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-ad-aot-atfe-rtt-auto",
+      "duration_s": 26.91649454200524,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-aot",
+        "model_id": "ad",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-aot\",\"model_id\":\"ad\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-ad-aot-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 212352.0,
+        "clean_infer_avg_us": 2212.0,
+        "layers": 10,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 2354.0,
+        "total_cycles": 213344.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 270880,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 270880
+                }
+              ],
+              "free": 1760736,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 270880
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [],
+              "free": 1835008,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 245760,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 896
+                }
+              ],
+              "free": 244864,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 896
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "457a734cc380b9052aa383fc1daf005e1d721e3dc5b4c87b6f8ff62a613c6f20"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-ad-aot-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 23.127401584002655,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-aot",
+        "model_id": "ad",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-aot\",\"model_id\":\"ad\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-ad-aot-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 210432.0,
+        "clean_infer_avg_us": 2192.0,
+        "layers": 10,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 2444.0,
+        "total_cycles": 212890.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 270880,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 270880
+                }
+              ],
+              "free": 3923424,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 270880
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [],
+              "free": 3145728,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 524288,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 896
+                }
+              ],
+              "free": 523392,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 896
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "457a734cc380b9052aa383fc1daf005e1d721e3dc5b4c87b6f8ff62a613c6f20"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-ad-aot-atfe-rtt-auto",
+      "duration_s": 22.824833499995293,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-aot",
+        "model_id": "ad",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-aot\",\"model_id\":\"ad\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-ad-aot-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 203616.0,
+        "clean_infer_avg_us": 2121.0,
+        "layers": 10,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 2357.0,
+        "total_cycles": 206906.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 270880,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 270880
+                }
+              ],
+              "free": 3923424,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 270880
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [],
+              "free": 3145728,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 524288,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 896
+                }
+              ],
+              "free": 523392,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 896
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "457a734cc380b9052aa383fc1daf005e1d721e3dc5b4c87b6f8ff62a613c6f20"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-ad-rt-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 54.37812470798963,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-rt",
+        "model_id": "ad",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-rt\",\"model_id\":\"ad\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-ad-rt-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 9268.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 219072.0,
+        "clean_infer_avg_us": 2282.0,
+        "layers": 10,
+        "model_size_bytes": 276848.0,
+        "profiled_infer_avg_us": 2440.0,
+        "total_cycles": 219595.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 276848,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 276848
+                }
+              ],
+              "free": 1754768,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 276848
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 131072
+                }
+              ],
+              "free": 1703936,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 131072
+            },
+            {
+              "capacity": 245760,
+              "consumers": [],
+              "free": 245760,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 0
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "457a734cc380b9052aa383fc1daf005e1d721e3dc5b4c87b6f8ff62a613c6f20"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-ad-rt-atfe-rtt-auto",
+      "duration_s": 44.317175250005675,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-rt",
+        "model_id": "ad",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-rt\",\"model_id\":\"ad\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-ad-rt-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 9268.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 213696.0,
+        "clean_infer_avg_us": 2226.0,
+        "layers": 10,
+        "model_size_bytes": 276848.0,
+        "profiled_infer_avg_us": 2360.0,
+        "total_cycles": 213087.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 276848,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 276848
+                }
+              ],
+              "free": 1754768,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 276848
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 131072
+                }
+              ],
+              "free": 1703936,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 131072
+            },
+            {
+              "capacity": 245760,
+              "consumers": [],
+              "free": 245760,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 0
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "457a734cc380b9052aa383fc1daf005e1d721e3dc5b4c87b6f8ff62a613c6f20"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-ad-rt-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 51.410888708007406,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-rt",
+        "model_id": "ad",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-rt\",\"model_id\":\"ad\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-ad-rt-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 9268.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 178464.0,
+        "clean_infer_avg_us": 1859.0,
+        "layers": 10,
+        "model_size_bytes": 276848.0,
+        "profiled_infer_avg_us": 2081.0,
+        "total_cycles": 182118.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 276848,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [],
+              "free": 4194304,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 0
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 276848
+                }
+              ],
+              "free": 2868880,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 276848
+            },
+            {
+              "capacity": 524288,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 131072
+                }
+              ],
+              "free": 393216,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 131072
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "457a734cc380b9052aa383fc1daf005e1d721e3dc5b4c87b6f8ff62a613c6f20"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-ad-rt-atfe-rtt-auto",
+      "duration_s": 37.84220466601255,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-rt",
+        "model_id": "ad",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-rt\",\"model_id\":\"ad\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-ad-rt-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 9268.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 173184.0,
+        "clean_infer_avg_us": 1804.0,
+        "layers": 10,
+        "model_size_bytes": 276848.0,
+        "profiled_infer_avg_us": 2065.0,
+        "total_cycles": 178812.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 276848,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [],
+              "free": 4194304,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 0
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 276848
+                }
+              ],
+              "free": 2868880,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 276848
+            },
+            {
+              "capacity": 524288,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 131072
+                }
+              ],
+              "free": 393216,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 131072
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "457a734cc380b9052aa383fc1daf005e1d721e3dc5b4c87b6f8ff62a613c6f20"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-ic-aot-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 24.468613207995077,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-aot",
+        "model_id": "ic",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-aot\",\"model_id\":\"ic\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-ic-aot-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 5182752.0,
+        "clean_infer_avg_us": 53987.0,
+        "layers": 16,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 54302.0,
+        "total_cycles": 5182074.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 81432,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 81432
+                }
+              ],
+              "free": 1950184,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 81432
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [],
+              "free": 1835008,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 245760,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 52224
+                }
+              ],
+              "free": 193536,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 52224
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "4f23aeaac429a86d4deb2d7402704243a060644a4d8fc868dfb44175633d24b7"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-ic-aot-atfe-rtt-auto",
+      "duration_s": 24.381609291987843,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-aot",
+        "model_id": "ic",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-aot\",\"model_id\":\"ic\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-ic-aot-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 4501536.0,
+        "clean_infer_avg_us": 46891.0,
+        "layers": 16,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 47173.0,
+        "total_cycles": 4502977.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 81432,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 81432
+                }
+              ],
+              "free": 1950184,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 81432
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [],
+              "free": 1835008,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 245760,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 52224
+                }
+              ],
+              "free": 193536,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 52224
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "4f23aeaac429a86d4deb2d7402704243a060644a4d8fc868dfb44175633d24b7"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-ic-aot-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 22.263141041999916,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-aot",
+        "model_id": "ic",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-aot\",\"model_id\":\"ic\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-ic-aot-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 5074176.0,
+        "clean_infer_avg_us": 52856.0,
+        "layers": 16,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 53654.0,
+        "total_cycles": 5102045.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 81432,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 81432
+                }
+              ],
+              "free": 4112872,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 81432
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [],
+              "free": 3145728,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 524288,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 52224
+                }
+              ],
+              "free": 472064,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 52224
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "4f23aeaac429a86d4deb2d7402704243a060644a4d8fc868dfb44175633d24b7"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-ic-aot-atfe-rtt-auto",
+      "duration_s": 22.04862829099875,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-aot",
+        "model_id": "ic",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-aot\",\"model_id\":\"ic\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-ic-aot-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 4398432.0,
+        "clean_infer_avg_us": 45817.0,
+        "layers": 16,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 46587.0,
+        "total_cycles": 4425119.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 81432,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 81432
+                }
+              ],
+              "free": 4112872,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 81432
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [],
+              "free": 3145728,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 524288,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 52224
+                }
+              ],
+              "free": 472064,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 52224
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "4f23aeaac429a86d4deb2d7402704243a060644a4d8fc868dfb44175633d24b7"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-ic-rt-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 53.835130624996964,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-rt",
+        "model_id": "ic",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-rt\",\"model_id\":\"ic\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-ic-rt-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 56500.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 5479680.0,
+        "clean_infer_avg_us": 57080.0,
+        "layers": 16,
+        "model_size_bytes": 98640.0,
+        "profiled_infer_avg_us": 57368.0,
+        "total_cycles": 5472262.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 98640,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 98640
+                }
+              ],
+              "free": 1932976,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 98640
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 262144
+                }
+              ],
+              "free": 1572864,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 262144
+            },
+            {
+              "capacity": 245760,
+              "consumers": [],
+              "free": 245760,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 0
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "4f23aeaac429a86d4deb2d7402704243a060644a4d8fc868dfb44175633d24b7"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-ic-rt-atfe-rtt-auto",
+      "duration_s": 42.29749379200803,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-rt",
+        "model_id": "ic",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-rt\",\"model_id\":\"ic\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-ic-rt-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 56500.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 4871136.0,
+        "clean_infer_avg_us": 50741.0,
+        "layers": 16,
+        "model_size_bytes": 98640.0,
+        "profiled_infer_avg_us": 51035.0,
+        "total_cycles": 4867425.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 98640,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 98640
+                }
+              ],
+              "free": 1932976,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 98640
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 262144
+                }
+              ],
+              "free": 1572864,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 262144
+            },
+            {
+              "capacity": 245760,
+              "consumers": [],
+              "free": 245760,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 0
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "4f23aeaac429a86d4deb2d7402704243a060644a4d8fc868dfb44175633d24b7"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-ic-rt-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 50.724769583990565,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-rt",
+        "model_id": "ic",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-rt\",\"model_id\":\"ic\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-ic-rt-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 56500.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 5088672.0,
+        "clean_infer_avg_us": 53007.0,
+        "layers": 16,
+        "model_size_bytes": 98640.0,
+        "profiled_infer_avg_us": 53788.0,
+        "total_cycles": 5114829.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 98640,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [],
+              "free": 4194304,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 0
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 98640
+                }
+              ],
+              "free": 3047088,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 98640
+            },
+            {
+              "capacity": 524288,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 262144
+                }
+              ],
+              "free": 262144,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 262144
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "4f23aeaac429a86d4deb2d7402704243a060644a4d8fc868dfb44175633d24b7"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-ic-rt-atfe-rtt-auto",
+      "duration_s": 38.92149620800046,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-rt",
+        "model_id": "ic",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-rt\",\"model_id\":\"ic\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-ic-rt-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 56500.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 4399872.0,
+        "clean_infer_avg_us": 45832.0,
+        "layers": 16,
+        "model_size_bytes": 98640.0,
+        "profiled_infer_avg_us": 46554.0,
+        "total_cycles": 4423175.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 98640,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [],
+              "free": 4194304,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 0
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 98640
+                }
+              ],
+              "free": 3047088,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 98640
+            },
+            {
+              "capacity": 524288,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 262144
+                }
+              ],
+              "free": 262144,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 262144
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "4f23aeaac429a86d4deb2d7402704243a060644a4d8fc868dfb44175633d24b7"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-kws-aot-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 24.036010499999975,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-aot",
+        "model_id": "kws",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-aot\",\"model_id\":\"kws\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-kws-aot-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 2024352.0,
+        "clean_infer_avg_us": 21087.0,
+        "layers": 13,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 21242.0,
+        "total_cycles": 2025004.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 28976,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 28976
+                }
+              ],
+              "free": 2002640,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 28976
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [],
+              "free": 1835008,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 245760,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 20960
+                }
+              ],
+              "free": 224800,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 20960
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "935c513a5f4dbfe6458c16b0a791e916f5e89d6c9b02ffbefce49c06fbbdf038"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-kws-aot-atfe-rtt-auto",
+      "duration_s": 23.797204749993398,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-aot",
+        "model_id": "kws",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-aot\",\"model_id\":\"kws\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-kws-aot-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 1778688.0,
+        "clean_infer_avg_us": 18528.0,
+        "layers": 13,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 18669.0,
+        "total_cycles": 1779440.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 28976,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 28976
+                }
+              ],
+              "free": 2002640,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 28976
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [],
+              "free": 1835008,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 245760,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 20960
+                }
+              ],
+              "free": 224800,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 20960
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "935c513a5f4dbfe6458c16b0a791e916f5e89d6c9b02ffbefce49c06fbbdf038"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-kws-aot-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 21.98106641600316,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-aot",
+        "model_id": "kws",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-aot\",\"model_id\":\"kws\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-kws-aot-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 2011776.0,
+        "clean_infer_avg_us": 20956.0,
+        "layers": 13,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 21326.0,
+        "total_cycles": 2023200.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 28976,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 28976
+                }
+              ],
+              "free": 4165328,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 28976
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [],
+              "free": 3145728,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 524288,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 20960
+                }
+              ],
+              "free": 503328,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 20960
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "935c513a5f4dbfe6458c16b0a791e916f5e89d6c9b02ffbefce49c06fbbdf038"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-kws-aot-atfe-rtt-auto",
+      "duration_s": 21.09171000000788,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-aot",
+        "model_id": "kws",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-aot\",\"model_id\":\"kws\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-kws-aot-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 1768032.0,
+        "clean_infer_avg_us": 18417.0,
+        "layers": 13,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 18755.0,
+        "total_cycles": 1777832.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 28976,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 28976
+                }
+              ],
+              "free": 4165328,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 28976
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [],
+              "free": 3145728,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 524288,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 20960
+                }
+              ],
+              "free": 503328,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 20960
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "935c513a5f4dbfe6458c16b0a791e916f5e89d6c9b02ffbefce49c06fbbdf038"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-kws-rt-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 53.83560337500239,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-rt",
+        "model_id": "kws",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-rt\",\"model_id\":\"kws\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-kws-rt-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 29780.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 2030208.0,
+        "clean_infer_avg_us": 21148.0,
+        "layers": 13,
+        "model_size_bytes": 53744.0,
+        "profiled_infer_avg_us": 21305.0,
+        "total_cycles": 2030278.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 53744,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [],
+              "free": 2031616,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 0
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 53744
+                }
+              ],
+              "free": 1781264,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 53744
+            },
+            {
+              "capacity": 245760,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 32768
+                }
+              ],
+              "free": 212992,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 32768
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "935c513a5f4dbfe6458c16b0a791e916f5e89d6c9b02ffbefce49c06fbbdf038"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-kws-rt-atfe-rtt-auto",
+      "duration_s": 41.687106000012136,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-rt",
+        "model_id": "kws",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-rt\",\"model_id\":\"kws\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-kws-rt-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 29780.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 1785216.0,
+        "clean_infer_avg_us": 18596.0,
+        "layers": 13,
+        "model_size_bytes": 53744.0,
+        "profiled_infer_avg_us": 18735.0,
+        "total_cycles": 1785127.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 53744,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [],
+              "free": 2031616,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 0
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 53744
+                }
+              ],
+              "free": 1781264,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 53744
+            },
+            {
+              "capacity": 245760,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 32768
+                }
+              ],
+              "free": 212992,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 32768
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "935c513a5f4dbfe6458c16b0a791e916f5e89d6c9b02ffbefce49c06fbbdf038"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-kws-rt-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 52.07216441699711,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-rt",
+        "model_id": "kws",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-rt\",\"model_id\":\"kws\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-kws-rt-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 29780.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 2018208.0,
+        "clean_infer_avg_us": 21023.0,
+        "layers": 13,
+        "model_size_bytes": 53744.0,
+        "profiled_infer_avg_us": 21388.0,
+        "total_cycles": 2028628.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 53744,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [],
+              "free": 4194304,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 0
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [],
+              "free": 3145728,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 524288,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 53744
+                },
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 32768
+                }
+              ],
+              "free": 437776,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 86512
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "935c513a5f4dbfe6458c16b0a791e916f5e89d6c9b02ffbefce49c06fbbdf038"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-kws-rt-atfe-rtt-auto",
+      "duration_s": 37.73174937500153,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-rt",
+        "model_id": "kws",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-rt\",\"model_id\":\"kws\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-kws-rt-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 29780.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 1774560.0,
+        "clean_infer_avg_us": 18485.0,
+        "layers": 13,
+        "model_size_bytes": 53744.0,
+        "profiled_infer_avg_us": 18820.0,
+        "total_cycles": 1783579.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 53744,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [],
+              "free": 4194304,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 0
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [],
+              "free": 3145728,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 524288,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 53744
+                },
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 32768
+                }
+              ],
+              "free": 437776,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 86512
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "935c513a5f4dbfe6458c16b0a791e916f5e89d6c9b02ffbefce49c06fbbdf038"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-vww-aot-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 27.428359915997135,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-aot",
+        "model_id": "vww",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-aot\",\"model_id\":\"vww\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-vww-aot-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 7397664.0,
+        "clean_infer_avg_us": 77059.0,
+        "layers": 31,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 77489.0,
+        "total_cycles": 7396166.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 240968,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 240968
+                }
+              ],
+              "free": 1790648,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 240968
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [],
+              "free": 1835008,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 245760,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 55296
+                }
+              ],
+              "free": 190464,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 55296
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "acb6e98203db1c21b27e26be8bcc5c46d19738ef444defefde619bec9860952d"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-vww-aot-atfe-rtt-auto",
+      "duration_s": 27.721451666991925,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-aot",
+        "model_id": "vww",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-aot\",\"model_id\":\"vww\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-vww-aot-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 6370464.0,
+        "clean_infer_avg_us": 66359.0,
+        "layers": 31,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 66760.0,
+        "total_cycles": 6370127.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 240968,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 240968
+                }
+              ],
+              "free": 1790648,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 240968
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [],
+              "free": 1835008,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 245760,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 55296
+                }
+              ],
+              "free": 190464,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 55296
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "acb6e98203db1c21b27e26be8bcc5c46d19738ef444defefde619bec9860952d"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-vww-aot-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 23.939171707999776,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-aot",
+        "model_id": "vww",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-aot\",\"model_id\":\"vww\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-vww-aot-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 7337472.0,
+        "clean_infer_avg_us": 76432.0,
+        "layers": 31,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 77621.0,
+        "total_cycles": 7379245.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 240968,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 240968
+                }
+              ],
+              "free": 3953336,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 240968
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [],
+              "free": 3145728,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 524288,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 55296
+                }
+              ],
+              "free": 468992,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 55296
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "acb6e98203db1c21b27e26be8bcc5c46d19738ef444defefde619bec9860952d"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-vww-aot-atfe-rtt-auto",
+      "duration_s": 23.25980308400176,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-aot",
+        "model_id": "vww",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-aot\",\"model_id\":\"vww\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-vww-aot-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": null,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 6316608.0,
+        "clean_infer_avg_us": 65798.0,
+        "layers": 31,
+        "model_size_bytes": null,
+        "profiled_infer_avg_us": 66876.0,
+        "total_cycles": 6352619.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-aot",
+          "has_overflow": false,
+          "model_weight_bytes": 240968,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "mram_constant_arena_1",
+                  "size": 240968
+                }
+              ],
+              "free": 3953336,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 240968
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [],
+              "free": 3145728,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 0
+            },
+            {
+              "capacity": 524288,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "dtcm_scratch_arena_0",
+                  "size": 55296
+                }
+              ],
+              "free": 468992,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 55296
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "acb6e98203db1c21b27e26be8bcc5c46d19738ef444defefde619bec9860952d"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-vww-rt-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 57.846032916990225,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-rt",
+        "model_id": "vww",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-rt\",\"model_id\":\"vww\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-vww-rt-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 112132.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 7755360.0,
+        "clean_infer_avg_us": 80785.0,
+        "layers": 31,
+        "model_size_bytes": 333584.0,
+        "profiled_infer_avg_us": 81228.0,
+        "total_cycles": 7745825.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 333584,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 333584
+                }
+              ],
+              "free": 1698032,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 333584
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 524288
+                }
+              ],
+              "free": 1310720,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 524288
+            },
+            {
+              "capacity": 245760,
+              "consumers": [],
+              "free": 245760,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 0
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "acb6e98203db1c21b27e26be8bcc5c46d19738ef444defefde619bec9860952d"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo330mP_evb-vww-rt-atfe-rtt-auto",
+      "duration_s": 45.5834302919975,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo330mP_evb",
+        "engine": "helia-rt",
+        "model_id": "vww",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo330mP_evb\",\"engine\":\"helia-rt\",\"model_id\":\"vww\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo330mP_evb-vww-rt-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 112132.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 6721152.0,
+        "clean_infer_avg_us": 70012.0,
+        "layers": 31,
+        "model_size_bytes": 333584.0,
+        "profiled_infer_avg_us": 70391.0,
+        "total_cycles": 6710488.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 333584,
+          "regions": [
+            {
+              "capacity": 2031616,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 333584
+                }
+              ],
+              "free": 1698032,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 333584
+            },
+            {
+              "capacity": 1835008,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 524288
+                }
+              ],
+              "free": 1310720,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 524288
+            },
+            {
+              "capacity": 245760,
+              "consumers": [],
+              "free": 245760,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 0
+            },
+            {
+              "capacity": 33554432,
+              "consumers": [],
+              "free": 33554432,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003409",
+        "model_sha256": "acb6e98203db1c21b27e26be8bcc5c46d19738ef444defefde619bec9860952d"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-vww-rt-arm-none-eabi-gcc-rtt-auto",
+      "duration_s": 52.345937792008044,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-rt",
+        "model_id": "vww",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "arm-none-eabi-gcc",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-rt\",\"model_id\":\"vww\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"arm-none-eabi-gcc\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-vww-rt-arm-none-eabi-gcc-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 112132.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 7532928.0,
+        "clean_infer_avg_us": 78468.0,
+        "layers": 31,
+        "model_size_bytes": 333584.0,
+        "profiled_infer_avg_us": 79691.0,
+        "total_cycles": 7568427.0
+      },
+      "provenance": {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 333584,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 333584
+                }
+              ],
+              "free": 3860720,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 333584
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 524288
+                }
+              ],
+              "free": 2621440,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 524288
+            },
+            {
+              "capacity": 524288,
+              "consumers": [],
+              "free": 524288,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 0
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "acb6e98203db1c21b27e26be8bcc5c46d19738ef444defefde619bec9860952d"
+      },
+      "status": "pass"
+    },
+    {
+      "case_id": "apollo510_evb-vww-rt-atfe-rtt-auto",
+      "duration_s": 38.585925708990544,
+      "health_issues": [],
+      "identity": {
+        "attempt": 1,
+        "board": "apollo510_evb",
+        "engine": "helia-rt",
+        "model_id": "vww",
+        "requested_memory": {
+          "preset": "auto"
+        },
+        "requested_power": {
+          "enabled": false
+        },
+        "toolchain": "atfe",
+        "transport": "rtt"
+      },
+      "identity_key": "{\"attempt\":1,\"board\":\"apollo510_evb\",\"engine\":\"helia-rt\",\"model_id\":\"vww\",\"requested_memory\":{\"preset\":\"auto\"},\"requested_power\":{\"enabled\":false},\"toolchain\":\"atfe\",\"transport\":\"rtt\"}",
+      "layer_path": "layers/20260716T1646065-27433cf2/apollo510_evb-vww-rt-atfe-rtt-auto.json",
+      "metrics": {
+        "arena_allocated_bytes": 112132.0,
+        "binary_bss_bytes": null,
+        "binary_data_bytes": null,
+        "binary_text_bytes": null,
+        "binary_total_bytes": null,
+        "clean_infer_avg_cycles": 6503904.0,
+        "clean_infer_avg_us": 67749.0,
+        "layers": 31,
+        "model_size_bytes": 333584.0,
+        "profiled_infer_avg_us": 68844.0,
+        "total_cycles": 6530031.0
+      },
+      "provenance": {
+        "compiler": "atfe",
+        "compiler_version": "",
+        "effective_memory": {
+          "engine": "helia-rt",
+          "has_overflow": false,
+          "model_weight_bytes": 333584,
+          "regions": [
+            {
+              "capacity": 4194304,
+              "consumers": [
+                {
+                  "kind": "weights",
+                  "name": "model_flatbuffer",
+                  "size": 333584
+                }
+              ],
+              "free": 3860720,
+              "overflow": false,
+              "region": "MRAM",
+              "used": 333584
+            },
+            {
+              "capacity": 3145728,
+              "consumers": [
+                {
+                  "kind": "arena",
+                  "name": "tensor_arena",
+                  "size": 524288
+                }
+              ],
+              "free": 2621440,
+              "overflow": false,
+              "region": "SRAM",
+              "used": 524288
+            },
+            {
+              "capacity": 524288,
+              "consumers": [],
+              "free": 524288,
+              "overflow": false,
+              "region": "DTCM",
+              "used": 0
+            },
+            {
+              "capacity": 262144,
+              "consumers": [],
+              "free": 262144,
+              "overflow": false,
+              "region": "ITCM",
+              "used": 0
+            },
+            {
+              "capacity": 67108864,
+              "consumers": [],
+              "free": 67108864,
+              "overflow": false,
+              "region": "PSRAM",
+              "used": 0
+            }
+          ]
+        },
+        "jlink_serial": "1160003180",
+        "model_sha256": "acb6e98203db1c21b27e26be8bcc5c46d19738ef444defefde619bec9860952d"
+      },
+      "status": "pass"
+    }
+  ],
+  "generated_at": "2026-07-16T16:46:06.544292Z",
+  "hpx_version": "0.1.0",
+  "repo": {
+    "branch": "main",
+    "dirty": false,
+    "sha": "27433cf24a39abf7d0b28727817d4c7da8e0ef1e"
+  },
+  "run_id": "20260716T1646065-27433cf2",
+  "schema_version": 1,
+  "suite": "complete",
+  "summary": {
+    "fail": 0,
+    "pass": 32,
+    "skip": 0,
+    "total": 32
+  }
+}
