@@ -23,11 +23,13 @@ from rich.console import Console
 from . import analysis, compare, doctor, progress, results
 
 if TYPE_CHECKING:
-    from ..compare import CompareResult
-    from ..pipeline import PipelineContext
+    from ..evaluation import CompareResult
+    from ..pipeline import PipelineContext, ProgressUpdate
 
-# Module-level console — reused everywhere.
+# Module-level consoles: durable command results go to stdout; transient
+# progress, logs, and errors go to stderr so future machine output stays clean.
 _console = Console(highlight=False)
+_status_console = Console(highlight=False, stderr=True)
 
 
 class HpxConsole:
@@ -43,10 +45,15 @@ class HpxConsole:
     def __init__(self, verbosity: int = 0) -> None:
         self.verbosity = verbosity
         self._console = _console
+        self._status_console = _status_console
         self._stage_start: float | None = None
         self._run_start: float = time.monotonic()
         self._spinner: Any | None = None  # rich.status.Status when active
         self._completed_stages: list[str] = []
+        self._stage_name: str | None = None
+        self._stage_index = 0
+        self._stage_total = 0
+        self._phase_name: str | None = None
 
     # ------------------------------------------------------------------
     # Banner
@@ -60,9 +67,13 @@ class HpxConsole:
     # Pipeline progress (verbosity >= 1)
     # ------------------------------------------------------------------
 
-    def stage_start(self, name: str) -> None:
+    def stage_start(self, name: str, index: int = 0, total: int = 0) -> None:
         """Called when a pipeline stage begins."""
-        progress.stage_start(self, name)
+        progress.stage_start(self, name, index, total)
+
+    def progress_update(self, update: ProgressUpdate) -> None:
+        """Show a user-meaningful update within the active stage."""
+        progress.progress_update(self, update)
 
     def stage_done(self, name: str) -> None:
         """Called when a pipeline stage completes."""
@@ -150,17 +161,10 @@ class HpxConsole:
 
     def print_doctor(
         self,
-        checks: list[tuple[str, str, str | None]],
-        required_python: list[tuple[str, str, bool]],
-        optional: list[tuple[str, str, bool]],
+        result,
     ) -> None:
-        """Render ``hpx doctor`` results.
-
-        *checks*: list of ``(label, binary_name, path_or_none)``
-        *required_python*: list of ``(label, package_name, available)``
-        *optional*: list of ``(label, package_name, available)``
-        """
-        doctor.print_doctor(self, checks, required_python, optional)
+        """Render a typed ``hpx doctor`` result."""
+        doctor.print_doctor(self, result)
 
     # ------------------------------------------------------------------
     # Boards & Engines

@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import logging
 import re
-import warnings
 from dataclasses import field, replace
 from enum import StrEnum
 from pathlib import Path
@@ -16,33 +14,20 @@ from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 from .engines import EngineType
 from .errors import ConfigError
-from .placement import ModelLocation, Placement
+from .placement import Placement
 from .platform import (
     DEFAULT_GO_GPIO_PIN,
     DEFAULT_STATE_GPIO_PIN,
     DEFAULT_SYNC_GPIO_PIN,
-    BoardDef,
-    ClockDomain,
-    ClockSpeed,
-    CoreArch,
-    MemoryLayout,
-    PerfTier,
     PlatformRegistry,
-    PmuTier,
-    SocDef,
-    SocFamily,
+    build_custom_platform_registry,
     build_platform_registry,
-    get_board,
     get_default_go_gpio_pin,
     get_default_state_gpio_pin,
     get_default_sync_gpio_pin,
-    get_soc,
 )
 from .power.base import PowerMode
 from .target.lifecycle import ResetStrategy
-
-log = logging.getLogger("helia_profiler.config")
-
 
 # Shared default used when the user leaves model.arena_size unset.
 # Keep plan-memory and firmware generation aligned so auto placement
@@ -110,8 +95,9 @@ WINDOW_MODES = ("fixed", "auto")
 DEFAULT_WINDOW_MODE = "auto"
 DEFAULT_WINDOW_TARGET_MS = 1000
 DEFAULT_POWER_WINDOW_TARGET_MS = 5000
+DEFAULT_POWER_MIN_WINDOW_MS = 1000
 DEFAULT_WINDOW_MIN = 10
-DEFAULT_WINDOW_MAX = 2000
+DEFAULT_WINDOW_MAX = 500000
 CLEAN_WINDOW_PROBES = ("infer", "busy_loop")
 DEFAULT_CLEAN_WINDOW_PROBE = "infer"
 # Per-iteration aggregation estimator for per-layer counters.  ``median`` is
@@ -120,7 +106,6 @@ DEFAULT_CLEAN_WINDOW_PROBE = "infer"
 # still settling) that a plain mean would smear across the whole layer.
 DEFAULT_AGGREGATION = "median"
 AGGREGATION_METHODS = ("mean", "median", "trimmed")
-DEFAULT_PMU_PRESETS = ("basic_cpu",)
 DEFAULT_POWER_DURATION_S = 30
 DEFAULT_IO_VOLTAGE = 1.8
 DEFAULT_POWER_DRIVER = "joulescope"
@@ -178,40 +163,16 @@ class ModelConfig:
     controls for runtime engines such as heliaRT: the arena is the mutable
     tensor arena, while weights are the model flatbuffer/constant data.
 
-    ``model_location`` is retained as a compatibility preset for older configs.
-    Split fields take precedence when present. ``helia-aot`` uses its own
-    tensor-kind placement controls via ``engine.config.aot_args.memory.tensors``.
-
-    Policy values:
-
-    * ``auto`` *(default)* — plan-memory stage picks the fastest region(s)
-      that fit. Greedy fastest-fit with arena prioritized over weights when
-      the two compete for the same region. Order: TCM → SRAM → MRAM.
-    * ``tcm`` — force both arena and weights into DTCM (highest performance,
-      smallest capacity). Fails preflight if the SoC has no TCM or it
-      doesn't fit.
-    * ``sram`` — force both into shared SRAM.
-    * ``mram`` — weights stay in MRAM/Flash (rodata); arena goes to TCM
-      when available, else SRAM. Matches pre-auto-placement behavior.
-    * ``psram`` — weights uploaded to external PSRAM at runtime via J-Link;
-      arena in SRAM. Requires a PSRAM-capable board.
+        When a split field is omitted, the engine and memory planner choose the
+        fastest region that fits. ``helia-aot`` translates these coarse controls
+        into tensor rules; explicit ``engine.config.aot_args.memory.tensors`` rules
+        remain available for per-kind and per-tensor placement.
     """
 
     path: Path
     arena_size: int | None = None  # bytes; None = let engine/firmware report
-    model_location: ModelLocation | str = ModelLocation.AUTO
     arena_location: Placement | str | None = None
     weights_location: Placement | str | None = None
-
-    @field_validator("model_location", mode="before")
-    @classmethod
-    def _coerce_model_location(cls, value: Any) -> Any:
-        if isinstance(value, ModelLocation):
-            return value
-        try:
-            return ModelLocation(value)
-        except ValueError:
-            return value
 
     @field_validator("arena_location", "weights_location", mode="before")
     @classmethod
@@ -238,9 +199,7 @@ class EngineConfig:
     def _reject_nested_backend(cls, value: dict[str, Any]) -> dict[str, Any]:
         """Keep the backend selector unambiguous across engine adapters."""
         if "backend" in value:
-            raise ValueError(
-                "engine.config.backend is not supported; use engine.backend instead"
-            )
+            raise ValueError("engine.config.backend is not supported; use engine.backend instead")
         return value
 
     @field_validator("type", mode="before")
@@ -327,6 +286,7 @@ class TargetConfig:
     jlink_serial: str | None = None  # select J-Link by S/N (None = auto)
     transport: Transport = DEFAULT_TRANSPORT
     usb_port: str | None = None
+    segger_rtt_path: Path | None = None
     rtt_buffer_size_up: int | None = None
     clock: ClockSelection = field(default_factory=ClockSelection)
     heartbeat: HeartbeatConfig = field(default_factory=HeartbeatConfig)
@@ -377,12 +337,9 @@ class ProfilingConfig:
     * ``"all"``     — every counter in the group (multi-pass).
     * ``["NAME", …]`` — explicit counter names.
 
-    The legacy *pmu_presets* field is still accepted for backward
-    compatibility and is converted internally.
     """
 
-    pmu_presets: tuple[str, ...] = DEFAULT_PMU_PRESETS
-    pmu_counters: dict[str, str | list[str]] | None = None
+    pmu_counters: dict[str, str | list[str]] = field(default_factory=lambda: {"cpu": "default"})
     per_layer: bool = True
     iterations: int = DEFAULT_ITERATIONS
     warmup: int = DEFAULT_WARMUP
@@ -425,13 +382,6 @@ class ProfilingConfig:
     # weights and arena both live in TCM. Code keeps running from MRAM, so
     # transports (RTT/USB/SWO) and printf remain available throughout the run.
     extreme_mode: bool = False
-
-    @field_validator("pmu_presets", mode="before")
-    @classmethod
-    def _coerce_pmu_presets(cls, value: Any) -> Any:
-        if isinstance(value, list):
-            return tuple(value)
-        return value
 
     @field_validator("pmu_counters", mode="before")
     @classmethod
@@ -669,7 +619,6 @@ class ProfileConfig:
     platform_registry: PlatformRegistry = field(default_factory=build_platform_registry)
     frozen: bool = False
     work_dir: Path | None = None  # None = use persistent cache dir
-    keep_work_dir: bool = False  # legacy — cache dir is always kept
     clean: bool = False  # wipe cached work dir before building
     verbose: int = 0
 
@@ -755,7 +704,6 @@ def load_config(yaml_path: Path | None, cli_overrides: dict[str, Any]) -> Profil
     merged = _deep_merge(base, cli_overrides)
     _check_reserved_user_keys(merged)
     _check_required_model_path(merged)
-    _emit_deprecation_warnings(merged)
     prepared, platform_registry = _prepare_merged_config(merged)
 
     try:
@@ -804,39 +752,6 @@ def _check_required_model_path(merged: dict[str, Any]) -> None:
         )
 
 
-def _emit_deprecation_warnings(merged: dict[str, Any]) -> None:
-    model = merged.get("model")
-    if isinstance(model, dict) and "model_location" in model:
-        model_location = model.get("model_location")
-        if model_location not in (None, ModelLocation.AUTO, ModelLocation.AUTO.value, "auto"):
-            _warn_deprecated(
-                "model.model_location is deprecated; prefer model.arena_location and "
-                "model.weights_location for placement control.",
-                stacklevel=3,
-            )
-
-    profiling = merged.get("profiling")
-    if isinstance(profiling, dict) and "pmu_presets" in profiling:
-        raw = profiling.get("pmu_presets")
-        normalized = tuple(raw) if isinstance(raw, list) else raw
-        if normalized != DEFAULT_PMU_PRESETS:
-            _warn_deprecated(
-                "profiling.pmu_presets is deprecated; prefer profiling.pmu_counters.",
-                stacklevel=3,
-            )
-
-    if "keep_work_dir" in merged:
-        _warn_deprecated(
-            "keep_work_dir is deprecated and has no effect; the cache work directory is always kept.",
-            stacklevel=3,
-        )
-
-
-def _warn_deprecated(message: str, *, stacklevel: int) -> None:
-    warnings.warn(message, DeprecationWarning, stacklevel=stacklevel)
-    log.warning(message)
-
-
 def _prepare_merged_config(merged: dict[str, Any]) -> tuple[dict[str, Any], PlatformRegistry]:
     prepared = dict(merged)
     raw_target = prepared.get("target")
@@ -845,7 +760,7 @@ def _prepare_merged_config(merged: dict[str, Any]) -> tuple[dict[str, Any], Plat
     power = dict(raw_power) if isinstance(raw_power, dict) else raw_power
 
     if isinstance(target, dict):
-        platform_registry = _build_platform_registry(target)
+        platform_registry = build_custom_platform_registry(target)
         board_name = target.get("board", DEFAULT_BOARD)
         prepared["target"] = target
     else:
@@ -945,233 +860,3 @@ def _valid_field_names_for_path(path: tuple[str, ...]) -> tuple[str, ...]:
         if wildcard in _VALID_FIELD_NAMES:
             return _VALID_FIELD_NAMES[wildcard]
     return ()
-
-
-def _build_platform_registry(target_d: dict[str, Any]) -> PlatformRegistry:
-    base = build_platform_registry()
-    custom_socs = _build_custom_socs(target_d.get("custom_socs"), base)
-    registry_with_socs = build_platform_registry(base=base, socs=custom_socs)
-    custom_boards = _build_custom_boards(target_d.get("custom_boards"), registry_with_socs)
-    return build_platform_registry(base=registry_with_socs, boards=custom_boards)
-
-
-def _build_custom_socs(raw: Any, base: PlatformRegistry) -> dict[str, SocDef]:
-    if raw is None:
-        return {}
-    if not isinstance(raw, dict):
-        raise ConfigError("target.custom_socs must be a mapping of name -> definition")
-
-    custom: dict[str, SocDef] = {}
-    for name, spec in raw.items():
-        if not isinstance(spec, dict):
-            raise ConfigError(f"target.custom_socs.{name} must be a mapping")
-        overlay = build_platform_registry(base=base, socs=custom)
-        based_on = spec.get("based_on")
-        base_soc = get_soc(based_on, registry=overlay) if based_on else None
-        family = _enum_value(
-            SocFamily,
-            spec.get("family", base_soc.family if base_soc else None),
-            field_name=f"target.custom_socs.{name}.family",
-        )
-        core = _enum_value(
-            CoreArch,
-            spec.get("core", base_soc.core if base_soc else None),
-            field_name=f"target.custom_socs.{name}.core",
-        )
-        pmu_tier = _enum_value(
-            PmuTier,
-            spec.get("pmu_tier", base_soc.pmu_tier if base_soc else None),
-            field_name=f"target.custom_socs.{name}.pmu_tier",
-        )
-        has_mve = spec.get("has_mve", base_soc.has_mve if base_soc else None)
-        if has_mve is None:
-            raise ConfigError(f"target.custom_socs.{name}.has_mve is required")
-        c_define = spec.get("c_define", base_soc.c_define if base_soc else None)
-        cmsis_header = spec.get("cmsis_header", base_soc.cmsis_header if base_soc else None)
-        if c_define is None:
-            raise ConfigError(f"target.custom_socs.{name}.c_define is required")
-        if cmsis_header is None:
-            raise ConfigError(f"target.custom_socs.{name}.cmsis_header is required")
-        custom[name] = SocDef(
-            name=name,
-            family=family,
-            core=core,
-            pmu_tier=pmu_tier,
-            has_mve=bool(has_mve),
-            memory=_build_memory_layout(
-                spec.get("memory"),
-                field_name=f"target.custom_socs.{name}.memory",
-                base=base_soc.memory if base_soc else None,
-            ),
-            clocks=_build_clock_domains(
-                spec.get("clocks"),
-                field_name=f"target.custom_socs.{name}.clocks",
-                base=base_soc.clocks if base_soc else None,
-            ),
-            c_define=str(c_define),
-            cmsis_header=str(cmsis_header),
-            rtt_scan_ranges=_build_rtt_scan_ranges(
-                spec.get("rtt_scan_ranges", base_soc.rtt_scan_ranges if base_soc else None),
-                field_name=f"target.custom_socs.{name}.rtt_scan_ranges",
-            ),
-            jlink_device=str(spec.get("jlink_device", base_soc.jlink_device if base_soc else "")),
-            pmu_max_ops=int(spec.get("pmu_max_ops", base_soc.pmu_max_ops if base_soc else 2048)),
-        )
-    return custom
-
-
-def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, BoardDef]:
-    if raw is None:
-        return {}
-    if not isinstance(raw, dict):
-        raise ConfigError("target.custom_boards must be a mapping of name -> definition")
-
-    custom: dict[str, BoardDef] = {}
-    for name, spec in raw.items():
-        if not isinstance(spec, dict):
-            raise ConfigError(f"target.custom_boards.{name} must be a mapping")
-        overlay = build_platform_registry(base=registry, boards=custom)
-        based_on = spec.get("based_on")
-        base_board = get_board(based_on, registry=overlay) if based_on else None
-        soc = spec.get("soc", base_board.soc if base_board else None)
-        channel = spec.get("channel", base_board.channel if base_board else None)
-        if soc is None:
-            raise ConfigError(f"target.custom_boards.{name}.soc is required")
-        if channel is None:
-            raise ConfigError(f"target.custom_boards.{name}.channel is required")
-        starter_profile_board = spec.get(
-            "starter_profile_board",
-            base_board.profile_source_board if base_board else None,
-        )
-        custom[name] = BoardDef(
-            name=name,
-            soc=str(soc),
-            channel=str(channel),
-            psram_kb=_optional_int(spec.get("psram_kb", base_board.psram_kb if base_board else None)),
-            default_sync_gpio_pin=int(
-                spec.get(
-                    "default_sync_gpio_pin",
-                    base_board.default_sync_gpio_pin if base_board else DEFAULT_SYNC_GPIO_PIN,
-                )
-            ),
-            default_state_gpio_pin=int(
-                spec.get(
-                    "default_state_gpio_pin",
-                    base_board.default_state_gpio_pin if base_board else DEFAULT_STATE_GPIO_PIN,
-                )
-            ),
-            default_go_gpio_pin=int(
-                spec.get(
-                    "default_go_gpio_pin",
-                    base_board.default_go_gpio_pin if base_board else DEFAULT_GO_GPIO_PIN,
-                )
-            ),
-            starter_profile_board=(
-                str(starter_profile_board) if starter_profile_board is not None else None
-            ),
-            description=str(spec.get("description", base_board.description if base_board else "")),
-        )
-    return custom
-
-
-def _enum_value(enum_cls: type, raw: Any, *, field_name: str):
-    if isinstance(raw, enum_cls):
-        return raw
-    if raw is None:
-        raise ConfigError(f"{field_name} is required")
-    try:
-        return enum_cls(raw)
-    except ValueError as exc:
-        allowed = ", ".join(member.value for member in enum_cls)
-        raise ConfigError(f"Invalid {field_name}: {raw!r}. Supported: {allowed}") from exc
-
-
-def _build_memory_layout(raw: Any, *, field_name: str, base: MemoryLayout | None) -> MemoryLayout:
-    if raw is None:
-        if base is None:
-            raise ConfigError(f"{field_name} is required")
-        return base
-    if not isinstance(raw, dict):
-        raise ConfigError(f"{field_name} must be a mapping")
-    values = {
-        "mram_kb": base.mram_kb if base else 0,
-        "sram_kb": base.sram_kb if base else 0,
-        "dtcm_kb": base.dtcm_kb if base else 0,
-        "itcm_kb": base.itcm_kb if base else 0,
-        "psram_kb": base.psram_kb if base else 0,
-        "nvm_kb": base.nvm_kb if base else 0,
-    }
-    for key in values:
-        if key in raw:
-            values[key] = int(raw[key])
-    return MemoryLayout(**values)
-
-
-def _build_clock_domains(
-    raw: Any,
-    *,
-    field_name: str,
-    base: tuple[ClockDomain, ...] | None,
-) -> tuple[ClockDomain, ...]:
-    if raw is None:
-        if base is None:
-            raise ConfigError(f"{field_name} is required")
-        return base
-    if not isinstance(raw, list):
-        raise ConfigError(f"{field_name} must be a list")
-    domains: list[ClockDomain] = []
-    for index, domain in enumerate(raw):
-        if not isinstance(domain, dict):
-            raise ConfigError(f"{field_name}[{index}] must be a mapping")
-        speeds_raw = domain.get("speeds")
-        if not isinstance(speeds_raw, list) or not speeds_raw:
-            raise ConfigError(f"{field_name}[{index}].speeds must be a non-empty list")
-        speeds: list[ClockSpeed] = []
-        for speed_index, speed in enumerate(speeds_raw):
-            if not isinstance(speed, dict):
-                raise ConfigError(f"{field_name}[{index}].speeds[{speed_index}] must be a mapping")
-            perf_tier = speed.get("perf_tier")
-            speeds.append(
-                ClockSpeed(
-                    name=str(speed["name"]),
-                    mhz=int(speed["mhz"]),
-                    perf_tier=(
-                        _enum_value(
-                            PerfTier,
-                            perf_tier,
-                            field_name=(f"{field_name}[{index}].speeds[{speed_index}].perf_tier"),
-                        )
-                        if perf_tier is not None
-                        else None
-                    ),
-                )
-            )
-        domains.append(
-            ClockDomain(
-                name=str(domain["name"]),
-                speeds=tuple(speeds),
-                default=str(domain["default"]),
-            )
-        )
-    return tuple(domains)
-
-
-def _build_rtt_scan_ranges(raw: Any, *, field_name: str) -> tuple[tuple[int, int], ...]:
-    if raw is None:
-        raise ConfigError(f"{field_name} is required")
-    if not isinstance(raw, (list, tuple)):
-        raise ConfigError(f"{field_name} must be a list of [base, length] pairs")
-    ranges: list[tuple[int, int]] = []
-    for index, item in enumerate(raw):
-        if not isinstance(item, (list, tuple)) or len(item) != 2:
-            raise ConfigError(f"{field_name}[{index}] must be a [base, length] pair")
-        ranges.append((int(item[0]), int(item[1])))
-    if not ranges:
-        raise ConfigError(f"{field_name} must not be empty")
-    return tuple(ranges)
-
-
-def _optional_int(raw: Any) -> int | None:
-    if raw is None:
-        return None
-    return int(raw)

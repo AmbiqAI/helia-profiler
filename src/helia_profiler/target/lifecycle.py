@@ -103,9 +103,10 @@ def prepare_target_for_phase(
         power_cycle_succeeded = _time_action(
             timings_s,
             "power_cycle",
-            lambda: _try_power_cycle(
+            lambda: try_power_cycle(
                 power_driver,
                 power_driver_name,
+                strict=True,
             ),
         )
     reset_action = _time_action(
@@ -139,13 +140,56 @@ def _time_action(timings_s: dict[str, float], key: str, action):
         )
 
 
-def _try_power_cycle(power_driver: object, power_driver_name: str) -> bool:
+def try_power_cycle(
+    power_driver: object,
+    power_driver_name: str,
+    *,
+    strict: bool,
+    off_time_s: float = 0.5,
+    settle_time_s: float = 2.0,
+) -> bool:
+    """Attempt a driver-owned rail cycle with shared strict/best-effort policy."""
     try:
-        power_driver.power_cycle(off_time_s=0.5, settle_time_s=2.0)  # type: ignore[attr-defined]
+        power_driver.power_cycle(  # type: ignore[attr-defined]
+            off_time_s=off_time_s,
+            settle_time_s=settle_time_s,
+        )
         log.info("Power-cycle reset via '%s' succeeded", power_driver_name)
         return True
-    except PowerError:
-        raise
+    except Exception as exc:
+        if strict:
+            if isinstance(exc, PowerError):
+                raise
+            raise PowerError(
+                f"Power-cycle reset via '{power_driver_name}' failed: {exc}"
+            ) from exc
+        log.debug("Power-cycle recovery via '%s' unavailable: %s", power_driver_name, exc)
+        return False
+
+
+def try_power_cycle_for_context(
+    ctx: PipelineContext,
+    *,
+    off_time_s: float = 1.0,
+    settle_time_s: float = 2.0,
+) -> bool:
+    """Best-effort rail-cycle recovery for a failed target deployment."""
+    if not ctx.config.power.enabled:
+        return False
+    from ..power import get_driver
+
+    try:
+        driver = get_driver(ctx.config.power.driver, serial=ctx.config.power.serial)
+    except Exception as exc:
+        log.debug("Power-cycle recovery driver unavailable: %s", exc)
+        return False
+    return try_power_cycle(
+        driver,
+        ctx.config.power.driver,
+        strict=False,
+        off_time_s=off_time_s,
+        settle_time_s=settle_time_s,
+    )
 
 
 def _reset_for_power_phase(ctx: PipelineContext, requested: ResetStrategy) -> ResetAction:
@@ -244,5 +288,6 @@ __all__ = [
     "ResetStrategy",
     "TargetLifecyclePlan",
     "prepare_target_for_phase",
+    "try_power_cycle",
     "resolve_power_lockstep",
 ]

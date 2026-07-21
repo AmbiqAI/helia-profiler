@@ -19,13 +19,14 @@ def _gated_stats_diagnostics(
     *,
     packets: list[dict[str, Any]],
     poll_samples: list[tuple[int, int]],
+    prefer_device_time: bool = False,
 ) -> dict[str, Any]:
     """Summarise how the GPIO windows intersect the stats packets."""
     import numpy as np
 
     a = _stats_arrays(packets)
     windows = _segment_gpi_windows(poll_samples)
-    mask_axis, axis_name = _gated_mask_axis(a)
+    mask_axis, axis_name = _gated_mask_axis(a, prefer_device_time=prefer_device_time)
 
     diagnostics: dict[str, Any] = {
         "mask_time_axis": axis_name,

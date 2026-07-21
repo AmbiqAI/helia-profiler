@@ -10,18 +10,12 @@ from typing import TYPE_CHECKING
 from ..engines import EngineType
 
 if TYPE_CHECKING:
-    from ..model_analysis import ModelAnalysis
+    from ..evaluation import ModelAnalysis
 
 
 def _cmd_analyze(args: argparse.Namespace) -> None:
     """Analyze model compute/parameter breakdown without hardware."""
-    from ..model_analysis import (
-        ModelAnalysis,
-        analyze_air_model,
-        analyze_model,
-        is_aot_available,
-        is_available,
-    )
+    from ..evaluation import ModelAnalysis, analyze_for_engine, analyze_model, is_available
     from ..console import HpxConsole
 
     console = HpxConsole(verbosity=1)  # always show output
@@ -50,14 +44,15 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
     # --- Engine-specific analysis ---
     engine_result: ModelAnalysis | None = None
     if is_aot:
-        if not is_aot_available():
-            print(
-                "Error: helia-aot is not installed.\n"
-                "  Install with: pip install 'helia-profiler[aot]'",
-                file=sys.stderr,
+        try:
+            engine_result = analyze_for_engine(
+                args.model,
+                engine=EngineType.HELIA_AOT,
+                board=args.board,
             )
+        except Exception as exc:
+            print(f"Error: {exc}", file=sys.stderr)
             sys.exit(1)
-        engine_result = _run_aot_analysis(args.model, args.board)
 
     # Determine which analysis is "primary" (what the engine actually runs)
     # and whether to show comparison
@@ -75,35 +70,6 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
         _write_analysis_file(primary, args.format, args.output, reference)
     else:
         console.print_analysis(primary, args.model.name, reference)
-
-
-def _run_aot_analysis(model_path: Path, board: str) -> "ModelAnalysis | None":
-    """Run heliaAOT compilation and return analysis of the transformed graph."""
-    import tempfile
-
-    from ..model_analysis import analyze_air_model
-
-    try:
-        from helia_aot.converter import AotConverter  # type: ignore[import-untyped]
-        from helia_aot.cli.defines import ConvertArgs  # type: ignore[import-untyped]
-        from helia_aot.defines import ModuleType  # type: ignore[import-untyped]
-    except ImportError:
-        print("Error: helia-aot import failed.", file=sys.stderr)
-        return None
-
-    with tempfile.TemporaryDirectory(prefix="hpx_aot_") as tmp:
-        convert_args = ConvertArgs(
-            model={"path": str(model_path)},
-            module={"path": tmp, "type": ModuleType.nsx.value},
-            platform={"name": board},
-        )
-        try:
-            ctx = AotConverter(config=convert_args).convert()
-        except Exception as exc:
-            print(f"Warning: AOT compilation failed: {exc}", file=sys.stderr)
-            return None
-
-        return analyze_air_model(ctx.model)
 
 
 def _write_analysis_file(

@@ -366,7 +366,6 @@ int main(void) {
     // path is while(1) -- firmware hangs forever at clean_window_begin.
     dwt_init();
     hpx_sync_init();
-    hpx_sync_ready();
 {% if apollo3_burst %}
     // --- Apollo3/3P TurboSPOT (96 MHz burst) ------------------------------
     // NSX exposes no perf-mode selector on Apollo3, so request burst directly
@@ -517,7 +516,10 @@ int main(void) {
         psram_cfg.enable_xip = true;
         if (nsx_psram_init(&psram_cfg) != 0) {
             hpx_printf("HPX_ERROR=psram_init_failed\n");
+{% if power_only | default(false) %}            hpx_power_terminal_fail("psram_init", 1U);
+{% else %}
             hpx_park();
+{% endif %}
         }
         // Stack PSRAM-placed arenas at successive 64-byte aligned offsets.
         uint32_t psram_off = 0;
@@ -545,7 +547,9 @@ int main(void) {
         if (bind_status != 0) {
             hpx_printf("HPX_ERROR=bind_arena_failed:%d:region=%d\n",
                        (int)bind_status, {{ region.region_id }});
-            hpx_park();
+{% if power_only | default(false) %}            hpx_power_terminal_fail("bind_arena", 5U);
+{% else %}            hpx_park();
+{% endif %}
         }
 {% endfor %}
     }
@@ -571,7 +575,9 @@ int main(void) {
     int32_t aot_status = {{ aot_prefix }}_model_init(&{{ aot_prefix }}_model_ctx);
     if (aot_status != 0) {
         hpx_printf("HPX_ERROR=model_init_failed:%ld\n", (long)aot_status);
-        hpx_park();
+    {% if power_only | default(false) %}        hpx_power_terminal_fail("model_init", 6U);
+    {% else %}        hpx_park();
+    {% endif %}
     }
     hpx_printf("HPX_HEARTBEAT phase=model_init_done\n");
 
@@ -688,6 +694,9 @@ int main(void) {
 {% endif %}
         uint64_t clean_cycles = 0;
         uint32_t clean_count = 0;
+        // Assert READY only after initialization and adaptive warmup. This
+        // keeps host GO low until the firmware can enter the measured window.
+        hpx_sync_ready();
         hpx_sync_wait_go();
         // Set the inputs once before the gated window, not on every
         // iteration — AutoDeploy's power loop re-invokes on the same fixed
@@ -900,13 +909,12 @@ int main(void) {
             }
 {% endif %}
         }
+{% if power_only | default(false) %}
+{% include "_power_terminal_success.j2" with context %}
+{% endif %}
     }
 
 {% if power_only | default(false) %}
-    // power_only: no per-layer PMU passes, no CSV dump, no HPX_END sentinel --
-    // the gated clean window above is the whole measurement.  The host reads
-    // completion off the GPIO gate falling, not off any transport, so simply
-    // park once the clean window closes.
 {% else %}{% if transport == "rtt" %}
     // Boot header was captured losslessly; restore droppable writes for the
     // timed window so an in-flight heartbeat can never stall model_run().

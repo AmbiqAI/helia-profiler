@@ -10,10 +10,8 @@ Two measurement modes:
 
 Driver names:
 
-- ``joulescope``:       Joulescope JS110 or JS220 (auto-detected via
+- ``joulescope``:       Joulescope JS110, JS220, or JS320 (auto-detected via
   ``pyjoulescope_driver`` device enumeration).
-- ``joulescope-js110``: Alias for ``joulescope`` (kept for back-compat).
-- ``joulescope-js220``: Alias for ``joulescope`` (kept for back-compat).
 - ``ondevice``:         On-device measurement (experimental).
 
 Use :func:`get_driver` to resolve a driver by name.
@@ -64,11 +62,8 @@ def _register_builtins() -> None:
     from .joulescope.driver import JoulescopeDriver
     from .ondevice_driver import OnDeviceDriver
 
-    # Single unified Joulescope driver — handles JS110 and JS220.
+    # Single unified Joulescope driver — handles JS110, JS220, and JS320.
     register_driver("joulescope", JoulescopeDriver)
-    # Back-compat aliases so existing configs / docs keep working.
-    register_driver("joulescope-js110", JoulescopeDriver)
-    register_driver("joulescope-js220", JoulescopeDriver)
     register_driver("ondevice", OnDeviceDriver)
 
 
@@ -100,8 +95,7 @@ def get_driver(name: str, *, serial: str | None = None) -> PowerDriver:
     """Instantiate and return the named power driver.
 
     The unified ``joulescope`` driver auto-detects JS110 vs JS220 from the
-    enumerated USB device path; the ``-js110`` / ``-js220`` suffixes are
-    accepted as aliases for backwards compatibility.
+    enumerated USB device path.
     Raises :class:`PowerError` if the name is unknown.
     """
     cls = resolve_driver_class(name)

@@ -1,0 +1,17 @@
+{# Successful fixed-N terminal report; included inside the clean-window scope. #}
+hpx_power_terminal_report(
+    true,
+    (uint32_t)clean_iters_n,
+    clean_count,
+{% if use_stimer_window %}
+    clean_stimer_total_us,
+{% else %}
+    (SystemCoreClock > 0U)
+        ? (clean_cycles * 1000000ULL) / (uint64_t)SystemCoreClock
+        : 0ULL,
+{% endif %}
+    "complete",
+    0U,
+    {{ power_sync_enabled | lower }},
+    true);
+hpx_power_terminal_park();

@@ -7,6 +7,8 @@ import failures (missing package OR binary/ABI mismatch) into actionable
 
 from __future__ import annotations
 
+import threading
+import time
 from unittest.mock import patch
 
 import pytest
@@ -80,16 +82,48 @@ class TestJoulescopeOpenRetries:
         assert fake_driver.open_calls == 2
 
 
+def test_aggregate_gpi_reads_are_serialized():
+    from helia_profiler.power.joulescope.device import _read_gpi_snapshot
+
+    class FakeDriver:
+        def __init__(self):
+            self.active = 0
+            self.max_active = 0
+            self.lock = threading.Lock()
+
+        def publish_and_wait(self, *_args, **_kwargs):
+            with self.lock:
+                self.active += 1
+                self.max_active = max(self.max_active, self.active)
+            time.sleep(0.01)
+            with self.lock:
+                self.active -= 1
+            return 2
+
+    driver = FakeDriver()
+    threads = [
+        threading.Thread(target=_read_gpi_snapshot, args=(driver, "u/js320/test"))
+        for _ in range(2)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert driver.max_active == 1
+
+
 class _FakeJsDriver:
     """Minimal fake ``pyjoulescope_driver.Driver`` for open/close refcounting."""
 
-    def __init__(self) -> None:
+    def __init__(self, device_path: str = "u/js110/004204") -> None:
+        self.device_path = device_path
         self.open_calls = 0
         self.close_calls = 0
         self.published: dict[str, object] = {}
 
     def device_paths(self):
-        return ["u/js110/004204"]
+        return [self.device_path]
 
     def open(self, device_path):
         self.open_calls += 1
@@ -168,3 +202,22 @@ class TestJoulescopeSyncControllerRelease:
         _close_device(capture_drv, capture_path)
         assert fake_drv.close_calls == 1
         assert "u/js110/004204" not in device_mod._open_refcounts
+
+    def test_js320_uses_bitmap_gpo_commands(self, monkeypatch: pytest.MonkeyPatch):
+        from helia_profiler.power.joulescope import device as device_mod
+
+        device_mod._open_refcounts.clear()
+        fake_drv = _FakeJsDriver("u/js320/25QG")
+        controller = self._make_controller(monkeypatch, fake_drv)
+
+        controller.arm()
+        controller.signal_go()
+
+        assert fake_drv.published == {
+            "u/js320/25QG/s/gpo/+/!clr": 1,
+            "u/js320/25QG/s/gpo/+/!set": 1,
+        }
+
+        controller.release()
+        assert fake_drv.close_calls == 1
+        assert "u/js320/25QG" not in device_mod._open_refcounts

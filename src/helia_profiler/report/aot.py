@@ -30,7 +30,11 @@ def _write_aot_manifest(ctx: PipelineContext, output_dir: Path) -> Path | None:
     if not manifest:
         return None
     out_path = output_dir / "aot_operator_manifest.json"
-    out_path.write_text(json.dumps(manifest, indent=2, default=str))
+    out_path.write_text(
+        json.dumps(manifest, indent=2, default=str),
+        encoding="utf-8",
+        newline="\n",
+    )
     log.info("Wrote AOT operator manifest: %s", out_path)
     return out_path
 

@@ -3,32 +3,16 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
-from ..errors import BuildError, PowerError
+from ..results import DeploymentRecord
+from ..errors import BuildError
 from ..firmware import _nsx_toolchain
 from ..pipeline import PipelineContext
 from ..target.probe.jlink import JLinkFlashBackend
+from ..target.lifecycle import try_power_cycle_for_context
 
 log = logging.getLogger("hpx")
-
-
-def _try_power_cycle(ctx: PipelineContext) -> bool:
-    """Attempt a Joulescope power-cycle reset to recover the debug domain.
-
-    Returns *True* if the power cycle succeeded, *False* otherwise.
-    """
-    if not ctx.config.power.enabled:
-        return False
-    try:
-        from ..power import get_driver
-
-        driver = get_driver(ctx.config.power.driver, serial=ctx.config.power.serial)
-        driver.power_cycle(off_time_s=1.0, settle_time_s=2.0)
-        log.info("Power-cycle reset succeeded — retrying flash")
-        return True
-    except (PowerError, Exception) as exc:
-        log.debug("Power-cycle recovery not available: %s", exc)
-        return False
 
 
 class FlashFirmwareStage:
@@ -40,11 +24,13 @@ class FlashFirmwareStage:
         return False
 
     def run(self, ctx: PipelineContext) -> None:
-        if ctx.binary_path is None:
-            raise BuildError("No binary to flash — build stage did not run.")
+        if ctx.profile_run is None:
+            raise BuildError("No profile artifact to flash — build stage did not run.")
+        artifact = ctx.profile_run.firmware
 
         if ctx.firmware_dir is None:
             raise BuildError("No firmware directory to flash — firmware generation did not run.")
+        ctx.report_progress(f"Deploying profile firmware to {ctx.config.target.board}")
         backend = ctx.flash_backend or JLinkFlashBackend()
         toolchain = _nsx_toolchain(ctx.config.target.toolchain)
         jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
@@ -65,7 +51,7 @@ class FlashFirmwareStage:
             # Flash can fail when the debug domain is locked (e.g. after a
             # previous run put the chip to sleep).  If a Joulescope is
             # available, power-cycle to recover and retry once.
-            if _try_power_cycle(ctx):
+            if try_power_cycle_for_context(ctx):
                 flash_firmware()  # raises BuildError on second failure
             else:
                 if ctx.passthrough_skipped:
@@ -92,3 +78,11 @@ class FlashFirmwareStage:
             ) from exc
 
         log.info("Firmware flashed to %s", ctx.config.target.board)
+        ctx.publish_profile_deployment(
+            DeploymentRecord(
+                firmware=artifact,
+                target_id=ctx.config.target.board,
+                deployed_at=datetime.now(timezone.utc).isoformat(),
+            )
+        )
+        ctx.report_progress("Profile firmware deployed", kind="checkpoint", min_verbosity=1)

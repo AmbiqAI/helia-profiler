@@ -12,7 +12,11 @@ from .build_firmware import BuildFirmwareStage
 from .verify_placement import VerifyPlacementStage
 from .flash import FlashFirmwareStage
 from .capture_pmu import CapturePmuStage
+from .plan_power import PlanPowerRunStage
+from .build_power_firmware import BuildPowerFirmwareStage
+from .flash_power import FlashPowerFirmwareStage
 from .capture_power import CapturePowerStage
+from .collect_power_terminal import CollectPowerTerminalStage
 from .report import GenerateReportStage
 
 __all__ = [
@@ -28,6 +32,10 @@ __all__ = [
     "VerifyPlacementStage",
     "FlashFirmwareStage",
     "CapturePmuStage",
+    "PlanPowerRunStage",
+    "BuildPowerFirmwareStage",
+    "FlashPowerFirmwareStage",
     "CapturePowerStage",
+    "CollectPowerTerminalStage",
     "GenerateReportStage",
 ]

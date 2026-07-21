@@ -21,7 +21,7 @@ import typer
 from .._version import __version__
 from ..config import AGGREGATION_METHODS, POWER_FIRMWARE_MODES, Transport
 from ..engines import EngineType
-from ..placement import ModelLocation, Placement
+from ..placement import Placement
 from ..target.lifecycle import ResetStrategy
 
 app = typer.Typer(
@@ -66,15 +66,12 @@ def _hpx_callback(
 
 
 _ENGINE_CHOICE = click.Choice([engine.value for engine in EngineType])
-_MODEL_LOCATION_CHOICE = click.Choice([loc.value for loc in ModelLocation])
 _ARENA_LOCATION_CHOICE = click.Choice([p.value for p in Placement if p is not Placement.MRAM])
 _WEIGHTS_LOCATION_CHOICE = click.Choice([p.value for p in Placement])
 _CORE_OVERRIDE_CHOICE = click.Choice(["cm4", "cm55"])
 _TRANSPORT_CHOICE = click.Choice([t.value for t in Transport])
 _AGGREGATION_CHOICE = click.Choice(list(AGGREGATION_METHODS))
-_POWER_DRIVER_CHOICE = click.Choice(
-    ["joulescope", "joulescope-js110", "joulescope-js220", "ondevice"]
-)
+_POWER_DRIVER_CHOICE = click.Choice(["joulescope", "ondevice"])
 _POWER_MODE_CHOICE = click.Choice(["external", "internal"])
 _POWER_FIRMWARE_CHOICE = click.Choice(list(POWER_FIRMWARE_MODES))
 _POWER_RESET_STRATEGY_CHOICE = click.Choice([strategy.value for strategy in ResetStrategy])
@@ -117,43 +114,28 @@ def profile_command(
     arena_size: Optional[int] = typer.Option(
         None, "--arena-size", help="Tensor arena size in bytes", rich_help_panel=G_ENGINE
     ),
-    model_location: Optional[str] = typer.Option(
-        None,
-        "--model-location",
-        click_type=_MODEL_LOCATION_CHOICE,
-        help=(
-            "Compatibility placement preset for both arena and weights. "
-            "Prefer --arena-location and --weights-location for runtime engines. "
-            "'auto' picks fastest fit; 'mram' keeps weights in MRAM and arena in fast RAM."
-        ),
-        rich_help_panel=G_ENGINE,
-    ),
     runtime_arena_location: Optional[str] = typer.Option(
         None,
         "--arena-location",
-        "--runtime-arena-location",
         click_type=_ARENA_LOCATION_CHOICE,
         help=(
             "Tensor arena placement. "
             "helia-rt: places the single runtime tensor arena. "
             "helia-aot: use engine.config.aot_args.memory.tensors instead. "
-            "Takes precedence over --model-location for the arena. "
-            "Alias: --runtime-arena-location."
+            "Omit to let the engine and memory planner choose."
         ),
         rich_help_panel=G_ENGINE,
     ),
     runtime_weights_location: Optional[str] = typer.Option(
         None,
         "--weights-location",
-        "--runtime-weights-location",
         click_type=_WEIGHTS_LOCATION_CHOICE,
         help=(
             "Model weights placement. "
             "helia-rt: places the model flatbuffer (psram requires "
             "J-Link upload via the RTT transport). "
             "helia-aot: use engine.config.aot_args.memory.tensors instead. "
-            "Takes precedence over --model-location for weights. "
-            "Alias: --runtime-weights-location."
+            "Omit to let the engine and memory planner choose."
         ),
         rich_help_panel=G_ENGINE,
     ),
@@ -269,12 +251,6 @@ def profile_command(
         rich_help_panel=G_BUILD,
     ),
     # -- PMU profiling --
-    pmu_presets: Optional[list[str]] = typer.Option(
-        None,
-        "--pmu-presets",
-        help="Legacy PMU preset names (default: basic_cpu). Prefer --pmu-counters. Repeatable.",
-        rich_help_panel=G_PMU,
-    ),
     pmu_counters: Optional[list[str]] = typer.Option(
         None,
         "--pmu-counters",
@@ -320,7 +296,7 @@ def profile_command(
         None,
         "--power-driver",
         click_type=_POWER_DRIVER_CHOICE,
-        help="Power driver (default: joulescope = auto-detect JS110/JS220)",
+        help="Power driver (default: joulescope = auto-detect JS110/JS220/JS320)",
         rich_help_panel=G_POWER,
     ),
     power_mode: Optional[str] = typer.Option(
@@ -429,9 +405,6 @@ def profile_command(
         help="Working directory for generated firmware",
         rich_help_panel=G_ADVANCED,
     ),
-    keep_work_dir: bool = typer.Option(
-        False, "--keep-work-dir", help="Keep working directory", rich_help_panel=G_ADVANCED
-    ),
     clean: bool = typer.Option(
         False,
         "--clean",
@@ -449,7 +422,6 @@ def profile_command(
         engine=engine,
         engine_config=engine_config,
         arena_size=arena_size,
-        model_location=model_location,
         runtime_arena_location=runtime_arena_location,
         runtime_weights_location=runtime_weights_location,
         core_override=core_override,
@@ -465,7 +437,6 @@ def profile_command(
         nsx_module_overrides=nsx_module,
         compiler_launcher=compiler_launcher,
         no_compiler_launcher=no_compiler_launcher,
-        pmu_presets=pmu_presets,
         pmu_counters=pmu_counters,
         per_layer=per_layer,
         iterations=iterations,
@@ -486,7 +457,6 @@ def profile_command(
         no_model_explorer=no_model_explorer,
         detailed=detailed,
         work_dir=work_dir,
-        keep_work_dir=keep_work_dir,
         clean=clean,
     )
     _cmd_profile(args)
@@ -597,9 +567,8 @@ probes_app = typer.Typer(
 @probes_app.callback(invoke_without_command=True)
 def _probes_callback(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is None:
-        from .inspect_cmds import _cmd_probes
-
-        _cmd_probes(SimpleNamespace(probes_action=None))
+        click.echo(ctx.get_help())
+        raise typer.Exit(0)
 
 
 @probes_app.command("list", help="List connected J-Link probes")
@@ -645,9 +614,8 @@ ports_app = typer.Typer(help="List host serial ports relevant to HPX transports"
 @ports_app.callback(invoke_without_command=True)
 def _ports_callback(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is None:
-        from .inspect_cmds import _cmd_ports
-
-        _cmd_ports(SimpleNamespace(ports_action=None))
+        click.echo(ctx.get_help())
+        raise typer.Exit(0)
 
 
 @ports_app.command("list", help="List serial ports with J-Link/CDC hints")
@@ -675,9 +643,8 @@ target_app = typer.Typer(help="Run explicit target-side utility operations")
 @target_app.callback(invoke_without_command=True)
 def _target_callback(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is None:
-        from .inspect_cmds import _cmd_target
-
-        _cmd_target(SimpleNamespace(target_action=None))
+        click.echo(ctx.get_help())
+        raise typer.Exit(0)
 
 
 _TARGET_RESET_KIND_CHOICE = click.Choice(["debug", "swpoi"])
@@ -710,7 +677,7 @@ app.add_typer(target_app, name="target")
 # hpx power-on
 # ---------------------------------------------------------------------------
 
-_POWER_ON_DRIVER_CHOICE = click.Choice(["joulescope", "joulescope-js110", "joulescope-js220"])
+_POWER_ON_DRIVER_CHOICE = click.Choice(["joulescope"])
 
 
 @app.command(
@@ -730,11 +697,17 @@ def power_on_command(
         click_type=_POWER_ON_DRIVER_CHOICE,
         help="Joulescope driver (default: auto-detect)",
     ),
+    power_serial: Optional[str] = typer.Option(
+        None,
+        "--power-serial",
+        "--js-serial",
+        help="Joulescope serial number to select when multiple are connected",
+    ),
 ) -> None:
     """Enable Joulescope current passthrough and hold open until Ctrl-C."""
     from .power_cmd import _cmd_power_on
 
-    _cmd_power_on(SimpleNamespace(driver=driver))
+    _cmd_power_on(driver, power_serial=power_serial)
 
 
 # ---------------------------------------------------------------------------
@@ -816,6 +789,16 @@ def validate_command(
     jlink_serials: str = typer.Option(
         "", "--jlink-serials", help="Comma-separated board=serial entries for multi-board validation."
     ),
+    power_serials: str = typer.Option(
+        "",
+        "--power-serials",
+        help="Comma-separated board=Joulescope-serial entries for powered multi-board validation.",
+    ),
+    power_gpios: str = typer.Option(
+        "",
+        "--power-gpios",
+        help="Comma-separated board=gate:state:go entries for powered boards without default sync wiring.",
+    ),
     repeat: int = typer.Option(
         1, "--repeat", help="Repeat each selected case N times for stress testing (default: 1)."
     ),
@@ -853,6 +836,8 @@ def validate_command(
         memories=memories,
         suite=suite,
         jlink_serials=jlink_serials,
+        power_serials=power_serials,
+        power_gpios=power_gpios,
         repeat=repeat,
         output_dir=output_dir,
         timeout=timeout,
@@ -886,6 +871,11 @@ def compare_command(
     output_dir: Optional[Path] = typer.Option(
         None, "--output-dir", help="Write comparison artifacts to this directory"
     ),
+    profile: Optional[Path] = typer.Option(
+        None,
+        "--profile",
+        help="Versioned JSON comparison profile for regression verdicts",
+    ),
     validation: bool = typer.Option(
         False, "--validation", help="Compare portable validation bundles instead of profile runs"
     ),
@@ -900,6 +890,7 @@ def compare_command(
         baseline=baseline,
         candidate=candidate,
         output_dir=output_dir,
+        profile=profile,
         top_layers=top_layers,
         validation=validation,
     )
@@ -926,9 +917,8 @@ cache_app = typer.Typer(
 @cache_app.callback(invoke_without_command=True)
 def _cache_callback(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is None:
-        from .cache_cmd import _cmd_cache
-
-        _cmd_cache(SimpleNamespace(cache_action=None))
+        click.echo(ctx.get_help())
+        raise typer.Exit(0)
 
 
 @cache_app.command("purge", help="Remove all cached data, including workspaces")

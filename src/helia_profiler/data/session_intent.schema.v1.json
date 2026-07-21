@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ambiqai.github.io/helia-profiler/schemas/session-intent/v1.json",
+  "title": "heliaPROFILER Session intent",
+  "type": "object",
+  "required": ["schema", "schema_version", "intent"],
+  "properties": {
+    "schema": {"const": "hpx.session-intent"},
+    "schema_version": {"const": 1},
+    "intent": {"type": "object", "additionalProperties": true}
+  },
+  "additionalProperties": true
+}

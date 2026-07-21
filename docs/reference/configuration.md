@@ -16,29 +16,15 @@ Model file and arena sizing.
 controls for runtime engines such as heliaRT: the arena is the mutable
 tensor arena, while weights are the model flatbuffer/constant data.
 
-``model_location`` is retained as a compatibility preset for older configs.
-Split fields take precedence when present. ``helia-aot`` uses its own
-tensor-kind placement controls via ``engine.config.aot_args.memory.tensors``.
-
-Policy values:
-
-* ``auto`` *(default)* — plan-memory stage picks the fastest region(s)
-  that fit. Greedy fastest-fit with arena prioritized over weights when
-  the two compete for the same region. Order: TCM → SRAM → MRAM.
-* ``tcm`` — force both arena and weights into DTCM (highest performance,
-  smallest capacity). Fails preflight if the SoC has no TCM or it
-  doesn't fit.
-* ``sram`` — force both into shared SRAM.
-* ``mram`` — weights stay in MRAM/Flash (rodata); arena goes to TCM
-  when available, else SRAM. Matches pre-auto-placement behavior.
-* ``psram`` — weights uploaded to external PSRAM at runtime via J-Link;
-  arena in SRAM. Requires a PSRAM-capable board.
+    When a split field is omitted, the engine and memory planner choose the
+    fastest region that fits. ``helia-aot`` translates these coarse controls
+    into tensor rules; explicit ``engine.config.aot_args.memory.tensors`` rules
+    remain available for per-kind and per-tensor placement.
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
 | `path` | Path | `—` |  |
 | `arena_size` | int \| null | `null` |  |
-| `model_location` | auto \| tcm \| sram \| mram \| psram | `auto` | **Deprecated** — prefer `arena_location`/`weights_location` for placement control. |
 | `arena_location` | tcm \| sram \| mram \| psram \| null | `null` |  |
 | `weights_location` | tcm \| sram \| mram \| psram \| null | `null` |  |
 
@@ -64,6 +50,7 @@ Hardware target.
 | `jlink_serial` | str \| null | `null` |  |
 | `transport` | rtt \| usb_cdc \| swo \| uart | `rtt` |  |
 | `usb_port` | str \| null | `null` |  |
+| `segger_rtt_path` | Path \| null | `null` | optional RTT target-source override; takes precedence over `SEGGER_RTT_PATH` and the bundled V8.58.0 sources. |
 | `rtt_buffer_size_up` | int \| null | `null` |  |
 | `clock` | ClockSelection | `see section below` |  |
 | `heartbeat` | HeartbeatConfig | `see section below` |  |
@@ -112,20 +99,16 @@ compute-unit group (``cpu``, ``mve``, ``memory``) to a selection:
 * ``"all"``     — every counter in the group (multi-pass).
 * ``["NAME", …]`` — explicit counter names.
 
-The legacy *pmu_presets* field is still accepted for backward
-compatibility and is converted internally.
-
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `pmu_presets` | tuple[str, ...] | `[basic_cpu]` | **Deprecated** — prefer `pmu_counters`. |
-| `pmu_counters` | dict[str, str \| list[str]] \| null | `null` |  |
+| `pmu_counters` | dict[str, str \| list[str]] | `{'cpu': 'default'}` |  |
 | `per_layer` | bool | `true` |  |
 | `iterations` | int | `100` |  |
 | `warmup` | int | `5` |  |
 | `window_mode` | str | `auto` |  |
 | `window_target_ms` | int | `1000` | units: milliseconds |
 | `window_min` | int | `10` |  |
-| `window_max` | int | `2000` |  |
+| `window_max` | int | `500000` |  |
 | `clean_window_probe` | str | `infer` |  |
 | `clean_window_trace` | bool | `false` |  |
 | `force_shared_sram` | bool | `false` |  |
@@ -237,6 +220,5 @@ Top-level immutable configuration for a profiling run.
 |---|---|---|---|
 | `frozen` | bool | `false` |  |
 | `work_dir` | Path \| null | `null` |  |
-| `keep_work_dir` | bool | `false` | **Deprecated** — no-op, the cache work directory is always kept. |
 | `clean` | bool | `false` |  |
 | `verbose` | int | `0` |  |

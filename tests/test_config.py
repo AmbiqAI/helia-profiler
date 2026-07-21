@@ -20,7 +20,6 @@ from helia_profiler.config import (
 )
 from helia_profiler.errors import ConfigError
 from helia_profiler.pipeline import _serialize_config
-from helia_profiler.placement import ModelLocation
 from helia_profiler.power.base import PowerMode
 
 
@@ -641,46 +640,6 @@ def test_multiple_validation_errors_are_reported_together():
 
 
 
-def test_model_location_deprecation_warning_still_flows_value():
-    cli = {
-        "model": {"path": "m.tflite", "model_location": "mram"},
-        "engine": {"type": "helia-rt"},
-    }
-
-    with pytest.warns(DeprecationWarning, match=r"model\.model_location is deprecated"):
-        config = load_config(None, cli)
-
-    assert config.model.model_location is ModelLocation.MRAM
-
-
-
-def test_pmu_presets_deprecation_warning_still_flows_value():
-    cli = {
-        "model": {"path": "m.tflite"},
-        "engine": {"type": "helia-rt"},
-        "profiling": {"pmu_presets": ["basic_cpu", "memory"]},
-    }
-
-    with pytest.warns(DeprecationWarning, match=r"profiling\.pmu_presets is deprecated"):
-        config = load_config(None, cli)
-
-    assert config.profiling.pmu_presets == ("basic_cpu", "memory")
-
-
-
-def test_keep_work_dir_deprecation_warning_still_flows_value():
-    cli = {
-        "model": {"path": "m.tflite"},
-        "engine": {"type": "helia-rt"},
-        "keep_work_dir": True,
-    }
-
-    with pytest.warns(DeprecationWarning, match="keep_work_dir is deprecated"):
-        config = load_config(None, cli)
-
-    assert config.keep_work_dir is True
-
-
 
 def test_non_dict_heartbeat_is_rejected():
     cli = {
@@ -707,7 +666,7 @@ def test_direct_construction_still_coerces_strings():
 
 def test_config_snapshot_serialization_is_json_safe():
     config = ProfileConfig(
-        model=ModelConfig(path=Path("m.tflite"), model_location="auto"),
+        model=ModelConfig(path=Path("m.tflite")),
         engine=EngineConfig(type=EngineType.HELIA_RT, config={"backend_mode": "fast"}),
         target=TargetConfig(clock={"cpu": "hp"}),
     )

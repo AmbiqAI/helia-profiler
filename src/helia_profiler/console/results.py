@@ -339,8 +339,13 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     # ── Power ─────────────────────────────────────────────────
     if ctx.power_result is not None:
         ps = ctx.power_result.summary
+        degraded = ctx.power_result.metadata.get("integrity") == "degraded"
         power_table = Table(
-            title="[bold]Power[/bold]",
+            title=(
+                "[bold yellow]Power diagnostics (degraded)[/bold yellow]"
+                if degraded
+                else "[bold]Power[/bold]"
+            ),
             box=box.SIMPLE_HEAVY,
             show_edge=False,
             title_justify="left",
@@ -352,7 +357,32 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         power_table.add_row("Avg current", f"{ps.avg_current_a * 1000:.3f} mA")
         power_table.add_row("Avg power", f"{ps.avg_power_w * 1000:.3f} mW")
         power_table.add_row("Peak current", f"{ps.peak_current_a * 1000:.3f} mA")
-        power_table.add_row("Energy", f"{ps.energy_j * 1e6:.3f} µJ")
+        power_table.add_row(
+            "Captured energy" if degraded else "Energy",
+            f"{ps.energy_j * 1e6:.3f} µJ",
+        )
+        if degraded:
+            failure = ctx.power_result.metadata.get("gate_failure", {})
+            if isinstance(failure, dict) and failure.get("kind"):
+                power_table.add_row("Integrity", f"degraded ({failure['kind']})")
+        if ctx.power_run is not None and ctx.power_run.terminal is not None:
+            terminal = ctx.power_run.terminal
+            power_table.add_row(
+                "Firmware status",
+                f"{terminal.status} ({terminal.completed_count}/{terminal.requested_count})",
+            )
+            if terminal.elapsed_us is not None:
+                power_table.add_row(
+                    "Firmware elapsed",
+                    f"{terminal.elapsed_us / 1_000_000:.6f} s",
+                )
+        if ctx.power_run is not None and ctx.power_run.on_device_summary is not None:
+            device_power = ctx.power_run.on_device_summary
+            power_table.add_row("On-device source", device_power.source)
+            power_table.add_row(
+                "On-device energy",
+                f"{device_power.energy_nj / 1000:.3f} µJ",
+            )
 
         console._console.print(power_table)
         console._console.print()

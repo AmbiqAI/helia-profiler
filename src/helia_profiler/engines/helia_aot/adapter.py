@@ -57,20 +57,11 @@ class HeliaAOTAdapter:
     def engine_type(self) -> EngineType:
         return EngineType.HELIA_AOT
 
-    def supports_runtime_split(self) -> bool:
-        # AOT bakes per-tensor placement into the compiled module; the
-        # profiler-config split overrides cannot influence weights.
-        return False
-
     def default_auto_placement(
         self, *, tcm_cap: int, sram_cap: int
     ) -> tuple[Placement, Placement] | None:
-        # AOT: keep simple — auto means weights in MRAM, arena in TCM.
-        # The AOT compiler further redistributes tensors via PUT_IN_*
-        # macros on the codegen side.
-        del sram_cap
-        arena = Placement.TCM if tcm_cap > 0 else Placement.SRAM
-        return arena, Placement.MRAM
+        del tcm_cap, sram_cap
+        return None
 
     def apply_arena_placement_override(
         self, regions: list[ArenaRegion], target: Placement

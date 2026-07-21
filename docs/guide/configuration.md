@@ -144,7 +144,3 @@ below cover behavior that a schema table can't express.
   did-you-mean suggestions based on the real field names.
 - Every config error raised is a `ConfigError` carrying a `hint` describing
   how to fix it.
-- Three keys are deprecated but still work, emitting a warning: `model.model_location`
-  (prefer `arena_location`/`weights_location`), `profiling.pmu_presets`
-  (prefer `pmu_counters`), and `keep_work_dir` (no-op — the cache work
-  directory is always kept).

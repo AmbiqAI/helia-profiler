@@ -15,8 +15,41 @@ from rich.text import Text
 from .tables import _to_float as _to_compare_float
 
 if TYPE_CHECKING:
-    from ..compare import CompareResult, LayerDiffRow, MetricDiff
+    from ..evaluation import CompareResult, LayerDiffRow, MetricDiff
     from .base import HpxConsole
+
+
+def _build_verdict_panel(result: CompareResult) -> Panel | None:
+    verdict = result.verdict
+    if verdict is None:
+        return None
+    styles = {
+        "pass": ("green", "PASS"),
+        "warn": ("yellow", "WARN"),
+        "fail": ("red", "FAIL"),
+        "skip": ("dim", "SKIP"),
+    }
+    style, label = styles[verdict.status.value]
+    body = Text()
+    body.append(label, style=f"bold {style}")
+    if verdict.profile_name:
+        body.append(f"  {verdict.profile_name}")
+    failed = [item.metric for item in verdict.metrics if item.status.value == "fail"]
+    warned = [item.metric for item in verdict.metrics if item.status.value == "warn"]
+    if verdict.dimension_mismatches:
+        body.append("\nDimensions: " + ", ".join(verdict.dimension_mismatches), style="red")
+    if failed:
+        body.append("\nRegressions: " + ", ".join(failed), style="red")
+    if warned:
+        body.append("\nWarnings: " + ", ".join(warned), style="yellow")
+    return Panel(
+        body,
+        title="[bold]Regression Verdict[/bold]",
+        title_align="left",
+        border_style=style,
+        padding=(0, 2),
+        expand=False,
+    )
 
 
 def _find_compare_metric(metrics: list[MetricDiff], name: str) -> MetricDiff | None:
@@ -344,6 +377,11 @@ def print_compare(
 
     console._console.print(overview)
     console._console.print()
+
+    verdict_panel = _build_verdict_panel(result)
+    if verdict_panel is not None:
+        console._console.print(verdict_panel)
+        console._console.print()
 
     if result.warnings:
         warnings = Text()

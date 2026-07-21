@@ -10,6 +10,7 @@ on request.
 
 ```
 results/
+├── result_manifest.json    # Versioned bundle envelope + artifact digests
 ├── summary.json            # Machine-readable high-level summary
 ├── profile_results.csv     # Merged per-layer PMU breakdown (all counters)
 ├── run_metadata.json       # Config, toolchain, platform, model info
@@ -44,12 +45,63 @@ results/
 
 ## File reference
 
+### result_manifest.json
+
+The publication marker for a completed result bundle. HPX writes this file
+after every other report artifact. It records the run identity, validity,
+structured issues, open provenance and comparability fields, plus each
+artifact's relative path, media type, size, and SHA-256 digest.
+
+The v1 schema intentionally fixes only the envelope. `provenance`,
+`comparability`, `extensions`, issue context, artifact metadata, and unknown
+root fields remain open for additive evolution. Consumers must ignore fields
+they do not use. Use `load_result_manifest(path, verify=True)` to reject missing,
+modified, or path-escaping artifacts.
+
+Each declared artifact may include additive semantic metadata:
+
+| Field | Meaning |
+| --- | --- |
+| `role` | `core`, `projection`, `extension`, `export`, or `diagnostic` |
+| `name` | Semantic artifact name used for discovery |
+| `schema` | Content-schema identity only when a published schema actually exists |
+| `schema_version` | Version of that published content schema, independent of the bundle version |
+| `producer` | Component or exporter that generated the artifact |
+| `optional` | Whether a valid bundle may omit this product |
+
+Complete `profile` bundles require named core artifacts for `summary.json`,
+`run_metadata.json`, and the selected primary profile result. Detailed CSV/JSON files are projections or
+diagnostics. heliaAOT files are engine extensions. Model Explorer overlays are
+optional exports governed by the Model Explorer format rather than the HPX core
+schema. Semantic names do not claim a published content schema. `schema` and
+`schema_version` remain absent until HPX or an external owner publishes one.
+Optional means the product need not be generated; once an artifact is
+declared in a manifest, verification still requires its file and digest.
+
+The permissive JSON Schema is shipped as
+`helia_profiler/data/result_manifest.schema.v1.json`.
+
+HPX-owned JSON artifacts carry independent schema identities and versions so
+consumers can evolve parsers without coupling every file to the bundle schema:
+
+| Artifact | Schema | Packaged JSON Schema |
+| --- | --- | --- |
+| `summary.json` | `hpx.run-summary` v1 | `run_summary.schema.v1.json` |
+| `run_metadata.json` | `hpx.run-metadata` v1 | `run_metadata.schema.v1.json` |
+| `profile_results.json` | `hpx.profile-results` v1 | `profile_results.schema.v1.json` |
+
+These schemas require the stable interpretation fields and remain open to
+additive measurements and extensions. CSV output retains its semantic artifact
+name but does not claim a formal content schema yet.
+
 ### summary.json
 
 The top-level summary — start here for a quick overview.
 
 ```json
 {
+  "schema": "hpx.run-summary",
+  "schema_version": 1,
   "engine": "helia-rt",
   "layers": 13,
   "total_cycles": 2016376,
@@ -92,6 +144,11 @@ The top-level summary — start here for a quick overview.
 | `binary` | ELF section sizes (text, data, bss) from `arm-none-eabi-size` |
 | `cache` | Aggregated cache/memory PMU counters + derived L1D hit rate |
 | `power` | Power summary (when Joulescope capture is enabled) |
+
+Every summary also includes top-level `validity` and `issues` fields. Validity
+is `valid`, `degraded`, or `invalid`; issues carry stable codes, severity,
+human guidance, and open context. Consumers should inspect these fields before
+using headline metrics.
 
 ### profile_results.csv
 

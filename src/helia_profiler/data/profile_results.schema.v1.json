@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ambiqai.github.io/helia-profiler/schemas/profile-results/v1.json",
+  "title": "heliaPROFILER profile results",
+  "type": "object",
+  "required": ["schema", "schema_version", "metadata", "summary", "layers", "presets", "overflow_detected"],
+  "properties": {
+    "schema": {"const": "hpx.profile-results"},
+    "schema_version": {"const": 1},
+    "metadata": {"type": "object", "additionalProperties": true},
+    "summary": {"type": "object", "additionalProperties": true},
+    "layers": {"type": "array", "items": {"type": "object"}},
+    "presets": {"type": "object", "additionalProperties": true},
+    "overflow_detected": {"type": "boolean"},
+    "power": {"type": "object", "additionalProperties": true}
+  },
+  "additionalProperties": true
+}

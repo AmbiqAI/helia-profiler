@@ -7,7 +7,7 @@
 # per-tensor `memory.tensors` overrides let us move the ARENA (scratch +
 # persistent) to TCM and pin only the highest-cycle-share CONSTANT
 # (weight) tensors into TCM as well, leaving the rest of the weights cold
-# in MRAM -- something heliaRT's engine-level model_location/
+# in MRAM -- something heliaRT's coarse weights placement/
 # arena_location knobs cannot express at all (it's TCM-for-everything or
 # nothing).
 #
@@ -108,4 +108,3 @@ output:
   dir: ./results/mlperf_tiny/vww_aot_power_ap330_hotpath_tcm
   model_explorer: false
   detailed: true
-

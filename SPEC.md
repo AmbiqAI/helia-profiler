@@ -219,17 +219,17 @@ target:
   # jlink_serial: "801000001"  # select J-Link probe by serial number
 
 profiling:
-  pmu_presets:                  # which PMU counter groups to capture
-    - basic_cpu
-    - memory
-    - mve
+  pmu_counters:                 # compute-unit groups and counter selections
+    cpu: default
+    memory: default
+    mve: default
   per_layer: true               # per-layer breakdown vs whole-model only
   iterations: 100               # inference iterations per PMU preset
   warmup: 5                     # warmup iterations before measurement
 
 power:
   enabled: false
-  driver: joulescope            # joulescope | joulescope-js110 | joulescope-js220 | ondevice
+  driver: joulescope            # joulescope (JS110/JS220/JS320) | ondevice
   mode: external                # external (Joulescope) | internal (on-device)
   duration_s: 30
   io_voltage: 1.8
@@ -431,7 +431,7 @@ hpx version
 
 Flags are organized into logical groups in `--help` output for progressive
 disclosure. The most common options (model, config, verbosity) appear first;
-advanced options (work-dir, keep-work-dir) appear last.
+advanced options such as `--work-dir` appear last.
 
 **Top-level:**
 
@@ -470,7 +470,7 @@ advanced options (work-dir, keep-work-dir) appear last.
 | Flag | Type | Description |
 | --- | --- | --- |
 | `--power` | flag | Enable Joulescope power capture |
-| `--power-driver` | choice | `joulescope`, `joulescope-js110`, `joulescope-js220`, `ondevice` |
+| `--power-driver` | choice | `joulescope`, `ondevice` |
 | `--power-mode` | choice | `external`, `internal` |
 | `--power-duration` | int | Power capture seconds (default: 30) |
 | `--sync-gpio` | int | GPIO pin for external power sync (default: 10) |
@@ -488,7 +488,6 @@ advanced options (work-dir, keep-work-dir) appear last.
 | Flag | Type | Description |
 | --- | --- | --- |
 | `--work-dir` | path | Working directory for generated firmware (default: temp) |
-| `--keep-work-dir` | flag | Don't delete working directory after profiling |
 
 CLI flags override YAML values. YAML provides defaults for reproducible runs.
 
@@ -512,7 +511,7 @@ config = ProfileConfig(
     model=ModelConfig(path="kws.tflite", arena_size=65536),
     engine=EngineConfig(type="tflm"),
     target=TargetConfig(board="apollo510_evb"),
-    profiling=ProfilingConfig(pmu_presets=["basic_cpu"]),
+    profiling=ProfilingConfig(pmu_counters={"cpu": "default"}),
     output=OutputConfig(dir="./results"),
 )
 result = profile(config)

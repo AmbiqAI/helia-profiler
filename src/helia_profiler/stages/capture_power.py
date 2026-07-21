@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 
+from ..results import PowerObservation
 from ..config import DEFAULT_POWER_DURATION_S, DEFAULT_POWER_WINDOW_TARGET_MS
 from ..errors import PowerError
 from ..pipeline import PipelineContext
@@ -71,6 +72,16 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
     cycles_per_inference = total_cycles
     inference_time_s = cycles_per_inference / clock_hz
 
+    if (
+        ctx.power_plan is not None
+        and ctx.power_plan.inference_count is not None
+        and ctx.power_plan.reference_inference_us is not None
+    ):
+        planned_run_s = (
+            ctx.power_plan.inference_count * ctx.power_plan.reference_inference_us
+        ) / 1_000_000.0
+        return _BOOT_SETTLE_S + planned_run_s + _SAFETY_MARGIN_S
+
     profiling = ctx.config.profiling
     num_presets = len(pmu.presets) or 1
     profiled_inferences = num_presets * (profiling.warmup + profiling.iterations)
@@ -100,9 +111,7 @@ class CapturePowerStage:
         return "capture_power"
 
     def should_skip(self, ctx: PipelineContext) -> bool:
-        if not ctx.config.power.enabled:
-            return True
-        return False
+        return not ctx.config.power.enabled or ctx.config.power.mode.value == "internal"
 
     def run(self, ctx: PipelineContext) -> None:
         from ..capture import capture_power
@@ -157,6 +166,22 @@ class CapturePowerStage:
         else:
             capture_duration = configured
 
+        planned_count = ctx.power_plan.inference_count if ctx.power_plan is not None else None
+        planned_us = (
+            ctx.power_plan.reference_inference_us if ctx.power_plan is not None else None
+        )
+        message = "Arming instrument and resetting target"
+        if planned_count is not None:
+            message += f" · {planned_count:,} inferences"
+        ctx.report_progress(
+            message,
+            eta_s=(
+                planned_count * planned_us / 1_000_000
+                if planned_count is not None and planned_us is not None
+                else capture_duration
+            ),
+        )
+
         try:
             power_result = capture_power(
                 ctx,
@@ -171,10 +196,41 @@ class CapturePowerStage:
                 hint=(f"Check that the {driver_name} is connected and powered on. Mode: {mode}."),
             ) from exc
 
-        ctx.power_result = power_result
+        valid_gate = (
+            power_result.metadata.get("measurement_scope")
+            == "gpio_gated_clean_window"
+        )
+        if not valid_gate:
+            observation = PowerObservation(
+                mode="free_form",
+                result=power_result,
+                gate_rise_observed=bool(
+                    power_result.metadata.get("gate_rise_observed", False)
+                ),
+                gate_fall_observed=bool(
+                    power_result.metadata.get("gate_fall_observed", False)
+                ),
+                deadline_s=capture_duration,
+                integrity="degraded",
+            )
+        else:
+            observation = PowerObservation(
+                mode="gpio_gated",
+                result=power_result,
+                gate_rise_observed=True,
+                gate_fall_observed=True,
+                deadline_s=capture_duration,
+                integrity="valid",
+            )
+        ctx.publish_power_observation(observation)
         log.info(
             "Captured power data (%.1fs, driver=%s, mode=%s)",
             capture_duration,
             driver_name,
             mode,
+        )
+        ctx.report_progress(
+            "Power capture complete",
+            kind="checkpoint",
+            min_verbosity=0,
         )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from helia_profiler.errors import FirmwareError
 from helia_profiler.firmware import (
     _board_module_name,
     _find_segger_rtt_dir,
+    _is_segger_rtt_root,
     _model_to_header,
     _resolve_module_list,
     _resolve_module_specs,
@@ -236,11 +238,27 @@ def _make_fake_rtt_root(path: Path) -> Path:
 
 def test_find_segger_rtt_dir_prefers_explicit_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     explicit = _make_fake_rtt_root(tmp_path / "explicit")
-    auto = _make_fake_rtt_root(tmp_path / "auto")
     monkeypatch.setenv("SEGGER_RTT_PATH", str(explicit))
-    monkeypatch.setattr("helia_profiler.firmware._segger_rtt_candidates", lambda: (auto,))
 
     assert _find_segger_rtt_dir() == explicit
+
+
+def test_find_segger_rtt_dir_prefers_config_over_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configured = _make_fake_rtt_root(tmp_path / "configured")
+    environment = _make_fake_rtt_root(tmp_path / "environment")
+    monkeypatch.setenv("SEGGER_RTT_PATH", str(environment))
+
+    assert _find_segger_rtt_dir(configured) == configured
+
+
+def test_find_segger_rtt_dir_rejects_invalid_config_path(tmp_path: Path) -> None:
+    invalid = tmp_path / "not-rtt"
+    invalid.mkdir()
+
+    with pytest.raises(FirmwareError, match="target.segger_rtt_path"):
+        _find_segger_rtt_dir(invalid)
 
 
 def test_find_segger_rtt_dir_expands_explicit_env_user_home(
@@ -262,14 +280,45 @@ def test_find_segger_rtt_dir_expands_explicit_env_user_home(
     assert _find_segger_rtt_dir() == explicit.resolve()
 
 
-def test_find_segger_rtt_dir_auto_detects_common_candidate(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    candidate = _make_fake_rtt_root(tmp_path / "examples" / "quickstart" / "RTT")
+def test_find_segger_rtt_dir_uses_bundled_sources_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.delenv("SEGGER_RTT_PATH", raising=False)
-    monkeypatch.setattr("helia_profiler.firmware._segger_rtt_candidates", lambda: (candidate,))
 
-    assert _find_segger_rtt_dir() == candidate.resolve()
+    bundled = _find_segger_rtt_dir()
+
+    assert bundled.name == "segger_rtt"
+    assert _is_segger_rtt_root(bundled)
+    assert (bundled / "LICENSE.md").is_file()
+    source = (bundled / "SOURCE.md").read_text()
+    assert "V8.58.0" in source
+    assert "4d8feab3150f86f37a9d323ddc88d6cdf5673072" in source
+    implementation = (bundled / "RTT" / "SEGGER_RTT.c").read_text()
+    assert "SEGGER_RTT_PUT_CB_SECTION" in implementation
+    assert "SEGGER_RTT_PUT_BUFFER_SECTION" in implementation
+
+
+def test_bundled_segger_rtt_file_integrity(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SEGGER_RTT_PATH", raising=False)
+    bundled = _find_segger_rtt_dir()
+    expected = {
+        "LICENSE.md": "e033779c697246a7a89eb411eca41cabb791dbf0b23619cfbd6d42429191baa8",
+        "RTT/SEGGER_RTT.c": "caf3d20bc2def30e176f937a56c878a363dec3cd805334ea8173f22e097f1106",
+        "RTT/SEGGER_RTT.h": "b8b6c29abd72c42082502306fe7cdaa0ca90ca2a9b7821dceaa3b023b75f4d95",
+        "RTT/SEGGER_RTT_ConfDefaults.h": (
+            "d2af82ee107fba25157e850109ed9da38243d234f5b70a1039a5c37a0579a054"
+        ),
+        "Config/SEGGER_RTT_Conf.h": (
+            "d02ef83f826dd29cddb466adca6c75dbdd71128f18bc6bef1113ca0127944d6f"
+        ),
+    }
+
+    actual = {
+        relative: hashlib.sha256((bundled / relative).read_bytes()).hexdigest()
+        for relative in expected
+    }
+
+    assert actual == expected
 
 
 def test_find_segger_rtt_dir_rejects_invalid_explicit_env(
@@ -277,9 +326,7 @@ def test_find_segger_rtt_dir_rejects_invalid_explicit_env(
 ):
     invalid = tmp_path / "not-rtt"
     invalid.mkdir()
-    auto = _make_fake_rtt_root(tmp_path / "auto")
     monkeypatch.setenv("SEGGER_RTT_PATH", str(invalid))
-    monkeypatch.setattr("helia_profiler.firmware._segger_rtt_candidates", lambda: (auto,))
 
     with pytest.raises(FirmwareError, match="SEGGER_RTT_PATH"):
         _find_segger_rtt_dir()
@@ -710,10 +757,18 @@ class TestGenerateApp:
         main_power_cc = (app_dir / "src" / "main_power.cc").read_text()
         cmake = (app_dir / "CMakeLists.txt").read_text()
         assert "hpx_profiler_power" in cmake
+        assert "add_executable(hpx_profiler_power EXCLUDE_FROM_ALL" in cmake
         assert "nsx_finalize_app(hpx_profiler_power)" in cmake
         assert "src/main_power.cc" in cmake
-        # power_only render never brings up a transport.
-        assert "SEGGER_RTT" not in main_power_cc
+        assert (
+            "target_compile_definitions(hpx_profiler_power PRIVATE "
+            "BUFFER_SIZE_UP="
+        ) in cmake
+        # RTT diagnostics are configured only after the measured gate closes.
+        assert main_power_cc.index("hpx_sync_window_end();") < main_power_cc.rindex(
+            "hpx_power_terminal_report("
+        )
+        assert "NSX_DEBUG_NONE" in main_power_cc
         assert "nsx_uart_printf_enable();" not in main_power_cc
         assert "nsx_itm_printf_enable();" not in main_power_cc
 
@@ -909,12 +964,12 @@ class TestGenerateApp:
             {
                 "model": {
                     "path": str(model),
+                    "weights_location": "psram",
                 },
                 "engine": {
                     "type": "helia-rt",
                     "config": {
                         "dist_path": str(fake_dist),
-                        "runtime_weights_location": "psram",
                     },
                 },
                 "target": {"board": "apollo510_evb"},
@@ -974,7 +1029,7 @@ class TestBuildApp:
         assert out_build_dir == build_dir
         assert out_binary == binary
 
-    def test_power_enabled_builds_and_locates_power_binary(
+    def test_power_enabled_defers_power_target_until_after_profile(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
     ):
         model = tmp_path / "model.tflite"
@@ -998,8 +1053,8 @@ class TestBuildApp:
         build_dir.mkdir(parents=True, exist_ok=True)
         binary = build_dir / "hpx_profiler.bin"
         binary.write_bytes(b"bin")
-        power_binary = build_dir / "hpx_profiler_power.bin"
-        power_binary.write_bytes(b"powerbin")
+        stale_power_binary = build_dir / "hpx_profiler_power.bin"
+        stale_power_binary.write_bytes(b"stale")
         object.__setattr__(ctx, "firmware_dir", app_dir)
 
         build_calls: list[dict] = []
@@ -1014,14 +1069,12 @@ class TestBuildApp:
 
         out_build_dir, out_binary = build_app(ctx)
 
-        # One build() call for hpx_profiler (default target) and a second
-        # explicit call for hpx_profiler_power (same configure/module-sync).
-        assert len(build_calls) == 2
+        assert len(build_calls) == 1
         assert build_calls[0].get("target") is None
-        assert build_calls[1]["target"] == "hpx_profiler_power"
         assert out_build_dir == build_dir
         assert out_binary == binary
-        assert ctx.power_binary_path == power_binary
+        assert ctx.power_binary_path is None
+        assert stale_power_binary.read_bytes() == b"stale"
 
     def test_power_disabled_does_not_build_power_target(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
@@ -1411,7 +1464,11 @@ class TestNsxModuleOverrides:
         config = load_config(
             None,
             {
-                "model": {"path": str(model), "model_location": "psram"},
+                "model": {
+                    "path": str(model),
+                    "arena_location": "sram",
+                    "weights_location": "psram",
+                },
                 "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
                 "target": {"board": "apollo510_evb", "transport": "rtt"},
                 "work_dir": str(tmp_path / "work"),

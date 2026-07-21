@@ -43,7 +43,6 @@ def _sample_pmu_passes() -> list[dict[str, object]]:
 
 def _render_tflm(
     transport: str = "rtt",
-    model_location: str = "mram",
     arena_region: str = "tcm",
     weights_region: str = "mram",
     has_armv8m_pmu: bool = True,
@@ -56,6 +55,8 @@ def _render_tflm(
     usb_serial_marker: str | None = None,
     window_mode: str = "fixed",
     clean_window_probe: str = "infer",
+    clean_iters: int = 3,
+    power_only: bool = False,
 ) -> str:
     registrations = resolver_registrations or ["r.AddConv2D();", "r.AddSoftmax();"]
     return _env.get_template("main.cc.j2").render(
@@ -69,7 +70,8 @@ def _render_tflm(
         iterations=3,
         warmup=1,
         clean_warmup=1,
-        clean_iters=3,
+        clean_iters=clean_iters,
+        power_only=power_only,
         window_mode=window_mode,
         window_target_ms=250,
         window_min=10,
@@ -81,7 +83,6 @@ def _render_tflm(
         sync_gpio_pin=91,
         transport=transport,
         usb_serial_marker=usb_serial_marker,
-        model_location=model_location,
         arena_region=arena_region,
         weights_region=weights_region,
         model_size=1024,
@@ -110,6 +111,8 @@ def _render_aot(
     cmsis_device_header: str = "apollo510.h",
     window_mode: str = "fixed",
     clean_window_probe: str = "infer",
+    clean_iters: int = 3,
+    power_only: bool = False,
 ) -> str:
     return _env.get_template("main_aot.cc.j2").render(
         aot_prefix="fake",
@@ -118,7 +121,8 @@ def _render_aot(
         iterations=3,
         warmup=1,
         clean_warmup=1,
-        clean_iters=3,
+        clean_iters=clean_iters,
+        power_only=power_only,
         window_mode=window_mode,
         window_target_ms=250,
         window_min=10,
@@ -161,6 +165,39 @@ class TestMainCcRender:
         # can link to it).
         assert "void hpx_printf(" in out
         assert "static void hpx_printf(" not in out
+
+    def test_power_only_routes_recoverable_errors_to_terminal_finalizer(self):
+        out = _render_tflm(transport="rtt", power_only=True)
+        assert 'hpx_power_terminal_fail("schema", 2U);' in out
+        assert 'hpx_power_terminal_fail("resolver", 3U);' in out
+        assert 'hpx_power_terminal_fail("allocate", 4U);' in out
+        assert out.index("hpx_sync_window_end();") < out.rindex(
+            "hpx_power_terminal_report("
+        )
+
+    def test_power_only_uart_enables_transport_after_gate(self):
+        out = _render_tflm(transport="uart", power_only=True)
+        assert "nsx_uart_printf_enable();" in out
+        assert out.index("hpx_sync_window_end();") < out.rindex(
+            "hpx_power_terminal_report("
+        )
+        assert "sys_cfg.debug.transport = NSX_DEBUG_NONE;" in out
+
+    def test_power_only_swo_enables_transport_after_gate(self):
+        out = _render_tflm(transport="swo", power_only=True)
+        assert "nsx_itm_printf_enable();" in out
+        assert out.index("hpx_sync_window_end();") < out.rindex(
+            "hpx_power_terminal_report("
+        )
+        assert "sys_cfg.debug.transport = NSX_DEBUG_NONE;" in out
+
+    def test_power_only_usb_initializes_transport_after_gate(self):
+        out = _render_tflm(transport="usb_cdc", power_only=True)
+        assert "nsx_usb_init(&g_usb_cfg)" in out
+        assert out.index("hpx_sync_window_end();") < out.rindex(
+            "hpx_power_terminal_report("
+        )
+        assert "sys_cfg.debug.transport = NSX_DEBUG_NONE;" in out
 
     def test_rtt_transport_includes_drain_helper(self):
         out = _render_tflm(transport="rtt")
@@ -298,7 +335,6 @@ class TestMainCcRender:
             power_sync_enabled=False,
             sync_gpio_pin=91,
             transport="rtt",
-            model_location="mram",
             arena_region="tcm",
             weights_region="mram",
             model_size=1024,
@@ -406,7 +442,6 @@ class TestMainCcRender:
             power_sync_enabled=True,
             sync_gpio_pin=42,
             transport="rtt",
-            model_location="mram",
             arena_region="tcm",
             weights_region="mram",
             model_size=1024,
@@ -433,13 +468,13 @@ class TestMainCcRender:
         # redefine it (that would be a duplicate symbol at link time).
         assert "ns_core_initialized" not in out
 
-    def test_psram_model_location_skips_model_data_header(self):
-        out = _render_tflm(transport="rtt", model_location="psram", weights_region="psram")
+    def test_psram_weights_skip_model_data_header(self):
+        out = _render_tflm(transport="rtt", weights_region="psram")
         assert '#include "model_data.h"' not in out
         assert "nsx_psram.h" in out
 
     def test_psram_weights_override_skips_model_data_header(self):
-        out = _render_tflm(transport="rtt", model_location="auto", weights_region="psram")
+        out = _render_tflm(transport="rtt", weights_region="psram")
         assert '#include "model_data.h"' not in out
         assert "nsx_psram.h" in out
 
@@ -460,6 +495,26 @@ class TestMainAotCcRender:
     def test_aot_hpx_printf_is_static(self):
         out = _render_aot(transport="rtt")
         assert "static void hpx_printf(" in out
+
+    def test_power_only_routes_recoverable_errors_to_terminal_finalizer(self):
+        out = _render_aot(
+            transport="rtt",
+            power_only=True,
+            arena_regions=[
+                {
+                    "region_id": 0,
+                    "placement": "tcm",
+                    "alignment": 64,
+                    "size": 4096,
+                    "blob_filename": None,
+                }
+            ],
+        )
+        assert 'hpx_power_terminal_fail("bind_arena", 5U);' in out
+        assert 'hpx_power_terminal_fail("model_init", 6U);' in out
+        assert out.index("hpx_sync_window_end();") < out.rindex(
+            "hpx_power_terminal_report("
+        )
 
     def test_usb_transport_includes_timer_helpers(self):
         out = _render_aot(transport="usb_cdc")
@@ -570,6 +625,19 @@ class TestMainAotCcRender:
             # (iters * warm cycles / clock) so the host can widen its deadline.
             assert "phase=clean_window_begin iters=%d est_ms=%llu" in out
             assert "clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)" in out
+            assert out.index("hpx_sync_ready();") < out.index("hpx_sync_wait_go();")
+            assert out.index("hpx_sync_ready();") > out.index("clean_warm_cyc")
+
+    def test_power_only_fixed_count_override(self):
+        for render in (_render_tflm, _render_aot):
+            out = render(
+                transport="rtt",
+                power_only=True,
+                window_mode="fixed",
+                clean_iters=2247,
+            )
+            assert "const int clean_iters_n = 2247;" in out
+            assert "uint32_t clean_warm_cyc = 0U;" not in out
 
     def test_busy_loop_probe_replaces_clean_window_body(self):
         tflm_out = _render_tflm(

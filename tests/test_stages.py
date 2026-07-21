@@ -139,6 +139,34 @@ class TestResolveJLinkProbeStage:
         stage = ResolveJLinkProbeStage()
         assert stage.should_skip(ctx)
 
+    def test_retries_probe_resolution_after_power_on(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.errors import ConfigError
+
+        ctx = _make_ctx(tmp_path)
+        ResolvePlatformStage().run(ctx)
+        ctx.target_power_ensured = True
+        calls = iter(
+            [
+                ConfigError("No J-Link probes detected."),
+                "1160002204",
+            ]
+        )
+
+        def resolve(**_kwargs):
+            value = next(calls)
+            if isinstance(value, Exception):
+                raise value
+            return value
+
+        monkeypatch.setattr("helia_profiler.stages.resolve_probe.resolve_probe_serial", resolve)
+        monkeypatch.setattr("helia_profiler.stages.resolve_probe.time.sleep", lambda _s: None)
+
+        ResolveJLinkProbeStage().run(ctx)
+
+        assert ctx.resolved_jlink_serial == "1160002204"
+
 
 class TestGenerateFirmwareStage:
     def test_no_artifacts_raises_firmware_error(self, tmp_path: Path):

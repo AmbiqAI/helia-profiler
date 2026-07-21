@@ -2,21 +2,8 @@
 
 from __future__ import annotations
 
-import argparse
 import shutil
-import sys
 from pathlib import Path
-
-
-def _cmd_cache(args: argparse.Namespace) -> None:
-    action = getattr(args, "cache_action", None)
-    if action == "purge":
-        _cmd_cache_purge()
-    elif action == "info":
-        _cmd_cache_info()
-    else:
-        print("Usage: hpx cache {purge|info}", file=sys.stderr)
-        sys.exit(1)
 
 
 def _workspace_cache_root() -> Path:

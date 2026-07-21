@@ -21,6 +21,14 @@ Every recipe follows the same shape:
 
 <div class="grid cards" markdown>
 
+-   :material-notebook-outline:{ .lg .middle } __Interactive Python__
+
+    ---
+
+    Explore typed results and branch immutable experiments in a notebook.
+
+    [:octicons-arrow-right-24: Read](interactive-python.md)
+
 -   :material-play:{ .lg .middle } __Basic Profiling__
 
     ---

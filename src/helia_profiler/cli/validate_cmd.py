@@ -45,7 +45,7 @@ _MEMORY_ALIASES = {
 }
 
 
-def _parse_jlink_serials(raw: str) -> dict[str, str] | None:
+def _parse_board_serials(raw: str, *, option: str) -> dict[str, str] | None:
     raw = (raw or "").strip()
     if not raw:
         return None
@@ -54,11 +54,36 @@ def _parse_jlink_serials(raw: str) -> dict[str, str] | None:
         board, sep, serial = item.partition("=")
         if not sep or not board.strip() or not serial.strip():
             print(
-                f"Error: invalid --jlink-serials entry {item!r}; expected board=serial.",
+                f"Error: invalid {option} entry {item!r}; expected board=serial.",
                 file=sys.stderr,
             )
             sys.exit(2)
         mapping[board.strip()] = serial.strip()
+    return mapping
+
+
+def _parse_power_gpio_pins(raw: str) -> dict[str, tuple[int, int, int]] | None:
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    mapping: dict[str, tuple[int, int, int]] = {}
+    for item in [p.strip() for p in raw.split(",") if p.strip()]:
+        board, sep, pins_raw = item.partition("=")
+        values = [value.strip() for value in pins_raw.split(":")]
+        if not sep or not board.strip() or len(values) != 3:
+            print(
+                f"Error: invalid --power-gpios entry {item!r}; expected board=gate:state:go.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        try:
+            mapping[board.strip()] = tuple(int(value, 0) for value in values)  # type: ignore[assignment]
+        except ValueError:
+            print(
+                f"Error: invalid --power-gpios entry {item!r}; GPIO pins must be integers.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
     return mapping
 
 
@@ -165,7 +190,9 @@ def _cmd_validate(args: argparse.Namespace) -> None:
     toolchains_csv = _normalise_toolchains(args.toolchains)
     transports_csv = _normalise_transports(args.transports)
     memories_csv = _normalise_memories(args.memories)
-    jlink_serials = _parse_jlink_serials(args.jlink_serials)
+    jlink_serials = _parse_board_serials(args.jlink_serials, option="--jlink-serials")
+    power_serials = _parse_board_serials(args.power_serials, option="--power-serials")
+    power_gpio_pins = _parse_power_gpio_pins(args.power_gpios)
 
     # --list mode — preview the matrix, don't touch hardware.
     if args.list:
@@ -179,6 +206,8 @@ def _cmd_validate(args: argparse.Namespace) -> None:
                 transports=[t.strip() for t in transports_csv.split(",") if t.strip()] or None,
                 memories=[m.strip() for m in memories_csv.split(",") if m.strip()] or None,
                 jlink_serials=jlink_serials,
+                power_serials=power_serials,
+                power_gpio_pins=power_gpio_pins,
                 repeat=args.repeat,
             )
         except ValueError as exc:
@@ -245,6 +274,10 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         pytest_args += ["--mlperf-memories", memories_csv]
     if args.jlink_serials.strip():
         pytest_args += ["--mlperf-jlink-serials", args.jlink_serials.strip()]
+    if args.power_serials.strip():
+        pytest_args += ["--mlperf-power-serials", args.power_serials.strip()]
+    if args.power_gpios.strip():
+        pytest_args += ["--mlperf-power-gpios", args.power_gpios.strip()]
     pytest_args += ["--mlperf-repeat", str(args.repeat)]
     if args.keyword:
         pytest_args += ["-k", args.keyword]

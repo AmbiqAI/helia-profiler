@@ -135,10 +135,6 @@ def collect_lines(
     heartbeat_timeout_s: float = HEARTBEAT_TIMEOUT_S,
     poll_interval_s: float = 0.005,
     on_line: Callable[[str, float], None] | None = None,
-    # Legacy kwargs — accepted for back-compat; if provided they override
-    # the new parameters.  Will be removed in a future release.
-    timeout_s: float | None = None,
-    line_timeout_s: float | None = None,
 ) -> list[str]:
     """Collect HPX protocol lines from a byte-stream transport.
 
@@ -162,17 +158,9 @@ def collect_lines(
         heartbeat_timeout_s: Max gap between *any* received lines.
         poll_interval_s: Sleep between ``read_fn()`` polls when no data
             is available.
-        timeout_s: Deprecated.  Maps to ``overall_timeout_s`` if provided.
-        line_timeout_s: Deprecated.  Maps to ``heartbeat_timeout_s``.
-
     Returns:
         List of non-empty, stripped text lines.
     """
-    if timeout_s is not None:
-        overall_timeout_s = timeout_s
-    if line_timeout_s is not None:
-        heartbeat_timeout_s = line_timeout_s
-
     lines: list[str] = []
     buf = b""
     start = time.monotonic()

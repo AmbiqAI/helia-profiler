@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
-from ..compare import CompareResult, compare_runs, write_compare_artifacts
+from ..evaluation import CompareResult, compare_runs, write_compare_artifacts
 from ..errors import HpxError, ReportError
 from .bundle import (
     ValidationBundle,

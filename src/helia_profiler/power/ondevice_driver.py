@@ -27,6 +27,8 @@ class OnDeviceDriver:
     per inference (or per layer).
     """
 
+    supports_firmware_measurement = False
+
     @property
     def name(self) -> str:
         return "On-Device"

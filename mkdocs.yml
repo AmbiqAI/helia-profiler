@@ -146,8 +146,10 @@ nav:
       - Model Explorer Overlays: guide/model-explorer.md
       - Output & Results: guide/output.md
       - Hardware Validation Artifacts: guide/hardware-ci.md
+      - Release Process: guide/releasing.md
   - Examples:
       - Overview: examples/index.md
+      - Interactive Python: examples/interactive-python.md
       - Basic Profiling: examples/basic-profiling.md
       - Vanilla TFLM Baseline: examples/tflm-baseline.md
       - Per-Layer Breakdown: examples/per-layer.md
@@ -176,6 +178,8 @@ nav:
       - Configuration Reference: reference/configuration.md
       - Python API:
           - Overview: reference/api/index.md
+          - Interactive Sessions: reference/api/session.md
+          - Power Result Types: reference/api/power-results.md
           - profile(): reference/api/profile.md
           - Configuration: reference/api/config.md
           - Results: reference/api/results.md
@@ -183,6 +187,8 @@ nav:
   - Architecture:
       - Overview: architecture/index.md
       - Pipeline & Stages: architecture/pipeline.md
+      - Public Release Readiness: architecture/public-release-readiness.md
+      - Profile and Power Refactor Plan: architecture/profile-power-refactor-plan.md
       - Engine Adapters: architecture/engine-adapters.md
       - Firmware Generation: architecture/firmware.md
       - Data Capture: architecture/capture.md

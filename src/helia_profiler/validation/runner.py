@@ -34,7 +34,7 @@ from typing import Any
 import yaml
 
 from ..engines import EngineType
-from .matrix import CaseSpec
+from .matrix import CaseSpec, MemoryProfile
 
 _TRANSIENT_POWER_LOCK_RETRY_DELAY_S = 5.0
 _TRANSIENT_POWER_LOCK_MARKERS = (
@@ -62,6 +62,7 @@ class CaseResult:
     transport: str
     memory: str
     jlink_serial: str | None = None
+    power_serial: str | None = None
     attempt: int = 1
     repeat_total: int = 1
     health_issues: tuple[str, ...] = ()
@@ -72,6 +73,11 @@ class CaseResult:
     energy_uj: float | None = None
     avg_current_ma: float | None = None
     peak_current_ma: float | None = None
+    gated_window_duration_suspect: bool = False
+    gate_duration_integrity_valid: bool | None = None
+    power_observation_mode: str | None = None
+    power_observation_integrity: str | None = None
+    power_gate_failure_kind: str | None = None
     aot_operator_count: int | None = None
 
     # Diagnostics
@@ -124,11 +130,21 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
     The shape mirrors the existing `hpx_kws_*.yml` files so any change
     there is trivially transferable.
     """
+    placement: dict[str, str] = {}
+    if case.memory is MemoryProfile.TCM:
+        placement = {"arena_location": "tcm", "weights_location": "tcm"}
+    elif case.memory is MemoryProfile.SRAM:
+        placement = {"arena_location": "sram", "weights_location": "sram"}
+    elif case.memory is MemoryProfile.MRAM:
+        placement = {"weights_location": "mram"}
+    elif case.memory is MemoryProfile.PSRAM:
+        placement = {"arena_location": "sram", "weights_location": "psram"}
+
     cfg: dict[str, Any] = {
         "model": {
             "path": str((repo_root / case.model.fixture_path).resolve()),
             "arena_size": case.model.arena_size,
-            "model_location": case.memory.value,
+            **placement,
         },
         "engine": {
             "type": case.engine.value,
@@ -139,7 +155,7 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
             "transport": case.transport.value,
         },
         "profiling": {
-            "pmu_presets": ["basic_cpu"],
+            "pmu_counters": {"cpu": "default"},
             "per_layer": True,
             "iterations": 3,
             "warmup": 1,
@@ -164,6 +180,17 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
                 "io_voltage": 1.8,
             }
         )
+        if case.power_serial:
+            cfg["power"]["serial"] = case.power_serial
+        if case.power_gpio_pins:
+            sync, state, go = case.power_gpio_pins
+            cfg["power"].update(
+                {
+                    "sync_gpio_pin": sync,
+                    "state_gpio_pin": state,
+                    "go_gpio_pin": go,
+                }
+            )
 
     if case.jlink_serial:
         cfg["target"]["jlink_serial"] = case.jlink_serial
@@ -361,6 +388,7 @@ def run_case(
                 transport=case.transport.value,
                 memory=case.memory.value,
                 jlink_serial=case.jlink_serial,
+                power_serial=case.power_serial,
                 attempt=case.attempt,
                 repeat_total=case.repeat_total,
                 output_dir=str(case_dir),
@@ -417,6 +445,7 @@ def run_case(
             transport=case.transport.value,
             memory=case.memory.value,
             jlink_serial=case.jlink_serial,
+            power_serial=case.power_serial,
             attempt=case.attempt,
             repeat_total=case.repeat_total,
             output_dir=str(case_dir),
@@ -439,6 +468,7 @@ def run_case(
         transport=case.transport.value,
         memory=case.memory.value,
         jlink_serial=case.jlink_serial,
+        power_serial=case.power_serial,
         attempt=case.attempt,
         repeat_total=case.repeat_total,
         output_dir=str(case_dir),
@@ -475,6 +505,19 @@ def run_case(
                     result.peak_current_ma = float(power_blob["peak_current_ma"])
                 elif "peak_current_a" in power_blob:
                     result.peak_current_ma = float(power_blob["peak_current_a"]) * 1e3
+                result.gated_window_duration_suspect = bool(
+                    power_blob.get("gated_window_duration_suspect", False)
+                )
+                integrity = power_blob.get("gate_duration_integrity")
+                if isinstance(integrity, dict) and "valid" in integrity:
+                    result.gate_duration_integrity_valid = bool(integrity["valid"])
+                if power_blob.get("observation_mode") is not None:
+                    result.power_observation_mode = str(power_blob["observation_mode"])
+                if power_blob.get("integrity") is not None:
+                    result.power_observation_integrity = str(power_blob["integrity"])
+                gate_failure = power_blob.get("gate_failure")
+                if isinstance(gate_failure, dict) and gate_failure.get("kind") is not None:
+                    result.power_gate_failure_kind = str(gate_failure["kind"])
         except (ValueError, OSError) as exc:
             result.error = f"could not parse summary.json: {exc}"
             result.status = "fail"
@@ -527,4 +570,11 @@ def validation_health_issues(result: CaseResult) -> tuple[str, ...]:
         issues.append("AOT manifest empty or missing")
     if result.power and (not result.energy_uj or result.energy_uj <= 0.0):
         issues.append("power enabled but zero energy captured")
+    if result.power and result.gated_window_duration_suspect:
+        issues.append("GPIO-gated power window duration is suspect")
+    if result.power and result.gate_duration_integrity_valid is False:
+        issues.append("GPIO-gated power window failed duration integrity")
+    if result.power and result.power_observation_integrity not in {None, "valid"}:
+        detail = result.power_gate_failure_kind or result.power_observation_mode or "unknown"
+        issues.append(f"power observation is degraded ({detail})")
     return tuple(issues)

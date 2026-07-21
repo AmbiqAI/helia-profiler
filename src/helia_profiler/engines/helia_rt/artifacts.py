@@ -100,18 +100,9 @@ def _toolchain_tag(toolchain: str) -> str:
 
     heliaRT release artifacts are named ``...-<gcc|armclang>-<variant>.a``.
     """
-    tc = (toolchain or "").lower()
-    if tc in ("armclang",):
-        return "armclang"
-    if tc in ("atfe",):
-        return "atfe"
-    if tc in ("arm-none-eabi-gcc", "gcc"):
-        return "gcc"
-    log.warning(
-        "heliaRT: no prebuilt archive for toolchain '%s'; falling back to gcc variant",
-        toolchain,
-    )
-    return "gcc"
+    from ...toolchains import get_toolchain_spec
+
+    return get_toolchain_spec(toolchain).heliart_tag
 
 
 def _verify_prebuilt_archive(

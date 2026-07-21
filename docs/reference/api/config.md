@@ -50,8 +50,6 @@ YAML file with CLI overrides and never mutated afterwards.
 
 ::: helia_profiler.Placement
 
-::: helia_profiler.ModelLocation
-
 ::: helia_profiler.PowerMode
 
 ::: helia_profiler.ResetStrategy

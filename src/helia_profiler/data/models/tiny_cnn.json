@@ -1,0 +1,27 @@
+{
+  "name": "tiny-cnn",
+  "description": "Deterministic sequential quantized int8 CNN",
+  "seed": 0,
+  "batch_size": 1,
+  "input_shape": [
+    1,
+    8,
+    8,
+    1
+  ],
+  "output_shape": [
+    1,
+    4
+  ],
+  "operators": [
+    "CONV_2D",
+    "AVERAGE_POOL_2D",
+    "CONV_2D",
+    "RESHAPE",
+    "FULLY_CONNECTED",
+    "SOFTMAX"
+  ],
+  "bytes": 2480,
+  "sha256": "4419dfff1e15e9479ad90b81c7997c4a2db274c87f6433e06cd34698108ac26f",
+  "generator": "tools/gen_example_model.py"
+}

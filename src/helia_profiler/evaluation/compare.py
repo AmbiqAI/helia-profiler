@@ -4,11 +4,18 @@ from __future__ import annotations
 
 import csv
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-from .errors import ReportError
+from .comparability import ComparabilityAssessment, assess_comparability
+from .comparison_profile import (
+    ComparisonProfile,
+    ComparisonVerdict,
+    evaluate_comparison_profile,
+)
+from ..errors import ReportError
+from ..results import ResultManifest, load_result_manifest
 
 
 @dataclass(frozen=True)
@@ -20,6 +27,7 @@ class RunArtifacts:
     metadata: dict[str, Any]
     layers: list[dict[str, Any]]
     layer_memory: dict[Any, list[dict[str, Any]]] = field(default_factory=dict)
+    manifest: ResultManifest | None = None
 
 
 @dataclass(frozen=True)
@@ -47,6 +55,7 @@ class ConfigDiffRow:
     baseline: Any
     candidate: Any
     status: str  # "same" | "diff"
+    key: str = ""
 
 
 @dataclass(frozen=True)
@@ -125,27 +134,30 @@ class CompareResult:
     metrics: list[MetricDiff]
     layer_rows: list[LayerDiffRow]
     warnings: list[str] = field(default_factory=list)
+    comparability: ComparabilityAssessment = field(default_factory=ComparabilityAssessment)
+    verdict: ComparisonVerdict | None = None
 
 
-_CONFIG_FIELDS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Model path", ("config", "model", "path")),
-    ("Model SHA256", ("model", "sha256")),
-    ("Engine", ("config", "engine", "type")),
-    ("Backend", ("config", "engine", "backend")),
-    ("Board", ("config", "target", "board")),
-    ("SoC", ("platform", "soc")),
-    ("Toolchain", ("config", "target", "toolchain")),
-    ("Transport", ("config", "target", "transport")),
-    ("CPU clock", ("platform", "cpu_clock_name")),
-    ("Iterations", ("config", "profiling", "iterations")),
-    ("Warmup", ("config", "profiling", "warmup")),
-    ("PMU counters", ("config", "profiling", "pmu_counters")),
-    ("PMU presets", ("config", "profiling", "pmu_presets")),
-    ("Arena size", ("config", "model", "arena_size")),
-    ("Arena location", ("config", "model", "arena_location")),
-    ("Weights location", ("config", "model", "weights_location")),
-    ("Model location", ("config", "model", "model_location")),
-    ("hpx version", ("hpx_version",)),
+_CONFIG_FIELDS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("model_path", "Model path", ("config", "model", "path")),
+    ("model_sha256", "Model SHA256", ("model", "sha256")),
+    ("engine", "Engine", ("config", "engine", "type")),
+    ("backend", "Backend", ("config", "engine", "backend")),
+    ("board", "Board", ("config", "target", "board")),
+    ("soc", "SoC", ("platform", "soc")),
+    ("toolchain", "Toolchain", ("config", "target", "toolchain")),
+    ("transport", "Transport", ("config", "target", "transport")),
+    ("cpu_clock", "CPU clock", ("platform", "cpu_clock_name")),
+    ("iterations", "Iterations", ("config", "profiling", "iterations")),
+    ("warmup", "Warmup", ("config", "profiling", "warmup")),
+    ("pmu_counters", "PMU counters", ("config", "profiling", "pmu_counters")),
+    ("arena_size", "Arena size", ("config", "model", "arena_size")),
+    ("arena_location", "Arena location", ("config", "model", "arena_location")),
+    ("weights_location", "Weights location", ("config", "model", "weights_location")),
+    ("hpx_version", "hpx version", ("hpx_version",)),
+    ("compiler_version", "Compiler version", ("toolchain", "compiler_version")),
+    ("system_clock_hz", "System clock", ("firmware", "system_clock_hz")),
+    ("run_metadata_schema_version", "Metadata schema", ("schema_version",)),
 )
 
 _METRIC_FIELDS: tuple[tuple[str, tuple[str, ...], str], ...] = (
@@ -170,45 +182,88 @@ _METRIC_FIELDS: tuple[tuple[str, tuple[str, ...], str], ...] = (
 )
 
 
-def compare_runs(baseline_dir: Path, candidate_dir: Path) -> CompareResult:
+def compare_runs(
+    baseline_dir: Path,
+    candidate_dir: Path,
+    *,
+    profile: ComparisonProfile | None = None,
+) -> CompareResult:
     """Load and compare two ``hpx profile`` result directories."""
 
     baseline = load_run_artifacts(baseline_dir)
     candidate = load_run_artifacts(candidate_dir)
+    comparability = assess_comparability(baseline, candidate)
+    if not comparability.run_metrics_comparable:
+        reasons = "; ".join(
+            issue.message
+            for issue in comparability.issues
+            if issue.severity.value == "blocking"
+        )
+        raise ReportError(f"Results are not comparable: {reasons}")
 
     config_rows = _compare_config(baseline.metadata, candidate.metadata)
-    metrics = _compare_metrics(baseline.summary, candidate.summary)
-    layer_rows = _compare_layers(baseline, candidate)
-    warnings = _build_warnings(baseline, candidate, config_rows, metrics, layer_rows)
+    metrics = _compare_metrics(
+        baseline.summary,
+        candidate.summary,
+        include_power=comparability.power_metrics_comparable,
+    )
+    layer_rows = _compare_layers(baseline, candidate) if comparability.layers_comparable else []
+    warnings = _build_warnings(baseline, candidate, metrics, comparability)
 
-    return CompareResult(
+    result = CompareResult(
         baseline=baseline,
         candidate=candidate,
         config_rows=config_rows,
         metrics=metrics,
         layer_rows=layer_rows,
+        comparability=comparability,
         warnings=warnings,
     )
+    if profile is None:
+        return result
+    return replace(result, verdict=evaluate_comparison_profile(result, profile))
 
 
 def load_run_artifacts(path: Path) -> RunArtifacts:
-    """Load summary, metadata, and per-layer CSV artifacts from *path*."""
+    """Load and, when published, verify one profile result bundle."""
 
     run_dir = path.expanduser().resolve()
     if not run_dir.is_dir():
         raise ReportError(f"Compare input is not a directory: {run_dir}")
 
-    summary = _read_json(run_dir / "summary.json")
-    metadata = _read_json(run_dir / "run_metadata.json")
-    layers_path = run_dir / "profile_results.csv"
-    if not layers_path.is_file():
+    declared: set[str] | None = None
+    manifest: ResultManifest | None = None
+    manifest_path = run_dir / "result_manifest.json"
+    if manifest_path.is_file():
+        manifest = load_result_manifest(manifest_path, verify=True)
+        declared = {artifact.path for artifact in manifest.artifacts}
+
+    summary_path = _declared_artifact(run_dir, "summary.json", declared)
+    metadata_path = _declared_artifact(run_dir, "run_metadata.json", declared)
+    summary = _read_json(summary_path)
+    metadata = _read_json(metadata_path)
+
+    csv_path = run_dir / "profile_results.csv"
+    json_path = run_dir / "profile_results.json"
+    csv_available = csv_path.is_file() and (declared is None or "profile_results.csv" in declared)
+    json_available = json_path.is_file() and (
+        declared is None or "profile_results.json" in declared
+    )
+    if csv_available:
+        layers = _read_layer_csv(csv_path)
+    elif json_available:
+        layers = _read_layer_json(json_path)
+    else:
         raise ReportError(
-            f"Missing profile_results.csv in {run_dir}",
-            hint="Run `hpx profile` with the default CSV output format before comparing.",
+            f"Missing declared per-layer profile results in {run_dir}",
+            hint="Expected profile_results.csv or profile_results.json.",
         )
-    layers = _read_layer_csv(layers_path)
+
     layer_memory_path = run_dir / "aot_memory_layers.csv"
-    layer_memory = _read_layer_memory_csv(layer_memory_path) if layer_memory_path.is_file() else {}
+    layer_memory_available = layer_memory_path.is_file() and (
+        declared is None or "aot_memory_layers.csv" in declared
+    )
+    layer_memory = _read_layer_memory_csv(layer_memory_path) if layer_memory_available else {}
 
     return RunArtifacts(
         path=run_dir,
@@ -216,6 +271,7 @@ def load_run_artifacts(path: Path) -> RunArtifacts:
         metadata=metadata,
         layers=layers,
         layer_memory=layer_memory,
+        manifest=manifest,
     )
 
 
@@ -238,6 +294,20 @@ def write_compare_artifacts(
         "baseline_dir": source_dirs[0] if source_dirs else str(result.baseline.path),
         "candidate_dir": source_dirs[1] if source_dirs else str(result.candidate.path),
         "warnings": result.warnings,
+        "comparability": {
+            "run_metrics_comparable": result.comparability.run_metrics_comparable,
+            "layers_comparable": result.comparability.layers_comparable,
+            "power_metrics_comparable": result.comparability.power_metrics_comparable,
+            "issues": [
+                {
+                    "code": issue.code,
+                    "severity": issue.severity.value,
+                    "message": issue.message,
+                    "context": issue.context,
+                }
+                for issue in result.comparability.issues
+            ],
+        },
         "config": [
             {
                 "field": row.field,
@@ -259,6 +329,8 @@ def write_compare_artifacts(
             for m in result.metrics
         ],
     }
+    if result.verdict is not None:
+        summary["verdict"] = _verdict_to_dict(result.verdict)
     paths[0].write_text(json.dumps(summary, indent=2, default=str) + "\n")
 
     if len(paths) > 1:
@@ -270,6 +342,32 @@ def write_compare_artifacts(
             writer.writerows(flat_layer_rows)
 
     return paths
+
+
+def _verdict_to_dict(verdict: ComparisonVerdict | None) -> dict[str, Any] | None:
+    if verdict is None:
+        return None
+    return {
+        "status": verdict.status.value,
+        "profile_name": verdict.profile_name,
+        "profile_schema": verdict.profile_schema,
+        "profile_schema_version": verdict.profile_schema_version,
+        "profile_sha256": verdict.profile_sha256,
+        "dimension_mismatches": list(verdict.dimension_mismatches),
+        "metrics": [
+            {
+                "metric": item.metric,
+                "status": item.status.value,
+                "message": item.message,
+                "baseline": item.baseline,
+                "candidate": item.candidate,
+                "regression": item.regression,
+                "allowed_regression": item.allowed_regression,
+                "unit": item.unit,
+            }
+            for item in verdict.metrics
+        ],
+    }
 
 
 def render_compare(result: CompareResult, *, top_layers: int = 10) -> str:
@@ -358,6 +456,20 @@ def _read_layer_csv(path: Path) -> list[dict[str, Any]]:
         return [{k: _coerce_csv_value(v) for k, v in row.items()} for row in reader]
 
 
+def _read_layer_json(path: Path) -> list[dict[str, Any]]:
+    data = _read_json(path)
+    layers = data.get("layers")
+    if not isinstance(layers, list) or not all(isinstance(layer, dict) for layer in layers):
+        raise ReportError(f"Expected a layers array of objects in {path}")
+    return layers
+
+
+def _declared_artifact(run_dir: Path, name: str, declared: set[str] | None) -> Path:
+    if declared is not None and name not in declared:
+        raise ReportError(f"Result manifest does not declare required artifact: {name}")
+    return run_dir / name
+
+
 def _coerce_csv_value(value: str | None) -> Any:
     if value is None:
         return None
@@ -375,7 +487,7 @@ def _coerce_csv_value(value: str | None) -> Any:
 
 def _compare_config(base: dict[str, Any], cand: dict[str, Any]) -> list[ConfigDiffRow]:
     rows: list[ConfigDiffRow] = []
-    for label, path in _CONFIG_FIELDS:
+    for key, label, path in _CONFIG_FIELDS:
         b = _get_nested(base, path)
         c = _get_nested(cand, path)
         stable_b = _stable_value(b)
@@ -386,14 +498,22 @@ def _compare_config(base: dict[str, Any], cand: dict[str, Any]) -> list[ConfigDi
                 baseline=stable_b,
                 candidate=stable_c,
                 status="same" if stable_b == stable_c else "diff",
+                key=key,
             )
         )
     return rows
 
 
-def _compare_metrics(base: dict[str, Any], cand: dict[str, Any]) -> list[MetricDiff]:
+def _compare_metrics(
+    base: dict[str, Any],
+    cand: dict[str, Any],
+    *,
+    include_power: bool = True,
+) -> list[MetricDiff]:
     metrics: list[MetricDiff] = []
     for name, path, unit in _METRIC_FIELDS:
+        if name.startswith("power.") and not include_power:
+            continue
         b = _get_nested(base, path)
         c = _get_nested(cand, path)
         if name.startswith("power.") and b is None and c is None:
@@ -493,26 +613,14 @@ def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[Laye
 def _build_warnings(
     baseline: RunArtifacts,
     candidate: RunArtifacts,
-    config_rows: list[ConfigDiffRow],
     metrics: list[MetricDiff],
-    layer_rows: list[LayerDiffRow],
+    comparability: ComparabilityAssessment,
 ) -> list[str]:
-    warnings: list[str] = []
-    important = {"Model SHA256", "Board", "SoC", "Engine", "Iterations", "Warmup", "Arena size"}
-    changed = [row.field for row in config_rows if row.status == "diff" and row.field in important]
-    if changed:
-        warnings.append("Important provenance differs: " + ", ".join(changed))
+    warnings = [issue.message for issue in comparability.issues]
     if baseline.summary.get("overflow_detected") or candidate.summary.get("overflow_detected"):
         warnings.append(
             "PMU overflow detected in at least one run; counter values may be unreliable."
         )
-    if len(baseline.layers) != len(candidate.layers):
-        warnings.append(
-            "Per-layer deltas omitted: layer counts differ "
-            f"(baseline={len(baseline.layers)}, candidate={len(candidate.layers)})."
-        )
-    elif [row.get("op") for row in baseline.layers] != [row.get("op") for row in candidate.layers]:
-        warnings.append("Per-layer deltas omitted: operation sequence differs.")
     missing_metrics = [m.name for m in metrics if m.baseline is None or m.candidate is None]
     if missing_metrics:
         warnings.append(

@@ -112,3 +112,8 @@ class ResolvePlatformStage:
             size_bytes=len(model_bytes),
             sha256=hashlib.sha256(model_bytes).hexdigest(),
         )
+        ctx.report_progress(
+            f"{board.name} at {cpu_speed.mhz} MHz · {model_path.name}",
+            kind="checkpoint",
+            min_verbosity=1,
+        )

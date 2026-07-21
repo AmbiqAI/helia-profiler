@@ -66,7 +66,10 @@ _RSTGEN_SWPOI_VALUE = 0x1B
 _DEFAULT_TIMEOUT_S = 15
 _READINESS_POLL_INTERVAL_S = 0.1
 _SBL_SETTLE_S = 0.2
+_PROBE_INSPECTION_ATTEMPTS = 2
+_PROBE_INSPECTION_RETRY_S = 0.1
 JLINK_COMMANDER = "JLinkExe"
+_JLINK_COMMANDER_NAMES = ("JLinkExe", "JLink.exe")
 
 _JLINK_NOT_FOUND_HINT = (
     "Install the SEGGER J-Link package and ensure JLinkExe is in PATH, "
@@ -119,11 +122,20 @@ def find_jlink_exe() -> str:
             hint="Set JLINK_PATH to the full path of JLinkExe.",
         )
     # 2. PATH lookup
-    exe = shutil.which(JLINK_COMMANDER)
-    if exe:
-        return exe
+    for name in _JLINK_COMMANDER_NAMES:
+        exe = shutil.which(name)
+        if exe:
+            return exe
     # 3. Common install locations
-    for candidate in ("/usr/local/bin/JLinkExe",):
+    program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+    program_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+    candidates = [
+        "/usr/local/bin/JLinkExe",
+        "/Applications/SEGGER/JLink/JLinkExe",
+        os.path.join(program_files, "SEGGER", "JLink", "JLink.exe"),
+        os.path.join(program_files_x86, "SEGGER", "JLink", "JLink.exe"),
+    ]
+    for candidate in candidates:
         if os.path.isfile(candidate):
             return candidate
     raise CaptureError("JLinkExe not found", hint=_JLINK_NOT_FOUND_HINT)
@@ -241,6 +253,8 @@ def _inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
     jlink_exe = find_jlink_exe()
     cmd = [
         jlink_exe,
+        "-NoGui",
+        "1",
         "-device",
         device,
         "-if",
@@ -252,22 +266,33 @@ def _inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
         "-SelectEmuBySN",
         probe.serial,
     ]
-    try:
-        result = subprocess.run(
-            cmd,
-            input="exit\n",
-            capture_output=True,
-            text=True,
-            timeout=_DEFAULT_TIMEOUT_S,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise ConfigError(
-            f"Timed out while querying J-Link serial '{probe.serial}'.",
-            hint="Check that the probe is connected and not in use by another process.",
-        ) from exc
+    for attempt in range(_PROBE_INSPECTION_ATTEMPTS):
+        try:
+            result = subprocess.run(
+                cmd,
+                input="exit\n",
+                capture_output=True,
+                text=True,
+                timeout=_DEFAULT_TIMEOUT_S,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise ConfigError(
+                f"Timed out while querying J-Link serial '{probe.serial}'.",
+                hint="Check that the probe is connected and not in use by another process.",
+            ) from exc
 
-    detected_core = _parse_detected_core((result.stdout or "") + "\n" + (result.stderr or ""))
-    return JLinkProbeMatch(probe=probe, detected_core=detected_core)
+        detected_core = _parse_detected_core(
+            (result.stdout or "") + "\n" + (result.stderr or "")
+        )
+        if detected_core is not None or attempt + 1 == _PROBE_INSPECTION_ATTEMPTS:
+            return JLinkProbeMatch(probe=probe, detected_core=detected_core)
+        log.debug(
+            "J-Link serial %s did not identify a target; retrying probe inspection",
+            probe.serial,
+        )
+        time.sleep(_PROBE_INSPECTION_RETRY_S)
+
+    raise AssertionError("unreachable")
 
 
 def inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
@@ -348,6 +373,8 @@ def run_jlink_script(
     jlink_exe = find_jlink_exe()
     cmd = [
         jlink_exe,
+        "-NoGui",
+        "1",
         "-device",
         device,
         "-if",
@@ -531,6 +558,8 @@ def reset_target_poi(
     jlink_exe = find_jlink_exe()
     cmd = [
         jlink_exe,
+        "-NoGui",
+        "1",
         "-device",
         device,
         "-if",
@@ -845,6 +874,27 @@ def open_jlink_with_retry(
 
 
 @contextlib.contextmanager
+def attached_session(
+    *,
+    device: str,
+    jlink_serial: str | None = None,
+    attach_timeout_s: float = 30.0,
+) -> Iterator[DebugMemorySession]:
+    """Attach to a running target without resetting or halting it."""
+    jlink = create_debug_memory_session()
+    open_jlink_with_retry(
+        jlink, device=device, jlink_serial=jlink_serial, timeout_s=attach_timeout_s
+    )
+    try:
+        yield jlink
+    finally:
+        try:
+            jlink.close()
+        except Exception:  # noqa: BLE001 — close errors are non-fatal
+            pass
+
+
+@contextlib.contextmanager
 def attached_reset_session(
     *,
     device: str,
@@ -878,6 +928,7 @@ __all__ = [
     "JLinkProbeMatch",
     "JLinkResetController",
     "attached_reset_session",
+    "attached_session",
     "create_debug_memory_session",
     "find_jlink_exe",
     "inspect_probe_target",

@@ -19,7 +19,12 @@
 {% if (extreme_mode and arena_region == "tcm" and weights_region == "tcm") or ((manages_shared_ssram_power | default(false)) and (_sram_resident or (force_shared_sram | default(false)))) or (power_only | default(false) and (broad_peripheral_shutdown | default(false))) %}
 #include "am_hal_pwrctrl.h"
 {% endif %}
-{% if power_only | default(false) %}
+{% if power_only | default(false) and transport == "usb_cdc" %}
+#include "nsx_usb.h"
+{% include "_usb_config.j2" with context %}
+{% elif power_only | default(false) and transport == "rtt" %}
+#include "SEGGER_RTT.h"
+{% elif power_only | default(false) %}
 {% elif transport == "usb_cdc" %}
 #include "nsx_usb.h"
 #include "am_hal_timer.h"

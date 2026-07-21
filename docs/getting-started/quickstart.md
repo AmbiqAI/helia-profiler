@@ -28,6 +28,7 @@ engine:
 
 target:
   board: apollo510_evb
+  toolchain: gcc
 ```
 
 Run it:
@@ -38,6 +39,8 @@ hpx profile --config hpx.yml
 
 Everything else falls back to defaults — RTT transport, GCC toolchain, CPU
 counter defaults, 100 iterations, results to `./results/`.
+
+`gcc` is accepted as the short alias for `arm-none-eabi-gcc`.
 
 ## A real-world config
 

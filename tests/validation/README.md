@@ -47,7 +47,7 @@ pytest -m hardware tests/validation/ \
 1. Supported Ambiq EVB connected via J-Link (SEGGER)
 2. **arm-none-eabi-gcc** toolchain on `PATH`
 3. Additional selected toolchains on `PATH` (`armclang`/ACfE, ATfE) when requested
-4. **Joulescope** (JS110 or JS220) — only required if `--power on`/`both`
+4. **Joulescope** (JS110, JS220, or JS320) — only required if `--power on`/`both`
 5. **Git LFS** fetched — the TFLite fixtures are stored via LFS:
    ```bash
    git lfs pull

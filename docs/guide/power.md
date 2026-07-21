@@ -10,9 +10,10 @@ likely to need afterward — from simplest to most advanced.
 
 ## What you need
 
-- **A Joulescope JS110 or JS220**, wired in series between your bench supply
-  (or wall adapter) and the EVB's power input. `pyjoulescope_driver` ships as
-  a core dependency of `helia-profiler` — no extra install.
+- **A Joulescope JS110, JS220, or JS320**, wired in series between your bench
+  supply (or wall adapter) and the EVB's power input. The
+  `pyjoulescope-driver` distribution ships as a core dependency of
+  `helia-profiler` — no extra install.
 - **One GPIO wire** from the board to the Joulescope's digital input
   `INPUT0` — this is the minimum wiring for a valid capture (see
   [Wiring reference](#wiring-reference)).
@@ -47,25 +48,35 @@ page:
 3. Connect J-Link USB for flashing, and the Joulescope to the host via its
    own USB.
 4. Wire the sync GPIO from [Wiring reference](#wiring-reference).
+5. For JS320 digital I/O, connect `Vref` to the target MCU I/O rail on the
+  EVB side of Joulescope passthrough (1.8 V for the registered Apollo510
+  wiring), and connect digital ground to EVB ground. Do not reference the
+  upstream supply when it differs from the MCU GPIO voltage.
+
+When JS320 `Vref` comes from the target-side I/O rail, normal capture keeps
+passthrough enabled through flash, reset, handshake, and measurement. Cycling
+passthrough would remove both target power and the digital logic reference, so
+it is reserved for explicit recovery. GPIO observations made during flash/reset
+are discarded; only fresh stable samples after a short reset grace period
+participate in the READY/GO/GATE protocol.
 
 ### Choosing a Joulescope
 
 | `power.driver` | Instrument | Status |
 |---|---|---|
-| `joulescope` *(default)* | Auto-detect JS110 or JS220 | Stable |
-| `joulescope-js110` | JS110 only | Stable |
-| `joulescope-js220` | JS220 only | Stable |
+| `joulescope` *(default)* | Auto-detect JS110, JS220, or JS320 | Stable |
 | `ondevice` | Apollo SoC internal power monitoring | Not yet implemented — see [Troubleshooting](#troubleshooting) |
 
-| Aspect | JS110 | JS220 |
+| Aspect | JS110 | JS220 | JS320 |
 |---|---|---|
 | Current range | nA → 3 A (auto-ranging) | nA → 10 A (auto-ranging) |
-| Sample rate | 250 kSPS | up to 2 MSPS |
-| Voltage range | 0–15 V | 0–15 V |
+| Sample rate | 250 kSPS | up to 2 MSPS | up to 2 MSPS |
+| Voltage range | 0–15 V | 0–15 V | 0–15 V |
+| Lock-step GO command | Per-output value | GPO bitmap set/clear | GPO bitmap set/clear |
 
 Both expose the same `JoulescopeDriver` interface inside heliaPROFILER.
 Auto-detect (`joulescope`) is fine unless you have both connected and want
-to pin one explicitly.
+to pin one explicitly with `power.serial` or `--power-serial`.
 
 ## Quick start
 
@@ -86,9 +97,9 @@ power:
 hpx profile model.tflite --board apollo510_evb --power
 ```
 
-That's it — `power.driver` defaults to `joulescope` (auto-detects JS110 or
-JS220), `power.mode` defaults to `external`, and the sync/state/go GPIO pins
-default to the board's registered wiring (GPIO 29 / 36 / 14 on
+That's it — `power.driver` defaults to `joulescope` (auto-detects JS110, JS220,
+or JS320), `power.mode` defaults to `external`, and the sync/state/go GPIO
+pins default to the board's registered wiring (GPIO 29 / 36 / 14 on
 `apollo510_evb`). Results land in `summary.json`'s `power` section and the
 terminal summary; see [Verifying a capture](#verifying-a-capture) for what a
 healthy run looks like.
@@ -149,6 +160,29 @@ power:
   go_gpio_pin: 7      # J8 GP7 — go
 ```
 
+### Verified EVB-to-Joulescope wiring
+
+Use the following direct connections for the validated benches. All signal
+grounds must share the EVB/Joulescope reference, and `power.io_voltage` must
+match the EVB GPIO rail.
+
+| EVB / instrument | Gate: device → monitor | State: device → monitor | GO: monitor → device |
+|---|---|---|---|
+| Apollo510 EVB + JS320 | GPIO 29 → `INPUT0` | GPIO 36 → `INPUT1` | `OUTPUT0` → GPIO 14 |
+| Apollo330 Plus EVB + JS110 | J8 GP5 → `INPUT0` | J8 GP6 → `INPUT1` | `OUTPUT0` → J8 GP7 |
+
+For Apollo330 Plus, `5:6:7` are **Apollo device GPIO pin numbers**, not
+Joulescope channel numbers. The matching JS110 channels are always
+`INPUT0:INPUT1:OUTPUT0` (`0:1:0` internally). With both instruments attached,
+pin the JS110 explicitly and provide the device-pin mapping to validation:
+
+```bash
+hpx validate --suite smoke --boards apollo330mP_evb \
+  --jlink-serials apollo330mP_evb=<AP330_JLINK> \
+  --power-serials apollo330mP_evb=004204 \
+  --power-gpios apollo330mP_evb=5:6:7 --power on
+```
+
 ### `io_voltage`
 
 `power.io_voltage` (default `1.8`) tells the Joulescope's GPI reference what
@@ -173,6 +207,25 @@ race the start of the gated window.
 - An **explicit** `true`/`false` always wins over the auto behavior.
 - Setting `lockstep: true` requires both `state_gpio_pin > 0` and
   `go_gpio_pin > 0` — heliaPROFILER raises a config error otherwise.
+
+### Capture modes
+
+| Mode | Wiring | When to use |
+|---|---|---|
+| Gated capture | Gate only (`INPUT0`) | Initial board bring-up or a bench without state/GO wiring. The host can miss a short window after a slow reset. |
+| Lock-step capture **(preferred)** | Gate + state + GO (`INPUT0`, `INPUT1`, `OUTPUT0`) | Production measurements. Firmware waits at `READY`; the host arms the GPI poller and asserts GO before inference begins. |
+
+Apollo5-family boards auto-select lock-step when all three board GPIOs are
+configured. Set `power.lockstep: false` only while bringing up incomplete
+wiring; do not use it as the normal measurement mode.
+
+### Relay and passthrough behavior
+
+JS220 and JS320 use `s/i/range/mode` (`off` / `auto`) to open or close the
+target-power relay; JS110 uses its family-specific range selector. `hpx
+power-on` and the profiler's preflight passthrough set the relay to `auto`.
+Releasing the host's passthrough handle does **not** turn target power off:
+the relay remains latched until a power-cycle or explicit relay-off command.
 
 ```yaml
 power:
@@ -249,6 +302,14 @@ When `power.enabled: true`, heliaPROFILER automatically raises the *effective*
 target to at least 5000 ms (`max(profiling.window_target_ms, 5000)`), because
 host-side GPIO polling and Joulescope packet alignment need more time to
 settle than a plain PMU capture does.
+
+External captures enforce the window contract before reporting
+energy-per-inference. The measured gate must be at least one second and agree
+with `clean_infer_count * clean_infer_avg_us` within the larger of two stats
+packets, half an inference, or 1% cross-binary timing drift. Short GPIO pulses
+are ignored as glitches; a capture with no qualifying window fails rather than
+publishing a plausible but invalid power number. The accepted ratio and any
+ignored pulse count are recorded in `summary.json`.
 
 ### Very short inferences
 
@@ -393,7 +454,7 @@ comparison.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `enabled` | bool | `false` | Enable power capture |
-| `driver` | string | `joulescope` | `joulescope` (auto-detect), `joulescope-js110`, `joulescope-js220`, or `ondevice` (see note below) |
+| `driver` | string | `joulescope` | `joulescope` (auto-detects JS110, JS220, or JS320), or `ondevice` (see note below) |
 | `mode` | string | `external` | `external` (Joulescope inline) or `internal` (on-device) |
 | `duration_s` | int \| null | `null` | Host-side safety bound; `null` auto-tunes from PMU-phase timing |
 | `io_voltage` | float | `1.8` | Joulescope GPI reference voltage — must match the board's I/O rail |
@@ -415,7 +476,7 @@ comparison.
 |---|---|---|---|
 | `profiling.window_mode` | string | `auto` | `auto` sizes the clean window at runtime; `fixed` runs exactly `iterations` |
 | `profiling.window_target_ms` | int | `1000` | Target wall-time for the clean window (auto-raised to ≥ 5000 when power is enabled) |
-| `profiling.window_min` / `window_max` | int | `10` / `2000` | Clamp bounds for the auto-sized clean-window iteration count |
+| `profiling.window_min` / `window_max` | int | `10` / `500000` | Clamp bounds for the auto-sized clean-window iteration count |
 | `profiling.extreme_mode` | bool | `false` | See [Advanced power floors](#advanced-power-floors) |
 | `profiling.force_shared_sram` | bool | `false` | See [Advanced power floors](#advanced-power-floors) |
 | `profiling.clean_window_trace` | bool | `false` | See [Diagnostics for bring-up](#diagnostics-for-bring-up) |
@@ -425,13 +486,18 @@ comparison.
 ### `hpx power-on`
 
 ```bash
-hpx power-on [--driver joulescope|joulescope-js110|joulescope-js220]
+hpx power-on [--driver joulescope] \
+    [--power-serial SERIAL]
 ```
 
 Opens the Joulescope and enables current passthrough so the target board
 stays powered, holding the connection open until Ctrl-C. Useful when you
 want the board powered for manual debugging (JLinkExe, a serial console,
 etc.) without running a profiling session.
+
+When multiple Joulescopes are attached, `--power-serial` is required. For
+example, use `hpx power-on --driver joulescope --power-serial 25QG` for
+the JS320 bench.
 
 ## Troubleshooting
 

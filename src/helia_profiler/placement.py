@@ -8,7 +8,7 @@ These enums are the single vocabulary used by:
 * engine adapters that emit arena regions
 * preflight validation
 
-Using ``StrEnum`` keeps backwards compatibility with the raw string
+Using ``StrEnum`` preserves interoperability with the raw string
 constants previously sprayed across templates and dicts (``"tcm"``,
 ``"sram"``, …) while letting Python code use ``is``-comparisons against
 the enum members.
@@ -17,6 +17,10 @@ the enum members.
 from __future__ import annotations
 
 from enum import StrEnum
+
+
+TCM_PLACEMENT_SLACK_BYTES = 128 * 1024
+SRAM_PLACEMENT_SLACK_BYTES = 32 * 1024
 
 
 class Placement(StrEnum):
@@ -34,18 +38,33 @@ class Placement(StrEnum):
     PSRAM = "psram"
 
 
-class ModelLocation(StrEnum):
-    """User-facing ``model.model_location`` values.
+def resolve_fastest_fit_placement(
+    *,
+    arena_size: int,
+    weights_size: int,
+    tcm_cap: int,
+    sram_cap: int,
+) -> tuple[Placement, Placement]:
+    """Resolve engine-neutral auto placement, prioritizing the mutable arena."""
+    tcm_budget = max(0, tcm_cap - TCM_PLACEMENT_SLACK_BYTES)
+    sram_budget = max(0, sram_cap - SRAM_PLACEMENT_SLACK_BYTES)
+    arena_in_tcm = arena_size > 0 and arena_size <= tcm_budget
+    arena_in_sram = not arena_in_tcm and arena_size > 0 and arena_size <= sram_budget
 
-    Includes :attr:`AUTO` for automatic placement plus the four
-    :class:`Placement` regions.
-    """
-
-    AUTO = "auto"
-    TCM = "tcm"
-    SRAM = "sram"
-    MRAM = "mram"
-    PSRAM = "psram"
+    if arena_in_tcm:
+        remaining_tcm = tcm_budget - arena_size
+        tcm_weight_budget = max(0, remaining_tcm - TCM_PLACEMENT_SLACK_BYTES)
+        if weights_size > 0 and weights_size <= tcm_weight_budget:
+            return Placement.TCM, Placement.TCM
+        if weights_size > 0 and weights_size <= sram_budget:
+            return Placement.TCM, Placement.SRAM
+        return Placement.TCM, Placement.MRAM
+    if arena_in_sram:
+        return Placement.SRAM, Placement.MRAM
+    return (
+        Placement.SRAM if arena_size <= sram_cap else Placement.MRAM,
+        Placement.MRAM,
+    )
 
 
 class ArenaRole(StrEnum):

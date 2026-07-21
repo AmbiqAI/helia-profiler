@@ -126,8 +126,13 @@ dependency — no extra install needed, just the udev rule below on Linux.
 
 ## 4. SEGGER J-Link software
 
-hpx drives J-Link through `JLinkExe` (flashing) and `pylink-square`
+hpx drives J-Link through SEGGER Commander (`JLinkExe` on Linux/macOS,
+`JLink.exe` on Windows) for flashing and `pylink-square`
 (RTT/SWO capture, installed automatically with heliaPROFILER).
+
+Discovery checks `JLINK_PATH` first, then both executable names on `PATH`, then
+common SEGGER install locations. Set `JLINK_PATH` to the full executable path
+for non-standard installations.
 
 === "Linux"
 
@@ -148,12 +153,29 @@ hpx drives J-Link through `JLinkExe` (flashing) and `pylink-square`
     [segger.com/downloads/jlink](https://www.segger.com/downloads/jlink/).
     Drivers are installed automatically.
 
-For local firmware development, hpx looks for SEGGER RTT sources at
-`./segger-rtt`, `./RTT`, `~/src/segger-rtt`, `~/src/RTT`, or the
-`SEGGER_RTT_PATH` environment variable:
+heliaPROFILER bundles a pinned, tested copy of the permissively licensed SEGGER
+RTT target sources. No separate RTT source checkout is required for normal use.
+The SEGGER J-Link host software remains a separate installation.
+
+For testing another RTT release, hpx resolves explicit overrides in this order:
+
+1. `target.segger_rtt_path` in configuration or `Session.with_target()`
+2. The `SEGGER_RTT_PATH` environment variable
+3. The bundled RTT target sources
+
+An override directory must contain both `RTT/SEGGER_RTT.c` and
+`Config/SEGGER_RTT_Conf.h`:
 
 ```bash
-git clone https://github.com/SEGGERMicro/RTT.git segger-rtt
+git clone --branch V8.58.0 https://github.com/SEGGERMicro/RTT.git segger-rtt
+```
+
+Prefer explicit profile configuration over modifying `PATH`:
+
+```yaml
+target:
+    transport: rtt
+    segger_rtt_path: /path/to/SEGGER_RTT
 ```
 
 ## 5. Joulescope (optional, for power capture)

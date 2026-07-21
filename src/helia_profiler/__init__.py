@@ -2,6 +2,24 @@
 
 from ._version import __version__
 from .api import profile
+from .evaluation import (
+    CompareResult,
+    ComparabilityAssessment,
+    ComparabilityIssue,
+    ComparabilitySeverity,
+    ComparisonProfile,
+    ComparisonVerdict,
+    MetricDirection,
+    MetricPolicy,
+    MetricVerdict,
+    MissingMetricPolicy,
+    VerdictStatus,
+    assess_comparability,
+    evaluate_comparison_profile,
+    RunEvaluation,
+    ModelAnalysis,
+    evaluate_run,
+)
 from .config import (
     BuildConfig,
     ClockSelection,
@@ -20,6 +38,9 @@ from .config import (
     Transport,
 )
 from .engines import EngineType
+from . import examples
+from .counters import PmuCounter
+from .doctor import DoctorCheck, DoctorResult
 from .errors import (
     BuildError,
     CaptureError,
@@ -32,7 +53,9 @@ from .errors import (
     PowerError,
     ReportError,
 )
-from .placement import ModelLocation, Placement
+from .placement import Placement
+from .pipeline import ProgressUpdate
+from .platform import BoardDef
 from .power.base import PowerMode, PowerResult
 from .results import (
     FirmwareMeta,
@@ -42,13 +65,28 @@ from .results import (
     PresetResult,
     ProfileResult,
     RunMetadata,
+    OnDevicePowerSummary,
+    PowerObservation,
+    PowerTerminalRecord,
+    ResultArtifact,
+    ResultIssue,
+    ResultManifest,
+    ResultValidity,
+    RunStatus,
+    load_result_manifest,
 )
+from .session import Session
+from .target.probe.jlink import JLinkProbe, JLinkProbeMatch
 from .target.lifecycle import ResetStrategy
+from .transport.ports import SerialPortInfo
 
 __all__ = [
     "__version__",
     # Public API
     "profile",
+    "Session",
+    "ProgressUpdate",
+    "examples",
     # Config
     "ProfileConfig",
     "ModelConfig",
@@ -67,9 +105,11 @@ __all__ = [
     "BuildConfig",
     "NsxModuleOverride",
     "Placement",
-    "ModelLocation",
     "PowerMode",
     "PowerResult",
+    "PowerObservation",
+    "PowerTerminalRecord",
+    "OnDevicePowerSummary",
     "ResetStrategy",
     # Results
     "ProfileResult",
@@ -79,6 +119,35 @@ __all__ = [
     "FirmwareMeta",
     "RunMetadata",
     "NsxModuleRef",
+    "ModelAnalysis",
+    "CompareResult",
+    "ComparabilityAssessment",
+    "ComparabilityIssue",
+    "ComparabilitySeverity",
+    "assess_comparability",
+    "ComparisonProfile",
+    "ComparisonVerdict",
+    "MetricDirection",
+    "MetricPolicy",
+    "MetricVerdict",
+    "MissingMetricPolicy",
+    "VerdictStatus",
+    "evaluate_comparison_profile",
+    "RunEvaluation",
+    "evaluate_run",
+    "ResultManifest",
+    "ResultArtifact",
+    "ResultIssue",
+    "ResultValidity",
+    "RunStatus",
+    "load_result_manifest",
+    "DoctorCheck",
+    "DoctorResult",
+    "BoardDef",
+    "PmuCounter",
+    "JLinkProbe",
+    "JLinkProbeMatch",
+    "SerialPortInfo",
     # Errors
     "HpxError",
     "ConfigError",
@@ -91,3 +160,92 @@ __all__ = [
     "PowerError",
     "ReportError",
 ]
+
+_STABLE_API = {
+    "__version__",
+    "profile",
+    "Session",
+    "ProgressUpdate",
+    "examples",
+    "ProfileConfig",
+    "ModelConfig",
+    "EngineConfig",
+    "EngineType",
+    "TargetConfig",
+    "ProfilingConfig",
+    "PowerConfig",
+    "OutputConfig",
+    "Toolchain",
+    "Transport",
+    "ClockSelection",
+    "OutputFormat",
+    "HeartbeatConfig",
+    "TimeoutsConfig",
+    "BuildConfig",
+    "Placement",
+    "PowerMode",
+    "ResetStrategy",
+    "ProfileResult",
+    "PmuResult",
+    "PresetResult",
+    "LayerResult",
+    "FirmwareMeta",
+    "RunMetadata",
+    "PowerResult",
+    "HpxError",
+    "ConfigError",
+    "PlatformError",
+    "EngineError",
+    "FirmwareError",
+    "BuildError",
+    "NetworkError",
+    "CaptureError",
+    "PowerError",
+    "ReportError",
+}
+
+_EXPERIMENTAL_API = {
+    "PowerObservation",
+    "PowerTerminalRecord",
+    "OnDevicePowerSummary",
+    "ModelAnalysis",
+    "CompareResult",
+    "ComparabilityAssessment",
+    "ComparabilityIssue",
+    "ComparabilitySeverity",
+    "assess_comparability",
+    "ComparisonProfile",
+    "ComparisonVerdict",
+    "MetricDirection",
+    "MetricPolicy",
+    "MetricVerdict",
+    "MissingMetricPolicy",
+    "VerdictStatus",
+    "evaluate_comparison_profile",
+    "RunEvaluation",
+    "evaluate_run",
+    "ResultManifest",
+    "ResultArtifact",
+    "ResultIssue",
+    "ResultValidity",
+    "RunStatus",
+    "load_result_manifest",
+}
+
+_IMPLEMENTATION_API = {
+    "NsxModuleOverride",
+    "NsxModuleRef",
+    "DoctorCheck",
+    "DoctorResult",
+    "BoardDef",
+    "PmuCounter",
+    "JLinkProbe",
+    "JLinkProbeMatch",
+    "SerialPortInfo",
+}
+
+__api_stability__ = {
+    **{name: "stable" for name in _STABLE_API},
+    **{name: "experimental" for name in _EXPERIMENTAL_API},
+    **{name: "implementation" for name in _IMPLEMENTATION_API},
+}

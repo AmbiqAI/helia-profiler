@@ -9,8 +9,7 @@ Checks performed (in order):
 1. **Model file** — exists, is a regular file, non-empty, has a ``.tflite``
    extension, starts with the TFLite ``TFL3`` magic string.
 2. **Arena size** — if specified, is positive.
-3. **Model placement** — ``model_location`` is valid and any runtime split
-    placement overrides use supported regions for the selected engine.
+3. **Model placement** — optional arena/weights overrides use supported regions.
 4. **Output directory** — can be created + written to.
 5. **Host toolchain** — ``nsx``, ``cmake``, ``ninja``, the selected compiler,
    and ``SEGGER commander`` are available. ATfE is located via ``ATFE_ROOT``.
@@ -26,23 +25,18 @@ so running preflight on a laptop without a board attached is safe.
 from __future__ import annotations
 
 import logging
-import os
-import shutil
-from importlib.util import find_spec
 from pathlib import Path
 
 from ..config import Transport
 from ..counters import (
     supported_groups_for_domains,
     validate_group_selection,
-    validate_legacy_presets,
 )
 from ..engines import get_adapter
 from ..errors import ConfigError
 from ..pipeline import PipelineContext
-from ..placement import ModelLocation, Placement
+from ..placement import Placement
 from ..platform import get_soc_for_board
-from ..target.probe.jlink import JLINK_COMMANDER
 
 log = logging.getLogger("hpx")
 
@@ -51,7 +45,6 @@ log = logging.getLogger("hpx")
 # versions emit the identifier at offset 4 (after the root-table offset),
 # so we accept either placement.
 _TFLITE_MAGIC = b"TFL3"
-_VALID_MODEL_LOCATIONS: tuple[ModelLocation, ...] = tuple(ModelLocation)
 _VALID_RUNTIME_ARENA_LOCATIONS: tuple[Placement, ...] = (
     Placement.TCM,
     Placement.SRAM,
@@ -72,13 +65,12 @@ class PreflightStage:
         cfg = ctx.config
         _check_model(cfg.model.path)
         _check_arena_size(cfg.model.arena_size)
-        _check_model_location(cfg.model.model_location)
         _check_rtt_buffer_size(cfg.target.rtt_buffer_size_up)
         _check_runtime_split_locations(cfg)
         _check_pmu_selection(cfg)
         _check_transport_support(cfg)
         _check_output_dir(cfg.output.dir)
-        _check_host_tools(cfg.target.transport, cfg.target.toolchain)
+        _check_host_tools(cfg)
         log.info("Preflight checks passed.")
 
 
@@ -139,14 +131,6 @@ def _check_arena_size(arena_size: int | None) -> None:
         )
 
 
-def _check_model_location(loc: str) -> None:
-    if loc not in _VALID_MODEL_LOCATIONS:
-        raise ConfigError(
-            f"Invalid model.model_location: '{loc}'.",
-            hint=f"Expected one of: {', '.join(_VALID_MODEL_LOCATIONS)}.",
-        )
-
-
 def _check_explicit_location(loc: str | None, *, name: str, valid: tuple[Placement, ...]) -> None:
     if loc is None:
         return
@@ -170,17 +154,8 @@ def _check_rtt_buffer_size(size: int | None) -> None:
 def _check_runtime_split_locations(cfg) -> None:
     runtime_arena = cfg.model.arena_location
     runtime_weights = cfg.model.weights_location
-    legacy_runtime_arena = cfg.engine.config.get("runtime_arena_location")
-    legacy_runtime_weights = cfg.engine.config.get("runtime_weights_location")
-    if runtime_arena is None:
-        runtime_arena = legacy_runtime_arena
-    if runtime_weights is None:
-        runtime_weights = legacy_runtime_weights
-    weights_in_psram = (
-        cfg.model.model_location == Placement.PSRAM or runtime_weights == Placement.PSRAM
-    )
 
-    if weights_in_psram and cfg.target.transport != Transport.RTT:
+    if runtime_weights == Placement.PSRAM and cfg.target.transport != Transport.RTT:
         raise ConfigError(
             "PSRAM model weights require target.transport='rtt'.",
             hint=(
@@ -188,26 +163,6 @@ def _check_runtime_split_locations(cfg) -> None:
                 "Use --transport rtt, or keep weights in MRAM/SRAM."
             ),
         )
-
-    adapter = get_adapter(cfg.engine.type)
-    if not adapter.supports_runtime_split():
-        # Engine bakes placement into its compiled module; the
-        # profiler-config split overrides cannot influence weights.
-        if runtime_arena is not None or runtime_weights is not None:
-            field = "model.weights_location" if runtime_weights is not None else "model.arena_location"
-            if runtime_weights is None and legacy_runtime_arena is not None:
-                field = "engine.config.runtime_arena_location"
-            elif runtime_weights is not None and legacy_runtime_weights is not None:
-                field = "engine.config.runtime_weights_location"
-            raise ConfigError(
-                f"{field} is not supported for engine.type='{cfg.engine.type.value}'.",
-                hint=(
-                    f"{adapter.name} controls tensor placement via its own compiler args. "
-                    "Use engine.config.aot_args.memory.tensors to place constant, "
-                    "persistent, and scratch tensors."
-                ),
-            )
-        return
 
     _check_explicit_location(
         runtime_arena,
@@ -229,16 +184,10 @@ def _check_pmu_selection(cfg) -> None:
 
     supported_groups = supported_groups_for_domains(soc.profiling_domains)
     try:
-        if cfg.profiling.pmu_counters is not None:
-            validate_group_selection(
-                cfg.profiling.pmu_counters,
-                supported_groups=supported_groups,
-            )
-        else:
-            validate_legacy_presets(
-                cfg.profiling.pmu_presets,
-                supported_groups=supported_groups,
-            )
+        validate_group_selection(
+            cfg.profiling.pmu_counters,
+            supported_groups=supported_groups,
+        )
     except ValueError as exc:
         raise ConfigError(
             str(exc),
@@ -288,83 +237,21 @@ def _check_output_dir(out_dir: Path) -> None:
         ) from exc
 
 
-def _check_host_tools(transport: Transport, toolchain: str) -> None:
-    required: list[tuple[str, str]] = [
-        ("cmake", "CMake >= 3.24 (brew install cmake / apt install cmake)"),
-        ("ninja", "Ninja build system (brew install ninja / apt install ninja-build)"),
-    ]
+def _check_host_tools(cfg) -> None:
+    from ..doctor import inspect_environment
 
-    # Toolchain-specific compiler binary check.
-    if toolchain == "armclang":
-        required.append(
-            (
-                toolchain,
-                f"ARM Compiler ({toolchain}) (https://developer.arm.com/tools-and-software/embedded/arm-compiler)",
-            ),
-        )
-    elif toolchain == "atfe":
-        _check_atfe_tools()
-    else:
-        gcc_cmd = toolchain if "gcc" in toolchain else f"{toolchain}-gcc"
-        required.append(
-            (gcc_cmd, "ARM GCC toolchain (https://developer.arm.com/downloads/-/gnu-rm)"),
-        )
-
-    # Transport-specific.
-    if transport in set(Transport):
-        required.append(
-            (JLINK_COMMANDER, "SEGGER J-Link commander (https://www.segger.com/downloads/jlink/)"),
-        )
-
-    missing: list[str] = []
-    for binary, hint in required:
-        if shutil.which(binary) is None:
-            missing.append(f"  - {binary}: {hint}")
-
-    if missing:
-        joined = "\n".join(missing)
-        raise ConfigError(
-            "Required host tools are missing from PATH.",
-            hint=(
-                "Install the following and re-run:\n"
-                f"{joined}\n"
-                "Run 'hpx doctor' for a full diagnostic."
-            ),
-        )
-
-    if find_spec("neuralspotx") is None:
-        raise ConfigError(
-            "Python package 'neuralspotx' is not installed.",
-            hint="Install helia-profiler with its runtime dependencies so the bundled neuralspotx API is available, then re-run 'hpx doctor'.",
-        )
-
-    if transport in (Transport.RTT, Transport.SWO) and find_spec("pylink") is None:
-        raise ConfigError(
-            f"Python package 'pylink' is required for {transport.upper()} transport.",
-            hint="Install pylink-square, then re-run 'hpx doctor'.",
-        )
-
-
-def _check_atfe_tools() -> None:
-    root = os.environ.get("ATFE_ROOT")
-    if not root:
-        raise ConfigError(
-            "ATfE toolchain requested, but ATFE_ROOT is not set.",
-            hint=(
-                "Set ATFE_ROOT to the Arm Toolchain for Embedded install "
-                "directory, e.g. export ATFE_ROOT=/Applications/ATFEToolchain/ATfE-22.1.0."
-            ),
-        )
-
-    bin_dir = Path(root).expanduser() / "bin"
-    required = ("clang", "clang++", "llvm-ar", "llvm-objcopy", "llvm-size")
-    missing = [name for name in required if not (bin_dir / name).exists()]
-    if missing:
-        raise ConfigError(
-            f"ATfE toolchain incomplete under ATFE_ROOT: {bin_dir}",
-            hint=(
-                "Expected these executables: "
-                f"{', '.join(required)}. Missing: {', '.join(missing)}. "
-                "Install ATfE with the newlib overlay or correct ATFE_ROOT."
-            ),
-        )
+    result = inspect_environment(
+        toolchain=cfg.target.toolchain,
+        transport=cfg.target.transport,
+        engine=cfg.engine.type,
+    )
+    if result.ok:
+        return
+    missing = "\n".join(
+        f"  - {check.name}: {check.hint or 'Install this dependency.'}"
+        for check in result.missing_required
+    )
+    raise ConfigError(
+        "Required host dependencies are missing.",
+        hint=f"Install the following and re-run:\n{missing}\nRun 'hpx doctor' for details.",
+    )

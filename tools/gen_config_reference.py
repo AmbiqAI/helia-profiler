@@ -29,18 +29,17 @@ _MISSING = dataclasses.MISSING
 
 # Explicit notes for fields whose semantics cannot be derived mechanically
 # from the type system alone. Keyed by dotted path (section path + field
-# name), e.g. "model.model_location".
+# name), e.g. "target.segger_rtt_path".
 _EXPLICIT_NOTES: dict[str, str] = {
-    "model.model_location": (
-        "**Deprecated** — prefer `arena_location`/`weights_location` for placement control."
-    ),
-    "profiling.pmu_presets": "**Deprecated** — prefer `pmu_counters`.",
-    "keep_work_dir": "**Deprecated** — no-op, the cache work directory is always kept.",
     "engine.type": "`tflm` is the vanilla TFLM baseline engine; use `engine.backend` to select `reference` or `cmsis_nn`.",
     "engine.backend": "TFLM: `reference` or `cmsis_nn`.",
     "engine.config": "free-form engine-specific mapping (not strictly validated).",
     "target.custom_socs": "advanced raw mapping validated by the platform layer.",
     "target.custom_boards": "advanced raw mapping validated by the platform layer.",
+    "target.segger_rtt_path": (
+        "optional RTT target-source override; takes precedence over `SEGGER_RTT_PATH` "
+        "and the bundled V8.58.0 sources."
+    ),
 }
 
 # Root dataclass fields that are resolved at runtime and never user-settable;

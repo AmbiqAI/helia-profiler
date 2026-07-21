@@ -16,7 +16,7 @@ from ..errors import ReportError
 from ..results import LayerResult
 
 if TYPE_CHECKING:
-    from ..model_analysis import ModelAnalysis
+    from ..evaluation import ModelAnalysis
     from ..results import PmuResult
 
 log = logging.getLogger("hpx")

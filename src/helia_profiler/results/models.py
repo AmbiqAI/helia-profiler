@@ -1,13 +1,14 @@
 """Typed result models for profiling data.
 
-Every piece of structured data that flows between pipeline stages, the
-capture layer, and the report module is represented as a frozen dataclass
-here.  No ``dict[str, Any]`` at the boundary — consumers get IDE completion,
-type-checking, and clear contracts.
+Structured data flowing between pipeline stages, capture, and reports uses
+typed dataclasses. Core measurement records are frozen against field
+reassignment, while run metadata is intentionally enriched by pipeline stages.
 
-The models are intentionally flat and simple.  ``LayerResult.counters`` is the
-one deliberate ``dict`` — PMU counter names are dynamic (varies by preset) and
-enumerating every possible ARM PMU event as a field would be impractical.
+Nested dynamic collections remain mutable for compatibility and efficient
+capture assembly. In particular, PMU counter names, engine extensions, power
+samples, and metadata are open-ended. Public consumers should treat returned
+collections as read-only; structural deep immutability is not currently part
+of the API contract.
 """
 
 from __future__ import annotations
@@ -15,11 +16,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from .engines import EngineType
-from .power.base import PowerResult
-from .placement import MemoryRegion
+from ..engines import EngineType
+from ..power.base import PowerResult
+from ..placement import MemoryRegion
+
+if TYPE_CHECKING:
+    from .artifacts import OnDevicePowerSummary, PowerObservation, PowerTerminalRecord
 
 
 class ConsumerKind(StrEnum):
@@ -307,6 +311,9 @@ class ProfileResult:
 
     pmu: PmuResult
     power: PowerResult | None = None
+    power_observation: PowerObservation | None = None
+    power_terminal: PowerTerminalRecord | None = None
+    on_device_power: OnDevicePowerSummary | None = None
     metadata: RunMetadata = field(default_factory=RunMetadata)
     report_paths: list[Path] = field(default_factory=list)
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import pytest
 
+from helia_profiler.results import DeploymentRecord, FirmwareArtifact, PowerRunPlan
 from helia_profiler.capture import capture_power
 from helia_profiler.power.base import PowerResult, PowerSummary
 from helia_profiler.power.sync import DeviceState
@@ -25,6 +26,29 @@ from helia_profiler.results import FirmwareMeta, PmuResult
 from helia_profiler.target.lifecycle import CapturePhase, prepare_target_for_phase
 
 from .conftest import make_pmu_ctx
+
+
+def _mark_deployed(ctx, tmp_path) -> None:
+    binary = tmp_path / "hpx_profiler_power"
+    binary.touch()
+    artifact = FirmwareArtifact(
+        role="power",
+        target_name="hpx_profiler_power",
+        app_dir=tmp_path,
+        build_dir=tmp_path,
+        binary_path=binary,
+    )
+    ctx.publish_power_plan(PowerRunPlan(
+        firmware_mode="dedicated",
+        inference_count=5,
+        count_source="configured",
+    ))
+    ctx.publish_power_firmware(artifact)
+    ctx.publish_power_deployment(DeploymentRecord(
+        firmware=artifact,
+        target_id=ctx.config.target.board,
+        deployed_at="2026-07-18T00:00:00+00:00",
+    ))
 
 
 def _power_result() -> PowerResult:
@@ -122,6 +146,7 @@ class TestLockstepArmBeforeReset:
             power_enabled=True, lockstep=True,
         )
         ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=5))
+        _mark_deployed(ctx, tmp_path)
 
         def _prepare_target(_driver, _name):
             events.append("lifecycle_reset")
@@ -157,6 +182,7 @@ class TestLockstepArmBeforeReset:
             power_enabled=True, lockstep=True,
         )
         ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=5))
+        _mark_deployed(ctx, tmp_path)
         capture_power(ctx, prepare_target=lambda *_: events.append("lifecycle_reset"))
         assert events.index("wait_ready") < events.index("signal_go")
 
@@ -199,24 +225,24 @@ class TestAutoStrategyNeverCyclesRail:
 
 class TestExplicitFlashRecoveryPath:
     def test_flash_recovery_is_the_other_rail_cycle_entry(self, tmp_path, monkeypatch):
-        """Stage-5 flash recovery is the only *other* place the rail cycles.
+        """Flash recovery is the only *other* place the rail cycles.
 
         This is the explicit bring-up/recovery path referenced by the auto-vs-
         rail-cycle invariant: a locked debug domain after a failed flash is
         recovered by power-cycling the Joulescope rail, never by the auto reset
         policy.
         """
-        from helia_profiler.stages.flash import _try_power_cycle
+        from helia_profiler.target.lifecycle import try_power_cycle_for_context
 
         driver = _FakeRailDriver()
         monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: driver)
         ctx = make_pmu_ctx(tmp_path, board="apollo510_evb", power_enabled=True)
 
-        assert _try_power_cycle(ctx) is True
+        assert try_power_cycle_for_context(ctx) is True
         assert driver.power_cycle_calls == 1
 
     def test_flash_recovery_skipped_when_power_disabled(self, tmp_path):
-        from helia_profiler.stages.flash import _try_power_cycle
+        from helia_profiler.target.lifecycle import try_power_cycle_for_context
 
         ctx = make_pmu_ctx(tmp_path, board="apollo510_evb", power_enabled=False)
-        assert _try_power_cycle(ctx) is False
+        assert try_power_cycle_for_context(ctx) is False

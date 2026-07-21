@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ambiqai.github.io/helia-profiler/schemas/comparison-profile/v1.json",
+  "title": "heliaPROFILER comparison profile",
+  "type": "object",
+  "required": ["schema", "schema_version", "metrics"],
+  "properties": {
+    "schema": {"const": "hpx.comparison-profile"},
+    "schema_version": {"const": 1},
+    "name": {"type": "string", "minLength": 1},
+    "missing": {"enum": ["fail", "warn", "ignore"]},
+    "required_dimensions": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "metrics": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/metricPolicy"}
+    }
+  },
+  "$defs": {
+    "metricPolicy": {
+      "type": "object",
+      "required": ["direction", "unit"],
+      "properties": {
+        "direction": {"enum": ["smaller", "larger", "equal"]},
+        "unit": {"type": "string"},
+        "max_regression_pct": {"type": "number", "minimum": 0},
+        "max_regression_abs": {"type": "number", "minimum": 0},
+        "missing": {"enum": ["fail", "warn", "ignore"]}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

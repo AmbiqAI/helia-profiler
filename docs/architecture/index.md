@@ -47,7 +47,7 @@ Compare engines by running `hpx profile` twice with different configs.
 
 ### 3. Typed stage boundaries
 
-All data flowing between stages uses frozen dataclasses from `results.py`.
+Structured stage outputs use typed dataclasses from the `results/` package.
 The one exception is `LayerResult.counters: dict[str, float]` — PMU counter
 names are dynamic and can't be enumerated as fields.
 
@@ -112,9 +112,10 @@ src/helia_profiler/
 ├── config.py           # ProfileConfig (frozen dataclasses)
 ├── profiler.py         # build_default_pipeline(), run_profile()
 ├── pipeline.py         # PipelineContext, Stage protocol, PipelineRunner
-├── results.py          # LayerResult, PmuResult, ProfileResult, etc.
+├── results/            # Result models, workflow artifacts, bundle manifests
+├── evaluation/         # Analysis, comparison, validity, regression policy
 ├── errors.py           # HpxError hierarchy
-├── platform/           # SoC/Board registry
+├── platform/           # SoC/Board registry + custom config overlays
 ├── nsx.py              # NSX subprocess wrapper (configure/build/flash)
 ├── counters.py         # PMU counter registry and pass planning
 ├── doctor.py           # hpx doctor — tool checks
@@ -126,7 +127,8 @@ src/helia_profiler/
 │
 ├── transport/          # CaptureTransport backend registry
 │   ├── protocol.py     # HPX wire protocol (HPX_START/HPX_END framing)
-│   ├── rtt.py          # RTT capture backend
+│   ├── rtt.py          # RTT capture lifecycle/orchestration
+│   ├── rtt_control.py  # Direct RTT control-block/ring-buffer access
 │   ├── swo.py          # SWO capture via pylink/J-Link API
 │   ├── uart.py         # UART capture backend
 │   └── usb_cdc.py      # USB CDC capture backend

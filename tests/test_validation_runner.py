@@ -10,9 +10,84 @@ import yaml
 
 from helia_profiler.config import Toolchain, Transport
 from helia_profiler.engines import EngineType
-from helia_profiler.placement import ModelLocation
-from helia_profiler.validation.matrix import BOARDS, MODELS, CaseSpec
-from helia_profiler.validation.runner import _build_config, run_case
+from helia_profiler.validation.matrix import BOARDS, MODELS, CaseSpec, MemoryProfile
+from helia_profiler.validation.runner import (
+    CaseResult,
+    _build_config,
+    run_case,
+    validation_health_issues,
+)
+
+
+def test_power_health_rejects_suspect_gate_duration():
+    result = CaseResult(
+        case_id="apollo510-power",
+        status="pass",
+        duration_s=1.0,
+        engine="helia-rt",
+        model_id="kws",
+        board="apollo510_evb",
+        power=True,
+        toolchain="arm-none-eabi-gcc",
+        transport="rtt",
+        memory="auto",
+        layers=13,
+        total_cycles=123456,
+        energy_uj=100.0,
+        gated_window_duration_suspect=True,
+    )
+
+    assert validation_health_issues(result) == (
+        "GPIO-gated power window duration is suspect",
+    )
+
+
+def test_power_health_rejects_invalid_gate_integrity():
+    result = CaseResult(
+        case_id="apollo510-power",
+        status="pass",
+        duration_s=1.0,
+        engine="helia-rt",
+        model_id="kws",
+        board="apollo510_evb",
+        power=True,
+        toolchain="arm-none-eabi-gcc",
+        transport="rtt",
+        memory="auto",
+        layers=13,
+        total_cycles=123456,
+        energy_uj=100.0,
+        gate_duration_integrity_valid=False,
+    )
+
+    assert validation_health_issues(result) == (
+        "GPIO-gated power window failed duration integrity",
+    )
+
+
+def test_power_health_rejects_degraded_observation():
+    result = CaseResult(
+        case_id="apollo510-power",
+        status="pass",
+        duration_s=1.0,
+        engine="helia-rt",
+        model_id="kws",
+        board="apollo510_evb",
+        power=True,
+        toolchain="arm-none-eabi-gcc",
+        transport="rtt",
+        memory="auto",
+        layers=13,
+        total_cycles=123456,
+        energy_uj=100.0,
+        power_observation_mode="free_form",
+        power_observation_integrity="degraded",
+        power_gate_failure_kind="no_gate_rise",
+    )
+
+    assert validation_health_issues(result) == (
+        "power observation is degraded (no_gate_rise)",
+    )
 
 
 def test_build_config_includes_reliability_axes(tmp_path: Path):
@@ -27,7 +102,7 @@ def test_build_config_includes_reliability_axes(tmp_path: Path):
         board=BOARDS["apollo4p_blue_kxr_evb"],
         toolchain=Toolchain.ATFE,
         transport=Transport.UART,
-        memory=ModelLocation.SRAM,
+        memory=MemoryProfile.SRAM,
         jlink_serial="1160001481",
     )
 
@@ -37,10 +112,48 @@ def test_build_config_includes_reliability_axes(tmp_path: Path):
     assert cfg["target"]["toolchain"] == "atfe"
     assert cfg["target"]["transport"] == "uart"
     assert cfg["target"]["jlink_serial"] == "1160001481"
-    assert cfg["model"]["model_location"] == "sram"
+    assert cfg["model"]["arena_location"] == "sram"
+    assert cfg["model"]["weights_location"] == "sram"
     assert cfg["power"]["enabled"] is False
     assert cfg["output"]["dir"] == str(output_dir)
     assert cfg["work_dir"] == str(output_dir / "work")
+
+
+def test_build_config_pins_power_serial_for_multi_instrument_bench(tmp_path: Path):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_dir = tmp_path / "out"
+    case = CaseSpec(
+        model=MODELS["kws"],
+        engine=EngineType.HELIA_RT,
+        power=True,
+        board=BOARDS["apollo510_evb"],
+        power_serial="25QG",
+    )
+
+    cfg = _build_config(case, repo_root=repo_root, output_dir=output_dir)
+
+    assert cfg["power"]["enabled"] is True
+    assert cfg["power"]["serial"] == "25QG"
+
+
+def test_build_config_pins_explicit_power_gpio_wiring(tmp_path: Path):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_dir = tmp_path / "out"
+    case = CaseSpec(
+        model=MODELS["kws"],
+        engine=EngineType.HELIA_RT,
+        power=True,
+        board=BOARDS["apollo330mP_evb"],
+        power_gpio_pins=(5, 6, 7),
+    )
+
+    cfg = _build_config(case, repo_root=repo_root, output_dir=output_dir)
+
+    assert cfg["power"]["sync_gpio_pin"] == 5
+    assert cfg["power"]["state_gpio_pin"] == 6
+    assert cfg["power"]["go_gpio_pin"] == 7
 
 
 def test_build_config_aot_prefers_explicit_cmsis_nn_env(

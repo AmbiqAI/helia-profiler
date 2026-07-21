@@ -147,8 +147,10 @@ def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _gated_mask_axis(a: dict[str, Any]) -> tuple[Any, str]:
+def _gated_mask_axis(a: dict[str, Any], *, prefer_device_time: bool = False) -> tuple[Any, str]:
     """Return the timestamp axis used to align packets with GPI polls."""
+    if prefer_device_time:
+        return a["mid"], "device_packet_midpoint_time64"
     host_time = a.get("host_time")
     if host_time is not None and getattr(host_time, "size", 0) and not bool(host_time.size == 0):
         import numpy as np
@@ -156,6 +158,44 @@ def _gated_mask_axis(a: dict[str, Any]) -> tuple[Any, str]:
         if not np.isnan(host_time).any():
             return host_time, "host_packet_arrival_time64"
     return a["mid"], "device_packet_midpoint_time64"
+
+
+def _map_poll_samples_to_packet_time(
+    *,
+    packets: list[dict[str, Any]],
+    poll_samples: list[tuple[int, int]],
+) -> list[tuple[int, int]]:
+    """Map host-timestamped GPI polls onto the instrument stats timeline.
+
+    JS220/JS320 ``s/stats`` callbacks can arrive in USB bursts. Selecting
+    packets by callback arrival time therefore truncates a correctly observed
+    GPIO window. Each packet includes both its instrument midpoint and the
+    host timestamp captured at callback arrival, which provides the conversion
+    needed to express GPI poll instants on the instrument timeline.
+    """
+    import numpy as np
+
+    if len(poll_samples) < 1:
+        return poll_samples
+
+    a = _stats_arrays(packets)
+    host_time = a["host_time"]
+    device_time = a["mid"]
+    if host_time.size < 2 or np.isnan(host_time).any():
+        return poll_samples
+
+    order = np.argsort(host_time)
+    host_time = host_time[order]
+    device_time = device_time[order]
+    unique = np.concatenate(([True], np.diff(host_time) > 0))
+    host_time = host_time[unique]
+    device_time = device_time[unique]
+    if host_time.size < 2:
+        return poll_samples
+
+    polls = np.asarray([tick for tick, _level in poll_samples], dtype=np.float64)
+    mapped = np.interp(polls, host_time, device_time)
+    return [(int(tick), level) for tick, (_host_tick, level) in zip(mapped, poll_samples)]
 
 
 def _whole_summary_from_stats(packets: list[dict[str, Any]]) -> PowerSummary:
@@ -298,6 +338,8 @@ def _process_gated_stats(
     packets: list[dict[str, Any]],
     poll_samples: list[tuple[int, int]],
     io_voltage: float,
+    prefer_device_time: bool = False,
+    minimum_window_s: float = 0.0,
 ) -> tuple[list[GatedPowerWindow], PowerSummary]:
     """Integrate the gated window(s) from on-device stat-packet integrals.
 
@@ -314,11 +356,15 @@ def _process_gated_stats(
     del io_voltage  # voltage is folded into the on-device power integral
 
     a = _stats_arrays(packets)
-    windows = _segment_gpi_windows(poll_samples)
+    windows = [
+        (rise, fall)
+        for rise, fall in _segment_gpi_windows(poll_samples)
+        if (fall - rise) / time64.SECOND >= minimum_window_s
+    ]
     if a["mid"].size == 0 or not windows:
         return [], PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0)
 
-    mask_axis, _axis_name = _gated_mask_axis(a)
+    mask_axis, _axis_name = _gated_mask_axis(a, prefer_device_time=prefer_device_time)
     t0 = float(mask_axis.min())
     gated_windows: list[GatedPowerWindow] = []
     total_charge = 0.0

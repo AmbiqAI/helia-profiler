@@ -11,7 +11,9 @@ from helia_profiler.errors import ConfigError
 from helia_profiler.target.probe.jlink import (
     JLinkProbe,
     JLinkProbeMatch,
+    attached_session,
     inspect_probe_target,
+    find_jlink_exe,
     list_connected_probes,
     resolve_probe_serial,
 )
@@ -24,6 +26,41 @@ def _probe(serial: str, product: str = "J-Link") -> JLinkProbe:
 
 def _match(serial: str, core: CoreArch | None, product: str = "J-Link") -> JLinkProbeMatch:
     return JLinkProbeMatch(probe=_probe(serial, product), detected_core=core)
+
+
+def test_attached_session_does_not_reset_or_restart(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeSession:
+        def __init__(self) -> None:
+            self.reset_calls = 0
+            self.restart_calls = 0
+            self.close_calls = 0
+
+        def reset(self, halt: bool = False) -> None:
+            del halt
+            self.reset_calls += 1
+
+        def restart(self) -> None:
+            self.restart_calls += 1
+
+        def close(self) -> None:
+            self.close_calls += 1
+
+    session = FakeSession()
+    monkeypatch.setattr(
+        "helia_profiler.target.probe.jlink.create_debug_memory_session",
+        lambda: session,
+    )
+    monkeypatch.setattr(
+        "helia_profiler.target.probe.jlink.open_jlink_with_retry",
+        lambda *args, **kwargs: None,
+    )
+
+    with attached_session(device="AP510NFA-CBR", attach_timeout_s=1.0) as attached:
+        assert attached is session
+
+    assert session.reset_calls == 0
+    assert session.restart_calls == 0
+    assert session.close_calls == 1
 
 
 def test_list_connected_probes_is_nongui_and_parses_multiple_products() -> None:
@@ -47,6 +84,26 @@ J-Link[1]: Connection: USB, Serial number: 1160003409, ProductName: J-Link-OB-Ap
     assert calls == [["JLinkExe", "-NoGui", "1"]]
     assert [probe.serial for probe in probes] == ["1160003180", "1160003409"]
     assert {probe.product for probe in probes} == {"J-Link-OB-Apollo4-CortexM"}
+
+
+def test_find_jlink_exe_accepts_windows_executable_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("JLINK_PATH", raising=False)
+    monkeypatch.setattr(
+        "helia_profiler.target.probe.jlink.shutil.which",
+        lambda name: r"C:\SEGGER\JLink.exe" if name == "JLink.exe" else None,
+    )
+
+    assert find_jlink_exe() == r"C:\SEGGER\JLink.exe"
+
+
+def test_find_jlink_exe_prefers_explicit_path(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    explicit = tmp_path / "custom-jlink"
+    explicit.write_text("")
+    monkeypatch.setenv("JLINK_PATH", str(explicit))
+
+    assert find_jlink_exe() == str(explicit)
 
 
 class TestResolveProbeSerial:
@@ -174,3 +231,21 @@ def test_inspect_probe_target_wraps_private_inspector() -> None:
     with patch("helia_profiler.target.probe.jlink._inspect_probe_target", return_value=match) as inspect:
         assert inspect_probe_target(probe, device="AP510NFA-CBR") is match
     inspect.assert_called_once_with(probe, device="AP510NFA-CBR")
+
+
+def test_inspect_probe_target_retries_unknown_target() -> None:
+    probe = _probe("111111", "Apollo5")
+    results = [
+        SimpleNamespace(returncode=0, stdout="Connecting to target...", stderr=""),
+        SimpleNamespace(returncode=0, stdout="Found Cortex-M55", stderr=""),
+    ]
+    with (
+        patch("helia_profiler.target.probe.jlink.find_jlink_exe", return_value="JLinkExe"),
+        patch("helia_profiler.target.probe.jlink.subprocess.run", side_effect=results) as run,
+        patch("helia_profiler.target.probe.jlink.time.sleep") as sleep,
+    ):
+        match = inspect_probe_target(probe, device="AP510NFA-CBR")
+
+    assert match.detected_core is CoreArch.CORTEX_M55
+    assert run.call_count == 2
+    sleep.assert_called_once()

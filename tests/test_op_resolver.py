@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from helia_profiler.engines import EngineType
 from helia_profiler.firmware.op_resolver import build_resolver_plan
-from helia_profiler.model_analysis import LayerOps, ModelAnalysis
+from helia_profiler.evaluation import LayerOps, ModelAnalysis
 
 
 def _analysis(*ops: str) -> ModelAnalysis:

@@ -25,6 +25,17 @@ from neuralspotx.api import NSXError
 
 
 class TestNsxBuild:
+    def test_quiet_build_does_not_redirect_process_stdout(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        def fake_build(*_args, **_kwargs):
+            print("unrelated-thread-output")
+
+        with patch("helia_profiler.nsx.nsx_api.build_app", side_effect=fake_build):
+            nsx.build(tmp_path, verbose=0)
+
+        assert "unrelated-thread-output" in capsys.readouterr().out
+
     def test_success_calls_api(self, tmp_path: Path) -> None:
         with patch("helia_profiler.nsx.nsx_api.build_app") as build_mock:
             nsx.build(tmp_path, toolchain="armclang", timeout_s=42)
@@ -52,7 +63,7 @@ class TestNsxBuild:
                 nsx.build(tmp_path)
         err = exc_info.value
         assert "nsx build" in str(err)
-        assert "boom" in (err.stderr or "")
+        assert "boom" in (err.details or "")
 
     def test_timeout_surfaces_as_build_error(self, tmp_path: Path) -> None:
         # The real subprocess-tree watchdog lives in
@@ -65,7 +76,7 @@ class TestNsxBuild:
             with pytest.raises(BuildError) as exc_info:
                 nsx.build(tmp_path, timeout_s=1)
         assert "nsx build" in str(exc_info.value)
-        assert "timed out" in (exc_info.value.stderr or "")
+        assert "timed out" in (exc_info.value.details or "")
 
 
 class TestNsxFlash:

@@ -2,19 +2,17 @@
 
 from __future__ import annotations
 
-import argparse
 import sys
+import threading
 
 
-def _cmd_power_on(args: argparse.Namespace) -> None:
+def _cmd_power_on(driver_name: str, *, power_serial: str | None = None) -> None:
     """Enable Joulescope current passthrough and hold open until Ctrl-C."""
     from ..power import get_driver
     from ..errors import PowerError
 
-    driver_name = args.driver
-
     try:
-        driver = get_driver(driver_name)
+        driver = get_driver(driver_name, serial=power_serial)
     except PowerError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         if exc.hint:
@@ -33,9 +31,7 @@ def _cmd_power_on(args: argparse.Namespace) -> None:
 
     print("Board powered — press Ctrl-C to release.")
     try:
-        import signal
-
-        signal.pause()
+        threading.Event().wait()
     except KeyboardInterrupt:
         pass
     finally:

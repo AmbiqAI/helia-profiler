@@ -36,6 +36,23 @@ def test_resolves_address_from_nested_map(tmp_path: Path):
     assert addr == 0x20088010
 
 
+def test_resolves_power_target_without_selecting_profile_map(tmp_path: Path):
+    build_dir = tmp_path / "build"
+    build_dir.mkdir()
+    (build_dir / "hpx_profiler.map").write_text(
+        _GCC_MAP.replace("0x20088010", "0x20001000")
+    )
+    (build_dir / "hpx_profiler_power.map").write_text(_GCC_MAP)
+
+    addr = resolve_rtt_control_block_address(
+        build_dir,
+        "arm-none-eabi-gcc",
+        target_name="hpx_profiler_power",
+    )
+
+    assert addr == 0x20088010
+
+
 def test_returns_none_when_symbol_absent(tmp_path: Path):
     build_dir = tmp_path / "build"
     build_dir.mkdir()

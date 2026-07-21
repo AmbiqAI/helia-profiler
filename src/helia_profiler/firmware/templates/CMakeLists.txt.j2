@@ -81,13 +81,23 @@ target_compile_definitions(hpx_profiler PRIVATE BUFFER_SIZE_UP={{ rtt_buffer_siz
 # Same AOT model + link deps as hpx_profiler, minus any transport (SEGGER
 # RTT / USB): main_power.cc (power_only=true render) never references a
 # transport symbol, so no transport sources/defines are added here.
-add_executable(hpx_profiler_power
+add_executable(hpx_profiler_power EXCLUDE_FROM_ALL
     src/main_power.cc
+{% if transport == "rtt" %}
+    src/rtt/SEGGER_RTT.c
+{% endif %}
 )
 
 target_include_directories(hpx_profiler_power PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src
+{% if transport == "rtt" %}
+    ${CMAKE_CURRENT_LIST_DIR}/src/rtt
+    ${CMAKE_CURRENT_LIST_DIR}/src/rtt/Config
+{% endif %}
 )
+{% if transport == "rtt" %}
+target_compile_definitions(hpx_profiler_power PRIVATE BUFFER_SIZE_UP={{ rtt_buffer_size_up }})
+{% endif %}
 
 target_link_libraries(hpx_profiler_power PRIVATE
     nsx::board
@@ -98,6 +108,9 @@ target_link_libraries(hpx_profiler_power PRIVATE
 {% endif %}
 {% if has_armv8m_pmu %}
     nsx::pmu_armv8m
+{% endif %}
+{% if transport == "usb_cdc" %}
+    nsx::usb
 {% endif %}
     {{ aot_cmake_target }}
 {% if psram_needed %}
@@ -155,14 +168,24 @@ target_compile_definitions(hpx_profiler PRIVATE BUFFER_SIZE_UP={{ rtt_buffer_siz
 # transport (SEGGER RTT / USB): main_power.cc (power_only=true render) never
 # references a transport symbol, so no transport sources/defines are added
 # here — that is the whole point of the dedicated binary (see AGENTS.md).
-add_executable(hpx_profiler_power
+add_executable(hpx_profiler_power EXCLUDE_FROM_ALL
     src/main_power.cc
     src/hpx_pmu_profiler.cc
+{% if transport == "rtt" %}
+    src/rtt/SEGGER_RTT.c
+{% endif %}
 )
 
 target_include_directories(hpx_profiler_power PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src
+{% if transport == "rtt" %}
+    ${CMAKE_CURRENT_LIST_DIR}/src/rtt
+    ${CMAKE_CURRENT_LIST_DIR}/src/rtt/Config
+{% endif %}
 )
+{% if transport == "rtt" %}
+target_compile_definitions(hpx_profiler_power PRIVATE BUFFER_SIZE_UP={{ rtt_buffer_size_up }})
+{% endif %}
 
 target_link_libraries(hpx_profiler_power PRIVATE
     nsx::board
@@ -173,6 +196,9 @@ target_link_libraries(hpx_profiler_power PRIVATE
 {% endif %}
 {% if has_armv8m_pmu %}
     nsx::pmu_armv8m
+{% endif %}
+{% if transport == "usb_cdc" %}
+    nsx::usb
 {% endif %}
 {% if engine_type == "helia-rt" %}
     nsx::helia_rt

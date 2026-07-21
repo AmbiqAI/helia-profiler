@@ -10,23 +10,50 @@ from __future__ import annotations
 import logging
 import shutil
 import uuid
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, runtime_checkable
 
 from ._version import __version__
+from .results import (
+    DeploymentRecord,
+    FirmwareArtifact,
+    PowerObservation,
+    PowerRun,
+    PowerRunPlan,
+    PowerTerminalEnvelope,
+    PowerTerminalRecord,
+    ProfileRun,
+)
 from .config import ProfileConfig
 from .engines.base import EngineAdapter, EngineArtifacts
 from .errors import HpxError
 from .platform import BoardDef, SocDef
-from .model_analysis import ModelAnalysis
+from .evaluation import ModelAnalysis
 from .placement import Placement
 from .power.base import PowerResult
 from .results import MemoryPlan, PmuResult, RunMetadata, BinarySections
 from .target.probe.base import FlashBackend, Probe, ResetController
 
 log = logging.getLogger("hpx")
+
+
+@dataclass(frozen=True)
+class ProgressUpdate:
+    """User-meaningful progress within a pipeline stage."""
+
+    message: str
+    kind: Literal["status", "checkpoint"] = "status"
+    completed: int | None = None
+    total: int | None = None
+    unit: str | None = None
+    eta_s: float | None = None
+    min_verbosity: int = 0
+
+
+ProgressSink = Callable[[ProgressUpdate], None]
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +95,18 @@ class PipelineContext:
     #: built alongside hpx_profiler only when config.power.enabled. WP3 wires
     #: this into the power-capture flash/run path; this stage only exposes it.
     power_binary_path: Path | None = None
+
+    # Explicit major-stage artifacts. Legacy path fields above remain mirrored
+    # during the staged migration so existing internals and tests keep working.
+    profile_firmware: FirmwareArtifact | None = None
+    power_firmware: FirmwareArtifact | None = None
+    deployed_power_firmware: FirmwareArtifact | None = None
+    power_plan: PowerRunPlan | None = None
+
+    # Grouped immutable workflow records. Legacy fields above and capture
+    # result fields below remain mirrored until reports/API migrate.
+    profile_run: ProfileRun | None = None
+    power_run: PowerRun | None = None
 
     # Model analysis (stage: analyze_model — optional)
     model_analysis: ModelAnalysis | None = None
@@ -111,6 +150,148 @@ class PipelineContext:
     #: when failures look connection-related.
     passthrough_skipped: bool = False
 
+    #: True only when EnsureBoardPoweredStage successfully energized the target
+    #: during this run. Probe discovery uses this to tolerate bounded USB
+    #: re-enumeration after a Joulescope relay closes.
+    target_power_ensured: bool = False
+
+    progress_sink: ProgressSink | None = field(default=None, repr=False, compare=False)
+
+    def publish_profile_firmware(self, firmware: FirmwareArtifact) -> None:
+        if firmware.role != "profile":
+            raise ValueError("Profile run requires a profile firmware artifact.")
+        self.profile_run = ProfileRun(firmware=firmware)
+        self.profile_firmware = firmware
+        self.pmu_result = None
+
+    def publish_profile_deployment(self, deployment: DeploymentRecord) -> None:
+        if self.profile_run is None:
+            raise ValueError("Profile firmware must be published before deployment.")
+        if deployment.firmware != self.profile_run.firmware:
+            raise ValueError("Profile deployment must reference the current firmware artifact.")
+        self.profile_run = replace(self.profile_run, deployment=deployment)
+
+    def publish_profile_result(self, result: PmuResult) -> None:
+        if self.profile_run is None or self.profile_run.deployment is None:
+            raise ValueError("Profile firmware must be deployed before capture.")
+        self.profile_run = replace(self.profile_run, result=result)
+        self.pmu_result = result
+
+    def publish_power_plan(self, plan: PowerRunPlan) -> None:
+        self.power_run = PowerRun(plan=plan)
+        self.power_plan = plan
+        self.power_firmware = None
+        self.deployed_power_firmware = None
+        self.power_binary_path = None
+        self.power_result = None
+
+    def publish_power_firmware(self, firmware: FirmwareArtifact) -> None:
+        if self.power_run is None:
+            raise ValueError("Power plan must be published before firmware.")
+        if self.power_run.plan.firmware_mode != "dedicated":
+            raise ValueError("Shared power runs do not accept dedicated firmware artifacts.")
+        if firmware.role != "power":
+            raise ValueError("Power run requires a power firmware artifact.")
+        self.power_run = replace(
+            self.power_run,
+            firmware=firmware,
+            deployment=None,
+            observation=None,
+        )
+        self.power_firmware = firmware
+        self.deployed_power_firmware = None
+        self.power_result = None
+
+    def publish_power_deployment(self, deployment: DeploymentRecord) -> None:
+        if self.power_run is None or self.power_run.firmware is None:
+            raise ValueError("Power firmware must be published before deployment.")
+        if deployment.firmware != self.power_run.firmware:
+            raise ValueError("Power deployment must reference the current firmware artifact.")
+        self.power_run = replace(self.power_run, deployment=deployment)
+        self.deployed_power_firmware = deployment.firmware
+
+    def publish_power_observation(self, observation: PowerObservation) -> None:
+        if self.power_run is None:
+            raise ValueError("Power plan must be published before capture.")
+        if (
+            self.power_run.plan.firmware_mode == "dedicated"
+            and self.power_run.deployment is None
+        ):
+            raise ValueError("Dedicated power firmware must be deployed before capture.")
+        observation.result.metadata.update(
+            {
+                "observation_mode": observation.mode,
+                "integrity": observation.integrity,
+                "gate_rise_observed": observation.gate_rise_observed,
+                "gate_fall_observed": observation.gate_fall_observed,
+                "observation_deadline_s": observation.deadline_s,
+            }
+        )
+        self.power_run = replace(self.power_run, observation=observation)
+        self.power_result = observation.result
+
+    def publish_power_terminal(self, terminal: PowerTerminalRecord) -> None:
+        if self.power_run is None or self.power_run.deployment is None:
+            raise ValueError("Power firmware must be deployed before terminal status.")
+        if self.power_run.observation is None and self.config.power.mode.value != "internal":
+            raise ValueError("Power observation must complete before terminal status.")
+        if self.power_run.terminal is not None:
+            raise ValueError("Power terminal status has already been published.")
+        self.power_run = replace(self.power_run, terminal=terminal)
+
+    def publish_power_terminal_envelope(self, envelope: PowerTerminalEnvelope) -> None:
+        self.publish_power_terminal(envelope.terminal)
+        assert self.power_run is not None
+        self.power_run = replace(
+            self.power_run,
+            on_device_summary=envelope.measurement,
+        )
+
+    def publish_power_result(self, result: PowerResult) -> None:
+        """Compatibility publisher for non-observing drivers and tests."""
+        metadata = result.metadata
+        valid_gate = metadata.get("measurement_scope") == "gpio_gated_clean_window"
+        mode: Literal["gpio_gated", "free_form"] = (
+            "gpio_gated" if valid_gate else "free_form"
+        )
+        self.publish_power_observation(
+            PowerObservation(
+                mode=mode,
+                result=result,
+                gate_rise_observed=bool(metadata.get("gate_rise_observed", valid_gate)),
+                gate_fall_observed=bool(metadata.get("gate_fall_observed", valid_gate)),
+                deadline_s=float(
+                    metadata.get("capture_safety_bound_s", result.summary.duration_s)
+                ),
+                integrity="valid" if valid_gate else "degraded",
+            )
+        )
+
+    def report_progress(
+        self,
+        message: str,
+        *,
+        kind: Literal["status", "checkpoint"] = "status",
+        completed: int | None = None,
+        total: int | None = None,
+        unit: str | None = None,
+        eta_s: float | None = None,
+        min_verbosity: int = 0,
+    ) -> None:
+        """Publish an optional progress update without depending on a UI."""
+        if self.progress_sink is not None:
+            self.progress_sink(
+                ProgressUpdate(
+                    message=message,
+                    kind=kind,
+                    completed=completed,
+                    total=total,
+                    unit=unit,
+                    eta_s=eta_s,
+                    min_verbosity=min_verbosity,
+                )
+            )
+
 
 # ---------------------------------------------------------------------------
 # Stage protocol — each pipeline step implements this
@@ -150,14 +331,20 @@ class PipelineRunner:
         self,
         stages: list[Stage],
         console: Any | None = None,
+        progress_sink: ProgressSink | None = None,
     ) -> None:
         self._stages = list(stages)
         self._console = console  # Optional HpxConsole — avoids circular import
+        self._progress_sink = progress_sink
 
     def run(self, config: ProfileConfig) -> PipelineContext:
         """Set up the working directory, run all stages, and clean up."""
         work_dir, should_cleanup = _resolve_work_dir(config)
         ctx = PipelineContext(config=config, work_dir=work_dir)
+        if self._progress_sink is not None:
+            ctx.progress_sink = self._progress_sink
+        elif self._console is not None:
+            ctx.progress_sink = self._console.progress_update
 
         # Seed run metadata with immutable fields
         ctx.run_metadata.hpx_version = __version__
@@ -166,7 +353,8 @@ class PipelineRunner:
         ctx.run_metadata.config_snapshot = _serialize_config(config)
 
         try:
-            for stage in self._stages:
+            total_stages = len(self._stages)
+            for stage_index, stage in enumerate(self._stages, start=1):
                 if stage.should_skip(ctx):
                     log.info("[skip] %s", stage.name)
                     if self._console is not None:
@@ -175,7 +363,7 @@ class PipelineRunner:
 
                 log.info("[start] %s", stage.name)
                 if self._console is not None:
-                    self._console.stage_start(stage.name)
+                    self._console.stage_start(stage.name, stage_index, total_stages)
                 try:
                     stage.run(ctx)
                 except KeyboardInterrupt:

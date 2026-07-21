@@ -28,6 +28,10 @@ these major phases. `PipelineRunner` still executes everything sequentially;
 if any stage raises an exception, the pipeline stops and reports the error
 with its typed hint.
 
+The planned evolution of these boundaries, including separate profile/power
+artifacts, early checkpoints, and deferred power diagnostics, is documented in
+[Profile and Power Pipeline Refactor Plan](profile-power-refactor-plan.md).
+
 ## PipelineContext
 
 The `PipelineContext` is a mutable state bag passed through all stages:
@@ -149,11 +153,12 @@ multiple PMU counter sets in sequence).
 **File:** `stages/capture_power.py`
 **Sets:** `ctx.power_result`
 
-Skipped if `power.enabled` is false. Otherwise:
-
-1. Power-cycle the EVB via Joulescope (cut power, wait, restore)
-2. Start the Joulescope capture for `duration_s` seconds
-3. Compute summary statistics (avg/peak current, power, energy)
+Skipped if `power.enabled` is false. The concrete pipeline first plans a fixed
+inference count from profile timing, rerenders and incrementally rebuilds the
+dedicated transport-free power target, and explicitly flashes that artifact.
+Capture then arms the configured power driver, resets the target without
+normally cycling its rail, observes the GPIO-gated clean window, and computes
+summary statistics from samples inside the accepted gate.
 
 ### S08: Generate Report
 

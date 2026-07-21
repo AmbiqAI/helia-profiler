@@ -35,8 +35,8 @@ hpx profile [MODEL] [--config FILE] [options]
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--arena-size` | int | (engine-specific) | Tensor arena size in bytes. |
-| `--arena-location` | `tcm` \| `sram` \| `psram` | — | Runtime tensor arena placement for heliaRT. Alias: `--runtime-arena-location`. |
-| `--weights-location` | `tcm` \| `sram` \| `mram` \| `psram` | — | Runtime model/weights placement for heliaRT. Alias: `--runtime-weights-location`. |
+| `--arena-location` | `tcm` \| `sram` \| `psram` | — | Runtime tensor arena placement for heliaRT. |
+| `--weights-location` | `tcm` \| `sram` \| `mram` \| `psram` | — | Runtime model/weights placement for heliaRT. |
 | `--model-location` | `auto` \| `tcm` \| `sram` \| `mram` \| `psram` | `auto` | Compatibility preset for arena + weights. Prefer split placement flags. See [Memory](../guide/memory.md). |
 
 ## Target hardware
@@ -65,7 +65,7 @@ hpx profile [MODEL] [--config FILE] [options]
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--power` | flag | off | Enable power capture. See [Power](../guide/power.md). |
-| `--power-driver` | `joulescope` \| `joulescope-js110` \| `joulescope-js220` \| `ondevice` | `joulescope` | Power instrument driver. |
+| `--power-driver` | `joulescope` \| `ondevice` | `joulescope` | Power instrument driver. The unified Joulescope driver auto-detects JS110, JS220, and JS320 devices. |
 | `--power-mode` | `external` \| `internal` | `external` | External Joulescope vs on-device measurement. |
 | `--power-duration` | int | 30 | Capture window length in seconds. |
 | `--power-firmware` | `dedicated` \| `shared` | `dedicated` | Binary flashed during power capture. `dedicated` uses a transport-free image to avoid transport current contamination; `shared` reuses the transport binary. See [Power](../guide/power.md#dedicated-power-firmware). |
@@ -80,12 +80,16 @@ hpx profile [MODEL] [--config FILE] [options]
 | `--no-model-explorer` | flag | — | Skip Model Explorer overlay generation. |
 | `--detailed` | flag | off | Emit per-preset CSVs and a memory plan dump. |
 
+Final human-readable result tables are written to stdout. Progress spinners,
+stage logs, warnings, interruptions, and errors are written to stderr. This
+keeps stdout available for durable command results and future machine-output
+modes; JSON/CSV profile data is currently written to files in `--output-dir`.
+
 ## Build / debug
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--work-dir DIR` | path | tempdir | Working directory for generated firmware. Useful for debugging the generated NSX project. |
-| `--keep-work-dir` | flag | off | Don't delete the work directory at exit. |
 | `--compiler-launcher NAME` | string | `auto` | CMake compiler launcher to cache compiles. `auto` uses `sccache`/`ccache` if installed; a name/path requires it to be found. Overridden by `HPX_COMPILER_LAUNCHER`. |
 | `--no-compiler-launcher` | flag | — | Disable the compiler launcher (same as `--compiler-launcher none`). |
 
@@ -94,14 +98,12 @@ hpx profile [MODEL] [--config FILE] [options]
 | Code | Meaning |
 |---|---|
 | 0 | Success |
-| 1 | `ConfigError` — bad YAML or invalid CLI combination |
-| 2 | `PlatformError` — unsupported board/SoC |
-| 3 | `EngineError` — engine adapter failure (download, AOT compile, etc.) |
-| 4 | `FirmwareError` — template rendering failure |
-| 5 | `BuildError` — NSX build failure |
-| 6 | `CaptureError` — flash, transport, or PMU capture failure |
-| 7 | `PowerError` — Joulescope driver failure |
-| 8 | `ReportError` — report generation failure |
+| 1 | HPX configuration, platform, engine, build, capture, power, or report failure |
+| 2 | Typer/Click command-line usage error |
+| 130 | Interrupted with Ctrl-C |
+
+Typed category-specific exit codes are not yet part of the CLI contract. Error
+types remain available to programmatic callers through the `HpxError` hierarchy.
 
 ## Examples
 
@@ -149,6 +151,6 @@ hpx profile model.tflite --power --power-duration 10
 ### Inspect generated firmware
 
 ```bash
-hpx profile model.tflite --keep-work-dir --work-dir ./build
+hpx profile model.tflite --work-dir ./build
 ls ./build/firmware/
 ```

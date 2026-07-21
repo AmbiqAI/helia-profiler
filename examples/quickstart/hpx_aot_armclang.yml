@@ -18,7 +18,8 @@ target:
   toolchain: armclang
 
 profiling:
-  pmu_presets: [basic_cpu]    # lightweight — just cycle counts + IPC
+  pmu_counters:
+    cpu: default
   per_layer: true
   iterations: 3
   warmup: 1
