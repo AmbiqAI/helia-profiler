@@ -42,8 +42,12 @@ class TestRegistry:
         assert Transport.USB_CDC not in BOARDS["apollo3p_evb"].transports
         assert Transport.USB_CDC in BOARDS["apollo4p_blue_kxr_evb"].transports
 
-    def test_engines_are_rt_and_aot(self):
-        assert set(ENGINES) == {EngineType.HELIA_RT, EngineType.HELIA_AOT}
+    def test_engines_include_tflm_cmsis_nn_baseline(self):
+        assert set(ENGINES) == {
+            EngineType.HELIA_RT,
+            EngineType.HELIA_AOT,
+            EngineType.TFLM,
+        }
 
 
 class TestCaseValidity:
@@ -73,31 +77,36 @@ class TestBuildMatrix:
     def test_full_matrix_default(self):
         cases = build_matrix()
         # Power is intentionally off by default for PR reliability validation:
-        # AP3: 4 models × 2 engines × 3 toolchains × 3 transports × 5 memories = 360
-        # AP4/AP5 boards: each 4 × 2 × 3 × 4 transports × 5 memories = 480
-        assert len(cases) == 1800
+        # AP3: 4 models × 3 engines × 3 toolchains × 3 transports × 5 memories = 540
+        # AP4/AP5 boards: each 4 × 3 × 3 × 4 transports × 5 memories = 720
+        assert len(cases) == 2700
 
     def test_power_off_halves_matrix(self):
-        assert len(build_matrix(power="off")) == 1800
+        assert len(build_matrix(power="off")) == 2700
 
     def test_power_on_halves_matrix(self):
-        assert len(build_matrix(power="on")) == 1800
+        assert len(build_matrix(power="on")) == 2700
 
     def test_power_both_doubles_matrix(self):
-        assert len(build_matrix(power="both")) == 3600
+        assert len(build_matrix(power="both")) == 5400
 
     def test_repeat_multiplies_matrix(self):
-        assert len(build_matrix(power="off", repeat=3)) == 5400
+        assert len(build_matrix(power="off", repeat=3)) == 8100
 
     def test_model_filter(self):
         cases = build_matrix(models=["kws"], power="off")
-        assert len(cases) == 450
+        assert len(cases) == 675
         assert {c.model.id for c in cases} == {"kws"}
 
     def test_engine_filter(self):
         cases = build_matrix(engines=["helia-aot"], power="off")
         assert len(cases) == 900
         assert all(c.engine is EngineType.HELIA_AOT for c in cases)
+
+    def test_tflm_engine_filter(self):
+        cases = build_matrix(engines=["tflm"], power="off")
+        assert len(cases) == 900
+        assert all(c.engine is EngineType.TFLM for c in cases)
 
     def test_axis_filters_can_select_one_board_case_with_two_passes(self):
         cases = build_matrix(

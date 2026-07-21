@@ -16,6 +16,7 @@ from .common import _find_repo_root
 _ENGINE_ALIASES = {
     "rt": "helia-rt",
     "aot": "helia-aot",
+    "tflm": "tflm",
     "helia-rt": "helia-rt",
     "helia-aot": "helia-aot",
 }
@@ -88,12 +89,12 @@ def _parse_power_gpio_pins(raw: str) -> dict[str, tuple[int, int, int]] | None:
 
 
 def _normalise_engines(raw: str) -> str:
-    """Translate short engine aliases (rt, aot) to canonical names."""
+    """Translate short engine aliases to canonical names."""
     return _normalise_csv_aliases(
         raw,
         aliases=_ENGINE_ALIASES,
         label="engine",
-        known="rt, aot, helia-rt, helia-aot",
+        known="rt, aot, tflm, helia-rt, helia-aot",
     )
 
 
@@ -172,7 +173,7 @@ def _cmd_validate(args: argparse.Namespace) -> None:
             args.engines = {
                 "models-rt": "helia-rt",
                 "models-aot": "helia-aot",
-                "complete": "helia-rt,helia-aot",
+                "complete": "helia-rt,helia-aot,tflm",
             }[suite]
         if not args.boards.strip():
             args.boards = "apollo510_evb,apollo330mP_evb"

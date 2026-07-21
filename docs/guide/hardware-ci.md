@@ -238,19 +238,20 @@ leave the optional axes empty. It uses the same model, board, toolchain,
 transport, and memory axes as `models-rt`, but runs `helia-aot`.
 
 For the full hardware regression, select `suite=complete`. It combines
-`models-rt` and `models-aot` into a 32-case sweep:
+heliaRT, heliaAOT, and the stock TFLM upstream-CMSIS-NN baseline into a
+48-case sweep:
 
 ```text
-4 models × 2 boards × 2 toolchains × 2 engines
+4 models × 2 boards × 2 toolchains × 3 engines
 ```
 
 To compare runtime engines on the same smoke model, keep `suite=smoke` and set:
 
 ```text
-engines=helia-rt,helia-aot
+engines=helia-rt,helia-aot,tflm
 ```
 
-You can combine axes when needed, for example `engines=helia-rt,helia-aot` and
+You can combine axes when needed, for example `engines=helia-rt,helia-aot,tflm` and
 `toolchains=arm-none-eabi-gcc,armclang`, but preview with `hpx validate --list`
 first so the manual run size is explicit.
 

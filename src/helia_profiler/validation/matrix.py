@@ -157,7 +157,11 @@ def _board_spec(board_id: str, display_name: str, description: str = "") -> Boar
 # ---------------------------------------------------------------------------
 
 #: Supported inference engines for validation.
-ENGINES: tuple[EngineType, ...] = (EngineType.HELIA_RT, EngineType.HELIA_AOT)
+ENGINES: tuple[EngineType, ...] = (
+    EngineType.HELIA_RT,
+    EngineType.HELIA_AOT,
+    EngineType.TFLM,
+)
 
 
 #: Canonical MLPerf Tiny models shipped as LFS fixtures.
@@ -301,7 +305,7 @@ def build_matrix(
                 unknown.append(str(e))
         if unknown:
             raise ValueError(f"Unknown engine(s): {unknown}. Known: {[e.value for e in ENGINES]}")
-        # Reject engines outside the validation matrix (e.g. TFLM).
+        # Reject engines outside the validation matrix.
         out_of_matrix = [e.value for e in engine_ids if e not in ENGINES]
         if out_of_matrix:
             raise ValueError(

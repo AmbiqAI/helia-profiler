@@ -205,6 +205,10 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
                 "module_name": "hpx_model",
                 "cmsis_nn_path": str(cmsis_nn_candidate),
             }
+    elif case.engine is EngineType.TFLM:
+        # Validation exercises the optimized upstream CMSIS-NN baseline. The
+        # reference-kernel backend remains available to ad-hoc profile runs.
+        cfg["engine"]["backend"] = "cmsis_nn"
 
     return cfg
 

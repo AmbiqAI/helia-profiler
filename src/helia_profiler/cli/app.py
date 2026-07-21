@@ -736,7 +736,7 @@ _VALIDATE_SUITE_CHOICE = click.Choice(["smoke", "models-rt", "models-aot", "comp
         "  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n\n"
         "  hpx validate --suite models-rt       # 16-case RT sweep: 2 boards x 4 models x 2 toolchains\n\n"
         "  hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains\n\n"
-        "  hpx validate --suite complete        # 32-case RT + AOT sweep"
+        "  hpx validate --suite complete        # 48-case RT + AOT + TFLM/CMSIS-NN sweep"
     ),
 )
 def validate_command(
@@ -746,7 +746,7 @@ def validate_command(
     engines: str = typer.Option(
         "",
         "--engines",
-        help="Comma-separated engines: rt,aot,helia-rt,helia-aot (default: both).",
+        help="Comma-separated engines: rt,aot,tflm,helia-rt,helia-aot (default: all).",
     ),
     power: str = typer.Option(
         "off",
@@ -782,7 +782,7 @@ def validate_command(
             "toolchains=arm-none-eabi-gcc, interfaces=rtt, memories=auto. "
             "'models-rt' and 'models-aot' default unset axes to all MLPerf Tiny models, "
             "Apollo510 + Apollo330mP, gcc + atfe, rtt, auto memory, and the selected engine. "
-            "'complete' runs the same axes for both helia-rt and helia-aot. "
+            "'complete' runs the same axes for helia-rt, helia-aot, and TFLM/CMSIS-NN. "
             "Explicit axis flags always win."
         ),
     ),
