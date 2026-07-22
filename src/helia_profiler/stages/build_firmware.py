@@ -50,19 +50,20 @@ class BuildFirmwareStage:
             toolchain,
             timeout_s=ctx.config.timeouts.binary_probe_s,
         )
-        ctx.publish_profile_firmware(FirmwareArtifact(
-            role="profile",
-            target_name="hpx_profiler",
-            app_dir=ctx.firmware_dir,
-            build_dir=build_dir,
-            binary_path=binary_path,
-            binary_sections=ctx.binary_sections,
-        ))
-        ctx.report_progress(
-            f"Profile firmware ready · {ctx.binary_sections.total:,} bytes",
-            kind="checkpoint",
-            min_verbosity=1,
+        ctx.publish_profile_firmware(
+            FirmwareArtifact(
+                role="profile",
+                target_name="hpx_profiler",
+                app_dir=ctx.firmware_dir,
+                build_dir=build_dir,
+                binary_path=binary_path,
+                binary_sections=ctx.binary_sections,
+            )
         )
+        ready_message = "Profile firmware ready"
+        if ctx.binary_sections is not None:
+            ready_message += f" · {ctx.binary_sections.total:,} bytes"
+        ctx.report_progress(ready_message, kind="checkpoint", min_verbosity=1)
         # Capture compiler + cmake version banners for run metadata
         probe_s = ctx.config.timeouts.toolchain_probe_s
         ctx.run_metadata.toolchain = ToolchainInfo(

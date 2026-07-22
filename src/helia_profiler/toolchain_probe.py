@@ -161,15 +161,19 @@ def binary_sections(
 ) -> BinarySections | None:
     """Return section sizes for *binary_path*, dispatching by toolchain.
 
-    Uses ``fromelf`` for armclang / ATfE binaries and ``<prefix>-size``
-    for GCC binaries.  Returns ``None`` if the size tool is unavailable
-    or its output cannot be parsed.
+    Uses ``fromelf`` for armclang binaries and the configured ``size`` tool
+    for GCC and ATFE binaries. Returns ``None`` if the size tool is
+    unavailable or its output cannot be parsed.
     """
     spec = get_toolchain_spec(toolchain)
     if spec.section_probe == "fromelf":
         return _sections_via_fromelf(binary_path, timeout_s=timeout_s)
     assert spec.size is not None
-    return _sections_via_size(binary_path, size_cmd=spec.size, timeout_s=timeout_s)
+    return _sections_via_size(
+        binary_path,
+        size_cmd=resolve_toolchain_executable(toolchain, spec.size),
+        timeout_s=timeout_s,
+    )
 
 
 # ---------------------------------------------------------------------------
