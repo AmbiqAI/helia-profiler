@@ -67,6 +67,14 @@ hpx profile --config hpx.yml                 # reproducible, config-driven run
 [Getting Started](https://ambiqai.github.io/helia-profiler/getting-started/)
 for a real walkthrough.)*
 
+## Hardware regression dashboard
+
+The companion [HPX Dashboard](https://github.com/AmbiqAI/hpx_dashboard)
+downloads completed hardware-validation artifacts and presents historical,
+layer-level comparisons. Dashboard code and deployment are maintained in that
+repository; `helia-profiler` remains the producer of portable validation
+bundles.
+
 ## Development
 
 ```bash
