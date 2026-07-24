@@ -40,7 +40,12 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(tmp_path
                 "schema": "hpx.run-metadata",
                 "schema_version": 1,
                 "hpx_version": "0.1.0",
-                "toolchain": {"compiler": "gcc", "compiler_version": "12.2.1"},
+                "toolchain": {
+                    "compiler": "gcc",
+                    "compiler_version": "12.2.1",
+                    "cmake_version": "3.31.6",
+                },
+                "engine": {"type": "helia-rt", "version": "1.16.0"},
                 "firmware": {"system_clock_hz": 96_000_000},
             }
         )
@@ -82,6 +87,14 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(tmp_path
     assert case["artifacts"]["run_metadata"]["path"] == f"{result.case_id}/run_metadata.json"
     assert case["provenance"]["hpx_version"] == "0.1.0"
     assert case["provenance"]["compiler_version"] == "12.2.1"
+    assert case["provenance"]["runtime"] == {
+        "toolchain": {
+            "compiler": "gcc",
+            "compiler_version": "12.2.1",
+            "cmake_version": "3.31.6",
+        },
+        "engine": {"type": "helia-rt", "version": "1.16.0"},
+    }
     assert case["provenance"]["system_clock_hz"] == 96_000_000
     assert case["provenance"]["run_metadata_schema_version"] == 1
     assert case["provenance"]["run_summary_schema_version"] == 1

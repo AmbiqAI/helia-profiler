@@ -99,6 +99,7 @@ class EngineArtifacts:
     heliart_version: str | None = None
     heliart_variant: str | None = None
     heliart_toolchain_tag: str | None = None
+    helia_aot_version: str | None = None
 
     # heliaAOT-only fields (None / defaults for other engines).
     aot_prefix: str | None = None

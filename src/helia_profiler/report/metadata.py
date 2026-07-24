@@ -41,6 +41,8 @@ def _metadata_to_dict(meta: RunMetadata) -> dict[str, Any]:
         d["model"] = asdict(meta.model)
     if meta.toolchain is not None:
         d["toolchain"] = asdict(meta.toolchain)
+    if meta.engine is not None:
+        d["engine"] = {k: v for k, v in asdict(meta.engine).items() if v is not None}
     if meta.timing is not None:
         d["timing"] = {k: v for k, v in asdict(meta.timing).items() if v is not None}
     return d

@@ -82,7 +82,7 @@ class HeliaAOTAdapter:
         module_name = config.engine.config.get("module_name", _DEFAULT_MODULE_NAME)
 
         # 0. Verify installed helia-aot satisfies the floor.
-        _check_helia_aot_version()
+        aot_version = _check_helia_aot_version()
 
         # 1. Resolve AOT platform from profiler board
         aot_platform = _resolve_aot_platform(config)
@@ -171,6 +171,7 @@ class HeliaAOTAdapter:
             aot_prefix=prefix,
             aot_module_name=module_name,
             aot_cmake_target=f"nsx::{cmake_name}",
+            helia_aot_version=aot_version,
             aot_allocate_arenas=allocate_arenas,
             aot_arena_regions=arena_regions,
             aot_op_manifest=op_manifest or None,
