@@ -194,6 +194,7 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
                 "run_metadata_schema_version": metadata.get("schema_version"),
                 "run_summary_schema_version": summary.get("schema_version"),
                 "effective_memory": summary.get("memory_plan"),
+                "runtime": _runtime_provenance(metadata) or None,
             }
         ),
         "metrics": {
@@ -209,6 +210,29 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
     if result.error:
         case_data["error"] = result.error
     return _strip_none(case_data)
+
+
+def _runtime_provenance(metadata: dict[str, Any]) -> dict[str, Any]:
+    """Return dashboard-oriented toolchain and engine version details."""
+    runtime: dict[str, Any] = {}
+    toolchain = _nested_dict(metadata, "toolchain")
+    if toolchain:
+        runtime["toolchain"] = _strip_none(
+            {
+                "compiler": toolchain.get("compiler"),
+                "compiler_version": toolchain.get("compiler_version"),
+                "cmake_version": toolchain.get("cmake_version"),
+            }
+        )
+    engine = _nested_dict(metadata, "engine")
+    if engine:
+        runtime["engine"] = _strip_none(
+            {
+                "type": engine.get("type"),
+                "version": engine.get("version"),
+            }
+        )
+    return runtime
 
 
 def _repo_metadata(repo_root: Path | None) -> dict[str, Any]:

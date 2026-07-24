@@ -24,6 +24,7 @@ from .manifest import (
 from .models import (
     BinarySections,
     ConsumerKind,
+    EngineInfo,
     FirmwareMeta,
     LayerResult,
     MemoryConsumer,
@@ -44,6 +45,7 @@ __all__ = [
     "BinarySections",
     "ConsumerKind",
     "DeploymentRecord",
+    "EngineInfo",
     "FirmwareArtifact",
     "FirmwareMeta",
     "LayerResult",

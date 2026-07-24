@@ -7,6 +7,7 @@ import logging
 from ..engines import get_adapter
 from ..errors import EngineError
 from ..pipeline import PipelineContext
+from ..results import EngineInfo
 
 log = logging.getLogger("hpx")
 
@@ -46,3 +47,7 @@ class PrepareEngineStage:
 
         ctx.engine_adapter = adapter
         ctx.engine_artifacts = artifacts
+        ctx.run_metadata.engine = EngineInfo(
+            type=engine_type.value,
+            version=artifacts.heliart_version or artifacts.helia_aot_version,
+        )

@@ -27,12 +27,14 @@ from helia_profiler.report import (
 from helia_profiler.results import load_result_manifest
 from helia_profiler.evaluation import ModelAnalysis
 from helia_profiler.results import (
+    EngineInfo,
     FirmwareMeta,
     LayerResult,
     PmuResult,
     PresetResult,
     RunMetadata,
     TimingInfo,
+    ToolchainInfo,
 )
 
 
@@ -57,6 +59,26 @@ def test_metadata_to_dict_includes_timing():
         "hpx_start_latency_s": 0.25,
         "protocol_duration_s": 0.9,
     }
+
+
+def test_metadata_to_dict_includes_runtime_versions():
+    meta = RunMetadata(
+        toolchain=ToolchainInfo(
+            compiler="arm-none-eabi-gcc",
+            compiler_version="14.2.1",
+            cmake_version="3.31.6",
+        ),
+        engine=EngineInfo(type="helia-aot", version="0.18.4"),
+    )
+
+    data = _metadata_to_dict(meta)
+
+    assert data["toolchain"] == {
+        "compiler": "arm-none-eabi-gcc",
+        "compiler_version": "14.2.1",
+        "cmake_version": "3.31.6",
+    }
+    assert data["engine"] == {"type": "helia-aot", "version": "0.18.4"}
 
 
 def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):

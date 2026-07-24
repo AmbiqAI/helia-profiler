@@ -67,3 +67,11 @@ hpx validate --suite complete         # full RT + AOT + TFLM/CMSIS-NN hardware s
 hpx validate -k kws-aot               # pytest-style keyword filter
 hpx validate --boards apollo3p_evb --repeat 2
 ```
+
+## Dashboard provenance
+
+Each case in `validation_manifest.json` includes a
+`provenance.runtime` object for dashboard ingestion. It contains the selected
+compiler and its version, the CMake version, and the resolved engine type and
+version when the engine publishes one (heliaRT or heliaAOT). These fields are
+provenance, not part of the case identity used for comparisons.

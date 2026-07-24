@@ -421,7 +421,7 @@ def _write_attributes_header(aot_module_dir: Path, prefix: str) -> Path:
 # ---------------------------------------------------------------------------
 
 
-def _check_helia_aot_version() -> None:
+def _check_helia_aot_version() -> str:
     """Verify the installed ``helia-aot`` package satisfies the floor.
 
     Raises ``EngineError`` with installation guidance if the package is
@@ -453,7 +453,7 @@ def _check_helia_aot_version() -> None:
             installed,
             HELIAAOT_MIN_VERSION,
         )
-        return
+        return installed
 
     if actual < minimum:
         raise EngineError(
@@ -466,6 +466,7 @@ def _check_helia_aot_version() -> None:
         )
 
     log.debug("Using helia-aot v%s (>= floor v%s).", installed, HELIAAOT_MIN_VERSION)
+    return installed
 
 
 def _parse_semver(version: str) -> tuple[int, int, int]:

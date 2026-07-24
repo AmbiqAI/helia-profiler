@@ -164,6 +164,14 @@ class ToolchainInfo:
 
 
 @dataclass
+class EngineInfo:
+    """Resolved inference-engine identity and version for one run."""
+
+    type: str = ""
+    version: str | None = None
+
+
+@dataclass
 class RunMetadata:
     """Accumulated run metadata — enriched by stages, consumed by reports."""
 
@@ -174,6 +182,7 @@ class RunMetadata:
     platform: PlatformInfo | None = None
     model: ModelInfo | None = None
     toolchain: ToolchainInfo | None = None
+    engine: EngineInfo | None = None
     firmware: FirmwareMeta | None = None
     memory_plan: "MemoryPlan | None" = None
     timing: TimingInfo | None = None

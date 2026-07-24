@@ -90,6 +90,9 @@ class TestPrepareEngineStage:
         assert ctx.engine_adapter is not None
         assert ctx.engine_adapter.name == "heliaRT"
         assert ctx.engine_artifacts is not None
+        assert ctx.run_metadata.engine is not None
+        assert ctx.run_metadata.engine.type == "helia-rt"
+        assert ctx.run_metadata.engine.version == "1.16.0"
 
     def test_helia_rt_adapter(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(
