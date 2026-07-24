@@ -2,13 +2,13 @@
 
 heliaPROFILER (`hpx`) needs Python plus a small set of embedded-development
 tools: an ARM cross-compiler, CMake/Ninja, and SEGGER J-Link software. Power
-capture additionally needs a Joulescope JS110/JS220 and, on Linux, a udev
+capture additionally needs a Joulescope JS110/JS220/JS320 and, on Linux, a udev
 rule for non-root USB access.
 
 !!! warning "Alpha"
     heliaPROFILER is pre-1.0. Breaking changes may land on **minor**
-    versions until v1.0 — pin an exact version (`pip install
-    helia-profiler==0.1.0`) for anything long-lived.
+    versions until v1.0 — pin the version you tested (for example,
+    `pip install helia-profiler==0.1.1`) for anything long-lived.
 
 ## Requirements
 
@@ -19,11 +19,14 @@ rule for non-root USB access.
 | CMake | `>= 3.24` | Build system |
 | Ninja | any | Build backend |
 | SEGGER J-Link software | `>= 7.80` | Flash and RTT/SWO capture |
-| `neuralspotx` (`nsx`) | latest `0.7.x` | Firmware build pipeline (installed automatically as a dependency) |
+| `neuralspotx` (`nsx`) | `>= 0.7.8, < 0.8.0` | Firmware build pipeline (installed automatically as a dependency) |
 
 `armclang` and ATfE are optional alternative toolchains — see
-[Toolchains](../guide/toolchains.md). A Joulescope JS110/JS220 is optional
+[Toolchains](../guide/toolchains.md). A Joulescope JS110/JS220/JS320 is optional
 and only needed for power capture — see [Power Measurement](../guide/power.md).
+Git and initial network access to GitHub are also needed while NSX resolves and
+clones firmware modules. After one successful build, `--frozen` can reuse the
+existing lock/module state for offline reruns.
 
 ## 1. Install heliaPROFILER
 
@@ -59,6 +62,10 @@ Extras:
 pip install 'helia-profiler[aot]'        # heliaAOT compiler support
 pip install 'helia-profiler[analysis]'   # model compute/parameter analysis, no hardware needed
 ```
+
+The AOT extra installs `helia-aot>=0.18.0` and a LiteRT-compatible analysis
+stack. The analysis extra installs the same constrained LiteRT stack plus
+flatbuffer inspection support.
 
 Power-measurement support (`pyjoulescope_driver`) ships as a core
 dependency — no extra install needed, just the udev rule below on Linux.
@@ -234,6 +241,8 @@ Toolchain Check
 All required tools found.
 ```
 
-`✓` rows are required; `–` rows are optional (only needed for heliaAOT or
-armclang). Once every required row shows `✓`, continue to
+`✓` means the dependency was found; `–` rows are optional (only needed for
+heliaAOT or an alternative toolchain). `hpx doctor` does not replace checking
+that your installed compiler, CMake, and J-Link versions meet the table above.
+Once every required row shows `✓`, continue to
 [First Profile](first-profile.md).

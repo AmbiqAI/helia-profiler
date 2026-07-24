@@ -89,9 +89,7 @@ hpx compare results/baseline results/candidate \
 ```
 
 The verdict records the profile schema/version and SHA-256 of canonical profile
-JSON, making CI and future web-tool decisions reproducible. `--profile` applies
-to individual profile comparisons; validation-bundle profile policy remains a
-separate follow-up.
+JSON, making CI and future web-tool decisions reproducible.
 
 ## Examples
 

@@ -131,9 +131,8 @@ Error: Memory plan does not fit:
   DTCM: 540672 B used > 524288 B capacity (over by 16384 B)
   Hint: DTCM is over capacity.  Try one of:
     * shrink the tensor arena (--arena-size);
-    * pick a less-aggressive placement
-      (--model-location auto / mram);
-    * move weights to PSRAM (--model-location psram) if the
+    * pick a less-aggressive arena or weights placement;
+    * move weights to PSRAM (--weights-location psram) if the
       board has PSRAM;
     * reduce model size (quantise / prune); or
     * pick a larger-memory board.

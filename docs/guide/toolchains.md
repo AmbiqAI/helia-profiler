@@ -41,9 +41,8 @@ GCC is special-cased: when `arm-none-eabi-gcc`/`gcc` is selected the
 profiler omits the `--toolchain` flag entirely so NSX uses its default
 GCC configuration. `armclang` and `atfe` are passed through explicitly.
 
-The profiler also probes the toolchain for binary size analysis using
-`fromelf` (armclang/ATfE) or `arm-none-eabi-size` (GCC), so both binaries
-must be on `PATH`.
+The profiler also probes binary sections with `arm-none-eabi-size` for GCC,
+`fromelf` for Arm Compiler 6, or `llvm-size` from `ATFE_ROOT/bin` for ATfE.
 
 ## GCC (default)
 
@@ -82,8 +81,7 @@ arm-none-eabi-size --version
 
 - First-time setup or CI on machines without a paid Arm Compiler license.
 - Cross-platform build reproducibility — works the same on all OSes.
-- The default heliaRT prebuilt archive (`libhelia-rt-gcc.a`) is GCC-built,
-  so no extra distribution download is needed.
+- The default heliaRT registry module is built with GCC through NSX.
 
 ## armclang (Arm Compiler 6)
 
@@ -126,42 +124,24 @@ preview within heliaPROFILER.
 
 Download from
 [developer.arm.com](https://developer.arm.com/downloads/-/arm-toolchain-for-embedded)
-and add the `bin/` to `PATH`.
+and set `ATFE_ROOT` to the extracted toolchain root:
 
 ```bash
-export PATH="/path/to/atfe/<version>/bin:$PATH"
+export ATFE_ROOT="/path/to/atfe/<version>"
 
-# ATfE binaries
-atfe --version
-fromelf --version
+"$ATFE_ROOT/bin/clang" --version
+"$ATFE_ROOT/bin/llvm-size" --version
 ```
 
-### Caveats
-
-!!! info "heliaRT compatibility"
-    The pinned heliaRT release does not yet ship a dedicated ATfE archive.
-    When `target.toolchain: atfe` is selected, the heliaRT adapter falls
-    back to `libhelia-rt-gcc.a` (with a warning). This works but means
-    the heliaRT static library itself was GCC-built; only the surrounding
-    profiler firmware is built with ATfE. heliaAOT builds cleanly
-    with ATfE end-to-end.
+HPX expects `clang`, `clang++`, `llvm-ar`, `llvm-objcopy`, `llvm-size`, and
+`llvm-nm` under `$ATFE_ROOT/bin`. The default heliaRT registry flow builds the
+runtime and profiler firmware with ATfE end to end.
 
 ## Toolchain comparison
 
-KWS reference model on Apollo510 EVB, 100 iterations, default counter
-set. Numbers come from `results/results_*/summary.json`.
-
-| Engine | Toolchain | Total cycles | vs GCC |
-|---|---|---|---|
-| heliaRT | gcc | 2,014,841 | 1.00× |
-| heliaRT | armclang | 1,874,429 | 0.93× |
-| heliaAOT | gcc | 1,965,501 | 1.00× |
-| heliaAOT | armclang | 1,869,210 | 0.95× |
-
-armclang is consistently ~5–7% faster on this model. The exact gain
-depends heavily on the operator mix and how MVE-friendly the kernels are.
-Reproduce on your own model with the
-[toolchain comparison example](../examples/toolchain-comparison.md).
+Compiler results depend on the model, engine, optimization settings, and target
+clock. Use the [toolchain comparison example](../examples/toolchain-comparison.md)
+to measure the trade-off on your own workload.
 
 ## Switching toolchains mid-experiment
 
@@ -187,10 +167,10 @@ re-configures and re-builds from scratch.
     `armclang --version` works without consuming a license; the build
     will fail when the actual compile step requests one.
 
-??? failure "Heliart archive download fails for atfe"
-    Expected — heliaRT does not yet publish an ATfE archive. The adapter
-    falls back to GCC archive. To build heliaRT itself with ATfE, you'd
-    need to build heliaRT from source with ATfE.
+??? failure "`ATFE_ROOT` is missing or incomplete"
+    Set `ATFE_ROOT` to the extracted toolchain root, not its `bin/`
+    directory. Confirm that `$ATFE_ROOT/bin/clang` and
+    `$ATFE_ROOT/bin/llvm-size` exist.
 
 ??? failure "Different cycle counts on different toolchains"
     Expected. Toolchain choice is one of several variables that affect
