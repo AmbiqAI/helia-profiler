@@ -28,6 +28,8 @@ Board                    SoC            Core           Backends             Dom
                                                                              mve
  apollo330mP_evb          apollo330P     cortex-m55     dwt, armv8m-pmu      cpu
                                                                              mve
+ atomiq110_fpga_turbo     atomiq110      cortex-m55     dwt, armv8m-pmu      cpu
+                                                                             mve
 ```
 
 Cortex-M55 boards (AP5/AP330 family) expose the full Armv8-M PMU plus MVE

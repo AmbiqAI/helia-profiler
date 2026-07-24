@@ -192,3 +192,17 @@ _register_board(
         description="Apollo330 — Cortex-M55 (AP5 family)",
     )
 )
+
+# The only upstream atomiq110 realization today is this FPGA "turbo" board
+# (nsx-board-atomiq110-fpga-turbo): no HBLRAM/PSRAM, no onboard BLE radio,
+# and no buttons (NSX_BOARD_HAS_BUTTONS=0 in board.cmake), so power-capture
+# GPIOs stay at their unregistered fallback defaults rather than a fabricated
+# board-specific wiring.
+_register_board(
+    BoardDef(
+        "atomiq110_fpga_turbo",
+        soc="atomiq110",
+        channel="preview",
+        description="Atomiq110 FPGA turbo — Cortex-M55 + Ethos-U85 NPU (fixed 25 MHz, FPGA-only)",
+    )
+)
