@@ -1,6 +1,9 @@
 name: Hardware Validation
 
 on:
+  schedule:
+    # 09:00 UTC nightly (01:00 PDT / 00:00 PST).
+    - cron: "0 9 * * *"
   workflow_dispatch:
     inputs:
       suite:
@@ -81,9 +84,22 @@ env:
   UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
   UV_PYTHON_INSTALL_DIR: ${{ github.workspace }}/.uv-python
   SEGGER_RTT_PATH: ${{ github.workspace }}/segger-rtt
+  # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
+  # with the manual defaults, except that nightly validation covers the full suite.
+  HPX_VALIDATION_SUITE: ${{ inputs.suite || 'complete' }}
+  HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb,apollo330mP_evb' }}
+  HPX_VALIDATION_MODELS: ${{ inputs.models || '' }}
+  HPX_VALIDATION_ENGINES: ${{ inputs.engines || '' }}
+  HPX_VALIDATION_TOOLCHAINS: ${{ inputs.toolchains || '' }}
+  HPX_VALIDATION_TRANSPORTS: ${{ inputs.transports || '' }}
+  HPX_VALIDATION_MEMORIES: ${{ inputs.memories || '' }}
+  HPX_VALIDATION_POWER: ${{ inputs.power || 'off' }}
+  HPX_VALIDATION_JLINK_SERIALS: ${{ inputs.jlink_serials || 'apollo510_evb=1160003180,apollo330mP_evb=1160003409' }}
+  HPX_VALIDATION_REPEAT: ${{ inputs.repeat || '1' }}
+  HPX_VALIDATION_TIMEOUT: ${{ inputs.timeout || '900' }}
 
 concurrency:
-  group: hardware-validation-${{ inputs.boards }}
+  group: hardware-validation-${{ inputs.boards || 'apollo510_evb,apollo330mP_evb' }}
   cancel-in-progress: false
 
 jobs:
@@ -129,18 +145,6 @@ jobs:
         run: uv run hpx doctor
 
       - name: Preview validation cases
-        env:
-          HPX_VALIDATION_SUITE: ${{ inputs.suite }}
-          HPX_VALIDATION_BOARDS: ${{ inputs.boards }}
-          HPX_VALIDATION_MODELS: ${{ inputs.models }}
-          HPX_VALIDATION_ENGINES: ${{ inputs.engines }}
-          HPX_VALIDATION_TOOLCHAINS: ${{ inputs.toolchains }}
-          HPX_VALIDATION_TRANSPORTS: ${{ inputs.transports }}
-          HPX_VALIDATION_MEMORIES: ${{ inputs.memories }}
-          HPX_VALIDATION_POWER: ${{ inputs.power }}
-          HPX_VALIDATION_JLINK_SERIALS: ${{ inputs.jlink_serials }}
-          HPX_VALIDATION_REPEAT: ${{ inputs.repeat }}
-          HPX_VALIDATION_TIMEOUT: ${{ inputs.timeout }}
         run: |
           args=(
             --list
@@ -171,18 +175,6 @@ jobs:
           uv run hpx validate "${args[@]}"
 
       - name: Run hardware validation
-        env:
-          HPX_VALIDATION_SUITE: ${{ inputs.suite }}
-          HPX_VALIDATION_BOARDS: ${{ inputs.boards }}
-          HPX_VALIDATION_MODELS: ${{ inputs.models }}
-          HPX_VALIDATION_ENGINES: ${{ inputs.engines }}
-          HPX_VALIDATION_TOOLCHAINS: ${{ inputs.toolchains }}
-          HPX_VALIDATION_TRANSPORTS: ${{ inputs.transports }}
-          HPX_VALIDATION_MEMORIES: ${{ inputs.memories }}
-          HPX_VALIDATION_POWER: ${{ inputs.power }}
-          HPX_VALIDATION_JLINK_SERIALS: ${{ inputs.jlink_serials }}
-          HPX_VALIDATION_REPEAT: ${{ inputs.repeat }}
-          HPX_VALIDATION_TIMEOUT: ${{ inputs.timeout }}
         run: |
           mkdir -p results/validation
           args=(
