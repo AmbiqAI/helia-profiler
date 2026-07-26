@@ -37,9 +37,7 @@ def test_power_health_rejects_suspect_gate_duration():
         gated_window_duration_suspect=True,
     )
 
-    assert validation_health_issues(result) == (
-        "GPIO-gated power window duration is suspect",
-    )
+    assert validation_health_issues(result) == ("GPIO-gated power window duration is suspect",)
 
 
 def test_power_health_rejects_invalid_gate_integrity():
@@ -85,9 +83,7 @@ def test_power_health_rejects_degraded_observation():
         power_gate_failure_kind="no_gate_rise",
     )
 
-    assert validation_health_issues(result) == (
-        "power observation is degraded (no_gate_rise)",
-    )
+    assert validation_health_issues(result) == ("power observation is degraded (no_gate_rise)",)
 
 
 def test_build_config_includes_reliability_axes(tmp_path: Path):
@@ -295,7 +291,21 @@ def test_run_case_uses_current_python_for_subprocess(tmp_path: Path, monkeypatch
         config_path = Path(cmd[-1])
         case_dir = Path(yaml.safe_load(config_path.read_text())["output"]["dir"])
         case_dir.mkdir(parents=True, exist_ok=True)
-        (case_dir / "summary.json").write_text(json.dumps({"layers": 13, "total_cycles": 123456}))
+        (case_dir / "summary.json").write_text(
+            json.dumps(
+                {
+                    "layers": 13,
+                    "total_cycles": 123456,
+                    "latency": {"device_profiled_infer_avg_us": 42.5},
+                    "binary": {"text": 80_000, "data": 2_000, "bss": 5_000, "total": 87_000},
+                    "memory": {
+                        "arena_size": 32_768,
+                        "allocated_arena": 24_000,
+                        "model_size": 53_744,
+                    },
+                }
+            )
+        )
         return subprocess.CompletedProcess(cmd, 0, stdout="ok\n", stderr="")
 
     monkeypatch.setattr("helia_profiler.validation.runner.subprocess.run", fake_run)
@@ -304,6 +314,9 @@ def test_run_case_uses_current_python_for_subprocess(tmp_path: Path, monkeypatch
     result = run_case(case=case, repo_root=repo_root, output_root=output_root, timeout_s=30)
 
     assert result.status == "pass"
+    assert result.latency_avg_us == 42.5
+    assert result.binary_total_bytes == 87_000
+    assert result.allocated_arena_bytes == 24_000
     assert seen["cwd"] == str(repo_root)
     assert seen["cmd"] == [
         str(fake_hpx),

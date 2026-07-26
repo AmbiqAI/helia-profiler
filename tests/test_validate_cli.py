@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
+from unittest.mock import patch
 
 import pytest
 
@@ -163,3 +165,48 @@ class TestSuiteSmoke:
         assert args[args.index("--mlperf-engines") + 1] == "helia-rt,helia-aot,tflm"
         assert args[args.index("--mlperf-boards") + 1] == "apollo510_evb,apollo330mP_evb"
         assert args[args.index("--mlperf-toolchains") + 1] == "arm-none-eabi-gcc,atfe"
+
+
+def test_completed_validation_renders_rich_report(monkeypatch, tmp_path):
+    from helia_profiler import cli
+    from helia_profiler.validation.runner import CaseResult
+
+    case = CaseResult(
+        case_id="candidate",
+        status="pass",
+        duration_s=1.0,
+        engine="helia-rt",
+        model_id="customer-model",
+        board="apollo510_evb",
+        power=False,
+        toolchain="arm-none-eabi-gcc",
+        transport="rtt",
+        memory="auto",
+        total_cycles=123,
+        binary_total_bytes=456,
+    )
+
+    def fake_pytest_main(args):
+        output_dir = tmp_path
+        (output_dir / "validation_report.json").write_text(
+            json.dumps(
+                {
+                    "cases": [case.to_dict()],
+                    "summary": {"total": 1, "pass": 1, "fail": 0, "skip": 0},
+                }
+            )
+        )
+        (output_dir / "validation_report.md").write_text("# report\n")
+        (output_dir / "validation_manifest.json").write_text("{}\n")
+        return 0
+
+    monkeypatch.setattr(pytest, "main", fake_pytest_main)
+    with (
+        patch("helia_profiler.console.HpxConsole.print_validation") as render,
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        cli.main(["validate", "--suite", "smoke", "--output-dir", str(tmp_path)])
+
+    assert exc_info.value.code == 0
+    report = render.call_args.args[0]
+    assert report.cases[0].model_id == "customer-model"

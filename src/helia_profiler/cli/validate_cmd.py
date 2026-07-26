@@ -289,15 +289,38 @@ def _cmd_validate(args: argparse.Namespace) -> None:
     else:
         pytest_args.append("-v")
 
+    report_dir = args.output_dir.resolve()
+    report_json = report_dir / "validation_report.json"
+    report_before = report_json.stat().st_mtime_ns if report_json.exists() else None
+
     import pytest
 
     print(f"Running: pytest {' '.join(pytest_args)}\n")
     rc = pytest.main(pytest_args)
 
-    report_md = args.output_dir.resolve() / "validation_report.md"
-    report_json = args.output_dir.resolve() / "validation_report.json"
-    if report_md.exists():
-        print(f"\nMarkdown report: {report_md}")
-    if report_json.exists():
-        print(f"JSON report:     {report_json}")
+    report_md = report_dir / "validation_report.md"
+    report_manifest = report_dir / "validation_manifest.json"
+    report_after = report_json.stat().st_mtime_ns if report_json.exists() else None
+    report_is_fresh = report_after is not None and report_after != report_before
+    if report_is_fresh:
+        from ..console import HpxConsole
+        from ..errors import ReportError
+        from ..validation.report import load_validation_report
+
+        console = HpxConsole(verbosity=args.verbose)
+        try:
+            report = load_validation_report(report_json)
+        except ReportError as exc:
+            console.print_error(exc)
+            rc = int(rc) or 1
+        else:
+            output_paths = [
+                path for path in (report_json, report_md, report_manifest) if path.exists()
+            ]
+            console.print_validation(report, output_paths=output_paths)
+    else:
+        if report_md.exists():
+            print(f"\nMarkdown report: {report_md}")
+        if report_json.exists():
+            print(f"JSON report:     {report_json}")
     sys.exit(int(rc))

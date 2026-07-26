@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from dataclasses import dataclass, fields
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
@@ -15,6 +16,70 @@ from .runner import CaseResult
 
 
 SCHEMA_VERSION = 2
+
+
+@dataclass(frozen=True)
+class ValidationSummary:
+    """Outcome totals for a completed validation sweep."""
+
+    total: int
+    passed: int
+    failed: int
+    skipped: int
+
+
+@dataclass(frozen=True)
+class ValidationReport:
+    """Typed aggregate loaded from ``validation_report.json``."""
+
+    cases: tuple[CaseResult, ...]
+    summary: ValidationSummary
+
+
+def load_validation_report(path: Path) -> ValidationReport:
+    """Load the completed validation report for terminal presentation."""
+
+    report_path = path.expanduser().resolve()
+    try:
+        document = json.loads(report_path.read_text())
+    except FileNotFoundError as exc:
+        raise ReportError(f"Missing validation report: {report_path}") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ReportError(f"Cannot parse validation report {report_path}: {exc}") from exc
+    if not isinstance(document, dict) or not isinstance(document.get("cases"), list):
+        raise ReportError(f"Invalid validation report structure: {report_path}")
+
+    case_fields = {item.name for item in fields(CaseResult)}
+    required = {
+        "case_id",
+        "status",
+        "duration_s",
+        "engine",
+        "model_id",
+        "board",
+        "power",
+        "toolchain",
+        "transport",
+        "memory",
+    }
+    cases: list[CaseResult] = []
+    for index, raw in enumerate(document["cases"]):
+        if not isinstance(raw, dict) or not required.issubset(raw):
+            raise ReportError(f"Invalid validation case at index {index}: {report_path}")
+        values = {key: value for key, value in raw.items() if key in case_fields}
+        if isinstance(values.get("health_issues"), list):
+            values["health_issues"] = tuple(values["health_issues"])
+        cases.append(CaseResult(**values))
+
+    raw_summary = document.get("summary")
+    counts = raw_summary if isinstance(raw_summary, dict) else summary_stats(cases)
+    summary = ValidationSummary(
+        total=int(counts.get("total", len(cases))),
+        passed=int(counts.get("pass", 0)),
+        failed=int(counts.get("fail", 0)),
+        skipped=int(counts.get("skip", 0)),
+    )
+    return ValidationReport(cases=tuple(cases), summary=summary)
 
 
 def write_validation_reports(
@@ -200,6 +265,14 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
         "metrics": {
             "layers": result.layers,
             "total_cycles": result.total_cycles,
+            "latency_avg_us": result.latency_avg_us,
+            "binary_text_bytes": result.binary_text_bytes,
+            "binary_data_bytes": result.binary_data_bytes,
+            "binary_bss_bytes": result.binary_bss_bytes,
+            "binary_total_bytes": result.binary_total_bytes,
+            "arena_size_bytes": result.arena_size_bytes,
+            "allocated_arena_bytes": result.allocated_arena_bytes,
+            "model_size_bytes": result.model_size_bytes,
             "energy_uj": result.energy_uj,
             "avg_current_ma": result.avg_current_ma,
             "peak_current_ma": result.peak_current_ma,

@@ -70,6 +70,14 @@ class CaseResult:
     # Metrics — populated on success
     layers: int | None = None
     total_cycles: int | None = None
+    latency_avg_us: float | None = None
+    binary_text_bytes: int | None = None
+    binary_data_bytes: int | None = None
+    binary_bss_bytes: int | None = None
+    binary_total_bytes: int | None = None
+    arena_size_bytes: int | None = None
+    allocated_arena_bytes: int | None = None
+    model_size_bytes: int | None = None
     energy_uj: float | None = None
     avg_current_ma: float | None = None
     peak_current_ma: float | None = None
@@ -493,6 +501,20 @@ def run_case(
                 if summary.get("total_cycles") is not None
                 else None
             )
+            latency_blob = summary.get("latency") or {}
+            if latency_blob.get("device_profiled_infer_avg_us") is not None:
+                result.latency_avg_us = float(latency_blob["device_profiled_infer_avg_us"])
+            binary_blob = summary.get("binary") or {}
+            if binary_blob:
+                result.binary_text_bytes = _optional_int(binary_blob.get("text"))
+                result.binary_data_bytes = _optional_int(binary_blob.get("data"))
+                result.binary_bss_bytes = _optional_int(binary_blob.get("bss"))
+                result.binary_total_bytes = _optional_int(binary_blob.get("total"))
+            memory_blob = summary.get("memory") or {}
+            if memory_blob:
+                result.arena_size_bytes = _optional_int(memory_blob.get("arena_size"))
+                result.allocated_arena_bytes = _optional_int(memory_blob.get("allocated_arena"))
+                result.model_size_bytes = _optional_int(memory_blob.get("model_size"))
             power_blob = summary.get("power") or {}
             if power_blob:
                 if "total_energy_uj" in power_blob:
@@ -543,6 +565,12 @@ def run_case(
 
     result.health_issues = validation_health_issues(result)
     return result
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    return int(value)
 
 
 # ---------------------------------------------------------------------------
