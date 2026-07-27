@@ -1,48 +1,68 @@
 set -euo pipefail
 
-archive="${1:-}"
-expected_hash="ab08dbdf8b295c3811e0b040871614d23f2b669d7d8409468baecd9216abca91"
+version="9.62"
+download_url="https://www.segger.com/downloads/jlink/JLink_Linux_V962_x86_64.tgz"
+expected_md5="abb96cbfcb3e3838eba15680f8e64709"
+expected_size="67213850"
 store_name="JLink_Linux_x86_64.tgz"
 
-if [[ -z "$archive" ]]; then
+if [[ "${1:-}" != "--accept-license" || "$#" -ne 1 ]]; then
   cat >&2 <<'EOF'
-Usage: nix run .#prepare-jlink -- /path/to/JLink_Linux_x86_64.tgz
+Usage: nix run .#prepare-jlink -- --accept-license
 
-Download the Linux x86-64 TGZ from:
-  https://www.segger.com/downloads/jlink/
+Before using --accept-license, review:
+  https://www.segger.com/downloads/jlink/JLink_Linux_V962_x86_64.tgz
+  https://www.segger.com/purchase/licensing/
 
-You must review and accept SEGGER's license on the download page. This helper
-only verifies the pinned J-Link 9.60 archive and adds it to your local Nix store.
+Passing --accept-license confirms that you accept SEGGER's terms and will use
+the software only with original SEGGER products or authorized OEM products.
+The helper then downloads the pinned J-Link 9.62 archive directly from SEGGER,
+verifies it, and adds it to the local Nix store.
 EOF
   exit 2
 fi
 
-if [[ ! -f "$archive" ]]; then
-  echo "J-Link archive does not exist: $archive" >&2
-  exit 1
-fi
+download_dir="$(mktemp -d)"
+trap 'rm -rf "$download_dir"' EXIT
+archive="$download_dir/$store_name"
 
-actual_hash="$(sha256sum "$archive" | cut -d ' ' -f 1)"
-if [[ "$actual_hash" != "$expected_hash" ]]; then
+echo "Downloading SEGGER J-Link $version from:"
+echo "  $download_url"
+curl \
+  --data "accept_license_agreement=accepted" \
+  --fail \
+  --location \
+  --output "$archive" \
+  --retry 3 \
+  --show-error \
+  --silent \
+  "$download_url"
+
+actual_md5="$(md5sum "$archive" | cut -d ' ' -f 1)"
+actual_size="$(stat -c '%s' "$archive")"
+if [[ "$actual_md5" != "$expected_md5" || "$actual_size" != "$expected_size" ]]; then
   cat >&2 <<EOF
-Unexpected J-Link archive hash.
-Expected J-Link 9.60: $expected_hash
-Actual:               $actual_hash
+Unexpected J-Link archive.
+Expected J-Link $version MD5:  $expected_md5
+Actual MD5:                    $actual_md5
+Expected size:                 $expected_size bytes
+Actual size:                   $actual_size bytes
 
-The SEGGER download may have moved to a newer release. Update nix/jlink.nix
-deliberately after testing that release rather than accepting it implicitly.
+SEGGER may have changed the download. Update nix/jlink.nix deliberately after
+testing the new artifact rather than accepting it implicitly.
 EOF
   exit 1
 fi
 
 store_path="$(
   nix store add \
+    --hash-algo md5 \
     --mode flat \
     --name "$store_name" \
     "$archive"
 )"
 
-echo "J-Link 9.60 is available to Nix at:"
+echo "J-Link $version is available to Nix at:"
 echo "  $store_path"
 echo
 echo "Next:"

@@ -137,6 +137,7 @@
             name = "hpx-prepare-jlink";
             runtimeInputs = [
               c.pkgs.coreutils
+              c.pkgs.curl
               c.pkgs.nix
             ];
             text = builtins.readFile ./nix/scripts/prepare-jlink.sh;
@@ -169,7 +170,7 @@
           prepare-jlink = {
             type = "app";
             program = "${prepareJlink}/bin/hpx-prepare-jlink";
-            meta.description = "Verify and add a licensed J-Link archive to the local Nix store";
+            meta.description = "Download, verify, and import licensed SEGGER J-Link 9.62";
           };
           install-udev-rules = {
             type = "app";

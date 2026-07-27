@@ -65,12 +65,12 @@ The repository flake provides heliaPROFILER with heliaAOT, LiteRT, NSX,
 Joulescope support, CMake, Ninja, GNU Arm Embedded, ATfE, and SEGGER J-Link.
 It currently targets x86-64 Linux.
 
-SEGGER requires users to accept the J-Link license themselves. Download the
-J-Link 9.60 Linux x86-64 TGZ from
-[SEGGER](https://www.segger.com/downloads/jlink/), then prepare the host:
+SEGGER requires users to accept the J-Link license themselves. After reviewing
+SEGGER's terms, explicitly accept them and let the helper download and verify
+the pinned J-Link 9.62 Linux x86-64 archive, then prepare the host:
 
 ```bash
-nix run .#prepare-jlink -- ~/Downloads/JLink_Linux_x86_64.tgz
+nix run .#prepare-jlink -- --accept-license
 nix run .#install-udev-rules
 nix develop
 ```

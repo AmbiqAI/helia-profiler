@@ -10,17 +10,18 @@
 
 stdenvNoCC.mkDerivation rec {
   pname = "segger-jlink";
-  version = "9.60";
+  version = "9.62";
 
   src = requireFile {
     name = "JLink_Linux_x86_64.tgz";
-    url = "https://www.segger.com/downloads/jlink/";
-    hash = "sha256-qwjb34spXDgR4LBAhxYU0j8rZp19hAlGi67NkharypE=";
+    url = "https://www.segger.com/downloads/jlink/JLink_Linux_V962_x86_64.tgz";
+    # Published by SEGGER for the 2026-07-22 J-Link 9.62 release.
+    hash = "md5-q7lsv8s+ODjroVaA+OZHCQ==";
     message = ''
-      J-Link is proprietary software and must be downloaded after accepting
-      SEGGER's license. Download the Linux x86-64 TGZ, then run:
+      J-Link is proprietary software and SEGGER requires explicit license
+      acceptance before download. Review the terms, then run:
 
-        nix run .#prepare-jlink -- /path/to/JLink_Linux_x86_64.tgz
+        nix run .#prepare-jlink -- --accept-license
     '';
   };
 
