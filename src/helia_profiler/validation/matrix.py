@@ -317,6 +317,8 @@ def _slug_model_id(value: str) -> str:
 
 
 def _positive_int(value: Any, *, label: str) -> int:
+    if isinstance(value, bool):
+        raise ValueError(f"{label} must be a positive integer, got {value!r}")
     try:
         parsed = int(value)
     except (TypeError, ValueError) as exc:
