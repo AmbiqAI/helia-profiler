@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.validation import build_matrix
+from helia_profiler.validation import MODELS, build_matrix, load_model_file, models_from_paths
 from helia_profiler.validation.runner import CaseResult
 from helia_profiler.validation.report import write_validation_reports
 
@@ -30,6 +30,27 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--mlperf-models",
         default="",
         help="Comma-separated model IDs to run (default: all).",
+    )
+    grp.addoption(
+        "--mlperf-models-file",
+        default="",
+        help="YAML registry containing custom validation models.",
+    )
+    grp.addoption(
+        "--mlperf-model-paths",
+        default="",
+        help="Comma-separated ad hoc model paths.",
+    )
+    grp.addoption(
+        "--mlperf-comparison-group",
+        default="custom",
+        help="Shared comparison group for ad hoc model paths.",
+    )
+    grp.addoption(
+        "--mlperf-model-arena-size",
+        type=int,
+        default=524288,
+        help="Arena size for ad hoc model paths.",
     )
     grp.addoption(
         "--mlperf-engines",
@@ -153,8 +174,22 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "case" not in metafunc.fixturenames:
         return
     cfg = metafunc.config
+    model_registry = dict(MODELS)
+    models_file = cfg.getoption("--mlperf-models-file")
+    if models_file:
+        model_registry.update(load_model_file(Path(models_file)))
+    model_paths = _split_csv(cfg.getoption("--mlperf-model-paths"))
+    if model_paths:
+        model_registry.update(
+            models_from_paths(
+                [Path(path) for path in model_paths],
+                arena_size=cfg.getoption("--mlperf-model-arena-size"),
+                comparison_group=cfg.getoption("--mlperf-comparison-group"),
+            )
+        )
     cases = build_matrix(
         models=_split_csv(cfg.getoption("--mlperf-models")),
+        model_registry=model_registry,
         engines=_split_csv(cfg.getoption("--mlperf-engines")),
         power=cfg.getoption("--mlperf-power"),
         boards=_split_csv(cfg.getoption("--mlperf-boards")),
@@ -215,10 +250,15 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         repo_root=Path(__file__).resolve().parents[2],
     )
 
+
 def _validation_options(config: pytest.Config) -> dict[str, object]:
     return {
         "suite": config.getoption("--mlperf-suite"),
         "models": config.getoption("--mlperf-models"),
+        "models_file": config.getoption("--mlperf-models-file"),
+        "model_paths": config.getoption("--mlperf-model-paths"),
+        "comparison_group": config.getoption("--mlperf-comparison-group"),
+        "model_arena_size": config.getoption("--mlperf-model-arena-size"),
         "engines": config.getoption("--mlperf-engines"),
         "power": config.getoption("--mlperf-power"),
         "boards": config.getoption("--mlperf-boards"),

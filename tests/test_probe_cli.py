@@ -159,6 +159,11 @@ def test_probe_cli_reports_hpx_errors(monkeypatch, capsys) -> None:
 def test_create_debug_memory_session_uses_default_pylink_first(monkeypatch) -> None:
     calls: list[str] = []
 
+    monkeypatch.setattr(
+        "helia_profiler.target.probe.jlink._preload_jlink_linux_usb_runtime",
+        lambda: calls.append("preload"),
+    )
+
     class FakeJLink:
         def __init__(self, lib=None):
             assert lib is None
@@ -170,7 +175,34 @@ def test_create_debug_memory_session_uses_default_pylink_first(monkeypatch) -> N
     session = create_debug_memory_session()
 
     assert isinstance(session, FakeJLink)
-    assert calls == ["default"]
+    assert calls == ["preload", "default"]
+
+
+def test_preload_jlink_linux_usb_runtime_uses_nixos_system_path(tmp_path, monkeypatch) -> None:
+    from helia_profiler.target.probe import jlink
+
+    system_lib = tmp_path / "system-lib"
+    system_lib.mkdir()
+    libudev = system_lib / "libudev.so"
+    libudev.write_bytes(b"fake")
+    attempts: list[str] = []
+
+    def fake_cdll(path, *, mode):
+        attempts.append(str(path))
+        if str(path) != str(libudev):
+            raise OSError("not found")
+        assert mode == jlink.ctypes.RTLD_GLOBAL
+        return object()
+
+    monkeypatch.setattr(jlink.sys, "platform", "linux")
+    monkeypatch.setattr(jlink, "_NIXOS_SYSTEM_LIB_DIR", system_lib)
+    monkeypatch.setattr(jlink.ctypes.util, "find_library", lambda name: None)
+    monkeypatch.setattr(jlink.ctypes, "CDLL", fake_cdll)
+    monkeypatch.delenv("LD_LIBRARY_PATH", raising=False)
+
+    jlink._preload_jlink_linux_usb_runtime()
+
+    assert attempts == ["libudev.so", str(libudev)]
 
 
 def test_create_debug_memory_session_falls_back_to_jlinkexe_wrapper_dll(

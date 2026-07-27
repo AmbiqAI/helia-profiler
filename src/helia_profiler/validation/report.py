@@ -233,6 +233,7 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
     engine = _enum_value(result.engine)
     identity = {
         "model_id": result.model_id,
+        "comparison_group": result.comparison_group or result.model_id,
         "engine": engine,
         "board": result.board,
         "toolchain": result.toolchain,

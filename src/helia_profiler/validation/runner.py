@@ -61,6 +61,7 @@ class CaseResult:
     toolchain: str
     transport: str
     memory: str
+    comparison_group: str | None = None
     jlink_serial: str | None = None
     power_serial: str | None = None
     attempt: int = 1
@@ -394,6 +395,7 @@ def run_case(
                 duration_s=duration,
                 engine=case.engine,
                 model_id=case.model.id,
+                comparison_group=case.model.decision_group,
                 board=case.board.id,
                 power=case.power,
                 toolchain=case.toolchain.value,
@@ -451,6 +453,7 @@ def run_case(
             duration_s=duration,
             engine=case.engine,
             model_id=case.model.id,
+            comparison_group=case.model.decision_group,
             board=case.board.id,
             power=case.power,
             toolchain=case.toolchain.value,
@@ -474,6 +477,7 @@ def run_case(
         duration_s=duration,
         engine=case.engine,
         model_id=case.model.id,
+        comparison_group=case.model.decision_group,
         board=case.board.id,
         power=case.power,
         toolchain=case.toolchain.value,

@@ -22,6 +22,10 @@ if TYPE_CHECKING:
 _MAX_ROWS = 20
 
 
+def _decision_group(case: CaseResult) -> str:
+    return case.comparison_group or case.model_id
+
+
 def _eligible(case: CaseResult) -> bool:
     return (
         case.status == "pass"
@@ -59,30 +63,35 @@ def _decision_tags(cases: list[CaseResult]) -> dict[str, tuple[str, ...]]:
     if not eligible:
         return {}
 
-    fastest = min(case.total_cycles for case in eligible if case.total_cycles is not None)
-    sized = [
-        case
-        for case in eligible
-        if case.binary_total_bytes is not None and case.binary_total_bytes > 0
-    ]
-    smallest = (
-        min(case.binary_total_bytes for case in sized if case.binary_total_bytes is not None)
-        if sized
-        else None
-    )
-    pareto = _pareto_cases(cases)
-
     tags: dict[str, tuple[str, ...]] = {}
+    groups: dict[str, list[CaseResult]] = {}
     for case in eligible:
-        values: list[str] = []
-        if case.total_cycles == fastest:
-            values.append("fastest")
-        if smallest is not None and case.binary_total_bytes == smallest:
-            values.append("smallest")
-        if case.case_id in pareto and not values:
-            values.append("pareto")
-        if values:
-            tags[case.case_id] = tuple(values)
+        groups.setdefault(_decision_group(case), []).append(case)
+
+    for group_cases in groups.values():
+        fastest = min(case.total_cycles for case in group_cases if case.total_cycles is not None)
+        sized = [
+            case
+            for case in group_cases
+            if case.binary_total_bytes is not None and case.binary_total_bytes > 0
+        ]
+        smallest = (
+            min(case.binary_total_bytes for case in sized if case.binary_total_bytes is not None)
+            if sized
+            else None
+        )
+        pareto = _pareto_cases(group_cases)
+
+        for case in group_cases:
+            values: list[str] = []
+            if case.total_cycles == fastest:
+                values.append("fastest")
+            if smallest is not None and case.binary_total_bytes == smallest:
+                values.append("smallest")
+            if case.case_id in pareto and not values:
+                values.append("pareto")
+            if values:
+                tags[case.case_id] = tuple(values)
     return tags
 
 
@@ -155,6 +164,10 @@ def print_validation(
     )
     overview.add_row("Decision-eligible", str(eligible))
     overview.add_row("Models", ", ".join(sorted({escape(case.model_id) for case in cases})))
+    overview.add_row(
+        "Comparison groups",
+        ", ".join(sorted({escape(_decision_group(case)) for case in cases})),
+    )
     console._console.print(overview)
     console._console.print()
 
@@ -171,6 +184,9 @@ def print_validation(
             padding=(0, 0) if compact else (0, 1),
         )
         table.add_column("Model", min_width=7)
+        show_group = any(_decision_group(case) != case.model_id for case in selected)
+        if show_group:
+            table.add_column("Group", min_width=7)
         table.add_column("Engine", min_width=9)
         if compact:
             table.add_column("Configuration", min_width=16, overflow="ellipsis")
@@ -201,8 +217,10 @@ def print_validation(
         for case in selected:
             row = [
                 escape(case.model_id),
-                escape(str(case.engine)),
             ]
+            if show_group:
+                row.append(escape(_decision_group(case)))
+            row.append(escape(str(case.engine)))
             if compact:
                 row.append(escape(_compact_config(case)))
             else:

@@ -84,6 +84,55 @@ class TestValidateList:
         assert proc.returncode != 0
         assert "unknown engine" in proc.stderr.lower()
 
+    def test_list_accepts_yaml_model_registry(self, tmp_path):
+        model = tmp_path / "candidate.tflite"
+        model.write_bytes(b"candidate")
+        registry = tmp_path / "models.yml"
+        registry.write_text(
+            f"""
+models:
+  kws-candidate:
+    path: {model}
+    comparison_group: kws
+    arena_size: 65536
+"""
+        )
+
+        proc = _run_hpx(
+            "validate",
+            "--list",
+            "--suite",
+            "smoke",
+            "--models-file",
+            str(registry),
+        )
+
+        assert proc.returncode == 0, proc.stderr
+        assert "1 case(s) would run" in proc.stdout
+        assert "apollo510_evb-kws-candidate-rt" in proc.stdout
+
+    def test_list_accepts_direct_model_paths(self, tmp_path):
+        first = tmp_path / "kws-base.tflite"
+        second = tmp_path / "kws-pruned.tflite"
+        first.write_bytes(b"base")
+        second.write_bytes(b"pruned")
+
+        proc = _run_hpx(
+            "validate",
+            "--list",
+            "--suite",
+            "smoke",
+            "--model-paths",
+            f"{first},{second}",
+            "--comparison-group",
+            "kws",
+        )
+
+        assert proc.returncode == 0, proc.stderr
+        assert "2 case(s) would run" in proc.stdout
+        assert "kws-base" in proc.stdout
+        assert "kws-pruned" in proc.stdout
+
     def test_help_mentions_validate(self):
         proc = _run_hpx("--help")
         assert proc.returncode == 0
@@ -130,6 +179,28 @@ class TestSuiteSmoke:
         assert args[args.index("--mlperf-models") + 1] == "vww"
         # Other unset axes still get smoke defaults.
         assert args[args.index("--mlperf-engines") + 1] == "helia-rt"
+
+    def test_custom_model_options_are_forwarded_to_pytest(self, monkeypatch, tmp_path):
+        model = tmp_path / "candidate.tflite"
+        model.write_bytes(b"candidate")
+        args = self._captured_pytest_args(
+            monkeypatch,
+            "--suite",
+            "smoke",
+            "--model-paths",
+            str(model),
+            "--comparison-group",
+            "kws",
+            "--model-arena-size",
+            "65536",
+            "--output-dir",
+            str(tmp_path / "out"),
+        )
+
+        assert args[args.index("--mlperf-models") + 1] == "candidate"
+        assert args[args.index("--mlperf-model-paths") + 1] == str(model)
+        assert args[args.index("--mlperf-comparison-group") + 1] == "kws"
+        assert args[args.index("--mlperf-model-arena-size") + 1] == "65536"
 
     def test_models_rt_defaults_to_two_board_gcc_atfe_model_sweep(self, monkeypatch, tmp_path):
         args = self._captured_pytest_args(

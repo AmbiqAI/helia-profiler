@@ -13,6 +13,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
+import re
+from typing import Any
+
+import yaml
 
 from ..config import Toolchain, Transport
 from ..engines import EngineType
@@ -43,6 +47,12 @@ class ModelSpec:
     fixture_path: str  # path relative to helia-profiler root
     arena_size: int  # tensor arena in bytes (RT / TFLM)
     description: str = ""
+    comparison_group: str | None = None
+
+    @property
+    def decision_group(self) -> str:
+        """Return the workload group used for performance decisions."""
+        return self.comparison_group or self.id
 
 
 @dataclass(frozen=True)
@@ -203,6 +213,117 @@ MODELS: dict[str, ModelSpec] = {
     ),
 }
 
+_MODEL_ID_RE = re.compile(r"[^a-z0-9]+")
+DEFAULT_CUSTOM_ARENA_SIZE = 512 * 1024
+
+
+def load_model_file(path: Path) -> dict[str, ModelSpec]:
+    """Load custom validation models from a YAML registry.
+
+    The document may contain a top-level ``models`` mapping or be the mapping
+    itself. Relative model paths are resolved from the YAML file's directory.
+    """
+    source = path.expanduser().resolve()
+    try:
+        document = yaml.safe_load(source.read_text())
+    except FileNotFoundError as exc:
+        raise ValueError(f"Model registry not found: {source}") from exc
+    except (OSError, yaml.YAMLError) as exc:
+        raise ValueError(f"Cannot read model registry {source}: {exc}") from exc
+
+    raw_models = document.get("models") if isinstance(document, dict) else None
+    if raw_models is None and isinstance(document, dict):
+        raw_models = document
+    if not isinstance(raw_models, dict) or not raw_models:
+        raise ValueError(f"Model registry must contain a non-empty 'models' mapping: {source}")
+
+    models: dict[str, ModelSpec] = {}
+    for raw_id, raw_spec in raw_models.items():
+        model_id = str(raw_id).strip()
+        if not model_id or not isinstance(raw_spec, dict):
+            raise ValueError(f"Invalid model entry {raw_id!r} in {source}")
+        if model_id in MODELS:
+            raise ValueError(f"Custom model ID {model_id!r} conflicts with a built-in model")
+
+        raw_path = raw_spec.get("path", raw_spec.get("fixture_path"))
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            raise ValueError(f"Custom model {model_id!r} must define 'path'")
+        model_path = Path(raw_path).expanduser()
+        if not model_path.is_absolute():
+            model_path = source.parent / model_path
+        model_path = model_path.resolve()
+        if not model_path.is_file():
+            raise ValueError(f"Custom model {model_id!r} not found: {model_path}")
+
+        arena_size = _positive_int(
+            raw_spec.get("arena_size", DEFAULT_CUSTOM_ARENA_SIZE),
+            label=f"arena_size for model {model_id!r}",
+        )
+        comparison_group = str(raw_spec.get("comparison_group", model_id)).strip()
+        if not comparison_group:
+            raise ValueError(f"comparison_group for model {model_id!r} cannot be empty")
+        models[model_id] = ModelSpec(
+            id=model_id,
+            name=str(raw_spec.get("name", model_id)),
+            category=str(raw_spec.get("category", comparison_group)),
+            fixture_path=str(model_path),
+            arena_size=arena_size,
+            description=str(raw_spec.get("description", "")),
+            comparison_group=comparison_group,
+        )
+    return models
+
+
+def models_from_paths(
+    paths: list[Path],
+    *,
+    arena_size: int = DEFAULT_CUSTOM_ARENA_SIZE,
+    comparison_group: str = "custom",
+) -> dict[str, ModelSpec]:
+    """Create ad hoc validation model specs from command-line paths."""
+    arena_size = _positive_int(arena_size, label="custom model arena size")
+    group = comparison_group.strip()
+    if not group:
+        raise ValueError("custom model comparison group cannot be empty")
+
+    models: dict[str, ModelSpec] = {}
+    for raw_path in paths:
+        model_path = raw_path.expanduser().resolve()
+        if not model_path.is_file():
+            raise ValueError(f"Custom model not found: {model_path}")
+        model_id = _slug_model_id(model_path.stem)
+        if model_id in MODELS or model_id in models:
+            raise ValueError(
+                f"Custom model path {model_path} produces duplicate ID {model_id!r}; "
+                "use a YAML model registry to assign explicit IDs"
+            )
+        models[model_id] = ModelSpec(
+            id=model_id,
+            name=model_path.stem,
+            category=group,
+            fixture_path=str(model_path),
+            arena_size=arena_size,
+            comparison_group=group,
+        )
+    return models
+
+
+def _slug_model_id(value: str) -> str:
+    slug = _MODEL_ID_RE.sub("-", value.lower()).strip("-")
+    if not slug:
+        raise ValueError(f"Cannot derive a model ID from {value!r}")
+    return slug
+
+
+def _positive_int(value: Any, *, label: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must be a positive integer, got {value!r}") from exc
+    if parsed <= 0:
+        raise ValueError(f"{label} must be a positive integer, got {value!r}")
+    return parsed
+
 
 #: Boards supported by the validation harness.
 BOARDS: dict[str, BoardSpec] = {
@@ -237,6 +358,7 @@ BOARDS: dict[str, BoardSpec] = {
 
 def build_matrix(
     models: list[str] | None = None,
+    model_registry: dict[str, ModelSpec] | None = None,
     engines: list[str | EngineType] | None = None,
     power: str = "off",
     boards: list[str] | None = None,
@@ -287,7 +409,8 @@ def build_matrix(
     ValueError
         If any filter value is not a known registry key.
     """
-    model_ids = models or list(MODELS.keys())
+    registry = model_registry or MODELS
+    model_ids = models or list(registry.keys())
     board_ids = boards or list(BOARDS.keys())
 
     if engines is None:
@@ -313,9 +436,9 @@ def build_matrix(
                 f"Known: {[e.value for e in ENGINES]}"
             )
 
-    unknown_m = [m for m in model_ids if m not in MODELS]
+    unknown_m = [m for m in model_ids if m not in registry]
     if unknown_m:
-        raise ValueError(f"Unknown model(s): {unknown_m}. Known: {list(MODELS)}")
+        raise ValueError(f"Unknown model(s): {unknown_m}. Known: {list(registry)}")
     unknown_b = [b for b in board_ids if b not in BOARDS]
     if unknown_b:
         raise ValueError(f"Unknown board(s): {unknown_b}. Known: {list(BOARDS)}")
@@ -358,7 +481,7 @@ def build_matrix(
         board_transports = _intersect_or_board_default(transport_filter, board.transports)
         board_memories = _intersect_or_board_default(memory_filter, board.memories)
         for model_id in model_ids:
-            model = MODELS[model_id]
+            model = registry[model_id]
             for engine in engine_ids:
                 for toolchain in board_toolchains:
                     for transport in board_transports:
