@@ -5,7 +5,7 @@ Joulescope, in addition to the normal cycle-count profile.
 
 ## Setup
 
-A Joulescope JS110 or JS220 wired in series with the EVB (`pyjoulescope_driver`
+A Joulescope JS110, JS220, or JS320 wired in series with the EVB (`pyjoulescope_driver`
 ships as a core dependency — see [Installation](../getting-started/install.md)
 for udev/USB setup).
 
@@ -18,7 +18,6 @@ engine:
   type: helia-rt
   config:
     variant: release-with-logs
-    dist_path: path/to/helia_rt_v1_7_0
 
 target:
   board: apollo510_evb
@@ -32,7 +31,7 @@ profiling:
 
 power:
   enabled: true
-  driver: joulescope          # auto-detects JS110 or JS220
+  driver: joulescope          # auto-detects JS110, JS220, or JS320
   mode: external
   duration_s: 30
 

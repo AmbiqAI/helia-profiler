@@ -25,13 +25,4 @@ This section is expected to grow as more workflows get written up.
 
     [:octicons-arrow-right-24: Read](memory-placement-tuning.md)
 
--   :material-clipboard-check:{ .lg .middle } __Validating a Board Setup__
-
-    ---
-
-    Use `hpx validate` to prove a bench or bring-up board works
-    end-to-end, then widen the matrix with confidence.
-
-    [:octicons-arrow-right-24: Read](validating-a-board-setup.md)
-
 </div>

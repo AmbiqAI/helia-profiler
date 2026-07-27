@@ -6,7 +6,7 @@ counts and a per-layer breakdown.
 ## Setup
 
 The minimal command needs only a model and a board — it uses the default
-engine (heliaRT), default PMU counters (`basic_cpu`), and writes results to
+engine (heliaRT), default CPU PMU counters, and writes results to
 `./results/`:
 
 ```bash
@@ -24,7 +24,6 @@ engine:
   type: helia-rt
   config:
     variant: release-with-logs
-    dist_path: path/to/helia_rt_v1_7_0
 
 target:
   board: apollo510_evb

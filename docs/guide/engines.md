@@ -7,11 +7,11 @@ once with different configs.
 
 ## Overview
 
-| Engine | `--engine` | Interpreter? | Best for | Typical binary |
-|---|---|---|---|---|
-| Vanilla TFLM | `tflm` | Yes | Baseline interpreter measurement | varies |
-| heliaRT | `helia-rt` | Yes | Optimized interpreter performance | ~570 KB |
-| heliaAOT | `helia-aot` | No | Maximum performance, smallest code | ~96 KB |
+| Engine | `--engine` | Interpreter? | Best for |
+|---|---|---|---|
+| Vanilla TFLM | `tflm` | Yes | Reference or CMSIS-NN interpreter baseline |
+| heliaRT | `helia-rt` | Yes | Ambiq-optimized interpreter performance |
+| heliaAOT | `helia-aot` | No | Ahead-of-time compilation and fine-grained placement |
 
 The pipeline, capture protocol, and report format are identical for all three
 engines. Only the firmware payload changes.
@@ -34,55 +34,63 @@ manual firmware edits just to stand up the interpreter.
 
 The profiler ships pinned to a specific heliaRT release
 (currently **v1.16.0**) and enforces a minimum supported version
-(**v1.16.0**). Pre-built static libraries are downloaded automatically
-the first time you use this engine.
+(**v1.16.0**). In the default flow NSX resolves the pinned
+`nsx-helia-rt` registry module and builds it with the selected toolchain.
 
 ### Distribution resolution
 
-There are three ways to point HPX at a heliaRT distribution. The adapter
-tries them in order and the first match wins:
+There are three ways to supply heliaRT:
 
 #### 1. Default (recommended)
 
-No config — HPX downloads the pinned release from `AmbiqAI/helia-rt`,
-caches it under `~/.cache/helia-profiler/heliart/`, and reuses the cache
-on subsequent runs.
+No engine path config — HPX declares the pinned `nsx-helia-rt` module and
+lets NSX clone, lock, and build it from the registry. The first run needs
+network access; later runs reuse the module and build caches.
 
 ```yaml title="hpx.yml"
 engine:
   type: helia-rt
 ```
 
-#### 2. Custom version or fork
+#### 2. Local source checkout
 
-Override the version (or repo) via `engine.config.source`:
+Point at a heliaRT source tree when developing the runtime itself:
+
+```yaml title="hpx.yml"
+engine:
+  type: helia-rt
+  config:
+    source_path: /path/to/helia-rt
+```
+
+`HELIART_SOURCE_PATH` is the environment-variable equivalent. The checkout
+must contain heliaRT's native NSX module.
+
+#### 3. Explicit prebuilt or custom release
+
+Use `dist_path` for an extracted prebuilt distribution, or
+`engine.config.source` for a custom GitHub release asset:
 
 ```yaml title="hpx.yml"
 engine:
   type: helia-rt
   config:
     source:
-      repo: AmbiqAI/helia-rt        # default if omitted
-      ref:  helia-rt-v1.16.0        # any release tag; bare "1.16.0" also works
+      repo: AmbiqAI/helia-rt
+      ref: helia-rt-v1.16.0
 ```
-
-The resolved release must be `>= v1.16.0`; older releases are rejected.
-
-#### 3. Local distribution path
-
-Point at an already-extracted distribution on disk:
 
 ```yaml title="hpx.yml"
 engine:
   type: helia-rt
   config:
-    dist_path: /path/to/helia_rt    # or: HELIART_DIST_PATH env var
+    dist_path: /path/to/helia_rt
 ```
 
-The directory must contain `lib/`, `tensorflow/`, `third_party/`,
-`signal/`, and an `nsx/` module (`CMakeLists.txt` + `nsx-module.yaml`).
-Version is parsed from `tensorflow/lite/micro/helia_rt_version.h` and
-must be `>= v1.16.0`.
+`HELIART_DIST_PATH` is the environment-variable equivalent. Prebuilt
+distributions must contain the headers, NSX wrapper inputs, and an archive
+matching the selected core, toolchain, and variant. All explicit sources must
+resolve to heliaRT `>= v1.16.0`.
 
 ### Toolchain → archive mapping
 
@@ -90,7 +98,10 @@ must be `>= v1.16.0`.
 |---|---|
 | `arm-none-eabi-gcc`, `gcc` | `libhelia-rt-{core}-gcc-{variant}.a` |
 | `armclang` | `libhelia-rt-{core}-armclang-{variant}.a` |
-| `atfe` | falls back to `gcc` *(with a warning — heliaRT does not yet ship a dedicated ATfE archive)* |
+| `atfe` | `libhelia-rt-{core}-atfe-{variant}.a` |
+
+This table applies only to the explicit prebuilt-distribution mode. The default
+registry and local-source modes compile heliaRT with the selected toolchain.
 
 ### heliaRT engine config
 
@@ -98,9 +109,10 @@ must be `>= v1.16.0`.
 |---|---|---|---|
 | `variant` | string | `release-with-logs` | `debug`, `release-with-logs`, or `release` |
 | `resolver_ops` | string | `auto` | Resolver strategy: `auto` registers builtins observed in the model; `all` keeps the broad fixed allowlist |
-| `dist_path` | string | *(auto-download)* | Local heliaRT distribution path |
-| `source.repo` | string | `AmbiqAI/helia-rt` | GitHub repo for download |
-| `source.ref` | string | pinned version | Release tag (e.g. `helia-rt-v1.16.0` or bare `1.16.0`) |
+| `source_path` | string | *(registry module)* | Local heliaRT source checkout |
+| `dist_path` | string | *(registry module)* | Explicit local prebuilt distribution |
+| `source.repo` | string | — | GitHub repo for an explicit prebuilt release |
+| `source.ref` | string | — | Explicit release tag |
 
 ### heliaRT runtime notes
 
@@ -156,7 +168,7 @@ You get three modes:
 pip install 'helia-profiler[aot]'
 ```
 
-Installs the upstream release tag pinned in the profiler's `pyproject.toml`.
+Installs a compatible PyPI release at or above the supported `0.18.0` floor.
 
 #### 2. Custom version or fork
 
@@ -242,28 +254,12 @@ graph TD
 
 | Scenario | Recommended |
 |---|---|
-| First-time profiling, baseline numbers | `helia-rt` |
+| First-time profiling | `helia-rt` |
+| Upstream interpreter baseline | `tflm` |
 | Production deployment | `helia-aot` |
 | Unsupported ops, prototyping new model | `helia-rt` |
 | Smallest flash footprint | `helia-aot` |
 
-## Reference numbers
-
-KWS reference model (`examples/quickstart/kws_model.tflite`),
-Apollo510 EVB, default counter set, 100 iterations. Cycles are the mean
-across iterations, shown relative to the heliaRT/GCC baseline (absolute
-cycle counts depend on your board, model, and clock configuration — see
-[First Profile](../getting-started/first-profile.md) to get your own).
-
-| Engine | Toolchain | Total cycles vs heliaRT/GCC |
-|---|---|---|
-| heliaRT | gcc | 1.00× (baseline) |
-| heliaRT | armclang | ~0.93× |
-| heliaAOT | gcc | ~0.98× |
-| heliaAOT | armclang | ~0.93× |
-
-The engine-vs-engine spread on this model is small; the toolchain spread
-is comparable. Bigger differences appear on convolution-heavy models with
-large feature maps. See the
-[engine-comparison example](../examples/engine-comparison.md) for a
-walkthrough you can re-run on your own model.
+Measure the trade-offs on your own model and hardware. See the
+[engine-comparison example](../examples/engine-comparison.md) for a repeatable
+walkthrough.

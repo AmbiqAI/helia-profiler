@@ -43,33 +43,27 @@ class EngineArtifacts:
 
 **File:** `engines/helia_rt/adapter.py`
 
-heliaRT is Ambiq's optimized TFLM fork, distributed as a pre-built static
-library (`libhelia-rt.a`).
+heliaRT is Ambiq's optimized TFLM fork. The normal flow resolves the pinned
+`nsx-helia-rt` registry module and builds it with the selected toolchain.
+Advanced users can instead provide a local source checkout or an explicit
+prebuilt distribution.
 
 ### What `prepare()` does
 
-1. Validates that `dist_path` exists and contains the correct library variant
-2. Creates a local NSX module (`helia-rt-local/`) that wraps the static lib:
-    - Writes `nsx.yml` pointing to the `.a` file
-    - Sets include paths for the RT headers
-3. Returns an artifact bundle pointing at `helia-rt-local` plus the metadata the firmware renderer needs
-
-### Template variables
-
-```python
-{
-    "engine": "helia-rt",
-    "helia_rt_include": "<path>/include",
-    "helia_rt_lib": "<path>/lib/libhelia-rt.a",
-}
-```
+1. Validates the requested heliaRT variant and selected toolchain.
+2. With no override, returns the pinned registry module reference for NSX.
+3. With `source_path`, installs the local source tree as an NSX module.
+4. With `dist_path` or a custom release source, verifies the matching
+   core/toolchain archive and generates a temporary NSX wrapper.
+5. Returns the module references and interpreter metadata needed by firmware
+   generation.
 
 ### Assumptions
 
-- The static library was built with the **same** GCC version as the profiling
-  firmware. Mixing ARM GCC 13 libs with GCC 14 firmware may cause link errors.
-- The library variant must match the build variant (`release-with-logs` is
-  required for SWO output).
+- Explicit prebuilt archives must match the target core, toolchain, and
+  requested variant.
+- The default registry and local-source modes build heliaRT with the selected
+  toolchain.
 
 ## heliaAOT adapter
 
@@ -84,9 +78,10 @@ eliminating the interpreter overhead.
     - Reads the model ops → generates operator manifest
     - Emits C source files for each layer
     - Produces `hpx_model.h` and `hpx_model.cc`
-2. Creates two local NSX modules:
+2. Creates or resolves two NSX modules:
     - **aot-model/** — the generated C code
-    - **ns-cmsis-nn/** — AmbiqAI's CMSIS-NN fork (required — not upstream)
+    - **nsx-cmsis-nn** — AmbiqAI's CMSIS-NN fork, from the registry by
+      default or an explicit local override
 3. Returns the artifact bundle and AOT-specific metadata
 
 ### Template variables
@@ -107,24 +102,25 @@ eliminating the interpreter overhead.
 - Uses a different `main.cc` template (`main_aot.cc.j2`) because AOT
   inference calls are direct function invocations, not interpreter runs
 
-## TFLM adapter (internal)
+## TFLM adapter
 
 **File:** `engines/tflm.py`
 
-Stock TensorFlow Lite for Microcontrollers adapter retained in source for the
-shared interpreter path. It is not currently exposed by `hpx engines` / `--engine`.
+Stock TensorFlow Lite for Microcontrollers adapter for interpreter baselines.
+It is exposed as `--engine tflm` and supports reference or upstream CMSIS-NN
+backends.
 
 ### What `prepare()` does
 
-1. Locates the TFLM source or pre-built library
-2. Creates NSX module references for TFLM + CMSIS-NN
+1. Resolves the `nsx-tflite-micro` module
+2. Selects the reference or CMSIS-NN backend
 3. Returns module refs with standard TFLM template variables
 
 ### When to use
 
 TFLM is primarily useful for:
 
-- Validating that a model runs correctly before trying optimized engines
+- Establishing an upstream interpreter baseline
 - Generating baseline numbers for comparison with heliaRT/heliaAOT
 
 ## How engines affect the firmware

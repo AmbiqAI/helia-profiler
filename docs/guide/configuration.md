@@ -22,7 +22,6 @@ engine:
   type: helia-rt               # (3)!
   config:                      # (4)!
     variant: release-with-logs
-    dist_path: path/to/helia_rt_dist
 
 target:
   board: apollo510_evb         # (5)!
@@ -53,11 +52,13 @@ output:
 ```
 
 1. Path to the `.tflite` model file.
-2. Tensor arena size in bytes. Required for heliaRT. heliaAOT can auto-size.
+2. Optional tensor arena override in bytes. Start with the default, then tune
+   from the reported `allocated_arena`. heliaAOT uses its own memory plan.
 3. Engine: `tflm`, `helia-rt`, or `helia-aot`.
 4. Engine-specific config (passed through to the adapter).
 5. Target board — run `hpx boards` to see options.
-6. Toolchain prefix (must be on PATH).
+6. Toolchain selection. GCC and armclang are discovered on `PATH`; ATfE is
+   resolved through `ATFE_ROOT`.
 7. Optional — select a specific J-Link probe by serial number.
 8. PMU counter groups and selections. See [PMU Counters](pmu-counters.md).
 9. Per-layer breakdown (vs. whole-model aggregate).
@@ -106,6 +107,9 @@ below cover behavior that a schema table can't express.
 
 - `engine.config.resolver_ops` now defaults to `auto` for `helia-rt`. Leave it
   unset unless you specifically want the broader `all` resolver surface.
+- With no engine path override, HPX resolves the pinned `nsx-helia-rt` module
+  through the NSX registry. Use `source_path`, `dist_path`, or `source` only
+  for an explicit local/custom runtime.
 - `target.clock.cpu` is the supported way to choose CPU frequency. Set it to
   one of the board's named speeds (`lp`/`hp`, or `ulp`/`lp`/`hp` on Atomiq);
   HPX validates the selection against the chosen board's platform registry

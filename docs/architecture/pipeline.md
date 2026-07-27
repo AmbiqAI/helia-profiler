@@ -28,10 +28,6 @@ these major phases. `PipelineRunner` still executes everything sequentially;
 if any stage raises an exception, the pipeline stops and reports the error
 with its typed hint.
 
-The planned evolution of these boundaries, including separate profile/power
-artifacts, early checkpoints, and deferred power diagnostics, is documented in
-[Profile and Power Pipeline Refactor Plan](profile-power-refactor-plan.md).
-
 ## PipelineContext
 
 The `PipelineContext` is a mutable state bag passed through all stages:
@@ -77,14 +73,15 @@ captured.
 **File:** `stages/prepare_engine.py`
 **Sets:** `ctx.engine_artifacts`
 
-Instantiates the engine adapter (heliaRT/heliaAOT, plus the internal TFLM path) and calls its
+Instantiates the selected heliaRT, heliaAOT, or TFLM adapter and calls its
 `prepare()` method. The adapter produces an `EngineArtifacts` bundle that records
 engine identity plus any local NSX modules, static libraries, and memory-planning
 metadata needed by later stages.
 
-For **heliaRT**, this creates a local NSX module wrapping the pre-built static
-library. For **heliaAOT**, this runs the AOT compiler and creates CMSIS-NN +
-model NSX modules.
+For **heliaRT**, this normally declares the pinned registry module, with local
+source/prebuilt overrides available. For **heliaAOT**, this runs the compiler
+and creates the model module while resolving CMSIS-NN. For **TFLM**, it resolves
+the stock interpreter module and selected backend.
 
 ### S03: Generate Firmware
 

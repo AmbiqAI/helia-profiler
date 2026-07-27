@@ -1,6 +1,6 @@
 # `hpx doctor`
 
-Verify that all required toolchain binaries and probes are available.
+Check whether required host binaries and Python packages can be found.
 
 ## Synopsis
 
@@ -23,6 +23,8 @@ Reports the current status of the host tools and Python packages that
 - `helia-aot` Python package (optional)
 - `armclang` (optional)
 - `fromelf` (optional)
+- ATfE's `clang`, `clang++`, `llvm-ar`, `llvm-objcopy`, `llvm-size`, and
+  `llvm-nm` when `ATFE_ROOT` is set
 
 ## Output
 
@@ -40,7 +42,7 @@ Reports the current status of the host tools and Python packages that
 
 | Symbol | Meaning |
 |---|---|
-| `✓` | Present and functional |
+| `✓` | Found at the reported path |
 | `✗` | **Required** binary missing — `hpx profile` will fail until installed |
 | `–` | Optional dependency missing — only matters if you opt into that feature |
 
@@ -52,7 +54,8 @@ Reports the current status of the host tools and Python packages that
 
 `doctor` flags **required** dependencies as failures in the table. Missing
 optional capabilities (for example `helia-aot` or Arm Compiler binaries)
-report `–`.
+report `–`. It does not compile a program or fully validate installed tool
+versions.
 
 ## See also
 

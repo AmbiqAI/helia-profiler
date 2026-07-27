@@ -16,7 +16,6 @@ engine:
   type: helia-rt
   config:
     variant: release-with-logs
-    dist_path: path/to/helia_rt_v1_7_0
 
 target:
   board: apollo510_evb
@@ -44,7 +43,6 @@ engine:
   config:
     prefix: hpx
     module_name: hpx_model
-    cmsis_nn_path: path/to/ns-cmsis-nn
 
 target:
   board: apollo510_evb
