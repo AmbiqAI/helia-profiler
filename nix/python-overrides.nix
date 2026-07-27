@@ -1,6 +1,15 @@
 { pkgs }:
 
 final: prev: {
+  neuralspotx = prev.neuralspotx.overrideAttrs (old: {
+    postInstall = (old.postInstall or "") + ''
+      project_config="$(find "$out" -path '*/site-packages/neuralspotx/project_config.py' -print -quit)"
+      test -n "$project_config"
+      site_packages="$(dirname "$(dirname "$project_config")")"
+      patch -d "$site_packages" -p1 < ${./patches/neuralspotx-writable-packaged-trees.patch}
+    '';
+  });
+
   ai-edge-litert = prev.ai-edge-litert.overrideAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.autoPatchelfHook ];
     buildInputs = (old.buildInputs or [ ]) ++ [ pkgs.stdenv.cc.cc.lib ];
