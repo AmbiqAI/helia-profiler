@@ -8,6 +8,7 @@ of :class:`~helia_profiler.validation.matrix.CaseSpec` cases.
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 import sys
 
 from .common import _find_repo_root
@@ -151,7 +152,41 @@ def _normalise_csv_aliases(
 
 def _cmd_validate(args: argparse.Namespace) -> None:
     """Drive the hardware validation suite via pytest."""
-    from ..validation import MODELS, BOARDS, build_matrix
+    from ..validation import (
+        BOARDS,
+        MODELS,
+        build_matrix,
+        load_model_file,
+        models_from_paths,
+    )
+
+    model_registry = dict(MODELS)
+    custom_model_ids: list[str] = []
+    try:
+        models_file = getattr(args, "models_file", None)
+        if models_file is not None:
+            file_models = load_model_file(Path(models_file))
+            model_registry.update(file_models)
+            custom_model_ids.extend(file_models)
+
+        raw_model_paths = getattr(args, "model_paths", "")
+        if raw_model_paths.strip():
+            path_models = models_from_paths(
+                [Path(item.strip()) for item in raw_model_paths.split(",") if item.strip()],
+                arena_size=getattr(args, "model_arena_size", 524288),
+                comparison_group=getattr(args, "comparison_group", "custom"),
+            )
+            duplicates = sorted(set(path_models) & set(model_registry))
+            if duplicates:
+                raise ValueError(f"Duplicate custom model ID(s): {duplicates}")
+            model_registry.update(path_models)
+            custom_model_ids.extend(path_models)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(2)
+
+    if custom_model_ids and not args.models.strip():
+        args.models = ",".join(custom_model_ids)
 
     # Preset suites fill in defaults for any axis the user did not set.
     suite = getattr(args, "suite", None)
@@ -200,6 +235,7 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         try:
             cases = build_matrix(
                 models=[m.strip() for m in args.models.split(",") if m.strip()] or None,
+                model_registry=model_registry,
                 engines=[e.strip() for e in engines_csv.split(",") if e.strip()] or None,
                 power=args.power,
                 boards=[b.strip() for b in args.boards.split(",") if b.strip()] or None,
@@ -215,7 +251,7 @@ def _cmd_validate(args: argparse.Namespace) -> None:
             print(f"Error: {exc}", file=sys.stderr)
             sys.exit(2)
 
-        print(f"Registered models: {', '.join(sorted(MODELS))}")
+        print(f"Registered models: {', '.join(sorted(model_registry))}")
         print(f"Registered boards: {', '.join(sorted(BOARDS))}")
         print(f"\n{len(cases)} case(s) would run:\n")
         for c in cases:
@@ -263,6 +299,16 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         pytest_args += ["--mlperf-suite", suite]
     if args.models.strip():
         pytest_args += ["--mlperf-models", args.models.strip()]
+    if models_file is not None:
+        pytest_args += ["--mlperf-models-file", str(Path(models_file).expanduser().resolve())]
+    if raw_model_paths.strip():
+        pytest_args += ["--mlperf-model-paths", raw_model_paths.strip()]
+        pytest_args += [
+            "--mlperf-comparison-group",
+            getattr(args, "comparison_group", "custom"),
+            "--mlperf-model-arena-size",
+            str(getattr(args, "model_arena_size", 524288)),
+        ]
     if engines_csv:
         pytest_args += ["--mlperf-engines", engines_csv]
     if args.boards.strip():
@@ -289,15 +335,38 @@ def _cmd_validate(args: argparse.Namespace) -> None:
     else:
         pytest_args.append("-v")
 
+    report_dir = args.output_dir.resolve()
+    report_json = report_dir / "validation_report.json"
+    report_before = report_json.stat().st_mtime_ns if report_json.exists() else None
+
     import pytest
 
     print(f"Running: pytest {' '.join(pytest_args)}\n")
     rc = pytest.main(pytest_args)
 
-    report_md = args.output_dir.resolve() / "validation_report.md"
-    report_json = args.output_dir.resolve() / "validation_report.json"
-    if report_md.exists():
-        print(f"\nMarkdown report: {report_md}")
-    if report_json.exists():
-        print(f"JSON report:     {report_json}")
+    report_md = report_dir / "validation_report.md"
+    report_manifest = report_dir / "validation_manifest.json"
+    report_after = report_json.stat().st_mtime_ns if report_json.exists() else None
+    report_is_fresh = report_after is not None and report_after != report_before
+    if report_is_fresh:
+        from ..console import HpxConsole
+        from ..errors import ReportError
+        from ..validation.report import load_validation_report
+
+        console = HpxConsole(verbosity=args.verbose)
+        try:
+            report = load_validation_report(report_json)
+        except ReportError as exc:
+            console.print_error(exc)
+            rc = int(rc) or 1
+        else:
+            output_paths = [
+                path for path in (report_json, report_md, report_manifest) if path.exists()
+            ]
+            console.print_validation(report, output_paths=output_paths)
+    else:
+        if report_md.exists():
+            print(f"\nMarkdown report: {report_md}")
+        if report_json.exists():
+            print(f"JSON report:     {report_json}")
     sys.exit(int(rc))

@@ -28,6 +28,7 @@ def _skip_result(case: CaseSpec, reason: str) -> CaseResult:
         duration_s=0.0,
         engine=case.engine.value,
         model_id=case.model.id,
+        comparison_group=case.model.decision_group,
         board=case.board.id,
         power=case.power,
         toolchain=case.toolchain.value,

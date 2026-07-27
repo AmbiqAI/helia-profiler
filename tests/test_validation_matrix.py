@@ -13,6 +13,8 @@ from helia_profiler.validation import (
     CaseSpec,
     build_matrix,
     case_validity,
+    load_model_file,
+    models_from_paths,
 )
 from helia_profiler.validation.matrix import MemoryProfile
 
@@ -48,6 +50,53 @@ class TestRegistry:
             EngineType.HELIA_AOT,
             EngineType.TFLM,
         }
+
+    def test_yaml_models_resolve_relative_paths_and_comparison_groups(self, tmp_path):
+        model = tmp_path / "models" / "kws-pruned.tflite"
+        model.parent.mkdir()
+        model.write_bytes(b"model")
+        registry = tmp_path / "variants.yml"
+        registry.write_text(
+            """
+models:
+  kws-pruned:
+    path: models/kws-pruned.tflite
+    name: KWS pruned
+    comparison_group: kws
+    arena_size: 65536
+"""
+        )
+
+        loaded = load_model_file(registry)
+
+        assert loaded["kws-pruned"].fixture_path == str(model.resolve())
+        assert loaded["kws-pruned"].decision_group == "kws"
+        assert loaded["kws-pruned"].arena_size == 65536
+
+    def test_command_line_paths_share_the_requested_comparison_group(self, tmp_path):
+        first = tmp_path / "KWS Base.tflite"
+        second = tmp_path / "KWS Pruned.tflite"
+        first.write_bytes(b"base")
+        second.write_bytes(b"pruned")
+
+        loaded = models_from_paths(
+            [first, second],
+            arena_size=98304,
+            comparison_group="kws-variants",
+        )
+
+        assert set(loaded) == {"kws-base", "kws-pruned"}
+        assert {model.decision_group for model in loaded.values()} == {"kws-variants"}
+        cases = build_matrix(
+            models=list(loaded),
+            model_registry={**MODELS, **loaded},
+            engines=["helia-rt"],
+            boards=["apollo510_evb"],
+            toolchains=["arm-none-eabi-gcc"],
+            transports=["rtt"],
+            memories=["auto"],
+        )
+        assert {case.model.id for case in cases} == {"kws-base", "kws-pruned"}
 
 
 class TestCaseValidity:
