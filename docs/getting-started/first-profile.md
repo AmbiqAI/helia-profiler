@@ -11,10 +11,17 @@ cycle-count table in about five commands.
   USB connector (the on-board debug USB port — check your specific EVB's
   quick-start card if it has more than one USB connector).
 
-!!! note "No model of your own yet? Use the bundled one."
-    The repo ships a small keyword-spotting reference model at
-    `examples/quickstart/kws_model.tflite`. The commands below use it —
-    substitute your own `.tflite` path once you're comfortable.
+You also need a LiteRT `.tflite` model. Replace `/path/to/model.tflite` below with
+your model path. If you installed with `pip` into the active Python
+environment, heliaPROFILER includes a small deterministic example model:
+
+```bash
+python -c "from helia_profiler.examples import tiny_cnn; print(tiny_cnn())"
+```
+
+Use the printed path in the commands below. A source checkout also contains
+`examples/quickstart/kws_model.tflite`. `uv tool install` keeps packages in an
+isolated environment, so supply your own model or use the source-checkout path.
 
 ## 1. Confirm the toolchain
 
@@ -56,24 +63,24 @@ Match the silkscreen/part number on your EVB against the `Board` column
 ## 4. Run the profiler
 
 ```bash
-hpx profile examples/quickstart/kws_model.tflite --board apollo510_evb
+hpx profile /path/to/model.tflite --board apollo510_evb
 ```
 
 With no other flags, heliaPROFILER:
 
 | Default | Value |
 |---|---|
-| Engine | `helia-rt` (auto-downloads the prebuilt distribution on first use) |
+| Engine | `helia-rt` (resolved from the NSX registry and built from source) |
 | Toolchain | `arm-none-eabi-gcc` |
 | Transport | `rtt` (lossless RTT capture over J-Link) |
 | Counters | CPU defaults — cycles, instructions, frontend/backend stalls |
 | Iterations | 100 inferences, 5 warmup |
 | Output | `./results/` |
 
-Progress prints stage-by-stage. The first run takes longer (toolchain
-download for heliaRT, NSX configure, build, flash, capture); subsequent
-runs are faster because the heliaRT distribution and build artifacts are
-cached.
+Progress prints stage-by-stage. The first run takes longer because NSX resolves
+and clones the pinned heliaRT and firmware modules, then configures, builds,
+flashes, and captures. Subsequent runs are faster because module and build
+artifacts are cached.
 
 !!! tip "Rerunning without touching the network"
     Once a run has succeeded, `hpx profile ... --frozen` skips NSX
@@ -82,13 +89,14 @@ cached.
 
 ## 5. Look at the result
 
-Three files matter on your first run:
+Four files matter on your first run:
 
 ```text
 results/
-├── summary.json         ← read this first
+├── result_manifest.json ← bundle validity, provenance, and artifact digests
+├── summary.json         ← headline metrics; read this first
 ├── profile_results.csv  ← per-layer breakdown for spreadsheets
-└── run_metadata.json    ← what config was actually used
+└── run_metadata.json    ← resolved config and environment provenance
 ```
 
 Open `summary.json`:
@@ -114,6 +122,10 @@ Three things to read off:
 - **`top_layers`** — which ops dominate runtime. Optimization effort goes here.
 - **`memory.allocated_arena`** — how much RAM TFLM actually used. If it's
   much smaller than `arena_size`, you can shrink the arena.
+
+Before consuming the headline metrics, check `validity` and `issues` in
+`summary.json` or `result_manifest.json`. A result is `valid`, `degraded`, or
+`invalid`; structured issues explain any capture or integrity problem.
 
 ## 6. View the per-layer table
 
@@ -154,6 +166,6 @@ Now that you've got a baseline:
     on your setup, switch to USB CDC — see [Transports](../guide/transports.md).
 
 ??? failure "`overflow_detected: true` in summary"
-    A PMU counter overflowed during one of the iterations. The averaged
-    cycle counts are still meaningful, but for a perfectly clean run lower
-    `--iterations` or run with `--detailed` to inspect per-iteration data.
+    A PMU counter overflowed during measurement, so the result is invalid.
+    Lower `--iterations`, reduce the requested counter set, or run with
+    `--detailed` to diagnose the affected pass before using the metrics.

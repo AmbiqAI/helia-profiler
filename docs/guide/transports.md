@@ -60,8 +60,10 @@ clean.
 ### How heliaPROFILER uses it
 
 - Opens an RTT session through `pylink` after `JLinkExe` resets the target.
-- Uses a **32 KB up-buffer** in the firmware (configured via NSX in trim
-  mode). Lines are scanned for the HPX protocol sentinels.
+- Uses a toolchain-aware firmware up-buffer (32 KB for GCC/armclang and
+  12 KB for ATfE by default). Override it with `--rtt-buffer-size-up` only
+  when a measured capture requires different sizing. Lines are scanned for
+  HPX protocol sentinels.
 - Supports the PSRAM model handshake: firmware emits `HPX_PSRAM_READY`,
   the host writes the model directly to PSRAM via J-Link, and the
   firmware proceeds with `HPX_GO`.
@@ -70,7 +72,7 @@ clean.
 
 | ✓ | ✗ |
 |---|---|
-| Lossless | Limited to ~32 KB of in-flight data; firmware blocks if buffer fills |
+| Lossless | In-flight capacity is bounded by the configured RTT up-buffer |
 | Zero target CPU/peripheral interrupts during transfer | Requires J-Link probe |
 | Same USB cable as flashing — no extra wiring | |
 
@@ -139,8 +141,8 @@ graph TD
 
 For 95% of runs, the default `rtt` is correct. Switch to `usb_cdc` when:
 
-- You're capturing extremely large per-layer data (every counter, every
-  iteration, every layer) and the 32 KB RTT buffer is filling.
+- You're capturing extremely large per-layer data and the configured RTT
+  buffer is filling; consider an explicit larger `--rtt-buffer-size-up`.
 - Your host has flaky `pylink`/J-Link RTT support but the target USB
   works fine.
 - Your board does not expose a usable target USB CDC path, but the J-Link OB

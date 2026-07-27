@@ -36,10 +36,10 @@ Validate a known serial before a hardware run:
 hpx probes match --board apollo510_evb --jlink-serial 801000001
 ```
 
-Use `--json` when scripting lab setup or generating validation inputs.
+Use `--json` when scripting lab setup or mapping probes to benches.
 
 ## Why Use This
 
 `JLinkExe` is interactive by default and can remain open waiting for input.
-These commands use HPX's bounded, non-interactive J-Link helpers and always
-select probes using the same policy as `hpx profile` and `hpx validate`.
+These commands use HPX's bounded, non-interactive J-Link helpers and select
+probes using the same policy as `hpx profile`.

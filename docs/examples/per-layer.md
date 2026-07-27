@@ -1,7 +1,7 @@
 # Per-Layer Breakdown
 
 **Goal:** capture every available PMU counter (CPU, memory, MVE) for each
-layer in a model, not just the default `basic_cpu` set.
+layer in a model, not just the default CPU counter selection.
 
 ## Setup
 
@@ -14,7 +14,6 @@ engine:
   type: helia-rt
   config:
     variant: release-with-logs
-    dist_path: path/to/helia_rt_v1_7_0
 
 target:
   board: apollo510_evb

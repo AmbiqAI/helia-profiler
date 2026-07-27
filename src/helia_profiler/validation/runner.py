@@ -574,7 +574,10 @@ def run_case(
 def _optional_int(value: Any) -> int | None:
     if value is None or isinstance(value, bool):
         return None
-    return int(value)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 # ---------------------------------------------------------------------------

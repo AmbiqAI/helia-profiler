@@ -21,4 +21,4 @@ By default, `hpx ports list` hides built-in system serial ports such as
 `/dev/ttyS*` and shows HPX-relevant USB/J-Link ports.  Use `--all` to include
 the full host serial inventory.
 
-Use `--json` when scripts need to map ports to probes or validation cases.
+Use `--json` when scripts need to map ports to probes or target benches.

@@ -14,8 +14,8 @@ hide:
 
 # Profile LiteRT models on Ambiq hardware.
 
-One command to build, flash, capture PMU counters, and generate reports —
-with heliaRT or heliaAOT.
+Build, flash, measure, and compare LiteRT models with heliaRT, heliaAOT,
+or a stock TFLM baseline.
 { .hero-sub }
 
 [Get Started :material-arrow-right:](getting-started/index.md){ .md-button .md-button--primary }
@@ -58,8 +58,22 @@ with heliaRT or heliaAOT.
 
     ---
 
-    Optional Joulescope integration for current and voltage traces
-    alongside PMU data.
+    GPIO-gated JS110/JS220/JS320 capture with a dedicated transport-free
+    firmware image for current, voltage, and energy per inference.
+
+-   :material-magnify-scan:{ .lg .middle } __Host-only model analysis__
+
+    ---
+
+    Inspect MACs, parameters, tensor sizes, and AOT graph transforms before
+    connecting a board.
+
+-   :material-compare:{ .lg .middle } __Comparison and regression policy__
+
+    ---
+
+    Compare compatible result bundles, find the largest layer deltas, and
+    apply versioned metric thresholds.
 
 -   :material-graph:{ .lg .middle } __Model Explorer overlays__
 
@@ -75,6 +89,20 @@ with heliaRT or heliaAOT.
 
     Declarative config merged with CLI flags.
     Frozen and immutable — no surprises mid-run.
+
+-   :material-shield-check:{ .lg .middle } __Verifiable result bundles__
+
+    ---
+
+    Machine-readable summaries, per-layer data, provenance, validity issues,
+    and a manifest with artifact sizes and SHA-256 digests.
+
+-   :material-language-python:{ .lg .middle } __Python and notebook API__
+
+    ---
+
+    Typed `profile()` results and immutable `Session` workflows for
+    interactive exploration and automation.
 
 </div>
 
@@ -93,9 +121,9 @@ hpx profile model.tflite            # (3)!
 3.  Profile with defaults — heliaRT, GCC, RTT capture, CPU counters, on the
     connected Apollo510 EVB. Results land in `./results/`.
 
-The pipeline handles firmware generation, build, flash, data capture, and
-report output. Each step is a modular
-[stage](architecture/pipeline.md) that fails with clear, actionable errors.
+The pipeline handles engine resolution, firmware generation, build, flash,
+capture, and report output. Start with [Output & Results](guide/output.md) to
+understand the portable bundle produced by a successful run.
 { .section-sub }
 
 ---
@@ -142,6 +170,24 @@ Pick the path that matches what you're trying to do:
     `profile()` Python API for calling heliaPROFILER programmatically.
 
     [:octicons-arrow-right-24: Reference](reference/index.md)
+
+-   :material-chart-box-outline:{ .lg .middle } __Analyzing or comparing__
+
+    ---
+
+    Inspect a model without hardware, compare two runs, or define regression
+    thresholds for repeatable experiments.
+
+    [:octicons-arrow-right-24: Analysis & Run Comparison](guide/analysis-comparison.md)
+
+-   :material-notebook-edit-outline:{ .lg .middle } __Working in Python__
+
+    ---
+
+    Use the typed API and branchable session workflow from scripts or
+    notebooks.
+
+    [:octicons-arrow-right-24: Interactive Python](examples/interactive-python.md)
 
 </div>
 

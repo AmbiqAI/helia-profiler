@@ -259,9 +259,10 @@ def load_model_file(path: Path) -> dict[str, ModelSpec]:
             raw_spec.get("arena_size", DEFAULT_CUSTOM_ARENA_SIZE),
             label=f"arena_size for model {model_id!r}",
         )
-        comparison_group = str(raw_spec.get("comparison_group", model_id)).strip()
-        if not comparison_group:
-            raise ValueError(f"comparison_group for model {model_id!r} cannot be empty")
+raw_group = raw_spec.get("comparison_group")
+comparison_group = model_id if raw_group is None else str(raw_group).strip()
+if not comparison_group:
+    raise ValueError(f"comparison_group for model {model_id!r} cannot be empty")
         models[model_id] = ModelSpec(
             id=model_id,
             name=str(raw_spec.get("name", model_id)),
@@ -316,6 +317,8 @@ def _slug_model_id(value: str) -> str:
 
 
 def _positive_int(value: Any, *, label: str) -> int:
+    if isinstance(value, bool):
+        raise ValueError(f"{label} must be a positive integer, got {value!r}")
     try:
         parsed = int(value)
     except (TypeError, ValueError) as exc:
