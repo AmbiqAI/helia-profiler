@@ -42,6 +42,10 @@ segger-rtt/
 
 site/
 
+# Nix build outputs
+result
+result-*
+
 # Profiling outputs (any location) — consolidate under results/ when possible
 **/results_*/
 **/work_*/
