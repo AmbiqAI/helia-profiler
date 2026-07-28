@@ -1,25 +1,40 @@
-diff --git a/neuralspotx/project_config.py b/neuralspotx/project_config.py
---- a/neuralspotx/project_config.py
-+++ b/neuralspotx/project_config.py
-@@ -311,6 +311,10 @@
-         if destination.exists():
-             import shutil
+diff --git a/neuralspotx/module_registry/_vendoring.py b/neuralspotx/module_registry/_vendoring.py
+--- a/neuralspotx/module_registry/_vendoring.py
++++ b/neuralspotx/module_registry/_vendoring.py
+@@ -22,4 +22,19 @@
+ from ._rmtree import _rmtree
+-
+-
++
++
++def _make_tree_owner_writable(tree: Path) -> None:
++    """Make a packaged Nix-store copy usable as an app-local work tree."""
++
++    if tree.is_symlink():
++        return
++    tree.chmod(tree.stat().st_mode | 0o700)
++    for path in tree.rglob("*"):
++        if path.is_symlink():
++            continue
++        if path.is_dir():
++            path.chmod(path.stat().st_mode | 0o700)
++        else:
++            path.chmod(path.stat().st_mode | 0o600)
++
++
+ def _is_full_commit_sha(revision: str) -> bool:
+@@ -240,5 +255,6 @@
+     preserve_existing = destination_dir == app_dir / "cmake" / "nsx"
+     if destination_dir.exists() and not preserve_existing:
++        _make_tree_owner_writable(destination_dir)
+         _rmtree(destination_dir)
+     destination_dir.parent.mkdir(parents=True, exist_ok=True)
+     shutil.copytree(
+@@ -246,6 +262,7 @@
+         dirs_exist_ok=True,
+         ignore=shutil.ignore_patterns(".git", "__pycache__"),
+     )
++    _make_tree_owner_writable(destination_dir)
  
-+            for path in destination.rglob("*"):
-+                if not path.is_symlink():
-+                    path.chmod(path.stat().st_mode | 0o200)
-+            destination.chmod(destination.stat().st_mode | 0o200)
-             shutil.rmtree(destination)
-         import shutil
  
-@@ -320,6 +324,10 @@
-             dirs_exist_ok=True,
-             ignore=shutil.ignore_patterns("__pycache__"),
-         )
-+        for path in destination.rglob("*"):
-+            if not path.is_symlink():
-+                path.chmod(path.stat().st_mode | 0o200)
-+        destination.chmod(destination.stat().st_mode | 0o200)
- 
- 
- def _write_cmake_nsx_gitignore(app_dir: Path) -> None:
+ def _remove_vendored_module_from_app(
