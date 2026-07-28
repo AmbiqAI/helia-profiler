@@ -260,7 +260,13 @@ def _run_aot_compiler(
                 hint="Check engine.config_path in your profiler YAML.",
             )
         with open(cfg_path) as f:
-            base_data = yaml.safe_load(f) or {}
+            loaded = yaml.safe_load(f) or {}
+        if not isinstance(loaded, dict):
+            raise EngineError(
+                "heliaAOT config must contain a YAML mapping",
+                hint="Check engine.config_path and use key/value YAML fields.",
+            )
+        base_data = loaded
 
     # Merge any engine.config.aot_args overrides (dict form)
     extra = config.engine.config.get("aot_args", {})
@@ -268,21 +274,24 @@ def _run_aot_compiler(
         _deep_merge(base_data, extra)
 
     # Pin the three AIR tensor kinds (constant/persistent/scratch) onto the
-    # profiler's requested memories via wildcard attribute rulesets.  These are
-    # the *base* rules; any user-supplied ``aot_args.memory.tensors`` are kept
-    # and appended after so they take precedence (equal-specificity ties resolve
-    # to the later rule; explicit per-id rules are strictly more specific).
+    # profiler's requested memories via wildcard attribute rulesets.  A
+    # user-supplied wildcard for a kind replaces the profiler's coarse rule;
+    # this is important for constants because the coarse rule may also carry a
+    # ``constant_destination_memory`` staging attribute.
     profiler_rulesets = _resolve_aot_tensor_rulesets(
         config, get_soc_for_board(config.target.board, registry=config.platform_registry)
     )
-    if profiler_rulesets:
-        mem = base_data.setdefault("memory", {})
-        user_tensors = mem.get("tensors") or []
-        mem["tensors"] = profiler_rulesets + list(user_tensors)
+    mem, user_tensors = _prepare_aot_memory_config(base_data)
+    merged_rulesets = _merge_aot_tensor_rulesets(profiler_rulesets, user_tensors)
+    if merged_rulesets:
+        mem["tensors"] = merged_rulesets
+        scratch_memory, constant_attributes = _summarize_aot_tensor_rulesets(
+            merged_rulesets
+        )
         log.info(
             "AOT tensor placement: scratch/persistent=%s, constant=%s",
-            profiler_rulesets[0]["attributes"]["memory"],
-            profiler_rulesets[2]["attributes"],
+            scratch_memory,
+            constant_attributes,
         )
 
     # Build ConvertArgs — profiler mandatory fields always win
@@ -334,6 +343,73 @@ def _run_aot_compiler(
             )
 
     return codegen_ctx
+
+
+def _merge_aot_tensor_rulesets(
+    profiler_rulesets: list[dict[str, Any]],
+    user_tensors: list[Any],
+) -> list[Any]:
+    """Merge user AOT tensor rules without leaking coarse attributes.
+
+    A type-only user rule is a wildcard for that tensor kind.  More specific
+    user rules (for example, a constant selected by ``id``) remain additive
+    and override the matching wildcard in heliaAOT.
+    """
+    wildcard_kinds = {
+        str(rule.get("type"))
+        for rule in user_tensors
+        if isinstance(rule, dict) and "type" in rule and "id" not in rule
+    }
+    return [
+        rule for rule in profiler_rulesets if rule.get("type") not in wildcard_kinds
+    ] + list(user_tensors)
+
+
+def _prepare_aot_memory_config(
+    base_data: dict[str, Any],
+) -> tuple[dict[str, Any], list[Any]]:
+    """Validate the free-form AOT memory config before merging placement rules."""
+
+    raw_memory = base_data.get("memory")
+    if raw_memory is None:
+        memory: dict[str, Any] = {}
+        base_data["memory"] = memory
+    elif isinstance(raw_memory, dict):
+        memory = raw_memory
+    else:
+        raise EngineError(
+            "engine.config.aot_args.memory must be a mapping",
+            hint="Use memory: {tensors: [...]} in the heliaAOT configuration.",
+        )
+
+    raw_tensors = memory.get("tensors")
+    if raw_tensors is None:
+        return memory, []
+    if not isinstance(raw_tensors, list):
+        raise EngineError(
+            "engine.config.aot_args.memory.tensors must be a list",
+            hint="Provide a YAML list of heliaAOT tensor placement rules.",
+        )
+    return memory, raw_tensors
+
+
+def _summarize_aot_tensor_rulesets(
+    rulesets: list[Any],
+) -> tuple[Any, Any]:
+    """Return logging-only placement summaries without validating user rules."""
+
+    by_kind: dict[str, dict[str, Any]] = {}
+    for rule in rulesets:
+        if not isinstance(rule, dict):
+            continue
+        kind = rule.get("type")
+        attributes = rule.get("attributes")
+        if isinstance(kind, str) and isinstance(attributes, dict):
+            by_kind.setdefault(kind, attributes)
+
+    scratch_memory = by_kind.get("scratch", {}).get("memory", "custom")
+    constant_attributes: Any = by_kind.get("constant", "custom")
+    return scratch_memory, constant_attributes
 
 
 def _deep_merge(base: dict, override: dict) -> None:

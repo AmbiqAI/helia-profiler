@@ -71,6 +71,7 @@ class MemoryContext:
     manages_shared_ssram_power: bool
     ssram_full_power_enum: str
     force_shared_sram: bool
+    psram_clock_hz: int
 
 
 @dataclass(frozen=True)
@@ -198,6 +199,7 @@ class FirmwareRenderContext:
                 manages_shared_ssram_power=soc.capabilities.memory.has_shared_ssram_power_domain,
                 ssram_full_power_enum=soc.ssram_full_power_enum,
                 force_shared_sram=config.profiling.force_shared_sram,
+                psram_clock_hz=config.target.psram.clock_hz,
             ),
             pmu=PmuContext(
                 pmu_passes=pmu_passes,
@@ -269,6 +271,7 @@ class FirmwareRenderContext:
             "manages_shared_ssram_power": self.memory.manages_shared_ssram_power,
             "ssram_full_power_enum": self.memory.ssram_full_power_enum,
             "force_shared_sram": self.memory.force_shared_sram,
+            "psram_clock_hz": self.memory.psram_clock_hz,
             "pmu_passes": self.pmu.pmu_passes,
             "pmu_pass_names": self.pmu.pmu_pass_names,
             "profiling_backends": self.pmu.profiling_backends,

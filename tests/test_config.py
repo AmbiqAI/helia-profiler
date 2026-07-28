@@ -129,6 +129,32 @@ def test_clock_from_cli():
     assert config.target.clock.cpu == "hp"
 
 
+def test_psram_clock_default_and_override():
+    base = {
+        "model": {"path": "test.tflite"},
+        "engine": {"type": "helia-rt"},
+    }
+    assert load_config(None, base).target.psram.clock_hz == 48_000_000
+
+    configured = load_config(
+        None,
+        {**base, "target": {"psram": {"clock_hz": 125_000_000}}},
+    )
+    assert configured.target.psram.clock_hz == 125_000_000
+
+
+def test_invalid_psram_clock_rejected():
+    with pytest.raises(ConfigError, match="Unsupported PSRAM clock"):
+        load_config(
+            None,
+            {
+                "model": {"path": "test.tflite"},
+                "engine": {"type": "helia-rt"},
+                "target": {"psram": {"clock_hz": 100_000_000}},
+            },
+        )
+
+
 def test_config_is_frozen():
     """ProfileConfig should be immutable."""
     cli = {

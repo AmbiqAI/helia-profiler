@@ -53,6 +53,7 @@ Hardware target.
 | `segger_rtt_path` | Path \| null | `null` | optional RTT target-source override; takes precedence over `SEGGER_RTT_PATH` and the bundled V8.58.0 sources. |
 | `rtt_buffer_size_up` | int \| null | `null` |  |
 | `clock` | ClockSelection | `see section below` |  |
+| `psram` | PsramConfig | `see section below` |  |
 | `heartbeat` | HeartbeatConfig | `see section below` |  |
 | `custom_socs` | dict[str, Any] \| null | `null` | advanced raw mapping validated by the platform layer. |
 | `custom_boards` | dict[str, Any] \| null | `null` | advanced raw mapping validated by the platform layer. |
@@ -71,6 +72,17 @@ silently.
 | Key | Type | Default | Notes |
 |---|---|---|---|
 | `cpu` | str \| null | `null` |  |
+
+## `target.psram`
+
+External PSRAM interface selection.
+
+The selected clock is passed to ``nsx-psram`` when a run places weights or
+arenas in PSRAM. Board-specific support is enforced by the NSX module.
+
+| Key | Type | Default | Notes |
+|---|---|---|---|
+| `clock_hz` | int | `48000000` | units: hertz |
 
 ## `target.heartbeat`
 

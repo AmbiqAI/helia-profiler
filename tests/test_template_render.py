@@ -57,6 +57,7 @@ def _render_tflm(
     clean_window_probe: str = "infer",
     clean_iters: int = 3,
     power_only: bool = False,
+    psram_clock_hz: int = 48_000_000,
 ) -> str:
     registrations = resolver_registrations or ["r.AddConv2D();", "r.AddSoftmax();"]
     return _env.get_template("main.cc.j2").render(
@@ -96,6 +97,7 @@ def _render_tflm(
         heartbeat_enabled=True,
         heartbeat_every_n_ops=4,
         heartbeat_every_ms=0,
+        psram_clock_hz=psram_clock_hz,
     )
 
 
@@ -113,6 +115,7 @@ def _render_aot(
     clean_window_probe: str = "infer",
     clean_iters: int = 3,
     power_only: bool = False,
+    psram_clock_hz: int = 48_000_000,
 ) -> str:
     return _env.get_template("main_aot.cc.j2").render(
         aot_prefix="fake",
@@ -148,6 +151,7 @@ def _render_aot(
         heartbeat_every_n_ops=4,
         heartbeat_every_ms=0,
         pmu_max_ops=4096,
+        psram_clock_hz=psram_clock_hz,
     )
 
 
@@ -469,9 +473,16 @@ class TestMainCcRender:
         assert "ns_core_initialized" not in out
 
     def test_psram_weights_skip_model_data_header(self):
-        out = _render_tflm(transport="rtt", weights_region="psram")
+        out = _render_tflm(
+            transport="rtt",
+            weights_region="psram",
+            psram_clock_hz=125_000_000,
+        )
         assert '#include "model_data.h"' not in out
         assert "nsx_psram.h" in out
+        assert "psram_cfg.clock_hz = 125000000U;" in out
+        assert "nsx_psram_get_info(&psram_info)" in out
+        assert "HPX_PSRAM_RXDQS_DELAY" in out
 
     def test_psram_weights_override_skips_model_data_header(self):
         out = _render_tflm(transport="rtt", weights_region="psram")
@@ -563,12 +574,16 @@ class TestMainAotCcRender:
                     "placement": "psram",
                     "alignment": 64,
                     "size": 4096,
-                    "blob_filename": None,
+                    "blob_filename": "weights.bin",
                 }
             ],
+            psram_clock_hz=125_000_000,
         )
         assert "nsx_psram.h" in out
         assert "nsx_psram_default_config(&psram_cfg);" in out
+        assert "psram_cfg.clock_hz = 125000000U;" in out
+        assert "nsx_psram_write(" in out
+        assert "hpx_arena_psram_offset_0" in out
 
     def test_aot_op_manifest_embedded(self):
         out = _render_aot(transport="rtt")

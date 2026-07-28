@@ -85,6 +85,20 @@ Automatic placement **never** chooses PSRAM — that path requires the runtime u
 handshake and you have to opt in explicitly with `weights_location: psram` or
 `--weights-location psram`.
 
+When using PSRAM, select its interface clock explicitly under the target:
+
+```yaml
+target:
+  board: apollo510b_evb
+  psram:
+    clock_hz: 125000000
+```
+
+HPX reports the initialized capacity, clock, XIP state, timing status, and RXDQS
+delay in `summary.json`, `run_metadata.json`, and the terminal memory panel. The
+default remains 48 MHz. Supported clock choices are validated by HPX, while the
+resolved NSX board module rejects choices unavailable on that specific target.
+
 A slack budget is reserved in TCM and SRAM for
 stack, heap, and BSS so the rest of the firmware still builds.
 

@@ -72,6 +72,37 @@ class ClockSelection:
     cpu: str | None = None
 
 
+PSRAM_CLOCK_HZ_VALUES = (
+    12_000_000,
+    24_000_000,
+    48_000_000,
+    96_000_000,
+    125_000_000,
+    192_000_000,
+    250_000_000,
+)
+DEFAULT_PSRAM_CLOCK_HZ = 48_000_000
+
+
+@pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
+class PsramConfig:
+    """External PSRAM interface selection.
+
+    The selected clock is passed to ``nsx-psram`` when a run places weights or
+    arenas in PSRAM. Board-specific support is enforced by the NSX module.
+    """
+
+    clock_hz: int = DEFAULT_PSRAM_CLOCK_HZ
+
+    @field_validator("clock_hz")
+    @classmethod
+    def _validate_clock_hz(cls, value: int) -> int:
+        if value not in PSRAM_CLOCK_HZ_VALUES:
+            supported = ", ".join(str(clock) for clock in PSRAM_CLOCK_HZ_VALUES)
+            raise ValueError(f"Unsupported PSRAM clock {value}. Supported values: {supported}")
+        return value
+
+
 class OutputFormat(StrEnum):
     """Top-level report format emitted by the report stage."""
 
@@ -289,6 +320,7 @@ class TargetConfig:
     segger_rtt_path: Path | None = None
     rtt_buffer_size_up: int | None = None
     clock: ClockSelection = field(default_factory=ClockSelection)
+    psram: PsramConfig = field(default_factory=PsramConfig)
     heartbeat: HeartbeatConfig = field(default_factory=HeartbeatConfig)
     custom_socs: dict[str, Any] | None = None
     custom_boards: dict[str, Any] | None = None
@@ -323,6 +355,13 @@ class TargetConfig:
     def _coerce_clock(cls, value: Any) -> Any:
         if isinstance(value, dict):
             return ClockSelection(**value)
+        return value
+
+    @field_validator("psram", mode="before")
+    @classmethod
+    def _coerce_psram(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            return PsramConfig(**value)
         return value
 
 

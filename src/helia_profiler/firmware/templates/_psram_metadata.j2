@@ -1,0 +1,10 @@
+{% if not power_only | default(false) %}
+    hpx_printf("HPX_PSRAM_SIZE_BYTES=%lu\n", (unsigned long)psram_info.size_bytes);
+    hpx_printf("HPX_PSRAM_CLOCK_HZ=%lu\n", (unsigned long)psram_info.configured_clock_hz);
+    hpx_printf("HPX_PSRAM_CAPABILITIES=%lu\n", (unsigned long)psram_info.capabilities);
+    hpx_printf("HPX_PSRAM_STATE=%d\n", (int)psram_info.state);
+    hpx_printf("HPX_PSRAM_LAST_INIT_STATUS=%lu\n", (unsigned long)psram_info.last_init_status);
+    hpx_printf("HPX_PSRAM_XIP_ENABLED=%d\n", (int)psram_info.xip_enabled);
+    hpx_printf("HPX_PSRAM_TIMING_STATUS=%d\n", (int)psram_info.timing_status);
+    hpx_printf("HPX_PSRAM_RXDQS_DELAY=%u\n", (unsigned)psram_info.rxdqs_delay);
+{% endif %}

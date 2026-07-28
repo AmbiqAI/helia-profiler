@@ -496,6 +496,7 @@ int main(void) {
 {% for region in arena_regions %}
 {% if region.placement == "psram" %}
     static uint8_t *hpx_arena_buf_{{ region.region_id }} = nullptr;
+    static uint32_t hpx_arena_psram_offset_{{ region.region_id }} = 0;
 {% elif region.placement == "tcm" %}
     NSX_MEM_FAST_BSS alignas({{ region.alignment }}) static uint8_t hpx_arena_buf_storage_{{ region.region_id }}[{{ region.size }}];
     static uint8_t *hpx_arena_buf_{{ region.region_id }} = hpx_arena_buf_storage_{{ region.region_id }};
@@ -513,6 +514,7 @@ int main(void) {
     {
         nsx_psram_config_t psram_cfg;
         nsx_psram_default_config(&psram_cfg);
+        psram_cfg.clock_hz = {{ psram_clock_hz }}U;
         psram_cfg.enable_xip = true;
         if (nsx_psram_init(&psram_cfg) != 0) {
             hpx_printf("HPX_ERROR=psram_init_failed\n");
@@ -521,12 +523,22 @@ int main(void) {
             hpx_park();
 {% endif %}
         }
+        nsx_psram_info_t psram_info;
+        if (nsx_psram_get_info(&psram_info) != 0) {
+            hpx_printf("HPX_ERROR=psram_info_failed\n");
+{% if power_only | default(false) %}            hpx_power_terminal_fail("psram_info", 2U);
+{% else %}
+            hpx_park();
+{% endif %}
+        }
+{% include "_psram_metadata.j2" %}
         // Stack PSRAM-placed arenas at successive 64-byte aligned offsets.
         uint32_t psram_off = 0;
 {% for region in psram_arena_regions %}
         psram_off = (psram_off + {{ region.alignment }} - 1u) & ~({{ region.alignment }}u - 1u);
+        hpx_arena_psram_offset_{{ region.region_id }} = psram_off;
         hpx_arena_buf_{{ region.region_id }} =
-            (uint8_t *)(psram_cfg.base_address + psram_off);
+            (uint8_t *)(psram_info.base_address + psram_off);
         hpx_printf("HPX_PSRAM_ARENA_REGION=%d,0x%08lx,%u\n",
                    {{ region.region_id }},
                    (unsigned long)hpx_arena_buf_{{ region.region_id }},
@@ -561,9 +573,22 @@ int main(void) {
     // copies them into the arena buffers before model_init.
 {% for region in arena_regions %}
 {% if region.blob_filename %}
+{% if region.placement == "psram" %}
+    if (nsx_psram_write(
+            hpx_arena_psram_offset_{{ region.region_id }},
+            hpx_const_blob_{{ region.region_id }},
+            sizeof(hpx_const_blob_{{ region.region_id }})) != 0) {
+        hpx_printf("HPX_ERROR=const_blob_psram_write_failed:region=%d\n",
+                   {{ region.region_id }});
+{% if power_only | default(false) %}        hpx_power_terminal_fail("const_blob", 7U);
+{% else %}        hpx_park();
+{% endif %}
+    }
+{% else %}
     memcpy(hpx_arena_buf_{{ region.region_id }},
            hpx_const_blob_{{ region.region_id }},
            sizeof(hpx_const_blob_{{ region.region_id }}));
+{% endif %}
     hpx_printf("HPX_CONST_BLOB_LOADED region=%d size=%u\n",
                {{ region.region_id }},
                (unsigned)sizeof(hpx_const_blob_{{ region.region_id }}));
