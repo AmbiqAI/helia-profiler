@@ -45,6 +45,24 @@ flashes the target, captures measurements, and writes a portable result bundle.
 
 ## Install
 
+### Nix
+
+The flake provides the complete environment on x86-64 Linux, ARM64 Linux, and
+Apple Silicon macOS. After reviewing and accepting
+[SEGGER's J-Link terms](https://www.segger.com/downloads/jlink/), run:
+
+```bash
+nix run .#prepare-jlink -- --accept-license && nix develop
+```
+
+Linux hardware users must also install the USB rules once:
+
+```bash
+nix run .#install-udev-rules
+```
+
+### Other installation options
+
 ```bash
 pip install helia-profiler
 # or
@@ -53,46 +71,9 @@ uv tool install helia-profiler
 
 Extras: `helia-profiler[aot]` adds the heliaAOT compiler;
 `helia-profiler[analysis]` enables model compute/parameter analysis without
-hardware. Python 3.11 or 3.12 is required.
-
-Hardware prerequisites (ARM toolchain, SEGGER J-Link, and optional
-Joulescope drivers) are covered step by step in
+hardware. Python 3.11 or 3.12 is required. Hardware prerequisites for these
+installation methods are covered in
 [Getting Started](https://ambiqai.github.io/helia-profiler/getting-started/).
-
-### Reproducible environment with Nix
-
-The repository flake provides heliaPROFILER with heliaAOT, LiteRT, NSX,
-Joulescope support, CMake, Ninja, GNU Arm Embedded, ATfE, and SEGGER J-Link.
-It provides native shells for x86-64 Linux, ARM64 Linux, and Apple Silicon
-macOS.
-
-SEGGER requires users to accept the J-Link license themselves. After reviewing
-SEGGER's terms, explicitly accept them and let the helper download and verify
-the correct native J-Link 9.62 package:
-
-```bash
-nix run .#prepare-jlink -- --accept-license
-nix develop
-```
-
-On Linux, run `nix run .#install-udev-rules` once before connecting to the
-hardware. macOS does not use udev.
-
-Inside `nix develop`, run `hpx` directly. The Python environment is already
-constructed from `uv.lock`; do not use `uv run`, which would create a second
-environment.
-
-Verify that the shell is not borrowing tools or Python packages from the host:
-
-```bash
-nix flake check
-nix run .#verify-isolation
-```
-
-The isolation verifier removes the caller's environment, checks that every
-required executable resolves beneath `/nix/store`, imports the native Python
-dependencies, and executes the packaged ATfE compiler. For a from-scratch
-container test, see [Nix environment](docs/getting-started/nix.md).
 
 ## Quick taste
 

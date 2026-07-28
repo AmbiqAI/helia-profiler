@@ -144,7 +144,6 @@ nav:
   - Getting Started:
       - Overview: getting-started/index.md
       - Installation: getting-started/install.md
-      - Nix Environment: getting-started/nix.md
       - First Profile: getting-started/first-profile.md
       - Quick Start: getting-started/quickstart.md
   - User Guide:
