@@ -19,6 +19,8 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 import contextlib
+import ctypes
+import ctypes.util
 from dataclasses import dataclass
 import logging
 import os
@@ -84,6 +86,7 @@ _JLINK_DLL_ENV_VARS = ("HPX_JLINK_DLL", "JLINK_DLL_PATH", "JLINKARM_DLL")
 _JLINK_WRAPPER_LIB_PATH_RE = re.compile(
     r"(?:DYLD_LIBRARY_PATH|LD_LIBRARY_PATH)=['\"](?P<path>[^'\"]+)['\"]"
 )
+_NIXOS_SYSTEM_LIB_DIR = Path("/run/current-system/sw/lib")
 
 
 @dataclass(frozen=True)
@@ -660,6 +663,7 @@ def create_debug_memory_session() -> DebugMemorySession:
             "pylink-square package not installed (required for debug probe transports)",
             hint="pip install pylink-square",
         ) from exc
+    _preload_jlink_linux_usb_runtime()
     try:
         return pylink.JLink()
     except TypeError as exc:
@@ -679,6 +683,43 @@ def create_debug_memory_session() -> DebugMemorySession:
             "DYLD_LIBRARY_PATH."
         ),
     )
+
+
+def _preload_jlink_linux_usb_runtime() -> None:
+    """Make ``libudev`` visible to SEGGER's runtime-loaded USB backend.
+
+    SEGGER's Linux library resolves ``libudev.so`` with ``dlopen`` when it
+    enumerates USB probes rather than declaring it as an ELF dependency. On
+    NixOS the library exists outside the default loader search path, so
+    ``JLinkExe`` can work while the same SDK loaded through pylink reports no
+    probes. Preloading it globally lets the subsequent SEGGER ``dlopen`` reuse
+    the already-loaded library without mutating the process environment.
+    """
+    if not sys.platform.startswith("linux"):
+        return
+
+    candidates: list[str | Path] = ["libudev.so"]
+    discovered = ctypes.util.find_library("udev")
+    if discovered:
+        candidates.append(discovered)
+
+    for raw_dir in os.environ.get("LD_LIBRARY_PATH", "").split(os.pathsep):
+        if raw_dir:
+            candidates.extend(Path(raw_dir).glob("libudev.so*"))
+    candidates.extend(_NIXOS_SYSTEM_LIB_DIR.glob("libudev.so*"))
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            ctypes.CDLL(key, mode=ctypes.RTLD_GLOBAL)
+        except OSError:
+            continue
+        log.debug("Preloaded J-Link USB runtime dependency: %s", candidate)
+        return
 
 
 def _create_jlink_with_discovered_dll(pylink_module):

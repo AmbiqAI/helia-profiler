@@ -6,6 +6,8 @@ Run the hardware-in-the-loop validation suite (MLPerf Tiny models).
 
 ```bash
 hpx validate [--models IDS] [--engines LIST] [--boards LIST]
+             [--models-file YAML | --model-paths PATH,...]
+             [--comparison-group NAME] [--model-arena-size BYTES]
              [--toolchains LIST] [--interfaces LIST] [--memories LIST]
              [--power off|on|both] [--suite NAME] [--repeat N]
              [--jlink-serials BOARD=SERIAL,...] [--power-serials BOARD=SERIAL,...]
@@ -29,6 +31,10 @@ See [Validating a Board Setup](../guides/validating-a-board-setup.md) and
 | Flag | Description |
 | --- | --- |
 | `--models` | Comma-separated model IDs (default: all). See `hpx validate --list`. |
+| `--models-file` | YAML registry defining custom model IDs, paths, arena sizes, and comparison groups. |
+| `--model-paths` | Comma-separated `.tflite` paths for a quick ad hoc comparison. |
+| `--comparison-group` | Shared decision group for `--model-paths` models (default: `custom`). |
+| `--model-arena-size` | Arena size for `--model-paths` models (default: 524288 bytes). |
 | `--engines` | Comma-separated engines: `helia-rt`, `helia-aot`, `tflm` (aliases `rt`, `aot`). Default: all. TFLM validation uses upstream CMSIS-NN. |
 | `--boards` | Comma-separated board IDs (default: `apollo510_evb`). |
 | `--toolchains` | Comma-separated toolchains: `gcc`, `armclang`/`acfe`, `atfe` (default: board defaults). |
@@ -55,6 +61,42 @@ See [Validating a Board Setup](../guides/validating-a-board-setup.md) and
   Apollo330mP with gcc + ATfE.
 - `complete` — combined RT + AOT + TFLM/CMSIS-NN sweep across all MLPerf Tiny models on
   Apollo510 + Apollo330mP with gcc + ATfE.
+
+## Custom models and comparison groups
+
+Use a YAML registry when variants need explicit IDs or different arena sizes.
+Relative paths are resolved from the registry file:
+
+```yaml
+models:
+  kws-base:
+    path: models/kws_base.tflite
+    comparison_group: kws
+    arena_size: 65536
+
+  kws-pruned:
+    path: models/kws_pruned.tflite
+    comparison_group: kws
+    arena_size: 49152
+```
+
+```bash
+hpx validate --suite smoke --models-file variants.yml
+```
+
+For a quick comparison, paths can be supplied directly. Their IDs are derived
+from filename stems and all paths share the requested comparison group:
+
+```bash
+hpx validate --suite smoke \
+  --model-paths models/kws_base.tflite,models/kws_pruned.tflite \
+  --comparison-group kws \
+  --model-arena-size 65536
+```
+
+The Rich summary calculates `fastest`, `smallest`, and Pareto decisions only
+within each comparison group. Built-in models use their own IDs as groups, so
+unrelated workloads are not ranked against one another.
 
 ## Examples
 

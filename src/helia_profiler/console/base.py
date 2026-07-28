@@ -20,11 +20,12 @@ from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
-from . import analysis, compare, doctor, progress, results
+from . import analysis, compare, doctor, progress, results, validation
 
 if TYPE_CHECKING:
     from ..evaluation import CompareResult
     from ..pipeline import PipelineContext, ProgressUpdate
+    from ..validation.report import ValidationReport
 
 # Module-level consoles: durable command results go to stdout; transient
 # progress, logs, and errors go to stderr so future machine output stays clean.
@@ -111,6 +112,15 @@ class HpxConsole:
     ) -> None:
         """Render a rich comparison between two completed profile runs."""
         compare.print_compare(self, result, top_layers=top_layers, output_paths=output_paths)
+
+    def print_validation(
+        self,
+        report: ValidationReport,
+        *,
+        output_paths: list[Path] | None = None,
+    ) -> None:
+        """Render a completed validation sweep and its decision candidates."""
+        validation.print_validation(self, report, output_paths=output_paths)
 
     # ------------------------------------------------------------------
     # Memory plan rendering

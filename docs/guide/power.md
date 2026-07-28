@@ -173,14 +173,22 @@ match the EVB GPIO rail.
 
 For Apollo330 Plus, `5:6:7` are **Apollo device GPIO pin numbers**, not
 Joulescope channel numbers. The matching JS110 channels are always
-`INPUT0:INPUT1:OUTPUT0` (`0:1:0` internally). With both instruments attached,
-pin the JS110 explicitly and provide the device-pin mapping to validation:
+`INPUT0:INPUT1:OUTPUT0` (`0:1:0` internally). Put the device-pin mapping in
+the profile config and pin the instrument when more than one is connected:
+
+```yaml
+target:
+  board: apollo330mP_evb
+power:
+  enabled: true
+  serial: "004204"
+  sync_gpio_pin: 5
+  state_gpio_pin: 6
+  go_gpio_pin: 7
+```
 
 ```bash
-hpx validate --suite smoke --boards apollo330mP_evb \
-  --jlink-serials apollo330mP_evb=<AP330_JLINK> \
-  --power-serials apollo330mP_evb=004204 \
-  --power-gpios apollo330mP_evb=5:6:7 --power on
+hpx profile model.tflite --config hpx.yml --jlink-serial AP330_JLINK
 ```
 
 ### `io_voltage`

@@ -8,8 +8,8 @@ Three short steps. Each one builds on the previous.
 
     ---
 
-    Get heliaPROFILER, the ARM GCC toolchain, J-Link, and NSX onto your
-    machine.
+    Get heliaPROFILER, the ARM GCC toolchain, CMake/Ninja, and J-Link onto
+    your machine. NSX is installed with heliaPROFILER.
 
     [:octicons-arrow-right-24: Installation](install.md)
 

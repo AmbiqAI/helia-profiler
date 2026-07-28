@@ -743,6 +743,26 @@ def validate_command(
     models: str = typer.Option(
         "", "--models", help="Comma-separated model IDs (default: all). See `hpx validate --list`."
     ),
+    models_file: Optional[Path] = typer.Option(
+        None,
+        "--models-file",
+        help="YAML registry of custom validation models and comparison groups.",
+    ),
+    model_paths: str = typer.Option(
+        "",
+        "--model-paths",
+        help="Comma-separated .tflite paths for an ad hoc comparison.",
+    ),
+    comparison_group: str = typer.Option(
+        "custom",
+        "--comparison-group",
+        help="Shared decision group for models supplied through --model-paths.",
+    ),
+    model_arena_size: int = typer.Option(
+        524288,
+        "--model-arena-size",
+        help="Arena size in bytes for models supplied through --model-paths.",
+    ),
     engines: str = typer.Option(
         "",
         "--engines",
@@ -828,6 +848,10 @@ def validate_command(
 
     args = SimpleNamespace(
         models=models,
+        models_file=models_file,
+        model_paths=model_paths,
+        comparison_group=comparison_group,
+        model_arena_size=model_arena_size,
         engines=engines,
         power=power,
         boards=boards,

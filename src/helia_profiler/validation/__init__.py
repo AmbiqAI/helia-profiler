@@ -24,6 +24,8 @@ from .matrix import (
     ModelSpec,
     build_matrix,
     case_validity,
+    load_model_file,
+    models_from_paths,
 )
 
 __all__ = [
@@ -35,4 +37,6 @@ __all__ = [
     "ModelSpec",
     "build_matrix",
     "case_validity",
+    "load_model_file",
+    "models_from_paths",
 ]

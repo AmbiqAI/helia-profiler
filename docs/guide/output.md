@@ -6,21 +6,25 @@ on request.
 
 ## Output directory structure
 
-### Default output (always generated)
+### Default output
 
 ```
 results/
 ├── result_manifest.json    # Versioned bundle envelope + artifact digests
 ├── summary.json            # Machine-readable high-level summary
-├── profile_results.csv     # Merged per-layer PMU breakdown (all counters)
+├── profile_results.{csv|json} # Selected primary per-layer result
 ├── run_metadata.json       # Config, toolchain, platform, model info
 ├── aot_operator_manifest.json # AOT only: compiled operators + tensor placement
 ├── aot_memory_layers.csv   # AOT only: spreadsheet-friendly per-layer buffers
-└── model_explorer/         # Model Explorer overlay JSONs
+└── model_explorer/         # Overlay JSONs unless explicitly disabled
     ├── me_overlay_ARM_PMU_CPU_CYCLES.json
     ├── me_overlay_ARM_PMU_INST_RETIRED.json
     └── ...
 ```
+
+The primary profile artifact is CSV or JSON, not both. AOT artifacts appear
+only for heliaAOT runs, and Model Explorer overlays are omitted when
+`--no-model-explorer` is set.
 
 ### Detailed output (with `--detailed`)
 
@@ -172,7 +176,7 @@ Full provenance for the run:
 
 ```json
 {
-  "hpx_version": "0.1.0",
+  "hpx_version": "0.1.1",
   "run_id": "a1b2c3d4",
   "timestamp": "2025-04-21T10:30:00",
   "config": { ... },

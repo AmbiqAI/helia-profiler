@@ -129,7 +129,7 @@ install and the cycle-count differences.
 hpx profile --config hpx.yml --power --power-duration 10
 ```
 
-Requires a Joulescope JS110 or JS220. See
+Requires a Joulescope JS110, JS220, or JS320. See
 [Power Measurement](../guide/power.md).
 
 ## What's next?

@@ -22,13 +22,23 @@ def test_showcase_is_separate_safe_and_programmatic() -> None:
     cell_ids = [cell.get("id") or cell.get("metadata", {}).get("id") for cell in cells]
 
     assert notebook["nbformat"] == 4
-    assert len(cells) == 32
+    assert len(cells) == 33
     assert all(cell_ids)
     assert len(cell_ids) == len(set(cell_ids))
 
     introduction = "\n".join(cells[0]["source"])
     assert "Get Started with heliaPROFILER" in introduction
     assert "candidate notebook" not in introduction.lower()
+
+    markdown = "\n\n".join(
+        "\n".join(cell["source"])
+        for cell in cells
+        if cell["cell_type"] == "markdown"
+    )
+    assert "hpx validate --suite smoke" in markdown
+    assert "--model-paths" in markdown
+    assert "--models-file" in markdown
+    assert "comparison_group" in markdown
 
     code = "\n\n".join(
         "\n".join(cell["source"])

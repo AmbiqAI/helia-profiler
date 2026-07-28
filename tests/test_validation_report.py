@@ -5,7 +5,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from helia_profiler.validation.report import build_manifest, write_validation_reports
+from helia_profiler.validation.report import (
+    build_manifest,
+    load_validation_report,
+    write_validation_reports,
+)
 from helia_profiler.validation.runner import CaseResult
 
 
@@ -23,6 +27,9 @@ def _case(output_dir: Path) -> CaseResult:
         memory="auto",
         layers=13,
         total_cycles=123456,
+        latency_avg_us=42.5,
+        binary_total_bytes=87_000,
+        allocated_arena_bytes=24_000,
         output_dir=str(output_dir / "apollo510_evb-kws-rt-arm-none-eabi-gcc-rtt-auto"),
     )
 
@@ -76,6 +83,9 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(tmp_path
 
     case = manifest["cases"][0]
     assert case["metrics"]["total_cycles"] == 123456
+    assert case["metrics"]["latency_avg_us"] == 42.5
+    assert case["metrics"]["binary_total_bytes"] == 87_000
+    assert case["metrics"]["allocated_arena_bytes"] == 24_000
     assert case["identity"]["attempt"] == 1
     assert case["identity"]["requested_memory"] == {"preset": "auto"}
     assert case["identity"]["requested_power"] == {"enabled": False}
@@ -99,6 +109,11 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(tmp_path
     assert case["provenance"]["run_metadata_schema_version"] == 1
     assert case["provenance"]["run_summary_schema_version"] == 1
     assert case["artifacts"]["profile_results"]["path"] == f"{result.case_id}/profile_results.csv"
+
+    loaded = load_validation_report(tmp_path / "validation_report.json")
+    assert loaded.cases[0].binary_total_bytes == 87_000
+    assert loaded.cases[0].health_issues == ()
+    assert loaded.summary.passed == 1
 
 
 def test_build_manifest_omits_none_metrics_and_tolerates_missing_git(tmp_path: Path):

@@ -164,7 +164,7 @@ src/helia_profiler/
 │
 ├── power/              # Power measurement drivers
 │   ├── base.py         # PowerDriver protocol, PowerResult
-│   └── joulescope/     # Joulescope JS110/JS220 driver package
+│   └── joulescope/     # Joulescope JS110/JS220/JS320 driver package
 │
 └── report/             # Output formatting
     ├── __init__.py     # write_report() dispatcher
