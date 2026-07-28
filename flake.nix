@@ -30,7 +30,11 @@
     }:
     let
       inherit (nixpkgs) lib;
-      supportedSystems = [ "x86_64-linux" ];
+      supportedSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+      ];
       forAllSystems = lib.genAttrs supportedSystems;
       workspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ./.; };
       pythonOverlay = workspace.mkPyprojectOverlay { sourcePreference = "wheel"; };
@@ -43,7 +47,9 @@
           config.allowUnfreePredicate =
             pkg:
             builtins.elem (lib.getName pkg) [
-              "JLink_Linux_x86_64.tgz"
+              "JLink_Linux_V962_x86_64.tgz"
+              "JLink_Linux_V962_arm64.tgz"
+              "JLink_MacOSX_V962_arm64.pkg"
               "segger-jlink"
             ];
         };
@@ -65,6 +71,7 @@
         system:
         let
           pkgs = mkPkgs system;
+          isLinux = pkgs.stdenv.hostPlatform.isLinux;
           pythonSet = mkPythonSet pkgs;
           runtimeEnv = pythonSet.mkVirtualEnv "helia-profiler-python-env" {
             "helia-profiler" = [
@@ -74,6 +81,12 @@
           };
           atfe = pkgs.callPackage ./nix/atfe.nix { };
           jlink = pkgs.callPackage ./nix/jlink.nix { };
+          jlinkLibrary =
+            "${jlink}/opt/SEGGER/JLink/" + (if isLinux then "libjlinkarm.so" else "libjlinkarm.dylib");
+          runtimeLibraries = lib.optionals isLinux [
+            pkgs.stdenv.cc.cc.lib
+            pkgs.systemd
+          ];
           nativeTools = [
             pkgs.cmake
             pkgs.gcc-arm-embedded
@@ -89,13 +102,9 @@
               wrapProgram "$out/bin/hpx" \
                 --prefix PATH : "${lib.makeBinPath nativeTools}" \
                 --set ATFE_ROOT "${atfe}" \
-                --set HPX_JLINK_DLL "${jlink}/opt/SEGGER/JLink/libjlinkarm.so" \
-                --prefix LD_LIBRARY_PATH : "${
-                  lib.makeLibraryPath [
-                    pkgs.stdenv.cc.cc.lib
-                    pkgs.systemd
-                  ]
-                }"
+                --set HPX_JLINK_DLL "${jlinkLibrary}" ${lib.optionalString isLinux ''
+                  --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath runtimeLibraries}"
+                ''}
             '';
             meta.mainProgram = "hpx";
           };
@@ -105,11 +114,14 @@
             atfe
             hpx
             jlink
+            jlinkLibrary
             nativeTools
             pkgs
             pythonSet
+            runtimeLibraries
             runtimeEnv
             ;
+          inherit isLinux;
         };
 
       components = forAllSystems mkComponents;
@@ -140,16 +152,24 @@
               c.pkgs.curl
               c.pkgs.nix
             ];
-            text = builtins.readFile ./nix/scripts/prepare-jlink.sh;
+            text = ''
+              export HPX_JLINK_DOWNLOAD_URL="${c.jlink.download.downloadUrl}"
+              export HPX_JLINK_EXPECTED_MD5="${c.jlink.download.md5}"
+              export HPX_JLINK_EXPECTED_SIZE="${c.jlink.download.size}"
+              export HPX_JLINK_STORE_NAME="${c.jlink.download.filename}"
+              ${builtins.readFile ./nix/scripts/prepare-jlink.sh}
+            '';
           };
-          installUdevRules = c.pkgs.writeShellApplication {
-            name = "hpx-install-udev-rules";
-            runtimeInputs = [
-              c.pkgs.coreutils
-              c.pkgs.systemd
-            ];
-            text = builtins.readFile ./nix/scripts/install-udev-rules.sh;
-          };
+          installUdevRules = lib.optionalAttrs c.isLinux (
+            c.pkgs.writeShellApplication {
+              name = "hpx-install-udev-rules";
+              runtimeInputs = [
+                c.pkgs.coreutils
+                c.pkgs.systemd
+              ];
+              text = builtins.readFile ./nix/scripts/install-udev-rules.sh;
+            }
+          );
           verifyIsolation = c.pkgs.writeShellApplication {
             name = "hpx-verify-isolation";
             runtimeInputs = [
@@ -172,15 +192,17 @@
             program = "${prepareJlink}/bin/hpx-prepare-jlink";
             meta.description = "Download, verify, and import licensed SEGGER J-Link 9.62";
           };
-          install-udev-rules = {
-            type = "app";
-            program = "${installUdevRules}/bin/hpx-install-udev-rules";
-            meta.description = "Install Linux USB access rules for J-Link and Joulescope";
-          };
           verify-isolation = {
             type = "app";
             program = "${verifyIsolation}/bin/hpx-verify-isolation";
             meta.description = "Verify that the development environment does not use host profiles";
+          };
+        }
+        // lib.optionalAttrs c.isLinux {
+          install-udev-rules = {
+            type = "app";
+            program = "${installUdevRules}/bin/hpx-install-udev-rules";
+            meta.description = "Install Linux USB access rules for J-Link and Joulescope";
           };
         }
       );
@@ -203,14 +225,12 @@
             ++ c.nativeTools;
             env = {
               ATFE_ROOT = "${c.atfe}";
-              LD_LIBRARY_PATH = lib.makeLibraryPath [
-                c.pkgs.stdenv.cc.cc.lib
-                c.pkgs.systemd
-              ];
+              HPX_JLINK_DLL = c.jlinkLibrary;
               UV_NO_SYNC = "1";
               UV_PYTHON = editablePythonSet.python.interpreter;
               UV_PYTHON_DOWNLOADS = "never";
             };
+            LD_LIBRARY_PATH = lib.optionalString c.isLinux (lib.makeLibraryPath c.runtimeLibraries);
             shellHook = ''
               unset PYTHONPATH
               export REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
@@ -236,13 +256,10 @@
               )
             }"
             export ATFE_ROOT="${c.atfe}"
-            export HPX_JLINK_DLL="${c.jlink}/opt/SEGGER/JLink/libjlinkarm.so"
-            export LD_LIBRARY_PATH="${
-              lib.makeLibraryPath [
-                c.pkgs.stdenv.cc.cc.lib
-                c.pkgs.systemd
-              ]
-            }"
+            export HPX_JLINK_DLL="${c.jlinkLibrary}"
+            ${lib.optionalString c.isLinux ''
+              export LD_LIBRARY_PATH="${lib.makeLibraryPath c.runtimeLibraries}"
+            ''}
             hpx --help >/dev/null
             python -c "import helia_aot, helia_profiler, pyjoulescope_driver"
             command -v arm-none-eabi-gcc >/dev/null

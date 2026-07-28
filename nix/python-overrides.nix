@@ -11,8 +11,12 @@ final: prev: {
   });
 
   ai-edge-litert = prev.ai-edge-litert.overrideAttrs (old: {
-    nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.autoPatchelfHook ];
-    buildInputs = (old.buildInputs or [ ]) ++ [ pkgs.stdenv.cc.cc.lib ];
+    nativeBuildInputs =
+      (old.nativeBuildInputs or [ ])
+      ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.autoPatchelfHook ];
+    buildInputs =
+      (old.buildInputs or [ ])
+      ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.stdenv.cc.cc.lib ];
     # LiteRT ships optional Qualcomm and Intel dispatch plugins whose vendor
     # SDKs are not needed by heliaAOT. Keep the core LiteRT libraries patched,
     # but do not require those unrelated proprietary runtimes.
@@ -27,10 +31,14 @@ final: prev: {
   });
 
   pyjoulescope-driver = prev.pyjoulescope-driver.overrideAttrs (old: {
-    nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.autoPatchelfHook ];
-    buildInputs = (old.buildInputs or [ ]) ++ [
-      pkgs.libusb1
-      pkgs.systemd
-    ];
+    nativeBuildInputs =
+      (old.nativeBuildInputs or [ ])
+      ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.autoPatchelfHook ];
+    buildInputs =
+      (old.buildInputs or [ ])
+      ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+        pkgs.libusb1
+        pkgs.systemd
+      ];
   });
 }

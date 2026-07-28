@@ -1,8 +1,9 @@
 # Nix environment
 
-The repository contains a pinned Nix flake for an x86-64 Linux development and
-runtime environment. It is independent of NixOS: any conventional Linux
-distribution with Nix and flakes enabled can use it.
+The repository contains a pinned Nix flake for native development and runtime
+environments on x86-64 Linux, ARM64 Linux, and Apple Silicon macOS. It is
+independent of NixOS: a conventional Linux distribution or macOS installation
+with Nix and flakes enabled can use it.
 
 ## What the flake provides
 
@@ -16,16 +17,16 @@ distribution with Nix and flakes enabled can use it.
 - SEGGER J-Link 9.62, downloaded automatically after explicit license acceptance
 - test, lint, notebook, and documentation dependencies in the development shell
 
-USB access remains a one-time host configuration because Nix builds cannot
-modify `/etc/udev/rules.d`.
+On Linux, USB access remains a one-time host configuration because Nix builds
+cannot modify `/etc/udev/rules.d`. macOS needs no equivalent udev step.
 
 ## First-time setup
 
 Review SEGGER's
-[download terms](https://www.segger.com/downloads/jlink/JLink_Linux_V962_x86_64.tgz)
+[download terms](https://www.segger.com/downloads/jlink/)
 and [software licensing](https://www.segger.com/purchase/licensing/). Then
 explicitly accept them and let the helper download, verify, and add the pinned
-J-Link 9.62 archive to the local Nix store:
+J-Link 9.62 package for the current host to the local Nix store:
 
 ```bash
 nix run .#prepare-jlink -- --accept-license
@@ -33,12 +34,14 @@ nix run .#prepare-jlink -- --accept-license
 
 Passing `--accept-license` confirms that the user accepts SEGGER's terms and
 will use the software only with original SEGGER products or authorized OEM
-products. The helper submits SEGGER's required acceptance field, downloads
-directly from SEGGER, and rejects any response whose checksum or size does not
-match the tested 9.62 release. The archive and derived J-Link package stay in
-the user's local Nix store and must not be uploaded to a public binary cache.
+products. The helper selects the Linux x86-64, Linux ARM64, or Apple Silicon
+macOS artifact automatically, submits SEGGER's required acceptance field,
+downloads directly from SEGGER, and rejects any response whose checksum or
+size does not match the tested 9.62 release. The archive and derived J-Link
+package stay in the user's local Nix store and must not be uploaded to a public
+binary cache.
 
-Install the J-Link and Joulescope USB access rules:
+On Linux, install the J-Link and Joulescope USB access rules:
 
 ```bash
 nix run .#install-udev-rules -- --dry-run
@@ -46,6 +49,8 @@ nix run .#install-udev-rules
 ```
 
 This is the only step that uses `sudo`. Reconnect the devices afterward.
+macOS grants USB access through its native device services and does not use
+udev, so skip these two commands there.
 
 Enter the editable development environment:
 
@@ -100,6 +105,7 @@ nix run path:.#verify-isolation
 ```
 
 The container starts with a separate Nix store and no packages from the host
-operating system. It validates software containment, not physical USB access.
-Hardware testing should still be performed on the host after installing the
-udev rules.
+operating system. It validates the x86-64 Linux environment's software
+containment, not physical USB access. Hardware testing should still be
+performed directly on the host; Linux hosts need the udev rules described
+above.

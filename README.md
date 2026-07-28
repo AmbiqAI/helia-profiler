@@ -59,21 +59,24 @@ Hardware prerequisites (ARM toolchain, SEGGER J-Link, and optional
 Joulescope drivers) are covered step by step in
 [Getting Started](https://ambiqai.github.io/helia-profiler/getting-started/).
 
-### Reproducible Linux environment with Nix
+### Reproducible environment with Nix
 
 The repository flake provides heliaPROFILER with heliaAOT, LiteRT, NSX,
 Joulescope support, CMake, Ninja, GNU Arm Embedded, ATfE, and SEGGER J-Link.
-It currently targets x86-64 Linux.
+It provides native shells for x86-64 Linux, ARM64 Linux, and Apple Silicon
+macOS.
 
 SEGGER requires users to accept the J-Link license themselves. After reviewing
 SEGGER's terms, explicitly accept them and let the helper download and verify
-the pinned J-Link 9.62 Linux x86-64 archive, then prepare the host:
+the correct native J-Link 9.62 package:
 
 ```bash
 nix run .#prepare-jlink -- --accept-license
-nix run .#install-udev-rules
 nix develop
 ```
+
+On Linux, run `nix run .#install-udev-rules` once before connecting to the
+hardware. macOS does not use udev.
 
 Inside `nix develop`, run `hpx` directly. The Python environment is already
 constructed from `uv.lock`; do not use `uv run`, which would create a second

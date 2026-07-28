@@ -1,17 +1,17 @@
 set -euo pipefail
 
 version="9.62"
-download_url="https://www.segger.com/downloads/jlink/JLink_Linux_V962_x86_64.tgz"
-expected_md5="abb96cbfcb3e3838eba15680f8e64709"
-expected_size="67213850"
-store_name="JLink_Linux_x86_64.tgz"
+: "${HPX_JLINK_DOWNLOAD_URL:?missing platform download URL}"
+: "${HPX_JLINK_EXPECTED_MD5:?missing platform checksum}"
+: "${HPX_JLINK_EXPECTED_SIZE:?missing platform archive size}"
+: "${HPX_JLINK_STORE_NAME:?missing platform archive name}"
 
 if [[ "${1:-}" != "--accept-license" || "$#" -ne 1 ]]; then
   cat >&2 <<'EOF'
 Usage: nix run .#prepare-jlink -- --accept-license
 
 Before using --accept-license, review:
-  https://www.segger.com/downloads/jlink/JLink_Linux_V962_x86_64.tgz
+  https://www.segger.com/downloads/jlink/
   https://www.segger.com/purchase/licensing/
 
 Passing --accept-license confirms that you accept SEGGER's terms and will use
@@ -24,10 +24,10 @@ fi
 
 download_dir="$(mktemp -d)"
 trap 'rm -rf "$download_dir"' EXIT
-archive="$download_dir/$store_name"
+archive="$download_dir/$HPX_JLINK_STORE_NAME"
 
 echo "Downloading SEGGER J-Link $version from:"
-echo "  $download_url"
+echo "  $HPX_JLINK_DOWNLOAD_URL"
 curl \
   --data "accept_license_agreement=accepted" \
   --fail \
@@ -36,16 +36,16 @@ curl \
   --retry 3 \
   --show-error \
   --silent \
-  "$download_url"
+  "$HPX_JLINK_DOWNLOAD_URL"
 
 actual_md5="$(md5sum "$archive" | cut -d ' ' -f 1)"
 actual_size="$(stat -c '%s' "$archive")"
-if [[ "$actual_md5" != "$expected_md5" || "$actual_size" != "$expected_size" ]]; then
+if [[ "$actual_md5" != "$HPX_JLINK_EXPECTED_MD5" || "$actual_size" != "$HPX_JLINK_EXPECTED_SIZE" ]]; then
   cat >&2 <<EOF
 Unexpected J-Link archive.
-Expected J-Link $version MD5:  $expected_md5
+Expected J-Link $version MD5:  $HPX_JLINK_EXPECTED_MD5
 Actual MD5:                    $actual_md5
-Expected size:                 $expected_size bytes
+Expected size:                 $HPX_JLINK_EXPECTED_SIZE bytes
 Actual size:                   $actual_size bytes
 
 SEGGER may have changed the download. Update nix/jlink.nix deliberately after
@@ -58,7 +58,7 @@ store_path="$(
   nix store add \
     --hash-algo md5 \
     --mode flat \
-    --name "$store_name" \
+    --name "$HPX_JLINK_STORE_NAME" \
     "$archive"
 )"
 
@@ -66,5 +66,7 @@ echo "J-Link $version is available to Nix at:"
 echo "  $store_path"
 echo
 echo "Next:"
-echo "  nix run .#install-udev-rules"
+if [[ "$(uname -s)" == "Linux" ]]; then
+  echo "  nix run .#install-udev-rules"
+fi
 echo "  nix develop"
