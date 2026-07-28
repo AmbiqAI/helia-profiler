@@ -41,3 +41,32 @@ diff --git a/neuralspotx/module_registry/_vendoring.py b/neuralspotx/module_regi
  
  
  def _remove_vendored_module_from_app(
+diff --git a/neuralspotx/project_config.py b/neuralspotx/project_config.py
+--- a/neuralspotx/project_config.py
++++ b/neuralspotx/project_config.py
+@@ -311,2 +311,10 @@
+         if destination.exists():
++            destination.chmod(destination.stat().st_mode | 0o700)
++            for path in destination.rglob("*"):
++                if path.is_symlink():
++                    continue
++                if path.is_dir():
++                    path.chmod(path.stat().st_mode | 0o700)
++                else:
++                    path.chmod(path.stat().st_mode | 0o600)
+             import shutil
+@@ -322,4 +330,12 @@
+         )
+-
+-
++        destination.chmod(destination.stat().st_mode | 0o700)
++        for path in destination.rglob("*"):
++            if path.is_symlink():
++                continue
++            if path.is_dir():
++                path.chmod(path.stat().st_mode | 0o700)
++            else:
++                path.chmod(path.stat().st_mode | 0o600)
++
++
+ def _write_cmake_nsx_gitignore(app_dir: Path) -> None:
