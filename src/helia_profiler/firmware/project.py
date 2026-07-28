@@ -371,9 +371,14 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
     )
 
     cmake_nsx_dir = ctx.app_dir / "cmake" / "nsx"
+    if cmake_nsx_dir.exists() and not cmake_nsx_dir.is_symlink():
+        cmake_nsx_dir.chmod(cmake_nsx_dir.stat().st_mode | 0o700)
     cmake_nsx_dir.mkdir(parents=True, exist_ok=True)
+    modules_cmake = cmake_nsx_dir / "modules.cmake"
+    if modules_cmake.exists() and not modules_cmake.is_symlink():
+        modules_cmake.chmod(modules_cmake.stat().st_mode | 0o600)
     _write_text(
-        cmake_nsx_dir / "modules.cmake",
+        modules_cmake,
         _jinja_env.get_template("modules.cmake.j2").render(modules=ctx.modules),
     )
 
