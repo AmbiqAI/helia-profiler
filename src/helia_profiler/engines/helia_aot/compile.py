@@ -260,7 +260,13 @@ def _run_aot_compiler(
                 hint="Check engine.config_path in your profiler YAML.",
             )
         with open(cfg_path) as f:
-            base_data = yaml.safe_load(f) or {}
+            loaded = yaml.safe_load(f) or {}
+        if not isinstance(loaded, dict):
+            raise EngineError(
+                "heliaAOT config must contain a YAML mapping",
+                hint="Check engine.config_path and use key/value YAML fields.",
+            )
+        base_data = loaded
 
     # Merge any engine.config.aot_args overrides (dict form)
     extra = config.engine.config.get("aot_args", {})
@@ -275,8 +281,7 @@ def _run_aot_compiler(
     profiler_rulesets = _resolve_aot_tensor_rulesets(
         config, get_soc_for_board(config.target.board, registry=config.platform_registry)
     )
-    mem = base_data.setdefault("memory", {})
-    user_tensors = mem.get("tensors") or []
+    mem, user_tensors = _prepare_aot_memory_config(base_data)
     merged_rulesets = _merge_aot_tensor_rulesets(profiler_rulesets, user_tensors)
     if merged_rulesets:
         mem["tensors"] = merged_rulesets
@@ -358,6 +363,34 @@ def _merge_aot_tensor_rulesets(
     return [
         rule for rule in profiler_rulesets if rule.get("type") not in wildcard_kinds
     ] + list(user_tensors)
+
+
+def _prepare_aot_memory_config(
+    base_data: dict[str, Any],
+) -> tuple[dict[str, Any], list[Any]]:
+    """Validate the free-form AOT memory config before merging placement rules."""
+
+    raw_memory = base_data.get("memory")
+    if raw_memory is None:
+        memory: dict[str, Any] = {}
+        base_data["memory"] = memory
+    elif isinstance(raw_memory, dict):
+        memory = raw_memory
+    else:
+        raise EngineError(
+            "engine.config.aot_args.memory must be a mapping",
+            hint="Use memory: {tensors: [...]} in the heliaAOT configuration.",
+        )
+
+    raw_tensors = memory.get("tensors")
+    if raw_tensors is None:
+        return memory, []
+    if not isinstance(raw_tensors, list):
+        raise EngineError(
+            "engine.config.aot_args.memory.tensors must be a list",
+            hint="Provide a YAML list of heliaAOT tensor placement rules.",
+        )
+    return memory, raw_tensors
 
 
 def _summarize_aot_tensor_rulesets(

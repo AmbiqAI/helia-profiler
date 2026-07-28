@@ -11,14 +11,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from helia_profiler.config import load_config
 from helia_profiler.engines.helia_aot.compile import (
     _EXPECTED_PRAGMA_SUFFIXES,
     _merge_aot_tensor_rulesets,
+    _prepare_aot_memory_config,
     _resolve_aot_placement_intent,
     _resolve_aot_tensor_rulesets,
     _summarize_aot_tensor_rulesets,
 )
+from helia_profiler.errors import EngineError
 from helia_profiler.placement import Placement
 from helia_profiler.platform import get_soc_for_board
 
@@ -76,6 +80,18 @@ def test_malformed_user_wildcards_do_not_break_placement_logging():
 
     assert scratch == "custom"
     assert constant == "custom"
+
+
+@pytest.mark.parametrize(
+    ("base_data", "message"),
+    [
+        ({"memory": "invalid"}, "memory must be a mapping"),
+        ({"memory": {"tensors": "invalid"}}, "memory.tensors must be a list"),
+    ],
+)
+def test_malformed_aot_memory_config_raises_engine_error(base_data, message):
+    with pytest.raises(EngineError, match=message):
+        _prepare_aot_memory_config(base_data)
 
 
 class TestPlacementIntent:
