@@ -280,24 +280,13 @@ def _run_aot_compiler(
     merged_rulesets = _merge_aot_tensor_rulesets(profiler_rulesets, user_tensors)
     if merged_rulesets:
         mem["tensors"] = merged_rulesets
+        scratch_memory, constant_attributes = _summarize_aot_tensor_rulesets(
+            merged_rulesets
+        )
         log.info(
             "AOT tensor placement: scratch/persistent=%s, constant=%s",
-            next(
-                (
-                    rule["attributes"]["memory"]
-                    for rule in merged_rulesets
-                    if rule.get("type") == "scratch"
-                ),
-                "custom",
-            ),
-            next(
-                (
-                    rule["attributes"]
-                    for rule in merged_rulesets
-                    if rule.get("type") == "constant"
-                ),
-                "custom",
-            ),
+            scratch_memory,
+            constant_attributes,
         )
 
     # Build ConvertArgs — profiler mandatory fields always win
@@ -369,6 +358,25 @@ def _merge_aot_tensor_rulesets(
     return [
         rule for rule in profiler_rulesets if rule.get("type") not in wildcard_kinds
     ] + list(user_tensors)
+
+
+def _summarize_aot_tensor_rulesets(
+    rulesets: list[Any],
+) -> tuple[Any, Any]:
+    """Return logging-only placement summaries without validating user rules."""
+
+    by_kind: dict[str, dict[str, Any]] = {}
+    for rule in rulesets:
+        if not isinstance(rule, dict):
+            continue
+        kind = rule.get("type")
+        attributes = rule.get("attributes")
+        if isinstance(kind, str) and isinstance(attributes, dict):
+            by_kind.setdefault(kind, attributes)
+
+    scratch_memory = by_kind.get("scratch", {}).get("memory", "custom")
+    constant_attributes: Any = by_kind.get("constant", "custom")
+    return scratch_memory, constant_attributes
 
 
 def _deep_merge(base: dict, override: dict) -> None:

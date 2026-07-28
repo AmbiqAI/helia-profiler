@@ -17,6 +17,7 @@ from helia_profiler.engines.helia_aot.compile import (
     _merge_aot_tensor_rulesets,
     _resolve_aot_placement_intent,
     _resolve_aot_tensor_rulesets,
+    _summarize_aot_tensor_rulesets,
 )
 from helia_profiler.placement import Placement
 from helia_profiler.platform import get_soc_for_board
@@ -63,6 +64,18 @@ def test_user_wildcard_kind_replaces_coarse_profiler_rule():
         "scratch": {"memory": "dtcm"},
         "constant": {"memory": "mram"},
     }
+
+
+def test_malformed_user_wildcards_do_not_break_placement_logging():
+    scratch, constant = _summarize_aot_tensor_rulesets(
+        [
+            {"type": "scratch"},
+            {"type": "constant", "attributes": "invalid"},
+        ]
+    )
+
+    assert scratch == "custom"
+    assert constant == "custom"
 
 
 class TestPlacementIntent:
