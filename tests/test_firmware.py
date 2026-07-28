@@ -554,6 +554,26 @@ class TestGenerateApp:
         assert "nsx-core" in modules_cmake
         assert "nsx-pmu-armv8m" in modules_cmake
 
+    def test_regenerates_modules_cmake_after_nix_store_copy(
+        self, tmp_path: Path, fake_dist: Path
+    ):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        cmake_nsx_dir = app_dir / "cmake" / "nsx"
+        modules_cmake = cmake_nsx_dir / "modules.cmake"
+        modules_cmake.chmod(0o444)
+        cmake_nsx_dir.chmod(0o555)
+
+        generate_app(ctx)
+
+        assert "nsx-core" in modules_cmake.read_text()
+        if os.name != "nt":
+            assert modules_cmake.stat().st_mode & 0o600 == 0o600
+            assert cmake_nsx_dir.stat().st_mode & 0o700 == 0o700
+
     def test_source_build_installs_heliart_under_module_name(
         self,
         tmp_path: Path,

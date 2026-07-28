@@ -45,19 +45,9 @@ flashes the target, captures measurements, and writes a portable result bundle.
 
 ## Install
 
-```bash
-pip install helia-profiler
-# or
-uv tool install helia-profiler
-```
-
-Extras: `helia-profiler[aot]` adds the heliaAOT compiler;
-`helia-profiler[analysis]` enables model compute/parameter analysis without
-hardware. Python 3.11 or 3.12 is required.
-
-Hardware prerequisites (ARM toolchain, SEGGER J-Link, and optional
-Joulescope drivers) are covered step by step in
-[Getting Started](https://ambiqai.github.io/helia-profiler/getting-started/).
+See the
+[Quick install](https://ambiqai.github.io/helia-profiler/getting-started/install/#quick-install)
+for Nix, uv, and pip setup.
 
 ## Quick taste
 

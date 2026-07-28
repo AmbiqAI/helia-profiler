@@ -5,6 +5,56 @@ tools: an ARM cross-compiler, CMake/Ninja, and SEGGER J-Link software. Power
 capture additionally needs a Joulescope JS110/JS220/JS320 and, on Linux, a udev
 rule for non-root USB access.
 
+## Quick install
+
+=== "Nix"
+
+    Install [Determinate Nix](https://determinate.systems/install/):
+
+    ```bash
+    curl -fsSL https://install.determinate.systems/nix | sh -s -- install
+    ```
+
+    Clone the repository:
+
+    ```bash
+    git clone https://github.com/AmbiqAI/helia-profiler.git && cd helia-profiler
+    ```
+
+    Review [SEGGER's J-Link terms](https://www.segger.com/downloads/jlink/),
+    then import the correct native J-Link package and enter the complete
+    development environment:
+
+    ```bash
+    nix run .#prepare-jlink -- --accept-license && nix develop
+    ```
+
+    Linux hardware users must also install the USB access rules once:
+
+    ```bash
+    nix run .#install-udev-rules
+    ```
+
+    The flake supports x86-64 Linux, ARM64 Linux, and Apple Silicon macOS and
+    includes Python, heliaAOT, LiteRT, NSX, CMake, Ninja, GNU Arm Embedded,
+    ATfE, J-Link, and the development dependencies.
+
+=== "uv"
+
+    ```bash
+    uv tool install helia-profiler
+    ```
+
+    Continue with the platform-specific hardware prerequisites below.
+
+=== "pip"
+
+    ```bash
+    pip install helia-profiler
+    ```
+
+    Continue with the platform-specific hardware prerequisites below.
+
 !!! warning "Alpha"
     heliaPROFILER is pre-1.0. Breaking changes may land on **minor**
     versions until v1.0 — pin the version you tested (for example,
