@@ -45,35 +45,9 @@ flashes the target, captures measurements, and writes a portable result bundle.
 
 ## Install
 
-### Nix
-
-The flake provides the complete environment on x86-64 Linux, ARM64 Linux, and
-Apple Silicon macOS. After reviewing and accepting
-[SEGGER's J-Link terms](https://www.segger.com/downloads/jlink/), run:
-
-```bash
-nix run .#prepare-jlink -- --accept-license && nix develop
-```
-
-Linux hardware users must also install the USB rules once:
-
-```bash
-nix run .#install-udev-rules
-```
-
-### Other installation options
-
-```bash
-pip install helia-profiler
-# or
-uv tool install helia-profiler
-```
-
-Extras: `helia-profiler[aot]` adds the heliaAOT compiler;
-`helia-profiler[analysis]` enables model compute/parameter analysis without
-hardware. Python 3.11 or 3.12 is required. Hardware prerequisites for these
-installation methods are covered in
-[Getting Started](https://ambiqai.github.io/helia-profiler/getting-started/).
+See the
+[Quick install](https://ambiqai.github.io/helia-profiler/getting-started/install/#quick-install)
+for Nix, uv, and pip setup.
 
 ## Quick taste
 
