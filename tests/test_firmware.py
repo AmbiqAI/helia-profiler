@@ -570,8 +570,9 @@ class TestGenerateApp:
         generate_app(ctx)
 
         assert "nsx-core" in modules_cmake.read_text()
-        assert modules_cmake.stat().st_mode & 0o600 == 0o600
-        assert cmake_nsx_dir.stat().st_mode & 0o700 == 0o700
+        if os.name != "nt":
+            assert modules_cmake.stat().st_mode & 0o600 == 0o600
+            assert cmake_nsx_dir.stat().st_mode & 0o700 == 0o700
 
     def test_source_build_installs_heliart_under_module_name(
         self,
