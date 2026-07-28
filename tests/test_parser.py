@@ -121,6 +121,40 @@ def test_clean_infer_timing_metadata():
     assert result.meta.clean_infer_avg_us == 21
 
 
+def test_psram_diagnostics_metadata():
+    lines = _wrap_session(
+        {
+            "presets": "basic_cpu",
+            "psram_size_bytes": "67108864",
+            "psram_clock_hz": "125000000",
+            "psram_capabilities": "7",
+            "psram_state": "1",
+            "psram_last_init_status": "0",
+            "psram_xip_enabled": "1",
+            "psram_timing_status": "2",
+            "psram_rxdqs_delay": "14",
+        },
+        [
+            _make_preset_block(
+                "basic_cpu",
+                ["Layer", "Op", "ARM_PMU_CPU_CYCLES"],
+                [["0", "CONV_2D", "1000"]],
+            )
+        ],
+    )
+
+    psram = parse_firmware_output(lines).meta.psram
+
+    assert psram is not None
+    assert psram.size_bytes == 67_108_864
+    assert psram.clock_hz == 125_000_000
+    assert psram.capabilities == 7
+    assert psram.state == 1
+    assert psram.xip_enabled is True
+    assert psram.timing_status == 2
+    assert psram.rxdqs_delay == 14
+
+
 def test_clean_infer_count_falls_back_to_announced_iters():
     """The authoritative HPX_CLEAN_INFER_COUNT line prints right after the
     transport peripheral is re-enabled post-window and can be lost on lossy

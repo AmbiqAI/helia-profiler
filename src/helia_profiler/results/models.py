@@ -63,6 +63,20 @@ class PresetResult:
 
 
 @dataclass(frozen=True)
+class PsramInfo:
+    """PSRAM state and timing diagnostics reported by ``nsx-psram``."""
+
+    size_bytes: int
+    clock_hz: int
+    capabilities: int
+    state: int
+    last_init_status: int
+    xip_enabled: bool
+    timing_status: int
+    rxdqs_delay: int
+
+
+@dataclass(frozen=True)
 class FirmwareMeta:
     """Metadata reported by the profiler firmware at startup.
 
@@ -92,6 +106,7 @@ class FirmwareMeta:
     clean_infer_total_cycles: int | None = None
     clean_infer_avg_cycles: int | None = None
     clean_infer_avg_us: int | None = None
+    psram: PsramInfo | None = None
     presets: tuple[str, ...] = ()
 
 

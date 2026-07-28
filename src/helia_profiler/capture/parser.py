@@ -34,7 +34,7 @@ import re
 import statistics
 from typing import Any
 
-from ..results import FirmwareMeta, LayerResult, PmuResult, PresetResult
+from ..results import FirmwareMeta, LayerResult, PmuResult, PresetResult, PsramInfo
 from ..transport.protocol import HPX_PROTOCOL_VERSION
 
 log = logging.getLogger("hpx")
@@ -148,6 +148,19 @@ def parse_firmware_output(
         if isinstance(preset_names_str, str) and preset_names_str
         else ()
     )
+    psram = None
+    if "psram_clock_hz" in meta_kv:
+        psram = PsramInfo(
+            size_bytes=meta_kv.get("psram_size_bytes", 0),
+            clock_hz=meta_kv["psram_clock_hz"],
+            capabilities=meta_kv.get("psram_capabilities", 0),
+            state=meta_kv.get("psram_state", 0),
+            last_init_status=meta_kv.get("psram_last_init_status", 0),
+            xip_enabled=bool(meta_kv.get("psram_xip_enabled", 0)),
+            timing_status=meta_kv.get("psram_timing_status", 0),
+            rxdqs_delay=meta_kv.get("psram_rxdqs_delay", 0),
+        )
+
     firmware_meta = FirmwareMeta(
         model_size=meta_kv.get("model_size"),
         arena_size=meta_kv.get("arena_size"),
@@ -168,6 +181,7 @@ def parse_firmware_output(
         clean_infer_total_cycles=meta_kv.get("clean_infer_total_cycles"),
         clean_infer_avg_cycles=meta_kv.get("clean_infer_avg_cycles"),
         clean_infer_avg_us=meta_kv.get("clean_infer_avg_us"),
+        psram=psram,
         presets=preset_names,
     )
 

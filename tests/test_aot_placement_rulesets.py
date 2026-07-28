@@ -14,6 +14,7 @@ from pathlib import Path
 from helia_profiler.config import load_config
 from helia_profiler.engines.helia_aot.compile import (
     _EXPECTED_PRAGMA_SUFFIXES,
+    _merge_aot_tensor_rulesets,
     _resolve_aot_placement_intent,
     _resolve_aot_tensor_rulesets,
 )
@@ -42,6 +43,26 @@ def _cfg(board: str, location: str, **engine_overrides):
 
 def _by_kind(rulesets):
     return {r["type"]: r["attributes"] for r in rulesets}
+
+
+def test_user_wildcard_kind_replaces_coarse_profiler_rule():
+    profiler = [
+        {"type": "scratch", "attributes": {"memory": "dtcm"}},
+        {
+            "type": "constant",
+            "attributes": {"memory": "mram", "constant_destination_memory": "sram"},
+        },
+    ]
+    user = [
+        {"type": "constant", "attributes": {"memory": "mram"}},
+    ]
+
+    merged = _merge_aot_tensor_rulesets(profiler, user)
+
+    assert _by_kind(merged) == {
+        "scratch": {"memory": "dtcm"},
+        "constant": {"memory": "mram"},
+    }
 
 
 class TestPlacementIntent:

@@ -129,6 +129,7 @@ def _common_kwargs(soc_name: str, transport: str) -> dict:
         "heartbeat_enabled": True,
         "heartbeat_every_n_ops": 4,
         "heartbeat_every_ms": 0,
+        "psram_clock_hz": 48_000_000,
     }
 
 

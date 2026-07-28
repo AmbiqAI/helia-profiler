@@ -251,6 +251,13 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         )
     if meta.model_size:
         mem_parts.append(f"Model    {meta.model_size:>8,} bytes")
+    if meta.psram is not None:
+        mem_parts.append(
+            "PSRAM    "
+            f"{meta.psram.clock_hz / 1_000_000:g} MHz · "
+            f"{meta.psram.size_bytes / (1024 * 1024):g} MiB · "
+            f"RXDQS {meta.psram.rxdqs_delay}"
+        )
 
     if ctx.binary_sections is not None:
         bs = ctx.binary_sections

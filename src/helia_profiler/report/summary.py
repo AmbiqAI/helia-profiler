@@ -65,6 +65,9 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     if mem:
         summary["memory"] = mem
 
+    if meta.psram is not None:
+        summary["psram"] = asdict(meta.psram)
+
     # Memory plan — engine-agnostic per-region usage
     if ctx.memory_plan is not None:
         summary["memory_plan"] = _serialise_memory_plan(ctx.memory_plan)

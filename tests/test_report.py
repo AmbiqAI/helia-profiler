@@ -32,6 +32,7 @@ from helia_profiler.results import (
     LayerResult,
     PmuResult,
     PresetResult,
+    PsramInfo,
     RunMetadata,
     TimingInfo,
     ToolchainInfo,
@@ -111,6 +112,45 @@ def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):
     assert summary["schema_version"] == 1
     assert summary["validity"] == "valid"
     assert summary["issues"] == []
+
+
+def test_write_summary_includes_psram_diagnostics(tmp_path: Path):
+    config = load_config(
+        None,
+        {
+            "model": {"path": "test.tflite"},
+            "engine": {"type": "helia-rt"},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.pmu_result = PmuResult(
+        meta=FirmwareMeta(
+            psram=PsramInfo(
+                size_bytes=67_108_864,
+                clock_hz=125_000_000,
+                capabilities=7,
+                state=1,
+                last_init_status=0,
+                xip_enabled=True,
+                timing_status=2,
+                rxdqs_delay=14,
+            )
+        ),
+        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+    )
+
+    summary = json.loads(_write_summary(ctx, tmp_path).read_text())
+
+    assert summary["psram"] == {
+        "size_bytes": 67_108_864,
+        "clock_hz": 125_000_000,
+        "capabilities": 7,
+        "state": 1,
+        "last_init_status": 0,
+        "xip_enabled": True,
+        "timing_status": 2,
+        "rxdqs_delay": 14,
+    }
 
 
 def test_write_run_metadata_includes_target_lifecycle(tmp_path: Path):
