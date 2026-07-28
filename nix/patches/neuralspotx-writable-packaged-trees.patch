@@ -23,14 +23,17 @@ diff --git a/neuralspotx/module_registry/_vendoring.py b/neuralspotx/module_regi
 +
 +
  def _is_full_commit_sha(revision: str) -> bool:
-@@ -240,5 +255,6 @@
+@@ -240,5 +255,7 @@
      preserve_existing = destination_dir == app_dir / "cmake" / "nsx"
-     if destination_dir.exists() and not preserve_existing:
+-    if destination_dir.exists() and not preserve_existing:
+-        _rmtree(destination_dir)
++    if destination_dir.exists():
 +        _make_tree_owner_writable(destination_dir)
-         _rmtree(destination_dir)
++        if not preserve_existing:
++            _rmtree(destination_dir)
      destination_dir.parent.mkdir(parents=True, exist_ok=True)
      shutil.copytree(
-@@ -246,6 +262,7 @@
+@@ -246,6 +263,7 @@
          dirs_exist_ok=True,
          ignore=shutil.ignore_patterns(".git", "__pycache__"),
      )
