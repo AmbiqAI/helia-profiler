@@ -153,6 +153,44 @@ def test_write_summary_includes_psram_diagnostics(tmp_path: Path):
     }
 
 
+def test_write_run_metadata_includes_psram_diagnostics(tmp_path: Path):
+    config = load_config(
+        None,
+        {
+            "model": {"path": "test.tflite"},
+            "engine": {"type": "helia-rt"},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.pmu_result = PmuResult(
+        meta=FirmwareMeta(
+            psram=PsramInfo(
+                size_bytes=67_108_864,
+                clock_hz=125_000_000,
+                capabilities=7,
+                state=1,
+                last_init_status=0,
+                xip_enabled=True,
+                timing_status=2,
+                rxdqs_delay=14,
+            )
+        )
+    )
+
+    metadata = json.loads(_write_run_metadata(ctx, tmp_path).read_text())
+
+    assert metadata["firmware"]["psram"] == {
+        "size_bytes": 67_108_864,
+        "clock_hz": 125_000_000,
+        "capabilities": 7,
+        "state": 1,
+        "last_init_status": 0,
+        "xip_enabled": True,
+        "timing_status": 2,
+        "rxdqs_delay": 14,
+    }
+
+
 def test_write_run_metadata_includes_target_lifecycle(tmp_path: Path):
     config = load_config(
         None,
