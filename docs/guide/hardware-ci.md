@@ -112,7 +112,14 @@ The initial schema includes:
 - `repo.sha`, `repo.branch`, and `repo.dirty` when available
 - `validation` options such as suite, selected axes, timeout, and output dir
 - `summary` pass/fail/skip counts
-- `cases` with identity, status, headline metrics, and artifact paths
+- `cases` with identity, status, headline metrics, resource usage, and artifact paths
+
+Schema v3 adds a per-case `resources` object to `validation_manifest.json` and
+`validation_report.json` for dashboard ingestion: `binary_sections` contains
+text/data/BSS/total sizes, `runtime_memory` contains firmware-reported arena and
+tensor details, and `memory_plan` contains engine-agnostic region capacities,
+used/free bytes, overflow state, and named consumers. The existing flat binary
+and arena metrics remain available for backward-compatible comparisons.
 
 Each case also carries cross-machine provenance when available: model SHA-256,
 HPX version, compiler name/version, firmware-reported `system_clock_hz`, and
