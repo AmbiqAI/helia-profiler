@@ -186,3 +186,8 @@ def test_build_manifest_omits_none_metrics_and_tolerates_missing_git(tmp_path: P
     assert "total_cycles" not in manifest["cases"][0]["metrics"]
     assert manifest["cases"][0]["resources"] == {}
     assert manifest["cases"][0]["error"] == "unsupported combination"
+
+    paths = write_validation_reports([result], tmp_path, repo_root=tmp_path / "missing")
+    assert paths
+    report = json.loads((tmp_path / "validation_report.json").read_text())
+    assert report["cases"][0]["resources"] == {}

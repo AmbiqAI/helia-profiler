@@ -286,11 +286,9 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
 def _case_report(result: CaseResult, output_dir: Path) -> dict[str, Any]:
     """Add dashboard resource data to the backward-compatible case result."""
     case_data = result.to_dict()
-    resources = _case_resources(
+    case_data["resources"] = _case_resources(
         _read_optional_json(_case_dir(result, output_dir) / "summary.json")
     )
-    if resources:
-        case_data["resources"] = resources
     return case_data
 
 
