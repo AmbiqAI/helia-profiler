@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 PACKAGE_NAME = "helia-profiler"
-REQUIRES_PYTHON = ">=3.11,<3.13"
+REQUIRES_PYTHON = ">=3.11"
 REQUIRED_PACKAGE_FILES = {
     "helia_profiler/vendor/segger_rtt/LICENSE.md",
     "helia_profiler/vendor/segger_rtt/SOURCE.md",

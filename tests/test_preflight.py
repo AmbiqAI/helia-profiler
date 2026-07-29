@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from helia_profiler.config import load_config
-from helia_profiler.errors import ConfigError
+from helia_profiler.errors import CaptureError, ConfigError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.stages.preflight import PreflightStage
 
@@ -212,9 +212,15 @@ class TestPreflightHostTools:
         ctx = _make_ctx(tmp_path, {"target": {"transport": "rtt"}})
 
         def which_no_jlink(name: str) -> str | None:
-            return None if name == "JLinkExe" else f"/usr/bin/{name}"
+            return None if name in ("JLinkExe", "JLink.exe") else f"/usr/bin/{name}"
 
-        with patch("shutil.which", side_effect=which_no_jlink):
+        with (
+            patch("shutil.which", side_effect=which_no_jlink),
+            patch(
+                "helia_profiler.doctor.find_jlink_exe",
+                side_effect=CaptureError("JLinkExe not found"),
+            ),
+        ):
             with pytest.raises(ConfigError, match="JLinkExe"):
                 PreflightStage().run(ctx)
 

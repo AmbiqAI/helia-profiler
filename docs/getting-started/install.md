@@ -39,6 +39,10 @@ rule for non-root USB access.
     includes Python, heliaAOT, LiteRT, NSX, CMake, Ninja, GNU Arm Embedded,
     ATfE, J-Link, and the development dependencies.
 
+    Nix does not run natively on Windows — Windows users should either run
+    this method inside WSL2 (note that J-Link/USB access from WSL2 requires
+    `usbipd-win` passthrough) or use the uv/pip methods below natively.
+
 === "uv"
 
     ```bash
@@ -64,7 +68,7 @@ rule for non-root USB access.
 
 | Dependency | Version | Purpose |
 |---|---|---|
-| Python | `>= 3.11, < 3.13` | Runtime |
+| Python | `>= 3.11` | Runtime (the `aot` extra currently needs 3.11–3.12) |
 | `arm-none-eabi-gcc` | 13.x or 14.x | Default ARM cross-compiler |
 | CMake | `>= 3.24` | Build system |
 | Ninja | any | Build backend |
@@ -77,6 +81,22 @@ and only needed for power capture — see [Power Measurement](../guide/power.md)
 Git and initial network access to GitHub are also needed while NSX resolves and
 clones firmware modules. After one successful build, `--frozen` can reuse the
 existing lock/module state for offline reruns.
+
+On Windows, enable long-path support before the first build — some NSX module
+checkouts (e.g. `ns-cmsis-nn` test data) exceed the 260-character `MAX_PATH`
+limit. Both settings are required: git's, so checkouts can create the files
+("Filename too long" otherwise), and the OS policy, so Python can traverse and
+clean them (without it, `nsx sync` fails with "refusing to operate on
+non-empty path"):
+
+```powershell
+git config --global core.longpaths true
+
+# In an elevated (Administrator) PowerShell; new processes pick it up
+# immediately, no reboot needed:
+Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem `
+    -Name LongPathsEnabled -Value 1
+```
 
 ## 1. Install heliaPROFILER
 
@@ -115,7 +135,9 @@ pip install 'helia-profiler[analysis]'   # model compute/parameter analysis, no 
 
 The AOT extra installs `helia-aot>=0.18.0` and a LiteRT-compatible analysis
 stack. The analysis extra installs the same constrained LiteRT stack plus
-flatbuffer inspection support.
+flatbuffer inspection support. `helia-aot` currently declares
+`requires-python >=3.11,<3.13`, so the `aot` extra needs Python 3.11 or 3.12
+until that cap is lifted.
 
 Power-measurement support (`pyjoulescope_driver`) ships as a core
 dependency — no extra install needed, just the udev rule below on Linux.
@@ -156,6 +178,23 @@ dependency — no extra install needed, just the udev rule below on Linux.
 
     ```powershell
     arm-none-eabi-gcc --version
+    ```
+
+    If a toolchain is already installed but that command isn't found, it just
+    isn't on `PATH` — no reinstall needed. Look for the `bin` directory of the
+    existing installation (installer default
+    `C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\<version>\bin`;
+    extracted archives are often under `C:\Program Files\Arm\`) and add it:
+
+    ```powershell
+    # current session only
+    $env:PATH = "C:\path\to\arm-toolchain\bin;$env:PATH"
+
+    # persistently, for future terminals
+    [Environment]::SetEnvironmentVariable(
+        "Path",
+        "C:\path\to\arm-toolchain\bin;" + [Environment]::GetEnvironmentVariable("Path", "User"),
+        "User")
     ```
 
 ## 3. CMake and Ninja
@@ -209,6 +248,12 @@ for non-standard installations.
     Download and run the `.exe` installer from
     [segger.com/downloads/jlink](https://www.segger.com/downloads/jlink/).
     Drivers are installed automatically.
+
+    The installer puts the software in a versioned directory
+    (`C:\Program Files\SEGGER\JLink_V<version>`). hpx finds it there
+    automatically even when it isn't on `PATH`; for a custom location, add
+    the directory to `PATH` or set `JLINK_PATH` to the full path of
+    `JLink.exe`.
 
 heliaPROFILER bundles a pinned, tested copy of the permissively licensed SEGGER
 RTT target sources. No separate RTT source checkout is required for normal use.

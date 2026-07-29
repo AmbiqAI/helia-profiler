@@ -7,14 +7,20 @@ from pathlib import Path
 from helia_profiler.config import Toolchain, Transport
 from helia_profiler.doctor import inspect_environment
 from helia_profiler.engines import EngineType
+from helia_profiler.errors import CaptureError
 
 
 def _which_all(name: str) -> str:
     return f"/usr/bin/{name}"
 
 
+def _jlink_found() -> str:
+    return "/usr/bin/JLinkExe"
+
+
 def test_inspect_environment_reports_missing_required_python(monkeypatch) -> None:
     monkeypatch.setattr("helia_profiler.doctor.shutil.which", _which_all)
+    monkeypatch.setattr("helia_profiler.doctor.find_jlink_exe", _jlink_found)
     monkeypatch.setattr("helia_profiler.doctor.find_spec", lambda _name: None)
 
     result = inspect_environment()
@@ -25,6 +31,7 @@ def test_inspect_environment_reports_missing_required_python(monkeypatch) -> Non
 
 def test_inspect_environment_uses_selected_toolchain_and_transport(monkeypatch) -> None:
     monkeypatch.setattr("helia_profiler.doctor.shutil.which", _which_all)
+    monkeypatch.setattr("helia_profiler.doctor.find_jlink_exe", _jlink_found)
     monkeypatch.setattr("helia_profiler.doctor.find_spec", lambda _name: object())
 
     result = inspect_environment(
@@ -41,6 +48,7 @@ def test_inspect_environment_uses_selected_toolchain_and_transport(monkeypatch) 
 
 def test_inspect_environment_requires_aot_only_for_aot_engine(monkeypatch) -> None:
     monkeypatch.setattr("helia_profiler.doctor.shutil.which", _which_all)
+    monkeypatch.setattr("helia_profiler.doctor.find_jlink_exe", _jlink_found)
     monkeypatch.setattr(
         "helia_profiler.doctor.find_spec",
         lambda name: None if name == "helia_aot" else object(),
@@ -68,6 +76,7 @@ def test_inspect_environment_validates_atfe_root(tmp_path: Path, monkeypatch) ->
         (bin_dir / name).touch()
     monkeypatch.setenv("ATFE_ROOT", str(tmp_path))
     monkeypatch.setattr("helia_profiler.doctor.shutil.which", _which_all)
+    monkeypatch.setattr("helia_profiler.doctor.find_jlink_exe", _jlink_found)
     monkeypatch.setattr("helia_profiler.doctor.find_spec", lambda _name: object())
 
     result = inspect_environment(toolchain=Toolchain.ATFE)
@@ -75,3 +84,34 @@ def test_inspect_environment_validates_atfe_root(tmp_path: Path, monkeypatch) ->
     check = next(check for check in result.checks if check.name == "ATFE_ROOT")
     assert check.available
     assert check.path == str(bin_dir)
+
+
+def test_inspect_environment_finds_jlink_beyond_path_lookup(monkeypatch) -> None:
+    # Windows installs name the commander JLink.exe, not JLinkExe, so the
+    # J-Link check must use full probe discovery rather than a bare which().
+    monkeypatch.setattr("helia_profiler.doctor.shutil.which", lambda _name: None)
+    monkeypatch.setattr(
+        "helia_profiler.doctor.find_jlink_exe",
+        lambda: r"C:\Program Files\SEGGER\JLink_V960\JLink.exe",
+    )
+    monkeypatch.setattr("helia_profiler.doctor.find_spec", lambda _name: object())
+
+    result = inspect_environment()
+
+    check = next(check for check in result.checks if check.name == "JLinkExe")
+    assert check.available
+    assert check.path == r"C:\Program Files\SEGGER\JLink_V960\JLink.exe"
+
+
+def test_inspect_environment_reports_missing_jlink(monkeypatch) -> None:
+    def _raise() -> str:
+        raise CaptureError("JLinkExe not found")
+
+    monkeypatch.setattr("helia_profiler.doctor.shutil.which", _which_all)
+    monkeypatch.setattr("helia_profiler.doctor.find_jlink_exe", _raise)
+    monkeypatch.setattr("helia_profiler.doctor.find_spec", lambda _name: object())
+
+    result = inspect_environment()
+
+    assert not result.ok
+    assert [check.name for check in result.missing_required] == ["JLinkExe"]
