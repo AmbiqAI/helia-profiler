@@ -10,7 +10,8 @@ import shutil
 
 from .config import Toolchain, Transport
 from .engines import EngineType
-from .target.probe.jlink import JLINK_COMMANDER
+from .errors import CaptureError
+from .target.probe.jlink import JLINK_COMMANDER, find_jlink_exe
 
 
 @dataclass(frozen=True)
@@ -97,7 +98,7 @@ def _dependency_specs(
         _DependencySpec(
             "SEGGER J-Link commander",
             JLINK_COMMANDER,
-            "binary",
+            "jlink",
             "Install SEGGER J-Link host software.",
         ),
         _DependencySpec(
@@ -157,6 +158,16 @@ def _inspect_dependency(spec: _DependencySpec) -> DoctorCheck:
     path: str | None = None
     if spec.kind == "binary":
         path = shutil.which(spec.name)
+        available = path is not None
+    elif spec.kind == "jlink":
+        # Same discovery the probe code uses: JLINK_PATH, both commander
+        # names on PATH, then common install locations — a plain
+        # which("JLinkExe") misses Windows installs, where the binary is
+        # JLink.exe.
+        try:
+            path = find_jlink_exe()
+        except CaptureError:
+            path = None
         available = path is not None
     elif spec.kind == "python":
         available = find_spec(spec.name) is not None

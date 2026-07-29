@@ -141,6 +141,13 @@ def find_jlink_exe() -> str:
     for candidate in candidates:
         if os.path.isfile(candidate):
             return candidate
+    # SEGGER's Windows installer defaults to a versioned directory
+    # (e.g. JLink_V960) rather than plain "JLink"; prefer the
+    # highest-sorting one when several coexist.
+    for root in (program_files, program_files_x86):
+        versioned = sorted(Path(root, "SEGGER").glob("JLink_V*/JLink.exe"))
+        if versioned:
+            return str(versioned[-1])
     raise CaptureError("JLinkExe not found", hint=_JLINK_NOT_FOUND_HINT)
 
 
