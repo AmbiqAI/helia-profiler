@@ -15,7 +15,7 @@ from ..errors import ReportError
 from .runner import CaseResult
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -104,7 +104,7 @@ def write_validation_reports(
     paths[0].write_text(
         json.dumps(
             {
-                "cases": [r.to_dict() for r in results],
+                "cases": [_case_report(result, out_dir) for result in results],
                 "summary": summary_stats(results),
             },
             indent=2,
@@ -195,11 +195,7 @@ def render_markdown(results: list[CaseResult]) -> str:
 
 
 def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
-    case_dir = (
-        Path(result.output_dir).expanduser().resolve()
-        if result.output_dir
-        else output_dir / result.case_id
-    )
+    case_dir = _case_dir(result, output_dir)
     artifact_paths = {
         "case_dir": case_dir,
         "config": case_dir / "config.yml",
@@ -224,6 +220,7 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
     metadata = _read_optional_json(case_dir / "run_metadata.json")
     summary = _read_optional_json(case_dir / "summary.json")
     model_config = _nested_dict(metadata, "config", "model")
+    resources = _case_resources(summary)
     requested_memory = {
         "preset": result.memory,
         "arena_location": model_config.get("arena_location"),
@@ -259,10 +256,10 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
                 "system_clock_hz": _nested(metadata, "firmware", "system_clock_hz"),
                 "run_metadata_schema_version": metadata.get("schema_version"),
                 "run_summary_schema_version": summary.get("schema_version"),
-                "effective_memory": summary.get("memory_plan"),
                 "runtime": _runtime_provenance(metadata) or None,
             }
         ),
+        "resources": resources,
         "metrics": {
             "layers": result.layers,
             "total_cycles": result.total_cycles,
@@ -284,6 +281,35 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
     if result.error:
         case_data["error"] = result.error
     return _strip_none(case_data)
+
+
+def _case_report(result: CaseResult, output_dir: Path) -> dict[str, Any]:
+    """Add dashboard resource data to the backward-compatible case result."""
+    case_data = result.to_dict()
+    resources = _case_resources(
+        _read_optional_json(_case_dir(result, output_dir) / "summary.json")
+    )
+    if resources:
+        case_data["resources"] = resources
+    return case_data
+
+
+def _case_dir(result: CaseResult, output_dir: Path) -> Path:
+    return (
+        Path(result.output_dir).expanduser().resolve()
+        if result.output_dir
+        else output_dir / result.case_id
+    )
+
+
+def _case_resources(summary: dict[str, Any]) -> dict[str, Any]:
+    return _strip_none(
+        {
+            "binary_sections": _nested_dict(summary, "binary") or None,
+            "runtime_memory": _nested_dict(summary, "memory") or None,
+            "memory_plan": _nested_dict(summary, "memory_plan") or None,
+        }
+    )
 
 
 def _runtime_provenance(metadata: dict[str, Any]) -> dict[str, Any]:

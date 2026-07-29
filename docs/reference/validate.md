@@ -117,3 +117,9 @@ Each case in `validation_manifest.json` includes a
 compiler and its version, the CMake version, and the resolved engine type and
 version when the engine publishes one (heliaRT or heliaAOT). These fields are
 provenance, not part of the case identity used for comparisons.
+
+Schema v3 also includes `resources.binary_sections`,
+`resources.runtime_memory`, and `resources.memory_plan` for each case in both
+machine-readable validation reports. The memory plan exposes per-region
+capacity, used/free bytes, overflow state, and named consumers so dashboards do
+not need to parse individual run summaries.

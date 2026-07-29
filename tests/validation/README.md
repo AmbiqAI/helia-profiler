@@ -94,9 +94,9 @@ results/validation/
 
 `validation_manifest.json` contains schema version, generation time, hpx
 version, best-effort git metadata, selected validation options, summary counts,
-and per-case relative artifact paths. Relative paths let the same bundle work
-locally, in downloaded GitHub Actions artifacts, and in future dashboard
-publishing.
+per-case binary sections and memory plans, and relative artifact paths.
+Relative paths let the same bundle work locally, in downloaded GitHub Actions
+artifacts, and in future dashboard publishing.
 
 ## Assertions per case
 

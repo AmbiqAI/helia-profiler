@@ -59,6 +59,7 @@ class ValidationBundleCase:
     health_issues: tuple[str, ...]
     artifacts: tuple[tuple[str, ArtifactRef], ...]
     provenance: tuple[tuple[str, Any], ...]
+    resources: tuple[tuple[str, Any], ...]
 
     def artifact(self, name: str) -> ArtifactRef | None:
         return dict(self.artifacts).get(name)
@@ -87,7 +88,7 @@ class ValidationBundle:
 
 
 def load_validation_bundle(root: Path) -> ValidationBundle:
-    """Load schema v1/v2, validate identities, and contain artifact paths."""
+    """Load supported schemas, validate identities, and contain artifact paths."""
 
     bundle_root = root.expanduser().resolve()
     if not bundle_root.is_dir():
@@ -107,7 +108,7 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
         )
 
     version = manifest.get("schema_version")
-    if version not in (1, 2):
+    if version not in (1, 2, 3):
         raise ValidationBundleError(f"Unsupported validation manifest schema_version: {version!r}")
     raw_cases = manifest.get("cases")
     if not isinstance(raw_cases, list):
@@ -153,7 +154,7 @@ def _load_case(
     if status not in _STATUSES:
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid status {status!r}")
 
-    if version == 2:
+    if version in (2, 3):
         identity_raw = raw.get("identity")
         if not isinstance(identity_raw, dict):
             raise ValidationBundleError(f"Validation case {case_id!r} has no identity object")
@@ -162,6 +163,7 @@ def _load_case(
         power = identity_raw.get("requested_power")
         health = raw.get("health_issues", [])
         provenance = raw.get("provenance", {})
+        resources = raw.get("resources", {})
     else:
         identity_raw = raw
         match = _REPEAT_SUFFIX.search(case_id)
@@ -170,6 +172,7 @@ def _load_case(
         power = {"enabled": raw.get("power")}
         health = []
         provenance = {"jlink_serial": raw.get("jlink_serial")}
+        resources = {}
 
     if not isinstance(attempt, int) or isinstance(attempt, bool) or attempt < 1:
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid repeat attempt")
@@ -181,6 +184,8 @@ def _load_case(
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid health_issues")
     if not isinstance(provenance, dict):
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid provenance")
+    if not isinstance(resources, dict):
+        raise ValidationBundleError(f"Validation case {case_id!r} has invalid resources")
 
     identity = ValidationCaseIdentity(
         model_id=_required_string(identity_raw, "model_id", index),
@@ -223,6 +228,7 @@ def _load_case(
         health_issues=tuple(health),
         artifacts=tuple(sorted(artifacts)),
         provenance=tuple(sorted(provenance.items())),
+        resources=tuple(sorted(resources.items())),
     )
 
 

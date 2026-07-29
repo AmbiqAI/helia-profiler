@@ -122,6 +122,16 @@ def test_repeat_attempts_match_exactly(tmp_path: Path) -> None:
     ]
 
 
+def test_loader_exposes_v3_resource_data(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+
+    loaded = load_validation_bundle(bundle)
+
+    assert loaded.schema_version == 3
+    assert dict(loaded.cases[0].resources) == {}
+
+
 def test_loader_rejects_unsafe_artifact_path(tmp_path: Path) -> None:
     bundle = tmp_path / "bundle"
     bundle.mkdir()

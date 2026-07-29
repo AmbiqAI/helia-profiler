@@ -39,7 +39,36 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(tmp_path
     case_dir = Path(result.output_dir)
     case_dir.mkdir(parents=True)
     (case_dir / "summary.json").write_text(
-        json.dumps({"schema": "hpx.run-summary", "schema_version": 1})
+        json.dumps(
+            {
+                "schema": "hpx.run-summary",
+                "schema_version": 1,
+                "binary": {"text": 80_000, "data": 2_000, "bss": 5_000, "total": 87_000},
+                "memory": {
+                    "arena_size": 32_768,
+                    "allocated_arena": 24_000,
+                    "model_size": 53_744,
+                    "num_tensors": 17,
+                },
+                "memory_plan": {
+                    "engine": "helia-rt",
+                    "model_weight_bytes": 53_744,
+                    "has_overflow": False,
+                    "regions": [
+                        {
+                            "region": "DTCM",
+                            "capacity": 393_216,
+                            "used": 32_768,
+                            "free": 360_448,
+                            "overflow": False,
+                            "consumers": [
+                                {"name": "tensor_arena", "size": 32_768, "kind": "arena"}
+                            ],
+                        }
+                    ],
+                },
+            }
+        )
     )
     (case_dir / "run_metadata.json").write_text(
         json.dumps(
@@ -76,7 +105,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(tmp_path
         "validation_manifest.json",
     }
     manifest = json.loads((tmp_path / "validation_manifest.json").read_text())
-    assert manifest["schema_version"] == 2
+    assert manifest["schema_version"] == 3
     assert manifest["validation"]["suite"] == "smoke"
     assert manifest["summary"] == {"total": 1, "pass": 1, "fail": 0, "skip": 0}
     assert manifest["repo"] == {"sha": None, "branch": None, "dirty": None}
@@ -108,6 +137,23 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(tmp_path
     assert case["provenance"]["system_clock_hz"] == 96_000_000
     assert case["provenance"]["run_metadata_schema_version"] == 1
     assert case["provenance"]["run_summary_schema_version"] == 1
+    assert case["resources"]["binary_sections"] == {
+        "text": 80_000,
+        "data": 2_000,
+        "bss": 5_000,
+        "total": 87_000,
+    }
+    assert case["resources"]["runtime_memory"]["num_tensors"] == 17
+    assert case["resources"]["memory_plan"]["regions"][0] == {
+        "region": "DTCM",
+        "capacity": 393_216,
+        "used": 32_768,
+        "free": 360_448,
+        "overflow": False,
+        "consumers": [{"name": "tensor_arena", "size": 32_768, "kind": "arena"}],
+    }
+    report = json.loads((tmp_path / "validation_report.json").read_text())
+    assert report["cases"][0]["resources"] == case["resources"]
     assert case["artifacts"]["profile_results"]["path"] == f"{result.case_id}/profile_results.csv"
 
     loaded = load_validation_report(tmp_path / "validation_report.json")
@@ -138,4 +184,5 @@ def test_build_manifest_omits_none_metrics_and_tolerates_missing_git(tmp_path: P
     assert manifest["summary"]["skip"] == 1
     assert manifest["cases"][0]["artifacts"]["case_dir"]["path"] == "skipped-case"
     assert "total_cycles" not in manifest["cases"][0]["metrics"]
+    assert manifest["cases"][0]["resources"] == {}
     assert manifest["cases"][0]["error"] == "unsupported combination"
