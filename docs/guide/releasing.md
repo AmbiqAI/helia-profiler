@@ -7,7 +7,7 @@ credential is stored in GitHub.
 
 Pushes to `main` update a Release Please pull request. Merging that pull request
 creates the version tag and GitHub Release, validates package metadata and
-resources, clean-installs the wheel and sdist on Python 3.11 and 3.12, and then
+resources, clean-installs the wheel and sdist on Python 3.11 through 3.14, and then
 publishes to PyPI.
 
 ## One-time repository setup

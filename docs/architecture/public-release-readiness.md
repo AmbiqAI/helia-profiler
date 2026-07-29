@@ -300,7 +300,7 @@ Deliverables:
   `CONTRIBUTING.md`, and `CHANGELOG.md`.
 - Complete package metadata: README content type, project URLs, authors or
   maintainers, classifiers, keywords, and license files.
-- Test Python 3.11 and 3.12 on Linux, macOS, and Windows as declared by the
+- Test Python 3.11 through 3.14 on Linux, macOS, and Windows as declared by the
   package requirement.
 - Add wheel/sdist build, metadata validation, clean-environment install, CLI
   smoke tests, and packaged-resource tests to CI.
