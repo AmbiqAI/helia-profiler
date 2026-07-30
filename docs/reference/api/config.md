@@ -38,7 +38,17 @@ YAML file with CLI overrides and never mutated afterwards.
 
 ::: helia_profiler.NsxModuleOverride
 
+## Compatibility baseline
+
+::: helia_profiler.CompatibilityBaseline
+
+::: helia_profiler.CompatibilityResolution
+
+::: helia_profiler.load_compatibility_baseline
+
 ## Enums
+
+::: helia_profiler.QualificationState
 
 ::: helia_profiler.EngineType
 

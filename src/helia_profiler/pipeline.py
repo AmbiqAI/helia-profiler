@@ -351,6 +351,7 @@ class PipelineRunner:
         ctx.run_metadata.run_id = str(uuid.uuid4())
         ctx.run_metadata.timestamp = datetime.now(timezone.utc).isoformat()
         ctx.run_metadata.config_snapshot = _serialize_config(config)
+        ctx.run_metadata.compatibility = config.compatibility
 
         try:
             total_stages = len(self._stages)

@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 import yaml
 
 from .. import nsx as nsx_cli
+from ..compatibility import CompatibilityBaseline
 from ..config import Transport
 from ..errors import ConfigError, FirmwareError
 from ..platform import get_soc_for_board
@@ -61,12 +62,6 @@ _POWER_SYNC_MODULE_NAMES: tuple[str, ...] = (
     "nsx-interrupt",
     "nsx-gpio",
 )
-
-_DEFAULT_MAIN_PROJECT_REFS: dict[str, str] = {
-    "neuralspotx": "main",
-    "nsx-ambiq-sdk": "main",
-}
-
 
 def _usb_provider_module_names(module_specs: list[NsxModuleSpec], profile: dict[str, Any]) -> list[str]:
     """Return provider-specific USB support modules implied by the SDK tier."""
@@ -263,6 +258,7 @@ def _resolve_module_list(
 def _resolve_project_overrides(
     module_specs: list[NsxModuleSpec],
     nsx_overrides: dict[str, Any],
+    baseline: CompatibilityBaseline,
 ) -> dict[str, tuple[str, str]]:
     """Collapse module-targeted ref/version overrides onto owning projects.
 
@@ -290,11 +286,11 @@ def _resolve_project_overrides(
                 ),
             )
         project_overrides[spec.project] = (mode, value)
-    for project, ref in _DEFAULT_MAIN_PROJECT_REFS.items():
+    for project in {spec.project for spec in module_specs}:
         if project in project_overrides:
             continue
-        if any(spec.project == project for spec in module_specs):
-            project_overrides[project] = ("ref", ref)
+        if any(qualified.name == project for qualified in baseline.projects):
+            project_overrides[project] = ("ref", baseline.project(project).ref)
     return project_overrides
 
 

@@ -1,5 +1,6 @@
 """Public result models and persisted/workflow result contracts."""
 
+from ..compatibility import CompatibilityResolution
 from .artifacts import (
     DeploymentRecord,
     FirmwareArtifact,
@@ -44,6 +45,7 @@ from .models import (
 
 __all__ = [
     "BinarySections",
+    "CompatibilityResolution",
     "ConsumerKind",
     "DeploymentRecord",
     "EngineInfo",

@@ -90,6 +90,7 @@ If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
 | `api.py` | `profile()` — public programmatic entry point, returns `ProfileResult` |
 | `cli.py` | Thin argparse CLI, delegates to `api.profile()` |
 | `config.py` | `ProfileConfig` dataclass, YAML + CLI merge |
+| `compatibility.py` | Typed HPX compatibility baseline (`data/compatibility-baseline-v1.json`) — qualified NSX project/module/engine refs and override classification |
 | `results/` | Typed result models, workflow artifacts, and bundle manifests |
 | `evaluation/` | Model analysis, verified comparison, validity, and regression profiles |
 | `profiler.py` | Pipeline composition and logging setup |

@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 import yaml
 
 from .. import nsx as nsx_cli
+from ..compatibility import ENGINE_OWNED_MODULE_NAMES
 from ..config import Transport
 from ..engines import EngineType
 from ..engines.base import ArenaRegion
@@ -477,7 +478,17 @@ def generate_app(ctx: PipelineContext) -> Path:
     # Build module descriptors (name + local flag + optional overrides)
     nsx_overrides = config.build.nsx_modules
     board_mod = _board_module_name(board.name)
-    project_overrides = _resolve_project_overrides(module_specs, nsx_overrides)
+    compatibility = config.compatibility
+    if compatibility is None:
+        raise ConfigError(
+            "Compatibility baseline was not resolved before firmware generation",
+            hint="Construct ProfileConfig through load_config().",
+        )
+    project_overrides = _resolve_project_overrides(
+        module_specs,
+        nsx_overrides,
+        compatibility.baseline,
+    )
     module_names_by_project = _module_names_by_project(module_specs)
     modules: list[dict[str, object]] = []
     matched_overrides: set[str] = set()
@@ -510,15 +521,29 @@ def generate_app(ctx: PipelineContext) -> Path:
         else:
             modules.append({"name": spec.name, "project": spec.project, "local": False})
 
-    # Warn about overrides that didn't match any module in the build
+    # Warn about overrides that didn't match any module in the build. Modules
+    # that engine adapters resolve themselves (nsx-helia-rt, nsx-cmsis-nn) are
+    # configured via `engine.config` (dist_path / source_path / source /
+    # cmsis_nn_path — see compatibility._ENGINE_SOURCE_OVERRIDE_KEYS), not
+    # `build.nsx_modules` — call that out explicitly. Other extra modules
+    # (e.g. TFLM's nsx-tflite-micro / arm-cmsis-nn) have no engine.config
+    # equivalent, so they fall back to the generic "unrecognized name" hint.
     unmatched = set(nsx_overrides.keys()) - matched_overrides
     for name in sorted(unmatched):
-        log.warning(
-            "build.nsx_modules override '%s' did not match any module in this "
-            "build — check the module name (available: %s)",
-            name,
-            ", ".join(spec.name for spec in module_specs),
-        )
+        if name in ENGINE_OWNED_MODULE_NAMES:
+            log.warning(
+                "build.nsx_modules override '%s' targets an engine-provided module "
+                "and was not applied — configure it via engine.config "
+                "(dist_path / source_path / source / cmsis_nn_path) instead.",
+                name,
+            )
+        else:
+            log.warning(
+                "build.nsx_modules override '%s' did not match any module in this "
+                "build — check the module name (available: %s)",
+                name,
+                ", ".join(spec.name for spec in module_specs),
+            )
 
     # Append engine-provided modules (e.g. nsx-helia-rt). Each is either a
     # registry module (NSX clones it from GitHub during `nsx sync`) or a
@@ -537,8 +562,15 @@ def generate_app(ctx: PipelineContext) -> Path:
                 "project": project,
                 "local": False,
             }
+            # Engine-provided modules are configured through `engine.config`
+            # (dist_path / source_path / source / cmsis_nn_path), not
+            # `build.nsx_modules` — an override here is already reported by
+            # the "unmatched override" warning above. Fall back to the
+            # baseline's qualified ref instead of a hard-coded default.
             if extra_mod.ref:
                 entry["ref"] = extra_mod.ref
+            elif any(module.name == extra_mod.name for module in compatibility.baseline.modules):
+                entry["ref"] = compatibility.baseline.module(extra_mod.name).ref
             modules.append(entry)
 
     log.info("NSX modules: %s", ", ".join(m["name"] for m in modules))  # type: ignore[arg-type]
