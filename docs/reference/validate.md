@@ -123,3 +123,8 @@ Schema v3 also includes `resources.binary_sections`,
 machine-readable validation reports. The memory plan exposes per-region
 capacity, used/free bytes, overflow state, and named consumers so dashboards do
 not need to parse individual run summaries.
+
+Schema v4 adds dashboard-ready power fields for powered cases and preserves the
+complete per-run power object as `power_metrics`. The portable artifact index
+points to `<case>/detailed/power_summary.csv`; powered validation cases enable
+that detailed output automatically.

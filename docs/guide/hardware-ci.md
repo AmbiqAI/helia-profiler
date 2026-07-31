@@ -121,6 +121,14 @@ tensor details, and `memory_plan` contains engine-agnostic region capacities,
 used/free bytes, overflow state, and named consumers. The existing flat binary
 and arena metrics remain available for backward-compatible comparisons.
 
+Schema v4 adds the powered-validation dashboard contract. Powered cases expose
+`avg_power_mw`, `energy_per_inference_uj`, `inferences_per_joule`, and capture
+duration alongside the existing energy/current metrics. The complete
+`summary.json.power` object is also copied to each case as `power_metrics`, so
+new gate-integrity and distribution fields remain available without another
+aggregate-schema change. The manifest links the detailed CSV at
+`<case>/detailed/power_summary.csv` and records whether it is available.
+
 Each case also carries cross-machine provenance when available: model SHA-256,
 HPX version, compiler name/version, firmware-reported `system_clock_hz`, and
 the summary/metadata schema versions. These values are not folded into case
@@ -137,7 +145,7 @@ Before transferring a bundle or comparing another machine's results:
 1. Commit or record the exact HPX revision and use a clean worktree.
 2. Run `hpx doctor`, `hpx probes match`, and `hpx ports list` on that bench.
 3. Pin every board to a J-Link serial and every power run to an instrument
-  serial when multiple instruments are attached.
+   serial when multiple instruments are attached.
 4. Preview the matrix with `hpx validate --list` and save that output.
 5. Use `--repeat 3` or more for release performance/power sweeps.
 6. Retain `validation_manifest.json`, reports, logs, and all per-case result
@@ -161,13 +169,16 @@ self-hosted
 hpx-hardware
 ```
 
+The checked-in bench defaults select the Apollo510 EVB, enable power capture,
+and pin both its J-Link and Joulescope serials. Override those workflow inputs
+when moving the workflow to a different physical bench.
+
 Use this label for a machine that has HPX-compatible hardware attached. For
 the first bench, label the local Mac runner with `hpx-hardware` and attach the
-Apollo510 EVB and Apollo330mP EVB. The workflow default board input runs the
-same smoke model on both boards:
+Apollo510 EVB plus its inline JS320. The workflow default board input is:
 
 ```text
-apollo510_evb,apollo330mP_evb
+apollo510_evb
 ```
 
 The workflow exposes the validation axes as manual inputs. Leave an optional
@@ -175,7 +186,7 @@ axis empty to use the selected suite's defaults; set it explicitly to override
 only that axis.
 
 - `suite`: `smoke`, `models-rt`, `models-aot`, or `complete`
-- `boards`: comma-separated board IDs, default `apollo510_evb,apollo330mP_evb`
+- `boards`: comma-separated board IDs, default `apollo510_evb`
 - `models`: optional comma-separated model IDs such as `kws` or `kws,vww`
 - `engines`: optional comma-separated engines such as `helia-rt` or `helia-aot`
 - `toolchains`: optional comma-separated toolchains such as
@@ -187,9 +198,11 @@ only that axis.
   or `usb_cdc`
 - `memories`: optional comma-separated placement presets such as `auto`, `tcm`,
   `sram`, `mram`, or `psram`
-- `power`: `off`, `on`, or `both`
+- `power`: `off`, `on`, or `both`; default `on`
 - `jlink_serials`: optional comma-separated `board=serial` entries, default
-  `apollo510_evb=801000001,apollo330mP_evb=801000002`
+  `apollo510_evb=1160003180`
+- `power_serials`: optional comma-separated `board=Joulescope-serial` entries,
+  default `apollo510_evb=H8MS`
 - `repeat`: repeat count per selected case
 - `timeout`: per-case timeout in seconds
 
@@ -198,8 +211,10 @@ Default inputs run the same smoke shape as the local command:
 ```bash
 uv run hpx validate \
   --suite smoke \
-  --boards apollo510_evb,apollo330mP_evb \
-  --power off \
+  --boards apollo510_evb \
+  --power on \
+  --jlink-serials apollo510_evb=1160003180 \
+  --power-serials apollo510_evb=H8MS \
   --output-dir results/validation \
   --junit-xml results/validation/junit.xml
 ```

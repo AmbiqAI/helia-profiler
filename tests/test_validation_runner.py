@@ -131,6 +131,7 @@ def test_build_config_pins_power_serial_for_multi_instrument_bench(tmp_path: Pat
 
     assert cfg["power"]["enabled"] is True
     assert cfg["power"]["serial"] == "25QG"
+    assert cfg["output"]["detailed"] is True
 
 
 def test_build_config_pins_explicit_power_gpio_wiring(tmp_path: Path):
@@ -250,7 +251,15 @@ def test_run_case_retries_once_on_transient_joulescope_lock(tmp_path: Path, monk
                 {
                     "layers": 13,
                     "total_cycles": 123456,
-                    "power": {"energy_j": 0.1, "avg_current_a": 0.005, "peak_current_a": 0.02},
+                    "power": {
+                        "energy_j": 0.1,
+                        "avg_current_a": 0.005,
+                        "avg_power_w": 0.009,
+                        "peak_current_a": 0.02,
+                        "capture_duration_s": 5.0,
+                        "energy_per_inference_j": 0.0002,
+                        "inferences_per_joule": 5000.0,
+                    },
                 }
             )
         )
@@ -263,6 +272,12 @@ def test_run_case_retries_once_on_transient_joulescope_lock(tmp_path: Path, monk
 
     assert result.status == "pass"
     assert result.energy_uj == 100000.0
+    assert result.avg_current_ma == 5.0
+    assert result.avg_power_mw == 9.0
+    assert result.peak_current_ma == 20.0
+    assert result.power_capture_duration_s == 5.0
+    assert result.energy_per_inference_uj == 200.0
+    assert result.inferences_per_joule == 5000.0
     assert calls["count"] == 2
 
 
