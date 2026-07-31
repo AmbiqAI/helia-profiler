@@ -195,6 +195,7 @@ nav:
           - Errors: reference/api/errors.md
   - Architecture:
       - Overview: architecture/index.md
+      - Compatibility Baseline: architecture/compatibility-baseline.md
       - Pipeline & Stages: architecture/pipeline.md
       - Engine Adapters: architecture/engine-adapters.md
       - Firmware Generation: architecture/firmware.md

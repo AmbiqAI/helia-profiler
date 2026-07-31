@@ -188,9 +188,10 @@ because they are tied to the on-device progress protocol.
 NSX build-system overrides.
 
 Controls how the generated firmware's NSX manifest resolves modules.
-Default behaviour keeps the selected board's default NSX channel, but
-generated manifests explicitly track ``main`` for the ``neuralspotx`` and
-``nsx-ambiq-sdk`` projects unless the user overrides those modules.
+Default behaviour keeps the selected board's default NSX channel, and
+generated manifests pin the qualified compatibility baseline's immutable
+refs for the ``neuralspotx`` and ``nsx-ambiq-sdk`` projects unless the
+user overrides those modules.
 
 Advanced users can pin individual modules to a version, point them at
 a local checkout, or select a custom git ref — useful for SoC/board
@@ -217,6 +218,12 @@ Exactly one mode must be set:
 * *path* — use a local directory as the module source (``local: true``).
 * *ref* — resolve the module's project at a specific git ref/tag.
 * *version* — pin the module to an exact version constraint.
+
+Only applies to modules NSX resolves itself (e.g. ``nsx-core``,
+``nsx-ambiq-bsp``). Engine-provided modules (``nsx-helia-rt``,
+``nsx-cmsis-nn``) are configured through ``engine.config``
+(``dist_path``/``source_path``/``source``/``cmsis_nn_path``) instead —
+an entry here targeting one of those names is ignored with a warning.
 
 | Key | Type | Default | Notes |
 |---|---|---|---|

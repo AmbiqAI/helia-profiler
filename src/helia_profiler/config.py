@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import field, replace
+from dataclasses import field
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -12,6 +12,12 @@ import difflib
 from pydantic import ConfigDict, TypeAdapter, ValidationError, field_validator, model_validator
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
+from .compatibility import (
+    CompatibilityBaseline,
+    CompatibilityResolution,
+    load_compatibility_baseline,
+    resolve_compatibility,
+)
 from .engines import EngineType
 from .errors import ConfigError
 from .placement import Placement
@@ -554,6 +560,12 @@ class NsxModuleOverride:
     * *path* — use a local directory as the module source (``local: true``).
     * *ref* — resolve the module's project at a specific git ref/tag.
     * *version* — pin the module to an exact version constraint.
+
+    Only applies to modules NSX resolves itself (e.g. ``nsx-core``,
+    ``nsx-ambiq-bsp``). Engine-provided modules (``nsx-helia-rt``,
+    ``nsx-cmsis-nn``) are configured through ``engine.config``
+    (``dist_path``/``source_path``/``source``/``cmsis_nn_path``) instead —
+    an entry here targeting one of those names is ignored with a warning.
     """
 
     path: Path | None = None
@@ -581,9 +593,10 @@ class BuildConfig:
     """NSX build-system overrides.
 
     Controls how the generated firmware's NSX manifest resolves modules.
-    Default behaviour keeps the selected board's default NSX channel, but
-    generated manifests explicitly track ``main`` for the ``neuralspotx`` and
-    ``nsx-ambiq-sdk`` projects unless the user overrides those modules.
+    Default behaviour keeps the selected board's default NSX channel, and
+    generated manifests pin the qualified compatibility baseline's immutable
+    refs for the ``neuralspotx`` and ``nsx-ambiq-sdk`` projects unless the
+    user overrides those modules.
 
     Advanced users can pin individual modules to a version, point them at
     a local checkout, or select a custom git ref — useful for SoC/board
@@ -656,10 +669,36 @@ class ProfileConfig:
     timeouts: TimeoutsConfig = field(default_factory=TimeoutsConfig)
     build: BuildConfig = field(default_factory=BuildConfig)
     platform_registry: PlatformRegistry = field(default_factory=build_platform_registry)
+    # These fields are resolved once from HPX package data and are not
+    # user-configurable.  The nested dataclasses are immutable.
+    compatibility_baseline: CompatibilityBaseline = field(
+        default_factory=load_compatibility_baseline,
+        init=False,
+        repr=False,
+    )
+    compatibility: CompatibilityResolution | None = field(
+        default=None,
+        init=False,
+        repr=False,
+        compare=False,
+    )
     frozen: bool = False
     work_dir: Path | None = None  # None = use persistent cache dir
     clean: bool = False  # wipe cached work dir before building
     verbose: int = 0
+
+    def __post_init__(self) -> None:
+        if self.compatibility is None:
+            object.__setattr__(
+                self,
+                "compatibility",
+                resolve_compatibility(
+                    self.compatibility_baseline,
+                    module_overrides=self.build.nsx_modules,
+                    engine_config=self.engine.config,
+                    engine_config_path=self.engine.config_path,
+                ),
+            )
 
 
 _PROFILE_CONFIG_ADAPTER = TypeAdapter(ProfileConfig)
@@ -680,11 +719,19 @@ def _build_valid_field_names() -> dict[tuple[str, ...], tuple[str, ...]]:
     def visit(cls: type, path: tuple[str, ...]) -> None:
         names = tuple(f.name for f in _dc.fields(cls))
         if path == ():
-            names = tuple(n for n in names if n != "platform_registry")
+            names = tuple(
+                n
+                for n in names
+                if n not in {"platform_registry", "compatibility_baseline", "compatibility"}
+            )
         result[path] = names
         hints = _t.get_type_hints(cls)
         for f in _dc.fields(cls):
-            if path == () and f.name == "platform_registry":
+            if path == () and f.name in {
+                "platform_registry",
+                "compatibility_baseline",
+                "compatibility",
+            }:
                 continue  # resolved runtime object, never user-settable
             tp = hints.get(f.name)
             for cand in (tp, *_t.get_args(tp)):
@@ -744,9 +791,15 @@ def load_config(yaml_path: Path | None, cli_overrides: dict[str, Any]) -> Profil
     _check_reserved_user_keys(merged)
     _check_required_model_path(merged)
     prepared, platform_registry = _prepare_merged_config(merged)
+    # Inject the resolved registry into `prepared` before validation (rather
+    # than constructing then patching via a post-construction replace())
+    # so pydantic's `validate_python()` — and therefore
+    # `ProfileConfig.__post_init__()`, which resolves `compatibility` —
+    # runs exactly once per call, not twice.
+    prepared["platform_registry"] = platform_registry
 
     try:
-        config = _PROFILE_CONFIG_ADAPTER.validate_python(prepared)
+        return _PROFILE_CONFIG_ADAPTER.validate_python(prepared)
     except ConfigError:
         raise
     except ValidationError as exc:
@@ -754,8 +807,6 @@ def load_config(yaml_path: Path | None, cli_overrides: dict[str, Any]) -> Profil
         raise ConfigError(message, hint=hint) from exc
     except ValueError as exc:
         raise ConfigError(str(exc)) from exc
-
-    return replace(config, platform_registry=platform_registry)
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -775,6 +826,12 @@ def _check_reserved_user_keys(merged: dict[str, Any]) -> None:
             "platform_registry is not a user-configurable field",
             hint="Remove platform_registry from the YAML/CLI input; it is resolved automatically.",
         )
+    for key in ("compatibility_baseline", "compatibility"):
+        if key in merged:
+            raise ConfigError(
+                f"{key} is not a user-configurable field",
+                hint="HPX owns the compatibility baseline; remove this key from YAML/CLI input.",
+            )
 
 
 def _check_required_model_path(merged: dict[str, Any]) -> None:

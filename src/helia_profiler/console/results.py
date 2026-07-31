@@ -132,6 +132,11 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     overview.add_column("value")
 
     overview.add_row("Engine", f"[bold]{ctx.config.engine.type.value}[/bold]")
+    if ctx.config.compatibility is not None:
+        overview.add_row(
+            "Compatibility",
+            f"[bold]{ctx.config.compatibility.qualification.value}[/bold]",
+        )
 
     if ctx.board is not None:
         overview.add_row("Board", ctx.board.name)

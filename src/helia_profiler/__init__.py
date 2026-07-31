@@ -37,6 +37,12 @@ from .config import (
     Toolchain,
     Transport,
 )
+from .compatibility import (
+    CompatibilityBaseline,
+    CompatibilityResolution,
+    QualificationState,
+    load_compatibility_baseline,
+)
 from .engines import EngineType
 from . import examples
 from .counters import PmuCounter
@@ -89,6 +95,10 @@ __all__ = [
     "examples",
     # Config
     "ProfileConfig",
+    "CompatibilityBaseline",
+    "CompatibilityResolution",
+    "QualificationState",
+    "load_compatibility_baseline",
     "ModelConfig",
     "EngineConfig",
     "EngineType",
@@ -168,6 +178,10 @@ _STABLE_API = {
     "ProgressUpdate",
     "examples",
     "ProfileConfig",
+    "CompatibilityBaseline",
+    "CompatibilityResolution",
+    "QualificationState",
+    "load_compatibility_baseline",
     "ModelConfig",
     "EngineConfig",
     "EngineType",

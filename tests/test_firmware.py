@@ -1387,7 +1387,9 @@ class TestNsxModuleOverrides:
         nsx_yml = (app_dir / "nsx.yml").read_text()
         assert "channel: stable" in nsx_yml
 
-    def test_default_build_uses_main_for_nsx_and_unified_sdk(self, tmp_path: Path, fake_dist: Path):
+    def test_default_build_uses_compatibility_baseline_refs(
+        self, tmp_path: Path, fake_dist: Path
+    ):
         ctx = self._make_ctx_with_overrides(tmp_path, fake_dist, {})
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)
@@ -1397,8 +1399,8 @@ class TestNsxModuleOverrides:
         specs = _resolve_module_specs("apollo510_evb")
         sdk_module_count = sum(1 for spec in specs if spec.project == "nsx-ambiq-sdk")
         nsx_module_count = sum(1 for spec in specs if spec.project == "neuralspotx")
-        assert nsx_yml.count("project: nsx-ambiq-sdk\n  ref: main") == sdk_module_count
-        assert nsx_yml.count("project: neuralspotx\n  ref: main") == nsx_module_count
+        assert nsx_yml.count("project: nsx-ambiq-sdk\n  ref: v5.2.23") == sdk_module_count
+        assert nsx_yml.count("project: neuralspotx\n  ref: neuralspotx-v0.7.9") == nsx_module_count
 
     def test_preview_board_defaults_to_preview_channel(self, tmp_path: Path, fake_dist: Path):
         model = tmp_path / "model.tflite"
@@ -1550,7 +1552,7 @@ class TestNsxModuleOverrides:
             1 for spec in _resolve_module_specs("apollo510_evb") if spec.project == "nsx-ambiq-sdk"
         )
         assert nsx_yml.count('version: "2.0.0"') == sdk_module_count
-        assert "project: neuralspotx\n  ref: main" in nsx_yml
+        assert "project: neuralspotx\n  ref: neuralspotx-v0.7.9" in nsx_yml
 
     def test_ref_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(
@@ -1571,14 +1573,14 @@ class TestNsxModuleOverrides:
             1 for spec in _resolve_module_specs("apollo510_evb") if spec.project == "nsx-ambiq-sdk"
         )
         assert nsx_yml.count("ref: feat/new-soc") == sdk_module_count
-        assert "project: neuralspotx\n  ref: main" in nsx_yml
+        assert "project: neuralspotx\n  ref: neuralspotx-v0.7.9" in nsx_yml
 
     def test_ref_override_aligns_module_registry_revisions(self, tmp_path: Path, fake_dist: Path):
         # Regression: a project ref override must also re-point the per-module
         # `module_registry.modules.<name>.revision` entries. The starter profile
-        # pins those to `main`; NSX's lock resolution honours the module-level
-        # revision over the project revision, so a stale `main` here drags the
-        # whole SDK monorepo back to `main` (and vendors the wrong commit).
+        # pins those independently; NSX's lock resolution honours the
+        # module-level revision over the project revision, so stale values can
+        # drag the whole SDK monorepo to the wrong commit.
         ctx = self._make_ctx_with_overrides(
             tmp_path,
             fake_dist,
@@ -1610,8 +1612,8 @@ class TestNsxModuleOverrides:
 
         nsx_yml = yaml.safe_load((app_dir / "nsx.yml").read_text())
         registry = nsx_yml["module_registry"]
-        assert registry["projects"]["nsx-ambiq-sdk"]["revision"] == "main"
-        assert registry["projects"]["neuralspotx"]["revision"] == "main"
+        assert registry["projects"]["nsx-ambiq-sdk"]["revision"] == "v5.2.23"
+        assert registry["projects"]["neuralspotx"]["revision"] == "neuralspotx-v0.7.9"
         assert "nsx-pmu-armv8m" not in registry.get("modules", {})
 
     def test_path_override_installs_local_module(self, tmp_path: Path, fake_dist: Path):
@@ -1681,3 +1683,81 @@ class TestNsxModuleOverrides:
             generate_app(ctx)
 
         assert any("nsx-nonexistent-module" in rec.message for rec in caplog.records)
+
+    def test_engine_module_override_logs_engine_config_hint(
+        self,
+        tmp_path: Path,
+        fake_dist: Path,
+        caplog,
+    ):
+        """An override targeting an engine-provided module (e.g. nsx-helia-rt)
+        is not a `build.nsx_modules` concern — it must not be silently applied
+        and the warning must point the user at `engine.config` instead."""
+        import logging
+
+        ctx = self._make_ctx_with_overrides(
+            tmp_path,
+            fake_dist,
+            {"nsx_modules": {"nsx-helia-rt": {"ref": "some-other-ref"}}},
+        )
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+
+        with caplog.at_level(logging.WARNING):
+            app_dir = generate_app(ctx)
+
+        assert any(
+            "nsx-helia-rt" in rec.message
+            and "engine.config" in rec.message
+            # engine.config.source is a real heliaRT override channel
+            # (adapter.py's `source_cfg`), distinct from dist_path /
+            # source_path / cmsis_nn_path — the hint must mention it too
+            # (as its own token, not just as part of "source_path").
+            and "/ source /" in rec.message
+            for rec in caplog.records
+        )
+        # The override must not have been applied.
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        assert "some-other-ref" not in nsx_yml
+
+    def test_tflm_extra_module_override_logs_generic_warning(
+        self,
+        tmp_path: Path,
+        fake_dist: Path,
+        caplog,
+    ):
+        """TFLM's extra modules (nsx-tflite-micro, arm-cmsis-nn) are added to
+        the build automatically but have no engine.config equivalent — an
+        override targeting one must get the generic "unrecognized name"
+        warning, not the "use engine.config instead" hint (which only
+        applies to engine-owned modules like nsx-helia-rt/nsx-cmsis-nn)."""
+        import logging
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "tflm"},
+                "target": {"board": "apollo510_evb"},
+                "work_dir": str(tmp_path / "work"),
+                "build": {"nsx_modules": {"nsx-tflite-micro": {"ref": "some-other-ref"}}},
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+
+        with caplog.at_level(logging.WARNING):
+            app_dir = generate_app(ctx)
+
+        matching = [rec.message for rec in caplog.records if "nsx-tflite-micro" in rec.message]
+        assert matching
+        assert all("engine.config" not in message for message in matching)
+        assert any("did not match any module" in message for message in matching)
+        # The override must not have been applied.
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        assert "some-other-ref" not in nsx_yml

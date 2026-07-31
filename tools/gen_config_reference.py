@@ -44,7 +44,7 @@ _EXPLICIT_NOTES: dict[str, str] = {
 
 # Root dataclass fields that are resolved at runtime and never user-settable;
 # excluded from every rendered section.
-_EXCLUDED_ROOT_FIELDS = {"platform_registry"}
+_EXCLUDED_ROOT_FIELDS = {"platform_registry", "compatibility_baseline", "compatibility"}
 
 
 @dataclasses.dataclass

@@ -156,6 +156,8 @@ def _provenance(ctx: PipelineContext) -> dict[str, Any]:
         provenance["model"] = asdict(ctx.run_metadata.model)
     if ctx.run_metadata.toolchain is not None:
         provenance["toolchain"] = asdict(ctx.run_metadata.toolchain)
+    if ctx.run_metadata.compatibility is not None:
+        provenance["compatibility"] = ctx.run_metadata.compatibility.to_dict()
     return provenance
 
 

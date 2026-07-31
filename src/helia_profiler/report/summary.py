@@ -37,6 +37,8 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
         "total_cycles": total_cycles,
         "overflow_detected": pmu.overflow_detected,
     }
+    if ctx.run_metadata.compatibility is not None:
+        summary["compatibility"] = ctx.run_metadata.compatibility.to_dict()
 
     # Top layers by cycles
     summary["top_layers"] = [
