@@ -10,11 +10,11 @@ The current baseline is `hpx-stage4-customer-hardening-2026-07`:
 
 | Identity | Qualified reference |
 | --- | --- |
-| `neuralspotx` package | `0.7.9` (wheel SHA-256 recorded in the baseline) |
+| `neuralspotx` package | `0.7.10` (wheel SHA-256 recorded in the baseline) |
 | `nsx-ambiq-sdk` | `v5.2.23` |
 | `nsx-pmu-armv8m` | `v0.2.0` |
 | `nsx-tflite-micro` | `v0.1.0` |
-| `arm-cmsis-nn` | `41e0cf520fe68d5e22298f98e1a0ffda1196f8d8` |
+| `arm-cmsis-nn` | `v0.1.0` |
 | `ns-cmsis-nn` | `v7.26.0` |
 | heliaRT | `1.16.0`, ref `helia-rt-v1.16.0` |
 | heliaAOT | `min_version=0.18.0`, `max_version_exclusive=0.19.0` |
