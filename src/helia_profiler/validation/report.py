@@ -295,12 +295,9 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
 def _case_report(result: CaseResult, output_dir: Path) -> dict[str, Any]:
     """Add dashboard resource data to the backward-compatible case result."""
     case_data = result.to_dict()
-    case_data["resources"] = _case_resources(
-        _read_optional_json(_case_dir(result, output_dir) / "summary.json")
-    )
-    case_data["power_metrics"] = _nested_dict(
-        _read_optional_json(_case_dir(result, output_dir) / "summary.json"), "power"
-    ) or None
+    summary = _read_optional_json(_case_dir(result, output_dir) / "summary.json")
+    case_data["resources"] = _case_resources(summary)
+    case_data["power_metrics"] = _nested_dict(summary, "power") or None
     case_data = _strip_none(case_data)
     return case_data
 
