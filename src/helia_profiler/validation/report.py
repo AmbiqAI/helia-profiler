@@ -15,7 +15,7 @@ from ..errors import ReportError
 from .runner import CaseResult
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 @dataclass(frozen=True)
@@ -208,7 +208,7 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
         "stderr_log": case_dir / "hpx_stderr.log",
         "aot_memory_layers": case_dir / "aot_memory_layers.csv",
         "aot_operator_manifest": case_dir / "aot_operator_manifest.json",
-        "power_summary": case_dir / "power_summary.csv",
+        "power_summary": case_dir / "detailed" / "power_summary.csv",
     }
     artifacts = {
         name: {
@@ -249,6 +249,7 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
         "provenance": _strip_none(
             {
                 "jlink_serial": result.jlink_serial,
+                "power_serial": result.power_serial,
                 "model_sha256": _nested(metadata, "model", "sha256"),
                 "hpx_version": metadata.get("hpx_version"),
                 "compiler": _nested(metadata, "toolchain", "compiler"),
@@ -273,9 +274,17 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
             "model_size_bytes": result.model_size_bytes,
             "energy_uj": result.energy_uj,
             "avg_current_ma": result.avg_current_ma,
+            "avg_power_mw": result.avg_power_mw,
             "peak_current_ma": result.peak_current_ma,
+            "power_capture_duration_s": result.power_capture_duration_s,
+            "energy_per_inference_uj": result.energy_per_inference_uj,
+            "inferences_per_joule": result.inferences_per_joule,
             "aot_operator_count": result.aot_operator_count,
         },
+        # Preserve the complete run-summary power object so dashboards can
+        # consume new power metrics without waiting for a validation schema
+        # revision for every field added by HPX.
+        "power_metrics": _nested_dict(summary, "power") or None,
         "artifacts": artifacts,
     }
     if result.error:
@@ -286,9 +295,10 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
 def _case_report(result: CaseResult, output_dir: Path) -> dict[str, Any]:
     """Add dashboard resource data to the backward-compatible case result."""
     case_data = result.to_dict()
-    case_data["resources"] = _case_resources(
-        _read_optional_json(_case_dir(result, output_dir) / "summary.json")
-    )
+    summary = _read_optional_json(_case_dir(result, output_dir) / "summary.json")
+    case_data["resources"] = _case_resources(summary)
+    case_data["power_metrics"] = _nested_dict(summary, "power") or None
+    case_data = _strip_none(case_data)
     return case_data
 
 

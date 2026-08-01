@@ -81,7 +81,11 @@ class CaseResult:
     model_size_bytes: int | None = None
     energy_uj: float | None = None
     avg_current_ma: float | None = None
+    avg_power_mw: float | None = None
     peak_current_ma: float | None = None
+    power_capture_duration_s: float | None = None
+    energy_per_inference_uj: float | None = None
+    inferences_per_joule: float | None = None
     gated_window_duration_suspect: bool = False
     gate_duration_integrity_valid: bool | None = None
     power_observation_mode: str | None = None
@@ -176,6 +180,9 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
             "format": "csv",
             "dir": str(output_dir),
             "model_explorer": False,
+            # Powered validation cases publish detailed/power_summary.csv as
+            # part of the portable dashboard artifact contract.
+            "detailed": bool(case.power),
         },
         "work_dir": str(output_dir / "work"),
     }
@@ -531,10 +538,22 @@ def run_case(
                     result.avg_current_ma = float(power_blob["avg_current_ma"])
                 elif "avg_current_a" in power_blob:
                     result.avg_current_ma = float(power_blob["avg_current_a"]) * 1e3
+                if "avg_power_mw" in power_blob:
+                    result.avg_power_mw = float(power_blob["avg_power_mw"])
+                elif "avg_power_w" in power_blob:
+                    result.avg_power_mw = float(power_blob["avg_power_w"]) * 1e3
                 if "peak_current_ma" in power_blob:
                     result.peak_current_ma = float(power_blob["peak_current_ma"])
                 elif "peak_current_a" in power_blob:
                     result.peak_current_ma = float(power_blob["peak_current_a"]) * 1e3
+                if power_blob.get("capture_duration_s") is not None:
+                    result.power_capture_duration_s = float(power_blob["capture_duration_s"])
+                if power_blob.get("energy_per_inference_j") is not None:
+                    result.energy_per_inference_uj = (
+                        float(power_blob["energy_per_inference_j"]) * 1e6
+                    )
+                if power_blob.get("inferences_per_joule") is not None:
+                    result.inferences_per_joule = float(power_blob["inferences_per_joule"])
                 result.gated_window_duration_suspect = bool(
                     power_blob.get("gated_window_duration_suspect", False)
                 )

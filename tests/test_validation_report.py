@@ -105,7 +105,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(tmp_path
         "validation_manifest.json",
     }
     manifest = json.loads((tmp_path / "validation_manifest.json").read_text())
-    assert manifest["schema_version"] == 3
+    assert manifest["schema_version"] == 4
     assert manifest["validation"]["suite"] == "smoke"
     assert manifest["summary"] == {"total": 1, "pass": 1, "fail": 0, "skip": 0}
     assert manifest["repo"] == {"sha": None, "branch": None, "dirty": None}
@@ -191,3 +191,64 @@ def test_build_manifest_omits_none_metrics_and_tolerates_missing_git(tmp_path: P
     assert paths
     report = json.loads((tmp_path / "validation_report.json").read_text())
     assert report["cases"][0]["resources"] == {}
+
+
+def test_powered_case_publishes_dashboard_metrics_and_detailed_artifact(tmp_path: Path):
+    case_dir = tmp_path / "apollo510-power"
+    detail_dir = case_dir / "detailed"
+    detail_dir.mkdir(parents=True)
+    (detail_dir / "power_summary.csv").write_text(
+        "scope,metric,value\ngpio_gated_clean_window,avg_power_w,0.00706\n"
+    )
+    power = {
+        "avg_current_a": 0.00393,
+        "avg_power_w": 0.00706,
+        "peak_current_a": 0.00609,
+        "energy_j": 0.03514,
+        "capture_duration_s": 4.978,
+        "measurement_scope": "gpio_gated_clean_window",
+        "integrity": "valid",
+        "energy_per_inference_j": 0.000147657,
+        "inferences_per_joule": 6772.47,
+    }
+    (case_dir / "summary.json").write_text(json.dumps({"power": power}))
+
+    result = CaseResult(
+        case_id="apollo510-power",
+        status="pass",
+        duration_s=45.0,
+        engine="helia-rt",
+        model_id="kws",
+        board="apollo510_evb",
+        power=True,
+        toolchain="arm-none-eabi-gcc",
+        transport="rtt",
+        memory="auto",
+        power_serial="H8MS",
+        energy_uj=35_140.0,
+        avg_current_ma=3.93,
+        avg_power_mw=7.06,
+        peak_current_ma=6.09,
+        power_capture_duration_s=4.978,
+        energy_per_inference_uj=147.657,
+        inferences_per_joule=6772.47,
+        output_dir=str(case_dir),
+    )
+
+    write_validation_reports([result], tmp_path, repo_root=tmp_path / "missing")
+
+    manifest_case = json.loads((tmp_path / "validation_manifest.json").read_text())["cases"][0]
+    assert manifest_case["provenance"]["power_serial"] == "H8MS"
+    assert manifest_case["metrics"]["avg_power_mw"] == 7.06
+    assert manifest_case["metrics"]["energy_per_inference_uj"] == 147.657
+    assert manifest_case["metrics"]["inferences_per_joule"] == 6772.47
+    assert manifest_case["power_metrics"] == power
+    assert manifest_case["artifacts"]["power_summary"] == {
+        "path": "apollo510-power/detailed/power_summary.csv",
+        "available": True,
+    }
+
+    report_case = json.loads((tmp_path / "validation_report.json").read_text())["cases"][0]
+    assert report_case["power"] is True
+    assert report_case["power_metrics"] == power
+    assert report_case["avg_power_mw"] == 7.06
