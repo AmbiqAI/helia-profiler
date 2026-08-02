@@ -122,14 +122,97 @@ def test_repeat_attempts_match_exactly(tmp_path: Path) -> None:
     ]
 
 
-def test_loader_exposes_v3_resource_data(tmp_path: Path) -> None:
+def test_loader_exposes_schema4_resource_data(tmp_path: Path) -> None:
     bundle = tmp_path / "bundle"
     _write_bundle(bundle, 100)
 
     loaded = load_validation_bundle(bundle)
 
-    assert loaded.schema_version == 3
+    assert loaded.schema_version == 4
     assert dict(loaded.cases[0].resources) == {}
+
+
+@pytest.mark.parametrize("schema_version", [1, 2, 3, 4])
+def test_loader_supports_all_manifest_schemas(tmp_path: Path, schema_version: int) -> None:
+    bundle = tmp_path / f"bundle-v{schema_version}"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["schema_version"] = schema_version
+    if schema_version == 4:
+        manifest["validation"] = {"suite": "smoke"}
+        manifest["cases"][0]["identity"]["comparison_group"] = "kws"
+        manifest["cases"][0]["repeat"] = {"attempt": 1, "total": 1}
+    elif schema_version in (2, 3):
+        manifest["cases"][0]["identity"].pop("comparison_group", None)
+    elif schema_version == 1:
+        case = manifest["cases"][0]
+        identity = case.pop("identity")
+        case.update(
+            {
+                **identity,
+                "memory": "auto",
+                "power": False,
+                "artifacts": {name: value["path"] for name, value in case["artifacts"].items()},
+            }
+        )
+    manifest_path.write_text(json.dumps(manifest))
+
+    loaded = load_validation_bundle(bundle)
+
+    assert loaded.schema_version == schema_version
+    assert loaded.cases[0].identity.comparison_group == "kws"
+    assert dict(loaded.cases[0].resources) == {}
+
+
+def test_schema_v4_comparison_group_controls_matching(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline"
+    candidate = tmp_path / "candidate"
+    _write_bundle(baseline, 100)
+    _write_bundle(candidate, 80)
+    for root, group in ((baseline, "baseline-group"), (candidate, "candidate-group")):
+        manifest_path = root / "validation_manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["cases"][0]["identity"]["comparison_group"] = group
+        manifest["validation"] = {"suite": "smoke"}
+        manifest_path.write_text(json.dumps(manifest))
+
+    result = compare_validation_bundles(baseline, candidate)
+
+    assert [case.outcome for case in result.cases] == [
+        CaseOutcome.BASELINE_ONLY,
+        CaseOutcome.CANDIDATE_ONLY,
+    ]
+
+
+def test_loader_rejects_unsupported_future_schema(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["schema_version"] = 5
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValidationBundleError, match="schema_version: 5"):
+        load_validation_bundle(bundle)
+
+
+@pytest.mark.parametrize(
+    "repeat",
+    [{"total": 1}, {"attempt": None, "total": 1}, {"attempt": 1, "total": True}],
+)
+def test_loader_rejects_malformed_schema_v4_repeat(
+    tmp_path: Path, repeat: dict[str, object]
+) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["cases"][0]["repeat"] = repeat
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValidationBundleError, match="repeat metadata"):
+        load_validation_bundle(bundle)
 
 
 def test_loader_rejects_unsafe_artifact_path(tmp_path: Path) -> None:
