@@ -35,10 +35,12 @@ class ValidationCaseIdentity:
     requested_memory: tuple[tuple[str, str], ...]
     requested_power: tuple[tuple[str, str], ...]
     attempt: int
+    comparison_group: str
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "model_id": self.model_id,
+            "comparison_group": self.comparison_group,
             "engine": self.engine,
             "board": self.board,
             "toolchain": self.toolchain,
@@ -108,7 +110,7 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
         )
 
     version = manifest.get("schema_version")
-    if version not in (1, 2, 3):
+    if not isinstance(version, int) or isinstance(version, bool) or version not in (1, 2, 3, 4):
         raise ValidationBundleError(f"Unsupported validation manifest schema_version: {version!r}")
     raw_cases = manifest.get("cases")
     if not isinstance(raw_cases, list):
@@ -131,6 +133,8 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
         cases.append(case)
 
     repo = manifest.get("repo") if isinstance(manifest.get("repo"), dict) else {}
+    if version == 4 and not isinstance(manifest.get("validation"), dict):
+        raise ValidationBundleError("Validation manifest schema v4 field 'validation' must be an object")
     return ValidationBundle(
         root=bundle_root,
         schema_version=version,
@@ -154,7 +158,7 @@ def _load_case(
     if status not in _STATUSES:
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid status {status!r}")
 
-    if version in (2, 3):
+    if version in (2, 3, 4):
         identity_raw = raw.get("identity")
         if not isinstance(identity_raw, dict):
             raise ValidationBundleError(f"Validation case {case_id!r} has no identity object")
@@ -164,6 +168,29 @@ def _load_case(
         health = raw.get("health_issues", [])
         provenance = raw.get("provenance", {})
         resources = raw.get("resources", {})
+        comparison_group = identity_raw.get("comparison_group", identity_raw.get("model_id"))
+        if version == 4:
+            repeat = raw.get("repeat")
+            if not isinstance(repeat, dict):
+                raise ValidationBundleError(
+                    f"Validation case {case_id!r} has no schema v4 repeat object"
+                )
+            repeat_attempt = repeat.get("attempt")
+            repeat_total = repeat.get("total")
+            if (
+                not isinstance(repeat_attempt, int)
+                or isinstance(repeat_attempt, bool)
+                or not isinstance(repeat_total, int)
+                or isinstance(repeat_total, bool)
+                or repeat_attempt != attempt
+            ):
+                raise ValidationBundleError(
+                    f"Validation case {case_id!r} has invalid schema v4 repeat metadata"
+                )
+            if repeat_total < 1 or repeat_attempt < 1 or repeat_attempt > repeat_total:
+                raise ValidationBundleError(
+                    f"Validation case {case_id!r} has invalid schema v4 repeat metadata"
+                )
     else:
         identity_raw = raw
         match = _REPEAT_SUFFIX.search(case_id)
@@ -173,6 +200,7 @@ def _load_case(
         health = []
         provenance = {"jlink_serial": raw.get("jlink_serial")}
         resources = {}
+        comparison_group = raw.get("model_id")
 
     if not isinstance(attempt, int) or isinstance(attempt, bool) or attempt < 1:
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid repeat attempt")
@@ -186,6 +214,10 @@ def _load_case(
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid provenance")
     if not isinstance(resources, dict):
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid resources")
+    if isinstance(comparison_group, str):
+        comparison_group = comparison_group.strip()
+    if not isinstance(comparison_group, str) or not comparison_group:
+        raise ValidationBundleError(f"Validation case {case_id!r} has invalid comparison_group")
 
     identity = ValidationCaseIdentity(
         model_id=_required_string(identity_raw, "model_id", index),
@@ -196,6 +228,7 @@ def _load_case(
         requested_memory=_freeze_mapping(memory),
         requested_power=_freeze_mapping(power),
         attempt=attempt,
+        comparison_group=comparison_group,
     )
     raw_artifacts = raw.get("artifacts")
     if not isinstance(raw_artifacts, dict):
