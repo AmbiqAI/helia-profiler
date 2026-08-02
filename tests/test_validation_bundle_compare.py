@@ -197,6 +197,21 @@ def test_loader_rejects_unsupported_future_schema(tmp_path: Path) -> None:
         load_validation_bundle(bundle)
 
 
+@pytest.mark.parametrize("schema_version", [True, False, "4", 4.0, None])
+def test_loader_rejects_non_integer_schema_version(
+    tmp_path: Path, schema_version: object
+) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["schema_version"] = schema_version
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValidationBundleError, match="schema_version"):
+        load_validation_bundle(bundle)
+
+
 @pytest.mark.parametrize(
     "repeat",
     [{"total": 1}, {"attempt": None, "total": 1}, {"attempt": 1, "total": True}],
@@ -212,6 +227,48 @@ def test_loader_rejects_malformed_schema_v4_repeat(
     manifest_path.write_text(json.dumps(manifest))
 
     with pytest.raises(ValidationBundleError, match="repeat metadata"):
+        load_validation_bundle(bundle)
+
+
+def test_loader_normalizes_schema4_comparison_group(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["cases"][0]["identity"]["comparison_group"] = "  kws  "
+    manifest_path.write_text(json.dumps(manifest))
+
+    loaded = load_validation_bundle(bundle)
+
+    assert loaded.cases[0].identity.comparison_group == "kws"
+
+
+def test_loader_rejects_empty_normalized_comparison_group(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["cases"][0]["identity"]["comparison_group"] = " \t "
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValidationBundleError, match="comparison_group"):
+        load_validation_bundle(bundle)
+
+
+def test_loader_detects_duplicate_groups_after_normalization(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    case = dict(manifest["cases"][0])
+    case["case_id"] = "second"
+    case["identity"] = dict(case["identity"])
+    case["identity"]["comparison_group"] = " kws "
+    manifest["cases"][0]["identity"]["comparison_group"] = "kws"
+    manifest["cases"].append(case)
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValidationBundleError, match="Duplicate validation case identity"):
         load_validation_bundle(bundle)
 
 

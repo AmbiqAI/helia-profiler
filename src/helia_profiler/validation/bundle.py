@@ -110,7 +110,7 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
         )
 
     version = manifest.get("schema_version")
-    if version not in (1, 2, 3, 4):
+    if not isinstance(version, int) or isinstance(version, bool) or version not in (1, 2, 3, 4):
         raise ValidationBundleError(f"Unsupported validation manifest schema_version: {version!r}")
     raw_cases = manifest.get("cases")
     if not isinstance(raw_cases, list):
@@ -214,6 +214,8 @@ def _load_case(
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid provenance")
     if not isinstance(resources, dict):
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid resources")
+    if isinstance(comparison_group, str):
+        comparison_group = comparison_group.strip()
     if not isinstance(comparison_group, str) or not comparison_group:
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid comparison_group")
 
