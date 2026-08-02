@@ -102,9 +102,23 @@ def test_package_dependency_matches_qualified_baseline() -> None:
     )
     assert dependency == "neuralspotx>=0.7.10,<0.8.0"
 
-    lock_text = (repo_root / "uv.lock").read_text(encoding="utf-8")
-    assert '{ name = "neuralspotx", specifier = ">=0.7.10,<0.8.0" }' in lock_text
-    assert 'name = "neuralspotx"\nversion = "0.7.10"' in lock_text
+    with (repo_root / "uv.lock").open("rb") as stream:
+        lock = tomllib.load(stream)
+    packages = lock["package"]
+    project_package = next(
+        package for package in packages if package["name"] == "helia-profiler"
+    )
+    locked_dependency = next(
+        dependency
+        for dependency in project_package["metadata"]["requires-dist"]
+        if dependency["name"] == "neuralspotx"
+    )
+    assert locked_dependency["specifier"] == ">=0.7.10,<0.8.0"
+
+    neuralspotx_package = next(
+        package for package in packages if package["name"] == "neuralspotx"
+    )
+    assert neuralspotx_package["version"] == "0.7.10"
 
 
 def test_provenance_fingerprint_is_serializable_and_stable(tmp_path: Path) -> None:
