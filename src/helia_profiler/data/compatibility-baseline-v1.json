@@ -4,13 +4,13 @@
   "baseline_id": "hpx-stage4-customer-hardening-2026-07",
   "neuralspotx": {
     "package": "neuralspotx",
-    "version": "0.7.9",
-    "sha256": "c743be42223164da9cbc1c9873b38ac361b246c7895d43b2d2c4c1f3da098994"
+    "version": "0.7.10",
+    "sha256": "bbeb075cc869b7e72e25346dce3f8d38618fd2228f10c356abf11bad64102a8a"
   },
   "projects": {
     "neuralspotx": {
       "url": "https://github.com/AmbiqAI/neuralspotx.git",
-      "ref": "neuralspotx-v0.7.9"
+      "ref": "neuralspotx-v0.7.10"
     },
     "nsx-ambiq-sdk": {
       "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
@@ -26,7 +26,7 @@
     },
     "arm-cmsis-nn": {
       "url": "https://github.com/AmbiqAI/arm-cmsis-nn.git",
-      "ref": "41e0cf520fe68d5e22298f98e1a0ffda1196f8d8"
+      "ref": "v0.1.0"
     },
     "ns-cmsis-nn": {
       "url": "https://github.com/AmbiqAI/ns-cmsis-nn.git",
@@ -52,7 +52,7 @@
     },
     "arm-cmsis-nn": {
       "project": "arm-cmsis-nn",
-      "ref": "41e0cf520fe68d5e22298f98e1a0ffda1196f8d8"
+      "ref": "v0.1.0"
     },
     "nsx-cmsis-nn": {
       "project": "ns-cmsis-nn",

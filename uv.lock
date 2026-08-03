@@ -516,7 +516,7 @@ requires-dist = [
     { name = "flatbuffers", marker = "extra == 'analysis'", specifier = ">=24.0" },
     { name = "helia-aot", marker = "extra == 'aot'", specifier = ">=0.18.0,<0.19.0" },
     { name = "jinja2", specifier = ">=3.1" },
-    { name = "neuralspotx", specifier = ">=0.7.9,<0.8.0" },
+    { name = "neuralspotx", specifier = ">=0.7.10,<0.8.0" },
     { name = "numpy", specifier = ">=2.1,<3" },
     { name = "pydantic", specifier = ">=2.7,<3" },
     { name = "pyjoulescope-driver", marker = "python_full_version < '3.12'", specifier = ">=2.2.12,<2.3.0" },
@@ -929,15 +929,15 @@ wheels = [
 
 [[package]]
 name = "neuralspotx"
-version = "0.7.9"
+version = "0.7.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jinja2" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a2/db/fb86772928daade3d9bb752badd5a842cabf5663746e63bce01139839cf4/neuralspotx-0.7.9.tar.gz", hash = "sha256:2ffdbfe9fb07642dde06a2563799bd7991645bf416180b85f44d1a0eb2303eb7", size = 314222, upload-time = "2026-07-30T03:49:08.913Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/12/4a/b98c57dcccb79287d17e5a42d121d16fc592a746e1104538cbdb113ab5c6/neuralspotx-0.7.10.tar.gz", hash = "sha256:5a698ec346541393b8f7968bb465caf3f11915804bfcb84acf7f79da5286dd79", size = 315214, upload-time = "2026-08-01T21:02:33.004Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/73/11/f2529ce31f0d9bcbd934b26dd4c4362491a4036b68b8969f755642ac4774/neuralspotx-0.7.9-py3-none-any.whl", hash = "sha256:c743be42223164da9cbc1c9873b38ac361b246c7895d43b2d2c4c1f3da098994", size = 309011, upload-time = "2026-07-30T03:49:07.294Z" },
+    { url = "https://files.pythonhosted.org/packages/63/79/1177c525aaf197474eec71ef2870b887a3e039b2e356b199cd035f69d029/neuralspotx-0.7.10-py3-none-any.whl", hash = "sha256:bbeb075cc869b7e72e25346dce3f8d38618fd2228f10c356abf11bad64102a8a", size = 308959, upload-time = "2026-08-01T21:02:31.27Z" },
 ]
 
 [[package]]

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -34,16 +35,99 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert compatibility.qualification is QualificationState.QUALIFIED
     baseline = compatibility.baseline
     assert baseline.schema_version == BASELINE_SCHEMA_VERSION
-    assert baseline.neuralspotx_version == "0.7.9"
+    assert baseline.neuralspotx_version == "0.7.10"
+    assert (
+        baseline.neuralspotx_sha256
+        == "bbeb075cc869b7e72e25346dce3f8d38618fd2228f10c356abf11bad64102a8a"
+    )
+    assert baseline.project("neuralspotx").ref == "neuralspotx-v0.7.10"
     assert baseline.project("nsx-ambiq-sdk").ref == "v5.2.23"
     assert baseline.project("nsx-pmu-armv8m").ref == "v0.2.0"
     assert baseline.project("nsx-tflite-micro").ref == "v0.1.0"
-    assert baseline.project("arm-cmsis-nn").ref == "41e0cf520fe68d5e22298f98e1a0ffda1196f8d8"
+    assert baseline.project("arm-cmsis-nn").ref == "v0.1.0"
+    assert baseline.module("arm-cmsis-nn").ref == "v0.1.0"
     assert baseline.project("ns-cmsis-nn").ref == "v7.26.0"
     assert baseline.engine("helia-rt").ref == "helia-rt-v1.16.0"
     assert baseline.engine("helia-aot").min_version == "0.18.0"
     assert baseline.engine("helia-aot").max_version_exclusive == "0.19.0"
     assert len(baseline.fingerprint) == 64
+
+
+def test_baseline_has_no_unrelated_ref_drift() -> None:
+    baseline = load_compatibility_baseline()
+
+    assert {project.name: project.ref for project in baseline.projects} == {
+        "neuralspotx": "neuralspotx-v0.7.10",
+        "nsx-ambiq-sdk": "v5.2.23",
+        "nsx-pmu-armv8m": "v0.2.0",
+        "nsx-tflite-micro": "v0.1.0",
+        "arm-cmsis-nn": "v0.1.0",
+        "ns-cmsis-nn": "v7.26.0",
+        "helia-rt": "helia-rt-v1.16.0",
+    }
+    assert {module.name: module.ref for module in baseline.modules} == {
+        "nsx-ambiq-bsp": "v5.2.23",
+        "nsx-pmu-armv8m": "v0.2.0",
+        "nsx-tflite-micro": "v0.1.0",
+        "arm-cmsis-nn": "v0.1.0",
+        "nsx-cmsis-nn": "v7.26.0",
+        "nsx-helia-rt": "helia-rt-v1.16.0",
+    }
+    assert baseline.engine("helia-rt").version == "1.16.0"
+    assert baseline.engine("helia-aot").min_version == "0.18.0"
+    assert baseline.engine("helia-aot").max_version_exclusive == "0.19.0"
+    assert baseline.engine("tflm").governed_by_modules
+
+
+def test_tag_shaped_refs_are_accepted_and_branches_rejected(tmp_path: Path) -> None:
+    baseline = load_compatibility_baseline().to_dict()
+    baseline["projects"]["nsx-ambiq-sdk"]["ref"] = "vendor-v1.2.3"
+    valid = tmp_path / "valid.json"
+    valid.write_text(json.dumps(baseline))
+    assert load_compatibility_baseline(valid).project("nsx-ambiq-sdk").ref == "vendor-v1.2.3"
+
+    baseline["projects"]["nsx-ambiq-sdk"]["ref"] = "vendor-release"
+    invalid = tmp_path / "invalid.json"
+    invalid.write_text(json.dumps(baseline))
+    with pytest.raises(ConfigError, match="must use an immutable ref"):
+        load_compatibility_baseline(invalid)
+
+
+def test_package_dependency_matches_qualified_baseline() -> None:
+    repo_root = Path(__file__).resolve().parent.parent
+    with (repo_root / "pyproject.toml").open("rb") as stream:
+        project = tomllib.load(stream)["project"]
+    dependency = next(
+        dependency for dependency in project["dependencies"] if dependency.startswith("neuralspotx")
+    )
+    assert dependency == "neuralspotx>=0.7.10,<0.8.0"
+
+    with (repo_root / "uv.lock").open("rb") as stream:
+        lock = tomllib.load(stream)
+    packages = lock["package"]
+    project_package = next(
+        package for package in packages if package["name"] == "helia-profiler"
+    )
+    locked_dependency = next(
+        dependency
+        for dependency in project_package["metadata"]["requires-dist"]
+        if dependency["name"] == "neuralspotx"
+    )
+    assert locked_dependency["specifier"] == ">=0.7.10,<0.8.0"
+
+    neuralspotx_package = next(
+        package for package in packages if package["name"] == "neuralspotx"
+    )
+    assert neuralspotx_package["version"] == "0.7.10"
+
+
+def test_provenance_fingerprint_is_serializable_and_stable(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    assert config.compatibility is not None
+    provenance = config.compatibility.to_dict()
+    assert provenance["baseline_fingerprint"] == config.compatibility.fingerprint
+    assert provenance["baseline_fingerprint"] == load_compatibility_baseline().fingerprint
+    assert json.loads(json.dumps(provenance)) == provenance
 
 
 def test_engine_override_is_qualified_with_override(tmp_path: Path) -> None:

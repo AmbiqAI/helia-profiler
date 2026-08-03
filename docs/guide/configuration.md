@@ -131,7 +131,7 @@ below cover behavior that a schema table can't express.
 
 ### Build-resolution notes
 
-- By default, generated profiler apps keep the board's normal NSX `channel`, but HPX explicitly resolves both `neuralspotx` and `nsx-ambiq-sdk` from `main`.
+- By default, generated profiler apps keep the board's normal NSX `channel`, but HPX explicitly resolves `neuralspotx` from `neuralspotx-v0.7.10` and `nsx-ambiq-sdk` from `v5.2.23` in the qualified compatibility baseline.
 - `build.nsx_modules.<module>.ref` or `.version` overrides win over that default for the owning project.
 - `build.nsx_modules.<module>.path` installs a local module checkout into the generated app and bypasses registry resolution for that module only.
 

@@ -1400,7 +1400,7 @@ class TestNsxModuleOverrides:
         sdk_module_count = sum(1 for spec in specs if spec.project == "nsx-ambiq-sdk")
         nsx_module_count = sum(1 for spec in specs if spec.project == "neuralspotx")
         assert nsx_yml.count("project: nsx-ambiq-sdk\n  ref: v5.2.23") == sdk_module_count
-        assert nsx_yml.count("project: neuralspotx\n  ref: neuralspotx-v0.7.9") == nsx_module_count
+        assert nsx_yml.count("project: neuralspotx\n  ref: neuralspotx-v0.7.10") == nsx_module_count
 
     def test_preview_board_defaults_to_preview_channel(self, tmp_path: Path, fake_dist: Path):
         model = tmp_path / "model.tflite"
@@ -1552,7 +1552,7 @@ class TestNsxModuleOverrides:
             1 for spec in _resolve_module_specs("apollo510_evb") if spec.project == "nsx-ambiq-sdk"
         )
         assert nsx_yml.count('version: "2.0.0"') == sdk_module_count
-        assert "project: neuralspotx\n  ref: neuralspotx-v0.7.9" in nsx_yml
+        assert "project: neuralspotx\n  ref: neuralspotx-v0.7.10" in nsx_yml
 
     def test_ref_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(
@@ -1573,7 +1573,7 @@ class TestNsxModuleOverrides:
             1 for spec in _resolve_module_specs("apollo510_evb") if spec.project == "nsx-ambiq-sdk"
         )
         assert nsx_yml.count("ref: feat/new-soc") == sdk_module_count
-        assert "project: neuralspotx\n  ref: neuralspotx-v0.7.9" in nsx_yml
+        assert "project: neuralspotx\n  ref: neuralspotx-v0.7.10" in nsx_yml
 
     def test_ref_override_aligns_module_registry_revisions(self, tmp_path: Path, fake_dist: Path):
         # Regression: a project ref override must also re-point the per-module
@@ -1613,7 +1613,7 @@ class TestNsxModuleOverrides:
         nsx_yml = yaml.safe_load((app_dir / "nsx.yml").read_text())
         registry = nsx_yml["module_registry"]
         assert registry["projects"]["nsx-ambiq-sdk"]["revision"] == "v5.2.23"
-        assert registry["projects"]["neuralspotx"]["revision"] == "neuralspotx-v0.7.9"
+        assert registry["projects"]["neuralspotx"]["revision"] == "neuralspotx-v0.7.10"
         assert "nsx-pmu-armv8m" not in registry.get("modules", {})
 
     def test_path_override_installs_local_module(self, tmp_path: Path, fake_dist: Path):
