@@ -189,6 +189,10 @@ only that axis.
 - `boards`: comma-separated board IDs, default `apollo510_evb`
 - `models`: optional comma-separated model IDs such as `kws` or `kws,vww`
 - `engines`: optional comma-separated engines such as `helia-rt` or `helia-aot`
+- `ns_cmsis_nn_ref`: optional `ns-cmsis-nn` branch, tag, or full commit SHA.
+  When empty, the workflow checks out the latest commit from the repository's
+  default branch. The requested ref and resolved commit are saved in
+  `ns-cmsis-nn-revision.txt` with the validation artifacts.
 - `toolchains`: optional comma-separated toolchains such as
   `arm-none-eabi-gcc,armclang,atfe`
 - `atfe_root`: optional ATfE install directory; when empty, the workflow uses
