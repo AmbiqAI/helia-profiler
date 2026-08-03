@@ -31,6 +31,11 @@ on:
         required: false
         default: ""
         type: string
+      ns_cmsis_nn_ref:
+        description: "Optional ns-cmsis-nn git ref or full commit SHA; empty uses the latest default-branch commit"
+        required: false
+        default: ""
+        type: string
       toolchains:
         description: "Optional comma-separated toolchains: arm-none-eabi-gcc,armclang,atfe; empty uses suite defaults"
         required: false
@@ -95,6 +100,7 @@ env:
   HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb' }}
   HPX_VALIDATION_MODELS: ${{ inputs.models || '' }}
   HPX_VALIDATION_ENGINES: ${{ inputs.engines || '' }}
+  HPX_NS_CMSIS_NN_REF: ${{ inputs.ns_cmsis_nn_ref || '' }}
   HPX_VALIDATION_TOOLCHAINS: ${{ inputs.toolchains || '' }}
   HPX_VALIDATION_TRANSPORTS: ${{ inputs.transports || '' }}
   HPX_VALIDATION_MEMORIES: ${{ inputs.memories || '' }}
@@ -131,6 +137,38 @@ jobs:
 
       - name: Fetch LFS fixtures
         run: git lfs pull
+
+      - name: Resolve ns-cmsis-nn source
+        run: |
+          checkout_root="$(mktemp -d "${RUNNER_TEMP}/hpx-ns-cmsis-nn.XXXXXX")"
+          checkout_path="${checkout_root}/ns-cmsis-nn"
+
+          if [[ -n "${HPX_NS_CMSIS_NN_REF}" ]]; then
+            git clone --filter=blob:none --no-checkout https://github.com/AmbiqAI/ns-cmsis-nn.git "${checkout_path}"
+            git -C "${checkout_path}" fetch --depth 1 origin "${HPX_NS_CMSIS_NN_REF}"
+            git -C "${checkout_path}" checkout --detach FETCH_HEAD
+            requested_ref="${HPX_NS_CMSIS_NN_REF}"
+          else
+            git clone --depth 1 https://github.com/AmbiqAI/ns-cmsis-nn.git "${checkout_path}"
+            requested_ref="latest-default-branch"
+          fi
+
+          resolved_commit="$(git -C "${checkout_path}" rev-parse HEAD)"
+          echo "CMSIS_NN_PATH=${checkout_path}" >> "${GITHUB_ENV}"
+          echo "NS_CMSIS_NN_RESOLVED_COMMIT=${resolved_commit}" >> "${GITHUB_ENV}"
+
+          mkdir -p results/validation
+          {
+            echo "requested_ref=${requested_ref}"
+            echo "resolved_commit=${resolved_commit}"
+          } > results/validation/ns-cmsis-nn-revision.txt
+
+          {
+            echo "### ns-cmsis-nn"
+            echo ""
+            echo "- Requested ref: \`${requested_ref}\`"
+            echo "- Resolved commit: \`${resolved_commit}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Fetch SEGGER RTT sources
         run: |

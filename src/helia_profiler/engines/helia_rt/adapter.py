@@ -131,6 +131,14 @@ class HeliaRTAdapter:
                     ref=HELIART_RELEASE_TAG,
                 )
             )
+            # A workflow or local caller can override the transitive
+            # nsx-cmsis-nn dependency with an explicit checkout. Adding the
+            # local module alongside registry-backed heliaRT makes NSX use
+            # that source instead of the ref declared by heliaRT's manifest.
+            if config.engine.config.get("cmsis_nn_path") or os.environ.get("CMSIS_NN_PATH"):
+                from ..helia_aot import cmsis_nn_module_ref
+
+                extra_modules.append(cmsis_nn_module_ref(config, work_dir))
             if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
                 cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
             return EngineArtifacts(

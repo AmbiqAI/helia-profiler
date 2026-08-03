@@ -196,6 +196,28 @@ class TestHeliaRTAdapter:
         assert not (tmp_path / "modules" / "helia-rt").exists()
         assert not (tmp_path / "modules" / "nsx-helia-rt").exists()
 
+    def test_registry_helia_rt_uses_explicit_cmsis_nn_checkout(
+        self,
+        tmp_path: Path,
+        fake_cmsis_nn: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.delenv("HELIART_DIST_PATH", raising=False)
+        monkeypatch.delenv("HELIART_SOURCE_PATH", raising=False)
+        monkeypatch.setenv("CMSIS_NN_PATH", str(fake_cmsis_nn))
+
+        artifacts = HeliaRTAdapter().prepare(_make_config(tmp_path), tmp_path)
+
+        assert [module.name for module in artifacts.extra_modules] == [
+            "nsx-helia-rt",
+            "nsx-cmsis-nn",
+        ]
+        cmsis_nn = artifacts.extra_modules[1]
+        assert cmsis_nn.local is True
+        assert cmsis_nn.project == "ns-cmsis-nn"
+        assert cmsis_nn.path == tmp_path / "modules" / "ns-cmsis-nn"
+        assert (cmsis_nn.path / "nsx-module.yaml").is_file()
+
     def test_prepare_via_env_var(
         self, tmp_path: Path, fake_dist: Path, monkeypatch: pytest.MonkeyPatch
     ):
