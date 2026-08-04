@@ -61,8 +61,8 @@ _TOKEN_SHAPE_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 _BEARER_RE = re.compile(r"(?i)(\bBearer\s+)([A-Za-z0-9\-_.=]{8,})")
 _SECRET_ASSIGNMENT_RE = re.compile(
-    r"(?i)\b((?:api[_-]?key|secret|token|password|passwd|access[_-]?key)\s*[:=]\s*)"
-    r"([\"']?)([^\s\"'&]{3,})\2"
+    r"(?i)\b(?P<key>(?:api[_-]?key|secret|token|password|passwd|access[_-]?key)\s*[:=]\s*)"
+    r"(?:(?P<quote>['\"])(?P<quoted>.*?)(?P=quote)|(?P<bare>[^\s\"'&]{3,}))"
 )
 _SERIAL_KEY_RE = re.compile(r"(?i)serial")
 
@@ -216,7 +216,11 @@ def _redact_secret_assignments(text: str) -> tuple[str, int]:
     def _replace(match: re.Match[str]) -> str:
         nonlocal count
         count += 1
-        return f"{match.group(1)}{match.group(2)}{_PLACEHOLDER_SECRET}{match.group(2)}"
+        key = match.group("key")
+        quote = match.group("quote")
+        if quote is not None:
+            return f"{key}{quote}{_PLACEHOLDER_SECRET}{quote}"
+        return f"{key}{_PLACEHOLDER_SECRET}"
 
     return _SECRET_ASSIGNMENT_RE.sub(_replace, text), count
 
