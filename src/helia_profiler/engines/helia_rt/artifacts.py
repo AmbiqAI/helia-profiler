@@ -43,6 +43,10 @@ HELIART_MIN_VERSION = "1.16.0"
 HELIART_GH_REPO = "AmbiqAI/helia-rt"
 # NB: v1.16.0+ uses "helia-rt-v..." tag format (previously "heliaRT-v...").
 HELIART_RELEASE_TAG = f"helia-rt-v{HELIART_VERSION}"
+# Immutable source identity corresponding to HELIART_RELEASE_TAG. Keep this
+# alongside the release pin so compatibility metadata never depends on a
+# movable tag name.
+HELIART_SOURCE_COMMIT = "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62"
 
 # NSX registry identity for heliaRT. By default hpx declares this module and
 # lets NSX clone it from the registered GitHub upstream; a user-provided

@@ -461,29 +461,23 @@ def _optional_bool(value: Mapping[str, Any], key: str) -> bool:
 
 
 _COMMIT_SHA_RE = re.compile(r"[0-9a-f]{40}")
-_TAG_RE = re.compile(r"(?:[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*-)?v\d+\.\d+\.\d+")
-
-
 def _immutable_ref(value: Mapping[str, Any], key: str, owner: str) -> str:
     """Validate that a baseline ref is an immutable, qualifiable pin.
 
-    Accepts only a full 40-character commit SHA or a semver-style tag
-    (``vX.Y.Z`` or ``<prefix>-vX.Y.Z``, e.g. ``helia-rt-v1.16.0``). This is an
-    allow-list rather than a deny-list: unrecognized ref shapes (branch
-    names such as ``develop``/``release``, ``refs/...``, ``HEAD``, etc.) are
-    rejected even if they aren't one of the well-known mutable names, since
-    they are just as likely to move underneath a qualified baseline.
+    Accepts only a full 40-character commit SHA. Tags and branches are both
+    mutable names, so preserving either in a qualified baseline would make
+    the baseline's identity dependent on remote repository state.
 
     ``fullmatch`` (rather than ``match`` with a ``$`` anchor) is used
     deliberately: ``$`` matches just before a trailing newline, which would
     otherwise let a ref like ``"v1.2.3\\n"`` slip through as immutable.
     """
     ref = _string(value, key)
-    if _COMMIT_SHA_RE.fullmatch(ref) or _TAG_RE.fullmatch(ref):
+    if _COMMIT_SHA_RE.fullmatch(ref):
         return ref
     raise ConfigError(
-        f"Compatibility baseline {owner} must use an immutable ref — a full "
-        f"40-character commit SHA or a 'vX.Y.Z' / '<prefix>-vX.Y.Z' tag — not {ref!r}."
+        f"Compatibility baseline {owner} must use a full 40-character commit SHA, "
+        f"not {ref!r}."
     )
 
 

@@ -189,8 +189,8 @@ NSX build-system overrides.
 
 Controls how the generated firmware's NSX manifest resolves modules.
 Default behaviour keeps the selected board's default NSX channel, and
-generated manifests pin the qualified compatibility baseline's immutable
-refs for the ``neuralspotx`` and ``nsx-ambiq-sdk`` projects unless the
+generated manifests pin the qualified compatibility baseline's full commit
+SHAs for the ``neuralspotx`` and ``nsx-ambiq-sdk`` projects unless the
 user overrides those modules.
 
 Advanced users can pin individual modules to a version, point them at

@@ -138,6 +138,14 @@ regression profiles surface differences and can require exact matches.
 Git metadata is best-effort. Missing git, source archives, or non-repository
 directories do not fail validation report generation.
 
+## Dependency source pinning
+
+The `ns_cmsis_nn_ref` workflow input accepts either a branch name or a full
+40-character commit SHA. Release version/tag names such as `v7.26.0` are not
+accepted. The workflow always resolves the selection to a full commit and
+writes both the requested selector and `resolved_commit` into the validation
+manifest's `sources.ns-cmsis-nn` metadata.
+
 ## Cross-machine release sweep
 
 Before transferring a bundle or comparing another machine's results:
