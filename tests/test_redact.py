@@ -208,6 +208,27 @@ def test_redact_text_scrubs_secret_shaped_query_param_names_beyond_the_narrow_se
     assert counts.total >= 1
 
 
+def test_redact_text_scrubs_oauth_fragment_credentials() -> None:
+    # OAuth's implicit-grant redirect shape puts the credential after a `#`
+    # fragment marker, not a `?` query marker -- the query-pair redactor
+    # must fire there too, not only after `?`/`&`.
+    raw = "https://host/cb#access_token=" + "SUPERSECRETOAUTHVALUE" + "&scope=all"
+
+    redacted, counts = redact_text(raw)
+
+    assert "SUPERSECRETOAUTHVALUE" not in redacted
+    assert counts.urls >= 1
+
+
+def test_redact_text_scrubs_oauth_fragment_credential_with_no_trailing_params() -> None:
+    raw = "https://host/cb#access_token=" + "SUPERSECRETOAUTHVALUE"
+
+    redacted, counts = redact_text(raw)
+
+    assert "SUPERSECRETOAUTHVALUE" not in redacted
+    assert counts.total >= 1
+
+
 def test_redact_text_scrubs_file_uri_path_keeping_basename() -> None:
     raw = "file:///Users/adam.page/proj/nsx.lock"
 
@@ -356,6 +377,34 @@ def test_redact_value_raw_probe_ids_opt_in_keeps_probe_serials_readable() -> Non
 
     assert redacted["serial"] == "1160002204"
     assert counts.total == 0
+
+
+def test_redact_value_secret_key_routing_is_sticky_through_nested_mappings() -> None:
+    """A secret-shaped key's value is fully redacted even when the value is
+    itself a nested mapping/list (e.g. a `credentials:`/`secrets:` block in
+    a free-form engine config) -- not just when it is a bare string.
+    Descendant keys that are NOT secret-shaped (`user`, `nested`, list
+    items) must still be swept up once an ancestor key was secret-shaped."""
+    value = {
+        "secrets": {"prod": "LEAKVALUE1"},
+        "credentials": {"user": "alice", "pass": "LEAKVALUE2"},
+        "api_key": ["LEAKVALUE3"],
+        "auth": {"password": "LEAKVALUE4"},
+        "deep": {"secret": {"nested": {"value": "LEAKVALUE5"}}},
+        "unrelated": {"nested": {"value": "keep-me"}},
+    }
+
+    redacted, counts = redact_value(value)
+
+    flattened = str(redacted)
+    for leaked in ("LEAKVALUE1", "LEAKVALUE2", "LEAKVALUE3", "LEAKVALUE4", "LEAKVALUE5"):
+        assert leaked not in flattened
+    assert redacted["credentials"]["user"] == "<redacted>"
+    assert redacted["deep"]["secret"]["nested"]["value"] == "<redacted>"
+    # A mapping with no secret-shaped ancestor key anywhere above it is
+    # untouched -- sticky routing must not leak into unrelated branches.
+    assert redacted["unrelated"]["nested"]["value"] == "keep-me"
+    assert counts.env_values == 6
 
 
 # ---------------------------------------------------------------------------

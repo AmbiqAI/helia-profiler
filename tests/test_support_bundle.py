@@ -197,6 +197,40 @@ def test_collect_support_bundle_marks_unresolvable_config_unavailable(tmp_path: 
     assert "model.path" in section.reason
 
 
+def test_collect_support_bundle_redacts_nested_secret_in_free_form_engine_config(
+    tmp_path: Path,
+) -> None:
+    """``engine.config`` is a free-form, user-supplied dict — a nested
+    ``credentials``/``secrets`` block under a secret-shaped key must be
+    fully redacted in the archived config.json, not only a bare string
+    value directly under that key."""
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"TFL3")
+    config_path = tmp_path / "hpx.yml"
+    config_path.write_text(
+        "model:\n"
+        f"  path: {model}\n"
+        "target:\n"
+        "  board: apollo510_evb\n"
+        "engine:\n"
+        "  type: tflm\n"
+        "  config:\n"
+        "    credentials:\n"
+        "      user: alice\n"
+        "      pass: LEAKVALUE_NESTED\n",
+        encoding="utf-8",
+    )
+    options = SupportBundleOptions(
+        config_path=config_path, include_probes=False, include_ports=False
+    )
+
+    collection = collect_support_bundle(options)
+
+    config_text = collection.members["config.json"].decode("utf-8")
+    assert "LEAKVALUE_NESTED" not in config_text
+    assert collection.manifest.redaction["env_values"] >= 1
+
+
 def test_collect_support_bundle_no_probes_no_ports_flags() -> None:
     options = SupportBundleOptions(include_probes=False, include_ports=False)
 
@@ -463,6 +497,31 @@ def test_collect_support_bundle_redacts_token_shape_embedded_in_lock_url_path(
     assert collection.manifest.redaction["tokens"] >= 1
     with open(path, "rb") as handle:
         assert token.encode("utf-8") not in handle.read()
+
+
+def test_collect_support_bundle_redacts_oauth_fragment_credential_in_lock_url(
+    tmp_path: Path,
+) -> None:
+    """An OAuth implicit-grant-style `#access_token=...` fragment credential
+    embedded in a git remote URL must not survive into the archive, and the
+    manifest's counters must say so (not read a false-clean 0)."""
+    secret = "SUPERSECRETOAUTHVALUE"
+    app_dir = _prepared_workspace(
+        tmp_path,
+        url_override=f"https://example.invalid/demo.git#access_token={secret}",
+    )
+    options = SupportBundleOptions(workspace=app_dir, include_probes=False, include_ports=False)
+
+    collection = collect_support_bundle(options)
+    path = write_support_bundle(collection, tmp_path / "out")
+
+    lock_text = collection.members["nsx.lock"].decode("utf-8")
+    deps_text = collection.members["dependencies.json"].decode("utf-8")
+    assert secret not in lock_text
+    assert secret not in deps_text
+    assert collection.manifest.redaction["urls"] >= 1
+    with open(path, "rb") as handle:
+        assert secret.encode("utf-8") not in handle.read()
 
 
 def test_collect_support_bundle_module_inventory_includes_baseline_and_resolved(

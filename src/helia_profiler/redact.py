@@ -65,10 +65,13 @@ _URL_RE = re.compile(r"\b[a-zA-Z][a-zA-Z0-9+.\-]*://[^\s\"'<>]+")
 # bearer-style credential with no colon (`token@host`) — both forms are
 # common ways a PAT ends up embedded in a git remote URL.
 _URL_USERINFO_RE = re.compile(r"://(?P<user>[^/@\s:]+)(?::(?P<password>[^/@\s]+))?@")
-# Every `?key=value`/`&key=value` pair; the allow-list below is the only
-# thing spared, so an unrecognized parameter name is redacted by default
-# rather than only a known-sensitive-name deny-list.
-_URL_QUERY_PAIR_RE = re.compile(r"([?&])([^=&#\s]+)=([^&#\s]*)")
+# Every `?key=value`/`&key=value`/`#key=value` pair — the `#` alternative
+# catches OAuth implicit-flow-style fragment parameters
+# (`#access_token=...&scope=...`), which are exactly as sensitive as a query
+# parameter but live after the fragment marker instead. The allow-list below
+# is the only thing spared, so an unrecognized parameter name is redacted by
+# default rather than only a known-sensitive-name deny-list.
+_URL_QUERY_PAIR_RE = re.compile(r"([?&#])([^=&#\s]+)=([^&#\s]*)")
 _URL_QUERY_BENIGN_KEYS = frozenset(
     {
         "v",
@@ -256,11 +259,11 @@ def _redact_url(url: str, policy: RedactionPolicy) -> tuple[str, RedactionCounts
 
     redacted, token_count = _redact_token_shapes(redacted)
     # Deliberately no _redact_secret_assignments() pass here: every
-    # `key=value` pair in the query string was already default-redacted
-    # above (a stricter rule than the generic secret-key-name pattern), and
-    # running both would double-count and double-replace the same value —
-    # this only remains relevant for a KEY=VALUE-shaped secret that appears
-    # outside the query string in the URL, which is not a realistic shape.
+    # `key=value` pair after a `?`/`&`/`#` marker (query string or a
+    # fragment, e.g. an OAuth implicit-grant redirect) was already
+    # default-redacted above — a stricter rule than the generic
+    # secret-key-name pattern — so running both would double-count and
+    # double-replace the same value.
     return redacted, url_counts.combined(RedactionCounts(tokens=token_count))
 
 
@@ -402,6 +405,7 @@ def redact_value(
     policy: RedactionPolicy = RedactionPolicy(),
     *,
     key: str | None = None,
+    _inside_secret: bool = False,
 ) -> tuple[Any, RedactionCounts]:
     """Recursively redact a JSON-safe value tree. Never raises.
 
@@ -413,9 +417,18 @@ def redact_value(
     through :func:`redact_text` (a no-op for the ordinary field-name keys
     used throughout HPX's own schemas, but a real safety net for a
     dynamic/user-supplied mapping such as an engine's free-form config).
+
+    Secret-key routing is *sticky*: once a mapping key matches
+    ``_SECRET_KEY_RE`` (for example ``{"credentials": {"user": "...",
+    "pass": "..."}}``), every string nested anywhere underneath it — through
+    further mappings, lists, or tuples — is redacted too, regardless of
+    those descendants' own key names. ``_inside_secret`` carries that state
+    through the recursion; it is an internal implementation detail, not part
+    of the public call contract.
     """
+    inside_secret = _inside_secret or (key is not None and _SECRET_KEY_RE.search(key) is not None)
     if isinstance(value, str):
-        if key is not None and _SECRET_KEY_RE.search(key):
+        if inside_secret:
             if not value:
                 return value, RedactionCounts()
             return _PLACEHOLDER_SECRET, RedactionCounts(env_values=1)
@@ -425,13 +438,15 @@ def redact_value(
         hwid_redacted, hwid_counts = _redact_hwid_serial(redacted, policy)
         return hwid_redacted, counts.combined(hwid_counts)
     if isinstance(value, Path):
-        return redact_value(str(value), policy, key=key)
+        return redact_value(str(value), policy, key=key, _inside_secret=inside_secret)
     if isinstance(value, Mapping):
         counts = RedactionCounts()
         result: dict[Any, Any] = {}
         for item_key, item_value in value.items():
             child_key = str(item_key) if isinstance(item_key, str) else None
-            redacted_value, value_counts = redact_value(item_value, policy, key=child_key)
+            redacted_value, value_counts = redact_value(
+                item_value, policy, key=child_key, _inside_secret=inside_secret
+            )
             counts = counts.combined(value_counts)
             redacted_key: Any = item_key
             if isinstance(item_key, str):
@@ -443,7 +458,7 @@ def redact_value(
         counts = RedactionCounts()
         items = []
         for item in value:
-            redacted, item_counts = redact_value(item, policy, key=key)
+            redacted, item_counts = redact_value(item, policy, key=key, _inside_secret=inside_secret)
             items.append(redacted)
             counts = counts.combined(item_counts)
         return (tuple(items) if isinstance(value, tuple) else items), counts
@@ -452,7 +467,7 @@ def redact_value(
         counts = RedactionCounts()
         items = []
         for item in value:
-            redacted, item_counts = redact_value(item, policy, key=key)
+            redacted, item_counts = redact_value(item, policy, key=key, _inside_secret=inside_secret)
             items.append(redacted)
             counts = counts.combined(item_counts)
         return items, counts
