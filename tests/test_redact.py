@@ -407,6 +407,34 @@ def test_redact_value_secret_key_routing_is_sticky_through_nested_mappings() -> 
     assert counts.env_values == 6
 
 
+def test_redact_value_secret_key_routing_redacts_non_string_leaves_too() -> None:
+    """YAML parses an unquoted numeric PIN/password as an int, not a str
+    ("password: 12345" -> {"password": 12345}) -- a secret-shaped key must
+    still fully redact that value, not silently pass it through untouched
+    just because it isn't textual."""
+    value = {
+        "password": 55512345678,
+        "credentials": {"pin": 987654321, "enabled": True},
+        "count": 5,
+        "flag": True,
+        "empty_secret": {"secret": None},
+    }
+
+    redacted, counts = redact_value(value)
+
+    assert redacted["password"] == "<redacted>"
+    assert redacted["credentials"]["pin"] == "<redacted>"
+    assert redacted["credentials"]["enabled"] == "<redacted>"
+    # Non-secret-shaped branches are left with their original JSON types.
+    assert redacted["count"] == 5
+    assert redacted["flag"] is True
+    # None carries no information either way; left as None rather than
+    # turned into a placeholder string that would misleadingly imply a
+    # real value was present and scrubbed.
+    assert redacted["empty_secret"]["secret"] is None
+    assert counts.env_values == 3
+
+
 # ---------------------------------------------------------------------------
 # Recursive structure handling and no-op / idempotence guarantees.
 # ---------------------------------------------------------------------------

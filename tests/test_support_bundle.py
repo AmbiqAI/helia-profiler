@@ -203,7 +203,8 @@ def test_collect_support_bundle_redacts_nested_secret_in_free_form_engine_config
     """``engine.config`` is a free-form, user-supplied dict — a nested
     ``credentials``/``secrets`` block under a secret-shaped key must be
     fully redacted in the archived config.json, not only a bare string
-    value directly under that key."""
+    value directly under that key, and not only when the value is itself a
+    string (an unquoted YAML PIN/password parses as an ``int``)."""
     model = tmp_path / "model.tflite"
     model.write_bytes(b"TFL3")
     config_path = tmp_path / "hpx.yml"
@@ -217,7 +218,8 @@ def test_collect_support_bundle_redacts_nested_secret_in_free_form_engine_config
         "  config:\n"
         "    credentials:\n"
         "      user: alice\n"
-        "      pass: LEAKVALUE_NESTED\n",
+        "      pass: LEAKVALUE_NESTED\n"
+        "    password: 55512345678\n",
         encoding="utf-8",
     )
     options = SupportBundleOptions(
@@ -225,10 +227,19 @@ def test_collect_support_bundle_redacts_nested_secret_in_free_form_engine_config
     )
 
     collection = collect_support_bundle(options)
+    path = write_support_bundle(collection, tmp_path / "out")
 
     config_text = collection.members["config.json"].decode("utf-8")
     assert "LEAKVALUE_NESTED" not in config_text
-    assert collection.manifest.redaction["env_values"] >= 1
+    assert "55512345678" not in config_text
+    assert collection.manifest.redaction["env_values"] >= 2
+
+    # Verify against the *decompressed* archived member, not raw zip bytes
+    # (DEFLATE-compressed content can't be reliably substring-searched).
+    with zipfile.ZipFile(path) as archive:
+        archived_config_text = archive.read("config.json").decode("utf-8")
+    assert "LEAKVALUE_NESTED" not in archived_config_text
+    assert "55512345678" not in archived_config_text
 
 
 def test_collect_support_bundle_no_probes_no_ports_flags() -> None:
@@ -495,6 +506,9 @@ def test_collect_support_bundle_redacts_token_shape_embedded_in_lock_url_path(
     lock_text = collection.members["nsx.lock"].decode("utf-8")
     assert token not in lock_text
     assert collection.manifest.redaction["tokens"] >= 1
+    with zipfile.ZipFile(path) as archive:
+        archived_lock = archive.read("nsx.lock").decode("utf-8")
+    assert token not in archived_lock
     with open(path, "rb") as handle:
         assert token.encode("utf-8") not in handle.read()
 
@@ -520,6 +534,9 @@ def test_collect_support_bundle_redacts_oauth_fragment_credential_in_lock_url(
     assert secret not in lock_text
     assert secret not in deps_text
     assert collection.manifest.redaction["urls"] >= 1
+    with zipfile.ZipFile(path) as archive:
+        assert secret not in archive.read("nsx.lock").decode("utf-8")
+        assert secret not in archive.read("dependencies.json").decode("utf-8")
     with open(path, "rb") as handle:
         assert secret.encode("utf-8") not in handle.read()
 

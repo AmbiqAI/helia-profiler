@@ -420,9 +420,11 @@ def redact_value(
 
     Secret-key routing is *sticky*: once a mapping key matches
     ``_SECRET_KEY_RE`` (for example ``{"credentials": {"user": "...",
-    "pass": "..."}}``), every string nested anywhere underneath it — through
-    further mappings, lists, or tuples — is redacted too, regardless of
-    those descendants' own key names. ``_inside_secret`` carries that state
+    "pass": "..."}}``), every value nested anywhere underneath it — through
+    further mappings, lists, or tuples, and regardless of whether that value
+    is itself a string or another JSON scalar (an unquoted YAML PIN parses
+    as an ``int``, for example) — is redacted too, regardless of those
+    descendants' own key names. ``_inside_secret`` carries that state
     through the recursion; it is an internal implementation detail, not part
     of the public call contract.
     """
@@ -471,6 +473,14 @@ def redact_value(
             items.append(redacted)
             counts = counts.combined(item_counts)
         return items, counts
+    if inside_secret and value is not None:
+        # A non-string, non-container leaf (int, float, bool, bytes, ...)
+        # directly under a secret-shaped key -- e.g. a numeric PIN written
+        # as unquoted YAML -- must be redacted too, not merely left as the
+        # one type generic text redaction can't reach. Changing its JSON
+        # type is an acceptable, deliberate trade-off here: this is by
+        # definition a value the key told us is secret.
+        return _PLACEHOLDER_SECRET, RedactionCounts(env_values=1)
     return value, RedactionCounts()
 
 
