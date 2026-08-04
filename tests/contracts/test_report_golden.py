@@ -282,7 +282,7 @@ def _make_ctx(tmp_path: Path, engine: EngineType, fmt: str) -> PipelineContext:
     ctx.run_metadata = _sample_run_metadata()
     dependency_lock = tmp_path / "_workspace" / "nsx.lock"
     dependency_lock.parent.mkdir(parents=True)
-    dependency_lock.write_text("schema_version: 4\ntargets: {}\n", encoding="utf-8")
+    dependency_lock.write_bytes(b"schema_version: 4\ntargets: {}\n")
     ctx.dependency_lock_path = dependency_lock
     return ctx
 
