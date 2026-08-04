@@ -105,6 +105,9 @@ If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
 | `transport/rtt.py` | RTT capture lifecycle; direct control-block access and low-level test patch points live in `rtt_control.py` |
 | `target/probe/jlink.py` | SEGGER J-Link helpers (discovery, reset, SWO commands) |
 | `nsx.py` | NSX build-system subprocess wrapper |
+| `doctor.py` | Host toolchain/version checks (`hpx doctor`) — never raises, informational only |
+| `redact.py` | Deterministic redaction of paths, URL credentials/tokens, secret assignments, and device serials for diagnostics output |
+| `support_bundle.py` | `hpx doctor --bundle` field-diagnostics collector and deterministic archive writer/verifier |
 | `errors.py` | Typed error hierarchy with `hint` field |
 
 ### Data Contract
