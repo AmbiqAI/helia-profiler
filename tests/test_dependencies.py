@@ -19,12 +19,14 @@ from helia_profiler.dependencies import (
     create_workspace,
     normalize_path,
     prepare_locked_dependencies,
+    read_dependency_lock_provenance,
 )
 from helia_profiler.engines.base import EngineArtifacts
 from helia_profiler.errors import DependencyError
 from helia_profiler.errors import BuildError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.results import DependencyLockMode
+from helia_profiler.compatibility import QualificationState
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
 
@@ -235,6 +237,7 @@ def test_exact_dependency_provenance_serialization(
     assert serialized["workspace"]["registry_hash"]["algorithm"] == "sha256"
     assert serialized["workspace"]["baseline_id"].startswith("hpx-stage4")
     assert serialized["lock"]["mode"] == "reused"
+    assert serialized["qualification"] == "development-overrides"
     assert serialized["lock"]["sha256"]["value"] == hashlib.sha256(exact_lock).hexdigest()
     assert serialized["modules"] == [
         {
@@ -255,6 +258,68 @@ def test_exact_dependency_provenance_serialization(
         and override["requested"] == "feature/test"
         for override in serialized["overrides"]
     )
+
+
+def test_read_only_lock_provenance_surface_from_app_or_workspace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(tmp_path)
+    exact_lock = _write_valid_lock(ctx)
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    prepare_locked_dependencies(ctx)
+    assert ctx.firmware_dir is not None
+    assert ctx.dependency_workspace is not None
+    state_path = ctx.firmware_dir / "hpx-dependencies.json"
+    lock_path = ctx.firmware_dir / "nsx.lock"
+    before = {
+        state_path: (state_path.read_bytes(), state_path.stat().st_mtime_ns),
+        lock_path: (lock_path.read_bytes(), lock_path.stat().st_mtime_ns),
+    }
+
+    surfaces = tuple(
+        read_dependency_lock_provenance(path)
+        for path in (
+            ctx.firmware_dir,
+            ctx.dependency_workspace.root,
+            state_path,
+            lock_path,
+        )
+    )
+
+    assert all(surface == surfaces[0] for surface in surfaces)
+    surface = surfaces[0]
+    assert surface.lock_path == lock_path.resolve()
+    assert surface.lock_sha256 == hashlib.sha256(exact_lock).hexdigest()
+    assert len(surface.registry_hash) == 64
+    assert surface.qualification is QualificationState.QUALIFIED
+    assert surface.baseline_fingerprint == ctx.config.compatibility_baseline.fingerprint
+    assert surface.workspace_fingerprint == ctx.dependency_workspace.fingerprint
+    assert surface.lock_mode is DependencyLockMode.REUSED
+    assert surface.update_requested is False
+    assert surface.overrides == ()
+    assert [(item.scope, item.name, item.requested_ref, item.requested_tag) for item in surface.requested_refs] == [
+        ("module", "demo", "v1.2.3", "v1.2.3"),
+        ("project", "demo-project", "v1.2.3", "v1.2.3"),
+    ]
+    assert surface.resolved[0].peeled_commit == "a" * 40
+    assert surface.resolved[0].content_hash.value == "b" * 64
+    assert {
+        path: (path.read_bytes(), path.stat().st_mtime_ns) for path in before
+    } == before
+
+
+def test_lock_provenance_provider_rejects_lock_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(tmp_path)
+    _write_valid_lock(ctx)
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    prepare_locked_dependencies(ctx)
+    assert ctx.firmware_dir is not None
+    (ctx.firmware_dir / "nsx.lock").write_bytes(b"changed")
+
+    with pytest.raises(DependencyError, match="no longer matches"):
+        read_dependency_lock_provenance(ctx.firmware_dir)
 
 
 def test_incompatible_inputs_select_isolated_workspaces(tmp_path: Path) -> None:

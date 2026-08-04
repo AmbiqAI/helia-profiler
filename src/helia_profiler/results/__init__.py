@@ -4,10 +4,12 @@ from ..compatibility import CompatibilityResolution
 from .dependencies import (
     ContentDigest,
     DependencyLockMode,
+    DependencyLockProvenance,
     DependencyLockState,
     DependencyModule,
     DependencyOverride,
     DependencyProvenance,
+    DependencyRequest,
     DependencyWorkspace,
 )
 from .artifacts import (
@@ -59,10 +61,12 @@ __all__ = [
     "ConsumerKind",
     "DeploymentRecord",
     "DependencyLockMode",
+    "DependencyLockProvenance",
     "DependencyLockState",
     "DependencyModule",
     "DependencyOverride",
     "DependencyProvenance",
+    "DependencyRequest",
     "DependencyWorkspace",
     "EngineInfo",
     "FirmwareArtifact",

@@ -40,6 +40,21 @@ producers can evolve additively without older tools silently deleting data.
 
 ::: helia_profiler.ResultValidity
 
+## Dependency lock provenance
+
+`read_dependency_lock_provenance()` is a read-only provider for later
+diagnostics collectors. Pass a prepared `profiler_app`, its `nsx.lock` or
+`hpx-dependencies.json`, or the parent fingerprint workspace. It verifies the
+exact lock SHA-256 and returns a frozen typed surface; it does not resolve,
+synchronize, sanitize, or write files.
+
+The stable join keys are `baseline_fingerprint`
+(`CompatibilityBaseline.fingerprint`) and `lock_sha256`.
+
+::: helia_profiler.read_dependency_lock_provenance
+
+::: helia_profiler.DependencyLockProvenance
+
 ## Validity and comparability
 
 The same pure policy functions drive manifests, summary output, comparisons,

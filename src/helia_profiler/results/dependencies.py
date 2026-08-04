@@ -7,6 +7,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from ..compatibility import QualificationState
+
 
 @dataclass(frozen=True)
 class ContentDigest:
@@ -80,6 +82,16 @@ class DependencyModule:
 
 
 @dataclass(frozen=True)
+class DependencyRequest:
+    """One requested ref/tag indexed by module or owning project."""
+
+    scope: str
+    name: str
+    requested_ref: str
+    requested_tag: str | None
+
+
+@dataclass(frozen=True)
 class DependencyLockState:
     """Operation state for the exact lock used by a run."""
 
@@ -100,6 +112,7 @@ class DependencyProvenance:
     lock: DependencyLockState
     modules: tuple[DependencyModule, ...]
     overrides: tuple[DependencyOverride, ...]
+    qualification: QualificationState
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -110,4 +123,22 @@ class DependencyProvenance:
             },
             "modules": [asdict(module) for module in self.modules],
             "overrides": [asdict(override) for override in self.overrides],
+            "qualification": self.qualification.value,
         }
+
+
+@dataclass(frozen=True)
+class DependencyLockProvenance:
+    """Read-only lock provenance surface for later diagnostics collectors."""
+
+    lock_path: Path
+    lock_sha256: str
+    registry_hash: str
+    requested_refs: tuple[DependencyRequest, ...]
+    resolved: tuple[DependencyModule, ...]
+    overrides: tuple[DependencyOverride, ...]
+    qualification: QualificationState
+    baseline_fingerprint: str
+    workspace_fingerprint: str
+    lock_mode: DependencyLockMode
+    update_requested: bool

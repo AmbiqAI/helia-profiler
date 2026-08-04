@@ -8,6 +8,7 @@ import logging
 import os
 import shutil
 import uuid
+from collections.abc import Mapping
 from contextlib import contextmanager
 from dataclasses import asdict, fields, is_dataclass
 from enum import Enum
@@ -23,12 +24,15 @@ from .errors import BuildError, DependencyError
 from .results.dependencies import (
     ContentDigest,
     DependencyLockMode,
+    DependencyLockProvenance,
     DependencyLockState,
     DependencyModule,
     DependencyOverride,
     DependencyProvenance,
+    DependencyRequest,
     DependencyWorkspace,
 )
+from .compatibility import QualificationState
 
 if TYPE_CHECKING:
     from .pipeline import PipelineContext
@@ -502,6 +506,105 @@ def prepare_locked_dependencies(ctx: PipelineContext) -> DependencyProvenance:
     return provenance
 
 
+def read_dependency_lock_provenance(
+    app_or_workspace_path: str | Path,
+) -> DependencyLockProvenance:
+    """Read typed lock provenance without mutating an app or workspace.
+
+    *app_or_workspace_path* may name ``profiler_app``, its ``nsx.lock`` or
+    ``hpx-dependencies.json``, or the parent fingerprint workspace containing
+    ``profiler_app``. The exact on-disk lock digest is verified against the
+    recorded run state before a surface is returned.
+    """
+
+    app_dir = _dependency_app_dir(Path(app_or_workspace_path))
+    state_path = app_dir / _DEPENDENCY_STATE
+    lock_path = app_dir / "nsx.lock"
+    try:
+        raw = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise DependencyError(
+            f"Cannot read dependency provenance state: {state_path}",
+            hint="Run a successful HPX dependency preparation in this workspace first.",
+        ) from exc
+    if not isinstance(raw, Mapping):
+        raise DependencyError(f"Dependency provenance state must be an object: {state_path}")
+
+    workspace = _state_mapping(raw, "workspace", state_path)
+    lock = _state_mapping(raw, "lock", state_path)
+    recorded_lock_sha256 = _state_digest(lock.get("sha256"), "lock.sha256", state_path)
+    if not lock_path.is_file():
+        raise DependencyError(f"Dependency lock is missing: {lock_path}")
+    actual_lock_sha256 = _digest_file(lock_path)
+    if actual_lock_sha256 != recorded_lock_sha256:
+        raise DependencyError(
+            f"Dependency lock no longer matches recorded provenance: {lock_path}",
+            hint="Re-run dependency preparation before collecting diagnostics.",
+        )
+
+    modules = tuple(
+        _state_module(name, value, state_path)
+        for name, value in _state_named_records(raw.get("modules"), "modules", state_path)
+    )
+    overrides = tuple(
+        _state_override(index, value, state_path)
+        for index, value in enumerate(_state_sequence(raw.get("overrides"), "overrides", state_path))
+    )
+    requests = [
+        DependencyRequest(
+            scope="module",
+            name=module.name,
+            requested_ref=module.requested_ref,
+            requested_tag=module.requested_tag,
+        )
+        for module in modules
+    ]
+    project_requests = {
+        (module.project, module.requested_ref, module.requested_tag) for module in modules
+    }
+    requests.extend(
+        DependencyRequest(
+            scope="project",
+            name=project,
+            requested_ref=requested_ref,
+            requested_tag=requested_tag,
+        )
+        for project, requested_ref, requested_tag in sorted(
+            project_requests,
+            key=lambda value: (value[0], value[1], value[2] or ""),
+        )
+    )
+
+    try:
+        qualification = QualificationState(_state_string(raw, "qualification", state_path))
+        lock_mode = DependencyLockMode(_state_string(lock, "mode", state_path))
+    except ValueError as exc:
+        raise DependencyError(f"Dependency provenance state has an invalid enum: {exc}") from exc
+    update_requested = lock.get("update_requested")
+    if not isinstance(update_requested, bool):
+        raise DependencyError(
+            f"Dependency provenance field 'lock.update_requested' must be boolean: {state_path}"
+        )
+
+    return DependencyLockProvenance(
+        lock_path=lock_path,
+        lock_sha256=actual_lock_sha256.value,
+        registry_hash=_state_digest(
+            workspace.get("registry_hash"), "workspace.registry_hash", state_path
+        ).value,
+        requested_refs=tuple(requests),
+        resolved=modules,
+        overrides=overrides,
+        qualification=qualification,
+        baseline_fingerprint=_state_string(
+            workspace, "baseline_fingerprint", state_path
+        ),
+        workspace_fingerprint=_state_string(workspace, "fingerprint", state_path),
+        lock_mode=lock_mode,
+        update_requested=update_requested,
+    )
+
+
 def _collect_provenance(
     ctx: PipelineContext,
     *,
@@ -515,6 +618,9 @@ def _collect_provenance(
     if lock is None:
         raise DependencyError("Cannot record dependency provenance without an exact NSX lock.")
     lock_path = ctx.firmware_dir / "nsx.lock"
+    compatibility = ctx.config.compatibility
+    if compatibility is None:
+        raise DependencyError("Cannot record dependency provenance without compatibility state.")
     modules = tuple(
         DependencyModule(
             name=name,
@@ -560,6 +666,153 @@ def _collect_provenance(
         ),
         modules=modules,
         overrides=tuple(override_list),
+        qualification=compatibility.qualification,
+    )
+
+
+def _dependency_app_dir(path: Path) -> Path:
+    resolved = path.expanduser().resolve()
+    if resolved.is_file():
+        if resolved.name not in {"nsx.lock", _DEPENDENCY_STATE}:
+            raise DependencyError(
+                f"Expected nsx.lock or {_DEPENDENCY_STATE}, got: {resolved}"
+            )
+        resolved = resolved.parent
+    if (resolved / _DEPENDENCY_STATE).is_file():
+        return resolved
+    app_dir = resolved / "profiler_app"
+    if (app_dir / _DEPENDENCY_STATE).is_file():
+        return app_dir
+    raise DependencyError(
+        f"No prepared HPX dependency app found at: {resolved}",
+        hint=(
+            "Pass a profiler_app directory, its nsx.lock/state file, or the "
+            "fingerprinted workspace containing profiler_app."
+        ),
+    )
+
+
+def _state_mapping(
+    value: Mapping[str, Any],
+    key: str,
+    state_path: Path,
+) -> Mapping[str, Any]:
+    result = value.get(key)
+    if not isinstance(result, Mapping):
+        raise DependencyError(
+            f"Dependency provenance field '{key}' must be an object: {state_path}"
+        )
+    return result
+
+
+def _state_sequence(value: Any, key: str, state_path: Path) -> list[Any]:
+    if not isinstance(value, list):
+        raise DependencyError(
+            f"Dependency provenance field '{key}' must be an array: {state_path}"
+        )
+    return value
+
+
+def _state_named_records(
+    value: Any,
+    key: str,
+    state_path: Path,
+) -> tuple[tuple[str, Any], ...]:
+    records = _state_sequence(value, key, state_path)
+    named: list[tuple[str, Any]] = []
+    for index, record in enumerate(records):
+        if not isinstance(record, Mapping):
+            raise DependencyError(
+                f"Dependency provenance field '{key}[{index}]' must be an object: {state_path}"
+            )
+        named.append((_state_string(record, "name", state_path), record))
+    return tuple(named)
+
+
+def _state_string(value: Mapping[str, Any], key: str, state_path: Path) -> str:
+    result = value.get(key)
+    if not isinstance(result, str) or not result:
+        raise DependencyError(
+            f"Dependency provenance field '{key}' must be a non-empty string: {state_path}"
+        )
+    return result
+
+
+def _state_optional_string(
+    value: Mapping[str, Any],
+    key: str,
+    state_path: Path,
+) -> str | None:
+    result = value.get(key)
+    if result is None:
+        return None
+    if not isinstance(result, str) or not result:
+        raise DependencyError(
+            f"Dependency provenance field '{key}' must be a string or null: {state_path}"
+        )
+    return result
+
+
+def _state_digest(value: Any, key: str, state_path: Path) -> ContentDigest:
+    if not isinstance(value, Mapping):
+        raise DependencyError(
+            f"Dependency provenance field '{key}' must be a digest object: {state_path}"
+        )
+    algorithm = _state_string(value, "algorithm", state_path)
+    digest = _state_string(value, "value", state_path)
+    if algorithm != "sha256" or len(digest) != 64 or any(
+        character not in "0123456789abcdef" for character in digest
+    ):
+        raise DependencyError(
+            f"Dependency provenance field '{key}' must be a lowercase SHA-256 digest: "
+            f"{state_path}"
+        )
+    return ContentDigest(algorithm, digest)
+
+
+def _state_module(name: str, value: Any, state_path: Path) -> DependencyModule:
+    if not isinstance(value, Mapping):
+        raise DependencyError(f"Dependency module '{name}' must be an object: {state_path}")
+    vendored_at = value.get("vendored_at")
+    if not isinstance(vendored_at, str):
+        raise DependencyError(
+            f"Dependency module '{name}' vendored_at must be a string: {state_path}"
+        )
+    return DependencyModule(
+        name=name,
+        project=_state_string(value, "project", state_path),
+        kind=_state_string(value, "kind", state_path),
+        requested_ref=_state_string(value, "requested_ref", state_path),
+        requested_tag=_state_optional_string(value, "requested_tag", state_path),
+        peeled_commit=_state_optional_string(value, "peeled_commit", state_path),
+        content_hash=_state_digest(
+            value.get("content_hash"), f"modules.{name}.content_hash", state_path
+        ),
+        url=_state_optional_string(value, "url", state_path),
+        vendored_at=vendored_at,
+    )
+
+
+def _state_override(index: int, value: Any, state_path: Path) -> DependencyOverride:
+    if not isinstance(value, Mapping):
+        raise DependencyError(
+            f"Dependency override at index {index} must be an object: {state_path}"
+        )
+    content_hash_raw = value.get("content_hash")
+    return DependencyOverride(
+        scope=_state_string(value, "scope", state_path),
+        name=_state_string(value, "name", state_path),
+        mode=_state_string(value, "mode", state_path),
+        requested=_state_string(value, "requested", state_path),
+        content_hash=(
+            _state_digest(
+                content_hash_raw,
+                f"overrides[{index}].content_hash",
+                state_path,
+            )
+            if content_hash_raw is not None
+            else None
+        ),
     )
 
 

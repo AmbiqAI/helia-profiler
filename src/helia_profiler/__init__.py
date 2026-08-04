@@ -43,6 +43,7 @@ from .compatibility import (
     QualificationState,
     load_compatibility_baseline,
 )
+from .dependencies import read_dependency_lock_provenance
 from .engines import EngineType
 from . import examples
 from .counters import PmuCounter
@@ -51,6 +52,7 @@ from .errors import (
     BuildError,
     CaptureError,
     ConfigError,
+    DependencyError,
     EngineError,
     FirmwareError,
     HpxError,
@@ -64,6 +66,7 @@ from .pipeline import ProgressUpdate
 from .platform import BoardDef
 from .power.base import PowerMode, PowerResult
 from .results import (
+    DependencyLockProvenance,
     FirmwareMeta,
     LayerResult,
     NsxModuleRef,
@@ -151,6 +154,8 @@ __all__ = [
     "ResultValidity",
     "RunStatus",
     "load_result_manifest",
+    "DependencyLockProvenance",
+    "read_dependency_lock_provenance",
     "DoctorCheck",
     "DoctorResult",
     "BoardDef",
@@ -161,6 +166,7 @@ __all__ = [
     # Errors
     "HpxError",
     "ConfigError",
+    "DependencyError",
     "PlatformError",
     "EngineError",
     "FirmwareError",
@@ -244,6 +250,9 @@ _EXPERIMENTAL_API = {
     "ResultValidity",
     "RunStatus",
     "load_result_manifest",
+    "DependencyLockProvenance",
+    "read_dependency_lock_provenance",
+    "DependencyError",
 }
 
 _IMPLEMENTATION_API = {
