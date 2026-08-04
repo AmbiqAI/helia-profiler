@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 from threading import Thread
 
@@ -22,7 +23,7 @@ from helia_profiler.dependencies import (
     read_dependency_lock_provenance,
 )
 from helia_profiler.engines.base import EngineArtifacts
-from helia_profiler.errors import DependencyError
+from helia_profiler.errors import DependencyError, LockError, VersionError
 from helia_profiler.errors import BuildError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.results import DependencyLockMode
@@ -367,6 +368,8 @@ def test_offline_requires_compatible_lock(tmp_path: Path) -> None:
 
     assert exc.value.hint is not None
     assert "--update-dependencies" in exc.value.hint
+    # Missing lock is a LockError, not a bare/other DependencyError.
+    assert isinstance(exc.value, LockError)
 
 
 def test_missing_override_path_fails_with_typed_error(tmp_path: Path) -> None:
@@ -388,8 +391,9 @@ def test_offline_requires_materialized_locked_modules(tmp_path: Path) -> None:
         child.unlink()
     module_dir.rmdir()
 
-    with pytest.raises(DependencyError, match="module trees are missing"):
+    with pytest.raises(DependencyError, match="module trees are missing") as exc:
         prepare_locked_dependencies(ctx)
+    assert isinstance(exc.value, LockError)
 
 
 def test_override_content_and_request_change_fingerprint(
@@ -449,3 +453,95 @@ def test_concurrent_workspace_identity_is_atomic(tmp_path: Path) -> None:
     assert json.loads(identity_path.read_text())["fingerprint"] == (
         ctx.dependency_workspace.fingerprint
     )
+
+
+# ---------------------------------------------------------------------------
+# DependencyError taxonomy — VersionError vs LockError classification.
+# ---------------------------------------------------------------------------
+
+
+def test_lock_schema_version_mismatch_raises_version_error(tmp_path: Path) -> None:
+    from helia_profiler.dependencies import _lock_incompatibility
+
+    ctx = _context(tmp_path)
+    assert ctx.firmware_dir is not None
+    _write_valid_lock(ctx)
+    lock_path = ctx.firmware_dir / "nsx.lock"
+    text = lock_path.read_text(encoding="utf-8")
+    assert "schema_version: 4" in text
+    lock_path.write_text(
+        text.replace("schema_version: 4", "schema_version: 999"), encoding="utf-8"
+    )
+
+    reason = _lock_incompatibility(ctx.firmware_dir, "apollo510_evb")
+
+    assert reason is not None
+    message, error_cls = reason
+    assert "schema_version 999" in message
+    assert error_cls is VersionError
+    assert issubclass(error_cls, DependencyError)
+    assert not issubclass(error_cls, LockError)
+
+
+def test_offline_lock_schema_drift_raises_version_error_end_to_end(tmp_path: Path) -> None:
+    """The full offline-reuse path surfaces the same VersionError, not a bare LockError."""
+    ctx = _context(tmp_path, build={"offline": True})
+    assert ctx.firmware_dir is not None
+    _write_valid_lock(ctx)
+    lock_path = ctx.firmware_dir / "nsx.lock"
+    text = lock_path.read_text(encoding="utf-8")
+    lock_path.write_text(
+        text.replace("schema_version: 4", "schema_version: 999"), encoding="utf-8"
+    )
+
+    with pytest.raises(VersionError, match="schema_version 999") as exc:
+        prepare_locked_dependencies(ctx)
+
+    assert not isinstance(exc.value, LockError)
+
+
+def test_read_dependency_lock_provenance_missing_state_raises_lock_error(
+    tmp_path: Path,
+) -> None:
+    empty_app_dir = tmp_path / "profiler_app"
+    empty_app_dir.mkdir(parents=True)
+
+    with pytest.raises(LockError, match="No prepared HPX dependency app found"):
+        read_dependency_lock_provenance(tmp_path)
+
+
+def test_lock_provenance_drift_raises_lock_error_not_version_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(tmp_path)
+    _write_valid_lock(ctx)
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    prepare_locked_dependencies(ctx)
+    assert ctx.firmware_dir is not None
+    (ctx.firmware_dir / "nsx.lock").write_bytes(b"changed")
+
+    with pytest.raises(LockError, match="no longer matches") as exc:
+        read_dependency_lock_provenance(ctx.firmware_dir)
+
+    assert not isinstance(exc.value, VersionError)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits only")
+def test_read_dependency_lock_provenance_unreadable_lock_raises_lock_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if os.geteuid() == 0:
+        pytest.skip("root ignores POSIX permission bits")
+    ctx = _context(tmp_path)
+    _write_valid_lock(ctx)
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    prepare_locked_dependencies(ctx)
+    assert ctx.firmware_dir is not None
+    lock_path = ctx.firmware_dir / "nsx.lock"
+    original_mode = lock_path.stat().st_mode
+    lock_path.chmod(0o000)
+    try:
+        with pytest.raises(LockError):
+            read_dependency_lock_provenance(ctx.firmware_dir)
+    finally:
+        lock_path.chmod(original_mode)

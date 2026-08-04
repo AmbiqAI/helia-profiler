@@ -47,7 +47,7 @@ from .dependencies import read_dependency_lock_provenance
 from .engines import EngineType
 from . import examples
 from .counters import PmuCounter
-from .doctor import DoctorCheck, DoctorResult
+from .doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
 from .errors import (
     BuildError,
     CaptureError,
@@ -56,10 +56,12 @@ from .errors import (
     EngineError,
     FirmwareError,
     HpxError,
+    LockError,
     NetworkError,
     PlatformError,
     PowerError,
     ReportError,
+    VersionError,
 )
 from .placement import Placement
 from .pipeline import ProgressUpdate
@@ -82,7 +84,15 @@ from .results import (
     ResultManifest,
     ResultValidity,
     RunStatus,
+    SupportBundleManifest,
+    SupportBundleSection,
     load_result_manifest,
+)
+from .support_bundle import (
+    SupportBundleOptions,
+    collect_support_bundle,
+    verify_support_bundle,
+    write_support_bundle,
 )
 from .session import Session
 from .target.probe.jlink import JLinkProbe, JLinkProbeMatch
@@ -156,8 +166,15 @@ __all__ = [
     "load_result_manifest",
     "DependencyLockProvenance",
     "read_dependency_lock_provenance",
+    "SupportBundleManifest",
+    "SupportBundleSection",
+    "SupportBundleOptions",
+    "collect_support_bundle",
+    "write_support_bundle",
+    "verify_support_bundle",
     "DoctorCheck",
     "DoctorResult",
+    "DoctorVersionCheck",
     "BoardDef",
     "PmuCounter",
     "JLinkProbe",
@@ -167,6 +184,8 @@ __all__ = [
     "HpxError",
     "ConfigError",
     "DependencyError",
+    "VersionError",
+    "LockError",
     "PlatformError",
     "EngineError",
     "FirmwareError",
@@ -253,6 +272,14 @@ _EXPERIMENTAL_API = {
     "DependencyLockProvenance",
     "read_dependency_lock_provenance",
     "DependencyError",
+    "VersionError",
+    "LockError",
+    "SupportBundleManifest",
+    "SupportBundleSection",
+    "SupportBundleOptions",
+    "collect_support_bundle",
+    "write_support_bundle",
+    "verify_support_bundle",
 }
 
 _IMPLEMENTATION_API = {
@@ -260,6 +287,7 @@ _IMPLEMENTATION_API = {
     "NsxModuleRef",
     "DoctorCheck",
     "DoctorResult",
+    "DoctorVersionCheck",
     "BoardDef",
     "PmuCounter",
     "JLinkProbe",

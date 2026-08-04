@@ -67,6 +67,8 @@ branches, profiling, filtering, comparisons, overlays, and power, see
 
 ::: helia_profiler.DoctorResult
 
+::: helia_profiler.DoctorVersionCheck
+
 ::: helia_profiler.BoardDef
 
 ::: helia_profiler.PmuCounter

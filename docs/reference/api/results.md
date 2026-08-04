@@ -55,6 +55,34 @@ The stable join keys are `baseline_fingerprint`
 
 ::: helia_profiler.DependencyLockProvenance
 
+## Field-diagnostics support bundle
+
+`collect_support_bundle()` is the diagnostics collector `read_dependency_lock_provenance()`
+was reserved for: it gathers doctor checks/versions, the compatibility
+baseline, the exact Stage 5 lock provenance (when `workspace` is given), a
+module inventory, an optional sanitized resolved config, and optional
+probe/port summaries — redacting absolute paths, credentialed URLs, tokens,
+and device serials by default (see `helia_profiler.redact`) — into one
+in-memory `SupportBundleCollection`. `write_support_bundle()` archives it
+deterministically (stable member order and byte content for identical
+inputs); `verify_support_bundle()` re-checks an archive's structure and
+per-member digests, rejecting unsafe or disallowed member paths. Every
+section is collected best-effort: a missing workspace, config, or optional
+tool marks just that section unavailable with a reason instead of failing
+the whole bundle.
+
+::: helia_profiler.SupportBundleOptions
+
+::: helia_profiler.collect_support_bundle
+
+::: helia_profiler.write_support_bundle
+
+::: helia_profiler.verify_support_bundle
+
+::: helia_profiler.SupportBundleManifest
+
+::: helia_profiler.SupportBundleSection
+
 ## Validity and comparability
 
 The same pure policy functions drive manifests, summary output, comparisons,

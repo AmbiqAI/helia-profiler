@@ -200,4 +200,5 @@ nav:
       - Engine Adapters: architecture/engine-adapters.md
       - Firmware Generation: architecture/firmware.md
       - Data Capture: architecture/capture.md
+      - Field Diagnostics: architecture/field-diagnostics.md
       - Contributing an Engine: architecture/adding-an-engine.md

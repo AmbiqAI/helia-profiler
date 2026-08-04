@@ -23,6 +23,7 @@ from ..config import AGGREGATION_METHODS, POWER_FIRMWARE_MODES, Transport
 from ..engines import EngineType
 from ..placement import Placement
 from ..target.lifecycle import ResetStrategy
+from . import inspect_app as _inspect_app
 
 app = typer.Typer(
     name="hpx",
@@ -477,35 +478,6 @@ def profile_command(
 
 
 # ---------------------------------------------------------------------------
-# hpx doctor / engines / boards
-# ---------------------------------------------------------------------------
-
-
-@app.command("doctor", help="Check toolchain and dependencies")
-def doctor_command() -> None:
-    """Check toolchain and dependencies."""
-    from .inspect_cmds import _cmd_doctor
-
-    _cmd_doctor()
-
-
-@app.command("engines", help="List available inference engines")
-def engines_command() -> None:
-    """List available inference engines."""
-    from .inspect_cmds import _cmd_engines
-
-    _cmd_engines()
-
-
-@app.command("boards", help="List supported boards and SoC capabilities")
-def boards_command() -> None:
-    """List supported boards and their SoC capabilities."""
-    from .inspect_cmds import _cmd_boards
-
-    _cmd_boards()
-
-
-# ---------------------------------------------------------------------------
 # hpx analyze
 # ---------------------------------------------------------------------------
 
@@ -570,121 +542,13 @@ def analyze_command(
 
 
 # ---------------------------------------------------------------------------
-# hpx probes {list, match}
+# hpx doctor / engines / boards / probes / ports / target
+#
+# Wired from a separate module (cli/inspect_app.py) so this file stays under
+# the project's per-module line ceiling — see tests/test_package_layout.py.
 # ---------------------------------------------------------------------------
 
-probes_app = typer.Typer(
-    help="Inspect connected J-Link probes without opening an interactive SEGGER commander session",
-)
-
-
-@probes_app.callback(invoke_without_command=True)
-def _probes_callback(ctx: typer.Context) -> None:
-    if ctx.invoked_subcommand is None:
-        click.echo(ctx.get_help())
-        raise typer.Exit(0)
-
-
-@probes_app.command("list", help="List connected J-Link probes")
-def probes_list_command(
-    board: Optional[str] = typer.Option(
-        None, "--board", help="Inspect each probe against this board's J-Link device string"
-    ),
-    inspect: bool = typer.Option(
-        False, "--inspect", help="Inspect target cores. Requires --board."
-    ),
-    json_: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
-) -> None:
-    from .inspect_cmds import _cmd_probes_list
-
-    _cmd_probes_list(SimpleNamespace(board=board, inspect=inspect, json=json_))
-
-
-@probes_app.command(
-    "match", help="Resolve the J-Link serial for a board using HPX's normal selection policy"
-)
-def probes_match_command(
-    board: str = typer.Option(..., "--board", help="Target board ID"),
-    jlink_serial: Optional[str] = typer.Option(
-        None, "--jlink-serial", help="Optional requested serial to validate against the selected board"
-    ),
-    json_: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
-) -> None:
-    from .inspect_cmds import _cmd_probes_match
-
-    _cmd_probes_match(SimpleNamespace(board=board, jlink_serial=jlink_serial, json=json_))
-
-
-app.add_typer(probes_app, name="probes")
-
-
-# ---------------------------------------------------------------------------
-# hpx ports {list}
-# ---------------------------------------------------------------------------
-
-ports_app = typer.Typer(help="List host serial ports relevant to HPX transports")
-
-
-@ports_app.callback(invoke_without_command=True)
-def _ports_callback(ctx: typer.Context) -> None:
-    if ctx.invoked_subcommand is None:
-        click.echo(ctx.get_help())
-        raise typer.Exit(0)
-
-
-@ports_app.command("list", help="List serial ports with J-Link/CDC hints")
-def ports_list_command(
-    show_all: bool = typer.Option(
-        False, "--all", help="Show every host serial port, not just HPX-relevant USB/J-Link ports"
-    ),
-    json_: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
-) -> None:
-    from .inspect_cmds import _cmd_ports_list
-
-    _cmd_ports_list(SimpleNamespace(show_all=show_all, json=json_))
-
-
-app.add_typer(ports_app, name="ports")
-
-
-# ---------------------------------------------------------------------------
-# hpx target {reset}
-# ---------------------------------------------------------------------------
-
-target_app = typer.Typer(help="Run explicit target-side utility operations")
-
-
-@target_app.callback(invoke_without_command=True)
-def _target_callback(ctx: typer.Context) -> None:
-    if ctx.invoked_subcommand is None:
-        click.echo(ctx.get_help())
-        raise typer.Exit(0)
-
-
-_TARGET_RESET_KIND_CHOICE = click.Choice(["debug", "swpoi"])
-
-
-@target_app.command(
-    "reset", help="Reset a target through HPX's non-interactive J-Link wrapper"
-)
-def target_reset_command(
-    board: str = typer.Option(..., "--board", help="Target board ID"),
-    jlink_serial: Optional[str] = typer.Option(
-        None, "--jlink-serial", help="J-Link probe serial number"
-    ),
-    kind: str = typer.Option(
-        "debug",
-        "--kind",
-        click_type=_TARGET_RESET_KIND_CHOICE,
-        help="Reset kind: debug r/g reset (default) or SWPOI reset",
-    ),
-) -> None:
-    from .inspect_cmds import _cmd_target_reset
-
-    _cmd_target_reset(SimpleNamespace(board=board, jlink_serial=jlink_serial, kind=kind))
-
-
-app.add_typer(target_app, name="target")
+_inspect_app.register(app)
 
 
 # ---------------------------------------------------------------------------

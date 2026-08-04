@@ -20,7 +20,7 @@ from neuralspotx.nsx_lock import LOCK_SCHEMA_VERSION, hash_manifest, read_lock
 
 from . import nsx as nsx_cli
 from ._version import __version__
-from .errors import BuildError, DependencyError
+from .errors import BuildError, DependencyError, LockError, VersionError
 from .results.dependencies import (
     ContentDigest,
     DependencyLockMode,
@@ -347,34 +347,45 @@ def workspace_mutex(workspace: DependencyWorkspace) -> Iterator[None]:
         yield
 
 
-def _lock_incompatibility(app_dir: Path, board: str) -> str | None:
+def _lock_incompatibility(app_dir: Path, board: str) -> tuple[str, type[DependencyError]] | None:
+    """Return ``(reason, error_class)`` if the on-disk lock cannot be reused.
+
+    *error_class* is :class:`VersionError` for a schema-version mismatch and
+    :class:`LockError` for every other missing/corrupt/drifted lock reason,
+    so callers can raise the exact taxonomy member without re-deriving it.
+    """
     lock_path = app_dir / "nsx.lock"
     if not lock_path.is_file():
-        return "nsx.lock is missing"
+        return "nsx.lock is missing", LockError
     try:
         lock = read_lock(app_dir, board)
     except Exception as exc:
-        return f"nsx.lock is unreadable or structurally incompatible: {exc}"
+        # neuralspotx's own reader raises for an incompatible on-disk
+        # ``schema_version`` (see ``NsxLock``/``LockFile.from_yaml_dict``)
+        # rather than returning a lock object we could inspect below, so
+        # that specific reason is classified as a version mismatch here.
+        error_cls = VersionError if "schema_version" in str(exc) else LockError
+        return f"nsx.lock is unreadable or structurally incompatible: {exc}", error_cls
     if lock is None:
-        return f"nsx.lock has no target section for board '{board}'"
+        return f"nsx.lock has no target section for board '{board}'", LockError
     if lock.schema_version != LOCK_SCHEMA_VERSION:
         return (
             f"nsx.lock schema v{lock.schema_version} is incompatible "
             f"(neuralspotx requires v{LOCK_SCHEMA_VERSION})"
-        )
+        ), VersionError
     expected_manifest_hash = hash_manifest(app_dir / "nsx.yml")
     if lock.manifest_hash != expected_manifest_hash:
-        return "nsx.lock was produced from a different generated nsx.yml manifest"
+        return "nsx.lock was produced from a different generated nsx.yml manifest", LockError
     if not lock.modules:
-        return "nsx.lock contains no resolved modules"
+        return "nsx.lock contains no resolved modules", LockError
     for name, module in lock.modules.items():
         content_hash = module.content_hash.removeprefix("sha256:")
         if len(content_hash) != 64 or any(ch not in "0123456789abcdef" for ch in content_hash):
-            return f"nsx.lock module '{name}' has an invalid content hash"
+            return f"nsx.lock module '{name}' has an invalid content hash", LockError
         if str(module.kind) == "git":
             commit = module.commit or ""
             if len(commit) != 40 or any(ch not in "0123456789abcdef" for ch in commit.lower()):
-                return f"nsx.lock module '{name}' has no exact peeled commit"
+                return f"nsx.lock module '{name}' has no exact peeled commit", LockError
     return None
 
 
@@ -419,8 +430,9 @@ def prepare_locked_dependencies(ctx: PipelineContext) -> DependencyProvenance:
         mode = DependencyLockMode.REUSED
         log.info("Reusing byte-exact compatible nsx.lock: %s", app_dir / "nsx.lock")
     elif offline:
-        raise DependencyError(
-            f"Offline/frozen dependency reuse requires a compatible lock: {reason}.",
+        reason_message, error_cls = reason
+        raise error_cls(
+            f"Offline/frozen dependency reuse requires a compatible lock: {reason_message}.",
             hint=(
                 "Run once online without --offline/--frozen to create the lock, or use "
                 "--update-dependencies online to intentionally refresh it."
@@ -437,14 +449,15 @@ def prepare_locked_dependencies(ctx: PipelineContext) -> DependencyProvenance:
 
     reason = _lock_incompatibility(app_dir, board)
     if reason is not None:
-        raise DependencyError(
-            f"NSX produced an incompatible dependency lock: {reason}.",
+        reason_message, error_cls = reason
+        raise error_cls(
+            f"NSX produced an incompatible dependency lock: {reason_message}.",
             hint="Update neuralspotx or remove this fingerprinted workspace and retry.",
         )
     if offline:
         missing = _offline_materialization_error(app_dir, board)
         if missing is not None:
-            raise DependencyError(
+            raise LockError(
                 f"Offline/frozen dependency sync cannot continue because {missing}.",
                 hint="Run once online without --offline/--frozen to materialize the exact lock.",
             )
@@ -457,7 +470,7 @@ def prepare_locked_dependencies(ctx: PipelineContext) -> DependencyProvenance:
         )
     except BuildError as exc:
         if offline:
-            raise DependencyError(
+            raise LockError(
                 "Frozen dependency sync rejected the locked workspace.",
                 details=exc.details,
                 hint=(
@@ -487,7 +500,7 @@ def prepare_locked_dependencies(ctx: PipelineContext) -> DependencyProvenance:
                 verbose=config.verbose,
             )
         except BuildError as repair_exc:
-            raise DependencyError(
+            raise LockError(
                 "Dependency module repair from the exact lock failed.",
                 details=repair_exc.details,
                 hint=(
@@ -523,21 +536,24 @@ def read_dependency_lock_provenance(
     try:
         raw = json.loads(state_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise DependencyError(
+        raise LockError(
             f"Cannot read dependency provenance state: {state_path}",
             hint="Run a successful HPX dependency preparation in this workspace first.",
         ) from exc
     if not isinstance(raw, Mapping):
-        raise DependencyError(f"Dependency provenance state must be an object: {state_path}")
+        raise LockError(f"Dependency provenance state must be an object: {state_path}")
 
     workspace = _state_mapping(raw, "workspace", state_path)
     lock = _state_mapping(raw, "lock", state_path)
     recorded_lock_sha256 = _state_digest(lock.get("sha256"), "lock.sha256", state_path)
     if not lock_path.is_file():
-        raise DependencyError(f"Dependency lock is missing: {lock_path}")
-    actual_lock_sha256 = _digest_file(lock_path)
+        raise LockError(f"Dependency lock is missing: {lock_path}")
+    try:
+        actual_lock_sha256 = _digest_file(lock_path)
+    except OSError as exc:
+        raise LockError(f"Cannot read dependency lock: {lock_path}: {exc}") from exc
     if actual_lock_sha256 != recorded_lock_sha256:
-        raise DependencyError(
+        raise LockError(
             f"Dependency lock no longer matches recorded provenance: {lock_path}",
             hint="Re-run dependency preparation before collecting diagnostics.",
         )
@@ -579,10 +595,10 @@ def read_dependency_lock_provenance(
         qualification = QualificationState(_state_string(raw, "qualification", state_path))
         lock_mode = DependencyLockMode(_state_string(lock, "mode", state_path))
     except ValueError as exc:
-        raise DependencyError(f"Dependency provenance state has an invalid enum: {exc}") from exc
+        raise LockError(f"Dependency provenance state has an invalid enum: {exc}") from exc
     update_requested = lock.get("update_requested")
     if not isinstance(update_requested, bool):
-        raise DependencyError(
+        raise LockError(
             f"Dependency provenance field 'lock.update_requested' must be boolean: {state_path}"
         )
 
@@ -616,7 +632,7 @@ def _collect_provenance(
     assert ctx.dependency_workspace is not None
     lock = read_lock(ctx.firmware_dir, ctx.board.name)
     if lock is None:
-        raise DependencyError("Cannot record dependency provenance without an exact NSX lock.")
+        raise LockError("Cannot record dependency provenance without an exact NSX lock.")
     lock_path = ctx.firmware_dir / "nsx.lock"
     compatibility = ctx.config.compatibility
     if compatibility is None:
@@ -674,7 +690,7 @@ def _dependency_app_dir(path: Path) -> Path:
     resolved = path.expanduser().resolve()
     if resolved.is_file():
         if resolved.name not in {"nsx.lock", _DEPENDENCY_STATE}:
-            raise DependencyError(
+            raise LockError(
                 f"Expected nsx.lock or {_DEPENDENCY_STATE}, got: {resolved}"
             )
         resolved = resolved.parent
@@ -683,7 +699,7 @@ def _dependency_app_dir(path: Path) -> Path:
     app_dir = resolved / "profiler_app"
     if (app_dir / _DEPENDENCY_STATE).is_file():
         return app_dir
-    raise DependencyError(
+    raise LockError(
         f"No prepared HPX dependency app found at: {resolved}",
         hint=(
             "Pass a profiler_app directory, its nsx.lock/state file, or the "
@@ -699,7 +715,7 @@ def _state_mapping(
 ) -> Mapping[str, Any]:
     result = value.get(key)
     if not isinstance(result, Mapping):
-        raise DependencyError(
+        raise LockError(
             f"Dependency provenance field '{key}' must be an object: {state_path}"
         )
     return result
@@ -707,7 +723,7 @@ def _state_mapping(
 
 def _state_sequence(value: Any, key: str, state_path: Path) -> list[Any]:
     if not isinstance(value, list):
-        raise DependencyError(
+        raise LockError(
             f"Dependency provenance field '{key}' must be an array: {state_path}"
         )
     return value
@@ -722,7 +738,7 @@ def _state_named_records(
     named: list[tuple[str, Any]] = []
     for index, record in enumerate(records):
         if not isinstance(record, Mapping):
-            raise DependencyError(
+            raise LockError(
                 f"Dependency provenance field '{key}[{index}]' must be an object: {state_path}"
             )
         named.append((_state_string(record, "name", state_path), record))
@@ -732,7 +748,7 @@ def _state_named_records(
 def _state_string(value: Mapping[str, Any], key: str, state_path: Path) -> str:
     result = value.get(key)
     if not isinstance(result, str) or not result:
-        raise DependencyError(
+        raise LockError(
             f"Dependency provenance field '{key}' must be a non-empty string: {state_path}"
         )
     return result
@@ -747,7 +763,7 @@ def _state_optional_string(
     if result is None:
         return None
     if not isinstance(result, str) or not result:
-        raise DependencyError(
+        raise LockError(
             f"Dependency provenance field '{key}' must be a string or null: {state_path}"
         )
     return result
@@ -755,7 +771,7 @@ def _state_optional_string(
 
 def _state_digest(value: Any, key: str, state_path: Path) -> ContentDigest:
     if not isinstance(value, Mapping):
-        raise DependencyError(
+        raise LockError(
             f"Dependency provenance field '{key}' must be a digest object: {state_path}"
         )
     algorithm = _state_string(value, "algorithm", state_path)
@@ -763,7 +779,7 @@ def _state_digest(value: Any, key: str, state_path: Path) -> ContentDigest:
     if algorithm != "sha256" or len(digest) != 64 or any(
         character not in "0123456789abcdef" for character in digest
     ):
-        raise DependencyError(
+        raise LockError(
             f"Dependency provenance field '{key}' must be a lowercase SHA-256 digest: "
             f"{state_path}"
         )
@@ -772,10 +788,10 @@ def _state_digest(value: Any, key: str, state_path: Path) -> ContentDigest:
 
 def _state_module(name: str, value: Any, state_path: Path) -> DependencyModule:
     if not isinstance(value, Mapping):
-        raise DependencyError(f"Dependency module '{name}' must be an object: {state_path}")
+        raise LockError(f"Dependency module '{name}' must be an object: {state_path}")
     vendored_at = value.get("vendored_at")
     if not isinstance(vendored_at, str):
-        raise DependencyError(
+        raise LockError(
             f"Dependency module '{name}' vendored_at must be a string: {state_path}"
         )
     return DependencyModule(
@@ -795,7 +811,7 @@ def _state_module(name: str, value: Any, state_path: Path) -> DependencyModule:
 
 def _state_override(index: int, value: Any, state_path: Path) -> DependencyOverride:
     if not isinstance(value, Mapping):
-        raise DependencyError(
+        raise LockError(
             f"Dependency override at index {index} must be an object: {state_path}"
         )
     content_hash_raw = value.get("content_hash")

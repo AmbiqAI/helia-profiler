@@ -20,6 +20,10 @@ the exception is formatted as a string.
 
 ::: helia_profiler.DependencyError
 
+::: helia_profiler.VersionError
+
+::: helia_profiler.LockError
+
 ::: helia_profiler.NetworkError
 
 ::: helia_profiler.CaptureError
