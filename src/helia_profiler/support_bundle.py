@@ -106,6 +106,7 @@ def collect_support_bundle(options: SupportBundleOptions = SupportBundleOptions(
         counts=counts,
         host=host,
         raw_probe_ids=options.raw_probe_ids,
+        policy=policy,
     )
     return SupportBundleCollection(manifest=manifest, members=members)
 
@@ -171,7 +172,12 @@ def _collect_dependencies(
 
     try:
         provenance = read_dependency_lock_provenance(options.workspace)
-    except (DependencyError, OSError) as exc:
+    except (DependencyError, OSError, UnicodeDecodeError) as exc:
+        # UnicodeDecodeError (a ValueError, not an OSError): the recorded
+        # provenance state file (hpx-dependencies.json) is read as UTF-8
+        # text internally by read_dependency_lock_provenance() -- a
+        # corrupted/truncated state file must degrade this section like
+        # every other best-effort failure here, not crash the collector.
         sections.append(SupportBundleSection("dependencies", False, reason=str(exc)))
         sections.append(SupportBundleSection("nsx.lock", False, reason=str(exc)))
         return None, counts
@@ -184,7 +190,12 @@ def _collect_dependencies(
 
     try:
         lock_text = provenance.lock_path.read_text(encoding="utf-8")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
+        # UnicodeDecodeError (a ValueError, not an OSError) is just as
+        # possible here as a read failure -- nsx.lock is user/tool-written
+        # and nothing guarantees it is valid UTF-8. Either way this is a
+        # best-effort section like every other one in this collector, not
+        # a reason to abort the whole bundle.
         sections.append(SupportBundleSection("nsx.lock", False, reason=str(exc)))
         return provenance, counts
 
@@ -289,7 +300,12 @@ def _collect_config(
         return counts
     try:
         config = load_config(options.config_path, {})
-    except (HpxError, OSError) as exc:
+    except (HpxError, OSError, UnicodeDecodeError) as exc:
+        # UnicodeDecodeError (a ValueError, not an OSError): load_config()
+        # opens the YAML file as text with no explicit encoding, so a
+        # hand-authored config with a non-UTF-8 byte (or any file read
+        # under a non-UTF-8 locale) must degrade this section like every
+        # other best-effort failure here, not crash the collector.
         sections.append(SupportBundleSection("config", False, reason=str(exc)))
         return counts
 
@@ -402,6 +418,30 @@ def _collect_host(
     return redacted, counts.combined(item_counts)
 
 
+def _redact_sections(
+    sections: list[SupportBundleSection], policy: RedactionPolicy, counts: RedactionCounts
+) -> tuple[tuple[SupportBundleSection, ...], RedactionCounts]:
+    """Redact every section's ``reason`` before it reaches the manifest.
+
+    A skip reason is almost always a formatted exception message (a missing
+    workspace, an unreadable config, ...), which routinely embeds the exact
+    absolute path or account name that triggered it -- this is otherwise
+    the one place in the collector where free-form text reaches the
+    archive without going through :func:`~helia_profiler.redact.redact_value`.
+    """
+    redacted_sections: list[SupportBundleSection] = []
+    for section in sections:
+        if section.reason is None:
+            redacted_sections.append(section)
+            continue
+        redacted_reason, reason_counts = redact_text(section.reason, policy)
+        counts = counts.combined(reason_counts)
+        redacted_sections.append(
+            SupportBundleSection(section.name, section.available, reason=redacted_reason)
+        )
+    return tuple(redacted_sections), counts
+
+
 def _build_manifest(
     *,
     members: dict[str, bytes],
@@ -409,7 +449,9 @@ def _build_manifest(
     counts: RedactionCounts,
     host: dict[str, Any],
     raw_probe_ids: bool,
+    policy: RedactionPolicy,
 ) -> SupportBundleManifest:
+    redacted_sections, counts = _redact_sections(sections, policy, counts)
     artifacts = tuple(
         ResultArtifact(
             path=name,
@@ -428,7 +470,7 @@ def _build_manifest(
         hpx_version=_hpx_version,
         generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         host=host,
-        sections=tuple(sections),
+        sections=redacted_sections,
         redaction={**counts.to_dict(), "raw_probe_ids": raw_probe_ids},
         artifacts=artifacts,
     )
@@ -442,6 +484,14 @@ _ZIP_FIXED_DATE_TIME = (1980, 1, 1, 0, 0, 0)
 _UNSAFE_VERSION_CHARS = re.compile(r"[^A-Za-z0-9_.-]+")
 _ALLOWED_MEMBER_SUFFIXES = frozenset({".json"})
 _ALLOWED_EXACT_MEMBER_NAMES = frozenset({"nsx.lock", "manifest.json"})
+# A Windows drive-absolute path ("C:/...") is absolute on Windows even
+# though it contains no leading "/" and PurePosixPath doesn't recognize a
+# drive letter as a root -- this module only ever writes this archive
+# itself, but a hostile/corrupted one could smuggle a member name that a
+# Windows extractor would treat as an absolute path outside the bundle.
+# Backslash forms are already rejected above by the plain "\\" in name
+# check; this only needs to close the forward-slash form.
+_WINDOWS_DRIVE_ABS_RE = re.compile(r"(?i)^[a-z]:[/\\]")
 
 
 def content_fingerprint(members: dict[str, bytes]) -> str:
@@ -469,20 +519,34 @@ def write_support_bundle(collection: SupportBundleCollection, output: Path) -> P
     version, so identical inputs always produce the same file name and the
     same member bytes for every entry except ``manifest.json`` (only its
     ``generated_at`` timestamp differs run to run).
+
+    Raises :class:`~helia_profiler.errors.ReportError` (not a raw
+    :class:`OSError`) if the destination cannot be created or written to
+    (permission denied, no space left, a path component that is itself a
+    file, ...), so CLI callers only ever need to catch ``HpxError``.
     """
     fingerprint = content_fingerprint(collection.members)
     all_members = dict(collection.members)
     all_members["manifest.json"] = _dump_json(collection.manifest.to_dict())
 
-    if output.suffix.lower() == ".zip":
+    is_explicit_file = output.suffix.lower() == ".zip"
+    if is_explicit_file:
         archive_path = output
-        archive_path.parent.mkdir(parents=True, exist_ok=True)
     else:
-        output.mkdir(parents=True, exist_ok=True)
         safe_version = _UNSAFE_VERSION_CHARS.sub("_", collection.manifest.hpx_version) or "0"
         archive_path = output / f"hpx-support-bundle-{safe_version}-{fingerprint[:16]}.zip"
 
-    _write_deterministic_zip(archive_path, all_members)
+    try:
+        if is_explicit_file:
+            archive_path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            output.mkdir(parents=True, exist_ok=True)
+        _write_deterministic_zip(archive_path, all_members)
+    except OSError as exc:
+        raise ReportError(
+            f"Cannot write support bundle to {archive_path}: {exc}",
+            hint="Check that the destination directory is writable and has free space.",
+        ) from exc
     return archive_path
 
 
@@ -500,10 +564,19 @@ def _write_deterministic_zip(path: Path, members: dict[str, bytes]) -> None:
     tmp_path = Path(tmp_name)
     try:
         with os.fdopen(fd, "wb") as handle:
-            with zipfile.ZipFile(handle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            # ZIP_STORED (no compression), not ZIP_DEFLATED: DEFLATE's exact
+            # output bytes are a function of the zlib version/build doing
+            # the compressing, which is not something this module controls
+            # or pins, so two hosts with different zlib builds could
+            # otherwise produce different bytes for identical input despite
+            # every other normalization here. Storing uncompressed makes
+            # the "byte-identical members" guarantee true independent of
+            # host/zlib — an acceptable trade-off since bundle members are
+            # small JSON/text, not something worth compressing.
+            with zipfile.ZipFile(handle, "w", compression=zipfile.ZIP_STORED) as archive:
                 for name in ordered_names:
                     info = zipfile.ZipInfo(name, date_time=_ZIP_FIXED_DATE_TIME)
-                    info.compress_type = zipfile.ZIP_DEFLATED
+                    info.compress_type = zipfile.ZIP_STORED
                     info.external_attr = 0o644 << 16
                     info.create_system = 0  # normalize across platforms for byte-determinism
                     archive.writestr(info, members[name])
@@ -515,18 +588,33 @@ def _write_deterministic_zip(path: Path, members: dict[str, bytes]) -> None:
 def verify_support_bundle(path: Path) -> SupportBundleManifest:
     """Verify a support-bundle archive's structure, contents, and digests.
 
-    Rejects absolute member paths, ``..``/empty path segments, backslashes,
-    NUL bytes, duplicate entries, and any file extension other than
-    ``.json``/exactly ``nsx.lock`` — defense in depth against a malformed or
-    hostile archive (zip-slip, disguised binary payloads) even though this
-    module only ever writes archives matching that shape itself.
+    Rejects absolute member paths (POSIX, and Windows drive-letter paths in
+    either ``C:\\...`` or ``C:/...`` form), ``..``/empty path segments,
+    backslashes, NUL bytes, duplicate entries, and any file extension other
+    than ``.json``/exactly ``nsx.lock`` — defense in depth against a
+    malformed or hostile archive (zip-slip, disguised binary payloads) even
+    though this module only ever writes archives matching that shape
+    itself.
     """
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
         _validate_member_names(names)
         if "manifest.json" not in names:
             raise ReportError(f"Support bundle is missing manifest.json: {path}")
-        manifest = SupportBundleManifest.from_dict(json.loads(archive.read("manifest.json")))
+        try:
+            manifest_data = json.loads(archive.read("manifest.json"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            # A corrupted/hand-edited archive can carry a manifest.json
+            # that isn't valid JSON or valid UTF-8 -- surface this as the
+            # same typed ReportError every other verification failure uses
+            # instead of letting a raw JSONDecodeError/UnicodeDecodeError
+            # escape and break the "verify never raises anything but
+            # ReportError" contract. SupportBundleManifest.from_dict()'s
+            # own ReportError (bad schema/shape) still propagates as-is.
+            raise ReportError(
+                f"Support bundle manifest.json is not valid JSON: {path}: {exc}"
+            ) from exc
+        manifest = SupportBundleManifest.from_dict(manifest_data)
 
         declared = {artifact.path for artifact in manifest.artifacts} | {"manifest.json"}
         actual = set(names)
@@ -558,7 +646,7 @@ def _validate_member_names(names: list[str]) -> None:
         if any(part in ("", ".", "..") for part in parts):
             raise ReportError(f"Support bundle member has an unsafe path: {name!r}")
         pure = PurePosixPath(name)
-        if pure.is_absolute():
+        if pure.is_absolute() or _WINDOWS_DRIVE_ABS_RE.match(name):
             raise ReportError(f"Support bundle member path must be relative: {name!r}")
         if name not in _ALLOWED_EXACT_MEMBER_NAMES and pure.suffix not in _ALLOWED_MEMBER_SUFFIXES:
             raise ReportError(f"Support bundle member has a disallowed type: {name!r}")

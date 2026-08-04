@@ -84,7 +84,7 @@ marked unavailable with a reason instead:
 |---|---|---|
 | `checks` / doctor table + versions | Yes | Same data as `--json` |
 | `compatibility` | Yes (offline) | The pinned HPX compatibility baseline |
-| `dependencies` / `nsx.lock` | Only with `--workspace` | Exact typed lock provenance via `read_dependency_lock_provenance()`, plus the verbatim `nsx.lock` bytes |
+| `dependencies` / `nsx.lock` | Only with `--workspace` | Exact typed lock provenance via `read_dependency_lock_provenance()`, plus a sanitized/redacted copy of the `nsx.lock` text |
 | `modules` | Yes | Baseline-qualified modules, plus exact resolved modules when `--workspace` is given |
 | `config` | Only with `--config` | A sanitized snapshot of the resolved `ProfileConfig` |
 | `probes` | Unless `--no-probes` | Connected J-Link probes (serials redacted by default) |

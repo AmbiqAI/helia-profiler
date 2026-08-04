@@ -8,6 +8,7 @@ archive self-verification, and rejection of malformed/hostile archives.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import zipfile
@@ -161,7 +162,7 @@ def test_collect_support_bundle_marks_missing_workspace_unavailable() -> None:
     assert "nsx.lock" not in collection.members
 
 
-def test_collect_support_bundle_marks_unpreparred_workspace_unavailable(tmp_path: Path) -> None:
+def test_collect_support_bundle_marks_unprepared_workspace_unavailable(tmp_path: Path) -> None:
     empty_dir = tmp_path / "not-prepared"
     empty_dir.mkdir()
     options = SupportBundleOptions(
@@ -195,6 +196,53 @@ def test_collect_support_bundle_marks_unresolvable_config_unavailable(tmp_path: 
 
     assert not section.available
     assert "model.path" in section.reason
+
+
+def test_collect_support_bundle_non_utf8_config_degrades_section_not_traceback(
+    tmp_path: Path,
+) -> None:
+    """A ``--config`` YAML with a byte that isn't valid UTF-8 must degrade
+    the ``config`` section, not raise a raw ``UnicodeDecodeError`` --
+    ``load_config()`` opens the file as text with no explicit encoding, so
+    nothing guarantees a hand-authored config actually is UTF-8 (or that
+    the process locale encoding is UTF-8 at all).
+    """
+    bad_config = tmp_path / "bad.yml"
+    bad_config.write_bytes(b"target:\n  board: apollo510_evb  # not utf-8: \xe9\n")
+    options = SupportBundleOptions(
+        config_path=bad_config, include_probes=False, include_ports=False
+    )
+
+    collection = collect_support_bundle(options)
+
+    section = collection.manifest.section("config")
+    assert section is not None and not section.available
+    assert section.reason
+
+
+def test_collect_support_bundle_redacts_section_reason_paths(tmp_path: Path) -> None:
+    """A skip *reason* is a formatted exception message, which routinely
+    embeds the exact path that caused it -- it must be redacted like every
+    other piece of free-form text in the bundle, not written verbatim into
+    manifest.json.
+    """
+    sensitive_workspace = tmp_path / "Users" / "very-secret-account" / "private-workspace"
+    options = SupportBundleOptions(
+        workspace=sensitive_workspace, include_probes=False, include_ports=False
+    )
+
+    collection = collect_support_bundle(options)
+
+    dependencies = collection.manifest.section("dependencies")
+    lock_section = collection.manifest.section("nsx.lock")
+    assert dependencies is not None and not dependencies.available
+    assert lock_section is not None and not lock_section.available
+    assert dependencies.reason and "very-secret-account" not in dependencies.reason
+    assert lock_section.reason and "very-secret-account" not in lock_section.reason
+    # The whole serialized manifest -- not just the section fields directly
+    # asserted above -- must never contain the raw sensitive path segment.
+    assert "very-secret-account" not in json.dumps(collection.manifest.to_dict())
+    assert collection.manifest.redaction["paths"] >= 1
 
 
 def test_collect_support_bundle_redacts_nested_secret_in_free_form_engine_config(
@@ -402,6 +450,68 @@ def test_collect_support_bundle_unreadable_lock_degrades_section_not_traceback(
     assert section.reason
 
 
+def test_collect_support_bundle_non_utf8_lock_degrades_nsx_lock_section_not_traceback(
+    tmp_path: Path,
+) -> None:
+    """An ``nsx.lock`` with bytes that aren't valid UTF-8 must degrade just
+    the ``nsx.lock`` section (``dependencies.json`` provenance has already
+    been recorded from the matching digest and stays available), not raise
+    a raw ``UnicodeDecodeError`` -- ``read_text(encoding="utf-8")`` doesn't
+    know or care that this collector only ever wrote valid-UTF-8 lock files
+    itself; nothing guarantees an on-disk ``nsx.lock`` from an older/other
+    tool actually is one.
+    """
+    app_dir = _prepared_workspace(tmp_path)
+    lock_path = app_dir / "nsx.lock"
+    state_path = app_dir / "hpx-dependencies.json"
+
+    corrupted = lock_path.read_bytes() + b"\n# \xff\xfe not valid utf-8\n"
+    lock_path.write_bytes(corrupted)
+    new_sha256 = hashlib.sha256(corrupted).hexdigest()
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["lock"]["sha256"]["value"] = new_sha256
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+    options = SupportBundleOptions(workspace=app_dir, include_probes=False, include_ports=False)
+    collection = collect_support_bundle(options)
+
+    dependencies = collection.manifest.section("dependencies")
+    lock_section = collection.manifest.section("nsx.lock")
+    assert dependencies is not None and dependencies.available
+    assert lock_section is not None and not lock_section.available
+    assert lock_section.reason and "codec" in lock_section.reason.lower()
+    assert "nsx.lock" not in collection.members
+
+
+def test_collect_support_bundle_non_utf8_dependency_state_degrades_section_not_traceback(
+    tmp_path: Path,
+) -> None:
+    """A corrupted/truncated ``hpx-dependencies.json`` provenance state file
+    that isn't valid UTF-8 must degrade the ``dependencies``/``nsx.lock``
+    sections, not raise a raw ``UnicodeDecodeError`` --
+    ``read_dependency_lock_provenance()`` reads that state file as UTF-8
+    text internally, and this collector's job is to catch every one of its
+    typed and untyped failure modes, matching the ``nsx.lock`` text-read
+    case just above.
+    """
+    app_dir = _prepared_workspace(tmp_path)
+    state_path = app_dir / "hpx-dependencies.json"
+
+    original = state_path.read_bytes()
+    state_path.write_bytes(original[:-1] + b"\xff" + original[-1:])
+
+    options = SupportBundleOptions(workspace=app_dir, include_probes=False, include_ports=False)
+    collection = collect_support_bundle(options)
+
+    dependencies = collection.manifest.section("dependencies")
+    lock_section = collection.manifest.section("nsx.lock")
+    assert dependencies is not None and not dependencies.available
+    assert lock_section is not None and not lock_section.available
+    assert dependencies.reason and "codec" in dependencies.reason.lower()
+    assert "dependencies.json" not in collection.members
+    assert "nsx.lock" not in collection.members
+
+
 def test_collect_support_bundle_always_includes_checks_and_compatibility() -> None:
     options = SupportBundleOptions(include_probes=False, include_ports=False)
 
@@ -441,7 +551,12 @@ def test_collect_support_bundle_includes_exact_stage5_provenance(tmp_path: Path)
     assert len(payload["baseline_fingerprint"]) == 64
     assert len(payload["workspace_fingerprint"]) == 64
 
-    # The exact on-disk nsx.lock bytes are embedded, not just a summary.
+    # nsx.lock text is embedded (redacted, when it contains anything
+    # secret-shaped), not just a dependencies.json summary. This fixture's
+    # lock has nothing redaction-worthy in it, so the embedded bytes equal
+    # the on-disk file exactly here -- see
+    # test_collect_support_bundle_redacts_credentials_in_embedded_lock for
+    # the case where they differ.
     exact_lock_bytes = (app_dir / "nsx.lock").read_bytes()
     assert collection.members["nsx.lock"] == exact_lock_bytes
 
@@ -686,6 +801,53 @@ def test_write_support_bundle_uses_fixed_zip_metadata_for_determinism(tmp_path: 
         for info in archive.infolist():
             assert info.date_time == (1980, 1, 1, 0, 0, 0)
             assert info.create_system == 0
+            # ZIP_STORED (not ZIP_DEFLATED): DEFLATE's exact output bytes
+            # depend on the zlib version/build doing the compressing, so a
+            # "byte-identical across hosts" guarantee can only actually
+            # hold for uncompressed members.
+            assert info.compress_type == zipfile.ZIP_STORED
+
+
+def test_write_support_bundle_raises_report_error_on_oserror(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A destination write failure (permission denied, disk full, ...) must
+    surface as a typed ReportError, not a raw OSError -- so a CLI caller
+    that only catches HpxError still gets a clean message instead of a
+    traceback.
+    """
+    from helia_profiler import support_bundle as support_bundle_module
+
+    options = SupportBundleOptions(include_probes=False, include_ports=False)
+    collection = collect_support_bundle(options)
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise OSError("No space left on device")
+
+    monkeypatch.setattr(support_bundle_module, "_write_deterministic_zip", _boom)
+
+    with pytest.raises(ReportError, match="Cannot write support bundle") as excinfo:
+        write_support_bundle(collection, tmp_path)
+    assert not isinstance(excinfo.value, OSError)
+    assert "No space left on device" in str(excinfo.value)
+
+
+def test_write_support_bundle_raises_report_error_when_output_dir_is_a_file(
+    tmp_path: Path,
+) -> None:
+    """A directory-mode ``--bundle`` destination that collides with an
+    existing plain file is a real, easy-to-hit OSError (``mkdir`` on a path
+    component that already exists as a file) -- confirm it is wrapped too,
+    without mocking anything.
+    """
+    options = SupportBundleOptions(include_probes=False, include_ports=False)
+    collection = collect_support_bundle(options)
+
+    blocking_file = tmp_path / "not-a-directory"
+    blocking_file.write_text("occupied", encoding="utf-8")
+
+    with pytest.raises(ReportError, match="Cannot write support bundle"):
+        write_support_bundle(collection, blocking_file / "bundle-dir")
 
 
 def test_write_support_bundle_explicit_zip_path_is_used_verbatim(tmp_path: Path) -> None:
@@ -781,6 +943,66 @@ def test_verify_support_bundle_requires_manifest(tmp_path: Path) -> None:
         verify_support_bundle(path)
 
 
+def test_verify_support_bundle_rejects_corrupt_manifest_json_as_report_error(
+    tmp_path: Path,
+) -> None:
+    """A truncated/corrupted manifest.json must raise ReportError.
+
+    Not a raw json.JSONDecodeError -- verify_support_bundle()'s contract is
+    that every failure is a typed ReportError, matching every other
+    structural check in this function (missing manifest, undeclared
+    members, tampered digests, ...).
+    """
+    path = tmp_path / "corrupt-manifest.zip"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("manifest.json", "{not valid json")
+
+    with pytest.raises(ReportError, match="not valid JSON") as excinfo:
+        verify_support_bundle(path)
+    assert not isinstance(excinfo.value, json.JSONDecodeError)
+
+
+def test_verify_support_bundle_rejects_non_utf8_manifest_json_as_report_error(
+    tmp_path: Path,
+) -> None:
+    """A manifest.json that isn't valid UTF-8 must also raise ReportError.
+
+    ``json.loads`` on bytes decodes as UTF-8 internally and raises
+    ``UnicodeDecodeError`` (a ``ValueError``, not caught by a bare
+    ``except json.JSONDecodeError``) for invalid byte sequences. This uses
+    a payload with no BOM: a leading ``\\xff\\xfe`` is itself a valid
+    UTF-16-LE byte-order mark, which ``json.detect_encoding()`` would pick
+    up and decode successfully (as garbage), raising ``JSONDecodeError``
+    instead and defeating the point of this test.
+    """
+    path = tmp_path / "non-utf8-manifest.zip"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("manifest.json", b'{"schema": "\xff"}')
+
+    with pytest.raises(ReportError, match="not valid JSON") as excinfo:
+        verify_support_bundle(path)
+    assert not isinstance(excinfo.value, UnicodeDecodeError)
+    assert isinstance(excinfo.value.__cause__, UnicodeDecodeError)
+
+
+def test_verify_support_bundle_still_raises_manifest_from_dict_report_error(
+    tmp_path: Path,
+) -> None:
+    """A structurally-valid-JSON but schema-invalid manifest.json still
+    surfaces SupportBundleManifest.from_dict()'s own ReportError message,
+    not the generic "not valid JSON" one -- the two failure modes must
+    stay distinguishable.
+    """
+    path = tmp_path / "wrong-schema-manifest.zip"
+    bad_manifest = json.loads(_minimal_manifest_json())
+    bad_manifest["schema"] = "nope"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("manifest.json", json.dumps(bad_manifest))
+
+    with pytest.raises(ReportError, match="Unsupported support bundle schema"):
+        verify_support_bundle(path)
+
+
 # ---------------------------------------------------------------------------
 # Malformed / hostile archive member paths.
 # ---------------------------------------------------------------------------
@@ -811,6 +1033,13 @@ def _minimal_manifest_json() -> str:
         ("model.tflite", "disallowed type"),
         ("profiler_app/main.elf", "disallowed type"),
         ("firmware.bin", "disallowed type"),
+        # Windows drive-absolute paths are absolute on Windows even though
+        # they contain no leading "/" -- PurePosixPath doesn't recognize a
+        # drive letter as a root, so these must be caught by a dedicated
+        # check rather than falling through as "relative".
+        ("C:/Windows/System32/x.json", "must be relative"),
+        ("c:/x.json", "must be relative"),
+        ("C:\\Windows\\System32\\x.json", "unsafe path"),
     ],
 )
 def test_verify_support_bundle_rejects_hostile_member_paths(

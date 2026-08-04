@@ -37,7 +37,7 @@ device identifier that shouldn't leave the building.
 |---|---|---|
 | `checks` | `doctor.inspect_environment(include_versions=True)` | Yes |
 | `compatibility` | `compatibility.load_compatibility_baseline()` | Yes (offline) |
-| `dependencies` / `nsx.lock` | `dependencies.read_dependency_lock_provenance()` + the verbatim `nsx.lock` bytes | Only with `--workspace` |
+| `dependencies` / `nsx.lock` | `dependencies.read_dependency_lock_provenance()` + a sanitized/redacted copy of the `nsx.lock` text | Only with `--workspace` |
 | `modules` | Baseline-qualified modules, plus exact resolved modules from the same provenance read | Yes (resolved half only with `--workspace`) |
 | `config` | `config.load_config()` + `pipeline._serialize_config()` | Only with `--config` |
 | `probes` | `target.probe.jlink.list_connected_probes()` | Unless `--no-probes` |
@@ -105,7 +105,8 @@ miss in a script or CI log.
 
 ## Deterministic archiving
 
-`write_support_bundle()` writes a `zipfile.ZIP_DEFLATED` archive with:
+`write_support_bundle()` writes a `zipfile.ZIP_STORED` (uncompressed) archive
+with:
 
 - members sorted lexicographically, `manifest.json` always last;
 - a fixed `(1980, 1, 1, 0, 0, 0)` timestamp and `create_system = 0` on every
@@ -114,6 +115,14 @@ miss in a script or CI log.
   *other* member's `(name, sha256)` pairs, deliberately excluding
   `manifest.json` (the one member whose content always differs run to run,
   via `generated_at`).
+
+Storage is deliberately uncompressed rather than `ZIP_DEFLATED`: DEFLATE's
+exact output bytes depend on the zlib version/build doing the compressing,
+which this module doesn't pin, so two hosts with different zlib builds
+could otherwise produce different archive bytes for identical input. Since
+bundle members are small JSON/text (not something worth compressing),
+storing them uncompressed makes the byte-identical-members guarantee true
+across hosts instead of only within one.
 
 `verify_support_bundle()` re-derives and checks every declared artifact's
 size and SHA-256, requires the declared and actual member sets match

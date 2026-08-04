@@ -53,6 +53,42 @@ def test_redact_text_scrubs_absolute_paths_keeping_basename(raw: str, expected: 
 
 
 @pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # Windows drive-letter paths using forward slashes (as commonly
+        # normalized/reported by Python's own pathlib, many toolchains, and
+        # any tool run under MSYS/Git-Bash/WSL-adjacent shells) are just as
+        # absolute -- and just as likely to embed a real account name -- as
+        # the backslash form above. There is no dedicated forward-slash
+        # Windows regex: `_POSIX_ABS_RE`'s "not preceded by a word
+        # character" lookbehind already matches starting right after the
+        # drive letter's `:`, so the drive letter itself (never sensitive
+        # on its own) is left as a literal prefix while everything from the
+        # first `/` onward is redacted exactly like a POSIX path.
+        ("C:/Users/Ada/module", "C:<redacted-path>/module"),
+        ("c:/Users/Ada/module", "c:<redacted-path>/module"),
+        (
+            "C:/Program Files/SEGGER/JLink_V960/JLink.exe",
+            "C:<redacted-path>/JLink.exe",
+        ),
+        ("D:/workspace/hpx-build", "D:<redacted-path>/hpx-build"),
+        # Bare home-directory forms: the final component *is* the account
+        # name, so nothing is kept -- same rule as the backslash/POSIX
+        # cases above.
+        ("C:/Users/Ada", "C:<redacted-path>"),
+        ("C:/Users/Ada/", "C:<redacted-path>"),
+    ],
+)
+def test_redact_text_scrubs_windows_forward_slash_drive_paths(raw: str, expected: str) -> None:
+    redacted, counts = redact_text(raw)
+
+    assert redacted == expected
+    assert "Ada" not in redacted
+    assert counts.paths == 1
+    assert counts.total == 1
+
+
+@pytest.mark.parametrize(
     "raw",
     [
         "relative/module/path",
