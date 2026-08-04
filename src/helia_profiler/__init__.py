@@ -84,7 +84,15 @@ from .results import (
     ResultManifest,
     ResultValidity,
     RunStatus,
+    SupportBundleManifest,
+    SupportBundleSection,
     load_result_manifest,
+)
+from .support_bundle import (
+    SupportBundleOptions,
+    collect_support_bundle,
+    verify_support_bundle,
+    write_support_bundle,
 )
 from .session import Session
 from .target.probe.jlink import JLinkProbe, JLinkProbeMatch
@@ -158,6 +166,12 @@ __all__ = [
     "load_result_manifest",
     "DependencyLockProvenance",
     "read_dependency_lock_provenance",
+    "SupportBundleManifest",
+    "SupportBundleSection",
+    "SupportBundleOptions",
+    "collect_support_bundle",
+    "write_support_bundle",
+    "verify_support_bundle",
     "DoctorCheck",
     "DoctorResult",
     "DoctorVersionCheck",
@@ -260,6 +274,12 @@ _EXPERIMENTAL_API = {
     "DependencyError",
     "VersionError",
     "LockError",
+    "SupportBundleManifest",
+    "SupportBundleSection",
+    "SupportBundleOptions",
+    "collect_support_bundle",
+    "write_support_bundle",
+    "verify_support_bundle",
 }
 
 _IMPLEMENTATION_API = {

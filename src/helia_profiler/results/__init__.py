@@ -33,6 +33,12 @@ from .manifest import (
     RunStatus,
     load_result_manifest,
 )
+from .support_bundle import (
+    SUPPORT_BUNDLE_SCHEMA,
+    SUPPORT_BUNDLE_SCHEMA_VERSION,
+    SupportBundleManifest,
+    SupportBundleSection,
+)
 from .models import (
     BinarySections,
     ConsumerKind,
@@ -97,6 +103,10 @@ __all__ = [
     "ResultValidity",
     "RunMetadata",
     "RunStatus",
+    "SUPPORT_BUNDLE_SCHEMA",
+    "SUPPORT_BUNDLE_SCHEMA_VERSION",
+    "SupportBundleManifest",
+    "SupportBundleSection",
     "TimingInfo",
     "ToolchainInfo",
     "load_result_manifest",
