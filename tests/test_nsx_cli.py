@@ -128,8 +128,17 @@ class TestNsxConfigure:
         with patch("helia_profiler.nsx.nsx_api.configure_app") as cfg_mock:
             nsx.configure(tmp_path, toolchain="gcc", timeout_s=120)
         cfg_mock.assert_called_once_with(
-            tmp_path, toolchain="gcc", timeout_s=120, emit=nsx._quiet_emitter
+            tmp_path,
+            toolchain="gcc",
+            frozen=False,
+            timeout_s=120,
+            emit=nsx._quiet_emitter,
         )
+
+    def test_configure_forwards_frozen(self, tmp_path: Path) -> None:
+        with patch("helia_profiler.nsx.nsx_api.configure_app") as cfg_mock:
+            nsx.configure(tmp_path, frozen=True)
+        assert cfg_mock.call_args.kwargs["frozen"] is True
 
 
 class TestNsxLock:

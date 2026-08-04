@@ -134,6 +134,19 @@ below cover behavior that a schema table can't express.
 - By default, generated profiler apps keep the board's normal NSX `channel`, but HPX explicitly resolves `neuralspotx` from `neuralspotx-v0.7.10` and `nsx-ambiq-sdk` from `v5.2.23` in the qualified compatibility baseline.
 - `build.nsx_modules.<module>.ref` or `.version` overrides win over that default for the owning project.
 - `build.nsx_modules.<module>.path` installs a local module checkout into the generated app and bypasses registry resolution for that module only.
+- Ordinary profiles reuse a compatible `nsx.lock` byte-for-byte and run
+  `nsx sync --frozen`; they do not check or advance upstream refs. A lock is
+  resolved only when missing or structurally incompatible.
+- Set `build.update_dependencies: true` (CLI:
+  `--update-dependencies`) for the explicit operation that refreshes refs and
+  rewrites the lock. It cannot be combined with offline mode.
+- Set `build.offline: true` (CLI: `--offline`) to require both a compatible
+  lock and already-materialized exact module trees. The legacy `--frozen` flag
+  is retained as an alias for this strict mode.
+- Cached applications are isolated by a deterministic workspace fingerprint
+  covering the compatibility baseline and registry hashes, target/toolchain,
+  engine backend/variant/version, overrides (including local content hashes),
+  and module-relevant build settings.
 
 ### Compiler-launcher notes
 

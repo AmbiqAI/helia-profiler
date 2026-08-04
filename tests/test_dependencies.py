@@ -1,0 +1,376 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+from threading import Thread
+
+import pytest
+from neuralspotx.nsx_lock import (
+    LockKind,
+    NsxLock,
+    ResolvedModule,
+    hash_manifest,
+    write_lock,
+)
+
+from helia_profiler.config import load_config
+from helia_profiler.dependencies import (
+    create_workspace,
+    normalize_path,
+    prepare_locked_dependencies,
+)
+from helia_profiler.engines.base import EngineArtifacts
+from helia_profiler.errors import DependencyError
+from helia_profiler.errors import BuildError
+from helia_profiler.pipeline import PipelineContext
+from helia_profiler.results import DependencyLockMode
+from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+
+
+def _context(
+    tmp_path: Path,
+    *,
+    build: dict | None = None,
+    backend: str | None = None,
+    model_bytes: bytes = b"TFL3",
+) -> PipelineContext:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    model = tmp_path / "model.tflite"
+    model.write_bytes(model_bytes)
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "tflm", "backend": backend},
+            "target": {"board": "apollo510_evb"},
+            "build": build or {},
+            "work_dir": str(tmp_path / "work"),
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
+    ResolvePlatformStage().run(ctx)
+    ctx.engine_artifacts = EngineArtifacts()
+    ctx.dependency_workspace = create_workspace(ctx)
+    ctx.firmware_dir = ctx.dependency_workspace.root / "profiler_app"
+    ctx.firmware_dir.mkdir(parents=True, exist_ok=True)
+    (ctx.firmware_dir / "nsx.yml").write_text(
+        "target:\n  board: apollo510_evb\nmodules:\n  - name: demo\n",
+        encoding="utf-8",
+    )
+    return ctx
+
+
+def _write_valid_lock(ctx: PipelineContext, *, commit: str = "a" * 40) -> bytes:
+    assert ctx.firmware_dir is not None
+    module_dir = ctx.firmware_dir / "modules" / "demo"
+    module_dir.mkdir(parents=True, exist_ok=True)
+    (module_dir / "nsx-module.yaml").write_text("name: demo\n", encoding="utf-8")
+    lock = NsxLock(
+        generated_at="2026-08-03T00:00:00+00:00",
+        nsx_tool_version="0.7.10",
+        manifest_hash=hash_manifest(ctx.firmware_dir / "nsx.yml"),
+        target={"board": "apollo510_evb"},
+        modules={
+            "demo": ResolvedModule(
+                project="demo-project",
+                kind=LockKind.GIT,
+                constraint="v1.2.3",
+                tag="v1.2.3",
+                commit=commit,
+                url="https://example.invalid/demo.git",
+                vendored_at="modules/demo",
+                content_hash="sha256:" + "b" * 64,
+                acquired_at="2026-08-03T00:00:00+00:00",
+            )
+        },
+    )
+    write_lock(ctx.firmware_dir, lock, "apollo510_evb")
+    return (ctx.firmware_dir / "nsx.lock").read_bytes()
+
+
+def test_first_resolution_locks_without_update_then_syncs_frozen(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(tmp_path)
+    lock_calls: list[bool] = []
+    sync_calls: list[bool] = []
+
+    def lock(app_dir: Path, *, update: bool, **_kwargs) -> None:
+        lock_calls.append(update)
+        _write_valid_lock(ctx)
+
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.lock", lock)
+    monkeypatch.setattr(
+        "helia_profiler.dependencies.nsx_cli.sync",
+        lambda _path, *, frozen, **_kwargs: sync_calls.append(frozen),
+    )
+
+    provenance = prepare_locked_dependencies(ctx)
+
+    assert lock_calls == [False]
+    assert sync_calls == [True]
+    assert provenance.lock.mode is DependencyLockMode.RESOLVED
+    assert provenance.modules[0].requested_tag == "v1.2.3"
+    assert provenance.modules[0].peeled_commit == "a" * 40
+
+
+def test_ordinary_reuse_is_byte_stable_and_never_locks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(tmp_path)
+    before = _write_valid_lock(ctx)
+    monkeypatch.setattr(
+        "helia_profiler.dependencies.nsx_cli.lock",
+        lambda *_args, **_kwargs: pytest.fail("ordinary reuse must not call nsx lock"),
+    )
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+
+    provenance = prepare_locked_dependencies(ctx)
+
+    assert (ctx.firmware_dir / "nsx.lock").read_bytes() == before
+    assert provenance.lock.mode is DependencyLockMode.REUSED
+    assert provenance.lock.frozen_sync is True
+
+
+def test_online_reuse_repairs_partial_materialization_without_relocking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(tmp_path)
+    before = _write_valid_lock(ctx)
+    calls: list[tuple[bool, bool]] = []
+
+    def sync(_path: Path, *, frozen: bool, force: bool = False, **_kwargs) -> None:
+        calls.append((frozen, force))
+        if len(calls) == 1:
+            raise BuildError("content mismatch", details="partial module")
+
+    monkeypatch.setattr(
+        "helia_profiler.dependencies.nsx_cli.lock",
+        lambda *_args, **_kwargs: pytest.fail("repair must not resolve refs"),
+    )
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", sync)
+
+    provenance = prepare_locked_dependencies(ctx)
+
+    assert calls == [(True, False), (False, True), (True, False)]
+    assert (ctx.firmware_dir / "nsx.lock").read_bytes() == before
+    assert provenance.lock.mode is DependencyLockMode.REUSED
+
+
+def test_engine_release_source_mapping_is_fingerprinted_and_serialized(
+    tmp_path: Path,
+) -> None:
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"TFL3")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {
+                "type": "helia-rt",
+                "config": {
+                    "source": {
+                        "repo": "AmbiqAI/helia-rt",
+                        "ref": "helia-rt-v1.16.0",
+                    }
+                },
+            },
+            "work_dir": str(tmp_path / "work"),
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
+    ResolvePlatformStage().run(ctx)
+    ctx.engine_artifacts = EngineArtifacts()
+
+    workspace = create_workspace(ctx)
+
+    assert workspace.fingerprint
+    from helia_profiler.dependencies import _override_inputs
+
+    _, overrides = _override_inputs(ctx)
+    assert overrides[-1].mode == "release"
+    assert overrides[-1].requested == "AmbiqAI/helia-rt@helia-rt-v1.16.0"
+
+
+def test_explicit_update_is_the_only_refresh_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(tmp_path, build={"update_dependencies": True})
+    _write_valid_lock(ctx)
+    updates: list[bool] = []
+
+    def lock(_app_dir: Path, *, update: bool, **_kwargs) -> None:
+        updates.append(update)
+        _write_valid_lock(ctx, commit="c" * 40)
+
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.lock", lock)
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+
+    provenance = prepare_locked_dependencies(ctx)
+
+    assert updates == [True]
+    assert provenance.lock.mode is DependencyLockMode.UPDATED
+    assert provenance.lock.update_requested is True
+    assert provenance.modules[0].peeled_commit == "c" * 40
+
+
+def test_exact_dependency_provenance_serialization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(
+        tmp_path,
+        build={"nsx_modules": {"demo": {"ref": "feature/test"}}},
+    )
+    exact_lock = _write_valid_lock(ctx)
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+
+    provenance = prepare_locked_dependencies(ctx)
+    assert ctx.dependency_lock_path is not None
+    snapshot_bytes = ctx.dependency_lock_path.read_bytes()
+    (ctx.firmware_dir / "nsx.lock").write_text("concurrent update\n")
+    serialized = json.loads(json.dumps(provenance.to_dict(), sort_keys=True))
+
+    assert ctx.dependency_lock_path.read_bytes() == snapshot_bytes == exact_lock
+    assert serialized["workspace"]["registry_hash"]["algorithm"] == "sha256"
+    assert serialized["workspace"]["baseline_id"].startswith("hpx-stage4")
+    assert serialized["lock"]["mode"] == "reused"
+    assert serialized["lock"]["sha256"]["value"] == hashlib.sha256(exact_lock).hexdigest()
+    assert serialized["modules"] == [
+        {
+            "content_hash": {"algorithm": "sha256", "value": "b" * 64},
+            "kind": "git",
+            "name": "demo",
+            "peeled_commit": "a" * 40,
+            "project": "demo-project",
+            "requested_ref": "v1.2.3",
+            "requested_tag": "v1.2.3",
+            "url": "https://example.invalid/demo.git",
+            "vendored_at": "modules/demo",
+        }
+    ]
+    assert any(
+        override["scope"] == "project"
+        and override["name"] == "demo-project"
+        and override["requested"] == "feature/test"
+        for override in serialized["overrides"]
+    )
+
+
+def test_incompatible_inputs_select_isolated_workspaces(tmp_path: Path) -> None:
+    first = _context(tmp_path / "first")
+    second = _context(tmp_path / "second", backend="cmsis-nn")
+
+    assert first.dependency_workspace is not None
+    assert second.dependency_workspace is not None
+    assert first.dependency_workspace.fingerprint != second.dependency_workspace.fingerprint
+    assert first.dependency_workspace.root != second.dependency_workspace.root
+
+
+def test_model_and_firmware_config_changes_isolate_workspaces(tmp_path: Path) -> None:
+    first = _context(tmp_path / "one")
+    assert first.dependency_workspace is not None
+    second = _context(tmp_path / "two", model_bytes=b"different-model")
+    assert second.dependency_workspace is not None
+
+    model = tmp_path / "three" / "model.tflite"
+    model.parent.mkdir(parents=True)
+    model.write_bytes(b"TFL3")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "tflm"},
+            "profiling": {"iterations": 7},
+            "work_dir": str(tmp_path / "three" / "work"),
+        },
+    )
+    third = PipelineContext(config=config, work_dir=tmp_path / "three" / "work")
+    ResolvePlatformStage().run(third)
+    third.engine_artifacts = EngineArtifacts()
+    third.dependency_workspace = create_workspace(third)
+
+    assert first.dependency_workspace.fingerprint != second.dependency_workspace.fingerprint
+    assert first.dependency_workspace.fingerprint != third.dependency_workspace.fingerprint
+
+
+def test_offline_requires_compatible_lock(tmp_path: Path) -> None:
+    ctx = _context(tmp_path, build={"offline": True})
+
+    with pytest.raises(DependencyError, match="requires a compatible lock") as exc:
+        prepare_locked_dependencies(ctx)
+
+    assert exc.value.hint is not None
+    assert "--update-dependencies" in exc.value.hint
+
+
+def test_offline_requires_materialized_locked_modules(tmp_path: Path) -> None:
+    ctx = _context(tmp_path, build={"offline": True})
+    _write_valid_lock(ctx)
+    assert ctx.firmware_dir is not None
+    module_dir = ctx.firmware_dir / "modules" / "demo"
+    for child in module_dir.iterdir():
+        child.unlink()
+    module_dir.rmdir()
+
+    with pytest.raises(DependencyError, match="module trees are missing"):
+        prepare_locked_dependencies(ctx)
+
+
+def test_override_content_and_request_change_fingerprint(
+    tmp_path: Path,
+) -> None:
+    override = tmp_path / "module"
+    override.mkdir(parents=True)
+    (override / "nsx-module.yaml").write_text("name: demo\n")
+    first = _context(
+        tmp_path / "one",
+        build={"nsx_modules": {"nsx-core": {"path": str(override)}}},
+    )
+    (override / "source.c").write_text("int changed;\n")
+    second = _context(
+        tmp_path / "two",
+        build={"nsx_modules": {"nsx-core": {"path": str(override)}}},
+    )
+
+    assert first.dependency_workspace is not None
+    assert second.dependency_workspace is not None
+    assert first.dependency_workspace.fingerprint != second.dependency_workspace.fingerprint
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (r"C:\Users\Ada\module", "c:/Users/Ada/module"),
+        ("C:/Users/Ada/module/", "c:/Users/Ada/module"),
+        ("relative\\module", "relative/module"),
+        (r"\\server\share\module", "//server/share/module"),
+    ],
+)
+def test_cross_platform_path_normalization(value: str, expected: str) -> None:
+    assert normalize_path(value) == expected
+
+
+def test_concurrent_workspace_identity_is_atomic(tmp_path: Path) -> None:
+    ctx = _context(tmp_path)
+    assert ctx.dependency_workspace is not None
+    identity_path = ctx.dependency_workspace.root / "hpx-workspace.json"
+    identity_path.unlink()
+    failures: list[Exception] = []
+
+    def create() -> None:
+        try:
+            create_workspace(ctx)
+        except Exception as exc:  # pragma: no cover - asserted below
+            failures.append(exc)
+
+    threads = [Thread(target=create) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert failures == []
+    assert json.loads(identity_path.read_text())["fingerprint"] == (
+        ctx.dependency_workspace.fingerprint
+    )

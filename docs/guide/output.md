@@ -14,6 +14,7 @@ results/
 ├── summary.json            # Machine-readable high-level summary
 ├── profile_results.{csv|json} # Selected primary per-layer result
 ├── run_metadata.json       # Config, toolchain, platform, model info
+├── nsx.lock                # Exact dependency lock used for this profile
 ├── aot_operator_manifest.json # AOT only: compiled operators + tensor placement
 ├── aot_memory_layers.csv   # AOT only: spreadsheet-friendly per-layer buffers
 └── model_explorer/         # Overlay JSONs unless explicitly disabled
@@ -74,7 +75,10 @@ Each declared artifact may include additive semantic metadata:
 | `optional` | Whether a valid bundle may omit this product |
 
 Complete `profile` bundles require named core artifacts for `summary.json`,
-`run_metadata.json`, and the selected primary profile result. Detailed CSV/JSON files are projections or
+`run_metadata.json`, `nsx.lock`, and the selected primary profile result. The
+dependency provenance records the typed registry hash, baseline identity and
+fingerprint, workspace fingerprint, lock mode/update state, requested refs and
+tags, peeled commits, content hashes, and explicit overrides. Detailed CSV/JSON files are projections or
 diagnostics. heliaAOT files are engine extensions. Model Explorer overlays are
 optional exports governed by the Model Explorer format rather than the HPX core
 schema. Semantic names do not claim a published content schema. `schema` and

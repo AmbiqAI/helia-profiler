@@ -39,6 +39,15 @@ from helia_profiler.results import (
 )
 
 
+def _attach_dependency_lock(ctx: PipelineContext, root: Path) -> bytes:
+    source = root / "workspace" / "nsx.lock"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    payload = b"schema_version: 4\ntargets: {}\n"
+    source.write_bytes(payload)
+    ctx.dependency_lock_path = source
+    return payload
+
+
 def test_metadata_to_dict_includes_timing():
     meta = RunMetadata(
         hpx_version="0.1.0",
@@ -293,6 +302,7 @@ def test_write_report_publishes_verifiable_manifest_last(tmp_path: Path):
         meta=FirmwareMeta(),
         layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
     )
+    expected_lock = _attach_dependency_lock(ctx, tmp_path)
 
     paths = write_report(ctx)
 
@@ -310,6 +320,8 @@ def test_write_report_publishes_verifiable_manifest_last(tmp_path: Path):
     assert artifacts["summary.json"].optional is False
     assert artifacts["profile_results.csv"].name == "hpx.profile-layers"
     assert artifacts["profile_results.csv"].schema is None
+    assert (tmp_path / "nsx.lock").read_bytes() == expected_lock
+    assert artifacts["nsx.lock"].name == "hpx.nsx-lock"
 
 
 def test_manifest_classifies_model_explorer_as_optional_export(tmp_path: Path):
@@ -338,6 +350,7 @@ def test_manifest_classifies_model_explorer_as_optional_export(tmp_path: Path):
             )
         ],
     )
+    _attach_dependency_lock(ctx, tmp_path)
 
     paths = write_report(ctx)
     manifest = load_result_manifest(paths[-1], verify=True)

@@ -1,6 +1,15 @@
 """Public result models and persisted/workflow result contracts."""
 
 from ..compatibility import CompatibilityResolution
+from .dependencies import (
+    ContentDigest,
+    DependencyLockMode,
+    DependencyLockState,
+    DependencyModule,
+    DependencyOverride,
+    DependencyProvenance,
+    DependencyWorkspace,
+)
 from .artifacts import (
     DeploymentRecord,
     FirmwareArtifact,
@@ -46,8 +55,15 @@ from .models import (
 __all__ = [
     "BinarySections",
     "CompatibilityResolution",
+    "ContentDigest",
     "ConsumerKind",
     "DeploymentRecord",
+    "DependencyLockMode",
+    "DependencyLockState",
+    "DependencyModule",
+    "DependencyOverride",
+    "DependencyProvenance",
+    "DependencyWorkspace",
     "EngineInfo",
     "FirmwareArtifact",
     "FirmwareMeta",

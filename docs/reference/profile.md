@@ -53,7 +53,7 @@ tensor placement rather than the heliaRT arena/weights flags.
 | `--usb-port` | path | auto-detect | Explicit serial device for `--transport usb_cdc`. |
 | `--rtt-buffer-size-up` | bytes | toolchain-aware | RTT firmware up-buffer size. Increase carefully for very large captures. |
 | `--cpu-clock` | board speed name | board lowest-power tier | CPU clock selection such as `lp` or `hp`, validated against the board. |
-| `--frozen` | flag | off | Use the existing `nsx.lock`/module state as-is instead of re-running dependency resolution/sync. Useful for fast, reproducible offline reruns once a build has already succeeded. |
+| `--frozen` | flag | off | Deprecated alias for `--offline`. |
 
 ## Build resolution
 
@@ -63,6 +63,12 @@ tensor placement rather than the heliaRT arena/weights flags.
 | `--nsx-module NAME:KEY=VALUE` (repeatable) | mapping | — | Override one module with `path`, `ref`, or `version`. |
 | `--compiler-launcher` | name/path | `auto` | Use `sccache`/`ccache` automatically or require an explicit launcher. |
 | `--no-compiler-launcher` | flag | — | Disable compiler-launcher caching. |
+| `--offline` | flag | off | Require a compatible exact lock and already-materialized module trees; never resolve refs. |
+| `--update-dependencies` | flag | off | Explicitly refresh dependency refs and rewrite the exact lock. Mutually exclusive with offline/frozen mode. |
+
+Without either mode, HPX resolves only when the lock is missing or structurally
+incompatible. Compatible locks are reused without rewriting or contacting refs,
+and synchronization is frozen.
 
 ## Profiling
 

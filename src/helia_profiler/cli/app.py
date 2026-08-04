@@ -207,10 +207,22 @@ def profile_command(
         False,
         "--frozen",
         help=(
-            "Use the existing nsx.lock/modules state without re-running dependency "
-            "resolution. Useful for reproducible offline reruns."
+            "Deprecated alias for --offline: require the compatible lock and "
+            "materialized module state without dependency resolution."
         ),
         rich_help_panel=G_TARGET,
+    ),
+    offline: bool = typer.Option(
+        False,
+        "--offline",
+        help="Require exact compatible lock/module reuse without network resolution.",
+        rich_help_panel=G_BUILD,
+    ),
+    update_dependencies: bool = typer.Option(
+        False,
+        "--update-dependencies",
+        help="Explicitly re-resolve dependency refs and rewrite nsx.lock.",
+        rich_help_panel=G_BUILD,
     ),
     # -- build / NSX overrides --
     nsx_channel: Optional[str] = typer.Option(
@@ -433,6 +445,8 @@ def profile_command(
         rtt_buffer_size_up=rtt_buffer_size_up,
         cpu_clock=cpu_clock,
         frozen=frozen,
+        offline=offline,
+        update_dependencies=update_dependencies,
         nsx_channel=nsx_channel,
         nsx_module_overrides=nsx_module,
         compiler_launcher=compiler_launcher,

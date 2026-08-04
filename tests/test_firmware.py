@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import os
 import hashlib
+from contextlib import nullcontext
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -354,6 +356,27 @@ def _make_ctx(
     work_dir = tmp_path / "work"
     work_dir.mkdir(parents=True, exist_ok=True)
     return PipelineContext(config=config, work_dir=work_dir)
+
+
+def _stub_locked_dependencies(
+    ctx: PipelineContext,
+    app_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[Path]:
+    prepared: list[Path] = []
+    ctx.dependency_workspace = SimpleNamespace(root=app_dir.parent)  # type: ignore[assignment]
+    monkeypatch.setattr(
+        "helia_profiler.dependencies.workspace_mutex",
+        lambda _workspace: nullcontext(),
+    )
+    monkeypatch.setattr(
+        "helia_profiler.dependencies.prepare_locked_dependencies",
+        lambda inner_ctx: (
+            prepared.append(inner_ctx.firmware_dir)
+            or SimpleNamespace(lock=SimpleNamespace(mode=SimpleNamespace(value="reused")))
+        ),
+    )
+    return prepared
 
 
 class TestBoardModuleName:
@@ -1012,7 +1035,7 @@ class TestGenerateApp:
 
 
 class TestBuildApp:
-    def test_non_frozen_updates_lock_before_sync(
+    def test_build_prepares_locked_dependencies_before_compile(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
     ):
         ctx = _make_ctx(tmp_path, fake_dist)
@@ -1023,6 +1046,7 @@ class TestBuildApp:
         binary = build_dir / "hpx_profiler.bin"
         binary.write_bytes(b"bin")
         object.__setattr__(ctx, "firmware_dir", app_dir)
+        prepared = _stub_locked_dependencies(ctx, app_dir, monkeypatch)
 
         lock_calls: list[dict] = []
         sync_calls: list[dict] = []
@@ -1042,10 +1066,9 @@ class TestBuildApp:
 
         out_build_dir, out_binary = build_app(ctx)
 
-        assert lock_calls == [
-            {"update": True, "timeout_s": ctx.config.timeouts.configure_s, "verbose": 0}
-        ]
-        assert sync_calls == [{"timeout_s": ctx.config.timeouts.configure_s, "verbose": 0}]
+        assert prepared == [app_dir]
+        assert lock_calls == []
+        assert sync_calls == []
         assert out_build_dir == build_dir
         assert out_binary == binary
 
@@ -1076,6 +1099,7 @@ class TestBuildApp:
         stale_power_binary = build_dir / "hpx_profiler_power.bin"
         stale_power_binary.write_bytes(b"stale")
         object.__setattr__(ctx, "firmware_dir", app_dir)
+        _stub_locked_dependencies(ctx, app_dir, monkeypatch)
 
         build_calls: list[dict] = []
 
@@ -1107,6 +1131,7 @@ class TestBuildApp:
         binary = build_dir / "hpx_profiler.bin"
         binary.write_bytes(b"bin")
         object.__setattr__(ctx, "firmware_dir", app_dir)
+        _stub_locked_dependencies(ctx, app_dir, monkeypatch)
 
         build_calls: list[dict] = []
 
@@ -1149,6 +1174,7 @@ class TestBuildApp:
         binary = build_dir / "hpx_profiler.bin"
         binary.write_bytes(b"bin")
         object.__setattr__(ctx, "firmware_dir", app_dir)
+        _stub_locked_dependencies(ctx, app_dir, monkeypatch)
 
         build_calls: list[dict] = []
 
@@ -1205,7 +1231,7 @@ class TestFlashApp:
 
         assert captured["jlink_serial"] == "0011223344"
 
-    def test_frozen_skips_lock_and_uses_frozen_sync(
+    def test_offline_build_still_verifies_dependencies_and_configures_frozen(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
     ):
         """First frozen build for a board/toolchain (no build.ninja yet):
@@ -1224,6 +1250,7 @@ class TestFlashApp:
         binary.write_bytes(b"bin")
         object.__setattr__(ctx, "firmware_dir", app_dir)
         object.__setattr__(ctx.config, "frozen", True)
+        prepared = _stub_locked_dependencies(ctx, app_dir, monkeypatch)
 
         lock_calls: list[tuple] = []
         sync_calls: list[dict] = []
@@ -1246,14 +1273,14 @@ class TestFlashApp:
         out_build_dir, out_binary = build_app(ctx)
 
         assert lock_calls == []
-        assert sync_calls == [
-            {"frozen": True, "timeout_s": ctx.config.timeouts.configure_s, "verbose": 0}
-        ]
+        assert sync_calls == []
+        assert prepared == [app_dir]
         assert len(configure_calls) == 1
+        assert configure_calls[0]["frozen"] is True
         assert out_build_dir == build_dir
         assert out_binary == binary
 
-    def test_frozen_with_existing_build_skips_lock_sync_and_configure(
+    def test_existing_build_still_verifies_dependencies_but_skips_configure(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
     ):
         """Offline incremental rebuild: frozen + an already-configured build
@@ -1275,6 +1302,7 @@ class TestFlashApp:
         binary.write_bytes(b"bin")
         object.__setattr__(ctx, "firmware_dir", app_dir)
         object.__setattr__(ctx.config, "frozen", True)
+        prepared = _stub_locked_dependencies(ctx, app_dir, monkeypatch)
 
         lock_calls: list[tuple] = []
         sync_calls: list[dict] = []
@@ -1302,6 +1330,7 @@ class TestFlashApp:
 
         assert lock_calls == []
         assert sync_calls == []
+        assert prepared == [app_dir]
         assert configure_calls == []
         assert len(build_calls) == 1
         assert out_build_dir == build_dir

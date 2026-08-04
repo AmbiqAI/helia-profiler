@@ -204,11 +204,18 @@ up repeated builds.  ``"auto"`` (the default) uses ``sccache`` then
 mere presence of the binary is the opt-in.  ``"none"`` disables it; an
 explicit tool name or path requires that the launcher be found.
 
+Ordinary profiles reuse a structurally compatible ``nsx.lock`` byte for
+byte and always materialize with frozen sync. ``update_dependencies`` is
+the only mode that intentionally advances refs. ``offline`` additionally
+requires the exact lock and all locked module trees to already exist.
+
 | Key | Type | Default | Notes |
 |---|---|---|---|
 | `channel` | str \| null | `null` |  |
 | `nsx_modules` | dict[str, NsxModuleOverride] | `{}` | see subsection below for the per-entry schema |
 | `compiler_launcher` | str | `auto` |  |
+| `update_dependencies` | bool | `false` |  |
+| `offline` | bool | `false` |  |
 
 ## `build.nsx_modules.<name>`
 

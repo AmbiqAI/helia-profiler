@@ -229,6 +229,8 @@ class ResultManifest:
         if self.status is not RunStatus.COMPLETE or self.bundle_type != "profile":
             return
         required = {"hpx.summary", "hpx.run-metadata", "hpx.profile-layers"}
+        if "dependencies" in self.provenance:
+            required.add("hpx.nsx-lock")
         declared = {artifact.name for artifact in self.artifacts if artifact.optional is False}
         missing = sorted(required - declared)
         if missing:

@@ -24,10 +24,14 @@ class GenerateFirmwareStage:
                 "No engine artifacts available — engine preparation stage did not run.",
             )
 
+        from ..dependencies import create_workspace, workspace_mutex
         from ..firmware import generate_app
 
         try:
-            firmware_dir = generate_app(ctx)
+            workspace = create_workspace(ctx)
+            ctx.dependency_workspace = workspace
+            with workspace_mutex(workspace):
+                firmware_dir = generate_app(ctx)
         except FirmwareError:
             raise
         except Exception as exc:

@@ -28,6 +28,7 @@ Detailed (``detailed/`` subfolder, only with ``--detailed``):
 from __future__ import annotations
 
 import logging
+import shutil
 from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -102,6 +103,13 @@ def write_report(ctx: PipelineContext) -> list[Path]:
     # --- Always: run metadata ---
     p = _write_run_metadata(ctx, output_dir)
     paths.append(p)
+
+    # --- Always: exact dependency lock used by this run ---
+    if ctx.dependency_lock_path is None or not ctx.dependency_lock_path.is_file():
+        raise ReportError("The exact resolved nsx.lock is unavailable for the result bundle.")
+    lock_output = output_dir / "nsx.lock"
+    shutil.copyfile(ctx.dependency_lock_path, lock_output)
+    paths.append(lock_output)
 
     # --- heliaAOT operator manifest (engine-specific) ---
     p = _write_aot_manifest(ctx, output_dir)

@@ -1943,6 +1943,7 @@ class TestPowerFirmwareSelection:
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         ctx.firmware_dir = tmp_path / "app"
+        ctx.dependency_workspace = object()  # type: ignore[assignment]
         ctx.build_dir = ctx.firmware_dir / "build" / "apollo510_evb"
         ctx.build_dir.mkdir(parents=True)
         stale_binary = ctx.build_dir / "hpx_profiler_power"
@@ -1980,6 +1981,10 @@ class TestPowerFirmwareSelection:
             stale_binary.write_bytes(b"fresh")
 
         monkeypatch.setattr("helia_profiler.nsx.build", fake_build)
+        monkeypatch.setattr(
+            "helia_profiler.dependencies.workspace_mutex",
+            lambda _workspace: __import__("contextlib").nullcontext(),
+        )
 
         BuildPowerFirmwareStage().run(ctx)
 
@@ -2002,6 +2007,7 @@ class TestPowerFirmwareSelection:
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         ctx.firmware_dir = tmp_path / "app"
+        ctx.dependency_workspace = object()  # type: ignore[assignment]
         ctx.build_dir = ctx.firmware_dir / "build" / "apollo510_evb"
         ctx.build_dir.mkdir(parents=True)
         binary = ctx.build_dir / "hpx_profiler_power"
@@ -2036,6 +2042,10 @@ class TestPowerFirmwareSelection:
         monkeypatch.setattr(
             "helia_profiler.nsx.build",
             lambda *_args, **_kwargs: (_ for _ in ()).throw(BuildError("compile failed")),
+        )
+        monkeypatch.setattr(
+            "helia_profiler.dependencies.workspace_mutex",
+            lambda _workspace: __import__("contextlib").nullcontext(),
         )
 
         with pytest.raises(BuildError, match="compile failed"):
