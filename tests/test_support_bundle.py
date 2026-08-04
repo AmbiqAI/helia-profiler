@@ -1039,7 +1039,14 @@ def _minimal_manifest_json() -> str:
         # check rather than falling through as "relative".
         ("C:/Windows/System32/x.json", "must be relative"),
         ("c:/x.json", "must be relative"),
-        ("C:\\Windows\\System32\\x.json", "unsafe path"),
+        # zipfile.ZipInfo normalizes a backslash to "/" only when the
+        # writing host's os.sep is "\\" (Windows) -- so this same literal
+        # Python string ends up stored as "C:\\Windows\\..." on POSIX CI
+        # runners (caught by the plain "\\" in name check) but as
+        # "C:/Windows/..." on Windows CI runners (caught by
+        # _WINDOWS_DRIVE_ABS_RE instead). Both are safely rejected; only
+        # the specific message differs by host, so accept either.
+        ("C:\\Windows\\System32\\x.json", "unsafe path|must be relative"),
     ],
 )
 def test_verify_support_bundle_rejects_hostile_member_paths(
