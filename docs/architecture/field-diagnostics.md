@@ -61,18 +61,43 @@ traversal — is rejected before any bytes are trusted.
 
 ## Redaction
 
-See `redact.py` for the full pattern set. In short: absolute paths keep
-only their final path component (`/Users/alice/model.tflite` →
-`<redacted-path>/model.tflite`); URL userinfo and token-shaped query
-parameters are stripped; known credential/token shapes (GitHub PAT, AWS
-access key, Slack token, JWT, `Bearer <token>`) and secret-looking
-`KEY=VALUE`/`KEY: VALUE` assignments are replaced; device serial numbers are
-redacted **structurally** (by field name — `serial`, `serial_number`, ...)
-rather than by digit-pattern matching, to avoid false positives on ordinary
-counters and sizes. Every redaction pass returns a `RedactionCounts`, summed
-into the manifest's `redaction` object so a reviewer can see exactly what
-categories were touched, and how many times, without ever needing the
-original value to confirm it.
+See `redact.py` for the full pattern set. In short:
+
+- Absolute paths keep only their final path component
+  (`/Users/alice/model.tflite` -> `<redacted-path>/model.tflite`) -- except
+  a path that resolves to a home directory itself (`/Users/alice`,
+  `C:\Users\alice`), whose final component *is* the account name, so
+  nothing is kept there.
+- URL credentials (both the `user:password@host` form and a single
+  bearer-style credential with no colon) are stripped, and every
+  query-parameter value is redacted by default except a narrow allow-list
+  of clearly non-sensitive names -- the same credential/token-shape and
+  secret-assignment passes described below also run over URL text, so a
+  token embedded in a URL's path or query is caught the same way it would
+  be in plain text. `file://` URLs additionally get their path component
+  run through path redaction.
+- Known credential/token shapes (GitHub PAT, AWS access key, Slack token,
+  JWT, an HTTP bearer credential) are replaced wherever they appear,
+  including inside a URL.
+- Secret-looking `KEY=VALUE`/`KEY: VALUE` text assignments are replaced,
+  and -- structurally, not just in free text -- any JSON mapping value
+  whose *key* looks secret-shaped (`api_key`, `NSX_SECRET`, ...) is always
+  replaced regardless of the value's own shape. Mapping keys themselves are
+  also redacted.
+- Device serial numbers are redacted **structurally** (by field name --
+  `serial`, `serial_number`, ...) rather than by digit-pattern matching, to
+  avoid false positives on ordinary counters and sizes, *and* by literal
+  substitution everywhere else a known serial value recurs (for example a
+  USB `hwid` string's `SER=<serial>` marker, or a device path whose
+  basename is derived from it) so a sibling field can't leak the same
+  value structural redaction already caught elsewhere.
+
+Every redaction pass returns a `RedactionCounts`, summed into the
+manifest's `redaction` object so a reviewer can see what categories of text
+were *found and rewritten*, and how many times. Treat this as an audit
+trail of what redaction did, not as a certificate that a bundle contains
+nothing sensitive -- review a bundle before sharing it as you would any
+other diagnostic output.
 
 `--raw-probe-ids` is the one explicit opt-out: it keeps real probe/port
 serial numbers in the bundle and prints a warning to make the choice hard to

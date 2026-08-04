@@ -548,7 +548,10 @@ def read_dependency_lock_provenance(
     recorded_lock_sha256 = _state_digest(lock.get("sha256"), "lock.sha256", state_path)
     if not lock_path.is_file():
         raise LockError(f"Dependency lock is missing: {lock_path}")
-    actual_lock_sha256 = _digest_file(lock_path)
+    try:
+        actual_lock_sha256 = _digest_file(lock_path)
+    except OSError as exc:
+        raise LockError(f"Cannot read dependency lock: {lock_path}: {exc}") from exc
     if actual_lock_sha256 != recorded_lock_sha256:
         raise LockError(
             f"Dependency lock no longer matches recorded provenance: {lock_path}",

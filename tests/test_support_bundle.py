@@ -9,6 +9,7 @@ archive self-verification, and rejection of malformed/hostile archives.
 from __future__ import annotations
 
 import json
+import os
 import zipfile
 from pathlib import Path
 from unittest import mock
@@ -47,7 +48,9 @@ pytestmark = pytest.mark.timeout(30)
 # ---------------------------------------------------------------------------
 
 
-def _prepared_workspace(tmp_path: Path, *, credentialed_url: bool = False) -> Path:
+def _prepared_workspace(
+    tmp_path: Path, *, credentialed_url: bool = False, url_override: str | None = None
+) -> Path:
     """Build a real dependency workspace with a frozen exact lock, offline-safe.
 
     Returns the ``profiler_app`` directory suitable for
@@ -77,11 +80,14 @@ def _prepared_workspace(tmp_path: Path, *, credentialed_url: bool = False) -> Pa
     module_dir.mkdir(parents=True, exist_ok=True)
     (module_dir / "nsx-module.yaml").write_text("name: demo\n", encoding="utf-8")
 
-    url = (
-        "https://user:hunter2@example.invalid/demo.git"
-        if credentialed_url
-        else "https://example.invalid/demo.git"
-    )
+    if url_override is not None:
+        url = url_override
+    else:
+        url = (
+            "https://" + "user:" + "hunter2" + "@example.invalid/demo.git"
+            if credentialed_url
+            else "https://example.invalid/demo.git"
+        )
     lock = NsxLock(
         generated_at="2026-08-03T00:00:00+00:00",
         nsx_tool_version="0.7.10",
@@ -236,6 +242,121 @@ def test_collect_support_bundle_marks_ports_unavailable_when_pyserial_missing(mo
     assert section.reason
 
 
+def test_collect_support_bundle_redacts_serial_everywhere_it_recurs_in_a_port_record(
+    monkeypatch,
+) -> None:
+    """A serial number recurring in ``hwid``'s ``SER=`` marker and in the
+    device path's basename (both realistic pyserial/macOS shapes) must be
+    scrubbed everywhere, not only in the field literally named ``serial_
+    number`` -- the structural-by-name defense alone is not enough."""
+    from helia_profiler.transport.ports import SerialPortInfo
+
+    serial = "000440123456"
+    port = SerialPortInfo(
+        device=f"/dev/tty.usbmodem{serial}1",
+        kind="hpx-usb-cdc",
+        description="HPX debug probe",
+        manufacturer="Ambiq",
+        product="HPX Probe",
+        serial_number=serial,
+        interface="00",
+        hwid=f"USB VID:PID=1366:0105 SER={serial} LOCATION=20-2",
+    )
+    monkeypatch.setattr(
+        "helia_profiler.transport.ports.list_serial_ports", lambda **_kw: (port,)
+    )
+    options = SupportBundleOptions(include_probes=False, include_ports=True)
+
+    collection = collect_support_bundle(options)
+
+    payload = json.loads(collection.members["ports.json"])
+    record = payload[0]
+    assert serial not in record["hwid"]
+    assert serial not in record["device"]
+    assert serial not in json.dumps(record)
+    assert record["serial_number"].startswith("<redacted-serial:")
+    # The same placeholder everywhere the same real value occurred, so a
+    # reviewer can still tell "these three fields refer to one probe".
+    assert record["serial_number"] in record["hwid"]
+    assert collection.manifest.redaction["serials"] >= 1
+
+
+def test_collect_support_bundle_ports_raw_probe_ids_opt_in_keeps_serial_everywhere(
+    monkeypatch,
+) -> None:
+    from helia_profiler.transport.ports import SerialPortInfo
+
+    serial = "000440123456"
+    port = SerialPortInfo(
+        device=f"/dev/tty.usbmodem{serial}1",
+        kind="hpx-usb-cdc",
+        serial_number=serial,
+        hwid=f"USB VID:PID=1366:0105 SER={serial} LOCATION=20-2",
+    )
+    monkeypatch.setattr(
+        "helia_profiler.transport.ports.list_serial_ports", lambda **_kw: (port,)
+    )
+    options = SupportBundleOptions(include_probes=False, include_ports=True, raw_probe_ids=True)
+
+    collection = collect_support_bundle(options)
+
+    payload = json.loads(collection.members["ports.json"])
+    record = payload[0]
+    assert record["serial_number"] == serial
+    assert serial in record["hwid"]
+
+
+def test_collect_support_bundle_config_directory_path_degrades_section_not_traceback(
+    tmp_path: Path,
+) -> None:
+    """A ``--config`` path that is a directory (or otherwise unreadable) must
+    raise ``IsADirectoryError``/``PermissionError`` -- plain ``OSError``
+    subclasses, not ``HpxError`` -- inside ``load_config``'s bare ``open()``.
+    The collector must still degrade just this section, never propagate."""
+    config_dir = tmp_path / "a-directory-not-a-file"
+    config_dir.mkdir()
+    options = SupportBundleOptions(
+        config_path=config_dir, include_probes=False, include_ports=False
+    )
+
+    collection = collect_support_bundle(options)
+
+    section = collection.manifest.section("config")
+    assert section is not None
+    assert not section.available
+    assert section.reason
+
+
+@pytest.mark.skipif(
+    not hasattr(os, "chmod") or os.name == "nt",
+    reason="POSIX permission bits only",
+)
+def test_collect_support_bundle_unreadable_lock_degrades_section_not_traceback(
+    tmp_path: Path,
+) -> None:
+    """An ``nsx.lock`` that becomes unreadable (permission denied) between
+    workspace preparation and bundle collection must degrade the
+    dependencies/nsx.lock sections, not raise a raw ``PermissionError``."""
+    if os.geteuid() == 0:
+        pytest.skip("root ignores POSIX permission bits")
+    app_dir = _prepared_workspace(tmp_path)
+    lock_path = app_dir / "nsx.lock"
+    original_mode = lock_path.stat().st_mode
+    lock_path.chmod(0o000)
+    try:
+        options = SupportBundleOptions(
+            workspace=app_dir, include_probes=False, include_ports=False
+        )
+        collection = collect_support_bundle(options)
+    finally:
+        lock_path.chmod(original_mode)
+
+    section = collection.manifest.section("dependencies")
+    assert section is not None
+    assert not section.available
+    assert section.reason
+
+
 def test_collect_support_bundle_always_includes_checks_and_compatibility() -> None:
     options = SupportBundleOptions(include_probes=False, include_ports=False)
 
@@ -290,6 +411,58 @@ def test_collect_support_bundle_redacts_credentials_in_embedded_lock(tmp_path: P
     assert "hunter2" not in lock_text
     assert "<redacted>@example.invalid" in lock_text
     assert collection.manifest.redaction["urls"] >= 1
+
+
+def test_collect_support_bundle_redacts_single_token_userinfo_in_embedded_lock(
+    tmp_path: Path,
+) -> None:
+    """A single-token (no-colon) credential in a git remote URL -- the most
+    common real-world shape (`https://<PAT>@host/...`) -- must not survive
+    into the archived nsx.lock, and the manifest's counters must say so."""
+    token = "ghp_" + "A" * 36
+    app_dir = _prepared_workspace(
+        tmp_path, url_override=f"https://{token}@example.invalid/demo.git"
+    )
+    options = SupportBundleOptions(workspace=app_dir, include_probes=False, include_ports=False)
+
+    collection = collect_support_bundle(options)
+    path = write_support_bundle(collection, tmp_path / "out")
+
+    lock_text = collection.members["nsx.lock"].decode("utf-8")
+    assert token not in lock_text
+    assert "<redacted>@example.invalid" in lock_text
+    assert collection.manifest.redaction["urls"] >= 1
+    assert collection.manifest.redaction["total"] >= 1
+
+    # And the same guarantee holds for the actual bytes written to disk, not
+    # just the in-memory collection.
+    with zipfile.ZipFile(path) as archive:
+        archived_lock = archive.read("nsx.lock").decode("utf-8")
+    assert token not in archived_lock
+    with open(path, "rb") as handle:
+        assert token.encode("utf-8") not in handle.read()
+
+
+def test_collect_support_bundle_redacts_token_shape_embedded_in_lock_url_path(
+    tmp_path: Path,
+) -> None:
+    """A credential/token shape can appear in a URL's path or query, not
+    only its userinfo component (e.g. a signed download link) -- that must
+    be caught too, both in-memory and in the written archive bytes."""
+    token = "ghp_" + "B" * 36
+    app_dir = _prepared_workspace(
+        tmp_path, url_override=f"https://example.invalid/download/{token}/demo.git"
+    )
+    options = SupportBundleOptions(workspace=app_dir, include_probes=False, include_ports=False)
+
+    collection = collect_support_bundle(options)
+    path = write_support_bundle(collection, tmp_path / "out")
+
+    lock_text = collection.members["nsx.lock"].decode("utf-8")
+    assert token not in lock_text
+    assert collection.manifest.redaction["tokens"] >= 1
+    with open(path, "rb") as handle:
+        assert token.encode("utf-8") not in handle.read()
 
 
 def test_collect_support_bundle_module_inventory_includes_baseline_and_resolved(
@@ -553,26 +726,30 @@ def _minimal_manifest_json() -> str:
 
 
 @pytest.mark.parametrize(
-    "hostile_name",
+    ("hostile_name", "expected_message"),
     [
-        "../../etc/passwd",
-        "/etc/passwd",
-        "a/../../b.json",
-        "a\\..\\b.json",
-        "model.tflite",
-        "profiler_app/main.elf",
-        "firmware.bin",
+        ("../../etc/passwd", "unsafe path"),
+        ("/etc/passwd", "unsafe path"),
+        ("a/../../b.json", "unsafe path"),
+        ("a\\..\\b.json", "unsafe path"),
+        ("model.tflite", "disallowed type"),
+        ("profiler_app/main.elf", "disallowed type"),
+        ("firmware.bin", "disallowed type"),
     ],
 )
 def test_verify_support_bundle_rejects_hostile_member_paths(
-    tmp_path: Path, hostile_name: str
+    tmp_path: Path, hostile_name: str, expected_message: str
 ) -> None:
     path = tmp_path / "hostile.zip"
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("manifest.json", _minimal_manifest_json())
         archive.writestr(hostile_name, "evil")
 
-    with pytest.raises(ReportError):
+    # Pin the *specific* rejection reason, not just "some ReportError" --
+    # a path-traversal/absolute-path member must be caught as an unsafe
+    # path, and a disguised model/firmware payload must be caught as a
+    # disallowed member type, even if the other check were ever loosened.
+    with pytest.raises(ReportError, match=expected_message):
         verify_support_bundle(path)
 
 

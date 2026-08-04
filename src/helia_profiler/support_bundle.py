@@ -19,6 +19,7 @@ import os
 import platform
 import re
 import sys
+import tempfile
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -32,7 +33,7 @@ from .dependencies import read_dependency_lock_provenance
 from .doctor import inspect_environment
 from .engines import EngineType
 from .errors import DependencyError, HpxError, ReportError
-from .redact import RedactionCounts, RedactionPolicy, redact_text, redact_value
+from .redact import RedactionCounts, RedactionPolicy, redact_known_serial, redact_text, redact_value
 from .results import DependencyLockProvenance, ResultArtifact
 from .results.support_bundle import (
     SUPPORT_BUNDLE_SCHEMA,
@@ -170,7 +171,7 @@ def _collect_dependencies(
 
     try:
         provenance = read_dependency_lock_provenance(options.workspace)
-    except DependencyError as exc:
+    except (DependencyError, OSError) as exc:
         sections.append(SupportBundleSection("dependencies", False, reason=str(exc)))
         sections.append(SupportBundleSection("nsx.lock", False, reason=str(exc)))
         return None, counts
@@ -288,7 +289,7 @@ def _collect_config(
         return counts
     try:
         config = load_config(options.config_path, {})
-    except HpxError as exc:
+    except (HpxError, OSError) as exc:
         sections.append(SupportBundleSection("config", False, reason=str(exc)))
         return counts
 
@@ -344,22 +345,44 @@ def _collect_ports(
         sections.append(SupportBundleSection("ports", False, reason=str(exc)))
         return counts
 
-    payload = [
-        {
-            "device": port.device,
-            "kind": port.kind,
-            "description": port.description,
-            "manufacturer": port.manufacturer,
-            "product": port.product,
-            "serial_number": port.serial_number,
-            "interface": port.interface,
-            "hwid": port.hwid,
-        }
-        for port in ports
-    ]
+    counts_and_records = [_sanitize_port_record(port, policy) for port in ports]
+    payload = [record for record, _ in counts_and_records]
+    for _, record_counts in counts_and_records:
+        counts = counts.combined(record_counts)
     item_counts = _add_json_member(members, "ports.json", payload, policy)
     sections.append(SupportBundleSection("ports", True))
     return counts.combined(item_counts)
+
+
+def _sanitize_port_record(
+    port: Any, policy: RedactionPolicy
+) -> tuple[dict[str, Any], RedactionCounts]:
+    """Scrub a known serial number out of every sibling field before JSON.
+
+    ``redact_value``'s key-based routing only redacts the field literally
+    *named* like a serial (``serial_number``); it does not catch the same
+    value recurring inside an unrelated field such as pyserial's ``hwid``
+    (``... SER=<serial> ...``) or a device path whose basename embeds it
+    (macOS ``/dev/tty.usbmodem<serial>...``). Substitute those first, so the
+    later generic redaction pass never sees the raw value at all.
+    """
+    record = {
+        "device": port.device,
+        "kind": port.kind,
+        "description": port.description,
+        "manufacturer": port.manufacturer,
+        "product": port.product,
+        "serial_number": port.serial_number,
+        "interface": port.interface,
+        "hwid": port.hwid,
+    }
+    serial = port.serial_number or ""
+    record_counts = RedactionCounts()
+    if serial:
+        for field in ("device", "description", "manufacturer", "product", "interface", "hwid"):
+            record[field], field_counts = redact_known_serial(record[field], serial, policy)
+            record_counts = record_counts.combined(field_counts)
+    return record, record_counts
 
 
 def _collect_host(
@@ -466,15 +489,24 @@ def write_support_bundle(collection: SupportBundleCollection, output: Path) -> P
 def _write_deterministic_zip(path: Path, members: dict[str, bytes]) -> None:
     ordered_names = sorted(name for name in members if name != "manifest.json")
     ordered_names.append("manifest.json")
-    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # tempfile.mkstemp opens with O_CREAT|O_EXCL (and O_NOFOLLOW where the
+    # platform supports it) at an unpredictable name, unlike a name derived
+    # from the PID alone — that would let another local user on a shared
+    # host pre-create the exact path (e.g. as a symlink) and win a race.
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent)
+    )
+    tmp_path = Path(tmp_name)
     try:
-        with zipfile.ZipFile(tmp_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            for name in ordered_names:
-                info = zipfile.ZipInfo(name, date_time=_ZIP_FIXED_DATE_TIME)
-                info.compress_type = zipfile.ZIP_DEFLATED
-                info.external_attr = 0o644 << 16
-                info.create_system = 0  # normalize across platforms for byte-determinism
-                archive.writestr(info, members[name])
+        with os.fdopen(fd, "wb") as handle:
+            with zipfile.ZipFile(handle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                for name in ordered_names:
+                    info = zipfile.ZipInfo(name, date_time=_ZIP_FIXED_DATE_TIME)
+                    info.compress_type = zipfile.ZIP_DEFLATED
+                    info.external_attr = 0o644 << 16
+                    info.create_system = 0  # normalize across platforms for byte-determinism
+                    archive.writestr(info, members[name])
         tmp_path.replace(path)
     finally:
         tmp_path.unlink(missing_ok=True)

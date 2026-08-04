@@ -99,17 +99,27 @@ inputs `read_dependency_lock_provenance()` accepts (see
 build outputs, raw proprietary payloads, or process environment values.
 
 **Redacted by default:** absolute filesystem paths (only the final path
-component is kept), URL userinfo credentials and token-shaped query
-parameters, common credential/token shapes (GitHub PAT, AWS key, Slack
-token, JWT, `Bearer <token>`), `KEY=VALUE`/`KEY: VALUE` secret-looking
-assignments, and device serial numbers (J-Link probes, USB serial numbers).
-Pass `--raw-probe-ids` to keep real probe/port serial numbers in the bundle
-— this prints an explicit warning and is never the default.
+component is kept, except a bare home directory itself, whose final
+component is the account name); URL credentials -- both the
+`user:password@host` form and a single bearer-style credential with no
+colon -- plus every URL query-parameter value except a narrow allow-list
+of clearly non-sensitive names; common credential/token shapes (GitHub
+PAT, AWS key, Slack token, JWT, an HTTP bearer credential) wherever they
+appear, including inside a URL; `KEY=VALUE`/`KEY: VALUE` secret-looking
+text assignments and, structurally, any JSON field whose *key* looks
+secret-shaped (`api_key`, `NSX_SECRET`, ...) regardless of its value; and
+device serial numbers (J-Link probes, USB serial numbers) -- both by field
+name and by substitution everywhere else a known serial value recurs (for
+example inside a `hwid` string). Pass `--raw-probe-ids` to keep real
+probe/port serial numbers in the bundle -- this prints an explicit warning
+and is never the default.
 
 The bundle's `manifest.json` records a `redaction` object with per-category
 counts (`paths`, `urls`, `tokens`, `serials`, `env_values`) and whether
-`--raw-probe-ids` was used, so you can see exactly what was scrubbed without
-needing the original values.
+`--raw-probe-ids` was used. These counts report what redaction found and
+rewrote -- they are useful evidence, not a certificate that a bundle
+contains nothing sensitive; review a bundle's contents before sharing it,
+as you would any other diagnostic output.
 
 Two bundles built from identical inputs produce the same archive file name
 and identical member bytes (except `manifest.json`'s `generated_at`

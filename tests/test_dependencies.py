@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 from threading import Thread
 
@@ -523,3 +524,24 @@ def test_lock_provenance_drift_raises_lock_error_not_version_error(
         read_dependency_lock_provenance(ctx.firmware_dir)
 
     assert not isinstance(exc.value, VersionError)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits only")
+def test_read_dependency_lock_provenance_unreadable_lock_raises_lock_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if os.geteuid() == 0:
+        pytest.skip("root ignores POSIX permission bits")
+    ctx = _context(tmp_path)
+    _write_valid_lock(ctx)
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    prepare_locked_dependencies(ctx)
+    assert ctx.firmware_dir is not None
+    lock_path = ctx.firmware_dir / "nsx.lock"
+    original_mode = lock_path.stat().st_mode
+    lock_path.chmod(0o000)
+    try:
+        with pytest.raises(LockError):
+            read_dependency_lock_provenance(ctx.firmware_dir)
+    finally:
+        lock_path.chmod(original_mode)

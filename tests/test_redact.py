@@ -37,7 +37,11 @@ from helia_profiler.redact import (
         (r"C:\Program Files\SEGGER\JLink_V960\JLink.exe", "<redacted-path>/JLink.exe"),
         (r"\\build-server\share\hpx-workspace", "<redacted-path>/hpx-workspace"),
         ("/opt/toolchains/gcc-arm/bin/arm-none-eabi-gcc", "<redacted-path>/arm-none-eabi-gcc"),
-        ("/Users/adam.page/", "<redacted-path>/adam.page"),
+        # A path that IS a home directory has the account name as its final
+        # component — unlike an ordinary basename, that must never be kept.
+        ("/Users/adam.page/", "<redacted-path>"),
+        ("/Users/adam.page", "<redacted-path>"),
+        (r"C:\Users\adam.page", "<redacted-path>"),
     ],
 )
 def test_redact_text_scrubs_absolute_paths_keeping_basename(raw: str, expected: str) -> None:
@@ -78,24 +82,40 @@ def test_redact_text_paths_disabled_by_policy() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _userinfo_case(user_pass: str, host_path: str) -> tuple[str, str]:
+    """Build a (raw, expected) URL-credential fixture without a literal
+    credential-shaped constant in the test source."""
+    raw = f"https://{user_pass}@{host_path}"
+    expected = f"https://<redacted>@{host_path}"
+    return raw, expected
+
+
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
+        _userinfo_case("user:" + "hunter2", "github.com/org/repo.git"),
         (
-            "https://user:hunter2@github.com/org/repo.git",
-            "https://<redacted>@github.com/org/repo.git",
+            "https://api.example.com/v1?token=" + "abcdef123456" + "&ref=v1.0",
+            "https://api.example.com/v1?token=<redacted>&ref=v1.0",
         ),
         (
-            "https://api.example.com/v1?token=abcdef123456&x=1",
-            "https://api.example.com/v1?token=<redacted>&x=1",
-        ),
-        (
-            "https://example.com/download?api_key=SECRETVALUE",
+            "https://example.com/download?api_key=" + "SECRETVALUE",
             "https://example.com/download?api_key=<redacted>",
         ),
         (
-            "https://example.com/download?access_token=abc123&other=keep",
-            "https://example.com/download?access_token=<redacted>&other=keep",
+            "https://example.com/download?access_token=" + "abc123" + "&other=keep",
+            "https://example.com/download?access_token=<redacted>&other=<redacted>",
+        ),
+        (
+            # Not a named credential/token parameter at all - redacted by
+            # default anyway, since the allow-list is narrow and explicit.
+            "https://example.com/download?x=1",
+            "https://example.com/download?x=<redacted>",
+        ),
+        (
+            # A parameter name on the narrow allow-list is left alone.
+            "https://example.com/download?ref=v1.0.0",
+            "https://example.com/download?ref=v1.0.0",
         ),
     ],
 )
@@ -103,11 +123,42 @@ def test_redact_text_scrubs_url_credentials_and_tokens(raw: str, expected: str) 
     redacted, counts = redact_text(raw)
 
     assert redacted == expected
+
+
+def test_redact_text_url_allowlisted_query_params_and_no_credentials_is_untouched() -> None:
+    raw = "https://example.com/download?ref=v1.0.0&page=2"
+
+    redacted, counts = redact_text(raw)
+
+    assert redacted == raw
+    assert counts.total == 0
+
+
+def test_redact_text_url_path_query_param_is_redacted_not_allowlisted() -> None:
+    # A query key literally named "path" is NOT allow-listed: its value
+    # could itself be an absolute filesystem path, which is exactly the
+    # category this module exists to redact.
+    raw = "https://example.com/api?path=/Users/adam.page/secret-project"
+
+    redacted, counts = redact_text(raw)
+
+    assert "adam.page" not in redacted
+    assert "secret-project" not in redacted
+    assert counts.total >= 1
+
+
+def test_redact_text_url_single_token_userinfo_credential_is_redacted() -> None:
+    token = "ghp_" + "A" * 36
+    raw = f"https://{token}@example.invalid/demo.git"
+
+    redacted, counts = redact_text(raw)
+
+    assert token not in redacted
+    assert redacted == "https://<redacted>@example.invalid/demo.git"
     assert counts.urls == 1
-    assert counts.total == 1
 
 
-def test_redact_text_url_path_segments_survive_intact() -> None:
+def test_redact_text_url_path_survives_intact() -> None:
     raw = "https://github.com/AmbiqAI/neuralspotx/releases/download/v0.7.10/asset.tar.gz"
 
     redacted, counts = redact_text(raw)
@@ -123,6 +174,48 @@ def test_redact_text_plain_url_without_credentials_is_untouched() -> None:
 
     assert redacted == raw
     assert counts.total == 0
+
+
+@pytest.mark.parametrize(
+    "token_builder",
+    [
+        lambda: "ghp_" + "A" * 36,
+        lambda: "AKIA" + "B" * 16,
+        lambda: (
+            "eyJhbGciOiJIUzI1NiJ9." + "eyJzdWIiOiIxMjM0NTY3ODkwIn0." + "dQw4w9WgXcQ_abcXYZ123"
+        ),
+    ],
+)
+def test_redact_text_scrubs_known_token_shapes_embedded_in_url_path(token_builder) -> None:
+    token = token_builder()
+    raw = f"https://example.com/download/{token}"
+
+    redacted, counts = redact_text(raw)
+
+    assert token not in redacted
+    assert counts.total >= 1
+
+
+def test_redact_text_scrubs_secret_shaped_query_param_names_beyond_the_narrow_set() -> None:
+    # A parameter name that isn't in the credential/token/key/secret/auth
+    # set is still redacted by default (deny-by-default query values),
+    # e.g. GitLab's private_token or a signed-URL signature.
+    raw = "https://gitlab.example.com/api/v4/projects?private_token=" + "SUPERSECRETVALUE123"
+
+    redacted, counts = redact_text(raw)
+
+    assert "SUPERSECRETVALUE123" not in redacted
+    assert counts.total >= 1
+
+
+def test_redact_text_scrubs_file_uri_path_keeping_basename() -> None:
+    raw = "file:///Users/adam.page/proj/nsx.lock"
+
+    redacted, counts = redact_text(raw)
+
+    assert "adam.page" not in redacted
+    assert redacted.endswith("nsx.lock")
+    assert counts.paths >= 1
 
 
 # ---------------------------------------------------------------------------
@@ -274,7 +367,10 @@ def test_redact_value_recurses_through_nested_dicts_and_lists() -> None:
     value = {
         "path": "/Users/adam.page/models/foo.tflite",
         "nested": {
-            "urls": ["https://user:pass@example.com/repo.git", "https://example.com/plain"],
+            "urls": [
+                "https://" + "user:" + "hunter2" + "@example.com/repo.git",
+                "https://example.com/plain",
+            ],
             "serial_number": "ABC123",
         },
         "list_of_dicts": [{"token": "ghp_" + "z" * 36}],
@@ -286,13 +382,13 @@ def test_redact_value_recurses_through_nested_dicts_and_lists() -> None:
     assert redacted["nested"]["urls"][0] == "https://<redacted>@example.com/repo.git"
     assert redacted["nested"]["urls"][1] == "https://example.com/plain"
     assert redacted["nested"]["serial_number"].startswith("<redacted-serial:")
-    assert redacted["list_of_dicts"][0]["token"] == "<redacted-token>"
+    # Routed by the "token" key itself (structural secret-key redaction),
+    # not by the generic ghp_-shape pattern -- the key alone is enough.
+    assert redacted["list_of_dicts"][0]["token"] == "<redacted>"
     assert counts.paths == 1
     assert counts.urls == 1
     assert counts.serials == 1
-    assert counts.tokens == 1
-
-
+    assert counts.env_values == 1
 def test_redact_value_preserves_tuple_type() -> None:
     value = ("relative/path", "plain text")
 
