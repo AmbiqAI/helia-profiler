@@ -6,12 +6,16 @@ from helia_profiler.errors import (
     BuildError,
     CaptureError,
     ConfigError,
+    DependencyError,
     EngineError,
     FirmwareError,
     HpxError,
+    LockError,
+    NetworkError,
     PlatformError,
     PowerError,
     ReportError,
+    VersionError,
 )
 
 
@@ -87,3 +91,38 @@ class TestBuildError:
         err = BuildError("build failed")
         assert err.returncode is None
         assert err.details is None
+
+
+class TestDependencyErrorTaxonomy:
+    """VersionError and LockError specialize DependencyError for CLI/collector triage."""
+
+    @pytest.mark.parametrize("cls", [DependencyError, VersionError, LockError])
+    def test_is_dependency_build_and_hpx_error(self, cls):
+        err = cls("test error")
+        assert isinstance(err, DependencyError)
+        assert isinstance(err, BuildError)
+        assert isinstance(err, HpxError)
+
+    def test_version_error_is_not_lock_error_and_vice_versa(self):
+        assert not issubclass(VersionError, LockError)
+        assert not issubclass(LockError, VersionError)
+
+    def test_version_error_catchable_as_dependency_error(self):
+        with pytest.raises(DependencyError):
+            raise VersionError("nsx.lock schema mismatch")
+
+    def test_lock_error_catchable_as_dependency_error(self):
+        with pytest.raises(DependencyError):
+            raise LockError("nsx.lock is missing")
+
+    def test_lock_error_carries_hint(self):
+        err = LockError("nsx.lock is missing", hint="Run hpx profile once online first.")
+        assert err.hint == "Run hpx profile once online first."
+        assert "Run hpx profile once online first." in str(err)
+
+    def test_network_error_unrelated_to_new_taxonomy(self):
+        # NetworkError predates and is orthogonal to Version/LockError: it is
+        # about transport retriability, not what kind of dependency state broke.
+        assert not issubclass(NetworkError, VersionError)
+        assert not issubclass(NetworkError, LockError)
+        assert issubclass(NetworkError, BuildError)

@@ -72,7 +72,33 @@ class NetworkError(BuildError):
 
 
 class DependencyError(BuildError):
-    """Deterministic dependency lock/workspace failure."""
+    """Deterministic dependency lock/workspace failure (base class).
+
+    Covers workspace fingerprinting, override, and provenance-collection
+    failures that are neither a version mismatch nor a lock-file problem.
+    Prefer :class:`VersionError` or :class:`LockError` when a failure is
+    specifically about an incompatible version or a missing/corrupt lock.
+    """
+
+
+class VersionError(DependencyError):
+    """A tool, package, engine, or lock schema version is incompatible.
+
+    Raised when an installed version fails a compatibility baseline check
+    (schema version, minimum/maximum engine version, pinned package
+    version) so callers can distinguish "wrong version" from other
+    dependency failures and surface an actionable upgrade/downgrade hint.
+    """
+
+
+class LockError(DependencyError):
+    """A dependency lock file or its recorded provenance is unusable.
+
+    Raised for a missing, unreadable, structurally invalid, or
+    drifted ``nsx.lock`` / ``hpx-dependencies.json``, so field-diagnostics
+    collectors can skip just the lock-provenance section instead of
+    failing an entire report.
+    """
 
 
 class PowerError(HpxError):

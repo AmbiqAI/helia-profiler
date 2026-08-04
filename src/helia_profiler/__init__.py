@@ -47,7 +47,7 @@ from .dependencies import read_dependency_lock_provenance
 from .engines import EngineType
 from . import examples
 from .counters import PmuCounter
-from .doctor import DoctorCheck, DoctorResult
+from .doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
 from .errors import (
     BuildError,
     CaptureError,
@@ -56,10 +56,12 @@ from .errors import (
     EngineError,
     FirmwareError,
     HpxError,
+    LockError,
     NetworkError,
     PlatformError,
     PowerError,
     ReportError,
+    VersionError,
 )
 from .placement import Placement
 from .pipeline import ProgressUpdate
@@ -158,6 +160,7 @@ __all__ = [
     "read_dependency_lock_provenance",
     "DoctorCheck",
     "DoctorResult",
+    "DoctorVersionCheck",
     "BoardDef",
     "PmuCounter",
     "JLinkProbe",
@@ -167,6 +170,8 @@ __all__ = [
     "HpxError",
     "ConfigError",
     "DependencyError",
+    "VersionError",
+    "LockError",
     "PlatformError",
     "EngineError",
     "FirmwareError",
@@ -253,6 +258,8 @@ _EXPERIMENTAL_API = {
     "DependencyLockProvenance",
     "read_dependency_lock_provenance",
     "DependencyError",
+    "VersionError",
+    "LockError",
 }
 
 _IMPLEMENTATION_API = {
@@ -260,6 +267,7 @@ _IMPLEMENTATION_API = {
     "NsxModuleRef",
     "DoctorCheck",
     "DoctorResult",
+    "DoctorVersionCheck",
     "BoardDef",
     "PmuCounter",
     "JLinkProbe",
