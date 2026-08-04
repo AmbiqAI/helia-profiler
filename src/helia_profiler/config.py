@@ -608,11 +608,27 @@ class BuildConfig:
     ``ccache`` if either is on ``PATH`` and otherwise does nothing — so the
     mere presence of the binary is the opt-in.  ``"none"`` disables it; an
     explicit tool name or path requires that the launcher be found.
+
+    Ordinary profiles reuse a structurally compatible ``nsx.lock`` byte for
+    byte and always materialize with frozen sync. ``update_dependencies`` is
+    the only mode that intentionally advances refs. ``offline`` additionally
+    requires the exact lock and all locked module trees to already exist.
     """
 
     channel: str | None = None
     nsx_modules: dict[str, NsxModuleOverride] = field(default_factory=dict)
     compiler_launcher: str = "auto"
+    update_dependencies: bool = False
+    offline: bool = False
+
+    @model_validator(mode="after")
+    def _validate_dependency_mode(self) -> BuildConfig:
+        if self.update_dependencies and self.offline:
+            raise ConfigError(
+                "build.update_dependencies and build.offline cannot both be true",
+                hint="Dependency updates require network access; select exactly one mode.",
+            )
+        return self
 
     @field_validator("channel")
     @classmethod
@@ -682,12 +698,17 @@ class ProfileConfig:
         repr=False,
         compare=False,
     )
-    frozen: bool = False
+    frozen: bool = False  # deprecated top-level alias for build.offline
     work_dir: Path | None = None  # None = use persistent cache dir
     clean: bool = False  # wipe cached work dir before building
     verbose: int = 0
 
     def __post_init__(self) -> None:
+        if self.frozen and self.build.update_dependencies:
+            raise ConfigError(
+                "frozen and build.update_dependencies cannot both be enabled",
+                hint="Remove --frozen/--offline when intentionally updating dependencies.",
+            )
         if self.compatibility is None:
             object.__setattr__(
                 self,

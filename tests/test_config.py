@@ -222,6 +222,27 @@ def test_build_config_defaults():
     config = load_config(None, cli)
     assert config.build.channel is None
     assert config.build.nsx_modules == {}
+    assert config.build.update_dependencies is False
+    assert config.build.offline is False
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"build": {"offline": True, "update_dependencies": True}},
+        {"frozen": True, "build": {"update_dependencies": True}},
+    ],
+)
+def test_dependency_update_rejects_offline_modes(overrides: dict):
+    with pytest.raises(ConfigError, match="cannot both|cannot both be enabled"):
+        load_config(
+            None,
+            {
+                "model": {"path": "test.tflite"},
+                "engine": {"type": "helia-rt"},
+                **overrides,
+            },
+        )
 
 
 def test_engine_defaults_to_helia_rt():

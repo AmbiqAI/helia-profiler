@@ -21,6 +21,8 @@ def _profile_args(**overrides):
         rtt_buffer_size_up=None,
         cpu_clock=None,
         frozen=False,
+        offline=False,
+        update_dependencies=False,
         pmu_counters=None,
         per_layer=None,
         iterations=None,
@@ -65,6 +67,24 @@ def test_profile_cli_forwards_rtt_buffer_size(monkeypatch) -> None:
 
     assert seen["overrides"] == {
         "target": {"rtt_buffer_size_up": 16384},
+        "verbose": False,
+    }
+
+
+def test_profile_cli_forwards_explicit_dependency_mode(monkeypatch) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_load_config(path, overrides):
+        seen["overrides"] = overrides
+        return SimpleNamespace(verbose=False)
+
+    monkeypatch.setattr("helia_profiler.config.load_config", fake_load_config)
+    monkeypatch.setattr("helia_profiler.profiler.run_profile", lambda config, **kwargs: None)
+
+    cli._cmd_profile(_profile_args(update_dependencies=True))
+
+    assert seen["overrides"] == {
+        "build": {"update_dependencies": True},
         "verbose": False,
     }
 

@@ -47,6 +47,8 @@ def _metadata_to_dict(meta: RunMetadata) -> dict[str, Any]:
         d["timing"] = {k: v for k, v in asdict(meta.timing).items() if v is not None}
     if meta.compatibility is not None:
         d["compatibility"] = meta.compatibility.to_dict()
+    if meta.dependencies is not None:
+        d["dependencies"] = meta.dependencies.to_dict()
     return d
 
 

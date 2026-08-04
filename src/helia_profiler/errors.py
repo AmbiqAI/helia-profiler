@@ -71,6 +71,10 @@ class NetworkError(BuildError):
     """
 
 
+class DependencyError(BuildError):
+    """Deterministic dependency lock/workspace failure."""
+
+
 class PowerError(HpxError):
     """Power measurement failure — Joulescope not found, calibration error."""
 

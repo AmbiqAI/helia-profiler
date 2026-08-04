@@ -27,6 +27,7 @@ from typing import Any, Callable
 from neuralspotx import api as nsx_api
 from neuralspotx._io import Emitter, Event
 from neuralspotx.api import NSXError
+from neuralspotx.nsx_lock import NsxLock
 
 from .errors import BuildError, NetworkError
 
@@ -117,6 +118,7 @@ def configure(
     app_dir: Path,
     *,
     toolchain: str | None = None,
+    frozen: bool = False,
     timeout_s: int = _DEFAULT_CONFIGURE_TIMEOUT_S,
     verbose: int = 0,
 ) -> None:
@@ -126,7 +128,7 @@ def configure(
     _translate(
         "nsx configure",
         lambda: nsx_api.configure_app(
-            app_dir, toolchain=toolchain, timeout_s=timeout_s, emit=emit
+            app_dir, toolchain=toolchain, frozen=frozen, timeout_s=timeout_s, emit=emit
         ),
     )
 
@@ -212,7 +214,7 @@ def lock(
     update: bool = False,
     timeout_s: int = _DEFAULT_LOCK_TIMEOUT_S,
     verbose: int = 0,
-) -> Path:
+) -> NsxLock:
     """Resolve module constraints and write ``nsx.lock``."""
     log.info("nsx lock: %s (update=%s)", app_dir, update)
     emit = emitter_for_verbosity(verbose)

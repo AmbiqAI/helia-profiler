@@ -280,6 +280,10 @@ def _make_ctx(tmp_path: Path, engine: EngineType, fmt: str) -> PipelineContext:
     ctx.binary_sections = BinarySections(text=45000, data=1200, bss=8000, total=54200)
     ctx.model_analysis = _sample_model_analysis()
     ctx.run_metadata = _sample_run_metadata()
+    dependency_lock = tmp_path / "_workspace" / "nsx.lock"
+    dependency_lock.parent.mkdir(parents=True)
+    dependency_lock.write_bytes(b"schema_version: 4\ntargets: {}\n")
+    ctx.dependency_lock_path = dependency_lock
     return ctx
 
 

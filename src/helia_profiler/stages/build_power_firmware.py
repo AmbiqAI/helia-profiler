@@ -46,6 +46,7 @@ class BuildPowerFirmwareStage:
             render_power_source,
         )
         from .. import nsx as nsx_cli
+        from ..dependencies import workspace_mutex
 
         if ctx.power_run is None or ctx.power_run.plan.inference_count is None:
             raise BuildError("Cannot build fixed-N power firmware without a resolved power plan.")
@@ -57,26 +58,29 @@ class BuildPowerFirmwareStage:
         )
 
         try:
-            render_power_source(ctx, inference_count=ctx.power_run.plan.inference_count)
-            ctx.power_firmware = None
-            ctx.deployed_power_firmware = None
-            ctx.power_binary_path = None
-            ctx.power_result = None
-            if ctx.power_run is not None:
-                ctx.power_run = replace(
-                    ctx.power_run,
-                    firmware=None,
-                    deployment=None,
-                    observation=None,
+            if ctx.dependency_workspace is None:
+                raise BuildError("Dependency workspace identity is unavailable.")
+            with workspace_mutex(ctx.dependency_workspace):
+                render_power_source(ctx, inference_count=ctx.power_run.plan.inference_count)
+                ctx.power_firmware = None
+                ctx.deployed_power_firmware = None
+                ctx.power_binary_path = None
+                ctx.power_result = None
+                if ctx.power_run is not None:
+                    ctx.power_run = replace(
+                        ctx.power_run,
+                        firmware=None,
+                        deployment=None,
+                        observation=None,
+                    )
+                _remove_stale_power_outputs(ctx.build_dir)
+                nsx_cli.build(
+                    ctx.firmware_dir,
+                    toolchain=_nsx_toolchain(ctx.config.target.toolchain),
+                    target="hpx_profiler_power",
+                    timeout_s=ctx.config.timeouts.build_s,
+                    verbose=ctx.config.verbose,
                 )
-            _remove_stale_power_outputs(ctx.build_dir)
-            nsx_cli.build(
-                ctx.firmware_dir,
-                toolchain=_nsx_toolchain(ctx.config.target.toolchain),
-                target="hpx_profiler_power",
-                timeout_s=ctx.config.timeouts.build_s,
-                verbose=ctx.config.verbose,
-            )
         except (BuildError, FirmwareError):
             raise
         except Exception as exc:

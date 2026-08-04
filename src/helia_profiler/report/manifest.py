@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 _MEDIA_TYPES = {
     ".csv": "text/csv",
     ".json": "application/json",
+    ".lock": "application/yaml",
 }
 
 
@@ -93,6 +94,13 @@ def _artifact_metadata(relative: str) -> dict[str, Any]:
             "hpx.run-metadata",
             schema=RUN_METADATA_SCHEMA,
             schema_version=RUN_METADATA_SCHEMA_VERSION,
+            optional=False,
+        )
+    if name == "nsx.lock":
+        return _artifact_fields(
+            "core",
+            "hpx.nsx-lock",
+            producer="neuralspotx",
             optional=False,
         )
     if name == "profile_results.json":
@@ -158,6 +166,8 @@ def _provenance(ctx: PipelineContext) -> dict[str, Any]:
         provenance["toolchain"] = asdict(ctx.run_metadata.toolchain)
     if ctx.run_metadata.compatibility is not None:
         provenance["compatibility"] = ctx.run_metadata.compatibility.to_dict()
+    if ctx.run_metadata.dependencies is not None:
+        provenance["dependencies"] = ctx.run_metadata.dependencies.to_dict()
     return provenance
 
 

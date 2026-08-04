@@ -3,8 +3,10 @@
 HPX owns the exact compatibility baseline in
 `src/helia_profiler/data/compatibility-baseline-v1.json`. It is loaded and
 validated during configuration resolution, then carried through the frozen
-configuration and result provenance. The baseline is not an NSX lockfile and
-does not change ordinary `nsx lock` or workspace update behavior.
+configuration and result provenance. The baseline is not an NSX lockfile.
+Stage 5 combines its identity and canonical hash with the NSX registry hash,
+target, engine, overrides, and relevant build inputs to select an isolated
+dependency workspace.
 
 The current baseline is `hpx-stage4-customer-hardening-2026-07`:
 
@@ -65,7 +67,10 @@ silently replaced by the baseline; the state and override names are recorded
 in `run_metadata.json`, `summary.json`, `result_manifest.json`, and terminal
 output.
 
-The baseline exposes a canonical SHA-256 fingerprint for the next hardening
-stage. Stage 5 may persist that fingerprint alongside deterministic lock
-reuse/update metadata; Stage 4 intentionally does not add those commands or
-alter normal lock resolution.
+The baseline exposes a canonical SHA-256 fingerprint. Ordinary profiles never
+refresh a structurally compatible lock: they reuse its exact bytes and run
+`nsx sync --frozen`. A missing or incompatible lock is resolved without the
+NSX update flag. Only `hpx profile --update-dependencies` (or
+`build.update_dependencies: true`) deliberately refreshes refs. The exact
+resulting `nsx.lock` and typed resolution provenance are copied into every
+completed result bundle.

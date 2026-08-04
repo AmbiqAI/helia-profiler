@@ -39,6 +39,8 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     }
     if ctx.run_metadata.compatibility is not None:
         summary["compatibility"] = ctx.run_metadata.compatibility.to_dict()
+    if ctx.run_metadata.dependencies is not None:
+        summary["dependencies"] = ctx.run_metadata.dependencies.to_dict()
 
     # Top layers by cycles
     summary["top_layers"] = [

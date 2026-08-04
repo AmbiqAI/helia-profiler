@@ -11,6 +11,7 @@ import glob
 import logging
 import os
 import shutil
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -407,7 +408,11 @@ def generate_app(ctx: PipelineContext) -> Path:
     assert ctx.board is not None
     assert ctx.engine_artifacts is not None
 
-    app_dir = ctx.work_dir / "profiler_app"
+    from ..dependencies import create_workspace
+
+    workspace = ctx.dependency_workspace or create_workspace(ctx)
+    ctx.dependency_workspace = workspace
+    app_dir = workspace.root / "profiler_app"
     app_dir.mkdir(parents=True, exist_ok=True)
 
     config = ctx.config
@@ -837,48 +842,27 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     build_dir = app_dir / "build" / board
     ninja_already_configured = (build_dir / "build.ninja").exists()
 
-    # Lock-aware flow: refresh nsx.lock for normal runs, then materialise
-    # modules/ from it before invoking the toolchain. When frozen, skip
-    # resolution entirely and require the existing lock/modules state to be
-    # reused as-is.
-    modules_dir = app_dir / "modules"
-    if ctx.config.frozen:
-        if not ninja_already_configured:
-            # First build for this board/toolchain combo: still need one
-            # verify-only sync (raises loudly on drift or a missing lock —
-            # see nsx_cli.sync's frozen docstring) plus a real `nsx
-            # configure`, since nothing has been materialised/configured
-            # here yet.
-            nsx_cli.sync(app_dir, frozen=True, timeout_s=timeouts.configure_s, verbose=verbose)
-            nsx_cli.configure(
-                app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s, verbose=verbose
-            )
-        # else: fully offline incremental rebuild. Skip nsx lock (no
-        # network resolve of the "main" branch constraint), nsx sync's
-        # module content-hash verification (a full tree hash over
-        # modules/ — real CPU/IO cost for large vendored trees), and the
-        # nsx configure() round-trip entirely. CMake's own
-        # --regenerate-during-build ninja rule transparently re-runs
-        # `cmake` if CMakeLists.txt (or any other tracked input,
-        # including hpx's freshly re-rendered templates from
-        # generate_app()) changed, with ZERO module-tree verification —
-        # so a hand-patched vendored NSX module under modules/ survives
-        # untouched across every subsequent build. This is the fast path
-        # for "I'm iterating on a local NSX module fix and want every
-        # rebuild to keep using it" (see AGENTS.md / the AP330 bring-up
-        # session that motivated this).
-    else:
-        nsx_cli.lock(app_dir, update=True, timeout_s=timeouts.configure_s, verbose=verbose)
-        try:
-            nsx_cli.sync(app_dir, timeout_s=timeouts.configure_s, verbose=verbose)
-        except Exception:
-            # Remove partially-materialised modules so next attempt starts clean.
-            if modules_dir.exists():
-                shutil.rmtree(modules_dir, ignore_errors=True)
-            raise
-        nsx_cli.configure(app_dir, toolchain=nsx_tc, timeout_s=timeouts.configure_s, verbose=verbose)
+    from ..dependencies import prepare_locked_dependencies, workspace_mutex
 
-    nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose)
+    assert ctx.dependency_workspace is not None
+    with workspace_mutex(ctx.dependency_workspace):
+        dependency_state = prepare_locked_dependencies(ctx)
+        if (
+            not ninja_already_configured
+            or dependency_state.lock.mode.value != "reused"
+        ):
+            nsx_cli.configure(
+                app_dir,
+                toolchain=nsx_tc,
+                frozen=True,
+                timeout_s=timeouts.configure_s,
+                verbose=verbose,
+            )
+        else:
+            # CMake's regeneration rule handles deterministic source/template
+            # changes; dependency verification already ran via sync --frozen.
+            log.info("Reusing configured deterministic workspace: %s", build_dir)
+        nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose)
 
     # Locate build output. Prefer the ELF-form executable because later
     # reporting stages run size tools against it to capture text/data/bss.
@@ -919,11 +903,19 @@ def flash_app(ctx: PipelineContext) -> None:
     assert ctx.firmware_dir is not None
     toolchain = ctx.config.target.toolchain
     nsx_tc = _nsx_toolchain(toolchain)
-    nsx_cli.flash(
-        ctx.firmware_dir,
-        toolchain=nsx_tc,
-        jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
-        frozen=ctx.config.frozen,
-        timeout_s=ctx.config.timeouts.flash_s,
-        verbose=ctx.config.verbose,
+    from ..dependencies import workspace_mutex
+
+    lock = (
+        workspace_mutex(ctx.dependency_workspace)
+        if ctx.dependency_workspace is not None
+        else nullcontext()
     )
+    with lock:
+        nsx_cli.flash(
+            ctx.firmware_dir,
+            toolchain=nsx_tc,
+            jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
+            frozen=True,
+            timeout_s=ctx.config.timeouts.flash_s,
+            verbose=ctx.config.verbose,
+        )

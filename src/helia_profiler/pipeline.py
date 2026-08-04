@@ -18,6 +18,7 @@ from typing import Any, Literal, Protocol, runtime_checkable
 
 from ._version import __version__
 from .results import (
+    DependencyWorkspace,
     DeploymentRecord,
     FirmwareArtifact,
     PowerObservation,
@@ -86,6 +87,8 @@ class PipelineContext:
 
     # Firmware generation (stage: generate_firmware)
     firmware_dir: Path | None = None
+    dependency_workspace: DependencyWorkspace | None = None
+    dependency_lock_path: Path | None = None
 
     # Build (stage: build_firmware)
     build_dir: Path | None = None
@@ -414,7 +417,7 @@ class PipelineRunner:
 
 
 def _default_cache_work_dir(config: ProfileConfig) -> Path:
-    """Deterministic cache path keyed on board-toolchain-engine."""
+    """Stable cache root; dependency fingerprints isolate incompatible apps."""
     key = f"{config.target.board}-{config.target.toolchain.value}-{config.engine.type.value}"
     return Path.home() / ".cache" / "helia-profiler" / "workspaces" / key
 

@@ -18,6 +18,8 @@ the exception is formatted as a string.
 
 ::: helia_profiler.BuildError
 
+::: helia_profiler.DependencyError
+
 ::: helia_profiler.NetworkError
 
 ::: helia_profiler.CaptureError

@@ -86,6 +86,10 @@ def _apply_target_overrides(args: argparse.Namespace, cli: dict) -> None:
         cli.setdefault("target", {})["clock"] = clock_sel
     if args.frozen:
         cli["frozen"] = True
+    if getattr(args, "offline", False):
+        cli.setdefault("build", {})["offline"] = True
+    if getattr(args, "update_dependencies", False):
+        cli.setdefault("build", {})["update_dependencies"] = True
 
 
 def _apply_pmu_overrides(args: argparse.Namespace, cli: dict) -> None:

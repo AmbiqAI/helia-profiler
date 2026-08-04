@@ -24,6 +24,7 @@ from ..power.base import PowerResult
 from ..placement import MemoryRegion
 
 if TYPE_CHECKING:
+    from .dependencies import DependencyProvenance
     from .artifacts import OnDevicePowerSummary, PowerObservation, PowerTerminalRecord
 
 
@@ -203,6 +204,7 @@ class RunMetadata:
     memory_plan: "MemoryPlan | None" = None
     timing: TimingInfo | None = None
     compatibility: CompatibilityResolution | None = None
+    dependencies: "DependencyProvenance | None" = None
 
 
 # ---------------------------------------------------------------------------

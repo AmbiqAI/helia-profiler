@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ..errors import FirmwareError
+from ..errors import DependencyError, FirmwareError
 from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
@@ -24,11 +24,15 @@ class GenerateFirmwareStage:
                 "No engine artifacts available — engine preparation stage did not run.",
             )
 
+        from ..dependencies import create_workspace, workspace_mutex
         from ..firmware import generate_app
 
         try:
-            firmware_dir = generate_app(ctx)
-        except FirmwareError:
+            workspace = create_workspace(ctx)
+            ctx.dependency_workspace = workspace
+            with workspace_mutex(workspace):
+                firmware_dir = generate_app(ctx)
+        except (DependencyError, FirmwareError):
             raise
         except Exception as exc:
             raise FirmwareError(
