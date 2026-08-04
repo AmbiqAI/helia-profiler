@@ -11,21 +11,15 @@ def _workspace_cache_root() -> Path:
 
 
 def _cmd_cache_purge() -> None:
-    """Purge hpx/nsx caches (module cache + resolve-ref cache + workspaces)."""
-    from neuralspotx import _resolve_cache, module_cache
+    """Purge all NSX persistent caches and HPX workspaces."""
+    from neuralspotx import clean_cache
 
-    # 1. Clear the module content-addressed cache
-    n_modules = module_cache.clear()
-    if n_modules:
-        print(f"  Purged {n_modules} cached module(s).")
+    nsx_result = clean_cache()
+    if nsx_result.removed_count:
+        print(f"  Purged {nsx_result.removed_count} neuralSPOT-X cache item(s).")
     else:
-        print("  Module cache already empty.")
+        print("  neuralSPOT-X caches already empty.")
 
-    # 2. Invalidate the resolve-ref TTL cache
-    _resolve_cache.invalidate_all()
-    print("  Purged resolve-ref cache.")
-
-    # 3. Remove persistent per-board workspaces (generated apps + nsx.lock)
     workspaces_root = _workspace_cache_root()
     if workspaces_root.is_dir():
         n_workspaces = sum(1 for child in workspaces_root.iterdir() if child.is_dir())
@@ -39,27 +33,18 @@ def _cmd_cache_purge() -> None:
 
 def _cmd_cache_info() -> None:
     """Show cache location and approximate disk usage."""
-    from neuralspotx import module_cache
-    from neuralspotx._resolve_cache import _cache_path
+    from neuralspotx import cache_info, clean_cache
 
-    mod_root = module_cache.module_cache_root()
-    resolve_path = _cache_path()
+    nsx_info = cache_info()
+    nsx_preview = clean_cache(dry_run=True)
     workspaces_root = _workspace_cache_root()
 
-    print(f"Module cache:      {mod_root}")
-    if mod_root.is_dir():
-        entries = module_cache.iter_entries()
-        total_bytes = sum(f.stat().st_size for e in entries for f in e.rglob("*") if f.is_file())
-        print(f"  Entries: {len(entries)}, Size: {total_bytes / 1024 / 1024:.1f} MB")
-    else:
-        print("  (empty)")
-
-    print(f"Resolve-ref cache: {resolve_path}")
-    if resolve_path.exists():
-        size = resolve_path.stat().st_size
-        print(f"  Size: {size / 1024:.1f} KB")
-    else:
-        print("  (empty)")
+    print(f"neuralSPOT-X cache: {nsx_preview.root}")
+    print(
+        f"  Module entries: {nsx_info.entry_count}, "
+        f"Size: {nsx_info.total_size_bytes / 1024 / 1024:.1f} MB"
+    )
+    print(f"  Purgeable items: {nsx_preview.removed_count}")
 
     print(f"Workspace cache:   {workspaces_root}")
     if workspaces_root.is_dir():

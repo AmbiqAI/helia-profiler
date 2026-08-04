@@ -195,7 +195,7 @@ def test_redact_text_url_single_token_userinfo_credential_is_redacted() -> None:
 
 
 def test_redact_text_url_path_survives_intact() -> None:
-    raw = "https://github.com/AmbiqAI/neuralspotx/releases/download/v0.7.10/asset.tar.gz"
+    raw = "https://github.com/AmbiqAI/neuralspotx/releases/download/v0.7.12/asset.tar.gz"
 
     redacted, counts = redact_text(raw)
 

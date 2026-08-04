@@ -11,14 +11,16 @@ hpx cache purge
 
 ## Description
 
-hpx caches NSX module clones, resolved refs, and generated firmware
-workspaces between runs so repeat profiles avoid network fetches and
-full rebuilds.
+hpx caches NSX module artifacts, git-artifact content hashes, resolved refs,
+and generated firmware workspaces between runs so repeat profiles avoid
+network fetches and full rebuilds.
 
 - `hpx cache info` — show the cache location and disk usage.
-- `hpx cache purge` — remove all cached data (module clones, resolved
-  refs, generated workspaces). The next run re-fetches and rebuilds
-  everything from scratch.
+- `hpx cache purge` — remove all NSX persistent cache items (module artifacts,
+  legacy/v1/v2 git-artifact hash files and their lock sidecars, and resolved
+  refs) through the neuralSPOT-X cache API, plus generated HPX workspaces.
+  Unrelated files under `NSX_CACHE_DIR` are preserved. The next run re-fetches,
+  re-hashes, and rebuilds everything from scratch.
 
 ## When to purge
 

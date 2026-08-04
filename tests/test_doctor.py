@@ -132,13 +132,13 @@ def test_check_versions_reports_hpx_own_version() -> None:
 
 
 def test_check_versions_matches_neuralspotx_against_baseline(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.doctor._package_version", lambda _name: "0.7.10")
+    monkeypatch.setattr("helia_profiler.doctor._package_version", lambda _name: "0.7.12")
 
     versions = check_versions()
 
     neuralspotx_check = next(v for v in versions if v.name == "neuralspotx")
-    assert neuralspotx_check.installed == "0.7.10"
-    assert neuralspotx_check.required == "==0.7.10"
+    assert neuralspotx_check.installed == "0.7.12"
+    assert neuralspotx_check.required == "==0.7.12"
     assert neuralspotx_check.ok is True
     assert neuralspotx_check.hint is None
 
@@ -152,7 +152,7 @@ def test_check_versions_flags_neuralspotx_mismatch(monkeypatch) -> None:
     assert neuralspotx_check.installed == "0.1.0"
     assert neuralspotx_check.ok is False
     assert neuralspotx_check.hint is not None
-    assert "0.7.10" in neuralspotx_check.hint
+    assert "0.7.12" in neuralspotx_check.hint
 
 
 def test_check_versions_neuralspotx_unknown_when_not_installed(monkeypatch) -> None:
