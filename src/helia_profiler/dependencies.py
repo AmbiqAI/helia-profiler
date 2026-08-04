@@ -72,6 +72,11 @@ def _digest_file(path: Path) -> ContentDigest:
 def _digest_path(path: Path) -> ContentDigest:
     """Hash path content without filesystem metadata or native separators."""
 
+    if not path.exists():
+        raise DependencyError(
+            f"Dependency fingerprint input does not exist: {path}",
+            hint="Correct or remove the model/module/engine source path override.",
+        )
     if path.is_file():
         return _digest_file(path)
     digest = hashlib.sha256()
@@ -91,7 +96,11 @@ def _digest_path(path: Path) -> ContentDigest:
             digest.update(b"\0")
             digest.update(_digest_file(child).value.encode("ascii"))
             digest.update(b"\n")
-    return ContentDigest("sha256", digest.hexdigest())
+        return ContentDigest("sha256", digest.hexdigest())
+    raise DependencyError(
+        f"Dependency fingerprint input is not a regular file or directory: {path}",
+        hint="Use a regular file or directory for dependency source overrides.",
+    )
 
 
 def _canonical(value: Any) -> Any:
@@ -308,21 +317,22 @@ def create_workspace(ctx: PipelineContext) -> DependencyWorkspace:
 def _persist_workspace_identity(workspace: DependencyWorkspace) -> None:
     path = workspace.root / _WORKSPACE_IDENTITY
     expected = workspace.to_dict()
-    if path.exists():
-        try:
-            current = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise DependencyError(
-                f"Dependency workspace identity is unreadable: {path}",
-                hint="Remove this fingerprinted workspace and retry.",
-            ) from exc
-        if current != expected:
-            raise DependencyError(
-                f"Dependency workspace fingerprint collision or incompatible state: {path}",
-                hint="Remove this fingerprinted workspace and retry.",
-            )
-        return
-    _atomic_json(path, expected)
+    with file_mutex(workspace.root / ".hpx-workspace.lock"):
+        if path.exists():
+            try:
+                current = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise DependencyError(
+                    f"Dependency workspace identity is unreadable: {path}",
+                    hint="Remove this fingerprinted workspace and retry.",
+                ) from exc
+            if current != expected:
+                raise DependencyError(
+                    f"Dependency workspace fingerprint collision or incompatible state: {path}",
+                    hint="Remove this fingerprinted workspace and retry.",
+                )
+            return
+        _atomic_json(path, expected)
 
 
 @contextmanager

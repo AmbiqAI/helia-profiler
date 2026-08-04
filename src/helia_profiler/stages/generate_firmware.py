@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ..errors import FirmwareError
+from ..errors import DependencyError, FirmwareError
 from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
@@ -32,7 +32,7 @@ class GenerateFirmwareStage:
             ctx.dependency_workspace = workspace
             with workspace_mutex(workspace):
                 firmware_dir = generate_app(ctx)
-        except FirmwareError:
+        except (DependencyError, FirmwareError):
             raise
         except Exception as exc:
             raise FirmwareError(

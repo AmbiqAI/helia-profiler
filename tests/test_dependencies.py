@@ -304,6 +304,16 @@ def test_offline_requires_compatible_lock(tmp_path: Path) -> None:
     assert "--update-dependencies" in exc.value.hint
 
 
+def test_missing_override_path_fails_with_typed_error(tmp_path: Path) -> None:
+    missing = tmp_path / "missing-module"
+
+    with pytest.raises(DependencyError, match="does not exist"):
+        _context(
+            tmp_path / "run",
+            build={"nsx_modules": {"nsx-core": {"path": str(missing)}}},
+        )
+
+
 def test_offline_requires_materialized_locked_modules(tmp_path: Path) -> None:
     ctx = _context(tmp_path, build={"offline": True})
     _write_valid_lock(ctx)
