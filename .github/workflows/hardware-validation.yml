@@ -146,10 +146,9 @@ jobs:
           requested_ref="${HPX_NS_CMSIS_NN_REF}"
 
           if [[ -z "${requested_ref}" ]]; then
-            git clone --depth 1 https://github.com/AmbiqAI/ns-cmsis-nn.git "${checkout_path}"
+            git clone --depth 1 --single-branch https://github.com/AmbiqAI/ns-cmsis-nn.git "${checkout_path}"
             requested_kind="default_branch"
-            requested_ref="$(git -C "${checkout_path}" symbolic-ref --quiet --short refs/remotes/origin/HEAD || true)"
-            requested_ref="${requested_ref#origin/}"
+            requested_ref="$(git -C "${checkout_path}" symbolic-ref --quiet --short HEAD || true)"
             requested_ref="${requested_ref:-default-branch}"
           else
             git clone --filter=blob:none --no-checkout https://github.com/AmbiqAI/ns-cmsis-nn.git "${checkout_path}"
