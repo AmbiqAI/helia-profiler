@@ -8,6 +8,8 @@ from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
+from neuralspotx.models import AppConfig
+
 import pytest
 import yaml
 
@@ -1428,8 +1430,18 @@ class TestNsxModuleOverrides:
         assert cmsis_nn == {
             "name": "nsx-cmsis-nn",
             "project": "ns-cmsis-nn",
-            "ref": commit,
+            "revision": commit,
         }
+        parsed = AppConfig.from_mapping(manifest)
+        parsed_cmsis_nn = next(
+            module for module in parsed.modules if module.name == "nsx-cmsis-nn"
+        )
+        assert parsed_cmsis_nn.revision == commit
+        assert manifest["module_registry"]["projects"]["ns-cmsis-nn"]["revision"] == commit
+        assert (
+            manifest["module_registry"]["modules"]["nsx-cmsis-nn"]["revision"]
+            == commit
+        )
 
     def test_channel_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(tmp_path, fake_dist, {"channel": "dev"})
@@ -1629,15 +1641,20 @@ class TestNsxModuleOverrides:
         app_dir = generate_app(ctx)
 
         nsx_yml = (app_dir / "nsx.yml").read_text()
-        assert "ref: feat/new-soc" in nsx_yml
+        assert "revision: feat/new-soc" in nsx_yml
         assert "project: nsx-ambiq-sdk" in nsx_yml
         # A ref override targets the whole owning project, so every module
         # vendored by nsx-ambiq-sdk receives it.
         sdk_module_count = sum(
             1 for spec in _resolve_module_specs("apollo510_evb") if spec.project == "nsx-ambiq-sdk"
         )
-        assert nsx_yml.count("ref: feat/new-soc") == sdk_module_count
         manifest = yaml.safe_load(nsx_yml)
+        direct_overrides = [
+            module
+            for module in manifest["modules"]
+            if module.get("revision") == "feat/new-soc"
+        ]
+        assert len(direct_overrides) == sdk_module_count
         assert (
             manifest["module_registry"]["projects"]["neuralspotx"]["revision"]
             == "1d358f770a572945b51628e6212181436960cf72"

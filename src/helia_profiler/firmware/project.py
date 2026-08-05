@@ -163,6 +163,7 @@ def _module_project(name: str, profile: dict[str, Any]) -> str:
 def _render_module_registry(
     profile: dict[str, Any],
     project_ref_overrides: dict[str, tuple[str, str]],
+    module_ref_overrides: dict[str, tuple[str, str]],
 ) -> str:
     """Render the ``module_registry`` block for nsx.yml from the profile.
 
@@ -184,6 +185,24 @@ def _render_module_registry(
         override["revision"] = value
         project_overrides[project] = override
         ref_overrides_by_project[project] = value
+
+    base_modules = nsx_cli.load_registry().get("modules") or {}
+    for name, (project, revision) in module_ref_overrides.items():
+        project_override = dict(project_overrides.get(project) or {})
+        if not project_override:
+            project_override = nsx_cli.registry_project(project) or {"name": project}
+        project_override["revision"] = revision
+        project_overrides[project] = project_override
+        ref_overrides_by_project[project] = revision
+
+        base_module = base_modules.get(name) if isinstance(base_modules, dict) else None
+        module_override = dict(base_module) if isinstance(base_module, dict) else {}
+        existing_override = module_overrides.get(name)
+        if isinstance(existing_override, dict):
+            module_override.update(existing_override)
+        module_override.update({"project": project, "revision": revision})
+        module_overrides[name] = module_override
+
     # Align per-module revisions with their owning project's ref override.
     # The starter profile pins each migrated module's ``revision`` to ``main``;
     # NSX's lock resolution honours that module-level pin over the project
