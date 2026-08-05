@@ -226,11 +226,11 @@ def load_compatibility_baseline(path: Path | None = None) -> CompatibilityBaseli
 # Other keys (e.g. "variant", "linker_profile", "aot_args") are ordinary
 # build knobs and do not deviate from the qualified engine baseline.
 _ENGINE_SOURCE_OVERRIDE_KEYS = frozenset(
-    {"dist_path", "source_path", "source", "cmsis_nn_path"}
+    {"dist_path", "source_path", "source", "cmsis_nn_path", "cmsis_nn_ref"}
 )
 
 # NSX module names that engine adapters resolve themselves (via
-# engine.config's dist_path/source_path/source/cmsis_nn_path, not build.nsx_modules).
+# engine.config's dist_path/source_path/source/cmsis_nn_path/cmsis_nn_ref, not build.nsx_modules).
 # Mirrors HELIART_MODULE ("nsx-helia-rt") in engines/helia_rt/artifacts.py and
 # CMSIS_NN_MODULE ("nsx-cmsis-nn") in engines/helia_aot/cmsis_nn.py — a test
 # asserts these literals never drift from those constants. A build.nsx_modules

@@ -145,7 +145,10 @@ the workflow clones `ns-cmsis-nn` as usual from its repository default branch.
 When supplied, the input accepts either a branch name or a full 40-character
 commit SHA; release version/tag names such as `v7.26.0` are not accepted. Every
 run records the selected/default branch and its `resolved_commit` in the
-validation manifest's `sources.ns-cmsis-nn` metadata.
+validation manifest's `sources.ns-cmsis-nn` metadata. The action passes that
+resolved commit explicitly to `hpx validate --ns-cmsis-nn-ref`; each heliaRT
+and heliaAOT case writes it into `engine.config.cmsis_nn_ref`, and the generated
+NSX manifest and `nsx.lock` therefore pin the source actually compiled.
 
 ## Cross-machine release sweep
 

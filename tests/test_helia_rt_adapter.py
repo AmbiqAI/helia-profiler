@@ -130,6 +130,23 @@ class TestHeliaRTAdapter:
         assert mod.project == "helia-rt"
         assert mod.path.is_dir()
 
+    def test_prepare_pins_cmsis_nn_registry_module_to_commit(
+        self, tmp_path: Path, fake_cmsis_nn: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        # An ambient legacy path must not override the explicit reproducible pin.
+        monkeypatch.setenv("CMSIS_NN_PATH", str(fake_cmsis_nn))
+        commit = "edc4edbd81af2f3baa9354ea1e30cca50dfcfd99"
+        config = _make_config(tmp_path, {"config": {"cmsis_nn_ref": commit}})
+
+        artifacts = HeliaRTAdapter().prepare(config, tmp_path)
+
+        cmsis_nn = next(
+            module for module in artifacts.extra_modules if module.name == "nsx-cmsis-nn"
+        )
+        assert cmsis_nn.project == "ns-cmsis-nn"
+        assert cmsis_nn.local is False
+        assert cmsis_nn.ref == commit
+
     def test_prepare_typed_fields(self, tmp_path: Path, fake_dist: Path):
         config = _make_config(tmp_path, {"config": {"dist_path": str(fake_dist)}})
         adapter = HeliaRTAdapter()

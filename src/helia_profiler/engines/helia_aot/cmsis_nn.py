@@ -42,7 +42,17 @@ def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
     ``CMSIS_NN_PATH`` environment variable, it is vendored as a local module
     under its registry-derived project directory (``modules/ns-cmsis-nn``).
     """
-    raw = config.engine.config.get("cmsis_nn_path") or os.environ.get("CMSIS_NN_PATH")
+    configured_path = config.engine.config.get("cmsis_nn_path")
+    requested_ref = config.engine.config.get("cmsis_nn_ref")
+    if configured_path and requested_ref:
+        raise EngineError(
+            "engine.config.cmsis_nn_path and cmsis_nn_ref are mutually exclusive"
+        )
+
+    # Explicit config always wins over the legacy environment fallback. This
+    # matters in hardware CI, where a resolved commit must remain a git-backed
+    # NSX lock entry rather than silently becoming an unversioned local module.
+    raw = configured_path or (None if requested_ref else os.environ.get("CMSIS_NN_PATH"))
     if raw:
         cmsis_nn_path = Path(str(raw)).expanduser().resolve()
         _validate_cmsis_nn(cmsis_nn_path)
@@ -56,16 +66,23 @@ def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
             project=CMSIS_NN_PROJECT,
         )
 
+    if requested_ref is not None and (
+        not isinstance(requested_ref, str) or not requested_ref.strip()
+    ):
+        raise EngineError("engine.config.cmsis_nn_ref must be a non-empty git ref")
+
     log.info(
-        "ns-cmsis-nn — resolving %s from NSX registry (project=%s)",
+        "ns-cmsis-nn — resolving %s from NSX registry (project=%s%s)",
         CMSIS_NN_MODULE,
         CMSIS_NN_PROJECT,
+        f", ref={requested_ref}" if requested_ref else "",
     )
     return NsxModuleRef(
         name=CMSIS_NN_MODULE,
         path=Path(),
         local=False,
         project=CMSIS_NN_PROJECT,
+        ref=requested_ref,
     )
 
 

@@ -73,6 +73,7 @@ def test_mlperf_tiny_case(
         output_root=validation_output_dir,
         timeout_s=timeout,
         verbose=request.config.get_verbosity() > 0,
+        ns_cmsis_nn_ref=request.config.getoption("--mlperf-ns-cmsis-nn-ref") or None,
     )
     results_accumulator.append(result)
     assert_healthy(result)

@@ -311,6 +311,8 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         ]
     if engines_csv:
         pytest_args += ["--mlperf-engines", engines_csv]
+    if args.ns_cmsis_nn_ref.strip():
+        pytest_args += ["--mlperf-ns-cmsis-nn-ref", args.ns_cmsis_nn_ref.strip()]
     if args.boards.strip():
         pytest_args += ["--mlperf-boards", args.boards.strip()]
     if toolchains_csv:

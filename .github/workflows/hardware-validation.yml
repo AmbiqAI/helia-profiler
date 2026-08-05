@@ -139,6 +139,7 @@ jobs:
         run: git lfs pull
 
       - name: Resolve ns-cmsis-nn source
+        id: resolve_ns_cmsis_nn
         run: |
           checkout_root="$(mktemp -d "${RUNNER_TEMP}/hpx-ns-cmsis-nn.XXXXXX")"
           checkout_path="${checkout_root}/ns-cmsis-nn"
@@ -173,8 +174,8 @@ jobs:
             echo "Resolved ns-cmsis-nn commit does not match the requested commit." >&2
             exit 2
           fi
-          echo "CMSIS_NN_PATH=${checkout_path}" >> "${GITHUB_ENV}"
           echo "NS_CMSIS_NN_RESOLVED_COMMIT=${resolved_commit}" >> "${GITHUB_ENV}"
+          echo "resolved_commit=${resolved_commit}" >> "${GITHUB_OUTPUT}"
           echo "HPX_SOURCE_REVISIONS_JSON={\"ns-cmsis-nn\":{\"requested_kind\":\"${requested_kind}\",\"requested_ref\":\"${requested_ref}\",\"resolved_commit\":\"${resolved_commit}\"}}" \
             >> "${GITHUB_ENV}"
 
@@ -219,6 +220,7 @@ jobs:
             --power "${HPX_VALIDATION_POWER}"
             --repeat "${HPX_VALIDATION_REPEAT}"
             --timeout "${HPX_VALIDATION_TIMEOUT}"
+            --ns-cmsis-nn-ref "${{ steps.resolve_ns_cmsis_nn.outputs.resolved_commit }}"
           )
           if [[ -n "${HPX_VALIDATION_MODELS}" ]]; then
             args+=(--models "${HPX_VALIDATION_MODELS}")
@@ -252,6 +254,7 @@ jobs:
             --power "${HPX_VALIDATION_POWER}"
             --repeat "${HPX_VALIDATION_REPEAT}"
             --timeout "${HPX_VALIDATION_TIMEOUT}"
+            --ns-cmsis-nn-ref "${{ steps.resolve_ns_cmsis_nn.outputs.resolved_commit }}"
             --output-dir results/validation
             --junit-xml results/validation/junit.xml
           )
