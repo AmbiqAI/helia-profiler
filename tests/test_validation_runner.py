@@ -153,6 +153,22 @@ def test_build_config_pins_explicit_power_gpio_wiring(tmp_path: Path):
     assert cfg["power"]["go_gpio_pin"] == 7
 
 
+def test_build_config_pins_resolved_cmsis_nn_commit_for_helia_rt(tmp_path: Path):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    commit = "edc4edbd81af2f3baa9354ea1e30cca50dfcfd99"
+    case = CaseSpec(
+        model=MODELS["kws"],
+        engine=EngineType.HELIA_RT,
+        power=False,
+        board=BOARDS["apollo510_evb"],
+    )
+
+    cfg = _build_config(case, repo_root, tmp_path / "out", ns_cmsis_nn_ref=commit)
+
+    assert cfg["engine"]["config"] == {"cmsis_nn_ref": commit}
+
+
 def test_build_config_aot_prefers_explicit_cmsis_nn_env(
     tmp_path: Path,
     fake_cmsis_nn: Path,

@@ -171,6 +171,15 @@ def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[Depend
         requested = normalize_path(raw)
         digest = _digest_path(Path(raw).expanduser())
         provenance.append(DependencyOverride("engine", key, "path", requested, digest))
+    cmsis_nn_ref = engine_config.get("cmsis_nn_ref")
+    if cmsis_nn_ref is not None:
+        if not isinstance(cmsis_nn_ref, str) or not cmsis_nn_ref.strip():
+            raise DependencyError(
+                "engine.config.cmsis_nn_ref must be a non-empty git ref."
+            )
+        provenance.append(
+            DependencyOverride("engine", "cmsis_nn_ref", "ref", cmsis_nn_ref)
+        )
     source = engine_config.get("source")
     if source is not None:
         if not isinstance(source, dict):

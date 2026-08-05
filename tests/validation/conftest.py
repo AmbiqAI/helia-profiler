@@ -58,6 +58,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Comma-separated engine names (helia-rt,helia-aot).",
     )
     grp.addoption(
+        "--mlperf-ns-cmsis-nn-ref",
+        default="",
+        help="Exact ns-cmsis-nn commit/ref for heliaRT and heliaAOT cases.",
+    )
+    grp.addoption(
         "--mlperf-power",
         default="off",
         choices=("both", "on", "off"),
@@ -260,6 +265,7 @@ def _validation_options(config: pytest.Config) -> dict[str, object]:
         "comparison_group": config.getoption("--mlperf-comparison-group"),
         "model_arena_size": config.getoption("--mlperf-model-arena-size"),
         "engines": config.getoption("--mlperf-engines"),
+        "ns_cmsis_nn_ref": config.getoption("--mlperf-ns-cmsis-nn-ref"),
         "power": config.getoption("--mlperf-power"),
         "boards": config.getoption("--mlperf-boards"),
         "repeat": config.getoption("--mlperf-repeat"),

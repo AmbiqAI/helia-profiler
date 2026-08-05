@@ -1398,6 +1398,39 @@ class TestNsxModuleOverrides:
         work_dir.mkdir(parents=True, exist_ok=True)
         return PipelineContext(config=config, work_dir=work_dir)
 
+    def test_cmsis_nn_commit_override_reaches_nsx_manifest(self, tmp_path: Path):
+        commit = "edc4edbd81af2f3baa9354ea1e30cca50dfcfd99"
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {
+                    "type": "helia-rt",
+                    "config": {"cmsis_nn_ref": commit},
+                },
+                "target": {"board": "apollo510_evb"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir()
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+
+        manifest = yaml.safe_load((generate_app(ctx) / "nsx.yml").read_text())
+
+        cmsis_nn = next(
+            module for module in manifest["modules"] if module["name"] == "nsx-cmsis-nn"
+        )
+        assert cmsis_nn == {
+            "name": "nsx-cmsis-nn",
+            "project": "ns-cmsis-nn",
+            "ref": commit,
+        }
+
     def test_channel_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(tmp_path, fake_dist, {"channel": "dev"})
         ResolvePlatformStage().run(ctx)

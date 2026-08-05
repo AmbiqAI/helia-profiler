@@ -646,6 +646,11 @@ def validate_command(
         "--engines",
         help="Comma-separated engines: rt,aot,tflm,helia-rt,helia-aot (default: all).",
     ),
+    ns_cmsis_nn_ref: str = typer.Option(
+        "",
+        "--ns-cmsis-nn-ref",
+        help="Exact ns-cmsis-nn commit/ref used by heliaRT and heliaAOT cases.",
+    ),
     power: str = typer.Option(
         "off",
         "--power",
@@ -731,6 +736,7 @@ def validate_command(
         comparison_group=comparison_group,
         model_arena_size=model_arena_size,
         engines=engines,
+        ns_cmsis_nn_ref=ns_cmsis_nn_ref,
         power=power,
         boards=boards,
         toolchains=toolchains,

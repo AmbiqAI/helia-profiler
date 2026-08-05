@@ -172,6 +172,20 @@ class TestSuiteSmoke:
         assert value_of("--mlperf-memories") == "auto"
         assert value_of("--mlperf-suite") == "smoke"
 
+    def test_resolved_cmsis_nn_commit_is_forwarded_to_pytest(self, monkeypatch, tmp_path):
+        commit = "edc4edbd81af2f3baa9354ea1e30cca50dfcfd99"
+        args = self._captured_pytest_args(
+            monkeypatch,
+            "--suite",
+            "smoke",
+            "--ns-cmsis-nn-ref",
+            commit,
+            "--output-dir",
+            str(tmp_path),
+        )
+
+        assert args[args.index("--mlperf-ns-cmsis-nn-ref") + 1] == commit
+
     def test_explicit_axis_wins_over_smoke_default(self, monkeypatch, tmp_path):
         args = self._captured_pytest_args(
             monkeypatch, "--models", "vww", "--suite", "smoke", "--output-dir", str(tmp_path)

@@ -564,7 +564,7 @@ class NsxModuleOverride:
     Only applies to modules NSX resolves itself (e.g. ``nsx-core``,
     ``nsx-ambiq-bsp``). Engine-provided modules (``nsx-helia-rt``,
     ``nsx-cmsis-nn``) are configured through ``engine.config``
-    (``dist_path``/``source_path``/``source``/``cmsis_nn_path``) instead —
+    (``dist_path``/``source_path``/``source``/``cmsis_nn_path``/``cmsis_nn_ref``) instead —
     an entry here targeting one of those names is ignored with a warning.
     """
 

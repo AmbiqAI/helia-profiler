@@ -137,7 +137,13 @@ def _find_local_cmsis_nn_checkout(repo_root: Path) -> Path | None:
     return None
 
 
-def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str, Any]:
+def _build_config(
+    case: CaseSpec,
+    repo_root: Path,
+    output_dir: Path,
+    *,
+    ns_cmsis_nn_ref: str | None = None,
+) -> dict[str, Any]:
     """Materialise an hpx profile YAML config for a single case.
 
     The shape mirrors the existing `hpx_kws_*.yml` files so any change
@@ -211,7 +217,12 @@ def _build_config(case: CaseSpec, repo_root: Path, output_dir: Path) -> dict[str
     if case.jlink_serial:
         cfg["target"]["jlink_serial"] = case.jlink_serial
 
-    if case.engine is EngineType.HELIA_AOT:
+    if case.engine in {EngineType.HELIA_RT, EngineType.HELIA_AOT} and ns_cmsis_nn_ref:
+        # Hardware CI resolves branches to an exact commit before creating
+        # cases. Put that commit in the profile config so it reaches the NSX
+        # manifest and lock instead of relying on a process environment path.
+        cfg["engine"]["config"] = {"cmsis_nn_ref": ns_cmsis_nn_ref}
+    elif case.engine is EngineType.HELIA_AOT:
         # Point heliaAOT at an explicit or nearby ns-cmsis-nn checkout when one
         # is available, instead of assuming a single sibling-repo layout.
         cmsis_nn_candidate = _find_local_cmsis_nn_checkout(repo_root)
@@ -346,6 +357,7 @@ def run_case(
     timeout_s: float = 900.0,
     verbose: bool = False,
     in_process: bool | None = None,
+    ns_cmsis_nn_ref: str | None = None,
 ) -> CaseResult:
     """Run one validation case end-to-end.
 
@@ -374,7 +386,9 @@ def run_case(
     case_dir.mkdir(parents=True, exist_ok=True)
 
     config_path = case_dir / "config.yml"
-    config = _build_config(case, repo_root, case_dir)
+    config = _build_config(
+        case, repo_root, case_dir, ns_cmsis_nn_ref=ns_cmsis_nn_ref
+    )
     config_path.write_text(yaml.safe_dump(config, sort_keys=False))
 
     if in_process is None:
