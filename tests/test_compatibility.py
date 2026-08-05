@@ -35,13 +35,13 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert compatibility.qualification is QualificationState.QUALIFIED
     baseline = compatibility.baseline
     assert baseline.schema_version == BASELINE_SCHEMA_VERSION
-    assert baseline.neuralspotx_version == "0.7.10"
+    assert baseline.neuralspotx_version == "0.7.12"
     assert (
         baseline.neuralspotx_sha256
-        == "bbeb075cc869b7e72e25346dce3f8d38618fd2228f10c356abf11bad64102a8a"
+        == "6e0366afa1c21dc6ed5732c1e41d69025ae98e871064d7d8a84b922b0326f41b"
     )
-    assert baseline.project("neuralspotx").ref == "1d358f770a572945b51628e6212181436960cf72"
-    assert baseline.project("nsx-ambiq-sdk").ref == "7f0c4abe0354898e68ead757b85f001b0ecfbacf"
+    assert baseline.project("neuralspotx").ref == "85406cc29f51d44e78c7ae6a83049766a6679417"
+    assert baseline.project("nsx-ambiq-sdk").ref == "a9f4ec25a162f6f3700623feb691423bb5a51132"
     assert baseline.project("nsx-pmu-armv8m").ref == "5725c065a0c3603132f1064ee2684d1fa8587c88"
     assert baseline.project("nsx-tflite-micro").ref == "2f02cc932a200c5d78383cc2dab3c28950842aea"
     assert baseline.project("arm-cmsis-nn").ref == "62967ecf040b1e3bb278e76a9828200187f02471"
@@ -57,8 +57,8 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
     baseline = load_compatibility_baseline()
 
     assert {project.name: project.ref for project in baseline.projects} == {
-        "neuralspotx": "1d358f770a572945b51628e6212181436960cf72",
-        "nsx-ambiq-sdk": "7f0c4abe0354898e68ead757b85f001b0ecfbacf",
+        "neuralspotx": "85406cc29f51d44e78c7ae6a83049766a6679417",
+        "nsx-ambiq-sdk": "a9f4ec25a162f6f3700623feb691423bb5a51132",
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "2f02cc932a200c5d78383cc2dab3c28950842aea",
         "arm-cmsis-nn": "62967ecf040b1e3bb278e76a9828200187f02471",
@@ -66,7 +66,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "helia-rt": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62",
     }
     assert {module.name: module.ref for module in baseline.modules} == {
-        "nsx-ambiq-bsp": "7f0c4abe0354898e68ead757b85f001b0ecfbacf",
+        "nsx-ambiq-bsp": "a9f4ec25a162f6f3700623feb691423bb5a51132",
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "2f02cc932a200c5d78383cc2dab3c28950842aea",
         "arm-cmsis-nn": "62967ecf040b1e3bb278e76a9828200187f02471",
@@ -95,12 +95,14 @@ def test_only_full_commit_refs_are_accepted(tmp_path: Path) -> None:
 
 def test_package_dependency_matches_qualified_baseline() -> None:
     repo_root = Path(__file__).resolve().parent.parent
+    baseline = load_compatibility_baseline()
+    expected_dependency = f"neuralspotx=={baseline.neuralspotx_version}"
     with (repo_root / "pyproject.toml").open("rb") as stream:
         project = tomllib.load(stream)["project"]
     dependency = next(
         dependency for dependency in project["dependencies"] if dependency.startswith("neuralspotx")
     )
-    assert dependency == "neuralspotx>=0.7.10,<0.8.0"
+    assert dependency == expected_dependency
 
     with (repo_root / "uv.lock").open("rb") as stream:
         lock = tomllib.load(stream)
@@ -113,12 +115,12 @@ def test_package_dependency_matches_qualified_baseline() -> None:
         for dependency in project_package["metadata"]["requires-dist"]
         if dependency["name"] == "neuralspotx"
     )
-    assert locked_dependency["specifier"] == ">=0.7.10,<0.8.0"
+    assert locked_dependency["specifier"] == f"=={baseline.neuralspotx_version}"
 
     neuralspotx_package = next(
         package for package in packages if package["name"] == "neuralspotx"
     )
-    assert neuralspotx_package["version"] == "0.7.10"
+    assert neuralspotx_package["version"] == baseline.neuralspotx_version
 
 
 def test_provenance_fingerprint_is_serializable_and_stable(tmp_path: Path) -> None:

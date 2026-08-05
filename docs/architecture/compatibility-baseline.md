@@ -12,23 +12,25 @@ The current baseline is `hpx-stage4-customer-hardening-2026-07`:
 
 | Identity | Qualified reference |
 | --- | --- |
-| `neuralspotx` package | `0.7.10` (wheel SHA-256 recorded in the baseline) |
-| `nsx-ambiq-sdk` | `v5.2.23` |
-| `nsx-pmu-armv8m` | `v0.2.0` |
-| `nsx-tflite-micro` | `v0.1.0` |
-| `arm-cmsis-nn` | `v0.1.0` |
-| `ns-cmsis-nn` | `v7.26.0` |
-| heliaRT | `1.16.0`, ref `helia-rt-v1.16.0` |
+| `neuralspotx` package | `0.7.12`, wheel SHA-256 `6e0366af…f41b`, tag peeled to `85406cc2…9417` |
+| `nsx-ambiq-sdk` | `v5.2.24`, peeled commit `a9f4ec25…1132` |
+| `nsx-pmu-armv8m` | `5725c065…c88` |
+| `nsx-tflite-micro` | `2f02cc93…aea` |
+| `arm-cmsis-nn` | `62967ecf…471` |
+| `ns-cmsis-nn` | `2bb81953…a5e` (`v7.26.0`) |
+| heliaRT | `1.16.0`, commit `c1b97f4a…f62` |
 | heliaAOT | `min_version=0.18.0`, `max_version_exclusive=0.19.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 
+The SDK advances to `v5.2.24`, matching neuralSPOT-X 0.7.12's registry, and the
+qualified baseline records its peeled commit rather than its annotated-tag
+object. The neuralSPOT-X tag is likewise verified and stored as its peeled
+commit; all other source refs remain unchanged by this focused promotion.
+
 Every baseline project and module ref is immutable by policy: only a full
-40-character commit SHA or a semver-style tag (`vX.Y.Z` or `<prefix>-vX.Y.Z`,
-e.g. `helia-rt-v1.16.0`) is accepted. This is an allow-list, not a
-deny-list — `main`, `master`, `HEAD`, plain branch names (`develop`,
-`release`, ...), and `refs/...`/`latest` markers are all rejected because
-they don't match either accepted shape, not because they're named on a
-blocklist. Each engine entry is typed: a pinned `version`/`ref`
+40-character Git object ID is accepted. Newly promoted annotated tags are
+verified and peeled before being recorded. Each engine entry is typed: a pinned
+`version`/`ref`
 (heliaRT), a `min_version`/`max_version_exclusive` semver range (heliaAOT),
 or `governed_by_modules: true` when an engine has no version of its own and
 is fully qualified by its NSX module refs (stock TFLM).

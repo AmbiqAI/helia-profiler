@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -61,3 +63,45 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
     assert "helia_profiler/vendor/segger_rtt/RTT/SEGGER_RTT.c" in names
     assert "helia_profiler/vendor/segger_rtt/RTT/SEGGER_RTT.h" in names
     assert "helia_profiler/vendor/segger_rtt/RTT/SEGGER_RTT_ConfDefaults.h" in names
+
+    installed = tmp_path / "installed"
+    subprocess.run(
+        [
+            "uv",
+            "pip",
+            "install",
+            "--python",
+            sys.executable,
+            "--no-deps",
+            "--target",
+            str(installed),
+            str(wheel),
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from helia_profiler.compatibility import load_compatibility_baseline; "
+                "baseline = load_compatibility_baseline(); "
+                "print(baseline.neuralspotx_version); "
+                "print(baseline.project('nsx-ambiq-sdk').ref); "
+                "print(baseline.fingerprint)"
+            ),
+        ],
+        cwd=tmp_path,
+        env={**os.environ, "PYTHONPATH": str(installed)},
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert probe.stdout.splitlines() == [
+        "0.7.12",
+        "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "56bdea1d27ac1ea32f0b6903350fad03eb3cfc9fc52258fb2340622552c31482",
+    ]

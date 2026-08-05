@@ -1471,8 +1471,8 @@ class TestNsxModuleOverrides:
 
         manifest = yaml.safe_load((app_dir / "nsx.yml").read_text())
         projects = manifest["module_registry"]["projects"]
-        assert projects["nsx-ambiq-sdk"]["revision"] == "7f0c4abe0354898e68ead757b85f001b0ecfbacf"
-        assert projects["neuralspotx"]["revision"] == "1d358f770a572945b51628e6212181436960cf72"
+        assert projects["nsx-ambiq-sdk"]["revision"] == "a9f4ec25a162f6f3700623feb691423bb5a51132"
+        assert projects["neuralspotx"]["revision"] == "85406cc29f51d44e78c7ae6a83049766a6679417"
 
     def test_preview_board_defaults_to_preview_channel(self, tmp_path: Path, fake_dist: Path):
         model = tmp_path / "model.tflite"
@@ -1627,7 +1627,7 @@ class TestNsxModuleOverrides:
         manifest = yaml.safe_load(nsx_yml)
         assert (
             manifest["module_registry"]["projects"]["neuralspotx"]["revision"]
-            == "1d358f770a572945b51628e6212181436960cf72"
+            == "85406cc29f51d44e78c7ae6a83049766a6679417"
         )
 
     def test_ref_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
@@ -1657,7 +1657,7 @@ class TestNsxModuleOverrides:
         assert len(direct_overrides) == sdk_module_count
         assert (
             manifest["module_registry"]["projects"]["neuralspotx"]["revision"]
-            == "1d358f770a572945b51628e6212181436960cf72"
+            == "85406cc29f51d44e78c7ae6a83049766a6679417"
         )
 
     def test_ref_override_aligns_module_registry_revisions(self, tmp_path: Path, fake_dist: Path):
@@ -1699,11 +1699,11 @@ class TestNsxModuleOverrides:
         registry = nsx_yml["module_registry"]
         assert (
             registry["projects"]["nsx-ambiq-sdk"]["revision"]
-            == "7f0c4abe0354898e68ead757b85f001b0ecfbacf"
+            == "a9f4ec25a162f6f3700623feb691423bb5a51132"
         )
         assert (
             registry["projects"]["neuralspotx"]["revision"]
-            == "1d358f770a572945b51628e6212181436960cf72"
+            == "85406cc29f51d44e78c7ae6a83049766a6679417"
         )
         assert "nsx-pmu-armv8m" not in registry.get("modules", {})
 

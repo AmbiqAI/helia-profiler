@@ -819,8 +819,9 @@ cache_app = typer.Typer(
     help="Manage hpx/nsx caches",
     epilog=(
         "Manage local caches used by hpx and its nsx dependency:\n\n"
-        "  hpx cache purge      Remove all cached data (module clones,\n\n"
-        "                       resolved refs, generated workspaces).\n\n"
+        "  hpx cache purge      Remove all cached data (module artifacts,\n\n"
+        "                       git-artifact hashes, resolved refs,\n\n"
+        "                       generated workspaces).\n\n"
         "                       Forces fresh network\n\n"
         "                       fetches on next run.\n\n"
         "  hpx cache info       Show cache location and size."
@@ -835,7 +836,7 @@ def _cache_callback(ctx: typer.Context) -> None:
         raise typer.Exit(0)
 
 
-@cache_app.command("purge", help="Remove all cached data, including workspaces")
+@cache_app.command("purge", help="Remove all NSX caches and HPX workspaces")
 def cache_purge_command() -> None:
     from .cache_cmd import _cmd_cache_purge
 
