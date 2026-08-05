@@ -382,7 +382,7 @@ def _source_revisions_from_env() -> dict[str, dict[str, str]]:
         requested_ref = value.get("requested_ref")
         resolved_commit = value.get("resolved_commit")
         if (
-            requested_kind not in {"branch", "commit"}
+            requested_kind not in {"default_branch", "branch", "commit"}
             or not isinstance(requested_ref, str)
             or not requested_ref
             or not isinstance(resolved_commit, str)
