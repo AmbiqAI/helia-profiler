@@ -19,13 +19,13 @@ release pull requests from Conventional Commits.
   ([78aab42](https://github.com/AmbiqAI/helia-profiler/commit/78aab42aab439e3e976b9bb0744ecf58e0e5b0d1)).
 * **Auditable result bundles.** Profiles carry the exact dependency lock,
   baseline, update/offline mode, source revisions, and runtime provenance
-  used for the run ([a83f8f0](https://github.com/AmbiqAI/helia-profiler/commit/a83f8f0f3434e722179a436dc0ded2dec786fb41), [977eb04](https://github.com/AmbiqAI/helia-profiler/commit/977eb04c78b463c52123cd840065e6a8caa461d6)).
+  used for the run ([78aab42](https://github.com/AmbiqAI/helia-profiler/commit/78aab42aab439e3e976b9bb0744ecf58e0e5b0d1), [977eb04](https://github.com/AmbiqAI/helia-profiler/commit/977eb04c78b463c52123cd840065e6a8caa461d6)).
 * **Safer field diagnostics.** `hpx doctor --bundle` creates sanitized support
   archives with credential, serial, path, and nested secret-shaped values
-  redacted ([a6d37c6](https://github.com/AmbiqAI/helia-profiler/commit/a6d37c6bfb81ca1ea6a2cc4bece9172a16a14589), [566055c](https://github.com/AmbiqAI/helia-profiler/commit/566055ca461ec5dd5e9fc4bda3272c0a736354b4), [ccb2bab](https://github.com/AmbiqAI/helia-profiler/commit/ccb2bab27fad910410e7347034c0e011dde8f484), [0954aad](https://github.com/AmbiqAI/helia-profiler/commit/0954aada3b93c8c3a9cb7e4032fbb4a4fc7c4b95)).
+  redacted ([a6d37c6](https://github.com/AmbiqAI/helia-profiler/commit/a6d37c6bfb81ca1ea6a2cc4bece9172a16a14589)).
 * **Hardware confidence.** Release validation covers Apollo510B cold- and
-  warm-start runs, with restored Apollo330 coverage and recorded run origin
-  ([3fbc9d6](https://github.com/AmbiqAI/helia-profiler/commit/3fbc9d6686ffbb59409e7ecf9e0f08defd0b8f11), [a1dcc0c](https://github.com/AmbiqAI/helia-profiler/commit/a1dcc0ca51b59f4ddd3a50f8596efd86a6fde6fe)).
+  warm-start runs. In-repository validation also restores Apollo330 coverage
+  and records run origin ([3fbc9d6](https://github.com/AmbiqAI/helia-profiler/commit/3fbc9d6686ffbb59409e7ecf9e0f08defd0b8f11), [a1dcc0c](https://github.com/AmbiqAI/helia-profiler/commit/a1dcc0ca51b59f4ddd3a50f8596efd86a6fde6fe)).
 * **PSRAM visibility.** Clock, timing, and placement diagnostics are now
   available in captured metadata and summaries ([983f784](https://github.com/AmbiqAI/helia-profiler/commit/983f7847d09faa041c98b2f631e0d9b7d34eaca6)).
 * **Broader host support.** Python 3.11–3.14, Windows diagnostics, and ARM64
