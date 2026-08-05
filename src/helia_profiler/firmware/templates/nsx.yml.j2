@@ -16,7 +16,7 @@ modules:
     vendored: true
 {% elif m.ref is defined and m.ref %}
   project: {{ m.project }}
-  ref: {{ m.ref }}
+  revision: {{ m.ref }}
 {% elif m.version is defined and m.version %}
   project: {{ m.project }}
   version: "{{ m.version }}"

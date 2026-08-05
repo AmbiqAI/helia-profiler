@@ -600,7 +600,15 @@ def generate_app(ctx: PipelineContext) -> Path:
             config=config,
             artifacts=artifacts,
             modules=modules,
-            module_registry_yaml=_render_module_registry(profile, project_overrides),
+            module_registry_yaml=_render_module_registry(
+                profile,
+                project_overrides,
+                {
+                    module.name: (module.project or module.name, module.ref)
+                    for module in artifacts.extra_modules
+                    if not module.local and module.ref
+                },
+            ),
             render_context=render_context,
             arena_regions=aot_arena_regions,
             compiler_launcher=compiler_launcher or "",
