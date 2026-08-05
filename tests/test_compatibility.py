@@ -95,12 +95,14 @@ def test_only_full_commit_refs_are_accepted(tmp_path: Path) -> None:
 
 def test_package_dependency_matches_qualified_baseline() -> None:
     repo_root = Path(__file__).resolve().parent.parent
+    baseline = load_compatibility_baseline()
+    expected_dependency = f"neuralspotx=={baseline.neuralspotx_version}"
     with (repo_root / "pyproject.toml").open("rb") as stream:
         project = tomllib.load(stream)["project"]
     dependency = next(
         dependency for dependency in project["dependencies"] if dependency.startswith("neuralspotx")
     )
-    assert dependency == "neuralspotx>=0.7.12,<0.8.0"
+    assert dependency == expected_dependency
 
     with (repo_root / "uv.lock").open("rb") as stream:
         lock = tomllib.load(stream)
@@ -113,12 +115,12 @@ def test_package_dependency_matches_qualified_baseline() -> None:
         for dependency in project_package["metadata"]["requires-dist"]
         if dependency["name"] == "neuralspotx"
     )
-    assert locked_dependency["specifier"] == ">=0.7.12,<0.8.0"
+    assert locked_dependency["specifier"] == f"=={baseline.neuralspotx_version}"
 
     neuralspotx_package = next(
         package for package in packages if package["name"] == "neuralspotx"
     )
-    assert neuralspotx_package["version"] == "0.7.12"
+    assert neuralspotx_package["version"] == baseline.neuralspotx_version
 
 
 def test_provenance_fingerprint_is_serializable_and_stable(tmp_path: Path) -> None:

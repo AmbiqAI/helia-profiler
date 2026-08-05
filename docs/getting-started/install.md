@@ -73,7 +73,7 @@ rule for non-root USB access.
 | CMake | `>= 3.24` | Build system |
 | Ninja | any | Build backend |
 | SEGGER J-Link software | `>= 7.80` | Flash and RTT/SWO capture |
-| `neuralspotx` (`nsx`) | `>= 0.7.12, < 0.8.0` | Firmware build pipeline (installed automatically as a dependency) |
+| `neuralspotx` (`nsx`) | `== 0.7.12` | Firmware build pipeline (installed automatically as a dependency) |
 
 `armclang` and ATfE are optional alternative toolchains — see
 [Toolchains](../guide/toolchains.md). A Joulescope JS110/JS220/JS320 is optional
