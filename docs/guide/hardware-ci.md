@@ -140,11 +140,12 @@ directories do not fail validation report generation.
 
 ## Dependency source pinning
 
-The `ns_cmsis_nn_ref` workflow input accepts either a branch name or a full
-40-character commit SHA. Release version/tag names such as `v7.26.0` are not
-accepted. The workflow always resolves the selection to a full commit and
-writes both the requested selector and `resolved_commit` into the validation
-manifest's `sources.ns-cmsis-nn` metadata.
+The `ns_cmsis_nn_ref` workflow input is blank by default. In that normal mode,
+the workflow clones `ns-cmsis-nn` as usual from its repository default branch.
+When supplied, the input accepts either a branch name or a full 40-character
+commit SHA; release version/tag names such as `v7.26.0` are not accepted. Every
+run records the selected/default branch and its `resolved_commit` in the
+validation manifest's `sources.ns-cmsis-nn` metadata.
 
 ## Cross-machine release sweep
 
@@ -197,7 +198,7 @@ only that axis.
 - `boards`: comma-separated board IDs, default `apollo510_evb`
 - `models`: optional comma-separated model IDs such as `kws` or `kws,vww`
 - `engines`: optional comma-separated engines such as `helia-rt` or `helia-aot`
-- `ns_cmsis_nn_ref`: optional `ns-cmsis-nn` branch, tag, or full commit SHA.
+- `ns_cmsis_nn_ref`: optional `ns-cmsis-nn` branch or full commit SHA.
   When empty, the workflow checks out the latest commit from the repository's
   default branch. The requested ref and resolved commit are saved in
   `ns-cmsis-nn-revision.txt` with the validation artifacts.

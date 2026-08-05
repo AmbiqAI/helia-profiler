@@ -214,6 +214,29 @@ def test_build_manifest_omits_none_metrics_and_tolerates_missing_git(tmp_path: P
     assert report["cases"][0]["resources"] == {}
 
 
+def test_build_manifest_records_default_branch_source(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv(
+        "HPX_SOURCE_REVISIONS_JSON",
+        json.dumps(
+            {
+                "ns-cmsis-nn": {
+                    "requested_kind": "default_branch",
+                    "requested_ref": "main",
+                    "resolved_commit": "b" * 40,
+                }
+            }
+        ),
+    )
+
+    manifest = build_manifest([], tmp_path, repo_root=tmp_path / "missing")
+
+    assert manifest["sources"]["ns-cmsis-nn"] == {
+        "requested_kind": "default_branch",
+        "requested_ref": "main",
+        "resolved_commit": "b" * 40,
+    }
+
+
 def test_powered_case_publishes_dashboard_metrics_and_detailed_artifact(tmp_path: Path):
     case_dir = tmp_path / "apollo510-power"
     detail_dir = case_dir / "detailed"
