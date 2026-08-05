@@ -40,14 +40,14 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
         baseline.neuralspotx_sha256
         == "bbeb075cc869b7e72e25346dce3f8d38618fd2228f10c356abf11bad64102a8a"
     )
-    assert baseline.project("neuralspotx").ref == "neuralspotx-v0.7.10"
-    assert baseline.project("nsx-ambiq-sdk").ref == "v5.2.23"
-    assert baseline.project("nsx-pmu-armv8m").ref == "v0.2.0"
-    assert baseline.project("nsx-tflite-micro").ref == "v0.1.0"
-    assert baseline.project("arm-cmsis-nn").ref == "v0.1.0"
-    assert baseline.module("arm-cmsis-nn").ref == "v0.1.0"
-    assert baseline.project("ns-cmsis-nn").ref == "v7.26.0"
-    assert baseline.engine("helia-rt").ref == "helia-rt-v1.16.0"
+    assert baseline.project("neuralspotx").ref == "1d358f770a572945b51628e6212181436960cf72"
+    assert baseline.project("nsx-ambiq-sdk").ref == "7f0c4abe0354898e68ead757b85f001b0ecfbacf"
+    assert baseline.project("nsx-pmu-armv8m").ref == "5725c065a0c3603132f1064ee2684d1fa8587c88"
+    assert baseline.project("nsx-tflite-micro").ref == "2f02cc932a200c5d78383cc2dab3c28950842aea"
+    assert baseline.project("arm-cmsis-nn").ref == "62967ecf040b1e3bb278e76a9828200187f02471"
+    assert baseline.module("arm-cmsis-nn").ref == "62967ecf040b1e3bb278e76a9828200187f02471"
+    assert baseline.project("ns-cmsis-nn").ref == "2bb81953a20518cf65613bd612352cc462dd7a5e"
+    assert baseline.engine("helia-rt").ref == "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62"
     assert baseline.engine("helia-aot").min_version == "0.18.0"
     assert baseline.engine("helia-aot").max_version_exclusive == "0.19.0"
     assert len(baseline.fingerprint) == 64
@@ -57,21 +57,21 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
     baseline = load_compatibility_baseline()
 
     assert {project.name: project.ref for project in baseline.projects} == {
-        "neuralspotx": "neuralspotx-v0.7.10",
-        "nsx-ambiq-sdk": "v5.2.23",
-        "nsx-pmu-armv8m": "v0.2.0",
-        "nsx-tflite-micro": "v0.1.0",
-        "arm-cmsis-nn": "v0.1.0",
-        "ns-cmsis-nn": "v7.26.0",
-        "helia-rt": "helia-rt-v1.16.0",
+        "neuralspotx": "1d358f770a572945b51628e6212181436960cf72",
+        "nsx-ambiq-sdk": "7f0c4abe0354898e68ead757b85f001b0ecfbacf",
+        "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
+        "nsx-tflite-micro": "2f02cc932a200c5d78383cc2dab3c28950842aea",
+        "arm-cmsis-nn": "62967ecf040b1e3bb278e76a9828200187f02471",
+        "ns-cmsis-nn": "2bb81953a20518cf65613bd612352cc462dd7a5e",
+        "helia-rt": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62",
     }
     assert {module.name: module.ref for module in baseline.modules} == {
-        "nsx-ambiq-bsp": "v5.2.23",
-        "nsx-pmu-armv8m": "v0.2.0",
-        "nsx-tflite-micro": "v0.1.0",
-        "arm-cmsis-nn": "v0.1.0",
-        "nsx-cmsis-nn": "v7.26.0",
-        "nsx-helia-rt": "helia-rt-v1.16.0",
+        "nsx-ambiq-bsp": "7f0c4abe0354898e68ead757b85f001b0ecfbacf",
+        "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
+        "nsx-tflite-micro": "2f02cc932a200c5d78383cc2dab3c28950842aea",
+        "arm-cmsis-nn": "62967ecf040b1e3bb278e76a9828200187f02471",
+        "nsx-cmsis-nn": "2bb81953a20518cf65613bd612352cc462dd7a5e",
+        "nsx-helia-rt": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62",
     }
     assert baseline.engine("helia-rt").version == "1.16.0"
     assert baseline.engine("helia-aot").min_version == "0.18.0"
@@ -79,17 +79,17 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
     assert baseline.engine("tflm").governed_by_modules
 
 
-def test_tag_shaped_refs_are_accepted_and_branches_rejected(tmp_path: Path) -> None:
+def test_only_full_commit_refs_are_accepted(tmp_path: Path) -> None:
     baseline = load_compatibility_baseline().to_dict()
-    baseline["projects"]["nsx-ambiq-sdk"]["ref"] = "vendor-v1.2.3"
+    baseline["projects"]["nsx-ambiq-sdk"]["ref"] = "a" * 40
     valid = tmp_path / "valid.json"
     valid.write_text(json.dumps(baseline))
-    assert load_compatibility_baseline(valid).project("nsx-ambiq-sdk").ref == "vendor-v1.2.3"
+    assert load_compatibility_baseline(valid).project("nsx-ambiq-sdk").ref == "a" * 40
 
-    baseline["projects"]["nsx-ambiq-sdk"]["ref"] = "vendor-release"
+    baseline["projects"]["nsx-ambiq-sdk"]["ref"] = "vendor-v1.2.3"
     invalid = tmp_path / "invalid.json"
     invalid.write_text(json.dumps(baseline))
-    with pytest.raises(ConfigError, match="must use an immutable ref"):
+    with pytest.raises(ConfigError, match="full 40-character commit SHA"):
         load_compatibility_baseline(invalid)
 
 
@@ -225,21 +225,21 @@ def test_malformed_or_unsupported_baseline_fails_clearly(tmp_path: Path) -> None
     baseline = load_compatibility_baseline().to_dict()
     baseline["projects"]["nsx-ambiq-sdk"]["ref"] = "feature/customer"
     branch_ref.write_text(json.dumps(baseline))
-    with pytest.raises(ConfigError, match="must use an immutable ref"):
+    with pytest.raises(ConfigError, match="full 40-character commit SHA"):
         load_compatibility_baseline(branch_ref)
 
     unrecognized_branch_ref = tmp_path / "unrecognized-branch-ref.json"
     baseline = load_compatibility_baseline().to_dict()
     baseline["projects"]["nsx-ambiq-sdk"]["ref"] = "develop"
     unrecognized_branch_ref.write_text(json.dumps(baseline))
-    with pytest.raises(ConfigError, match="must use an immutable ref"):
+    with pytest.raises(ConfigError, match="full 40-character commit SHA"):
         load_compatibility_baseline(unrecognized_branch_ref)
 
     trailing_newline_ref = tmp_path / "trailing-newline-ref.json"
     baseline = load_compatibility_baseline().to_dict()
     baseline["projects"]["nsx-ambiq-sdk"]["ref"] = "v5.2.23\n"
     trailing_newline_ref.write_text(json.dumps(baseline))
-    with pytest.raises(ConfigError, match="must use an immutable ref"):
+    with pytest.raises(ConfigError, match="full 40-character commit SHA"):
         load_compatibility_baseline(trailing_newline_ref)
 
     inverted_range = tmp_path / "inverted-range.json"
@@ -289,7 +289,7 @@ def test_malformed_or_unsupported_baseline_fails_clearly(tmp_path: Path) -> None
 
     malformed_pinned_version = tmp_path / "malformed-pinned-version.json"
     baseline = load_compatibility_baseline().to_dict()
-    baseline["engines"]["helia-rt"] = {"version": "not-semver", "ref": "helia-rt-v1.16.0"}
+    baseline["engines"]["helia-rt"] = {"version": "not-semver", "ref": "a" * 40}
     malformed_pinned_version.write_text(json.dumps(baseline))
     with pytest.raises(ConfigError, match="major.minor.patch"):
         load_compatibility_baseline(malformed_pinned_version)
@@ -312,7 +312,10 @@ def test_result_metadata_serializes_qualification_provenance(tmp_path: Path) -> 
 
     compatibility = metadata["compatibility"]
     assert compatibility["qualification"] == "qualified"
-    assert compatibility["baseline"]["projects"]["nsx-tflite-micro"]["ref"] == "v0.1.0"
+    assert (
+        compatibility["baseline"]["projects"]["nsx-tflite-micro"]["ref"]
+        == "2f02cc932a200c5d78383cc2dab3c28950842aea"
+    )
     json.dumps(metadata)
 
 
@@ -513,13 +516,13 @@ def test_baseline_helia_rt_entry_matches_canonical_artifacts_constants() -> None
     # resolution must keep consulting the constants directly, not the
     # baseline (see engines/helia_rt/adapter.py and artifacts.py).
     from helia_profiler.engines.helia_rt.artifacts import (
-        HELIART_RELEASE_TAG,
+        HELIART_SOURCE_COMMIT,
         HELIART_VERSION,
     )
 
     engine = load_compatibility_baseline().engine("helia-rt")
     assert engine.version == HELIART_VERSION
-    assert engine.ref == HELIART_RELEASE_TAG
+    assert engine.ref == HELIART_SOURCE_COMMIT
 
 
 def test_engine_owned_module_names_match_canonical_constants() -> None:

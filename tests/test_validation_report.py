@@ -34,7 +34,21 @@ def _case(output_dir: Path) -> CaseResult:
     )
 
 
-def test_write_validation_reports_includes_manifest_with_relative_paths(tmp_path: Path):
+def test_write_validation_reports_includes_manifest_with_relative_paths(
+    tmp_path: Path, monkeypatch
+):
+    monkeypatch.setenv(
+        "HPX_SOURCE_REVISIONS_JSON",
+        json.dumps(
+            {
+                "ns-cmsis-nn": {
+                    "requested_kind": "branch",
+                    "requested_ref": "feature/faster-kernels",
+                    "resolved_commit": "a" * 40,
+                }
+            }
+        ),
+    )
     result = _case(tmp_path)
     case_dir = Path(result.output_dir)
     case_dir.mkdir(parents=True)
@@ -109,6 +123,13 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(tmp_path
     assert manifest["validation"]["suite"] == "smoke"
     assert manifest["summary"] == {"total": 1, "pass": 1, "fail": 0, "skip": 0}
     assert manifest["repo"] == {"sha": None, "branch": None, "dirty": None}
+    assert manifest["sources"] == {
+        "ns-cmsis-nn": {
+            "requested_kind": "branch",
+            "requested_ref": "feature/faster-kernels",
+            "resolved_commit": "a" * 40,
+        }
+    }
 
     case = manifest["cases"][0]
     assert case["metrics"]["total_cycles"] == 123456

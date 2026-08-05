@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import subprocess
 from dataclasses import dataclass, fields
 from datetime import UTC, datetime
@@ -16,6 +18,7 @@ from .runner import CaseResult
 
 
 SCHEMA_VERSION = 4
+_COMMIT_SHA_RE = re.compile(r"[0-9a-f]{40}")
 
 
 @dataclass(frozen=True)
@@ -153,6 +156,7 @@ def build_manifest(
         "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "hpx_version": __version__,
         "repo": _repo_metadata(root),
+        "sources": _source_revisions_from_env(),
         "validation": _json_safe(validation_options or {}),
         "summary": summary_stats(results),
         "cases": [_case_manifest(result, out_dir) for result in results],
@@ -351,6 +355,46 @@ def _repo_metadata(repo_root: Path | None) -> dict[str, Any]:
         "branch": _git(repo_root, "rev-parse", "--abbrev-ref", "HEAD"),
         "dirty": _git_dirty(repo_root),
     }
+
+
+def _source_revisions_from_env() -> dict[str, dict[str, str]]:
+    """Return workflow-resolved source identities for portable validation metadata.
+
+    The workflow resolves a user-facing branch or commit selector before HPX
+    starts.  Only its resulting full commit is a reproducible identity; the
+    selector remains as context for the person who triggered the run.
+    """
+    raw = os.environ.get("HPX_SOURCE_REVISIONS_JSON")
+    if not raw:
+        return {}
+    try:
+        sources = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(sources, dict):
+        return {}
+
+    validated: dict[str, dict[str, str]] = {}
+    for name, value in sources.items():
+        if not isinstance(name, str) or not isinstance(value, dict):
+            continue
+        requested_kind = value.get("requested_kind")
+        requested_ref = value.get("requested_ref")
+        resolved_commit = value.get("resolved_commit")
+        if (
+            requested_kind not in {"branch", "commit"}
+            or not isinstance(requested_ref, str)
+            or not requested_ref
+            or not isinstance(resolved_commit, str)
+            or not _COMMIT_SHA_RE.fullmatch(resolved_commit)
+        ):
+            continue
+        validated[name] = {
+            "requested_kind": requested_kind,
+            "requested_ref": requested_ref,
+            "resolved_commit": resolved_commit,
+        }
+    return validated
 
 
 def _discover_repo_root() -> Path | None:

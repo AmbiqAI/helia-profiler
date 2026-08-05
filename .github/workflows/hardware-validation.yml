@@ -32,9 +32,9 @@ on:
         default: ""
         type: string
       ns_cmsis_nn_ref:
-        description: "Optional ns-cmsis-nn git ref or full commit SHA; empty uses the latest default-branch commit"
+        description: "ns-cmsis-nn branch name or full 40-character commit SHA (release version/tag names are not accepted)"
         required: false
-        default: ""
+        default: "2bb81953a20518cf65613bd612352cc462dd7a5e"
         type: string
       toolchains:
         description: "Optional comma-separated toolchains: arm-none-eabi-gcc,armclang,atfe; empty uses suite defaults"
@@ -100,7 +100,7 @@ env:
   HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb' }}
   HPX_VALIDATION_MODELS: ${{ inputs.models || '' }}
   HPX_VALIDATION_ENGINES: ${{ inputs.engines || '' }}
-  HPX_NS_CMSIS_NN_REF: ${{ inputs.ns_cmsis_nn_ref || '' }}
+  HPX_NS_CMSIS_NN_REF: ${{ inputs.ns_cmsis_nn_ref || '2bb81953a20518cf65613bd612352cc462dd7a5e' }}
   HPX_VALIDATION_TOOLCHAINS: ${{ inputs.toolchains || '' }}
   HPX_VALIDATION_TRANSPORTS: ${{ inputs.transports || '' }}
   HPX_VALIDATION_MEMORIES: ${{ inputs.memories || '' }}
@@ -143,22 +143,37 @@ jobs:
           checkout_root="$(mktemp -d "${RUNNER_TEMP}/hpx-ns-cmsis-nn.XXXXXX")"
           checkout_path="${checkout_root}/ns-cmsis-nn"
 
-          if [[ -n "${HPX_NS_CMSIS_NN_REF}" ]]; then
-            git clone --filter=blob:none --no-checkout https://github.com/AmbiqAI/ns-cmsis-nn.git "${checkout_path}"
+          git clone --filter=blob:none --no-checkout https://github.com/AmbiqAI/ns-cmsis-nn.git "${checkout_path}"
+          requested_ref="${HPX_NS_CMSIS_NN_REF}"
+
+          if [[ "${requested_ref}" =~ ^[0-9a-fA-F]{40}$ ]]; then
             git -C "${checkout_path}" fetch --depth 1 origin "${HPX_NS_CMSIS_NN_REF}"
             git -C "${checkout_path}" checkout --detach FETCH_HEAD
-            requested_ref="${HPX_NS_CMSIS_NN_REF}"
+            requested_kind="commit"
           else
-            git clone --depth 1 https://github.com/AmbiqAI/ns-cmsis-nn.git "${checkout_path}"
-            requested_ref="latest-default-branch"
+            if [[ "${requested_ref}" =~ ^([[:alnum:]-]+-)?v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+              || ! git check-ref-format --branch "${requested_ref}" > /dev/null; then
+              echo "ns_cmsis_nn_ref must be a branch name or a full 40-character commit SHA; release version/tag names are not accepted." >&2
+              exit 2
+            fi
+            git -C "${checkout_path}" fetch --depth 1 origin "refs/heads/${requested_ref}"
+            git -C "${checkout_path}" checkout --detach FETCH_HEAD
+            requested_kind="branch"
           fi
 
           resolved_commit="$(git -C "${checkout_path}" rev-parse HEAD)"
+          if [[ "${requested_kind}" == "commit" && "${resolved_commit}" != "${requested_ref,,}" ]]; then
+            echo "Resolved ns-cmsis-nn commit does not match the requested commit." >&2
+            exit 2
+          fi
           echo "CMSIS_NN_PATH=${checkout_path}" >> "${GITHUB_ENV}"
           echo "NS_CMSIS_NN_RESOLVED_COMMIT=${resolved_commit}" >> "${GITHUB_ENV}"
+          echo "HPX_SOURCE_REVISIONS_JSON={\"ns-cmsis-nn\":{\"requested_kind\":\"${requested_kind}\",\"requested_ref\":\"${requested_ref}\",\"resolved_commit\":\"${resolved_commit}\"}}" \
+            >> "${GITHUB_ENV}"
 
           mkdir -p results/validation
           {
+            echo "requested_kind=${requested_kind}"
             echo "requested_ref=${requested_ref}"
             echo "resolved_commit=${resolved_commit}"
           } > results/validation/ns-cmsis-nn-revision.txt
@@ -166,7 +181,7 @@ jobs:
           {
             echo "### ns-cmsis-nn"
             echo ""
-            echo "- Requested ref: \`${requested_ref}\`"
+            echo "- Requested ${requested_kind}: \`${requested_ref}\`"
             echo "- Resolved commit: \`${resolved_commit}\`"
           } >> "${GITHUB_STEP_SUMMARY}"
 
