@@ -19,7 +19,7 @@ on:
       boards:
         description: "Comma-separated board IDs"
         required: true
-        default: apollo510_evb
+        default: apollo510_evb,apollo330mP_evb
         type: string
       models:
         description: "Optional comma-separated model IDs; empty uses suite defaults"
@@ -68,7 +68,7 @@ on:
       jlink_serials:
         description: "Optional comma-separated board=serial entries"
         required: false
-        default: "apollo510_evb=1160003180"
+        default: "apollo510_evb=1160003180,apollo330mP_evb=1160003409"
         type: string
       power_serials:
         description: "Optional comma-separated board=Joulescope-serial entries"
@@ -97,7 +97,7 @@ env:
   # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
   # with the manual defaults, except that nightly validation covers the full suite.
   HPX_VALIDATION_SUITE: ${{ inputs.suite || 'complete' }}
-  HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb' }}
+  HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb,apollo330mP_evb' }}
   HPX_VALIDATION_MODELS: ${{ inputs.models || '' }}
   HPX_VALIDATION_ENGINES: ${{ inputs.engines || '' }}
   HPX_NS_CMSIS_NN_REF: ${{ inputs.ns_cmsis_nn_ref || '' }}
@@ -105,13 +105,13 @@ env:
   HPX_VALIDATION_TRANSPORTS: ${{ inputs.transports || '' }}
   HPX_VALIDATION_MEMORIES: ${{ inputs.memories || '' }}
   HPX_VALIDATION_POWER: ${{ inputs.power || 'on' }}
-  HPX_VALIDATION_JLINK_SERIALS: ${{ inputs.jlink_serials || 'apollo510_evb=1160003180' }}
+  HPX_VALIDATION_JLINK_SERIALS: ${{ inputs.jlink_serials || 'apollo510_evb=1160003180,apollo330mP_evb=1160003409' }}
   HPX_VALIDATION_POWER_SERIALS: ${{ inputs.power_serials || 'apollo510_evb=H8MS' }}
   HPX_VALIDATION_REPEAT: ${{ inputs.repeat || '1' }}
   HPX_VALIDATION_TIMEOUT: ${{ inputs.timeout || '900' }}
 
 concurrency:
-  group: hardware-validation-${{ inputs.boards || 'apollo510_evb' }}
+  group: hardware-validation-${{ inputs.boards || 'apollo510_evb,apollo330mP_evb' }}
   cancel-in-progress: false
 
 jobs:
