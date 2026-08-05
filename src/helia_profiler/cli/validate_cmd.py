@@ -238,6 +238,8 @@ def _cmd_validate(args: argparse.Namespace) -> None:
                 model_registry=model_registry,
                 engines=[e.strip() for e in engines_csv.split(",") if e.strip()] or None,
                 power=args.power,
+                power_boards=[b.strip() for b in args.power_boards.split(",") if b.strip()]
+                or None,
                 boards=[b.strip() for b in args.boards.split(",") if b.strip()] or None,
                 toolchains=[t.strip() for t in toolchains_csv.split(",") if t.strip()] or None,
                 transports=[t.strip() for t in transports_csv.split(",") if t.strip()] or None,
@@ -295,6 +297,8 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         "--mlperf-timeout",
         str(args.timeout),
     ]
+    if args.power_boards.strip():
+        pytest_args += ["--mlperf-power-boards", args.power_boards.strip()]
     if suite:
         pytest_args += ["--mlperf-suite", suite]
     if args.models.strip():

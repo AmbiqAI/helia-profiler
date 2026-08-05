@@ -48,6 +48,25 @@ class TestValidateList:
         assert proc.returncode == 0, proc.stderr
         assert "720 case(s)" in proc.stdout
 
+    def test_list_power_boards_keeps_apollo330_unpowered(self):
+        proc = _run_hpx(
+            "validate",
+            "--list",
+            "--suite",
+            "smoke",
+            "--boards",
+            "apollo510_evb,apollo330mP_evb",
+            "--power",
+            "on",
+            "--power-boards",
+            "apollo510_evb",
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert "2 case(s) would run" in proc.stdout
+        assert "apollo510_evb-kws-rt-arm-none-eabi-gcc-rtt-auto-power" in proc.stdout
+        assert "apollo330mP_evb-kws-rt-arm-none-eabi-gcc-rtt-auto-power" not in proc.stdout
+        assert "apollo330mP_evb-kws-rt-arm-none-eabi-gcc-rtt-auto" in proc.stdout
+
     def test_list_axis_filters_for_two_pass_board_smoke(self):
         proc = _run_hpx(
             "validate",
@@ -185,6 +204,21 @@ class TestSuiteSmoke:
         )
 
         assert args[args.index("--mlperf-ns-cmsis-nn-ref") + 1] == commit
+
+    def test_power_boards_are_forwarded_to_pytest(self, monkeypatch, tmp_path):
+        args = self._captured_pytest_args(
+            monkeypatch,
+            "--suite",
+            "smoke",
+            "--power",
+            "on",
+            "--power-boards",
+            "apollo510_evb",
+            "--output-dir",
+            str(tmp_path),
+        )
+
+        assert args[args.index("--mlperf-power-boards") + 1] == "apollo510_evb"
 
     def test_explicit_axis_wins_over_smoke_default(self, monkeypatch, tmp_path):
         args = self._captured_pytest_args(

@@ -657,6 +657,11 @@ def validate_command(
         click_type=_VALIDATE_POWER_CHOICE,
         help="Power matrix: off (default) | on (only Joulescope runs) | both.",
     ),
+    power_boards: str = typer.Option(
+        "",
+        "--power-boards",
+        help="Comma-separated boards allowed to use power capture (default: all selected boards).",
+    ),
     boards: str = typer.Option(
         "", "--boards", help="Comma-separated board IDs (default: apollo510_evb)."
     ),
@@ -738,6 +743,7 @@ def validate_command(
         engines=engines,
         ns_cmsis_nn_ref=ns_cmsis_nn_ref,
         power=power,
+        power_boards=power_boards,
         boards=boards,
         toolchains=toolchains,
         transports=transports,
