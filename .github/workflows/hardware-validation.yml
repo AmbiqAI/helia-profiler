@@ -113,6 +113,7 @@ env:
   HPX_VALIDATION_POWER_BOARDS: ${{ inputs.power_boards || 'apollo510_evb' }}
   HPX_VALIDATION_JLINK_SERIALS: ${{ inputs.jlink_serials || 'apollo510_evb=1160003180,apollo330mP_evb=1160003409' }}
   HPX_VALIDATION_POWER_SERIALS: ${{ inputs.power_serials || 'apollo510_evb=H8MS' }}
+  HPX_VALIDATION_RUN_ORIGIN: ${{ github.event_name == 'schedule' && 'nightly' || 'manual' }}
   HPX_VALIDATION_REPEAT: ${{ inputs.repeat || '1' }}
   HPX_VALIDATION_TIMEOUT: ${{ inputs.timeout || '900' }}
 

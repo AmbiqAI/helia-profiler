@@ -110,6 +110,7 @@ The initial schema includes:
 - `generated_at`
 - `hpx_version`
 - `repo.sha`, `repo.branch`, and `repo.dirty` when available
+- `run.origin` (`nightly`, `manual`, `local`, or generic `ci`) plus GitHub run metadata
 - `validation` options such as suite, selected axes, timeout, and output dir
 - `summary` pass/fail/skip counts
 - `cases` with identity, status, headline metrics, resource usage, and artifact paths
@@ -137,6 +138,12 @@ regression profiles surface differences and can require exact matches.
 
 Git metadata is best-effort. Missing git, source archives, or non-repository
 directories do not fail validation report generation.
+
+Scheduled GitHub Actions runs record `run.origin: nightly`; user-triggered
+`workflow_dispatch` runs record `run.origin: manual`. The accompanying
+`run.github` object contains the event name, repository, numeric run ID and
+attempt, and a direct run URL. Dashboards can therefore separate nightly and
+ad hoc validation without inferring intent from timestamps or branch names.
 
 ## Dependency source pinning
 

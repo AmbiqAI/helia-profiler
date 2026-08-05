@@ -156,6 +156,7 @@ def build_manifest(
         "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "hpx_version": __version__,
         "repo": _repo_metadata(root),
+        "run": _run_provenance_from_env(),
         "sources": _source_revisions_from_env(),
         "validation": _json_safe(validation_options or {}),
         "summary": summary_stats(results),
@@ -355,6 +356,44 @@ def _repo_metadata(repo_root: Path | None) -> dict[str, Any]:
         "branch": _git(repo_root, "rev-parse", "--abbrev-ref", "HEAD"),
         "dirty": _git_dirty(repo_root),
     }
+
+
+def _run_provenance_from_env() -> dict[str, Any]:
+    """Return stable run-origin metadata for dashboard filtering."""
+    event_name = os.environ.get("GITHUB_EVENT_NAME", "").strip()
+    explicit_origin = os.environ.get("HPX_VALIDATION_RUN_ORIGIN", "").strip()
+    origin = explicit_origin or {
+        "schedule": "nightly",
+        "workflow_dispatch": "manual",
+    }.get(event_name, "ci" if event_name else "local")
+
+    repository = os.environ.get("GITHUB_REPOSITORY", "").strip()
+    run_id = _positive_int_from_env("GITHUB_RUN_ID")
+    server_url = os.environ.get("GITHUB_SERVER_URL", "").strip()
+    run_url = (
+        f"{server_url}/{repository}/actions/runs/{run_id}"
+        if server_url and repository and run_id is not None
+        else None
+    )
+    github = _strip_none(
+        {
+            "event_name": event_name or None,
+            "repository": repository or None,
+            "run_id": run_id,
+            "run_attempt": _positive_int_from_env("GITHUB_RUN_ATTEMPT"),
+            "run_url": run_url,
+        }
+    )
+    return _strip_none({"origin": origin, "github": github or None})
+
+
+def _positive_int_from_env(name: str) -> int | None:
+    raw = os.environ.get(name, "").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return None
+    return value if value > 0 else None
 
 
 def _source_revisions_from_env() -> dict[str, dict[str, str]]:

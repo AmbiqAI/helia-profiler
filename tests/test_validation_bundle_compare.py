@@ -132,6 +132,31 @@ def test_loader_exposes_schema4_resource_data(tmp_path: Path) -> None:
     assert dict(loaded.cases[0].resources) == {}
 
 
+def test_loader_exposes_run_origin_metadata(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["run"] = {
+        "origin": "nightly",
+        "github": {
+            "event_name": "schedule",
+            "run_id": 31033041861,
+            "run_attempt": 2,
+            "run_url": "https://github.com/AmbiqAI/helia-profiler/actions/runs/31033041861",
+        },
+    }
+    manifest_path.write_text(json.dumps(manifest))
+
+    metadata = load_validation_bundle(bundle).metadata
+
+    assert metadata.run_origin == "nightly"
+    assert metadata.github_event_name == "schedule"
+    assert metadata.github_run_id == 31033041861
+    assert metadata.github_run_attempt == 2
+    assert metadata.github_run_url.endswith("/actions/runs/31033041861")
+
+
 @pytest.mark.parametrize("schema_version", [1, 2, 3, 4])
 def test_loader_supports_all_manifest_schemas(tmp_path: Path, schema_version: int) -> None:
     bundle = tmp_path / f"bundle-v{schema_version}"

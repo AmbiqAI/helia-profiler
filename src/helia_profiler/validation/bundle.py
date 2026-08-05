@@ -76,6 +76,11 @@ class ValidationBundleMetadata:
     repo_sha: str | None
     repo_branch: str | None
     repo_dirty: bool | None
+    run_origin: str | None
+    github_event_name: str | None
+    github_run_id: int | None
+    github_run_attempt: int | None
+    github_run_url: str | None
 
 
 @dataclass(frozen=True)
@@ -133,6 +138,8 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
         cases.append(case)
 
     repo = manifest.get("repo") if isinstance(manifest.get("repo"), dict) else {}
+    run = manifest.get("run") if isinstance(manifest.get("run"), dict) else {}
+    github = run.get("github") if isinstance(run.get("github"), dict) else {}
     if version == 4 and not isinstance(manifest.get("validation"), dict):
         raise ValidationBundleError("Validation manifest schema v4 field 'validation' must be an object")
     return ValidationBundle(
@@ -146,6 +153,11 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
             repo_sha=_optional_string(repo.get("sha")),
             repo_branch=_optional_string(repo.get("branch")),
             repo_dirty=repo.get("dirty") if isinstance(repo.get("dirty"), bool) else None,
+            run_origin=_optional_string(run.get("origin")),
+            github_event_name=_optional_string(github.get("event_name")),
+            github_run_id=_optional_positive_int(github.get("run_id")),
+            github_run_attempt=_optional_positive_int(github.get("run_attempt")),
+            github_run_url=_optional_string(github.get("run_url")),
         ),
     )
 
@@ -314,3 +326,7 @@ def _freeze_mapping(value: dict[str, Any]) -> tuple[tuple[str, str], ...]:
 
 def _optional_string(value: Any) -> str | None:
     return value if isinstance(value, str) else None
+
+
+def _optional_positive_int(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
