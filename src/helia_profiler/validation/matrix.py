@@ -369,6 +369,7 @@ def build_matrix(
     transports: list[str | Transport] | None = None,
     memories: list[str | MemoryProfile] | None = None,
     jlink_serials: dict[str, str] | None = None,
+    power_boards: list[str] | None = None,
     power_serials: dict[str, str] | None = None,
     power_gpio_pins: dict[str, tuple[int, int, int]] | None = None,
     repeat: int = 1,
@@ -395,6 +396,10 @@ def build_matrix(
         Model placement presets to include (default: each board's supported placements).
     jlink_serials:
         Optional mapping of board ID to J-Link serial number for multi-board labs.
+    power_boards:
+        Optional board IDs allowed to run powered cases. Selected boards not in
+        this list run unpowered even when ``power`` is ``"on"`` or ``"both"``.
+        When omitted, the power mode applies to every selected board.
     power_serials:
         Optional mapping of board ID to Joulescope serial number for powered
         cases. This permits several instruments to remain connected.
@@ -445,6 +450,11 @@ def build_matrix(
     unknown_b = [b for b in board_ids if b not in BOARDS]
     if unknown_b:
         raise ValueError(f"Unknown board(s): {unknown_b}. Known: {list(BOARDS)}")
+    unknown_power_boards = [b for b in (power_boards or []) if b not in BOARDS]
+    if unknown_power_boards:
+        raise ValueError(
+            f"Unknown power board(s): {unknown_power_boards}. Known: {list(BOARDS)}"
+        )
     if power not in ("both", "on", "off"):
         raise ValueError(f"power must be 'both'|'on'|'off', got {power!r}")
     if repeat < 1:
@@ -469,17 +479,16 @@ def build_matrix(
         label="memory",
     )
 
-    power_flags: list[bool]
-    if power == "both":
-        power_flags = [False, True]
-    elif power == "on":
-        power_flags = [True]
-    else:
-        power_flags = [False]
-
     cases: list[CaseSpec] = []
     for board_id in board_ids:
         board = BOARDS[board_id]
+        power_allowed = power_boards is None or board_id in power_boards
+        if not power_allowed or power == "off":
+            power_flags = [False]
+        elif power == "both":
+            power_flags = [False, True]
+        else:
+            power_flags = [True]
         board_toolchains = _intersect_or_board_default(toolchain_filter, board.toolchains)
         board_transports = _intersect_or_board_default(transport_filter, board.transports)
         board_memories = _intersect_or_board_default(memory_filter, board.memories)

@@ -110,6 +110,7 @@ The initial schema includes:
 - `generated_at`
 - `hpx_version`
 - `repo.sha`, `repo.branch`, and `repo.dirty` when available
+- `run.origin` (`nightly`, `manual`, `local`, or generic `ci`) plus GitHub run metadata
 - `validation` options such as suite, selected axes, timeout, and output dir
 - `summary` pass/fail/skip counts
 - `cases` with identity, status, headline metrics, resource usage, and artifact paths
@@ -137,6 +138,12 @@ regression profiles surface differences and can require exact matches.
 
 Git metadata is best-effort. Missing git, source archives, or non-repository
 directories do not fail validation report generation.
+
+Scheduled GitHub Actions runs record `run.origin: nightly`; user-triggered
+`workflow_dispatch` runs record `run.origin: manual`. The accompanying
+`run.github` object contains the event name, repository, numeric run ID and
+attempt, and a direct run URL. Dashboards can therefore separate nightly and
+ad hoc validation without inferring intent from timestamps or branch names.
 
 ## Dependency source pinning
 
@@ -181,16 +188,17 @@ self-hosted
 hpx-hardware
 ```
 
-The checked-in bench defaults select the Apollo510 EVB, enable power capture,
-and pin both its J-Link and Joulescope serials. Override those workflow inputs
-when moving the workflow to a different physical bench.
+The checked-in bench defaults select the Apollo510 and Apollo330mP EVBs, enable
+power capture only for Apollo510, and pin both J-Link serials plus the Apollo510
+Joulescope serial. Override those workflow inputs when moving the workflow to a
+different physical bench.
 
 Use this label for a machine that has HPX-compatible hardware attached. For
 the first bench, label the local Mac runner with `hpx-hardware` and attach the
 Apollo510 EVB plus its inline JS320. The workflow default board input is:
 
 ```text
-apollo510_evb
+apollo510_evb,apollo330mP_evb
 ```
 
 The workflow exposes the validation axes as manual inputs. Leave an optional
@@ -198,7 +206,7 @@ axis empty to use the selected suite's defaults; set it explicitly to override
 only that axis.
 
 - `suite`: `smoke`, `models-rt`, `models-aot`, or `complete`
-- `boards`: comma-separated board IDs, default `apollo510_evb`
+- `boards`: comma-separated board IDs, default `apollo510_evb,apollo330mP_evb`
 - `models`: optional comma-separated model IDs such as `kws` or `kws,vww`
 - `engines`: optional comma-separated engines such as `helia-rt` or `helia-aot`
 - `ns_cmsis_nn_ref`: optional `ns-cmsis-nn` branch or full commit SHA.
@@ -215,8 +223,10 @@ only that axis.
 - `memories`: optional comma-separated placement presets such as `auto`, `tcm`,
   `sram`, `mram`, or `psram`
 - `power`: `off`, `on`, or `both`; default `on`
+- `power_boards`: boards allowed to use power capture, default `apollo510_evb`;
+  other selected boards always run unpowered
 - `jlink_serials`: optional comma-separated `board=serial` entries, default
-  `apollo510_evb=1160003180`
+  `apollo510_evb=1160003180,apollo330mP_evb=1160003409`
 - `power_serials`: optional comma-separated `board=Joulescope-serial` entries,
   default `apollo510_evb=H8MS`
 - `repeat`: repeat count per selected case
@@ -227,9 +237,10 @@ Default inputs run the same smoke shape as the local command:
 ```bash
 uv run hpx validate \
   --suite smoke \
-  --boards apollo510_evb \
+  --boards apollo510_evb,apollo330mP_evb \
   --power on \
-  --jlink-serials apollo510_evb=1160003180 \
+  --power-boards apollo510_evb \
+  --jlink-serials apollo510_evb=1160003180,apollo330mP_evb=1160003409 \
   --power-serials apollo510_evb=H8MS \
   --output-dir results/validation \
   --junit-xml results/validation/junit.xml

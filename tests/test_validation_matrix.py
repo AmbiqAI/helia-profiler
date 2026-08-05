@@ -193,6 +193,26 @@ class TestBuildMatrix:
         assert powered.power_serial == "25QG"
         assert unpowered.power_serial is None
 
+    def test_power_boards_restricts_power_to_selected_board(self):
+        cases = build_matrix(
+            models=["kws"],
+            engines=["helia-rt"],
+            power="on",
+            power_boards=["apollo510_evb"],
+            boards=["apollo510_evb", "apollo330mP_evb"],
+            toolchains=["gcc"],
+            transports=["rtt"],
+            memories=["auto"],
+            power_serials={"apollo510_evb": "H8MS"},
+        )
+
+        assert len(cases) == 2
+        by_board = {case.board.id: case for case in cases}
+        assert by_board["apollo510_evb"].power is True
+        assert by_board["apollo510_evb"].power_serial == "H8MS"
+        assert by_board["apollo330mP_evb"].power is False
+        assert by_board["apollo330mP_evb"].power_serial is None
+
     def test_power_gpio_mapping_is_applied_only_to_powered_cases(self):
         cases = build_matrix(
             models=["kws"],
@@ -221,6 +241,10 @@ class TestBuildMatrix:
     def test_unknown_board_raises(self):
         with pytest.raises(ValueError, match="Unknown board"):
             build_matrix(boards=["not_a_board"])
+
+    def test_unknown_power_board_raises(self):
+        with pytest.raises(ValueError, match="Unknown power board"):
+            build_matrix(power_boards=["not_a_board"])
 
     def test_invalid_transport_for_board_raises(self):
         with pytest.raises(ValueError, match="No requested transports"):

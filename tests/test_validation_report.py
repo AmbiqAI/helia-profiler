@@ -237,6 +237,35 @@ def test_build_manifest_records_default_branch_source(tmp_path: Path, monkeypatc
     }
 
 
+def test_build_manifest_distinguishes_nightly_and_manual_runs(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("GITHUB_REPOSITORY", "AmbiqAI/helia-profiler")
+    monkeypatch.setenv("GITHUB_SERVER_URL", "https://github.com")
+    monkeypatch.setenv("GITHUB_RUN_ID", "31033041861")
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "2")
+
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "schedule")
+    monkeypatch.setenv("HPX_VALIDATION_RUN_ORIGIN", "nightly")
+    nightly = build_manifest([], tmp_path, repo_root=tmp_path / "missing")
+    assert nightly["run"] == {
+        "origin": "nightly",
+        "github": {
+            "event_name": "schedule",
+            "repository": "AmbiqAI/helia-profiler",
+            "run_id": 31033041861,
+            "run_attempt": 2,
+            "run_url": "https://github.com/AmbiqAI/helia-profiler/actions/runs/31033041861",
+        },
+    }
+
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "workflow_dispatch")
+    monkeypatch.setenv("HPX_VALIDATION_RUN_ORIGIN", "manual")
+    manual = build_manifest([], tmp_path, repo_root=tmp_path / "missing")
+    assert manual["run"]["origin"] == "manual"
+    assert manual["run"]["github"]["event_name"] == "workflow_dispatch"
+
+
 def test_powered_case_publishes_dashboard_metrics_and_detailed_artifact(tmp_path: Path):
     case_dir = tmp_path / "apollo510-power"
     detail_dir = case_dir / "detailed"

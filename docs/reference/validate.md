@@ -9,7 +9,8 @@ hpx validate [--models IDS] [--engines LIST] [--boards LIST]
              [--models-file YAML | --model-paths PATH,...]
              [--comparison-group NAME] [--model-arena-size BYTES]
              [--toolchains LIST] [--interfaces LIST] [--memories LIST]
-             [--power off|on|both] [--suite NAME] [--repeat N]
+             [--power off|on|both] [--power-boards BOARD,...]
+             [--suite NAME] [--repeat N]
              [--jlink-serials BOARD=SERIAL,...] [--power-serials BOARD=SERIAL,...]
              [--power-gpios BOARD=GATE:STATE:GO,...] [--timeout SECONDS]
              [--output-dir DIR] [--junit-xml FILE] [-k EXPR] [--list]
@@ -41,6 +42,7 @@ See [Validating a Board Setup](../guides/validating-a-board-setup.md) and
 | `--interfaces`, `--transports` | Comma-separated transports: `rtt`, `uart`, `swo`, `usb_cdc` (default: board defaults). |
 | `--memories` | Comma-separated placement presets: `auto`, `tcm`, `sram`, `mram`, `psram` (default: board defaults). |
 | `--power` | Power matrix: `off` (default), `on` (only Joulescope runs), or `both`. |
+| `--power-boards` | Restrict powered cases to these boards; other selected boards run unpowered. By default, `--power` applies to every selected board. |
 | `--suite` | Preset suite: `smoke`, `models-rt`, `models-aot`, or `complete`. Explicit axis flags always win. |
 | `--jlink-serials` | `board=serial` entries for multi-board validation. |
 | `--power-serials` | `board=Joulescope-serial` entries for powered multi-board validation; required when multiple Joulescopes are visible. |
@@ -106,6 +108,7 @@ hpx validate --list                   # preview what would run
 hpx validate --models kws,ic          # subset by model
 hpx validate --suite smoke            # quick single-case sanity check
 hpx validate --suite complete         # full RT + AOT + TFLM/CMSIS-NN hardware sweep
+hpx validate --suite complete --power on --power-boards apollo510_evb
 hpx validate -k kws-aot               # pytest-style keyword filter
 hpx validate --boards apollo3p_evb --repeat 2
 ```

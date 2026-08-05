@@ -65,6 +65,11 @@ on:
           - "off"
           - "on"
           - "both"
+      power_boards:
+        description: "Comma-separated boards allowed to use power capture"
+        required: false
+        default: "apollo510_evb"
+        type: string
       jlink_serials:
         description: "Optional comma-separated board=serial entries"
         required: false
@@ -105,8 +110,10 @@ env:
   HPX_VALIDATION_TRANSPORTS: ${{ inputs.transports || '' }}
   HPX_VALIDATION_MEMORIES: ${{ inputs.memories || '' }}
   HPX_VALIDATION_POWER: ${{ inputs.power || 'on' }}
+  HPX_VALIDATION_POWER_BOARDS: ${{ inputs.power_boards || 'apollo510_evb' }}
   HPX_VALIDATION_JLINK_SERIALS: ${{ inputs.jlink_serials || 'apollo510_evb=1160003180,apollo330mP_evb=1160003409' }}
   HPX_VALIDATION_POWER_SERIALS: ${{ inputs.power_serials || 'apollo510_evb=H8MS' }}
+  HPX_VALIDATION_RUN_ORIGIN: ${{ github.event_name == 'schedule' && 'nightly' || 'manual' }}
   HPX_VALIDATION_REPEAT: ${{ inputs.repeat || '1' }}
   HPX_VALIDATION_TIMEOUT: ${{ inputs.timeout || '900' }}
 
@@ -237,6 +244,9 @@ jobs:
           if [[ -n "${HPX_VALIDATION_MEMORIES}" ]]; then
             args+=(--memories "${HPX_VALIDATION_MEMORIES}")
           fi
+          if [[ -n "${HPX_VALIDATION_POWER_BOARDS}" ]]; then
+            args+=(--power-boards "${HPX_VALIDATION_POWER_BOARDS}")
+          fi
           if [[ -n "${HPX_VALIDATION_JLINK_SERIALS}" ]]; then
             args+=(--jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}")
           fi
@@ -272,6 +282,9 @@ jobs:
           fi
           if [[ -n "${HPX_VALIDATION_MEMORIES}" ]]; then
             args+=(--memories "${HPX_VALIDATION_MEMORIES}")
+          fi
+          if [[ -n "${HPX_VALIDATION_POWER_BOARDS}" ]]; then
+            args+=(--power-boards "${HPX_VALIDATION_POWER_BOARDS}")
           fi
           if [[ -n "${HPX_VALIDATION_JLINK_SERIALS}" ]]; then
             args+=(--jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}")

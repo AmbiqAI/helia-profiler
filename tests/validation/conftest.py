@@ -69,6 +69,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Power matrix: both|on|off (default: off).",
     )
     grp.addoption(
+        "--mlperf-power-boards",
+        default="",
+        help="Comma-separated boards allowed to use power capture (default: all selected boards).",
+    )
+    grp.addoption(
         "--mlperf-boards",
         default="apollo510_evb",
         help="Comma-separated board IDs (default: apollo510_evb).",
@@ -197,6 +202,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
         model_registry=model_registry,
         engines=_split_csv(cfg.getoption("--mlperf-engines")),
         power=cfg.getoption("--mlperf-power"),
+        power_boards=_split_csv(cfg.getoption("--mlperf-power-boards")),
         boards=_split_csv(cfg.getoption("--mlperf-boards")),
         toolchains=_split_csv(cfg.getoption("--mlperf-toolchains")),
         transports=_split_csv(cfg.getoption("--mlperf-transports")),
@@ -267,6 +273,7 @@ def _validation_options(config: pytest.Config) -> dict[str, object]:
         "engines": config.getoption("--mlperf-engines"),
         "ns_cmsis_nn_ref": config.getoption("--mlperf-ns-cmsis-nn-ref"),
         "power": config.getoption("--mlperf-power"),
+        "power_boards": config.getoption("--mlperf-power-boards"),
         "boards": config.getoption("--mlperf-boards"),
         "repeat": config.getoption("--mlperf-repeat"),
         "toolchains": config.getoption("--mlperf-toolchains"),
