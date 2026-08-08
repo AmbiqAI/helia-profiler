@@ -8,11 +8,11 @@ Stage 5 combines its identity and canonical hash with the NSX registry hash,
 target, engine, overrides, and relevant build inputs to select an isolated
 dependency workspace.
 
-The current baseline is `hpx-stage4-customer-hardening-2026-07`:
+The current baseline is `hpx-neuralspotx-0.7.14-2026-08`:
 
 | Identity | Qualified reference |
 | --- | --- |
-| `neuralspotx` package | `0.7.12`, wheel SHA-256 `6e0366af…f41b`, tag peeled to `85406cc2…9417` |
+| `neuralspotx` package | `0.7.14`, wheel SHA-256 `11634550…5ede`, tag peeled to `25d8d944…e406` |
 | `nsx-ambiq-sdk` | `v5.2.24`, peeled commit `a9f4ec25…1132` |
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `2f02cc93…aea` |
@@ -22,10 +22,12 @@ The current baseline is `hpx-stage4-customer-hardening-2026-07`:
 | heliaAOT | `min_version=0.18.0`, `max_version_exclusive=0.19.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 
-The SDK advances to `v5.2.24`, matching neuralSPOT-X 0.7.12's registry, and the
-qualified baseline records its peeled commit rather than its annotated-tag
-object. The neuralSPOT-X tag is likewise verified and stored as its peeled
-commit; all other source refs remain unchanged by this focused promotion.
+neuralSPOT-X 0.7.14 promotes the helia-dsp, TileIO, Physiokit, and Sensors
+registry entries to published semantic tags. Those projects are not part of
+HPX's qualified profiling module graph, so their promotions do not add fields
+or refs to this baseline. The neuralSPOT-X tag is verified and stored as its
+peeled commit; all existing SDK, PMU, TFLM, CMSIS-NN, and engine refs remain
+unchanged by this focused promotion.
 
 Every baseline project and module ref is immutable by policy: only a full
 40-character Git object ID is accepted. Newly promoted annotated tags are

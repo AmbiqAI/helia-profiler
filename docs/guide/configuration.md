@@ -131,7 +131,7 @@ below cover behavior that a schema table can't express.
 
 ### Build-resolution notes
 
-- By default, generated profiler apps keep the board's normal NSX `channel`, but HPX pins the verified peeled commits for `neuralspotx-v0.7.12` (`85406cc2…9417`) and `nsx-ambiq-sdk` v5.2.24 (`a9f4ec25…1132`) in the qualified compatibility baseline.
+- By default, generated profiler apps keep the board's normal NSX `channel`, but HPX pins the verified peeled commits for `neuralspotx-v0.7.14` (`25d8d944…e406`) and `nsx-ambiq-sdk` v5.2.24 (`a9f4ec25…1132`) in the qualified compatibility baseline.
 - `build.nsx_modules.<module>.ref` or `.version` overrides win over that default for the owning project.
 - `build.nsx_modules.<module>.path` installs a local module checkout into the generated app and bypasses registry resolution for that module only.
 - Ordinary profiles reuse a compatible `nsx.lock` byte-for-byte and run
