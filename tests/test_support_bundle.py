@@ -91,7 +91,7 @@ def _prepared_workspace(
         )
     lock = NsxLock(
         generated_at="2026-08-03T00:00:00+00:00",
-        nsx_tool_version="0.7.12",
+        nsx_tool_version="0.7.14",
         manifest_hash=hash_manifest(ctx.firmware_dir / "nsx.yml"),
         target={"board": "apollo510_evb"},
         modules={
@@ -524,15 +524,15 @@ def test_collect_support_bundle_always_includes_checks_and_compatibility() -> No
     checks_payload = json.loads(collection.members["checks.json"])
     assert "checks" in checks_payload and "versions" in checks_payload
     compatibility_payload = json.loads(collection.members["compatibility.json"])
-    assert compatibility_payload["baseline_id"] == "hpx-stage4-customer-hardening-2026-07"
-    assert compatibility_payload["neuralspotx"]["version"] == "0.7.12"
+    assert compatibility_payload["baseline_id"] == "hpx-neuralspotx-0.7.14-2026-08"
+    assert compatibility_payload["neuralspotx"]["version"] == "0.7.14"
     assert (
         compatibility_payload["neuralspotx"]["sha256"]
-        == "6e0366afa1c21dc6ed5732c1e41d69025ae98e871064d7d8a84b922b0326f41b"
+        == "1163455033997bd11024ac691ae92cf2cc0d3216cf94ebe5e7997300627d5ede"
     )
     assert (
         compatibility_payload["projects"]["neuralspotx"]["ref"]
-        == "85406cc29f51d44e78c7ae6a83049766a6679417"
+        == "25d8d944aaf9301d343764e22968f9375a37e406"
     )
     assert (
         compatibility_payload["projects"]["nsx-ambiq-sdk"]["ref"]

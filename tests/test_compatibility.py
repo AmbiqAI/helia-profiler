@@ -35,12 +35,12 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert compatibility.qualification is QualificationState.QUALIFIED
     baseline = compatibility.baseline
     assert baseline.schema_version == BASELINE_SCHEMA_VERSION
-    assert baseline.neuralspotx_version == "0.7.12"
+    assert baseline.neuralspotx_version == "0.7.14"
     assert (
         baseline.neuralspotx_sha256
-        == "6e0366afa1c21dc6ed5732c1e41d69025ae98e871064d7d8a84b922b0326f41b"
+        == "1163455033997bd11024ac691ae92cf2cc0d3216cf94ebe5e7997300627d5ede"
     )
-    assert baseline.project("neuralspotx").ref == "85406cc29f51d44e78c7ae6a83049766a6679417"
+    assert baseline.project("neuralspotx").ref == "25d8d944aaf9301d343764e22968f9375a37e406"
     assert baseline.project("nsx-ambiq-sdk").ref == "a9f4ec25a162f6f3700623feb691423bb5a51132"
     assert baseline.project("nsx-pmu-armv8m").ref == "5725c065a0c3603132f1064ee2684d1fa8587c88"
     assert baseline.project("nsx-tflite-micro").ref == "2f02cc932a200c5d78383cc2dab3c28950842aea"
@@ -57,7 +57,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
     baseline = load_compatibility_baseline()
 
     assert {project.name: project.ref for project in baseline.projects} == {
-        "neuralspotx": "85406cc29f51d44e78c7ae6a83049766a6679417",
+        "neuralspotx": "25d8d944aaf9301d343764e22968f9375a37e406",
         "nsx-ambiq-sdk": "a9f4ec25a162f6f3700623feb691423bb5a51132",
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "2f02cc932a200c5d78383cc2dab3c28950842aea",
