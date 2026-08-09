@@ -127,7 +127,7 @@ the `results/` package, never bare `dict[str, Any]`. The main exception is
 
 ## Dependency Security Floors
 
-Dependabot alerts on `uv.lock`, and most alerts land on transitive packages
+Dependabot alerts on `uv.lock`, and alerts often land on transitive packages
 HPX never names directly. Hold the fix in `[tool.uv] constraint-dependencies`
 in `pyproject.toml` — one entry per advisory, set to the first patched release,
 commented with the advisory and the path that reaches it — then re-run
@@ -136,8 +136,10 @@ downstream consumers' resolves, so a real runtime floor still belongs in
 `[project] dependencies`.
 
 `tests/test_security_advisories.py` asserts `uv.lock` honours every declared
-floor and fails on floors that no longer apply, so stale entries get dropped
-rather than accumulating.
+floor — across every per-marker resolution fork, not just the first entry for a
+name — and fails on floors that no longer apply, so stale entries get dropped
+rather than accumulating. Dropping a floor is a two-place edit: remove the
+constraint and its assertion in `test_security_floors_are_declared`.
 
 `uv lock` strips the `# x-release-please-version` marker from the
 `helia-profiler` entry in `uv.lock`. Restore it before committing — the
