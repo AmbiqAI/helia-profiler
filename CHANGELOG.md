@@ -6,6 +6,13 @@ This project follows [Semantic Versioning](https://semver.org/) and uses
 [Release Please](https://github.com/googleapis/release-please) to prepare
 release pull requests from Conventional Commits.
 
+## [0.1.3](https://github.com/AmbiqAI/helia-profiler/compare/v0.1.2...v0.1.3) (2026-08-09)
+
+
+### Bug Fixes
+
+* **compatibility:** promote neuralSPOT-X 0.7.14 ([#90](https://github.com/AmbiqAI/helia-profiler/issues/90)) ([65072dd](https://github.com/AmbiqAI/helia-profiler/commit/65072dd54f13cab0b6c2f8afb0162ec5a42d34fc))
+
 ## [0.1.2](https://github.com/AmbiqAI/helia-profiler/compare/v0.1.1...v0.1.2) (2026-08-05)
 
 ### Release Highlights
