@@ -106,6 +106,10 @@ target_link_libraries(hpx_profiler_power PRIVATE
 {% if power_sync_enabled %}
     nsx::gpio
 {% endif %}
+{% if power_monitor | default(none) == "ina228" %}
+    nsx::i2c
+    nsx::sensors
+{% endif %}
 {% if has_armv8m_pmu %}
     nsx::pmu_armv8m
 {% endif %}
@@ -193,6 +197,10 @@ target_link_libraries(hpx_profiler_power PRIVATE
     nsx::cmsis_core
 {% if power_sync_enabled %}
     nsx::gpio
+{% endif %}
+{% if power_monitor | default(none) == "ina228" %}
+    nsx::i2c
+    nsx::sensors
 {% endif %}
 {% if has_armv8m_pmu %}
     nsx::pmu_armv8m

@@ -779,6 +779,77 @@ class TestGenerateApp:
         assert "nsx-interrupt" in nsx_yml
         assert "nsx::gpio" in cmake
 
+    def test_ina228_monitor_pulls_sensor_modules_and_renders_block(
+        self, tmp_path: Path, fake_dist: Path
+    ):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb"},
+                "power": {
+                    "enabled": True,
+                    "driver": "ina228",
+                    "mode": "internal",
+                    "ina228": {"shunt_ohms": 2.0},
+                },
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        cmake = (app_dir / "CMakeLists.txt").read_text()
+        main_cc = (app_dir / "src" / "main.cc").read_text()
+        main_power_cc = (app_dir / "src" / "main_power.cc").read_text()
+        # Module graph: the dedicated power binary reads the monitor over I2C.
+        assert "nsx-i2c" in nsx_yml
+        assert "nsx-sensors" in nsx_yml
+        assert "nsx::sensors" in cmake
+        # Monitor code lives only in the power binary, never the profile one.
+        assert "hpx_ina228_setup" in main_power_cc
+        assert "HPX_POWER_MEASUREMENT_SOURCE=ina228" in main_power_cc
+        assert "ina228" not in main_cc
+        # Internal mode: no GPIO sync handshake is armed.
+        assert "kPowerSyncEnabled = false" in main_power_cc
+
+    def test_joulescope_power_run_does_not_pull_sensor_modules(
+        self, tmp_path: Path, fake_dist: Path
+    ):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb"},
+                "power": {"enabled": True},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        cmake = (app_dir / "CMakeLists.txt").read_text()
+        main_power_cc = (app_dir / "src" / "main_power.cc").read_text()
+        assert "nsx-sensors" not in nsx_yml
+        assert "nsx::sensors" not in cmake
+        assert "ina228" not in main_power_cc
+
     def test_power_binary_generated_when_power_enabled(self, tmp_path: Path, fake_dist: Path):
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)

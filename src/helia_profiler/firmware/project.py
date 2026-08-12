@@ -413,6 +413,7 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
             profiling_backends=list(ctx.render_context.pmu.profiling_backends),
             has_armv8m_pmu=ctx.render_context.pmu.has_armv8m_pmu,
             power_sync_enabled=ctx.render_context.sync.power_sync_enabled,
+            power_monitor=ctx.render_context.power_monitor.power_monitor,
             arena_regions=ctx.arena_regions,
             power_binary_enabled=ctx.power_binary_enabled,
         ),

@@ -149,6 +149,29 @@ Power measurement settings.
 | `stats_rate_hz` | int | `1000` | units: hertz |
 | `reset_strategy` | auto \| power_cycle \| none \| debug_reset \| swpoi_reset \| debug_reset+swpoi_reset | `auto` |  |
 | `serial` | str \| null | `null` |  |
+| `ina228` | Ina228Config \| null | `null` |  |
+
+## `power.ina228`
+
+On-target INA228 power monitor wiring and calibration (I2C).
+
+The INA228 sits in series with the target rail and integrates energy and
+charge in hardware; firmware reads the accumulators over I2C around the
+fixed-N inference window. ``shunt_ohms`` has no default on purpose: a
+wrong shunt calibration produces plausible-looking but wrong energy, and
+the resistor value is a physical property of the user's wiring that HPX
+cannot guess.
+
+| Key | Type | Default | Notes |
+|---|---|---|---|
+| `shunt_ohms` | float | `—` |  |
+| `max_current_a` | float | `0.5` |  |
+| `i2c_iom` | int | `1` |  |
+| `i2c_address` | int | `64` |  |
+| `i2c_speed_hz` | int | `400000` | units: hertz |
+| `conversion_time_us` | int | `540` |  |
+| `averaging_count` | int | `16` |  |
+| `calibration_id` | str \| null | `null` |  |
 
 ## `output`
 

@@ -52,6 +52,58 @@ class SyncContext:
 
 
 @dataclass(frozen=True)
+class PowerMonitorContext:
+    """On-target power monitor (INA228) render inputs.
+
+    ``power_monitor`` is ``None`` for every run that doesn't select the
+    ina228 driver, and all template content is gated on it — non-monitor
+    renders stay byte-identical (WP2). Physical quantities are carried as
+    scaled integers so the rendered C literals are exact and the render
+    digest is stable across float formatting.
+    """
+
+    power_monitor: str | None
+    ina228_i2c_iom: int = 0
+    ina228_i2c_address: int = 0
+    ina228_i2c_speed_hz: int = 0
+    ina228_shunt_micro_ohms: int = 0
+    ina228_max_current_ma: int = 0
+    ina228_conversion_time_us: int = 0
+    ina228_averaging_count: int = 0
+    ina228_adc_range: int = 0
+    ina228_calibration_id: str = ""
+
+    @classmethod
+    def from_config(cls, config: "ProfileConfig") -> "PowerMonitorContext":
+        power = config.power
+        if not (power.enabled and power.driver == "ina228"):
+            return cls(power_monitor=None)
+        ina = power.ina228
+        assert ina is not None  # enforced by PowerConfig._validate
+        shunt_micro_ohms = round(ina.shunt_ohms * 1_000_000)
+        max_current_ma = round(ina.max_current_a * 1_000)
+        # ADCRANGE=1 quarters the shunt full scale (±163.84 mV -> ±40.96 mV)
+        # for 4x resolution; select it whenever the configured worst-case
+        # shunt drop fits, otherwise stay on the wide range.
+        adc_range = 1 if ina.max_current_a * ina.shunt_ohms <= 0.04096 else 0
+        calibration_id = ina.calibration_id or (
+            f"ina228:r{shunt_micro_ohms}uohm:i{max_current_ma}ma:adc{adc_range}"
+        )
+        return cls(
+            power_monitor="ina228",
+            ina228_i2c_iom=ina.i2c_iom,
+            ina228_i2c_address=ina.i2c_address,
+            ina228_i2c_speed_hz=ina.i2c_speed_hz,
+            ina228_shunt_micro_ohms=shunt_micro_ohms,
+            ina228_max_current_ma=max_current_ma,
+            ina228_conversion_time_us=ina.conversion_time_us,
+            ina228_averaging_count=ina.averaging_count,
+            ina228_adc_range=adc_range,
+            ina228_calibration_id=calibration_id,
+        )
+
+
+@dataclass(frozen=True)
 class TransportContext:
     transport: Transport
     usb_serial_marker: str | None
@@ -129,6 +181,7 @@ class FirmwareRenderContext:
     memory: MemoryContext
     pmu: PmuContext
     power_window: PowerWindowContext
+    power_monitor: PowerMonitorContext
     engine: EngineContext
 
     @classmethod
@@ -237,6 +290,7 @@ class FirmwareRenderContext:
                 has_radio_subsystem=soc.has_radio_subsystem,
                 ble_reset_gpio_pin=ctx.board.ble_reset_gpio_pin,
             ),
+            power_monitor=PowerMonitorContext.from_config(config),
             engine=EngineContext(
                 engine_type=engine_type,
                 engine_header=artifacts.engine_header,
@@ -300,6 +354,16 @@ class FirmwareRenderContext:
             "crypto_otp_shutdown": self.power_window.crypto_otp_shutdown,
             "has_radio_subsystem": self.power_window.has_radio_subsystem,
             "ble_reset_gpio_pin": self.power_window.ble_reset_gpio_pin,
+            "power_monitor": self.power_monitor.power_monitor,
+            "ina228_i2c_iom": self.power_monitor.ina228_i2c_iom,
+            "ina228_i2c_address": self.power_monitor.ina228_i2c_address,
+            "ina228_i2c_speed_hz": self.power_monitor.ina228_i2c_speed_hz,
+            "ina228_shunt_micro_ohms": self.power_monitor.ina228_shunt_micro_ohms,
+            "ina228_max_current_ma": self.power_monitor.ina228_max_current_ma,
+            "ina228_conversion_time_us": self.power_monitor.ina228_conversion_time_us,
+            "ina228_averaging_count": self.power_monitor.ina228_averaging_count,
+            "ina228_adc_range": self.power_monitor.ina228_adc_range,
+            "ina228_calibration_id": self.power_monitor.ina228_calibration_id,
             "engine_header": self.engine.engine_header,
             "resolver_mode": self.engine.resolver_mode,
             "resolver_max_ops": self.engine.resolver_max_ops,

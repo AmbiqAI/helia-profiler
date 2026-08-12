@@ -59,12 +59,14 @@ def _register_builtins() -> None:
     if _DRIVERS:
         return
 
+    from .ina228_driver import Ina228Driver
     from .joulescope.driver import JoulescopeDriver
     from .ondevice_driver import OnDeviceDriver
 
     # Single unified Joulescope driver — handles JS110, JS220, and JS320.
     register_driver("joulescope", JoulescopeDriver)
     register_driver("ondevice", OnDeviceDriver)
+    register_driver("ina228", Ina228Driver)
 
 
 def register_driver(name: str, driver_cls: type[PowerDriver]) -> None:

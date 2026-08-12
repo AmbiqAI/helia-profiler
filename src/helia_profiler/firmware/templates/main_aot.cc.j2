@@ -102,6 +102,12 @@
 // ---------------------------------------------------------------------------
 {% include "_gpio_sync.j2" %}
 
+{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
+#include "nsx_i2c.h"
+#include "nsx_ina228.h"
+{% include "_ina228_power.j2" %}
+{% endif %}
+
 // ---------------------------------------------------------------------------
 // PMU profiler — per-operator recording via AOT callback
 // ---------------------------------------------------------------------------
@@ -366,6 +372,17 @@ int main(void) {
     // path is while(1) -- firmware hangs forever at clean_window_begin.
     dwt_init();
     hpx_sync_init();
+{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
+    // Bring up the on-target INA228 before any heavy setup: a missing or
+    // mis-wired monitor is a terminal condition for an internal-mode power
+    // run, so fail fast with the setup sub-step as the error code.
+    {
+        uint32_t ina228_rc = hpx_ina228_setup();
+        if (ina228_rc != 0U) {
+            hpx_power_terminal_fail("ina228_init", ina228_rc);
+        }
+    }
+{% endif %}
 {% if apollo3_burst %}
     // --- Apollo3/3P TurboSPOT (96 MHz burst) ------------------------------
     // NSX exposes no perf-mode selector on Apollo3, so request burst directly
@@ -824,6 +841,17 @@ int main(void) {
         // calling it) -- AutoDeploy's power binary has no callback at all.
         // Drop to nullptr for the measured window; restored right after.
         {{ aot_prefix }}_model_ctx.callback = nullptr;
+{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
+        // Zero the INA228 energy/charge accumulators immediately before the
+        // window opens — one I2C register write, strictly outside the
+        // measured region.
+        {
+            uint32_t ina228_rc = hpx_ina228_window_begin();
+            if (ina228_rc != 0U) {
+                hpx_power_terminal_fail("ina228_arm", ina228_rc);
+            }
+        }
+{% endif %}
         hpx_sync_window_begin();
 {% if clean_window_probe | default("infer") == "busy_loop" %}
         hpx_printf("HPX_CLEAN_WINDOW_PROBE=busy_loop\n");
@@ -872,6 +900,18 @@ int main(void) {
         }
 {% endif %}
         hpx_sync_window_end();
+{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
+        // Read the integrated energy/charge (plus bus voltage and the
+        // accumulator-overflow flags) now that the window is closed. The
+        // window itself completed, but an internal-mode run without a
+        // measurement is useless — treat a failed read-back as terminal.
+        {
+            uint32_t ina228_rc = hpx_ina228_window_end();
+            if (ina228_rc != 0U) {
+                hpx_power_terminal_fail("ina228_read", ina228_rc);
+            }
+        }
+{% endif %}
 {% if use_stimer_window %}
         uint64_t clean_stimer_total_us =
             hpx_stimer_ticks_to_us((uint64_t)(uint32_t)(hpx_stimer_ticks() - clean_stimer_t0));
