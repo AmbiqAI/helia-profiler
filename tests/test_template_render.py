@@ -816,6 +816,20 @@ class TestIna228PowerRender:
         assert "ina228" not in out
 
     @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    def test_broad_peripheral_shutdown_spares_the_monitor_iom(self, render):
+        """On families with broad peripheral shutdown (AP4) the IOM disable
+        runs *after* hpx_ina228_setup(), so powering down the monitor's IOM
+        would break the accumulator reset/read bracketing the window."""
+        out = render(power_only=True, broad_peripheral_shutdown=True, **_INA228_VARS)
+        disabled = [i for i in range(8) if f"PERIPH_IOM{i});" in out]
+        assert disabled == [0, 2, 3, 4, 5, 6, 7]
+
+    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    def test_broad_peripheral_shutdown_unchanged_without_a_monitor(self, render):
+        out = render(power_only=True, broad_peripheral_shutdown=True)
+        assert [i for i in range(8) if f"PERIPH_IOM{i});" in out] == list(range(8))
+
+    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
     @pytest.mark.parametrize("power_only", [False, True])
     def test_renders_without_monitor_stay_clean(self, render, power_only: bool):
         """No power_monitor var at all (StrictUndefined would raise on a bad
