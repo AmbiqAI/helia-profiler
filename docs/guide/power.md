@@ -409,18 +409,44 @@ power:
   driver: ina228
   mode: internal          # the target measures itself
   ina228:
-    shunt_ohms: 2.0       # REQUIRED — the physical shunt on your wiring
-    max_current_a: 0.5    # full-scale current for calibration
+    shunt_ohms: 0.1       # REQUIRED — YOUR sense resistor (see below)
+    max_current_a: 0.4    # full-scale current for calibration
     i2c_iom: 1            # Ambiq IOM instance wired to the monitor
-    # i2c_address: 0x40   # A0/A1 strapping
+    i2c_address: 0x4A     # MikroE Power Monitor Click as shipped
     # conversion_time_us: 540   # 50|84|150|280|540|1052|2074|4120
     # averaging_count: 16       # 1|4|16|64|128|256|512|1024
 ```
 
 `shunt_ohms` has **no default on purpose**: a wrong shunt calibration
-produces plausible-looking but wrong energy, and the resistor value is a
-physical property of your wiring that HPX cannot guess. Check your Click
-module's schematic.
+produces plausible-looking but wrong energy, and the sense resistor is a
+physical property of your wiring that HPX cannot guess.
+
+!!! warning "The MikroE Power Monitor Click has no onboard shunt"
+    Per its [schematic](https://download.mikroe.com/documents/add-on-boards/click/power_monitor_click/Power_Monitor_click_v100_Schematic.PDF),
+    the board's only resistors are `R1` 470 Ω (power LED), `R2`/`R3` 4.7 kΩ
+    (I2C pull-ups) and `R4` 10 kΩ (ALERT pull-up). `IN+`/`IN-` go straight
+    to a screw terminal — **you supply the sense resistor** and wire it
+    across those terminals. `shunt_ohms` is therefore the value of *your*
+    resistor, not a board property. (MikroE's own example uses
+    `shunt = 0.28`, but that is an arbitrary placeholder for whatever the
+    user wired up, not a measurement of the board.)
+
+    The board also ships with both `ADDR SEL` jumpers in the **Down = SDA**
+    position, which is I2C address **`0x4A`** — not the INA228's `0x40`
+    power-on default that `i2c_address` otherwise assumes.
+
+**Choosing a shunt.** Two competing pressures: a larger resistor gives more
+signal (better resolution), a smaller one steals less of the target's supply
+(lower burden voltage). For Apollo-class inference currents of roughly
+10–100 mA, `0.1 Ω` is a reasonable starting point — 10 mV of burden at
+100 mA (~0.3 % of a 3.3 V rail), while staying inside the INA228's
+high-resolution ±40.96 mV range up to ~400 mA.
+
+HPX picks the ADC range for you from `shunt_ohms × max_current_a`: if the
+worst-case shunt drop fits in ±40.96 mV it selects the 4×-resolution range,
+otherwise the wide ±163.84 mV range. Setting `max_current_a` far above what
+your board actually draws silently costs you resolution, so size it to the
+real peak rather than to the shunt's rating.
 
 What you get in `summary.json` is an `on_device_summary` block — integrated
 energy (nJ), charge (nC), bus voltage, and the inference count — with
@@ -459,7 +485,8 @@ part fails fast with a typed terminal phase:
 
 - `ina228_init` — I2C bring-up, ID check (manufacturer `0x5449`, device
   `0x228`), or configuration failed. Check wiring, `i2c_iom`, and address
-  strapping.
+  strapping — on a MikroE Power Monitor Click the as-shipped address is
+  `0x4A`, so leaving `i2c_address` at the `0x40` default fails here.
 - `ina228_arm` — the accumulator reset write failed right before the window.
 - `ina228_read` — the post-window read-back failed; the window ran but the
   measurement was lost, so the run is treated as failed rather than
