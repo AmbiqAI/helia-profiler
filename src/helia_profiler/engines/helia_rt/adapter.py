@@ -34,6 +34,29 @@ from .nsx_module import _install_nsx_module, _install_nsx_module_source
 
 log = logging.getLogger("hpx")
 
+# Ethos-U NPU support: the nsx-npu registry module vendors the Ethos-U core
+# driver and the nsx_npu_init() bring-up helper; the CMake flag compiles
+# heliaRT's ethos-u custom-op kernel against that real driver instead of its
+# host stub. Mirrors the hardware-validated NSX npu-tflm app wiring.
+NSX_NPU_MODULE = "nsx-npu"
+NSX_NPU_PROJECT = "nsx-ambiq-sdk"
+_ETHOSU_CMAKE_FLAG = "NSX_HELIA_RT_ENABLE_ETHOSU"
+
+
+def _add_ethos_u_artifacts(
+    extra_modules: list[NsxModuleRef], cmake_vars: dict[str, str]
+) -> None:
+    """Append the NPU module + kernel flag for the ``ethos_u`` backend."""
+    extra_modules.append(
+        NsxModuleRef(
+            name=NSX_NPU_MODULE,
+            path=Path(),
+            local=False,
+            project=NSX_NPU_PROJECT,
+        )
+    )
+    cmake_vars[_ETHOSU_CMAKE_FLAG] = "ON"
+
 
 class HeliaRTAdapter:
     """Adapter for heliaRT — Ambiq's optimized TFLM fork.
@@ -73,6 +96,10 @@ class HeliaRTAdapter:
         backend = config.engine.backend or "helia"
         variant = config.engine.config.get("variant", "release-with-logs")
         core_override = config.engine.config.get("core_override")
+
+        # heliaRT treats unknown backend strings as a passthrough for its own
+        # runtime selection — only "ethos_u" changes hpx behavior here.
+        ethos_u = backend == "ethos_u"
 
         # Validate variant
         valid_variants = ("debug", "release-with-logs", "release")
@@ -145,6 +172,8 @@ class HeliaRTAdapter:
                 extra_modules.append(cmsis_nn_module_ref(config, work_dir))
             if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
                 cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
+            if ethos_u:
+                _add_ethos_u_artifacts(extra_modules, cmake_vars)
             return EngineArtifacts(
                 engine_type=EngineType.HELIA_RT,
                 extra_modules=extra_modules,
@@ -204,6 +233,17 @@ class HeliaRTAdapter:
         else:
             # --- Prebuilt distribution (explicit dist_path or custom
             #     GitHub release) ---
+            if ethos_u:
+                raise EngineError(
+                    "backend 'ethos_u' requires a heliaRT source build — "
+                    "prebuilt heliaRT distributions do not ship the Ethos-U "
+                    "custom-op kernel.",
+                    hint=(
+                        "Remove engine.config.dist_path/source (registry "
+                        "default builds from source), or set "
+                        "engine.config.source_path to a heliaRT checkout."
+                    ),
+                )
             dist_path, resolved_version = _resolve_distribution(config)
             _check_version_compatibility(dist_path, resolved_version)
             version = resolved_version or HELIART_VERSION
@@ -243,6 +283,8 @@ class HeliaRTAdapter:
                 project=HELIART_PROJECT,
             ),
         )
+        if ethos_u:
+            _add_ethos_u_artifacts(extra_modules, cmake_vars)
 
         return EngineArtifacts(
             engine_type=EngineType.HELIA_RT,

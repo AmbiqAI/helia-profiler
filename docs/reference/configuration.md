@@ -35,7 +35,7 @@ Inference engine selection and passthrough config.
 | Key | Type | Default | Notes |
 |---|---|---|---|
 | `type` | tflm \| helia-rt \| helia-aot | `helia-rt` | `tflm` is the vanilla TFLM baseline engine; use `engine.backend` to select `reference` or `cmsis_nn`. |
-| `backend` | str \| null | `null` | TFLM: `reference` or `cmsis_nn`. |
+| `backend` | str \| null | `null` | TFLM: `reference` or `cmsis_nn`. helia-rt: free-form passthrough; `ethos_u` enables the Ethos-U NPU (Vela-compiled model required, NPU-equipped board only). helia-aot: `ethos_u` compiles the model's Vela ethos-u ops into NPU kernels (same requirements). |
 | `config` | dict[str, Any] | `{}` | free-form engine-specific mapping (not strictly validated). |
 | `config_path` | Path \| null | `null` |  |
 
@@ -105,11 +105,16 @@ timeout, and (b) show the user live progress.
 PMU capture settings.
 
 Counter selection is specified via *pmu_counters* — a mapping of
-compute-unit group (``cpu``, ``mve``, ``memory``) to a selection:
+compute-unit group (``cpu``, ``mve``, ``memory``, ``ethos_npu``) to a
+selection:
 
 * ``"default"`` — curated set of the most useful counters.
 * ``"all"``     — every counter in the group (multi-pass).
 * ``["NAME", …]`` — explicit counter names.
+
+The ``ethos_npu`` group samples the Ethos-U NPU's own PMU (NPU cycles,
+MAC activity, SRAM/external bus beats) and requires an NPU-equipped board
+plus ``engine.backend: ethos_u`` (engine.type helia-rt or helia-aot).
 
 | Key | Type | Default | Notes |
 |---|---|---|---|

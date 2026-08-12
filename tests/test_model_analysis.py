@@ -142,3 +142,46 @@ def test_quickstart_kws_model_reports_real_builtin_ops():
     assert "CONV_2D" in ops
     assert "SOFTMAX" in ops
     assert ops != {"ADD"}
+
+
+class TestEthosUDetection:
+    """ModelAnalysis Vela/ethos-u helpers (pure dataclass logic)."""
+
+    def test_counts_ethos_u_ops(self):
+        from helia_profiler.evaluation import ETHOS_U_OP_NAME, LayerOps, ModelAnalysis
+
+        analysis = ModelAnalysis(
+            layers=[
+                LayerOps(id=0, op=ETHOS_U_OP_NAME),
+                LayerOps(id=1, op="SOFTMAX"),
+                LayerOps(id=2, op=ETHOS_U_OP_NAME),
+            ],
+            total_macs=0,
+            total_ops=0,
+            num_parameters=0,
+        )
+        assert analysis.has_ethos_u_op is True
+        assert analysis.ethos_u_op_count == 2
+
+    def test_plain_model_has_no_ethos_u(self):
+        from helia_profiler.evaluation import LayerOps, ModelAnalysis
+
+        analysis = ModelAnalysis(
+            layers=[LayerOps(id=0, op="CONV_2D")],
+            total_macs=0,
+            total_ops=0,
+            num_parameters=0,
+        )
+        assert analysis.has_ethos_u_op is False
+        assert analysis.ethos_u_op_count == 0
+
+    def test_other_custom_ops_do_not_count(self):
+        from helia_profiler.evaluation import LayerOps, ModelAnalysis
+
+        analysis = ModelAnalysis(
+            layers=[LayerOps(id=0, op="CUSTOM(my-op)")],
+            total_macs=0,
+            total_ops=0,
+            num_parameters=0,
+        )
+        assert analysis.has_ethos_u_op is False

@@ -1,0 +1,129 @@
+{# _npu_pmu.j2 — Ethos-U NPU PMU capture for the ethos_npu counter group.
+
+   Overrides the Ethos-U core driver's weak ethosu_inference_begin/end hooks
+   to sample the NPU's own PMU around every command-stream dispatch and
+   accumulate the counters against the engine layer (the ethos-u op) that
+   issued it. Engine-agnostic: the including template must define, before
+   this include —
+     HPX_NPU_MAX_LAYERS            capacity of the per-layer table
+     hpx_npu_current_layer(void)   ordinal of the op currently executing
+     hpx_npu_num_layers(void)      rows recorded this iteration
+     hpx_npu_print_row_head(int)   prints "<idx>,<tag>" for one CSV row
+   main.cc.j2 maps these onto HpxPmuProfiler; main_aot.cc.j2 onto the AOT
+   operator-callback bookkeeping. Included only when has_ethos_u is set.
+
+   VELA FUSION NOTE: Vela compiles the whole supported subgraph into one
+   command stream executed as a single ethos-u custom op, so a fully
+   offloaded model produces exactly one instrumented layer; partially
+   offloaded graphs produce one per ethos-u op. Counters here are the NPU's
+   view (NPU cycles, MAC activity, bus beats) — per-layer visibility inside
+   a fused command stream does not exist at runtime.
+#}
+#include "pmu_ethosu.h"
+
+// One pass programs at most this many NPU event counters (U55/U65 HW limit
+// is 4; U85 has 8 but the host plans 4 per pass to stay uniform).
+static constexpr int kNpuMaxEvents = 4;
+
+static enum ethosu_pmu_event_type g_npu_events[kNpuMaxEvents] = {};
+static const char *g_npu_event_names[kNpuMaxEvents] = {};
+static int g_npu_num_events = 0;
+static volatile bool g_npu_enabled = false;
+
+// Per-layer accumulation for the current profiled iteration. Indexed by the
+// engine's layer ordinal; multiple dispatches from one layer accumulate.
+// SRAM-resident: HPX_NPU_MAX_LAYERS * kNpuMaxEvents * 4 B is far too large
+// for TCM.
+NSX_MEM_SRAM static uint32_t g_npu_acc[HPX_NPU_MAX_LAYERS][kNpuMaxEvents];
+NSX_MEM_SRAM static uint8_t g_npu_hit[HPX_NPU_MAX_LAYERS];
+
+static void hpx_npu_configure(const enum ethosu_pmu_event_type events[],
+                              const char *const names[], int num_events) {
+    g_npu_num_events = (num_events > kNpuMaxEvents) ? kNpuMaxEvents : num_events;
+    for (int i = 0; i < g_npu_num_events; i++) {
+        g_npu_events[i] = events[i];
+        g_npu_event_names[i] = names[i];
+    }
+}
+
+static void hpx_npu_set_enabled(bool enabled) { g_npu_enabled = enabled; }
+
+static void hpx_npu_clear(void) {
+    memset(g_npu_acc, 0, sizeof(g_npu_acc));
+    memset((void *)g_npu_hit, 0, sizeof(g_npu_hit));
+}
+
+// The driver invokes these weak-symbol overrides around every command-stream
+// dispatch (ethosu_driver.c). They run inside the engine's per-op execution
+// window — i.e. while hpx_npu_current_layer() names the dispatching layer —
+// single-core bare-metal, so no locking is needed.
+
+// Disable the vendored driver's built-in PMU auto-configuration
+// (ENABLE_U85_PMU): it reprograms all EVTYPERs right before starting the
+// command stream, which would clobber the events programmed below.
+extern "C" bool ethosu_pmu_auto_config_enabled(void) {
+    return false;
+}
+
+extern "C" void ethosu_inference_begin(struct ethosu_driver *drv, void *user_arg) {
+    (void)user_arg;
+    if (!g_npu_enabled || g_npu_num_events == 0) {
+        return;
+    }
+    // (Re)program every dispatch: the driver may power-cycle the NPU between
+    // inferences, clearing PMU state. Event types are the driver's symbolic
+    // enum — never raw HW values (they differ per NPU generation).
+    ETHOSU_PMU_Enable(drv);
+    uint32_t mask = ETHOSU_PMU_CCNT_Msk;
+    for (int i = 0; i < g_npu_num_events; i++) {
+        ETHOSU_PMU_Set_EVTYPER(drv, (uint32_t)i, g_npu_events[i]);
+        mask |= (1UL << i);
+    }
+    ETHOSU_PMU_CYCCNT_Reset(drv);
+    ETHOSU_PMU_EVCNTR_ALL_Reset(drv);
+    ETHOSU_PMU_CNTR_Enable(drv, mask);
+}
+
+extern "C" void ethosu_inference_end(struct ethosu_driver *drv, void *user_arg) {
+    (void)user_arg;
+    if (!g_npu_enabled || g_npu_num_events == 0) {
+        return;
+    }
+    // Freeze first so every counter describes the same window.
+    uint32_t mask = ETHOSU_PMU_CCNT_Msk;
+    for (int i = 0; i < g_npu_num_events; i++) {
+        mask |= (1UL << i);
+    }
+    ETHOSU_PMU_CNTR_Disable(drv, mask);
+
+    const int layer = hpx_npu_current_layer();
+    if (layer < 0 || layer >= HPX_NPU_MAX_LAYERS) {
+        return;
+    }
+    for (int i = 0; i < g_npu_num_events; i++) {
+        g_npu_acc[layer][i] += ETHOSU_PMU_Get_EVCNTR(drv, (uint32_t)i);
+    }
+    g_npu_hit[layer] = 1U;
+}
+
+// CSV emission mirroring the engine's per-layer CSV: one row per layer so
+// the host merges this preset with ARM-PMU presets by layer index. Rows
+// for CPU-resident layers are all zeros (the NPU never ran for them).
+static void hpx_npu_print_csv(void) {
+    const int num_layers = hpx_npu_num_layers();
+    if (num_layers == 0 || g_npu_num_events == 0) {
+        return;
+    }
+    hpx_printf("\"Layer\",\"Op\"");
+    for (int e = 0; e < g_npu_num_events; e++) {
+        hpx_printf(",\"%s\"", g_npu_event_names[e] ? g_npu_event_names[e] : "?");
+    }
+    hpx_printf(",\"overflow\"\n");
+    for (int i = 0; i < num_layers; i++) {
+        hpx_npu_print_row_head(i);
+        for (int e = 0; e < g_npu_num_events; e++) {
+            hpx_printf(",%lu", (unsigned long)g_npu_acc[i][e]);
+        }
+        hpx_printf(",0\n");
+    }
+}

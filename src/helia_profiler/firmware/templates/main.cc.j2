@@ -34,6 +34,11 @@
 #include "tensorflow/compiler/mlir/lite/schema/schema_utils.h"
 
 #include "hpx_pmu_profiler.h"
+{% if has_ethos_u | default(false) %}
+// Ethos-U NPU bring-up (nsx-npu module): powers/initializes the microNPU
+// before the interpreter dispatches Vela's ethos-u custom op to it.
+#include "nsx_npu.h"
+{% endif %}
 {% include "_system_includes.j2" %}
 {% if apollo3_burst %}
 // Apollo3/3P TurboSPOT (burst) control lives in the AmbiqSuite HAL umbrella.
@@ -196,6 +201,18 @@ static uint8_t *g_arena = g_arena_storage;
 static HpxPmuProfiler g_profiler;
 {% else %}
 NSX_MEM_SRAM static HpxPmuProfiler g_profiler;
+{% endif %}
+
+{% if has_ethos_u | default(false) %}
+// Engine seams for the engine-agnostic _npu_pmu.j2 (see its header).
+#define HPX_NPU_MAX_LAYERS HpxPmuProfiler::kMaxLayers
+static inline int hpx_npu_current_layer(void) { return g_profiler.current_layer(); }
+static inline int hpx_npu_num_layers(void) { return g_profiler.num_events(); }
+static inline void hpx_npu_print_row_head(int i) {
+    const char *tag = g_profiler.layer_tag(i);
+    hpx_printf("%d,%s", i, tag ? tag : "?");
+}
+{% include "_npu_pmu.j2" %}
 {% endif %}
 
 // Register builtin ops using the selected resolver strategy.
@@ -444,6 +461,31 @@ int main(void) {
 
     hpx_printf("HPX_HEARTBEAT phase=init t=0\n");{% endif %}
 
+{% if has_ethos_u | default(false) %}
+    // --- Ethos-U NPU init (before any interpreter work) -------------------
+    // skip_perf_mode=false is hardware-validated on the atomiq110 NPU
+    // bitstream: HP mode programs fine even though the FPGA core clock is
+    // fixed. nsx_npu_init() treats the always-on FPGA power-domain timeout
+    // as non-fatal; a hard failure here almost always means the loaded
+    // bitstream's generation does not match the SDK payload the firmware
+    // was built against (no working Ethos-U at the expected base address).
+    {
+        nsx_npu_config_t npu_cfg = {
+            .perf_mode      = NSX_NPU_PERF_HIGH_PERFORMANCE,
+            .skip_perf_mode = false,
+        };
+        uint32_t npu_rc = nsx_npu_init(&npu_cfg);
+        if (npu_rc != 0U) {
+            hpx_printf("HPX_ERROR=npu_init_failed rc=%lu "
+                       "hint=bitstream_sdk_generation_mismatch\n",
+                       (unsigned long)npu_rc);
+{% if power_only | default(false) %}            hpx_power_terminal_fail("npu", 2U);
+{% else %}            hpx_park();
+{% endif %}
+        }
+        hpx_printf("HPX_NPU=ethos-u85 init=ok\n");
+    }
+{% endif %}
     tflite::InitializeTarget();
 
     const tflite::Model *model = tflite::GetModel(model_data);
@@ -456,7 +498,11 @@ int main(void) {
     }
 
 {% if not power_only | default(false) %}    // Use the first pass to allocate (all passes use the same model/arena)
-{% if pmu_passes[0].custom %}
+{% if pmu_passes[0].group == "ethos_npu" %}
+    // First pass samples the Ethos-U's own PMU; the ARM-side profiler only
+    // records layer ordinals/tags (0 ARM counters).
+    g_profiler.InitCustom(nullptr, 0);
+{% elif pmu_passes[0].custom %}
 {% if has_armv8m_pmu %}
     {
         static const uint32_t _init_ids[] = { {{ pmu_passes[0].event_ids | join(', ') }} };
@@ -940,7 +986,19 @@ int main(void) {
     // stable cache / pipeline state.
 {% for pass in pmu_passes %}
     hpx_printf("\n--- HPX_PRESET {{ pass.name }} ---\n");
-{% if pass.custom %}
+{% if pass.group == "ethos_npu" %}
+    {
+        // Ethos-U PMU pass: counters live in the NPU and are sampled by the
+        // driver inference hooks (_npu_pmu.j2). g_profiler still tracks layer
+        // ordinals/tags so rows align with ARM-PMU presets, but programs no
+        // ARM counters. Names ARE the driver's symbolic event enum.
+        static const enum ethosu_pmu_event_type _pass{{ loop.index0 }}_npu_events[] = { {{ pass.counter_names | join(', ') }} };
+        static const char* _pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
+        g_profiler.InitCustom(nullptr, 0);
+        hpx_npu_configure(_pass{{ loop.index0 }}_npu_events, _pass{{ loop.index0 }}_names, {{ pass.num_counters }});
+        hpx_npu_set_enabled(true);
+    }
+{% elif pass.custom %}
 {% if has_armv8m_pmu %}
     {
         static const uint32_t _pass{{ loop.index0 }}_ids[] = { {{ pass.event_ids | join(', ') }} };
@@ -981,6 +1039,9 @@ int main(void) {
     for (int iter = 0; iter < {{ iterations }}; iter++) {
         memset(input->data.raw, 0, input->bytes);
         g_profiler.ClearEvents();
+{% if pass.group == "ethos_npu" %}
+        hpx_npu_clear();
+{% endif %}
         g_profiler.SetIterationContext({{ loop.index0 }}, iter);
 
         uint32_t infer_start_cyc = DWT->CYCCNT;
@@ -995,7 +1056,11 @@ int main(void) {
         hpx_rtt_set_blocking();
 {% endif %}
         hpx_printf("\n--- HPX_ITER %d ---\n", iter);
+{% if pass.group == "ethos_npu" %}
+        hpx_npu_print_csv();
+{% else %}
         g_profiler.PrintCsv();
+{% endif %}
 {% if transport == "usb_cdc" %}
         usb_timer_pause();
 {% elif transport == "rtt" %}
@@ -1005,6 +1070,9 @@ int main(void) {
 {% endif %}
     }
 
+{% if pass.group == "ethos_npu" %}
+    hpx_npu_set_enabled(false);
+{% endif %}
 {% if transport == "usb_cdc" %}
     usb_timer_resume();
 {% endif %}

@@ -32,7 +32,7 @@ from ..counters import (
     supported_groups_for_domains,
     validate_group_selection,
 )
-from ..engines import get_adapter
+from ..engines import EngineType, get_adapter
 from ..errors import ConfigError
 from ..pipeline import PipelineContext
 from ..placement import Placement
@@ -68,6 +68,7 @@ class PreflightStage:
         _check_rtt_buffer_size(cfg.target.rtt_buffer_size_up)
         _check_runtime_split_locations(cfg)
         _check_pmu_selection(cfg)
+        _check_npu_backend(cfg)
         _check_transport_support(cfg)
         _check_output_dir(cfg.output.dir)
         _check_host_tools(cfg)
@@ -196,6 +197,51 @@ def _check_pmu_selection(cfg) -> None:
                 f"{', '.join(supported_groups) if supported_groups else 'none'}."
             ),
         ) from exc
+
+    # ethos_npu counters are sampled via the Ethos-U driver's inference
+    # hooks — without the ethos_u engine backend the NPU never runs and every
+    # row would be zero.
+    if "ethos_npu" in cfg.profiling.pmu_counters and cfg.engine.backend != "ethos_u":
+        raise ConfigError(
+            "The 'ethos_npu' counter group requires engine.backend=ethos_u "
+            "(the NPU is only exercised when the Ethos-U backend is enabled).",
+            hint=(
+                "Set engine.backend=ethos_u with engine.type helia-rt or "
+                "helia-aot, and use a Vela-compiled model."
+            ),
+        )
+
+
+def _check_npu_backend(cfg) -> None:
+    """Gate the ``ethos_u`` engine backend to NPU-equipped targets and engines."""
+    if cfg.engine.backend != "ethos_u":
+        return
+    if cfg.engine.type not in (EngineType.HELIA_RT, EngineType.HELIA_AOT):
+        raise ConfigError(
+            f"engine.backend=ethos_u is not supported with engine.type="
+            f"{cfg.engine.type} — only helia-rt and helia-aot can dispatch "
+            "Vela-compiled ethos-u ops.",
+            hint="Set engine.type to helia-rt or helia-aot.",
+        )
+    try:
+        soc = get_soc_for_board(cfg.target.board, registry=cfg.platform_registry)
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
+    if soc.npu is None:
+        from ..platform import list_boards
+
+        npu_boards = sorted(
+            b.name
+            for b in list_boards(registry=cfg.platform_registry)
+            if get_soc_for_board(b.name, registry=cfg.platform_registry).npu is not None
+        )
+        raise ConfigError(
+            f"Board '{cfg.target.board}' ({soc.name}) has no Ethos-U NPU — "
+            "engine.backend=ethos_u is unavailable.",
+            hint=(
+                f"NPU-capable boards: {', '.join(npu_boards) if npu_boards else 'none'}."
+            ),
+        )
 
 
 def _check_transport_support(cfg) -> None:

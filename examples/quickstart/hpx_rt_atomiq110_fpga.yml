@@ -1,0 +1,33 @@
+# heliaPROFILER quickstart — Atomiq110 FPGA bring-up (PMU-only)
+# Minimal no-power profile to validate build/flash/capture on atomiq110_fpga_turbo.
+model:
+  path: examples/quickstart/kws_model.tflite
+  arena_size: 131072
+  arena_location: tcm
+  weights_location: mram
+
+engine:
+  type: helia-rt
+  config:
+    variant: release-with-logs
+
+target:
+  board: atomiq110_fpga_turbo
+  toolchain: arm-none-eabi-gcc
+  transport: rtt
+
+profiling:
+  pmu_counters:
+    cpu: default
+    memory: default
+    mve: default
+  per_layer: true
+  iterations: 5
+  warmup: 2
+
+power:
+  enabled: false
+
+output:
+  format: csv
+  dir: ./results/atomiq110_fpga_rt

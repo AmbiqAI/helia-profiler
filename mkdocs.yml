@@ -162,6 +162,8 @@ nav:
       - Overview: examples/index.md
       - Interactive Python: examples/interactive-python.md
       - Basic Profiling: examples/basic-profiling.md
+      - Atomiq110 FPGA Bring-up: examples/atomiq110-fpga-bringup.md
+      - Atomiq110 NPU Profiling: examples/atomiq110-npu-profiling.md
       - Vanilla TFLM Baseline: examples/tflm-baseline.md
       - Per-Layer Breakdown: examples/per-layer.md
       - Engine Comparison: examples/engine-comparison.md

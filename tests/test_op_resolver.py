@@ -101,3 +101,35 @@ def test_non_rt_engines_ignore_auto_mode():
 
     assert plan.mode == "all"
     assert len(plan.registrations) > 1
+
+
+def test_ethos_u_appends_custom_kernel_in_auto_mode():
+    plan = build_resolver_plan(
+        engine_type=EngineType.HELIA_RT,
+        engine_config={"resolver_ops": "auto"},
+        model_analysis=_analysis("CUSTOM(ethos-u)", "SOFTMAX"),
+        ethos_u=True,
+    )
+    assert plan.mode == "auto"
+    assert plan.registrations[-1] == "r.AddEthosU();"
+    # The ethos-u custom op itself is not a builtin — no warning-path entry.
+    assert "r.AddSoftmax();" in plan.registrations
+
+
+def test_ethos_u_appends_custom_kernel_in_all_mode():
+    plan = build_resolver_plan(
+        engine_type=EngineType.HELIA_RT,
+        engine_config={"resolver_ops": "all"},
+        model_analysis=None,
+        ethos_u=True,
+    )
+    assert plan.registrations[-1] == "r.AddEthosU();"
+
+
+def test_no_ethos_u_registration_by_default():
+    plan = build_resolver_plan(
+        engine_type=EngineType.HELIA_RT,
+        engine_config={},
+        model_analysis=_analysis("CONV_2D"),
+    )
+    assert "r.AddEthosU();" not in plan.registrations

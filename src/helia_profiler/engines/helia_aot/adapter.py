@@ -21,6 +21,7 @@ from ...placement import ArenaRole, Placement
 from ...results import NsxModuleRef
 from .. import EngineType
 from ..base import ArenaRegion, EngineArtifacts
+from ..helia_rt.adapter import NSX_NPU_MODULE, NSX_NPU_PROJECT
 from .cmsis_nn import cmsis_nn_module_ref
 from .compile import (
     _DEFAULT_MODULE_NAME,
@@ -34,6 +35,34 @@ from .compile import (
 from .manifest import _extract_arena_regions, _extract_memory_plan, _extract_operator_manifest
 
 log = logging.getLogger("hpx")
+
+
+def _build_extra_modules(
+    config: ProfileConfig,
+    cmsis_nn_ref: NsxModuleRef,
+    module_name: str,
+    aot_module_dir: Path,
+) -> list[NsxModuleRef]:
+    """Assemble the NSX module list the firmware project must vendor.
+
+    With ``engine.backend: ethos_u`` the generated module contains Ethos-U
+    kernels that call the Ethos-U core driver; the nsx-npu registry module
+    vendors that driver plus the ``nsx_npu_init()`` bring-up helper. It must
+    precede the AOT module so its ``nsx::npu`` target exists when the AOT
+    module's CMakeLists resolves the driver dependency.
+    """
+    extra_modules = [cmsis_nn_ref]
+    if config.engine.backend == "ethos_u":
+        extra_modules.append(
+            NsxModuleRef(
+                name=NSX_NPU_MODULE,
+                path=Path(),
+                local=False,
+                project=NSX_NPU_PROJECT,
+            )
+        )
+    extra_modules.append(NsxModuleRef(name=module_name, path=aot_module_dir))
+    return extra_modules
 
 
 class HeliaAOTAdapter:
@@ -157,12 +186,12 @@ class HeliaAOTAdapter:
         )
         arena_regions = _extract_arena_regions(codegen_ctx, prefix)
 
+        extra_modules = _build_extra_modules(config, cmsis_nn_ref, module_name, aot_module_dir)
+
         return EngineArtifacts(
             engine_type=EngineType.HELIA_AOT,
-            extra_modules=[
-                cmsis_nn_ref,
-                NsxModuleRef(name=module_name, path=aot_module_dir),
-            ],
+            engine_backend=config.engine.backend,
+            extra_modules=extra_modules,
             cmake_vars={
                 attr_var: str(attr_header),
                 **cmsis_nn_cmake,

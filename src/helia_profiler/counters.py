@@ -63,6 +63,35 @@ def _load_counter_catalog() -> dict[str, PmuCounter]:
 
 _COUNTERS: dict[str, PmuCounter] = _load_counter_catalog()
 
+# ---------------------------------------------------------------------------
+# Ethos-U NPU counter catalogue (group "ethos_npu")
+#
+# These are sampled from the Ethos-U's own PMU via the core-driver API, not
+# the ARM PMU. Names double as the driver's symbolic event-type enum
+# (enum ethosu_pmu_event_type) — the header explicitly warns that raw HW
+# event values differ between NPUs, so firmware is generated from the
+# symbol, never a numeric ID (event_id below is a placeholder).
+# ---------------------------------------------------------------------------
+
+_ETHOS_NPU_EVENTS: tuple[tuple[str, str], ...] = (
+    ("ETHOSU_PMU_CYCLE", "Total NPU cycles while the command stream runs"),
+    ("ETHOSU_PMU_NPU_ACTIVE", "Cycles the NPU is active (not idle/stalled)"),
+    ("ETHOSU_PMU_NPU_IDLE", "Cycles the NPU is idle"),
+    ("ETHOSU_PMU_MAC_ACTIVE", "Cycles the MAC engine is active"),
+    ("ETHOSU_PMU_WD_ACTIVE", "Cycles the weight decoder is active"),
+    ("ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED", "SRAM interface read data beats"),
+    ("ETHOSU_PMU_SRAM_WR_DATA_BEAT_WRITTEN", "SRAM interface write data beats"),
+    ("ETHOSU_PMU_EXT_RD_DATA_BEAT_RECEIVED", "External (flash/MRAM) read data beats"),
+)
+
+for _name, _desc in _ETHOS_NPU_EVENTS:
+    _COUNTERS[_name] = PmuCounter(
+        name=_name,
+        event_id=0,  # symbolic — firmware emits the enum name, not a number
+        group="ethos_npu",
+        description=_desc,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Compute-unit groups and curated defaults
@@ -93,6 +122,16 @@ DEFAULT_COUNTERS: dict[str, list[str]] = {
         "ARM_PMU_MVE_INT_MAC_RETIRED",
         "ARM_PMU_MVE_LDST_RETIRED",
         "ARM_PMU_MVE_STALL",
+    ],
+    # Fits one pass (U55/U65 have exactly 4 event counters; U85 has 8 but 4
+    # keeps the pass budget uniform). Sampled per ethos-u command stream via
+    # the driver's inference begin/end hooks. Names are the U85 spelling of
+    # the driver's symbolic enum (the only NPU shipped on a supported SoC).
+    "ethos_npu": [
+        "ETHOSU_PMU_CYCLE",
+        "ETHOSU_PMU_NPU_ACTIVE",
+        "ETHOSU_PMU_MAC_ACTIVE",
+        "ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED",
     ],
 }
 

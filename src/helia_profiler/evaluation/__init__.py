@@ -29,6 +29,7 @@ from .comparison_profile import (
 )
 from .validity import RunEvaluation, evaluate_run
 from .model_analysis import (
+    ETHOS_U_OP_NAME,
     LayerOps,
     ModelAnalysis,
     analyze_for_engine,
@@ -45,6 +46,7 @@ __all__ = [
     "CounterDiff",
     "ComparisonProfile",
     "ComparisonVerdict",
+    "ETHOS_U_OP_NAME",
     "MetricDirection",
     "MetricDiff",
     "MetricPolicy",

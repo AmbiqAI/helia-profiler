@@ -16,6 +16,7 @@ import pathlib
 
 import pytest
 
+from helia_profiler.config import load_config
 from helia_profiler.platform import (
     get_default_go_gpio_pin,
     get_default_state_gpio_pin,
@@ -112,3 +113,23 @@ def test_no_stage_compares_board_name_strings():
             if name in text:
                 offenders.append(f"{stage_file.name}: {name}")
     assert not offenders, f"stage modules reference board-name literals: {offenders}"
+
+
+def test_atomiq110_fpga_quickstart_loads_with_expected_board():
+    """The checked-in FPGA quickstart must stay loadable and board-specific."""
+    config_path = (
+        pathlib.Path(__file__).resolve().parents[2]
+        / "examples"
+        / "quickstart"
+        / "hpx_rt_atomiq110_fpga.yml"
+    )
+    assert config_path.is_file(), config_path
+
+    config = load_config(config_path, {})
+    assert config.target.board == "atomiq110_fpga_turbo"
+    assert config.target.toolchain.value == "arm-none-eabi-gcc"
+    assert config.target.transport.value == "rtt"
+    assert config.engine.type.value == "helia-rt"
+    assert config.power.enabled is False
+    assert config.profiling.per_layer is True
+    assert config.output.format.value == "csv"

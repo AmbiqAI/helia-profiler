@@ -15,6 +15,7 @@ Run `hpx boards` to see the live list. As of this release:
 | `apollo510b_evb` | apollo510b | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
 | `apollo5b_evb` | apollo5b | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
 | `apollo330mP_evb` | apollo330P | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
+| `atomiq110_fpga_turbo` | atomiq110 | Cortex-M55 | Full Armv8-M | Yes | No | Preview |
 | `apollo4p_evb` | apollo4p | Cortex-M4 | DWT only | No | Yes | Preview |
 | `apollo4l_evb` | apollo4l | Cortex-M4 | DWT only | No | Yes | Preview |
 | `apollo4l_blue_evb` | apollo4l | Cortex-M4 | DWT only | No | Yes | Preview |
@@ -30,7 +31,7 @@ Run `hpx boards` to see the live list. As of this release:
 
 ## SoC families
 
-### AP5 — Cortex-M55 (Apollo510, Apollo510b, Apollo5b, Apollo330P)
+### AP5 — Cortex-M55 (Apollo510, Apollo510b, Apollo5b, Apollo330P, Atomiq110)
 
 - Full **Armv8-M PMU** with 8 configurable event counters plus a
   dedicated cycle counter.
@@ -41,6 +42,13 @@ Run `hpx boards` to see the live list. As of this release:
 !!! note "Apollo330P is in the AP5 family"
     Despite the "3" in the name, Apollo330P uses a Cortex-M55 core. It
     belongs to the AP5 family and gets full PMU + MVE.
+
+!!! note "Atomiq110 is FPGA-only today"
+    The only upstream atomiq110 realization is the `atomiq110_fpga_turbo`
+    board: a Cortex-M55 + Ethos-U85 NPU FPGA carrier running at a single
+    fixed 25 MHz clock (no PSRAM, no onboard BLE radio, `preview` channel).
+    It gets the same full PMU + MVE profiling support as the other AP5
+    boards; the NPU itself is not yet a profiling target.
 
 ### AP4 — Cortex-M4 (Apollo4p)
 
@@ -91,6 +99,7 @@ For reference:
 | `apollo510b_evb` | `AP510BFA-CBR` |
 | `apollo5b_evb` | `AP510NFA-CBR` |
 | `apollo330mP_evb` | `Apollo330P_510L` |
+| `atomiq110_fpga_turbo` | `Atomiq110` |
 | `apollo4p_evb` | `AMAP42KP-KBR` |
 | `apollo4l_evb` | `AMAP42KL-KBR` |
 | `apollo4l_blue_evb` | `AMAP42KL-KBR` |

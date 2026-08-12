@@ -32,7 +32,7 @@ _MISSING = dataclasses.MISSING
 # name), e.g. "target.segger_rtt_path".
 _EXPLICIT_NOTES: dict[str, str] = {
     "engine.type": "`tflm` is the vanilla TFLM baseline engine; use `engine.backend` to select `reference` or `cmsis_nn`.",
-    "engine.backend": "TFLM: `reference` or `cmsis_nn`.",
+    "engine.backend": "TFLM: `reference` or `cmsis_nn`. helia-rt: free-form passthrough; `ethos_u` enables the Ethos-U NPU (Vela-compiled model required, NPU-equipped board only). helia-aot: `ethos_u` compiles the model's Vela ethos-u ops into NPU kernels (same requirements).",
     "engine.config": "free-form engine-specific mapping (not strictly validated).",
     "target.custom_socs": "advanced raw mapping validated by the platform layer.",
     "target.custom_boards": "advanced raw mapping validated by the platform layer.",
