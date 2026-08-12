@@ -56,42 +56,137 @@ DEFAULT_POWER_STATS_RATE_HZ = 1000
 
 
 @pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
+class MonitorBoardPreset:
+    """Known breakout/Click board carrying an on-target power monitor chip.
+
+    A preset is pure data: the electrical facts a specific board fixes
+    (address strapping, an onboard shunt when the board has one) plus the
+    board-specific hint to show when a required fact is missing. Explicit
+    ``power.ina228.*`` values always win over the preset. Adding support for
+    a new breakout of an already-supported chip is one registry entry here —
+    no new driver, no new firmware.
+    """
+
+    label: str
+    i2c_address: int | None = None
+    shunt_ohms: float | None = None
+    # Shown when the config resolves no shunt value; lets the error explain
+    # the physical fix for this exact board.
+    missing_shunt_hint: str | None = None
+
+
+#: Known INA228 carrier boards, selectable via ``power.ina228.board``.
+INA228_BOARD_PRESETS: dict[str, MonitorBoardPreset] = {
+    # Schematic: only LED/pull-up resistors on board; IN+/IN- go straight to
+    # the IN1 screw terminal, and both ADDR SEL jumpers ship Down (= SDA).
+    "mikroe-power-monitor-click": MonitorBoardPreset(
+        label="MikroE Power Monitor Click (MIKROE-4810)",
+        i2c_address=0x4A,
+        shunt_ohms=None,
+        missing_shunt_hint=(
+            "The Power Monitor Click has no onboard shunt: wire a sense "
+            "resistor across the IN1 terminal (IN+/IN-) and set "
+            "power.ina228.shunt_ohms to its value."
+        ),
+    ),
+    # Onboard 15 mOhm 0.1% shunt, INA228 default address strapping.
+    "adafruit-ina228": MonitorBoardPreset(
+        label="Adafruit INA228 breakout (5832)",
+        i2c_address=0x40,
+        shunt_ohms=0.015,
+    ),
+}
+
+
+@pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class Ina228Config:
     """On-target INA228 power monitor wiring and calibration (I2C).
 
     The INA228 sits in series with the target rail and integrates energy and
     charge in hardware; firmware reads the accumulators over I2C around the
-    fixed-N inference window. ``shunt_ohms`` has no default on purpose: a
-    wrong shunt calibration produces plausible-looking but wrong energy, and
-    the resistor value is a physical property of the user's wiring that HPX
-    cannot guess.
+    fixed-N inference window.
+
+    ``board`` selects a known carrier's electrical facts (address strapping,
+    onboard shunt) from :data:`INA228_BOARD_PRESETS`; explicit values always
+    win over the preset. ``shunt_ohms`` has no bare default on purpose: a
+    wrong shunt calibration produces plausible-looking but wrong energy, so
+    the value must come either from the user's wiring or from a board that
+    physically carries its shunt.
     """
 
-    # Shunt resistance in ohms (e.g. 2.0 for the MikroE Power Monitor Click).
-    shunt_ohms: float
+    # Known carrier board (see INA228_BOARD_PRESETS); None = custom wiring.
+    board: str | None = None
+    # Shunt resistance in ohms. Required unless the selected board preset
+    # carries an onboard shunt value.
+    shunt_ohms: float | None = None
     # Full-scale current used to derive CURRENT_LSB for the shunt calibration.
     max_current_a: float = 0.5
     # Ambiq IOM instance the monitor's I2C bus is wired to.
     i2c_iom: int = 1
-    i2c_address: int = DEFAULT_INA228_I2C_ADDRESS
+    # None = board preset's strapping, falling back to the INA228 power-on
+    # default (0x40, A0/A1 to GND).
+    i2c_address: int | None = None
     i2c_speed_hz: int = DEFAULT_INA228_I2C_SPEED_HZ
     # Per-signal ADC conversion time and averaging window — discrete INA228
     # hardware steps (INA228_CONVERSION_TIMES_US / INA228_AVERAGING_COUNTS).
     conversion_time_us: int = DEFAULT_INA228_CONVERSION_TIME_US
     averaging_count: int = DEFAULT_INA228_AVERAGING_COUNT
     # Free-form calibration label carried into result metadata. Defaults to a
-    # value derived from shunt_ohms/max_current_a at firmware render time.
+    # value derived from the resolved shunt/current at firmware render time.
     calibration_id: str | None = None
+
+    @property
+    def board_preset(self) -> MonitorBoardPreset | None:
+        return INA228_BOARD_PRESETS[self.board] if self.board is not None else None
+
+    @property
+    def resolved_shunt_ohms(self) -> float:
+        """Effective shunt: explicit value, else the board's onboard shunt."""
+        if self.shunt_ohms is not None:
+            return self.shunt_ohms
+        preset = self.board_preset
+        assert preset is not None and preset.shunt_ohms is not None  # _validate
+        return preset.shunt_ohms
+
+    @property
+    def resolved_i2c_address(self) -> int:
+        """Effective address: explicit, else board strapping, else chip default."""
+        if self.i2c_address is not None:
+            return self.i2c_address
+        preset = self.board_preset
+        if preset is not None and preset.i2c_address is not None:
+            return preset.i2c_address
+        return DEFAULT_INA228_I2C_ADDRESS
 
     @model_validator(mode="after")
     def _validate(self) -> Ina228Config:
-        if self.shunt_ohms <= 0:
+        if self.board is not None and self.board not in INA228_BOARD_PRESETS:
+            known = ", ".join(sorted(INA228_BOARD_PRESETS))
+            raise ValueError(
+                f"Unknown power.ina228.board '{self.board}'. Known boards: {known}. "
+                "For custom wiring omit 'board' and set shunt_ohms/i2c_address directly."
+            )
+        preset = self.board_preset
+        if self.shunt_ohms is None and (preset is None or preset.shunt_ohms is None):
+            if preset is not None and preset.missing_shunt_hint is not None:
+                raise ValueError(
+                    f"power.ina228.shunt_ohms is required for board '{self.board}' "
+                    f"({preset.label}). {preset.missing_shunt_hint}"
+                )
+            raise ValueError(
+                "power.ina228.shunt_ohms is required: it is the physical sense "
+                "resistor on your wiring, which HPX cannot guess. Boards with an "
+                "onboard shunt can set power.ina228.board instead ("
+                + ", ".join(sorted(INA228_BOARD_PRESETS))
+                + ")."
+            )
+        if self.shunt_ohms is not None and self.shunt_ohms <= 0:
             raise ValueError(f"power.ina228.shunt_ohms must be > 0, got {self.shunt_ohms}.")
         if self.max_current_a <= 0:
             raise ValueError(f"power.ina228.max_current_a must be > 0, got {self.max_current_a}.")
         if not 0 <= self.i2c_iom <= 7:
             raise ValueError(f"power.ina228.i2c_iom must be 0..7, got {self.i2c_iom}.")
-        if not 0x08 <= self.i2c_address <= 0x77:
+        if self.i2c_address is not None and not 0x08 <= self.i2c_address <= 0x77:
             raise ValueError(
                 f"power.ina228.i2c_address must be a 7-bit address in 0x08..0x77, "
                 f"got 0x{self.i2c_address:02x}."

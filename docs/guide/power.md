@@ -403,23 +403,39 @@ monitor's ADC integrates autonomously, so nothing the host does can
 contaminate the window. Results arrive through the same post-run terminal
 report the dedicated power firmware already emits.
 
+`power.driver` names the monitor **chip** (that's what the firmware talks
+to); `power.ina228.board` optionally names the **carrier board**, which
+fills in the electrical facts that board fixes — address strapping, and the
+onboard shunt when the board has one. Explicit values always win over the
+preset.
+
 ```yaml
 power:
   enabled: true
   driver: ina228
   mode: internal          # the target measures itself
   ina228:
-    shunt_ohms: 0.1       # REQUIRED — YOUR sense resistor (see below)
-    max_current_a: 0.4    # full-scale current for calibration
+    board: mikroe-power-monitor-click   # fills i2c_address 0x4A
+    shunt_ohms: 0.5       # REQUIRED for this board — YOUR sense resistor
+    max_current_a: 0.05   # size to your real peak, not the shunt rating
     i2c_iom: 1            # Ambiq IOM instance wired to the monitor
-    i2c_address: 0x4A     # MikroE Power Monitor Click as shipped
     # conversion_time_us: 540   # 50|84|150|280|540|1052|2074|4120
     # averaging_count: 16       # 1|4|16|64|128|256|512|1024
 ```
 
-`shunt_ohms` has **no default on purpose**: a wrong shunt calibration
-produces plausible-looking but wrong energy, and the sense resistor is a
-physical property of your wiring that HPX cannot guess.
+An Adafruit INA228 breakout (5832) carries its own 15 mΩ 0.1 % shunt and
+default strapping, so the preset alone is a complete config:
+
+```yaml
+  ina228:
+    board: adafruit-ina228
+```
+
+For custom wiring, omit `board` and set `shunt_ohms` (and `i2c_address` if
+strapped away from 0x40) directly. `shunt_ohms` has **no bare default on
+purpose**: a wrong shunt calibration produces plausible-looking but wrong
+energy, so the value must come either from your wiring or from a board that
+physically carries its shunt.
 
 !!! warning "The MikroE Power Monitor Click has no onboard shunt"
     Per its [schematic](https://download.mikroe.com/documents/add-on-boards/click/power_monitor_click/Power_Monitor_click_v100_Schematic.PDF),
@@ -433,7 +449,9 @@ physical property of your wiring that HPX cannot guess.
 
     The board also ships with both `ADDR SEL` jumpers in the **Down = SDA**
     position, which is I2C address **`0x4A`** — not the INA228's `0x40`
-    power-on default that `i2c_address` otherwise assumes.
+    power-on default. The `mikroe-power-monitor-click` board preset sets
+    this automatically; only override `i2c_address` if you have moved the
+    jumpers.
 
 ### Wiring the Click board
 
@@ -508,6 +526,24 @@ per-inference energy; average power is energy over the window duration.
 The INA228 path is a *cheap aggregate-energy instrument*, not a Joulescope
 replacement: with 50 µs minimum conversions it cannot resolve per-layer
 detail, and it reports one integrated window, not a sample stream.
+
+### Adding other monitors and boards
+
+The on-target monitor stack is deliberately layered so each piece stays
+small:
+
+- **A new carrier board** for an already-supported chip (another INA228
+  breakout) is one data entry in `INA228_BOARD_PRESETS` — its strapping,
+  its shunt if it has one, and the hint to show when a required fact is
+  missing. No new driver, no firmware change.
+- **A new monitor chip** is a new `power.driver` value: a host driver class
+  (subclass the internal-mode base, set
+  `supports_firmware_measurement = True`), a firmware partial that brackets
+  the fixed-N window with the chip's own measurement primitive, and a
+  `HPX_POWER_MEASUREMENT_SOURCE` value. The terminal envelope, parser,
+  result model, and report layer are chip-agnostic and unchanged.
+
+Only the INA228 is supported today.
 
 !!! note "Cross-instrument comparisons"
     Runs measured with different instruments carry different

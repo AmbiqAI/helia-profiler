@@ -13,6 +13,7 @@ import pytest
 
 from helia_profiler.capture.power_terminal import parse_power_terminal_envelope
 from helia_profiler.config import (
+    INA228_BOARD_PRESETS,
     Ina228Config,
     PowerConfig,
     PowerMode,
@@ -33,11 +34,13 @@ class TestIna228Config:
         ina = Ina228Config(shunt_ohms=2.0)
         assert ina.max_current_a == 0.5
         assert ina.i2c_iom == 1
-        assert ina.i2c_address == 0x40
+        assert ina.i2c_address is None  # resolves via board preset/chip default
+        assert ina.resolved_i2c_address == 0x40
         assert ina.i2c_speed_hz == 400_000
         assert ina.conversion_time_us == 540
         assert ina.averaging_count == 16
         assert ina.calibration_id is None
+        assert ina.board is None
 
     @pytest.mark.parametrize(
         ("kwargs", "fragment"),
@@ -58,6 +61,54 @@ class TestIna228Config:
     def test_rejects_invalid_values(self, kwargs: dict, fragment: str):
         with pytest.raises(pydantic.ValidationError, match=fragment):
             Ina228Config(**kwargs)
+
+
+class TestIna228BoardPresets:
+    def test_adafruit_preset_is_complete_on_its_own(self):
+        """The Adafruit breakout carries its own 15 mOhm shunt and default
+        strapping — `board:` alone must be a valid config."""
+        ina = Ina228Config(board="adafruit-ina228")
+        assert ina.resolved_shunt_ohms == 0.015
+        assert ina.resolved_i2c_address == 0x40
+
+    def test_click_preset_supplies_address_but_demands_a_shunt(self):
+        """The Power Monitor Click has no onboard shunt; the preset knows its
+        0x4A strapping but must refuse to run without a user shunt, and the
+        error must explain the physical fix."""
+        with pytest.raises(
+            pydantic.ValidationError, match="IN1"
+        ):
+            Ina228Config(board="mikroe-power-monitor-click")
+        ina = Ina228Config(board="mikroe-power-monitor-click", shunt_ohms=0.5)
+        assert ina.resolved_shunt_ohms == 0.5
+        assert ina.resolved_i2c_address == 0x4A
+
+    def test_explicit_values_beat_the_preset(self):
+        ina = Ina228Config(
+            board="adafruit-ina228", shunt_ohms=0.1, i2c_address=0x41
+        )
+        assert ina.resolved_shunt_ohms == 0.1
+        assert ina.resolved_i2c_address == 0x41
+
+    def test_unknown_board_lists_the_known_ones(self):
+        with pytest.raises(pydantic.ValidationError, match="adafruit-ina228"):
+            Ina228Config(board="acme-power-9000", shunt_ohms=0.5)
+
+    def test_no_board_no_shunt_is_rejected_with_preset_pointer(self):
+        with pytest.raises(pydantic.ValidationError, match="shunt_ohms is required"):
+            Ina228Config()
+
+    def test_custom_wiring_without_board_still_works(self):
+        ina = Ina228Config(shunt_ohms=0.5)
+        assert ina.resolved_shunt_ohms == 0.5
+        assert ina.resolved_i2c_address == 0x40  # chip power-on default
+
+    def test_every_preset_declares_a_label_and_resolvable_facts(self):
+        for name, preset in INA228_BOARD_PRESETS.items():
+            assert preset.label, name
+            # A preset without an onboard shunt must explain the fix.
+            if preset.shunt_ohms is None:
+                assert preset.missing_shunt_hint, name
 
 
 class TestPowerConfigIna228Coupling:
@@ -213,6 +264,25 @@ class TestPowerMonitorContext:
         )
         monitor = PowerMonitorContext.from_config(config)
         assert monitor.ina228_adc_range == 1
+
+    def test_board_preset_flows_into_context_and_calibration_id(self, tmp_path: Path):
+        config = _profile_config(
+            tmp_path,
+            {
+                "enabled": True,
+                "driver": "ina228",
+                "mode": "internal",
+                "ina228": {"board": "adafruit-ina228"},
+            },
+        )
+        monitor = PowerMonitorContext.from_config(config)
+        assert monitor.ina228_i2c_address == 0x40
+        assert monitor.ina228_shunt_micro_ohms == 15_000
+        # 0.5 A x 0.015 ohm = 7.5 mV worst case -> high-resolution range
+        assert monitor.ina228_adc_range == 1
+        assert monitor.ina228_calibration_id == (
+            "ina228:adafruit-ina228:r15000uohm:i500ma:adc1"
+        )
 
     def test_explicit_calibration_id_wins(self, tmp_path: Path):
         config = _profile_config(

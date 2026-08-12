@@ -48,9 +48,11 @@ from .config_power import (
     DEFAULT_POWER_STATS_RATE_HZ,
     DEFAULT_POWER_SYNC_INPUT_INDEX,
     INA228_AVERAGING_COUNTS,
+    INA228_BOARD_PRESETS,
     INA228_CONVERSION_TIMES_US,
     POWER_FIRMWARE_MODES,
     Ina228Config,
+    MonitorBoardPreset,
     PowerConfig,
 )
 from .target.lifecycle import ResetStrategy

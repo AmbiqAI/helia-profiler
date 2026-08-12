@@ -80,19 +80,21 @@ class PowerMonitorContext:
             return cls(power_monitor=None)
         ina = power.ina228
         assert ina is not None  # enforced by PowerConfig._validate
-        shunt_micro_ohms = round(ina.shunt_ohms * 1_000_000)
+        shunt_ohms = ina.resolved_shunt_ohms
+        shunt_micro_ohms = round(shunt_ohms * 1_000_000)
         max_current_ma = round(ina.max_current_a * 1_000)
         # ADCRANGE=1 quarters the shunt full scale (±163.84 mV -> ±40.96 mV)
         # for 4x resolution; select it whenever the configured worst-case
         # shunt drop fits, otherwise stay on the wide range.
-        adc_range = 1 if ina.max_current_a * ina.shunt_ohms <= 0.04096 else 0
+        adc_range = 1 if ina.max_current_a * shunt_ohms <= 0.04096 else 0
+        board_tag = f":{ina.board}" if ina.board is not None else ""
         calibration_id = ina.calibration_id or (
-            f"ina228:r{shunt_micro_ohms}uohm:i{max_current_ma}ma:adc{adc_range}"
+            f"ina228{board_tag}:r{shunt_micro_ohms}uohm:i{max_current_ma}ma:adc{adc_range}"
         )
         return cls(
             power_monitor="ina228",
             ina228_i2c_iom=ina.i2c_iom,
-            ina228_i2c_address=ina.i2c_address,
+            ina228_i2c_address=ina.resolved_i2c_address,
             ina228_i2c_speed_hz=ina.i2c_speed_hz,
             ina228_shunt_micro_ohms=shunt_micro_ohms,
             ina228_max_current_ma=max_current_ma,
