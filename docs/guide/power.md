@@ -8,6 +8,11 @@ charge/energy on-device and streams it to the host. This page walks through
 wiring, the minimal config to get a first reading, and every knob you're
 likely to need afterward — from simplest to most advanced.
 
+No Joulescope on the bench? A **TI INA228 monitor on the target's own I2C
+bus** (e.g. a MikroE Power Monitor Click) can measure whole-window energy
+instead — see [On-device INA228 measurement](#on-device-ina228-measurement)
+for the trade-offs.
+
 ## What you need
 
 - **A Joulescope JS110, JS220, or JS320**, wired in series between your bench
@@ -381,6 +386,240 @@ you understand the tradeoff:
   the HAL exposes it) on AP5-family SoCs. This is capability-gated and needs
   no configuration.
 
+## On-device INA228 measurement
+
+A TI **INA228** current/power monitor wired into the target rail and onto the
+target's own I2C bus can replace the Joulescope for **aggregate energy**
+measurements. The measurement model inverts: instead of a host instrument
+watching a GPIO gate, the INA228 integrates energy and charge in hardware and
+the firmware itself brackets the fixed-N inference window —
+
+```
+reset accumulators → run N inferences → read energy/charge → report
+```
+
+All I2C traffic happens strictly outside the measured region, and the
+monitor's ADC integrates autonomously, so nothing the host does can
+contaminate the window. Results arrive through the same post-run terminal
+report the dedicated power firmware already emits.
+
+`power.driver` names the monitor **chip** (that's what the firmware talks
+to); `power.ina228.board` optionally names the **carrier board**, which
+fills in the electrical facts that board fixes — address strapping, and the
+onboard shunt when the board has one. Explicit values always win over the
+preset.
+
+```yaml
+power:
+  enabled: true
+  driver: ina228
+  mode: internal          # the target measures itself
+  ina228:
+    board: mikroe-power-monitor-click   # fills i2c_address 0x4A
+    shunt_ohms: 0.5       # REQUIRED for this board — YOUR sense resistor
+    max_current_a: 0.05   # size to your real peak, not the shunt rating
+    i2c_iom: 1            # Ambiq IOM instance wired to the monitor
+    # conversion_time_us: 540   # 50|84|150|280|540|1052|2074|4120
+    # averaging_count: 16       # 1|4|16|64|128|256|512|1024
+```
+
+An Adafruit INA228 breakout (5832) carries its own 15 mΩ 0.1 % shunt and
+default strapping, so the preset alone is a complete config:
+
+```yaml
+  ina228:
+    board: adafruit-ina228
+```
+
+For custom wiring, omit `board` and set `shunt_ohms` (and `i2c_address` if
+strapped away from 0x40) directly. `shunt_ohms` has **no bare default on
+purpose**: a wrong shunt calibration produces plausible-looking but wrong
+energy, so the value must come either from your wiring or from a board that
+physically carries its shunt.
+
+!!! warning "The MikroE Power Monitor Click has no onboard shunt"
+    Per its [schematic](https://download.mikroe.com/documents/add-on-boards/click/power_monitor_click/Power_Monitor_click_v100_Schematic.PDF),
+    the board's only resistors are `R1` 470 Ω (power LED), `R2`/`R3` 4.7 kΩ
+    (I2C pull-ups) and `R4` 10 kΩ (ALERT pull-up). `IN+`/`IN-` go straight
+    to a screw terminal — **you supply the sense resistor** and wire it
+    across those terminals. `shunt_ohms` is therefore the value of *your*
+    resistor, not a board property. (MikroE's own example uses
+    `shunt = 0.28`, but that is an arbitrary placeholder for whatever the
+    user wired up, not a measurement of the board.)
+
+    The board also ships with both `ADDR SEL` jumpers in the **Down = SDA**
+    position, which is I2C address **`0x4A`** — not the INA228's `0x40`
+    power-on default. The `mikroe-power-monitor-click` board preset sets
+    this automatically; only override `i2c_address` if you have moved the
+    jumpers.
+
+### Wiring the Click board
+
+The board has two 2-position screw terminals:
+
+| Terminal | Screw | Net | Wire it to |
+|---|---|---|---|
+| **IN1** | 1 | `IN+` | Supply side of the broken rail |
+| **IN1** | 2 | `IN-` | Target side of the broken rail |
+| **IN2** | 1 | `VBUS` | Target-side rail node (same node as `IN-`) |
+| **IN2** | 2 | `GND` | Common ground |
+
+Your sense resistor goes **across IN1** — i.e. in series with the rail you
+are measuring. Break the target's supply, run the supply into `IN+` and the
+target into `IN-`, and the resistor bridges the two.
+
+Tie `VBUS` to the **target side** (the `IN-` node): the INA228 computes
+power as `VBUS × CURRENT`, so sensing there reports the energy actually
+delivered to the target and excludes the shunt's own dissipation. `GND` must
+be common with both the supply and the target. The INA228 itself is powered
+from mikroBUS `VCC`, independent of the rail under test, and tolerates a
+common-mode voltage up to 85 V — so a 1.8 V or 3.3 V rail is well inside
+range.
+
+The screw terminal is also the silver lining of having no onboard shunt:
+swapping the sense resistor to re-range the measurement is a screwdriver
+turn, not a rework station.
+
+**Choosing a shunt.** Two competing pressures: a larger resistor gives more
+signal (and shrinks the INA228's input offset relative to it), a smaller one
+steals less of the target's supply. Pick the largest value whose worst-case
+drop still fits the high-resolution ±40.96 mV range, leaving headroom for
+current peaks above your steady state:
+
+| Peak current | Largest shunt in ±40.96 mV range | Burden at that peak |
+|---|---|---|
+| 50 mA | 0.82 Ω | 41 mV |
+| 100 mA | 0.41 Ω | 41 mV |
+| 400 mA | 0.10 Ω | 41 mV |
+
+For a target drawing ~20 mA with peaks under ~80 mA, **0.5 Ω** is a good
+choice: 10 mV of burden at 20 mA (0.6 % of a 1.8 V rail), ~128 k ADC counts
+of resolution, and offset error well under 0.05 %. Power dissipation is
+negligible at these currents (0.2 mW), so any 0603/0805 part works —
+prioritise **tolerance over rating**, since the resistor's tolerance passes
+straight through into your energy figure. A 1 % part means 1 % energy error;
+a 5 % carbon film means 5 %.
+
+HPX picks the ADC range for you from `shunt_ohms × max_current_a`: if the
+worst-case shunt drop fits in ±40.96 mV it selects the 4×-resolution range,
+otherwise the wide ±163.84 mV range. Setting `max_current_a` far above what
+your board actually draws silently costs you resolution, so size it to the
+real peak rather than to the shunt's rating.
+
+What you get in `summary.json` is an `on_device_summary` block — integrated
+energy (nJ), charge (nC), bus voltage, and the inference count — with
+`measurement_scope: on_device_gated_inference`. Divide energy by count for
+per-inference energy; average power is energy over the window duration.
+
+### When to use which instrument
+
+| | Joulescope | INA228 |
+|---|---|---|
+| Cost | Bench instrument | A few dollars + Click module |
+| Streaming samples | ~2 MSa/s | none (hardware accumulators) |
+| Whole-window energy | ✓ (on-device integration) | ✓ (on-device integration) |
+| Current distribution (median/p95/p99) | ✓ | ✗ |
+| Per-layer power attribution | future | ✗ |
+| Host wiring | series supply + GPIO gate wires | none (target I2C) |
+| Powers/resets the target rail | ✓ (relay, power-cycle recovery) | ✗ |
+
+The INA228 path is a *cheap aggregate-energy instrument*, not a Joulescope
+replacement: with 50 µs minimum conversions it cannot resolve per-layer
+detail, and it reports one integrated window, not a sample stream.
+
+### Adding other monitors and boards
+
+The on-target monitor stack is deliberately layered so each piece stays
+small:
+
+- **A new carrier board** for an already-supported chip (another INA228
+  breakout) is one data entry in `INA228_BOARD_PRESETS` — its strapping,
+  its shunt if it has one, and the hint to show when a required fact is
+  missing. No new driver, no firmware change.
+- **A new monitor chip** is a new `power.driver` value: a host driver class
+  (subclass the internal-mode base, set
+  `supports_firmware_measurement = True`), a firmware partial that brackets
+  the fixed-N window with the chip's own measurement primitive, and a
+  `HPX_POWER_MEASUREMENT_SOURCE` value. The terminal envelope, parser,
+  result model, and report layer are chip-agnostic and unchanged.
+
+Only the INA228 is supported today.
+
+!!! note "Cross-instrument comparisons"
+    Runs measured with different instruments carry different
+    `measurement_scope` values, so `hpx compare` **omits power deltas**
+    between a Joulescope run and an INA228 run (the comparison itself still
+    works for cycles/PMU metrics, and the report says why power was
+    omitted). Energy figures also legitimately differ between instruments:
+    the INA228 measures whatever rail your shunt sits in, which is usually
+    not the same net the Joulescope was in series with.
+
+### Bring-up without a sense resistor
+
+You can smoke-test the whole path before a proper shunt arrives. Short `IN+`
+to `IN-` with a jumper — the target then runs through the terminal on the
+wiring's own parasitic resistance (a few milliohms of wire and screw-contact
+resistance) — and set a deliberately-labelled calibration:
+
+```yaml
+    shunt_ohms: 0.5
+    calibration_id: "UNCALIBRATED-parasitic-path"
+```
+
+Short the terminal rather than leaving it open: floating sense inputs give a
+meaningless differential and the target loses its supply path.
+
+Everything except the absolute current scale is exercised for real — I2C
+bring-up and the manufacturer/device ID probes, ADC configuration, the
+accumulator reset/read bracketing, the terminal envelope, and the host-side
+parse into `OnDevicePowerSummary`. **`bus_voltage_uv` is fully trustworthy**
+because it does not involve the shunt at all: seeing ~1.8 V (or whatever your
+rail is) confirms the chip, the bus, and the read path in one number.
+
+What is *not* valid is magnitude. The reported current is the true current
+scaled by `R_parasitic / shunt_ohms`, so with milliohms of wire against a
+configured 0.5 Ω expect readings one to two orders of magnitude low. Energy
+and charge inherit the same error. Label the run — that is what
+`calibration_id` is for — so the numbers are never mistaken for a real
+measurement later.
+
+Two things worth reading into the result:
+
+- **Energy exactly zero** (with a non-zero bus voltage) points at the
+  calibration register, not your wiring — the pre-v0.2.0 `nsx-sensors`
+  SHUNT_CAL bug wrote `SHUNT_CAL = 0` and zeroed every current-derived
+  reading. The qualified baseline pins the fixed release, so this should not
+  occur.
+- **`charge_nc` zero while `energy_nj` is non-zero** means reversed polarity:
+  the INA228's ENERGY register is unsigned but CHARGE is signed, and the
+  firmware clamps negatives to zero rather than letting them wrap. Swap
+  `IN+`/`IN-`.
+
+### Failure modes
+
+The monitor is brought up before any heavy setup, so a missing or mis-wired
+part fails fast with a typed terminal phase:
+
+- `ina228_init` — I2C bring-up, ID check (manufacturer `0x5449`, device
+  `0x228`), or configuration failed. Check wiring, `i2c_iom`, and address
+  strapping — on a MikroE Power Monitor Click the as-shipped address is
+  `0x4A`, so leaving `i2c_address` at the `0x40` default fails here.
+- `ina228_arm` — the accumulator reset write failed right before the window.
+- `ina228_init` code 10/11 — the shunt calibration write failed, or read
+  back a different value than was written. HPX computes `SHUNT_CAL`
+  host-side and verifies the register after writing it, because an
+  unverified calibration fails silently in the worst possible way: with
+  `SHUNT_CAL = 0` the chip reports **exactly zero** current, power, energy
+  and charge while bus voltage still reads perfectly, and every conversion
+  raises `MATHOF`. If you hit this, the monitor is reachable but not
+  calibrated — treat it as a driver/bus problem, not a wiring one.
+- `ina228_read` — the post-window read-back failed; the window ran but the
+  measurement was lost, so the run is treated as failed rather than
+  silently reporting nothing.
+- An accumulator **overflow** during a very long window fails the run
+  explicitly (`On-device power monitor reported accumulator overflow`).
+  Shorten the window or raise `conversion_time_us`/`averaging_count`.
+
 ## Verifying a capture
 
 The terminal prints a compact power table at the end of a run:
@@ -547,10 +786,11 @@ the JS320 bench.
     against the `whole_capture_window` row in `detailed/power_summary.csv`.
 
 ??? failure "`driver: ondevice` raises `PowerError: not yet implemented`"
-    The on-device driver is present in `power.driver`'s choices for forward
-    compatibility, but its capture path is currently a stub and always
-    raises. Use `power.driver: joulescope` (the default) for any real
-    measurement today.
+    The generic `ondevice` driver is a stub with no firmware-side producer
+    and always raises. For a real on-target measurement use
+    `power.driver: ina228` with an INA228 wired to the target's I2C bus
+    (see [On-device INA228 measurement](#on-device-ina228-measurement)),
+    or `power.driver: joulescope` (the default) for a bench instrument.
 
 ??? failure "TOPS-per-Watt missing from summary"
     Only emitted for heliaAOT runs with power enabled. heliaRT/TFLM

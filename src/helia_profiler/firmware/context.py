@@ -52,6 +52,81 @@ class SyncContext:
 
 
 @dataclass(frozen=True)
+class PowerMonitorContext:
+    """On-target power monitor (INA228) render inputs.
+
+    ``power_monitor`` is ``None`` for every run that doesn't select the
+    ina228 driver, and all template content is gated on it — non-monitor
+    renders stay byte-identical (WP2). Physical quantities are carried as
+    scaled integers so the rendered C literals are exact and the render
+    digest is stable across float formatting.
+    """
+
+    power_monitor: str | None
+    ina228_i2c_iom: int = 0
+    ina228_i2c_address: int = 0
+    ina228_i2c_speed_hz: int = 0
+    ina228_shunt_micro_ohms: int = 0
+    ina228_max_current_ma: int = 0
+    ina228_conversion_time_us: int = 0
+    ina228_averaging_count: int = 0
+    ina228_adc_range: int = 0
+    # Expected SHUNT_CAL register value, precomputed host-side. Carried into
+    # the calibration_id for provenance and range-checked at render time.
+    ina228_shunt_cal: int = 0
+    # SHUNT_CAL = 13107.2e6 * CURRENT_LSB * R_shunt (x4 at ADCRANGE=1), so
+    # firmware recovers the effective CURRENT_LSB as SHUNT_CAL / this. Kept
+    # as a rendered double literal so the scaling tracks the register that is
+    # actually programmed rather than the nominal configuration.
+    ina228_current_lsb_divisor: str = "1.0"
+    ina228_calibration_id: str = ""
+
+    @classmethod
+    def from_config(cls, config: "ProfileConfig") -> "PowerMonitorContext":
+        power = config.power
+        if not (power.enabled and power.driver == "ina228"):
+            return cls(power_monitor=None)
+        ina = power.ina228
+        assert ina is not None  # enforced by PowerConfig._validate
+        shunt_ohms = ina.resolved_shunt_ohms
+        shunt_micro_ohms = round(shunt_ohms * 1_000_000)
+        max_current_ma = round(ina.max_current_a * 1_000)
+        # ADCRANGE=1 quarters the shunt full scale (±163.84 mV -> ±40.96 mV)
+        # for 4x resolution; select it whenever the configured worst-case
+        # shunt drop fits, otherwise stay on the wide range.
+        adc_range = 1 if ina.max_current_a * shunt_ohms <= 0.04096 else 0
+        # SHUNT_CAL = 13107.2e6 * CURRENT_LSB * R_shunt (x4 when ADCRANGE=1),
+        # CURRENT_LSB = max_current / 2^19. 15-bit register.
+        current_lsb = ina.max_current_a / (1 << 19)
+        current_lsb_divisor = 13107.2e6 * shunt_ohms * (4 if adc_range else 1)
+        shunt_cal = round(13107.2e6 * current_lsb * shunt_ohms) * (4 if adc_range else 1)
+        if not 0 < shunt_cal <= 0x7FFF:
+            raise FirmwareError(
+                f"INA228 SHUNT_CAL {shunt_cal} out of range for "
+                f"shunt={shunt_ohms} ohm, max_current={ina.max_current_a} A; "
+                "adjust power.ina228.max_current_a."
+            )
+        board_tag = f":{ina.board}" if ina.board is not None else ""
+        calibration_id = ina.calibration_id or (
+            f"ina228{board_tag}:r{shunt_micro_ohms}uohm:i{max_current_ma}ma:adc{adc_range}"
+        )
+        return cls(
+            power_monitor="ina228",
+            ina228_i2c_iom=ina.i2c_iom,
+            ina228_i2c_address=ina.resolved_i2c_address,
+            ina228_i2c_speed_hz=ina.i2c_speed_hz,
+            ina228_shunt_micro_ohms=shunt_micro_ohms,
+            ina228_max_current_ma=max_current_ma,
+            ina228_conversion_time_us=ina.conversion_time_us,
+            ina228_averaging_count=ina.averaging_count,
+            ina228_adc_range=adc_range,
+            ina228_shunt_cal=shunt_cal,
+            ina228_current_lsb_divisor=repr(current_lsb_divisor),
+            ina228_calibration_id=calibration_id,
+        )
+
+
+@dataclass(frozen=True)
 class TransportContext:
     transport: Transport
     usb_serial_marker: str | None
@@ -129,6 +204,7 @@ class FirmwareRenderContext:
     memory: MemoryContext
     pmu: PmuContext
     power_window: PowerWindowContext
+    power_monitor: PowerMonitorContext
     engine: EngineContext
 
     @classmethod
@@ -237,6 +313,7 @@ class FirmwareRenderContext:
                 has_radio_subsystem=soc.has_radio_subsystem,
                 ble_reset_gpio_pin=ctx.board.ble_reset_gpio_pin,
             ),
+            power_monitor=PowerMonitorContext.from_config(config),
             engine=EngineContext(
                 engine_type=engine_type,
                 engine_header=artifacts.engine_header,
@@ -300,6 +377,18 @@ class FirmwareRenderContext:
             "crypto_otp_shutdown": self.power_window.crypto_otp_shutdown,
             "has_radio_subsystem": self.power_window.has_radio_subsystem,
             "ble_reset_gpio_pin": self.power_window.ble_reset_gpio_pin,
+            "power_monitor": self.power_monitor.power_monitor,
+            "ina228_i2c_iom": self.power_monitor.ina228_i2c_iom,
+            "ina228_i2c_address": self.power_monitor.ina228_i2c_address,
+            "ina228_i2c_speed_hz": self.power_monitor.ina228_i2c_speed_hz,
+            "ina228_shunt_micro_ohms": self.power_monitor.ina228_shunt_micro_ohms,
+            "ina228_max_current_ma": self.power_monitor.ina228_max_current_ma,
+            "ina228_conversion_time_us": self.power_monitor.ina228_conversion_time_us,
+            "ina228_averaging_count": self.power_monitor.ina228_averaging_count,
+            "ina228_adc_range": self.power_monitor.ina228_adc_range,
+            "ina228_shunt_cal": self.power_monitor.ina228_shunt_cal,
+            "ina228_current_lsb_divisor": self.power_monitor.ina228_current_lsb_divisor,
+            "ina228_calibration_id": self.power_monitor.ina228_calibration_id,
             "engine_header": self.engine.engine_header,
             "resolver_mode": self.engine.resolver_mode,
             "resolver_max_ops": self.engine.resolver_max_ops,

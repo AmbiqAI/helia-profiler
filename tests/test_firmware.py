@@ -779,6 +779,90 @@ class TestGenerateApp:
         assert "nsx-interrupt" in nsx_yml
         assert "nsx::gpio" in cmake
 
+    def test_ina228_monitor_pulls_sensor_modules_and_renders_block(
+        self, tmp_path: Path, fake_dist: Path
+    ):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb"},
+                "power": {
+                    "enabled": True,
+                    "driver": "ina228",
+                    "mode": "internal",
+                    "ina228": {"shunt_ohms": 2.0},
+                },
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        cmake = (app_dir / "CMakeLists.txt").read_text()
+        main_cc = (app_dir / "src" / "main.cc").read_text()
+        main_power_cc = (app_dir / "src" / "main_power.cc").read_text()
+        # Module graph: the dedicated power binary reads the monitor over I2C.
+        assert "nsx-i2c" in nsx_yml
+        assert "nsx-sensors" in nsx_yml
+        assert "nsx::sensors" in cmake
+        # The baseline pin must reach BOTH the module entry and the
+        # module_registry's module-level override. NSX honours a module-level
+        # revision over its owning project's, so a project-only pin silently
+        # resolves the packaged registry's commit while nsx.yml still claims
+        # the baseline ref — hardware bring-up built nsx-sensors v0.1.0 for
+        # eight runs that way.
+        pinned = "c219a2bc98c62f96819fae20ab6c8911fcea3e25"
+        assert pinned in nsx_yml
+        modules_block = nsx_yml.split("module_registry:", 1)[1].split("modules:", 1)[1]
+        sensors_entry = modules_block.split("nsx-sensors:", 1)[1].split("\n    nsx-", 1)[0]
+        assert pinned in sensors_entry, (
+            "nsx-sensors needs a module-level revision pin, not only a project one"
+        )
+        # Monitor code lives only in the power binary, never the profile one.
+        assert "hpx_ina228_setup" in main_power_cc
+        assert "HPX_POWER_MEASUREMENT_SOURCE=ina228" in main_power_cc
+        assert "ina228" not in main_cc
+        # Internal mode: no GPIO sync handshake is armed.
+        assert "kPowerSyncEnabled = false" in main_power_cc
+
+    def test_joulescope_power_run_does_not_pull_sensor_modules(
+        self, tmp_path: Path, fake_dist: Path
+    ):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb"},
+                "power": {"enabled": True},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        cmake = (app_dir / "CMakeLists.txt").read_text()
+        main_power_cc = (app_dir / "src" / "main_power.cc").read_text()
+        assert "nsx-sensors" not in nsx_yml
+        assert "nsx::sensors" not in cmake
+        assert "ina228" not in main_power_cc
+
     def test_power_binary_generated_when_power_enabled(self, tmp_path: Path, fake_dist: Path):
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
@@ -1705,7 +1789,16 @@ class TestNsxModuleOverrides:
             registry["projects"]["neuralspotx"]["revision"]
             == "25d8d944aaf9301d343764e22968f9375a37e406"
         )
-        assert "nsx-pmu-armv8m" not in registry.get("modules", {})
+        # Standalone baseline-pinned projects need a module-level revision
+        # too. NSX honours a module's own revision over its project's, so a
+        # project-only pin leaves the packaged registry's module entry in
+        # charge: nsx-pmu-armv8m resolved correctly only because the
+        # registry's tag happens to point at the commit we pin, and
+        # nsx-sensors (whose registry tag does not) silently built v0.1.0
+        # through eight hardware runs.
+        assert registry["modules"]["nsx-pmu-armv8m"]["revision"] == (
+            "5725c065a0c3603132f1064ee2684d1fa8587c88"
+        )
 
     def test_path_override_installs_local_module(self, tmp_path: Path, fake_dist: Path):
         # Create a fake local module with nsx-module.yaml

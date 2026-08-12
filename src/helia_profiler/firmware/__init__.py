@@ -471,6 +471,17 @@ def generate_app(ctx: PipelineContext) -> Path:
                 module_specs.append(NsxModuleSpec(name, _module_project(name, profile)))
                 module_names.add(name)
 
+    # On-target INA228 power monitor (power.driver: ina228): the dedicated
+    # power binary reads the monitor over I2C, so pull in the transport and
+    # driver modules. nsx-sensors' own closure (nsx-core/nsx-spi) resolves
+    # transitively during nsx lock.
+    if power_binary_enabled and config.power.driver == "ina228":
+        module_names = {m.name for m in module_specs}
+        for name in ("nsx-i2c", "nsx-sensors"):
+            if name not in module_names:
+                module_specs.append(NsxModuleSpec(name, _module_project(name, profile)))
+                module_names.add(name)
+
     # BLE-controller-reset GPIO drive (Blue-variant boards, dedicated power
     # binary only — see _ble_reset.j2) needs nsx-gpio even when power_sync
     # itself is off (e.g. power.mode == "internal").
@@ -608,6 +619,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                     for module in artifacts.extra_modules
                     if not module.local and module.ref
                 },
+                app_modules={spec.name: spec.project for spec in module_specs},
             ),
             render_context=render_context,
             arena_regions=aot_arena_regions,

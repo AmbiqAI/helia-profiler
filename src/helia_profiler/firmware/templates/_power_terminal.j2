@@ -11,6 +11,67 @@ static void hpx_power_terminal_report(
     uint32_t error_code,
     bool gate_asserted,
     bool gate_lowered) {
+{% if power_monitor | default(none) == "ina228" %}
+    char record[1024];
+    // The DIAG line sits BEFORE the start marker on purpose: the envelope
+    // parser ignores pre-record lines, so this reaches a bench capture
+    // without widening the host wire contract.
+    int length = snprintf(
+        record,
+        sizeof(record),
+        "HPX_POWER_INA228_DIAG=0x%03X CFG=0x%04X ADCCFG=0x%04X SHUNTCAL=%u\n"
+        "--- HPX_POWER_TERMINAL_START ---\n"
+        "HPX_POWER_TERMINAL_VERSION=1\n"
+        "HPX_POWER_STATUS=%s\n"
+        "HPX_POWER_REQUESTED_COUNT=%lu\n"
+        "HPX_POWER_COMPLETED_COUNT=%lu\n"
+        "HPX_POWER_ELAPSED_US=%llu\n"
+        "HPX_POWER_FINAL_PHASE=%s\n"
+        "HPX_POWER_ERROR_CODE=%lu\n"
+        "HPX_POWER_GATE_ASSERTED=%d\n"
+        "HPX_POWER_GATE_LOWERED=%d\n",
+        (unsigned)g_hpx_ina228_diag_bits,
+        (unsigned)g_hpx_ina228_reg_config,
+        (unsigned)g_hpx_ina228_reg_adccfg,
+        (unsigned)g_hpx_ina228_reg_shuntcal,
+        success ? "ok" : "error",
+        (unsigned long)requested_count,
+        (unsigned long)completed_count,
+        (unsigned long long)elapsed_us,
+        final_phase,
+        (unsigned long)error_code,
+        gate_asserted ? 1 : 0,
+        gate_lowered ? 1 : 0);
+    // Measurement keys are emitted only for a successful window with valid
+    // accumulator reads: the parser requires DURATION_US == ELAPSED_US and
+    // COUNT == COMPLETED_COUNT, so both reuse the terminal values verbatim.
+    if (success && g_hpx_ina228_ok && length > 0 && (unsigned)length < sizeof(record)) {
+        length += snprintf(
+            record + length,
+            sizeof(record) - (unsigned)length,
+            "HPX_POWER_MEASUREMENT_SOURCE=ina228\n"
+            "HPX_POWER_MEASUREMENT_SCOPE=fixed_n_inference\n"
+            "HPX_POWER_ENERGY_NJ=%llu\n"
+            "HPX_POWER_MEASUREMENT_DURATION_US=%llu\n"
+            "HPX_POWER_MEASUREMENT_COUNT=%lu\n"
+            "HPX_POWER_MEASUREMENT_OVERFLOW=%d\n"
+            "HPX_POWER_CHARGE_NC=%llu\n"
+            "HPX_POWER_BUS_VOLTAGE_UV=%lu\n"
+            "HPX_POWER_CALIBRATION_ID={{ ina228_calibration_id }}\n",
+            (unsigned long long)g_hpx_ina228_energy_nj,
+            (unsigned long long)elapsed_us,
+            (unsigned long)completed_count,
+            g_hpx_ina228_overflow ? 1 : 0,
+            (unsigned long long)g_hpx_ina228_charge_nc,
+            (unsigned long)g_hpx_ina228_bus_voltage_uv);
+    }
+    if (length > 0 && (unsigned)length < sizeof(record)) {
+        length += snprintf(
+            record + length,
+            sizeof(record) - (unsigned)length,
+            "--- HPX_POWER_TERMINAL_END ---\n");
+    }
+{% else %}
     char record[512];
     int length = snprintf(
         record,
@@ -34,6 +95,7 @@ static void hpx_power_terminal_report(
         (unsigned long)error_code,
         gate_asserted ? 1 : 0,
         gate_lowered ? 1 : 0);
+{% endif %}
 {% if transport == "rtt" %}
     SEGGER_RTT_Init();
     SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0, SEGGER_RTT_MODE_NO_BLOCK_TRIM);

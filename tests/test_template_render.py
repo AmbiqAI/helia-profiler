@@ -58,6 +58,7 @@ def _render_tflm(
     clean_iters: int = 3,
     power_only: bool = False,
     psram_clock_hz: int = 48_000_000,
+    **extra_vars: object,
 ) -> str:
     registrations = resolver_registrations or ["r.AddConv2D();", "r.AddSoftmax();"]
     return _env.get_template("main.cc.j2").render(
@@ -98,6 +99,7 @@ def _render_tflm(
         heartbeat_every_n_ops=4,
         heartbeat_every_ms=0,
         psram_clock_hz=psram_clock_hz,
+        **extra_vars,
     )
 
 
@@ -116,6 +118,7 @@ def _render_aot(
     clean_iters: int = 3,
     power_only: bool = False,
     psram_clock_hz: int = 48_000_000,
+    **extra_vars: object,
 ) -> str:
     return _env.get_template("main_aot.cc.j2").render(
         aot_prefix="fake",
@@ -152,6 +155,7 @@ def _render_aot(
         heartbeat_every_ms=0,
         pmu_max_ops=4096,
         psram_clock_hz=psram_clock_hz,
+        **extra_vars,
     )
 
 
@@ -725,3 +729,97 @@ class TestMainAotCcRender:
             pmu_max_ops=4096,
         )
         assert "kMaxLayers = 4096;" in large
+
+
+# ---------------------------------------------------------------------------
+# On-target INA228 power monitor (power.driver: ina228)
+# ---------------------------------------------------------------------------
+
+_INA228_VARS: dict[str, object] = {
+    "power_monitor": "ina228",
+    "ina228_i2c_iom": 1,
+    "ina228_i2c_address": 0x40,
+    "ina228_i2c_speed_hz": 400_000,
+    "ina228_shunt_micro_ohms": 2_000_000,
+    "ina228_max_current_ma": 500,
+    "ina228_conversion_time_us": 540,
+    "ina228_averaging_count": 16,
+    "ina228_adc_range": 0,
+    "ina228_shunt_cal": 6250,
+    "ina228_current_lsb_divisor": "13107200000.0",
+    "ina228_calibration_id": "ina228:r2000000uohm:i500ma:adc0",
+}
+
+_INA228_MEASUREMENT_KEYS = (
+    "HPX_POWER_MEASUREMENT_SOURCE=ina228",
+    "HPX_POWER_MEASUREMENT_SCOPE=fixed_n_inference",
+    "HPX_POWER_ENERGY_NJ",
+    "HPX_POWER_MEASUREMENT_DURATION_US",
+    "HPX_POWER_MEASUREMENT_COUNT",
+    "HPX_POWER_MEASUREMENT_OVERFLOW",
+    "HPX_POWER_CHARGE_NC",
+    "HPX_POWER_BUS_VOLTAGE_UV",
+    "HPX_POWER_CALIBRATION_ID=ina228:r2000000uohm:i500ma:adc0",
+)
+
+
+class TestIna228PowerRender:
+    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    def test_power_only_render_contains_monitor_block(self, render):
+        out = render(power_only=True, **_INA228_VARS)
+        for fragment in (
+            "hpx_ina228_setup",
+            "hpx_ina228_window_begin",
+            "hpx_ina228_window_end",
+            "nsx_i2c_interface_init(&g_hpx_ina228_i2c, 400000U)",
+            "ina228_set_adc_range(&g_hpx_ina228, 0U)",
+            "INA228_TIME_540_us",
+            "INA228_COUNT_16",
+            "INA228_MODE_CONT_BUS_SHUNT",
+            'hpx_power_terminal_fail("ina228_init"',
+            'hpx_power_terminal_fail("ina228_arm"',
+            'hpx_power_terminal_fail("ina228_read"',
+            # SHUNT_CAL is read back and required non-zero: an uncalibrated
+            # part silently reports zero current/energy (hardware finding).
+            "g_hpx_ina228_shunt_cal == 0U",
+            # Accumulators read raw (40-bit) rather than through the float API.
+            "ina228_read_energy_raw",
+            "ina228_read_charge_raw",
+            "/ 13107200000.0",
+            *_INA228_MEASUREMENT_KEYS,
+        ):
+            assert fragment in out, f"missing: {fragment}"
+
+    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    def test_accumulator_calls_bracket_the_sync_window(self, render):
+        """Reset before the gate opens, read after it closes — the I2C
+        traffic must sit strictly outside the measured region."""
+        out = render(power_only=True, **_INA228_VARS)
+        i_setup = out.index("uint32_t ina228_rc = hpx_ina228_setup()")
+        i_begin = out.index("hpx_ina228_window_begin()", i_setup)
+        i_sync_begin = out.index("hpx_sync_window_begin();", i_begin)
+        i_sync_end = out.index("hpx_sync_window_end();", i_sync_begin)
+        out.index("hpx_ina228_window_end()", i_sync_end)  # raises if absent
+
+    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    def test_monitor_statics_precede_terminal_report_definition(self, render):
+        out = render(power_only=True, **_INA228_VARS)
+        assert out.index("static bool     g_hpx_ina228_ok") < out.index(
+            "static void hpx_power_terminal_report("
+        )
+
+    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    def test_profile_binary_never_embeds_monitor_code(self, render):
+        """power_only=false renders (the transport/profile binary) must not
+        pick up monitor code even when the run selects the ina228 driver."""
+        out = render(power_only=False, **_INA228_VARS)
+        assert "ina228" not in out
+
+    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    @pytest.mark.parametrize("power_only", [False, True])
+    def test_renders_without_monitor_stay_clean(self, render, power_only: bool):
+        """No power_monitor var at all (StrictUndefined would raise on a bad
+        gate) and no ina228 content — the WP2 byte-identical guarantee."""
+        out = render(power_only=power_only)
+        assert "ina228" not in out
+        assert "HPX_POWER_MEASUREMENT_SOURCE" not in out

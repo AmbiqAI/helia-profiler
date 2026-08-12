@@ -149,6 +149,34 @@ Power measurement settings.
 | `stats_rate_hz` | int | `1000` | units: hertz |
 | `reset_strategy` | auto \| power_cycle \| none \| debug_reset \| swpoi_reset \| debug_reset+swpoi_reset | `auto` |  |
 | `serial` | str \| null | `null` |  |
+| `ina228` | Ina228Config \| null | `null` |  |
+
+## `power.ina228`
+
+On-target INA228 power monitor wiring and calibration (I2C).
+
+The INA228 sits in series with the target rail and integrates energy and
+charge in hardware; firmware reads the accumulators over I2C around the
+fixed-N inference window.
+
+``board`` selects a known carrier's electrical facts (address strapping,
+onboard shunt) from :data:`INA228_BOARD_PRESETS`; explicit values always
+win over the preset. ``shunt_ohms`` has no bare default on purpose: a
+wrong shunt calibration produces plausible-looking but wrong energy, so
+the value must come either from the user's wiring or from a board that
+physically carries its shunt.
+
+| Key | Type | Default | Notes |
+|---|---|---|---|
+| `board` | str \| null | `null` |  |
+| `shunt_ohms` | float \| null | `null` |  |
+| `max_current_a` | float | `0.5` |  |
+| `i2c_iom` | int | `1` |  |
+| `i2c_address` | int \| null | `null` |  |
+| `i2c_speed_hz` | int | `400000` | units: hertz |
+| `conversion_time_us` | int | `540` |  |
+| `averaging_count` | int | `16` |  |
+| `calibration_id` | str \| null | `null` |  |
 
 ## `output`
 

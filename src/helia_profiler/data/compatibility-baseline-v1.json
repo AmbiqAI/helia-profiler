@@ -35,6 +35,10 @@
     "helia-rt": {
       "url": "https://github.com/AmbiqAI/helia-rt.git",
       "ref": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62"
+    },
+    "nsx-sensors": {
+      "url": "https://github.com/AmbiqAI/nsx-sensors.git",
+      "ref": "c219a2bc98c62f96819fae20ab6c8911fcea3e25"
     }
   },
   "modules": {
@@ -61,6 +65,10 @@
     "nsx-helia-rt": {
       "project": "helia-rt",
       "ref": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62"
+    },
+    "nsx-sensors": {
+      "project": "nsx-sensors",
+      "ref": "c219a2bc98c62f96819fae20ab6c8911fcea3e25"
     }
   },
   "engines": {
