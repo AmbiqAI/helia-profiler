@@ -144,3 +144,17 @@ constraint and its assertion in `test_security_floors_are_declared`.
 `uv lock` strips the `# x-release-please-version` marker from the
 `helia-profiler` entry in `uv.lock`. Restore it before committing — the
 `package` CI job requires exactly one marker.
+
+## Compatibility Baseline Pins
+
+NSX resolves a module-level registry revision ahead of an app's
+project-level override — including the *packaged* registry's module
+defaults. A baseline pin therefore must reach the generated
+`module_registry.modules` entry, not just the project entry
+(`_render_module_registry` handles this for every app module owned by a
+pinned project). `prepare_locked_dependencies` independently verifies the
+lock's resolved commits against the baseline and raises `VersionError` on
+drift, so a resolver disagreement fails loudly instead of shipping
+unqualified sources under a QUALIFIED claim. When adding a baseline
+project, assert the pin in the *lock/manifest module entry* in tests —
+never encode the currently-observed registry shape as a golden.
