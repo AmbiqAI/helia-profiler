@@ -619,6 +619,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                     for module in artifacts.extra_modules
                     if not module.local and module.ref
                 },
+                app_modules={spec.name: spec.project for spec in module_specs},
             ),
             render_context=render_context,
             arena_regions=aot_arena_regions,

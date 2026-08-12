@@ -814,10 +814,19 @@ class TestGenerateApp:
         assert "nsx-i2c" in nsx_yml
         assert "nsx-sensors" in nsx_yml
         assert "nsx::sensors" in cmake
-        # The compatibility baseline pins the nsx-sensors project at the
-        # first release with a correct SHUNT_CAL calibration (v0.2.0);
-        # generated manifests must carry that exact ref.
-        assert "9c130859486327e9859f5fcc90a41171ef89ef7a" in nsx_yml
+        # The baseline pin must reach BOTH the module entry and the
+        # module_registry's module-level override. NSX honours a module-level
+        # revision over its owning project's, so a project-only pin silently
+        # resolves the packaged registry's commit while nsx.yml still claims
+        # the baseline ref — hardware bring-up built nsx-sensors v0.1.0 for
+        # eight runs that way.
+        pinned = "c219a2bc98c62f96819fae20ab6c8911fcea3e25"
+        assert pinned in nsx_yml
+        modules_block = nsx_yml.split("module_registry:", 1)[1].split("modules:", 1)[1]
+        sensors_entry = modules_block.split("nsx-sensors:", 1)[1].split("\n    nsx-", 1)[0]
+        assert pinned in sensors_entry, (
+            "nsx-sensors needs a module-level revision pin, not only a project one"
+        )
         # Monitor code lives only in the power binary, never the profile one.
         assert "hpx_ina228_setup" in main_power_cc
         assert "HPX_POWER_MEASUREMENT_SOURCE=ina228" in main_power_cc
@@ -1780,7 +1789,16 @@ class TestNsxModuleOverrides:
             registry["projects"]["neuralspotx"]["revision"]
             == "25d8d944aaf9301d343764e22968f9375a37e406"
         )
-        assert "nsx-pmu-armv8m" not in registry.get("modules", {})
+        # Standalone baseline-pinned projects need a module-level revision
+        # too. NSX honours a module's own revision over its project's, so a
+        # project-only pin leaves the packaged registry's module entry in
+        # charge: nsx-pmu-armv8m resolved correctly only because the
+        # registry's tag happens to point at the commit we pin, and
+        # nsx-sensors (whose registry tag does not) silently built v0.1.0
+        # through eight hardware runs.
+        assert registry["modules"]["nsx-pmu-armv8m"]["revision"] == (
+            "5725c065a0c3603132f1064ee2684d1fa8587c88"
+        )
 
     def test_path_override_installs_local_module(self, tmp_path: Path, fake_dist: Path):
         # Create a fake local module with nsx-module.yaml

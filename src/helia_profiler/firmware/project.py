@@ -164,6 +164,7 @@ def _render_module_registry(
     profile: dict[str, Any],
     project_ref_overrides: dict[str, tuple[str, str]],
     module_ref_overrides: dict[str, tuple[str, str]],
+    app_modules: dict[str, str] | None = None,
 ) -> str:
     """Render the ``module_registry`` block for nsx.yml from the profile.
 
@@ -217,6 +218,21 @@ def _render_module_registry(
                 aligned = dict(override)
                 aligned["revision"] = ref_overrides_by_project[project]
                 module_overrides[name] = aligned
+        # Modules the app pulls in that the starter profile never mentions
+        # (e.g. nsx-sensors for the INA228 power monitor) have no entry in
+        # module_overrides to align, so the loop above misses them and NSX
+        # falls back to its packaged registry's module-level revision —
+        # silently resolving a different commit than the qualified baseline
+        # pins, while nsx.yml still *claims* the baseline ref. Emit an
+        # explicit module pin for those too.
+        for name, project in (app_modules or {}).items():
+            if project not in ref_overrides_by_project or name in module_overrides:
+                continue
+            base_module = base_modules.get(name) if isinstance(base_modules, dict) else None
+            aligned = dict(base_module) if isinstance(base_module, dict) else {}
+            aligned["project"] = project
+            aligned["revision"] = ref_overrides_by_project[project]
+            module_overrides[name] = aligned
     if not project_overrides and not module_overrides:
         return ""
     registry: dict[str, Any] = {}
