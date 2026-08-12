@@ -817,7 +817,7 @@ class TestGenerateApp:
         # The compatibility baseline pins the nsx-sensors project at the
         # first release with a correct SHUNT_CAL calibration (v0.2.0);
         # generated manifests must carry that exact ref.
-        assert "3dbc15ffbb35df496294ff3215ddd04e22a5ab93" in nsx_yml
+        assert "9c130859486327e9859f5fcc90a41171ef89ef7a" in nsx_yml
         # Monitor code lives only in the power binary, never the profile one.
         assert "hpx_ina228_setup" in main_power_cc
         assert "HPX_POWER_MEASUREMENT_SOURCE=ina228" in main_power_cc

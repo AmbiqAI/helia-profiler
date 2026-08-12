@@ -64,10 +64,13 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "arm-cmsis-nn": "62967ecf040b1e3bb278e76a9828200187f02471",
         "ns-cmsis-nn": "2bb81953a20518cf65613bd612352cc462dd7a5e",
         "helia-rt": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62",
-        # nsx-sensors v0.2.0 — first release with a datasheet-correct
-        # INA228 SHUNT_CAL calibration (older revisions read zero current
-        # at ADCRANGE=0). Pinned for power.driver: ina228 (issue #95).
-        "nsx-sensors": "3dbc15ffbb35df496294ff3215ddd04e22a5ab93",
+        # nsx-sensors v0.2.1 — first release where the INA228 driver is
+        # correct end-to-end: SHUNT_CAL datasheet scaling (v0.2.0), plus
+        # ADCRANGE moved to its real register (CONFIG bit 4 — v0.2.0 wrote
+        # a VTCT bit, so range-1 calibrations came out 4x wrong), DEVICE_ID
+        # rev-nibble masking, and conversion_ready reading CNVRF. Pinned
+        # for power.driver: ina228 (issue #95).
+        "nsx-sensors": "9c130859486327e9859f5fcc90a41171ef89ef7a",
     }
     assert {module.name: module.ref for module in baseline.modules} == {
         "nsx-ambiq-bsp": "a9f4ec25a162f6f3700623feb691423bb5a51132",
@@ -76,7 +79,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "arm-cmsis-nn": "62967ecf040b1e3bb278e76a9828200187f02471",
         "nsx-cmsis-nn": "2bb81953a20518cf65613bd612352cc462dd7a5e",
         "nsx-helia-rt": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62",
-        "nsx-sensors": "3dbc15ffbb35df496294ff3215ddd04e22a5ab93",
+        "nsx-sensors": "9c130859486327e9859f5fcc90a41171ef89ef7a",
     }
     assert baseline.engine("helia-rt").version == "1.16.0"
     assert baseline.engine("helia-aot").min_version == "0.18.0"

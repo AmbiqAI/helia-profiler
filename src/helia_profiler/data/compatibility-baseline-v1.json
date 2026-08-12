@@ -38,7 +38,7 @@
     },
     "nsx-sensors": {
       "url": "https://github.com/AmbiqAI/nsx-sensors.git",
-      "ref": "3dbc15ffbb35df496294ff3215ddd04e22a5ab93"
+      "ref": "9c130859486327e9859f5fcc90a41171ef89ef7a"
     }
   },
   "modules": {
@@ -68,7 +68,7 @@
     },
     "nsx-sensors": {
       "project": "nsx-sensors",
-      "ref": "3dbc15ffbb35df496294ff3215ddd04e22a5ab93"
+      "ref": "9c130859486327e9859f5fcc90a41171ef89ef7a"
     }
   },
   "engines": {
