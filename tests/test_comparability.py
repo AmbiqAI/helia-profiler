@@ -14,10 +14,14 @@ def _run(
     compiler_version: str = "12.2.1",
     system_clock_hz: int = 250_000_000,
     ops=("CONV_2D",),
+    power: dict | None = None,
 ):
+    summary: dict = {"schema_version": 1, "total_cycles": 100}
+    if power is not None:
+        summary["power"] = power
     return RunArtifacts(
         path=Path("results"),
-        summary={"schema_version": 1, "total_cycles": 100},
+        summary=summary,
         metadata={
             "schema_version": 1,
             "hpx_version": "0.1.0",
@@ -75,6 +79,39 @@ def test_cross_machine_provenance_differences_are_structured():
         "dimension.compiler_version_differs",
         "dimension.system_clock_hz_differs",
     }
+
+
+def test_cross_instrument_power_scopes_omit_power_metrics_only():
+    """Joulescope (host-gated window) vs INA228 (on-device accumulators) are
+    different-instrument measurements: power deltas are omitted with an
+    explanatory issue, while run/layer performance deltas stay comparable."""
+    joulescope = _run(
+        power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid"}
+    )
+    ina228 = _run(
+        power={"measurement_scope": "on_device_gated_inference", "integrity": "valid"}
+    )
+
+    assessment = assess_comparability(joulescope, ina228)
+
+    assert assessment.run_metrics_comparable
+    assert assessment.layers_comparable
+    assert not assessment.power_metrics_comparable
+    issue = next(
+        issue
+        for issue in assessment.issues
+        if issue.code == "metric.power_power_scope_mismatch"
+    )
+    assert issue.severity is ComparabilitySeverity.METRIC_BLOCKING
+    assert issue.context["baseline"] == "gpio_gated_clean_window"
+    assert issue.context["candidate"] == "on_device_gated_inference"
+
+
+def test_matching_on_device_power_scopes_stay_comparable():
+    ina228 = {"measurement_scope": "on_device_gated_inference", "integrity": "valid"}
+    assessment = assess_comparability(_run(power=ina228), _run(power=ina228))
+
+    assert assessment.power_metrics_comparable
 
 
 def test_partial_manifest_dimensions_fall_back_to_metadata():

@@ -8,6 +8,11 @@ charge/energy on-device and streams it to the host. This page walks through
 wiring, the minimal config to get a first reading, and every knob you're
 likely to need afterward — from simplest to most advanced.
 
+No Joulescope on the bench? A **TI INA228 monitor on the target's own I2C
+bus** (e.g. a MikroE Power Monitor Click) can measure whole-window energy
+instead — see [On-device INA228 measurement](#on-device-ina228-measurement)
+for the trade-offs.
+
 ## What you need
 
 - **A Joulescope JS110, JS220, or JS320**, wired in series between your bench
@@ -381,6 +386,88 @@ you understand the tradeoff:
   the HAL exposes it) on AP5-family SoCs. This is capability-gated and needs
   no configuration.
 
+## On-device INA228 measurement
+
+A TI **INA228** current/power monitor wired into the target rail and onto the
+target's own I2C bus can replace the Joulescope for **aggregate energy**
+measurements. The measurement model inverts: instead of a host instrument
+watching a GPIO gate, the INA228 integrates energy and charge in hardware and
+the firmware itself brackets the fixed-N inference window —
+
+```
+reset accumulators → run N inferences → read energy/charge → report
+```
+
+All I2C traffic happens strictly outside the measured region, and the
+monitor's ADC integrates autonomously, so nothing the host does can
+contaminate the window. Results arrive through the same post-run terminal
+report the dedicated power firmware already emits.
+
+```yaml
+power:
+  enabled: true
+  driver: ina228
+  mode: internal          # the target measures itself
+  ina228:
+    shunt_ohms: 2.0       # REQUIRED — the physical shunt on your wiring
+    max_current_a: 0.5    # full-scale current for calibration
+    i2c_iom: 1            # Ambiq IOM instance wired to the monitor
+    # i2c_address: 0x40   # A0/A1 strapping
+    # conversion_time_us: 540   # 50|84|150|280|540|1052|2074|4120
+    # averaging_count: 16       # 1|4|16|64|128|256|512|1024
+```
+
+`shunt_ohms` has **no default on purpose**: a wrong shunt calibration
+produces plausible-looking but wrong energy, and the resistor value is a
+physical property of your wiring that HPX cannot guess. Check your Click
+module's schematic.
+
+What you get in `summary.json` is an `on_device_summary` block — integrated
+energy (nJ), charge (nC), bus voltage, and the inference count — with
+`measurement_scope: on_device_gated_inference`. Divide energy by count for
+per-inference energy; average power is energy over the window duration.
+
+### When to use which instrument
+
+| | Joulescope | INA228 |
+|---|---|---|
+| Cost | Bench instrument | A few dollars + Click module |
+| Streaming samples | ~2 MSa/s | none (hardware accumulators) |
+| Whole-window energy | ✓ (on-device integration) | ✓ (on-device integration) |
+| Current distribution (median/p95/p99) | ✓ | ✗ |
+| Per-layer power attribution | future | ✗ |
+| Host wiring | series supply + GPIO gate wires | none (target I2C) |
+| Powers/resets the target rail | ✓ (relay, power-cycle recovery) | ✗ |
+
+The INA228 path is a *cheap aggregate-energy instrument*, not a Joulescope
+replacement: with 50 µs minimum conversions it cannot resolve per-layer
+detail, and it reports one integrated window, not a sample stream.
+
+!!! note "Cross-instrument comparisons"
+    Runs measured with different instruments carry different
+    `measurement_scope` values, so `hpx compare` **omits power deltas**
+    between a Joulescope run and an INA228 run (the comparison itself still
+    works for cycles/PMU metrics, and the report says why power was
+    omitted). Energy figures also legitimately differ between instruments:
+    the INA228 measures whatever rail your shunt sits in, which is usually
+    not the same net the Joulescope was in series with.
+
+### Failure modes
+
+The monitor is brought up before any heavy setup, so a missing or mis-wired
+part fails fast with a typed terminal phase:
+
+- `ina228_init` — I2C bring-up, ID check (manufacturer `0x5449`, device
+  `0x228`), or configuration failed. Check wiring, `i2c_iom`, and address
+  strapping.
+- `ina228_arm` — the accumulator reset write failed right before the window.
+- `ina228_read` — the post-window read-back failed; the window ran but the
+  measurement was lost, so the run is treated as failed rather than
+  silently reporting nothing.
+- An accumulator **overflow** during a very long window fails the run
+  explicitly (`On-device power monitor reported accumulator overflow`).
+  Shorten the window or raise `conversion_time_us`/`averaging_count`.
+
 ## Verifying a capture
 
 The terminal prints a compact power table at the end of a run:
@@ -547,10 +634,11 @@ the JS320 bench.
     against the `whole_capture_window` row in `detailed/power_summary.csv`.
 
 ??? failure "`driver: ondevice` raises `PowerError: not yet implemented`"
-    The on-device driver is present in `power.driver`'s choices for forward
-    compatibility, but its capture path is currently a stub and always
-    raises. Use `power.driver: joulescope` (the default) for any real
-    measurement today.
+    The generic `ondevice` driver is a stub with no firmware-side producer
+    and always raises. For a real on-target measurement use
+    `power.driver: ina228` with an INA228 wired to the target's I2C bus
+    (see [On-device INA228 measurement](#on-device-ina228-measurement)),
+    or `power.driver: joulescope` (the default) for a bench instrument.
 
 ??? failure "TOPS-per-Watt missing from summary"
     Only emitted for heliaAOT runs with power enabled. heliaRT/TFLM
