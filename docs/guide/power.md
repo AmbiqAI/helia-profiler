@@ -518,6 +518,47 @@ detail, and it reports one integrated window, not a sample stream.
     the INA228 measures whatever rail your shunt sits in, which is usually
     not the same net the Joulescope was in series with.
 
+### Bring-up without a sense resistor
+
+You can smoke-test the whole path before a proper shunt arrives. Short `IN+`
+to `IN-` with a jumper — the target then runs through the terminal on the
+wiring's own parasitic resistance (a few milliohms of wire and screw-contact
+resistance) — and set a deliberately-labelled calibration:
+
+```yaml
+    shunt_ohms: 0.5
+    calibration_id: "UNCALIBRATED-parasitic-path"
+```
+
+Short the terminal rather than leaving it open: floating sense inputs give a
+meaningless differential and the target loses its supply path.
+
+Everything except the absolute current scale is exercised for real — I2C
+bring-up and the manufacturer/device ID probes, ADC configuration, the
+accumulator reset/read bracketing, the terminal envelope, and the host-side
+parse into `OnDevicePowerSummary`. **`bus_voltage_uv` is fully trustworthy**
+because it does not involve the shunt at all: seeing ~1.8 V (or whatever your
+rail is) confirms the chip, the bus, and the read path in one number.
+
+What is *not* valid is magnitude. The reported current is the true current
+scaled by `R_parasitic / shunt_ohms`, so with milliohms of wire against a
+configured 0.5 Ω expect readings one to two orders of magnitude low. Energy
+and charge inherit the same error. Label the run — that is what
+`calibration_id` is for — so the numbers are never mistaken for a real
+measurement later.
+
+Two things worth reading into the result:
+
+- **Energy exactly zero** (with a non-zero bus voltage) points at the
+  calibration register, not your wiring — the pre-v0.2.0 `nsx-sensors`
+  SHUNT_CAL bug wrote `SHUNT_CAL = 0` and zeroed every current-derived
+  reading. The qualified baseline pins the fixed release, so this should not
+  occur.
+- **`charge_nc` zero while `energy_nj` is non-zero** means reversed polarity:
+  the INA228's ENERGY register is unsigned but CHARGE is signed, and the
+  firmware clamps negatives to zero rather than letting them wrap. Swap
+  `IN+`/`IN-`.
+
 ### Failure modes
 
 The monitor is brought up before any heavy setup, so a missing or mis-wired
