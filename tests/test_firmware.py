@@ -814,6 +814,10 @@ class TestGenerateApp:
         assert "nsx-i2c" in nsx_yml
         assert "nsx-sensors" in nsx_yml
         assert "nsx::sensors" in cmake
+        # The compatibility baseline pins the nsx-sensors project at the
+        # first release with a correct SHUNT_CAL calibration (v0.2.0);
+        # generated manifests must carry that exact ref.
+        assert "3dbc15ffbb35df496294ff3215ddd04e22a5ab93" in nsx_yml
         # Monitor code lives only in the power binary, never the profile one.
         assert "hpx_ina228_setup" in main_power_cc
         assert "HPX_POWER_MEASUREMENT_SOURCE=ina228" in main_power_cc
