@@ -165,21 +165,76 @@ power:
   go_gpio_pin: 7      # J8 GP7 — go
 ```
 
-### Verified EVB-to-Joulescope wiring
+### EVB-to-Joulescope wiring
 
-Use the following direct connections for the validated benches. All signal
-grounds must share the EVB/Joulescope reference, and `power.io_voltage` must
-match the EVB GPIO rail.
+Three signals plus a shared ground carry the handshake. Only the **gate**
+is required to produce a valid gated measurement; state and GO add
+race-robustness (see [Lock-step](#lock-step-3-wire-handshake)).
 
-| EVB / instrument | Gate: device → monitor | State: device → monitor | GO: monitor → device |
+| Signal | Direction | Joulescope channel | Purpose |
 |---|---|---|---|
-| Apollo510 EVB + JS320 | GPIO 29 → `INPUT0` | GPIO 36 → `INPUT1` | `OUTPUT0` → GPIO 14 |
-| Apollo330 Plus EVB + JS110 | J8 GP5 → `INPUT0` | J8 GP6 → `INPUT1` | `OUTPUT0` → J8 GP7 |
+| Gate | device → monitor | `INPUT0` | Brackets the measured window |
+| State | device → monitor | `INPUT1` | Ready / fault flag |
+| GO | monitor → device | `OUTPUT0` | Host says "poller armed, you may run" |
 
-For Apollo330 Plus, `5:6:7` are **Apollo device GPIO pin numbers**, not
-Joulescope channel numbers. The matching JS110 channels are always
-`INPUT0:INPUT1:OUTPUT0` (`0:1:0` internally). Put the device-pin mapping in
-the profile config and pin the instrument when more than one is connected:
+Joulescope channel numbers are always `INPUT0:INPUT1:OUTPUT0` (`0:1:0`
+internally) regardless of board — the numbers in the table below are
+**Apollo device GPIO pin numbers**.
+
+| EVB | Gate | State | GO | Status |
+|---|---|---|---|---|
+| Apollo510 EVB | 29 | 36 | 14 | Verified (JS320) |
+| Apollo510B EVB | 22 | 23 | 24 | See note below |
+| Apollo4 Plus EVB (incl. Blue KBR/KXR) | 22 | 23 | 24 | AutoDeploy AP4P wiring |
+| Apollo4 Lite EVB (incl. Blue) | 61 | 23 | 24 | 22 unavailable on AP4L |
+| Apollo3 Plus EVB | 26 | 24 | 25 | 22/23 are the J-Link OB VCOM UART |
+| Apollo330 Plus EVB | 5 | 6 | 7 | Verified (JS110); J8 header |
+
+!!! warning "Registry defaults are not always the verified wiring"
+    Two boards ship built-in defaults that differ from the wiring above,
+    because the defaults were inherited rather than measured:
+
+    - **Apollo510B EVB** defaults to the Apollo510 EVB's `29/36/14`, but
+      those pins are not readily broken out on the 510B. Use `22/23/24`
+      (their only BSP claim is IOM7, which the power binary never uses)
+      and set them explicitly in config.
+    - **Apollo330 Plus EVB** defaults to `10/0/0` (the generic fallback,
+      state and GO disabled). The verified JS110 bench is `5/6/7`.
+
+    Always set `sync_gpio_pin` / `state_gpio_pin` / `go_gpio_pin`
+    explicitly for these two boards rather than trusting the defaults.
+
+!!! danger "Apollo510B: avoid GPIO 47/48/49"
+    They are accessible on the header but double as `VDD18_SWITCH`,
+    `VDDUSB33_SWITCH` and `VDDUSB0P9_SWITCH` — driving them as GPIO during
+    a power measurement can toggle supply rails. Check
+    `am_bsp_pins.h` for your board before choosing alternatives, and avoid
+    whichever IOM carries an on-target power monitor (`power.ina228.i2c_iom`;
+    IOM1 = GPIO 8/9 on the 510B).
+
+#### Vref: required on JS220 and JS320, absent on JS110
+
+The JS110's GPI thresholds are fixed; `power.io_voltage` only tells HPX how
+to interpret them. The **JS220 and JS320 GPIO connector carries a Vref pin
+that sets both the input threshold and the output drive level**, and HPX
+never programs it — there is no software knob, so it must be wired:
+
+> "The GPIO includes an external Vref signal. When using the GPIO with your
+> device under test, connect Vref to the supply voltage on the device under
+> test." — [JS220 User's Guide](https://download.joulescope.com/products/JS220/JS220-K000/users_guide/Joulescope%20JS220%20User's%20Guide.pdf)
+
+Leaving Vref floating on a JS220/JS320 gives undefined thresholds — the
+usual symptom is a gate that never reads high, so every capture degrades to
+"rose but did not fall" or free-run. The instrument can fall back to an
+internal 3.3 V reference, but on a 1.8 V EVB rail that threshold will not
+match your logic levels; wire Vref to the board's GPIO rail. Vref must also
+satisfy `Vref < (VUSB − 0.5 V)`. Connecting it additionally prevents the
+GPOs from back-powering the target.
+
+`power.io_voltage` must match that same rail (default `1.8`).
+
+For Apollo330 Plus, put the device-pin mapping in the profile config and pin
+the instrument when more than one is connected:
 
 ```yaml
 target:
@@ -198,10 +253,15 @@ hpx profile model.tflite --config hpx.yml --jlink-serial AP330_JLINK
 
 ### `io_voltage`
 
-`power.io_voltage` (default `1.8`) tells the Joulescope's GPI reference what
-voltage represents a logic-high on the gate/state lines. It must match the
-board's GPIO I/O rail — a mismatch reads a gate that never appears to go
-high (or reads noise as always-high).
+`power.io_voltage` (default `1.8`) tells HPX what voltage represents a
+logic-high on the gate/state lines. It must match the board's GPIO I/O rail
+— a mismatch reads a gate that never appears to go high (or reads noise as
+always-high).
+
+It is a *host-side interpretation* setting only: HPX never programs an IO
+voltage on the instrument. On a JS220/JS320 the physical threshold comes
+from the wired Vref pin, so `io_voltage` and Vref must describe the same
+rail — see [Vref](#vref-required-on-js220-and-js320-absent-on-js110).
 
 ## Lock-step (3-wire handshake)
 
