@@ -475,7 +475,7 @@ def generate_app(ctx: PipelineContext) -> Path:
     # power binary reads the monitor over I2C, so pull in the transport and
     # driver modules. nsx-sensors' own closure (nsx-core/nsx-spi) resolves
     # transitively during nsx lock.
-    if power_binary_enabled and config.power.driver == "ina228":
+    if power_binary_enabled and config.power.ina228 is not None:
         module_names = {m.name for m in module_specs}
         for name in ("nsx-i2c", "nsx-sensors"):
             if name not in module_names:

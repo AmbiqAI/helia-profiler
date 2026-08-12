@@ -75,19 +75,33 @@ class CollectPowerTerminalStage:
             raise PowerError("Power firmware did not confirm that GATE was lowered.")
         if envelope.measurement is not None and envelope.measurement.overflow:
             measurement = envelope.measurement
-            raise PowerError(
-                "On-device power monitor reported accumulator overflow.",
-                hint=(
-                    f"Monitor saw energy={measurement.energy_nj} nJ, "
-                    f"charge={measurement.charge_nc} nC, "
-                    f"bus_voltage={measurement.bus_voltage_uv} uV over "
-                    f"{measurement.duration_us} us. An implausible bus voltage "
-                    "usually means the VBUS sense input is floating — wire it "
-                    "to the target-side rail node. Check the "
-                    "'Power firmware diagnostic' log line for the raw DIAG bits "
-                    "(0x200=MATHOF, 0x400=CHARGEOF, 0x800=ENERGYOF)."
-                ),
-            )
+            if not internal_mode:
+                # The monitor is present but is not this run's measurement of
+                # record (e.g. an INA228 left on the bus while a Joulescope
+                # measures, or with its sense inputs disconnected). Its health
+                # flags are informational — failing the run would discard a
+                # perfectly good external capture.
+                log.warning(
+                    "On-device power monitor reported accumulator overflow; "
+                    "ignoring because %s is the measurement of record.",
+                    ctx.config.power.driver,
+                )
+                measurement = None
+            else:
+                raise PowerError(
+                    "On-device power monitor reported accumulator overflow.",
+                    hint=(
+                        f"Monitor saw energy={measurement.energy_nj} nJ, "
+                        f"charge={measurement.charge_nc} nC, "
+                        f"bus_voltage={measurement.bus_voltage_uv} uV over "
+                        f"{measurement.duration_us} us. An implausible bus "
+                        "voltage usually means the VBUS sense input is "
+                        "floating — wire it to the target-side rail node. "
+                        "Check the 'Power firmware diagnostic' log line for "
+                        "the raw DIAG bits (0x200=MATHOF, 0x400=CHARGEOF, "
+                        "0x800=ENERGYOF)."
+                    ),
+                )
         if internal_mode and envelope.measurement is None:
             raise PowerError("Internal power mode requires an on-device measurement payload.")
 
