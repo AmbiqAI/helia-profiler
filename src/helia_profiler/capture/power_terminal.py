@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Iterable
 from pathlib import Path
@@ -12,6 +13,8 @@ from ..results import (
     PowerTerminalRecord,
 )
 from ..errors import PowerError
+
+log = logging.getLogger("hpx")
 
 POWER_TERMINAL_START = "--- HPX_POWER_TERMINAL_START ---"
 POWER_TERMINAL_END = "--- HPX_POWER_TERMINAL_END ---"
@@ -214,6 +217,20 @@ def parse_power_terminal(lines: Iterable[str]) -> PowerTerminalRecord:
     return parse_power_terminal_envelope(lines).terminal
 
 
+def _log_pre_record_diagnostics(text: str) -> None:
+    """Surface firmware diagnostic lines emitted before the envelope.
+
+    The wire contract only covers the record between the start/end markers;
+    monitor-specific diagnostics (e.g. ``HPX_POWER_INA228_DIAG=0x...``) ride
+    in front of it precisely so they can change freely. Logging them here is
+    what makes a bench failure diagnosable from the host output alone.
+    """
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("HPX_POWER_"):
+            log.info("Power firmware diagnostic: %s", line)
+
+
 def collect_power_terminal_envelope_rtt(
     *,
     build_dir: Path,
@@ -260,6 +277,7 @@ def collect_power_terminal_envelope_rtt(
                         if end < 0:
                             break
                         end += len(POWER_TERMINAL_END)
+                        _log_pre_record_diagnostics(text[:start])
                         try:
                             return parse_power_terminal_envelope(
                                 text[start:end].splitlines()

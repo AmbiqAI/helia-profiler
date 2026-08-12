@@ -74,7 +74,20 @@ class CollectPowerTerminalStage:
         if not terminal.gate_lowered:
             raise PowerError("Power firmware did not confirm that GATE was lowered.")
         if envelope.measurement is not None and envelope.measurement.overflow:
-            raise PowerError("On-device power monitor reported accumulator overflow.")
+            measurement = envelope.measurement
+            raise PowerError(
+                "On-device power monitor reported accumulator overflow.",
+                hint=(
+                    f"Monitor saw energy={measurement.energy_nj} nJ, "
+                    f"charge={measurement.charge_nc} nC, "
+                    f"bus_voltage={measurement.bus_voltage_uv} uV over "
+                    f"{measurement.duration_us} us. An implausible bus voltage "
+                    "usually means the VBUS sense input is floating — wire it "
+                    "to the target-side rail node. Check the "
+                    "'Power firmware diagnostic' log line for the raw DIAG bits "
+                    "(0x200=MATHOF, 0x400=CHARGEOF, 0x800=ENERGYOF)."
+                ),
+            )
         if internal_mode and envelope.measurement is None:
             raise PowerError("Internal power mode requires an on-device measurement payload.")
 

@@ -605,6 +605,14 @@ part fails fast with a typed terminal phase:
   strapping — on a MikroE Power Monitor Click the as-shipped address is
   `0x4A`, so leaving `i2c_address` at the `0x40` default fails here.
 - `ina228_arm` — the accumulator reset write failed right before the window.
+- `ina228_init` code 10/11 — the shunt calibration write failed, or read
+  back a different value than was written. HPX computes `SHUNT_CAL`
+  host-side and verifies the register after writing it, because an
+  unverified calibration fails silently in the worst possible way: with
+  `SHUNT_CAL = 0` the chip reports **exactly zero** current, power, energy
+  and charge while bus voltage still reads perfectly, and every conversion
+  raises `MATHOF`. If you hit this, the monitor is reachable but not
+  calibrated — treat it as a driver/bus problem, not a wiring one.
 - `ina228_read` — the post-window read-back failed; the window ran but the
   measurement was lost, so the run is treated as failed rather than
   silently reporting nothing.

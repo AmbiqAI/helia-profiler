@@ -19,7 +19,7 @@ static void hpx_power_terminal_report(
     int length = snprintf(
         record,
         sizeof(record),
-        "HPX_POWER_INA228_DIAG=0x%03X\n"
+        "HPX_POWER_INA228_DIAG=0x%03X CFG=0x%04X ADCCFG=0x%04X SHUNTCAL=%u\n"
         "--- HPX_POWER_TERMINAL_START ---\n"
         "HPX_POWER_TERMINAL_VERSION=1\n"
         "HPX_POWER_STATUS=%s\n"
@@ -31,6 +31,9 @@ static void hpx_power_terminal_report(
         "HPX_POWER_GATE_ASSERTED=%d\n"
         "HPX_POWER_GATE_LOWERED=%d\n",
         (unsigned)g_hpx_ina228_diag_bits,
+        (unsigned)g_hpx_ina228_reg_config,
+        (unsigned)g_hpx_ina228_reg_adccfg,
+        (unsigned)g_hpx_ina228_reg_shuntcal,
         success ? "ok" : "error",
         (unsigned long)requested_count,
         (unsigned long)completed_count,

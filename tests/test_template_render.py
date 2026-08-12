@@ -745,6 +745,7 @@ _INA228_VARS: dict[str, object] = {
     "ina228_conversion_time_us": 540,
     "ina228_averaging_count": 16,
     "ina228_adc_range": 0,
+    "ina228_shunt_cal": 6250,
     "ina228_calibration_id": "ina228:r2000000uohm:i500ma:adc0",
 }
 
@@ -777,6 +778,11 @@ class TestIna228PowerRender:
             'hpx_power_terminal_fail("ina228_init"',
             'hpx_power_terminal_fail("ina228_arm"',
             'hpx_power_terminal_fail("ina228_read"',
+            # SHUNT_CAL is raw-written from the host-computed constant and
+            # read back — an unverified calibration silently yields zero
+            # current/energy (see the hardware bring-up finding).
+            "cal_buf[0] = 0x02U;",
+            "cal_readback != 6250U",
             *_INA228_MEASUREMENT_KEYS,
         ):
             assert fragment in out, f"missing: {fragment}"

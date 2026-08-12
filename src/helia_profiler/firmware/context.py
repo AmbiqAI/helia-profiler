@@ -71,6 +71,11 @@ class PowerMonitorContext:
     ina228_conversion_time_us: int = 0
     ina228_averaging_count: int = 0
     ina228_adc_range: int = 0
+    # SHUNT_CAL register value, precomputed host-side so the firmware can
+    # raw-write and readback-verify a known constant instead of depending on
+    # the driver's float pipeline (first Apollo510B bring-up found the
+    # driver's masked write leaving the register at 0).
+    ina228_shunt_cal: int = 0
     ina228_calibration_id: str = ""
 
     @classmethod
@@ -87,6 +92,16 @@ class PowerMonitorContext:
         # for 4x resolution; select it whenever the configured worst-case
         # shunt drop fits, otherwise stay on the wide range.
         adc_range = 1 if ina.max_current_a * shunt_ohms <= 0.04096 else 0
+        # SHUNT_CAL = 13107.2e6 * CURRENT_LSB * R_shunt (x4 when ADCRANGE=1),
+        # CURRENT_LSB = max_current / 2^19. 15-bit register.
+        current_lsb = ina.max_current_a / (1 << 19)
+        shunt_cal = round(13107.2e6 * current_lsb * shunt_ohms) * (4 if adc_range else 1)
+        if not 0 < shunt_cal <= 0x7FFF:
+            raise FirmwareError(
+                f"INA228 SHUNT_CAL {shunt_cal} out of range for "
+                f"shunt={shunt_ohms} ohm, max_current={ina.max_current_a} A; "
+                "adjust power.ina228.max_current_a."
+            )
         board_tag = f":{ina.board}" if ina.board is not None else ""
         calibration_id = ina.calibration_id or (
             f"ina228{board_tag}:r{shunt_micro_ohms}uohm:i{max_current_ma}ma:adc{adc_range}"
@@ -101,6 +116,7 @@ class PowerMonitorContext:
             ina228_conversion_time_us=ina.conversion_time_us,
             ina228_averaging_count=ina.averaging_count,
             ina228_adc_range=adc_range,
+            ina228_shunt_cal=shunt_cal,
             ina228_calibration_id=calibration_id,
         )
 
@@ -365,6 +381,7 @@ class FirmwareRenderContext:
             "ina228_conversion_time_us": self.power_monitor.ina228_conversion_time_us,
             "ina228_averaging_count": self.power_monitor.ina228_averaging_count,
             "ina228_adc_range": self.power_monitor.ina228_adc_range,
+            "ina228_shunt_cal": self.power_monitor.ina228_shunt_cal,
             "ina228_calibration_id": self.power_monitor.ina228_calibration_id,
             "engine_header": self.engine.engine_header,
             "resolver_mode": self.engine.resolver_mode,

@@ -19,7 +19,7 @@ from helia_profiler.config import (
     PowerMode,
     load_config,
 )
-from helia_profiler.errors import PowerError
+from helia_profiler.errors import FirmwareError, PowerError
 from helia_profiler.firmware.context import PowerMonitorContext
 from helia_profiler.power import get_driver, list_drivers
 
@@ -283,6 +283,60 @@ class TestPowerMonitorContext:
         assert monitor.ina228_calibration_id == (
             "ina228:adafruit-ina228:r15000uohm:i500ma:adc1"
         )
+
+    def test_shunt_cal_matches_datasheet_formula(self, tmp_path: Path):
+        """SHUNT_CAL = 13107.2e6 x CURRENT_LSB x R_shunt, x4 at ADCRANGE=1.
+
+        The 0.5 ohm / 0.5 A case is the one verified on Apollo510B hardware:
+        the firmware raw-wrote 6250 and read 6250 back, at which point the
+        measurement worked.
+        """
+        config = _profile_config(
+            tmp_path,
+            {
+                "enabled": True,
+                "driver": "ina228",
+                "mode": "internal",
+                "ina228": {"shunt_ohms": 0.5, "max_current_a": 0.5},
+            },
+        )
+        monitor = PowerMonitorContext.from_config(config)
+        assert monitor.ina228_adc_range == 0  # 0.25 V >> 40.96 mV
+        assert monitor.ina228_shunt_cal == 6250
+
+    def test_shunt_cal_scales_by_four_on_the_high_resolution_range(
+        self, tmp_path: Path
+    ):
+        config = _profile_config(
+            tmp_path,
+            {
+                "enabled": True,
+                "driver": "ina228",
+                "mode": "internal",
+                # 0.5 ohm x 0.05 A = 25 mV -> ADCRANGE=1
+                "ina228": {"shunt_ohms": 0.5, "max_current_a": 0.05},
+            },
+        )
+        monitor = PowerMonitorContext.from_config(config)
+        assert monitor.ina228_adc_range == 1
+        assert monitor.ina228_shunt_cal == 625 * 4
+
+    def test_shunt_cal_overflow_is_rejected_with_actionable_error(
+        self, tmp_path: Path
+    ):
+        """SHUNT_CAL is a 15-bit register; an oversized current/shunt pair
+        must fail at render time rather than silently truncating."""
+        config = _profile_config(
+            tmp_path,
+            {
+                "enabled": True,
+                "driver": "ina228",
+                "mode": "internal",
+                "ina228": {"shunt_ohms": 10.0, "max_current_a": 10.0},
+            },
+        )
+        with pytest.raises(FirmwareError, match="SHUNT_CAL"):
+            PowerMonitorContext.from_config(config)
 
     def test_explicit_calibration_id_wins(self, tmp_path: Path):
         config = _profile_config(
