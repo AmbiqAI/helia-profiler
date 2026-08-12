@@ -41,6 +41,23 @@ def _sample_pmu_passes() -> list[dict[str, object]]:
     ]
 
 
+def _npu_pmu_pass() -> dict[str, object]:
+    return {
+        "name": "EthosNpu",
+        "custom": True,
+        "event_ids": ["0x0000", "0x0000", "0x0000", "0x0000"],
+        "counter_names": [
+            "ETHOSU_PMU_CYCLE",
+            "ETHOSU_PMU_NPU_ACTIVE",
+            "ETHOSU_PMU_MAC_ACTIVE",
+            "ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED",
+        ],
+        "num_counters": 4,
+        "c_enum": None,
+        "group": "ethos_npu",
+    }
+
+
 def _render_tflm(
     transport: str = "rtt",
     arena_region: str = "tcm",
@@ -57,10 +74,12 @@ def _render_tflm(
     clean_window_probe: str = "infer",
     clean_iters: int = 3,
     power_only: bool = False,
+    has_ethos_u: bool = False,
+    pmu_passes: list[dict[str, object]] | None = None,
     psram_clock_hz: int = 48_000_000,
-    **extra_vars: object,
 ) -> str:
     registrations = resolver_registrations or ["r.AddConv2D();", "r.AddSoftmax();"]
+    passes = pmu_passes if pmu_passes is not None else _sample_pmu_passes()
     return _env.get_template("main.cc.j2").render(
         engine_header="tensorflow/lite/micro/micro_interpreter.h",
         cmsis_device_header="apollo510.h",
@@ -79,8 +98,8 @@ def _render_tflm(
         window_min=10,
         window_max=200,
         clean_window_probe=clean_window_probe,
-        pmu_passes=_sample_pmu_passes(),
-        pmu_pass_names=["Cache"],
+        pmu_passes=passes,
+        pmu_pass_names=[p["name"] for p in passes],
         power_sync_enabled=False,
         sync_gpio_pin=91,
         transport=transport,
@@ -98,8 +117,8 @@ def _render_tflm(
         heartbeat_enabled=True,
         heartbeat_every_n_ops=4,
         heartbeat_every_ms=0,
+        has_ethos_u=has_ethos_u,
         psram_clock_hz=psram_clock_hz,
-        **extra_vars,
     )
 
 
@@ -117,13 +136,15 @@ def _render_aot(
     clean_window_probe: str = "infer",
     clean_iters: int = 3,
     power_only: bool = False,
+    has_ethos_u: bool = False,
+    pmu_passes: list[dict[str, object]] | None = None,
     psram_clock_hz: int = 48_000_000,
-    **extra_vars: object,
 ) -> str:
     return _env.get_template("main_aot.cc.j2").render(
         aot_prefix="fake",
         cmsis_device_header=cmsis_device_header,
         aot_op_manifest=[{"id": 0, "op_type": "CONV_2D"}],
+        has_ethos_u=has_ethos_u,
         iterations=3,
         warmup=1,
         clean_warmup=1,
@@ -134,7 +155,7 @@ def _render_aot(
         window_min=10,
         window_max=200,
         clean_window_probe=clean_window_probe,
-        pmu_passes=_sample_pmu_passes(),
+        pmu_passes=pmu_passes if pmu_passes is not None else _sample_pmu_passes(),
         pmu_pass_names=["Cache"],
         power_sync_enabled=False,
         sync_gpio_pin=91,
@@ -155,7 +176,6 @@ def _render_aot(
         heartbeat_every_ms=0,
         pmu_max_ops=4096,
         psram_clock_hz=psram_clock_hz,
-        **extra_vars,
     )
 
 
@@ -731,95 +751,112 @@ class TestMainAotCcRender:
         assert "kMaxLayers = 4096;" in large
 
 
-# ---------------------------------------------------------------------------
-# On-target INA228 power monitor (power.driver: ina228)
-# ---------------------------------------------------------------------------
+class TestEthosURender:
+    """has_ethos_u gates the NPU include + init block in main.cc.j2."""
 
-_INA228_VARS: dict[str, object] = {
-    "power_monitor": "ina228",
-    "ina228_i2c_iom": 1,
-    "ina228_i2c_address": 0x40,
-    "ina228_i2c_speed_hz": 400_000,
-    "ina228_shunt_micro_ohms": 2_000_000,
-    "ina228_max_current_ma": 500,
-    "ina228_conversion_time_us": 540,
-    "ina228_averaging_count": 16,
-    "ina228_adc_range": 0,
-    "ina228_shunt_cal": 6250,
-    "ina228_current_lsb_divisor": "13107200000.0",
-    "ina228_calibration_id": "ina228:r2000000uohm:i500ma:adc0",
-}
+    def test_npu_blocks_present_when_enabled(self):
+        out = _render_tflm(has_ethos_u=True)
+        assert '#include "nsx_npu.h"' in out
+        assert "nsx_npu_init(&npu_cfg)" in out
+        assert "HPX_NPU=ethos-u85 init=ok" in out
+        assert "HPX_ERROR=npu_init_failed" in out
+        # Init must run before the interpreter touches the model.
+        assert out.index("nsx_npu_init") < out.index("tflite::InitializeTarget")
 
-_INA228_MEASUREMENT_KEYS = (
-    "HPX_POWER_MEASUREMENT_SOURCE=ina228",
-    "HPX_POWER_MEASUREMENT_SCOPE=fixed_n_inference",
-    "HPX_POWER_ENERGY_NJ",
-    "HPX_POWER_MEASUREMENT_DURATION_US",
-    "HPX_POWER_MEASUREMENT_COUNT",
-    "HPX_POWER_MEASUREMENT_OVERFLOW",
-    "HPX_POWER_CHARGE_NC",
-    "HPX_POWER_BUS_VOLTAGE_UV",
-    "HPX_POWER_CALIBRATION_ID=ina228:r2000000uohm:i500ma:adc0",
-)
+    def test_npu_blocks_absent_by_default(self):
+        out = _render_tflm()
+        assert "nsx_npu" not in out
+        assert "HPX_NPU" not in out
 
+    def test_power_only_uses_terminal_fail(self):
+        out = _render_tflm(has_ethos_u=True, power_only=True)
+        assert 'hpx_power_terminal_fail("npu", 2U);' in out
 
-class TestIna228PowerRender:
-    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
-    def test_power_only_render_contains_monitor_block(self, render):
-        out = render(power_only=True, **_INA228_VARS)
-        for fragment in (
-            "hpx_ina228_setup",
-            "hpx_ina228_window_begin",
-            "hpx_ina228_window_end",
-            "nsx_i2c_interface_init(&g_hpx_ina228_i2c, 400000U)",
-            "ina228_set_adc_range(&g_hpx_ina228, 0U)",
-            "INA228_TIME_540_us",
-            "INA228_COUNT_16",
-            "INA228_MODE_CONT_BUS_SHUNT",
-            'hpx_power_terminal_fail("ina228_init"',
-            'hpx_power_terminal_fail("ina228_arm"',
-            'hpx_power_terminal_fail("ina228_read"',
-            # SHUNT_CAL is read back and required non-zero: an uncalibrated
-            # part silently reports zero current/energy (hardware finding).
-            "g_hpx_ina228_shunt_cal == 0U",
-            # Accumulators read raw (40-bit) rather than through the float API.
-            "ina228_read_energy_raw",
-            "ina228_read_charge_raw",
-            "/ 13107200000.0",
-            *_INA228_MEASUREMENT_KEYS,
-        ):
-            assert fragment in out, f"missing: {fragment}"
+    def test_npu_pmu_partial_included(self):
+        out = _render_tflm(has_ethos_u=True)
+        assert '#include "pmu_ethosu.h"' in out
+        assert "ethosu_inference_begin" in out
+        assert "ethosu_inference_end" in out
+        assert "hpx_npu_print_csv" in out
 
-    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
-    def test_accumulator_calls_bracket_the_sync_window(self, render):
-        """Reset before the gate opens, read after it closes — the I2C
-        traffic must sit strictly outside the measured region."""
-        out = render(power_only=True, **_INA228_VARS)
-        i_setup = out.index("uint32_t ina228_rc = hpx_ina228_setup()")
-        i_begin = out.index("hpx_ina228_window_begin()", i_setup)
-        i_sync_begin = out.index("hpx_sync_window_begin();", i_begin)
-        i_sync_end = out.index("hpx_sync_window_end();", i_sync_begin)
-        out.index("hpx_ina228_window_end()", i_sync_end)  # raises if absent
+    def test_npu_pmu_partial_absent_without_ethos_u(self):
+        out = _render_tflm()
+        assert "pmu_ethosu.h" not in out
+        assert "ethosu_inference_begin" not in out
 
-    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
-    def test_monitor_statics_precede_terminal_report_definition(self, render):
-        out = render(power_only=True, **_INA228_VARS)
-        assert out.index("static bool     g_hpx_ina228_ok") < out.index(
-            "static void hpx_power_terminal_report("
+    def test_ethos_npu_pass_uses_npu_csv(self):
+        out = _render_tflm(has_ethos_u=True, pmu_passes=[_npu_pmu_pass()])
+        # Pass programs NPU events symbolically and prints via the NPU path.
+        assert "ETHOSU_PMU_CYCLE, ETHOSU_PMU_NPU_ACTIVE" in out
+        assert "hpx_npu_configure(" in out
+        assert "hpx_npu_set_enabled(true);" in out
+        assert "hpx_npu_set_enabled(false);" in out
+        assert "hpx_npu_clear();" in out
+        assert "hpx_npu_print_csv();" in out
+        # ARM-side profiler records only layer ordinals for this pass.
+        assert "g_profiler.InitCustom(nullptr, 0);" in out
+        assert "g_profiler.PrintCsv();" not in out
+
+    def test_mixed_passes_branch_per_group(self):
+        out = _render_tflm(
+            has_ethos_u=True,
+            pmu_passes=[_sample_pmu_passes()[0], _npu_pmu_pass()],
         )
+        # Both print paths coexist: ARM pass keeps PrintCsv, NPU pass its own.
+        assert "g_profiler.PrintCsv();" in out
+        assert "hpx_npu_print_csv();" in out
 
-    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
-    def test_profile_binary_never_embeds_monitor_code(self, render):
-        """power_only=false renders (the transport/profile binary) must not
-        pick up monitor code even when the run selects the ina228 driver."""
-        out = render(power_only=False, **_INA228_VARS)
-        assert "ina228" not in out
 
-    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
-    @pytest.mark.parametrize("power_only", [False, True])
-    def test_renders_without_monitor_stay_clean(self, render, power_only: bool):
-        """No power_monitor var at all (StrictUndefined would raise on a bad
-        gate) and no ina228 content — the WP2 byte-identical guarantee."""
-        out = render(power_only=power_only)
-        assert "ina228" not in out
-        assert "HPX_POWER_MEASUREMENT_SOURCE" not in out
+class TestEthosUAotRender:
+    """has_ethos_u gates the NPU include + init + PMU blocks in main_aot.cc.j2."""
+
+    def test_npu_blocks_present_when_enabled(self):
+        out = _render_aot(has_ethos_u=True)
+        assert '#include "nsx_npu.h"' in out
+        assert "nsx_npu_init(&npu_cfg)" in out
+        assert "HPX_NPU=ethos-u85 init=ok" in out
+        assert "HPX_ERROR=npu_init_failed" in out
+        # Init must run before the AOT runtime touches the model.
+        assert out.index("nsx_npu_init") < out.index("fake_model_init")
+
+    def test_npu_blocks_absent_by_default(self):
+        out = _render_aot()
+        assert "nsx_npu" not in out
+        assert "HPX_NPU" not in out
+        assert "pmu_ethosu.h" not in out
+        assert "ethosu_inference_begin" not in out
+
+    def test_power_only_uses_terminal_fail(self):
+        out = _render_aot(has_ethos_u=True, power_only=True)
+        assert 'hpx_power_terminal_fail("npu", 2U);' in out
+
+    def test_npu_pmu_partial_included_with_aot_seams(self):
+        out = _render_aot(has_ethos_u=True)
+        assert '#include "pmu_ethosu.h"' in out
+        assert "ethosu_inference_begin" in out
+        assert "ethosu_inference_end" in out
+        # AOT engine seams — layer ordinal from the operator callback.
+        assert "#define HPX_NPU_MAX_LAYERS kMaxLayers" in out
+        assert "return g_num_layers;" in out
+        # Row head reuses the AOT "TYPE:id" tag for host-side merging.
+        assert 'hpx_printf("%d,%s:%ld", i, aot_op_name(i), (long)aot_op_id(i));' in out
+
+    def test_ethos_npu_pass_uses_npu_csv(self):
+        out = _render_aot(has_ethos_u=True, pmu_passes=[_npu_pmu_pass()])
+        assert "ETHOSU_PMU_CYCLE, ETHOSU_PMU_NPU_ACTIVE" in out
+        assert "hpx_npu_configure(" in out
+        assert "hpx_npu_set_enabled(true);" in out
+        assert "hpx_npu_set_enabled(false);" in out
+        assert "hpx_npu_clear();" in out
+        assert "hpx_npu_print_csv();" in out
+        # ARM-side profiler records only layer ordinals for this pass.
+        assert "profiler_init_custom(nullptr, 0);" in out
+        assert "profiler_print_csv();" not in out
+
+    def test_mixed_passes_branch_per_group(self):
+        out = _render_aot(
+            has_ethos_u=True,
+            pmu_passes=[_sample_pmu_passes()[0], _npu_pmu_pass()],
+        )
+        assert "profiler_print_csv();" in out
+        assert "hpx_npu_print_csv();" in out

@@ -145,6 +145,9 @@ target_link_libraries(hpx_profiler PRIVATE
 {% if engine_type == "helia-rt" %}
     nsx::helia_rt
 {% endif %}
+{% if has_ethos_u %}
+    nsx::npu
+{% endif %}
 {% if engine_type == "tflm" %}
     nsx::tflite_micro
 {% endif %}
@@ -210,6 +213,9 @@ target_link_libraries(hpx_profiler_power PRIVATE
 {% endif %}
 {% if engine_type == "helia-rt" %}
     nsx::helia_rt
+{% endif %}
+{% if has_ethos_u %}
+    nsx::npu
 {% endif %}
 {% if engine_type == "tflm" %}
     nsx::tflite_micro

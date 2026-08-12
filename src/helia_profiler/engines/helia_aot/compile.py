@@ -75,6 +75,7 @@ _BOARD_TO_AOT_PLATFORM: dict[str, str] = {
     "apollo4l_blue_evb": "apollo4l_blue_evb",
     "apollo510_evb": "apollo510_evb",
     "apollo510b_evb": "apollo510_evb",  # same SoC family / memory layout
+    "atomiq110_fpga_turbo": "at110",  # Atomiq110 FPGA (M55 + Ethos-U85-256)
     "apollo5b_evb": "apollo510_evb",
     "apollo330mP_evb": "apollo510_evb",  # Cortex-M55, AP5 family
 }
@@ -179,6 +180,28 @@ def _resolve_aot_placement_intent(
     )
     arena = config.model.arena_location or arena
     weights = config.model.weights_location or weights
+
+    # Ethos-U backend: the NPU is an AXI master that cannot reach the M55's
+    # TCMs, so every NPU-visible buffer (scratch/IO and the command
+    # stream/weights) must live in NPU-reachable memory. Steer the automatic
+    # choice to SRAM and reject an explicit TCM request.
+    if config.engine.backend == "ethos_u":
+        if config.model.arena_location == Placement.TCM:
+            raise EngineError(
+                "arena_location=tcm is incompatible with engine.backend="
+                "ethos_u: the Ethos-U NPU cannot access the CPU's TCM.",
+                hint="Set model.arena_location to sram (or omit it).",
+            )
+        if config.model.weights_location == Placement.TCM:
+            raise EngineError(
+                "weights_location=tcm is incompatible with engine.backend="
+                "ethos_u: the Ethos-U NPU cannot access the CPU's TCM.",
+                hint="Set model.weights_location to mram or sram (or omit it).",
+            )
+        if arena == Placement.TCM:
+            arena = Placement.SRAM
+        if weights == Placement.TCM:
+            weights = Placement.MRAM
     return arena, weights
 
 

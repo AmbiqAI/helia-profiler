@@ -134,6 +134,9 @@ def analyze_for_engine(
 # Result dataclasses
 # ---------------------------------------------------------------------------
 
+#: Display name of the Vela-generated Ethos-U custom op (see _display_name).
+ETHOS_U_OP_NAME = "CUSTOM(ethos-u)"
+
 
 @dataclass(frozen=True)
 class LayerOps:
@@ -165,6 +168,16 @@ class ModelAnalysis:
     """Approximate parameter count (weights + biases)."""
     engine: str = "tflite"
     """Engine/interpreter that produced this analysis ('tflite', 'helia-rt', 'helia-aot')."""
+
+    @property
+    def ethos_u_op_count(self) -> int:
+        """Number of Vela-generated ethos-u custom ops in the graph."""
+        return sum(1 for layer in self.layers if layer.op == ETHOS_U_OP_NAME)
+
+    @property
+    def has_ethos_u_op(self) -> bool:
+        """True when the model was compiled by Vela (contains ethos-u ops)."""
+        return self.ethos_u_op_count > 0
 
 
 # ---------------------------------------------------------------------------
@@ -354,6 +367,22 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
             return deprecated
         return code
 
+    def _display_name(opcode_idx: int, builtin: int) -> str:
+        """Op name for reporting; custom ops carry their custom_code string.
+
+        Vela-compiled models wrap NPU subgraphs in a CUSTOM op whose
+        custom_code is ``"ethos-u"`` — surfacing the string (as
+        ``CUSTOM(ethos-u)``) lets callers detect Vela models and lets the
+        resolver planner register the matching kernel.
+        """
+        name = _op_name(builtin)
+        if name != "CUSTOM":
+            return name
+        custom = model.OperatorCodes(opcode_idx).CustomCode()
+        if custom:
+            return f"CUSTOM({custom.decode('utf-8', errors='replace')})"
+        return name
+
     # Element-wise ops that count as 1 op per element
     _ELEMENTWISE_OPS = set()
     bo = _schema.BuiltinOperator
@@ -419,8 +448,9 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
 
     for i in range(sg.OperatorsLength()):
         op = sg.Operators(i)
-        builtin = _builtin_code(op.OpcodeIndex())
-        name = _op_name(builtin)
+        opcode_idx = op.OpcodeIndex()
+        builtin = _builtin_code(opcode_idx)
+        name = _display_name(opcode_idx, builtin)
 
         # Collect input/output shapes
         in_shapes: list[list[int]] = []

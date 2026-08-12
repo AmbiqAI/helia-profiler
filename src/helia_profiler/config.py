@@ -372,11 +372,16 @@ class ProfilingConfig:
     """PMU capture settings.
 
     Counter selection is specified via *pmu_counters* — a mapping of
-    compute-unit group (``cpu``, ``mve``, ``memory``) to a selection:
+    compute-unit group (``cpu``, ``mve``, ``memory``, ``ethos_npu``) to a
+    selection:
 
     * ``"default"`` — curated set of the most useful counters.
     * ``"all"``     — every counter in the group (multi-pass).
     * ``["NAME", …]`` — explicit counter names.
+
+    The ``ethos_npu`` group samples the Ethos-U NPU's own PMU (NPU cycles,
+    MAC activity, SRAM/external bus beats) and requires an NPU-equipped board
+    plus ``engine.backend: ethos_u`` (engine.type helia-rt or helia-aot).
 
     """
 

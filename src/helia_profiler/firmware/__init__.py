@@ -504,6 +504,7 @@ def generate_app(ctx: PipelineContext) -> Path:
         module_specs,
         nsx_overrides,
         compatibility.baseline,
+        profile,
     )
     module_names_by_project = _module_names_by_project(module_specs)
     modules: list[dict[str, object]] = []

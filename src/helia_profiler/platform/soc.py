@@ -176,6 +176,12 @@ class SocDef:
     #: per-part rather than assumed true for the whole AP5 family.
     has_radio_subsystem: bool = False
 
+    #: Attached microNPU accelerator config string (Vela's
+    #: ``--accelerator-config`` spelling, e.g. ``"ethos-u85-256"``), or
+    #: ``None`` when the SoC has no NPU. Gates the ``ethos_u`` engine
+    #: backend and the ``ethos_npu`` PMU counter group.
+    npu: str | None = None
+
     def clock_domain(self, name: str) -> ClockDomain | None:
         """Return the named clock domain, or ``None`` if not present."""
         return next((d for d in self.clocks if d.name == name), None)
@@ -249,6 +255,8 @@ class SocDef:
             domains.append("memory")
         if self.has_mve:
             domains.append("mve")
+        if self.npu is not None:
+            domains.append("ethos_npu")
         return tuple(domains)
 
     @property
@@ -257,6 +265,8 @@ class SocDef:
         flags: list[str] = list(self.profiling_backends)
         if self.has_mve:
             flags.append("mve")
+        if self.npu is not None:
+            flags.append("npu")
         return tuple(flags)
 
 
@@ -590,6 +600,77 @@ _register_soc(
         # plain apollo510/apollo510b HAL variants this project builds
         # against) -- see SocDef.has_radio_subsystem docstring.
         has_radio_subsystem=True,
+    )
+)
+
+# Atomiq110 (R6-generation Cortex-M55 + Ethos-U85 NPU). The only upstream
+# realization today is the atomiq110_fpga_turbo FPGA board -- all facts below
+# are sourced from the real nsx-ambiq-sdk atomiq110 SoC/board files (not
+# copy-pasted from apollo510), per the same bring-up discipline as apollo330P
+# above:
+#   - cmake/socs/facts/atomiq110.cmake (NSX_SEGGER_*, NSX_SOC_* facts)
+#   - modules/nsx-core/src/atomiq110/gcc/linker_script_nbl.ld (memory map)
+#   - modules/nsx-ambiqsuite/sdk/mcu/atomiq110/hal/am_hal_pwrctrl.h (SRAM enum)
+_register_soc(
+    SocDef(
+        name="atomiq110",
+        family=SocFamily.AP5,  # CM55 + MVE + full PMU, same tier as AP5
+        core=CoreArch.CORTEX_M55,
+        pmu_tier=PmuTier.ARMV8M_PMU,
+        has_mve=True,
+        memory=MemoryLayout(
+            # FPGA "nbl" (no-bootloader) memory map -- MRAM/SRAM are
+            # FPGA-emulated at 0x22000000/0x21000000, not the Apollo5
+            # silicon addresses (see linker_script_nbl.ld comment block).
+            #   MCU_ITCM    0x00000000, LENGTH=262144  -> 256 KB
+            #   MCU_MRAM    0x22000000, LENGTH=4194304 -> 4096 KB
+            #   MCU_TCM     0x20000000, LENGTH=507904  ->  496 KB (DTCM)
+            #   SHARED_SRAM 0x21000000, LENGTH=3145728 -> 3072 KB
+            # No PSRAM/MSPI populated on this FPGA carrier board.
+            mram_kb=4096,
+            sram_kb=3072,
+            dtcm_kb=496,
+            itcm_kb=256,
+        ),
+        clocks=(
+            ClockDomain(
+                "cpu",
+                # The FPGA "turbo" bitstream runs the core at a single fixed
+                # clock (NSX_SEGGER_CPUFREQ=25000000 in
+                # cmake/socs/facts/atomiq110.cmake) -- there is no faster
+                # "hp" tier to expose on this realization, unlike the
+                # silicon AP5 parts. Declaring a real second speed here
+                # would be fabricated, not measured.
+                (ClockSpeed("lp", 25, PerfTier.LOW),),
+                default="lp",
+            ),
+        ),
+        # No AM_PART_* macro on this part -- the HAL is selected by its
+        # mcu/atomiq110/ directory rather than a device-header ifdef, and
+        # the real build-time selector is PART_atomiq110 (see
+        # NSX_SOC_COMPILE_DEFINITIONS in cmake/socs/facts/atomiq110.cmake).
+        c_define="PART_atomiq110",
+        cmsis_header="atomiq110.h",
+        # M55 RTT lives in non-cached TCM (.bss); scan window matches the
+        # real 496 KB MCU_TCM region above, not AP510's 512 KB.
+        rtt_scan_ranges=((0x20000000, 0x7C000),),
+        # NSX_SEGGER_DEVICE in cmake/socs/facts/atomiq110.cmake.
+        jlink_device="Atomiq110",
+        pmu_max_ops=4096,
+        # No nsx-ambiq-usb compatibility entry for atomiq110/atomiq110_fpga_turbo
+        # (modules/nsx-ambiq-usb/nsx-module.yaml's compatibility.socs list does
+        # not include it) -- usb_cdc transport is unavailable, same posture as
+        # apollo3p above.
+        has_usb=False,
+        # am_hal_pwrctrl_rss_pwroff() is declared in this part's
+        # am_hal_pwrctrl.h but NOT implemented in the compiled
+        # lib/gcc/atomiq110/libam_hal.a (confirmed via nm) -- calling it
+        # would be a link error, unlike apollo330P/apollo510L where the
+        # symbol is genuinely present. Left at the dataclass default (False).
+        # Ethos-U85 in the 256-MAC configuration (matches the Vela
+        # --accelerator-config the NPU bitstream was generated for; validated
+        # on hardware via nsx npu_person_detect, 2026-08).
+        npu="ethos-u85-256",
     )
 )
 

@@ -1945,3 +1945,61 @@ class TestNsxModuleOverrides:
         # The override must not have been applied.
         nsx_yml = (app_dir / "nsx.yml").read_text()
         assert "some-other-ref" not in nsx_yml
+
+
+class TestResolveProjectOverrides:
+    """Baseline modernization must not clobber starter-profile branch pins."""
+
+    @staticmethod
+    def _specs():
+        from helia_profiler.firmware.project import NsxModuleSpec
+
+        return [NsxModuleSpec("nsx-npu", "nsx-ambiq-sdk")]
+
+    @staticmethod
+    def _baseline():
+        from helia_profiler.compatibility import load_compatibility_baseline
+
+        return load_compatibility_baseline()
+
+    def test_baseline_ref_applied_without_profile_pin(self):
+        from helia_profiler.firmware.project import _resolve_project_overrides
+
+        baseline = self._baseline()
+        overrides = _resolve_project_overrides(self._specs(), {}, baseline, profile={})
+        assert overrides["nsx-ambiq-sdk"] == ("ref", baseline.project("nsx-ambiq-sdk").ref)
+
+    def test_profile_branch_pin_suppresses_baseline_ref(self):
+        from helia_profiler.firmware.project import _resolve_project_overrides
+
+        profile = {
+            "project_overrides": {
+                "nsx-ambiq-sdk": {"revision": "feat/nsx-power-atomiq110"}
+            }
+        }
+        overrides = _resolve_project_overrides(self._specs(), {}, self._baseline(), profile=profile)
+        assert "nsx-ambiq-sdk" not in overrides
+
+    def test_profile_release_tag_pin_still_modernized_to_baseline(self):
+        from helia_profiler.firmware.project import _resolve_project_overrides
+
+        baseline = self._baseline()
+        profile = {"project_overrides": {"nsx-ambiq-sdk": {"revision": "r5.3"}}}
+        overrides = _resolve_project_overrides(self._specs(), {}, baseline, profile=profile)
+        assert overrides["nsx-ambiq-sdk"] == ("ref", baseline.project("nsx-ambiq-sdk").ref)
+
+    def test_user_override_outranks_profile_pin(self):
+        from types import SimpleNamespace
+
+        from helia_profiler.firmware.project import _resolve_project_overrides
+
+        profile = {
+            "project_overrides": {
+                "nsx-ambiq-sdk": {"revision": "feat/nsx-power-atomiq110"}
+            }
+        }
+        user = {"nsx-npu": SimpleNamespace(path=None, ref="my-branch", version=None)}
+        overrides = _resolve_project_overrides(self._specs(), user, self._baseline(), profile=profile)
+        assert overrides["nsx-ambiq-sdk"] == ("ref", "my-branch")
+
+

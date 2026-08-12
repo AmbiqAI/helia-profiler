@@ -195,6 +195,7 @@ class EngineContext:
     resource_variable_count: int
     aot_prefix: str
     aot_op_manifest: tuple[AotOpContext, ...]
+    has_ethos_u: bool = False
 
 
 @dataclass(frozen=True)
@@ -235,6 +236,7 @@ class FirmwareRenderContext:
             engine_type=engine_type,
             engine_config=config.engine.config,
             model_analysis=ctx.model_analysis,
+            ethos_u=artifacts.engine_backend == "ethos_u",
         )
         resource_variable_count = sum(
             1
@@ -323,6 +325,7 @@ class FirmwareRenderContext:
                 resource_variable_count=resource_variable_count,
                 aot_prefix=artifacts.aot_prefix or "",
                 aot_op_manifest=aot_manifest,
+                has_ethos_u=artifacts.engine_backend == "ethos_u",
             ),
         )
 
@@ -396,6 +399,7 @@ class FirmwareRenderContext:
             "resource_variable_count": self.engine.resource_variable_count,
             "aot_prefix": self.engine.aot_prefix,
             "aot_op_manifest": self.engine.aot_op_manifest,
+            "has_ethos_u": self.engine.has_ethos_u,
         }
 
 

@@ -324,3 +324,51 @@ class TestRunAotCompilerUsesConfigRegistry:
         assert seen["registry"] is config.platform_registry
         soc = config.platform_registry.socs["apollo510_custom"]
         assert soc.jlink_device == "AP510-CUSTOM"
+
+
+class TestEthosUPlacement:
+    """engine.backend=ethos_u forces NPU-reachable placement.
+
+    The Ethos-U NPU is an AXI master that cannot access the M55's TCMs, so
+    when the ethos_u backend is selected the automatic fastest-fit choice is
+    steered away from TCM and an explicit TCM request is rejected.
+    """
+
+    def _npu_cfg(self, placement: dict):
+        cli = {
+            "model": {"path": "m.tflite", **placement},
+            "engine": {"type": "helia-aot", "backend": "ethos_u"},
+            "target": {"board": "atomiq110_fpga_turbo"},
+        }
+        return load_config(None, cli)
+
+    def test_auto_placement_steered_off_tcm(self):
+        soc = get_soc_for_board("atomiq110_fpga_turbo")
+        arena, weights = _resolve_aot_placement_intent(self._npu_cfg({}), soc)
+        assert arena is not Placement.TCM
+        assert weights is not Placement.TCM
+
+    def test_explicit_tcm_arena_rejected(self):
+        import pytest
+
+        from helia_profiler.errors import EngineError
+
+        soc = get_soc_for_board("atomiq110_fpga_turbo")
+        cfg = self._npu_cfg({"arena_location": "tcm"})
+        with pytest.raises(EngineError, match="cannot access the CPU's TCM"):
+            _resolve_aot_placement_intent(cfg, soc)
+
+    def test_explicit_tcm_weights_rejected(self):
+        import pytest
+
+        from helia_profiler.errors import EngineError
+
+        soc = get_soc_for_board("atomiq110_fpga_turbo")
+        cfg = self._npu_cfg({"weights_location": "tcm"})
+        with pytest.raises(EngineError, match="cannot access the CPU's TCM"):
+            _resolve_aot_placement_intent(cfg, soc)
+
+    def test_sram_arena_kept(self):
+        soc = get_soc_for_board("atomiq110_fpga_turbo")
+        cfg = self._npu_cfg({"arena_location": "sram", "weights_location": "mram"})
+        assert _resolve_aot_placement_intent(cfg, soc) == (Placement.SRAM, Placement.MRAM)

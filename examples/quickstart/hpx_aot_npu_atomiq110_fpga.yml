@@ -1,0 +1,39 @@
+# heliaPROFILER quickstart — Ethos-U85 NPU profiling on Atomiq110 FPGA (heliaAOT)
+# Same checked-in Vela-compiled KWS model as hpx_npu_atomiq110_fpga.yml but
+# compiled ahead-of-time with heliaAOT instead of interpreted by helia-rt:
+# the Vela ethos-u op becomes a generated NPU kernel dispatching the embedded
+# command stream to the driver. Run from the repo root.
+#
+# The model MUST be Vela-compiled (contains ethos-u custom ops); hpx rejects
+# plain tflite models when engine.backend=ethos_u and vice versa. With the
+# NPU backend, arena/weights must stay NPU-reachable (SRAM/MRAM/PSRAM — the
+# Ethos-U cannot access the M55's TCMs; hpx enforces this).
+model:
+  path: examples/quickstart/kws_model_vela.tflite
+  arena_size: 524288
+  arena_location: sram
+  weights_location: mram
+
+engine:
+  type: helia-aot
+  backend: ethos_u
+
+target:
+  board: atomiq110_fpga_turbo
+  toolchain: arm-none-eabi-gcc
+  transport: rtt
+
+profiling:
+  pmu_counters:
+    cpu: default
+    ethos_npu: default
+  per_layer: true
+  iterations: 5
+  warmup: 2
+
+power:
+  enabled: false
+
+output:
+  format: csv
+  dir: ./results/atomiq110_npu_aot

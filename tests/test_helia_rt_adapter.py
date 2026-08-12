@@ -429,3 +429,47 @@ def test_install_nsx_module_source_points_to_source_root(tmp_path: Path, fake_so
     cmake = (module_dir / "CMakeLists.txt").read_text()
     assert f'HELIA_RT_TFLM_ROOT "{fake_source_tree.as_posix()}"' in cmake
     assert not (module_dir / "_source_shim").exists()
+
+
+class TestEthosUBackend:
+    """engine.backend=ethos_u — NPU module + kernel flag wiring."""
+
+    def test_registry_default_adds_npu_module_and_flag(self, tmp_path: Path):
+        config = _make_config(tmp_path, {"backend": "ethos_u"})
+        adapter = HeliaRTAdapter()
+        artifacts = adapter.prepare(config, tmp_path)
+        names = [m.name for m in artifacts.extra_modules]
+        assert names == ["nsx-helia-rt", "nsx-npu"]
+        npu = artifacts.extra_modules[1]
+        assert npu.local is False
+        assert npu.project == "nsx-ambiq-sdk"
+        assert artifacts.cmake_vars["NSX_HELIA_RT_ENABLE_ETHOSU"] == "ON"
+        assert artifacts.engine_backend == "ethos_u"
+
+    def test_source_build_adds_npu_module_and_flag(
+        self, tmp_path: Path, fake_source_tree: Path
+    ):
+        config = _make_config(
+            tmp_path,
+            {"backend": "ethos_u", "config": {"source_path": str(fake_source_tree)}},
+        )
+        adapter = HeliaRTAdapter()
+        artifacts = adapter.prepare(config, tmp_path)
+        names = [m.name for m in artifacts.extra_modules]
+        assert "nsx-npu" in names
+        assert artifacts.cmake_vars["NSX_HELIA_RT_ENABLE_ETHOSU"] == "ON"
+
+    def test_prebuilt_dist_rejected(self, tmp_path: Path, fake_dist: Path):
+        config = _make_config(
+            tmp_path, {"backend": "ethos_u", "config": {"dist_path": str(fake_dist)}}
+        )
+        adapter = HeliaRTAdapter()
+        with pytest.raises(EngineError, match="source build"):
+            adapter.prepare(config, tmp_path)
+
+    def test_default_backend_has_no_npu_artifacts(self, tmp_path: Path):
+        config = _make_config(tmp_path)
+        adapter = HeliaRTAdapter()
+        artifacts = adapter.prepare(config, tmp_path)
+        assert all(m.name != "nsx-npu" for m in artifacts.extra_modules)
+        assert "NSX_HELIA_RT_ENABLE_ETHOSU" not in artifacts.cmake_vars
