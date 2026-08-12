@@ -29,6 +29,9 @@ static bool     g_hpx_ina228_overflow = false;
 static uint64_t g_hpx_ina228_energy_nj = 0;
 static uint64_t g_hpx_ina228_charge_nc = 0;
 static uint32_t g_hpx_ina228_bus_voltage_uv = 0;
+// Raw DIAG_ALRT low bits at window end — emitted as a pre-envelope
+// diagnostic line so a bench capture shows WHICH health bit tripped.
+static uint16_t g_hpx_ina228_diag_bits = 0;
 
 // DIAG_ALRT accumulator-health bits (ina228_alert_functions() returns the
 // low 12 bits of DIAG_ALRT): ENERGYOF(11), CHARGEOF(10), MATHOF(9).
@@ -44,7 +47,10 @@ static uint32_t hpx_ina228_setup(void) {
     if (ina228_get_manufacturer_id(&g_hpx_ina228, &id) != 0 || id != 0x5449U) {
         return 2U;  // no INA228 at this address (manufacturer ID mismatch)
     }
-    if (ina228_get_device_id(&g_hpx_ina228, &id) != 0 || id != 0x228U) {
+    // DEVICE_ID register: DIEID in bits 15:4, silicon REV_ID in bits 3:0 —
+    // the raw read is 0x228<rev>, so compare the die ID field only (found
+    // the hard way on first Apollo510B hardware bring-up: raw 0x2281).
+    if (ina228_get_device_id(&g_hpx_ina228, &id) != 0 || (id >> 4) != 0x228U) {
         return 3U;
     }
     if (ina228_reset(&g_hpx_ina228) != 0) {
@@ -81,7 +87,10 @@ static uint32_t hpx_ina228_setup(void) {
 
 static uint32_t hpx_ina228_window_begin(void) {
     // Single register write; issued before the window opens so the
-    // accumulators integrate exactly the gated inference loop.
+    // accumulators integrate exactly the gated inference loop. Per the
+    // datasheet, RSTACC also clears a latched MATHOF, so the window starts
+    // with clean health flags — a MATHOF seen at window end is *live*
+    // (recent conversions still overflowing), not boot-era residue.
     return ina228_reset_accumulators(&g_hpx_ina228);
 }
 
@@ -90,12 +99,17 @@ static uint32_t hpx_ina228_window_end(void) {
     float charge_c = 0.0f;
     float bus_mv = 0.0f;
     uint16_t diag = 0;
-    if (ina228_read_energy(&g_hpx_ina228, &energy_j) != 0 ||
+    // DIAG_ALRT must be sampled BEFORE the accumulators: ENERGYOF clears
+    // when ENERGY is read and CHARGEOF when CHARGE is read, so reading them
+    // first would blind the overflow check to exactly the overflows it
+    // exists to catch.
+    if (ina228_alert_functions(&g_hpx_ina228, &diag) != 0 ||
+        ina228_read_energy(&g_hpx_ina228, &energy_j) != 0 ||
         ina228_read_charge(&g_hpx_ina228, &charge_c) != 0 ||
-        ina228_read_bus_voltage(&g_hpx_ina228, &bus_mv) != 0 ||
-        ina228_alert_functions(&g_hpx_ina228, &diag) != 0) {
+        ina228_read_bus_voltage(&g_hpx_ina228, &bus_mv) != 0) {
         return 1U;
     }
+    g_hpx_ina228_diag_bits = diag;
     // Envelope integers are non-negative by contract; a (mis-wired) negative
     // charge would sign-glitch the cast, so clamp at zero rather than wrap.
     if (energy_j < 0.0f) energy_j = 0.0f;

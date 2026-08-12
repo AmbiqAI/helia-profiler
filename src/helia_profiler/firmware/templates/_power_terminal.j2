@@ -13,9 +13,13 @@ static void hpx_power_terminal_report(
     bool gate_lowered) {
 {% if power_monitor | default(none) == "ina228" %}
     char record[1024];
+    // The DIAG line sits BEFORE the start marker on purpose: the envelope
+    // parser ignores pre-record lines, so this reaches a bench capture
+    // without widening the host wire contract.
     int length = snprintf(
         record,
         sizeof(record),
+        "HPX_POWER_INA228_DIAG=0x%03X\n"
         "--- HPX_POWER_TERMINAL_START ---\n"
         "HPX_POWER_TERMINAL_VERSION=1\n"
         "HPX_POWER_STATUS=%s\n"
@@ -26,6 +30,7 @@ static void hpx_power_terminal_report(
         "HPX_POWER_ERROR_CODE=%lu\n"
         "HPX_POWER_GATE_ASSERTED=%d\n"
         "HPX_POWER_GATE_LOWERED=%d\n",
+        (unsigned)g_hpx_ina228_diag_bits,
         success ? "ok" : "error",
         (unsigned long)requested_count,
         (unsigned long)completed_count,
