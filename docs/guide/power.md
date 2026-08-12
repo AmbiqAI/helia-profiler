@@ -435,12 +435,52 @@ physical property of your wiring that HPX cannot guess.
     position, which is I2C address **`0x4A`** — not the INA228's `0x40`
     power-on default that `i2c_address` otherwise assumes.
 
+### Wiring the Click board
+
+The board has two 2-position screw terminals:
+
+| Terminal | Screw | Net | Wire it to |
+|---|---|---|---|
+| **IN1** | 1 | `IN+` | Supply side of the broken rail |
+| **IN1** | 2 | `IN-` | Target side of the broken rail |
+| **IN2** | 1 | `VBUS` | Target-side rail node (same node as `IN-`) |
+| **IN2** | 2 | `GND` | Common ground |
+
+Your sense resistor goes **across IN1** — i.e. in series with the rail you
+are measuring. Break the target's supply, run the supply into `IN+` and the
+target into `IN-`, and the resistor bridges the two.
+
+Tie `VBUS` to the **target side** (the `IN-` node): the INA228 computes
+power as `VBUS × CURRENT`, so sensing there reports the energy actually
+delivered to the target and excludes the shunt's own dissipation. `GND` must
+be common with both the supply and the target. The INA228 itself is powered
+from mikroBUS `VCC`, independent of the rail under test, and tolerates a
+common-mode voltage up to 85 V — so a 1.8 V or 3.3 V rail is well inside
+range.
+
+The screw terminal is also the silver lining of having no onboard shunt:
+swapping the sense resistor to re-range the measurement is a screwdriver
+turn, not a rework station.
+
 **Choosing a shunt.** Two competing pressures: a larger resistor gives more
-signal (better resolution), a smaller one steals less of the target's supply
-(lower burden voltage). For Apollo-class inference currents of roughly
-10–100 mA, `0.1 Ω` is a reasonable starting point — 10 mV of burden at
-100 mA (~0.3 % of a 3.3 V rail), while staying inside the INA228's
-high-resolution ±40.96 mV range up to ~400 mA.
+signal (and shrinks the INA228's input offset relative to it), a smaller one
+steals less of the target's supply. Pick the largest value whose worst-case
+drop still fits the high-resolution ±40.96 mV range, leaving headroom for
+current peaks above your steady state:
+
+| Peak current | Largest shunt in ±40.96 mV range | Burden at that peak |
+|---|---|---|
+| 50 mA | 0.82 Ω | 41 mV |
+| 100 mA | 0.41 Ω | 41 mV |
+| 400 mA | 0.10 Ω | 41 mV |
+
+For a target drawing ~20 mA with peaks under ~80 mA, **0.5 Ω** is a good
+choice: 10 mV of burden at 20 mA (0.6 % of a 1.8 V rail), ~128 k ADC counts
+of resolution, and offset error well under 0.05 %. Power dissipation is
+negligible at these currents (0.2 mW), so any 0603/0805 part works —
+prioritise **tolerance over rating**, since the resistor's tolerance passes
+straight through into your energy figure. A 1 % part means 1 % energy error;
+a 5 % carbon film means 5 %.
 
 HPX picks the ADC range for you from `shunt_ohms × max_current_a`: if the
 worst-case shunt drop fits in ±40.96 mV it selects the 4×-resolution range,
