@@ -519,6 +519,7 @@ def prepare_locked_dependencies(ctx: PipelineContext) -> DependencyProvenance:
             ) from repair_exc
 
     provenance = _collect_provenance(ctx, mode=mode, offline=offline)
+    _verify_baseline_resolution(ctx, provenance)
     _atomic_json(app_dir / _DEPENDENCY_STATE, provenance.to_dict())
     run_key = ctx.run_metadata.run_id or uuid.uuid4().hex
     snapshot = ctx.work_dir / "run-locks" / run_key / "nsx.lock"
@@ -628,6 +629,65 @@ def read_dependency_lock_provenance(
         lock_mode=lock_mode,
         update_requested=update_requested,
     )
+
+
+def _verify_baseline_resolution(
+    ctx: PipelineContext, provenance: DependencyProvenance
+) -> None:
+    """Fail when the lock resolves a baseline-pinned project off its ref.
+
+    The generated manifest *asserts* qualified refs; the NSX lock is the
+    *outcome*. The qualified-compatibility claim is only meaningful if the
+    two agree, and NSX gives a packaged registry's module-level revision
+    precedence over an app's project-level override — found 2026-08-12 when
+    eight hardware runs silently built nsx-sensors v0.1.0 while every
+    generated manifest and provenance artifact claimed the baseline commit.
+    Runs whose divergence is intentional must say so through overrides
+    (which reclassify qualification) rather than drift silently.
+    """
+    compatibility = ctx.config.compatibility
+    if compatibility is None:
+        return
+    baseline = compatibility.baseline
+    pinned = {project.name: project.ref for project in baseline.projects}
+    engine_projects = {
+        engine.name for engine in baseline.engines if engine.ref is not None
+    }
+    module_projects = {module.name: module.project for module in provenance.modules}
+    skipped: set[str] = set()
+    for override in provenance.overrides:
+        if override.scope == "project":
+            skipped.add(override.name)
+        elif override.scope == "module":
+            project = module_projects.get(override.name)
+            if project is not None:
+                skipped.add(project)
+        elif override.scope == "engine":
+            # Engine source overrides redirect engine-owned projects; their
+            # divergence is already classified by qualification state.
+            skipped |= engine_projects
+    for module in provenance.modules:
+        expected = pinned.get(module.project)
+        if (
+            expected is None
+            or module.project in skipped
+            or module.kind != "git"
+            or not module.peeled_commit
+        ):
+            continue
+        if module.peeled_commit != expected:
+            raise VersionError(
+                f"Locked dependency '{module.name}' resolved to commit "
+                f"{module.peeled_commit}, but the qualified baseline pins project "
+                f"'{module.project}' at {expected}.",
+                hint=(
+                    "The generated manifest and NSX's resolution disagree — the "
+                    "run would silently build unqualified sources. Re-resolve with "
+                    "--update-dependencies (or remove the fingerprinted workspace); "
+                    "for intentional divergence use build.nsx_modules overrides so "
+                    "qualification is classified honestly."
+                ),
+            )
 
 
 def _collect_provenance(

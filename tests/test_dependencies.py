@@ -64,7 +64,12 @@ def _context(
     return ctx
 
 
-def _write_valid_lock(ctx: PipelineContext, *, commit: str = "a" * 40) -> bytes:
+def _write_valid_lock(
+    ctx: PipelineContext,
+    *,
+    commit: str = "a" * 40,
+    project: str = "demo-project",
+) -> bytes:
     assert ctx.firmware_dir is not None
     module_dir = ctx.firmware_dir / "modules" / "demo"
     module_dir.mkdir(parents=True, exist_ok=True)
@@ -76,7 +81,7 @@ def _write_valid_lock(ctx: PipelineContext, *, commit: str = "a" * 40) -> bytes:
         target={"board": "apollo510_evb"},
         modules={
             "demo": ResolvedModule(
-                project="demo-project",
+                project=project,
                 kind=LockKind.GIT,
                 constraint="v1.2.3",
                 tag="v1.2.3",
@@ -457,6 +462,79 @@ def test_concurrent_workspace_identity_is_atomic(tmp_path: Path) -> None:
     assert json.loads(identity_path.read_text())["fingerprint"] == (
         ctx.dependency_workspace.fingerprint
     )
+
+
+# ---------------------------------------------------------------------------
+# Baseline resolution integrity — the lock must agree with the manifest's
+# qualified-ref claims (found 2026-08-12: NSX honoured its packaged registry's
+# module revision over the app's project pin, so eight hardware runs built
+# nsx-sensors v0.1.0 while every artifact claimed the baseline commit).
+# ---------------------------------------------------------------------------
+
+
+def _baseline_ref(ctx: PipelineContext, project: str) -> str:
+    compatibility = ctx.config.compatibility
+    assert compatibility is not None
+    return compatibility.baseline.project(project).ref
+
+
+def test_lock_resolving_off_baseline_ref_raises_version_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(tmp_path)
+    _write_valid_lock(ctx, project="nsx-sensors", commit="d" * 40)
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+
+    with pytest.raises(VersionError, match="qualified baseline pins") as exc:
+        prepare_locked_dependencies(ctx)
+
+    message = str(exc.value)
+    assert "d" * 40 in message
+    assert _baseline_ref(ctx, "nsx-sensors") in message
+    # The corrupt resolution must not be persisted as valid run state.
+    assert ctx.firmware_dir is not None
+    assert not (ctx.firmware_dir / "hpx-dependencies.json").exists()
+
+
+def test_lock_matching_baseline_ref_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(tmp_path)
+    _write_valid_lock(ctx, project="nsx-sensors", commit=_baseline_ref(ctx, "nsx-sensors"))
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+
+    provenance = prepare_locked_dependencies(ctx)
+
+    assert provenance.modules[0].peeled_commit == _baseline_ref(ctx, "nsx-sensors")
+
+
+def test_explicit_module_override_exempts_project_from_baseline_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intentional divergence goes through overrides, which reclassify
+    qualification — it must not trip the silent-drift guard."""
+    ctx = _context(
+        tmp_path,
+        build={"nsx_modules": {"demo": {"ref": "feature/experiment"}}},
+    )
+    _write_valid_lock(ctx, project="nsx-sensors", commit="d" * 40)
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+
+    provenance = prepare_locked_dependencies(ctx)
+
+    assert provenance.modules[0].peeled_commit == "d" * 40
+
+
+def test_unpinned_projects_are_not_baseline_checked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(tmp_path)
+    _write_valid_lock(ctx, project="demo-project", commit="d" * 40)
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+
+    provenance = prepare_locked_dependencies(ctx)  # must not raise
+
+    assert provenance.modules[0].project == "demo-project"
 
 
 # ---------------------------------------------------------------------------
