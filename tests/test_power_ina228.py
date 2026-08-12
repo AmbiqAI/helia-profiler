@@ -224,6 +224,64 @@ def _profile_config(tmp_path: Path, power: dict):
     )
 
 
+class TestMonitorFirmwareGate:
+    """The firmware gate is the config block, not the driver name.
+
+    `power.ina228` says an INA228 is on the bus; `power.driver` says who
+    measures. When the render gate and the module-selection gate disagreed,
+    `driver: joulescope` with an ina228 block pulled nsx-sensors into the
+    manifest while generating no monitor code at all — runs looked configured
+    but measured nothing, silently invalidating a hardware sweep.
+    """
+
+    def test_block_without_ina228_driver_still_builds_monitor_firmware(
+        self, tmp_path: Path
+    ):
+        config = _profile_config(
+            tmp_path,
+            {
+                "enabled": True,
+                "driver": "joulescope",
+                "mode": "external",
+                "ina228": {"board": "adafruit-ina228"},
+            },
+        )
+        monitor = PowerMonitorContext.from_config(config)
+        assert monitor.power_monitor == "ina228", (
+            "an ina228 block must build monitor firmware regardless of driver"
+        )
+
+    def test_render_gate_and_module_gate_agree(self, tmp_path: Path):
+        """Both gates must derive from the same predicate."""
+        import inspect
+
+        from helia_profiler import firmware as firmware_module
+
+        source = inspect.getsource(firmware_module.generate_app)
+        assert "config.power.ina228 is not None" in source, (
+            "module selection must gate on the config block; if this moves, "
+            "keep PowerMonitorContext.from_config in step with it"
+        )
+        for driver in ("ina228", "joulescope"):
+            power: dict[str, object] = {
+                "enabled": True,
+                "driver": driver,
+                "ina228": {"board": "adafruit-ina228"},
+            }
+            if driver == "ina228":
+                power["mode"] = "internal"
+            else:
+                power["mode"] = "external"
+            sub = tmp_path / driver
+            sub.mkdir(parents=True, exist_ok=True)
+            config = _profile_config(sub, power)
+            assert PowerMonitorContext.from_config(config).power_monitor == "ina228"
+
+    def test_no_block_builds_no_monitor(self, tmp_path: Path):
+        config = _profile_config(tmp_path, {"enabled": True, "driver": "joulescope"})
+        assert PowerMonitorContext.from_config(config).power_monitor is None
+
+
 class TestPowerMonitorContext:
     def test_disabled_without_ina228_driver(self, tmp_path: Path):
         config = _profile_config(tmp_path, {"enabled": True})

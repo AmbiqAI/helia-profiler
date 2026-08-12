@@ -74,7 +74,6 @@ class CollectPowerTerminalStage:
         if not terminal.gate_lowered:
             raise PowerError("Power firmware did not confirm that GATE was lowered.")
         if envelope.measurement is not None and envelope.measurement.overflow:
-            measurement = envelope.measurement
             if not internal_mode:
                 # The monitor is present but is not this run's measurement of
                 # record (e.g. an INA228 left on the bus while a Joulescope
@@ -86,8 +85,8 @@ class CollectPowerTerminalStage:
                     "ignoring because %s is the measurement of record.",
                     ctx.config.power.driver,
                 )
-                measurement = None
             else:
+                measurement = envelope.measurement
                 raise PowerError(
                     "On-device power monitor reported accumulator overflow.",
                     hint=(

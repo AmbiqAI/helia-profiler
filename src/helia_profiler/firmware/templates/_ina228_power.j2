@@ -1,8 +1,10 @@
 {# _ina228_power.j2 — on-target INA228 energy/charge measurement.
 
-   Included only in dedicated power builds (power_only=true) when the run
-   selects power.driver: ina228. The INA228 integrates energy and charge in
-   hardware, autonomously, so the measured window needs no host instrument:
+   Included in dedicated power builds (power_only=true) whenever the config
+   carries a power.ina228 block — independent of power.driver, which selects
+   who *measures* rather than what firmware talks to. The INA228 integrates
+   energy and charge in hardware, autonomously, so the measured window needs
+   no host instrument:
 
        hpx_ina228_setup()         I2C bring-up, ID check, shunt calibration
        hpx_ina228_window_begin()  zero the energy/charge accumulators
@@ -53,9 +55,12 @@ static uint32_t hpx_ina228_read_reg16(uint8_t reg, uint16_t *value) {
     return rst;
 }
 
-// DIAG_ALRT accumulator-health bits (ina228_alert_functions() returns the
-// low 12 bits of DIAG_ALRT): ENERGYOF(11), CHARGEOF(10), MATHOF(9).
-#define HPX_INA228_OVF_MASK ((uint16_t)0x0E00)
+// DIAG_ALRT accumulator-health bits, named by the driver's own enum so the
+// bit layout stays single-sourced (ina228_alert_functions() returns the low
+// 12 bits of DIAG_ALRT).
+#define HPX_INA228_OVF_MASK                                                    \
+    ((uint16_t)(INA228_ALERT_MATH_OVERFLOW | INA228_ALERT_CHARGE_OVERFLOW |    \
+                INA228_ALERT_ENERGY_OVERFLOW))
 
 static uint32_t hpx_ina228_setup(void) {
     uint32_t status = nsx_i2c_interface_init(&g_hpx_ina228_i2c, {{ ina228_i2c_speed_hz }}U);
@@ -88,12 +93,9 @@ static uint32_t hpx_ina228_setup(void) {
     if (ina228_set_adc_range(&g_hpx_ina228, {{ ina228_adc_range }}U) != 0) {
         return 5U;
     }
-    // set_shunt seeds the driver context's _shunt_res/_current_lsb (used by
-    // read_energy/read_charge scaling); the register write itself is then
-    // forced to the host-precomputed constant and readback-verified, because
-    // bring-up found the driver's masked SHUNT_CAL write leaving the
-    // register at 0 while every other configuration write landed
-    // (DIAG=0x203 CFG=0x0000 ADCCFG=0xB92A SHUNTCAL=0).
+    // Seeds the driver context's _shunt_res/_current_lsb and writes
+    // SHUNT_CAL. nsx-sensors >= 0.3.0 readback-verifies the write itself, so
+    // a non-zero return already means the calibration landed.
     if (ina228_set_shunt(
             &g_hpx_ina228,
             (float){{ ina228_shunt_micro_ohms }} / 1000000.0f,

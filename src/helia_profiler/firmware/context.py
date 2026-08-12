@@ -84,10 +84,17 @@ class PowerMonitorContext:
     @classmethod
     def from_config(cls, config: "ProfileConfig") -> "PowerMonitorContext":
         power = config.power
-        if not (power.enabled and power.driver == "ina228"):
-            return cls(power_monitor=None)
+        # The presence of a power.ina228 block — not the driver name — decides
+        # whether firmware talks to a monitor. `driver` selects who *measures*
+        # (on-device vs host instrument), so `driver: joulescope` with an
+        # ina228 block builds identical firmware and lets an external
+        # instrument observe the monitor's own cost. This must stay in step
+        # with the module-selection gate in firmware/__init__.py: when the two
+        # disagreed, runs silently built no monitor at all while appearing to
+        # configure one, which invalidated a bench sweep.
         ina = power.ina228
-        assert ina is not None  # enforced by PowerConfig._validate
+        if not (power.enabled and ina is not None):
+            return cls(power_monitor=None)
         shunt_ohms = ina.resolved_shunt_ohms
         shunt_micro_ohms = round(shunt_ohms * 1_000_000)
         max_current_ma = round(ina.max_current_a * 1_000)
