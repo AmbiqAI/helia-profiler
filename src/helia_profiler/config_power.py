@@ -89,7 +89,10 @@ INA228_BOARD_PRESETS: dict[str, MonitorBoardPreset] = {
             "power.ina228.shunt_ohms to its value."
         ),
     ),
-    # Onboard 15 mOhm 0.1% shunt, INA228 default address strapping.
+    # Onboard 15 mOhm shunt (R1 = HoLLR2512-2W-15mR-1% per Adafruit's
+    # schematic; the product page advertises 0.1%, so treat ~1% as the
+    # systematic floor when comparing against another instrument) and the
+    # INA228 default 0x40 address strapping.
     "adafruit-ina228": MonitorBoardPreset(
         label="Adafruit INA228 breakout (5832)",
         i2c_address=0x40,

@@ -746,6 +746,7 @@ _INA228_VARS: dict[str, object] = {
     "ina228_averaging_count": 16,
     "ina228_adc_range": 0,
     "ina228_shunt_cal": 6250,
+    "ina228_current_lsb_divisor": "13107200000.0",
     "ina228_calibration_id": "ina228:r2000000uohm:i500ma:adc0",
 }
 
@@ -778,11 +779,13 @@ class TestIna228PowerRender:
             'hpx_power_terminal_fail("ina228_init"',
             'hpx_power_terminal_fail("ina228_arm"',
             'hpx_power_terminal_fail("ina228_read"',
-            # SHUNT_CAL is raw-written from the host-computed constant and
-            # read back — an unverified calibration silently yields zero
-            # current/energy (see the hardware bring-up finding).
-            "cal_buf[0] = 0x02U;",
-            "cal_readback != 6250U",
+            # SHUNT_CAL is read back and required non-zero: an uncalibrated
+            # part silently reports zero current/energy (hardware finding).
+            "g_hpx_ina228_shunt_cal == 0U",
+            # Accumulators read raw (40-bit) rather than through the float API.
+            "ina228_read_energy_raw",
+            "ina228_read_charge_raw",
+            "/ 13107200000.0",
             *_INA228_MEASUREMENT_KEYS,
         ):
             assert fragment in out, f"missing: {fragment}"

@@ -71,11 +71,14 @@ class PowerMonitorContext:
     ina228_conversion_time_us: int = 0
     ina228_averaging_count: int = 0
     ina228_adc_range: int = 0
-    # SHUNT_CAL register value, precomputed host-side so the firmware can
-    # raw-write and readback-verify a known constant instead of depending on
-    # the driver's float pipeline (first Apollo510B bring-up found the
-    # driver's masked write leaving the register at 0).
+    # Expected SHUNT_CAL register value, precomputed host-side. Carried into
+    # the calibration_id for provenance and range-checked at render time.
     ina228_shunt_cal: int = 0
+    # SHUNT_CAL = 13107.2e6 * CURRENT_LSB * R_shunt (x4 at ADCRANGE=1), so
+    # firmware recovers the effective CURRENT_LSB as SHUNT_CAL / this. Kept
+    # as a rendered double literal so the scaling tracks the register that is
+    # actually programmed rather than the nominal configuration.
+    ina228_current_lsb_divisor: str = "1.0"
     ina228_calibration_id: str = ""
 
     @classmethod
@@ -95,6 +98,7 @@ class PowerMonitorContext:
         # SHUNT_CAL = 13107.2e6 * CURRENT_LSB * R_shunt (x4 when ADCRANGE=1),
         # CURRENT_LSB = max_current / 2^19. 15-bit register.
         current_lsb = ina.max_current_a / (1 << 19)
+        current_lsb_divisor = 13107.2e6 * shunt_ohms * (4 if adc_range else 1)
         shunt_cal = round(13107.2e6 * current_lsb * shunt_ohms) * (4 if adc_range else 1)
         if not 0 < shunt_cal <= 0x7FFF:
             raise FirmwareError(
@@ -117,6 +121,7 @@ class PowerMonitorContext:
             ina228_averaging_count=ina.averaging_count,
             ina228_adc_range=adc_range,
             ina228_shunt_cal=shunt_cal,
+            ina228_current_lsb_divisor=repr(current_lsb_divisor),
             ina228_calibration_id=calibration_id,
         )
 
@@ -382,6 +387,7 @@ class FirmwareRenderContext:
             "ina228_averaging_count": self.power_monitor.ina228_averaging_count,
             "ina228_adc_range": self.power_monitor.ina228_adc_range,
             "ina228_shunt_cal": self.power_monitor.ina228_shunt_cal,
+            "ina228_current_lsb_divisor": self.power_monitor.ina228_current_lsb_divisor,
             "ina228_calibration_id": self.power_monitor.ina228_calibration_id,
             "engine_header": self.engine.engine_header,
             "resolver_mode": self.engine.resolver_mode,

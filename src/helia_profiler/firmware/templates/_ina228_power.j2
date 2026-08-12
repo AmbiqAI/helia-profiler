@@ -38,6 +38,11 @@ static uint16_t g_hpx_ina228_diag_bits = 0;
 static uint16_t g_hpx_ina228_reg_config = 0;
 static uint16_t g_hpx_ina228_reg_adccfg = 0;
 static uint16_t g_hpx_ina228_reg_shuntcal = 0;
+// SHUNT_CAL as actually programmed, captured at setup. CURRENT_LSB is
+// derived from this rather than from the nominal configuration, so the
+// scaling matches what the hardware is really doing (the register is an
+// integer, so the effective LSB differs slightly from the nominal one).
+static uint16_t g_hpx_ina228_shunt_cal = 0;
 
 static uint32_t hpx_ina228_read_reg16(uint8_t reg, uint16_t *value) {
     uint8_t buf[2];
@@ -95,21 +100,18 @@ static uint32_t hpx_ina228_setup(void) {
             (float){{ ina228_max_current_ma }} / 1000.0f) != 0) {
         return 6U;
     }
-    {
-        uint8_t cal_buf[3];
-        cal_buf[0] = 0x02U;  // SHUNT_CAL register
-        cal_buf[1] = (uint8_t)({{ ina228_shunt_cal }}U >> 8);
-        cal_buf[2] = (uint8_t)({{ ina228_shunt_cal }}U & 0xFFU);
-        if (nsx_i2c_write(&g_hpx_ina228_i2c, cal_buf, 3,
-                          {{ "0x%02X" | format(ina228_i2c_address) }}) !=
-            NSX_I2C_STATUS_SUCCESS) {
-            return 10U;
-        }
-        uint16_t cal_readback = 0;
-        if (hpx_ina228_read_reg16(0x02U, &cal_readback) != 0 ||
-            cal_readback != {{ ina228_shunt_cal }}U) {
-            return 11U;  // calibration did not stick — measurement impossible
-        }
+    // Independent readback of SHUNT_CAL. nsx-sensors >= 0.3.0 writes and
+    // verifies this itself, but a zero calibration is the one failure that
+    // corrupts a run silently — the chip then reports exactly zero current,
+    // power, energy and charge while bus voltage still reads perfectly
+    // (Apollo510B bring-up, DIAG=0x203 SHUNTCAL=0). Checking non-zero rather
+    // than an exact value keeps this robust to float-rounding differences
+    // between the driver's computation and ours.
+    if (hpx_ina228_read_reg16(0x02U, &g_hpx_ina228_shunt_cal) != 0) {
+        return 10U;
+    }
+    if (g_hpx_ina228_shunt_cal == 0U) {
+        return 11U;  // uncalibrated — every current-derived reading would be 0
     }
     if (ina228_set_current_conversion_time(
             &g_hpx_ina228, INA228_TIME_{{ ina228_conversion_time_us }}_us) != 0 ||
@@ -139,17 +141,22 @@ static uint32_t hpx_ina228_window_begin(void) {
 }
 
 static uint32_t hpx_ina228_window_end(void) {
-    float energy_j = 0.0f;
-    float charge_c = 0.0f;
+    uint64_t energy_raw = 0;
+    int64_t charge_raw = 0;
     float bus_mv = 0.0f;
     uint16_t diag = 0;
     // DIAG_ALRT must be sampled BEFORE the accumulators: ENERGYOF clears
     // when ENERGY is read and CHARGEOF when CHARGE is read, so reading them
     // first would blind the overflow check to exactly the overflows it
     // exists to catch.
+    //
+    // The accumulators are read RAW: ENERGY is 40 bits and CHARGE is 40-bit
+    // signed, against a float's 24-bit mantissa, so the driver's float API
+    // quantizes once a long window accumulates past ~2^24 LSBs. Scaling the
+    // exact integers here keeps long profiling runs honest.
     if (ina228_alert_functions(&g_hpx_ina228, &diag) != 0 ||
-        ina228_read_energy(&g_hpx_ina228, &energy_j) != 0 ||
-        ina228_read_charge(&g_hpx_ina228, &charge_c) != 0 ||
+        ina228_read_energy_raw(&g_hpx_ina228, &energy_raw) != 0 ||
+        ina228_read_charge_raw(&g_hpx_ina228, &charge_raw) != 0 ||
         ina228_read_bus_voltage(&g_hpx_ina228, &bus_mv) != 0) {
         return 1U;
     }
@@ -158,14 +165,24 @@ static uint32_t hpx_ina228_window_end(void) {
     (void)hpx_ina228_read_reg16(0x00U, &g_hpx_ina228_reg_config);
     (void)hpx_ina228_read_reg16(0x01U, &g_hpx_ina228_reg_adccfg);
     (void)hpx_ina228_read_reg16(0x02U, &g_hpx_ina228_reg_shuntcal);
-    // Envelope integers are non-negative by contract; a (mis-wired) negative
-    // charge would sign-glitch the cast, so clamp at zero rather than wrap.
-    if (energy_j < 0.0f) energy_j = 0.0f;
-    if (charge_c < 0.0f) charge_c = 0.0f;
-    if (bus_mv < 0.0f) bus_mv = 0.0f;
-    g_hpx_ina228_energy_nj = (uint64_t)(energy_j * 1.0e9f + 0.5f);
-    g_hpx_ina228_charge_nc = (uint64_t)(charge_c * 1.0e9f + 0.5f);
-    g_hpx_ina228_bus_voltage_uv = (uint32_t)(bus_mv * 1000.0f + 0.5f);
+    // CURRENT_LSB back-derived from the SHUNT_CAL actually in the register:
+    // SHUNT_CAL = 13107.2e6 * CURRENT_LSB * R_shunt (x4 at ADCRANGE=1), so
+    // CURRENT_LSB = SHUNT_CAL / divisor with the divisor precomputed by the
+    // host from the same shunt/range. Energy LSB is 16 * 3.2 * CURRENT_LSB
+    // joules; charge LSB is CURRENT_LSB coulombs. Doubles here (53-bit
+    // mantissa) hold the 40-bit registers exactly; this runs once, after the
+    // measured window, so the cost is irrelevant.
+    const double current_lsb =
+        (double)g_hpx_ina228_shunt_cal / {{ ina228_current_lsb_divisor }};
+    const double energy_nj = (double)energy_raw * 51.2 * current_lsb * 1.0e9;
+    const double charge_nc = (double)charge_raw * current_lsb * 1.0e9;
+    // Envelope integers are non-negative by contract. Negative charge means
+    // IN+/IN- are wired backwards; clamp rather than wrap the cast, and let
+    // the zero-charge-with-nonzero-energy signature report the miswiring.
+    g_hpx_ina228_energy_nj = energy_nj > 0.0 ? (uint64_t)(energy_nj + 0.5) : 0U;
+    g_hpx_ina228_charge_nc = charge_nc > 0.0 ? (uint64_t)(charge_nc + 0.5) : 0U;
+    g_hpx_ina228_bus_voltage_uv =
+        bus_mv > 0.0f ? (uint32_t)(bus_mv * 1000.0f + 0.5f) : 0U;
     g_hpx_ina228_overflow = (diag & HPX_INA228_OVF_MASK) != 0;
     g_hpx_ina228_ok = true;
     return 0U;
