@@ -491,6 +491,50 @@ default strapping, so the preset alone is a complete config:
     board: adafruit-ina228
 ```
 
+!!! warning "The Adafruit board's 15 mΩ shunt is sized for amps, not milliamps"
+
+    That shunt is convenient — it makes the preset a complete config — but a
+    low-power target develops only tens of µV across 15 mΩ, and the INA228's
+    own input offset is on the order of a µV. The offset then lands as a
+    *percentage-level* error on the reading.
+
+    Characterised against a Joulescope in series with the same rail, both
+    instruments integrating the same window, over 13 runs spanning a 5× range
+    of sense voltage. The disagreement decomposes into two terms:
+
+    | Term | Value | Behaviour |
+    |---|---|---|
+    | Input offset | **−1.31 µV** at the shunt input | fixed in volts, so it dominates when the shunt drop is small |
+    | Gain | **+0.53 %** (effective shunt 14.92 mΩ vs 15 nominal) | proportional, so it never washes out |
+
+    Both instruments repeat to ~0.1 %, so this is systematic, not noise. The
+    net error depends only on the shunt drop, which makes it easy to predict
+    for *your* resistor and load — error ≈ `+0.53 % − 1.31 µV / V_shunt`:
+
+    | Shunt drop | Net error |
+    |---|---|
+    | 50 µV | −2.1 % |
+    | 100 µV | −0.8 % |
+    | ~250 µV | ~0 (crossover) |
+    | 1 mV | +0.4 % |
+    | ≥10 mV | +0.5 % (gain term only) |
+
+    The offset is referred to shunt *voltage*, so raising the sense resistor
+    attacks it directly: a 0.5 Ω resistor puts you in the gain-only regime for
+    anything but the lightest loads. If you need absolute accuracy on a
+    low-power target, wire a larger sense resistor (see **Choosing a shunt**
+    below) rather than living with the preset. The residual gain term can be
+    calibrated out by setting `shunt_ohms` to the effective value.
+
+    For *relative* work — A/B comparisons, regression tracking, optimisation
+    deltas at a roughly fixed operating current — the stable bias largely
+    cancels and the stock board is fine.
+
+    Note that offset and gain are *per-part*: these figures characterise one
+    board and one Joulescope. Another unit will differ in the same way any two
+    instruments do. Treat the model as the shape of the error, not as a
+    calibration constant you can borrow.
+
 For custom wiring, omit `board` and set `shunt_ohms` (and `i2c_address` if
 strapped away from 0x40) directly. `shunt_ohms` has **no bare default on
 purpose**: a wrong shunt calibration produces plausible-looking but wrong
@@ -560,6 +604,14 @@ prioritise **tolerance over rating**, since the resistor's tolerance passes
 straight through into your energy figure. A 1 % part means 1 % energy error;
 a 5 % carbon film means 5 %.
 
+The offset term is what bites at low current, and it bites hard: 0.5 Ω at
+20 mA gives 10 mV of signal, while a 15 mΩ shunt at the same current gives
+300 µV — a 33× difference in how much a µV of input offset matters. That
+ratio is the whole argument for a larger resistor; see the measured error-vs-
+shunt-drop table above. What extra signal will *not* fix is gain error, which
+stays a fixed percentage — calibrate `shunt_ohms` to the effective value if
+you need that gone too.
+
 HPX picks the ADC range for you from `shunt_ohms × max_current_a`: if the
 worst-case shunt drop fits in ±40.96 mV it selects the 4×-resolution range,
 otherwise the wide ±163.84 mV range. Setting `max_current_a` far above what
@@ -582,10 +634,31 @@ per-inference energy; average power is energy over the window duration.
 | Per-layer power attribution | future | ✗ |
 | Host wiring | series supply + GPIO gate wires | none (target I2C) |
 | Powers/resets the target rail | ✓ (relay, power-cycle recovery) | ✗ |
+| Adds to the measured current | ✗ (fully external) | ✓ (target IOM stays powered) |
 
 The INA228 path is a *cheap aggregate-energy instrument*, not a Joulescope
 replacement: with 50 µs minimum conversions it cannot resolve per-layer
 detail, and it reports one integrated window, not a sample stream.
+
+!!! warning "On-target monitoring is inside its own measurement"
+
+    Talking to the INA228 requires an IOM to stay powered and clocked for the
+    whole run. That current is drawn by the target, on the rail the INA228 is
+    measuring — so it is counted in the reported energy. An external
+    instrument has no equivalent cost, which is one reason the two do not
+    agree out of the box.
+
+    It is a *fixed* adder, not a tunable one. The firmware brackets the window
+    so no I2C transactions occur inside it (see `_ina228_power.j2`), which
+    means conversion time, averaging and bus speed do not change it — there is
+    nothing to tune away. On a low-power target it can be a non-trivial
+    fraction of the total.
+
+    Measure it on your own board rather than assuming a figure: run once with
+    the `power.ina228` block and once without it, using an external instrument
+    for both. The block's presence — not `power.driver` — is what decides
+    whether the firmware brings up a monitor, so removing it gives you a clean
+    monitor-free baseline with everything else identical.
 
 ### Adding other monitors and boards
 
