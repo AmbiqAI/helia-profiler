@@ -29,15 +29,15 @@
     // ns_power_down_peripherals() for this SoC family).
     // ---------------------------------------------------------------------
     {
-{% for iom in range(8) %}
-{% if power_monitor | default(none) == "ina228" and iom == ina228_i2c_iom %}
+{%- for iom in range(8) %}
+{%- if power_monitor | default(none) == "ina228" and iom == ina228_i2c_iom %}
         // IOM{{ iom }} carries the on-target INA228 monitor and must stay
         // powered: this block runs after hpx_ina228_setup(), so disabling it
         // would break the accumulator reset/read that bracket the window.
-{% else %}
+{%- else %}
         am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM{{ iom }});
-{% endif %}
-{% endfor %}
+{%- endif %}
+{%- endfor %}
 
         am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_UART0);
         am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_UART1);

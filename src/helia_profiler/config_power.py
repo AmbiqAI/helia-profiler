@@ -7,6 +7,8 @@ surface (``from helia_profiler.config import PowerConfig`` keeps working).
 
 from __future__ import annotations
 
+import re
+
 from pydantic import ConfigDict, model_validator
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
@@ -134,8 +136,11 @@ class Ina228Config:
     # hardware steps (INA228_CONVERSION_TIMES_US / INA228_AVERAGING_COUNTS).
     conversion_time_us: int = DEFAULT_INA228_CONVERSION_TIME_US
     averaging_count: int = DEFAULT_INA228_AVERAGING_COUNT
-    # Free-form calibration label carried into result metadata. Defaults to a
-    # value derived from the resolved shunt/current at firmware render time.
+    # Calibration label carried into result metadata. Defaults to a value
+    # derived from the resolved shunt/current at firmware render time.
+    # Restricted charset: the value is rendered verbatim inside a C string
+    # literal that doubles as an snprintf format string in the power
+    # firmware, so '%', quotes, backslashes and whitespace are all unsafe.
     calibration_id: str | None = None
 
     @property
@@ -206,6 +211,14 @@ class Ina228Config:
                 f"power.ina228.averaging_count must be one of "
                 f"{INA228_AVERAGING_COUNTS}, got {self.averaging_count}."
             )
+        if self.calibration_id is not None and not re.fullmatch(
+            r"[A-Za-z0-9._:+-]{1,64}", self.calibration_id
+        ):
+            raise ValueError(
+                "power.ina228.calibration_id must be 1-64 characters from "
+                "[A-Za-z0-9._:+-]: it is rendered verbatim into a C format "
+                f"string in the power firmware. Got {self.calibration_id!r}."
+            )
         return self
 
 
@@ -256,8 +269,24 @@ class PowerConfig:
     # when more than one device is plugged in. Leave None to auto-pick the
     # single available device (and fail loudly if multiple are present).
     serial: str | None = None
-    # On-target INA228 monitor settings; required when driver is "ina228".
+    # On-target INA228 monitor settings. The presence of this block — not the
+    # driver — decides whether generated power firmware talks to a monitor:
+    # required when driver is "ina228", and with any other driver it adds the
+    # monitor as a bystander (its IOM stays powered, which costs measurable
+    # target current). Delete the block when the monitor is not in use.
     ina228: Ina228Config | None = None
+
+    @property
+    def monitor_selected(self) -> bool:
+        """Whether generated power firmware talks to an on-target monitor.
+
+        The single source of truth for both firmware gates: NSX module
+        selection in ``firmware/__init__.py`` and render-context derivation
+        in ``PowerMonitorContext.from_config``. When these two used separate
+        predicates and disagreed, runs silently built no monitor at all
+        while appearing to configure one.
+        """
+        return self.enabled and self.ina228 is not None
 
     @model_validator(mode="after")
     def _validate(self) -> PowerConfig:

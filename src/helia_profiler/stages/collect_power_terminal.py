@@ -103,6 +103,39 @@ class CollectPowerTerminalStage:
                 )
         if internal_mode and envelope.measurement is None:
             raise PowerError("Internal power mode requires an on-device measurement payload.")
+        if internal_mode and envelope.measurement is not None:
+            measurement = envelope.measurement
+            # Plausibility gates for the measurement of record. Both
+            # signatures pass every register-level health check (no DIAG bit,
+            # firmware status ok), so without these the run would publish a
+            # confidently wrong number.
+            if measurement.energy_nj == 0 and measurement.charge_nc == 0:
+                # A window shorter than one accumulator update, or a dead
+                # sense path, reads exactly zero while bus voltage (which
+                # needs no calibration) still looks perfect.
+                raise PowerError(
+                    "On-device power monitor measured exactly zero energy and charge.",
+                    hint=(
+                        "Either the window contained no completed accumulator "
+                        "update (averaging_count x 2 x conversion_time_us "
+                        "longer than the window) or no current flows through "
+                        "the shunt. Check the IN+/IN- sense wiring and the "
+                        "conversion/averaging settings."
+                    ),
+                )
+            if measurement.energy_nj > 0 and measurement.charge_nc == 0:
+                # ENERGY integrates |power| while CHARGE is signed: reversed
+                # IN+/IN- accumulates negative charge, which the firmware
+                # clamps to zero. Nonzero energy with zero charge is that
+                # miswiring's exact signature.
+                raise PowerError(
+                    "On-device power monitor reports energy but zero charge.",
+                    hint=(
+                        "This is the signature of reversed sense wiring: "
+                        "swap the INA228's IN+/IN- connections (current must "
+                        "flow IN+ -> IN-)."
+                    ),
+                )
 
         ctx.publish_power_terminal_envelope(envelope)
         if internal_mode and envelope.measurement is not None:

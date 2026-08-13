@@ -200,6 +200,74 @@ def test_collect_stage_rejects_inconsistent_terminal(
         CollectPowerTerminalStage().run(ctx)
 
 
+def _measurement(**overrides) -> OnDevicePowerSummary:
+    values = {
+        "source": "ina228",
+        "scope": "fixed_n_inference",
+        "energy_nj": 90_000_000,
+        "duration_us": 5000,
+        "inference_count": 5,
+        "overflow": False,
+        "charge_nc": 50_000_000,
+        "bus_voltage_uv": 1_800_000,
+        "sample_count": 100,
+        "calibration_id": "board-rev-a",
+        **overrides,
+    }
+    return OnDevicePowerSummary(**values)
+
+
+class TestInternalMeasurementPlausibility:
+    """Both corrupt-measurement signatures pass every register-level health
+    check (firmware status ok, no DIAG bit), so the host must refuse to
+    publish them as a valid PowerResult."""
+
+    def test_all_zero_measurement_is_rejected(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        # A window shorter than one accumulator update — or a dead sense
+        # path — reads exactly zero while looking perfectly healthy.
+        ctx = _make_ctx(tmp_path, internal=True)
+        monkeypatch.setattr(
+            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            lambda transport: _FakeTerminalTransport(
+                _record(), _measurement(energy_nj=0, charge_nc=0)
+            ),
+        )
+        with pytest.raises(PowerError, match="exactly zero energy and charge"):
+            CollectPowerTerminalStage().run(ctx)
+
+    def test_energy_without_charge_flags_reversed_wiring(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        # ENERGY integrates |power| while CHARGE is signed: reversed IN+/IN-
+        # clamps negative charge to zero — nonzero energy, zero charge.
+        ctx = _make_ctx(tmp_path, internal=True)
+        monkeypatch.setattr(
+            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            lambda transport: _FakeTerminalTransport(
+                _record(), _measurement(charge_nc=0)
+            ),
+        )
+        with pytest.raises(PowerError, match="reversed sense wiring"):
+            CollectPowerTerminalStage().run(ctx)
+
+    def test_external_mode_ignores_bystander_zero_measurement(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        # A bystander monitor with disconnected sense inputs legitimately
+        # reads zero; the external capture is the measurement of record.
+        ctx = _make_ctx(tmp_path)
+        monkeypatch.setattr(
+            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            lambda transport: _FakeTerminalTransport(
+                _record(), _measurement(energy_nj=0, charge_nc=0, bus_voltage_uv=600)
+            ),
+        )
+        CollectPowerTerminalStage().run(ctx)
+        assert ctx.power_run is not None and ctx.power_run.terminal is not None
+
+
 @pytest.mark.parametrize("transport", ["rtt", "uart", "swo", "usb_cdc"])
 def test_collect_stage_supports_all_profile_transports(tmp_path: Path, transport: str):
     ctx = _make_ctx(tmp_path, transport=transport)

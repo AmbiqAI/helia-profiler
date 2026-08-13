@@ -200,6 +200,12 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
                 "power_integrity": ctx.power_result.metadata.get("integrity"),
                 "power_mode": ctx.config.power.mode.value,
                 "power_firmware": ctx.power_run.plan.firmware_mode if ctx.power_run else None,
+                # An on-target monitor keeps its IOM powered on the measured
+                # rail for the whole run — a double-digit-percent current
+                # adder on a low-power target. A block/no-block pair is
+                # therefore not power-comparable even when every other
+                # dimension matches.
+                "power_monitor": "ina228" if ctx.config.power.monitor_selected else "none",
             }
         )
     return dimensions

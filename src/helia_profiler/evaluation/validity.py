@@ -123,12 +123,27 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
 
         if on_device is not None:
             if on_device.overflow:
-                issues.append(
-                    _error(
-                        "power.on_device_overflow",
-                        "On-device power monitor reported accumulator overflow.",
+                # Fatal only when the monitor is the measurement of record.
+                # In external mode the monitor is a bystander (e.g. sense
+                # inputs disconnected while a Joulescope measures) and its
+                # health flags must not invalidate a good external capture —
+                # this mirrors CollectPowerTerminalStage's warn-only path.
+                if internal_mode:
+                    issues.append(
+                        _error(
+                            "power.on_device_overflow",
+                            "On-device power monitor reported accumulator overflow.",
+                        )
                     )
-                )
+                else:
+                    issues.append(
+                        _warning(
+                            "power.on_device_overflow",
+                            "Bystander on-device monitor reported accumulator "
+                            "overflow; the external measurement of record is "
+                            "unaffected.",
+                        )
+                    )
             expected_count = terminal.completed_count if terminal is not None else plan.inference_count
             if expected_count is not None and on_device.inference_count != expected_count:
                 issues.append(

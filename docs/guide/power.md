@@ -494,46 +494,26 @@ default strapping, so the preset alone is a complete config:
 !!! warning "The Adafruit board's 15 mΩ shunt is sized for amps, not milliamps"
 
     That shunt is convenient — it makes the preset a complete config — but a
-    low-power target develops only tens of µV across 15 mΩ, and the INA228's
-    own input offset is on the order of a µV. The offset then lands as a
-    *percentage-level* error on the reading.
+    low-power target develops only tens of µV across 15 mΩ, while the
+    INA228's input offset is on the order of a µV (datasheet `V_OS`, per ADC
+    range). At that signal level the offset alone lands as a
+    *percentage-level* current error, and on our bench a low-mA target read
+    several percent away from a reference instrument on the same rail —
+    consistent with exactly that offset budget. Shunt-referred offset is
+    fixed in volts, so the error scales inversely with the shunt drop: more
+    sense voltage, proportionally less error.
 
-    Characterised against a Joulescope in series with the same rail, both
-    instruments integrating the same window, over 13 runs spanning a 5× range
-    of sense voltage. The disagreement decomposes into two terms:
+    The practical consequences:
 
-    | Term | Value | Behaviour |
-    |---|---|---|
-    | Input offset | **−1.31 µV** at the shunt input | fixed in volts, so it dominates when the shunt drop is small |
-    | Gain | **+0.53 %** (effective shunt 14.92 mΩ vs 15 nominal) | proportional, so it never washes out |
-
-    Both instruments repeat to ~0.1 %, so this is systematic, not noise. The
-    net error depends only on the shunt drop, which makes it easy to predict
-    for *your* resistor and load — error ≈ `+0.53 % − 1.31 µV / V_shunt`:
-
-    | Shunt drop | Net error |
-    |---|---|
-    | 50 µV | −2.1 % |
-    | 100 µV | −0.8 % |
-    | ~250 µV | ~0 (crossover) |
-    | 1 mV | +0.4 % |
-    | ≥10 mV | +0.5 % (gain term only) |
-
-    The offset is referred to shunt *voltage*, so raising the sense resistor
-    attacks it directly: a 0.5 Ω resistor puts you in the gain-only regime for
-    anything but the lightest loads. If you need absolute accuracy on a
-    low-power target, wire a larger sense resistor (see **Choosing a shunt**
-    below) rather than living with the preset. The residual gain term can be
-    calibrated out by setting `shunt_ohms` to the effective value.
-
-    For *relative* work — A/B comparisons, regression tracking, optimisation
-    deltas at a roughly fixed operating current — the stable bias largely
-    cancels and the stock board is fine.
-
-    Note that offset and gain are *per-part*: these figures characterise one
-    board and one Joulescope. Another unit will differ in the same way any two
-    instruments do. Treat the model as the shape of the error, not as a
-    calibration constant you can borrow.
+    - For **relative** work — A/B comparisons, regression tracking,
+      optimisation deltas at a similar operating current — the bias largely
+      cancels and the stock board is fine.
+    - For **absolute** numbers on a low-power target, wire a larger sense
+      resistor (see **Choosing a shunt** below) so the shunt drop dwarfs the
+      offset, and prefer mV-scale drops over µV-scale ones.
+    - Offset and gain are **per-part**: characterise your own board against
+      a reference if you need a number you can defend, rather than borrowing
+      anyone else's calibration.
 
 For custom wiring, omit `board` and set `shunt_ohms` (and `i2c_address` if
 strapped away from 0x40) directly. `shunt_ohms` has **no bare default on
@@ -592,9 +572,15 @@ current peaks above your steady state:
 
 | Peak current | Largest shunt in ±40.96 mV range | Burden at that peak |
 |---|---|---|
-| 50 mA | 0.82 Ω | 41 mV |
-| 100 mA | 0.41 Ω | 41 mV |
-| 400 mA | 0.10 Ω | 41 mV |
+| 50 mA | 0.8192 Ω (use 0.75 Ω) | ≤41 mV |
+| 100 mA | 0.4096 Ω (use 0.39 Ω) | ≤41 mV |
+| 400 mA | 0.1024 Ω (use 0.10 Ω) | ≤41 mV |
+
+The limit values are exact: HPX selects the high-resolution range only when
+`shunt_ohms × max_current_a ≤ 0.04096`, so a shunt *at* a rounded-up value
+(0.82 Ω at 50 mA is 41.0 mV) silently lands on the wide range and loses the
+4× resolution this table is trying to buy. Round **down** to a standard
+value.
 
 For a target drawing ~20 mA with peaks under ~80 mA, **0.5 Ω** is a good
 choice: 10 mV of burden at 20 mA (0.6 % of a 1.8 V rail), ~128 k ADC counts
@@ -607,10 +593,10 @@ a 5 % carbon film means 5 %.
 The offset term is what bites at low current, and it bites hard: 0.5 Ω at
 20 mA gives 10 mV of signal, while a 15 mΩ shunt at the same current gives
 300 µV — a 33× difference in how much a µV of input offset matters. That
-ratio is the whole argument for a larger resistor; see the measured error-vs-
-shunt-drop table above. What extra signal will *not* fix is gain error, which
-stays a fixed percentage — calibrate `shunt_ohms` to the effective value if
-you need that gone too.
+ratio is the whole argument for a larger resistor. What extra signal will
+*not* fix is gain-type error (shunt tolerance, sense-path parasitics), which
+stays a fixed percentage — if you need that gone too, characterise the board
+against a reference instrument and set `shunt_ohms` to the effective value.
 
 HPX picks the ADC range for you from `shunt_ohms × max_current_a`: if the
 worst-case shunt drop fits in ±40.96 mV it selects the 4×-resolution range,
@@ -648,17 +634,23 @@ detail, and it reports one integrated window, not a sample stream.
     instrument has no equivalent cost, which is one reason the two do not
     agree out of the box.
 
-    It is a *fixed* adder, not a tunable one. The firmware brackets the window
-    so no I2C transactions occur inside it (see `_ina228_power.j2`), which
-    means conversion time, averaging and bus speed do not change it — there is
-    nothing to tune away. On a low-power target it can be a non-trivial
-    fraction of the total.
+    Do not expect to tune it away with conversion settings. The firmware
+    brackets the window so no I2C transactions occur inside it (see
+    `_ina228_power.j2`) — the adder is the *idle* IOM, not bus traffic — and
+    on our bench it did not move between conversion-time settings. On a
+    low-power target it can be a non-trivial fraction of the total.
 
     Measure it on your own board rather than assuming a figure: run once with
     the `power.ina228` block and once without it, using an external instrument
     for both. The block's presence — not `power.driver` — is what decides
-    whether the firmware brings up a monitor, so removing it gives you a clean
-    monitor-free baseline with everything else identical.
+    whether the firmware brings up a monitor, so removing it gives you a
+    monitor-free baseline (the binaries differ only in the monitor code and
+    its I2C/driver modules). Also note the flip side: a *leftover* `ina228:`
+    block keeps costing that current on every run, so delete the block when
+    the monitor comes off the board. If the block is present but the chip is
+    missing or unpowered, an external-instrument run logs a warning and
+    continues without a monitor payload (only `driver: ina228` treats a
+    missing chip as fatal, since the monitor *is* the measurement there).
 
 ### Adding other monitors and boards
 
@@ -750,8 +742,16 @@ part fails fast with a typed terminal phase:
   measurement was lost, so the run is treated as failed rather than
   silently reporting nothing.
 - An accumulator **overflow** during a very long window fails the run
-  explicitly (`On-device power monitor reported accumulator overflow`).
-  Shorten the window or raise `conversion_time_us`/`averaging_count`.
+  explicitly when the monitor is the measurement of record
+  (`driver: ina228`). When the monitor is a bystander on an external
+  capture, the overflow logs a warning instead — the external instrument's
+  result stands. Shorten the window or raise
+  `conversion_time_us`/`averaging_count`.
+- An internal-mode measurement of **exactly zero** energy and charge, or
+  nonzero energy with zero charge, fails the run with a wiring/cadence
+  hint rather than publishing a confidently wrong number: the first is a
+  dead sense path or a window shorter than one accumulator update, the
+  second is the signature of reversed IN+/IN- sense wiring.
 
 ## Verifying a capture
 

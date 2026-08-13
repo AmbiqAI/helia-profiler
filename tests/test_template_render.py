@@ -737,6 +737,10 @@ class TestMainAotCcRender:
 
 _INA228_VARS: dict[str, object] = {
     "power_monitor": "ina228",
+    # driver: ina228 — the monitor is the measurement of record, so setup /
+    # arm / read failures are terminal. The bystander variant (driver:
+    # joulescope + ina228 block) is exercised separately.
+    "ina228_required": True,
     "ina228_i2c_iom": 1,
     "ina228_i2c_address": 0x40,
     "ina228_i2c_speed_hz": 400_000,
@@ -807,6 +811,25 @@ class TestIna228PowerRender:
         assert out.index("static bool     g_hpx_ina228_ok") < out.index(
             "static void hpx_power_terminal_report("
         )
+
+    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    def test_bystander_monitor_failures_are_not_terminal(self, render):
+        """driver: joulescope + an ina228 block builds the same monitor
+        firmware, but a missing/mis-wired chip must not kill the run — the
+        external instrument owns the measurement. Failures are recorded and
+        reported by the terminal report instead (no printf at the failure
+        sites: UART/ITM are disabled for the window, and an ITM write with
+        PD_DBG off hangs the part)."""
+        out = render(power_only=True, **{**_INA228_VARS, "ina228_required": False})
+        for phase in ("ina228_init", "ina228_arm", "ina228_read"):
+            assert f'hpx_power_terminal_fail("{phase}"' not in out, phase
+        assert "g_hpx_ina228_bystander_fail_phase" in out
+        assert "HPX_POWER_INA228_BYSTANDER_FAILED=" in out
+        # The window hooks must be conditional on a live monitor.
+        assert "if (g_hpx_ina228_active)" in out
+        # Measurement keys stay gated on a successful read, so a dropped
+        # bystander yields no payload rather than a zeroed one.
+        assert "g_hpx_ina228_ok" in out
 
     @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
     def test_profile_binary_never_embeds_monitor_code(self, render):

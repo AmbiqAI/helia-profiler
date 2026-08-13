@@ -10,9 +10,9 @@
        hpx_ina228_window_begin()  zero the energy/charge accumulators
        hpx_ina228_window_end()    read accumulators + bus voltage + overflow
 
-   All I2C traffic happens strictly outside the measured window (begin is
-   one register write, issued before the gate; reads happen after), so the
-   monitor's own bus activity never contaminates the measurement it takes.
+   All I2C traffic happens strictly outside the measured window (begin's
+   RSTACC read-modify-write is issued before the gate; reads happen after),
+   so the monitor's own bus activity never contaminates the measurement.
 
    Results land in the g_hpx_ina228_* statics consumed by the terminal
    report in _power_terminal.j2. Values are converted to the integer wire
@@ -25,6 +25,19 @@ static nsx_i2c_config_t g_hpx_ina228_i2c = {
 };
 static ina228_context_t g_hpx_ina228;
 
+// Set when hpx_ina228_setup() succeeds. When the monitor is a bystander
+// (an external instrument owns the measurement), setup failure clears this
+// instead of terminating the run, and the window hooks become no-ops — the
+// terminal report then simply carries no measurement payload.
+static bool     g_hpx_ina228_active = false;
+// Bystander-mode failure record. Set instead of calling
+// hpx_power_terminal_fail() when the monitor is not the measurement of
+// record; emitted as a pre-record diagnostic by the terminal report. Not a
+// printf at the failure site: the arm/read hooks run while UART/ITM are
+// disabled for the measured window (an ITM write with PD_DBG off hangs the
+// part, DS510 erratum ERR003).
+static const char *g_hpx_ina228_bystander_fail_phase = (const char *)0;
+static uint32_t g_hpx_ina228_bystander_fail_rc = 0;
 // Window results, reported by hpx_power_terminal_report().
 static bool     g_hpx_ina228_ok = false;
 static bool     g_hpx_ina228_overflow = false;
@@ -134,11 +147,12 @@ static uint32_t hpx_ina228_setup(void) {
 }
 
 static uint32_t hpx_ina228_window_begin(void) {
-    // Single register write; issued before the window opens so the
-    // accumulators integrate exactly the gated inference loop. Per the
-    // datasheet, RSTACC also clears a latched MATHOF, so the window starts
-    // with clean health flags — a MATHOF seen at window end is *live*
-    // (recent conversions still overflowing), not boot-era residue.
+    // Sets CONFIG.RSTACC via the driver's read-modify-write (two I2C
+    // transactions), issued before the window opens so the accumulators
+    // integrate exactly the gated inference loop. Per the datasheet, RSTACC
+    // also clears a latched MATHOF, so the window starts with clean health
+    // flags — a MATHOF seen at window end is *live* (recent conversions
+    // still overflowing), not boot-era residue.
     return ina228_reset_accumulators(&g_hpx_ina228);
 }
 
@@ -180,7 +194,8 @@ static uint32_t hpx_ina228_window_end(void) {
     const double charge_nc = (double)charge_raw * current_lsb * 1.0e9;
     // Envelope integers are non-negative by contract. Negative charge means
     // IN+/IN- are wired backwards; clamp rather than wrap the cast, and let
-    // the zero-charge-with-nonzero-energy signature report the miswiring.
+    // the zero-charge-with-nonzero-energy signature report the miswiring
+    // (CollectPowerTerminalStage raises on exactly that signature).
     g_hpx_ina228_energy_nj = energy_nj > 0.0 ? (uint64_t)(energy_nj + 0.5) : 0U;
     g_hpx_ina228_charge_nc = charge_nc > 0.0 ? (uint64_t)(charge_nc + 0.5) : 0U;
     g_hpx_ina228_bus_voltage_uv =

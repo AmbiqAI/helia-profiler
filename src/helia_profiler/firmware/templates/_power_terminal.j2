@@ -16,9 +16,21 @@ static void hpx_power_terminal_report(
     // The DIAG line sits BEFORE the start marker on purpose: the envelope
     // parser ignores pre-record lines, so this reaches a bench capture
     // without widening the host wire contract.
-    int length = snprintf(
-        record,
-        sizeof(record),
+    int length = 0;
+    if (g_hpx_ina228_bystander_fail_phase != (const char *)0) {
+        // A bystander monitor failed (init/arm/read) and was dropped while
+        // the run continued on its external instrument. Pre-record line, so
+        // the parser ignores it but a bench capture shows what happened.
+        length += snprintf(
+            record,
+            sizeof(record),
+            "HPX_POWER_INA228_BYSTANDER_FAILED=%s:%lu\n",
+            g_hpx_ina228_bystander_fail_phase,
+            (unsigned long)g_hpx_ina228_bystander_fail_rc);
+    }
+    length += snprintf(
+        record + length,
+        sizeof(record) - (unsigned)length,
         "HPX_POWER_INA228_DIAG=0x%03X CFG=0x%04X ADCCFG=0x%04X SHUNTCAL=%u\n"
         "--- HPX_POWER_TERMINAL_START ---\n"
         "HPX_POWER_TERMINAL_VERSION=1\n"

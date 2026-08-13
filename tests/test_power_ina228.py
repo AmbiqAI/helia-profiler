@@ -252,30 +252,55 @@ class TestMonitorFirmwareGate:
         )
 
     def test_render_gate_and_module_gate_agree(self, tmp_path: Path):
-        """Both gates must derive from the same predicate."""
+        """Both gates single-source PowerConfig.monitor_selected.
+
+        The render gate is exercised behaviorally; the module gate is pinned
+        by asserting generate_app consumes the shared property rather than
+        re-deriving its own predicate — agreement then holds by construction
+        instead of by parallel maintenance.
+        """
         import inspect
 
         from helia_profiler import firmware as firmware_module
 
         source = inspect.getsource(firmware_module.generate_app)
-        assert "config.power.ina228 is not None" in source, (
-            "module selection must gate on the config block; if this moves, "
-            "keep PowerMonitorContext.from_config in step with it"
+        assert "config.power.monitor_selected" in source, (
+            "module selection must consume PowerConfig.monitor_selected — "
+            "re-deriving the predicate inline is how the gates diverged"
         )
-        for driver in ("ina228", "joulescope"):
-            power: dict[str, object] = {
-                "enabled": True,
-                "driver": driver,
-                "ina228": {"board": "adafruit-ina228"},
-            }
-            if driver == "ina228":
-                power["mode"] = "internal"
-            else:
-                power["mode"] = "external"
+        for driver, mode, expected in (
+            ("ina228", "internal", "ina228"),
+            ("joulescope", "external", "ina228"),
+        ):
             sub = tmp_path / driver
             sub.mkdir(parents=True, exist_ok=True)
-            config = _profile_config(sub, power)
-            assert PowerMonitorContext.from_config(config).power_monitor == "ina228"
+            config = _profile_config(
+                sub,
+                {
+                    "enabled": True,
+                    "driver": driver,
+                    "mode": mode,
+                    "ina228": {"board": "adafruit-ina228"},
+                },
+            )
+            assert config.power.monitor_selected is True
+            monitor = PowerMonitorContext.from_config(config)
+            assert monitor.power_monitor == expected
+            # driver decides required-vs-bystander, not monitor presence.
+            assert monitor.ina228_required is (driver == "ina228")
+
+    def test_monitor_selected_false_without_block_or_power(self, tmp_path: Path):
+        (tmp_path / "a").mkdir()
+        (tmp_path / "b").mkdir()
+        no_block = _profile_config(
+            tmp_path / "a", {"enabled": True, "driver": "joulescope"}
+        )
+        assert no_block.power.monitor_selected is False
+        disabled = _profile_config(
+            tmp_path / "b",
+            {"enabled": False, "ina228": {"board": "adafruit-ina228"}},
+        )
+        assert disabled.power.monitor_selected is False
 
     def test_no_block_builds_no_monitor(self, tmp_path: Path):
         config = _profile_config(tmp_path, {"enabled": True, "driver": "joulescope"})
@@ -482,3 +507,177 @@ class TestIna228EnvelopeWireFormat:
         envelope = parse_power_terminal_envelope(record.splitlines())
         assert envelope.measurement is not None
         assert envelope.measurement.overflow is True
+
+
+class TestCalibrationIdValidation:
+    """calibration_id is rendered verbatim inside a C string literal that is
+    also an snprintf format string — the charset must make '%', quotes,
+    backslashes, and newlines unrepresentable, and the length bound keeps the
+    terminal record clear of its buffer."""
+
+    @pytest.mark.parametrize("value", ["bench-A", "rev1.2:site_3+cal-7", "a"])
+    def test_safe_ids_accepted(self, tmp_path: Path, value: str):
+        config = _profile_config(
+            tmp_path,
+            {
+                "enabled": True,
+                "driver": "ina228",
+                "mode": "internal",
+                "ina228": {"board": "adafruit-ina228", "calibration_id": value},
+            },
+        )
+        assert config.power.ina228 is not None
+        assert config.power.ina228.calibration_id == value
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "rev%s",  # printf conversion -> UB in the reporting path
+            'bench "A"',  # breaks the C string literal
+            "back\\slash",  # escape sequence
+            "line\nbreak",  # breaks the key=value envelope contract
+            "",  # empty
+            "x" * 65,  # overlong -> record truncation risk
+        ],
+    )
+    def test_unsafe_ids_rejected(self, tmp_path: Path, value: str):
+        from helia_profiler.errors import ConfigError
+
+        with pytest.raises((ConfigError, pydantic.ValidationError), match="calibration_id"):
+            _profile_config(
+                tmp_path,
+                {
+                    "enabled": True,
+                    "driver": "ina228",
+                    "mode": "internal",
+                    "ina228": {"board": "adafruit-ina228", "calibration_id": value},
+                },
+            )
+
+
+class TestAccumulatorCadenceGuard:
+    """The ENERGY/CHARGE accumulators advance once per completed averaged
+    conversion set. A window shorter than one update reads exactly zero with
+    no DIAG bit — a fabricated 0 W result — so internal-mode plans that
+    undersample are rejected before any firmware is built."""
+
+    def _plan(self, tmp_path: Path, power: dict):
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.stages.plan_power import plan_power_run
+
+        config = _profile_config(tmp_path, power)
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        return plan_power_run(ctx, inference_count=12000)
+
+    def test_slowest_settings_rejected(self, tmp_path: Path):
+        # 1024 x 2 x 4120 us = 8.44 s per update against a ~5 s window:
+        # zero completed updates, previously published as a healthy 0 W.
+        with pytest.raises(PowerError, match="accumulator would update only"):
+            self._plan(
+                tmp_path,
+                {
+                    "enabled": True,
+                    "driver": "ina228",
+                    "mode": "internal",
+                    "firmware": "dedicated",
+                    "ina228": {
+                        "board": "adafruit-ina228",
+                        "conversion_time_us": 4120,
+                        "averaging_count": 1024,
+                    },
+                },
+            )
+
+    def test_default_settings_pass(self, tmp_path: Path):
+        plan = self._plan(
+            tmp_path,
+            {
+                "enabled": True,
+                "driver": "ina228",
+                "mode": "internal",
+                "firmware": "dedicated",
+                "ina228": {"board": "adafruit-ina228"},
+            },
+        )
+        assert plan.inference_count == 12000
+
+    def test_external_mode_not_gated(self, tmp_path: Path):
+        """A bystander monitor may undersample freely — its numbers are not
+        the measurement of record."""
+        plan = self._plan(
+            tmp_path,
+            {
+                "enabled": True,
+                "driver": "joulescope",
+                "mode": "external",
+                "firmware": "dedicated",
+                "ina228": {
+                    "board": "adafruit-ina228",
+                    "conversion_time_us": 4120,
+                    "averaging_count": 1024,
+                },
+            },
+        )
+        assert plan.inference_count == 12000
+
+
+class TestOverflowValidityModeAware:
+    """evaluate_run must mirror CollectPowerTerminalStage: an internal-mode
+    (measurement-of-record) overflow invalidates the result, a bystander
+    monitor's overflow only degrades it."""
+
+    @pytest.mark.parametrize(
+        ("internal", "expected_severity"),
+        [(True, "error"), (False, "warning")],
+    )
+    def test_overflow_severity_tracks_mode(
+        self, tmp_path: Path, internal: bool, expected_severity: str
+    ):
+        import dataclasses
+
+        from helia_profiler.evaluation.validity import evaluate_run
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.results import OnDevicePowerSummary, PowerRunPlan
+
+        config = _profile_config(
+            tmp_path,
+            {
+                "enabled": True,
+                "driver": "ina228" if internal else "joulescope",
+                "mode": "internal" if internal else "external",
+                "firmware": "dedicated",
+                "ina228": {"board": "adafruit-ina228"},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.publish_power_plan(
+            PowerRunPlan(
+                firmware_mode="dedicated",
+                inference_count=5,
+                reference_inference_us=1000,
+                count_source="configured",
+            )
+        )
+        assert ctx.power_run is not None
+        ctx.power_run = dataclasses.replace(
+            ctx.power_run,
+            on_device_summary=OnDevicePowerSummary(
+                source="ina228",
+                scope="fixed_n_inference",
+                energy_nj=1,
+                duration_us=5000,
+                inference_count=5,
+                overflow=True,
+                charge_nc=1,
+                bus_voltage_uv=1_800_000,
+                sample_count=None,
+                calibration_id="x",
+            ),
+        )
+        issues = [
+            issue
+            for issue in evaluate_run(ctx).issues
+            if issue.code == "power.on_device_overflow"
+        ]
+        assert len(issues) == 1
+        assert issues[0].severity == expected_severity

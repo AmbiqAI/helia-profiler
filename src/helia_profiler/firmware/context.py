@@ -55,14 +55,20 @@ class SyncContext:
 class PowerMonitorContext:
     """On-target power monitor (INA228) render inputs.
 
-    ``power_monitor`` is ``None`` for every run that doesn't select the
-    ina228 driver, and all template content is gated on it — non-monitor
+    ``power_monitor`` is ``None`` for every run without a ``power.ina228``
+    config block, and all template content is gated on it — non-monitor
     renders stay byte-identical (WP2). Physical quantities are carried as
     scaled integers so the rendered C literals are exact and the render
     digest is stable across float formatting.
     """
 
     power_monitor: str | None
+    # True when the monitor is the measurement of record (driver: ina228):
+    # a setup failure is then terminal. False makes it a bystander — a
+    # missing or mis-wired chip logs a diagnostic and the run continues
+    # without a monitor payload, because the actual measurement belongs to
+    # an external instrument.
+    ina228_required: bool = False
     ina228_i2c_iom: int = 0
     ina228_i2c_address: int = 0
     ina228_i2c_speed_hz: int = 0
@@ -93,7 +99,7 @@ class PowerMonitorContext:
         # disagreed, runs silently built no monitor at all while appearing to
         # configure one, which invalidated a bench sweep.
         ina = power.ina228
-        if not (power.enabled and ina is not None):
+        if not power.monitor_selected or ina is None:
             return cls(power_monitor=None)
         shunt_ohms = ina.resolved_shunt_ohms
         shunt_micro_ohms = round(shunt_ohms * 1_000_000)
@@ -119,6 +125,7 @@ class PowerMonitorContext:
         )
         return cls(
             power_monitor="ina228",
+            ina228_required=power.driver == "ina228",
             ina228_i2c_iom=ina.i2c_iom,
             ina228_i2c_address=ina.resolved_i2c_address,
             ina228_i2c_speed_hz=ina.i2c_speed_hz,
@@ -385,6 +392,7 @@ class FirmwareRenderContext:
             "has_radio_subsystem": self.power_window.has_radio_subsystem,
             "ble_reset_gpio_pin": self.power_window.ble_reset_gpio_pin,
             "power_monitor": self.power_monitor.power_monitor,
+            "ina228_required": self.power_monitor.ina228_required,
             "ina228_i2c_iom": self.power_monitor.ina228_i2c_iom,
             "ina228_i2c_address": self.power_monitor.ina228_i2c_address,
             "ina228_i2c_speed_hz": self.power_monitor.ina228_i2c_speed_hz,

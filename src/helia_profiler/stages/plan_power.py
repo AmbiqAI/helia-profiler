@@ -27,6 +27,46 @@ def _derive_inference_count(
     return max(window_min, min(window_max, count))
 
 
+#: Minimum number of INA228 accumulator updates the measured window must
+#: contain. The ENERGY/CHARGE accumulators advance only once per completed
+#: averaged conversion set (averaging_count x (t_shunt + t_bus)), so a window
+#: shorter than a few updates quantizes badly — and a window shorter than ONE
+#: update reads exactly zero while looking perfectly healthy (no DIAG bit).
+#: 20 updates bounds the boundary-phase error at ~5%.
+MIN_INA228_ACCUMULATOR_UPDATES = 20
+
+
+def _check_ina228_cadence(ctx: PipelineContext, plan: PowerRunPlan) -> None:
+    """Reject internal-mode plans whose window undersamples the accumulator."""
+    ina = ctx.config.power.ina228
+    if ina is None or ctx.config.power.mode.value != "internal":
+        return
+    # CONT_BUS_SHUNT: one shunt + one bus conversion per averaging sample.
+    update_period_us = ina.averaging_count * 2 * ina.conversion_time_us
+    if plan.inference_count is not None and plan.reference_inference_us is not None:
+        window_us = plan.inference_count * plan.reference_inference_us
+        window_source = "planned window"
+    else:
+        window_us = plan.target_duration_ms * 1000
+        window_source = "target duration"
+    updates = window_us // update_period_us
+    if updates < MIN_INA228_ACCUMULATOR_UPDATES:
+        raise PowerError(
+            f"INA228 accumulator would update only {updates}x in the "
+            f"{window_source} ({window_us / 1e6:.2f} s): one update takes "
+            f"averaging_count x 2 x conversion_time_us = "
+            f"{update_period_us / 1e3:.1f} ms.",
+            hint=(
+                "The energy/charge accumulators advance once per completed "
+                "averaged conversion set; too few updates quantizes the "
+                "measurement (zero updates reads exactly 0 with no error "
+                "flag). Reduce power.ina228.averaging_count or "
+                "conversion_time_us, or lengthen the window "
+                f"(need >= {MIN_INA228_ACCUMULATOR_UPDATES} updates)."
+            ),
+        )
+
+
 def plan_power_run(
     ctx: PipelineContext,
     *,
@@ -58,13 +98,15 @@ def plan_power_run(
     else:
         count_source = "configured"
 
-    return PowerRunPlan(
+    plan = PowerRunPlan(
         firmware_mode=ctx.config.power.firmware,
         inference_count=inference_count,
         reference_inference_us=reference_us,
         target_duration_ms=target_duration_ms,
         count_source=count_source,
     )
+    _check_ina228_cadence(ctx, plan)
+    return plan
 
 
 class PlanPowerRunStage:
