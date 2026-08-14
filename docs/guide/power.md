@@ -497,23 +497,27 @@ default strapping, so the preset alone is a complete config:
     low-power target develops only tens of µV across 15 mΩ, while the
     INA228's input offset is on the order of a µV (datasheet `V_OS`, per ADC
     range). At that signal level the offset alone lands as a
-    *percentage-level* current error, and on our bench a low-mA target read
-    several percent away from a reference instrument on the same rail —
-    consistent with exactly that offset budget. Shunt-referred offset is
-    fixed in volts, so the error scales inversely with the shunt drop: more
-    sense voltage, proportionally less error.
+    *percentage-level* current error. Offset is fixed in volts, so the error
+    scales inversely with the shunt drop: more sense voltage, proportionally
+    less error.
 
-    The practical consequences:
+    You do not need a second instrument to deal with this — accuracy here is
+    a design-time choice, made when you pick the resistor:
 
+    - **Size the shunt so the drop is mV, not µV**, at your target's typical
+      current (see **Choosing a shunt** below). This is what shrinks the
+      offset error, and it is entirely under your control.
+    - **Buy tolerance.** Whatever error remains after the offset is
+      swamped is dominated by the resistor itself, so a 0.1 % part bounds
+      you near 0.1 %. This is why `shunt_ohms` must be the real value of a
+      known resistor rather than a guess.
     - For **relative** work — A/B comparisons, regression tracking,
-      optimisation deltas at a similar operating current — the bias largely
-      cancels and the stock board is fine.
-    - For **absolute** numbers on a low-power target, wire a larger sense
-      resistor (see **Choosing a shunt** below) so the shunt drop dwarfs the
-      offset, and prefer mV-scale drops over µV-scale ones.
-    - Offset and gain are **per-part**: characterise your own board against
-      a reference if you need a number you can defend, rather than borrowing
-      anyone else's calibration.
+      optimisation deltas at a similar operating current — even the stock
+      15 mΩ board is fine, because a stable bias cancels in the delta.
+
+    The stock preset is the convenient choice, not the accurate one. If you
+    care about absolute milliwatts on a sleepy target, wire your own sense
+    resistor.
 
 For custom wiring, omit `board` and set `shunt_ohms` (and `i2c_address` if
 strapped away from 0x40) directly. `shunt_ohms` has **no bare default on
@@ -594,9 +598,9 @@ The offset term is what bites at low current, and it bites hard: 0.5 Ω at
 20 mA gives 10 mV of signal, while a 15 mΩ shunt at the same current gives
 300 µV — a 33× difference in how much a µV of input offset matters. That
 ratio is the whole argument for a larger resistor. What extra signal will
-*not* fix is gain-type error (shunt tolerance, sense-path parasitics), which
-stays a fixed percentage — if you need that gone too, characterise the board
-against a reference instrument and set `shunt_ohms` to the effective value.
+*not* fix is the resistor's own tolerance, which stays a fixed percentage of
+the reading — so once the drop is comfortably in mV, your accuracy floor is
+simply the part you bought.
 
 HPX picks the ADC range for you from `shunt_ohms × max_current_a`: if the
 worst-case shunt drop fits in ±40.96 mV it selects the 4×-resolution range,
