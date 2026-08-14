@@ -834,6 +834,60 @@ class TestGenerateApp:
         # Internal mode: no GPIO sync handshake is armed.
         assert "kPowerSyncEnabled = false" in main_power_cc
 
+    def test_ina228_block_builds_monitor_under_a_non_ina228_driver(
+        self, tmp_path: Path, fake_dist: Path
+    ):
+        """driver: joulescope + an ina228 block must drive BOTH firmware
+        gates — NSX module selection and render-context derivation.
+
+        This is the configuration that broke: the two gates used different
+        predicates, so the manifest pulled nsx-sensors while the render
+        produced no monitor code at all. Runs looked configured and measured
+        nothing. Neither the driver: ina228 case nor the no-block case
+        exercises the decoupled path, so it needs its own end-to-end test.
+        """
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo510_evb"},
+                "power": {
+                    "enabled": True,
+                    "driver": "joulescope",
+                    "mode": "external",
+                    "ina228": {"shunt_ohms": 2.0},
+                },
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        nsx_yml = (app_dir / "nsx.yml").read_text()
+        cmake = (app_dir / "CMakeLists.txt").read_text()
+        main_power_cc = (app_dir / "src" / "main_power.cc").read_text()
+        # Gate 1 — module selection.
+        assert "nsx-i2c" in nsx_yml
+        assert "nsx-sensors" in nsx_yml
+        assert "nsx::sensors" in cmake
+        # Gate 2 — render context. Both must fire, or the run silently
+        # measures nothing while appearing configured.
+        assert "hpx_ina228_setup" in main_power_cc
+        assert "HPX_POWER_MEASUREMENT_SOURCE=ina228" in main_power_cc
+        # Bystander: the Joulescope owns the measurement, so a missing chip
+        # must not terminate the run.
+        assert 'hpx_power_terminal_fail("ina228_init"' not in main_power_cc
+        assert "g_hpx_ina228_bystander_fail_phase" in main_power_cc
+        # External mode still arms the GPIO handshake for the instrument.
+        assert "kPowerSyncEnabled = true" in main_power_cc
+
     def test_joulescope_power_run_does_not_pull_sensor_modules(
         self, tmp_path: Path, fake_dist: Path
     ):

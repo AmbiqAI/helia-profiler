@@ -21,12 +21,20 @@ static void hpx_power_terminal_report(
         // A bystander monitor failed (init/arm/read) and was dropped while
         // the run continued on its external instrument. Pre-record line, so
         // the parser ignores it but a bench capture shows what happened.
-        length += snprintf(
+        int written = snprintf(
             record,
             sizeof(record),
             "HPX_POWER_INA228_BYSTANDER_FAILED=%s:%lu\n",
             g_hpx_ina228_bystander_fail_phase,
             (unsigned long)g_hpx_ina228_bystander_fail_rc);
+        // snprintf returns what it WOULD have written (>= sizeof on
+        // truncation) and negative on encoding error; either would make the
+        // offset arithmetic below run off the buffer. This line is short and
+        // bounded, so neither is reachable in practice — clamp anyway, the
+        // same way every other append in this function guards itself.
+        if (written > 0 && (unsigned)written < sizeof(record)) {
+            length = written;
+        }
     }
     length += snprintf(
         record + length,

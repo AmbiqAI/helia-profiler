@@ -237,6 +237,23 @@ class TestInternalMeasurementPlausibility:
         with pytest.raises(PowerError, match="exactly zero energy and charge"):
             CollectPowerTerminalStage().run(ctx)
 
+    def test_tiny_measurement_is_not_mistaken_for_reversed_wiring(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """energy_nj and charge_nc round independently on-device, so a charge
+        under the 1 nC step legitimately reports 0 alongside a 1-2 nJ energy.
+        That must not be diagnosed as miswiring — blocking a valid run with a
+        wrong hint is worse than the reading being uselessly small."""
+        ctx = _make_ctx(tmp_path, internal=True)
+        monkeypatch.setattr(
+            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            lambda transport: _FakeTerminalTransport(
+                _record(), _measurement(energy_nj=1, charge_nc=0)
+            ),
+        )
+        CollectPowerTerminalStage().run(ctx)
+        assert ctx.power_result is not None
+
     def test_energy_without_charge_flags_reversed_wiring(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):

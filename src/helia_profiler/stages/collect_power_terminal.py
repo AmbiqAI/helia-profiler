@@ -123,10 +123,17 @@ class CollectPowerTerminalStage:
                         "conversion/averaging settings."
                     ),
                 )
-            if measurement.energy_nj > 0 and measurement.charge_nc == 0:
+            # energy_nj and charge_nc are rounded to integers independently
+            # on-device, so a true charge below the 1 nC step reports as 0
+            # legitimately. Bound the energy such a charge could have carried
+            # (E = Q x V) and require an ample margin over it, so a genuinely
+            # tiny measurement is never misdiagnosed as miswiring. Real
+            # reversed wiring overshoots this by many orders of magnitude.
+            rounding_energy_nj = 0.5 * (measurement.bus_voltage_uv or 0) / 1_000_000
+            if measurement.energy_nj > 100 * rounding_energy_nj and measurement.charge_nc == 0:
                 # ENERGY integrates |power| while CHARGE is signed: reversed
                 # IN+/IN- accumulates negative charge, which the firmware
-                # clamps to zero. Nonzero energy with zero charge is that
+                # clamps to zero. Substantial energy with zero charge is that
                 # miswiring's exact signature.
                 raise PowerError(
                     "On-device power monitor reports energy but zero charge.",

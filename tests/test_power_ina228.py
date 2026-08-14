@@ -251,23 +251,14 @@ class TestMonitorFirmwareGate:
             "an ina228 block must build monitor firmware regardless of driver"
         )
 
-    def test_render_gate_and_module_gate_agree(self, tmp_path: Path):
-        """Both gates single-source PowerConfig.monitor_selected.
+    def test_render_gate_follows_the_config_block(self, tmp_path: Path):
+        """The render gate keys off the block, not the driver.
 
-        The render gate is exercised behaviorally; the module gate is pinned
-        by asserting generate_app consumes the shared property rather than
-        re-deriving its own predicate — agreement then holds by construction
-        instead of by parallel maintenance.
+        Both firmware gates now read PowerConfig.monitor_selected, so they
+        agree by construction. That they *both* fire is covered end-to-end by
+        test_firmware.py::test_ina228_block_builds_monitor_under_a_non_ina228_driver;
+        this test pins the render side and the required/bystander split.
         """
-        import inspect
-
-        from helia_profiler import firmware as firmware_module
-
-        source = inspect.getsource(firmware_module.generate_app)
-        assert "config.power.monitor_selected" in source, (
-            "module selection must consume PowerConfig.monitor_selected — "
-            "re-deriving the predicate inline is how the gates diverged"
-        )
         for driver, mode, expected in (
             ("ina228", "internal", "ina228"),
             ("joulescope", "external", "ina228"),
