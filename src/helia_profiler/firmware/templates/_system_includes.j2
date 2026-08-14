@@ -3,7 +3,7 @@
 #include "nsx_core.h"
 #include "nsx_mem.h"
 #include "nsx_system.h"
-{% if power_sync_enabled or (power_only | default(false) and ble_reset_gpio_pin | default(none)) %}
+{% if power_sync_enabled or (power_only | default(false) and power_binary_needs_gpio | default(false)) %}
 #include "nsx_gpio.h"
 {% endif %}
 

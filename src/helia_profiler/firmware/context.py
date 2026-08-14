@@ -340,10 +340,29 @@ class FirmwareRenderContext:
             ),
         )
 
+    @property
+    def power_binary_needs_gpio(self) -> bool:
+        """Whether the dedicated power binary needs the nsx-gpio module.
+
+        Two independent consumers: the GPIO lock-step handshake (external
+        mode) and the BLE-controller reset drive on Blue-variant boards
+        (see ``_ble_reset.j2``), which is emitted regardless of mode. Both
+        the ``nsx_gpio.h`` include and the CMake link line read this single
+        property, and ``firmware/__init__.py`` selects the module on the
+        same basis — when the link condition was narrower than the include,
+        an internal-mode run on a Blue board fetched nsx-gpio, emitted the
+        header, and failed to compile with 'nsx_gpio.h: No such file'.
+        """
+        return (
+            self.sync.power_sync_enabled
+            or self.power_window.ble_reset_gpio_pin is not None
+        )
+
     def to_template_vars(self) -> dict[str, object]:
         """Flatten typed fields to the legacy Jinja variable names."""
         return {
             "power_sync_enabled": self.sync.power_sync_enabled,
+            "power_binary_needs_gpio": self.power_binary_needs_gpio,
             "sync_gpio_pin": self.sync.sync_gpio_pin,
             "lockstep": self.sync.lockstep,
             "state_gpio_pin": self.sync.state_gpio_pin,
