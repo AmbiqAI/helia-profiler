@@ -51,6 +51,34 @@ class TestPreflightHappyPath:
         # Output dir should have been created.
         assert (tmp_path / "out").is_dir()
 
+    def test_passes_with_executorch_pte(self, tmp_path: Path):
+        model = tmp_path / "model.pte"
+        model.write_bytes(b"\x00\x00\x00\x00ET" + b"\x00" * 512)
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "executorch"},
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            PreflightStage().run(ctx)
+
+    def test_executorch_rejects_power_capture(self, tmp_path: Path):
+        model = tmp_path / "model.pte"
+        model.write_bytes(b"\x00\x00\x00\x00ET" + b"\x00" * 512)
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "executorch"},
+                "power": {"enabled": True},
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="ExecuTorch profiling"):
+                PreflightStage().run(ctx)
+
 
 class TestPreflightModel:
     def test_missing_model_raises(self, tmp_path: Path):

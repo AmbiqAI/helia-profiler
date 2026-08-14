@@ -31,8 +31,8 @@ _MISSING = dataclasses.MISSING
 # from the type system alone. Keyed by dotted path (section path + field
 # name), e.g. "target.segger_rtt_path".
 _EXPLICIT_NOTES: dict[str, str] = {
-    "engine.type": "`tflm` is the vanilla TFLM baseline engine; use `engine.backend` to select `reference` or `cmsis_nn`.",
-    "engine.backend": "TFLM: `reference` or `cmsis_nn`.",
+    "engine.type": "`tflm` is the vanilla TFLM baseline; `executorch` consumes an exported Cortex-M `.pte`.",
+    "engine.backend": "TFLM: `reference` or `cmsis_nn`; ExecuTorch: `arm` or `ns`.",
     "engine.config": "free-form engine-specific mapping (not strictly validated).",
     "target.custom_socs": "advanced raw mapping validated by the platform layer.",
     "target.custom_boards": "advanced raw mapping validated by the platform layer.",

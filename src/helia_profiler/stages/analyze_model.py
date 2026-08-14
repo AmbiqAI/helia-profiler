@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 
 from ..evaluation import analyze_model, is_available
+from ..engines import EngineType
 from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
@@ -21,6 +22,9 @@ class AnalyzeModelStage:
         return "analyze_model"
 
     def should_skip(self, ctx: PipelineContext) -> bool:
+        if ctx.config.engine.type is EngineType.EXECUTORCH:
+            log.debug("ExecuTorch PTE analysis is not available — skipping model analysis")
+            return True
         if not is_available():
             log.debug("ai-edge-litert not installed — skipping model analysis")
             return True

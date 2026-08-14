@@ -13,7 +13,7 @@ hpx profile [MODEL] [--config FILE] [options]
 
 | Argument | Description |
 |---|---|
-| `MODEL` | Path to a `.tflite` model file. Optional if `model.path` is set in `--config`. |
+| `MODEL` | Path to a `.tflite` or ExecuTorch `.pte` model file. Optional if `model.path` is set in `--config`. |
 
 ## Top-level options
 
@@ -27,7 +27,7 @@ hpx profile [MODEL] [--config FILE] [options]
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
-| `--engine` | `tflm` \| `helia-rt` \| `helia-aot` | `helia-rt` | Inference engine. See [Engines](../guide/engines.md). TFLM backend is selected with `engine.backend` in YAML. |
+| `--engine` | `tflm` \| `helia-rt` \| `helia-aot` \| `executorch` | `helia-rt` | Inference engine. See [Engines](../guide/engines.md). TFLM and ExecuTorch backends are selected with `engine.backend` in YAML. |
 | `--engine-config FILE` | path | — | Engine-specific YAML loaded into `engine.config`. |
 | `--core-override` | `cm4` \| `cm55` | — | Force a heliaRT prebuilt core-library variant. Intended for controlled experiments. |
 

@@ -49,6 +49,54 @@ class TestMemoryRegionUsage:
 
 
 class TestPlanMemorySynthesise:
+    def test_executorch_plan_includes_all_explicit_runtime_buffers(
+        self, tmp_path: Path
+    ):
+        model = tmp_path / "model.pte"
+        model.write_bytes(b"\x00\x00\x00\x00ET" + b"\x00" * 2048)
+        config = load_config(
+            None,
+            {
+                "model": {
+                    "path": str(model),
+                    "arena_size": 163840,
+                    "arena_location": "tcm",
+                    "weights_location": "mram",
+                },
+                "engine": {"type": "executorch"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
+        ResolvePlatformStage().run(ctx)
+        ctx.engine_artifacts = EngineArtifacts(
+            engine_type=config.engine.type,
+            executorch_method_arena_size=65536,
+            executorch_planned_arena_size=163840,
+            executorch_temporary_arena_size=32768,
+            executorch_input_size=12288,
+            executorch_output_size=40,
+        )
+
+        PlanMemoryStage().run(ctx)
+
+        dtcm = ctx.memory_plan.region("DTCM")
+        sram = ctx.memory_plan.region("SRAM")
+        mram = ctx.memory_plan.region("MRAM")
+        assert dtcm is not None and sram is not None and mram is not None
+        sizes = {consumer.name: consumer.size for consumer in dtcm.consumers}
+        assert sizes == {
+            "planned_arena": 163840,
+            "method_arena": 65536,
+            "temporary_arena": 32768,
+            "input_buffer": 12288,
+            "output_buffer": 40,
+        }
+        assert {consumer.name for consumer in sram.consumers} == {
+            "pmu_layer_records"
+        }
+        assert {consumer.name for consumer in mram.consumers} == {"pte_program"}
+
     def test_synth_plan_default_auto_places_both_in_tcm(self, tmp_path: Path):
         """With automatic placement (the default), both arena and
         a tiny model fit comfortably in DTCM on Apollo510."""

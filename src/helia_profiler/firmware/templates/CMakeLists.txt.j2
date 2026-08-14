@@ -35,7 +35,7 @@ nsx_bootstrap_app(
 )
 
 # --- Profiler application ---
-{% if engine_type == "helia-aot" %}
+{% if engine_type == "helia-aot" or engine_type == "executorch" %}
 add_executable(hpx_profiler
     src/main.cc
 )
@@ -54,7 +54,11 @@ target_link_libraries(hpx_profiler PRIVATE
 {% if has_armv8m_pmu %}
     nsx::pmu_armv8m
 {% endif %}
+{% if engine_type == "executorch" %}
+    nsx::executorch
+{% else %}
     {{ aot_cmake_target }}
+{% endif %}
 {% if transport == "usb_cdc" %}
     nsx::usb
 {% endif %}
@@ -116,7 +120,11 @@ target_link_libraries(hpx_profiler_power PRIVATE
 {% if transport == "usb_cdc" %}
     nsx::usb
 {% endif %}
+{% if engine_type == "executorch" %}
+    nsx::executorch
+{% else %}
     {{ aot_cmake_target }}
+{% endif %}
 {% if psram_needed %}
     nsx::psram
 {% endif %}

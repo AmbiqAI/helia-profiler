@@ -1,0 +1,54 @@
+# ExecuTorch Cortex-M/CMSIS-NN ResNet-8 fixture from the adjacent
+# neuralspotx and nsx-executorch development checkouts. Run this config from
+# the helia-profiler repository root, or replace the two relative paths.
+model:
+  path: ../neuralspotx/examples/executorch_cmsis_nn/model/resnet8_cmsis_nn.pte
+  # The PTE reports 163,840 bytes of memory-planned storage.
+  arena_size: 163840
+  arena_location: tcm
+  weights_location: mram
+
+engine:
+  type: executorch
+  backend: arm
+  config:
+    source_path: ../nsx-executorch
+    method_arena_size: 65536
+    temporary_arena_size: 32768
+    input_size: 12288
+    output_size: 40
+    cortex_m_ops:
+      - cortex_m::quantize_per_tensor.out
+      - cortex_m::quantized_conv2d.out
+      - cortex_m::quantized_add.out
+      - cortex_m::quantized_avg_pool2d.out
+      - cortex_m::quantized_linear.out
+      - cortex_m::dequantize_per_tensor.out
+    portable_ops: []
+
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+    mve: default
+    memory: default
+  per_layer: true
+  iterations: 25
+  warmup: 5
+  aggregation: median
+
+power:
+  enabled: false
+
+output:
+  format: json
+  dir: ./results/executorch_resnet8
+  # PTE instruction IDs do not map directly onto a TFLite graph overlay.
+  model_explorer: false
+  detailed: true

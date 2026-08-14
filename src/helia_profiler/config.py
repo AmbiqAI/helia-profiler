@@ -223,7 +223,7 @@ class EngineConfig:
     """Inference engine selection and passthrough config."""
 
     type: EngineType = EngineType.HELIA_RT
-    backend: str | None = None  # engine-specific (e.g. helia-rt backend)
+    backend: str | None = None  # TFLM: reference/cmsis_nn; ExecuTorch: arm/ns
     config: dict[str, Any] = field(default_factory=dict)
     config_path: Path | None = None  # path to engine-specific YAML
 
@@ -244,7 +244,7 @@ class EngineConfig:
             return EngineType(value)
         except ValueError as exc:
             supported = ", ".join(
-                engine.value for engine in (EngineType.HELIA_RT, EngineType.HELIA_AOT)
+                engine.value for engine in EngineType
             )
             raise ValueError(f"Invalid engine.type: {value!r}. Supported: {supported}") from exc
 

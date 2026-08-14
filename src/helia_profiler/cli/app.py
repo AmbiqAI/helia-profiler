@@ -98,7 +98,9 @@ G_ADVANCED = "advanced"
     ),
 )
 def profile_command(
-    model: Optional[Path] = typer.Argument(None, help="Path to .tflite model file"),
+    model: Optional[Path] = typer.Argument(
+        None, help="Path to .tflite or .pte model file"
+    ),
     config: Optional[Path] = typer.Option(None, "--config", help="YAML config file (hpx.yml)"),
     verbose: int = typer.Option(0, "-v", "--verbose", count=True, help="Increase verbosity"),
     # -- engine --

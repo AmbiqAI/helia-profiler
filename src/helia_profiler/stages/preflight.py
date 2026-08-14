@@ -6,8 +6,8 @@ wrong — instead of waiting for a confusing failure several stages in.
 
 Checks performed (in order):
 
-1. **Model file** — exists, is a regular file, non-empty, has a ``.tflite``
-   extension, starts with the TFLite ``TFL3`` magic string.
+1. **Model file** — exists, is a regular file, non-empty, and matches the
+   selected engine: TFLite ``.tflite``/``TFL3`` or ExecuTorch ``.pte``/``ET``.
 2. **Arena size** — if specified, is positive.
 3. **Model placement** — optional arena/weights overrides use supported regions.
 4. **Output directory** — can be created + written to.
@@ -32,7 +32,7 @@ from ..counters import (
     supported_groups_for_domains,
     validate_group_selection,
 )
-from ..engines import get_adapter
+from ..engines import EngineType, get_adapter
 from ..errors import ConfigError
 from ..pipeline import PipelineContext
 from ..placement import Placement
@@ -63,7 +63,7 @@ class PreflightStage:
 
     def run(self, ctx: PipelineContext) -> None:
         cfg = ctx.config
-        _check_model(cfg.model.path)
+        _check_model(cfg.model.path, cfg.engine.type)
         _check_arena_size(cfg.model.arena_size)
         _check_rtt_buffer_size(cfg.target.rtt_buffer_size_up)
         _check_runtime_split_locations(cfg)
@@ -79,7 +79,7 @@ class PreflightStage:
 # ---------------------------------------------------------------------------
 
 
-def _check_model(path: Path) -> None:
+def _check_model(path: Path, engine: EngineType) -> None:
     if not path.exists():
         raise ConfigError(
             f"Model file not found: {path}",
@@ -96,10 +96,15 @@ def _check_model(path: Path) -> None:
             f"Model file is empty: {path}",
             hint="The file exists but has zero bytes — re-export your model.",
         )
-    if path.suffix.lower() != ".tflite":
+    expected_suffix = ".pte" if engine is EngineType.EXECUTORCH else ".tflite"
+    if path.suffix.lower() != expected_suffix:
         raise ConfigError(
-            f"Model file does not have a .tflite extension: {path.name}",
-            hint="heliaPROFILER expects a TFLite flatbuffer (.tflite).",
+            f"{engine.value} model file must use the {expected_suffix} extension: {path.name}",
+            hint=(
+                "Use a PTE exported for ExecuTorch when engine.type is executorch."
+                if engine is EngineType.EXECUTORCH
+                else "TFLM, heliaRT, and heliaAOT consume TFLite flatbuffers."
+            ),
         )
     # TFLite flatbuffer sanity: 'TFL3' magic should appear in the first 16
     # bytes.  Anything else is either truncated, a different format, or a
@@ -111,12 +116,14 @@ def _check_model(path: Path) -> None:
             f"Cannot read model file: {path} ({exc})",
             hint="Check file permissions.",
         ) from exc
-    if _TFLITE_MAGIC not in head:
+    expected_magic = b"ET" if engine is EngineType.EXECUTORCH else _TFLITE_MAGIC
+    if expected_magic not in head:
+        format_name = "ExecuTorch PTE" if engine is EngineType.EXECUTORCH else "TFLite flatbuffer"
         raise ConfigError(
-            f"Model file does not look like a TFLite flatbuffer: {path}",
+            f"Model file does not look like an {format_name}: {path}",
             hint=(
-                "Expected the 'TFL3' magic marker within the first 16 bytes. "
-                "Make sure the file was exported with the TFLite converter."
+                f"Expected the {expected_magic!r} marker within the first 16 bytes. "
+                "Make sure the model export completed successfully."
             ),
         )
 
@@ -199,6 +206,11 @@ def _check_pmu_selection(cfg) -> None:
 
 
 def _check_transport_support(cfg) -> None:
+    if cfg.engine.type is EngineType.EXECUTORCH and cfg.power.enabled:
+        raise ConfigError(
+            "ExecuTorch profiling does not yet support the dedicated power binary.",
+            hint="Disable power capture; clean end-to-end cycle measurements are supported.",
+        )
     if cfg.target.transport != Transport.USB_CDC:
         return
     try:
