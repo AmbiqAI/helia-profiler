@@ -523,14 +523,20 @@ def flash_binary(
         timeout_s=timeout_s,
         op_label="JLinkExe flash",
     )
-    # Verify the program step actually ran.  JLinkExe reports a successful
-    # flash with an explicit summary line; require it rather than trusting
-    # the exit code alone.
-    output = (proc.stdout or "") + (proc.stderr or "")
-    if "Flash download: Total" not in output and "O.K." not in output:
+    # Exit status is the primary gate: every recipe (NSX-generated and the
+    # fallback above) starts with ``ExitOnError 1``, and run_jlink_script
+    # raises CaptureError on nonzero rc — so the marker check below is a
+    # tripwire for J-Link wording drift, not the gate.  Exactly two markers
+    # confirm a flash: the "Flash download: Total" summary, or "Skipped.
+    # Contents already match" when re-flashing a byte-identical image
+    # (AP4-class parts skip; secure Apollo5 parts always erase+reprogram).
+    # A bare connection "O.K." is printed before flashing and must NOT count.
+    output = ((proc.stdout or "") + (proc.stderr or "")).lower()
+    if not any(m in output for m in ("flash download: total", "skipped. contents already match")):
         raise CaptureError(
             f"JLinkExe flash of {target_name} produced no flash-download "
-            "confirmation — the image was likely NOT programmed.",
+            "confirmation — the image was likely NOT programmed, and a power "
+            "capture would silently measure the previously flashed firmware.",
             hint="Inspect the JLinkExe output; check the probe connection "
             "and that the .bin/base-address recipe matches the board.",
         )
