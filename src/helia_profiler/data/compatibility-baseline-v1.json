@@ -1,16 +1,16 @@
 {
   "schema": "hpx.compatibility-baseline",
   "schema_version": 1,
-  "baseline_id": "hpx-neuralspotx-0.7.14-2026-08",
+  "baseline_id": "hpx-neuralspotx-0.7.17-2026-08",
   "neuralspotx": {
     "package": "neuralspotx",
-    "version": "0.7.14",
-    "sha256": "1163455033997bd11024ac691ae92cf2cc0d3216cf94ebe5e7997300627d5ede"
+    "version": "0.7.17",
+    "sha256": "1289cd67eb27475159a4f9083338ee81648fcc115783db4f467ec96c9ca0fbdb"
   },
   "projects": {
     "neuralspotx": {
       "url": "https://github.com/AmbiqAI/neuralspotx.git",
-      "ref": "25d8d944aaf9301d343764e22968f9375a37e406"
+      "ref": "8b5a7fa99f044cfd4ba3c0668fb2419eceabb44f"
     },
     "nsx-ambiq-sdk": {
       "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
@@ -30,7 +30,7 @@
     },
     "ns-cmsis-nn": {
       "url": "https://github.com/AmbiqAI/ns-cmsis-nn.git",
-      "ref": "2bb81953a20518cf65613bd612352cc462dd7a5e"
+      "ref": "631726420b04860a5c4236956a3741ff5a96bd7f"
     },
     "helia-rt": {
       "url": "https://github.com/AmbiqAI/helia-rt.git",
@@ -60,7 +60,7 @@
     },
     "nsx-cmsis-nn": {
       "project": "ns-cmsis-nn",
-      "ref": "2bb81953a20518cf65613bd612352cc462dd7a5e"
+      "ref": "631726420b04860a5c4236956a3741ff5a96bd7f"
     },
     "nsx-helia-rt": {
       "project": "helia-rt",
