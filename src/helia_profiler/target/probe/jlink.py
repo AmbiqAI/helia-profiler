@@ -531,12 +531,12 @@ def flash_binary(
     # Contents already match" when re-flashing a byte-identical image
     # (AP4-class parts skip; secure Apollo5 parts always erase+reprogram).
     # A bare connection "O.K." is printed before flashing and must NOT count.
-    output = ((proc.stdout or "") + (proc.stderr or "")).lower()
+    output = ((proc.stdout or "") + "\n" + (proc.stderr or "")).lower()
     if not any(m in output for m in ("flash download: total", "skipped. contents already match")):
         raise CaptureError(
-            f"JLinkExe flash of {target_name} produced no flash-download "
-            "confirmation — the image was likely NOT programmed, and a power "
-            "capture would silently measure the previously flashed firmware.",
+            f"JLinkExe flash of {target_name} printed no recognized flash "
+            "confirmation — either J-Link reworded its summary, or nothing was "
+            "programmed and a power capture would measure stale firmware.",
             hint="Inspect the JLinkExe output; check the probe connection "
             "and that the .bin/base-address recipe matches the board.",
         )

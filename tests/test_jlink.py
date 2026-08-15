@@ -299,5 +299,5 @@ class TestFlashBinaryVerification:
         self._flash(tmp_path, self._SKIPPED_IDENTICAL)
 
     def test_connection_only_ok_is_rejected(self, tmp_path) -> None:
-        with pytest.raises(CaptureError, match="NOT programmed"):
+        with pytest.raises(CaptureError, match="no recognized flash confirmation"):
             self._flash(tmp_path, self._CONNECTION_ONLY)
