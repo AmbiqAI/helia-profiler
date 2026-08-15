@@ -22,11 +22,11 @@
     },
     "nsx-tflite-micro": {
       "url": "https://github.com/AmbiqAI/nsx-tflite-micro.git",
-      "ref": "2f02cc932a200c5d78383cc2dab3c28950842aea"
+      "ref": "7afcf2b4170e039caf4c49f91e2c45d5869be333"
     },
     "arm-cmsis-nn": {
       "url": "https://github.com/AmbiqAI/arm-cmsis-nn.git",
-      "ref": "62967ecf040b1e3bb278e76a9828200187f02471"
+      "ref": "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
     },
     "ns-cmsis-nn": {
       "url": "https://github.com/AmbiqAI/ns-cmsis-nn.git",
@@ -52,11 +52,11 @@
     },
     "nsx-tflite-micro": {
       "project": "nsx-tflite-micro",
-      "ref": "2f02cc932a200c5d78383cc2dab3c28950842aea"
+      "ref": "7afcf2b4170e039caf4c49f91e2c45d5869be333"
     },
     "arm-cmsis-nn": {
       "project": "arm-cmsis-nn",
-      "ref": "62967ecf040b1e3bb278e76a9828200187f02471"
+      "ref": "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
     },
     "nsx-cmsis-nn": {
       "project": "ns-cmsis-nn",

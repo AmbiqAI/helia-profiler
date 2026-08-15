@@ -43,9 +43,9 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert baseline.project("neuralspotx").ref == "8b5a7fa99f044cfd4ba3c0668fb2419eceabb44f"
     assert baseline.project("nsx-ambiq-sdk").ref == "a9f4ec25a162f6f3700623feb691423bb5a51132"
     assert baseline.project("nsx-pmu-armv8m").ref == "5725c065a0c3603132f1064ee2684d1fa8587c88"
-    assert baseline.project("nsx-tflite-micro").ref == "2f02cc932a200c5d78383cc2dab3c28950842aea"
-    assert baseline.project("arm-cmsis-nn").ref == "62967ecf040b1e3bb278e76a9828200187f02471"
-    assert baseline.module("arm-cmsis-nn").ref == "62967ecf040b1e3bb278e76a9828200187f02471"
+    assert baseline.project("nsx-tflite-micro").ref == "7afcf2b4170e039caf4c49f91e2c45d5869be333"
+    assert baseline.project("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
+    assert baseline.module("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
     assert baseline.project("ns-cmsis-nn").ref == "631726420b04860a5c4236956a3741ff5a96bd7f"
     assert baseline.engine("helia-rt").ref == "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62"
     assert baseline.engine("helia-aot").min_version == "0.18.0"
@@ -60,8 +60,8 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "neuralspotx": "8b5a7fa99f044cfd4ba3c0668fb2419eceabb44f",
         "nsx-ambiq-sdk": "a9f4ec25a162f6f3700623feb691423bb5a51132",
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
-        "nsx-tflite-micro": "2f02cc932a200c5d78383cc2dab3c28950842aea",
-        "arm-cmsis-nn": "62967ecf040b1e3bb278e76a9828200187f02471",
+        "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
+        "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
         "ns-cmsis-nn": "631726420b04860a5c4236956a3741ff5a96bd7f",
         "helia-rt": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62",
         # nsx-sensors v0.3.0 — full datasheet audit of the INA228 driver.
@@ -78,8 +78,8 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
     assert {module.name: module.ref for module in baseline.modules} == {
         "nsx-ambiq-bsp": "a9f4ec25a162f6f3700623feb691423bb5a51132",
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
-        "nsx-tflite-micro": "2f02cc932a200c5d78383cc2dab3c28950842aea",
-        "arm-cmsis-nn": "62967ecf040b1e3bb278e76a9828200187f02471",
+        "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
+        "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
         "nsx-cmsis-nn": "631726420b04860a5c4236956a3741ff5a96bd7f",
         "nsx-helia-rt": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62",
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
@@ -327,7 +327,7 @@ def test_result_metadata_serializes_qualification_provenance(tmp_path: Path) -> 
     assert compatibility["qualification"] == "qualified"
     assert (
         compatibility["baseline"]["projects"]["nsx-tflite-micro"]["ref"]
-        == "2f02cc932a200c5d78383cc2dab3c28950842aea"
+        == "7afcf2b4170e039caf4c49f91e2c45d5869be333"
     )
     json.dumps(metadata)
 
