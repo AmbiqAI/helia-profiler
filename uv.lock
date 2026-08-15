@@ -465,7 +465,7 @@ wheels = [
 
 [[package]]
 name = "helia-profiler"
-version = "0.1.4" # x-release-please-version
+version = "0.1.4"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -522,7 +522,7 @@ requires-dist = [
     { name = "flatbuffers", marker = "extra == 'analysis'", specifier = ">=24.0" },
     { name = "helia-aot", marker = "extra == 'aot'", specifier = ">=0.18.0,<0.19.0" },
     { name = "jinja2", specifier = ">=3.1" },
-    { name = "neuralspotx", specifier = "==0.7.14" },
+    { name = "neuralspotx", specifier = "==0.7.17" },
     { name = "numpy", specifier = ">=2.1,<3" },
     { name = "pydantic", specifier = ">=2.7,<3" },
     { name = "pyjoulescope-driver", marker = "python_full_version < '3.12'", specifier = ">=2.2.12,<2.3.0" },
@@ -935,15 +935,15 @@ wheels = [
 
 [[package]]
 name = "neuralspotx"
-version = "0.7.14"
+version = "0.7.17"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jinja2" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fb/de/5185b9278198494e3bc6fa8579980481649ce721c2c5daa5a467bf429d03/neuralspotx-0.7.14.tar.gz", hash = "sha256:f99a07e3a3f5190abe4cfb17eebd143726b1f92d7b0535d5d900fdda1df18227", size = 326280, upload-time = "2026-08-08T12:43:20.665Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5a/f0/ac15ae6736e4662300de6e5522c060c7c493fbb62f24a147ca19a9128de3/neuralspotx-0.7.17.tar.gz", hash = "sha256:662b895d57c6693d0afd4b26104119499e9da137d9664d50eb01770fca5889e6", size = 319108, upload-time = "2026-08-15T19:19:49.498Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8d/f5/d1c381f3e5476137066a8dad0c67925d91436a6421daaef7bf01fbc98842/neuralspotx-0.7.14-py3-none-any.whl", hash = "sha256:1163455033997bd11024ac691ae92cf2cc0d3216cf94ebe5e7997300627d5ede", size = 310940, upload-time = "2026-08-08T12:43:19.05Z" },
+    { url = "https://files.pythonhosted.org/packages/95/7d/3fa2702ac56cf74e5e60c842a4253a3290d0184c6791ebef128181384bb3/neuralspotx-0.7.17-py3-none-any.whl", hash = "sha256:1289cd67eb27475159a4f9083338ee81648fcc115783db4f467ec96c9ca0fbdb", size = 311680, upload-time = "2026-08-15T19:19:48.144Z" },
 ]
 
 [[package]]

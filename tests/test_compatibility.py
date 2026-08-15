@@ -35,18 +35,18 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert compatibility.qualification is QualificationState.QUALIFIED
     baseline = compatibility.baseline
     assert baseline.schema_version == BASELINE_SCHEMA_VERSION
-    assert baseline.neuralspotx_version == "0.7.14"
+    assert baseline.neuralspotx_version == "0.7.17"
     assert (
         baseline.neuralspotx_sha256
-        == "1163455033997bd11024ac691ae92cf2cc0d3216cf94ebe5e7997300627d5ede"
+        == "1289cd67eb27475159a4f9083338ee81648fcc115783db4f467ec96c9ca0fbdb"
     )
-    assert baseline.project("neuralspotx").ref == "25d8d944aaf9301d343764e22968f9375a37e406"
+    assert baseline.project("neuralspotx").ref == "8b5a7fa99f044cfd4ba3c0668fb2419eceabb44f"
     assert baseline.project("nsx-ambiq-sdk").ref == "a9f4ec25a162f6f3700623feb691423bb5a51132"
     assert baseline.project("nsx-pmu-armv8m").ref == "5725c065a0c3603132f1064ee2684d1fa8587c88"
     assert baseline.project("nsx-tflite-micro").ref == "2f02cc932a200c5d78383cc2dab3c28950842aea"
     assert baseline.project("arm-cmsis-nn").ref == "62967ecf040b1e3bb278e76a9828200187f02471"
     assert baseline.module("arm-cmsis-nn").ref == "62967ecf040b1e3bb278e76a9828200187f02471"
-    assert baseline.project("ns-cmsis-nn").ref == "2bb81953a20518cf65613bd612352cc462dd7a5e"
+    assert baseline.project("ns-cmsis-nn").ref == "631726420b04860a5c4236956a3741ff5a96bd7f"
     assert baseline.engine("helia-rt").ref == "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62"
     assert baseline.engine("helia-aot").min_version == "0.18.0"
     assert baseline.engine("helia-aot").max_version_exclusive == "0.19.0"
@@ -57,12 +57,12 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
     baseline = load_compatibility_baseline()
 
     assert {project.name: project.ref for project in baseline.projects} == {
-        "neuralspotx": "25d8d944aaf9301d343764e22968f9375a37e406",
+        "neuralspotx": "8b5a7fa99f044cfd4ba3c0668fb2419eceabb44f",
         "nsx-ambiq-sdk": "a9f4ec25a162f6f3700623feb691423bb5a51132",
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "2f02cc932a200c5d78383cc2dab3c28950842aea",
         "arm-cmsis-nn": "62967ecf040b1e3bb278e76a9828200187f02471",
-        "ns-cmsis-nn": "2bb81953a20518cf65613bd612352cc462dd7a5e",
+        "ns-cmsis-nn": "631726420b04860a5c4236956a3741ff5a96bd7f",
         "helia-rt": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62",
         # nsx-sensors v0.3.0 — full datasheet audit of the INA228 driver.
         # Cumulative fixes that matter here: SHUNT_CAL scaling (v0.2.0),
@@ -80,7 +80,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "2f02cc932a200c5d78383cc2dab3c28950842aea",
         "arm-cmsis-nn": "62967ecf040b1e3bb278e76a9828200187f02471",
-        "nsx-cmsis-nn": "2bb81953a20518cf65613bd612352cc462dd7a5e",
+        "nsx-cmsis-nn": "631726420b04860a5c4236956a3741ff5a96bd7f",
         "nsx-helia-rt": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62",
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
     }

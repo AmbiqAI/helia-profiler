@@ -8,26 +8,32 @@ Stage 5 combines its identity and canonical hash with the NSX registry hash,
 target, engine, overrides, and relevant build inputs to select an isolated
 dependency workspace.
 
-The current baseline is `hpx-neuralspotx-0.7.14-2026-08`:
+The current baseline is `hpx-neuralspotx-0.7.17-2026-08`:
 
 | Identity | Qualified reference |
 | --- | --- |
-| `neuralspotx` package | `0.7.14`, wheel SHA-256 `11634550…5ede`, tag peeled to `25d8d944…e406` |
+| `neuralspotx` package | `0.7.17`, wheel SHA-256 `1289cd67…fbdb`, tag peeled to `8b5a7fa9…b44f` |
 | `nsx-ambiq-sdk` | `v5.2.24`, peeled commit `a9f4ec25…1132` |
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `2f02cc93…aea` |
 | `arm-cmsis-nn` | `62967ecf…471` |
-| `ns-cmsis-nn` | `2bb81953…a5e` (`v7.26.0`) |
+| `ns-cmsis-nn` | `63172642…d7f` (`v7.29.2`) |
 | heliaRT | `1.16.0`, commit `c1b97f4a…f62` |
 | heliaAOT | `min_version=0.18.0`, `max_version_exclusive=0.19.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 
-neuralSPOT-X 0.7.14 promotes the helia-dsp, TileIO, Physiokit, and Sensors
-registry entries to published semantic tags. Those projects are not part of
-HPX's qualified profiling module graph, so their promotions do not add fields
-or refs to this baseline. The neuralSPOT-X tag is verified and stored as its
-peeled commit; all existing SDK, PMU, TFLM, CMSIS-NN, and engine refs remain
-unchanged by this focused promotion.
+neuralSPOT-X 0.7.17 fixes the J-Link flash-verification false negative that
+aborted idempotent re-flashes of an unchanged image, and enforces
+`ExitOnError 1` in generated flash recipes (AmbiqAI/neuralspotx#220). Its
+packaged registry resolves `ns-cmsis-nn` at `v7.29.2`, and this promotion
+advances that qualified ref in lockstep. HPX does not override packaged
+registry resolution: it validates the resolved lock against this baseline
+and refuses to build when they disagree, so a promotion must adopt the
+registry's refs for every module the profiling graph resolves. `nsx-nanopb`
+(promoted in 0.7.16) is outside HPX's qualified module graph. The
+neuralSPOT-X tag is verified and stored as its peeled commit; all other
+project, module, and engine refs (SDK, PMU, TFLM, arm-cmsis-nn, heliaRT)
+are unchanged.
 
 Every baseline project and module ref is immutable by policy: only a full
 40-character Git object ID is accepted. Newly promoted annotated tags are
