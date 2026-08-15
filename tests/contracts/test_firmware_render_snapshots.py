@@ -319,6 +319,49 @@ def test_power_only_never_initializes_transport():
             assert forbidden not in code_only, (soc, transport, engine, forbidden)
 
 
+def test_window_is_never_timed_by_a_domain_the_binary_powers_down():
+    """No power render may both disable the debug power domain and time its
+    measured window with DWT->CYCCNT.
+
+    DWT lives in the CoreSight debug domain. Where the power binary calls
+    am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_DEBUG) (AP4 families,
+    via broad_peripheral_shutdown), an in-window DWT read returns garbage, the
+    accumulated cycle count is meaningless, and the terminal report's
+    elapsed_us -- derived from it -- is inflated. Energy survives (the monitor
+    integrates in hardware) but average power and current are silently divided
+    by the inflation factor. Measured ~7x on Apollo4 Blue Plus: a 24-second
+    wall-clock run reported a 38.6-second window.
+
+    This is the invariant, not the specific family mapping: any future SoC that
+    gains the broad shutdown must not also inherit a DWT-timed window.
+    """
+    import re
+
+    def _code_only(src: str) -> str:
+        return "\n".join(re.sub(r"//.*$", "", line) for line in src.splitlines())
+
+    checked = 0
+    for soc, transport, engine in _power_combos():
+        code = _code_only(_render(soc, transport, engine, power_only=True))
+        if "am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_DEBUG)" not in code:
+            continue
+        checked += 1
+        # Anchor on the CALL sites, not the names: the no-op `static inline`
+        # definitions appear earlier in the file (and an end() call precedes
+        # the begin() call), so slicing on bare names yields an empty window
+        # and silently asserts nothing.
+        begin = code.index("hpx_sync_window_begin();")
+        window = code[begin : code.index("hpx_sync_window_end();", begin)]
+        assert "DWT->CYCCNT" not in window, (
+            f"{soc}|{transport}|{engine}: window timed by DWT while the same "
+            "binary disables the debug power domain DWT lives in"
+        )
+    assert checked, (
+        "no power render disables the debug domain — this test lost its subject, "
+        "so it is no longer pinning anything"
+    )
+
+
 def test_snapshot_covers_exactly_the_current_matrix():
     """The committed snapshot must match the code's supported matrix exactly."""
     expected_keys = {_key(*c) for c in _all_combos()} | {

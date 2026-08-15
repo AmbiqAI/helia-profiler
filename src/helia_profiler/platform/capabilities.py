@@ -109,8 +109,16 @@ class ClockCapabilities:
     #: powered).
     #: STIMER (XTAL 32.768 kHz) is clock-mode- and debug-domain-independent,
     #: so it can be read with PD_DBG off.  ``"dwt"`` (Apollo3/Apollo4): DWT
-    #: lives in a different, cheaper-to-hold domain there; keep the existing
-    #: behavior unless a family-specific case for STIMER is made later.
+    #: lives in a different, cheaper-to-hold domain there.
+    #:
+    #: This is the family's *preference*, not the final choice.  The dedicated
+    #: power binary overrides it to STIMER wherever
+    #: ``broad_peripheral_shutdown`` is set, because that shutdown disables
+    #: AM_HAL_PWRCTRL_PERIPH_DEBUG — a different mechanism from the
+    #: ``gate_debug_domain_in_window`` path below, and one that leaves DWT
+    #: unreadable regardless of this preference.  See the ``window_timer``
+    #: derivation at the top of ``main.cc.j2``; the invariant is pinned by
+    #: ``test_window_is_never_timed_by_a_domain_the_binary_powers_down``.
     clean_window_timer: str
     #: Whether the firmware should call am_hal_debug_disable()/enable() around
     #: the *default* ``infer`` clean-window probe (not just the opt-in

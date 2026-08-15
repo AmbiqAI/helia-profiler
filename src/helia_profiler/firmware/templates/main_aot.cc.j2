@@ -1,4 +1,10 @@
 {# main_aot.cc — heliaPROFILER firmware for heliaAOT engine #}
+{#- See main.cc.j2 for the full rationale: the dedicated power binary disables
+   the CoreSight debug domain wherever broad_peripheral_shutdown is set (AP4
+   families) and DWT->CYCCNT lives there, so those renders must time the window
+   with STIMER or the reported duration is garbage and average power/current
+   are silently divided by the inflation factor. -#}
+{%- set window_timer = "stimer" if (clean_window_timer | default("dwt") == "stimer" or (power_only | default(false) and broad_peripheral_shutdown | default(false))) else "dwt" %}
 /**
  * @file main.cc
  * @brief heliaPROFILER firmware (heliaAOT) — auto-generated, do not edit.
@@ -93,7 +99,7 @@
 // ---------------------------------------------------------------------------
 {% include "_dwt_init.j2" %}
 
-{% if clean_window_timer | default("dwt") == "stimer" %}
+{% if window_timer == "stimer" %}
 {% include "_stimer_init.j2" %}
 {% endif %}
 
@@ -799,7 +805,7 @@ int main(void) {
         usb_timer_pause();
 {% endif %}
 {% set gate_dbg = (clean_window_probe | default("infer") == "busy_loop") or (gate_debug_domain_in_window | default(false)) %}
-{% set use_stimer_window = (clean_window_timer | default("dwt") == "stimer") and (clean_window_probe | default("infer") != "busy_loop") %}
+{% set use_stimer_window = (window_timer == "stimer") and (clean_window_probe | default("infer") != "busy_loop") %}
 {% if transport == "uart" and not power_only | default(false) %}
         // The UART peripheral (PWRSTUART0-3) lives in the peripheral device
         // power domain, NOT the debug domain am_hal_debug_disable() below
