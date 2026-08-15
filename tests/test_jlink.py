@@ -7,11 +7,12 @@ from unittest.mock import patch
 
 import pytest
 
-from helia_profiler.errors import ConfigError
+from helia_profiler.errors import CaptureError, ConfigError
 from helia_profiler.target.probe.jlink import (
     JLinkProbe,
     JLinkProbeMatch,
     attached_session,
+    flash_binary,
     inspect_probe_target,
     find_jlink_exe,
     list_connected_probes,
@@ -249,3 +250,54 @@ def test_inspect_probe_target_retries_unknown_target() -> None:
     assert match.detected_core is CoreArch.CORTEX_M55
     assert run.call_count == 2
     sleep.assert_called_once()
+
+
+class TestFlashBinaryVerification:
+    """flash_binary must demand explicit flash evidence, not a bare connection O.K.
+
+    Command failures are already gated by exit status (``ExitOnError 1`` in
+    every recipe plus ``run_jlink_script``'s CaptureError on nonzero rc);
+    these tests pin the output tripwire that catches recipes which connect
+    successfully but never issue a program step (issue #101).  All three
+    outputs below were captured from real hardware.
+    """
+
+    # Secure Apollo5 parts always erase+reprogram, printing the Total summary.
+    _PROGRAMMED = (
+        "J-Link: Flash download: Bank 0 @ 0x00410000: 1 range affected (761856 bytes)\n"
+        "J-Link: Flash download: Total: 4.088s (Prepare: 0.139s, Compare: 0.000s, "
+        "Erase: 0.000s, Program: 3.549s, Verify: 0.308s, Restore: 0.090s)\n"
+        "O.K.\n"
+    )
+    # AP4-class parts skip byte-identical images: only the skip notice, no
+    # "Total:" line.  (Secure Apollo5 parts never print this notice.)
+    _SKIPPED_IDENTICAL = (
+        "J-Link: Flash download: Bank 0 @ 0x00018000: Skipped. Contents already match\n"
+        "O.K.\n"
+    )
+    # JLinkExe prints this on ANY successful connection, before flashing
+    # anything — a recipe that connects and programs nothing looks like this.
+    _CONNECTION_ONLY = "Connecting to J-Link via USB...O.K.\n"
+
+    def _flash(self, tmp_path, output: str) -> None:
+        binary = tmp_path / "hpx_profiler_power"
+        script_dir = tmp_path / "jlink" / "hpx_profiler_power"
+        script_dir.mkdir(parents=True)
+        (script_dir / "flash_cmds.jlink").write_text(
+            "ExitOnError 1\nLoadFile hpx_profiler_power.bin, 0x00410000\nExit\n"
+        )
+        with patch(
+            "helia_profiler.target.probe.jlink.run_jlink_script",
+            return_value=SimpleNamespace(returncode=0, stdout=output, stderr=""),
+        ):
+            flash_binary(binary, device="AP510NFA-CBR", jlink_serial="1160002204")
+
+    def test_programmed_output_verifies(self, tmp_path) -> None:
+        self._flash(tmp_path, self._PROGRAMMED)
+
+    def test_skipped_identical_output_verifies(self, tmp_path) -> None:
+        self._flash(tmp_path, self._SKIPPED_IDENTICAL)
+
+    def test_connection_only_ok_is_rejected(self, tmp_path) -> None:
+        with pytest.raises(CaptureError, match="no recognized flash confirmation"):
+            self._flash(tmp_path, self._CONNECTION_ONLY)
