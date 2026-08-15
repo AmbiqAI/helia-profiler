@@ -236,13 +236,26 @@ int main(void) {
     dwt_init();
     hpx_sync_init();
 {% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
-    // Bring up the on-target INA228 before any heavy setup: a missing or
-    // mis-wired monitor is a terminal condition for an internal-mode power
-    // run, so fail fast with the setup sub-step as the error code.
+    // Bring up the on-target INA228 before any heavy setup.
     {
         uint32_t ina228_rc = hpx_ina228_setup();
-        if (ina228_rc != 0U) {
+        if (ina228_rc == 0U) {
+            g_hpx_ina228_active = true;
+        } else {
+{% if ina228_required | default(false) %}
+            // The monitor IS the measurement (driver: ina228): a missing or
+            // mis-wired chip makes the run worthless, so fail fast with the
+            // setup sub-step as the error code.
             hpx_power_terminal_fail("ina228_init", ina228_rc);
+{% else %}
+            // Bystander monitor (an external instrument owns the
+            // measurement): record the failure and continue — the run is
+            // still a perfectly good external capture. The terminal report
+            // emits the failure as a pre-record diagnostic; it will carry
+            // no measurement payload.
+            g_hpx_ina228_bystander_fail_phase = "init";
+            g_hpx_ina228_bystander_fail_rc = ina228_rc;
+{% endif %}
         }
     }
 {% endif %}
@@ -783,12 +796,22 @@ int main(void) {
 {% endif %}
 {% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
         // Zero the INA228 energy/charge accumulators immediately before the
-        // window opens — one I2C register write, strictly outside the
-        // measured region.
-        {
+        // window opens — an RSTACC read-modify-write, strictly outside the
+        // measured region. Skipped when a bystander monitor failed setup.
+        if (g_hpx_ina228_active) {
             uint32_t ina228_rc = hpx_ina228_window_begin();
             if (ina228_rc != 0U) {
+{% if ina228_required | default(false) %}
                 hpx_power_terminal_fail("ina228_arm", ina228_rc);
+{% else %}
+                // Bystander: drop the monitor for this run rather than the
+                // run itself. No printf here — UART/ITM are disabled for the
+                // window (an ITM write with PD_DBG off hangs, ERR003); the
+                // failure is reported by hpx_power_terminal_report().
+                g_hpx_ina228_active = false;
+                g_hpx_ina228_bystander_fail_phase = "arm";
+                g_hpx_ina228_bystander_fail_rc = ina228_rc;
+{% endif %}
             }
         }
 {% endif %}
@@ -842,13 +865,21 @@ int main(void) {
         hpx_sync_window_end();
 {% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
         // Read the integrated energy/charge (plus bus voltage and the
-        // accumulator-overflow flags) now that the window is closed. The
-        // window itself completed, but an internal-mode run without a
-        // measurement is useless — treat a failed read-back as terminal.
-        {
+        // accumulator-overflow flags) now that the window is closed.
+        if (g_hpx_ina228_active) {
             uint32_t ina228_rc = hpx_ina228_window_end();
             if (ina228_rc != 0U) {
+{% if ina228_required | default(false) %}
+                // The window itself completed, but an internal-mode run
+                // without a measurement is useless — treat as terminal.
                 hpx_power_terminal_fail("ina228_read", ina228_rc);
+{% else %}
+                // Bystander: the external capture stands on its own. No
+                // printf here — the transport may still be disabled; the
+                // failure is reported by hpx_power_terminal_report().
+                g_hpx_ina228_bystander_fail_phase = "read";
+                g_hpx_ina228_bystander_fail_rc = ina228_rc;
+{% endif %}
             }
         }
 {% endif %}

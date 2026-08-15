@@ -429,6 +429,10 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
             profiling_backends=list(ctx.render_context.pmu.profiling_backends),
             has_armv8m_pmu=ctx.render_context.pmu.has_armv8m_pmu,
             power_sync_enabled=ctx.render_context.sync.power_sync_enabled,
+            # Same flag the nsx_gpio.h include gates on: the power binary
+            # also needs nsx-gpio for the BLE-controller reset on Blue-variant
+            # boards, where power_sync alone is off in internal mode.
+            power_binary_needs_gpio=ctx.render_context.power_binary_needs_gpio,
             power_monitor=ctx.render_context.power_monitor.power_monitor,
             arena_regions=ctx.arena_regions,
             power_binary_enabled=ctx.power_binary_enabled,

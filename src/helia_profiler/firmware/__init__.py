@@ -471,11 +471,13 @@ def generate_app(ctx: PipelineContext) -> Path:
                 module_specs.append(NsxModuleSpec(name, _module_project(name, profile)))
                 module_names.add(name)
 
-    # On-target INA228 power monitor (power.driver: ina228): the dedicated
-    # power binary reads the monitor over I2C, so pull in the transport and
-    # driver modules. nsx-sensors' own closure (nsx-core/nsx-spi) resolves
-    # transitively during nsx lock.
-    if power_binary_enabled and config.power.driver == "ina228":
+    # On-target INA228 power monitor: the dedicated power binary reads the
+    # monitor over I2C, so pull in the transport and driver modules.
+    # nsx-sensors' own closure (nsx-core/nsx-spi) resolves transitively
+    # during nsx lock. monitor_selected is the same predicate
+    # PowerMonitorContext.from_config gates on — single-sourced so the two
+    # gates cannot diverge.
+    if power_binary_enabled and config.power.monitor_selected:
         module_names = {m.name for m in module_specs}
         for name in ("nsx-i2c", "nsx-sensors"):
             if name not in module_names:
@@ -484,7 +486,11 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # BLE-controller-reset GPIO drive (Blue-variant boards, dedicated power
     # binary only — see _ble_reset.j2) needs nsx-gpio even when power_sync
-    # itself is off (e.g. power.mode == "internal").
+    # itself is off (e.g. power.mode == "internal"). The header include and
+    # the CMake link line both gate on render_context.power_binary_needs_gpio,
+    # which is this same condition — the CMake side used to check only
+    # power_sync_enabled, so an internal-mode run on a Blue board selected
+    # the module here, emitted the include, and then failed to compile.
     if power_binary_enabled and board.ble_reset_gpio_pin is not None:
         module_names = {m.name for m in module_specs}
         if "nsx-gpio" not in module_names:

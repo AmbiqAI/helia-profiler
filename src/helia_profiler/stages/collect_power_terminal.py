@@ -74,22 +74,75 @@ class CollectPowerTerminalStage:
         if not terminal.gate_lowered:
             raise PowerError("Power firmware did not confirm that GATE was lowered.")
         if envelope.measurement is not None and envelope.measurement.overflow:
-            measurement = envelope.measurement
-            raise PowerError(
-                "On-device power monitor reported accumulator overflow.",
-                hint=(
-                    f"Monitor saw energy={measurement.energy_nj} nJ, "
-                    f"charge={measurement.charge_nc} nC, "
-                    f"bus_voltage={measurement.bus_voltage_uv} uV over "
-                    f"{measurement.duration_us} us. An implausible bus voltage "
-                    "usually means the VBUS sense input is floating — wire it "
-                    "to the target-side rail node. Check the "
-                    "'Power firmware diagnostic' log line for the raw DIAG bits "
-                    "(0x200=MATHOF, 0x400=CHARGEOF, 0x800=ENERGYOF)."
-                ),
-            )
+            if not internal_mode:
+                # The monitor is present but is not this run's measurement of
+                # record (e.g. an INA228 left on the bus while a Joulescope
+                # measures, or with its sense inputs disconnected). Its health
+                # flags are informational — failing the run would discard a
+                # perfectly good external capture.
+                log.warning(
+                    "On-device power monitor reported accumulator overflow; "
+                    "ignoring because %s is the measurement of record.",
+                    ctx.config.power.driver,
+                )
+            else:
+                measurement = envelope.measurement
+                raise PowerError(
+                    "On-device power monitor reported accumulator overflow.",
+                    hint=(
+                        f"Monitor saw energy={measurement.energy_nj} nJ, "
+                        f"charge={measurement.charge_nc} nC, "
+                        f"bus_voltage={measurement.bus_voltage_uv} uV over "
+                        f"{measurement.duration_us} us. An implausible bus "
+                        "voltage usually means the VBUS sense input is "
+                        "floating — wire it to the target-side rail node. "
+                        "Check the 'Power firmware diagnostic' log line for "
+                        "the raw DIAG bits (0x200=MATHOF, 0x400=CHARGEOF, "
+                        "0x800=ENERGYOF)."
+                    ),
+                )
         if internal_mode and envelope.measurement is None:
             raise PowerError("Internal power mode requires an on-device measurement payload.")
+        if internal_mode and envelope.measurement is not None:
+            measurement = envelope.measurement
+            # Plausibility gates for the measurement of record. Both
+            # signatures pass every register-level health check (no DIAG bit,
+            # firmware status ok), so without these the run would publish a
+            # confidently wrong number.
+            if measurement.energy_nj == 0 and measurement.charge_nc == 0:
+                # A window shorter than one accumulator update, or a dead
+                # sense path, reads exactly zero while bus voltage (which
+                # needs no calibration) still looks perfect.
+                raise PowerError(
+                    "On-device power monitor measured exactly zero energy and charge.",
+                    hint=(
+                        "Either the window contained no completed accumulator "
+                        "update (averaging_count x 2 x conversion_time_us "
+                        "longer than the window) or no current flows through "
+                        "the shunt. Check the IN+/IN- sense wiring and the "
+                        "conversion/averaging settings."
+                    ),
+                )
+            # energy_nj and charge_nc are rounded to integers independently
+            # on-device, so a true charge below the 1 nC step reports as 0
+            # legitimately. Bound the energy such a charge could have carried
+            # (E = Q x V) and require an ample margin over it, so a genuinely
+            # tiny measurement is never misdiagnosed as miswiring. Real
+            # reversed wiring overshoots this by many orders of magnitude.
+            rounding_energy_nj = 0.5 * (measurement.bus_voltage_uv or 0) / 1_000_000
+            if measurement.energy_nj > 100 * rounding_energy_nj and measurement.charge_nc == 0:
+                # ENERGY integrates |power| while CHARGE is signed: reversed
+                # IN+/IN- accumulates negative charge, which the firmware
+                # clamps to zero. Substantial energy with zero charge is that
+                # miswiring's exact signature.
+                raise PowerError(
+                    "On-device power monitor reports energy but zero charge.",
+                    hint=(
+                        "This is the signature of reversed sense wiring: "
+                        "swap the INA228's IN+/IN- connections (current must "
+                        "flow IN+ -> IN-)."
+                    ),
+                )
 
         ctx.publish_power_terminal_envelope(envelope)
         if internal_mode and envelope.measurement is not None:

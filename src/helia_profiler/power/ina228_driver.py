@@ -17,12 +17,7 @@ mode.
 
 from __future__ import annotations
 
-import logging
-
-from .base import PowerMode
 from .ondevice_driver import OnDeviceDriver
-
-log = logging.getLogger("hpx")
 
 
 class Ina228Driver(OnDeviceDriver):
@@ -32,8 +27,15 @@ class Ina228Driver(OnDeviceDriver):
     firmware-side producer: the generated dedicated power binary initialises
     the INA228 over ``nsx-i2c``, brackets the fixed-N window with accumulator
     reset/read, and emits the measurement keys of the power terminal
-    envelope. Everything host-side is inherited no-op behaviour — there is no
-    instrument to arm, no GPIO gate to watch, and no rail to power-cycle.
+    envelope.
+
+    Everything else is inherited unchanged, and deliberately so: the mode is
+    already ``INTERNAL`` and ``check_available()`` already a no-op on the
+    base, because there is no host-side instrument to arm, no GPIO gate to
+    watch, and no rail to power-cycle. Monitor presence is verified on-target
+    via the INA228 manufacturer/device ID registers, so a missing or
+    mis-wired part surfaces as a typed ``ina228_init`` terminal failure
+    rather than a host-side availability error.
     """
 
     #: The generated power firmware emits a complete measurement payload
@@ -44,14 +46,3 @@ class Ina228Driver(OnDeviceDriver):
     @property
     def name(self) -> str:
         return "INA228 (on-device)"
-
-    @property
-    def mode(self) -> PowerMode:
-        return PowerMode.INTERNAL
-
-    def check_available(self) -> None:
-        # No host-side dependencies: the monitor hangs off the target's own
-        # I2C bus. Presence is verified by firmware at runtime via the
-        # INA228 manufacturer/device ID registers; a missing or mis-wired
-        # part surfaces as a typed ina228_init terminal failure.
-        pass

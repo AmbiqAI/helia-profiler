@@ -132,7 +132,12 @@ def assess_comparability(
             )
         )
 
-    for dimension in ("power_scope", "power_mode", "power_firmware"):
+    # power_monitor: an on-target monitor's IOM stays powered on the measured
+    # rail, so block-present vs block-absent runs differ by a real,
+    # bench-measurable current adder and must not be power-compared.
+    # Baselines predating the dimension carry None and are skipped, like
+    # every other dimension here.
+    for dimension in ("power_scope", "power_mode", "power_firmware", "power_monitor"):
         baseline_value = baseline_dimensions.get(dimension)
         candidate_value = candidate_dimensions.get(dimension)
         if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:
@@ -227,6 +232,10 @@ def _dimensions(run: RunArtifacts) -> dict[str, Any]:
                 "power_scope": power.get("measurement_scope"),
                 "power_integrity": power.get("integrity"),
                 "power_firmware": power.get("power_firmware"),
+                # Manifest-less fallback: a published on-device payload means
+                # monitor firmware was live. The manifest's config-derived
+                # value (merged below) is authoritative when present.
+                "power_monitor": "ina228" if power.get("on_device_summary") else "none",
             }
         )
     if run.manifest is not None:

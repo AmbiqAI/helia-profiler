@@ -107,6 +107,47 @@ def test_cross_instrument_power_scopes_omit_power_metrics_only():
     assert issue.context["candidate"] == "on_device_gated_inference"
 
 
+def test_monitor_presence_mismatch_omits_power_metrics_only():
+    """An on-target monitor keeps its IOM powered on the measured rail, so a
+    block-present run draws measurably more than a block-absent one even when
+    the instrument, mode, and firmware all match. Comparing the two as equals
+    would report a phantom power regression."""
+    without_monitor = _run(
+        power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid"}
+    )
+    with_monitor = _run(
+        power={
+            "measurement_scope": "gpio_gated_clean_window",
+            "integrity": "valid",
+            "on_device_summary": {"source": "ina228", "energy_nj": 0},
+        }
+    )
+
+    assessment = assess_comparability(without_monitor, with_monitor)
+
+    assert assessment.run_metrics_comparable
+    assert assessment.layers_comparable
+    assert not assessment.power_metrics_comparable
+    issue = next(
+        issue
+        for issue in assessment.issues
+        if issue.code == "metric.power_power_monitor_mismatch"
+    )
+    assert issue.severity is ComparabilitySeverity.METRIC_BLOCKING
+    assert issue.context["baseline"] == "none"
+    assert issue.context["candidate"] == "ina228"
+
+
+def test_matching_monitor_presence_stays_power_comparable():
+    with_monitor = {
+        "measurement_scope": "gpio_gated_clean_window",
+        "integrity": "valid",
+        "on_device_summary": {"source": "ina228", "energy_nj": 0},
+    }
+    assessment = assess_comparability(_run(power=with_monitor), _run(power=with_monitor))
+    assert assessment.power_metrics_comparable
+
+
 def test_matching_on_device_power_scopes_stay_comparable():
     ina228 = {"measurement_scope": "on_device_gated_inference", "integrity": "valid"}
     assessment = assess_comparability(_run(power=ina228), _run(power=ina228))

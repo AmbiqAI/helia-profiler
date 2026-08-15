@@ -357,6 +357,11 @@ def test_ble_reset_only_in_power_only_binary_for_blue_boards():
         resource_variable_count=0,
         printf_linkage="",
         ble_reset_gpio_pin=55,
+        # Mirrors FirmwareRenderContext.power_binary_needs_gpio: true here
+        # because this board carries a BLE reset pin, even though power_sync
+        # is off. The CMake link line reads the same flag, so the include and
+        # the linked module cannot disagree.
+        power_binary_needs_gpio=True,
     )
 
     power_rendered = _jinja_env.get_template("main.cc.j2").render(**{**kwargs, "power_only": True})
