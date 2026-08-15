@@ -35,10 +35,14 @@ nsx-sensors) carry manifest pins at the baseline refs, and those pins
 defeat the packaged registry — `nsx-sensors` stays at its audited `v0.3.0`
 pin even though 0.7.17's registry default is older. Modules that arrive
 only transitively (`nsx-cmsis-nn`, pulled by registry-backed heliaRT) have
-no manifest pin and follow the packaged registry; for those, the post-lock
-validation refuses to build when the resolved commit disagrees with this
-baseline, so a promotion must advance exactly the transitive refs together
-with the tool — never "adopt the registry" for the pinned tier.
+no manifest pin and follow the packaged registry. The stock-TFLM engine's
+declared modules (`nsx-tflite-micro`, `arm-cmsis-nn`) sit in this
+registry-governed tier too: hpx renders informational manifest revisions
+for them, but NSX locking reads only the registry's module revision. For
+this whole tier the post-lock validation refuses to build when the
+resolved commit disagrees with this baseline, so a promotion must advance
+exactly these refs together with the tool — never "adopt the registry"
+for the pinned tier.
 `nsx-nanopb` (promoted in 0.7.16) is outside HPX's qualified module graph.
 The neuralSPOT-X tag is verified and stored as its peeled commit. The
 `nsx-tflite-micro` and `arm-cmsis-nn` rows still pin the same qualified
