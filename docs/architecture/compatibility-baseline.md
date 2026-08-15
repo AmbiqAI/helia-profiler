@@ -15,8 +15,8 @@ The current baseline is `hpx-neuralspotx-0.7.17-2026-08`:
 | `neuralspotx` package | `0.7.17`, wheel SHA-256 `1289cd67…fbdb`, tag peeled to `8b5a7fa9…b44f` |
 | `nsx-ambiq-sdk` | `v5.2.24`, peeled commit `a9f4ec25…1132` |
 | `nsx-pmu-armv8m` | `5725c065…c88` |
-| `nsx-tflite-micro` | `2f02cc93…aea` |
-| `arm-cmsis-nn` | `62967ecf…471` |
+| `nsx-tflite-micro` | `7afcf2b4…333` |
+| `arm-cmsis-nn` | `6d21a6f8…f7c` |
 | `ns-cmsis-nn` | `63172642…d7f` (`v7.29.2`) |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
 | heliaRT | `1.16.0`, commit `c1b97f4a…f62` |
@@ -35,13 +35,20 @@ nsx-sensors) carry manifest pins at the baseline refs, and those pins
 defeat the packaged registry — `nsx-sensors` stays at its audited `v0.3.0`
 pin even though 0.7.17's registry default is older. Modules that arrive
 only transitively (`nsx-cmsis-nn`, pulled by registry-backed heliaRT) have
-no manifest pin and follow the packaged registry; for those, the post-lock
-validation refuses to build when the resolved commit disagrees with this
-baseline, so a promotion must advance exactly the transitive refs together
-with the tool — never "adopt the registry" for the pinned tier.
+no manifest pin and follow the packaged registry. The stock-TFLM engine's
+declared modules (`nsx-tflite-micro`, `arm-cmsis-nn`) sit in this
+registry-governed tier too: hpx renders informational manifest revisions
+for them, but NSX locking reads only the registry's module revision. For
+this whole tier the post-lock validation refuses to build when the
+resolved commit disagrees with this baseline, so a promotion must advance
+exactly these refs together with the tool — never "adopt the registry"
+for the pinned tier.
 `nsx-nanopb` (promoted in 0.7.16) is outside HPX's qualified module graph.
-The neuralSPOT-X tag is verified and stored as its peeled commit; all
-other project, module, and engine refs (SDK, PMU, TFLM, arm-cmsis-nn,
+The neuralSPOT-X tag is verified and stored as its peeled commit. The
+`nsx-tflite-micro` and `arm-cmsis-nn` rows still pin the same qualified
+`v0.1.0` tags but are now recorded as their peeled commits — earlier
+baselines recorded the annotated tag-object ids, which a resolved NSX lock
+can never match. All other project, module, and engine refs (SDK, PMU,
 heliaRT, nsx-sensors) are unchanged.
 
 Every baseline project and module ref is immutable by policy: only a full
