@@ -251,9 +251,10 @@ between the two is normal and shown in the terminal output.
 | MVE load/store density | `MVE_LDST_RETIRED / MVE_INST_RETIRED` | Terminal summary |
 | MVE stall share | `MVE_STALL / CPU_CYCLES × 100%` | Terminal summary |
 
-## Apollo4: the debugger must stay attached
+## Apollo3 and Apollo4: the debugger must stay attached
 
-On Apollo4 (Cortex-M4, DWT-only tier) the `DWT->CYCCNT` cycle counter lives
+On the Cortex-M4F families (Apollo3/3P and Apollo4/4P/4L, the DWT-only tier)
+the `DWT->CYCCNT` cycle counter lives
 in the core **debug power domain**. That domain is powered only while a
 debugger asserts the Debug Access Port's `CDBGPWRUPREQ` signal — which is
 *not* memory-mapped and therefore cannot be set by firmware running on the
@@ -262,14 +263,22 @@ down mid-run and every per-layer cycle count reads back as **0**.
 
 The `rtt` and `swo` transports already hold a debugger attached for the
 whole capture, so they are unaffected. For `uart` and `usb_cdc`,
-heliaPROFILER detects Apollo4 automatically and keeps a `pylink` session
-attached for the entire capture (reset and go are driven through that
-session), so per-layer cycles are captured correctly. No configuration is
-required.
+heliaPROFILER detects both Cortex-M4F families automatically and keeps a
+`pylink` session attached for the entire capture (reset and go are driven
+through that session), so per-layer cycles are captured correctly. No
+configuration is required. Apollo3 gating was confirmed on hardware: an
+AOT-over-UART capture read 0 cycles until the probe was held attached.
 
-Other families (Apollo3, Apollo5) do not gate the debug domain this way —
-and the Apollo5 secure bootloader prefers the probe released — so they keep
-releasing the probe after reset as before.
+Apollo5 is the exception. Its Cortex-M55 uses the resettable Armv8-M PMU
+rather than DWT, and its secure bootloader prefers the probe released, so
+Apollo5 boards keep releasing it after reset.
+
+!!! note "The dedicated power binary has no debugger at all"
+    This section is about the *profile* binary, which runs with a transport
+    (and therefore a probe) attached. The dedicated power binary free-runs
+    unwatched after flashing, so on Apollo3 and Apollo4 it can never rely on
+    DWT — it times its measured window with STIMER instead. See
+    `SocCapabilities.power_window_timer`.
 
 ## `pmu_max_ops` — per-op record budget
 

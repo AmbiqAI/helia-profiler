@@ -5,11 +5,15 @@
    _peripheral_power_down.j2) or simply has nothing holding up, since it
    free-runs with no debugger asserting CDBGPWRUPREQ. Reads are then frozen or
    garbage, so the accumulated cycle count is meaningless; because the terminal
-   report derives elapsed_us from it, the window duration is wrong. Energy is
-   unaffected (a monitor integrates in hardware over real time) but average
-   power and current are silently scaled by the error -- measured ~7x on
-   Apollo4 Blue Plus, where a 24-second wall-clock run reported a 38.6-second
-   window.
+   report derives elapsed_us from it, the window duration is wrong -- measured
+   ~7x on Apollo4 Blue Plus, where a 24-second wall-clock run reported a
+   38.6-second window.
+
+   What that costs depends on who is measuring. With an ON-DEVICE monitor
+   (internal mode) the reported duration is the denominator for average power
+   and current, so both are scaled by the same error and only integrated energy
+   and charge survive. With an EXTERNAL instrument the host owns those numbers
+   and only elapsed_us is affected.
 
    The predicate itself lives host-side, once, in
    SocCapabilities.power_window_timer -- read that docstring for the two

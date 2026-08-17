@@ -130,25 +130,37 @@ def assess_gate_duration(
 # The dedicated power binary times its own measured window and reports the
 # result as HPX_POWER_ELAPSED_US. That clock is independent of every host
 # measurement, which makes it the one number that can be silently wrong without
-# anything else looking unhealthy: energy is integrated in hardware over real
-# time, the completed/requested counts still match, and the gate edges are
-# still observed. Two real regressions have taken exactly this shape --
-# Apollo4 over-reported its window ~7x (the debug domain the binary powers down
-# holds DWT), and Apollo3 reported exactly 0 (nothing holds that domain up on a
-# free-running binary). Both published confidently wrong average power and
-# current while every other check passed.
+# anything else looking unhealthy: the completed/requested counts still match,
+# and the gate edges are still observed. Two real regressions have taken
+# exactly this shape -- Apollo4 over-reported its window ~7x (the debug domain
+# the binary powers down holds DWT), and Apollo3 reported exactly 0 (nothing
+# holds that domain up on a free-running binary).
+#
+# What that costs depends on the mode, and the difference matters:
+#   * INTERNAL: the firmware clock IS the denominator. capture/power_terminal.py
+#     requires MEASUREMENT_DURATION_US == ELAPSED_US, so average power and
+#     current are computed from the broken number and are wrong by the same
+#     factor. Only the integrated energy and charge survive.
+#   * EXTERNAL: the instrument owns every published power number. A broken
+#     firmware clock corrupts elapsed_us and nothing else -- the Apollo3
+#     baseline capture reported elapsed_us=0 and still had average power correct
+#     to 0.19% against the fixed run.
+# Severity follows that split; see the collect stage and evaluation.validity.
 #
 # The policy lives here so the collect stage (which raises/warns at capture
 # time) and evaluation.validity (the downstream authority over an already
 # captured run) cannot disagree about it.
 
 #: Externally-referenced tolerance. The firmware clock and the host-timestamped
-#: gate edges measure the SAME physical window, so real agreement is tight:
-#: 0.065% on Apollo4 Blue Plus and 0.064% on Apollo3 Blue Plus (bench, 2026-08).
-#: 5% is ~75x that observed error -- generous enough that instrument jitter,
+#: gate edges measure the SAME physical window, so real agreement is tight.
+#: Evidence, stated with its actual n:
+#:   - Apollo510B: 13 gated runs, all within 0.08% -- the bulk of the sample,
+#:   - Apollo3 Blue Plus: ONE valid gated run, 0.064%,
+#:   - Apollo4 Blue Plus: ONE valid gated run, 0.065%.
+#: 5% is ~60x the worst of those -- generous enough that instrument jitter,
 #: packet quantization and gate-edge poll resolution can never trip it, while
-#: still catching the 0x and 7x failures. Warning-only for now: two boards is
-#: not a wide enough envelope to make this fatal.
+#: still catching the 0x and 7x failures. Warning-only: three boards, and only
+#: one run on two of them, is not a wide enough envelope to make this fatal.
 EXTERNAL_WINDOW_CLOCK_TOLERANCE = 0.05
 
 #: Internally-referenced tolerance, TWO-SIDED. Internal mode has no host-timed
@@ -156,20 +168,29 @@ EXTERNAL_WINDOW_CLOCK_TOLERANCE = 0.05
 #: measured by a DIFFERENT binary (the transport-attached profile build). That
 #: cross-binary comparison is legitimately loose, so 5% would false-fail valid
 #: runs. The evidence bounding it:
-#:   - worst legitimate disagreement observed: 14% (Apollo4, profile clean-loop
-#:     757-786 us against a true 866 us window),
-#:   - Apollo3 agreed to 0.1%,
-#:   - build-to-build swings of ~4% in the profile metric alone, most likely
-#:     code-layout / XIP-cache sensitivity rather than instrumentation.
-#: 25% sits comfortably above 14% + a few points of build noise while still
-#: being tight enough to be useful to the internal-mode (INA228) user, who has
-#: no external instrument to fall back on. Do not tighten below the 14%
-#: observation without new cross-binary timing evidence.
+#:   - worst legitimate disagreement observed: 14.5% (Apollo4, profile
+#:     clean-loop 757-786 us against a true 866 us window),
+#:   - Apollo3 agreed to 0.8%,
+#:   - build-to-build swings of ~4% in the profile metric alone.
+#: 25% clears 14.5% plus a few points of build noise while still being tight
+#: enough to be useful to the internal-mode (INA228) user, who has no external
+#: instrument to fall back on. Do not tighten below the 14.5% observation
+#: without new cross-binary timing evidence; the guardrail is rounded up from
+#: 14.48% deliberately.
 #:
-#: MUST stay two-sided. The one real disagreement had the power window SLOWER
-#: than the profile prediction -- the opposite of the "power binary does less
-#: logging, so it must be faster" intuition -- so encoding a direction here
-#: would have missed it.
+#: Two caveats on that 14.5%, both of which argue against reading it as a
+#: characterised bound:
+#:   - it is not one run. FOUR runs showed the skew, and in every one the power
+#:     window was SLOWER than the profile predicted -- the opposite of the
+#:     "power binary does less logging, so it must be faster" intuition. Which
+#:     is why this comparison MUST stay two-sided: a directional check would
+#:     have missed the only failure mode actually observed.
+#:   - it is config-correlated, not obviously build-noise. The skew appears only
+#:     in internal-mode/INA228 builds; external builds of the same code agreed
+#:     to <0.1%. Code-layout / XIP-cache sensitivity is one hypothesis for that,
+#:     not an established explanation -- the INA228 bus traffic inside the
+#:     window is at least as plausible. Treat the number as an observation with
+#:     an unknown cause.
 INTERNAL_WINDOW_CLOCK_TOLERANCE = 0.25
 
 #: Slack on the host wall-clock ceiling (see :func:`assess_window_clock_ceiling`).
@@ -179,15 +200,26 @@ INTERNAL_WINDOW_CLOCK_TOLERANCE = 0.25
 WINDOW_CLOCK_CEILING_SLACK_S = 0.25
 
 #: Shared user-facing explanation for a frozen firmware window clock.
+#:
+#: Two causes produce this identical signature, and the hint must name both --
+#: ``SocCapabilities.power_window_timer`` now resolves to ``stimer`` for EVERY
+#: registered SoC, so on current firmware the debug domain is no longer even
+#: the likelier of the two.
 FROZEN_WINDOW_CLOCK_HINT = (
     "The firmware completed its inferences but timed the window with a clock "
-    "that never advanced. On Cortex-M4F parts DWT->CYCCNT lives in the "
-    "CoreSight debug power domain, which the dedicated power binary either "
-    "powers down itself or -- free-running with no debugger asserting "
-    "CDBGPWRUPREQ -- has nothing holding up. Rebuild the power firmware on a "
-    "revision whose SocCapabilities.power_window_timer resolves to STIMER for "
-    "this SoC; energy and charge from an external instrument are unaffected, "
-    "but average power, average current and elapsed time are not."
+    "that never advanced. Two causes produce this exact signature. (1) A DWT-"
+    "timed window on a Cortex-M4F part: DWT->CYCCNT lives in the CoreSight "
+    "debug power domain, which the dedicated power binary either powers down "
+    "itself or -- free-running with no debugger asserting CDBGPWRUPREQ -- has "
+    "nothing holding up; rebuild on a revision whose "
+    "SocCapabilities.power_window_timer resolves to STIMER for this SoC. "
+    "(2) A STIMER-timed window whose 32.768 kHz XTAL source is stopped or "
+    "absent on this board, leaving the counter at zero; check that the target "
+    "populates and starts XT. In internal (on-device monitor) mode the "
+    "reported duration is the denominator for average power and current, so "
+    "both are wrong by the same factor and only integrated energy and charge "
+    "survive. In external mode the instrument owns those numbers and only "
+    "elapsed_us is affected."
 )
 
 
@@ -265,26 +297,31 @@ def assess_window_clock(
 
 
 def gated_window_reference_s(result: "PowerResult") -> tuple[float, str] | None:
-    """Most precise host-measured duration of the gated window, with its source.
+    """Host-measured duration of the gated window, with its source name.
 
-    Prefers ``gated_windows`` over ``summary.duration_s``. Both are summed from
-    the same instrument ``dur_ticks`` at time64 resolution, so neither is
-    numerically coarser -- but ``summary.duration_s`` means "the gated window"
-    only on the gated path; on the degraded/free-form path the same field holds
-    the WHOLE capture window, which would silently turn this check into a
-    comparison against an unrelated (much longer) interval. ``gated_windows``
-    can only ever mean the gate, so it is the correct source and the fallback
-    is used only when the gated path produced a summary but no window list.
+    ``gated_windows`` is the ONLY acceptable source. ``summary.duration_s`` is
+    numerically identical to it on the gated path (both are summed from the
+    same instrument ``dur_ticks`` at time64 resolution), which makes it look
+    like a harmless fallback -- it is not. The single code path that leaves
+    ``gated_windows`` empty is ``capture_gated.py``'s no-usable-window branch,
+    and that branch returns the DEGRADED free-form result whose
+    ``summary.duration_s`` is the whole capture window. So the fallback could
+    only ever fire in exactly the case where it is wrong.
 
-    Returns ``None`` when no gated duration is available at all.
+    That is not hypothetical: on two real degraded Apollo4 artifacts
+    (ap4-js110-2, ap4-js110-smoke) the firmware clock was accurate to 0.16%,
+    yet comparing it against the 19.2 s free-form capture instead of the ~5 s
+    window produced a 73.9% "disagreement" -- a second, misleading issue piled
+    on top of the ``power.observation_degraded`` that already described the
+    real problem.
+
+    Returns ``None`` when there is no gated window, which callers treat as
+    "nothing to compare against" rather than substituting a worse reference.
     """
     windows_total = sum(window.duration_s for window in result.gated_windows)
-    if windows_total > 0:
-        return windows_total, "gated_windows"
-    summary_duration = result.summary.duration_s
-    if summary_duration > 0:
-        return summary_duration, "capture_summary"
-    return None
+    if windows_total <= 0:
+        return None
+    return windows_total, "gated_windows"
 
 
 @dataclass(frozen=True)
@@ -296,16 +333,27 @@ class WindowClockCeiling:
     terminal record. A firmware window longer than that whole interval is
     physically impossible, whatever the plan says and whatever board it is.
 
-    This is the internal-mode counterpart to external mode's gate comparison:
-    it needs no instrument, no plan and no per-board timing, which makes it the
-    check that catches the Apollo4-style ~7x inflation class for the INA228
-    user, who has neither a host-timed gate nor anything else to cross-check
-    against.
+    Scope, stated honestly: this is a REDUNDANT backstop, not the primary
+    internal-mode check. In every shipped flow the 25% plan comparison can run
+    wherever this one can -- ``BuildPowerFirmwareStage`` skips unless the plan
+    carries ``inference_count``, and the pipeline only ever derives that count
+    FROM ``reference_inference_us`` -- so the plan check sees every case this
+    one does, and sees it far more sensitively. (The exception is an
+    externally-supplied N with no profile phase to measure the reference, which
+    the API allows but no shipped caller constructs; there this is the only
+    window-clock check there is.)
 
-    The envelope deliberately over-counts -- it includes flash-tool exit, boot,
-    engine/model init, and the post-window terminal emit and collect wait -- so
-    it is a loose ceiling, not a duration estimate. Breaching it is therefore a
-    strong signal rather than a marginal one.
+    What it adds is independence: it is the only check that still works if the
+    plan reference is ITSELF corrupted -- a bad profile-phase measurement
+    feeding a bad expectation -- because it depends on nothing but two host
+    timestamps.
+
+    It is also blunt. The envelope deliberately over-counts -- it includes
+    flash-tool exit, boot, engine/model init, and the post-window terminal emit
+    and collect wait -- so a window has to be inflated by roughly 2-3x before it
+    breaches, and more than that when the window is a small fraction of the
+    phase. It will not notice a 30% error. Treat a breach as conclusive and
+    silence as uninformative.
     """
 
     elapsed_us: int

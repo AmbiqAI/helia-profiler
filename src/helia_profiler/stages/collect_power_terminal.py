@@ -24,13 +24,15 @@ def _host_phase_envelope_s(ctx: PipelineContext) -> float | None:
     immediately after the J-Link recipe programs and releases the target, and
     in internal mode nothing touches the device again before this stage (the
     capture stage is skipped -- see ``CapturePowerStage.should_skip``). No new
-    plumbing is needed, and the value is already persisted in the run artifact.
+    plumbing is needed. Note the record itself is never serialized -- what
+    reaches an artifact is the derived ``window_clock_ceiling`` metadata this
+    stage stores, not ``deployed_at``.
 
     The interval is a deliberate over-estimate of the measured window: it also
     contains flash-tool exit, boot, engine/model init, and the post-window
     terminal emit plus this stage's own wait. That makes it a loose ceiling, not
-    a duration estimate -- which is exactly what a physical-impossibility check
-    wants.
+    a duration estimate -- see ``WindowClockCeiling`` for what that costs in
+    sensitivity.
 
     Returns ``None`` when there is no deployment record or the timestamp cannot
     be parsed, so the caller simply has nothing to check rather than inventing
@@ -43,7 +45,9 @@ def _host_phase_envelope_s(ctx: PipelineContext) -> float | None:
         return None
     try:
         started = datetime.fromisoformat(deployment.deployed_at)
-    except ValueError:
+    except (ValueError, TypeError):
+        # Unreachable while deployed_at is always an ISO string, but a
+        # warn-only diagnostic must never be the thing that crashes a run.
         return None
     if started.tzinfo is None:
         started = started.replace(tzinfo=timezone.utc)
@@ -114,17 +118,17 @@ class CollectPowerTerminalStage:
             )
         if not terminal.gate_lowered:
             raise PowerError("Power firmware did not confirm that GATE was lowered.")
-        if firmware_window_clock_is_frozen(
+        frozen_window_clock = firmware_window_clock_is_frozen(
             elapsed_us=terminal.elapsed_us,
             completed_count=terminal.completed_count,
-        ):
-            # Terminal, in every mode, with no instrument required: the
-            # firmware says it ran N inferences in zero time. Everything else
-            # about the run still looks healthy (status ok, counts matched,
-            # both gate edges seen, energy integrated in hardware), which is
-            # precisely why this needs its own gate -- an Apollo3 capture with
-            # this exact signature passed every other check and published
-            # average power derived from a frozen counter.
+        )
+        if frozen_window_clock and internal_mode:
+            # The firmware says it ran N inferences in zero time, and in
+            # internal mode that number IS the denominator: the parser requires
+            # MEASUREMENT_DURATION_US == ELAPSED_US, so average power and
+            # current are wrong by the same factor. The measurement of record
+            # is corrupt, which is terminal here for the same reason the
+            # all-zero INA228 reading above is.
             raise PowerError(
                 "Power firmware reported zero elapsed time for "
                 f"{terminal.completed_count} completed inferences.",
@@ -229,11 +233,28 @@ class CollectPowerTerminalStage:
                     "inference_count": measurement.inference_count,
                 },
             )
+        if frozen_window_clock:
+            # External mode: warn, do not raise. The instrument owns every
+            # published power number here, so a frozen firmware clock corrupts
+            # elapsed_us and nothing else -- the Apollo3 baseline capture
+            # reported elapsed_us=0 with average power still correct to 0.19%.
+            # Raising would throw away a good capture, and would do it before
+            # GenerateReportStage, so the run would produce no artifact at all
+            # and the downstream validity issue could never be seen. Same shape
+            # as the bystander-overflow path below.
+            log.warning(
+                "Power firmware reported zero elapsed time for %d completed "
+                "inferences: its window clock never advanced. The %s owns this "
+                "run's power numbers and they are unaffected; only the "
+                "firmware-reported window duration is meaningless. %s",
+                terminal.completed_count,
+                ctx.config.power.driver,
+                FROZEN_WINDOW_CLOCK_HINT,
+            )
         # Non-fatal cross-check of the firmware's own window clock against an
-        # independent measurement of the same work. Warning-only: the frozen
-        # (0x) case above is already terminal, and the tolerances here are set
-        # from a two-board bench envelope -- wide enough that only a real
-        # timing fault trips them, not wide enough to promise no false
+        # independent measurement of the same work. Warning-only: the tolerances
+        # here are set from a narrow bench envelope -- wide enough that only a
+        # real timing fault trips them, not wide enough to promise no false
         # positives on hardware nobody has run yet. See
         # power.diagnostics.EXTERNAL_/INTERNAL_WINDOW_CLOCK_TOLERANCE.
         agreement = assess_run_window_clock(
@@ -274,8 +295,12 @@ class CollectPowerTerminalStage:
             if ceiling is not None:
                 if ctx.power_result is not None:
                     # Recorded so evaluation.validity can re-derive the same
-                    # verdict later; it has no "now" of its own. Mirrors how
-                    # gate_duration_integrity is stashed on the observation.
+                    # verdict later; it has no "now" of its own. Note this does
+                    # NOT reach summary.json -- report/summary.py copies power
+                    # metadata through an explicit allowlist and this key is not
+                    # in it (adding it is a schema change, deliberately out of
+                    # scope). The numbers surface only in the validity issue's
+                    # context.
                     ctx.power_result.metadata["window_clock_ceiling"] = (
                         ceiling.to_metadata()
                     )

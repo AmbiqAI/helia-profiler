@@ -194,11 +194,14 @@ class SocCapabilities:
 
         Either way an in-window DWT read is frozen or garbage, the accumulated
         cycle count is meaningless, and the terminal report's ``elapsed_us`` —
-        derived from it — is wrong; energy survives (an on-target monitor
-        integrates in hardware over real time) but average power and current
-        are silently scaled by the error.  STIMER runs off its own 32.768 kHz
-        XTAL and is readable in both situations, so it is the answer whenever
-        DWT is not trustworthy.
+        derived from it — is wrong.  What that costs depends on who measures:
+        with an on-device monitor (internal mode) that duration is also the
+        denominator for average power and current, so both are scaled by the
+        same error and only the hardware-integrated energy and charge survive;
+        with an external instrument the host owns those numbers and only
+        ``elapsed_us`` is affected.  STIMER runs off its own 32.768 kHz XTAL
+        and is readable in both situations, so it is the answer whenever DWT is
+        not trustworthy.
 
         The two mechanisms are kept as separate disjuncts rather than
         collapsed: AP4 happens to satisfy both, but a future family could

@@ -393,27 +393,38 @@ class TestFirmwareWindowClockIntegrity:
             duration_us=elapsed_us, inference_count=self.BENCH_COUNT
         )
 
-    # --- 1. hard fail, both modes, no hardware ------------------------------
+    # --- 1. frozen clock: fatal internally, warning externally ---------------
 
-    def test_zero_elapsed_with_completed_work_is_terminal(
+    def test_zero_elapsed_is_terminal_in_internal_mode(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        """The exact pre-fix Apollo3 signature: 24/24 inferences in 0 us."""
-        ctx = self._bench_ctx(tmp_path, gate_s=self.BASELINE_GATE_S)
-        record = self._bench_record(elapsed_us=0)
-        with pytest.raises(PowerError, match="zero elapsed time") as excinfo:
-            self._run(ctx, record, monkeypatch)
-        assert "CDBGPWRUPREQ" in (excinfo.value.hint or "")
-
-    def test_zero_elapsed_is_terminal_in_internal_mode_too(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
-        """No instrument is involved in this check -- it must fire with no
-        external observation at all."""
+        """Internal mode requires MEASUREMENT_DURATION_US == ELAPSED_US, so a
+        zero window makes average power and current wrong by the same factor.
+        The measurement of record is corrupt -- terminal, for the same reason
+        the all-zero INA228 reading is."""
         ctx = self._bench_ctx(tmp_path, internal=True)
         record = self._bench_record(elapsed_us=0)
-        with pytest.raises(PowerError, match="zero elapsed time"):
+        with pytest.raises(PowerError, match="zero elapsed time") as excinfo:
             self._run(ctx, record, monkeypatch, self._bench_measurement(1))
+        hint = excinfo.value.hint or ""
+        assert "CDBGPWRUPREQ" in hint
+        assert "32.768 kHz" in hint  # the second cause must be named too
+
+    def test_zero_elapsed_only_warns_in_external_mode(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        """The exact pre-fix Apollo3 signature: 24/24 inferences in 0 us. The
+        JS110 owns this run's power numbers and they were correct to 0.19%
+        despite it, so raising would discard a good capture -- and would do it
+        before GenerateReportStage, leaving no artifact at all."""
+        ctx = self._bench_ctx(tmp_path, gate_s=self.BASELINE_GATE_S)
+        record = self._bench_record(elapsed_us=0)
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(ctx, record, monkeypatch)
+        assert "window clock never advanced" in caplog.text
+        # The capture survives and is published.
+        assert ctx.power_run is not None
+        assert ctx.power_run.terminal is record
 
     def test_zero_elapsed_with_no_completed_work_is_not_this_failure(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -459,15 +470,45 @@ class TestFirmwareWindowClockIntegrity:
         # Warning only -- the run still completes and publishes.
         assert ctx.power_run is not None and ctx.power_run.terminal is not None
 
-    def test_external_check_prefers_the_gated_window_over_the_capture_summary(
+    def test_external_check_uses_the_gated_window_not_the_capture_summary(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
     ):
         """summary.duration_s holds the WHOLE capture window on the degraded
         path, so comparing against it would measure the wrong interval. The
-        gated window is the correct reference and must win when both exist."""
+        gated window is the only accepted reference."""
         # Whole-capture duration was 8.4821 s on the bench run: 41% away from
         # the firmware's window, so picking that source would warn.
         ctx = self._bench_ctx(tmp_path, capture_s=8.4821)
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(ctx, self._bench_record(), monkeypatch)
+        assert "window clock" not in caplog.text
+
+    def test_degraded_capture_is_not_cross_checked_at_all(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        """A degraded capture has no gated window, only a whole-capture
+        free-form summary. Falling back to it fabricates a disagreement out of
+        an unrelated interval -- reproduced on two real Apollo4 artifacts
+        (ap4-js110-2, ap4-js110-smoke), where a firmware clock accurate to
+        0.16% "disagreed" by 73.9% with a 19.2 s free-form capture. There must
+        be no window-clock warning here; power.observation_degraded already
+        says what actually went wrong."""
+        ctx = self._bench_ctx(tmp_path)
+        assert ctx.power_run is not None and ctx.power_run.observation is not None
+        ctx.publish_power_observation(
+            PowerObservation(
+                mode="free_form",
+                result=PowerResult(
+                    summary=PowerSummary(0.001, 0.002, 0.02, 0.04, 19.2, 19200),
+                    gated_windows=[],
+                    metadata={"measurement_scope": "free_form_capture"},
+                ),
+                gate_rise_observed=True,
+                gate_fall_observed=False,
+                deadline_s=45.0,
+                integrity="degraded",
+            )
+        )
         with caplog.at_level("WARNING", logger="hpx"):
             self._run(ctx, self._bench_record(), monkeypatch)
         assert "window clock" not in caplog.text

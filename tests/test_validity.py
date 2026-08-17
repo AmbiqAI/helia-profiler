@@ -12,7 +12,7 @@ from helia_profiler.results import (
 )
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.power.base import PowerResult, PowerSummary
+from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
 from helia_profiler.power.diagnostics import (
     WINDOW_CLOCK_CEILING_SLACK_S,
     WindowClockCeiling,
@@ -187,6 +187,12 @@ class TestWindowClockValidity:
         observation = ctx.power_run.observation
         result = PowerResult(
             summary=replace(observation.result.summary, duration_s=gate_s),
+            # gated_windows is the ONLY source the window-clock check accepts;
+            # a gated observation without one is the degraded shape, which is
+            # exercised separately in test_degraded_capture_gains_no_window_*.
+            gated_windows=[
+                GatedPowerWindow(0.0, gate_s, gate_s, 0.0, 0.0, 0.0, 0.0, 0.0, 0)
+            ],
             metadata=dict(observation.result.metadata),
         )
         terminal = replace(
@@ -217,7 +223,11 @@ class TestWindowClockValidity:
                     charge_nc=6_582_360,
                     bus_voltage_uv=1_800_000,
                 )
-                if internal
+                # OnDevicePowerSummary itself forbids duration_us == 0 with
+                # completed work, so a frozen internal run can never carry one
+                # -- the stage raises before it would be built. Reproduce that
+                # shape rather than an impossible one.
+                if internal and elapsed_us > 0
                 else None
             ),
         )
@@ -246,9 +256,11 @@ class TestWindowClockValidity:
         assert "power.window_clock_frozen" not in codes
         assert "power.window_clock_mismatch" not in codes
 
-    def test_frozen_window_clock_is_an_error(self, tmp_path: Path):
-        ctx = _context(tmp_path)
-        self._bench_run(ctx, elapsed_us=0, gate_s=4.963)
+    def test_frozen_window_clock_is_an_error_in_internal_mode(self, tmp_path: Path):
+        """Internal mode divides energy by this duration, so the published
+        power is corrupt -- the measurement of record is unusable."""
+        ctx = _context(tmp_path, mode="internal")
+        self._bench_run(ctx, elapsed_us=0, gate_s=4.963, internal=True)
 
         evaluation = evaluate_run(ctx)
 
@@ -259,6 +271,24 @@ class TestWindowClockValidity:
         assert len(frozen) == 1
         assert frozen[0].severity == "error"
         assert frozen[0].context["completed_count"] == self.BENCH_COUNT
+
+    def test_frozen_window_clock_is_only_a_warning_in_external_mode(self, tmp_path: Path):
+        """The instrument owns the power numbers and they are fine -- the
+        Apollo3 baseline capture had elapsed_us=0 and average power correct to
+        0.19%. Invalidating would block comparability of a sound capture, so
+        this degrades rather than invalidates (same shape as the bystander
+        on_device_overflow split)."""
+        ctx = _context(tmp_path)
+        self._bench_run(ctx, elapsed_us=0, gate_s=4.963)
+
+        evaluation = evaluate_run(ctx)
+
+        frozen = [
+            issue for issue in evaluation.issues if issue.code == "power.window_clock_frozen"
+        ]
+        assert len(frozen) == 1
+        assert frozen[0].severity == "warning"
+        assert evaluation.validity is ResultValidity.DEGRADED
 
     def test_frozen_window_clock_suppresses_the_agreement_warning(self, tmp_path: Path):
         """Zero elapsed is reported once, as the error that explains it -- not
@@ -284,7 +314,50 @@ class TestWindowClockValidity:
         ]
         assert len(mismatch) == 1
         assert mismatch[0].severity == "warning"
-        assert mismatch[0].context["reference_source"] == "capture_summary"
+        assert mismatch[0].context["reference_source"] == "gated_windows"
+
+    def test_degraded_capture_gains_no_window_clock_issue(self, tmp_path: Path):
+        """A degraded capture has no gated window, only a whole-capture
+        free-form summary. Comparing the firmware clock against THAT invents a
+        disagreement out of an unrelated interval: on two real Apollo4
+        artifacts the firmware clock was accurate to 0.16% while the free-form
+        capture ran 19.2 s against a ~5 s window -- a fabricated 73.9%
+        mismatch stacked on top of the power.observation_degraded that already
+        described the real failure. The run must carry exactly one issue."""
+        ctx = _context(tmp_path)
+        assert ctx.power_run is not None and ctx.power_run.observation is not None
+        observation = ctx.power_run.observation
+        degraded = PowerResult(
+            # Whole 19.2 s capture retained for diagnostics; no gated window.
+            summary=replace(observation.result.summary, duration_s=19.2),
+            gated_windows=[],
+            metadata={"measurement_scope": "free_form_capture"},
+        )
+        ctx.power_run = PowerRun(
+            plan=PowerRunPlan(
+                firmware_mode="dedicated",
+                inference_count=self.BENCH_COUNT,
+                reference_inference_us=self.BENCH_REFERENCE_US,
+            ),
+            observation=PowerObservation(
+                mode="free_form",
+                result=degraded,
+                gate_rise_observed=True,
+                gate_fall_observed=False,
+                deadline_s=45.0,
+                integrity="degraded",
+            ),
+            terminal=replace(
+                ctx.power_run.terminal,
+                requested_count=self.BENCH_COUNT,
+                completed_count=self.BENCH_COUNT,
+                elapsed_us=self.BENCH_ELAPSED_US,
+            ),
+        )
+
+        codes = {issue.code for issue in evaluate_run(ctx).issues}
+
+        assert codes == {"power.observation_degraded"}
 
     def test_the_two_modes_apply_different_tolerances(self, tmp_path: Path):
         """One 14% deviation, two verdicts: a real fault against a host-timed

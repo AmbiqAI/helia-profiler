@@ -136,14 +136,36 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 elapsed_us=terminal.elapsed_us,
                 completed_count=terminal.completed_count,
             ):
-                issues.append(
-                    _error(
-                        "power.window_clock_frozen",
-                        "Power firmware reported zero elapsed time for completed inferences.",
-                        completed_count=terminal.completed_count,
-                        elapsed_us=terminal.elapsed_us,
+                # Mode-aware for the same reason on_device_overflow is: whether
+                # this is fatal depends entirely on whether the broken number is
+                # the measurement of record. Internal mode divides energy by
+                # this duration, so the published power is corrupt. External
+                # mode gets its power from the instrument and only loses
+                # elapsed_us -- invalidating there would block comparability of
+                # a capture whose power metrics are sound.
+                if internal_mode:
+                    issues.append(
+                        _error(
+                            "power.window_clock_frozen",
+                            "Power firmware reported zero elapsed time for completed "
+                            "inferences; the on-device measurement derived from it is "
+                            "corrupt.",
+                            completed_count=terminal.completed_count,
+                            elapsed_us=terminal.elapsed_us,
+                        )
                     )
-                )
+                else:
+                    issues.append(
+                        _warning(
+                            "power.window_clock_frozen",
+                            "Power firmware reported zero elapsed time for completed "
+                            "inferences; the external instrument's power numbers are "
+                            "unaffected, but the firmware-reported window duration is "
+                            "meaningless.",
+                            completed_count=terminal.completed_count,
+                            elapsed_us=terminal.elapsed_us,
+                        )
+                    )
             else:
                 agreement = assess_run_window_clock(
                     elapsed_us=terminal.elapsed_us,

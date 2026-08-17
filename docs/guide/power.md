@@ -613,6 +613,18 @@ energy (nJ), charge (nC), bus voltage, and the inference count — with
 `measurement_scope: on_device_gated_inference`. Divide energy by count for
 per-inference energy; average power is energy over the window duration.
 
+!!! warning "That duration comes from the firmware, not the instrument"
+    Energy and charge are integrated in hardware over real time and are
+    robust. Average power and average current are not: both are energy (or
+    charge) divided by the window duration the *firmware* reports, so a
+    firmware timing fault scales them by exactly its own error while leaving
+    every other field looking healthy. External mode is immune — the
+    instrument measures the window itself — but in internal mode this is the
+    single point of failure. HPX therefore cross-checks it: a zero duration
+    is a hard error, and a duration more than 25% from the host's expectation
+    (or longer than the wall time that contained it) is a warning. See
+    `power.window_clock_frozen` below.
+
 ### When to use which instrument
 
 | | Joulescope | INA228 |
@@ -815,7 +827,32 @@ on your board, model, and clock configuration.)
   enabled points at a wiring or GO-line problem.
 - **`gated_window_duration_suspect`** — set when the duration check above
   fails tolerance, or when the device-reported clean-window timing itself
-  looks corrupted (an inference reporting zero time).
+  looks corrupted (an inference reporting zero time). Per-inference metrics
+  are suppressed when it is set.
+
+The dedicated power firmware also times its own measured window and reports it
+as `power.terminal.elapsed_us`. Because nothing else on the host depends on
+that clock, it is the one number that can be wrong while every other check
+passes, so it is cross-checked directly. Three issue codes come out of that:
+
+- **`power.window_clock_frozen`** — the firmware completed its inferences but
+  reported zero elapsed time, so its window clock never advanced. In
+  **internal** mode this fails the run: that duration is the denominator for
+  average power and current, so the measurement of record is corrupt. In
+  **external** mode it is only a warning that degrades the run — the
+  instrument owns the power numbers and they are unaffected; only
+  `elapsed_us` is meaningless. Two causes produce it: a window timed with
+  `DWT->CYCCNT` on a Cortex-M4F part whose debug power domain is down, or a
+  STIMER-timed window whose 32.768 kHz XTAL is stopped or unpopulated.
+- **`power.window_clock_mismatch`** — the firmware's window disagrees with an
+  independent measurement of the same work: the host-timed gate in external
+  mode (5% tolerance — the two time the same physical window), or
+  `inference_count × reference_inference_us` in internal mode (25%, looser
+  because that reference comes from a different binary). A warning in both.
+- **`power.window_clock_exceeds_host_time`** — internal mode only: the
+  reported window is longer than the host wall time between starting the
+  power binary and collecting its record, which is physically impossible.
+  A blunt backstop — it needs roughly 2–3× inflation before it fires.
 
 `detailed/power_summary.csv` (with `output.detailed: true`) breaks all of
 this down per gated window, plus a `whole_capture_window` reference row for
@@ -915,6 +952,16 @@ the JS320 bench.
     state wiring, confirm `power.lockstep` reflects your actual wiring, and
     verify the selected reset strategy relaunches the firmware cleanly
     before capture.
+
+    **Check the firmware's own clock first.** Both symptoms above are about
+    the *host-observed* gate, but a firmware timing fault can look similar and
+    has a completely different fix. The distinguishing symptom is
+    `power.terminal.elapsed_us` disagreeing with the gate: compare it against
+    `power.capture_duration_s` in `summary.json` (they should agree to well
+    under 1%). If `elapsed_us` is `0`, or several times the gate, the wiring
+    is fine and the firmware timed its window with a clock it could not read —
+    see `power.window_clock_frozen` and `power.window_clock_mismatch` above.
+    The remedy is a firmware rebuild, not a rewire.
 
 ??? failure "\"gated avg current <= whole-capture avg\" warning"
     Usually a gate/timing problem, but can be a legitimate reading for a

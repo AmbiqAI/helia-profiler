@@ -3,8 +3,10 @@
    SocCapabilities.power_window_timer for the predicate: the dedicated power
    binary cannot rely on DWT->CYCCNT (the CoreSight debug domain is either
    powered down by the binary itself or held up by nobody), so those renders
-   must time the window with STIMER or the reported duration is wrong and
-   average power/current are silently scaled by the error. -#}
+   must time the window with STIMER or the reported duration is wrong. With an
+   on-device monitor (internal mode) that duration is also the denominator for
+   average power and current, so both are scaled by the same error; with an
+   external instrument only elapsed_us is affected. -#}
 {%- set window_timer = power_window_timer if power_only | default(false) else (clean_window_timer | default("dwt")) %}
 {%- set use_stimer_window = (window_timer == "stimer") and (clean_window_probe | default("infer") != "busy_loop") %}
 /**
