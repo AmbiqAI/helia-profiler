@@ -37,6 +37,8 @@ from ..engines import EngineType
 from .matrix import CaseSpec, MemoryProfile
 
 _TRANSIENT_POWER_LOCK_RETRY_DELAY_S = 5.0
+_EXECUTORCH_ARM_CMSIS_NN_REF = "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
+_EXECUTORCH_NS_CMSIS_NN_REF = "631726420b04860a5c4236956a3741ff5a96bd7f"
 _TRANSIENT_POWER_LOCK_MARKERS = (
     "is already in use by another process",
     "busy during open; retrying",
@@ -61,6 +63,7 @@ class CaseResult:
     toolchain: str
     transport: str
     memory: str
+    backend: str | None = None
     comparison_group: str | None = None
     jlink_serial: str | None = None
     power_serial: str | None = None
@@ -158,11 +161,15 @@ def _build_config(
         placement = {"weights_location": "mram"}
     elif case.memory is MemoryProfile.PSRAM:
         placement = {"arena_location": "sram", "weights_location": "psram"}
+    elif case.engine is EngineType.EXECUTORCH:
+        # Keep mutable runtime workspace in SRAM so it fits Apollo330's
+        # 240 KB TCM; the immutable PTE executes directly from MRAM.
+        placement = {"arena_location": "sram", "weights_location": "mram"}
 
     cfg: dict[str, Any] = {
         "model": {
-            "path": str((repo_root / case.model.fixture_path).resolve()),
-            "arena_size": case.model.arena_size,
+            "path": str((repo_root / case.model.fixture_for(case.engine)).resolve()),
+            "arena_size": case.model.arena_size_for(case.engine),
             **placement,
         },
         "engine": {
@@ -217,7 +224,33 @@ def _build_config(
     if case.jlink_serial:
         cfg["target"]["jlink_serial"] = case.jlink_serial
 
-    if case.engine in {EngineType.HELIA_RT, EngineType.HELIA_AOT} and ns_cmsis_nn_ref:
+    if case.engine is EngineType.EXECUTORCH:
+        contract = case.model.executorch
+        if contract is None or case.cmsis_nn_backend is None:
+            raise ValueError(f"Incomplete ExecuTorch contract for {case.case_id}")
+        nsx_root = Path(
+            os.environ.get("NSX_EXECUTORCH_ROOT", repo_root.parent / "nsx-executorch")
+        ).expanduser()
+        cmsis_nn_ref = _EXECUTORCH_ARM_CMSIS_NN_REF
+        if case.cmsis_nn_backend.value == "ns":
+            cmsis_nn_ref = ns_cmsis_nn_ref or _EXECUTORCH_NS_CMSIS_NN_REF
+        engine_config: dict[str, Any] = {
+            "source_path": str(nsx_root.resolve()),
+            "planned_arena_size": contract.planned_arena_size,
+            "method_arena_size": contract.method_arena_size,
+            "temporary_arena_size": contract.temporary_arena_size,
+            "input_size": contract.input_size,
+            "output_size": contract.output_size,
+            "portable_ops": list(contract.portable_ops),
+            "cmsis_nn_ref": cmsis_nn_ref,
+        }
+        cfg["engine"].update(
+            {
+                "backend": case.cmsis_nn_backend.value,
+                "config": engine_config,
+            }
+        )
+    elif case.engine in {EngineType.HELIA_RT, EngineType.HELIA_AOT} and ns_cmsis_nn_ref:
         # Hardware CI resolves branches to an exact commit before creating
         # cases. Put that commit in the profile config so it reaches the NSX
         # manifest and lock instead of relying on a process environment path.
@@ -386,9 +419,7 @@ def run_case(
     case_dir.mkdir(parents=True, exist_ok=True)
 
     config_path = case_dir / "config.yml"
-    config = _build_config(
-        case, repo_root, case_dir, ns_cmsis_nn_ref=ns_cmsis_nn_ref
-    )
+    config = _build_config(case, repo_root, case_dir, ns_cmsis_nn_ref=ns_cmsis_nn_ref)
     config_path.write_text(yaml.safe_dump(config, sort_keys=False))
 
     if in_process is None:
@@ -422,6 +453,9 @@ def run_case(
                 toolchain=case.toolchain.value,
                 transport=case.transport.value,
                 memory=case.memory.value,
+                backend=(
+                    case.cmsis_nn_backend.value if case.cmsis_nn_backend is not None else None
+                ),
                 jlink_serial=case.jlink_serial,
                 power_serial=case.power_serial,
                 attempt=case.attempt,
@@ -480,6 +514,7 @@ def run_case(
             toolchain=case.toolchain.value,
             transport=case.transport.value,
             memory=case.memory.value,
+            backend=case.cmsis_nn_backend.value if case.cmsis_nn_backend is not None else None,
             jlink_serial=case.jlink_serial,
             power_serial=case.power_serial,
             attempt=case.attempt,
@@ -504,6 +539,7 @@ def run_case(
         toolchain=case.toolchain.value,
         transport=case.transport.value,
         memory=case.memory.value,
+        backend=case.cmsis_nn_backend.value if case.cmsis_nn_backend is not None else None,
         jlink_serial=case.jlink_serial,
         power_serial=case.power_serial,
         attempt=case.attempt,
@@ -521,13 +557,16 @@ def run_case(
             result.layers = (
                 int(summary.get("layers")) if summary.get("layers") is not None else None
             )
-            result.total_cycles = (
-                int(summary.get("total_cycles"))
-                if summary.get("total_cycles") is not None
-                else None
-            )
             latency_blob = summary.get("latency") or {}
-            if latency_blob.get("device_profiled_infer_avg_us") is not None:
+            clean_cycles = latency_blob.get("device_clean_infer_avg_cycles")
+            result.total_cycles = (
+                int(clean_cycles)
+                if clean_cycles is not None
+                else _optional_int(summary.get("total_cycles"))
+            )
+            if latency_blob.get("device_clean_infer_avg_us") is not None:
+                result.latency_avg_us = float(latency_blob["device_clean_infer_avg_us"])
+            elif latency_blob.get("device_profiled_infer_avg_us") is not None:
                 result.latency_avg_us = float(latency_blob["device_profiled_infer_avg_us"])
             binary_blob = summary.get("binary") or {}
             if binary_blob:

@@ -16,6 +16,7 @@ def _case(
     binary: int,
     *,
     engine: str = "helia-rt",
+    backend: str | None = None,
     comparison_group: str | None = None,
 ) -> CaseResult:
     return CaseResult(
@@ -23,6 +24,7 @@ def _case(
         status="pass",
         duration_s=1.0,
         engine=engine,
+        backend=backend,
         model_id=model,
         comparison_group=comparison_group,
         board="apollo510_evb",
@@ -84,3 +86,36 @@ def test_print_validation_calculates_decisions_within_comparison_groups() -> Non
     assert "kws, vww" in rendered
     assert rendered.count("fastest") == 2
     assert "Group" in rendered
+
+
+def test_print_validation_shows_executorch_provider() -> None:
+    report = ValidationReport(
+        cases=(
+            _case(
+                "executorch-arm",
+                "kws",
+                100,
+                100_000,
+                engine="executorch",
+                backend="arm",
+            ),
+            _case(
+                "executorch-ns",
+                "kws",
+                90,
+                105_000,
+                engine="executorch",
+                backend="ns",
+            ),
+        ),
+        summary=ValidationSummary(total=2, passed=2, failed=0, skipped=0),
+    )
+    hpx_console = HpxConsole()
+    output = Console(record=True, highlight=False, width=100)
+    hpx_console._console = output
+
+    hpx_console.print_validation(report)
+    rendered = output.export_text()
+
+    assert "executorch/arm" in rendered
+    assert "executorch/ns" in rendered

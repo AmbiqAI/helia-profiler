@@ -237,6 +237,7 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
         "model_id": result.model_id,
         "comparison_group": result.comparison_group or result.model_id,
         "engine": engine,
+        "backend": result.backend,
         "board": result.board,
         "toolchain": result.toolchain,
         "transport": result.transport,

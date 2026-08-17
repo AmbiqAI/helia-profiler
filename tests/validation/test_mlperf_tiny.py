@@ -34,6 +34,7 @@ def _skip_result(case: CaseSpec, reason: str) -> CaseResult:
         toolchain=case.toolchain.value,
         transport=case.transport.value,
         memory=case.memory.value,
+        backend=case.cmsis_nn_backend.value if case.cmsis_nn_backend is not None else None,
         jlink_serial=case.jlink_serial,
         attempt=case.attempt,
         repeat_total=case.repeat_total,
@@ -52,7 +53,7 @@ def test_mlperf_tiny_case(
     """Drive one (model × engine × power × board) case through hpx profile."""
     # Skip early if the fixture file isn't present — surfaces LFS misfetch
     # cleanly instead of as a cryptic pipeline error.
-    fixture = repo_root / case.model.fixture_path
+    fixture = repo_root / case.model.fixture_for(case.engine)
     if not fixture.exists() or fixture.stat().st_size < 1024:
         reason = (
             f"fixture missing / LFS not fetched: {fixture} "

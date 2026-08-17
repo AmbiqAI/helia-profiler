@@ -39,13 +39,17 @@ static bool g_layer_capacity_exceeded = false;
 
 {% if arena_region == "sram" %}
 NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_planned_arena[{{ executorch_planned_arena_size }}];
+NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_method_arena[{{ executorch_method_arena_size }}];
+NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_temporary_arena[{{ executorch_temporary_arena_size }}];
+NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_input[{{ executorch_input_size }}];
+NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_output[{{ executorch_output_size }}];
 {% else %}
 NSX_MEM_FAST_BSS alignas(16) static uint8_t g_planned_arena[{{ executorch_planned_arena_size }}];
-{% endif %}
 alignas(16) static uint8_t g_method_arena[{{ executorch_method_arena_size }}];
 alignas(16) static uint8_t g_temporary_arena[{{ executorch_temporary_arena_size }}];
 alignas(16) static uint8_t g_input[{{ executorch_input_size }}];
 alignas(16) static uint8_t g_output[{{ executorch_output_size }}];
+{% endif %}
 
 static bool profiler_init(
     const uint32_t event_ids[], const char *const names[], int count) {

@@ -220,7 +220,10 @@ def print_validation(
             ]
             if show_group:
                 row.append(escape(_decision_group(case)))
-            row.append(escape(str(case.engine)))
+            engine = str(case.engine)
+            if case.backend:
+                engine = f"{engine}/{case.backend}"
+            row.append(escape(engine))
             if compact:
                 row.append(escape(_compact_config(case)))
             else:

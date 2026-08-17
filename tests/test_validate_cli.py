@@ -31,7 +31,7 @@ class TestValidateList:
     def test_list_default_shows_full_matrix(self):
         proc = _run_hpx("validate", "--list")
         assert proc.returncode == 0, proc.stderr
-        assert "720 case(s) would run" in proc.stdout
+        assert "848 case(s) would run" in proc.stdout
         assert "kws" in proc.stdout
         assert "vww" in proc.stdout
         assert "ic" in proc.stdout
@@ -43,10 +43,32 @@ class TestValidateList:
         assert "240 case(s)" in proc.stdout
         assert "helia-aot" in proc.stdout
 
+    def test_list_executorch_alias_expands_both_providers(self):
+        proc = _run_hpx(
+            "validate",
+            "--list",
+            "--boards",
+            "apollo330mP_evb",
+            "--engines",
+            "et",
+            "--power",
+            "off",
+            "--toolchains",
+            "gcc",
+            "--interfaces",
+            "rtt",
+            "--memories",
+            "auto",
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert "8 case(s) would run" in proc.stdout
+        assert "executorch/arm" in proc.stdout
+        assert "executorch/ns" in proc.stdout
+
     def test_list_power_off(self):
         proc = _run_hpx("validate", "--list", "--power", "off")
         assert proc.returncode == 0, proc.stderr
-        assert "720 case(s)" in proc.stdout
+        assert "848 case(s)" in proc.stdout
 
     def test_list_power_boards_keeps_apollo330_unpowered(self):
         proc = _run_hpx(
@@ -281,7 +303,7 @@ class TestSuiteSmoke:
         )
 
         assert args[args.index("--mlperf-models") + 1] == "kws,vww,ic,ad"
-        assert args[args.index("--mlperf-engines") + 1] == "helia-rt,helia-aot,tflm"
+        assert args[args.index("--mlperf-engines") + 1] == "helia-rt,helia-aot,tflm,executorch"
         assert args[args.index("--mlperf-boards") + 1] == "apollo510_evb,apollo330mP_evb"
         assert args[args.index("--mlperf-toolchains") + 1] == "arm-none-eabi-gcc,atfe"
 
