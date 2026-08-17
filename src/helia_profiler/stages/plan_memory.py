@@ -37,7 +37,7 @@ from typing import TYPE_CHECKING
 
 from ..config import DEFAULT_ARENA_SIZE_BYTES
 from ..errors import PlatformError
-from ..engines import get_adapter
+from ..engines import EngineType, get_adapter
 from ..pipeline import PipelineContext
 from ..placement import MemoryRegion, Placement, resolve_fastest_fit_placement
 from ..platform import MemoryLayout, SocDef
@@ -129,7 +129,9 @@ class PlanMemoryStage:
         for placement, so the plan reflects what the firmware template
         will actually emit.
         """
-        engine = ctx.config.engine.type.value
+        engine_type = ctx.config.engine.type
+        engine = engine_type.value
+        artifacts = ctx.engine_artifacts
         arena = int(ctx.config.model.arena_size or DEFAULT_ARENA_SIZE_BYTES)
 
         try:
@@ -146,23 +148,62 @@ class PlanMemoryStage:
             MemoryRegion.DTCM,
         )
 
-        region_map: dict[str, list[MemoryConsumer]] = {}
+        region_map: dict[MemoryRegion, list[MemoryConsumer]] = {}
+
+        def add(region: MemoryRegion, name: str, size: int, kind: str) -> None:
+            if size > 0:
+                region_map.setdefault(region, []).append(
+                    MemoryConsumer(name=name, size=size, kind=kind)
+                )
+
         if model_bytes > 0:
-            region_map.setdefault(weight_phys, []).append(
-                MemoryConsumer(
-                    name="model_flatbuffer",
-                    size=model_bytes,
-                    kind="weights",
-                )
+            add(
+                weight_phys,
+                "pte_program" if engine_type is EngineType.EXECUTORCH else "model_flatbuffer",
+                model_bytes,
+                "weights",
             )
-        if arena > 0:
-            region_map.setdefault(arena_phys, []).append(
-                MemoryConsumer(
-                    name="tensor_arena",
-                    size=arena,
-                    kind="arena",
-                )
+
+        if engine_type is EngineType.EXECUTORCH and artifacts is not None:
+            # The generated ExecuTorch runner owns several explicit buffers in
+            # addition to the PTE memory-planned arena. Unannotated BSS lands
+            # in DTCM; layer records are deliberately placed in shared SRAM.
+            add(
+                arena_phys,
+                "planned_arena",
+                int(artifacts.executorch_planned_arena_size or arena),
+                "arena",
             )
+            add(
+                MemoryRegion.DTCM,
+                "method_arena",
+                int(artifacts.executorch_method_arena_size or 0),
+                "other",
+            )
+            add(
+                MemoryRegion.DTCM,
+                "temporary_arena",
+                int(artifacts.executorch_temporary_arena_size or 0),
+                "other",
+            )
+            add(
+                MemoryRegion.DTCM,
+                "input_buffer",
+                int(artifacts.executorch_input_size or 0),
+                "other",
+            )
+            add(
+                MemoryRegion.DTCM,
+                "output_buffer",
+                int(artifacts.executorch_output_size or 0),
+                "other",
+            )
+            # sizeof(LayerRecord) is 32 bytes on the 32-bit target ABI: a
+            # 12-byte operator key, four uint32 counters, bool, and padding.
+            max_ops = int(ctx.soc.pmu_max_ops) if ctx.soc is not None else 2048
+            add(MemoryRegion.SRAM, "pmu_layer_records", max_ops * 32, "other")
+        else:
+            add(arena_phys, "tensor_arena", arena, "arena")
 
         regions = tuple(
             MemoryRegionUsage(

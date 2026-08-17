@@ -25,6 +25,7 @@ class EngineType(StrEnum):
     TFLM = "tflm"
     HELIA_RT = "helia-rt"
     HELIA_AOT = "helia-aot"
+    EXECUTORCH = "executorch"
 
     @property
     def short_slug(self) -> str:
@@ -54,6 +55,12 @@ def _load_helia_aot_adapter() -> "EngineAdapter":
     return HeliaAOTAdapter()
 
 
+def _load_executorch_adapter() -> "EngineAdapter":
+    from .executorch import ExecuTorchAdapter
+
+    return ExecuTorchAdapter()
+
+
 # ---------------------------------------------------------------------------
 # Engine adapter registry
 # ---------------------------------------------------------------------------
@@ -66,6 +73,7 @@ _ADAPTER_FACTORIES: dict[EngineType, "Callable[[], EngineAdapter]"] = {
     EngineType.TFLM: _load_tflm_adapter,
     EngineType.HELIA_RT: _load_helia_rt_adapter,
     EngineType.HELIA_AOT: _load_helia_aot_adapter,
+    EngineType.EXECUTORCH: _load_executorch_adapter,
 }
 
 

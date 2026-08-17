@@ -32,6 +32,10 @@
       "url": "https://github.com/AmbiqAI/ns-cmsis-nn.git",
       "ref": "631726420b04860a5c4236956a3741ff5a96bd7f"
     },
+    "nsx-executorch": {
+      "url": "https://github.com/AmbiqAI/nsx-executorch.git",
+      "ref": "88585066743dc21847541793191c558a647c2f6e"
+    },
     "helia-rt": {
       "url": "https://github.com/AmbiqAI/helia-rt.git",
       "ref": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62"
@@ -62,6 +66,10 @@
       "project": "ns-cmsis-nn",
       "ref": "631726420b04860a5c4236956a3741ff5a96bd7f"
     },
+    "nsx-executorch": {
+      "project": "nsx-executorch",
+      "ref": "88585066743dc21847541793191c558a647c2f6e"
+    },
     "nsx-helia-rt": {
       "project": "helia-rt",
       "ref": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62"
@@ -82,6 +90,10 @@
     },
     "tflm": {
       "governed_by_modules": true
+    },
+    "executorch": {
+      "version": "0.1.0",
+      "ref": "88585066743dc21847541793191c558a647c2f6e"
     }
   }
 }

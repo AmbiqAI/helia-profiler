@@ -1,0 +1,54 @@
+# ExecuTorch Cortex-M/CMSIS-NN ResNet-8 hardware fixture. Supply a PTE exported
+# against nsx-executorch's pinned ExecuTorch revision and an nsx-executorch
+# PR #1 checkout at HPX's compatibility-baseline commit.
+# Verified on apollo330mP_evb — its MCU_TCM is only 240 KB, too small for
+# the combined method (64 KB) + temporary (32 KB) + planned (160 KB) arenas,
+# so arena_location is sram (1792 KB) rather than tcm.
+model:
+  path: /path/to/resnet8_cmsis_nn.pte
+  # The PTE reports 163,840 bytes of memory-planned storage.
+  arena_size: 163840
+  arena_location: sram
+  weights_location: mram
+
+engine:
+  type: executorch
+  # Select `ns` to use the qualified ns-cmsis-nn v7.29.2 provider instead.
+  backend: arm
+  config:
+    # Exact commit: 88585066743dc21847541793191c558a647c2f6e
+    source_path: /path/to/nsx-executorch
+    method_arena_size: 65536
+    temporary_arena_size: 32768
+    input_size: 12288
+    output_size: 40
+    # Cortex-M kernels are defined by nsx-executorch's pinned operator schema.
+    # List only portable ATen fallbacks required by the PTE.
+    portable_ops: []
+
+target:
+  board: apollo330mP_evb
+  toolchain: arm-none-eabi-gcc
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+    mve: default
+    memory: default
+  per_layer: true
+  iterations: 25
+  warmup: 5
+  aggregation: median
+
+power:
+  enabled: false
+
+output:
+  format: json
+  dir: ./results/executorch_resnet8
+  # PTE instruction IDs do not map directly onto a TFLite graph overlay.
+  model_explorer: false
+  detailed: true

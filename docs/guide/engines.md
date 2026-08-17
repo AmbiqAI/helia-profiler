@@ -1,6 +1,6 @@
 # Inference Engines
 
-heliaPROFILER currently exposes three inference engines. Each profiling run uses
+heliaPROFILER currently exposes four inference engines. Each profiling run uses
 **exactly one** engine — you choose which at configuration time. There is
 no "run all" mode; comparison is done by running the profiler more than
 once with different configs.
@@ -12,13 +12,70 @@ once with different configs.
 | Vanilla TFLM | `tflm` | Yes | Reference or CMSIS-NN interpreter baseline |
 | heliaRT | `helia-rt` | Yes | Ambiq-optimized interpreter performance |
 | heliaAOT | `helia-aot` | No | Ahead-of-time compilation and fine-grained placement |
+| ExecuTorch | `executorch` | No | Cortex-M PTE programs and CMSIS-NN kernels |
 
-The pipeline, capture protocol, and report format are identical for all three
+The pipeline, capture protocol, and report format are identical for all four
 engines. Only the firmware payload changes.
 
 Vanilla TFLM is intended as a baseline. It uses the separate
 `nsx-tflite-micro` port and can select either reference kernels or upstream
 CMSIS-NN. It does not enable heliaRT's Ambiq-tuned HELIA backend.
+
+## ExecuTorch
+
+The ExecuTorch engine consumes an already exported `.pte` program and builds
+the local `nsx-executorch` Cortex-M runtime into the generated NSX firmware.
+It uses ExecuTorch's `EventTracer` instruction scopes to reset and sample the
+Armv8-M PMU around each kernel or delegate call. This keeps the runtime and
+CMSIS-NN kernels unmodified while producing stable instruction identities such
+as `OPERATOR_CALL:c0i7` in per-layer results.
+
+```yaml title="hpx.yml"
+model:
+  path: /path/to/model.pte
+  arena_size: 163840
+
+engine:
+  type: executorch
+  backend: arm  # arm or ns CMSIS-NN provider
+  config:
+    source_path: /path/to/nsx-executorch
+    method_arena_size: 65536
+    temporary_arena_size: 32768
+    input_size: 12288
+    output_size: 40
+    portable_ops: []
+```
+
+All sizes and the optional portable-operator list are explicit because the embedded runner does not
+run an export pipeline or infer a PTE's application I/O contract. The clean
+whole-model measurement is the DWT cycle count of `Method::execute()` only;
+program loading, method loading, input/output copies, layer instrumentation,
+and report transport are excluded. Per-layer measurements are repeated for
+each PMU pass and aggregated by the normal HPX parser.
+
+The profiler validates `nsx_pmu_init()`, runs a CPU-cycle counter self-test,
+checks every counter read, and reports true 32-bit chained-counter overflow.
+ExecuTorch power capture is not yet supported; keep `power.enabled: false`.
+See `configs/executorch/resnet8_cmsis_nn.yaml` for the verified fixture — it
+targets `apollo330mP_evb` with `arena_location: sram` (that board's MCU_TCM is
+too small for the combined method/temporary/planned arenas) and accepts a
+caller-supplied PTE plus a single `nsx-executorch` checkout at `source_path`.
+The checkout must be at
+commit `88585066743dc21847541793191c558a647c2f6e`, the current head of
+`nsx-executorch` PR #1; HPX does not assume an unpublished release tag.
+
+`source_path` is the repository root containing `nsx-module.yaml`, not the
+embedded ExecuTorch submodule. Initialize the minimal Cortex-M submodules listed
+in that repository's README. HPX passes its own Python 3.11+ interpreter to
+CMake so the pinned torchgen wrapper also sees HPX's PyYAML dependency. HPX
+declares exactly one qualified provider (`arm-cmsis-nn` or `nsx-cmsis-nn`) as
+a normal NSX module immediately before `nsx-executorch`. NSX lock/sync therefore
+owns provider materialization and uses its standard `NSX_CACHE_DIR` cache;
+the runtime's idempotent bridge prevents duplicate targets. The `ns` provider
+uses PR #1's private compatibility layer for the v7.29.2 `weight_sum_ctx` ABI.
+Set `engine.config.cmsis_nn_path` or `cmsis_nn_ref` to override the selected
+provider while preserving the same ordered module contract.
 
 ## heliaRT
 

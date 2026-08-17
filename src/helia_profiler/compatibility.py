@@ -25,12 +25,20 @@ _REQUIRED_PROJECTS = frozenset(
         "nsx-tflite-micro",
         "arm-cmsis-nn",
         "ns-cmsis-nn",
+        "nsx-executorch",
     }
 )
 _REQUIRED_MODULES = frozenset(
-    {"nsx-pmu-armv8m", "nsx-tflite-micro", "arm-cmsis-nn", "nsx-cmsis-nn", "nsx-helia-rt"}
+    {
+        "nsx-pmu-armv8m",
+        "nsx-tflite-micro",
+        "arm-cmsis-nn",
+        "nsx-cmsis-nn",
+        "nsx-helia-rt",
+        "nsx-executorch",
+    }
 )
-_REQUIRED_ENGINES = frozenset({"helia-rt", "helia-aot", "tflm"})
+_REQUIRED_ENGINES = frozenset({"helia-rt", "helia-aot", "tflm", "executorch"})
 
 
 class QualificationState(StrEnum):
@@ -231,12 +239,13 @@ _ENGINE_SOURCE_OVERRIDE_KEYS = frozenset(
 
 # NSX module names that engine adapters resolve themselves (via
 # engine.config's dist_path/source_path/source/cmsis_nn_path/cmsis_nn_ref, not build.nsx_modules).
-# Mirrors HELIART_MODULE ("nsx-helia-rt") in engines/helia_rt/artifacts.py and
-# CMSIS_NN_MODULE ("nsx-cmsis-nn") in engines/helia_aot/cmsis_nn.py — a test
+# Mirrors the canonical engine module constants — a test
 # asserts these literals never drift from those constants. A build.nsx_modules
 # entry targeting one of these names is never applied (see
 # firmware/__init__.py), so it must not be counted as a development override.
-ENGINE_OWNED_MODULE_NAMES = frozenset({"nsx-helia-rt", "nsx-cmsis-nn"})
+ENGINE_OWNED_MODULE_NAMES = frozenset(
+    {"nsx-helia-rt", "nsx-cmsis-nn", "nsx-executorch"}
+)
 
 
 def resolve_compatibility(
@@ -461,6 +470,7 @@ def _optional_bool(value: Mapping[str, Any], key: str) -> bool:
 
 
 _COMMIT_SHA_RE = re.compile(r"[0-9a-f]{40}")
+
 def _immutable_ref(value: Mapping[str, Any], key: str, owner: str) -> str:
     """Validate that a baseline ref is an immutable, qualifiable pin.
 

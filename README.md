@@ -1,6 +1,7 @@
 # heliaPROFILER
 
-**`hpx`** profiles LiteRT (`.tflite`) models on real Ambiq Apollo silicon.
+**`hpx`** profiles LiteRT (`.tflite`) and ExecuTorch (`.pte`) models on real
+Ambiq Apollo silicon.
 One command resolves an inference engine, builds temporary NSX firmware,
 flashes the target, captures measurements, and writes a portable result bundle.
 
@@ -16,9 +17,9 @@ flashes the target, captures measurements, and writes a portable result bundle.
 - **Power & energy per inference** — GPIO-gated Joulescope capture
   (JS110/JS220/JS320) uses a dedicated transport-free firmware image to
   isolate the inference window from setup/teardown and capture traffic.
-- **Three engines** — `tflm` (vanilla TFLM baseline), `helia-rt` (Ambiq's
+- **Four engines** — `tflm` (vanilla TFLM baseline), `helia-rt` (Ambiq's
   optimized TFLM interpreter), and `helia-aot` (Ambiq's ahead-of-time model
-  compiler), selected explicitly
+  compiler), plus `executorch` for Cortex-M PTE programs, selected explicitly
   per run.
 - **Multiple toolchains** — `arm-none-eabi-gcc`, `armclang`, and ATfE, so you
   can compare build/runtime trade-offs without changing your model.

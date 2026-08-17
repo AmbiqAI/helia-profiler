@@ -121,6 +121,14 @@ class EngineArtifacts:
     # the resolved split placement.
     memory_plan: MemoryPlan | None = None
 
+    # ExecuTorch PTE runtime contract. ExecuTorch intentionally keeps these
+    # explicit because a PTE does not expose a stable host-side sizing API.
+    executorch_method_arena_size: int | None = None
+    executorch_planned_arena_size: int | None = None
+    executorch_temporary_arena_size: int | None = None
+    executorch_input_size: int | None = None
+    executorch_output_size: int | None = None
+
 
 @runtime_checkable
 class EngineAdapter(Protocol):

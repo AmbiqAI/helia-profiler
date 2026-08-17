@@ -209,6 +209,11 @@ class EngineContext:
     resource_variable_count: int
     aot_prefix: str
     aot_op_manifest: tuple[AotOpContext, ...]
+    executorch_method_arena_size: int
+    executorch_planned_arena_size: int
+    executorch_temporary_arena_size: int
+    executorch_input_size: int
+    executorch_output_size: int
 
 
 @dataclass(frozen=True)
@@ -337,6 +342,13 @@ class FirmwareRenderContext:
                 resource_variable_count=resource_variable_count,
                 aot_prefix=artifacts.aot_prefix or "",
                 aot_op_manifest=aot_manifest,
+                executorch_method_arena_size=artifacts.executorch_method_arena_size or 0,
+                executorch_planned_arena_size=artifacts.executorch_planned_arena_size or 0,
+                executorch_temporary_arena_size=(
+                    artifacts.executorch_temporary_arena_size or 0
+                ),
+                executorch_input_size=artifacts.executorch_input_size or 0,
+                executorch_output_size=artifacts.executorch_output_size or 0,
             ),
         )
 
@@ -430,6 +442,13 @@ class FirmwareRenderContext:
             "resource_variable_count": self.engine.resource_variable_count,
             "aot_prefix": self.engine.aot_prefix,
             "aot_op_manifest": self.engine.aot_op_manifest,
+            "executorch_method_arena_size": self.engine.executorch_method_arena_size,
+            "executorch_planned_arena_size": self.engine.executorch_planned_arena_size,
+            "executorch_temporary_arena_size": (
+                self.engine.executorch_temporary_arena_size
+            ),
+            "executorch_input_size": self.engine.executorch_input_size,
+            "executorch_output_size": self.engine.executorch_output_size,
         }
 
 

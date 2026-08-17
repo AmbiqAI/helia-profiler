@@ -40,12 +40,12 @@ or a stock TFLM baseline.
     Cycle counts, instruction counts, cache stats, and per-layer PMU
     breakdowns — all from a single `hpx profile` command.
 
--   :material-engine:{ .lg .middle } __Three engines__
+-   :material-engine:{ .lg .middle } __Four engines__
 
     ---
 
-    Profile the same model with vanilla TFLM, heliaRT (interpreter), or
-    heliaAOT (ahead-of-time compiler) — one explicitly-chosen engine per run.
+    Profile with vanilla TFLM, heliaRT (interpreter), heliaAOT
+    (ahead-of-time compiler), or ExecuTorch — one explicit engine per run.
 
 -   :material-chip:{ .lg .middle } __Apollo 3 / 4 / 5__
 

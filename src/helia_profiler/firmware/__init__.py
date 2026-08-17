@@ -658,7 +658,20 @@ def generate_app(ctx: PipelineContext) -> Path:
             weights_region,
         )
 
-    if engine_type is EngineType.HELIA_AOT:
+    if engine_type is EngineType.EXECUTORCH:
+        if weights_region != "psram":
+            _write_text(
+                src_dir / "model_data.h",
+                _model_to_header(config.model.path, weights_region),
+            )
+        _write_text(
+            src_dir / "main.cc",
+            _jinja_env.get_template("main_executorch.cc.j2").render(
+                **template_vars,
+                pmu_max_ops=soc.pmu_max_ops,
+            ),
+        )
+    elif engine_type is EngineType.HELIA_AOT:
         # --- AOT engine: use AOT-specific main template, no model embedding ---
         aot_prefix = artifacts.aot_prefix
         assert aot_prefix is not None  # heliaAOT adapter always sets this
@@ -835,7 +848,11 @@ def render_power_source(ctx: PipelineContext, *, inference_count: int) -> Path:
     template_name = (
         "main_aot.cc.j2"
         if ctx.engine_artifacts.engine_type is EngineType.HELIA_AOT
-        else "main.cc.j2"
+        else (
+            "main_executorch.cc.j2"
+            if ctx.engine_artifacts.engine_type is EngineType.EXECUTORCH
+            else "main.cc.j2"
+        )
     )
     destination = ctx.firmware_dir / "src" / "main_power.cc"
     _write_text(
