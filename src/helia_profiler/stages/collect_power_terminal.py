@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from ..errors import PowerError
 from ..pipeline import PipelineContext
@@ -10,8 +11,43 @@ from ..power.base import PowerResult, PowerSummary
 from ..power.diagnostics import (
     FROZEN_WINDOW_CLOCK_HINT,
     assess_run_window_clock,
+    assess_window_clock_ceiling,
     firmware_window_clock_is_frozen,
 )
+
+
+def _host_phase_envelope_s(ctx: PipelineContext) -> float | None:
+    """Host wall time from starting the power binary to collecting its record.
+
+    ``DeploymentRecord.deployed_at`` is the cleanest timestamp already in the
+    pipeline for "the power phase began": ``FlashPowerFirmwareStage`` stamps it
+    immediately after the J-Link recipe programs and releases the target, and
+    in internal mode nothing touches the device again before this stage (the
+    capture stage is skipped -- see ``CapturePowerStage.should_skip``). No new
+    plumbing is needed, and the value is already persisted in the run artifact.
+
+    The interval is a deliberate over-estimate of the measured window: it also
+    contains flash-tool exit, boot, engine/model init, and the post-window
+    terminal emit plus this stage's own wait. That makes it a loose ceiling, not
+    a duration estimate -- which is exactly what a physical-impossibility check
+    wants.
+
+    Returns ``None`` when there is no deployment record or the timestamp cannot
+    be parsed, so the caller simply has nothing to check rather than inventing
+    a bound. Note this reads the host wall clock, not a monotonic one -- a clock
+    step between the two reads would skew it, which is a reason this check warns
+    rather than fails.
+    """
+    deployment = ctx.power_run.deployment if ctx.power_run is not None else None
+    if deployment is None:
+        return None
+    try:
+        started = datetime.fromisoformat(deployment.deployed_at)
+    except ValueError:
+        return None
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - started).total_seconds()
 
 log = logging.getLogger("hpx")
 
@@ -224,6 +260,37 @@ class CollectPowerTerminalStage:
                 agreement.relative_error * 100.0,
                 agreement.relative_tolerance * 100.0,
             )
+        if internal_mode:
+            # Plan- and hardware-independent ceiling. The plan comparison above
+            # can only ever be as good as a different binary's timing, but the
+            # host knows for a fact when it started this binary and when it
+            # collected the record -- the measured window is strictly inside
+            # that interval. This is what catches the AP4-style ~7x inflation
+            # for a user with no external instrument.
+            ceiling = assess_window_clock_ceiling(
+                elapsed_us=terminal.elapsed_us,
+                host_envelope_s=_host_phase_envelope_s(ctx),
+            )
+            if ceiling is not None:
+                if ctx.power_result is not None:
+                    # Recorded so evaluation.validity can re-derive the same
+                    # verdict later; it has no "now" of its own. Mirrors how
+                    # gate_duration_integrity is stashed on the observation.
+                    ctx.power_result.metadata["window_clock_ceiling"] = (
+                        ceiling.to_metadata()
+                    )
+                if ceiling.exceeded:
+                    log.warning(
+                        "Power firmware reported a %.6f s window, but only "
+                        "%.6f s of host wall time elapsed between starting the "
+                        "power binary and collecting its record (%.1fx). A "
+                        "window cannot outlast the interval that contains it, "
+                        "so the firmware's window clock is wrong; integrated "
+                        "energy and charge are unaffected.",
+                        ceiling.elapsed_s,
+                        ceiling.host_envelope_s,
+                        ceiling.ratio,
+                    )
         log.info(
             "Power terminal: status=%s count=%d elapsed_us=%s phase=%s",
             terminal.status,

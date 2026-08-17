@@ -13,6 +13,10 @@ from helia_profiler.results import (
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import PowerResult, PowerSummary
+from helia_profiler.power.diagnostics import (
+    WINDOW_CLOCK_CEILING_SLACK_S,
+    WindowClockCeiling,
+)
 from helia_profiler.results import ResultValidity
 from helia_profiler.results import FirmwareMeta, PmuResult
 from helia_profiler.evaluation import evaluate_run
@@ -177,6 +181,7 @@ class TestWindowClockValidity:
         elapsed_us: int,
         gate_s: float = BENCH_GATE_S,
         internal: bool = False,
+        host_envelope_s: float | None = None,
     ) -> None:
         assert ctx.power_run is not None and ctx.power_run.observation is not None
         observation = ctx.power_run.observation
@@ -198,7 +203,38 @@ class TestWindowClockValidity:
             ),
             observation=None if internal else replace(observation, result=result),
             terminal=terminal,
+            # Internal mode requires an on-device measurement, or the run is
+            # invalid for an unrelated reason and the window-clock verdict
+            # cannot be read off the overall validity.
+            on_device_summary=(
+                OnDevicePowerSummary(
+                    source="ina228",
+                    scope="fixed_n_inference",
+                    energy_nj=11_848_248,
+                    duration_us=elapsed_us,
+                    inference_count=self.BENCH_COUNT,
+                    overflow=False,
+                    charge_nc=6_582_360,
+                    bus_voltage_uv=1_800_000,
+                )
+                if internal
+                else None
+            ),
         )
+        if host_envelope_s is not None:
+            # Exactly the shape the collect stage records; validity re-derives
+            # `exceeded` from these numbers rather than trusting a verdict.
+            ctx.power_result = PowerResult(
+                summary=replace(observation.result.summary, duration_s=gate_s),
+                metadata={
+                    "measurement_scope": "on_device_gated_inference",
+                    "window_clock_ceiling": WindowClockCeiling(
+                        elapsed_us=elapsed_us,
+                        host_envelope_s=host_envelope_s,
+                        slack_s=WINDOW_CLOCK_CEILING_SLACK_S,
+                    ).to_metadata(),
+                },
+            )
 
     def test_bench_agreement_is_valid(self, tmp_path: Path):
         ctx = _context(tmp_path)
@@ -286,6 +322,68 @@ class TestWindowClockValidity:
         ]
         assert len(mismatch) == 1
         assert mismatch[0].context["reference_source"] == "planned_window"
+
+    def test_internal_threshold_is_25_percent_not_50(self, tmp_path: Path):
+        """30% from the plan warns, 14% does not -- the band the threshold
+        revision moved. Mirrors the stage-side pin so a revert in either layer
+        alone shows up here too."""
+        near = _context(tmp_path, mode="internal")
+        self._bench_run(
+            near,
+            elapsed_us=int(self.BENCH_COUNT * self.BENCH_REFERENCE_US * 1.14),
+            internal=True,
+        )
+        assert not any(
+            issue.code == "power.window_clock_mismatch" for issue in evaluate_run(near).issues
+        )
+
+        far = _context(tmp_path, mode="internal")
+        self._bench_run(
+            far,
+            elapsed_us=int(self.BENCH_COUNT * self.BENCH_REFERENCE_US * 1.30),
+            internal=True,
+        )
+        assert any(
+            issue.code == "power.window_clock_mismatch" for issue in evaluate_run(far).issues
+        )
+
+    def test_window_longer_than_host_wall_time_is_a_warning(self, tmp_path: Path):
+        """Physically impossible, but warning severity: a timestamp-plumbing
+        bug would otherwise false-fail an otherwise good run. Revisit after
+        soak time."""
+        ctx = _context(tmp_path, mode="internal")
+        self._bench_run(
+            ctx,
+            elapsed_us=int(self.BENCH_ELAPSED_US * 6027 / 866.6),
+            internal=True,
+            host_envelope_s=10.0,
+        )
+
+        evaluation = evaluate_run(ctx)
+
+        exceeded = [
+            issue
+            for issue in evaluation.issues
+            if issue.code == "power.window_clock_exceeds_host_time"
+        ]
+        assert len(exceeded) == 1
+        assert exceeded[0].severity == "warning"
+        assert exceeded[0].context["host_envelope_s"] == 10.0
+        assert evaluation.validity is not ResultValidity.INVALID
+
+    def test_window_inside_host_wall_time_raises_no_ceiling_issue(self, tmp_path: Path):
+        ctx = _context(tmp_path, mode="internal")
+        self._bench_run(
+            ctx,
+            elapsed_us=self.BENCH_ELAPSED_US,
+            internal=True,
+            host_envelope_s=10.0,
+        )
+
+        assert not any(
+            issue.code == "power.window_clock_exceeds_host_time"
+            for issue in evaluate_run(ctx).issues
+        )
 
 
 def test_duration_fallback_matches_summary_policy(tmp_path: Path):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -48,6 +49,7 @@ def _make_ctx(
     count_source: str = "configured",
     gate_duration_s: float = 0.005,
     capture_duration_s: float | None = None,
+    deployed_at: str = "2026-07-18T00:00:00+00:00",
 ) -> PipelineContext:
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")
@@ -91,7 +93,7 @@ def _make_ctx(
         DeploymentRecord(
             firmware=firmware,
             target_id="apollo510_evb",
-            deployed_at="2026-07-18T00:00:00+00:00",
+            deployed_at=deployed_at,
         )
     )
     if not internal:
@@ -346,8 +348,17 @@ class TestFirmwareWindowClockIntegrity:
         internal: bool = False,
         gate_s: float = BENCH_GATE_S,
         capture_s: float | None = None,
+        host_envelope_s: float | None = None,
     ) -> PipelineContext:
         tmp_path.mkdir(parents=True, exist_ok=True)
+        kwargs = {}
+        if host_envelope_s is not None:
+            # Backdate the power-firmware deployment so the stage computes a
+            # controlled host wall-clock envelope. The default fixture uses a
+            # fixed 2026-07-18 stamp, i.e. an envelope of months -- no ceiling
+            # can trip, which is what every other test wants.
+            started = datetime.now(timezone.utc) - timedelta(seconds=host_envelope_s)
+            kwargs["deployed_at"] = started.isoformat()
         return _make_ctx(
             tmp_path,
             internal=internal,
@@ -356,6 +367,7 @@ class TestFirmwareWindowClockIntegrity:
             count_source="profile_guided",
             gate_duration_s=gate_s,
             capture_duration_s=capture_s,
+            **kwargs,
         )
 
     def _bench_record(self, **overrides) -> PowerTerminalRecord:
@@ -477,17 +489,20 @@ class TestFirmwareWindowClockIntegrity:
         assert "window clock and the reference disagree" in caplog.text
         assert "planned_window" in caplog.text
 
+    @pytest.mark.parametrize("skew", [1.14, 0.86])
     def test_internal_cross_binary_skew_does_not_warn(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog, skew: float
     ):
-        """Internal mode's only reference is the host plan -- N x a per-
-        inference time measured by a DIFFERENT binary. That comparison
-        legitimately skews: profile-vs-power timing disagreed by 10-14% on
-        Apollo4. A 14% skew must not warn, or valid runs fail for a known,
-        expected reason."""
+        """Internal mode's plan reference is N x a per-inference time measured
+        by a DIFFERENT binary, and that comparison legitimately skews: the
+        worst legitimate disagreement seen was 14% (Apollo4, profile clean-loop
+        757-786 us against a true 866 us window), plus ~4% build-to-build swing
+        in the profile metric alone. 14% must not warn in EITHER direction --
+        the real disagreement had the power window slower than the profile
+        predicted, the opposite of the intuition."""
         ctx = self._bench_ctx(tmp_path, internal=True)
         planned_us = self.BENCH_COUNT * self.BENCH_REFERENCE_US
-        skewed = int(planned_us * 1.14)
+        skewed = int(planned_us * skew)
         with caplog.at_level("WARNING", logger="hpx"):
             self._run(
                 ctx,
@@ -496,6 +511,76 @@ class TestFirmwareWindowClockIntegrity:
                 self._bench_measurement(skewed),
             )
         assert "window clock" not in caplog.text
+
+    @pytest.mark.parametrize("skew", [1.30, 0.70])
+    def test_internal_threshold_is_25_percent_not_50(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog, skew: float
+    ):
+        """30% away from the plan is past the widest legitimate cross-binary
+        disagreement ever observed (14% + build noise) and must warn. Pins the
+        band between the old 50% bound and the current 25% one, in both
+        directions, so a silent revert is a test failure."""
+        ctx = self._bench_ctx(tmp_path, internal=True)
+        skewed = int(self.BENCH_COUNT * self.BENCH_REFERENCE_US * skew)
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(
+                ctx,
+                self._bench_record(elapsed_us=skewed),
+                monkeypatch,
+                self._bench_measurement(skewed),
+            )
+        assert "window clock and the reference disagree" in caplog.text
+        assert "planned_window" in caplog.text
+
+    # --- 4. internal-mode host wall-clock ceiling ---------------------------
+
+    def test_internal_window_longer_than_host_wall_time_warns(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        """The plan-independent, hardware-independent check. A window cannot
+        outlast the interval that contains it, so this catches the Apollo4-style
+        ~7x inflation for an INA228 user with no external instrument -- even if
+        the plan happened to agree."""
+        ctx = self._bench_ctx(tmp_path, internal=True, host_envelope_s=10.0)
+        inflated = int(self.BENCH_ELAPSED_US * self.AP4_INFLATION)  # ~34.6 s
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(
+                ctx,
+                self._bench_record(elapsed_us=inflated),
+                monkeypatch,
+                self._bench_measurement(inflated),
+            )
+        assert "cannot outlast the interval that contains it" in caplog.text
+        assert ctx.power_result is not None
+        assert ctx.power_result.metadata["window_clock_ceiling"]["elapsed_us"] == inflated
+
+    def test_internal_window_inside_host_wall_time_does_not_warn(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        """The bench window (4.970184 s) inside a realistic 10 s host envelope:
+        recorded for downstream policy, but silent."""
+        ctx = self._bench_ctx(tmp_path, internal=True, host_envelope_s=10.0)
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(
+                ctx,
+                self._bench_record(),
+                monkeypatch,
+                self._bench_measurement(self.BENCH_ELAPSED_US),
+            )
+        assert "cannot outlast" not in caplog.text
+        assert ctx.power_result is not None
+        assert "window_clock_ceiling" in ctx.power_result.metadata
+
+    def test_ceiling_is_internal_mode_only(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        """External mode already compares against the host-timed gate, which is
+        strictly better than a start-to-collect envelope; running both would
+        only add a second, weaker voice saying the same thing."""
+        ctx = self._bench_ctx(tmp_path, host_envelope_s=1.0)
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(ctx, self._bench_record(), monkeypatch)
+        assert "cannot outlast" not in caplog.text
 
     # --- 4. mode-awareness ---------------------------------------------------
 

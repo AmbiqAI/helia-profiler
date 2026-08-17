@@ -151,16 +151,32 @@ def assess_gate_duration(
 #: not a wide enough envelope to make this fatal.
 EXTERNAL_WINDOW_CLOCK_TOLERANCE = 0.05
 
-#: Internally-referenced tolerance. Internal mode has no host-timed gate, so
-#: the only reference is the host plan -- N x the reference inference time
+#: Internally-referenced tolerance, TWO-SIDED. Internal mode has no host-timed
+#: gate, so the only plan-based reference is N x the reference inference time
 #: measured by a DIFFERENT binary (the transport-attached profile build). That
-#: cross-binary comparison is legitimately loose: profile-vs-power timing
-#: disagreed by 10-14% on Apollo4 (the metric-shopping finding), so a 5%
-#: threshold here would false-fail perfectly valid runs. 50% still catches
-#: every failure ever observed (0x and 7x) with an order of magnitude of
-#: margin. DO NOT tighten this without new cross-binary timing evidence --
-#: the loose bound is the point, not an oversight.
-INTERNAL_WINDOW_CLOCK_TOLERANCE = 0.50
+#: cross-binary comparison is legitimately loose, so 5% would false-fail valid
+#: runs. The evidence bounding it:
+#:   - worst legitimate disagreement observed: 14% (Apollo4, profile clean-loop
+#:     757-786 us against a true 866 us window),
+#:   - Apollo3 agreed to 0.1%,
+#:   - build-to-build swings of ~4% in the profile metric alone, most likely
+#:     code-layout / XIP-cache sensitivity rather than instrumentation.
+#: 25% sits comfortably above 14% + a few points of build noise while still
+#: being tight enough to be useful to the internal-mode (INA228) user, who has
+#: no external instrument to fall back on. Do not tighten below the 14%
+#: observation without new cross-binary timing evidence.
+#:
+#: MUST stay two-sided. The one real disagreement had the power window SLOWER
+#: than the profile prediction -- the opposite of the "power binary does less
+#: logging, so it must be faster" intuition -- so encoding a direction here
+#: would have missed it.
+INTERNAL_WINDOW_CLOCK_TOLERANCE = 0.25
+
+#: Slack on the host wall-clock ceiling (see :func:`assess_window_clock_ceiling`).
+#: The envelope already over-counts the measured window by seconds (flash exit,
+#: boot, model init, terminal emit), so this covers only timestamp granularity
+#: and small host clock adjustments -- not measurement uncertainty.
+WINDOW_CLOCK_CEILING_SLACK_S = 0.25
 
 #: Shared user-facing explanation for a frozen firmware window clock.
 FROZEN_WINDOW_CLOCK_HINT = (
@@ -271,6 +287,96 @@ def gated_window_reference_s(result: "PowerResult") -> tuple[float, str] | None:
     return None
 
 
+@dataclass(frozen=True)
+class WindowClockCeiling:
+    """Host wall-clock bound on how long the firmware's window could have been.
+
+    The measured window is strictly contained in the interval between the
+    moment the host started the power binary and the moment it collected the
+    terminal record. A firmware window longer than that whole interval is
+    physically impossible, whatever the plan says and whatever board it is.
+
+    This is the internal-mode counterpart to external mode's gate comparison:
+    it needs no instrument, no plan and no per-board timing, which makes it the
+    check that catches the Apollo4-style ~7x inflation class for the INA228
+    user, who has neither a host-timed gate nor anything else to cross-check
+    against.
+
+    The envelope deliberately over-counts -- it includes flash-tool exit, boot,
+    engine/model init, and the post-window terminal emit and collect wait -- so
+    it is a loose ceiling, not a duration estimate. Breaching it is therefore a
+    strong signal rather than a marginal one.
+    """
+
+    elapsed_us: int
+    host_envelope_s: float
+    slack_s: float
+
+    @property
+    def elapsed_s(self) -> float:
+        return self.elapsed_us / 1_000_000.0
+
+    @property
+    def limit_s(self) -> float:
+        return self.host_envelope_s + self.slack_s
+
+    @property
+    def exceeded(self) -> bool:
+        return self.elapsed_s > self.limit_s
+
+    @property
+    def ratio(self) -> float:
+        return self.elapsed_s / self.host_envelope_s if self.host_envelope_s > 0 else 0.0
+
+    def to_metadata(self) -> dict[str, float | int]:
+        return {
+            "elapsed_us": self.elapsed_us,
+            "elapsed_s": round(self.elapsed_s, 6),
+            "host_envelope_s": round(self.host_envelope_s, 6),
+            "slack_s": self.slack_s,
+            "ratio": round(self.ratio, 6),
+        }
+
+
+def assess_window_clock_ceiling(
+    *, elapsed_us: int | None, host_envelope_s: float | None
+) -> WindowClockCeiling | None:
+    """Bound the firmware window by the host's own start-to-collect interval.
+
+    Returns ``None`` when either side is missing or non-positive -- notably the
+    frozen-clock case, which :func:`firmware_window_clock_is_frozen` reports far
+    more precisely.
+    """
+    if elapsed_us is None or elapsed_us <= 0:
+        return None
+    if host_envelope_s is None or host_envelope_s <= 0:
+        return None
+    return WindowClockCeiling(
+        elapsed_us=elapsed_us,
+        host_envelope_s=host_envelope_s,
+        slack_s=WINDOW_CLOCK_CEILING_SLACK_S,
+    )
+
+
+def window_clock_ceiling_from_metadata(
+    data: dict[str, object],
+) -> WindowClockCeiling | None:
+    """Rebuild a ceiling from stored metadata, re-deriving the verdict.
+
+    The collect stage records the two measurements; downstream policy recomputes
+    ``exceeded`` from them rather than trusting a stored boolean, so the two
+    cannot drift apart the way a cached verdict would.
+    """
+    try:
+        return WindowClockCeiling(
+            elapsed_us=int(data["elapsed_us"]),  # type: ignore[arg-type]
+            host_envelope_s=float(data["host_envelope_s"]),  # type: ignore[arg-type]
+            slack_s=float(data["slack_s"]),  # type: ignore[arg-type]
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def assess_run_window_clock(
     *,
     elapsed_us: int | None,
@@ -354,16 +460,20 @@ __all__ = [
     "EXTERNAL_WINDOW_CLOCK_TOLERANCE",
     "FROZEN_WINDOW_CLOCK_HINT",
     "INTERNAL_WINDOW_CLOCK_TOLERANCE",
+    "WINDOW_CLOCK_CEILING_SLACK_S",
     "GateDurationIntegrity",
     "GateFailure",
     "GateFailureKind",
     "GateTransitionTiming",
     "SyncHandshakeMetadata",
     "WindowClockAgreement",
+    "WindowClockCeiling",
     "assess_gate_duration",
     "assess_run_window_clock",
     "assess_window_clock",
+    "assess_window_clock_ceiling",
     "classify_gate_failure",
     "firmware_window_clock_is_frozen",
     "gated_window_reference_s",
+    "window_clock_ceiling_from_metadata",
 ]

@@ -9,6 +9,7 @@ from ..power.diagnostics import (
     assess_gate_duration,
     assess_run_window_clock,
     firmware_window_clock_is_frozen,
+    window_clock_ceiling_from_metadata,
 )
 from ..results import ResultIssue, ResultValidity
 
@@ -160,6 +161,27 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                             **agreement.to_metadata(),
                         )
                     )
+                # Host wall-clock ceiling, recorded by the collect stage (which
+                # is the only place that knows "now"). The verdict is
+                # re-derived from the stored measurements rather than read from
+                # a cached boolean, the same way _duration_integrity_valid()
+                # re-derives the gate-duration verdict.
+                ceiling_meta = (
+                    ctx.power_result.metadata.get("window_clock_ceiling")
+                    if ctx.power_result is not None
+                    else None
+                )
+                if isinstance(ceiling_meta, dict):
+                    ceiling = window_clock_ceiling_from_metadata(ceiling_meta)
+                    if ceiling is not None and ceiling.exceeded:
+                        issues.append(
+                            _warning(
+                                "power.window_clock_exceeds_host_time",
+                                "Firmware-reported window is longer than the host "
+                                "wall time that contained it.",
+                                **ceiling.to_metadata(),
+                            )
+                        )
 
         if on_device is not None:
             if on_device.overflow:
