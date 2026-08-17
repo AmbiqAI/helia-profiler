@@ -1,4 +1,11 @@
 {# main_aot.cc — heliaPROFILER firmware for heliaAOT engine #}
+{#- See main.cc.j2 for the full rationale: the dedicated power binary disables
+   the CoreSight debug domain wherever broad_peripheral_shutdown is set (AP4
+   families) and DWT->CYCCNT lives there, so those renders must time the window
+   with STIMER or the reported duration is garbage and average power/current
+   are silently divided by the inflation factor. -#}
+{%- set window_timer = "stimer" if (clean_window_timer | default("dwt") == "stimer" or (power_only | default(false) and broad_peripheral_shutdown | default(false))) else "dwt" %}
+{%- set use_stimer_window = (window_timer == "stimer") and (clean_window_probe | default("infer") != "busy_loop") %}
 /**
  * @file main.cc
  * @brief heliaPROFILER firmware (heliaAOT) — auto-generated, do not edit.
@@ -93,7 +100,7 @@
 // ---------------------------------------------------------------------------
 {% include "_dwt_init.j2" %}
 
-{% if clean_window_timer | default("dwt") == "stimer" %}
+{% if window_timer == "stimer" %}
 {% include "_stimer_init.j2" %}
 {% endif %}
 
@@ -747,7 +754,9 @@ int main(void) {
         hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=0\n",
                    clean_iters_n);
 {% endif %}
+{%- if not use_stimer_window %}
         uint64_t clean_cycles = 0;
+{%- endif %}
         uint32_t clean_count = 0;
         // Assert READY only after initialization and adaptive warmup. This
         // keeps host GO low until the firmware can enter the measured window.
@@ -799,7 +808,7 @@ int main(void) {
         usb_timer_pause();
 {% endif %}
 {% set gate_dbg = (clean_window_probe | default("infer") == "busy_loop") or (gate_debug_domain_in_window | default(false)) %}
-{% set use_stimer_window = (clean_window_timer | default("dwt") == "stimer") and (clean_window_probe | default("infer") != "busy_loop") %}
+{# use_stimer_window is set in the prelude: the clean_cycles declaration above depends on it. #}
 {% if transport == "uart" and not power_only | default(false) %}
         // The UART peripheral (PWRSTUART0-3) lives in the peripheral device
         // power domain, NOT the debug domain am_hal_debug_disable() below
@@ -835,9 +844,10 @@ int main(void) {
         // XTAL), so PD_DBG can be gated off for the *default* infer probe
         // too, not just the opt-in busy_loop probe — closing most of a
         // measurable current gap vs the reference baseline (which never powers this
-        // domain at all).  Families still timing the window with DWT
-        // (clean_window_timer=="dwt": Apollo3/Apollo4) keep the domain
-        // powered for the infer probe, same as before.
+        // domain at all).  Renders still timing the window with DWT
+        // (window_timer=="dwt") keep the domain powered for the infer
+        // probe -- note AP4 *power* binaries are no longer in that set:
+        // their broad shutdown kills the domain, so they use STIMER.
         nsx_ambiq_pmu_disable();
 {% if gate_dbg %}
         am_hal_debug_disable();

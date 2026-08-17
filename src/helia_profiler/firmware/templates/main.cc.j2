@@ -1,4 +1,20 @@
 {# main.cc — heliaPROFILER firmware entry point #}
+{#- The measured window must not be timed by a clock this same binary
+   powers down. DWT->CYCCNT lives in the CoreSight debug domain, and the
+   dedicated power binary disables that domain (AM_HAL_PWRCTRL_PERIPH_DEBUG,
+   see _peripheral_power_down.j2) wherever broad_peripheral_shutdown is set
+   -- AP4 families. Reads then return garbage, so the accumulated cycle count
+   is meaningless; because the terminal report derives elapsed_us from it, the
+   window duration is over-reported. Energy is unaffected (the monitor
+   integrates in hardware over real time) but average power and current are
+   divided by the inflation factor -- measured ~7x on Apollo4 Blue Plus, where
+   a 24-second wall-clock run reported a 38.6-second window.
+
+   STIMER runs off its own 32.768 kHz XTAL and keeps ticking with the debug
+   domain off, so those renders fall back to it. The profile binary never runs
+   the shutdown, so it keeps DWT's finer resolution. -#}
+{%- set window_timer = "stimer" if (clean_window_timer | default("dwt") == "stimer" or (power_only | default(false) and broad_peripheral_shutdown | default(false))) else "dwt" %}
+{%- set use_stimer_window = (window_timer == "stimer") and (clean_window_probe | default("infer") != "busy_loop") %}
 /**
  * @file main.cc
  * @brief heliaPROFILER firmware — auto-generated, do not edit.
@@ -45,12 +61,12 @@
 #include "am_mcu_apollo.h"
 {% endif %}
 {% endif %}
-{% if clean_window_timer | default("dwt") == "stimer" and not apollo3_burst and not has_armv8m_pmu %}
+{% if window_timer == "stimer" and not apollo3_burst and not has_armv8m_pmu %}
 // STIMER (used to time the clean/power window debug-domain-free) lives in
 // the same AmbiqSuite HAL umbrella header as the other MCU peripherals.
 #include "am_mcu_apollo.h"
 {% endif %}
-{% if power_only | default(false) and (broad_peripheral_shutdown | default(false) or crypto_otp_shutdown | default(false)) and not apollo3_burst and not has_armv8m_pmu and not (clean_window_timer | default("dwt") == "stimer") %}
+{% if power_only | default(false) and (broad_peripheral_shutdown | default(false) or crypto_otp_shutdown | default(false)) and not apollo3_burst and not has_armv8m_pmu and not (window_timer == "stimer") %}
 // Broad peripheral power-down (_peripheral_power_down.j2) / crypto-otp
 // shutdown (_crypto_otp_shutdown.j2) needs VCOMP/_VAL2FLD register
 // definitions from the same AmbiqSuite HAL umbrella.
@@ -92,7 +108,7 @@
 
 {% include "_dwt_init.j2" %}
 
-{% if clean_window_timer | default("dwt") == "stimer" %}
+{% if window_timer == "stimer" %}
 {% include "_stimer_init.j2" %}
 {% endif %}
 
@@ -697,7 +713,9 @@ int main(void) {
         hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=0\n",
                    clean_iters_n);
 {% endif %}
+{%- if not use_stimer_window %}
         uint64_t clean_cycles = 0;
+{%- endif %}
         uint32_t clean_count = 0;
         // READY means initialization and adaptive warmup are complete. Keep
         // host GO low until this point so it cannot backfeed/couple into the
@@ -747,7 +765,7 @@ int main(void) {
         usb_timer_pause();
 {% endif %}
 {% set gate_dbg = (clean_window_probe | default("infer") == "busy_loop") or (gate_debug_domain_in_window | default(false)) %}
-{% set use_stimer_window = (clean_window_timer | default("dwt") == "stimer") and (clean_window_probe | default("infer") != "busy_loop") %}
+{# use_stimer_window is set in the prelude: the clean_cycles declaration above depends on it. #}
 {% if transport == "uart" and not power_only | default(false) %}
         // The UART peripheral (PWRSTUART0-3) lives in the peripheral device
         // power domain, NOT the debug domain am_hal_debug_disable() below
@@ -782,9 +800,10 @@ int main(void) {
         // XTAL), so PD_DBG can be gated off for the *default* infer probe
         // too, not just the opt-in busy_loop probe — closing most of a
         // measurable current gap vs the reference baseline (which never powers this
-        // domain at all).  Families still timing the window with DWT
-        // (clean_window_timer=="dwt": Apollo3/Apollo4) keep the domain
-        // powered for the infer probe, same as before.
+        // domain at all).  Renders still timing the window with DWT
+        // (window_timer=="dwt") keep the domain powered for the infer
+        // probe -- note AP4 *power* binaries are no longer in that set:
+        // their broad shutdown kills the domain, so they use STIMER.
         nsx_ambiq_pmu_disable();
 {% if gate_dbg %}
         am_hal_debug_disable();

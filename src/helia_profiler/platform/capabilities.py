@@ -109,14 +109,41 @@ class ClockCapabilities:
     #: powered).
     #: STIMER (XTAL 32.768 kHz) is clock-mode- and debug-domain-independent,
     #: so it can be read with PD_DBG off.  ``"dwt"`` (Apollo3/Apollo4): DWT
-    #: lives in a different, cheaper-to-hold domain there; keep the existing
-    #: behavior unless a family-specific case for STIMER is made later.
+    #: is *not* cheaper to hold there -- it lives in the core debug power
+    #: domain on those Cortex-M4F parts too (see
+    #: ``SocCapabilities.requires_attached_probe_for_cycles``).  What makes
+    #: DWT usable is that the transport-attached profile binary runs with a
+    #: debugger asserting CDBGPWRUPREQ, which keeps that domain alive for
+    #: free.  A *free-running* binary has no such guarantee -- see the
+    #: override note below.
+    #:
+    #: This is the family's *preference*, not the final choice.  The dedicated
+    #: power binary overrides it to STIMER wherever
+    #: ``broad_peripheral_shutdown`` is set, because that shutdown disables
+    #: AM_HAL_PWRCTRL_PERIPH_DEBUG — a different mechanism from the
+    #: ``gate_debug_domain_in_window`` path below, and one that leaves DWT
+    #: unreadable regardless of this preference.  See the ``window_timer``
+    #: derivation at the top of ``main.cc.j2``; the invariant is pinned by
+    #: ``test_window_is_never_timed_by_a_domain_the_binary_powers_down``.
+    #:
+    #: KNOWN GAP: ``broad_peripheral_shutdown`` is a proxy for "this binary
+    #: cannot read DWT", not the condition itself.  Apollo3 has
+    #: ``requires_attached_probe_for_cycles=True`` and no broad shutdown, so
+    #: it keeps DWT here even though its free-running power binary has no
+    #: debugger holding the domain up either.  Widening the predicate needs
+    #: AP3 hardware to verify; tracked separately.
     clean_window_timer: str
     #: Whether the firmware should call am_hal_debug_disable()/enable() around
     #: the *default* ``infer`` clean-window probe (not just the opt-in
     #: ``busy_loop`` probe).  True only where ``clean_window_timer`` is
     #: debug-domain-independent (Apollo5) so gating PD_DBG off cannot freeze
     #: the in-window timer.
+    #:
+    #: Inert without ``has_armv8m_pmu``: both am_hal_debug_disable() call
+    #: sites sit inside that guard, so setting this on a Cortex-M4 family
+    #: renders nothing.  AP4 needs no in-window gating regardless --
+    #: ``broad_peripheral_shutdown`` disables the same domain earlier and
+    #: holds it off longer, which is strictly stronger.
     gate_debug_domain_in_window: bool
     #: Mirrors AutoDeploy's ns_power_down_peripherals(): AP4's implementation
     #: explicitly powers down IOM/UART/ADC/MSPI(-when-unused)/GFX/DISP/USB/
