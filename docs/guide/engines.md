@@ -62,25 +62,20 @@ targets `apollo330mP_evb` with `arena_location: sram` (that board's MCU_TCM is
 too small for the combined method/temporary/planned arenas) and accepts a
 caller-supplied PTE plus a single `nsx-executorch` checkout at `source_path`.
 The checkout must be at
-commit `0a0d5a1633f595b86dfd156f3c2859bebdf2a470`, the current head of
+commit `88585066743dc21847541793191c558a647c2f6e`, the current head of
 `nsx-executorch` PR #1; HPX does not assume an unpublished release tag.
 
 `source_path` is the repository root containing `nsx-module.yaml`, not the
 embedded ExecuTorch submodule. Initialize the minimal Cortex-M submodules listed
 in that repository's README. HPX passes its own Python 3.11+ interpreter to
-CMake so the pinned torchgen wrapper also sees HPX's PyYAML dependency. The Arm
-CMSIS-NN provider is cloned at its qualified commit under `NSX_CACHE_DIR` (or
-the normal XDG/`~/.cache/nsx` fallback) and supplied through
-`NSX_EXECUTORCH_ARM_CMSIS_NN_ROOT`. Set `engine.config.cmsis_nn_path` to use an
-explicit provider checkout instead. `backend: ns` currently requires that
-explicit path: the qualified `ns-cmsis-nn` v7.29.2 used by heliaRT/heliaAOT has
-an additional `weight_sum_ctx` ABI and is not source-compatible with PR #1's
-pinned ExecuTorch kernels, so HPX refuses to present it as a qualified default.
-Once a source-compatible ns checkout is supplied, HPX passes its project root
-through `NSX_EXECUTORCH_NS_CMSIS_NN_ROOT`.
-The provider is intentionally not added to `NSX_APP_MODULES`: current NSX does
-not resolve optional dependencies, and bootstrapping the provider separately
-would duplicate targets that `nsx-executorch` owns.
+CMake so the pinned torchgen wrapper also sees HPX's PyYAML dependency. HPX
+declares exactly one qualified provider (`arm-cmsis-nn` or `nsx-cmsis-nn`) as
+a normal NSX module immediately before `nsx-executorch`. NSX lock/sync therefore
+owns provider materialization and uses its standard `NSX_CACHE_DIR` cache;
+the runtime's idempotent bridge prevents duplicate targets. The `ns` provider
+uses PR #1's private compatibility layer for the v7.29.2 `weight_sum_ctx` ABI.
+Set `engine.config.cmsis_nn_path` or `cmsis_nn_ref` to override the selected
+provider while preserving the same ordered module contract.
 
 ## heliaRT
 

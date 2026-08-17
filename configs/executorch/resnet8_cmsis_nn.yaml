@@ -13,11 +13,10 @@ model:
 
 engine:
   type: executorch
-  # `ns` requires config.cmsis_nn_path pointing at a source-compatible
-  # ns-cmsis-nn checkout; the qualified v7.29.2 fork has a different ABI.
+  # Select `ns` to use the qualified ns-cmsis-nn v7.29.2 provider instead.
   backend: arm
   config:
-    # Exact commit: 0a0d5a1633f595b86dfd156f3c2859bebdf2a470
+    # Exact commit: 88585066743dc21847541793191c558a647c2f6e
     source_path: /path/to/nsx-executorch
     method_arena_size: 65536
     temporary_arena_size: 32768

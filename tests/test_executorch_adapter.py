@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
 
@@ -11,13 +10,6 @@ import helia_profiler.engines.executorch as executorch_mod
 from helia_profiler.config import load_config
 from helia_profiler.engines.executorch import ExecuTorchAdapter
 from helia_profiler.errors import EngineError
-
-# Captured before the autouse fixture below monkeypatches the module
-# attribute, so tests that exercise the real clone/subprocess logic can call
-# it directly without going through the fake.
-_real_clone_provider_at_ref = executorch_mod._clone_provider_at_ref
-_real_provider_cache_root = executorch_mod._provider_cache_root
-
 
 def _source_tree(tmp_path: Path) -> Path:
     # Mirrors nsx-executorch's real checkout-root layout: nsx-module.yaml
@@ -39,17 +31,7 @@ def _source_tree(tmp_path: Path) -> Path:
 
 
 @pytest.fixture(autouse=True)
-def _fake_cmsis_nn_cache(tmp_path_factory: pytest.TempPathFactory, monkeypatch):
-    """Redirect the CMSIS-NN provider cache and skip real git clones.
-
-    Every test in this module runs the ExecuTorchAdapter, which materializes
-    the selected CMSIS-NN provider outside NSX's own module bootstrap (see
-    executorch.py's module docstring for why). Point the cache at a scratch
-    directory and fake the clone step so tests never touch the real
-    ~/.cache/helia-profiler or the network.
-    """
-    cache_root = tmp_path_factory.mktemp("cmsis-nn-cache")
-    monkeypatch.setattr(executorch_mod, "_provider_cache_root", lambda: cache_root)
+def _fake_source_refs(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         executorch_mod,
         "_checkout_commit",
@@ -62,7 +44,7 @@ def _fake_cmsis_nn_cache(tmp_path_factory: pytest.TempPathFactory, monkeypatch):
                 else (
                     "631726420b04860a5c4236956a3741ff5a96bd7f"
                     if path.name.startswith("ns-cmsis-nn-")
-                    else "0a0d5a1633f595b86dfd156f3c2859bebdf2a470"
+                    else "88585066743dc21847541793191c558a647c2f6e"
                 )
             )
         ),
@@ -72,18 +54,6 @@ def _fake_cmsis_nn_cache(tmp_path_factory: pytest.TempPathFactory, monkeypatch):
         "_gitlink_commit",
         lambda _path, _submodule: "3a97429b0ce0c192861fc3e3729fb81432fd22cf",
     )
-
-    calls: list[tuple[str, str, Path]] = []
-
-    def _fake_clone(url: str, ref: str, dest: Path) -> None:
-        calls.append((url, ref, dest))
-        dest.mkdir(parents=True, exist_ok=True)
-        (dest / "CMakeLists.txt").write_text(
-            "# fake CMSIS-NN provider checkout\n", encoding="utf-8"
-        )
-
-    monkeypatch.setattr(executorch_mod, "_clone_provider_at_ref", _fake_clone)
-    return calls
 
 
 def _config(tmp_path: Path, source: Path, *, backend: str = "arm", **engine_config):
@@ -113,25 +83,18 @@ def test_adapter_wraps_root_layout_checkout_for_arm_provider(tmp_path: Path):
     artifacts = ExecuTorchAdapter().prepare(_config(tmp_path, source), tmp_path / "work")
 
     assert artifacts.cmake_vars["NSX_EXECUTORCH_ENABLE_PROFILING"] == "ON"
-    # HPX-generated apps add ExecuTorch as a subproject and never install()
-    # it (nor finalize NSX's own board-flags "nsxTargets" export set), so
-    # ExecuTorch's stock install(EXPORT ExecuTorchTargets ...) validation
-    # must be skipped via its own documented standalone-consumer opt-out.
-    assert artifacts.cmake_vars["EXECUTORCH_BAREMETAL_SKIP_INSTALL"] == "ON"
     assert artifacts.cmake_vars["NSX_EXECUTORCH_CMSIS_NN_PROVIDER"] == "arm"
     assert artifacts.cmake_vars["NSX_EXECUTORCH_PORTABLE_SELECT_OPS_LIST"] == ("aten::clamp.out")
     assert artifacts.cmake_vars["Python3_EXECUTABLE"] == Path(sys.executable).absolute().as_posix()
-    # The selected provider is materialized outside NSX's module bootstrap
-    # and handed to nsx-executorch via its own explicit root-override var —
-    # never declared as a normal NSX_APP_MODULE (see executorch.py docstring
-    # for why that would double-add_subdirectory() the same source tree).
-    arm_root = Path(artifacts.cmake_vars["NSX_EXECUTORCH_ARM_CMSIS_NN_ROOT"])
-    assert (arm_root / "CMakeLists.txt").is_file()
+    assert "NSX_EXECUTORCH_ARM_CMSIS_NN_ROOT" not in artifacts.cmake_vars
     assert "NSX_EXECUTORCH_NS_CMSIS_NN_ROOT" not in artifacts.cmake_vars
     assert artifacts.executorch_planned_arena_size == 2048
 
     module_names = [module.name for module in artifacts.extra_modules]
-    assert module_names == ["nsx-executorch"]
+    assert module_names == ["arm-cmsis-nn", "nsx-executorch"]
+    provider = artifacts.extra_modules[0]
+    assert provider.project == "arm-cmsis-nn"
+    assert provider.local is False
 
     wrapper = artifacts.extra_modules[-1].path
     cmake_text = (wrapper / "CMakeLists.txt").read_text()
@@ -150,63 +113,20 @@ def test_adapter_wraps_root_layout_checkout_for_arm_provider(tmp_path: Path):
 
 def test_adapter_selects_only_ns_provider_module(tmp_path: Path):
     source = _source_tree(tmp_path)
-    provider = tmp_path / "ns-provider"
-    provider.mkdir()
-    (provider / "CMakeLists.txt").write_text("# provider\n", encoding="utf-8")
     artifacts = ExecuTorchAdapter().prepare(
-        _config(tmp_path, source, backend="ns", cmsis_nn_path=str(provider)),
+        _config(tmp_path, source, backend="ns"),
         tmp_path / "work",
     )
 
     module_names = [module.name for module in artifacts.extra_modules]
-    assert module_names == ["nsx-executorch"]
+    assert module_names == ["nsx-cmsis-nn", "nsx-executorch"]
 
     assert artifacts.cmake_vars["NSX_EXECUTORCH_CMSIS_NN_PROVIDER"] == "ns"
-    ns_root = Path(artifacts.cmake_vars["NSX_EXECUTORCH_NS_CMSIS_NN_ROOT"])
-    assert (ns_root / "CMakeLists.txt").is_file()
     assert "NSX_EXECUTORCH_ARM_CMSIS_NN_ROOT" not in artifacts.cmake_vars
-
-
-@pytest.mark.parametrize("cmsis_nn_path", [None, ""])
-def test_adapter_rejects_unqualified_default_ns_provider(
-    tmp_path: Path, cmsis_nn_path: str | None
-):
-    source = _source_tree(tmp_path)
-    engine_config = {} if cmsis_nn_path is None else {"cmsis_nn_path": cmsis_nn_path}
-
-    with pytest.raises(EngineError, match="requires engine.config.cmsis_nn_path"):
-        ExecuTorchAdapter().prepare(
-            _config(tmp_path, source, backend="ns", **engine_config), tmp_path / "work"
-        )
-
-
-def test_adapter_materializes_cmsis_nn_provider_at_pinned_baseline_ref(
-    tmp_path: Path, _fake_cmsis_nn_cache
-):
-    source = _source_tree(tmp_path)
-    config = _config(tmp_path, source, backend="arm")
-    baseline_project = config.compatibility_baseline.project("arm-cmsis-nn")
-
-    artifacts = ExecuTorchAdapter().prepare(config, tmp_path / "work")
-
-    assert len(_fake_cmsis_nn_cache) == 1
-    url, ref, dest = _fake_cmsis_nn_cache[0]
-    assert url == baseline_project.url
-    assert ref == baseline_project.ref
-    assert dest.name == f"arm-cmsis-nn-{baseline_project.ref}"
-    assert artifacts.cmake_vars["NSX_EXECUTORCH_ARM_CMSIS_NN_ROOT"] == dest.as_posix()
-
-
-def test_adapter_reuses_cached_cmsis_nn_provider_checkout(tmp_path: Path, _fake_cmsis_nn_cache):
-    source = _source_tree(tmp_path)
-    config = _config(tmp_path, source, backend="arm")
-
-    ExecuTorchAdapter().prepare(config, tmp_path / "work")
-    ExecuTorchAdapter().prepare(config, tmp_path / "work2")
-
-    # Second prepare() reuses the already-materialized checkout — no
-    # redundant clone of the same pinned commit.
-    assert len(_fake_cmsis_nn_cache) == 1
+    assert "NSX_EXECUTORCH_NS_CMSIS_NN_ROOT" not in artifacts.cmake_vars
+    provider = artifacts.extra_modules[0]
+    assert provider.project == "ns-cmsis-nn"
+    assert provider.local is False
 
 
 def test_adapter_honors_explicit_provider_checkout(tmp_path: Path):
@@ -214,94 +134,49 @@ def test_adapter_honors_explicit_provider_checkout(tmp_path: Path):
     provider = tmp_path / "custom-arm-cmsis-nn"
     provider.mkdir()
     (provider / "CMakeLists.txt").write_text("# provider\n", encoding="utf-8")
+    (provider / "nsx-module.yaml").write_text(
+        "schema_version: 1\nmodule:\n  name: arm-cmsis-nn\n", encoding="utf-8"
+    )
 
     artifacts = ExecuTorchAdapter().prepare(
         _config(tmp_path, source, cmsis_nn_path=str(provider)), tmp_path / "work"
     )
 
-    assert artifacts.cmake_vars["NSX_EXECUTORCH_ARM_CMSIS_NN_ROOT"] == provider.as_posix()
+    provider_ref = artifacts.extra_modules[0]
+    assert provider_ref.name == "arm-cmsis-nn"
+    assert provider_ref.path == provider
+    assert provider_ref.local is True
 
 
-def test_provider_cache_honors_nsx_cache_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("NSX_CACHE_DIR", str(tmp_path / "nsx-cache"))
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "ignored-xdg"))
+def test_adapter_honors_explicit_ns_provider_checkout(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    provider = tmp_path / "custom-ns-cmsis-nn"
+    (provider / "Include").mkdir(parents=True)
+    (provider / "Source").mkdir()
+    (provider / "nsx").mkdir()
+    (provider / "CMakeLists.txt").write_text("# provider\n", encoding="utf-8")
+    (provider / "nsx" / "CMakeLists.txt").write_text(
+        "# nsx provider\n", encoding="utf-8"
+    )
+    (provider / "nsx" / "nsx-module.yaml").write_text(
+        "schema_version: 1\nmodule:\n  name: nsx-cmsis-nn\n", encoding="utf-8"
+    )
 
-    assert _real_provider_cache_root() == tmp_path / "nsx-cache" / "hpx-provider-sources"
+    artifacts = ExecuTorchAdapter().prepare(
+        _config(
+            tmp_path,
+            source,
+            backend="ns",
+            cmsis_nn_path=str(provider),
+        ),
+        tmp_path / "work",
+    )
 
-
-def test_clone_provider_at_ref_runs_clone_checkout_and_submodule_update(
-    tmp_path: Path, monkeypatch
-):
-    calls: list[list[str]] = []
-
-    def _fake_run(cmd, **kwargs):
-        calls.append(cmd)
-        if cmd[:2] == ["git", "clone"]:
-            Path(cmd[-1]).mkdir(parents=True, exist_ok=True)
-        assert kwargs.get("check") is True
-        return subprocess.CompletedProcess(cmd, 0, stdout="")
-
-    monkeypatch.setattr(executorch_mod.subprocess, "run", _fake_run)
-
-    dest = tmp_path / "arm-cmsis-nn-deadbeef"
-    _real_clone_provider_at_ref("https://github.com/AmbiqAI/arm-cmsis-nn.git", "deadbeef", dest)
-
-    assert [c[:2] for c in calls] == [
-        ["git", "clone"],
-        ["git", "-C"],
-        ["git", "-C"],
-    ]
-    clone_dest = calls[0][-1]
-    assert calls[0][-3:-1] == ["--no-checkout", "https://github.com/AmbiqAI/arm-cmsis-nn.git"]
-    assert calls[1][2:] == [clone_dest, "checkout", "--quiet", "--detach", "deadbeef"]
-    assert calls[2][2:] == [
-        clone_dest,
-        "submodule",
-        "update",
-        "--init",
-        "--recursive",
-    ]
-    assert dest.is_dir()
-
-
-def test_clone_provider_at_ref_cleans_up_and_raises_engine_error_on_failure(
-    tmp_path: Path, monkeypatch
-):
-    import subprocess as real_subprocess
-
-    def _fake_run(cmd, **kwargs):
-        if cmd[:2] == ["git", "clone"]:
-            Path(cmd[-1]).mkdir(parents=True, exist_ok=True)
-            raise real_subprocess.CalledProcessError(1, cmd)
-        return None
-
-    monkeypatch.setattr(executorch_mod.subprocess, "run", _fake_run)
-
-    dest = tmp_path / "arm-cmsis-nn-deadbeef"
-    with pytest.raises(EngineError, match="Failed to materialize CMSIS-NN provider"):
-        _real_clone_provider_at_ref("https://github.com/AmbiqAI/arm-cmsis-nn.git", "deadbeef", dest)
-    assert not dest.exists()
-
-
-def test_clone_provider_reuses_concurrent_valid_publication(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    dest = tmp_path / "arm-cmsis-nn-deadbeef"
-    dest.mkdir()
-    (dest / "CMakeLists.txt").write_text("# winner\n", encoding="utf-8")
-    monkeypatch.setattr(executorch_mod, "_checkout_commit", lambda _path: "deadbeef")
-
-    calls: list[list[str]] = []
-
-    def _fake_run(cmd, **kwargs):
-        calls.append(cmd)
-        return subprocess.CompletedProcess(cmd, 0, stdout="")
-
-    monkeypatch.setattr(executorch_mod.subprocess, "run", _fake_run)
-    _real_clone_provider_at_ref("https://github.com/AmbiqAI/arm-cmsis-nn.git", "deadbeef", dest)
-
-    assert (dest / "CMakeLists.txt").read_text(encoding="utf-8") == "# winner\n"
-    assert len(calls) == 3
+    provider_ref = artifacts.extra_modules[0]
+    assert provider_ref.name == "nsx-cmsis-nn"
+    assert provider_ref.project == "ns-cmsis-nn"
+    assert provider_ref.local is True
+    assert (provider_ref.path / "nsx-module.yaml").is_file()
 
 
 def test_adapter_rejects_wrong_nsx_executorch_commit(
@@ -310,7 +185,7 @@ def test_adapter_rejects_wrong_nsx_executorch_commit(
     source = _source_tree(tmp_path)
     monkeypatch.setattr(executorch_mod, "_checkout_commit", lambda _path: "f" * 40)
 
-    with pytest.raises(EngineError, match="expected 0a0d5a"):
+    with pytest.raises(EngineError, match="expected 885850"):
         ExecuTorchAdapter().prepare(_config(tmp_path, source), tmp_path / "work")
 
 
@@ -322,7 +197,7 @@ def test_adapter_rejects_wrong_executorch_submodule_commit(
     def _commit(path: Path) -> str:
         if path.parent.name == "external":
             return "f" * 40
-        return "0a0d5a1633f595b86dfd156f3c2859bebdf2a470"
+        return "88585066743dc21847541793191c558a647c2f6e"
 
     monkeypatch.setattr(executorch_mod, "_checkout_commit", _commit)
 

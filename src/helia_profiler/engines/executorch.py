@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import logging
-import os
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -18,41 +15,12 @@ from ..results import NsxModuleRef
 from . import EngineType
 from .base import ArenaRegion, EngineArtifacts
 
-log = logging.getLogger("hpx")
-
-# CMSIS-NN provider -> (registry project, override cache var) consumed by
-# nsx-executorch's own CMakeLists.txt (NSX_EXECUTORCH_CMSIS_NN_PROVIDER).
-#
-# Exactly one provider is materialized per run — never both. nsx-executorch's
-# CMakeLists.txt add_subdirectory()s the selected provider's source itself
-# (directly, or transitively via ExecuTorch's stock CMSIS_NN_LOCAL_PATH
-# hook) — it does not expect the NSX app's own generic module bootstrap to
-# have already add_subdirectory()'d the identical source tree. Declaring the
-# provider as a normal NSX_APP_MODULE would make `nsx_bootstrap_app()` do
-# exactly that, colliding with nsx-executorch's own add_subdirectory() of the
-# same directory (duplicate `cmsis-nn` / `nsx_*_cmsis_nn` targets). So HPX
-# materializes the selected provider itself, pinned to the HPX compatibility
-# baseline's qualified commit, and hands nsx-executorch the checkout via its
-# documented standalone override cache var — the same override path its own
-# README/CMakeLists.txt describe for "standalone/test consumers".
-_CMSIS_NN_PROVIDERS: dict[str, tuple[str, str]] = {
-    "arm": ("arm-cmsis-nn", "NSX_EXECUTORCH_ARM_CMSIS_NN_ROOT"),
-    "ns": ("ns-cmsis-nn", "NSX_EXECUTORCH_NS_CMSIS_NN_ROOT"),
-}
-
 EXECUTORCH_MODULE = "nsx-executorch"
 EXECUTORCH_PROJECT = "nsx-executorch"
-
-
-def _provider_cache_root() -> Path:
-    """Return the NSX-compatible cache root for provider source checkouts."""
-    if configured := os.environ.get("NSX_CACHE_DIR"):
-        root = Path(configured).expanduser()
-    elif configured := os.environ.get("XDG_CACHE_HOME"):
-        root = Path(configured).expanduser() / "nsx"
-    else:
-        root = Path.home() / ".cache" / "nsx"
-    return root.resolve() / "hpx-provider-sources"
+ARM_CMSIS_NN_MODULE = "arm-cmsis-nn"
+ARM_CMSIS_NN_PROJECT = "arm-cmsis-nn"
+NS_CMSIS_NN_MODULE = "nsx-cmsis-nn"
+NS_CMSIS_NN_PROJECT = "ns-cmsis-nn"
 
 
 def _checkout_commit(path: Path) -> str:
@@ -95,97 +63,51 @@ def _gitlink_commit(path: Path, submodule: str) -> str:
     )
 
 
-def _resolve_cmsis_nn_provider_root(config: ProfileConfig, project: str) -> Path:
-    """Materialize the selected CMSIS-NN provider outside NSX's app bootstrap.
+def _provider_module_ref(
+    config: ProfileConfig, work_dir: Path, provider: str
+) -> NsxModuleRef:
+    """Resolve exactly one provider through the normal NSX module contract."""
+    if provider == "ns":
+        from .helia_aot import cmsis_nn_module_ref
 
-    Clones (or reuses a cached checkout of) the HPX compatibility baseline's
-    pinned commit for *project* so nsx-executorch can add_subdirectory() it
-    exactly once, itself, via its explicit root-override cache var.
-    """
-    configured = config.engine.config.get("cmsis_nn_path")
-    if configured is not None:
-        if not isinstance(configured, (str, Path)) or not str(configured).strip():
+        return cmsis_nn_module_ref(config, work_dir)
+
+    configured_path = config.engine.config.get("cmsis_nn_path")
+    requested_ref = config.engine.config.get("cmsis_nn_ref")
+    if configured_path and requested_ref:
+        raise EngineError(
+            "engine.config.cmsis_nn_path and cmsis_nn_ref are mutually exclusive"
+        )
+    if configured_path is not None:
+        if not isinstance(configured_path, (str, Path)) or not str(configured_path).strip():
             raise EngineError(
                 "engine.config.cmsis_nn_path must be a non-empty filesystem path"
             )
-        dest = Path(configured).expanduser().resolve()
-        if not (dest / "CMakeLists.txt").is_file():
-            raise EngineError(f"CMSIS-NN provider checkout at {dest} is missing CMakeLists.txt")
-        return dest
-
-    baseline_project = config.compatibility_baseline.project(project)
-    dest = _provider_cache_root() / f"{project}-{baseline_project.ref}"
-    if not (dest / "CMakeLists.txt").is_file():
-        _clone_provider_at_ref(baseline_project.url, baseline_project.ref, dest)
-    if not (dest / "CMakeLists.txt").is_file():
-        raise EngineError(
-            f"CMSIS-NN provider checkout at {dest} is missing CMakeLists.txt",
-            hint=(f"Delete {dest} and retry, or verify network access to {baseline_project.url}."),
+        source = Path(configured_path).expanduser().resolve()
+        if not (source / "nsx-module.yaml").is_file() or not (
+            source / "CMakeLists.txt"
+        ).is_file():
+            raise EngineError(
+                f"Invalid arm-cmsis-nn checkout: {source}",
+                hint="Expected nsx-module.yaml and CMakeLists.txt at the repository root.",
+            )
+        return NsxModuleRef(
+            name=ARM_CMSIS_NN_MODULE,
+            path=source,
+            local=True,
+            project=ARM_CMSIS_NN_PROJECT,
         )
-    actual_ref = _checkout_commit(dest)
-    if actual_ref != baseline_project.ref:
-        raise EngineError(
-            f"Cached CMSIS-NN provider at {dest} is at {actual_ref}, "
-            f"expected {baseline_project.ref}",
-            hint=f"Remove {dest} and retry so HPX can materialize the qualified commit.",
-        )
-    return dest
-
-
-def _clone_provider_at_ref(url: str, ref: str, dest: Path) -> None:
-    log.info("ExecuTorch: materializing CMSIS-NN provider %s@%s -> %s", url, ref, dest)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    temporary = Path(tempfile.mkdtemp(prefix=f".{dest.name}.", dir=dest.parent))
-    try:
-        subprocess.run(
-            ["git", "clone", "--quiet", "--no-checkout", url, str(temporary)],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        subprocess.run(
-            ["git", "-C", str(temporary), "checkout", "--quiet", "--detach", ref],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        subprocess.run(
-            ["git", "-C", str(temporary), "submodule", "update", "--init", "--recursive"],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        try:
-            temporary.replace(dest)
-        except OSError:
-            try:
-                concurrently_published = (dest / "CMakeLists.txt").is_file() and _checkout_commit(
-                    dest
-                ) == ref
-            except EngineError:
-                concurrently_published = False
-            if not concurrently_published:
-                raise
-            shutil.rmtree(temporary)
-    except (
-        OSError,
-        subprocess.CalledProcessError,
-        subprocess.TimeoutExpired,
-    ) as exc:
-        if temporary.exists():
-            shutil.rmtree(temporary)
-        raise EngineError(
-            f"Failed to materialize CMSIS-NN provider from {url}@{ref}",
-            hint=(
-                "Clone manually and retry:\n"
-                f"  git clone {url} {dest}\n"
-                f"  git -C {dest} checkout {ref}\n"
-                f"  git -C {dest} submodule update --init --recursive"
-            ),
-        ) from exc
+    if requested_ref is not None and (
+        not isinstance(requested_ref, str) or not requested_ref.strip()
+    ):
+        raise EngineError("engine.config.cmsis_nn_ref must be a non-empty git ref")
+    return NsxModuleRef(
+        name=ARM_CMSIS_NN_MODULE,
+        path=Path(),
+        local=False,
+        project=ARM_CMSIS_NN_PROJECT,
+        ref=requested_ref,
+    )
 
 
 def _positive_int(config: dict[str, Any], name: str, default: int | None = None) -> int:
@@ -284,22 +206,8 @@ class ExecuTorchAdapter:
             )
 
         provider = config.engine.backend or "arm"
-        if provider not in _CMSIS_NN_PROVIDERS:
+        if provider not in {"arm", "ns"}:
             raise EngineError("ExecuTorch backend must be 'arm' or 'ns'")
-        configured_provider = engine_config.get("cmsis_nn_path")
-        if provider == "ns" and (
-            not isinstance(configured_provider, (str, Path))
-            or not str(configured_provider).strip()
-        ):
-            raise EngineError(
-                "ExecuTorch backend 'ns' requires engine.config.cmsis_nn_path",
-                hint=(
-                    "Provide an ns-cmsis-nn checkout that implements the stock CMSIS-NN "
-                    "API used by nsx-executorch PR #1. The qualified ns-cmsis-nn v7.29.2 "
-                    "pin has an incompatible weight_sum_ctx ABI and is not selected "
-                    "silently."
-                ),
-            )
 
         planned_size = _positive_int(engine_config, "planned_arena_size", config.model.arena_size)
         method_size = _positive_int(engine_config, "method_arena_size", 64 * 1024)
@@ -330,17 +238,13 @@ class ExecuTorchAdapter:
             encoding="utf-8",
         )
 
-        cmsis_project, cmsis_override_var = _CMSIS_NN_PROVIDERS[provider]
-        cmsis_root = _resolve_cmsis_nn_provider_root(config, cmsis_project)
+        provider_module = _provider_module_ref(config, work_dir, provider)
         return EngineArtifacts(
             engine_type=EngineType.EXECUTORCH,
             extra_modules=[
-                # Only nsx-executorch is declared as a normal NSX app module.
-                # The selected CMSIS-NN provider is materialized separately
-                # (see _resolve_cmsis_nn_provider_root) and handed to
-                # nsx-executorch via its own root-override cache var below —
-                # never both providers, and never through NSX's generic
-                # per-module bootstrap (see _CMSIS_NN_PROVIDERS docstring).
+                # The provider must precede nsx-executorch so NSX configures it
+                # exactly once before the runtime creates its idempotent bridge.
+                provider_module,
                 NsxModuleRef(
                     name=EXECUTORCH_MODULE,
                     path=wrapper,
@@ -351,7 +255,6 @@ class ExecuTorchAdapter:
             cmake_vars={
                 "NSX_EXECUTORCH_ENABLE_PROFILING": "ON",
                 "NSX_EXECUTORCH_CMSIS_NN_PROVIDER": provider,
-                cmsis_override_var: cmsis_root.as_posix(),
                 "NSX_EXECUTORCH_PORTABLE_SELECT_OPS_LIST": _operator_list(
                     engine_config, "portable_ops"
                 ),
@@ -363,17 +266,6 @@ class ExecuTorchAdapter:
                 # `.venv/bin/python` at a base interpreter whose standalone
                 # site-packages do not contain HPX's PyYAML dependency.
                 "Python3_EXECUTABLE": Path(sys.executable).absolute().as_posix(),
-                # ExecuTorch's own CMakeLists.txt documents this exact
-                # scenario: a "standalone consumer" (like this HPX-generated
-                # app) adds ExecuTorch as a subproject but cannot satisfy its
-                # install(EXPORT ExecuTorchTargets ...) rules — those pull in
-                # NSX board-flags targets (e.g. nsx_board_<board>_flags via
-                # cmsis-nn's PUBLIC link) that NSX's own board.cmake stages
-                # under an "nsxTargets" export set HPX-generated apps never
-                # finalize with a matching install(EXPORT nsxTargets ...).
-                # Skip ExecuTorch's install() rules entirely; HPX profiles
-                # firmware directly off the build tree and never installs it.
-                "EXECUTORCH_BAREMETAL_SKIP_INSTALL": "ON",
             },
             engine_header="nsx_executorch.h",
             executorch_method_arena_size=method_size,
