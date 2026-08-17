@@ -1,11 +1,11 @@
-# ExecuTorch Cortex-M/CMSIS-NN ResNet-8 fixture from the adjacent
-# neuralspotx and nsx-executorch development checkouts. Run this config from
-# the helia-profiler repository root, or replace the two relative paths.
+# ExecuTorch Cortex-M/CMSIS-NN ResNet-8 hardware fixture. Supply a PTE exported
+# against nsx-executorch's pinned ExecuTorch revision and an nsx-executorch
+# PR #1 checkout at HPX's compatibility-baseline commit.
 # Verified on apollo330mP_evb — its MCU_TCM is only 240 KB, too small for
 # the combined method (64 KB) + temporary (32 KB) + planned (160 KB) arenas,
 # so arena_location is sram (1792 KB) rather than tcm.
 model:
-  path: ../neuralspotx/examples/executorch_cmsis_nn/model/resnet8_cmsis_nn.pte
+  path: /path/to/resnet8_cmsis_nn.pte
   # The PTE reports 163,840 bytes of memory-planned storage.
   arena_size: 163840
   arena_location: sram
@@ -13,20 +13,18 @@ model:
 
 engine:
   type: executorch
+  # `ns` requires config.cmsis_nn_path pointing at a source-compatible
+  # ns-cmsis-nn checkout; the qualified v7.29.2 fork has a different ABI.
   backend: arm
   config:
-    source_path: ../nsx-executorch
+    # Exact commit: 0a0d5a1633f595b86dfd156f3c2859bebdf2a470
+    source_path: /path/to/nsx-executorch
     method_arena_size: 65536
     temporary_arena_size: 32768
     input_size: 12288
     output_size: 40
-    cortex_m_ops:
-      - cortex_m::quantize_per_tensor.out
-      - cortex_m::quantized_conv2d.out
-      - cortex_m::quantized_add.out
-      - cortex_m::quantized_avg_pool2d.out
-      - cortex_m::quantized_linear.out
-      - cortex_m::dequantize_per_tensor.out
+    # Cortex-M kernels are defined by nsx-executorch's pinned operator schema.
+    # List only portable ATen fallbacks required by the PTE.
     portable_ops: []
 
 target:

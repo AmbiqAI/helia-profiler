@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
+import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -40,9 +43,56 @@ _CMSIS_NN_PROVIDERS: dict[str, tuple[str, str]] = {
 EXECUTORCH_MODULE = "nsx-executorch"
 EXECUTORCH_PROJECT = "nsx-executorch"
 
-# Persistent, ref-keyed cache so repeat hpx runs don't re-clone a provider
-# that is already materialized at the pinned baseline commit.
-_CMSIS_NN_CACHE_ROOT = Path.home() / ".cache" / "helia-profiler" / "executorch-cmsis-nn"
+
+def _provider_cache_root() -> Path:
+    """Return the NSX-compatible cache root for provider source checkouts."""
+    if configured := os.environ.get("NSX_CACHE_DIR"):
+        root = Path(configured).expanduser()
+    elif configured := os.environ.get("XDG_CACHE_HOME"):
+        root = Path(configured).expanduser() / "nsx"
+    else:
+        root = Path.home() / ".cache" / "nsx"
+    return root.resolve() / "hpx-provider-sources"
+
+
+def _checkout_commit(path: Path) -> str:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        raise EngineError(
+            f"Cannot verify git revision for ExecuTorch dependency checkout: {path}",
+            hint="Use a git checkout at the exact HPX compatibility-baseline commit.",
+        ) from exc
+    return completed.stdout.strip()
+
+
+def _gitlink_commit(path: Path, submodule: str) -> str:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(path), "ls-tree", "HEAD", "--", submodule],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        fields = completed.stdout.split()
+        if len(fields) >= 3 and fields[1] == "commit":
+            return fields[2]
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        raise EngineError(
+            f"Cannot verify nsx-executorch submodule pin for {submodule}",
+            hint="Use the recursively initialized git checkout pinned by HPX.",
+        ) from exc
+    raise EngineError(
+        f"nsx-executorch does not record the expected submodule: {submodule}",
+        hint="Use the exact nsx-executorch commit pinned by HPX.",
+    )
 
 
 def _resolve_cmsis_nn_provider_root(config: ProfileConfig, project: str) -> Path:
@@ -52,51 +102,81 @@ def _resolve_cmsis_nn_provider_root(config: ProfileConfig, project: str) -> Path
     pinned commit for *project* so nsx-executorch can add_subdirectory() it
     exactly once, itself, via its explicit root-override cache var.
     """
+    configured = config.engine.config.get("cmsis_nn_path")
+    if configured is not None:
+        if not isinstance(configured, (str, Path)) or not str(configured).strip():
+            raise EngineError(
+                "engine.config.cmsis_nn_path must be a non-empty filesystem path"
+            )
+        dest = Path(configured).expanduser().resolve()
+        if not (dest / "CMakeLists.txt").is_file():
+            raise EngineError(f"CMSIS-NN provider checkout at {dest} is missing CMakeLists.txt")
+        return dest
+
     baseline_project = config.compatibility_baseline.project(project)
-    dest = _CMSIS_NN_CACHE_ROOT / f"{project}-{baseline_project.ref}"
+    dest = _provider_cache_root() / f"{project}-{baseline_project.ref}"
     if not (dest / "CMakeLists.txt").is_file():
         _clone_provider_at_ref(baseline_project.url, baseline_project.ref, dest)
     if not (dest / "CMakeLists.txt").is_file():
         raise EngineError(
             f"CMSIS-NN provider checkout at {dest} is missing CMakeLists.txt",
-            hint=(
-                f"Delete {dest} and retry, or verify network access to "
-                f"{baseline_project.url}."
-            ),
+            hint=(f"Delete {dest} and retry, or verify network access to {baseline_project.url}."),
+        )
+    actual_ref = _checkout_commit(dest)
+    if actual_ref != baseline_project.ref:
+        raise EngineError(
+            f"Cached CMSIS-NN provider at {dest} is at {actual_ref}, "
+            f"expected {baseline_project.ref}",
+            hint=f"Remove {dest} and retry so HPX can materialize the qualified commit.",
         )
     return dest
 
 
 def _clone_provider_at_ref(url: str, ref: str, dest: Path) -> None:
     log.info("ExecuTorch: materializing CMSIS-NN provider %s@%s -> %s", url, ref, dest)
-    if dest.exists():
-        shutil.rmtree(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
+    temporary = Path(tempfile.mkdtemp(prefix=f".{dest.name}.", dir=dest.parent))
     try:
         subprocess.run(
-            ["git", "clone", "--quiet", url, str(dest)],
+            ["git", "clone", "--quiet", "--no-checkout", url, str(temporary)],
             check=True,
             capture_output=True,
             text=True,
             timeout=300,
         )
         subprocess.run(
-            ["git", "-C", str(dest), "checkout", "--quiet", ref],
+            ["git", "-C", str(temporary), "checkout", "--quiet", "--detach", ref],
             check=True,
             capture_output=True,
             text=True,
             timeout=120,
         )
         subprocess.run(
-            ["git", "-C", str(dest), "submodule", "update", "--init", "--recursive"],
+            ["git", "-C", str(temporary), "submodule", "update", "--init", "--recursive"],
             check=True,
             capture_output=True,
             text=True,
             timeout=300,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as exc:
-        if dest.exists():
-            shutil.rmtree(dest)
+        try:
+            temporary.replace(dest)
+        except OSError:
+            try:
+                concurrently_published = (dest / "CMakeLists.txt").is_file() and _checkout_commit(
+                    dest
+                ) == ref
+            except EngineError:
+                concurrently_published = False
+            if not concurrently_published:
+                raise
+            shutil.rmtree(temporary)
+    except (
+        OSError,
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+    ) as exc:
+        if temporary.exists():
+            shutil.rmtree(temporary)
         raise EngineError(
             f"Failed to materialize CMSIS-NN provider from {url}@{ref}",
             hint=(
@@ -122,8 +202,7 @@ def _operator_list(config: dict[str, Any], name: str) -> str:
     value = config.get(name, [])
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise EngineError(f"engine.config.{name} must be a list of operator names")
-    separator = ";" if name == "cortex_m_ops" else ","
-    return separator.join(value)
+    return ",".join(value)
 
 
 class ExecuTorchAdapter:
@@ -169,14 +248,60 @@ class ExecuTorchAdapter:
                 f"Invalid nsx-executorch source_path: {source_root}",
                 hint="Expected version.txt, nsx-module.yaml, and CMakeLists.txt at the checkout root.",
             )
+        expected_engine = config.compatibility_baseline.engine("executorch")
+        actual_version = (source_root / "version.txt").read_text(encoding="utf-8").strip()
+        if actual_version != expected_engine.version:
+            raise EngineError(
+                f"nsx-executorch version {actual_version!r} does not match the qualified "
+                f"version {expected_engine.version!r}",
+                hint="Check out the exact nsx-executorch commit pinned by HPX.",
+            )
+        actual_ref = _checkout_commit(source_root)
+        if actual_ref != expected_engine.ref:
+            raise EngineError(
+                f"nsx-executorch checkout is at {actual_ref}, expected {expected_engine.ref}",
+                hint="Fetch PR #1 and check out the exact commit pinned by HPX.",
+            )
+        if not (source_root / "external" / "executorch" / "version.txt").is_file():
+            raise EngineError(
+                f"nsx-executorch checkout is missing its ExecuTorch submodule: {source_root}",
+                hint=(
+                    "Initialize external/executorch and the minimal Cortex-M submodules "
+                    "listed in nsx-executorch's README."
+                ),
+            )
+        expected_submodule_ref = _gitlink_commit(source_root, "external/executorch")
+        actual_submodule_ref = _checkout_commit(source_root / "external" / "executorch")
+        if actual_submodule_ref != expected_submodule_ref:
+            raise EngineError(
+                f"nsx-executorch external/executorch is at {actual_submodule_ref}, "
+                f"expected {expected_submodule_ref}",
+                hint="Run git submodule update --init external/executorch at the pinned checkout.",
+            )
+        if not (source_root / "tools" / "python" / "torchgen" / "__init__.py").is_file():
+            raise EngineError(
+                f"nsx-executorch checkout is missing its pinned torchgen sources: {source_root}"
+            )
 
         provider = config.engine.backend or "arm"
         if provider not in _CMSIS_NN_PROVIDERS:
             raise EngineError("ExecuTorch backend must be 'arm' or 'ns'")
+        configured_provider = engine_config.get("cmsis_nn_path")
+        if provider == "ns" and (
+            not isinstance(configured_provider, (str, Path))
+            or not str(configured_provider).strip()
+        ):
+            raise EngineError(
+                "ExecuTorch backend 'ns' requires engine.config.cmsis_nn_path",
+                hint=(
+                    "Provide an ns-cmsis-nn checkout that implements the stock CMSIS-NN "
+                    "API used by nsx-executorch PR #1. The qualified ns-cmsis-nn v7.29.2 "
+                    "pin has an incompatible weight_sum_ctx ABI and is not selected "
+                    "silently."
+                ),
+            )
 
-        planned_size = _positive_int(
-            engine_config, "planned_arena_size", config.model.arena_size
-        )
+        planned_size = _positive_int(engine_config, "planned_arena_size", config.model.arena_size)
         method_size = _positive_int(engine_config, "method_arena_size", 64 * 1024)
         temporary_size = _positive_int(engine_config, "temporary_arena_size", 32 * 1024)
         input_size = _positive_int(engine_config, "input_size")
@@ -227,12 +352,17 @@ class ExecuTorchAdapter:
                 "NSX_EXECUTORCH_ENABLE_PROFILING": "ON",
                 "NSX_EXECUTORCH_CMSIS_NN_PROVIDER": provider,
                 cmsis_override_var: cmsis_root.as_posix(),
-                "NSX_EXECUTORCH_CORTEX_M_SELECT_OPS_LIST": _operator_list(
-                    engine_config, "cortex_m_ops"
-                ),
                 "NSX_EXECUTORCH_PORTABLE_SELECT_OPS_LIST": _operator_list(
                     engine_config, "portable_ops"
                 ),
+                # nsx-executorch wraps this interpreter with its pinned
+                # torchgen sources. Point CMake discovery at HPX's own Python
+                # environment, which is Python 3.11+ and already includes
+                # PyYAML, rather than whichever `python3` happens to be first.
+                # Do not resolve this symlink: uv-managed environments point
+                # `.venv/bin/python` at a base interpreter whose standalone
+                # site-packages do not contain HPX's PyYAML dependency.
+                "Python3_EXECUTABLE": Path(sys.executable).absolute().as_posix(),
                 # ExecuTorch's own CMakeLists.txt documents this exact
                 # scenario: a "standalone consumer" (like this HPX-generated
                 # app) adds ExecuTorch as a subproject but cannot satisfy its

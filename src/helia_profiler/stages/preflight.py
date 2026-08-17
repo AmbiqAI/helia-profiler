@@ -162,6 +162,14 @@ def _check_runtime_split_locations(cfg) -> None:
     runtime_arena = cfg.model.arena_location
     runtime_weights = cfg.model.weights_location
 
+    if cfg.engine.type is EngineType.EXECUTORCH and (
+        runtime_arena == Placement.PSRAM or runtime_weights == Placement.PSRAM
+    ):
+        raise ConfigError(
+            "ExecuTorch profiling does not yet support PSRAM model or arena placement.",
+            hint="Use model.arena_location=tcm|sram and model.weights_location=tcm|sram|mram.",
+        )
+
     if runtime_weights == Placement.PSRAM and cfg.target.transport != Transport.RTT:
         raise ConfigError(
             "PSRAM model weights require target.transport='rtt'.",

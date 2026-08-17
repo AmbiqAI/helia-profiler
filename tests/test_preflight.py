@@ -79,6 +79,21 @@ class TestPreflightHappyPath:
             with pytest.raises(ConfigError, match="ExecuTorch profiling"):
                 PreflightStage().run(ctx)
 
+    @pytest.mark.parametrize("field", ["arena_location", "weights_location"])
+    def test_executorch_rejects_psram_placement(self, tmp_path: Path, field: str):
+        model = tmp_path / "model.pte"
+        model.write_bytes(b"\x00\x00\x00\x00ET" + b"\x00" * 512)
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {"path": str(model), field: "psram"},
+                "engine": {"type": "executorch"},
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="does not yet support PSRAM"):
+                PreflightStage().run(ctx)
+
 
 class TestPreflightModel:
     def test_missing_model_raises(self, tmp_path: Path):

@@ -148,7 +148,7 @@ class PlanMemoryStage:
             MemoryRegion.DTCM,
         )
 
-        region_map: dict[str, list[MemoryConsumer]] = {}
+        region_map: dict[MemoryRegion, list[MemoryConsumer]] = {}
 
         def add(region: MemoryRegion, name: str, size: int, kind: str) -> None:
             if size > 0:

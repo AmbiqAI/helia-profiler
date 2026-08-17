@@ -14,7 +14,7 @@ once with different configs.
 | heliaAOT | `helia-aot` | No | Ahead-of-time compilation and fine-grained placement |
 | ExecuTorch | `executorch` | No | Cortex-M PTE programs and CMSIS-NN kernels |
 
-The pipeline, capture protocol, and report format are identical for all three
+The pipeline, capture protocol, and report format are identical for all four
 engines. Only the firmware payload changes.
 
 Vanilla TFLM is intended as a baseline. It uses the separate
@@ -44,12 +44,10 @@ engine:
     temporary_arena_size: 32768
     input_size: 12288
     output_size: 40
-    cortex_m_ops:
-      - cortex_m::quantized_conv2d.out
     portable_ops: []
 ```
 
-All sizes and operator lists are explicit because the embedded runner does not
+All sizes and the optional portable-operator list are explicit because the embedded runner does not
 run an export pipeline or infer a PTE's application I/O contract. The clean
 whole-model measurement is the DWT cycle count of `Method::execute()` only;
 program loading, method loading, input/output copies, layer instrumentation,
@@ -61,10 +59,28 @@ checks every counter read, and reports true 32-bit chained-counter overflow.
 ExecuTorch power capture is not yet supported; keep `power.enabled: false`.
 See `configs/executorch/resnet8_cmsis_nn.yaml` for the verified fixture — it
 targets `apollo330mP_evb` with `arena_location: sram` (that board's MCU_TCM is
-too small for the combined method/temporary/planned arenas) and only needs a
-single `nsx-executorch` checkout at `source_path`; `hpx` materializes the
-selected `backend`'s CMSIS-NN provider (`arm-cmsis-nn` or `ns-cmsis-nn`)
-itself, pinned to the HPX compatibility baseline.
+too small for the combined method/temporary/planned arenas) and accepts a
+caller-supplied PTE plus a single `nsx-executorch` checkout at `source_path`.
+The checkout must be at
+commit `0a0d5a1633f595b86dfd156f3c2859bebdf2a470`, the current head of
+`nsx-executorch` PR #1; HPX does not assume an unpublished release tag.
+
+`source_path` is the repository root containing `nsx-module.yaml`, not the
+embedded ExecuTorch submodule. Initialize the minimal Cortex-M submodules listed
+in that repository's README. HPX passes its own Python 3.11+ interpreter to
+CMake so the pinned torchgen wrapper also sees HPX's PyYAML dependency. The Arm
+CMSIS-NN provider is cloned at its qualified commit under `NSX_CACHE_DIR` (or
+the normal XDG/`~/.cache/nsx` fallback) and supplied through
+`NSX_EXECUTORCH_ARM_CMSIS_NN_ROOT`. Set `engine.config.cmsis_nn_path` to use an
+explicit provider checkout instead. `backend: ns` currently requires that
+explicit path: the qualified `ns-cmsis-nn` v7.29.2 used by heliaRT/heliaAOT has
+an additional `weight_sum_ctx` ABI and is not source-compatible with PR #1's
+pinned ExecuTorch kernels, so HPX refuses to present it as a qualified default.
+Once a source-compatible ns checkout is supplied, HPX passes its project root
+through `NSX_EXECUTORCH_NS_CMSIS_NN_ROOT`.
+The provider is intentionally not added to `NSX_APP_MODULES`: current NSX does
+not resolve optional dependencies, and bootstrapping the provider separately
+would duplicate targets that `nsx-executorch` owns.
 
 ## heliaRT
 
