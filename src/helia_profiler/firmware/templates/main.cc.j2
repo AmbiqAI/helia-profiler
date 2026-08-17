@@ -800,9 +800,10 @@ int main(void) {
         // XTAL), so PD_DBG can be gated off for the *default* infer probe
         // too, not just the opt-in busy_loop probe — closing most of a
         // measurable current gap vs the reference baseline (which never powers this
-        // domain at all).  Families still timing the window with DWT
-        // (clean_window_timer=="dwt": Apollo3/Apollo4) keep the domain
-        // powered for the infer probe, same as before.
+        // domain at all).  Renders still timing the window with DWT
+        // (window_timer=="dwt") keep the domain powered for the infer
+        // probe -- note AP4 *power* binaries are no longer in that set:
+        // their broad shutdown kills the domain, so they use STIMER.
         nsx_ambiq_pmu_disable();
 {% if gate_dbg %}
         am_hal_debug_disable();

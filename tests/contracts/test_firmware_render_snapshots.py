@@ -329,11 +329,20 @@ def test_window_is_never_timed_by_a_domain_the_binary_powers_down():
     accumulated cycle count is meaningless, and the terminal report's
     elapsed_us -- derived from it -- is inflated. Energy survives (the monitor
     integrates in hardware) but average power and current are silently divided
-    by the inflation factor. Measured ~7x on Apollo4 Blue Plus: a 24-second
-    wall-clock run reported a 38.6-second window.
+    by the inflation factor. Measured ~7x on Apollo4 Blue Plus, in-session:
+    the unfixed build reported 6027 us/inference against the fixed build's
+    866 us with identical energy per inference.
 
-    This is the invariant, not the specific family mapping: any future SoC that
-    gains the broad shutdown must not also inherit a DWT-timed window.
+    Scope: this pins the invariant across the *render matrix* -- any future
+    SoC that gains the broad shutdown must not also inherit a DWT-timed
+    window. It is a textual check, keyed on the literal
+    am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_DEBUG) and
+    DWT->CYCCNT spellings between the hpx_sync_window_begin();/end(); call
+    sites, so it does NOT defend against refactors that rename or wrap any
+    of those (a DWT read behind a helper, a differently-spelled shutdown),
+    nor against the OTHER way the domain disappears on Cortex-M4F parts --
+    a free-running binary with no debugger asserting CDBGPWRUPREQ (the
+    still-open Apollo3 case).
     """
     import re
 
