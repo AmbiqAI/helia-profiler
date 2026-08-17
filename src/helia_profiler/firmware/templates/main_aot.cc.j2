@@ -5,6 +5,7 @@
    with STIMER or the reported duration is garbage and average power/current
    are silently divided by the inflation factor. -#}
 {%- set window_timer = "stimer" if (clean_window_timer | default("dwt") == "stimer" or (power_only | default(false) and broad_peripheral_shutdown | default(false))) else "dwt" %}
+{%- set use_stimer_window = (window_timer == "stimer") and (clean_window_probe | default("infer") != "busy_loop") %}
 /**
  * @file main.cc
  * @brief heliaPROFILER firmware (heliaAOT) — auto-generated, do not edit.
@@ -753,7 +754,9 @@ int main(void) {
         hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=0\n",
                    clean_iters_n);
 {% endif %}
+{%- if not use_stimer_window %}
         uint64_t clean_cycles = 0;
+{%- endif %}
         uint32_t clean_count = 0;
         // Assert READY only after initialization and adaptive warmup. This
         // keeps host GO low until the firmware can enter the measured window.
@@ -805,7 +808,7 @@ int main(void) {
         usb_timer_pause();
 {% endif %}
 {% set gate_dbg = (clean_window_probe | default("infer") == "busy_loop") or (gate_debug_domain_in_window | default(false)) %}
-{% set use_stimer_window = (window_timer == "stimer") and (clean_window_probe | default("infer") != "busy_loop") %}
+{# use_stimer_window is set in the prelude: the clean_cycles declaration above depends on it. #}
 {% if transport == "uart" and not power_only | default(false) %}
         // The UART peripheral (PWRSTUART0-3) lives in the peripheral device
         // power domain, NOT the debug domain am_hal_debug_disable() below
