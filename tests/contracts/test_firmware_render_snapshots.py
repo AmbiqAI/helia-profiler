@@ -33,7 +33,7 @@ import pytest
 
 from helia_profiler.engines import TFLM_ENGINE_HEADER
 from helia_profiler.firmware import _jinja_env
-from helia_profiler.platform import get_soc
+from helia_profiler.platform import get_soc, list_socs
 
 _SNAPSHOT_PATH = Path(__file__).parent / "snapshots" / "firmware_render.json"
 _UPDATE = os.environ.get("HPX_UPDATE_SNAPSHOTS") == "1"
@@ -63,6 +63,11 @@ _MARKERS: dict[str, str] = {
     "ssram_power_ap5": "ns_power",
     "newlib_syscalls": "_sbrk",
     "peripheral_power_down": "AM_HAL_PWRCTRL_PERIPH_IOM0",
+    # Which clock times the measured window. Without this marker the switch
+    # from DWT to STIMER shows up only as a sha256 change, so the semantic
+    # layer of the snapshot -- the part a reviewer actually reads -- stayed
+    # silent about the fix.
+    "stimer_window": "hpx_stimer_init(",
 }
 
 
@@ -110,6 +115,7 @@ def _common_kwargs(soc_name: str, transport: str) -> dict:
         "manages_shared_ssram_power": soc.capabilities.memory.has_shared_ssram_power_domain,
         "ssram_full_power_enum": soc.ssram_full_power_enum,
         "clean_window_timer": soc.capabilities.clock.clean_window_timer,
+        "power_window_timer": soc.capabilities.power_window_timer,
         "gate_debug_domain_in_window": soc.capabilities.clock.gate_debug_domain_in_window,
         "broad_peripheral_shutdown": soc.capabilities.clock.broad_peripheral_shutdown,
         "crypto_otp_shutdown": soc.capabilities.clock.crypto_otp_shutdown,
@@ -339,10 +345,11 @@ def test_window_is_never_timed_by_a_domain_the_binary_powers_down():
     am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_DEBUG) and
     DWT->CYCCNT spellings between the hpx_sync_window_begin();/end(); call
     sites, so it does NOT defend against refactors that rename or wrap any
-    of those (a DWT read behind a helper, a differently-spelled shutdown),
-    nor against the OTHER way the domain disappears on Cortex-M4F parts --
-    a free-running binary with no debugger asserting CDBGPWRUPREQ (the
-    still-open Apollo3 case).
+    of those (a DWT read behind a helper, a differently-spelled shutdown).
+    The OTHER way the domain disappears on Cortex-M4F parts -- a free-running
+    binary with no debugger asserting CDBGPWRUPREQ -- is pinned separately, by
+    capability rather than by spelling, in
+    ``test_free_running_power_binary_never_times_the_window_with_dwt``.
     """
     import re
 
@@ -369,6 +376,111 @@ def test_window_is_never_timed_by_a_domain_the_binary_powers_down():
         "no power render disables the debug domain — this test lost its subject, "
         "so it is no longer pinning anything"
     )
+
+
+def test_every_soc_that_cannot_read_dwt_unwatched_resolves_to_stimer():
+    """``SocCapabilities.power_window_timer`` is the single source of the
+    predicate; check it directly for every registered SoC, not just the three
+    representatives the render matrix covers.
+
+    A power binary may keep DWT only when it neither powers the debug domain
+    down itself nor depends on an attached probe to keep that domain alive.
+    No registered SoC is in that set today (AP3/AP4 are Cortex-M4F, AP5
+    prefers STIMER outright) -- the assertion is written as an implication so
+    it stays meaningful if one ever is.
+    """
+    for soc in list_socs():
+        caps = soc.capabilities
+        unwatched_dwt_is_unreadable = (
+            caps.clock.broad_peripheral_shutdown
+            or caps.transport.requires_attached_probe_for_cycles
+        )
+        if unwatched_dwt_is_unreadable or caps.clock.clean_window_timer == "stimer":
+            assert caps.power_window_timer == "stimer", soc.name
+        else:
+            assert caps.power_window_timer == caps.clock.clean_window_timer, soc.name
+        # The profile binary runs with a transport (and so a probe) attached
+        # and keeps the family preference -- the power override must not leak
+        # into it.
+        assert caps.clock.clean_window_timer in {"dwt", "stimer"}, soc.name
+
+
+def test_free_running_power_binary_never_times_the_window_with_dwt():
+    """No power render for a family that needs an attached probe to read DWT
+    may time its measured window with DWT->CYCCNT.
+
+    This is the capability-driven half of the invariant. The sibling test above
+    keys on the *literal shutdown call*, so it only catches families that power
+    the debug domain down themselves (AP4). It cannot see the other, equally
+    fatal mechanism: on the Cortex-M4F parts DWT lives in the core debug power
+    domain and stays powered only while a debugger asserts CDBGPWRUPREQ, which
+    firmware cannot set. The dedicated power binary free-runs unwatched once
+    flashed (WP4 -- the probe is released after flash+reset and the Joulescope
+    watches GPIO, not SWD), so on Apollo3 the counter never advances: elapsed_us
+    lands at 0, HPX_CLEAN_INFER_AVG_US at 0, and every per-inference power
+    metric derived from them is suppressed or wrong.
+
+    ``transport.requires_attached_probe_for_cycles`` is the capability that
+    already records exactly this fact (confirmed empirically on AP3 in
+    2026-06: AOT-over-UART read 0 cycles until a probe was held attached), so
+    this keys on it rather than on any single shutdown spelling.
+    """
+    import re
+
+    def _code_only(src: str) -> str:
+        return "\n".join(re.sub(r"//.*$", "", line) for line in src.splitlines())
+
+    checked = 0
+    for soc, transport, engine in _power_combos():
+        if not get_soc(soc).capabilities.transport.requires_attached_probe_for_cycles:
+            continue
+        checked += 1
+        code = _code_only(_render(soc, transport, engine, power_only=True))
+        # Anchor on the CALL sites, not the names: the no-op `static inline`
+        # definitions appear earlier in the file (and an end() call precedes
+        # the begin() call), so slicing on bare names yields an empty window
+        # and silently asserts nothing.
+        begin = code.index("hpx_sync_window_begin();")
+        window = code[begin : code.index("hpx_sync_window_end();", begin)]
+        assert "DWT->CYCCNT" not in window, (
+            f"{soc}|{transport}|{engine}: window timed by DWT in a free-running "
+            "power binary, where nothing holds the core debug power domain up"
+        )
+    assert checked, (
+        "no power render targets a probe-dependent-cycles family — this test "
+        "lost its subject, so it is no longer pinning anything"
+    )
+
+
+def test_hal_umbrella_header_is_included_at_most_once():
+    """``am_mcu_apollo.h`` has several independent consumers in the main
+    templates (Apollo3 burst, the Armv8-M PMU, STIMER window timing, the broad
+    peripheral / crypto-otp shutdowns) guarded by separate blocks. They must
+    stay mutually exclusive: main.cc.j2 keeps them as separate blocks, while
+    main_aot.cc.j2 merges the STIMER and shutdown cases into one guard. This
+    pins the shared invariant so the two structures cannot silently diverge
+    into a double include -- or, as the AOT template did before this change,
+    into no include at all for a render that calls am_hal_stimer_*.
+    """
+    for soc, transport, engine in _all_combos():
+        rendered = _render(soc, transport, engine)
+        assert rendered.count('#include "am_mcu_apollo.h"') <= 1, (
+            soc,
+            transport,
+            engine,
+        )
+    for soc, transport, engine in _power_combos():
+        rendered = _render(soc, transport, engine, power_only=True)
+        assert rendered.count('#include "am_mcu_apollo.h"') <= 1, (
+            soc,
+            transport,
+            engine,
+        )
+        if "am_hal_stimer_" in rendered:
+            assert '#include "am_mcu_apollo.h"' in rendered, (
+                f"{soc}|{transport}|{engine}: calls am_hal_stimer_* with no "
+                "AmbiqSuite HAL umbrella header in scope"
+            )
 
 
 def test_snapshot_covers_exactly_the_current_matrix():

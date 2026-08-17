@@ -57,6 +57,11 @@ def _render_tflm(
     clean_window_probe: str = "infer",
     clean_iters: int = 3,
     power_only: bool = False,
+    # Only read for power_only renders (SocCapabilities.power_window_timer);
+    # these smoke tests leave clean_window_timer at its "dwt" template default,
+    # so the matching power-binary default keeps them on the DWT paths unless a
+    # case opts into STIMER explicitly.
+    power_window_timer: str = "dwt",
     psram_clock_hz: int = 48_000_000,
     **extra_vars: object,
 ) -> str:
@@ -74,6 +79,7 @@ def _render_tflm(
         clean_warmup=1,
         clean_iters=clean_iters,
         power_only=power_only,
+        power_window_timer=power_window_timer,
         window_mode=window_mode,
         window_target_ms=250,
         window_min=10,
@@ -117,6 +123,8 @@ def _render_aot(
     clean_window_probe: str = "infer",
     clean_iters: int = 3,
     power_only: bool = False,
+    # See _render_tflm.
+    power_window_timer: str = "dwt",
     psram_clock_hz: int = 48_000_000,
     **extra_vars: object,
 ) -> str:
@@ -129,6 +137,7 @@ def _render_aot(
         clean_warmup=1,
         clean_iters=clean_iters,
         power_only=power_only,
+        power_window_timer=power_window_timer,
         window_mode=window_mode,
         window_target_ms=250,
         window_min=10,
