@@ -737,6 +737,10 @@ class TestMainAotCcRender:
 
 _INA228_VARS: dict[str, object] = {
     "power_monitor": "ina228",
+    # driver: ina228 — the monitor is the measurement of record, so setup /
+    # arm / read failures are terminal. The bystander variant (driver:
+    # joulescope + ina228 block) is exercised separately.
+    "ina228_required": True,
     "ina228_i2c_iom": 1,
     "ina228_i2c_address": 0x40,
     "ina228_i2c_speed_hz": 400_000,
@@ -809,11 +813,44 @@ class TestIna228PowerRender:
         )
 
     @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    def test_bystander_monitor_failures_are_not_terminal(self, render):
+        """driver: joulescope + an ina228 block builds the same monitor
+        firmware, but a missing/mis-wired chip must not kill the run — the
+        external instrument owns the measurement. Failures are recorded and
+        reported by the terminal report instead (no printf at the failure
+        sites: UART/ITM are disabled for the window, and an ITM write with
+        PD_DBG off hangs the part)."""
+        out = render(power_only=True, **{**_INA228_VARS, "ina228_required": False})
+        for phase in ("ina228_init", "ina228_arm", "ina228_read"):
+            assert f'hpx_power_terminal_fail("{phase}"' not in out, phase
+        assert "g_hpx_ina228_bystander_fail_phase" in out
+        assert "HPX_POWER_INA228_BYSTANDER_FAILED=" in out
+        # The window hooks must be conditional on a live monitor.
+        assert "if (g_hpx_ina228_active)" in out
+        # Measurement keys stay gated on a successful read, so a dropped
+        # bystander yields no payload rather than a zeroed one.
+        assert "g_hpx_ina228_ok" in out
+
+    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
     def test_profile_binary_never_embeds_monitor_code(self, render):
         """power_only=false renders (the transport/profile binary) must not
         pick up monitor code even when the run selects the ina228 driver."""
         out = render(power_only=False, **_INA228_VARS)
         assert "ina228" not in out
+
+    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    def test_broad_peripheral_shutdown_spares_the_monitor_iom(self, render):
+        """On families with broad peripheral shutdown (AP4) the IOM disable
+        runs *after* hpx_ina228_setup(), so powering down the monitor's IOM
+        would break the accumulator reset/read bracketing the window."""
+        out = render(power_only=True, broad_peripheral_shutdown=True, **_INA228_VARS)
+        disabled = [i for i in range(8) if f"PERIPH_IOM{i});" in out]
+        assert disabled == [0, 2, 3, 4, 5, 6, 7]
+
+    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    def test_broad_peripheral_shutdown_unchanged_without_a_monitor(self, render):
+        out = render(power_only=True, broad_peripheral_shutdown=True)
+        assert [i for i in range(8) if f"PERIPH_IOM{i});" in out] == list(range(8))
 
     @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
     @pytest.mark.parametrize("power_only", [False, True])

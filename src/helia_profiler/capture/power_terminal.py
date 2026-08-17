@@ -227,7 +227,17 @@ def _log_pre_record_diagnostics(text: str) -> None:
     """
     for line in text.splitlines():
         line = line.strip()
-        if line.startswith("HPX_POWER_"):
+        if line.startswith("HPX_POWER_INA228_BYSTANDER_FAILED="):
+            # A bystander monitor (configured but not the measurement of
+            # record) failed and was dropped; the external capture stands.
+            log.warning(
+                "On-target INA228 monitor failed and was skipped: %s. "
+                "The external capture is unaffected; check the monitor's "
+                "wiring/power, or delete the power.ina228 block if the "
+                "monitor is no longer connected.",
+                line,
+            )
+        elif line.startswith("HPX_POWER_"):
             log.info("Power firmware diagnostic: %s", line)
 
 

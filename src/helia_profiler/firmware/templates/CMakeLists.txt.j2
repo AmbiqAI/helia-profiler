@@ -107,7 +107,7 @@ target_link_libraries(hpx_profiler_power PRIVATE
     nsx::board
     nsx::runtime_core
     nsx::cmsis_core
-{% if power_sync_enabled %}
+{% if power_binary_needs_gpio %}
     nsx::gpio
 {% endif %}
 {% if power_monitor | default(none) == "ina228" %}
@@ -203,7 +203,7 @@ target_link_libraries(hpx_profiler_power PRIVATE
     nsx::board
     nsx::runtime_core
     nsx::cmsis_core
-{% if power_sync_enabled %}
+{% if power_binary_needs_gpio %}
     nsx::gpio
 {% endif %}
 {% if power_monitor | default(none) == "ina228" %}

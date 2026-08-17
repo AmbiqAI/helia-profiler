@@ -165,21 +165,76 @@ power:
   go_gpio_pin: 7      # J8 GP7 — go
 ```
 
-### Verified EVB-to-Joulescope wiring
+### EVB-to-Joulescope wiring
 
-Use the following direct connections for the validated benches. All signal
-grounds must share the EVB/Joulescope reference, and `power.io_voltage` must
-match the EVB GPIO rail.
+Three signals plus a shared ground carry the handshake. Only the **gate**
+is required to produce a valid gated measurement; state and GO add
+race-robustness (see [Lock-step](#lock-step-3-wire-handshake)).
 
-| EVB / instrument | Gate: device → monitor | State: device → monitor | GO: monitor → device |
+| Signal | Direction | Joulescope channel | Purpose |
 |---|---|---|---|
-| Apollo510 EVB + JS320 | GPIO 29 → `INPUT0` | GPIO 36 → `INPUT1` | `OUTPUT0` → GPIO 14 |
-| Apollo330 Plus EVB + JS110 | J8 GP5 → `INPUT0` | J8 GP6 → `INPUT1` | `OUTPUT0` → J8 GP7 |
+| Gate | device → monitor | `INPUT0` | Brackets the measured window |
+| State | device → monitor | `INPUT1` | Ready / fault flag |
+| GO | monitor → device | `OUTPUT0` | Host says "poller armed, you may run" |
 
-For Apollo330 Plus, `5:6:7` are **Apollo device GPIO pin numbers**, not
-Joulescope channel numbers. The matching JS110 channels are always
-`INPUT0:INPUT1:OUTPUT0` (`0:1:0` internally). Put the device-pin mapping in
-the profile config and pin the instrument when more than one is connected:
+Joulescope channel numbers are always `INPUT0:INPUT1:OUTPUT0` (`0:1:0`
+internally) regardless of board — the numbers in the table below are
+**Apollo device GPIO pin numbers**.
+
+| EVB | Gate | State | GO | Status |
+|---|---|---|---|---|
+| Apollo510 EVB | 29 | 36 | 14 | Verified (JS320) |
+| Apollo510B EVB | 22 | 23 | 24 | See note below |
+| Apollo4 Plus EVB (incl. Blue KBR/KXR) | 22 | 23 | 24 | AutoDeploy AP4P wiring |
+| Apollo4 Lite EVB (incl. Blue) | 61 | 23 | 24 | 22 unavailable on AP4L |
+| Apollo3 Plus EVB | 26 | 24 | 25 | 22/23 are the J-Link OB VCOM UART |
+| Apollo330 Plus EVB | 5 | 6 | 7 | Verified (JS110); J8 header |
+
+!!! warning "Registry defaults are not always the verified wiring"
+    Two boards ship built-in defaults that differ from the wiring above,
+    because the defaults were inherited rather than measured:
+
+    - **Apollo510B EVB** defaults to the Apollo510 EVB's `29/36/14`, but
+      those pins are not readily broken out on the 510B. Use `22/23/24`
+      (their only BSP claim is IOM7, which the power binary never uses)
+      and set them explicitly in config.
+    - **Apollo330 Plus EVB** defaults to `10/0/0` (the generic fallback,
+      state and GO disabled). The verified JS110 bench is `5/6/7`.
+
+    Always set `sync_gpio_pin` / `state_gpio_pin` / `go_gpio_pin`
+    explicitly for these two boards rather than trusting the defaults.
+
+!!! danger "Apollo510B: avoid GPIO 47/48/49"
+    They are accessible on the header but double as `VDD18_SWITCH`,
+    `VDDUSB33_SWITCH` and `VDDUSB0P9_SWITCH` — driving them as GPIO during
+    a power measurement can toggle supply rails. Check
+    `am_bsp_pins.h` for your board before choosing alternatives, and avoid
+    whichever IOM carries an on-target power monitor (`power.ina228.i2c_iom`;
+    IOM1 = GPIO 8/9 on the 510B).
+
+#### Vref: required on JS220 and JS320, absent on JS110
+
+The JS110's GPI thresholds are fixed; `power.io_voltage` only tells HPX how
+to interpret them. The **JS220 and JS320 GPIO connector carries a Vref pin
+that sets both the input threshold and the output drive level**, and HPX
+never programs it — there is no software knob, so it must be wired:
+
+> "The GPIO includes an external Vref signal. When using the GPIO with your
+> device under test, connect Vref to the supply voltage on the device under
+> test." — [JS220 User's Guide](https://download.joulescope.com/products/JS220/JS220-K000/users_guide/Joulescope%20JS220%20User's%20Guide.pdf)
+
+Leaving Vref floating on a JS220/JS320 gives undefined thresholds — the
+usual symptom is a gate that never reads high, so every capture degrades to
+"rose but did not fall" or free-run. The instrument can fall back to an
+internal 3.3 V reference, but on a 1.8 V EVB rail that threshold will not
+match your logic levels; wire Vref to the board's GPIO rail. Vref must also
+satisfy `Vref < (VUSB − 0.5 V)`. Connecting it additionally prevents the
+GPOs from back-powering the target.
+
+`power.io_voltage` must match that same rail (default `1.8`).
+
+For Apollo330 Plus, put the device-pin mapping in the profile config and pin
+the instrument when more than one is connected:
 
 ```yaml
 target:
@@ -198,10 +253,15 @@ hpx profile model.tflite --config hpx.yml --jlink-serial AP330_JLINK
 
 ### `io_voltage`
 
-`power.io_voltage` (default `1.8`) tells the Joulescope's GPI reference what
-voltage represents a logic-high on the gate/state lines. It must match the
-board's GPIO I/O rail — a mismatch reads a gate that never appears to go
-high (or reads noise as always-high).
+`power.io_voltage` (default `1.8`) tells HPX what voltage represents a
+logic-high on the gate/state lines. It must match the board's GPIO I/O rail
+— a mismatch reads a gate that never appears to go high (or reads noise as
+always-high).
+
+It is a *host-side interpretation* setting only: HPX never programs an IO
+voltage on the instrument. On a JS220/JS320 the physical threshold comes
+from the wired Vref pin, so `io_voltage` and Vref must describe the same
+rail — see [Vref](#vref-required-on-js220-and-js320-absent-on-js110).
 
 ## Lock-step (3-wire handshake)
 
@@ -431,6 +491,34 @@ default strapping, so the preset alone is a complete config:
     board: adafruit-ina228
 ```
 
+!!! warning "The Adafruit board's 15 mΩ shunt is sized for amps, not milliamps"
+
+    That shunt is convenient — it makes the preset a complete config — but a
+    low-power target develops only tens of µV across 15 mΩ, while the
+    INA228's input offset is on the order of a µV (datasheet `V_OS`, per ADC
+    range). At that signal level the offset alone lands as a
+    *percentage-level* current error. Offset is fixed in volts, so the error
+    scales inversely with the shunt drop: more sense voltage, proportionally
+    less error.
+
+    You do not need a second instrument to deal with this — accuracy here is
+    a design-time choice, made when you pick the resistor:
+
+    - **Size the shunt so the drop is mV, not µV**, at your target's typical
+      current (see **Choosing a shunt** below). This is what shrinks the
+      offset error, and it is entirely under your control.
+    - **Buy tolerance.** Whatever error remains after the offset is
+      swamped is dominated by the resistor itself, so a 0.1 % part bounds
+      you near 0.1 %. This is why `shunt_ohms` must be the real value of a
+      known resistor rather than a guess.
+    - For **relative** work — A/B comparisons, regression tracking,
+      optimisation deltas at a similar operating current — even the stock
+      15 mΩ board is fine, because a stable bias cancels in the delta.
+
+    The stock preset is the convenient choice, not the accurate one. If you
+    care about absolute milliwatts on a sleepy target, wire your own sense
+    resistor.
+
 For custom wiring, omit `board` and set `shunt_ohms` (and `i2c_address` if
 strapped away from 0x40) directly. `shunt_ohms` has **no bare default on
 purpose**: a wrong shunt calibration produces plausible-looking but wrong
@@ -488,9 +576,15 @@ current peaks above your steady state:
 
 | Peak current | Largest shunt in ±40.96 mV range | Burden at that peak |
 |---|---|---|
-| 50 mA | 0.82 Ω | 41 mV |
-| 100 mA | 0.41 Ω | 41 mV |
-| 400 mA | 0.10 Ω | 41 mV |
+| 50 mA | 0.8192 Ω (use 0.75 Ω) | ≤41 mV |
+| 100 mA | 0.4096 Ω (use 0.39 Ω) | ≤41 mV |
+| 400 mA | 0.1024 Ω (use 0.10 Ω) | ≤41 mV |
+
+The limit values are exact: HPX selects the high-resolution range only when
+`shunt_ohms × max_current_a ≤ 0.04096`, so a shunt *at* a rounded-up value
+(0.82 Ω at 50 mA is 41.0 mV) silently lands on the wide range and loses the
+4× resolution this table is trying to buy. Round **down** to a standard
+value.
 
 For a target drawing ~20 mA with peaks under ~80 mA, **0.5 Ω** is a good
 choice: 10 mV of burden at 20 mA (0.6 % of a 1.8 V rail), ~128 k ADC counts
@@ -499,6 +593,14 @@ negligible at these currents (0.2 mW), so any 0603/0805 part works —
 prioritise **tolerance over rating**, since the resistor's tolerance passes
 straight through into your energy figure. A 1 % part means 1 % energy error;
 a 5 % carbon film means 5 %.
+
+The offset term is what bites at low current, and it bites hard: 0.5 Ω at
+20 mA gives 10 mV of signal, while a 15 mΩ shunt at the same current gives
+300 µV — a 33× difference in how much a µV of input offset matters. That
+ratio is the whole argument for a larger resistor. What extra signal will
+*not* fix is the resistor's own tolerance, which stays a fixed percentage of
+the reading — so once the drop is comfortably in mV, your accuracy floor is
+simply the part you bought.
 
 HPX picks the ADC range for you from `shunt_ohms × max_current_a`: if the
 worst-case shunt drop fits in ±40.96 mV it selects the 4×-resolution range,
@@ -522,10 +624,37 @@ per-inference energy; average power is energy over the window duration.
 | Per-layer power attribution | future | ✗ |
 | Host wiring | series supply + GPIO gate wires | none (target I2C) |
 | Powers/resets the target rail | ✓ (relay, power-cycle recovery) | ✗ |
+| Adds to the measured current | ✗ (fully external) | ✓ (target IOM stays powered) |
 
 The INA228 path is a *cheap aggregate-energy instrument*, not a Joulescope
 replacement: with 50 µs minimum conversions it cannot resolve per-layer
 detail, and it reports one integrated window, not a sample stream.
+
+!!! warning "On-target monitoring is inside its own measurement"
+
+    Talking to the INA228 requires an IOM to stay powered and clocked for the
+    whole run. That current is drawn by the target, on the rail the INA228 is
+    measuring — so it is counted in the reported energy. An external
+    instrument has no equivalent cost, which is one reason the two do not
+    agree out of the box.
+
+    Do not expect to tune it away with conversion settings. The firmware
+    brackets the window so no I2C transactions occur inside it (see
+    `_ina228_power.j2`) — the adder is the *idle* IOM, not bus traffic — and
+    on our bench it did not move between conversion-time settings. On a
+    low-power target it can be a non-trivial fraction of the total.
+
+    Measure it on your own board rather than assuming a figure: run once with
+    the `power.ina228` block and once without it, using an external instrument
+    for both. The block's presence — not `power.driver` — is what decides
+    whether the firmware brings up a monitor, so removing it gives you a
+    monitor-free baseline (the binaries differ only in the monitor code and
+    its I2C/driver modules). Also note the flip side: a *leftover* `ina228:`
+    block keeps costing that current on every run, so delete the block when
+    the monitor comes off the board. If the block is present but the chip is
+    missing or unpowered, an external-instrument run logs a warning and
+    continues without a monitor payload (only `driver: ina228` treats a
+    missing chip as fatal, since the monitor *is* the measurement there).
 
 ### Adding other monitors and boards
 
@@ -617,8 +746,16 @@ part fails fast with a typed terminal phase:
   measurement was lost, so the run is treated as failed rather than
   silently reporting nothing.
 - An accumulator **overflow** during a very long window fails the run
-  explicitly (`On-device power monitor reported accumulator overflow`).
-  Shorten the window or raise `conversion_time_us`/`averaging_count`.
+  explicitly when the monitor is the measurement of record
+  (`driver: ina228`). When the monitor is a bystander on an external
+  capture, the overflow logs a warning instead — the external instrument's
+  result stands. Shorten the window or raise
+  `conversion_time_us`/`averaging_count`.
+- An internal-mode measurement of **exactly zero** energy and charge, or
+  nonzero energy with zero charge, fails the run with a wiring/cadence
+  hint rather than publishing a confidently wrong number: the first is a
+  dead sense path or a window shorter than one accumulator update, the
+  second is the signature of reversed IN+/IN- sense wiring.
 
 ## Verifying a capture
 

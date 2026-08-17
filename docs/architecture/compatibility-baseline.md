@@ -8,26 +8,48 @@ Stage 5 combines its identity and canonical hash with the NSX registry hash,
 target, engine, overrides, and relevant build inputs to select an isolated
 dependency workspace.
 
-The current baseline is `hpx-neuralspotx-0.7.14-2026-08`:
+The current baseline is `hpx-neuralspotx-0.7.17-2026-08`:
 
 | Identity | Qualified reference |
 | --- | --- |
-| `neuralspotx` package | `0.7.14`, wheel SHA-256 `11634550…5ede`, tag peeled to `25d8d944…e406` |
+| `neuralspotx` package | `0.7.17`, wheel SHA-256 `1289cd67…fbdb`, tag peeled to `8b5a7fa9…b44f` |
 | `nsx-ambiq-sdk` | `v5.2.24`, peeled commit `a9f4ec25…1132` |
 | `nsx-pmu-armv8m` | `5725c065…c88` |
-| `nsx-tflite-micro` | `2f02cc93…aea` |
-| `arm-cmsis-nn` | `62967ecf…471` |
-| `ns-cmsis-nn` | `2bb81953…a5e` (`v7.26.0`) |
+| `nsx-tflite-micro` | `7afcf2b4…333` |
+| `arm-cmsis-nn` | `6d21a6f8…f7c` |
+| `ns-cmsis-nn` | `63172642…d7f` (`v7.29.2`) |
+| `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
 | heliaRT | `1.16.0`, commit `c1b97f4a…f62` |
 | heliaAOT | `min_version=0.18.0`, `max_version_exclusive=0.19.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 
-neuralSPOT-X 0.7.14 promotes the helia-dsp, TileIO, Physiokit, and Sensors
-registry entries to published semantic tags. Those projects are not part of
-HPX's qualified profiling module graph, so their promotions do not add fields
-or refs to this baseline. The neuralSPOT-X tag is verified and stored as its
-peeled commit; all existing SDK, PMU, TFLM, CMSIS-NN, and engine refs remain
-unchanged by this focused promotion.
+neuralSPOT-X 0.7.17 fixes the J-Link flash-verification false negative that
+aborted idempotent re-flashes of an unchanged image, and enforces
+`ExitOnError 1` in generated flash recipes (AmbiqAI/neuralspotx#220). Its
+packaged registry resolves `ns-cmsis-nn` at `v7.29.2`, and this promotion
+advances that qualified ref in lockstep.
+
+Baseline refs relate to the packaged registry in two tiers. Modules HPX
+itself declares in generated apps (the SDK monorepo, PMU, heliaRT,
+nsx-sensors) carry manifest pins at the baseline refs, and those pins
+defeat the packaged registry — `nsx-sensors` stays at its audited `v0.3.0`
+pin even though 0.7.17's registry default is older. Modules that arrive
+only transitively (`nsx-cmsis-nn`, pulled by registry-backed heliaRT) have
+no manifest pin and follow the packaged registry. The stock-TFLM engine's
+declared modules (`nsx-tflite-micro`, `arm-cmsis-nn`) sit in this
+registry-governed tier too: hpx renders informational manifest revisions
+for them, but NSX locking reads only the registry's module revision. For
+this whole tier the post-lock validation refuses to build when the
+resolved commit disagrees with this baseline, so a promotion must advance
+exactly these refs together with the tool — never "adopt the registry"
+for the pinned tier.
+`nsx-nanopb` (promoted in 0.7.16) is outside HPX's qualified module graph.
+The neuralSPOT-X tag is verified and stored as its peeled commit. The
+`nsx-tflite-micro` and `arm-cmsis-nn` rows still pin the same qualified
+`v0.1.0` tags but are now recorded as their peeled commits — earlier
+baselines recorded the annotated tag-object ids, which a resolved NSX lock
+can never match. All other project, module, and engine refs (SDK, PMU,
+heliaRT, nsx-sensors) are unchanged.
 
 Every baseline project and module ref is immutable by policy: only a full
 40-character Git object ID is accepted. Newly promoted annotated tags are

@@ -55,14 +55,20 @@ class SyncContext:
 class PowerMonitorContext:
     """On-target power monitor (INA228) render inputs.
 
-    ``power_monitor`` is ``None`` for every run that doesn't select the
-    ina228 driver, and all template content is gated on it — non-monitor
+    ``power_monitor`` is ``None`` for every run without a ``power.ina228``
+    config block, and all template content is gated on it — non-monitor
     renders stay byte-identical (WP2). Physical quantities are carried as
     scaled integers so the rendered C literals are exact and the render
     digest is stable across float formatting.
     """
 
     power_monitor: str | None
+    # True when the monitor is the measurement of record (driver: ina228):
+    # a setup failure is then terminal. False makes it a bystander — a
+    # missing or mis-wired chip logs a diagnostic and the run continues
+    # without a monitor payload, because the actual measurement belongs to
+    # an external instrument.
+    ina228_required: bool = False
     ina228_i2c_iom: int = 0
     ina228_i2c_address: int = 0
     ina228_i2c_speed_hz: int = 0
@@ -84,10 +90,17 @@ class PowerMonitorContext:
     @classmethod
     def from_config(cls, config: "ProfileConfig") -> "PowerMonitorContext":
         power = config.power
-        if not (power.enabled and power.driver == "ina228"):
-            return cls(power_monitor=None)
+        # The presence of a power.ina228 block — not the driver name — decides
+        # whether firmware talks to a monitor. `driver` selects who *measures*
+        # (on-device vs host instrument), so `driver: joulescope` with an
+        # ina228 block builds identical firmware and lets an external
+        # instrument observe the monitor's own cost. This must stay in step
+        # with the module-selection gate in firmware/__init__.py: when the two
+        # disagreed, runs silently built no monitor at all while appearing to
+        # configure one, which invalidated a bench sweep.
         ina = power.ina228
-        assert ina is not None  # enforced by PowerConfig._validate
+        if not power.monitor_selected or ina is None:
+            return cls(power_monitor=None)
         shunt_ohms = ina.resolved_shunt_ohms
         shunt_micro_ohms = round(shunt_ohms * 1_000_000)
         max_current_ma = round(ina.max_current_a * 1_000)
@@ -112,6 +125,7 @@ class PowerMonitorContext:
         )
         return cls(
             power_monitor="ina228",
+            ina228_required=power.driver == "ina228",
             ina228_i2c_iom=ina.i2c_iom,
             ina228_i2c_address=ina.resolved_i2c_address,
             ina228_i2c_speed_hz=ina.i2c_speed_hz,
@@ -338,10 +352,29 @@ class FirmwareRenderContext:
             ),
         )
 
+    @property
+    def power_binary_needs_gpio(self) -> bool:
+        """Whether the dedicated power binary needs the nsx-gpio module.
+
+        Two independent consumers: the GPIO lock-step handshake (external
+        mode) and the BLE-controller reset drive on Blue-variant boards
+        (see ``_ble_reset.j2``), which is emitted regardless of mode. Both
+        the ``nsx_gpio.h`` include and the CMake link line read this single
+        property, and ``firmware/__init__.py`` selects the module on the
+        same basis — when the link condition was narrower than the include,
+        an internal-mode run on a Blue board fetched nsx-gpio, emitted the
+        header, and failed to compile with 'nsx_gpio.h: No such file'.
+        """
+        return (
+            self.sync.power_sync_enabled
+            or self.power_window.ble_reset_gpio_pin is not None
+        )
+
     def to_template_vars(self) -> dict[str, object]:
         """Flatten typed fields to the legacy Jinja variable names."""
         return {
             "power_sync_enabled": self.sync.power_sync_enabled,
+            "power_binary_needs_gpio": self.power_binary_needs_gpio,
             "sync_gpio_pin": self.sync.sync_gpio_pin,
             "lockstep": self.sync.lockstep,
             "state_gpio_pin": self.sync.state_gpio_pin,
@@ -390,6 +423,7 @@ class FirmwareRenderContext:
             "has_radio_subsystem": self.power_window.has_radio_subsystem,
             "ble_reset_gpio_pin": self.power_window.ble_reset_gpio_pin,
             "power_monitor": self.power_monitor.power_monitor,
+            "ina228_required": self.power_monitor.ina228_required,
             "ina228_i2c_iom": self.power_monitor.ina228_i2c_iom,
             "ina228_i2c_address": self.power_monitor.ina228_i2c_address,
             "ina228_i2c_speed_hz": self.power_monitor.ina228_i2c_speed_hz,
