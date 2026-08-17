@@ -1,19 +1,22 @@
 {# main.cc — heliaPROFILER firmware entry point #}
-{#- The measured window must not be timed by a clock this same binary
-   powers down. DWT->CYCCNT lives in the CoreSight debug domain, and the
-   dedicated power binary disables that domain (AM_HAL_PWRCTRL_PERIPH_DEBUG,
-   see _peripheral_power_down.j2) wherever broad_peripheral_shutdown is set
-   -- AP4 families. Reads then return garbage, so the accumulated cycle count
-   is meaningless; because the terminal report derives elapsed_us from it, the
-   window duration is over-reported. Energy is unaffected (the monitor
-   integrates in hardware over real time) but average power and current are
-   divided by the inflation factor -- measured ~7x on Apollo4 Blue Plus, where
-   a 24-second wall-clock run reported a 38.6-second window.
+{#- The measured window must not be timed by a clock this binary cannot read.
+   DWT->CYCCNT lives in the CoreSight debug domain, which the dedicated power
+   binary either powers down itself (AM_HAL_PWRCTRL_PERIPH_DEBUG, see
+   _peripheral_power_down.j2) or simply has nothing holding up, since it
+   free-runs with no debugger asserting CDBGPWRUPREQ. Reads are then frozen or
+   garbage, so the accumulated cycle count is meaningless; because the terminal
+   report derives elapsed_us from it, the window duration is wrong. Energy is
+   unaffected (a monitor integrates in hardware over real time) but average
+   power and current are silently scaled by the error -- measured ~7x on
+   Apollo4 Blue Plus, where a 24-second wall-clock run reported a 38.6-second
+   window.
 
-   STIMER runs off its own 32.768 kHz XTAL and keeps ticking with the debug
-   domain off, so those renders fall back to it. The profile binary never runs
-   the shutdown, so it keeps DWT's finer resolution. -#}
-{%- set window_timer = "stimer" if (clean_window_timer | default("dwt") == "stimer" or (power_only | default(false) and broad_peripheral_shutdown | default(false))) else "dwt" %}
+   The predicate itself lives host-side, once, in
+   SocCapabilities.power_window_timer -- read that docstring for the two
+   independent mechanisms. This template only picks between the power binary's
+   answer and the family preference the transport-attached profile binary uses
+   (it runs with a debugger attached, so it keeps DWT's finer resolution). -#}
+{%- set window_timer = power_window_timer if power_only | default(false) else (clean_window_timer | default("dwt")) %}
 {%- set use_stimer_window = (window_timer == "stimer") and (clean_window_probe | default("infer") != "busy_loop") %}
 /**
  * @file main.cc
@@ -845,13 +848,14 @@ int main(void) {
         clean_cycles = clean_probe_target_cyc;
         clean_count = 1;
 {% elif use_stimer_window %}
-        // Timed via STIMER (see hpx_stimer_init above), not DWT->CYCCNT: PD_DBG
-        // (and DWT with it) is disabled for this whole loop on this family, so
-        // an in-window DWT read would read frozen.  A single before/after
-        // STIMER read brackets the whole window rather than reading every
-        // iteration — fewer peripheral accesses inside the timed loop and no
-        // resolution concern at this scale (XTAL 32.768 kHz ticks are ~30.5us,
-        // negligible against a multi-ms clean window).
+        // Timed via STIMER (see hpx_stimer_init above), not DWT->CYCCNT: this
+        // build cannot rely on PD_DBG (and DWT with it) being readable for the
+        // whole loop -- it is either gated off deliberately or simply never
+        // powered -- so an in-window DWT read would read frozen or garbage.  A
+        // single before/after STIMER read brackets the whole window rather
+        // than reading every iteration — fewer peripheral accesses inside the
+        // timed loop and no resolution concern at this scale (XTAL 32.768 kHz
+        // ticks are ~30.5us, negligible against a multi-ms clean window).
         for (int iter = 0; iter < clean_iters_n; iter++) {
             interpreter.Invoke();
             clean_count++;
