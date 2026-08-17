@@ -9,8 +9,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from .sync import DeviceState
+
+if TYPE_CHECKING:
+    from .base import PowerResult
 
 
 class GateFailureKind(StrEnum):
@@ -119,6 +123,198 @@ def assess_gate_duration(
     )
 
 
+# ---------------------------------------------------------------------------
+# Firmware window-clock integrity
+# ---------------------------------------------------------------------------
+#
+# The dedicated power binary times its own measured window and reports the
+# result as HPX_POWER_ELAPSED_US. That clock is independent of every host
+# measurement, which makes it the one number that can be silently wrong without
+# anything else looking unhealthy: energy is integrated in hardware over real
+# time, the completed/requested counts still match, and the gate edges are
+# still observed. Two real regressions have taken exactly this shape --
+# Apollo4 over-reported its window ~7x (the debug domain the binary powers down
+# holds DWT), and Apollo3 reported exactly 0 (nothing holds that domain up on a
+# free-running binary). Both published confidently wrong average power and
+# current while every other check passed.
+#
+# The policy lives here so the collect stage (which raises/warns at capture
+# time) and evaluation.validity (the downstream authority over an already
+# captured run) cannot disagree about it.
+
+#: Externally-referenced tolerance. The firmware clock and the host-timestamped
+#: gate edges measure the SAME physical window, so real agreement is tight:
+#: 0.065% on Apollo4 Blue Plus and 0.064% on Apollo3 Blue Plus (bench, 2026-08).
+#: 5% is ~75x that observed error -- generous enough that instrument jitter,
+#: packet quantization and gate-edge poll resolution can never trip it, while
+#: still catching the 0x and 7x failures. Warning-only for now: two boards is
+#: not a wide enough envelope to make this fatal.
+EXTERNAL_WINDOW_CLOCK_TOLERANCE = 0.05
+
+#: Internally-referenced tolerance. Internal mode has no host-timed gate, so
+#: the only reference is the host plan -- N x the reference inference time
+#: measured by a DIFFERENT binary (the transport-attached profile build). That
+#: cross-binary comparison is legitimately loose: profile-vs-power timing
+#: disagreed by 10-14% on Apollo4 (the metric-shopping finding), so a 5%
+#: threshold here would false-fail perfectly valid runs. 50% still catches
+#: every failure ever observed (0x and 7x) with an order of magnitude of
+#: margin. DO NOT tighten this without new cross-binary timing evidence --
+#: the loose bound is the point, not an oversight.
+INTERNAL_WINDOW_CLOCK_TOLERANCE = 0.50
+
+#: Shared user-facing explanation for a frozen firmware window clock.
+FROZEN_WINDOW_CLOCK_HINT = (
+    "The firmware completed its inferences but timed the window with a clock "
+    "that never advanced. On Cortex-M4F parts DWT->CYCCNT lives in the "
+    "CoreSight debug power domain, which the dedicated power binary either "
+    "powers down itself or -- free-running with no debugger asserting "
+    "CDBGPWRUPREQ -- has nothing holding up. Rebuild the power firmware on a "
+    "revision whose SocCapabilities.power_window_timer resolves to STIMER for "
+    "this SoC; energy and charge from an external instrument are unaffected, "
+    "but average power, average current and elapsed time are not."
+)
+
+
+def firmware_window_clock_is_frozen(
+    *, elapsed_us: int | None, completed_count: int
+) -> bool:
+    """True when firmware completed work but reported zero elapsed time.
+
+    An inference cannot take zero time, so this is never a legitimate reading;
+    it is the exact signature of a window timed by a counter that is not
+    powered. Kept separate from :func:`assess_window_clock` because it needs no
+    reference measurement at all -- it is checkable in every mode, on every
+    board, with no instrument attached.
+    """
+    return completed_count > 0 and elapsed_us == 0
+
+
+@dataclass(frozen=True)
+class WindowClockAgreement:
+    """Agreement between the firmware's own window clock and a reference."""
+
+    elapsed_us: int
+    reference_s: float
+    #: Which independent measurement ``reference_s`` came from, so a warning
+    #: can name it and a reader knows how much to trust the comparison.
+    reference_source: str
+    relative_tolerance: float
+
+    @property
+    def elapsed_s(self) -> float:
+        return self.elapsed_us / 1_000_000.0
+
+    @property
+    def ratio(self) -> float:
+        return self.elapsed_s / self.reference_s if self.reference_s > 0 else 0.0
+
+    @property
+    def relative_error(self) -> float:
+        if self.reference_s <= 0:
+            return 0.0
+        return abs(self.elapsed_s - self.reference_s) / self.reference_s
+
+    @property
+    def agrees(self) -> bool:
+        return self.relative_error <= self.relative_tolerance
+
+    def to_metadata(self) -> dict[str, float | int | str]:
+        return {
+            "elapsed_us": self.elapsed_us,
+            "elapsed_s": round(self.elapsed_s, 6),
+            "reference_s": round(self.reference_s, 6),
+            "reference_source": self.reference_source,
+            "relative_error": round(self.relative_error, 6),
+            "relative_tolerance": self.relative_tolerance,
+            "ratio": round(self.ratio, 6),
+        }
+
+
+def assess_window_clock(
+    *, elapsed_us: int, reference_s: float, reference_source: str, relative_tolerance: float
+) -> WindowClockAgreement | None:
+    """Compare the firmware window clock against an independent reference.
+
+    Returns ``None`` when there is nothing to compare against (no positive
+    reference), so callers never have to invent a verdict from missing data.
+    """
+    if reference_s <= 0:
+        return None
+    return WindowClockAgreement(
+        elapsed_us=elapsed_us,
+        reference_s=reference_s,
+        reference_source=reference_source,
+        relative_tolerance=relative_tolerance,
+    )
+
+
+def gated_window_reference_s(result: "PowerResult") -> tuple[float, str] | None:
+    """Most precise host-measured duration of the gated window, with its source.
+
+    Prefers ``gated_windows`` over ``summary.duration_s``. Both are summed from
+    the same instrument ``dur_ticks`` at time64 resolution, so neither is
+    numerically coarser -- but ``summary.duration_s`` means "the gated window"
+    only on the gated path; on the degraded/free-form path the same field holds
+    the WHOLE capture window, which would silently turn this check into a
+    comparison against an unrelated (much longer) interval. ``gated_windows``
+    can only ever mean the gate, so it is the correct source and the fallback
+    is used only when the gated path produced a summary but no window list.
+
+    Returns ``None`` when no gated duration is available at all.
+    """
+    windows_total = sum(window.duration_s for window in result.gated_windows)
+    if windows_total > 0:
+        return windows_total, "gated_windows"
+    summary_duration = result.summary.duration_s
+    if summary_duration > 0:
+        return summary_duration, "capture_summary"
+    return None
+
+
+def assess_run_window_clock(
+    *,
+    elapsed_us: int | None,
+    internal_mode: bool,
+    gated_result: "PowerResult | None",
+    planned_inference_count: int | None,
+    planned_inference_us: int | None,
+) -> WindowClockAgreement | None:
+    """Resolve reference + tolerance for one run and compare the window clock.
+
+    Mode selects the reference, and the reference selects the tolerance -- they
+    are not independent knobs, so they are chosen together here rather than at
+    each call site. External mode gets the host-timed gate (same physical
+    window, tight bound); internal mode gets the host plan (a different binary's
+    timing, loose bound). Returns ``None`` whenever no usable reference exists,
+    which callers treat as "nothing to say", not "passed".
+    """
+    if elapsed_us is None or elapsed_us <= 0:
+        # 0 is the frozen-clock case, handled by
+        # firmware_window_clock_is_frozen() with a far better message; a ratio
+        # of 0.0 here would only restate it less clearly.
+        return None
+    if not internal_mode:
+        if gated_result is None:
+            return None
+        reference = gated_window_reference_s(gated_result)
+        if reference is None:
+            return None
+        reference_s, reference_source = reference
+        tolerance = EXTERNAL_WINDOW_CLOCK_TOLERANCE
+    else:
+        if not planned_inference_count or not planned_inference_us:
+            return None
+        reference_s = planned_inference_count * planned_inference_us / 1_000_000.0
+        reference_source = "planned_window"
+        tolerance = INTERNAL_WINDOW_CLOCK_TOLERANCE
+    return assess_window_clock(
+        elapsed_us=elapsed_us,
+        reference_s=reference_s,
+        reference_source=reference_source,
+        relative_tolerance=tolerance,
+    )
+
+
 def classify_gate_failure(
     *, saw_gate_rise: bool, saw_gate_fall: bool = False, duration_s: float
 ) -> GateFailure:
@@ -155,11 +351,19 @@ def classify_gate_failure(
 
 
 __all__ = [
+    "EXTERNAL_WINDOW_CLOCK_TOLERANCE",
+    "FROZEN_WINDOW_CLOCK_HINT",
+    "INTERNAL_WINDOW_CLOCK_TOLERANCE",
     "GateDurationIntegrity",
     "GateFailure",
     "GateFailureKind",
     "GateTransitionTiming",
     "SyncHandshakeMetadata",
+    "WindowClockAgreement",
     "assess_gate_duration",
+    "assess_run_window_clock",
+    "assess_window_clock",
     "classify_gate_failure",
+    "firmware_window_clock_is_frozen",
+    "gated_window_reference_s",
 ]

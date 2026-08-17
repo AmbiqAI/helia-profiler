@@ -5,7 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from ..power.diagnostics import assess_gate_duration
+from ..power.diagnostics import (
+    assess_gate_duration,
+    assess_run_window_clock,
+    firmware_window_clock_is_frozen,
+)
 from ..results import ResultIssue, ResultValidity
 
 if TYPE_CHECKING:
@@ -120,6 +124,42 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                         requested_count=terminal.requested_count,
                     )
                 )
+            # Same policy the collect stage applies at capture time, from the
+            # same helpers, so the two cannot disagree about severity: a run
+            # the stage refuses to accept must not evaluate as VALID here if
+            # it reaches this path some other way (a resumed or replayed
+            # artifact, or a caller that skipped the stage). This mirrors the
+            # on_device_overflow shape below, where the stage's mode-aware
+            # fatal/warn split is reproduced rather than restated.
+            if firmware_window_clock_is_frozen(
+                elapsed_us=terminal.elapsed_us,
+                completed_count=terminal.completed_count,
+            ):
+                issues.append(
+                    _error(
+                        "power.window_clock_frozen",
+                        "Power firmware reported zero elapsed time for completed inferences.",
+                        completed_count=terminal.completed_count,
+                        elapsed_us=terminal.elapsed_us,
+                    )
+                )
+            else:
+                agreement = assess_run_window_clock(
+                    elapsed_us=terminal.elapsed_us,
+                    internal_mode=internal_mode,
+                    gated_result=observation.result if observation is not None else None,
+                    planned_inference_count=plan.inference_count,
+                    planned_inference_us=plan.reference_inference_us,
+                )
+                if agreement is not None and not agreement.agrees:
+                    issues.append(
+                        _warning(
+                            "power.window_clock_mismatch",
+                            "Firmware-reported window duration does not agree with "
+                            "the independently measured window.",
+                            **agreement.to_metadata(),
+                        )
+                    )
 
         if on_device is not None:
             if on_device.overflow:

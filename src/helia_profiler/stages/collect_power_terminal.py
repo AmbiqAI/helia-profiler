@@ -7,6 +7,11 @@ import logging
 from ..errors import PowerError
 from ..pipeline import PipelineContext
 from ..power.base import PowerResult, PowerSummary
+from ..power.diagnostics import (
+    FROZEN_WINDOW_CLOCK_HINT,
+    assess_run_window_clock,
+    firmware_window_clock_is_frozen,
+)
 
 log = logging.getLogger("hpx")
 
@@ -73,6 +78,22 @@ class CollectPowerTerminalStage:
             )
         if not terminal.gate_lowered:
             raise PowerError("Power firmware did not confirm that GATE was lowered.")
+        if firmware_window_clock_is_frozen(
+            elapsed_us=terminal.elapsed_us,
+            completed_count=terminal.completed_count,
+        ):
+            # Terminal, in every mode, with no instrument required: the
+            # firmware says it ran N inferences in zero time. Everything else
+            # about the run still looks healthy (status ok, counts matched,
+            # both gate edges seen, energy integrated in hardware), which is
+            # precisely why this needs its own gate -- an Apollo3 capture with
+            # this exact signature passed every other check and published
+            # average power derived from a frozen counter.
+            raise PowerError(
+                "Power firmware reported zero elapsed time for "
+                f"{terminal.completed_count} completed inferences.",
+                hint=FROZEN_WINDOW_CLOCK_HINT,
+            )
         if envelope.measurement is not None and envelope.measurement.overflow:
             if not internal_mode:
                 # The monitor is present but is not this run's measurement of
@@ -171,6 +192,37 @@ class CollectPowerTerminalStage:
                     "source": measurement.source,
                     "inference_count": measurement.inference_count,
                 },
+            )
+        # Non-fatal cross-check of the firmware's own window clock against an
+        # independent measurement of the same work. Warning-only: the frozen
+        # (0x) case above is already terminal, and the tolerances here are set
+        # from a two-board bench envelope -- wide enough that only a real
+        # timing fault trips them, not wide enough to promise no false
+        # positives on hardware nobody has run yet. See
+        # power.diagnostics.EXTERNAL_/INTERNAL_WINDOW_CLOCK_TOLERANCE.
+        agreement = assess_run_window_clock(
+            elapsed_us=terminal.elapsed_us,
+            internal_mode=internal_mode,
+            gated_result=(
+                ctx.power_run.observation.result
+                if ctx.power_run.observation is not None
+                else None
+            ),
+            planned_inference_count=plan.inference_count,
+            planned_inference_us=plan.reference_inference_us,
+        )
+        if agreement is not None and not agreement.agrees:
+            log.warning(
+                "Power firmware reported a %.6f s window but the %s measured "
+                "%.6f s (%.1f%% apart, tolerance %.0f%%). The firmware's "
+                "window clock and the reference disagree, so elapsed time, "
+                "average power and average current derived from it are "
+                "suspect; integrated energy and charge are not.",
+                agreement.elapsed_s,
+                agreement.reference_source,
+                agreement.reference_s,
+                agreement.relative_error * 100.0,
+                agreement.relative_tolerance * 100.0,
             )
         log.info(
             "Power terminal: status=%s count=%d elapsed_us=%s phase=%s",

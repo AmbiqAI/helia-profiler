@@ -18,9 +18,24 @@ from helia_profiler.results import (
 from helia_profiler.config import load_config
 from helia_profiler.errors import PowerError
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.power.base import PowerResult, PowerSummary
+from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
 from helia_profiler.stages.collect_power_terminal import CollectPowerTerminalStage
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+
+
+def _gated_window(duration_s: float) -> GatedPowerWindow:
+    """A gated window carrying only the field the clock cross-check reads."""
+    return GatedPowerWindow(
+        start_s=0.0,
+        end_s=duration_s,
+        duration_s=duration_s,
+        charge_c=0.0,
+        energy_j=0.0,
+        avg_current_a=0.0,
+        avg_power_w=0.0,
+        peak_current_a=0.0,
+        sample_count=int(duration_s * 1000),
+    )
 
 
 def _make_ctx(
@@ -28,6 +43,11 @@ def _make_ctx(
     *,
     transport: str = "rtt",
     internal: bool = False,
+    inference_count: int = 5,
+    reference_inference_us: int = 1000,
+    count_source: str = "configured",
+    gate_duration_s: float = 0.005,
+    capture_duration_s: float | None = None,
 ) -> PipelineContext:
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")
@@ -61,9 +81,9 @@ def _make_ctx(
     ctx.publish_power_plan(
         PowerRunPlan(
             firmware_mode="dedicated",
-            inference_count=5,
-            reference_inference_us=1000,
-            count_source="configured",
+            inference_count=inference_count,
+            reference_inference_us=reference_inference_us,
+            count_source=count_source,
         )
     )
     ctx.publish_power_firmware(firmware)
@@ -75,8 +95,19 @@ def _make_ctx(
         )
     )
     if not internal:
+        # The gated window must agree with the plan (5 x 1000 us) and with
+        # _record()'s elapsed_us, or every run through this fixture trips the
+        # window-clock cross-check for reasons unrelated to what it is testing.
         result = PowerResult(
-            summary=PowerSummary(0.01, 0.018, 0.02, 0.09, 5.0, 5000),
+            summary=PowerSummary(
+                0.01,
+                0.018,
+                0.02,
+                0.09,
+                capture_duration_s if capture_duration_s is not None else gate_duration_s,
+                5000,
+            ),
+            gated_windows=[_gated_window(gate_duration_s)],
             metadata={"measurement_scope": "gpio_gated_clean_window"},
         )
         ctx.publish_power_observation(
@@ -283,6 +314,221 @@ class TestInternalMeasurementPlausibility:
         )
         CollectPowerTerminalStage().run(ctx)
         assert ctx.power_run is not None and ctx.power_run.terminal is not None
+
+
+class TestFirmwareWindowClockIntegrity:
+    """The firmware times its own measured window and reports it as
+    HPX_POWER_ELAPSED_US. Nothing else on the host depends on that clock, so
+    when it is wrong every other check still passes -- status ok, counts
+    matched, both gate edges seen, energy integrated in hardware -- and the run
+    publishes confidently wrong average power and current.
+
+    Numbers below are the real Apollo3 Blue Plus bench pair (2026-08,
+    apollo3p_evb, KWS/heliaRT, JS110 external): the pre-fix build reported
+    elapsed_us=0 for 24/24 completed inferences against a 4.963 s measured
+    gate, and the fixed build reported 4.970184 s against a 4.967 s gate.
+    """
+
+    # --- Apollo3 bench pair -------------------------------------------------
+    BENCH_COUNT = 24
+    BENCH_REFERENCE_US = 208_744  # host plan, from the profile binary
+    BENCH_GATE_S = 4.967  # JS110 gated window, fixed build
+    BENCH_ELAPSED_US = 4_970_184  # firmware STIMER, fixed build -> 0.064% apart
+    BASELINE_GATE_S = 4.963  # JS110 gated window, pre-fix build
+    # Apollo4's failure shape: reported 6027 us/inference where the truth was
+    # 866.6 us, i.e. the window clock ran ~7x long.
+    AP4_INFLATION = 6027 / 866.6
+
+    def _bench_ctx(
+        self,
+        tmp_path: Path,
+        *,
+        internal: bool = False,
+        gate_s: float = BENCH_GATE_S,
+        capture_s: float | None = None,
+    ) -> PipelineContext:
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        return _make_ctx(
+            tmp_path,
+            internal=internal,
+            inference_count=self.BENCH_COUNT,
+            reference_inference_us=self.BENCH_REFERENCE_US,
+            count_source="profile_guided",
+            gate_duration_s=gate_s,
+            capture_duration_s=capture_s,
+        )
+
+    def _bench_record(self, **overrides) -> PowerTerminalRecord:
+        values = {
+            "requested_count": self.BENCH_COUNT,
+            "completed_count": self.BENCH_COUNT,
+            "elapsed_us": self.BENCH_ELAPSED_US,
+            **overrides,
+        }
+        return _record(**values)
+
+    def _run(self, ctx, record, monkeypatch, measurement=None):
+        monkeypatch.setattr(
+            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            lambda transport: _FakeTerminalTransport(record, measurement),
+        )
+        CollectPowerTerminalStage().run(ctx)
+
+    def _bench_measurement(self, elapsed_us: int) -> OnDevicePowerSummary:
+        # Internal mode requires a measurement payload; the parser already
+        # enforces duration_us == elapsed_us, so mirror that here.
+        return _measurement(
+            duration_us=elapsed_us, inference_count=self.BENCH_COUNT
+        )
+
+    # --- 1. hard fail, both modes, no hardware ------------------------------
+
+    def test_zero_elapsed_with_completed_work_is_terminal(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """The exact pre-fix Apollo3 signature: 24/24 inferences in 0 us."""
+        ctx = self._bench_ctx(tmp_path, gate_s=self.BASELINE_GATE_S)
+        record = self._bench_record(elapsed_us=0)
+        with pytest.raises(PowerError, match="zero elapsed time") as excinfo:
+            self._run(ctx, record, monkeypatch)
+        assert "CDBGPWRUPREQ" in (excinfo.value.hint or "")
+
+    def test_zero_elapsed_is_terminal_in_internal_mode_too(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """No instrument is involved in this check -- it must fire with no
+        external observation at all."""
+        ctx = self._bench_ctx(tmp_path, internal=True)
+        record = self._bench_record(elapsed_us=0)
+        with pytest.raises(PowerError, match="zero elapsed time"):
+            self._run(ctx, record, monkeypatch, self._bench_measurement(1))
+
+    def test_zero_elapsed_with_no_completed_work_is_not_this_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """A firmware that failed before running anything reports 0/0 and
+        elapsed 0 legitimately; it is rejected earlier, for the real reason,
+        not misdiagnosed as a frozen clock."""
+        ctx = self._bench_ctx(tmp_path)
+        record = _record(
+            status="error",
+            requested_count=self.BENCH_COUNT,
+            completed_count=0,
+            elapsed_us=0,
+            error_code=4,
+            final_phase="allocate",
+        )
+        with pytest.raises(PowerError, match="reported error 4"):
+            self._run(ctx, record, monkeypatch)
+
+    # --- 2. external-mode warning -------------------------------------------
+
+    def test_bench_agreement_logs_no_window_clock_warning(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        """4.970184 s firmware vs 4.967 s host = 0.064% apart. The check must
+        stay silent well inside its 5% bound on a real passing run."""
+        ctx = self._bench_ctx(tmp_path)
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(ctx, self._bench_record(), monkeypatch)
+        assert "window clock" not in caplog.text
+        assert ctx.power_run is not None and ctx.power_run.terminal is not None
+
+    def test_external_window_clock_disagreement_warns(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        """Apollo4's ~7x inflation against a correctly measured gate."""
+        ctx = self._bench_ctx(tmp_path)
+        inflated = int(self.BENCH_ELAPSED_US * self.AP4_INFLATION)
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(ctx, self._bench_record(elapsed_us=inflated), monkeypatch)
+        assert "window clock and the reference disagree" in caplog.text
+        assert "gated_windows" in caplog.text
+        # Warning only -- the run still completes and publishes.
+        assert ctx.power_run is not None and ctx.power_run.terminal is not None
+
+    def test_external_check_prefers_the_gated_window_over_the_capture_summary(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        """summary.duration_s holds the WHOLE capture window on the degraded
+        path, so comparing against it would measure the wrong interval. The
+        gated window is the correct reference and must win when both exist."""
+        # Whole-capture duration was 8.4821 s on the bench run: 41% away from
+        # the firmware's window, so picking that source would warn.
+        ctx = self._bench_ctx(tmp_path, capture_s=8.4821)
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(ctx, self._bench_record(), monkeypatch)
+        assert "window clock" not in caplog.text
+
+    # --- 3. internal-mode warning -------------------------------------------
+
+    def test_internal_window_clock_disagreement_warns(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        ctx = self._bench_ctx(tmp_path, internal=True)
+        inflated = int(self.BENCH_ELAPSED_US * self.AP4_INFLATION)
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(
+                ctx,
+                self._bench_record(elapsed_us=inflated),
+                monkeypatch,
+                self._bench_measurement(inflated),
+            )
+        assert "window clock and the reference disagree" in caplog.text
+        assert "planned_window" in caplog.text
+
+    def test_internal_cross_binary_skew_does_not_warn(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        """Internal mode's only reference is the host plan -- N x a per-
+        inference time measured by a DIFFERENT binary. That comparison
+        legitimately skews: profile-vs-power timing disagreed by 10-14% on
+        Apollo4. A 14% skew must not warn, or valid runs fail for a known,
+        expected reason."""
+        ctx = self._bench_ctx(tmp_path, internal=True)
+        planned_us = self.BENCH_COUNT * self.BENCH_REFERENCE_US
+        skewed = int(planned_us * 1.14)
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(
+                ctx,
+                self._bench_record(elapsed_us=skewed),
+                monkeypatch,
+                self._bench_measurement(skewed),
+            )
+        assert "window clock" not in caplog.text
+
+    # --- 4. mode-awareness ---------------------------------------------------
+
+    def test_the_two_modes_apply_different_tolerances_to_the_same_skew(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        """One 14% deviation, two verdicts. Against a host-timed gate (same
+        physical window) that is a real fault; against a cross-binary plan it
+        is expected noise. The split is the whole point of having two
+        thresholds, so pin it directly rather than inferring it from the two
+        single-mode tests above."""
+        skew = 1.14
+
+        external = self._bench_ctx(tmp_path / "ext")
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(
+                external,
+                self._bench_record(elapsed_us=int(self.BENCH_GATE_S * 1e6 * skew)),
+                monkeypatch,
+            )
+        assert "window clock and the reference disagree" in caplog.text
+
+        caplog.clear()
+        internal = self._bench_ctx(tmp_path / "int", internal=True)
+        planned = int(self.BENCH_COUNT * self.BENCH_REFERENCE_US * skew)
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(
+                internal,
+                self._bench_record(elapsed_us=planned),
+                monkeypatch,
+                self._bench_measurement(planned),
+            )
+        assert "window clock" not in caplog.text
 
 
 @pytest.mark.parametrize("transport", ["rtt", "uart", "swo", "usb_cdc"])
