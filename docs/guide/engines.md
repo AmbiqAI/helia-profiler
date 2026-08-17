@@ -59,7 +59,12 @@ each PMU pass and aggregated by the normal HPX parser.
 The profiler validates `nsx_pmu_init()`, runs a CPU-cycle counter self-test,
 checks every counter read, and reports true 32-bit chained-counter overflow.
 ExecuTorch power capture is not yet supported; keep `power.enabled: false`.
-See `configs/executorch/resnet8_cmsis_nn.yaml` for the two-checkout fixture.
+See `configs/executorch/resnet8_cmsis_nn.yaml` for the verified fixture — it
+targets `apollo330mP_evb` with `arena_location: sram` (that board's MCU_TCM is
+too small for the combined method/temporary/planned arenas) and only needs a
+single `nsx-executorch` checkout at `source_path`; `hpx` materializes the
+selected `backend`'s CMSIS-NN provider (`arm-cmsis-nn` or `ns-cmsis-nn`)
+itself, pinned to the HPX compatibility baseline.
 
 ## heliaRT
 

@@ -1,11 +1,14 @@
 # ExecuTorch Cortex-M/CMSIS-NN ResNet-8 fixture from the adjacent
 # neuralspotx and nsx-executorch development checkouts. Run this config from
 # the helia-profiler repository root, or replace the two relative paths.
+# Verified on apollo330mP_evb — its MCU_TCM is only 240 KB, too small for
+# the combined method (64 KB) + temporary (32 KB) + planned (160 KB) arenas,
+# so arena_location is sram (1792 KB) rather than tcm.
 model:
   path: ../neuralspotx/examples/executorch_cmsis_nn/model/resnet8_cmsis_nn.pte
   # The PTE reports 163,840 bytes of memory-planned storage.
   arena_size: 163840
-  arena_location: tcm
+  arena_location: sram
   weights_location: mram
 
 engine:
@@ -27,7 +30,7 @@ engine:
     portable_ops: []
 
 target:
-  board: apollo510_evb
+  board: apollo330mP_evb
   toolchain: arm-none-eabi-gcc
   transport: rtt
   clock:
