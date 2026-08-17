@@ -192,6 +192,11 @@ class PowerWindowContext:
     heartbeat_every_n_ops: int
     heartbeat_every_ms: int
     clean_window_timer: str
+    #: Effective timer for the dedicated power binary's measured window —
+    #: ``SocCapabilities.power_window_timer``, which owns the predicate.  The
+    #: templates select between this and ``clean_window_timer`` on
+    #: ``power_only`` alone and carry no policy of their own.
+    power_window_timer: str
     gate_debug_domain_in_window: bool
     broad_peripheral_shutdown: bool
     crypto_otp_shutdown: bool
@@ -326,6 +331,7 @@ class FirmwareRenderContext:
                     config.target.heartbeat.every_ms if config.target.heartbeat.enabled else 0
                 ),
                 clean_window_timer=soc.capabilities.clock.clean_window_timer,
+                power_window_timer=soc.capabilities.power_window_timer,
                 gate_debug_domain_in_window=soc.capabilities.clock.gate_debug_domain_in_window,
                 broad_peripheral_shutdown=soc.capabilities.clock.broad_peripheral_shutdown,
                 crypto_otp_shutdown=soc.capabilities.clock.crypto_otp_shutdown,
@@ -417,6 +423,7 @@ class FirmwareRenderContext:
             "heartbeat_every_n_ops": self.power_window.heartbeat_every_n_ops,
             "heartbeat_every_ms": self.power_window.heartbeat_every_ms,
             "clean_window_timer": self.power_window.clean_window_timer,
+            "power_window_timer": self.power_window.power_window_timer,
             "gate_debug_domain_in_window": self.power_window.gate_debug_domain_in_window,
             "broad_peripheral_shutdown": self.power_window.broad_peripheral_shutdown,
             "crypto_otp_shutdown": self.power_window.crypto_otp_shutdown,
