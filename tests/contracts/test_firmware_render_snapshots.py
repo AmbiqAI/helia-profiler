@@ -152,6 +152,20 @@ def _render(soc_name: str, transport: str, engine: str, power_only: bool = False
             arena_regions=[],
         )
         return _jinja_env.get_template("main_aot.cc.j2").render(**kwargs)
+    if engine not in ("tflm", "helia-rt"):
+        # Production picks the template three ways (firmware/__init__.py:
+        # HELIA_AOT -> main_aot.cc.j2, EXECUTORCH -> main_executorch.cc.j2,
+        # else main.cc.j2), but this helper only ever branched on helia-aot.
+        # Falling through for anything else would render main.cc.j2 while the
+        # snapshot key says otherwise -- entries byte-identical to tflm,
+        # asserting coverage of a template no contract test has ever rendered.
+        # Fail loudly instead: a silent wrong answer here is worse than none,
+        # because the snapshot it writes reads as real coverage forever after.
+        raise AssertionError(
+            f"_render() has no branch for engine {engine!r}; add one that renders "
+            "the template production would select for it before adding the engine "
+            "to _ENGINES."
+        )
     kwargs.update(
         engine_header=TFLM_ENGINE_HEADER,
         arena_size=65_536,

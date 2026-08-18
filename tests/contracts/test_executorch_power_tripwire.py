@@ -33,7 +33,8 @@ from helia_profiler.stages.preflight import _check_transport_support
 from .test_firmware_render_snapshots import _ENGINES
 
 _BUG_CLASS_MESSAGE = (
-    "preflight now accepts engine.type=executorch with power.enabled=True, but "
+    "stages.preflight._check_transport_support now accepts "
+    "engine.type=executorch with power.enabled=True, but "
     "'executorch' is still absent from the render-contract engine matrix "
     "(_ENGINES in tests/contracts/test_firmware_render_snapshots.py). Lifting "
     "the preflight rejection in stages/preflight.py resurrects the #106/#107 "
@@ -41,34 +42,57 @@ _BUG_CLASS_MESSAGE = (
     "template still times its clean loop with DWT->CYCCNT and has no "
     "power_only window bracketing, terminal record, or "
     "SocCapabilities.power_window_timer consumption. Before removing this "
-    "rejection: add the power_only machinery to main_executorch.cc.j2 "
-    "(mirroring main.cc.j2/main_aot.cc.j2), add 'executorch' to _ENGINES, "
-    "regenerate tests/contracts/snapshots/firmware_render.json, and confirm "
+    "rejection: (1) add the power_only machinery to main_executorch.cc.j2 "
+    "(mirroring main.cc.j2/main_aot.cc.j2); (2) give _render() in "
+    "tests/contracts/test_firmware_render_snapshots.py an executorch branch "
+    "that renders main_executorch.cc.j2 -- WITHOUT this, adding the engine to "
+    "_ENGINES renders main.cc.j2 under an executorch key and writes snapshot "
+    "entries byte-identical to tflm, so the DWT guards below pass while "
+    "covering nothing; (3) add 'executorch' to _ENGINES and regenerate "
+    "tests/contracts/snapshots/firmware_render.json; (4) confirm "
     "test_window_is_never_timed_by_a_domain_the_binary_powers_down / "
-    "test_free_running_power_binary_never_times_the_window_with_dwt cover it."
+    "test_free_running_power_binary_never_times_the_window_with_dwt cover it. "
+    "(If you MOVED the rejection to another function rather than removing it, "
+    "production is fine and this test just needs to call the new one -- it "
+    "names _check_transport_support deliberately so this stays a loud, "
+    "fail-closed prompt to re-point it rather than a silent loss of the guard.)"
 )
 
 
-def _executorch_power_cfg(tmp_path):
+def _executorch_power_cfg(tmp_path, mode="external"):
     model = tmp_path / "model.pte"
+    power = {"enabled": True, "mode": mode}
+    if mode == "internal":
+        # An on-device monitor is the only way to ask for internal mode, and
+        # ina228 requires its own block (shunt value) to validate at all.
+        power.update(driver="ina228", ina228={"shunt_ohms": 0.1})
     overrides = {
         "model": {"path": str(model)},
         "engine": {"type": "executorch"},
-        "power": {"enabled": True},
+        "power": power,
     }
     return load_config(None, overrides)
 
 
-def test_preflight_accepting_executorch_power_requires_engine_matrix_coverage(tmp_path):
+# Both modes, because narrowing the gate is a likelier relaxation than deleting
+# it, and the two modes are not equally bad. Internal mode is the WORSE one to
+# let through: the firmware's own clock is the denominator for average power
+# and current (see power/diagnostics.py), so a frozen DWT scales both by the
+# error -- where external mode's numbers come from the instrument and only
+# elapsed_us is affected. A tripwire that only pinned the default (external)
+# would stay green through exactly the relaxation that does the most damage.
+@pytest.mark.parametrize("mode", ["external", "internal"])
+def test_preflight_accepting_executorch_power_requires_engine_matrix_coverage(tmp_path, mode):
     """Fails the moment preflight stops rejecting executorch+power while the
     render-contract matrix has not been extended to cover it.
 
     Today ``_check_transport_support`` raises ``ConfigError`` for this
     combination, so this test currently just confirms that (and stays green).
-    The moment that rejection is removed -- without the matching render/test
-    work -- this flips to a hard failure naming the bug class.
+    The moment that rejection is removed -- or narrowed to only one power mode
+    -- without the matching render/test work, this flips to a hard failure
+    naming the bug class.
     """
-    cfg = _executorch_power_cfg(tmp_path)
+    cfg = _executorch_power_cfg(tmp_path, mode)
 
     try:
         _check_transport_support(cfg)
