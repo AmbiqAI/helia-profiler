@@ -8,10 +8,15 @@
    average power and current, so both are scaled by the same error; with an
    external instrument only elapsed_us is affected.
 
-   The opt-in busy_loop probe resolves to STIMER on every family regardless:
-   it gates the debug domain off for its own window, so DWT is unreadable
-   there by construction, calibration included.  See main.cc.j2's prelude and
-   _busy_loop_calibration.j2 for the failure it used to produce (issue #112). -#}
+   The opt-in busy_loop probe is pinned to STIMER on every family. That is a
+   deliberate simplification rather than a per-family necessity: only Apollo5
+   and the Apollo3/Apollo4 POWER binaries actually lose DWT (the first gates
+   the domain off via am_hal_debug_disable(), the second never had it held up),
+   while an Apollo3/Apollo4 PROFILE binary could still read it. One clock is
+   used for all three, trading DWT's cycle resolution for STIMER's ~30.5 us
+   tick -- negligible on a window measured in milliseconds to seconds. See
+   main.cc.j2's prelude for the full reasoning and _busy_loop_calibration.j2
+   for the failure the old per-family answer produced (issue #112). -#}
 {%- set busy_loop_probe = (clean_window_probe | default("infer") == "busy_loop") %}
 {%- set window_timer = "stimer" if busy_loop_probe else (power_window_timer if power_only | default(false) else (clean_window_timer | default("dwt"))) %}
 {%- set use_stimer_window = (window_timer == "stimer") %}
@@ -881,11 +886,11 @@ int main(void) {
         hpx_sync_window_begin();
 {% if busy_loop_probe %}
         hpx_printf("HPX_CLEAN_WINDOW_PROBE=busy_loop\n");
-        // No clock reads here — this probe gates the CoreSight debug domain
-        // (and DWT with it) off for the window wherever the HAL exposes that,
-        // and on a free-running power binary DWT is unreadable regardless;
-        // STIMER polling would meanwhile put peripheral traffic inside the
-        // measured region.  Plain bounded counter loop only; its duration
+        // No clock reads here.  DWT is unreadable on the builds that matter
+        // (see the prelude: AP5 gates the domain off, and the AP3/AP4 power
+        // binary never had it held up), and STIMER polling would put
+        // peripheral traffic inside the measured region.  A plain bounded
+        // counter loop reads neither.  Its duration
         // comes from the STIMER bracket around the whole window
         // (clean_stimer_t0, read just above).  It is NOT assumed to equal
         // window_target_ms: reporting the target as if it had been measured

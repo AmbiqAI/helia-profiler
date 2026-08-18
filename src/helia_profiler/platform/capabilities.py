@@ -213,13 +213,21 @@ class SocCapabilities:
         bug that produced the original AP4 miss).
 
         One thing deliberately stays out of this property: the opt-in
-        ``clean_window_probe: busy_loop`` diagnostic resolves to STIMER on
-        every family, power binary or not, because it gates the debug domain
-        off for its own window and so cannot read DWT anywhere -- including in
-        the calibration pass that sizes its loop (issue #112).  That is a
-        property of the *probe*, not of the SoC, so the templates apply it on
-        top of this answer rather than this property second-guessing a
-        profiling setting it is not given.
+        ``clean_window_probe: busy_loop`` diagnostic is pinned to STIMER on
+        every family, power binary or not.  That is *not* because DWT is
+        always unreadable for it -- on an AP3/AP4 *profile* binary it is
+        readable, since ``am_hal_debug_disable()`` renders only under
+        ``has_armv8m_pmu`` and a debugger is attached anyway.  It is one clock
+        for every case by choice, trading DWT's cycle resolution for STIMER's
+        ~30.5 us tick (negligible against a window measured in milliseconds to
+        seconds) to avoid a second code path whose only reachable
+        configuration is the one that does not need it.  The case that forces
+        the issue is the AP3/AP4 *power* binary, where the calibration pass
+        that sizes the loop was reading an already-dead DWT (issue #112).
+
+        Either way it is a property of the *probe*, not of the SoC, so the
+        templates apply it on top of this answer rather than this property
+        second-guessing a profiling setting it is not given.
         """
         if self.clock.clean_window_timer == "stimer":
             return "stimer"

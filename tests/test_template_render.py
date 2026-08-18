@@ -787,6 +787,48 @@ class TestMainAotCcRender:
             # elapsed_us in the terminal report comes from the measurement.
             assert "clean_stimer_total_us," in out
 
+    def test_busy_loop_calibration_rejects_an_implausible_measurement(self):
+        """The scaling branch is gated on a plausibility BAND, not just != 0.
+
+        ``busy_calib_ticks`` is the denominator that sizes the window, so a
+        corrupt reading mis-sizes it by that same multiplicative factor.  The
+        known source is ``hpx_stimer_init()`` itself: AM_HAL_STIMER_CFG_CLEAR
+        drops the XT request before re-requesting it, and the XT is a crystal
+        that restarts.  Measured on an Apollo4 Blue Plus KBR, reading STIMER
+        straight after that sequence gave apparent rates varying 45% across
+        identical builds (584/591/858 kHz against a true 95.771 MHz); a 750 ms
+        settle made it repeatable to 20 ppm.  A transient that is negligible
+        across a multi-second measured window can swallow this ~6-8 ms
+        calibration pass whole.
+
+        The settle belongs in ``hpx_stimer_init()`` and needs a bench pass to
+        size (issue #110).  Until then the band keeps a bad reading from
+        producing an absurd iteration count -- it falls back to the seed, and
+        because the window is now measured, that fallback is visible in
+        HPX_CLEAN_INFER_AVG_US rather than hidden behind the nominal target.
+        """
+        for render in (_render_tflm, _render_aot):
+            out = render(
+                transport="rtt",
+                power_only=True,
+                power_window_timer="stimer",
+                clean_window_probe="busy_loop",
+                has_armv8m_pmu=False,
+                broad_peripheral_shutdown=True,
+            )
+            assert "const uint32_t busy_calib_min_ticks = 16U;" in out
+            assert "const uint32_t busy_calib_max_ticks = 8192U;" in out
+            # Both ends of the band gate the scaling branch -- a bare
+            # "> 0U" guard (what this shipped with before) would let the
+            # observed corruption straight through.
+            assert (
+                "if (busy_calib_ticks >= busy_calib_min_ticks &&\n"
+                "            busy_calib_ticks <= busy_calib_max_ticks) {"
+            ) in out
+            assert "if (busy_calib_ticks > 0U) {" not in out
+            # The seed survives as the fallback value.
+            assert "uint32_t busy_loop_iters = 100000U;" in out
+
     def test_armv8m_infer_probe_keeps_debug_domain_up_for_clean_timing(self):
         tflm_out = _render_tflm(transport="rtt", has_armv8m_pmu=True)
         aot_out = _render_aot(transport="rtt", has_armv8m_pmu=True)
