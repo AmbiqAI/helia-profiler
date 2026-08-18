@@ -58,6 +58,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Comma-separated engine names (helia-rt,helia-aot).",
     )
     grp.addoption(
+        "--mlperf-executorch-backends",
+        default="",
+        help="Comma-separated ExecuTorch CMSIS-NN providers (arm,ns).",
+    )
+    grp.addoption(
         "--mlperf-ns-cmsis-nn-ref",
         default="",
         help="Exact ns-cmsis-nn commit/ref for heliaRT and heliaAOT cases.",
@@ -201,6 +206,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
         models=_split_csv(cfg.getoption("--mlperf-models")),
         model_registry=model_registry,
         engines=_split_csv(cfg.getoption("--mlperf-engines")),
+        executorch_backends=_split_csv(cfg.getoption("--mlperf-executorch-backends")),
         power=cfg.getoption("--mlperf-power"),
         power_boards=_split_csv(cfg.getoption("--mlperf-power-boards")),
         boards=_split_csv(cfg.getoption("--mlperf-boards")),
@@ -271,6 +277,7 @@ def _validation_options(config: pytest.Config) -> dict[str, object]:
         "comparison_group": config.getoption("--mlperf-comparison-group"),
         "model_arena_size": config.getoption("--mlperf-model-arena-size"),
         "engines": config.getoption("--mlperf-engines"),
+        "executorch_backends": config.getoption("--mlperf-executorch-backends"),
         "ns_cmsis_nn_ref": config.getoption("--mlperf-ns-cmsis-nn-ref"),
         "power": config.getoption("--mlperf-power"),
         "power_boards": config.getoption("--mlperf-power-boards"),

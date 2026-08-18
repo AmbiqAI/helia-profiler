@@ -31,6 +31,15 @@ on:
         required: false
         default: ""
         type: string
+      executorch_backends:
+        description: "ExecuTorch CMSIS-NN provider selection"
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - arm
+          - ns
       ns_cmsis_nn_ref:
         description: "Optional ns-cmsis-nn branch name or full 40-character commit SHA (empty uses the repository default branch)"
         required: false
@@ -106,6 +115,7 @@ env:
   HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb,apollo330mP_evb' }}
   HPX_VALIDATION_MODELS: ${{ inputs.models || '' }}
   HPX_VALIDATION_ENGINES: ${{ inputs.engines || '' }}
+  HPX_VALIDATION_EXECUTORCH_BACKENDS: ${{ inputs.executorch_backends || 'both' }}
   HPX_NS_CMSIS_NN_REF: ${{ inputs.ns_cmsis_nn_ref || '' }}
   HPX_VALIDATION_TOOLCHAINS: ${{ inputs.toolchains || '' }}
   HPX_VALIDATION_TRANSPORTS: ${{ inputs.transports || '' }}
@@ -286,6 +296,7 @@ jobs:
             --power "${HPX_VALIDATION_POWER}"
             --repeat "${HPX_VALIDATION_REPEAT}"
             --timeout "${HPX_VALIDATION_TIMEOUT}"
+            --executorch-backends "${HPX_VALIDATION_EXECUTORCH_BACKENDS}"
             --ns-cmsis-nn-ref "${{ steps.resolve_ns_cmsis_nn.outputs.resolved_commit }}"
           )
           if [[ -n "${HPX_VALIDATION_MODELS}" ]]; then
@@ -323,6 +334,7 @@ jobs:
             --power "${HPX_VALIDATION_POWER}"
             --repeat "${HPX_VALIDATION_REPEAT}"
             --timeout "${HPX_VALIDATION_TIMEOUT}"
+            --executorch-backends "${HPX_VALIDATION_EXECUTORCH_BACKENDS}"
             --ns-cmsis-nn-ref "${{ steps.resolve_ns_cmsis_nn.outputs.resolved_commit }}"
             --output-dir results/validation
             --junit-xml results/validation/junit.xml

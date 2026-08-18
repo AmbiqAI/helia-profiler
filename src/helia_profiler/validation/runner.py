@@ -64,6 +64,7 @@ class CaseResult:
     transport: str
     memory: str
     backend: str | None = None
+    cmsis_nn_provider: str | None = None
     comparison_group: str | None = None
     jlink_serial: str | None = None
     power_serial: str | None = None
@@ -273,6 +274,15 @@ def _build_config(
     return cfg
 
 
+def _engine_backend(case: CaseSpec) -> str | None:
+    """Return the engine-level backend value written to the profile config."""
+    if case.engine is EngineType.TFLM:
+        return "cmsis_nn"
+    if case.engine is EngineType.EXECUTORCH:
+        return case.cmsis_nn_provider.value
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Case runner
 # ---------------------------------------------------------------------------
@@ -453,9 +463,8 @@ def run_case(
                 toolchain=case.toolchain.value,
                 transport=case.transport.value,
                 memory=case.memory.value,
-                backend=(
-                    case.cmsis_nn_backend.value if case.cmsis_nn_backend is not None else None
-                ),
+                backend=_engine_backend(case),
+                cmsis_nn_provider=case.cmsis_nn_provider.value,
                 jlink_serial=case.jlink_serial,
                 power_serial=case.power_serial,
                 attempt=case.attempt,
@@ -514,7 +523,8 @@ def run_case(
             toolchain=case.toolchain.value,
             transport=case.transport.value,
             memory=case.memory.value,
-            backend=case.cmsis_nn_backend.value if case.cmsis_nn_backend is not None else None,
+            backend=_engine_backend(case),
+            cmsis_nn_provider=case.cmsis_nn_provider.value,
             jlink_serial=case.jlink_serial,
             power_serial=case.power_serial,
             attempt=case.attempt,
@@ -539,7 +549,8 @@ def run_case(
         toolchain=case.toolchain.value,
         transport=case.transport.value,
         memory=case.memory.value,
-        backend=case.cmsis_nn_backend.value if case.cmsis_nn_backend is not None else None,
+        backend=_engine_backend(case),
+        cmsis_nn_provider=case.cmsis_nn_provider.value,
         jlink_serial=case.jlink_serial,
         power_serial=case.power_serial,
         attempt=case.attempt,

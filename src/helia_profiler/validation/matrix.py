@@ -37,11 +37,15 @@ class MemoryProfile(StrEnum):
     PSRAM = "psram"
 
 
-class ExecuTorchBackend(StrEnum):
-    """CMSIS-NN provider linked by ExecuTorch validation."""
+class CmsisNNProvider(StrEnum):
+    """CMSIS-NN implementation used by a validation case."""
 
     ARM = "arm"
     NS = "ns"
+
+
+# Compatibility name retained for callers added with initial ExecuTorch validation.
+ExecuTorchBackend = CmsisNNProvider
 
 
 @dataclass(frozen=True)
@@ -133,7 +137,7 @@ class CaseSpec:
     toolchain: Toolchain = Toolchain.ARM_NONE_EABI_GCC
     transport: Transport = Transport.RTT
     memory: MemoryProfile = MemoryProfile.AUTO
-    cmsis_nn_backend: ExecuTorchBackend | None = None
+    cmsis_nn_backend: CmsisNNProvider | None = None
     jlink_serial: str | None = None
     power_serial: str | None = None
     power_gpio_pins: tuple[int, int, int] | None = None
@@ -144,11 +148,7 @@ class CaseSpec:
     def case_id(self) -> str:
         """Stable slug — used in report tables and output subfolders."""
         suffix = "-power" if self.power else ""
-        provider = (
-            f"-{self.cmsis_nn_backend.value}"
-            if self.engine is EngineType.EXECUTORCH and self.cmsis_nn_backend is not None
-            else ""
-        )
+        provider = f"-{self.cmsis_nn_provider.value}"
         base = (
             f"{self.board.id}-{self.model.id}-{self.engine.short_slug}{provider}-"
             f"{self.toolchain.value}-{self.transport.value}-{self.memory.value}{suffix}"
@@ -156,6 +156,17 @@ class CaseSpec:
         if self.repeat_total > 1:
             return f"{base}-run{self.attempt:02d}"
         return base
+
+    @property
+    def cmsis_nn_provider(self) -> CmsisNNProvider:
+        """Return the concrete CMSIS-NN implementation used by this case."""
+        if self.engine is EngineType.EXECUTORCH:
+            if self.cmsis_nn_backend is None:
+                raise ValueError("ExecuTorch validation case is missing a CMSIS-NN provider")
+            return self.cmsis_nn_backend
+        if self.engine is EngineType.TFLM:
+            return CmsisNNProvider.ARM
+        return CmsisNNProvider.NS
 
 
 def case_validity(case: CaseSpec) -> str | None:
@@ -454,6 +465,7 @@ def build_matrix(
     models: list[str] | None = None,
     model_registry: dict[str, ModelSpec] | None = None,
     engines: list[str | EngineType] | None = None,
+    executorch_backends: list[str | CmsisNNProvider] | None = None,
     power: str = "off",
     boards: list[str] | None = None,
     toolchains: list[str | Toolchain] | None = None,
@@ -474,6 +486,10 @@ def build_matrix(
     engines:
         Engine identifiers to include (string slug or :class:`EngineType`;
         default: all in :data:`ENGINES`).
+    executorch_backends:
+        ExecuTorch CMSIS-NN providers to include (``arm`` and/or ``ns``).
+        Defaults to both. Other engines use their fixed validation provider:
+        ARM CMSIS-NN for TFLM and ns-cmsis-nn for heliaRT/heliaAOT.
     power:
         One of ``"both"``, ``"on"``, ``"off"``.  ``"both"`` runs each
         (model, engine) case twice — with and without Joulescope.
@@ -567,6 +583,12 @@ def build_matrix(
         known=tuple(MemoryProfile),
         label="memory",
     )
+    executorch_backend_filter = _coerce_filter(
+        executorch_backends,
+        enum_type=CmsisNNProvider,
+        known=tuple(CmsisNNProvider),
+        label="ExecuTorch backend",
+    )
 
     cases: list[CaseSpec] = []
     for board_id in board_ids:
@@ -589,11 +611,9 @@ def build_matrix(
                     soc.core.value != "cortex-m55" or model.executorch is None
                 ):
                     continue
-                providers: tuple[ExecuTorchBackend | None, ...] = (
-                    (ExecuTorchBackend.ARM, ExecuTorchBackend.NS)
-                    if engine is EngineType.EXECUTORCH
-                    else (None,)
-                )
+                providers: tuple[CmsisNNProvider | None, ...] = (None,)
+                if engine is EngineType.EXECUTORCH:
+                    providers = executorch_backend_filter or tuple(CmsisNNProvider)
                 engine_toolchains = (
                     tuple(
                         toolchain

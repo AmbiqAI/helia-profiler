@@ -405,6 +405,8 @@ def test_run_case_uses_current_python_for_subprocess(tmp_path: Path, monkeypatch
     result = run_case(case=case, repo_root=repo_root, output_root=output_root, timeout_s=30)
 
     assert result.status == "pass"
+    assert result.backend is None
+    assert result.cmsis_nn_provider == "ns"
     assert result.total_cycles == 4000
     assert result.latency_avg_us == 41.5
     assert result.binary_total_bytes == 87_000

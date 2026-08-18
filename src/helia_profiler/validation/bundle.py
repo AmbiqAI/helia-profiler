@@ -29,6 +29,7 @@ class ValidationCaseIdentity:
 
     model_id: str
     engine: str
+    cmsis_nn_provider: str
     board: str
     toolchain: str
     transport: str
@@ -42,6 +43,7 @@ class ValidationCaseIdentity:
             "model_id": self.model_id,
             "comparison_group": self.comparison_group,
             "engine": self.engine,
+            "cmsis_nn_provider": self.cmsis_nn_provider,
             "board": self.board,
             "toolchain": self.toolchain,
             "transport": self.transport,
@@ -115,7 +117,7 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
         )
 
     version = manifest.get("schema_version")
-    if not isinstance(version, int) or isinstance(version, bool) or version not in (1, 2, 3, 4):
+    if not isinstance(version, int) or isinstance(version, bool) or version not in (1, 2, 3, 4, 5):
         raise ValidationBundleError(f"Unsupported validation manifest schema_version: {version!r}")
     raw_cases = manifest.get("cases")
     if not isinstance(raw_cases, list):
@@ -140,8 +142,10 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
     repo = manifest.get("repo") if isinstance(manifest.get("repo"), dict) else {}
     run = manifest.get("run") if isinstance(manifest.get("run"), dict) else {}
     github = run.get("github") if isinstance(run.get("github"), dict) else {}
-    if version == 4 and not isinstance(manifest.get("validation"), dict):
-        raise ValidationBundleError("Validation manifest schema v4 field 'validation' must be an object")
+    if version in (4, 5) and not isinstance(manifest.get("validation"), dict):
+        raise ValidationBundleError(
+            f"Validation manifest schema v{version} field 'validation' must be an object"
+        )
     return ValidationBundle(
         root=bundle_root,
         schema_version=version,
@@ -170,7 +174,7 @@ def _load_case(
     if status not in _STATUSES:
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid status {status!r}")
 
-    if version in (2, 3, 4):
+    if version in (2, 3, 4, 5):
         identity_raw = raw.get("identity")
         if not isinstance(identity_raw, dict):
             raise ValidationBundleError(f"Validation case {case_id!r} has no identity object")
@@ -181,11 +185,11 @@ def _load_case(
         provenance = raw.get("provenance", {})
         resources = raw.get("resources", {})
         comparison_group = identity_raw.get("comparison_group", identity_raw.get("model_id"))
-        if version == 4:
+        if version in (4, 5):
             repeat = raw.get("repeat")
             if not isinstance(repeat, dict):
                 raise ValidationBundleError(
-                    f"Validation case {case_id!r} has no schema v4 repeat object"
+                    f"Validation case {case_id!r} has no schema v{version} repeat object"
                 )
             repeat_attempt = repeat.get("attempt")
             repeat_total = repeat.get("total")
@@ -197,11 +201,11 @@ def _load_case(
                 or repeat_attempt != attempt
             ):
                 raise ValidationBundleError(
-                    f"Validation case {case_id!r} has invalid schema v4 repeat metadata"
+                    f"Validation case {case_id!r} has invalid schema v{version} repeat metadata"
                 )
             if repeat_total < 1 or repeat_attempt < 1 or repeat_attempt > repeat_total:
                 raise ValidationBundleError(
-                    f"Validation case {case_id!r} has invalid schema v4 repeat metadata"
+                    f"Validation case {case_id!r} has invalid schema v{version} repeat metadata"
                 )
     else:
         identity_raw = raw
@@ -231,9 +235,11 @@ def _load_case(
     if not isinstance(comparison_group, str) or not comparison_group:
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid comparison_group")
 
+    engine = _required_string(identity_raw, "engine", index)
     identity = ValidationCaseIdentity(
         model_id=_required_string(identity_raw, "model_id", index),
-        engine=_required_string(identity_raw, "engine", index),
+        engine=engine,
+        cmsis_nn_provider=_cmsis_nn_provider(identity_raw, engine, case_id, version),
         board=_required_string(identity_raw, "board", index),
         toolchain=_required_string(identity_raw, "toolchain", index),
         transport=_required_string(identity_raw, "transport", index),
@@ -275,6 +281,44 @@ def _load_case(
         provenance=tuple(sorted(provenance.items())),
         resources=tuple(sorted(resources.items())),
     )
+
+
+def _cmsis_nn_provider(
+    identity: dict[str, Any], engine: str, case_id: str, version: int
+) -> str:
+    """Load schema v5 provider identity or infer it for older manifests."""
+    provider = identity.get("cmsis_nn_provider")
+    if provider is None:
+        if version >= 5:
+            raise ValidationBundleError(
+                f"Validation case {case_id!r} has no cmsis_nn_provider"
+            )
+        backend = identity.get("backend")
+        if engine == "executorch" and backend in {"arm", "ns"}:
+            provider = backend
+        elif engine == "tflm":
+            provider = "arm"
+        elif engine in {"helia-rt", "helia-aot"}:
+            provider = "ns"
+    if provider not in {"arm", "ns"}:
+        raise ValidationBundleError(
+            f"Validation case {case_id!r} has invalid cmsis_nn_provider"
+        )
+    expected = {
+        "tflm": "arm",
+        "helia-rt": "ns",
+        "helia-aot": "ns",
+    }.get(engine)
+    if expected is not None and provider != expected:
+        raise ValidationBundleError(
+            f"Validation case {case_id!r} has cmsis_nn_provider={provider!r}; "
+            f"{engine} requires {expected!r}"
+        )
+    if engine == "executorch" and identity.get("backend") != provider:
+        raise ValidationBundleError(
+            f"Validation case {case_id!r} has inconsistent ExecuTorch backend/provider"
+        )
+    return provider
 
 
 def resolve_artifact(bundle: ValidationBundle, artifact: ArtifactRef) -> Path:

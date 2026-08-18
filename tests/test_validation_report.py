@@ -15,7 +15,7 @@ from helia_profiler.validation.runner import CaseResult
 
 def _case(output_dir: Path) -> CaseResult:
     return CaseResult(
-        case_id="apollo510_evb-kws-rt-arm-none-eabi-gcc-rtt-auto",
+        case_id="apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto",
         status="pass",
         duration_s=12.5,
         engine="helia-rt",
@@ -25,12 +25,13 @@ def _case(output_dir: Path) -> CaseResult:
         toolchain="arm-none-eabi-gcc",
         transport="rtt",
         memory="auto",
+        cmsis_nn_provider="ns",
         layers=13,
         total_cycles=123456,
         latency_avg_us=42.5,
         binary_total_bytes=87_000,
         allocated_arena_bytes=24_000,
-        output_dir=str(output_dir / "apollo510_evb-kws-rt-arm-none-eabi-gcc-rtt-auto"),
+        output_dir=str(output_dir / "apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto"),
     )
 
 
@@ -119,7 +120,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
         "validation_manifest.json",
     }
     manifest = json.loads((tmp_path / "validation_manifest.json").read_text())
-    assert manifest["schema_version"] == 4
+    assert manifest["schema_version"] == 5
     assert manifest["validation"]["suite"] == "smoke"
     assert manifest["summary"] == {"total": 1, "pass": 1, "fail": 0, "skip": 0}
     assert manifest["repo"] == {"sha": None, "branch": None, "dirty": None}
@@ -137,6 +138,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
     assert case["metrics"]["binary_total_bytes"] == 87_000
     assert case["metrics"]["allocated_arena_bytes"] == 24_000
     assert case["identity"]["attempt"] == 1
+    assert case["identity"]["cmsis_nn_provider"] == "ns"
     assert case["identity"]["requested_memory"] == {"preset": "auto"}
     assert case["identity"]["requested_power"] == {"enabled": False}
     assert case["health_issues"] == []

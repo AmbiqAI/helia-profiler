@@ -645,6 +645,14 @@ def validate_command(
             "Comma-separated engines: rt,aot,tflm,et,executorch,helia-rt,helia-aot (default: all)."
         ),
     ),
+    executorch_backends: str = typer.Option(
+        "both",
+        "--executorch-backends",
+        help=(
+            "ExecuTorch CMSIS-NN providers: arm, ns, or both (default: both). "
+            "TFLM always uses ARM CMSIS-NN; heliaRT and heliaAOT always use ns-cmsis-nn."
+        ),
+    ),
     ns_cmsis_nn_ref: str = typer.Option(
         "",
         "--ns-cmsis-nn-ref",
@@ -743,6 +751,7 @@ def validate_command(
         comparison_group=comparison_group,
         model_arena_size=model_arena_size,
         engines=engines,
+        executorch_backends=executorch_backends,
         ns_cmsis_nn_ref=ns_cmsis_nn_ref,
         power=power,
         power_boards=power_boards,

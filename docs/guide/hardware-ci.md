@@ -287,22 +287,24 @@ leave the optional axes empty. It uses the same model, board, toolchain,
 transport, and memory axes as `models-rt`, but runs `helia-aot`.
 
 For the full hardware regression, select `suite=complete`. It combines
-heliaRT, heliaAOT, and the stock TFLM upstream-CMSIS-NN baseline into a
-48-case sweep:
+heliaRT/ns-cmsis-nn, heliaAOT/ns-cmsis-nn, the stock TFLM ARM CMSIS-NN
+baseline, and both ExecuTorch provider variants into a 64-case sweep:
 
 ```text
-4 models × 2 boards × 2 toolchains × 3 engines
+48 heliaRT + heliaAOT + TFLM cases
++ 16 ExecuTorch cases (4 models × ARM/ns × 2 Cortex-M55 boards, GCC only)
 ```
 
 To compare runtime engines on the same smoke model, keep `suite=smoke` and set:
 
 ```text
-engines=helia-rt,helia-aot,tflm
+engines=helia-rt,helia-aot,tflm,executorch
+executorch_backends=both
 ```
 
-You can combine axes when needed, for example `engines=helia-rt,helia-aot,tflm` and
-`toolchains=arm-none-eabi-gcc,armclang`, but preview with `hpx validate --list`
-first so the manual run size is explicit.
+Set `executorch_backends=arm` or `executorch_backends=ns` to run only one
+ExecuTorch provider. You can combine other axes as needed, but preview with
+`hpx validate --list` first so the manual run size is explicit.
 
 Before the real run, the workflow installs validation dependencies, including
 the profiler's `aot` extra for `helia-aot` suites, fetches Git LFS fixtures,

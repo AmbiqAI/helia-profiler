@@ -22,6 +22,20 @@ if TYPE_CHECKING:
 _MAX_ROWS = 20
 
 
+def _cmsis_nn_provider(case: CaseResult) -> str | None:
+    """Return explicit provider metadata or infer it for legacy results."""
+    if case.cmsis_nn_provider:
+        return case.cmsis_nn_provider
+    engine = str(case.engine)
+    if engine == "executorch" and case.backend in {"arm", "ns"}:
+        return case.backend
+    if engine == "tflm":
+        return "arm"
+    if engine in {"helia-rt", "helia-aot"}:
+        return "ns"
+    return None
+
+
 def _decision_group(case: CaseResult) -> str:
     return case.comparison_group or case.model_id
 
@@ -221,8 +235,9 @@ def print_validation(
             if show_group:
                 row.append(escape(_decision_group(case)))
             engine = str(case.engine)
-            if case.backend:
-                engine = f"{engine}/{case.backend}"
+            provider = _cmsis_nn_provider(case)
+            if provider:
+                engine = f"{engine}/{provider}"
             row.append(escape(engine))
             if compact:
                 row.append(escape(_compact_config(case)))

@@ -65,6 +65,33 @@ class TestValidateList:
         assert "executorch/arm" in proc.stdout
         assert "executorch/ns" in proc.stdout
 
+    def test_list_executorch_provider_can_be_selected_independently(self):
+        proc = _run_hpx(
+            "validate",
+            "--list",
+            "--boards",
+            "apollo330mP_evb",
+            "--models",
+            "kws",
+            "--engines",
+            "executorch",
+            "--executorch-backends",
+            "ns",
+            "--power",
+            "off",
+            "--toolchains",
+            "gcc",
+            "--interfaces",
+            "rtt",
+            "--memories",
+            "auto",
+        )
+
+        assert proc.returncode == 0, proc.stderr
+        assert "1 case(s) would run" in proc.stdout
+        assert "executorch/ns" in proc.stdout
+        assert "executorch/arm" not in proc.stdout
+
     def test_list_power_off(self):
         proc = _run_hpx("validate", "--list", "--power", "off")
         assert proc.returncode == 0, proc.stderr
@@ -85,9 +112,9 @@ class TestValidateList:
         )
         assert proc.returncode == 0, proc.stderr
         assert "2 case(s) would run" in proc.stdout
-        assert "apollo510_evb-kws-rt-arm-none-eabi-gcc-rtt-auto-power" in proc.stdout
-        assert "apollo330mP_evb-kws-rt-arm-none-eabi-gcc-rtt-auto-power" not in proc.stdout
-        assert "apollo330mP_evb-kws-rt-arm-none-eabi-gcc-rtt-auto" in proc.stdout
+        assert "apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto-power" in proc.stdout
+        assert "apollo330mP_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto-power" not in proc.stdout
+        assert "apollo330mP_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto" in proc.stdout
 
     def test_list_axis_filters_for_two_pass_board_smoke(self):
         proc = _run_hpx(
@@ -112,8 +139,8 @@ class TestValidateList:
         )
         assert proc.returncode == 0, proc.stderr
         assert "2 case(s)" in proc.stdout
-        assert "apollo3p_evb-kws-rt-arm-none-eabi-gcc-rtt-auto-run01" in proc.stdout
-        assert "apollo3p_evb-kws-rt-arm-none-eabi-gcc-rtt-auto-run02" in proc.stdout
+        assert "apollo3p_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto-run01" in proc.stdout
+        assert "apollo3p_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto-run02" in proc.stdout
 
     def test_list_unknown_model_fails(self):
         proc = _run_hpx("validate", "--list", "--models", "nope")
@@ -296,6 +323,7 @@ class TestSuiteSmoke:
         assert args[args.index("--mlperf-engines") + 1] == "helia-aot"
         assert args[args.index("--mlperf-boards") + 1] == "apollo510_evb,apollo330mP_evb"
         assert args[args.index("--mlperf-toolchains") + 1] == "arm-none-eabi-gcc,atfe"
+        assert args[args.index("--mlperf-executorch-backends") + 1] == "arm,ns"
 
     def test_complete_defaults_to_all_engines_two_board_gcc_atfe_sweep(self, monkeypatch, tmp_path):
         args = self._captured_pytest_args(

@@ -182,6 +182,48 @@ class TestBuildMatrix:
         }
         assert all(f"executorch-{case.cmsis_nn_backend.value}" in case.case_id for case in cases)
 
+    @pytest.mark.parametrize(
+        ("selected", "expected"),
+        [
+            (["arm"], ExecuTorchBackend.ARM),
+            (["ns"], ExecuTorchBackend.NS),
+        ],
+    )
+    def test_executorch_provider_can_be_selected_independently(self, selected, expected):
+        cases = build_matrix(
+            models=["kws"],
+            engines=["executorch"],
+            executorch_backends=selected,
+            power="off",
+            boards=["apollo330mP_evb"],
+            toolchains=["gcc"],
+            transports=["rtt"],
+            memories=["auto"],
+        )
+
+        assert len(cases) == 1
+        assert cases[0].cmsis_nn_provider is expected
+        assert f"executorch-{expected.value}" in cases[0].case_id
+
+    @pytest.mark.parametrize(
+        ("engine", "expected"),
+        [
+            (EngineType.TFLM, ExecuTorchBackend.ARM),
+            (EngineType.HELIA_RT, ExecuTorchBackend.NS),
+            (EngineType.HELIA_AOT, ExecuTorchBackend.NS),
+        ],
+    )
+    def test_fixed_engine_provider_is_explicit(self, engine, expected):
+        case = CaseSpec(
+            model=MODELS["kws"],
+            engine=engine,
+            power=False,
+            board=BOARDS["apollo510_evb"],
+        )
+
+        assert case.cmsis_nn_provider is expected
+        assert f"-{engine.short_slug}-{expected.value}-" in case.case_id
+
     def test_executorch_is_limited_to_m55_gcc(self):
         assert not build_matrix(
             engines=["executorch"],
@@ -336,8 +378,8 @@ class TestBuildMatrix:
             power=True,
             board=BOARDS["apollo510_evb"],
         )
-        assert off.case_id == "apollo510_evb-kws-rt-arm-none-eabi-gcc-rtt-auto"
-        assert on.case_id == "apollo510_evb-kws-rt-arm-none-eabi-gcc-rtt-auto-power"
+        assert off.case_id == "apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto"
+        assert on.case_id == "apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto-power"
 
     def test_case_id_encodes_repeat_attempt_when_stressing(self):
         repeated = CaseSpec(
@@ -348,7 +390,7 @@ class TestBuildMatrix:
             attempt=2,
             repeat_total=3,
         )
-        assert repeated.case_id == "apollo510_evb-kws-rt-arm-none-eabi-gcc-rtt-auto-run02"
+        assert repeated.case_id == "apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto-run02"
 
     def test_deterministic_order(self):
         a = build_matrix()
