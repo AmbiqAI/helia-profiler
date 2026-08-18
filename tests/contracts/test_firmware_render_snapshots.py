@@ -753,6 +753,70 @@ def test_busy_loop_probe_reports_a_measured_duration_not_the_nominal_target():
     assert checked, "busy_loop matrix is empty"
 
 
+def test_busy_loop_terminal_report_requests_one_unit_not_the_inference_count():
+    """Firmware's terminal counts must be self-consistent for this probe.
+
+    ``requested_count``/``completed_count`` are units of work the window
+    performed.  The busy_loop probe performs exactly one -- a calibrated spin,
+    not N inferences -- and the window body sets ``clean_count = 1``, so the
+    requested side must be 1 too.
+
+    Rendering ``clean_iters_n`` there is what shipped before: N requested
+    against 1 completed, with status "complete".  collect_power_terminal.py
+    reads that as "Power firmware reported incomplete inference execution" and
+    raises, so no busy_loop run could finish on any board and elapsed_us -- the
+    number this probe exists to produce -- was never consumed.
+
+    Pinned semantically here as well as byte-wise in the snapshots, so a
+    regression has to argue with a named invariant rather than just regenerate
+    a hash.  The host half is
+    ``power.diagnostics.expected_terminal_requested_count`` and is tested in
+    tests/test_collect_power_terminal.py.
+    """
+    # Anchor on the CALL, not the name: hpx_power_terminal_report( appears
+    # first as the function DEFINITION (whose parameter list contains neither
+    # spelling), so slicing on the bare name asserts against the signature and
+    # passes or fails for reasons unrelated to the render. The call is the only
+    # occurrence followed by the literal `true,` first argument.
+    call_anchor = "hpx_power_terminal_report(\n    true,"
+
+    def _report_args(code: str) -> str:
+        body = code[code.index(call_anchor) :]
+        return body[: body.index(");")]
+
+    checked = 0
+    for soc, transport, engine in _power_busy_loop_combos():
+        code = _code_only(
+            _render(
+                soc,
+                transport,
+                engine,
+                power_only=True,
+                clean_window_probe=_POWER_BUSY_LOOP_PROBE,
+            )
+        )
+        label = f"{soc}|{transport}|{engine}"
+        report = _report_args(code)
+        checked += 1
+        assert "clean_iters_n" not in report, (
+            f"{label}: busy_loop terminal report requests clean_iters_n while "
+            "the window completes 1 — the host rejects this run as incomplete"
+        )
+        assert "1U," in report, f"{label}: busy_loop terminal report requests no unit count"
+        # The completed side is unchanged and still comes from the window.
+        assert "clean_count," in report, f"{label}: terminal report lost completed_count"
+
+    # The default probe must keep reporting the planned N.
+    for soc, transport, engine in _power_combos():
+        code = _code_only(_render(soc, transport, engine, power_only=True))
+        report = _report_args(code)
+        assert "clean_iters_n" in report, (
+            f"{soc}|{transport}|{engine}: infer probe stopped reporting the "
+            "planned inference count"
+        )
+    assert checked, "busy_loop power matrix is empty"
+
+
 def test_hal_umbrella_header_is_included_at_most_once():
     """``am_mcu_apollo.h`` has several independent consumers in the main
     templates (Apollo3 burst, the Armv8-M PMU, STIMER window timing, the broad
