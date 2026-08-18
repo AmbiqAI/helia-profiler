@@ -148,14 +148,17 @@ ad hoc validation without inferring intent from timestamps or branch names.
 ## Dependency source pinning
 
 The `ns_cmsis_nn_ref` workflow input is blank by default. In that normal mode,
-the workflow clones `ns-cmsis-nn` as usual from its repository default branch.
-When supplied, the input accepts either a branch name or a full 40-character
-commit SHA; release version/tag names such as `v7.26.0` are not accepted. Every
-run records the selected/default branch and its `resolved_commit` in the
-validation manifest's `sources.ns-cmsis-nn` metadata. The action passes that
-resolved commit explicitly to `hpx validate --ns-cmsis-nn-ref`; each heliaRT
-and heliaAOT case writes it into `engine.config.cmsis_nn_ref`, and the generated
-NSX manifest and `nsx.lock` therefore pin the source actually compiled.
+the workflow uses the immutable `ns-cmsis-nn` commit from HPX's checked-in
+qualified compatibility baseline. This prevents the repository's moving
+default branch from silently selecting sources that disagree with HPX's
+qualification metadata. When supplied, the input accepts either a branch name
+or a full 40-character commit SHA; release version/tag names such as `v7.26.0`
+are not accepted. Every run records the requested source and its
+`resolved_commit` in the validation manifest's `sources.ns-cmsis-nn` metadata.
+The action passes that resolved commit explicitly to
+`hpx validate --ns-cmsis-nn-ref`; each heliaRT and heliaAOT case writes it into
+`engine.config.cmsis_nn_ref`, and the generated NSX manifest and `nsx.lock`
+therefore pin the source actually compiled.
 
 ## Cross-machine release sweep
 
@@ -210,8 +213,8 @@ only that axis.
 - `models`: optional comma-separated model IDs such as `kws` or `kws,vww`
 - `engines`: optional comma-separated engines such as `helia-rt` or `helia-aot`
 - `ns_cmsis_nn_ref`: optional `ns-cmsis-nn` branch or full commit SHA.
-  When empty, the workflow checks out the latest commit from the repository's
-  default branch. The requested ref and resolved commit are saved in
+  When empty, the workflow checks out HPX's qualified baseline commit. The
+  requested ref and resolved commit are saved in
   `ns-cmsis-nn-revision.txt` with the validation artifacts.
 - `toolchains`: optional comma-separated toolchains such as
   `arm-none-eabi-gcc,armclang,atfe`

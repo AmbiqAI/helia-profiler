@@ -41,7 +41,7 @@ on:
           - arm
           - ns
       ns_cmsis_nn_ref:
-        description: "Optional ns-cmsis-nn branch name or full 40-character commit SHA (empty uses the repository default branch)"
+        description: "Optional ns-cmsis-nn branch name or full 40-character commit SHA (empty uses the HPX qualified baseline)"
         required: false
         default: ""
         type: string
@@ -109,6 +109,7 @@ env:
   UV_PYTHON_INSTALL_DIR: ${{ github.workspace }}/.uv-python
   SEGGER_RTT_PATH: ${{ github.workspace }}/segger-rtt
   HPX_NSX_EXECUTORCH_REF: 88585066743dc21847541793191c558a647c2f6e
+  HPX_QUALIFIED_NS_CMSIS_NN_REF: 631726420b04860a5c4236956a3741ff5a96bd7f
   # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
   # with the manual defaults, except that nightly validation covers the full suite.
   HPX_VALIDATION_SUITE: ${{ inputs.suite || 'complete' }}
@@ -165,30 +166,29 @@ jobs:
           requested_ref="${HPX_NS_CMSIS_NN_REF}"
 
           if [[ -z "${requested_ref}" ]]; then
-            git clone --depth 1 --single-branch https://github.com/AmbiqAI/ns-cmsis-nn.git "${checkout_path}"
-            requested_kind="default_branch"
-            requested_ref="$(git -C "${checkout_path}" symbolic-ref --quiet --short HEAD || true)"
-            requested_ref="${requested_ref:-default-branch}"
+            requested_ref="${HPX_QUALIFIED_NS_CMSIS_NN_REF}"
+            requested_kind="qualified_baseline"
+          elif [[ "${requested_ref}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            requested_kind="commit"
           else
-            git clone --filter=blob:none --no-checkout https://github.com/AmbiqAI/ns-cmsis-nn.git "${checkout_path}"
-            if [[ "${requested_ref}" =~ ^[0-9a-fA-F]{40}$ ]]; then
-              git -C "${checkout_path}" fetch --depth 1 origin "${HPX_NS_CMSIS_NN_REF}"
-              git -C "${checkout_path}" checkout --detach FETCH_HEAD
-              requested_kind="commit"
-            else
-              if [[ "${requested_ref}" =~ ^([[:alnum:]-]+-)?v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
-                || ! git check-ref-format --branch "${requested_ref}" > /dev/null; then
-                echo "ns_cmsis_nn_ref must be a branch name or a full 40-character commit SHA; release version/tag names are not accepted." >&2
-                exit 2
-              fi
-              git -C "${checkout_path}" fetch --depth 1 origin "refs/heads/${requested_ref}"
-              git -C "${checkout_path}" checkout --detach FETCH_HEAD
-              requested_kind="branch"
+            if [[ "${requested_ref}" =~ ^([[:alnum:]-]+-)?v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+              || ! git check-ref-format --branch "${requested_ref}" > /dev/null; then
+              echo "ns_cmsis_nn_ref must be a branch name or a full 40-character commit SHA; release version/tag names are not accepted." >&2
+              exit 2
             fi
+            requested_kind="branch"
           fi
 
+          git clone --filter=blob:none --no-checkout https://github.com/AmbiqAI/ns-cmsis-nn.git "${checkout_path}"
+          if [[ "${requested_kind}" == "branch" ]]; then
+            git -C "${checkout_path}" fetch --depth 1 origin "refs/heads/${requested_ref}"
+          else
+            git -C "${checkout_path}" fetch --depth 1 origin "${requested_ref}"
+          fi
+          git -C "${checkout_path}" checkout --detach FETCH_HEAD
+
           resolved_commit="$(git -C "${checkout_path}" rev-parse HEAD)"
-          if [[ "${requested_kind}" == "commit" && "${resolved_commit}" != "${requested_ref,,}" ]]; then
+          if [[ "${requested_kind}" != "branch" && "${resolved_commit}" != "${requested_ref,,}" ]]; then
             echo "Resolved ns-cmsis-nn commit does not match the requested commit." >&2
             exit 2
           fi

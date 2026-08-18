@@ -666,6 +666,14 @@ def _verify_baseline_resolution(
             # Engine source overrides redirect engine-owned projects; their
             # divergence is already classified by qualification state.
             skipped |= engine_projects
+            if override.name in {"cmsis_nn_path", "cmsis_nn_ref"}:
+                provider_project = "ns-cmsis-nn"
+                if (
+                    str(ctx.config.engine.type) == "executorch"
+                    and ctx.config.engine.backend == "arm"
+                ):
+                    provider_project = "arm-cmsis-nn"
+                skipped.add(provider_project)
     for module in provenance.modules:
         expected = pinned.get(module.project)
         if (
@@ -684,8 +692,9 @@ def _verify_baseline_resolution(
                     "The generated manifest and NSX's resolution disagree — the "
                     "run would silently build unqualified sources. Re-resolve with "
                     "--update-dependencies (or remove the fingerprinted workspace); "
-                    "for intentional divergence use build.nsx_modules overrides so "
-                    "qualification is classified honestly."
+                    "for intentional divergence use explicit build.nsx_modules or "
+                    "engine.config source overrides so qualification is classified "
+                    "honestly."
                 ),
             )
 
