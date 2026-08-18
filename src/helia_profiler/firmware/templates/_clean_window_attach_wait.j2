@@ -87,11 +87,12 @@
    HPX_CLEAN_PARTIAL_ITERS detector, not on this wait.  Neither is given an
    additional blind delay. #}
 #ifndef HPX_CLEAN_WINDOW_ATTACH_WAIT_MS
-// Covers the measured probe-absence gap (~204 ms lost, regressing on the
-// host's own sbl_settle + attach + api_probe phases with a 53 ms offset) with
-// roughly 3x headroom, while staying a small fraction of the host's boot
-// allowance for the free-running case described above.  Set to 0 to disable
-// the wait entirely -- that is how the stall detector is exercised on a bench.
+// The measured probe-absence gap was ~204 ms of lost window, regressing on
+// the host's own sbl_settle + attach + api_probe phases with a 53 ms offset,
+// so this is ~4.9x the observed gap -- while staying a small fraction of the
+// host's boot allowance for the free-running case described above.  Set to 0
+// to disable the wait entirely; that is how a bench run exercises the
+// detectors against a real stall.
 #define HPX_CLEAN_WINDOW_ATTACH_WAIT_MS 1000U
 #endif
 #ifndef HPX_CLEAN_WINDOW_ATTACH_POLL_US

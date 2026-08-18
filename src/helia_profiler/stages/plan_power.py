@@ -49,8 +49,9 @@ def _warn_if_reference_stalled(ctx: PipelineContext) -> None:
         stalled_iters=ctx.pmu_result.meta.clean_stalled_iters,
         partial_iters=ctx.pmu_result.meta.clean_partial_iters,
         clean_infer_count=ctx.pmu_result.meta.clean_infer_count,
+        ref_cycles=ctx.pmu_result.meta.clean_ref_cycles,
     )
-    if stall is None:
+    if stall is None or stall.affected_iters == 0:
         return
     log.warning(
         "Power window sized from a stalled clean-window reference: %d of %d "

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from ..power.diagnostics import (
+    assess_clean_window_clock_rate,
     assess_clean_window_stall,
     assess_gate_duration,
     assess_run_window_clock,
@@ -42,29 +43,65 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         )
 
     if ctx.pmu_result is not None:
+        meta = ctx.pmu_result.meta
         # The profile binary's clean window is DWT-timed on the Cortex-M4F
-        # families, and DWT stops whenever no debugger holds the core debug
-        # power domain up -- which is exactly what happens between the J-Link
-        # reset subprocess exiting and the host attach completing (#121). The
-        # firmware counts the iterations that lost their delta -- both the
-        # frozen (exactly zero) and the partial (implausibly low) shape; either
-        # means clean_infer_avg_us is short, and short by a plausible-looking
-        # amount rather than an obviously broken one.
-        stall = assess_clean_window_stall(
-            stalled_iters=ctx.pmu_result.meta.clean_stalled_iters,
-            partial_iters=ctx.pmu_result.meta.clean_partial_iters,
-            clean_infer_count=ctx.pmu_result.meta.clean_infer_count,
+        # families, and DWT misbehaves whenever no debugger holds the core
+        # debug power domain up -- which is exactly what happens between the
+        # J-Link reset subprocess exiting and the host attach completing
+        # (#121). Two independent checks, because they fail differently.
+        #
+        # First the one whose reference is NOT DWT: the firmware times a known
+        # nsx_delay_us() interval with DWT before the window opens. The
+        # in-window counters below are DWT-relative and cancel exactly under a
+        # uniform slowdown, so this is the only check that can see one -- and a
+        # uniform slowdown is what a timed-out attach wait leaves behind.
+        rate = assess_clean_window_clock_rate(
+            rate_cycles=meta.clean_dwt_rate_cyc,
+            probe_us=meta.clean_dwt_rate_us,
+            system_clock_hz=meta.system_clock_hz,
         )
-        if stall is not None:
+        if rate is not None and rate.is_broken:
             issues.append(
                 _warning(
-                    "profile.clean_window_stalled",
-                    "The clean-inference window's cycle counter stalled: "
-                    "clean_infer_avg_us understates the true per-inference "
-                    "time, and any power window sized from it is short.",
-                    **stall.to_metadata(),
+                    "profile.clean_window_clock_rate_low",
+                    "The clean window's cycle counter was running far below "
+                    "its expected rate when the window opened, measured "
+                    "against an independent clock; every timing derived from "
+                    "it is short by roughly that factor.",
+                    **rate.to_metadata(),
                 )
             )
+        # Then the in-window counters: they catch a counter that froze or
+        # slowed part-way through, which the rate probe (taken before the
+        # window) cannot see.
+        stall = assess_clean_window_stall(
+            stalled_iters=meta.clean_stalled_iters,
+            partial_iters=meta.clean_partial_iters,
+            clean_infer_count=meta.clean_infer_count,
+            ref_cycles=meta.clean_ref_cycles,
+        )
+        if stall is not None:
+            if stall.partial_check_inoperative and stall.affected_iters == 0:
+                issues.append(
+                    _warning(
+                        "profile.clean_window_check_inoperative",
+                        "The clean window's partial-stall check could not run: "
+                        "its warm reference was zero, so no iteration could "
+                        "fall below the floor. Absence of stalls here is not "
+                        "evidence of a healthy window.",
+                        **stall.to_metadata(),
+                    )
+                )
+            else:
+                issues.append(
+                    _warning(
+                        "profile.clean_window_stalled",
+                        "The clean-inference window's cycle counter stalled: "
+                        "clean_infer_avg_us understates the true per-inference "
+                        "time, and any power window sized from it is short.",
+                        **stall.to_metadata(),
+                    )
+                )
 
     power_run = ctx.power_run
     if power_run is not None:

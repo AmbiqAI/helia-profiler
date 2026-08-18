@@ -782,10 +782,26 @@ int main(void) {
         hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\n",
                    clean_iters_n, (unsigned long long)clean_est_ms);
 {% else %}
+{%- if not use_stimer_window %}
+        // Fixed window on a DWT-timed build: the warmup above measures the
+        // per-inference cost for the stall floor, so the blackout estimate is
+        // derivable here too.  Emitting it lets the host widen its capture
+        // deadline (transport/protocol.py: window_budget_s) instead of
+        // falling back to the flat heartbeat timeout, which a long fixed
+        // window can outlast.
+        uint64_t clean_est_ms = 0;
+        if (SystemCoreClock >= 1000U) {
+            clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)
+                           / ((uint64_t)SystemCoreClock / 1000ULL);
+        }
+        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\n",
+                   clean_iters_n, (unsigned long long)clean_est_ms);
+{%- else %}
         // Fixed window: no runtime warm measurement, so est_ms=0 — the host
         // already knows the iteration count from its own settings.
         hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=0\n",
                    clean_iters_n);
+{%- endif %}
 {% endif %}
 {%- if not use_stimer_window %}
         uint64_t clean_cycles = 0;

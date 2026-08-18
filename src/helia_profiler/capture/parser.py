@@ -184,6 +184,8 @@ def parse_firmware_output(
         clean_stalled_iters=meta_kv.get("clean_stalled_iters"),
         clean_partial_iters=meta_kv.get("clean_partial_iters"),
         clean_ref_cycles=meta_kv.get("clean_ref_cycles"),
+        clean_dwt_rate_cyc=meta_kv.get("clean_dwt_rate_cyc"),
+        clean_dwt_rate_us=meta_kv.get("clean_dwt_rate_us"),
         psram=psram,
         presets=preset_names,
     )

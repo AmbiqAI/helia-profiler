@@ -129,6 +129,13 @@ class FirmwareMeta:
     #: "unknown", never "healthy".  See
     #: ``power.diagnostics.assess_clean_window_stall``.
     clean_ref_cycles: int | None = None
+    #: DWT cycles counted across the firmware's ``HPX_CLEAN_DWT_RATE_US``
+    #: calibration interval (``HPX_CLEAN_DWT_RATE_CYC``), timed by
+    #: nsx_delay_us's BOOTROM cycle loop -- a clock that shares none of DWT's
+    #: dependencies.  The only clean-window check whose reference is not itself
+    #: DWT, and so the only one that can see a uniform slowdown.
+    clean_dwt_rate_cyc: int | None = None
+    clean_dwt_rate_us: int | None = None
     psram: PsramInfo | None = None
     presets: tuple[str, ...] = ()
 
