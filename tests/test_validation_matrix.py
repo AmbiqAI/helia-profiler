@@ -11,6 +11,7 @@ from helia_profiler.validation import (
     ENGINES,
     MODELS,
     CaseSpec,
+    ExecuTorchBackend,
     build_matrix,
     case_validity,
     load_model_file,
@@ -27,6 +28,9 @@ class TestRegistry:
         for m in MODELS.values():
             assert m.fixture_path.startswith("tests/fixtures/mlperf_tiny/")
             assert m.fixture_path.endswith(".tflite")
+            assert m.executorch is not None
+            assert m.executorch.fixture_path.startswith("tests/fixtures/mlperf_tiny/")
+            assert m.executorch.fixture_path.endswith(".pte")
 
     def test_apollo510_registered(self):
         assert "apollo510_evb" in BOARDS
@@ -49,6 +53,7 @@ class TestRegistry:
             EngineType.HELIA_RT,
             EngineType.HELIA_AOT,
             EngineType.TFLM,
+            EngineType.EXECUTORCH,
         }
 
     def test_yaml_models_resolve_relative_paths_and_comparison_groups(self, tmp_path):
@@ -126,25 +131,28 @@ class TestBuildMatrix:
     def test_full_matrix_default(self):
         cases = build_matrix()
         # Power is intentionally off by default for PR reliability validation:
-        # AP3: 4 models × 3 engines × 3 toolchains × 3 transports × 5 memories = 540
-        # AP4/AP5 boards: each 4 × 3 × 3 × 4 transports × 5 memories = 720
-        assert len(cases) == 2700
+        # Existing engines contribute 2700 cases. ExecuTorch adds 128 cases
+        # on each Cortex-M55 board: 4 models × 2 providers × GCC × 4 × 4.
+        # PSRAM is omitted because the ExecuTorch adapter does not support it.
+        assert len(cases) == 2956
 
     def test_power_off_halves_matrix(self):
-        assert len(build_matrix(power="off")) == 2700
+        assert len(build_matrix(power="off")) == 2956
 
     def test_power_on_halves_matrix(self):
-        assert len(build_matrix(power="on")) == 2700
+        assert len(build_matrix(power="on")) == 2956
 
     def test_power_both_doubles_matrix(self):
-        assert len(build_matrix(power="both")) == 5400
+        # ExecuTorch remains unpowered until its dedicated firmware implements
+        # the GPIO READY/GO/gate protocol.
+        assert len(build_matrix(power="both")) == 5656
 
     def test_repeat_multiplies_matrix(self):
-        assert len(build_matrix(power="off", repeat=3)) == 8100
+        assert len(build_matrix(power="off", repeat=3)) == 8868
 
     def test_model_filter(self):
         cases = build_matrix(models=["kws"], power="off")
-        assert len(cases) == 675
+        assert len(cases) == 739
         assert {c.model.id for c in cases} == {"kws"}
 
     def test_engine_filter(self):
@@ -156,6 +164,96 @@ class TestBuildMatrix:
         cases = build_matrix(engines=["tflm"], power="off")
         assert len(cases) == 900
         assert all(c.engine is EngineType.TFLM for c in cases)
+
+    def test_executorch_expands_both_providers_for_all_models(self):
+        cases = build_matrix(
+            engines=["executorch"],
+            power="off",
+            boards=["apollo330mP_evb"],
+            toolchains=["gcc"],
+            transports=["rtt"],
+            memories=["auto"],
+        )
+
+        assert len(cases) == 8
+        assert {case.cmsis_nn_backend for case in cases} == {
+            ExecuTorchBackend.ARM,
+            ExecuTorchBackend.NS,
+        }
+        assert all(f"executorch-{case.cmsis_nn_backend.value}" in case.case_id for case in cases)
+
+    @pytest.mark.parametrize(
+        ("selected", "expected"),
+        [
+            (["arm"], ExecuTorchBackend.ARM),
+            (["ns"], ExecuTorchBackend.NS),
+        ],
+    )
+    def test_executorch_provider_can_be_selected_independently(self, selected, expected):
+        cases = build_matrix(
+            models=["kws"],
+            engines=["executorch"],
+            executorch_backends=selected,
+            power="off",
+            boards=["apollo330mP_evb"],
+            toolchains=["gcc"],
+            transports=["rtt"],
+            memories=["auto"],
+        )
+
+        assert len(cases) == 1
+        assert cases[0].cmsis_nn_provider is expected
+        assert f"executorch-{expected.value}" in cases[0].case_id
+
+    @pytest.mark.parametrize(
+        ("engine", "expected"),
+        [
+            (EngineType.TFLM, ExecuTorchBackend.ARM),
+            (EngineType.HELIA_RT, ExecuTorchBackend.NS),
+            (EngineType.HELIA_AOT, ExecuTorchBackend.NS),
+        ],
+    )
+    def test_fixed_engine_provider_is_explicit(self, engine, expected):
+        case = CaseSpec(
+            model=MODELS["kws"],
+            engine=engine,
+            power=False,
+            board=BOARDS["apollo510_evb"],
+        )
+
+        assert case.cmsis_nn_provider is expected
+        assert f"-{engine.short_slug}-{expected.value}-" in case.case_id
+
+    def test_executorch_is_limited_to_m55_gcc(self):
+        assert not build_matrix(
+            engines=["executorch"],
+            boards=["apollo3p_evb"],
+            toolchains=["gcc"],
+        )
+        assert not build_matrix(
+            engines=["executorch"],
+            boards=["apollo330mP_evb"],
+            toolchains=["atfe"],
+        )
+        assert not build_matrix(
+            engines=["executorch"],
+            boards=["apollo330mP_evb"],
+            memories=["psram"],
+        )
+
+    def test_executorch_cases_remain_unpowered(self):
+        cases = build_matrix(
+            models=["kws"],
+            engines=["executorch"],
+            power="on",
+            boards=["apollo510_evb"],
+            toolchains=["gcc"],
+            transports=["rtt"],
+            memories=["auto"],
+        )
+
+        assert len(cases) == 2
+        assert all(not case.power for case in cases)
 
     def test_axis_filters_can_select_one_board_case_with_two_passes(self):
         cases = build_matrix(
@@ -280,8 +378,8 @@ class TestBuildMatrix:
             power=True,
             board=BOARDS["apollo510_evb"],
         )
-        assert off.case_id == "apollo510_evb-kws-rt-arm-none-eabi-gcc-rtt-auto"
-        assert on.case_id == "apollo510_evb-kws-rt-arm-none-eabi-gcc-rtt-auto-power"
+        assert off.case_id == "apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto"
+        assert on.case_id == "apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto-power"
 
     def test_case_id_encodes_repeat_attempt_when_stressing(self):
         repeated = CaseSpec(
@@ -292,7 +390,7 @@ class TestBuildMatrix:
             attempt=2,
             repeat_total=3,
         )
-        assert repeated.case_id == "apollo510_evb-kws-rt-arm-none-eabi-gcc-rtt-auto-run02"
+        assert repeated.case_id == "apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto-run02"
 
     def test_deterministic_order(self):
         a = build_matrix()
@@ -324,9 +422,7 @@ class TestCaseValidityGuards:
 
         fixture = tmp_path / "model.tflite"
         fixture.write_bytes(b"\x00" * (53 * 1024))
-        model = dataclasses.replace(
-            self._case().model, fixture_path=str(fixture)
-        )
+        model = dataclasses.replace(self._case().model, fixture_path=str(fixture))
         case = self._case(memory=MemoryProfile.TCM, model=model)
         reason = case_validity(case)
         assert reason is not None and "DTCM" in reason
@@ -334,9 +430,7 @@ class TestCaseValidityGuards:
     def test_tcm_guard_silent_when_fixture_missing(self):
         import dataclasses
 
-        model = dataclasses.replace(
-            self._case().model, fixture_path="does/not/exist.tflite"
-        )
+        model = dataclasses.replace(self._case().model, fixture_path="does/not/exist.tflite")
         case = self._case(memory=MemoryProfile.TCM, model=model)
         assert case_validity(case) is None
 
@@ -355,7 +449,5 @@ class TestCaseValidityGuards:
     def test_ap5_psram_power_is_allowed(self):
         from helia_profiler.validation.matrix import BOARDS
 
-        case = self._case(
-            board=BOARDS["apollo510_evb"], power=True, memory=MemoryProfile.PSRAM
-        )
+        case = self._case(board=BOARDS["apollo510_evb"], power=True, memory=MemoryProfile.PSRAM)
         assert case_validity(case) is None

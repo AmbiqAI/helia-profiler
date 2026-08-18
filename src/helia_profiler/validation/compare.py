@@ -311,7 +311,14 @@ def _case_document(case: ValidationCaseCompare, artifact_refs: dict[str, str]) -
 
 def _identity_slug(identity: ValidationCaseIdentity) -> str:
     body = "-".join(
-        [identity.board, identity.model_id, identity.engine, identity.toolchain, identity.transport]
+        [
+            identity.board,
+            identity.model_id,
+            identity.engine,
+            identity.cmsis_nn_provider,
+            identity.toolchain,
+            identity.transport,
+        ]
     )
     safe = re.sub(r"[^a-zA-Z0-9._-]+", "-", body).strip("-.") or "case"
     digest = hashlib.sha256(json.dumps(identity.to_dict(), sort_keys=True).encode()).hexdigest()[:8]
@@ -319,4 +326,8 @@ def _identity_slug(identity: ValidationCaseIdentity) -> str:
 
 
 def _display_identity(identity: ValidationCaseIdentity) -> str:
-    return f"{identity.board}/{identity.model_id}/{identity.engine}/{identity.toolchain}/{identity.transport}"
+    return (
+        f"{identity.board}/{identity.model_id}/"
+        f"{identity.engine}/{identity.cmsis_nn_provider}/"
+        f"{identity.toolchain}/{identity.transport}"
+    )

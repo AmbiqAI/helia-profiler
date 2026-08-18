@@ -18,8 +18,15 @@ _ENGINE_ALIASES = {
     "rt": "helia-rt",
     "aot": "helia-aot",
     "tflm": "tflm",
+    "et": "executorch",
+    "executorch": "executorch",
     "helia-rt": "helia-rt",
     "helia-aot": "helia-aot",
+}
+
+_EXECUTORCH_BACKEND_ALIASES = {
+    "arm": "arm",
+    "ns": "ns",
 }
 
 _TOOLCHAIN_ALIASES = {
@@ -95,7 +102,19 @@ def _normalise_engines(raw: str) -> str:
         raw,
         aliases=_ENGINE_ALIASES,
         label="engine",
-        known="rt, aot, tflm, helia-rt, helia-aot",
+        known="rt, aot, tflm, et, executorch, helia-rt, helia-aot",
+    )
+
+
+def _normalise_executorch_backends(raw: str) -> str:
+    """Translate ExecuTorch CMSIS-NN provider selection to canonical names."""
+    if (raw or "").strip() == "both":
+        return "arm,ns"
+    return _normalise_csv_aliases(
+        raw,
+        aliases=_EXECUTORCH_BACKEND_ALIASES,
+        label="ExecuTorch backend",
+        known="arm, ns, both",
     )
 
 
@@ -208,7 +227,7 @@ def _cmd_validate(args: argparse.Namespace) -> None:
             args.engines = {
                 "models-rt": "helia-rt",
                 "models-aot": "helia-aot",
-                "complete": "helia-rt,helia-aot,tflm",
+                "complete": "helia-rt,helia-aot,tflm,executorch",
             }[suite]
         if not args.boards.strip():
             args.boards = "apollo510_evb,apollo330mP_evb"
@@ -223,6 +242,9 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         args.boards = "apollo510_evb"
 
     engines_csv = _normalise_engines(args.engines)
+    executorch_backends_csv = _normalise_executorch_backends(
+        getattr(args, "executorch_backends", "both")
+    )
     toolchains_csv = _normalise_toolchains(args.toolchains)
     transports_csv = _normalise_transports(args.transports)
     memories_csv = _normalise_memories(args.memories)
@@ -237,9 +259,14 @@ def _cmd_validate(args: argparse.Namespace) -> None:
                 models=[m.strip() for m in args.models.split(",") if m.strip()] or None,
                 model_registry=model_registry,
                 engines=[e.strip() for e in engines_csv.split(",") if e.strip()] or None,
-                power=args.power,
-                power_boards=[b.strip() for b in args.power_boards.split(",") if b.strip()]
+                executorch_backends=[
+                    backend.strip()
+                    for backend in executorch_backends_csv.split(",")
+                    if backend.strip()
+                ]
                 or None,
+                power=args.power,
+                power_boards=[b.strip() for b in args.power_boards.split(",") if b.strip()] or None,
                 boards=[b.strip() for b in args.boards.split(",") if b.strip()] or None,
                 toolchains=[t.strip() for t in toolchains_csv.split(",") if t.strip()] or None,
                 transports=[t.strip() for t in transports_csv.split(",") if t.strip()] or None,
@@ -258,8 +285,10 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         print(f"\n{len(cases)} case(s) would run:\n")
         for c in cases:
             power = "power" if c.power else "     "
+            engine = c.engine.value
+            engine = f"{engine}/{c.cmsis_nn_provider.value}"
             print(
-                f"  {c.case_id:<82}  {c.engine:<10}  "
+                f"  {c.case_id:<82}  {engine:<14}  "
                 f"{c.toolchain.value:<18}  {c.transport.value:<7}  {c.memory.value:<5}  {power}"
             )
         return
@@ -315,6 +344,8 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         ]
     if engines_csv:
         pytest_args += ["--mlperf-engines", engines_csv]
+    if executorch_backends_csv:
+        pytest_args += ["--mlperf-executorch-backends", executorch_backends_csv]
     if args.ns_cmsis_nn_ref.strip():
         pytest_args += ["--mlperf-ns-cmsis-nn-ref", args.ns_cmsis_nn_ref.strip()]
     if args.boards.strip():

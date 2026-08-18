@@ -6,6 +6,7 @@ Run the hardware-in-the-loop validation suite (MLPerf Tiny models).
 
 ```bash
 hpx validate [--models IDS] [--engines LIST] [--boards LIST]
+             [--executorch-backends arm|ns|both]
              [--models-file YAML | --model-paths PATH,...]
              [--comparison-group NAME] [--model-arena-size BYTES]
              [--toolchains LIST] [--interfaces LIST] [--memories LIST]
@@ -36,7 +37,8 @@ See [Validating a Board Setup](../guides/validating-a-board-setup.md) and
 | `--model-paths` | Comma-separated `.tflite` paths for a quick ad hoc comparison. |
 | `--comparison-group` | Shared decision group for `--model-paths` models (default: `custom`). |
 | `--model-arena-size` | Arena size for `--model-paths` models (default: 524288 bytes). |
-| `--engines` | Comma-separated engines: `helia-rt`, `helia-aot`, `tflm` (aliases `rt`, `aot`). Default: all. TFLM validation uses upstream CMSIS-NN. |
+| `--engines` | Comma-separated engines: `helia-rt`, `helia-aot`, `tflm`, `executorch` (aliases `rt`, `aot`, `et`). Default: all. |
+| `--executorch-backends` | ExecuTorch CMSIS-NN providers: `arm`, `ns`, or `both` (default). TFLM always uses ARM CMSIS-NN; heliaRT and heliaAOT always use ns-cmsis-nn. |
 | `--boards` | Comma-separated board IDs (default: `apollo510_evb`). |
 | `--toolchains` | Comma-separated toolchains: `gcc`, `armclang`/`acfe`, `atfe` (default: board defaults). |
 | `--interfaces`, `--transports` | Comma-separated transports: `rtt`, `uart`, `swo`, `usb_cdc` (default: board defaults). |
@@ -61,8 +63,9 @@ See [Validating a Board Setup](../guides/validating-a-board-setup.md) and
   Apollo330mP with gcc + ATfE.
 - `models-aot` — AOT sweep across all MLPerf Tiny models on Apollo510 +
   Apollo330mP with gcc + ATfE.
-- `complete` — combined RT + AOT + TFLM/CMSIS-NN sweep across all MLPerf Tiny models on
-  Apollo510 + Apollo330mP with gcc + ATfE.
+- `complete` — combined heliaRT/ns, heliaAOT/ns, TFLM/ARM, ExecuTorch/ARM,
+  and ExecuTorch/ns sweep. ExecuTorch cases run only on the supported Cortex-M55
+  GCC axis.
 
 ## Custom models and comparison groups
 
@@ -107,7 +110,8 @@ hpx validate                          # default reliability matrix, power off
 hpx validate --list                   # preview what would run
 hpx validate --models kws,ic          # subset by model
 hpx validate --suite smoke            # quick single-case sanity check
-hpx validate --suite complete         # full RT + AOT + TFLM/CMSIS-NN hardware sweep
+hpx validate --suite complete         # all engines and CMSIS-NN providers
+hpx validate --engines executorch --executorch-backends arm
 hpx validate --suite complete --power on --power-boards apollo510_evb
 hpx validate -k kws-aot               # pytest-style keyword filter
 hpx validate --boards apollo3p_evb --repeat 2
@@ -115,7 +119,9 @@ hpx validate --boards apollo3p_evb --repeat 2
 
 ## Dashboard provenance
 
-Each case in `validation_manifest.json` includes a
+Each case in schema v5 `validation_manifest.json` includes an explicit
+`identity.cmsis_nn_provider` (`arm` or `ns`) so provider variants compare as
+independent configurations. It also includes a
 `provenance.runtime` object for dashboard ingestion. It contains the selected
 compiler and its version, the CMake version, and the resolved engine type and
 version when the engine publishes one (heliaRT or heliaAOT). These fields are

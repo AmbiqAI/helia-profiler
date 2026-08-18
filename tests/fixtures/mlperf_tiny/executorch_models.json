@@ -1,0 +1,70 @@
+{
+  "schema": "hpx.executorch-fixtures",
+  "schema_version": 1,
+  "seed": 20260817,
+  "weights": "deterministic random initialization; not trained",
+  "target": "Cortex-M55",
+  "generation": {
+    "executorch": "3a97429b0ce0c192861fc3e3729fb81432fd22cf",
+    "executorch_version": "1.3.0",
+    "torch_version": "2.12.0",
+    "cmsis_nn_source": "d933672e7ca97eec70ef43230baee7b20c2a28ae",
+    "kws_nsx_executorch": "67955a77e4cd6b3aaf29e0895106a94430ec29e5",
+    "note": "The other exporters do not embed an nsx-executorch generation revision."
+  },
+  "qualified_runtime": {
+    "nsx_executorch": "88585066743dc21847541793191c558a647c2f6e",
+    "executorch": "3a97429b0ce0c192861fc3e3729fb81432fd22cf",
+    "executorch_version": "1.3.0",
+    "arm_cmsis_nn_project": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
+    "ns_cmsis_nn": "631726420b04860a5c4236956a3741ff5a96bd7f"
+  },
+  "models": {
+    "kws": {
+      "path": "kws/kws_dscnn_random_cortex_m55.pte",
+      "sha256": "7416b4f1fbfdd5547a3af2370280577e8ae7db560af413d62a04a436e5fb754d",
+      "byte_size": 50400,
+      "planned_arena_size": 16000,
+      "method_arena_size": 65536,
+      "temporary_arena_size": 32768,
+      "input_size": 1960,
+      "output_size": 48,
+      "portable_ops": [
+        "dim_order_ops::_clone_dim_order.out"
+      ]
+    },
+    "vww": {
+      "path": "vww/vww_mobilenetv1_random_int8.pte",
+      "sha256": "72adcd9d66fb5ae2f63c7d575aeef4ed9bdc1d04c836eb0dc9a54a95bbef74b5",
+      "byte_size": 309592,
+      "planned_arena_size": 138240,
+      "method_arena_size": 65536,
+      "temporary_arena_size": 32768,
+      "input_size": 110592,
+      "output_size": 8,
+      "portable_ops": []
+    },
+    "ic": {
+      "path": "ic/ic_resnet8_random_int8.pte",
+      "sha256": "e15f913a56fa8eb77230fb00483ac75ec838c1cadce7f31e3cc04fa247808fd4",
+      "byte_size": 99528,
+      "planned_arena_size": 49152,
+      "method_arena_size": 65536,
+      "temporary_arena_size": 32768,
+      "input_size": 12288,
+      "output_size": 40,
+      "portable_ops": []
+    },
+    "ad": {
+      "path": "ad/deep_autoencoder_int8_random.pte",
+      "sha256": "a2f4dd48f025c74de11fba1a8d6af2e379dc11370a3fb6be3fbf013d5e64514c",
+      "byte_size": 284864,
+      "planned_arena_size": 3200,
+      "method_arena_size": 65536,
+      "temporary_arena_size": 32768,
+      "input_size": 2560,
+      "output_size": 2560,
+      "portable_ops": []
+    }
+  }
+}

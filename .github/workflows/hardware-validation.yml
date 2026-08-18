@@ -27,10 +27,19 @@ on:
         default: ""
         type: string
       engines:
-        description: "Optional comma-separated engines: helia-rt,helia-aot,tflm; empty uses suite defaults"
+        description: "Optional comma-separated engines: helia-rt,helia-aot,tflm,executorch; empty uses suite defaults"
         required: false
         default: ""
         type: string
+      executorch_backends:
+        description: "ExecuTorch CMSIS-NN provider selection"
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - arm
+          - ns
       ns_cmsis_nn_ref:
         description: "Optional ns-cmsis-nn branch name or full 40-character commit SHA (empty uses the repository default branch)"
         required: false
@@ -99,12 +108,14 @@ env:
   UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
   UV_PYTHON_INSTALL_DIR: ${{ github.workspace }}/.uv-python
   SEGGER_RTT_PATH: ${{ github.workspace }}/segger-rtt
+  HPX_NSX_EXECUTORCH_REF: 88585066743dc21847541793191c558a647c2f6e
   # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
   # with the manual defaults, except that nightly validation covers the full suite.
   HPX_VALIDATION_SUITE: ${{ inputs.suite || 'complete' }}
   HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb,apollo330mP_evb' }}
   HPX_VALIDATION_MODELS: ${{ inputs.models || '' }}
   HPX_VALIDATION_ENGINES: ${{ inputs.engines || '' }}
+  HPX_VALIDATION_EXECUTORCH_BACKENDS: ${{ inputs.executorch_backends || 'both' }}
   HPX_NS_CMSIS_NN_REF: ${{ inputs.ns_cmsis_nn_ref || '' }}
   HPX_VALIDATION_TOOLCHAINS: ${{ inputs.toolchains || '' }}
   HPX_VALIDATION_TRANSPORTS: ${{ inputs.transports || '' }}
@@ -182,6 +193,8 @@ jobs:
             exit 2
           fi
           echo "NS_CMSIS_NN_RESOLVED_COMMIT=${resolved_commit}" >> "${GITHUB_ENV}"
+          echo "NS_CMSIS_NN_REQUESTED_KIND=${requested_kind}" >> "${GITHUB_ENV}"
+          echo "NS_CMSIS_NN_REQUESTED_REF=${requested_ref}" >> "${GITHUB_ENV}"
           echo "resolved_commit=${resolved_commit}" >> "${GITHUB_OUTPUT}"
           echo "HPX_SOURCE_REVISIONS_JSON={\"ns-cmsis-nn\":{\"requested_kind\":\"${requested_kind}\",\"requested_ref\":\"${requested_ref}\",\"resolved_commit\":\"${resolved_commit}\"}}" \
             >> "${GITHUB_ENV}"
@@ -198,6 +211,62 @@ jobs:
             echo ""
             echo "- Requested ${requested_kind}: \`${requested_ref}\`"
             echo "- Resolved commit: \`${resolved_commit}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Checkout qualified nsx-executorch
+        uses: actions/checkout@v4
+        if: >-
+          contains(env.HPX_VALIDATION_ENGINES, 'executorch') ||
+          contains(env.HPX_VALIDATION_ENGINES, 'et') ||
+          (env.HPX_VALIDATION_SUITE == 'complete' && env.HPX_VALIDATION_ENGINES == '')
+        with:
+          repository: AmbiqAI/nsx-executorch
+          ref: ${{ env.HPX_NSX_EXECUTORCH_REF }}
+          path: .dependencies/nsx-executorch
+          token: ${{ secrets.NSX_EXECUTORCH_TOKEN || github.token }}
+          fetch-depth: 1
+
+      - name: Initialize qualified ExecuTorch dependencies
+        if: >-
+          contains(env.HPX_VALIDATION_ENGINES, 'executorch') ||
+          contains(env.HPX_VALIDATION_ENGINES, 'et') ||
+          (env.HPX_VALIDATION_SUITE == 'complete' && env.HPX_VALIDATION_ENGINES == '')
+        run: |
+          checkout_path="${GITHUB_WORKSPACE}/.dependencies/nsx-executorch"
+
+          git -C "${checkout_path}" submodule update --init --depth 1 external/executorch
+          git -C "${checkout_path}/external/executorch" submodule update --init --depth 1 \
+            backends/xnnpack/third-party/FXdiv \
+            third-party/flatbuffers \
+            third-party/flatcc \
+            third-party/gflags \
+            third-party/json
+
+          resolved_commit="$(git -C "${checkout_path}" rev-parse HEAD)"
+          executorch_commit="$(git -C "${checkout_path}/external/executorch" rev-parse HEAD)"
+          if [[ "${resolved_commit}" != "${HPX_NSX_EXECUTORCH_REF}" ]]; then
+            echo "Resolved nsx-executorch commit does not match the qualified commit." >&2
+            exit 2
+          fi
+          if [[ "${executorch_commit}" != "3a97429b0ce0c192861fc3e3729fb81432fd22cf" ]]; then
+            echo "Resolved ExecuTorch submodule does not match the qualified commit." >&2
+            exit 2
+          fi
+
+          echo "NSX_EXECUTORCH_ROOT=${checkout_path}" >> "${GITHUB_ENV}"
+          echo "HPX_SOURCE_REVISIONS_JSON={\"ns-cmsis-nn\":{\"requested_kind\":\"${NS_CMSIS_NN_REQUESTED_KIND}\",\"requested_ref\":\"${NS_CMSIS_NN_REQUESTED_REF}\",\"resolved_commit\":\"${NS_CMSIS_NN_RESOLVED_COMMIT}\"},\"nsx-executorch\":{\"requested_kind\":\"commit\",\"requested_ref\":\"${HPX_NSX_EXECUTORCH_REF}\",\"resolved_commit\":\"${resolved_commit}\"},\"executorch\":{\"requested_kind\":\"commit\",\"requested_ref\":\"${executorch_commit}\",\"resolved_commit\":\"${executorch_commit}\"},\"arm-cmsis-nn\":{\"requested_kind\":\"commit\",\"requested_ref\":\"6d21a6f821fb72541173a6c4d05d83329fa74f7c\",\"resolved_commit\":\"6d21a6f821fb72541173a6c4d05d83329fa74f7c\"}}" \
+            >> "${GITHUB_ENV}"
+          {
+            echo "nsx-executorch=${resolved_commit}"
+            echo "executorch=${executorch_commit}"
+          } > results/validation/executorch-revisions.txt
+
+          {
+            echo ""
+            echo "### ExecuTorch"
+            echo ""
+            echo "- nsx-executorch: \`${resolved_commit}\`"
+            echo "- ExecuTorch: \`${executorch_commit}\`"
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Fetch SEGGER RTT sources
@@ -227,6 +296,7 @@ jobs:
             --power "${HPX_VALIDATION_POWER}"
             --repeat "${HPX_VALIDATION_REPEAT}"
             --timeout "${HPX_VALIDATION_TIMEOUT}"
+            --executorch-backends "${HPX_VALIDATION_EXECUTORCH_BACKENDS}"
             --ns-cmsis-nn-ref "${{ steps.resolve_ns_cmsis_nn.outputs.resolved_commit }}"
           )
           if [[ -n "${HPX_VALIDATION_MODELS}" ]]; then
@@ -264,6 +334,7 @@ jobs:
             --power "${HPX_VALIDATION_POWER}"
             --repeat "${HPX_VALIDATION_REPEAT}"
             --timeout "${HPX_VALIDATION_TIMEOUT}"
+            --executorch-backends "${HPX_VALIDATION_EXECUTORCH_BACKENDS}"
             --ns-cmsis-nn-ref "${{ steps.resolve_ns_cmsis_nn.outputs.resolved_commit }}"
             --output-dir results/validation
             --junit-xml results/validation/junit.xml

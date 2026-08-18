@@ -37,6 +37,41 @@ class MemoryProfile(StrEnum):
     PSRAM = "psram"
 
 
+class CmsisNNProvider(StrEnum):
+    """CMSIS-NN implementation used by a validation case."""
+
+    ARM = "arm"
+    NS = "ns"
+
+
+# Compatibility name retained for callers added with initial ExecuTorch validation.
+ExecuTorchBackend = CmsisNNProvider
+
+
+@dataclass(frozen=True)
+class ExecuTorchModelSpec:
+    """Runtime contract for one pre-exported ExecuTorch model."""
+
+    fixture_path: str
+    planned_arena_size: int
+    method_arena_size: int
+    temporary_arena_size: int
+    input_size: int
+    output_size: int
+    portable_ops: tuple[str, ...] = ()
+
+    @property
+    def runtime_workspace_size(self) -> int:
+        """Return all mutable runtime storage required by the PTE."""
+        return (
+            self.planned_arena_size
+            + self.method_arena_size
+            + self.temporary_arena_size
+            + self.input_size
+            + self.output_size
+        )
+
+
 @dataclass(frozen=True)
 class ModelSpec:
     """One canonical benchmark model."""
@@ -48,11 +83,24 @@ class ModelSpec:
     arena_size: int  # tensor arena in bytes (RT / TFLM)
     description: str = ""
     comparison_group: str | None = None
+    executorch: ExecuTorchModelSpec | None = None
 
     @property
     def decision_group(self) -> str:
         """Return the workload group used for performance decisions."""
         return self.comparison_group or self.id
+
+    def fixture_for(self, engine: EngineType) -> str:
+        """Return the model artifact consumed by ``engine``."""
+        if engine is EngineType.EXECUTORCH and self.executorch is not None:
+            return self.executorch.fixture_path
+        return self.fixture_path
+
+    def arena_size_for(self, engine: EngineType) -> int:
+        """Return the primary planned-arena size consumed by ``engine``."""
+        if engine is EngineType.EXECUTORCH and self.executorch is not None:
+            return self.executorch.planned_arena_size
+        return self.arena_size
 
 
 @dataclass(frozen=True)
@@ -89,6 +137,7 @@ class CaseSpec:
     toolchain: Toolchain = Toolchain.ARM_NONE_EABI_GCC
     transport: Transport = Transport.RTT
     memory: MemoryProfile = MemoryProfile.AUTO
+    cmsis_nn_backend: CmsisNNProvider | None = None
     jlink_serial: str | None = None
     power_serial: str | None = None
     power_gpio_pins: tuple[int, int, int] | None = None
@@ -99,22 +148,41 @@ class CaseSpec:
     def case_id(self) -> str:
         """Stable slug — used in report tables and output subfolders."""
         suffix = "-power" if self.power else ""
+        provider = f"-{self.cmsis_nn_provider.value}"
         base = (
-            f"{self.board.id}-{self.model.id}-{self.engine.short_slug}-"
+            f"{self.board.id}-{self.model.id}-{self.engine.short_slug}{provider}-"
             f"{self.toolchain.value}-{self.transport.value}-{self.memory.value}{suffix}"
         )
         if self.repeat_total > 1:
             return f"{base}-run{self.attempt:02d}"
         return base
 
+    @property
+    def cmsis_nn_provider(self) -> CmsisNNProvider:
+        """Return the concrete CMSIS-NN implementation used by this case."""
+        if self.engine is EngineType.EXECUTORCH:
+            if self.cmsis_nn_backend is None:
+                raise ValueError("ExecuTorch validation case is missing a CMSIS-NN provider")
+            return self.cmsis_nn_backend
+        if self.engine is EngineType.TFLM:
+            return CmsisNNProvider.ARM
+        return CmsisNNProvider.NS
+
 
 def case_validity(case: CaseSpec) -> str | None:
     """Return a skip reason if the case is a known-unsupported combination."""
+    soc = get_soc_for_board(case.board.id)
+    if case.engine is EngineType.EXECUTORCH:
+        if case.model.executorch is None:
+            return "no ExecuTorch PTE contract is registered for this model"
+        if soc.core.value != "cortex-m55":
+            return "ExecuTorch validation requires a Cortex-M55 board"
+        if case.toolchain is not Toolchain.ARM_NONE_EABI_GCC:
+            return "ExecuTorch validation currently requires arm-none-eabi-gcc"
     if case.memory is MemoryProfile.PSRAM and case.transport is not Transport.RTT:
         return "psram weights require the rtt transport"
     if case.transport is Transport.USB_CDC and case.transport not in case.board.transports:
         return "usb_cdc not supported on this board"
-    soc = get_soc_for_board(case.board.id)
     # Statically infeasible TCM profile: arena and weights both use DTCM,
     # AND weights into DTCM, which cannot fit when their combined size
     # exceeds it (e.g. KWS's 32 KB arena + ~53 KB weights vs Apollo3's
@@ -122,18 +190,18 @@ def case_validity(case: CaseSpec) -> str | None:
     # fixture is missing (LFS not pulled) the guard stays silent — the
     # harness already skips missing fixtures with its own reason.
     if case.memory is MemoryProfile.TCM:
-        fixture = Path(case.model.fixture_path)
+        fixture = Path(case.model.fixture_for(case.engine))
         if not fixture.is_absolute():
             # matrix.py lives at src/helia_profiler/validation/ — repo root is
             # three levels up from the package dir.
-            fixture = Path(__file__).resolve().parents[3] / case.model.fixture_path
+            fixture = Path(__file__).resolve().parents[3] / case.model.fixture_for(case.engine)
         weights = fixture.stat().st_size if fixture.exists() else 0
-        needed = case.model.arena_size + weights
+        workspace = case.model.arena_size_for(case.engine)
+        if case.engine is EngineType.EXECUTORCH and case.model.executorch is not None:
+            workspace = case.model.executorch.runtime_workspace_size
+        needed = workspace + weights
         if weights and needed > soc.memory.dtcm_kb * 1024:
-            return (
-                f"arena+weights (~{needed // 1024} KB) cannot fit "
-                f"{soc.memory.dtcm_kb} KB DTCM"
-            )
+            return f"arena+weights (~{needed // 1024} KB) cannot fit {soc.memory.dtcm_kb} KB DTCM"
     # Apollo3 EVBs: the power-sync GPIOs (24/25/26, moved off the J-Link VCOM
     # UART pads) sit on the MSPI0 pads that external PSRAM needs, so PSRAM
     # placement and gated power capture are electrically exclusive there.
@@ -171,6 +239,7 @@ ENGINES: tuple[EngineType, ...] = (
     EngineType.HELIA_RT,
     EngineType.HELIA_AOT,
     EngineType.TFLM,
+    EngineType.EXECUTORCH,
 )
 
 
@@ -186,6 +255,15 @@ MODELS: dict[str, ModelSpec] = {
         # presets viable on small boards (AP3 DTCM is only 64 KB).
         arena_size=32768,
         description="MLPerf Tiny keyword spotting — DS-CNN int8",
+        executorch=ExecuTorchModelSpec(
+            fixture_path=("tests/fixtures/mlperf_tiny/kws/kws_dscnn_random_cortex_m55.pte"),
+            planned_arena_size=16000,
+            method_arena_size=65536,
+            temporary_arena_size=32768,
+            input_size=1960,
+            output_size=48,
+            portable_ops=("dim_order_ops::_clone_dim_order.out",),
+        ),
     ),
     "vww": ModelSpec(
         id="vww",
@@ -194,6 +272,14 @@ MODELS: dict[str, ModelSpec] = {
         fixture_path="tests/fixtures/mlperf_tiny/vww/vww_96_int8.tflite",
         arena_size=524288,
         description="MLPerf Tiny visual wake words — MobileNetV1 96x96 int8",
+        executorch=ExecuTorchModelSpec(
+            fixture_path=("tests/fixtures/mlperf_tiny/vww/vww_mobilenetv1_random_int8.pte"),
+            planned_arena_size=138240,
+            method_arena_size=65536,
+            temporary_arena_size=32768,
+            input_size=110592,
+            output_size=8,
+        ),
     ),
     "ic": ModelSpec(
         id="ic",
@@ -202,6 +288,14 @@ MODELS: dict[str, ModelSpec] = {
         fixture_path="tests/fixtures/mlperf_tiny/ic/ic_resnet_int8.tflite",
         arena_size=262144,
         description="MLPerf Tiny image classification — ResNet int8",
+        executorch=ExecuTorchModelSpec(
+            fixture_path="tests/fixtures/mlperf_tiny/ic/ic_resnet8_random_int8.pte",
+            planned_arena_size=49152,
+            method_arena_size=65536,
+            temporary_arena_size=32768,
+            input_size=12288,
+            output_size=40,
+        ),
     ),
     "ad": ModelSpec(
         id="ad",
@@ -210,6 +304,14 @@ MODELS: dict[str, ModelSpec] = {
         fixture_path="tests/fixtures/mlperf_tiny/ad/ad01_int8.tflite",
         arena_size=131072,
         description="MLPerf Tiny anomaly detection — DeepAutoEncoder ToyADMX int8",
+        executorch=ExecuTorchModelSpec(
+            fixture_path=("tests/fixtures/mlperf_tiny/ad/deep_autoencoder_int8_random.pte"),
+            planned_arena_size=3200,
+            method_arena_size=65536,
+            temporary_arena_size=32768,
+            input_size=2560,
+            output_size=2560,
+        ),
     ),
 }
 
@@ -363,6 +465,7 @@ def build_matrix(
     models: list[str] | None = None,
     model_registry: dict[str, ModelSpec] | None = None,
     engines: list[str | EngineType] | None = None,
+    executorch_backends: list[str | CmsisNNProvider] | None = None,
     power: str = "off",
     boards: list[str] | None = None,
     toolchains: list[str | Toolchain] | None = None,
@@ -383,6 +486,10 @@ def build_matrix(
     engines:
         Engine identifiers to include (string slug or :class:`EngineType`;
         default: all in :data:`ENGINES`).
+    executorch_backends:
+        ExecuTorch CMSIS-NN providers to include (``arm`` and/or ``ns``).
+        Defaults to both. Other engines use their fixed validation provider:
+        ARM CMSIS-NN for TFLM and ns-cmsis-nn for heliaRT/heliaAOT.
     power:
         One of ``"both"``, ``"on"``, ``"off"``.  ``"both"`` runs each
         (model, engine) case twice — with and without Joulescope.
@@ -452,9 +559,7 @@ def build_matrix(
         raise ValueError(f"Unknown board(s): {unknown_b}. Known: {list(BOARDS)}")
     unknown_power_boards = [b for b in (power_boards or []) if b not in BOARDS]
     if unknown_power_boards:
-        raise ValueError(
-            f"Unknown power board(s): {unknown_power_boards}. Known: {list(BOARDS)}"
-        )
+        raise ValueError(f"Unknown power board(s): {unknown_power_boards}. Known: {list(BOARDS)}")
     if power not in ("both", "on", "off"):
         raise ValueError(f"power must be 'both'|'on'|'off', got {power!r}")
     if repeat < 1:
@@ -478,6 +583,12 @@ def build_matrix(
         known=tuple(MemoryProfile),
         label="memory",
     )
+    executorch_backend_filter = _coerce_filter(
+        executorch_backends,
+        enum_type=CmsisNNProvider,
+        known=tuple(CmsisNNProvider),
+        label="ExecuTorch backend",
+    )
 
     cases: list[CaseSpec] = []
     for board_id in board_ids:
@@ -492,30 +603,63 @@ def build_matrix(
         board_toolchains = _intersect_or_board_default(toolchain_filter, board.toolchains)
         board_transports = _intersect_or_board_default(transport_filter, board.transports)
         board_memories = _intersect_or_board_default(memory_filter, board.memories)
+        soc = get_soc_for_board(board_id)
         for model_id in model_ids:
             model = registry[model_id]
             for engine in engine_ids:
-                for toolchain in board_toolchains:
-                    for transport in board_transports:
-                        for memory in board_memories:
-                            for p in power_flags:
-                                for attempt in range(1, repeat + 1):
-                                    cases.append(
-                                        CaseSpec(
-                                            model=model,
-                                            engine=engine,
-                                            power=p,
-                                            board=board,
-                                            toolchain=toolchain,
-                                            transport=transport,
-                                            memory=memory,
-                                            jlink_serial=(jlink_serials or {}).get(board_id),
-                                            power_serial=(power_serials or {}).get(board_id) if p else None,
-                                            power_gpio_pins=(power_gpio_pins or {}).get(board_id) if p else None,
-                                            attempt=attempt,
-                                            repeat_total=repeat,
+                if engine is EngineType.EXECUTORCH and (
+                    soc.core.value != "cortex-m55" or model.executorch is None
+                ):
+                    continue
+                providers: tuple[CmsisNNProvider | None, ...] = (None,)
+                if engine is EngineType.EXECUTORCH:
+                    providers = executorch_backend_filter or tuple(CmsisNNProvider)
+                engine_toolchains = (
+                    tuple(
+                        toolchain
+                        for toolchain in board_toolchains
+                        if toolchain is Toolchain.ARM_NONE_EABI_GCC
+                    )
+                    if engine is EngineType.EXECUTORCH
+                    else board_toolchains
+                )
+                # The dedicated ExecuTorch firmware does not yet implement the
+                # GPIO READY/GO/gate protocol required by power capture.
+                engine_power_flags = [False] if engine is EngineType.EXECUTORCH else power_flags
+                engine_memories = (
+                    tuple(memory for memory in board_memories if memory is not MemoryProfile.PSRAM)
+                    if engine is EngineType.EXECUTORCH
+                    else board_memories
+                )
+                for provider in providers:
+                    for toolchain in engine_toolchains:
+                        for transport in board_transports:
+                            for memory in engine_memories:
+                                for p in engine_power_flags:
+                                    for attempt in range(1, repeat + 1):
+                                        cases.append(
+                                            CaseSpec(
+                                                model=model,
+                                                engine=engine,
+                                                power=p,
+                                                board=board,
+                                                toolchain=toolchain,
+                                                transport=transport,
+                                                memory=memory,
+                                                cmsis_nn_backend=provider,
+                                                jlink_serial=(jlink_serials or {}).get(board_id),
+                                                power_serial=(power_serials or {}).get(board_id)
+                                                if p
+                                                else None,
+                                                power_gpio_pins=(power_gpio_pins or {}).get(
+                                                    board_id
+                                                )
+                                                if p
+                                                else None,
+                                                attempt=attempt,
+                                                repeat_total=repeat,
+                                            )
                                         )
-                                    )
 
         if toolchain_filter is not None and not board_toolchains:
             raise ValueError(
@@ -531,7 +675,7 @@ def build_matrix(
             raise ValueError(
                 f"No requested memories are valid for board {board_id}. "
                 f"Known for board: {[m.value for m in board.memories]}"
-                            )
+            )
     return cases
 
 

@@ -166,8 +166,8 @@ class PlanMemoryStage:
 
         if engine_type is EngineType.EXECUTORCH and artifacts is not None:
             # The generated ExecuTorch runner owns several explicit buffers in
-            # addition to the PTE memory-planned arena. Unannotated BSS lands
-            # in DTCM; layer records are deliberately placed in shared SRAM.
+            # addition to the PTE memory-planned arena. Keep the complete
+            # runtime workspace together so selecting SRAM also relieves DTCM.
             add(
                 arena_phys,
                 "planned_arena",
@@ -175,25 +175,25 @@ class PlanMemoryStage:
                 "arena",
             )
             add(
-                MemoryRegion.DTCM,
+                arena_phys,
                 "method_arena",
                 int(artifacts.executorch_method_arena_size or 0),
                 "other",
             )
             add(
-                MemoryRegion.DTCM,
+                arena_phys,
                 "temporary_arena",
                 int(artifacts.executorch_temporary_arena_size or 0),
                 "other",
             )
             add(
-                MemoryRegion.DTCM,
+                arena_phys,
                 "input_buffer",
                 int(artifacts.executorch_input_size or 0),
                 "other",
             )
             add(
-                MemoryRegion.DTCM,
+                arena_phys,
                 "output_buffer",
                 int(artifacts.executorch_output_size or 0),
                 "other",

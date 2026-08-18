@@ -7,10 +7,17 @@ import subprocess
 from pathlib import Path
 
 import yaml
+import pytest
 
 from helia_profiler.config import Toolchain, Transport
 from helia_profiler.engines import EngineType
-from helia_profiler.validation.matrix import BOARDS, MODELS, CaseSpec, MemoryProfile
+from helia_profiler.validation.matrix import (
+    BOARDS,
+    MODELS,
+    CaseSpec,
+    ExecuTorchBackend,
+    MemoryProfile,
+)
 from helia_profiler.validation.runner import (
     CaseResult,
     _build_config,
@@ -232,6 +239,55 @@ def test_build_config_tflm_selects_upstream_cmsis_nn_backend(tmp_path: Path):
     assert cfg["engine"] == {"type": "tflm", "backend": "cmsis_nn"}
 
 
+@pytest.mark.parametrize(
+    ("backend", "cmsis_nn_ref"),
+    [
+        (ExecuTorchBackend.ARM, "6d21a6f821fb72541173a6c4d05d83329fa74f7c"),
+        (ExecuTorchBackend.NS, "631726420b04860a5c4236956a3741ff5a96bd7f"),
+    ],
+)
+def test_build_config_executorch_uses_pte_contract(
+    tmp_path: Path,
+    monkeypatch,
+    backend: ExecuTorchBackend,
+    cmsis_nn_ref: str,
+):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    nsx_root = tmp_path / "nsx-executorch"
+    monkeypatch.setenv("NSX_EXECUTORCH_ROOT", str(nsx_root))
+    case = CaseSpec(
+        model=MODELS["kws"],
+        engine=EngineType.EXECUTORCH,
+        power=False,
+        board=BOARDS["apollo330mP_evb"],
+        cmsis_nn_backend=backend,
+    )
+
+    cfg = _build_config(case, repo_root=repo_root, output_dir=tmp_path / "out")
+
+    assert cfg["model"] == {
+        "path": str(
+            (repo_root / "tests/fixtures/mlperf_tiny/kws/kws_dscnn_random_cortex_m55.pte").resolve()
+        ),
+        "arena_size": 16000,
+        "arena_location": "sram",
+        "weights_location": "mram",
+    }
+    assert cfg["engine"]["type"] == "executorch"
+    assert cfg["engine"]["backend"] == backend.value
+    assert cfg["engine"]["config"] == {
+        "source_path": str(nsx_root.resolve()),
+        "planned_arena_size": 16000,
+        "method_arena_size": 65536,
+        "temporary_arena_size": 32768,
+        "input_size": 1960,
+        "output_size": 48,
+        "portable_ops": ["dim_order_ops::_clone_dim_order.out"],
+        "cmsis_nn_ref": cmsis_nn_ref,
+    }
+
+
 def test_run_case_retries_once_on_transient_joulescope_lock(tmp_path: Path, monkeypatch):
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -327,7 +383,11 @@ def test_run_case_uses_current_python_for_subprocess(tmp_path: Path, monkeypatch
                 {
                     "layers": 13,
                     "total_cycles": 123456,
-                    "latency": {"device_profiled_infer_avg_us": 42.5},
+                    "latency": {
+                        "device_clean_infer_avg_cycles": 4000,
+                        "device_clean_infer_avg_us": 41.5,
+                        "device_profiled_infer_avg_us": 42.5,
+                    },
                     "binary": {"text": 80_000, "data": 2_000, "bss": 5_000, "total": 87_000},
                     "memory": {
                         "arena_size": 32_768,
@@ -345,7 +405,10 @@ def test_run_case_uses_current_python_for_subprocess(tmp_path: Path, monkeypatch
     result = run_case(case=case, repo_root=repo_root, output_root=output_root, timeout_s=30)
 
     assert result.status == "pass"
-    assert result.latency_avg_us == 42.5
+    assert result.backend is None
+    assert result.cmsis_nn_provider == "ns"
+    assert result.total_cycles == 4000
+    assert result.latency_avg_us == 41.5
     assert result.binary_total_bytes == 87_000
     assert result.allocated_arena_bytes == 24_000
     assert seen["cwd"] == str(repo_root)

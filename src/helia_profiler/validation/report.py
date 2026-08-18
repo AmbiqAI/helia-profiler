@@ -17,7 +17,7 @@ from ..errors import ReportError
 from .runner import CaseResult
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 _COMMIT_SHA_RE = re.compile(r"[0-9a-f]{40}")
 
 
@@ -233,10 +233,15 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
     }
     requested_memory = _strip_none(requested_memory)
     engine = _enum_value(result.engine)
+    cmsis_nn_provider = _resolve_cmsis_nn_provider(
+        engine, result.backend, result.cmsis_nn_provider
+    )
     identity = {
         "model_id": result.model_id,
         "comparison_group": result.comparison_group or result.model_id,
         "engine": engine,
+        "backend": result.backend,
+        "cmsis_nn_provider": cmsis_nn_provider,
         "board": result.board,
         "toolchain": result.toolchain,
         "transport": result.transport,
@@ -305,6 +310,24 @@ def _case_report(result: CaseResult, output_dir: Path) -> dict[str, Any]:
     case_data["power_metrics"] = _nested_dict(summary, "power") or None
     case_data = _strip_none(case_data)
     return case_data
+
+
+def _resolve_cmsis_nn_provider(
+    engine: str, backend: str | None, provider: str | None
+) -> str:
+    """Resolve and validate the CMSIS-NN provider written to schema v5."""
+    if engine == "executorch":
+        if backend not in {"arm", "ns"} or provider not in {None, backend}:
+            raise ReportError("ExecuTorch validation backend/provider metadata is inconsistent")
+        return backend
+    expected = {
+        "tflm": "arm",
+        "helia-rt": "ns",
+        "helia-aot": "ns",
+    }.get(engine)
+    if expected is None or provider not in {None, expected}:
+        raise ReportError(f"Invalid CMSIS-NN provider metadata for validation engine {engine!r}")
+    return expected
 
 
 def _case_dir(result: CaseResult, output_dir: Path) -> Path:

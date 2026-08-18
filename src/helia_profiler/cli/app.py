@@ -98,9 +98,7 @@ G_ADVANCED = "advanced"
     ),
 )
 def profile_command(
-    model: Optional[Path] = typer.Argument(
-        None, help="Path to .tflite or .pte model file"
-    ),
+    model: Optional[Path] = typer.Argument(None, help="Path to .tflite or .pte model file"),
     config: Optional[Path] = typer.Option(None, "--config", help="YAML config file (hpx.yml)"),
     verbose: int = typer.Option(0, "-v", "--verbose", count=True, help="Increase verbosity"),
     # -- engine --
@@ -178,10 +176,7 @@ def profile_command(
     usb_port: Optional[str] = typer.Option(
         None,
         "--usb-port",
-        help=(
-            "Explicit USB CDC device path for --transport usb_cdc "
-            "(for example /dev/ttyACM1)."
-        ),
+        help=("Explicit USB CDC device path for --transport usb_cdc (for example /dev/ttyACM1)."),
         rich_help_panel=G_TARGET,
     ),
     rtt_buffer_size_up: Optional[int] = typer.Option(
@@ -512,7 +507,9 @@ def analyze_command(
         ),
     ),
     compare: bool = typer.Option(
-        False, "--compare", help="Show side-by-side comparison of original vs engine-transformed graph"
+        False,
+        "--compare",
+        help="Show side-by-side comparison of original vs engine-transformed graph",
     ),
     format: str = typer.Option(
         "table",
@@ -520,9 +517,7 @@ def analyze_command(
         click_type=_ANALYZE_FORMAT_CHOICE,
         help="Output format (default: table)",
     ),
-    output: Optional[Path] = typer.Option(
-        None, "--output", "-o", help="Write output to file"
-    ),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Write output to file"),
     board: str = typer.Option(
         "apollo510_evb",
         "--board",
@@ -616,7 +611,7 @@ _VALIDATE_SUITE_CHOICE = click.Choice(["smoke", "models-rt", "models-aot", "comp
         "  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n\n"
         "  hpx validate --suite models-rt       # 16-case RT sweep: 2 boards x 4 models x 2 toolchains\n\n"
         "  hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains\n\n"
-        "  hpx validate --suite complete        # 48-case RT + AOT + TFLM/CMSIS-NN sweep"
+        "  hpx validate --suite complete        # RT + AOT + TFLM + ExecuTorch sweep"
     ),
 )
 def validate_command(
@@ -646,12 +641,22 @@ def validate_command(
     engines: str = typer.Option(
         "",
         "--engines",
-        help="Comma-separated engines: rt,aot,tflm,helia-rt,helia-aot (default: all).",
+        help=(
+            "Comma-separated engines: rt,aot,tflm,et,executorch,helia-rt,helia-aot (default: all)."
+        ),
+    ),
+    executorch_backends: str = typer.Option(
+        "both",
+        "--executorch-backends",
+        help=(
+            "ExecuTorch CMSIS-NN providers: arm, ns, or both (default: both). "
+            "TFLM always uses ARM CMSIS-NN; heliaRT and heliaAOT always use ns-cmsis-nn."
+        ),
     ),
     ns_cmsis_nn_ref: str = typer.Option(
         "",
         "--ns-cmsis-nn-ref",
-        help="Exact ns-cmsis-nn commit/ref used by heliaRT and heliaAOT cases.",
+        help="Exact ns-cmsis-nn commit/ref used by heliaRT, heliaAOT, and ExecuTorch/ns.",
     ),
     power: str = typer.Option(
         "off",
@@ -692,12 +697,15 @@ def validate_command(
             "toolchains=arm-none-eabi-gcc, interfaces=rtt, memories=auto. "
             "'models-rt' and 'models-aot' default unset axes to all MLPerf Tiny models, "
             "Apollo510 + Apollo330mP, gcc + atfe, rtt, auto memory, and the selected engine. "
-            "'complete' runs the same axes for helia-rt, helia-aot, and TFLM/CMSIS-NN. "
+            "'complete' runs the same axes for helia-rt, helia-aot, TFLM/CMSIS-NN, "
+            "and both ExecuTorch CMSIS-NN providers. "
             "Explicit axis flags always win."
         ),
     ),
     jlink_serials: str = typer.Option(
-        "", "--jlink-serials", help="Comma-separated board=serial entries for multi-board validation."
+        "",
+        "--jlink-serials",
+        help="Comma-separated board=serial entries for multi-board validation.",
     ),
     power_serials: str = typer.Option(
         "",
@@ -743,6 +751,7 @@ def validate_command(
         comparison_group=comparison_group,
         model_arena_size=model_arena_size,
         engines=engines,
+        executorch_backends=executorch_backends,
         ns_cmsis_nn_ref=ns_cmsis_nn_ref,
         power=power,
         power_boards=power_boards,

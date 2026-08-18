@@ -20,7 +20,7 @@ from helia_profiler.validation.runner import CaseResult
 
 
 def _write_bundle(root: Path, cycles: int, *, attempt: int = 1, repeat_total: int = 1) -> None:
-    case_id = "apollo510_evb-kws-rt-arm-none-eabi-gcc-rtt-auto"
+    case_id = "apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto"
     if repeat_total > 1:
         case_id += f"-run{attempt:02d}"
     case_dir = root / case_id
@@ -65,6 +65,7 @@ def _write_bundle(root: Path, cycles: int, *, attempt: int = 1, repeat_total: in
                 toolchain="arm-none-eabi-gcc",
                 transport="rtt",
                 memory="auto",
+                cmsis_nn_provider="ns",
                 attempt=attempt,
                 repeat_total=repeat_total,
                 layers=1,
@@ -122,13 +123,13 @@ def test_repeat_attempts_match_exactly(tmp_path: Path) -> None:
     ]
 
 
-def test_loader_exposes_schema4_resource_data(tmp_path: Path) -> None:
+def test_loader_exposes_schema5_resource_data(tmp_path: Path) -> None:
     bundle = tmp_path / "bundle"
     _write_bundle(bundle, 100)
 
     loaded = load_validation_bundle(bundle)
 
-    assert loaded.schema_version == 4
+    assert loaded.schema_version == 5
     assert dict(loaded.cases[0].resources) == {}
 
 
@@ -157,14 +158,16 @@ def test_loader_exposes_run_origin_metadata(tmp_path: Path) -> None:
     assert metadata.github_run_url.endswith("/actions/runs/31033041861")
 
 
-@pytest.mark.parametrize("schema_version", [1, 2, 3, 4])
+@pytest.mark.parametrize("schema_version", [1, 2, 3, 4, 5])
 def test_loader_supports_all_manifest_schemas(tmp_path: Path, schema_version: int) -> None:
     bundle = tmp_path / f"bundle-v{schema_version}"
     _write_bundle(bundle, 100)
     manifest_path = bundle / "validation_manifest.json"
     manifest = json.loads(manifest_path.read_text())
     manifest["schema_version"] = schema_version
-    if schema_version == 4:
+    if schema_version < 5:
+        manifest["cases"][0]["identity"].pop("cmsis_nn_provider")
+    if schema_version in (4, 5):
         manifest["validation"] = {"suite": "smoke"}
         manifest["cases"][0]["identity"]["comparison_group"] = "kws"
         manifest["cases"][0]["repeat"] = {"attempt": 1, "total": 1}
@@ -215,14 +218,14 @@ def test_loader_rejects_unsupported_future_schema(tmp_path: Path) -> None:
     _write_bundle(bundle, 100)
     manifest_path = bundle / "validation_manifest.json"
     manifest = json.loads(manifest_path.read_text())
-    manifest["schema_version"] = 5
+    manifest["schema_version"] = 6
     manifest_path.write_text(json.dumps(manifest))
 
-    with pytest.raises(ValidationBundleError, match="schema_version: 5"):
+    with pytest.raises(ValidationBundleError, match="schema_version: 6"):
         load_validation_bundle(bundle)
 
 
-@pytest.mark.parametrize("schema_version", [True, False, "4", 4.0, None])
+@pytest.mark.parametrize("schema_version", [True, False, "5", 5.0, None])
 def test_loader_rejects_non_integer_schema_version(
     tmp_path: Path, schema_version: object
 ) -> None:
@@ -241,7 +244,7 @@ def test_loader_rejects_non_integer_schema_version(
     "repeat",
     [{"total": 1}, {"attempt": None, "total": 1}, {"attempt": 1, "total": True}],
 )
-def test_loader_rejects_malformed_schema_v4_repeat(
+def test_loader_rejects_malformed_schema_v5_repeat(
     tmp_path: Path, repeat: dict[str, object]
 ) -> None:
     bundle = tmp_path / "bundle"
@@ -255,7 +258,7 @@ def test_loader_rejects_malformed_schema_v4_repeat(
         load_validation_bundle(bundle)
 
 
-def test_loader_normalizes_schema4_comparison_group(tmp_path: Path) -> None:
+def test_loader_normalizes_schema5_comparison_group(tmp_path: Path) -> None:
     bundle = tmp_path / "bundle"
     _write_bundle(bundle, 100)
     manifest_path = bundle / "validation_manifest.json"
@@ -294,6 +297,63 @@ def test_loader_detects_duplicate_groups_after_normalization(tmp_path: Path) -> 
     manifest_path.write_text(json.dumps(manifest))
 
     with pytest.raises(ValidationBundleError, match="Duplicate validation case identity"):
+        load_validation_bundle(bundle)
+
+
+def test_loader_distinguishes_cmsis_nn_providers(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    arm = manifest["cases"][0]
+    arm["case_id"] = "executorch-arm"
+    arm["identity"].update(
+        {"engine": "executorch", "backend": "arm", "cmsis_nn_provider": "arm"}
+    )
+    ns = {**arm, "case_id": "executorch-ns", "identity": dict(arm["identity"])}
+    ns["identity"].update({"backend": "ns", "cmsis_nn_provider": "ns"})
+    manifest["cases"].append(ns)
+    manifest_path.write_text(json.dumps(manifest))
+
+    loaded = load_validation_bundle(bundle)
+
+    assert {case.identity.cmsis_nn_provider for case in loaded.cases} == {"arm", "ns"}
+
+
+@pytest.mark.parametrize(
+    ("engine", "backend", "provider"),
+    [
+        ("executorch", "arm", "ns"),
+        ("tflm", "cmsis_nn", "ns"),
+        ("helia-rt", None, "arm"),
+        ("helia-aot", None, "arm"),
+    ],
+)
+def test_loader_rejects_contradictory_provider_identity(
+    tmp_path: Path, engine: str, backend: str | None, provider: str
+) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["cases"][0]["identity"].update(
+        {"engine": engine, "backend": backend, "cmsis_nn_provider": provider}
+    )
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValidationBundleError, match="requires|inconsistent"):
+        load_validation_bundle(bundle)
+
+
+def test_loader_requires_provider_in_schema_v5(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["cases"][0]["identity"].pop("cmsis_nn_provider")
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValidationBundleError, match="no cmsis_nn_provider"):
         load_validation_bundle(bundle)
 
 

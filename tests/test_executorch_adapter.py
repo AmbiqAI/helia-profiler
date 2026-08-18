@@ -11,6 +11,7 @@ from helia_profiler.config import load_config
 from helia_profiler.engines.executorch import ExecuTorchAdapter
 from helia_profiler.errors import EngineError
 
+
 def _source_tree(tmp_path: Path) -> Path:
     # Mirrors nsx-executorch's real checkout-root layout: nsx-module.yaml
     # and CMakeLists.txt live at the root (not a retired nsx/ subdirectory).
@@ -155,9 +156,7 @@ def test_adapter_honors_explicit_ns_provider_checkout(tmp_path: Path):
     (provider / "Source").mkdir()
     (provider / "nsx").mkdir()
     (provider / "CMakeLists.txt").write_text("# provider\n", encoding="utf-8")
-    (provider / "nsx" / "CMakeLists.txt").write_text(
-        "# nsx provider\n", encoding="utf-8"
-    )
+    (provider / "nsx" / "CMakeLists.txt").write_text("# nsx provider\n", encoding="utf-8")
     (provider / "nsx" / "nsx-module.yaml").write_text(
         "schema_version: 1\nmodule:\n  name: nsx-cmsis-nn\n", encoding="utf-8"
     )
@@ -283,3 +282,46 @@ def test_executorch_template_has_counter_health_and_true_overflow_mask():
         "nsx_pmu_get_counters(&g_pmu_cfg)"
     )
     assert "result.execution_cycles" in out
+
+
+def test_executorch_template_places_complete_workspace_in_sram():
+    env = jinja2.Environment(
+        loader=jinja2.PackageLoader("helia_profiler.firmware", "templates"),
+        trim_blocks=True,
+        lstrip_blocks=True,
+        keep_trailing_newline=True,
+        undefined=jinja2.StrictUndefined,
+    )
+    out = env.get_template("main_executorch.cc.j2").render(
+        cmsis_device_header="apollo330P.h",
+        pmu_max_ops=512,
+        executorch_planned_arena_size=138240,
+        executorch_method_arena_size=65536,
+        executorch_temporary_arena_size=32768,
+        executorch_input_size=110592,
+        executorch_output_size=8,
+        arena_region="sram",
+        weights_region="mram",
+        transport="rtt",
+        power_sync_enabled=False,
+        extreme_mode=False,
+        manages_shared_ssram_power=True,
+        ssram_full_power_enum="AM_HAL_PWRCTRL_SRAM_1P75M",
+        perf_mode_symbol="NSX_PERF_LOW",
+        perf_mode_mhz=96,
+        iterations=5,
+        warmup=2,
+        clean_iters=5,
+        pmu_passes=[],
+        pmu_pass_names=[],
+        psram_clock_hz=48_000_000,
+    )
+
+    for name in (
+        "g_planned_arena",
+        "g_method_arena",
+        "g_temporary_arena",
+        "g_input",
+        "g_output",
+    ):
+        assert f"NSX_MEM_SRAM_BSS alignas(16) static uint8_t {name}" in out
