@@ -716,16 +716,20 @@ int main(void) {
         // counter never advances at all we fall back to window_min.
         dwt_init();
         uint32_t clean_warm_cyc = 0U;
+{%- if not use_stimer_window %}
         uint32_t clean_warm_min_cyc = 0U;
+{%- endif %}
         for (int w = 0; w < 3; w++) {
             memset(input->data.raw, 0, input->bytes);
             uint32_t wt0 = DWT->CYCCNT;
             interpreter.Invoke();
             uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
             if (wc > clean_warm_cyc) clean_warm_cyc = wc;
+{%- if not use_stimer_window %}
             if (wc > 0U && (clean_warm_min_cyc == 0U || wc < clean_warm_min_cyc)) {
                 clean_warm_min_cyc = wc;
             }
+{%- endif %}
         }
         int clean_iters_n = {{ window_min }};
         if (clean_warm_cyc > 0U) {
