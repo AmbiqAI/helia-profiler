@@ -6,6 +6,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": true,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": false,
       "debug_uart": false,
@@ -21,7 +22,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "574fbd811356616a1a3015e71280d1cf3163d2ebb123f536c14dd1f9779a2a92"
+    "sha256": "2c3f4d3140657a4e019d791c95cb0cd18709bb4a6ff1e2d5080cfeb24cc9a0bd"
   },
   "apollo3p|rtt|helia-aot|busy_loop": {
     "markers": {
@@ -29,6 +30,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -52,6 +56,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
@@ -75,6 +80,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -98,6 +106,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": true,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": false,
       "debug_uart": false,
@@ -113,7 +122,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "147984c6ab925f2341df57f2f6077e49d44ecc12259932bb264354652580023b"
+    "sha256": "ed1092e95230eb998dbe1d86c8661935660df40ccc79a748d0f2f8997b7a4996"
   },
   "apollo3p|rtt|helia-rt|busy_loop": {
     "markers": {
@@ -121,6 +130,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -144,6 +156,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
@@ -167,6 +180,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -190,6 +206,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": true,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": false,
       "debug_uart": false,
@@ -205,7 +222,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "147984c6ab925f2341df57f2f6077e49d44ecc12259932bb264354652580023b"
+    "sha256": "ed1092e95230eb998dbe1d86c8661935660df40ccc79a748d0f2f8997b7a4996"
   },
   "apollo3p|rtt|tflm|busy_loop": {
     "markers": {
@@ -213,6 +230,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -236,6 +256,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
@@ -259,6 +280,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -282,6 +306,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": true,
       "debug_uart": false,
@@ -297,7 +322,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "0994ae3e3745ce2615ede89914cc4527b0b78cee7a8f9545500e665d943ee80d"
+    "sha256": "523115ca603fc60e67b33495c2b35a3211dc16942ec7f7d98da315898e7c47bf"
   },
   "apollo3p|swo|helia-rt": {
     "markers": {
@@ -306,6 +331,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": true,
       "debug_uart": false,
@@ -321,7 +347,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "7749889c58b9b8cfb0f5cb96843351a6a7e304e58e39fb4b9bde42584313441e"
+    "sha256": "859aca9a5e67d313d5e134045b0041b708adf44311637f72f9fbebcb9932c071"
   },
   "apollo3p|swo|tflm": {
     "markers": {
@@ -330,6 +356,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": true,
       "debug_uart": false,
@@ -345,7 +372,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "7749889c58b9b8cfb0f5cb96843351a6a7e304e58e39fb4b9bde42584313441e"
+    "sha256": "859aca9a5e67d313d5e134045b0041b708adf44311637f72f9fbebcb9932c071"
   },
   "apollo3p|uart|helia-aot": {
     "markers": {
@@ -354,6 +381,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": true,
       "debug_uart": true,
@@ -369,7 +397,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "1645f1d9dff6fd675e476b101a5100c76e2d6936944fe7111da9e39f6e27f7b1"
+    "sha256": "1429a2d763d5de4075537339f1aa65c718c0bcdf2eeaa7994e38bb70130d160c"
   },
   "apollo3p|uart|helia-rt": {
     "markers": {
@@ -378,6 +406,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": true,
       "debug_uart": true,
@@ -393,7 +422,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "52363af13ae3463e30f5f9651d7c53ebc840f60c5ba0278b8cee0f933378b05e"
+    "sha256": "b306b0b7dd8486671061c82fd310f9ddf99a33f1ebada03dca5d9c11f2bf33f6"
   },
   "apollo3p|uart|tflm": {
     "markers": {
@@ -402,6 +431,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": true,
       "debug_uart": true,
@@ -417,7 +447,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "52363af13ae3463e30f5f9651d7c53ebc840f60c5ba0278b8cee0f933378b05e"
+    "sha256": "b306b0b7dd8486671061c82fd310f9ddf99a33f1ebada03dca5d9c11f2bf33f6"
   },
   "apollo3p|usb_cdc|helia-aot": {
     "markers": {
@@ -426,6 +456,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": false,
       "debug_uart": false,
@@ -441,7 +472,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "f5074849ea8437bb0256855f6742ee5dc774ae471faa108b0176805637dc450c"
+    "sha256": "2486cc3435f0c0dda192bee26ec6667e2d64c76f483869006648d68171ef94d9"
   },
   "apollo3p|usb_cdc|helia-rt": {
     "markers": {
@@ -450,6 +481,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": false,
       "debug_uart": false,
@@ -465,7 +497,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "185ad4d9697f20613be027fa4d7c17ba527608bd1317418ab9ec23391efdaf98"
+    "sha256": "c2608170bff8e2f1d84b2fed0550a90a8b001ed0384b5454375b8ad7b3dbf98a"
   },
   "apollo3p|usb_cdc|tflm": {
     "markers": {
@@ -474,6 +506,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": false,
       "debug_uart": false,
@@ -489,7 +522,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "185ad4d9697f20613be027fa4d7c17ba527608bd1317418ab9ec23391efdaf98"
+    "sha256": "c2608170bff8e2f1d84b2fed0550a90a8b001ed0384b5454375b8ad7b3dbf98a"
   },
   "apollo4p|rtt|helia-aot": {
     "markers": {
@@ -498,6 +531,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": true,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": false,
       "debug_uart": false,
@@ -513,7 +547,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "e72fbb39bf2a8fe9e8bf5d38b2235bee21d4c2178ae737d486e328e0dd65fc35"
+    "sha256": "016f1218bd5cbe170eb4a923f8f653836a7fd516d6ab31ef67e305238523759b"
   },
   "apollo4p|rtt|helia-aot|busy_loop": {
     "markers": {
@@ -521,6 +555,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -544,6 +581,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
@@ -567,6 +605,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -590,6 +631,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": true,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": false,
       "debug_uart": false,
@@ -605,7 +647,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "aa87547cb2eee31d3f94d218b328f1b649ea04fe75d71a05a19eb402444ee10d"
+    "sha256": "6beb81905689c531c4eb9aaafe9e4cd74ef23b74c546751251d1411f73b514ce"
   },
   "apollo4p|rtt|helia-rt|busy_loop": {
     "markers": {
@@ -613,6 +655,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -636,6 +681,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
@@ -659,6 +705,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -682,6 +731,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": true,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": false,
       "debug_uart": false,
@@ -697,7 +747,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "aa87547cb2eee31d3f94d218b328f1b649ea04fe75d71a05a19eb402444ee10d"
+    "sha256": "6beb81905689c531c4eb9aaafe9e4cd74ef23b74c546751251d1411f73b514ce"
   },
   "apollo4p|rtt|tflm|busy_loop": {
     "markers": {
@@ -705,6 +755,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -728,6 +781,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
@@ -751,6 +805,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -774,6 +831,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": true,
       "debug_uart": false,
@@ -789,7 +847,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "c6dd5b348fd237b839664ae2b80fe8ff6765a4d664a9ecb536b2f6e323d3d653"
+    "sha256": "39507c8609e3c09c901f66e9db04b835d10ba3c69e1f066e3e944e4b820d906d"
   },
   "apollo4p|swo|helia-rt": {
     "markers": {
@@ -798,6 +856,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": true,
       "debug_uart": false,
@@ -813,7 +872,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "6efe6e482d0ec2747ea0a9f23aafb8e59b4a5c0e0a0b0d86e575a169049e3bd9"
+    "sha256": "fcd85df578eb01146ddb92c7005f1a8418809f64a480ca2a1e2026d74f6d95bc"
   },
   "apollo4p|swo|tflm": {
     "markers": {
@@ -822,6 +881,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": true,
       "debug_uart": false,
@@ -837,7 +897,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "6efe6e482d0ec2747ea0a9f23aafb8e59b4a5c0e0a0b0d86e575a169049e3bd9"
+    "sha256": "fcd85df578eb01146ddb92c7005f1a8418809f64a480ca2a1e2026d74f6d95bc"
   },
   "apollo4p|uart|helia-aot": {
     "markers": {
@@ -846,6 +906,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": true,
       "debug_uart": true,
@@ -861,7 +922,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "22a98820b41e4cf4ece3796501e3bd333dc59b662994df5e99fbba5ed96ba316"
+    "sha256": "14b8fc7260fbd6ab30c0029f42760d46255480ea76dc811570d8987027772c41"
   },
   "apollo4p|uart|helia-rt": {
     "markers": {
@@ -870,6 +931,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": true,
       "debug_uart": true,
@@ -885,7 +947,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "f549a7106e30d20f63e219b92a33a062540cbefb421ea2ba2bbee68bccb86720"
+    "sha256": "b3ac283f8d12c49986c55fcf83c49efbbac22730e5b90fe052ddc7af049ba3f7"
   },
   "apollo4p|uart|tflm": {
     "markers": {
@@ -894,6 +956,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": true,
       "debug_uart": true,
@@ -909,7 +972,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "f549a7106e30d20f63e219b92a33a062540cbefb421ea2ba2bbee68bccb86720"
+    "sha256": "b3ac283f8d12c49986c55fcf83c49efbbac22730e5b90fe052ddc7af049ba3f7"
   },
   "apollo4p|usb_cdc|helia-aot": {
     "markers": {
@@ -918,6 +981,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": false,
       "debug_uart": false,
@@ -933,7 +997,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "9c74827373c87a54b33f5941c0cc42cebbd6050ff09f859ee27e367acd825a25"
+    "sha256": "44ed7838cffc29f83e77fd671b3656c64f6ad6646c0f878fead3c92d15559017"
   },
   "apollo4p|usb_cdc|helia-rt": {
     "markers": {
@@ -942,6 +1006,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": false,
       "debug_uart": false,
@@ -957,7 +1022,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "fc0ec760eda51d047c38003271444d52d855ca3802a0f885a690866abf8c761d"
+    "sha256": "b4d1e439d83a6fbf2de64c938601995112c3ca1b2ece81fa03c07fd85a49613d"
   },
   "apollo4p|usb_cdc|tflm": {
     "markers": {
@@ -966,6 +1031,7 @@
       "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": true,
       "clean_window_stall_check": true,
       "debug_itm": false,
       "debug_uart": false,
@@ -981,7 +1047,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "fc0ec760eda51d047c38003271444d52d855ca3802a0f885a690866abf8c761d"
+    "sha256": "b4d1e439d83a6fbf2de64c938601995112c3ca1b2ece81fa03c07fd85a49613d"
   },
   "apollo510|rtt|helia-aot": {
     "markers": {
@@ -990,6 +1056,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
@@ -1013,6 +1080,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -1036,6 +1106,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
@@ -1059,6 +1130,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -1082,6 +1156,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
@@ -1105,6 +1180,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -1128,6 +1206,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
@@ -1151,6 +1230,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -1174,6 +1256,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
@@ -1197,6 +1280,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -1220,6 +1306,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
@@ -1243,6 +1330,9 @@
       "auto_window": false,
       "busy_loop_probe": true,
       "cache_shims": false,
+      "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
+      "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
       "dwt_init": true,
@@ -1266,6 +1356,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": true,
       "debug_uart": false,
@@ -1290,6 +1381,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": true,
       "debug_uart": false,
@@ -1314,6 +1406,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": true,
       "debug_uart": false,
@@ -1338,6 +1431,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": true,
       "debug_uart": true,
@@ -1362,6 +1456,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": true,
       "debug_uart": true,
@@ -1386,6 +1481,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": true,
       "debug_uart": true,
@@ -1410,6 +1506,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
@@ -1434,6 +1531,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,
@@ -1458,6 +1556,7 @@
       "busy_loop_probe": true,
       "cache_shims": false,
       "clean_window_attach_wait": false,
+      "clean_window_rate_probe": false,
       "clean_window_stall_check": false,
       "debug_itm": false,
       "debug_uart": false,

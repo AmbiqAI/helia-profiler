@@ -109,6 +109,12 @@ def test_write_summary_surfaces_the_clean_window_self_check(tmp_path: Path):
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
+    # Setting run_metadata.timing is load-bearing, not incidental: summary.py
+    # has TWO latency branches, and every real capture takes the primary one
+    # (capture/__init__.py always populates timing). A fixture that leaves it
+    # None exercises only the fallback elif -- the three device_clean_* lines
+    # could be deleted from the shipping branch with the whole suite green.
+    ctx.run_metadata.timing = TimingInfo(capture_duration_s=1.0)
     ctx.pmu_result = PmuResult(
         meta=FirmwareMeta(
             clean_infer_count=1092,
@@ -116,6 +122,8 @@ def test_write_summary_surfaces_the_clean_window_self_check(tmp_path: Path):
             clean_stalled_iters=0,
             clean_partial_iters=0,
             clean_ref_cycles=83300,
+            clean_dwt_rate_cyc=96_000,
+            clean_dwt_rate_us=1000,
         ),
         layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
     )
@@ -125,6 +133,8 @@ def test_write_summary_surfaces_the_clean_window_self_check(tmp_path: Path):
     assert summary["latency"]["device_clean_stalled_iters"] == 0
     assert summary["latency"]["device_clean_partial_iters"] == 0
     assert summary["latency"]["device_clean_ref_cycles"] == 83300
+    assert summary["latency"]["device_clean_dwt_rate_cyc"] == 96_000
+    assert summary["latency"]["device_clean_dwt_rate_us"] == 1000
 
     # Firmware that never reported them omits the keys entirely rather than
     # publishing a 0 that would read as "checked, healthy".
@@ -137,8 +147,19 @@ def test_write_summary_surfaces_the_clean_window_self_check(tmp_path: Path):
         "device_clean_stalled_iters",
         "device_clean_partial_iters",
         "device_clean_ref_cycles",
+        "device_clean_dwt_rate_cyc",
+        "device_clean_dwt_rate_us",
     ):
         assert key not in silent["latency"], key
+
+    # And the fallback branch carries them too, for a capture with no timing.
+    ctx.run_metadata.timing = None
+    ctx.pmu_result = PmuResult(
+        meta=FirmwareMeta(clean_stalled_iters=4, clean_infer_count=1092),
+        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+    )
+    fallback = json.loads(_write_summary(ctx, tmp_path).read_text())
+    assert fallback["latency"]["device_clean_stalled_iters"] == 4
 
 
 def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):

@@ -2220,6 +2220,31 @@ class TestPowerFirmwareSelection:
             for record in caplog.records
         )
 
+        # A pure-partial stall must report a real magnitude. The bound used to
+        # be frozen-only, so this case printed "reads at least ~0.0% low" in a
+        # sentence that then said "short by about the same factor".
+        caplog.clear()
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(
+                clean_infer_avg_us=2226,
+                clean_infer_count=1091,
+                clean_stalled_iters=0,
+                clean_partial_iters=1091,
+            ),
+            layers=[],
+        )
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            plan_power_run(ctx)
+        partial_msgs = [
+            r.getMessage()
+            for r in caplog.records
+            if "stalled clean-window reference" in r.getMessage()
+        ]
+        assert partial_msgs, "pure-partial stall was not flagged at all"
+        assert "~0.0%" not in partial_msgs[0], (
+            f"pure-partial stall reported a zero magnitude: {partial_msgs[0]}"
+        )
+
     def test_power_build_replaces_stale_output_and_publishes_artifact(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):

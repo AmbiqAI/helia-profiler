@@ -631,10 +631,12 @@ class TestMainAotCcRender:
             # window from it. Asserting the variable's absence would have been
             # asserting the wrong thing.
             assert "target_cyc" not in out
-            assert "clean_est_ms" not in out
-            # Fixed mode announces the window as pure state with est_ms=0
-            # (no runtime warm measurement to estimate from).
-            assert "phase=clean_window_begin iters=%d est_ms=0" in out
+            # est_ms is no longer 0 here: a DWT-timed fixed window measures the
+            # warm cost for its stall floor (#121), so the blackout estimate is
+            # derivable and is emitted, which lets the host widen its capture
+            # deadline instead of falling back to the flat heartbeat timeout.
+            # What "fixed" still means is that clean_iters_n is a literal.
+            assert "phase=clean_window_begin iters=%d est_ms=%llu" in out
 
     def test_auto_window_mode_computes_clean_iters_at_runtime(self):
         """Auto mode measures warm cycles and clamps N to fill the target window."""
@@ -674,7 +676,6 @@ class TestMainAotCcRender:
             # measurement" -- a DWT-timed window measures the warm cost for its
             # stall floor regardless of window mode.
             assert "target_cyc" not in out
-            assert "clean_est_ms" not in out
 
     def test_busy_loop_probe_replaces_clean_window_body(self):
         tflm_out = _render_tflm(
