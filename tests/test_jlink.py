@@ -406,12 +406,69 @@ def test_a_per_soc_address_overrides_its_family(monkeypatch: pytest.MonkeyPatch)
     it heads a separate Atomiq series and is only tagged AP5 as a placeholder
     for its Cortex-M55 core tier.  It loads at 0x22000000, so without per-SoC
     precedence it would silently inherit Apollo5's 0x00410000.
+
+    Uses a mixed-case registered name so that normalizing the lookup key
+    (``soc.name.lower()``) fails here instead of silently never matching the
+    mixed-case parts in the registry.
     """
     from helia_profiler.platform import capabilities, get_soc
 
-    monkeypatch.setitem(capabilities._SOC_APP_FLASH_LOAD_ADDR, "apollo510", 0x22000000)
+    monkeypatch.setitem(capabilities._SOC_APP_FLASH_LOAD_ADDR, "apollo330P", 0x22000000)
 
-    assert get_soc("apollo510").capabilities.memory.app_flash_load_addr == 0x22000000
+    assert get_soc("apollo330P").capabilities.memory.app_flash_load_addr == 0x22000000
+
+
+def test_the_atomiq110_override_value_is_pinned() -> None:
+    """Pin atomiq110's address while it is still unreachable data.
+
+    It is not a registered SoC yet (PR #98 adds it), so no behavioural test can
+    reach this entry and a wrong value would land on main unnoticed.  The value
+    is nsx's ``NSX_SEGGER_PF_ADDR`` for the part and is the **nbl** origin,
+    because atomiq110.cmake makes nbl the default profile -- the FPGA
+    realization is flashed straight over J-Link with no secure bootloader.  Its
+    *sbl* scripts sit at 0x22010000, reserved for future AT110 silicon, so
+    "correcting" this to the sbl address would break the part that exists.
+    """
+    from helia_profiler.platform import capabilities
+
+    assert capabilities._SOC_APP_FLASH_LOAD_ADDR["atomiq110"] == 0x22000000
+
+
+def test_a_per_soc_address_of_zero_is_honoured(monkeypatch: pytest.MonkeyPatch) -> None:
+    """0 is a real address in the override tier too, not "no override".
+
+    The family tier already distinguishes 0 from None; writing this tier's
+    check as ``if override:`` would silently drop a legitimate 0 and fall
+    through to the family address -- the exact silent inheritance the override
+    map exists to prevent.
+    """
+    from helia_profiler.platform import capabilities, get_soc
+
+    monkeypatch.setitem(capabilities._SOC_APP_FLASH_LOAD_ADDR, "apollo510", 0)
+
+    assert get_soc("apollo510").capabilities.memory.app_flash_load_addr == 0
+
+
+def test_a_custom_soc_cannot_forge_a_per_soc_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A user-named custom SoC must not inherit a built-in's override.
+
+    ``target.custom_socs`` names are user-chosen and replace built-ins in the
+    merged registry, so matching the override by name alone would let the name
+    outrank the ``family`` the user explicitly declared -- and hand their part
+    an address belonging to a different SoC, past the ``load_addr is None``
+    guard.  A custom SoC must always resolve through its declared family.
+    """
+    from helia_profiler.platform import capabilities
+    from helia_profiler.platform.custom import build_custom_platform_registry
+
+    monkeypatch.setitem(capabilities._SOC_APP_FLASH_LOAD_ADDR, "apollo510", 0x22000000)
+    registry = build_custom_platform_registry(
+        {"custom_socs": {"apollo510": {"based_on": "apollo4p", "family": "ap4"}}}
+    )
+
+    soc = registry.socs["apollo510"]
+    assert soc.family is SocFamily.AP4
+    assert soc.capabilities.memory.app_flash_load_addr == 0x00018000
 
 
 def test_a_family_with_no_registered_address_resolves_to_none(
