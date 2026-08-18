@@ -868,7 +868,10 @@ comparison.
 - **`profiling.clean_window_probe: busy_loop`** (default: `infer`) — replaces
   the clean window's inference loop with a calibrated CPU spin. Useful during
   bring-up to distinguish "the gate semantics are wrong" from "the model's
-  inference behavior is wrong," independent of actual model execution.
+  inference behavior is wrong," independent of actual model execution. The
+  spin is sized to approximately `window_target_ms`, but the duration the run
+  reports is always the one STIMER measured — the probe never echoes the
+  nominal target back as if it had been measured.
 
 ## Power config reference
 

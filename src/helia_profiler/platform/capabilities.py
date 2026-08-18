@@ -208,9 +208,18 @@ class SocCapabilities:
         acquire the broad shutdown without being Cortex-M4F, or vice versa.
 
         Consumed by ``main.cc.j2`` / ``main_aot.cc.j2`` through
-        ``FirmwareRenderContext``; this is the single place the predicate
-        lives, so the two templates cannot drift apart (the class of bug that
-        produced the original AP4 miss).
+        ``FirmwareRenderContext``; this is the single place the *per-SoC*
+        predicate lives, so the two templates cannot drift apart (the class of
+        bug that produced the original AP4 miss).
+
+        One thing deliberately stays out of this property: the opt-in
+        ``clean_window_probe: busy_loop`` diagnostic resolves to STIMER on
+        every family, power binary or not, because it gates the debug domain
+        off for its own window and so cannot read DWT anywhere -- including in
+        the calibration pass that sizes its loop (issue #112).  That is a
+        property of the *probe*, not of the SoC, so the templates apply it on
+        top of this answer rather than this property second-guessing a
+        profiling setting it is not given.
         """
         if self.clock.clean_window_timer == "stimer":
             return "stimer"

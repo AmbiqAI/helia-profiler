@@ -1,0 +1,58 @@
+{# _busy_loop_calibration.j2 — size the busy-loop probe's iteration count.
+
+   Shared verbatim by main.cc.j2 and main_aot.cc.j2 (both render it at 8-space
+   indentation, immediately before the clean/power window is armed) so the two
+   cannot drift apart -- the class of bug that produced the original AP4 miss.
+
+   Timed by STIMER, never DWT.  The busy_loop probe always requests the
+   CoreSight debug power domain gated off for its window (gate_dbg; the
+   am_hal_debug_disable() call renders on families whose HAL exposes it), and
+   on the dedicated power binary that domain is already gone long before this
+   point regardless of any HAL call: AP4's broad peripheral
+   shutdown disables AM_HAL_PWRCTRL_PERIPH_DEBUG at boot (~200 rendered lines
+   above here), and on any Cortex-M4F part a free-running power binary has no
+   debugger asserting CDBGPWRUPREQ to hold it up in the first place.  See
+   SocCapabilities.power_window_timer; main.cc.j2's prelude pins
+   window_timer == "stimer" for this probe on every family, which is what puts
+   hpx_stimer_* in scope here.
+
+   Reading DWT->CYCCNT here instead (as this block did until issue #112) read a
+   frozen counter: the tick delta came out 0, the scaling branch was skipped,
+   the iteration count silently kept its seed value, and the window ran for a
+   length unrelated to window_target_ms. #}
+        // Size the busy-loop iteration count so the window fills roughly the
+        // {{ window_target_ms }} ms target, then run a plain bounded counter loop
+        // with no clock reads at all inside the window itself.  A live
+        // "while (elapsed < target) nop();" exit condition is not an option:
+        // when it read DWT it hung forever once the debug domain went off
+        // (found 2026-07-03: real firmware hang, required a J-Link reset to
+        // recover the board), and polling STIMER every iteration would put
+        // peripheral traffic inside the measured region.
+        //
+        // The calibration loop must keep the SAME shape as the measured loop
+        // below -- volatile counter, one nop -- or its per-iteration cost does
+        // not transfer.  STIMER is the clock (see the file header): its
+        // ~30.5 us tick over a multi-ms calibration pass is well under 1%,
+        // and unlike SystemCoreClock it is measured rather than assumed.
+        //
+        // The window-begin block below calls hpx_stimer_init() again and reads
+        // its own t0 immediately after; re-clearing the counter there is
+        // harmless (two register writes, outside the measured region) and
+        // keeps that block identical for every probe.
+        hpx_stimer_init();
+        const uint32_t busy_calib_t0 = hpx_stimer_ticks();
+        volatile uint32_t busy_calib_i = 0;
+        for (; busy_calib_i < 100000U; busy_calib_i++) {
+            __asm volatile("nop");
+        }
+        const uint32_t busy_calib_ticks =
+            (uint32_t)(hpx_stimer_ticks() - busy_calib_t0);
+        const uint64_t clean_probe_target_ticks =
+            ((uint64_t)HPX_STIMER_HZ * (uint64_t){{ window_target_ms }}U) / 1000ULL;
+        uint32_t busy_loop_iters = 100000U;
+        if (busy_calib_ticks > 0U) {
+            const uint64_t scaled =
+                ((uint64_t)busy_calib_i * clean_probe_target_ticks) /
+                (uint64_t)busy_calib_ticks;
+            busy_loop_iters = (scaled > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)scaled;
+        }
