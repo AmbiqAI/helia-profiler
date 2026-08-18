@@ -295,12 +295,12 @@ class CollectPowerTerminalStage:
             if ceiling is not None:
                 if ctx.power_result is not None:
                     # Recorded so evaluation.validity can re-derive the same
-                    # verdict later; it has no "now" of its own. Note this does
-                    # NOT reach summary.json -- report/summary.py copies power
-                    # metadata through an explicit allowlist and this key is not
-                    # in it (adding it is a schema change, deliberately out of
-                    # scope). The numbers surface only in the validity issue's
-                    # context.
+                    # verdict later; it has no "now" of its own. Also copied
+                    # into summary.json (report/summary.py's power-metadata
+                    # allowlist) so the envelope comparison a
+                    # power.window_clock_exceeds_host_time warning refers to
+                    # is visible from the summary alone, not just the
+                    # validity issue's context.
                     ctx.power_result.metadata["window_clock_ceiling"] = (
                         ceiling.to_metadata()
                     )

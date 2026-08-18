@@ -585,6 +585,35 @@ def test_write_summary_uses_fixed_power_plan_count(tmp_path: Path):
     assert summary["power"]["power_plan"]["inference_count"] == 8
 
 
+def test_write_summary_surfaces_window_clock_ceiling(tmp_path: Path):
+    # #115: window_clock_ceiling (added by #107's collect_power_terminal
+    # stage) must reach summary.json -- previously report/summary.py's power
+    # metadata allowlist omitted it, so a power.window_clock_exceeds_host_time
+    # warning had no envelope numbers a user could see outside the validity
+    # issue's context.
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=10, clean_infer_avg_us=10000, duration_s=0.1
+    )
+    ctx.power_result.metadata["window_clock_ceiling"] = {
+        "elapsed_us": 6_027_000,
+        "elapsed_s": 6.027,
+        "host_envelope_s": 0.9,
+        "slack_s": 0.05,
+        "ratio": 6.7,
+    }
+
+    out_path = _write_summary(ctx, tmp_path)
+    summary = json.loads(out_path.read_text())
+
+    assert summary["power"]["window_clock_ceiling"] == {
+        "elapsed_us": 6_027_000,
+        "elapsed_s": 6.027,
+        "host_envelope_s": 0.9,
+        "slack_s": 0.05,
+        "ratio": 6.7,
+    }
+
+
 def test_degraded_free_form_capture_suppresses_derived_efficiency(tmp_path: Path):
     config = load_config(
         None,

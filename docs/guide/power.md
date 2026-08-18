@@ -852,7 +852,12 @@ passes, so it is cross-checked directly. Three issue codes come out of that:
 - **`power.window_clock_exceeds_host_time`** — internal mode only: the
   reported window is longer than the host wall time between starting the
   power binary and collecting its record, which is physically impossible.
-  A blunt backstop — it needs roughly 2–3× inflation before it fires.
+  A blunt backstop — it needs roughly 2–3× inflation before it fires. The
+  envelope comparison behind this warning is surfaced as
+  `power.window_clock_ceiling` in `summary.json` (`elapsed_s`, the firmware's
+  reported window; `host_envelope_s`, the host-timed interval that must
+  contain it; `slack_s` and `ratio`), so the warning is explicable from the
+  summary alone without cross-referencing the validity issue's context.
 
 `detailed/power_summary.csv` (with `output.detailed: true`) breaks all of
 this down per gated window, plus a `whole_capture_window` reference row for
