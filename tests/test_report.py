@@ -92,6 +92,55 @@ def test_metadata_to_dict_includes_runtime_versions():
     assert data["engine"] == {"type": "helia-aot", "version": "0.18.4"}
 
 
+def test_write_summary_surfaces_the_clean_window_self_check(tmp_path: Path):
+    """The window-clock self-check must reach summary.json (#121).
+
+    Same reason ``window_clock_ceiling`` had to: a reader of summary.json
+    cannot otherwise distinguish a build that checked its clean-window clock
+    and found nothing from one that never checked at all. Both counters and the
+    warm reference the partial-count floor was derived from are carried, so the
+    threshold is auditable from the artifact.
+    """
+    config = load_config(
+        None,
+        {
+            "model": {"path": "test.tflite"},
+            "engine": {"type": "helia-rt"},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.pmu_result = PmuResult(
+        meta=FirmwareMeta(
+            clean_infer_count=1092,
+            clean_infer_avg_us=684,
+            clean_stalled_iters=0,
+            clean_partial_iters=0,
+            clean_ref_cycles=83300,
+        ),
+        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+    )
+
+    summary = json.loads(_write_summary(ctx, tmp_path).read_text())
+
+    assert summary["latency"]["device_clean_stalled_iters"] == 0
+    assert summary["latency"]["device_clean_partial_iters"] == 0
+    assert summary["latency"]["device_clean_ref_cycles"] == 83300
+
+    # Firmware that never reported them omits the keys entirely rather than
+    # publishing a 0 that would read as "checked, healthy".
+    ctx.pmu_result = PmuResult(
+        meta=FirmwareMeta(clean_infer_count=1092, clean_infer_avg_us=684),
+        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+    )
+    silent = json.loads(_write_summary(ctx, tmp_path).read_text())
+    for key in (
+        "device_clean_stalled_iters",
+        "device_clean_partial_iters",
+        "device_clean_ref_cycles",
+    ):
+        assert key not in silent["latency"], key
+
+
 def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):
     config = load_config(
         None,
