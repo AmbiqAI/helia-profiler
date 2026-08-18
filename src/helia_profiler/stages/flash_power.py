@@ -30,7 +30,7 @@ class FlashPowerFirmwareStage:
         )
 
     def run(self, ctx: PipelineContext) -> None:
-        from ..target.probe.jlink import flash_binary
+        from ..target.probe.flash import flash_binary
 
         if ctx.power_run is None or ctx.power_run.firmware is None:
             raise BuildError(
@@ -49,6 +49,7 @@ class FlashPowerFirmwareStage:
             flash_binary(
                 binary_path,
                 device=ctx.soc.jlink_device,
+                load_addr=ctx.soc.capabilities.memory.app_flash_load_addr,
                 jlink_serial=jlink_serial,
                 timeout_s=ctx.config.timeouts.flash_s,
             )

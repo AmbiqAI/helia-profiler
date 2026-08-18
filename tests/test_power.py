@@ -1653,7 +1653,14 @@ class TestCapturePowerWrapper:
 class TestPowerFirmwareSelection:
     """WP3: flashing the dedicated power binary before gated power capture."""
 
-    def _make_ctx(self, tmp_path: Path, *, firmware: str, transport: str = "rtt"):
+    def _make_ctx(
+        self,
+        tmp_path: Path,
+        *,
+        firmware: str,
+        transport: str = "rtt",
+        board: str = "apollo510_evb",
+    ):
         from helia_profiler.config import load_config
         from helia_profiler.pipeline import PipelineContext
         from helia_profiler.results import FirmwareMeta, PmuResult
@@ -1666,7 +1673,7 @@ class TestPowerFirmwareSelection:
             {
                 "model": {"path": str(model)},
                 "engine": {"type": "helia-rt"},
-                "target": {"board": "apollo510_evb", "transport": transport},
+                "target": {"board": board, "transport": transport},
                 "power": {
                     "enabled": True,
                     "driver": "joulescope",
@@ -1734,7 +1741,7 @@ class TestPowerFirmwareSelection:
             flash_calls.append({"binary_path": binary_path, **kwargs})
             calls.append("flash")
 
-        monkeypatch.setattr("helia_profiler.target.probe.jlink.flash_binary", fake_flash_binary)
+        monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", fake_flash_binary)
 
         FlashPowerFirmwareStage().run(ctx)
         result = capture_power(ctx, duration_override_s=7.0)
@@ -1742,10 +1749,51 @@ class TestPowerFirmwareSelection:
         assert calls == ["flash", "check", "capture_gated"]
         assert flash_calls[0]["binary_path"] == power_bin
         assert flash_calls[0]["jlink_serial"] == "1160002204"
+        # The stage resolves the SoC's app flash load address for the .bin
+        # fallback; apollo510_evb is AP5, so it must not be an AP3/AP4 address.
+        assert flash_calls[0]["load_addr"] == 0x00410000
         assert result.metadata["power_firmware"] == "dedicated"
         assert ctx.power_run is not None
         assert ctx.power_run.deployment is not None
         assert ctx.power_run.deployment.firmware is ctx.power_firmware
+
+    def test_dedicated_flash_stage_resolves_load_addr_per_soc(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """The stage must resolve the address from the SoC, not hardcode one.
+
+        Deliberately a non-AP5 board: on AP5 a call site that hardcoded the
+        Apollo5 address would still look correct, so only a part whose address
+        differs can tell "resolved from capabilities" from "hardcoded".
+        """
+        from helia_profiler.stages.flash_power import FlashPowerFirmwareStage
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated", board="apollo4p_blue_kxr_evb")
+        power_bin = tmp_path / "hpx_profiler_power"
+        power_bin.write_bytes(b"\x00")
+        ctx.publish_power_plan(
+            PowerRunPlan(firmware_mode="dedicated", inference_count=5, count_source="configured")
+        )
+        ctx.publish_power_firmware(
+            FirmwareArtifact(
+                role="power",
+                target_name="hpx_profiler_power",
+                app_dir=tmp_path,
+                build_dir=tmp_path,
+                binary_path=power_bin,
+            )
+        )
+
+        flash_calls: list[dict] = []
+        monkeypatch.setattr(
+            "helia_profiler.target.probe.flash.flash_binary",
+            lambda binary_path, **kwargs: flash_calls.append(kwargs),
+        )
+
+        FlashPowerFirmwareStage().run(ctx)
+
+        assert flash_calls[0]["load_addr"] == 0x00018000
+        assert flash_calls[0]["load_addr"] != 0x00410000
 
     def test_dedicated_flash_retries_after_power_cycle(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1776,7 +1824,7 @@ class TestPowerFirmwareSelection:
             if attempts == 1:
                 raise CaptureError("debug domain unavailable")
 
-        monkeypatch.setattr("helia_profiler.target.probe.jlink.flash_binary", flash_binary)
+        monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", flash_binary)
         monkeypatch.setattr(
             "helia_profiler.stages.flash_power.try_power_cycle_for_context",
             lambda _ctx: True,
@@ -1807,7 +1855,7 @@ class TestPowerFirmwareSelection:
             "helia_profiler.power.get_driver", lambda *a, **k: self._FakeDriver(calls)
         )
         monkeypatch.setattr(
-            "helia_profiler.target.probe.jlink.flash_binary",
+            "helia_profiler.target.probe.flash.flash_binary",
             lambda *a, **k: flash_calls.append({}),
         )
 
