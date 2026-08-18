@@ -108,6 +108,39 @@ class FirmwareMeta:
     clean_infer_total_cycles: int | None = None
     clean_infer_avg_cycles: int | None = None
     clean_infer_avg_us: int | None = None
+    #: Clean-window iterations whose DWT delta came back as exactly zero
+    #: (``HPX_CLEAN_STALLED_ITERS``) -- a frozen cycle counter.  An inference
+    #: cannot take zero core cycles, so any non-zero value means the counter
+    #: stopped mid-window and the timing above is short by those iterations.
+    clean_stalled_iters: int | None = None
+    #: Clean-window iterations whose delta was non-zero but below the
+    #: firmware's warm-derived floor (``HPX_CLEAN_PARTIAL_ITERS``) -- a counter
+    #: that kept advancing far too slowly rather than stopping.  Observed on
+    #: Apollo4 at ~0.6% of the expected rate; such deltas pass the zero test,
+    #: so they are counted separately.
+    clean_partial_iters: int | None = None
+    #: The warm per-inference cycle count that floor was derived from
+    #: (``HPX_CLEAN_REF_CYCLES``), so the threshold is auditable from the
+    #: capture rather than taken on trust.
+    #:
+    #: For all three: ``None`` means the firmware did not report it -- either a
+    #: build whose window is not DWT-timed per-iteration (Apollo5 / STIMER, or
+    #: the busy_loop probe), or firmware predating the check.  Absence is
+    #: "unknown", never "healthy".  See
+    #: ``power.diagnostics.assess_clean_window_stall``.
+    clean_ref_cycles: int | None = None
+    #: DWT cycles counted across the firmware's ``HPX_CLEAN_DWT_RATE_US``
+    #: calibration interval (``HPX_CLEAN_DWT_RATE_CYC``), timed by
+    #: nsx_delay_us's BOOTROM cycle loop -- a clock that shares none of DWT's
+    #: dependencies.  The only clean-window check whose reference is not itself
+    #: DWT, and so the only one that can see a uniform slowdown.
+    clean_dwt_rate_cyc: int | None = None
+    clean_dwt_rate_us: int | None = None
+    #: Microseconds the firmware spent waiting for the host debug probe to
+    #: attach before opening the window (``HPX_CLEAN_ATTACH_WAIT_US``).  0 means
+    #: the host was already draining RTT; a value at the budget means the wait
+    #: timed out and the detectors above are the only cover for that run.
+    clean_attach_wait_us: int | None = None
     psram: PsramInfo | None = None
     presets: tuple[str, ...] = ()
 

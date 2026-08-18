@@ -2157,6 +2157,94 @@ class TestPowerFirmwareSelection:
         assert plan.target_duration_ms == 5000
         assert plan.count_source == "profile_guided"
 
+    def test_power_plan_flags_a_stalled_profile_reference(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ):
+        """A stalled clean window contaminates the window sizing too (#121).
+
+        ``clean_infer_avg_us`` reads low by the stalled fraction, so the
+        derived N comes out short by the same factor. (``report/summary.py``'s
+        ``active_window_estimated_*`` are NOT affected -- they come from
+        ``profiled_infer_total_us``.) The count is deliberately still
+        derived (dropping to ``firmware_auto`` would make
+        ``BuildPowerFirmwareStage`` skip the fixed-N build and change what runs
+        on the bench), so the contamination has to be stated rather than
+        silently absorbed.
+        """
+        import logging
+
+        from helia_profiler.stages.plan_power import plan_power_run
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(
+                clean_infer_avg_us=2226,
+                clean_infer_count=1092,
+                clean_stalled_iters=233,
+                clean_partial_iters=0,
+            ),
+            layers=[],
+        )
+
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            plan = plan_power_run(ctx)
+
+        assert plan.count_source == "profile_guided"
+        warnings = [
+            record.getMessage()
+            for record in caplog.records
+            if record.levelno >= logging.WARNING
+        ]
+        assert any("stalled clean-window reference" in message for message in warnings), (
+            f"power plan sized from a stalled reference without saying so: {warnings}"
+        )
+
+        # The healthy case is asserted here rather than as its own test: a lone
+        # "no warning" assertion also passes against a build that never checks,
+        # so on its own it would guard nothing.
+        caplog.clear()
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(
+                clean_infer_avg_us=2226,
+                clean_infer_count=1092,
+                clean_stalled_iters=0,
+                clean_partial_iters=0,
+            ),
+            layers=[],
+        )
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            plan_power_run(ctx)
+        assert not any(
+            "stalled clean-window reference" in record.getMessage()
+            for record in caplog.records
+        )
+
+        # A pure-partial stall must report a real magnitude. The bound used to
+        # be frozen-only, so this case printed "reads at least ~0.0% low" in a
+        # sentence that then said "short by about the same factor".
+        caplog.clear()
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(
+                clean_infer_avg_us=2226,
+                clean_infer_count=1091,
+                clean_stalled_iters=0,
+                clean_partial_iters=1091,
+            ),
+            layers=[],
+        )
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            plan_power_run(ctx)
+        partial_msgs = [
+            r.getMessage()
+            for r in caplog.records
+            if "stalled clean-window reference" in r.getMessage()
+        ]
+        assert partial_msgs, "pure-partial stall was not flagged at all"
+        assert "~0.0%" not in partial_msgs[0], (
+            f"pure-partial stall reported a zero magnitude: {partial_msgs[0]}"
+        )
+
     def test_power_build_replaces_stale_output_and_publishes_artifact(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):

@@ -8,6 +8,7 @@ from ..results import PowerRunPlan
 from ..config import DEFAULT_POWER_WINDOW_TARGET_MS
 from ..errors import PowerError
 from ..pipeline import PipelineContext
+from ..power.diagnostics import assess_clean_window_stall
 
 log = logging.getLogger("hpx")
 
@@ -19,12 +20,51 @@ def _derive_inference_count(
     window_min: int,
     window_max: int,
 ) -> int | None:
-    """Choose enough iterations to meet the target duration, then clamp."""
+    """Choose enough iterations to meet the target duration, then clamp.
+
+    ``clean_infer_avg_us`` comes from the profile binary's clean window, and on
+    the Cortex-M4F families that window is DWT-timed and can stall (#121). A
+    reference that reads N% low makes this pick N% too FEW iterations, so the
+    power window comes out short by the same factor. (The
+    ``active_window_estimated_*`` fields are NOT affected: ``report/summary.py``
+    derives those from ``profiled_infer_total_us``, a different measurement.)
+    The contamination is flagged
+    rather than corrected: the alternative, dropping to ``firmware_auto``,
+    makes ``BuildPowerFirmwareStage`` skip the fixed-N build entirely and
+    changes what runs on the bench. See :func:`_warn_if_reference_stalled` and
+    the ``profile.clean_window_stalled`` validity issue.
+    """
     if clean_infer_avg_us is None or clean_infer_avg_us <= 0:
         return None
     target_us = target_duration_ms * 1000
     count = (target_us + clean_infer_avg_us - 1) // clean_infer_avg_us
     return max(window_min, min(window_max, count))
+
+
+def _warn_if_reference_stalled(ctx: PipelineContext) -> None:
+    """Log when the plan's reference came from a stalled clean window."""
+    if ctx.pmu_result is None:
+        return
+    stall = assess_clean_window_stall(
+        stalled_iters=ctx.pmu_result.meta.clean_stalled_iters,
+        partial_iters=ctx.pmu_result.meta.clean_partial_iters,
+        clean_infer_count=ctx.pmu_result.meta.clean_infer_count,
+        ref_cycles=ctx.pmu_result.meta.clean_ref_cycles,
+    )
+    if stall is None or stall.affected_iters == 0:
+        return
+    log.warning(
+        "Power window sized from a stalled clean-window reference: %d of %d "
+        "profile iterations lost their cycle delta (%d frozen, %d partial), so "
+        "clean_infer_avg_us reads at least ~%.1f%% low and the planned window "
+        "will be short by about the same factor (see the "
+        "profile.clean_window_stalled validity issue).",
+        stall.affected_iters,
+        stall.total_iters,
+        stall.stalled_iters,
+        stall.partial_iters,
+        stall.understatement_lower_bound * 100.0,
+    )
 
 
 #: Minimum number of INA228 accumulator updates the measured window must
@@ -95,6 +135,8 @@ def plan_power_run(
             window_max=ctx.config.profiling.window_max,
         )
         count_source = "profile_guided" if inference_count is not None else "firmware_auto"
+        if count_source == "profile_guided":
+            _warn_if_reference_stalled(ctx)
     else:
         count_source = "configured"
 

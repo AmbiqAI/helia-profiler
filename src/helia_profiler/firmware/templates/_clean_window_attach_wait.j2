@@ -1,0 +1,123 @@
+{# _clean_window_attach_wait.j2 — hold the clean window shut until the host's
+   debug probe is demonstrably attached.
+
+   WHY (issue #121).  On the Cortex-M4F families (Apollo3/3P, Apollo4/4P/4L)
+   the profile binary times its clean window with DWT->CYCCNT, which lives in
+   the core debug power domain and only advances while a debugger asserts
+   CDBGPWRUPREQ -- a signal firmware cannot set.  The host does NOT hold that
+   probe continuously: it resets the target with a separate JLinkExe
+   subprocess, and from the moment that process exits until the pylink attach
+   completes, nothing holds the domain up and CYCCNT stops.  The per-iteration
+   deltas across that span come back as exactly 0, so the window reads SHORT --
+   plausibly short, which is what made it survive so long.  Measured on an
+   Apollo4 Blue Plus KBR: ~204 ms lost from a ~950 ms window, 21% low, on two
+   of five byte-identical-configuration runs.
+
+   THE FIX IS SEQUENCING, NOT MEASUREMENT.  Rather than time around the gap, we
+   do not open the window until it has closed.  The predicate is
+   SocCapabilities.clean_window_needs_probe_attach; this file is the RTT
+   realization of it.
+
+   WHAT WE POLL.  SEGGER_RTT_HasDataUp(0) reads non-zero until the host has
+   consumed every byte the firmware has written so far (the whole HPX_START
+   preamble is queued by this point, so the buffer is non-empty unless a host
+   drained it).  RdOff is advanced by the J-Link reading target SRAM over SWD,
+   so observing the drain is direct evidence that the probe is attached and
+   actively driving the DAP -- the same condition DWT needs.  This is a poll on
+   an observable signal with a deadline, per capture/readiness.py's contract,
+   not a blind delay; when the host is already attached it returns immediately
+   and costs nothing.
+
+   WHY NOT hpx_rtt_drain().  It asks the same question, but its budget is
+   nominal only: it paces itself with a volatile-counter+NOP loop sized
+   SystemCoreClock/2000 per "ms", i.e. assuming 2 cycles per iteration where a
+   Cortex-M4 actually spends 6-9.  A drain that runs to timeout therefore takes
+   3-4x its stated budget.  That is harmless where it is used -- the park and
+   failure paths, where over-waiting costs nothing and a dead host is the
+   exceptional case.  Here the timeout is reachable on a SUPPORTED path (see
+   below) and is charged against a host-side allowance, so the budget has to
+   mean what it says.  nsx_delay_us() is calibrated, needs no debug domain (the
+   power binary already uses it with PD_DBG off), and makes the bound real.
+
+   THE BOUND IS LOAD-BEARING, NOT BELT-AND-BRACES.  With power.firmware:
+   shared, this same binary is re-run as the gated power window, and that pass
+   free-runs: capture_power drives only the instrument and the reset, and
+   capture_pmu has already closed its pylink session, so nothing reads RTT and
+   this poll ALWAYS runs to timeout.  It lands after capture_gated's
+   on_started hook returns, so it is charged against the poller's boot
+   allowance (_BOOT_SETTLE_S in stages/capture_power.py) -- overrun it and the
+   poller stops before or mid-window, which the host reports as no_gate_rise.
+   The budget below is sized against the measured gap with headroom and pinned
+   against that host constant by
+   test_attach_wait_budget_fits_the_power_capture_boot_allowance.
+
+   A pathologically slow host attach (the RTT control-block SCAN fallback, when
+   the linked address could not be recovered from the build) can outlast the
+   budget.  That case is deliberately not covered here: extending the budget to
+   fit it would tax every free-running shared run for a fallback path, so it
+   falls through to the HPX_CLEAN_STALLED_ITERS detector and surfaces as
+   profile.clean_window_stalled instead.
+
+   The wait sits BEFORE the adaptive warmup so the window *sizing* is covered
+   too, and well before hpx_sync_ready()/hpx_sync_window_begin() -- it is
+   entirely outside the measured/gated region and cannot perturb power.
+
+   Then we re-assert dwt_init().  The attach we just waited for is exactly the
+   event that can reset/reconfigure DEMCR/DWT behind us (the auto-window path
+   documents the same hazard); doing it after the wait, rather than hoping to
+   beat the attach, is the point.
+
+   NOT RENDERED FOR: Apollo5 (STIMER-timed window, indifferent to the probe),
+   the dedicated power binary (no transport, and its window is STIMER-timed on
+   every family -- SocCapabilities.power_window_timer), and the non-RTT
+   transports, which have no host-drain signal to poll.
+
+   What the other transports do instead, stated precisely because the whole
+   point of this note is which of them are covered:
+     * SWO gets ~800 ms of HPX_READY sync preamble before HPX_START, and the
+       host must be decoding ITM to consume it -- which requires the same DAP
+       the debug domain needs.  Covered by construction.
+     * UART shares that preamble (it renders from the same bare {% else %} in
+       the main templates, not from an SWO-only branch), but a host opening a
+       serial port proves nothing about SWD: on these parts the probe is held
+       open separately, only so DWT keeps counting.  So UART burns the same
+       ~800 ms without establishing what SWO establishes.
+     * USB CDC blocks on DTR, which likewise says nothing about the probe.
+   UART and USB therefore depend on the HPX_CLEAN_STALLED_ITERS /
+   HPX_CLEAN_PARTIAL_ITERS detector, not on this wait.  Neither is given an
+   additional blind delay. #}
+#ifndef HPX_CLEAN_WINDOW_ATTACH_WAIT_MS
+// The measured probe-absence gap was ~204 ms of lost window, regressing on
+// the host's own sbl_settle + attach + api_probe phases with a 53 ms offset,
+// so this is ~4.9x the observed gap -- while staying a small fraction of the
+// host's boot allowance for the free-running case described above.  Set to 0
+// to disable the wait entirely; that is how a bench run exercises the
+// detectors against a real stall.
+#define HPX_CLEAN_WINDOW_ATTACH_WAIT_MS 1000U
+#endif
+#ifndef HPX_CLEAN_WINDOW_ATTACH_POLL_US
+// Poll cadence.  Two cheap reads per pass, so the resolution costs nothing and
+// an already-attached host is detected on the first pass.
+#define HPX_CLEAN_WINDOW_ATTACH_POLL_US 1000U
+#endif
+        // Do not open the clean window until the host probe is attached: the
+        // window is DWT-timed and DWT stops while no debugger holds the core
+        // debug power domain up (issue #121).  Draining the RTT up-buffer is
+        // the host-attach signal -- the J-Link advances RdOff over SWD, which
+        // it can only do with the DAP alive.
+        // Reported, not just computed: "attached on the first poll" and
+        // "spun the whole budget and gave up" are the two ends of this fix
+        // working or not, and nothing else distinguishes them.  A run that
+        // times out here is the one whose detectors matter most.
+        uint32_t clean_attach_wait_us = 0U;
+        hpx_rtt_invalidate_cb();
+        while (SEGGER_RTT_HasDataUp(0) &&
+               clean_attach_wait_us <
+                   (HPX_CLEAN_WINDOW_ATTACH_WAIT_MS * 1000U)) {
+            nsx_delay_us(HPX_CLEAN_WINDOW_ATTACH_POLL_US);
+            clean_attach_wait_us += HPX_CLEAN_WINDOW_ATTACH_POLL_US;
+            hpx_rtt_invalidate_cb();
+        }
+        // Re-assert the counter the attach we just waited for may have
+        // reconfigured (DEMCR/TRCENA + CYCCNTENA).
+        dwt_init();

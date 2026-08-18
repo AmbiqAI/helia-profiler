@@ -71,6 +71,15 @@ _MARKERS: dict[str, str] = {
     # tell #112's fixed and unfixed busy_loop renders apart). clean_stimer_t0
     # exists only where the window is actually bracketed by STIMER.
     "stimer_window": "clean_stimer_t0",
+    # Whether the clean window holds until the host debug probe has attached
+    # (#121), whether it self-checks for a stalled cycle counter, and whether
+    # it calibrates that counter against an independent clock first. Semantic,
+    # not cosmetic: without markers, losing any of them would show up only as a
+    # sha256 change -- which is how the DWT->STIMER switch nearly slipped past
+    # the reviewable layer of this snapshot.
+    "clean_window_attach_wait": "HPX_CLEAN_WINDOW_ATTACH_WAIT_MS",
+    "clean_window_stall_check": "HPX_CLEAN_STALLED_ITERS",
+    "clean_window_rate_probe": "HPX_CLEAN_DWT_RATE_CYC",
 }
 
 
@@ -119,6 +128,9 @@ def _common_kwargs(soc_name: str, transport: str) -> dict:
         "ssram_full_power_enum": soc.ssram_full_power_enum,
         "clean_window_timer": soc.capabilities.clock.clean_window_timer,
         "power_window_timer": soc.capabilities.power_window_timer,
+        # Sourced from the capability exactly as FirmwareRenderContext does, so
+        # the snapshot exercises the real per-SoC value rather than a default.
+        "clean_window_needs_probe_attach": soc.capabilities.clean_window_needs_probe_attach,
         "gate_debug_domain_in_window": soc.capabilities.clock.gate_debug_domain_in_window,
         "broad_peripheral_shutdown": soc.capabilities.clock.broad_peripheral_shutdown,
         "crypto_otp_shutdown": soc.capabilities.clock.crypto_otp_shutdown,
@@ -148,9 +160,11 @@ def _render(
     engine: str,
     power_only: bool = False,
     clean_window_probe: str = "infer",
+    window_mode: str = "fixed",
 ) -> str:
     kwargs = _common_kwargs(soc_name, transport)
     kwargs["clean_window_probe"] = clean_window_probe
+    kwargs["window_mode"] = window_mode
     if power_only:
         kwargs["power_only"] = True
     if engine == "helia-aot":
@@ -829,6 +843,298 @@ def test_busy_loop_terminal_report_requests_one_unit_not_the_inference_count():
             "planned inference count"
         )
     assert checked, "busy_loop power matrix is empty"
+
+
+def _clean_window_region(code: str) -> str:
+    """Code between the clean-window scope opening and the window closing.
+
+    Anchored on statements present in BOTH the fixed and unfixed renders
+    (``g_profiler...= false`` / ``hpx_sync_window_end();``) so slicing does not
+    depend on the change under test -- the failure mode #120 documented, where
+    a slice keyed on new spelling silently matched nothing.
+
+    The opener is searched BACKWARDS from ``hpx_sync_window_begin();``: the AOT
+    template's ``g_profiler_enabled = false;`` also appears as a file-scope
+    initializer hundreds of lines earlier, and anchoring on that would silently
+    widen the region to most of the file (and swallow unrelated DWT reads).
+    """
+    gate = code.index("hpx_sync_window_begin();")
+    starts = [
+        found
+        for opener in ("g_profiler.SetEnabled(false);", "g_profiler_enabled = false;")
+        if (found := code.rfind(opener, 0, gate)) != -1
+    ]
+    assert starts, "clean-window scope opener not found before the window gate"
+    end = code.index("hpx_sync_window_end();", gate)
+    return code[max(starts) : end]
+
+
+def test_dwt_timed_clean_window_waits_for_the_host_attach():
+    """A DWT-timed clean window must not open before the host probe attaches.
+
+    On the Cortex-M4F families DWT->CYCCNT only advances while a debugger
+    asserts CDBGPWRUPREQ, and the host does not hold the probe continuously:
+    the J-Link reset is a separate JLinkExe subprocess, and nothing holds the
+    debug domain up between that process exiting and the pylink attach
+    completing. Per-iteration deltas taken across that gap read exactly zero,
+    so the window comes back SHORT -- 21% low on two of five Apollo4 Blue Plus
+    KBR runs in #121, while the later profiled loop (host fully attached) held
+    at 875-876 us in all five.
+
+    The fix is sequencing: wait for the RTT up-buffer to drain, which the host
+    can only do with the DAP alive, before touching the counter. This pins that
+    the drain precedes the FIRST DWT read of the window -- covering the
+    adaptive sizing warmup as well as the measured loop -- and that it is
+    scoped to renders that actually need it, so no STIMER-timed or
+    probe-independent build inherits a pointless wait.
+    """
+    import re
+
+    def _code_only(src: str) -> str:
+        return "\n".join(re.sub(r"//.*$", "", line) for line in src.splitlines())
+
+    waited = 0
+    for soc, transport, engine in _all_combos():
+        for window_mode in ("fixed", "auto"):
+            caps = get_soc(soc).capabilities
+            rendered = _render(soc, transport, engine, window_mode=window_mode)
+            region = _clean_window_region(_code_only(rendered))
+            case = f"{soc}|{transport}|{engine}|{window_mode}"
+            needs_wait = caps.clean_window_needs_probe_attach and transport == "rtt"
+            if not needs_wait:
+                assert "HPX_CLEAN_WINDOW_ATTACH_WAIT_MS" not in rendered, (
+                    f"{case}: waits for a probe attach it does not depend on "
+                    f"(window timer {caps.clock.clean_window_timer!r}, "
+                    f"transport {transport!r})"
+                )
+                continue
+            waited += 1
+            drain = region.find("HPX_CLEAN_WINDOW_ATTACH_WAIT_MS * 1000U")
+            assert drain != -1, (
+                f"{case}: DWT-timed clean window opens without waiting for the "
+                "host attach that keeps DWT running"
+            )
+            first_dwt = region.find("DWT->CYCCNT")
+            assert first_dwt != -1, (
+                f"{case}: expected a DWT-timed window here; the render no "
+                "longer reads DWT->CYCCNT at all, so this test has lost its "
+                "subject"
+            )
+            assert drain < first_dwt, (
+                f"{case}: the clean window reads DWT->CYCCNT before waiting "
+                "for the host attach, so the reads can still land in the "
+                "probe-absence gap. In auto mode the sizing warmup is the "
+                "first such read, and it is inside the window this covers."
+            )
+
+    assert waited, (
+        "no render has a probe-dependent DWT-timed clean window — this test "
+        "lost its subject, so it is no longer pinning anything"
+    )
+
+
+def test_dwt_timed_clean_window_counts_stalled_iterations():
+    """Every per-iteration DWT-timed clean window must report zero-cycle
+    iterations, on every transport.
+
+    The attach wait above needs an observable host-attach signal and so only
+    covers RTT; SWO happens to be covered by its ~800 ms sync preamble, and
+    UART/USB are covered by nothing. This detector is the part that applies
+    everywhere: DWT does not run slow when the debug domain drops, it STOPS, so
+    an iteration wholly inside a stall reads a delta of exactly zero -- and an
+    inference cannot take zero core cycles. Counting those turns a future
+    regression into ``profile.clean_window_stalled`` instead of a plausible
+    average.
+
+    Pinned inside the measured window slice, so moving the counter outside the
+    loop (where it could never observe a stall) fails here.
+    """
+    import re
+
+    def _code_only(src: str) -> str:
+        return "\n".join(re.sub(r"//.*$", "", line) for line in src.splitlines())
+
+    checked = 0
+    for soc, transport, engine in _all_combos():
+        if get_soc(soc).capabilities.clock.clean_window_timer != "dwt":
+            continue
+        for window_mode in ("fixed", "auto"):
+            checked += 1
+            case = f"{soc}|{transport}|{engine}|{window_mode}"
+            rendered = _render(soc, transport, engine, window_mode=window_mode)
+            code = _code_only(rendered)
+            begin = code.index("hpx_sync_window_begin();")
+            window = code[begin : code.index("hpx_sync_window_end();", begin)]
+            assert "clean_stalled_iters++" in window, (
+                f"{case}: the DWT-timed clean loop does not detect a frozen "
+                "cycle counter"
+            )
+            # The partial check is the one that matters for the shape the
+            # exact-zero test cannot see: a counter that keeps advancing at a
+            # fraction of the true rate produces small non-zero deltas, which
+            # would otherwise accumulate uncounted and let the run report
+            # itself healthy while still being wrong.
+            assert "clean_partial_iters++" in window, (
+                f"{case}: the DWT-timed clean loop detects a frozen counter "
+                "but not one that merely runs implausibly slow"
+            )
+            assert "clean_low_cyc" in window, (
+                f"{case}: the partial check has no floor to compare against"
+            )
+            for line in ("HPX_CLEAN_STALLED_ITERS", "HPX_CLEAN_PARTIAL_ITERS",
+                         "HPX_CLEAN_REF_CYCLES"):
+                assert line in rendered, (
+                    f"{case}: {line} is computed but never reported, so the "
+                    "host cannot act on it"
+                )
+
+    assert checked, (
+        "no render times its clean window with DWT — this test lost its "
+        "subject, so it is no longer pinning anything"
+    )
+
+
+def test_partial_floor_comes_from_the_lowest_warm_sample_not_the_highest():
+    """The floor must not be derivable from a single cold-cache warm sample.
+
+    ``clean_warm_cyc`` is a MAX, chosen so a warm sample that itself lost time
+    to a stall cannot drag the window sizing down. That makes it the wrong
+    reference for the partial-stall floor: one cold sample inflates it, the
+    floor rises with it, and every healthy iteration in the window is marked
+    partial (a 9x sample marks all 1091). The floor therefore comes from the
+    lowest NON-ZERO warm sample -- conservative in the only safe direction,
+    since it can under-report partials but never invent them -- and skipping
+    zeros keeps a frozen warm pass from silently zeroing the floor.
+
+    Pinned semantically rather than left to the snapshot sha256, which changes
+    for any edit and so says nothing about which reference was used.
+    """
+    checked = 0
+    for soc, transport, engine in _all_combos():
+        if get_soc(soc).capabilities.clock.clean_window_timer != "dwt":
+            continue
+        for window_mode in ("fixed", "auto"):
+            checked += 1
+            case = f"{soc}|{transport}|{engine}|{window_mode}"
+            code = _code_only(_render(soc, transport, engine, window_mode=window_mode))
+            region = _clean_window_region(code)
+
+            assert "clean_low_cyc = clean_warm_min_cyc" in region, (
+                f"{case}: the partial floor is derived from the MAX warm "
+                "sample, so one cold-cache warmup marks a whole healthy "
+                "window partial"
+            )
+            # The min tracker must skip zero samples, or a frozen warm pass
+            # zeroes the floor and disables the check it is meant to arm.
+            assert "wc > 0U" in region, (
+                f"{case}: the warm minimum does not skip zero samples, so a "
+                "frozen warmup silently disables the partial check"
+            )
+            # And the check itself must not fire when the floor is dead.
+            assert "clean_low_cyc > 0U" in region, (
+                f"{case}: the partial check does not guard against a zero "
+                "floor"
+            )
+
+    assert checked, (
+        "no render times its clean window with DWT -- this test lost its "
+        "subject, so it is no longer pinning anything"
+    )
+
+
+def test_dwt_rate_probe_uses_a_clock_that_cannot_share_the_fault():
+    """Every DWT-timed clean window must calibrate DWT before trusting it.
+
+    The in-window counters are DWT-relative: the partial floor is a warm sample
+    taken with the same counter in the same fault window, so a uniform slowdown
+    scales both sides and cancels exactly. The probe is the only check with an
+    outside reference -- ``nsx_delay_us`` resolves to the BOOTROM cycle loop,
+    which touches no DWT, no CoreSight register and no debug power domain.
+
+    Rendered on every transport, not just the ones with an attach signal: UART
+    and USB CDC have no host-drain signal to wait on, so this is all they get.
+    """
+    checked = 0
+    for soc, transport, engine in _all_combos():
+        if get_soc(soc).capabilities.clock.clean_window_timer != "dwt":
+            continue
+        checked += 1
+        case = f"{soc}|{transport}|{engine}"
+        rendered = _render(soc, transport, engine)
+        region = _clean_window_region(_code_only(rendered))
+
+        probe = region.find("nsx_delay_us(HPX_CLEAN_DWT_RATE_PROBE_US)")
+        assert probe != -1, (
+            f"{case}: the clean window trusts DWT without ever calibrating it "
+            "against an independent clock"
+        )
+        window_begin = region.find("hpx_sync_window_begin();")
+        if window_begin != -1:
+            assert probe < window_begin, (
+                f"{case}: the rate probe runs inside the measured window"
+            )
+        for line in ("HPX_CLEAN_DWT_RATE_CYC", "HPX_CLEAN_DWT_RATE_US"):
+            assert line in rendered, (
+                f"{case}: {line} is measured but never reported, so the host "
+                "cannot act on it"
+            )
+
+    assert checked, (
+        "no render times its clean window with DWT -- this test lost its "
+        "subject, so it is no longer pinning anything"
+    )
+
+
+def test_attach_wait_budget_fits_the_power_capture_boot_allowance():
+    """The attach wait is reachable-to-timeout on a supported path, so its
+    stated budget has to be both small and honest.
+
+    With ``power.firmware: shared`` the profile binary is re-run as the gated
+    power window, and that pass free-runs -- ``capture_power`` drives only the
+    instrument and the reset, and ``capture_pmu`` has already closed its pylink
+    session. Nothing reads RTT, so this poll ALWAYS runs to timeout, and it
+    lands after ``capture_gated``'s ``on_started`` hook returns, which charges
+    it against the GPI poller's boot allowance. Overrun that and the poller
+    stops before or mid-window, reported as ``no_gate_rise``.
+
+    Two things are pinned, because the budget is only as good as the clock
+    enforcing it:
+
+    * the nominal budget is a small fraction of ``_BOOT_SETTLE_S``, read from
+      the host module rather than restated, so the two cannot drift apart;
+    * the loop paces itself with ``nsx_delay_us`` (calibrated) rather than
+      ``hpx_rtt_drain`` (whose spin assumes 2 cycles per iteration where a
+      Cortex-M4 spends 6-9, so a drain that times out takes 3-4x its stated
+      budget -- harmless on the park/failure paths it was written for, not
+      here).
+    """
+    import re
+
+    from helia_profiler.stages.capture_power import _BOOT_SETTLE_S
+
+    rendered = _render("apollo4p", "rtt", "tflm")
+    match = re.search(
+        r"#define\s+HPX_CLEAN_WINDOW_ATTACH_WAIT_MS\s+(\d+)U", rendered
+    )
+    assert match, "attach wait renders no nominal budget to check"
+    budget_s = int(match.group(1)) / 1000.0
+
+    assert 0 < budget_s <= _BOOT_SETTLE_S / 4, (
+        f"attach wait budget {budget_s:.3f}s is too large a share of the "
+        f"{_BOOT_SETTLE_S:.1f}s host boot allowance it is charged against on a "
+        "free-running shared-firmware power pass"
+    )
+
+    region = _clean_window_region(rendered)
+    assert "nsx_delay_us(HPX_CLEAN_WINDOW_ATTACH_POLL_US)" in region, (
+        "the attach wait must pace itself with a calibrated delay, or its "
+        "budget does not bound anything"
+    )
+    assert "hpx_rtt_drain(" not in region, (
+        "the attach wait must not use hpx_rtt_drain's uncalibrated spin: it "
+        "overruns its stated budget by 3-4x, which the free-running "
+        "shared-firmware pass pays in full"
+    )
 
 
 def test_hal_umbrella_header_is_included_at_most_once():

@@ -702,6 +702,12 @@ int main(void) {
     // power sync is disabled, hpx_sync_window_begin/end compile to no-ops.
     {
         g_profiler_enabled = false;
+{% if clean_window_needs_probe_attach | default(false) and transport == "rtt" and not power_only | default(false) and not use_stimer_window -%}
+{% include "_clean_window_attach_wait.j2" %}
+{%- endif -%}
+{% if not use_stimer_window -%}
+{% include "_clean_window_rate_probe.j2" %}
+{%- endif -%}
 {% if window_mode | default("fixed") == "auto" %}
         // Adaptive clean-window sizing.  Warm caches / branch predictor / MRAM
         // prefetch (uninstrumented) and capture the warm per-inference cycle
@@ -724,6 +730,9 @@ int main(void) {
         // counter never advances at all we fall back to window_min.
         dwt_init();
         uint32_t clean_warm_cyc = 0U;
+{%- if not use_stimer_window %}
+        uint32_t clean_warm_min_cyc = 0U;
+{%- endif %}
         for (int w = 0; w < 3; w++) {
             for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
                 memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
@@ -733,6 +742,11 @@ int main(void) {
             {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
             uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
             if (wc > clean_warm_cyc) clean_warm_cyc = wc;
+{%- if not use_stimer_window %}
+            if (wc > 0U && (clean_warm_min_cyc == 0U || wc < clean_warm_min_cyc)) {
+                clean_warm_min_cyc = wc;
+            }
+{%- endif %}
         }
         int clean_iters_n = {{ window_min }};
         if (clean_warm_cyc > 0U) {
@@ -745,6 +759,28 @@ int main(void) {
         }
 {% else %}
         // Warm caches / branch predictor / MRAM prefetch (uninstrumented).
+{%- if not use_stimer_window %}
+        // The warm cost is MEASURED here as well as primed: it is the
+        // reference the in-window stall check compares against (#121).  Taking
+        // the MAX rejects a warm iteration that itself lost time to a stalled
+        // counter, since a stall only ever reads low.  The auto path above
+        // already measures this for its own window sizing.
+        uint32_t clean_warm_cyc = 0U;
+        uint32_t clean_warm_min_cyc = 0U;
+        for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
+            for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
+                memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
+                       {{ aot_prefix }}_model_ctx.inputs[i].size);
+            }
+            uint32_t wt0 = DWT->CYCCNT;
+            {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
+            uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
+            if (wc > clean_warm_cyc) clean_warm_cyc = wc;
+            if (wc > 0U && (clean_warm_min_cyc == 0U || wc < clean_warm_min_cyc)) {
+                clean_warm_min_cyc = wc;
+            }
+        }
+{%- else %}
         for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
             for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
                 memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
@@ -752,6 +788,7 @@ int main(void) {
             }
             {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
         }
+{%- endif %}
         const int clean_iters_n = {{ clean_iters | default(1) }};
 {% endif %}
         // Announce the upcoming silent clean (power) window so the host can
@@ -768,10 +805,26 @@ int main(void) {
         hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\n",
                    clean_iters_n, (unsigned long long)clean_est_ms);
 {% else %}
+{%- if not use_stimer_window %}
+        // Fixed window on a DWT-timed build: the warmup above measures the
+        // per-inference cost for the stall floor, so the blackout estimate is
+        // derivable here too.  Emitting it lets the host widen its capture
+        // deadline (transport/protocol.py: window_budget_s) instead of
+        // falling back to the flat heartbeat timeout, which a long fixed
+        // window can outlast.
+        uint64_t clean_est_ms = 0;
+        if (SystemCoreClock >= 1000U) {
+            clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)
+                           / ((uint64_t)SystemCoreClock / 1000ULL);
+        }
+        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\n",
+                   clean_iters_n, (unsigned long long)clean_est_ms);
+{%- else %}
         // Fixed window: no runtime warm measurement, so est_ms=0 — the host
         // already knows the iteration count from its own settings.
         hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=0\n",
                    clean_iters_n);
+{%- endif %}
 {% endif %}
 {%- if not use_stimer_window %}
         uint64_t clean_cycles = 0;
@@ -924,10 +977,52 @@ int main(void) {
 {% endif %}
         }
 {% else %}
+        // Self-check for the failure this window is exposed to (issue #121):
+        // DWT->CYCCNT lives in the core debug power domain, and when no
+        // debugger holds that domain up the window silently reads short.
+        //
+        // TWO shapes, because the counter has been seen doing both:
+        //  * FROZEN -- the usual case.  Every delta wholly inside the stall
+        //    reads exactly 0.  An inference cannot take zero core cycles, so
+        //    this needs no threshold and cannot false-positive.
+        //  * PARTIAL -- observed at least once on AP4, where DWT advanced at
+        //    ~0.6% of the expected rate through an early-boot window.  A delta
+        //    that is small but non-zero passes the zero test, accumulates
+        //    uncounted, and would let the run report itself healthy while
+        //    still being wrong.  So it is checked separately, against a floor
+        //    derived from this run's own warm reference.
+        //
+        // The floor is deliberately far below any legitimate reading: a warm
+        // reference is if anything an over-estimate (colder caches), and a
+        // genuine steady-state iteration being under an EIGHTH of it would
+        // mean the warm pass ran 8x slow.  The observed pathological regime
+        // (~0.6% of expected) sits two orders of magnitude below the floor.
+        // Both counters are exported; neither is inferred from the other.
+        uint32_t clean_stalled_iters = 0;
+        uint32_t clean_partial_iters = 0;
+        // Floor for the partial check, from the LOWEST non-zero warm sample --
+        // not the highest.  clean_warm_cyc is a MAX, chosen so a warm sample
+        // that itself lost time to a stall cannot drag the window sizing down;
+        // that same choice makes it the wrong reference here, because a single
+        // cold-cache warm sample inflates it and would mark every healthy
+        // iteration partial (one 9x sample marks all 1091).  Taking the
+        // smallest non-zero sample instead is conservative in the direction
+        // that matters: it can only ever under-report partials, never invent
+        // them.  Zero samples are skipped rather than minimised over, so a
+        // frozen warm pass cannot zero the floor and silently disable the
+        // check -- when every sample is zero the floor is 0, the check is
+        // inert, and clean_warm_min_cyc == 0 says so on the wire.
+        const uint32_t clean_low_cyc = clean_warm_min_cyc >> 3;
         for (int iter = 0; iter < clean_iters_n; iter++) {
             uint32_t t0 = DWT->CYCCNT;
             {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
-            clean_cycles += (uint32_t)(DWT->CYCCNT - t0);
+            const uint32_t clean_iter_cyc = (uint32_t)(DWT->CYCCNT - t0);
+            if (clean_iter_cyc == 0U) {
+                clean_stalled_iters++;
+            } else if (clean_low_cyc > 0U && clean_iter_cyc < clean_low_cyc) {
+                clean_partial_iters++;
+            }
+            clean_cycles += clean_iter_cyc;
             clean_count++;
 {% if clean_window_trace | default(false) and transport not in ["swo", "uart"] %}
             // Sanity-check trace: prove the device is looping inferences for
@@ -1011,6 +1106,27 @@ int main(void) {
                        (unsigned long long)clean_cycles);
             hpx_printf("HPX_CLEAN_INFER_AVG_CYCLES=%lu\n",
                        (unsigned long)clean_avg_cycles);
+{%- if not use_stimer_window %}
+            // Always emitted (0 on a healthy run) so the host can tell a
+            // firmware that checks from one that does not.  The warm
+            // reference goes out too, so the partial-count threshold is
+            // auditable from the capture rather than taken on trust.  See the
+            // clean_stalled_iters declaration above.
+            hpx_printf("HPX_CLEAN_STALLED_ITERS=%lu\n",
+                       (unsigned long)clean_stalled_iters);
+            hpx_printf("HPX_CLEAN_PARTIAL_ITERS=%lu\n",
+                       (unsigned long)clean_partial_iters);
+            hpx_printf("HPX_CLEAN_REF_CYCLES=%lu\n",
+                       (unsigned long)clean_warm_min_cyc);
+            hpx_printf("HPX_CLEAN_DWT_RATE_CYC=%lu\n",
+                       (unsigned long)clean_dwt_rate_cyc);
+            hpx_printf("HPX_CLEAN_DWT_RATE_US=%lu\n",
+                       (unsigned long)HPX_CLEAN_DWT_RATE_PROBE_US);
+{%- if clean_window_needs_probe_attach | default(false) and transport == "rtt" and not power_only | default(false) %}
+            hpx_printf("HPX_CLEAN_ATTACH_WAIT_US=%lu\n",
+                       (unsigned long)clean_attach_wait_us);
+{%- endif %}
+{%- endif %}
             if (SystemCoreClock > 0U) {
                 const uint32_t clean_avg_us = (uint32_t)(
                     ((uint64_t)clean_avg_cycles * 1000000ULL +

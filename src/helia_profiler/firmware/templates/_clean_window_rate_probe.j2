@@ -1,0 +1,52 @@
+{# _clean_window_rate_probe.j2 — calibrate DWT against an independent clock
+   before the clean window trusts it.
+
+   WHY THIS EXISTS.  The in-window checks (HPX_CLEAN_STALLED_ITERS and
+   HPX_CLEAN_PARTIAL_ITERS) both derive their expectation from DWT itself: the
+   zero test needs no reference, but the partial test compares each iteration
+   against a warm sample measured with the SAME counter, moments earlier, in
+   the same fault window.  That makes it scale-invariant -- if a stall slows
+   the warm reference and the counted iterations by the same factor k, then
+   k*iter < k*warm/8 reduces to iter < warm/8 and nothing fires.  A UNIFORM
+   slowdown is undetectable by construction, and that is precisely the case
+   the attach wait hands over when it times out: DWT is still stalled, so the
+   warm reference is taken in the stalled regime too.
+
+   Replayed numerically against the pre-fix bug (233 affected iterations at the
+   measured ~0.6% rate), the in-window counters alone report STALLED=0,
+   PARTIAL=0, avg 65,617 -- inside the observed 65,351-65,538 stalled band,
+   with the host verdict "clean".
+
+   WHAT THIS DOES.  Times a fixed nsx_delay_us() interval with DWT and reports
+   the cycle count.  nsx_delay_us() resolves to the AmbiqSuite BOOTROM cycle
+   loop: it uses no DWT, no CoreSight register and no debug power domain, so it
+   keeps its calibration exactly when DWT loses its.  The expected reading is
+   known in closed form from SystemCoreClock, so the host needs no tolerance
+   guessed from model behaviour -- unlike a clean-vs-profiled comparison, whose
+   legitimate spread (per-layer instrumentation overhead) is the same order as
+   the fault it would have to detect.
+
+   WHAT IT DOES NOT DO.  It is an instantaneous check taken just before the
+   window opens, so it answers "is DWT broken going in", not "did it break
+   half-way through".  The zero and partial counters answer the second
+   question.  Neither covers a slowdown that begins exactly at window open,
+   ends exactly at window close, and is perfectly uniform throughout; that
+   residual is stated in docs/guide/power.md rather than papered over.
+
+   Rendered wherever the clean window is timed per-iteration by DWT -- every
+   transport, not just the ones with an attach signal, since UART and USB CDC
+   have no host-drain signal to wait on and this is all they get.  ~1 ms, and
+   entirely outside the measured/gated region. #}
+#ifndef HPX_CLEAN_DWT_RATE_PROBE_US
+// Long enough that nsx_delay_us's own granularity is noise against it, short
+// enough to be invisible next to boot.  The host compares the reading against
+// SystemCoreClock * this / 1e6.
+#define HPX_CLEAN_DWT_RATE_PROBE_US 1000U
+#endif
+        // Verify DWT is actually counting, and counting at the right rate,
+        // against a clock that cannot share its fault (issue #121).  Both
+        // in-window checks below are DWT-relative and cannot see a uniform
+        // slowdown; this can.
+        uint32_t clean_dwt_rate_t0 = DWT->CYCCNT;
+        nsx_delay_us(HPX_CLEAN_DWT_RATE_PROBE_US);
+        uint32_t clean_dwt_rate_cyc = (uint32_t)(DWT->CYCCNT - clean_dwt_rate_t0);

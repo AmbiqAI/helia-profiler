@@ -481,3 +481,256 @@ def test_duration_fallback_matches_summary_policy(tmp_path: Path):
 
     assert evaluation.validity is ResultValidity.DEGRADED
     assert any(issue.code == "power.gate_duration_mismatch" for issue in evaluation.issues)
+
+
+class TestCleanWindowStall:
+    """``profile.clean_window_stalled`` — the #121 detector's host half.
+
+    The profile binary's clean window is DWT-timed on the Cortex-M4F families,
+    and DWT stops whenever no debugger holds the core debug power domain up.
+    Iterations wholly inside such a stall accumulate a delta of exactly zero,
+    so ``clean_infer_avg_us`` comes back low by the stalled fraction -- 21% on
+    the Apollo4 runs in #121, against a 3.9% legitimate build-to-build spread.
+    Nothing else in the result looks wrong, which is precisely why the firmware
+    counts the stalls and this turns the count into an issue.
+    """
+
+    def _profile_only(
+        self,
+        tmp_path: Path,
+        *,
+        stalled: int | None,
+        partial: int | None = 0,
+        count: int | None = 1092,
+        ref_cycles: int | None = 83_300,
+        rate_cyc: int | None = 96_000,
+    ) -> PipelineContext:
+        """A profile-phase-only run, so validity reflects this issue alone.
+
+        The shared fixture carries a gated power run whose own duration checks
+        would otherwise fire on these clean-window numbers and mask what is
+        being asserted.
+        """
+        ctx = _context(tmp_path)
+        ctx.power_run = None
+        ctx.power_result = None
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(
+                clean_infer_count=count,
+                clean_infer_avg_us=684,
+                clean_stalled_iters=stalled,
+                clean_partial_iters=partial,
+                clean_ref_cycles=ref_cycles,
+                clean_dwt_rate_cyc=rate_cyc,
+                clean_dwt_rate_us=1000,
+                system_clock_hz=96_000_000,
+            ),
+            layers=[],
+        )
+        return ctx
+
+    def test_stalled_clean_window_is_reported(self, tmp_path: Path):
+        ctx = self._profile_only(tmp_path, stalled=233)
+
+        evaluation = evaluate_run(ctx)
+
+        stalls = [
+            issue
+            for issue in evaluation.issues
+            if issue.code == "profile.clean_window_stalled"
+        ]
+        assert len(stalls) == 1
+        assert stalls[0].severity == "warning"
+        assert stalls[0].context["stalled_iters"] == 233
+        assert stalls[0].context["total_iters"] == 1092
+        # ~21% low, matching the measured Apollo4 shortfall.
+        assert 0.20 < stalls[0].context["understatement_lower_bound"] < 0.22
+        assert evaluation.validity is ResultValidity.DEGRADED
+
+    def test_issue_fires_only_when_the_firmware_reports_a_stall(
+        self, tmp_path: Path
+    ):
+        """Present when stalled, absent when not -- asserted together.
+
+        The negative rows are deliberately not their own tests: an
+        "issue absent" assertion also passes against a build with no detector
+        at all, so on its own it would guard nothing. Paired with the positive
+        row it both fails against the unfixed code and pins that the check
+        cannot over-fire on a healthy run or on firmware that never reports.
+        """
+        cases = {
+            233: True,  # stalled
+            0: False,  # checked, healthy
+            None: False,  # not reported -- unknown, not an issue
+        }
+        for stalled, expected in cases.items():
+            evaluation = evaluate_run(self._profile_only(tmp_path, stalled=stalled))
+            raised = any(
+                issue.code == "profile.clean_window_stalled"
+                for issue in evaluation.issues
+            )
+            assert raised is expected, f"clean_stalled_iters={stalled!r}"
+            if not expected:
+                assert evaluation.validity is ResultValidity.VALID, stalled
+
+    def test_partial_counting_is_caught_when_nothing_froze(self, tmp_path: Path):
+        """The shape the exact-zero test cannot see.
+
+        A dropped debug domain usually stops DWT outright, but it has been
+        observed on Apollo4 merely slowing it -- ~0.6% of the expected rate --
+        which produces deltas that are small but non-zero. Those satisfy no
+        zero test, accumulate into the total uncounted, and would leave the run
+        asserting "checked, clean" while still being wrong. That is worse than
+        the pre-fix silence, so a partial-only run must still raise.
+        """
+        ctx = self._profile_only(tmp_path, stalled=0, partial=233)
+
+        evaluation = evaluate_run(ctx)
+
+        stalls = [
+            issue
+            for issue in evaluation.issues
+            if issue.code == "profile.clean_window_stalled"
+        ]
+        assert len(stalls) == 1, "a slow-but-running counter went unreported"
+        assert stalls[0].context["partial_iters"] == 233
+        assert stalls[0].context["stalled_iters"] == 0
+        # Both magnitudes are real. The affected fraction counts every
+        # touched iteration; the understatement bound discounts partials to
+        # 0.875 each, since a partial contributed *something* but by
+        # construction less than an eighth of the warm reference.
+        assert 0.20 < stalls[0].context["affected_fraction"] < 0.22
+        assert 0.18 < stalls[0].context["understatement_lower_bound"] < 0.19
+
+    def test_impossible_counts_are_flagged_not_published_as_nonsense(
+        self, tmp_path: Path
+    ):
+        """More affected iterations than the window ran means a corrupt report.
+
+        A torn transport line can inflate one field while the other parses
+        cleanly. The raw division would publish "reads 457.9% low", which is
+        both meaningless and more alarming than the truth. Clamp the fractions,
+        keep the raw counts, and say the record is inconsistent.
+        """
+        ctx = self._profile_only(tmp_path, stalled=5000, partial=0, count=1092)
+
+        evaluation = evaluate_run(ctx)
+
+        stall = next(
+            issue
+            for issue in evaluation.issues
+            if issue.code == "profile.clean_window_stalled"
+        )
+        assert stall.context["stalled_iters"] == 5000
+        assert stall.context["total_iters"] == 1092
+        assert stall.context["understatement_lower_bound"] == 1.0
+        assert stall.context["affected_fraction"] == 1.0
+        assert stall.context["counts_are_inconsistent"] is True
+
+    def test_pure_partial_stall_reports_a_real_magnitude(self, tmp_path: Path):
+        """A window where every iteration is partial must not read "~0.0% low".
+
+        The bound was frozen-only, so a stall that slowed the counter without
+        ever freezing it reported a magnitude of zero next to the words "short
+        by about the same factor". Partials are bounded above by the floor
+        (an eighth of the warm reference), so each costs at least 0.875 of an
+        inference -- a sound bound, and one that is not zero.
+        """
+        ctx = self._profile_only(tmp_path, stalled=0, partial=1091, count=1091)
+
+        stall = next(
+            issue
+            for issue in evaluate_run(ctx).issues
+            if issue.code == "profile.clean_window_stalled"
+        )
+
+        assert stall.context["affected_fraction"] == 1.0
+        assert stall.context["understatement_lower_bound"] >= 0.87
+
+    def test_detector_does_not_over_fire_on_an_inflated_warm_reference(
+        self, tmp_path: Path
+    ):
+        """The direction every other test here misses: healthy runs stay quiet.
+
+        The floor comes from the warm reference, and the reference is taken
+        from the LOWEST non-zero warm sample precisely so a single cold-cache
+        sample cannot inflate it and mark a whole healthy window partial. This
+        pins the host half: a run reporting zero of both counts, an operative
+        floor and a healthy clock rate raises nothing at all.
+        """
+        ctx = self._profile_only(tmp_path, stalled=0, partial=0)
+
+        evaluation = evaluate_run(ctx)
+
+        assert evaluation.validity is ResultValidity.VALID
+        assert evaluation.issues == ()
+
+    def test_uniform_slowdown_is_caught_by_the_independent_clock(
+        self, tmp_path: Path
+    ):
+        """The blocker: a stall that scales BOTH the reference and the window.
+
+        The in-window counters compare each iteration against a warm sample
+        taken with the same counter, moments earlier, in the same fault window.
+        Multiply both by k and the comparison is unchanged -- so a uniform
+        slowdown reports zero stalled, zero partial, and a plausible average.
+        Replaying the pre-fix bug at the measured ~0.6% rate gives exactly
+        that. Only the rate probe, timed by a clock DWT's fault cannot reach,
+        sees it.
+        """
+        ctx = self._profile_only(
+            tmp_path,
+            stalled=0,
+            partial=0,
+            rate_cyc=576,  # 0.6% of the expected 96,000
+        )
+
+        evaluation = evaluate_run(ctx)
+        codes = {issue.code for issue in evaluation.issues}
+
+        assert "profile.clean_window_clock_rate_low" in codes, (
+            "a uniform slowdown that both in-window counters are blind to went "
+            "unreported"
+        )
+        rate = next(
+            i for i in evaluation.issues
+            if i.code == "profile.clean_window_clock_rate_low"
+        )
+        assert rate.context["ratio"] < 0.01
+        assert rate.context["expected_cycles"] == 96_000.0
+
+    def test_dead_partial_floor_is_not_reported_as_healthy(self, tmp_path: Path):
+        """A zero warm reference makes the partial floor zero, so no unsigned
+        delta can fall below it and the check cannot fire at all.
+
+        That happens when every warm sample was itself frozen -- the documented
+        usual case of this very fault -- so zero counts there must not read as
+        "checked, clean".
+        """
+        ctx = self._profile_only(tmp_path, stalled=0, partial=0, ref_cycles=0)
+
+        codes = {issue.code for issue in evaluate_run(ctx).issues}
+
+        assert "profile.clean_window_check_inoperative" in codes
+
+    def test_a_torn_count_line_does_not_crash_evaluation(self, tmp_path: Path):
+        """The parser passes through values it cannot int() as strings.
+
+        ``HPX_CLEAN_PARTIAL_ITERS=1 7`` from a torn transport line therefore
+        arrives as text, and int() on it would take down evaluate_run() for the
+        whole run -- in the function whose docstring names torn lines as its
+        motivation.
+        """
+        ctx = self._profile_only(tmp_path, stalled=233, partial=0)
+        ctx.pmu_result = PmuResult(
+            meta=replace(ctx.pmu_result.meta, clean_partial_iters="1 7"),
+            layers=[],
+        )
+
+        evaluation = evaluate_run(ctx)
+
+        stall = next(
+            i for i in evaluation.issues if i.code == "profile.clean_window_stalled"
+        )
+        assert stall.context["stalled_iters"] == 233
+        assert stall.context["partial_iters"] == 0

@@ -121,6 +121,52 @@ def test_clean_infer_timing_metadata():
     assert result.meta.clean_infer_avg_us == 21
 
 
+def test_clean_window_stalled_iterations_are_captured():
+    """``HPX_CLEAN_STALLED_ITERS`` must reach FirmwareMeta (#121).
+
+    It is the only signal that the DWT-timed clean window lost time to a
+    stalled cycle counter -- every other clean_infer_* field stays inside its
+    plausible range when that happens -- so dropping it on the floor would
+    leave the corruption undetectable downstream.
+
+    The unreported case is asserted here too rather than in its own test: a
+    lone "field is None" assertion would also pass against a build that never
+    reads the line at all, which is exactly the vacuous shape this repo has
+    shipped before.
+    """
+    csv_block = [
+        _make_preset_block("basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]])
+    ]
+
+    reported = parse_firmware_output(
+        _wrap_session(
+            {
+                "presets": "basic_cpu",
+                "clean_infer_count": "1092",
+                "clean_infer_avg_us": "684",
+                "clean_stalled_iters": "233",
+                "clean_partial_iters": "17",
+                "clean_ref_cycles": "83300",
+            },
+            csv_block,
+        )
+    )
+    assert reported.meta.clean_stalled_iters == 233
+    assert reported.meta.clean_partial_iters == 17
+    assert reported.meta.clean_ref_cycles == 83300
+
+    # Firmware that emits no such line leaves it None, not 0: a build whose
+    # window is not DWT-timed per iteration (Apollo5/STIMER, or the busy_loop
+    # probe) never reports it, and neither does firmware predating the check.
+    # Defaulting to 0 would read as "checked, healthy".
+    silent = parse_firmware_output(
+        _wrap_session({"presets": "basic_cpu", "clean_infer_count": "5"}, csv_block)
+    )
+    assert silent.meta.clean_stalled_iters is None
+    assert silent.meta.clean_partial_iters is None
+    assert silent.meta.clean_ref_cycles is None
+
+
 def test_psram_diagnostics_metadata():
     lines = _wrap_session(
         {

@@ -625,11 +625,18 @@ class TestMainAotCcRender:
         for render in (_render_tflm, _render_aot):
             out = render(transport="rtt")
             assert "const int clean_iters_n = 3;" in out
-            assert "clean_warm_cyc" not in out
+            # Keyed on the SIZING machinery, not on clean_warm_cyc: fixed mode
+            # now measures the warm cost too (it is the floor the in-window
+            # stall check compares against, #121), it just does not size the
+            # window from it. Asserting the variable's absence would have been
+            # asserting the wrong thing.
             assert "target_cyc" not in out
-            # Fixed mode announces the window as pure state with est_ms=0
-            # (no runtime warm measurement to estimate from).
-            assert "phase=clean_window_begin iters=%d est_ms=0" in out
+            # est_ms is no longer 0 here: a DWT-timed fixed window measures the
+            # warm cost for its stall floor (#121), so the blackout estimate is
+            # derivable and is emitted, which lets the host widen its capture
+            # deadline instead of falling back to the flat heartbeat timeout.
+            # What "fixed" still means is that clean_iters_n is a literal.
+            assert "phase=clean_window_begin iters=%d est_ms=%llu" in out
 
     def test_auto_window_mode_computes_clean_iters_at_runtime(self):
         """Auto mode measures warm cycles and clamps N to fill the target window."""
@@ -665,7 +672,10 @@ class TestMainAotCcRender:
                 clean_iters=2247,
             )
             assert "const int clean_iters_n = 2247;" in out
-            assert "uint32_t clean_warm_cyc = 0U;" not in out
+            # As above: the property is "no adaptive sizing", not "no warm
+            # measurement" -- a DWT-timed window measures the warm cost for its
+            # stall floor regardless of window mode.
+            assert "target_cyc" not in out
 
     def test_busy_loop_probe_replaces_clean_window_body(self):
         tflm_out = _render_tflm(
@@ -833,13 +843,14 @@ class TestMainAotCcRender:
         tflm_out = _render_tflm(transport="rtt", has_armv8m_pmu=True)
         aot_out = _render_aot(transport="rtt", has_armv8m_pmu=True)
 
-        assert 'uint32_t t0 = DWT->CYCCNT;' in tflm_out
-        assert 'clean_cycles += (uint32_t)(DWT->CYCCNT - t0);' in tflm_out
-        assert 'am_hal_debug_disable();' not in tflm_out
-
-        assert 'uint32_t t0 = DWT->CYCCNT;' in aot_out
-        assert 'clean_cycles += (uint32_t)(DWT->CYCCNT - t0);' in aot_out
-        assert 'am_hal_debug_disable();' not in aot_out
+        # The per-iteration delta is bound to a name before it is accumulated
+        # so the loop can also test it for the zero that marks a stalled cycle
+        # counter (#121); the DWT-timed accumulation itself is unchanged.
+        for out in (tflm_out, aot_out):
+            assert 'uint32_t t0 = DWT->CYCCNT;' in out
+            assert 'const uint32_t clean_iter_cyc = (uint32_t)(DWT->CYCCNT - t0);' in out
+            assert 'clean_cycles += clean_iter_cyc;' in out
+            assert 'am_hal_debug_disable();' not in out
 
     def test_dwt_only_aot_render_avoids_armv8m_pmu_api(self):
         out = _render_aot(transport="rtt", has_armv8m_pmu=False)

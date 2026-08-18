@@ -326,6 +326,21 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             timing["device_clean_infer_avg_cycles"] = meta.clean_infer_avg_cycles
         if meta.clean_infer_avg_us is not None:
             timing["device_clean_infer_avg_us"] = meta.clean_infer_avg_us
+        # Window-clock self-check (#121). Surfaced here for the same reason
+        # window_clock_ceiling is: a summary.json reader must be able to tell a
+        # build that checked and found nothing from one that never checked.
+        if meta.clean_stalled_iters is not None:
+            timing["device_clean_stalled_iters"] = meta.clean_stalled_iters
+        if meta.clean_partial_iters is not None:
+            timing["device_clean_partial_iters"] = meta.clean_partial_iters
+        if meta.clean_ref_cycles is not None:
+            timing["device_clean_ref_cycles"] = meta.clean_ref_cycles
+        if meta.clean_dwt_rate_cyc is not None:
+            timing["device_clean_dwt_rate_cyc"] = meta.clean_dwt_rate_cyc
+        if meta.clean_dwt_rate_us is not None:
+            timing["device_clean_dwt_rate_us"] = meta.clean_dwt_rate_us
+        if meta.clean_attach_wait_us is not None:
+            timing["device_clean_attach_wait_us"] = meta.clean_attach_wait_us
         if timing:
             summary["latency"] = timing
     elif any(
@@ -337,6 +352,12 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             meta.clean_infer_count,
             meta.clean_infer_avg_cycles,
             meta.clean_infer_avg_us,
+            meta.clean_stalled_iters,
+            meta.clean_partial_iters,
+            meta.clean_ref_cycles,
+            meta.clean_dwt_rate_cyc,
+            meta.clean_dwt_rate_us,
+            meta.clean_attach_wait_us,
         )
     ):
         summary["latency"] = {
@@ -349,6 +370,12 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                 "device_clean_infer_total_cycles": meta.clean_infer_total_cycles,
                 "device_clean_infer_avg_cycles": meta.clean_infer_avg_cycles,
                 "device_clean_infer_avg_us": meta.clean_infer_avg_us,
+                "device_clean_stalled_iters": meta.clean_stalled_iters,
+                "device_clean_partial_iters": meta.clean_partial_iters,
+                "device_clean_ref_cycles": meta.clean_ref_cycles,
+                "device_clean_dwt_rate_cyc": meta.clean_dwt_rate_cyc,
+                "device_clean_dwt_rate_us": meta.clean_dwt_rate_us,
+                "device_clean_attach_wait_us": meta.clean_attach_wait_us,
             }.items()
             if value is not None
         }

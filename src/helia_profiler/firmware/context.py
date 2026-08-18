@@ -197,6 +197,13 @@ class PowerWindowContext:
     #: templates select between this and ``clean_window_timer`` on
     #: ``power_only`` alone and carry no policy of their own.
     power_window_timer: str
+    #: ``SocCapabilities.clean_window_needs_probe_attach`` — the profile
+    #: binary's DWT-timed window only advances while a debugger holds the core
+    #: debug power domain up, so it must not open before the host attach
+    #: completes.  The capability owns the predicate; the templates combine it
+    #: with the transport (only RTT exposes a host-attach signal) and
+    #: ``power_only``, exactly as they do for the two window timers above.
+    clean_window_needs_probe_attach: bool
     gate_debug_domain_in_window: bool
     broad_peripheral_shutdown: bool
     crypto_otp_shutdown: bool
@@ -332,6 +339,9 @@ class FirmwareRenderContext:
                 ),
                 clean_window_timer=soc.capabilities.clock.clean_window_timer,
                 power_window_timer=soc.capabilities.power_window_timer,
+                clean_window_needs_probe_attach=(
+                    soc.capabilities.clean_window_needs_probe_attach
+                ),
                 gate_debug_domain_in_window=soc.capabilities.clock.gate_debug_domain_in_window,
                 broad_peripheral_shutdown=soc.capabilities.clock.broad_peripheral_shutdown,
                 crypto_otp_shutdown=soc.capabilities.clock.crypto_otp_shutdown,
@@ -424,6 +434,9 @@ class FirmwareRenderContext:
             "heartbeat_every_ms": self.power_window.heartbeat_every_ms,
             "clean_window_timer": self.power_window.clean_window_timer,
             "power_window_timer": self.power_window.power_window_timer,
+            "clean_window_needs_probe_attach": (
+                self.power_window.clean_window_needs_probe_attach
+            ),
             "gate_debug_domain_in_window": self.power_window.gate_debug_domain_in_window,
             "broad_peripheral_shutdown": self.power_window.broad_peripheral_shutdown,
             "crypto_otp_shutdown": self.power_window.crypto_otp_shutdown,
