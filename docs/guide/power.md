@@ -854,6 +854,17 @@ passes, so it is cross-checked directly. Three issue codes come out of that:
   power binary and collecting its record, which is physically impossible.
   A blunt backstop — it needs roughly 2–3× inflation before it fires.
 
+The envelope comparison behind that last warning is written to
+`power.window_clock_ceiling` in `summary.json` on every internal-mode run that
+produces a summary at all — not only when the warning fires — so you can see the margin on a healthy run
+as well as a breached one. Its five fields are `elapsed_us` and `elapsed_s`
+(the firmware's reported window), `host_envelope_s` (the host-timed interval
+from starting the power binary to collecting its record), `slack_s`, and
+`ratio` (`elapsed_s / host_envelope_s`). The warning fires when `elapsed_s`
+exceeds `host_envelope_s + slack_s`, so `slack_s` is part of the bound rather
+than a separate note. (The field is absent only if the deployment timestamp
+the envelope is measured from could not be read, which no shipped flow does.)
+
 `detailed/power_summary.csv` (with `output.detailed: true`) breaks all of
 this down per gated window, plus a `whole_capture_window` reference row for
 comparison.

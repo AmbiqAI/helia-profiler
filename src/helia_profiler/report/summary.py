@@ -137,6 +137,7 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             "stat_packets",
             "capture_window_s",
             "gating_diagnostics",
+            "window_clock_ceiling",
         ):
             if key in power_meta:
                 summary["power"][key] = power_meta[key]

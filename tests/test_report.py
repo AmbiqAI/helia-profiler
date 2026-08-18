@@ -16,6 +16,7 @@ from helia_profiler.results import (
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.errors import ReportError
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
+from helia_profiler.power.diagnostics import WindowClockCeiling
 from helia_profiler.report import (
     _metadata_to_dict,
     _write_csv,
@@ -583,6 +584,45 @@ def test_write_summary_uses_fixed_power_plan_count(tmp_path: Path):
 
     assert summary["power"]["energy_per_inference_j"] == 0.0002
     assert summary["power"]["power_plan"]["inference_count"] == 8
+
+
+def test_write_summary_surfaces_window_clock_ceiling(tmp_path: Path):
+    # #115: window_clock_ceiling (added by #107's collect_power_terminal
+    # stage) must reach summary.json -- previously report/summary.py's power
+    # metadata allowlist omitted it, so a power.window_clock_exceeds_host_time
+    # warning had no envelope numbers a user could see outside the validity
+    # issue's context.
+    # Built from the real producer, not a hand-written literal: the point is
+    # that whatever WindowClockCeiling emits reaches summary.json intact. A
+    # fabricated dict would keep passing after to_metadata() renamed a key,
+    # leaving the documented field silently wrong.
+    ceiling = WindowClockCeiling(elapsed_us=6_027_000, host_envelope_s=0.9, slack_s=0.05)
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=10, clean_infer_avg_us=10000, duration_s=0.1
+    )
+    ctx.power_result.metadata["window_clock_ceiling"] = ceiling.to_metadata()
+
+    out_path = _write_summary(ctx, tmp_path)
+    summary = json.loads(out_path.read_text())
+
+    assert summary["power"]["window_clock_ceiling"] == ceiling.to_metadata()
+
+
+def test_window_clock_ceiling_metadata_keys_are_the_documented_set():
+    # docs/guide/power.md names these fields for users reading summary.json,
+    # and #115 put them in the summary's power block. Nothing else pins the
+    # key set, so renaming or adding one in to_metadata() would leave the
+    # guide describing a field that no longer exists while the whole suite
+    # stayed green. Update the guide and this list together, deliberately.
+    ceiling = WindowClockCeiling(elapsed_us=6_027_000, host_envelope_s=0.9, slack_s=0.05)
+
+    assert set(ceiling.to_metadata()) == {
+        "elapsed_us",
+        "elapsed_s",
+        "host_envelope_s",
+        "slack_s",
+        "ratio",
+    }
 
 
 def test_degraded_free_form_capture_suppresses_derived_efficiency(tmp_path: Path):
