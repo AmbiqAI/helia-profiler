@@ -47,10 +47,16 @@ def make_pmu_ctx(
     engine: str = "helia-rt",
     power_enabled: bool = False,
     reset_strategy: str = "auto",
-    lockstep: bool = False,
+    lockstep: bool | None = False,
     extra: dict | None = None,
 ) -> PipelineContext:
-    """Build a resolved :class:`PipelineContext` ready for a capture stage."""
+    """Build a resolved :class:`PipelineContext` ready for a capture stage.
+
+    ``lockstep=None`` leaves ``power.lockstep`` *unset* rather than writing an
+    explicit ``null``, so the auto-resolution path is what gets exercised.
+    (Both spellings mean the same thing to ``PowerConfig``, but leaving the key
+    out matches what a real user config looks like.)
+    """
     model = tmp_path / "model.tflite"
     if not model.exists():
         model.write_bytes(b"\x00")
@@ -61,9 +67,10 @@ def make_pmu_ctx(
         "power": {
             "enabled": power_enabled,
             "reset_strategy": reset_strategy,
-            "lockstep": lockstep,
         },
     }
+    if lockstep is not None:
+        overrides["power"]["lockstep"] = lockstep
     if lockstep:
         # lockstep validation requires both state and go pins > 0
         overrides["power"].update({"state_gpio_pin": 23, "go_gpio_pin": 24})

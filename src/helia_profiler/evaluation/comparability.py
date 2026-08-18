@@ -137,7 +137,13 @@ def assess_comparability(
     # bench-measurable current adder and must not be power-compared.
     # Baselines predating the dimension carry None and are skipped, like
     # every other dimension here.
-    for dimension in ("power_scope", "power_mode", "power_firmware", "power_monitor"):
+    for dimension in (
+        "power_scope",
+        "power_mode",
+        "power_firmware",
+        "power_monitor",
+        "power_lockstep",
+    ):
         baseline_value = baseline_dimensions.get(dimension)
         candidate_value = candidate_dimensions.get(dimension)
         if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:
@@ -236,6 +242,28 @@ def _dimensions(run: RunArtifacts) -> dict[str, Any]:
                 # monitor firmware was live. The manifest's config-derived
                 # value (merged below) is authoritative when present.
                 "power_monitor": "ina228" if power.get("on_device_summary") else "none",
+                # Lock-step is read from the RUNTIME record only -- the state
+                # the rail was actually in, written by capture/__init__.py as
+                # summary.power.sync.lockstep. Deliberately NOT carried in the
+                # manifest alongside the config-derived dimensions above: the
+                # manifest is merged last and would overwrite this, and config
+                # intent is the wrong question. capture/__init__.py's own
+                # comment says why -- "a driver with no GO output degrades to
+                # the null controller even when the config resolved lock-step
+                # on" -- so an intent-derived value would compare two runs as
+                # equivalent while one of them actually free-ran its window,
+                # which is the phantom-comparability failure this dimension
+                # exists to prevent.
+                #
+                # _nested, not a hand-rolled .get chain: report/summary.py
+                # copies power metadata's "sync" through on an is-not-None
+                # check alone, so it reaches disk as whatever was stored --
+                # the repo's own report golden fixture holds the bool True,
+                # which an unguarded .get() dies on with AttributeError. That
+                # is not an HpxError, so cli/compare_cmd.py would print a
+                # traceback and validation/compare.py would abort a whole
+                # multi-case run instead of recording one COMPARE_ERROR.
+                "power_lockstep": _nested(power, "sync", "lockstep"),
             }
         )
     if run.manifest is not None:

@@ -248,11 +248,10 @@ class PowerConfig:
     # go_gpio_pin (host->device). 0 disables a wire; lockstep stays off until
     # the monitor exposes a GO output and both extra pins are configured.
     # ``None`` means "not explicitly set": callers resolve the effective value
-    # via ``target.lifecycle.resolve_power_lockstep``, which auto-enables
-    # lock-step when the board is wired for it and the SoC family's default
-    # power reset policy needs it to stay race-free (e.g. Apollo5's
-    # debug_reset+swpoi_reset combo -- see the AP510 combo+RTT gate-race
-    # investigation). An explicit ``true``/``false`` here always wins.
+    # via :attr:`lockstep_resolved` (re-exported as
+    # ``target.lifecycle.resolve_power_lockstep``), which auto-enables
+    # lock-step whenever the board is wired for it and gated external capture
+    # is requested. An explicit ``true``/``false`` here always wins.
     lockstep: bool | None = None
     state_gpio_pin: int = DEFAULT_STATE_GPIO_PIN
     go_gpio_pin: int = DEFAULT_GO_GPIO_PIN
@@ -288,13 +287,72 @@ class PowerConfig:
         """
         return self.enabled and self.ina228 is not None
 
+    @property
+    def gated_external_capture(self) -> bool:
+        """Whether this run asks for host-gated *external* power capture.
+
+        The single source of the predicate that gates every piece of GPIO sync
+        machinery: the firmware's ``kPowerSyncEnabled`` (via
+        ``SyncContext.power_sync_enabled`` and the NSX GPIO module selection in
+        ``firmware/__init__.py``) and the host-side lock-step default below.
+        Internal (on-device monitor) mode measures inside the firmware and has
+        no host poller to race, so it is excluded.
+        """
+        return self.enabled and self.mode is PowerMode.EXTERNAL
+
+    @property
+    def lockstep_wiring_available(self) -> bool:
+        """Whether the board carries the two extra lock-step wires.
+
+        ``state`` (device -> host) and ``go`` (host -> device); ``0`` means the
+        wire is not assigned. Single-sourced because three consumers ask the
+        same question and must agree: the lock-step default
+        (:attr:`lockstep_resolved`), the ``power.lockstep: true`` config
+        validator, and the ``no_gate_rise`` diagnostic, which only names
+        lock-step as the likely fix when the wiring can actually support it.
+        """
+        return self.state_gpio_pin > 0 and self.go_gpio_pin > 0
+
+    @property
+    def lockstep_resolved(self) -> bool:
+        """Effective 3-wire GPIO lock-step decision for this run.
+
+        An explicit ``power.lockstep`` always wins -- auto-enable is a
+        *default*, never an override, so ``lockstep: false`` still forces the
+        free-running path for bring-up on incomplete wiring.
+
+        Left unset, lock-step is enabled whenever the board is wired for it and
+        gated external capture is requested. The hazard it closes is not
+        family-specific: without lock-step ``kSyncLockstep`` bakes false,
+        ``hpx_sync_wait_go()`` compiles to a no-op, and the target free-runs its
+        measured window straight out of reset. Any reset latency the host
+        spends after that -- flash-tool exit, JLinkExe teardown, poller
+        start-up -- races the gate. Apollo5's default
+        ``debug_reset+swpoi_reset`` makes the gap widest (two sequential
+        JLinkExe invocations; see the AP510 combo+RTT ``t2-gate-race``
+        investigation, which is why the rule was originally AP5-only), but
+        Apollo4 Blue Plus reproduced the same ``no_gate_rise`` degradation on a
+        single-invocation ``debug_reset`` with a ~5 s window (issue #114), and
+        Apollo3 differs only in how narrow the gap is. So the condition is the
+        wiring and the mode, not the SoC family.
+
+        This is the one place both the firmware generator (which bakes
+        ``kSyncLockstep`` in at build time, via ``FirmwareRenderContext``) and
+        the host-side capture path (which must arm/wait/signal accordingly)
+        resolve the *same* answer -- callers must not read
+        :attr:`lockstep` directly.
+        """
+        if self.lockstep is not None:
+            return self.lockstep
+        return self.gated_external_capture and self.lockstep_wiring_available
+
     @model_validator(mode="after")
     def _validate(self) -> PowerConfig:
         if self.sync_input_index < 0:
             raise ValueError(f"power.sync_input_index must be >= 0, got {self.sync_input_index}.")
         if self.stats_rate_hz < 1:
             raise ValueError(f"power.stats_rate_hz must be >= 1, got {self.stats_rate_hz}.")
-        if self.lockstep and (self.state_gpio_pin <= 0 or self.go_gpio_pin <= 0):
+        if self.lockstep and not self.lockstep_wiring_available:
             raise ValueError("power.lockstep requires both state_gpio_pin and go_gpio_pin > 0.")
         if self.firmware not in POWER_FIRMWARE_MODES:
             raise ValueError(

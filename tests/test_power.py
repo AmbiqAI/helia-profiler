@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from pathlib import Path
 
@@ -125,6 +126,86 @@ class TestPowerDiagnostics:
 
         assert failure.kind is GateFailureKind.NO_GATE_FALL
         assert "did not fall" in failure.message
+
+    def test_no_gate_rise_names_lockstep_when_it_is_off_on_wired_board(self):
+        """Issue #114: this exact combination has a non-wiring cause.
+
+        Lock-step off + state/GO pins present means the firmware never waits
+        for the host, so the window can open and close before the GPI poller
+        is armed. That reads as a dead gate wire, and cost real bench time
+        (headers re-seated on an Apollo4 Blue Plus) before the flag was found.
+        Both the message -- which is what the degraded-path ``log.warning``
+        prints -- and the hint must name the fix.
+        """
+        from helia_profiler.power.diagnostics import GateFailureKind, classify_gate_failure
+
+        failure = classify_gate_failure(
+            saw_gate_rise=False,
+            duration_s=7.0,
+            lockstep=False,
+            lockstep_wiring_available=True,
+        )
+
+        assert failure.kind is GateFailureKind.NO_GATE_RISE
+        assert "power.lockstep: true" in failure.message
+        assert "power.lockstep: true" in failure.hint
+        # It must be offered as the *leading* explanation, not buried after
+        # the wiring checks the user already exhausted.
+        assert failure.hint.index("power.lockstep") < failure.hint.index("wiring")
+
+    @pytest.mark.parametrize(
+        ("lockstep", "wired"),
+        [
+            (True, True),  # lock-step already on: cannot be the cause
+            (False, False),  # board has no state/GO wires to run it over
+            (None, True),  # caller did not report the handshake state
+        ],
+    )
+    def test_no_gate_rise_does_not_blame_lockstep_when_it_cannot_be_the_cause(
+        self, lockstep, wired
+    ):
+        """The hint is only useful if it stays quiet when it does not apply.
+
+        A hint that blames lock-step on every missed gate is the same
+        misdirection as blaming wiring on every missed gate.
+        """
+        from helia_profiler.power.diagnostics import GateFailureKind, classify_gate_failure
+
+        failure = classify_gate_failure(
+            saw_gate_rise=False,
+            duration_s=7.0,
+            lockstep=lockstep,
+            lockstep_wiring_available=wired,
+        )
+
+        assert failure.kind is GateFailureKind.NO_GATE_RISE
+        assert "power.lockstep" not in failure.message
+        assert "power.lockstep" not in failure.hint
+        assert "wiring" in failure.hint
+
+    @pytest.mark.parametrize(
+        ("saw_rise", "saw_fall"),
+        [(True, False), (True, True)],
+    )
+    def test_lockstep_hint_is_scoped_to_no_gate_rise(self, saw_rise, saw_fall):
+        """A gate that DID rise was observed, so lock-step armed in time.
+
+        The other two failure kinds have their own causes (a hung window, a
+        stats-timeline mismatch); pointing them at ``power.lockstep`` would be
+        a fresh wrong turn.
+        """
+        from helia_profiler.power.diagnostics import classify_gate_failure
+
+        failure = classify_gate_failure(
+            saw_gate_rise=saw_rise,
+            saw_gate_fall=saw_fall,
+            duration_s=7.0,
+            lockstep=False,
+            lockstep_wiring_available=True,
+        )
+
+        assert "power.lockstep" not in failure.message
+        assert "power.lockstep" not in failure.hint
 
 
 class TestGatedStatsProcessing:
@@ -521,6 +602,140 @@ class TestGatedStatsProcessing:
         assert result.metadata["gate_failure"]["kind"] == failure_kind
         assert result.metadata["gate_rise_observed"] is saw_rise
         assert result.metadata["gate_fall_observed"] is saw_fall
+
+    def test_degraded_artifact_records_the_lockstep_diagnosis(self):
+        """The retained degraded artifact must carry the lock-step diagnosis.
+
+        The console warning scrolls away; ``summary.json`` is what gets
+        attached to a bug report days later, so the stored ``gate_failure``
+        metadata has to name ``power.lockstep: true`` too -- not just the live
+        log line (issue #114).
+        """
+        from helia_profiler.power.joulescope.capture_gated import (
+            _degraded_observation_result,
+        )
+
+        ms = _SECOND // 1000
+        packets = [
+            self._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12) for i in range(10)
+        ]
+
+        result = _degraded_observation_result(
+            packets=packets,
+            family="js320",
+            device_path="u/js320/test",
+            io_voltage=1.8,
+            sync_input_index=0,
+            stats_rate_hz=1000,
+            scnt=1000,
+            poll_count=20,
+            duration_s=7.0,
+            captured_s=7.1,
+            saw_gate_rise=False,
+            saw_gate_fall=False,
+            short_pulses_ignored=0,
+            lockstep=False,
+            lockstep_wiring_available=True,
+        )
+
+        gate_failure = result.metadata["gate_failure"]
+        assert gate_failure["kind"] == "no_gate_rise"
+        assert "power.lockstep: true" in gate_failure["message"]
+        assert "power.lockstep: true" in gate_failure["hint"]
+
+
+class TestMissedGateWarningNamesTheFix:
+    """End-to-end: the degraded-path ``log.warning`` must name the fix.
+
+    Issue #114's whole cost was that the user only ever saw "no GPIO gate
+    rising edge detected" and went looking for a wiring fault. This drives the
+    real :func:`capture_gated` against a fake instrument whose GPI never goes
+    high -- the exact bench signature -- and reads the log record back, so it
+    pins what the operator actually sees rather than what a helper returns.
+    """
+
+    class _FakeJoulescopeDriver:
+        """Minimal pyjoulescope_driver.Driver stand-in for the gated path."""
+
+        def __init__(self) -> None:
+            self._stats_cb = None
+
+        def publish(self, _topic, _value, **_kwargs) -> None:
+            pass
+
+        def subscribe(self, _topic, _flags, callback) -> None:
+            self._stats_cb = callback
+
+        def unsubscribe(self, _topic, _callback) -> None:
+            pass
+
+        def emit_packets(self, count: int) -> None:
+            ms = _SECOND // 1000
+            for i in range(count):
+                self._stats_cb(
+                    "u/js320/test/s/stats/value",
+                    TestGatedStatsProcessing._packet(
+                        i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12
+                    ),
+                )
+
+    def _run_capture(self, monkeypatch, *, lockstep: bool, wired: bool):
+        from helia_profiler.power.joulescope import capture_gated as module
+        from helia_profiler.power.joulescope.driver import JoulescopeDriver
+
+        fake = self._FakeJoulescopeDriver()
+        monkeypatch.setattr(
+            module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320")
+        )
+        # GPI never goes high: the gate was missed entirely.
+        monkeypatch.setattr(module, "_read_gpi_snapshot", lambda _d, _p: 0)
+        monkeypatch.setattr(module, "_close_device", lambda *_a, **_k: None)
+
+        return module.capture_gated(
+            JoulescopeDriver(),
+            duration_s=0.3,
+            io_voltage=1.8,
+            sync_input_index=0,
+            stats_rate_hz=1000,
+            clean_infer_count=5,
+            clean_infer_avg_us=1000,
+            poll_interval_s=0.005,
+            on_started=lambda _wait: fake.emit_packets(10),
+            lockstep=lockstep,
+            lockstep_wiring_available=wired,
+        )
+
+    def test_warning_names_power_lockstep_when_it_is_the_suspect(
+        self, monkeypatch, caplog
+    ):
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            result = self._run_capture(monkeypatch, lockstep=False, wired=True)
+
+        assert result.metadata["integrity"] == "degraded"
+        assert result.metadata["gate_failure"]["kind"] == "no_gate_rise"
+        warnings = "\n".join(
+            record.getMessage()
+            for record in caplog.records
+            if record.levelno >= logging.WARNING
+        )
+        assert "No GPIO gate rising edge detected" in warnings
+        assert "power.lockstep: true" in warnings
+
+    def test_warning_stays_wiring_only_when_lockstep_was_already_on(
+        self, monkeypatch, caplog
+    ):
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            result = self._run_capture(monkeypatch, lockstep=True, wired=True)
+
+        assert result.metadata["gate_failure"]["kind"] == "no_gate_rise"
+        warnings = "\n".join(
+            record.getMessage()
+            for record in caplog.records
+            if record.levelno >= logging.WARNING
+        )
+        assert "No GPIO gate rising edge detected" in warnings
+        assert "power.lockstep" not in warnings
+        assert "wiring" in warnings
 
 
 class TestJoulescopeUngatedCapture:
@@ -1455,6 +1670,12 @@ class TestCapturePowerWrapper:
             "clean_infer_avg_us": None,
             "minimum_gate_s": 1.0,
             "gate_relative_tolerance": 0.10,
+            # Lock-step facts for the gate-failure classifier (issue #114).
+            # This FakeDriver has no make_sync_controller, so the host degrades
+            # to the null controller regardless of config -- which is exactly
+            # the runtime truth the classifier needs.
+            "lockstep": False,
+            "lockstep_wiring_available": True,
         }
 
     def test_capture_power_waits_for_lockstep_ready_before_go(

@@ -206,6 +206,17 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
                 # therefore not power-comparable even when every other
                 # dimension matches.
                 "power_monitor": "ina228" if ctx.config.power.monitor_selected else "none",
+                # NOTE: power_lockstep is deliberately NOT recorded here.
+                # It IS a measured-rail difference -- the state pin becomes
+                # an output, the GO pin's input buffer is enabled, and the
+                # host holds GO high into it until gate rise -- so it belongs
+                # in the comparability set. But only as the RUNTIME value,
+                # which lives in summary.power.sync.lockstep. Config intent
+                # answers the wrong question (a driver with no GO output
+                # degrades to the null controller even when config resolved
+                # lock-step on), and because the manifest is merged LAST it
+                # would silently overwrite the runtime value. See
+                # evaluation/comparability.py.
             }
         )
     return dimensions

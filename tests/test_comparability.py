@@ -138,6 +138,136 @@ def test_monitor_presence_mismatch_omits_power_metrics_only():
     assert issue.context["candidate"] == "ina228"
 
 
+def test_lockstep_mismatch_omits_power_metrics_only():
+    """#114 flips the lock-step default, so runs recorded either side of it
+    differ in a baked firmware constant. Lock-step drives the state pin as an
+    output and enables the GO pin's input buffer on the measured rail, and the
+    host holds GO high into that input until gate rise -- the same class of
+    real, rail-level difference that makes monitor-presence power-blocking.
+
+    Adversarial review found both runs comparing clean with integrity: valid,
+    which is #115's phantom-delta failure mode: only the runs that LOST the
+    gate race are marked degraded, so the ones that won compare silently
+    against post-change runs."""
+    free_running = _run(
+        power={
+            "measurement_scope": "gpio_gated_clean_window",
+            "integrity": "valid",
+            "sync": {"lockstep": False},
+        }
+    )
+    lockstepped = _run(
+        power={
+            "measurement_scope": "gpio_gated_clean_window",
+            "integrity": "valid",
+            "sync": {"lockstep": True},
+        }
+    )
+
+    assessment = assess_comparability(free_running, lockstepped)
+
+    assert assessment.run_metrics_comparable
+    assert assessment.layers_comparable
+    assert not assessment.power_metrics_comparable
+    issue = next(
+        issue
+        for issue in assessment.issues
+        if issue.code == "metric.power_power_lockstep_mismatch"
+    )
+    assert issue.severity is ComparabilitySeverity.METRIC_BLOCKING
+    assert issue.context["baseline"] is False
+    assert issue.context["candidate"] is True
+
+
+def test_bundles_with_no_sync_record_at_all_are_skipped():
+    """Only bundles carrying no sync record skip the dimension.
+
+    An earlier version of this test claimed pre-#114 runs "have no
+    sync.lockstep key at all". Adversarial review showed that is false:
+    capture writes ``SyncHandshakeMetadata(lockstep=...)`` on BOTH branches, so
+    a real pre-#114 gated external baseline carries ``sync.lockstep: False``
+    and IS compared -- correctly, since it genuinely ran with the rail in the
+    other state (see the test below). What actually skips is a bundle with no
+    sync record at all: internal-mode runs, free-form captures, and anything
+    predating the field."""
+    legacy = _run(
+        power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid"}
+    )
+    current = _run(
+        power={
+            "measurement_scope": "gpio_gated_clean_window",
+            "integrity": "valid",
+            "sync": {"lockstep": True},
+        }
+    )
+
+    assessment = assess_comparability(legacy, current)
+
+    assert assessment.power_metrics_comparable
+    assert not any(
+        issue.code == "metric.power_power_lockstep_mismatch"
+        for issue in assessment.issues
+    )
+
+
+def test_real_pre_change_baselines_do_block_power_comparison():
+    """The behaviour change #114 actually ships, pinned deliberately.
+
+    A pre-#114 gated external run recorded ``sync.lockstep: False`` -- that WAS
+    the bug: the target free-ran its measured window. Post-#114 the same config
+    runs lock-stepped. The rail genuinely differs, so blocking is correct. It
+    is pinned here because the consequence is easy to miss: a power-gated
+    comparison against a stored baseline flips from pass to fail, since
+    ``MissingMetricPolicy.FAIL`` is the default. Documented in
+    docs/guide/power.md."""
+    pre_change = _run(
+        power={
+            "measurement_scope": "gpio_gated_clean_window",
+            "integrity": "valid",
+            "sync": {"lockstep": False},
+        }
+    )
+    post_change = _run(
+        power={
+            "measurement_scope": "gpio_gated_clean_window",
+            "integrity": "valid",
+            "sync": {"lockstep": True},
+        }
+    )
+
+    assessment = assess_comparability(pre_change, post_change)
+
+    assert not assessment.power_metrics_comparable
+    assert assessment.run_metrics_comparable
+
+
+def test_a_non_dict_sync_record_does_not_crash_comparison():
+    """``report/summary.py`` copies power metadata's ``sync`` through on an
+    is-not-None check alone, so it reaches disk as whatever was stored -- the
+    repo's own report golden fixture holds the bool ``True``. An unguarded
+    dereference raised ``AttributeError``, which is not an ``HpxError``: the
+    CLI printed a traceback and ``validation/compare.py`` aborted an entire
+    multi-case run instead of recording one ``COMPARE_ERROR``."""
+    weird = _run(
+        power={
+            "measurement_scope": "gpio_gated_clean_window",
+            "integrity": "valid",
+            "sync": True,
+        }
+    )
+    normal = _run(
+        power={
+            "measurement_scope": "gpio_gated_clean_window",
+            "integrity": "valid",
+            "sync": {"lockstep": True},
+        }
+    )
+
+    assessment = assess_comparability(weird, normal)
+
+    assert assessment.power_metrics_comparable
+
+
 def test_matching_monitor_presence_stays_power_comparable():
     with_monitor = {
         "measurement_scope": "gpio_gated_clean_window",
