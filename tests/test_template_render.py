@@ -672,15 +672,13 @@ class TestMainAotCcRender:
             transport="rtt", window_mode="auto", clean_window_probe="busy_loop"
         )
         assert 'HPX_CLEAN_WINDOW_PROBE=busy_loop' in tflm_out
-        # The busy-loop bound is calibrated via DWT BEFORE the PMU/debug
-        # domain is disabled, then the gated window itself runs a plain
-        # bounded counter loop with no live DWT reads — DWT lives in the
-        # same debug power domain that gets disabled, so a live
-        # "while (DWT->CYCCNT - t0 < target)" loop as the exit condition
-        # would hang forever once that domain is off (regression found
-        # 2026-07-03: real firmware hang on hardware).
+        # The busy-loop bound is calibrated against STIMER, then the gated
+        # window itself runs a plain bounded counter loop with no live clock
+        # reads at all — DWT lives in the debug power domain this probe
+        # disables, so a live "while (DWT->CYCCNT - t0 < target)" loop as the
+        # exit condition would hang forever once that domain is off
+        # (regression found 2026-07-03: real firmware hang on hardware).
         assert 'for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++)' in tflm_out
-        assert 'while ((uint32_t)(DWT->CYCCNT - t0) < (uint32_t)clean_probe_target_cyc)' not in tflm_out
         assert 'clean_count = 1;' in tflm_out
 
         aot_out = _render_aot(
@@ -688,10 +686,148 @@ class TestMainAotCcRender:
         )
         assert 'HPX_CLEAN_WINDOW_PROBE=busy_loop' in aot_out
         assert 'for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++)' in aot_out
-        assert 'while ((uint32_t)(DWT->CYCCNT - t0) < (uint32_t)clean_probe_target_cyc)' not in aot_out
         assert 'clean_count = 1;' in aot_out
         assert 'am_hal_debug_disable();' in tflm_out
         assert 'am_hal_debug_disable();' in aot_out
+
+        # Pin the "no live DWT read in the window" rule against the RENDER, not
+        # against one hypothetical spelling of the rejected design.  The old
+        # assertion here looked for a literal
+        # "while ((uint32_t)(DWT->CYCCNT - t0) < ...)" that the template never
+        # contained under any branch, so it could not fail.  Anchor on the
+        # window CALL sites (the static inline definitions appear earlier) and
+        # forbid the register outright.
+        for out in (tflm_out, aot_out):
+            begin = out.index("hpx_sync_window_begin();")
+            window = out[begin : out.index("hpx_sync_window_end();", begin)]
+            assert "DWT->CYCCNT" not in window
+
+    @pytest.mark.parametrize(
+        "soc_shape",
+        [
+            # Apollo3/3P power binary: no broad shutdown, but nothing asserts
+            # CDBGPWRUPREQ once it free-runs, so DWT never advances.
+            {"power_window_timer": "stimer", "broad_peripheral_shutdown": False},
+            # Apollo4 family power binary: _peripheral_power_down.j2 disables
+            # AM_HAL_PWRCTRL_PERIPH_DEBUG ~200 rendered lines above the probe.
+            {"power_window_timer": "stimer", "broad_peripheral_shutdown": True},
+        ],
+        ids=["apollo3p_shaped", "apollo4p_shaped"],
+    )
+    @pytest.mark.parametrize("window_mode", ["fixed", "auto"])
+    def test_busy_loop_calibration_never_reads_dwt_on_a_power_binary(
+        self, soc_shape: dict, window_mode: str
+    ):
+        """Regression, issue #112.
+
+        The Cortex-M4F power binaries cannot read DWT->CYCCNT: AP4 powers the
+        debug domain down itself, and neither AP3 nor AP4 has a debugger
+        holding that domain up once the binary free-runs.  The busy-loop probe
+        used to size its iteration count from a DWT delta anyway; the delta
+        read 0, ``if (busy_calib_cyc > 0U)`` was skipped, the count kept its
+        hardcoded 100000 seed, and the window ran for an arbitrary length.
+
+        These renders are AP3/AP4-shaped (has_armv8m_pmu=False,
+        power_window_timer="stimer") -- the combination the snapshot suite did
+        not cover, because it pins clean_window_probe="infer", and that the
+        busy-loop case here did not cover either, because it used AP5-shaped
+        defaults.
+        """
+        for render in (_render_tflm, _render_aot):
+            out = render(
+                transport="rtt",
+                power_only=True,
+                window_mode=window_mode,
+                clean_window_probe="busy_loop",
+                has_armv8m_pmu=False,
+                **soc_shape,
+            )
+            # The calibration pass exists and is timed by STIMER, not DWT.
+            assert "busy_calib_t0 = hpx_stimer_ticks();" in out
+            calib = out[out.index("busy_calib_t0") : out.index("busy_loop_iters =")]
+            assert "DWT->CYCCNT" not in calib, (
+                "busy-loop calibration reads DWT on a binary that cannot read it"
+            )
+            # STIMER must actually be defined in this render, not just called.
+            assert "static inline void hpx_stimer_init(void)" in out
+            shutdown = "am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_DEBUG);"
+            if soc_shape["broad_peripheral_shutdown"]:
+                # The AP4 shape: pin the ordering the original comment got
+                # wrong -- the domain is gone long BEFORE the calibration, not
+                # after it.
+                assert out.index(shutdown) < out.index("busy_calib_t0")
+            else:
+                assert shutdown not in out
+
+    @pytest.mark.parametrize("window_mode", ["fixed", "auto"])
+    def test_busy_loop_window_duration_is_measured_not_the_nominal_target(
+        self, window_mode: str
+    ):
+        """Regression, issue #112 (second half).
+
+        ``clean_cycles = clean_probe_target_cyc`` made the terminal report echo
+        window_target_ms as the measured duration, so a mis-sized window was
+        indistinguishable from a correct one -- and in internal mode that
+        duration is the denominator for average power and current.  The STIMER
+        bracket around the window is now the only source of elapsed_us.
+        """
+        for render in (_render_tflm, _render_aot):
+            out = render(
+                transport="rtt",
+                power_only=True,
+                power_window_timer="stimer",
+                window_mode=window_mode,
+                clean_window_probe="busy_loop",
+                has_armv8m_pmu=False,
+                broad_peripheral_shutdown=True,
+            )
+            assert "clean_cycles = clean_probe_target" not in out
+            assert "uint32_t clean_stimer_t0 = hpx_stimer_ticks();" in out
+            assert "uint64_t clean_stimer_total_us =" in out
+            # elapsed_us in the terminal report comes from the measurement.
+            assert "clean_stimer_total_us," in out
+
+    def test_busy_loop_calibration_rejects_an_implausible_measurement(self):
+        """The scaling branch is gated on a plausibility BAND, not just != 0.
+
+        ``busy_calib_ticks`` is the denominator that sizes the window, so a
+        corrupt reading mis-sizes it by that same multiplicative factor.  The
+        known source is ``hpx_stimer_init()`` itself: AM_HAL_STIMER_CFG_CLEAR
+        drops the XT request before re-requesting it, and the XT is a crystal
+        that restarts.  Measured on an Apollo4 Blue Plus KBR, reading STIMER
+        straight after that sequence gave apparent rates varying 45% across
+        identical builds (584/591/858 kHz against a true 95.771 MHz); a 750 ms
+        settle made it repeatable to 20 ppm.  A transient that is negligible
+        across a multi-second measured window can swallow this ~6-8 ms
+        calibration pass whole.
+
+        The settle belongs in ``hpx_stimer_init()`` and needs a bench pass to
+        size (issue #110).  Until then the band keeps a bad reading from
+        producing an absurd iteration count -- it falls back to the seed, and
+        because the window is now measured, that fallback is visible in
+        HPX_CLEAN_INFER_AVG_US rather than hidden behind the nominal target.
+        """
+        for render in (_render_tflm, _render_aot):
+            out = render(
+                transport="rtt",
+                power_only=True,
+                power_window_timer="stimer",
+                clean_window_probe="busy_loop",
+                has_armv8m_pmu=False,
+                broad_peripheral_shutdown=True,
+            )
+            assert "const uint32_t busy_calib_min_ticks = 16U;" in out
+            assert "const uint32_t busy_calib_max_ticks = 8192U;" in out
+            # Both ends of the band gate the scaling branch -- a bare
+            # "> 0U" guard (what this shipped with before) would let the
+            # observed corruption straight through.
+            assert (
+                "if (busy_calib_ticks >= busy_calib_min_ticks &&\n"
+                "            busy_calib_ticks <= busy_calib_max_ticks) {"
+            ) in out
+            assert "if (busy_calib_ticks > 0U) {" not in out
+            # The seed survives as the fallback value.
+            assert "uint32_t busy_loop_iters = 100000U;" in out
 
     def test_armv8m_infer_probe_keeps_debug_domain_up_for_clean_timing(self):
         tflm_out = _render_tflm(transport="rtt", has_armv8m_pmu=True)

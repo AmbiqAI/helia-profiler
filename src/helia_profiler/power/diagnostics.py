@@ -237,6 +237,48 @@ def firmware_window_clock_is_frozen(
     return completed_count > 0 and elapsed_us == 0
 
 
+#: Clean-window probes that never execute a model inference.  The ``busy_loop``
+#: diagnostic replaces the whole window body with one calibrated CPU spin whose
+#: length comes from ``window_target_ms``, so a run using it does exactly one
+#: unit of work no matter what the host planned.
+_NON_INFERENCE_PROBES = frozenset({"busy_loop"})
+
+
+def probe_runs_inferences(clean_window_probe: str) -> bool:
+    """Whether *clean_window_probe* executes the model inside the window.
+
+    Every host-side rule that reasons about "how many inferences ran" or "how
+    long N inferences should take" is meaningless when this is False, so the
+    rules ask here rather than each spelling ``!= "busy_loop"`` for itself.
+    """
+    return clean_window_probe not in _NON_INFERENCE_PROBES
+
+
+def expected_terminal_requested_count(
+    *, inference_count: int | None, clean_window_probe: str
+) -> int | None:
+    """What the firmware's terminal report should call ``requested_count``.
+
+    Normally the host's planned inference count: firmware renders
+    ``clean_iters_n`` from it and reports it straight back.
+
+    The ``busy_loop`` probe is the exception.  It runs no inferences at all --
+    one calibrated spin window, sized from ``window_target_ms`` -- so firmware
+    reports 1 requested and 1 completed (see ``_power_terminal_success.j2``).
+    A host that still expected N would reject every such run as "incomplete
+    inference execution", which is exactly what happened before this was
+    centralized: the diagnostic could not finish a run on any board, and the
+    window duration it exists to expose was never consumed.
+
+    Returns ``None`` when there is no planned count to check against.
+    """
+    if inference_count is None:
+        return None
+    if not probe_runs_inferences(clean_window_probe):
+        return 1
+    return inference_count
+
+
 @dataclass(frozen=True)
 class WindowClockAgreement:
     """Agreement between the firmware's own window clock and a reference."""

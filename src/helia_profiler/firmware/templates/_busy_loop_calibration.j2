@@ -1,0 +1,90 @@
+{# _busy_loop_calibration.j2 — size the busy-loop probe's iteration count.
+
+   Shared verbatim by main.cc.j2 and main_aot.cc.j2 (both render it at 8-space
+   indentation, immediately before the clean/power window is armed) so the two
+   cannot drift apart -- the class of bug that produced the original AP4 miss.
+
+   Timed by STIMER, never DWT.  main.cc.j2's prelude pins
+   window_timer == "stimer" for this probe on every family (read it for the
+   per-family reasoning and the resolution trade that choice accepts), which is
+   what puts hpx_stimer_* in scope here.  The case this block exists to survive
+   is the dedicated power binary, where the CoreSight debug domain is already
+   gone long before this point regardless of any HAL call: AP4's broad
+   peripheral shutdown disables AM_HAL_PWRCTRL_PERIPH_DEBUG at boot (~200
+   rendered lines above here), and on any Cortex-M4F part a free-running power
+   binary has no debugger asserting CDBGPWRUPREQ to hold it up in the first
+   place.  See SocCapabilities.power_window_timer.
+
+   Reading DWT->CYCCNT here instead (as this block did until issue #112) read a
+   frozen counter: the tick delta came out 0, the scaling branch was skipped,
+   the iteration count silently kept its seed value, and the window ran for a
+   length unrelated to window_target_ms. #}
+        // Size the busy-loop iteration count so the window fills roughly the
+        // {{ window_target_ms }} ms target, then run a plain bounded counter loop
+        // with no clock reads at all inside the window itself.  A live
+        // "while (elapsed < target) nop();" exit condition is not an option:
+        // when it read DWT it hung forever once the debug domain went off
+        // (found 2026-07-03: real firmware hang, required a J-Link reset to
+        // recover the board), and polling STIMER every iteration would put
+        // peripheral traffic inside the measured region.
+        //
+        // The calibration loop must keep the SAME shape as the measured loop
+        // below -- volatile counter, one nop -- or its per-iteration cost does
+        // not transfer.  STIMER is the clock (see the file header): unlike
+        // SystemCoreClock it is measured rather than assumed.
+        //
+        // The window-begin block below calls hpx_stimer_init() again and reads
+        // its own t0 immediately after.  That keeps the window-begin block
+        // identical for every probe, but it is NOT free: every init issues
+        // AM_HAL_STIMER_CFG_CLEAR, which drops the XT request before
+        // re-requesting it (see the plausibility band below), so the measured
+        // window inherits the same crystal-restart transient this calibration
+        // does.  That is tolerable there only because the measured window is
+        // multiple seconds -- production gates land within 0.064-0.065% of the
+        // JS110 reference -- and it stops being a caveat once issue #110 puts
+        // the settle inside hpx_stimer_init() itself.
+        hpx_stimer_init();
+        const uint32_t busy_calib_t0 = hpx_stimer_ticks();
+        volatile uint32_t busy_calib_i = 0;
+        for (; busy_calib_i < 100000U; busy_calib_i++) {
+            __asm volatile("nop");
+        }
+        const uint32_t busy_calib_ticks =
+            (uint32_t)(hpx_stimer_ticks() - busy_calib_t0);
+        const uint64_t clean_probe_target_ticks =
+            ((uint64_t)HPX_STIMER_HZ * (uint64_t){{ window_target_ms }}U) / 1000ULL;
+        // Plausibility band for the measurement above.  100000 volatile-counter
+        // nop iterations cost roughly 4-8 core cycles each, so from a 24 MHz to
+        // a 250 MHz core the pass lands somewhere between ~1.6 ms and ~34 ms --
+        // 52 to ~1100 STIMER ticks.  A reading outside [16, 8192] ticks
+        // (~0.5 ms to ~250 ms) does not describe a slow or a fast part, it
+        // describes a bad measurement.
+        //
+        // busy_calib_ticks is a DENOMINATOR, so a bad one mis-sizes the window
+        // by that same multiplicative factor -- which is exactly the failure
+        // issue #112 was about, just arriving through a different door.  The
+        // known door: hpx_stimer_init() drops and re-requests the XT, and the
+        // XT is a crystal that has to restart ("the XT is only enabled when an
+        // internal module is using it", Apollo4 datasheet 6.4).  Reading STIMER
+        // straight after that sequence measured apparent rates varying 45%
+        // across identical builds on an Apollo4 Blue Plus KBR (584/591/858 kHz
+        // where the true answer was 95.771 MHz); a 750 ms settle made it
+        // repeatable to 20 ppm.  A transient that is negligible across a
+        // multi-second measured window can swallow this 6-8 ms pass whole.
+        //
+        // The settle belongs in hpx_stimer_init(), once, and needs a bench pass
+        // to size: issue #110.  Until it lands, refuse an implausible reading
+        // rather than scale from it.  Falling back to the seed yields a short
+        // (~6 ms) window, but the window is now MEASURED, so a fallback shows
+        // up in HPX_CLEAN_INFER_AVG_US as the ~1000x miss it is instead of
+        // hiding behind the nominal target.
+        const uint32_t busy_calib_min_ticks = 16U;
+        const uint32_t busy_calib_max_ticks = 8192U;
+        uint32_t busy_loop_iters = 100000U;
+        if (busy_calib_ticks >= busy_calib_min_ticks &&
+            busy_calib_ticks <= busy_calib_max_ticks) {
+            const uint64_t scaled =
+                ((uint64_t)busy_calib_i * clean_probe_target_ticks) /
+                (uint64_t)busy_calib_ticks;
+            busy_loop_iters = (scaled > 0xFFFFFFFFULL) ? 0xFFFFFFFFU : (uint32_t)scaled;
+        }
