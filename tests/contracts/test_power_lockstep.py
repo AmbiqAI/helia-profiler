@@ -328,6 +328,49 @@ class TestLockstepDefaultsOnWhenWired:
         assert "static constexpr bool     kSyncLockstep     = true;" in rendered
         assert "static constexpr bool     kPowerSyncEnabled = true;" in rendered
 
+    def test_render_context_feeds_the_resolved_decision_to_the_template(self, tmp_path):
+        """The one wiring the test above does NOT cover.
+
+        ``test_auto_enabled_lockstep_reaches_the_baked_firmware_constant``
+        calls ``resolve_power_lockstep`` itself and hands the result straight
+        to the template, so it re-implements the very hand-off it claims to
+        verify. Adversarial review proved the gap: replacing
+        ``FirmwareRenderContext``'s ``lockstep=resolve_power_lockstep(ctx)``
+        with a bare ``False`` -- or with ``bool(config.power.lockstep)``, the
+        plausible refactor slip that reads the raw tri-state field -- left the
+        entire suite green.
+
+        That divergence is #114 with the polarity reversed and is worse than
+        the bug this PR fixes: the host arms lock-step and holds GO low while
+        the binary free-runs, so the run blocks for the full ``power.duration_s``
+        and then dies with "Target did not signal READY", pointing the user at
+        wiring that is fine.
+
+        So assert on the value the render context actually emits, taking the
+        same path ``firmware.generate_app`` takes.
+        """
+        from helia_profiler.engines.base import EngineArtifacts
+        from helia_profiler.firmware.context import FirmwareRenderContext
+
+        ctx = make_pmu_ctx(
+            tmp_path,
+            board="apollo4p_blue_kbr_evb",
+            transport="rtt",
+            power_enabled=True,
+            lockstep=None,
+        )
+        # from_pipeline_context asserts the engine stage has run; nothing about
+        # the lock-step hand-off depends on which engine, so the default TFLM
+        # artifacts are enough to reach to_template_vars().
+        ctx.engine_artifacts = EngineArtifacts()
+
+        template_vars = FirmwareRenderContext.from_pipeline_context(ctx).to_template_vars()
+
+        assert template_vars["lockstep"] == resolve_power_lockstep(ctx)
+        # Pin the value too, so a future change that makes BOTH sides wrong
+        # in the same direction still fails here.
+        assert template_vars["lockstep"] is True
+
 
 class TestAutoStrategyNeverCyclesRail:
     @pytest.mark.parametrize("strategy", ["auto", "none", "debug_reset", "swpoi_reset"])

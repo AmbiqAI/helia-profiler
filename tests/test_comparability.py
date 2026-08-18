@@ -138,6 +138,71 @@ def test_monitor_presence_mismatch_omits_power_metrics_only():
     assert issue.context["candidate"] == "ina228"
 
 
+def test_lockstep_mismatch_omits_power_metrics_only():
+    """#114 flips the lock-step default, so runs recorded either side of it
+    differ in a baked firmware constant. Lock-step drives the state pin as an
+    output and enables the GO pin's input buffer on the measured rail, and the
+    host holds GO high into that input until gate rise -- the same class of
+    real, rail-level difference that makes monitor-presence power-blocking.
+
+    Adversarial review found both runs comparing clean with integrity: valid,
+    which is #115's phantom-delta failure mode: only the runs that LOST the
+    gate race are marked degraded, so the ones that won compare silently
+    against post-change runs."""
+    free_running = _run(
+        power={
+            "measurement_scope": "gpio_gated_clean_window",
+            "integrity": "valid",
+            "sync": {"lockstep": False},
+        }
+    )
+    lockstepped = _run(
+        power={
+            "measurement_scope": "gpio_gated_clean_window",
+            "integrity": "valid",
+            "sync": {"lockstep": True},
+        }
+    )
+
+    assessment = assess_comparability(free_running, lockstepped)
+
+    assert assessment.run_metrics_comparable
+    assert assessment.layers_comparable
+    assert not assessment.power_metrics_comparable
+    issue = next(
+        issue
+        for issue in assessment.issues
+        if issue.code == "metric.power_power_lockstep_mismatch"
+    )
+    assert issue.severity is ComparabilitySeverity.METRIC_BLOCKING
+    assert issue.context["baseline"] is False
+    assert issue.context["candidate"] is True
+
+
+def test_baselines_predating_the_lockstep_dimension_are_skipped():
+    """A run recorded before #114 has no sync.lockstep key at all. Dimensions
+    are skipped when either side is None, so old baselines must not start
+    reporting a phantom mismatch against new runs."""
+    legacy = _run(
+        power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid"}
+    )
+    current = _run(
+        power={
+            "measurement_scope": "gpio_gated_clean_window",
+            "integrity": "valid",
+            "sync": {"lockstep": True},
+        }
+    )
+
+    assessment = assess_comparability(legacy, current)
+
+    assert assessment.power_metrics_comparable
+    assert not any(
+        issue.code == "metric.power_power_lockstep_mismatch"
+        for issue in assessment.issues
+    )
+
+
 def test_matching_monitor_presence_stays_power_comparable():
     with_monitor = {
         "measurement_scope": "gpio_gated_clean_window",

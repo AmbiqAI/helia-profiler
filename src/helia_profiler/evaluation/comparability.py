@@ -137,7 +137,13 @@ def assess_comparability(
     # bench-measurable current adder and must not be power-compared.
     # Baselines predating the dimension carry None and are skipped, like
     # every other dimension here.
-    for dimension in ("power_scope", "power_mode", "power_firmware", "power_monitor"):
+    for dimension in (
+        "power_scope",
+        "power_mode",
+        "power_firmware",
+        "power_monitor",
+        "power_lockstep",
+    ):
         baseline_value = baseline_dimensions.get(dimension)
         candidate_value = candidate_dimensions.get(dimension)
         if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:
@@ -236,6 +242,10 @@ def _dimensions(run: RunArtifacts) -> dict[str, Any]:
                 # monitor firmware was live. The manifest's config-derived
                 # value (merged below) is authoritative when present.
                 "power_monitor": "ina228" if power.get("on_device_summary") else "none",
+                # Recorded by capture/__init__.py into summary.power.sync;
+                # the manifest's config-derived value (merged below) is
+                # authoritative when present.
+                "power_lockstep": (power.get("sync") or {}).get("lockstep"),
             }
         )
     if run.manifest is not None:

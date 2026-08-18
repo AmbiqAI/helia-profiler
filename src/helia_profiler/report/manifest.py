@@ -206,6 +206,14 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
                 # therefore not power-comparable even when every other
                 # dimension matches.
                 "power_monitor": "ina228" if ctx.config.power.monitor_selected else "none",
+                # Lock-step is a measured-rail change, not just a handshake:
+                # it drives the state pin as an output and enables the GO pin's
+                # input buffer, and the host holds GO high into that input from
+                # signal_go() until gate rise. Same argument as power_monitor
+                # above, so it gets the same treatment -- otherwise flipping
+                # the default (#114) silently makes every pre-existing baseline
+                # incomparable while still reporting integrity: valid.
+                "power_lockstep": ctx.config.power.lockstep_resolved,
             }
         )
     return dimensions
