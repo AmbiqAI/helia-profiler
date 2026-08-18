@@ -59,7 +59,7 @@ _BUG_CLASS_MESSAGE = (
 )
 
 
-def _executorch_power_cfg(tmp_path, mode="external"):
+def _executorch_power_cfg(tmp_path, mode="external", board="apollo510_evb"):
     model = tmp_path / "model.pte"
     power = {"enabled": True, "mode": mode}
     if mode == "internal":
@@ -69,6 +69,7 @@ def _executorch_power_cfg(tmp_path, mode="external"):
     overrides = {
         "model": {"path": str(model)},
         "engine": {"type": "executorch"},
+        "target": {"board": board},
         "power": power,
     }
     return load_config(None, overrides)
@@ -81,8 +82,19 @@ def _executorch_power_cfg(tmp_path, mode="external"):
 # error -- where external mode's numbers come from the instrument and only
 # elapsed_us is affected. A tripwire that only pinned the default (external)
 # would stay green through exactly the relaxation that does the most damage.
+#
+# And one board per SoC family, because the bug class's two root causes ARE
+# family-specific (AP4 powers the debug domain down via
+# broad_peripheral_shutdown; AP3 simply has nothing asserting CDBGPWRUPREQ), so
+# "exempt one family" is a plausible narrowing too. Adversarial review proved
+# the gap: exempting AP3 from the gate left a mode-only tripwire fully green
+# while the family this module's own docstring names as vulnerable walked
+# straight through.
+@pytest.mark.parametrize("board", ["apollo3p_evb", "apollo4p_evb", "apollo510_evb"])
 @pytest.mark.parametrize("mode", ["external", "internal"])
-def test_preflight_accepting_executorch_power_requires_engine_matrix_coverage(tmp_path, mode):
+def test_preflight_accepting_executorch_power_requires_engine_matrix_coverage(
+    tmp_path, mode, board
+):
     """Fails the moment preflight stops rejecting executorch+power while the
     render-contract matrix has not been extended to cover it.
 
@@ -92,7 +104,7 @@ def test_preflight_accepting_executorch_power_requires_engine_matrix_coverage(tm
     -- without the matching render/test work, this flips to a hard failure
     naming the bug class.
     """
-    cfg = _executorch_power_cfg(tmp_path, mode)
+    cfg = _executorch_power_cfg(tmp_path, mode, board)
 
     try:
         _check_transport_support(cfg)
