@@ -98,6 +98,10 @@ class FirmwareMeta:
     #: Actual CPU clock (Hz) reported by the firmware's ``SystemCoreClock``.
     #: Ground truth for verifying the host's registry clock assumption.
     system_clock_hz: int | None = None
+    # EXPERIMENT (issue #111): actual core frequency measured on-device by
+    # counting DWT cycles across a fixed STIMER (32.768 kHz XTAL) interval.
+    # system_clock_hz above is the NOMINAL configured value; this is reality.
+    core_freq_measured_hz: int | None = None
     profiled_infer_count: int | None = None
     profiled_infer_total_us: int | None = None
     profiled_infer_avg_us: int | None = None

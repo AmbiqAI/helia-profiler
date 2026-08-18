@@ -58,6 +58,11 @@
 
 #include "hpx_pmu_profiler.h"
 {% include "_system_includes.j2" %}
+// EXPERIMENT (issue #111, do not merge): the core-frequency measurement in
+// main() needs STIMER register definitions on renders that otherwise skip
+// the HAL umbrella (AP3/AP4 profile). Header guards make this a no-op where
+// another block already includes it.
+#include "am_mcu_apollo.h"
 {% if apollo3_burst %}
 // Apollo3/3P TurboSPOT (burst) control lives in the AmbiqSuite HAL umbrella.
 #include "am_mcu_apollo.h"
@@ -631,6 +636,28 @@ int main(void) {
     // this to verify its registry assumption (used for SWO baud + cycle->time
     // math) matches reality instead of trusting a hardcoded frequency.
     hpx_printf("HPX_SYSTEM_CLOCK_HZ=%lu\n", (unsigned long)SystemCoreClock);
+{% if not power_only | default(false) %}
+    // EXPERIMENT (issue #111, do not merge): measure the ACTUAL core
+    // frequency against the 32.768 kHz crystal. DWT cycles are HFRC-anchored
+    // and every cycles->time conversion above trusts the NOMINAL SystemCoreClock;
+    // STIMER is crystal-anchored (ppm-class). Counting cycles across a fixed
+    // 8192-tick (exactly 250 ms) STIMER interval exposes any HFRC deviation:
+    // Hz = cycles * 4. Edge-aligned start bounds quantization at 1/8192
+    // (~122 ppm). Runs once at boot in the PROFILE binary only, where the
+    // attached probe keeps the DWT domain powered on AP3/AP4.
+    {
+        am_hal_stimer_config(AM_HAL_STIMER_CFG_CLEAR);
+        am_hal_stimer_config(AM_HAL_STIMER_XTAL_32KHZ | AM_HAL_STIMER_CFG_RUN);
+        uint32_t align = am_hal_stimer_counter_get();
+        while (am_hal_stimer_counter_get() == align) {}
+        uint32_t freq_c0 = DWT->CYCCNT;
+        uint32_t freq_t0 = am_hal_stimer_counter_get();
+        while ((uint32_t)(am_hal_stimer_counter_get() - freq_t0) < 8192U) {}
+        uint32_t freq_cycles = DWT->CYCCNT - freq_c0;
+        hpx_printf("HPX_CORE_FREQ_MEASURED_HZ=%lu\n",
+                   (unsigned long)(freq_cycles * 4U));
+    }
+{% endif %}
 {% if apollo3_burst %}
     hpx_printf("HPX_BURST_AVAIL=%d\n", hpx_burst_avail);
     hpx_printf("HPX_BURST_ENGAGED=%d\n", hpx_burst_engaged);
