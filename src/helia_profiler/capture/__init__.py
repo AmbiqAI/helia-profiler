@@ -208,13 +208,13 @@ class _UsbDtrHolder:
 def _make_sync_controller(ctx: PipelineContext, driver: object):
     """Build a host sync controller from config, or a gate-only fallback.
 
-    Lock-step is resolved via ``target.lifecycle.resolve_power_lockstep``: an
-    explicit ``power.lockstep`` setting always wins, otherwise it is
-    auto-enabled when the board is wired for it and the SoC family's default
-    reset policy needs it to stay race-free (see that function's docstring
-    for the AP510 combo+RTT race it closes). Without lock-step, or on
-    drivers that cannot drive a GO output, the controller is a no-op and the
-    device free-runs.
+    Lock-step is resolved via ``target.lifecycle.resolve_power_lockstep``
+    (which delegates to ``PowerConfig.lockstep_resolved``): an explicit
+    ``power.lockstep`` setting always wins, otherwise it is auto-enabled when
+    the board is wired for it and gated external capture is requested. Without
+    lock-step, or on drivers that cannot drive a GO output, the controller is
+    a no-op and the device free-runs -- which is exactly the state that lets
+    the measured window race the GPI poller (issue #114).
     """
     from ..power.sync import NullSyncController, SyncWiring
     from ..target.lifecycle import resolve_power_lockstep
@@ -430,6 +430,14 @@ def capture_power(
                 # during the measured window.
                 on_gate_rise=sync.release_go,
                 phase_getter=lambda: capture_phase["name"],
+                # Lock-step facts for the gate-failure classifier: with
+                # lock-step off on a board that IS wired for it, a missed gate
+                # is far more likely the free-running window racing the poller
+                # than a wiring fault (issue #114). ``sync.lockstep`` is the
+                # runtime truth -- a driver with no GO output degrades to the
+                # null controller even when the config resolved lock-step on.
+                lockstep=sync.lockstep,
+                lockstep_wiring_available=ctx.config.power.lockstep_wiring_available,
             )
             if prepare_error:
                 raise prepare_error[0]

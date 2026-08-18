@@ -216,35 +216,15 @@ def _default_power_reset_strategy(ctx: PipelineContext) -> ResetStrategy:
 def resolve_power_lockstep(ctx: PipelineContext) -> bool:
     """Resolve whether gated power capture should use 3-wire GPIO lock-step.
 
-    An explicit ``power.lockstep`` setting always wins. When left unset
-    (``None``), lock-step is recommended -- and auto-enabled -- exactly when
-    the board is wired for it (``state_gpio_pin``/``go_gpio_pin`` > 0) *and*
-    the SoC family's default power reset policy needs it to stay race-free
-    (see ``ResetCapabilities.requires_lockstep_for_gated_power``).
-
-    This closes the AP510 ``debug_reset+swpoi_reset``+RTT race: that combo
-    issues two sequential JLinkExe invocations (several seconds of extra
-    host-side wall time versus a single reset). Without lock-step, the
-    un-synchronized firmware gate window can rise -- and, on a slow host,
-    nearly finish -- before the Joulescope GPI poller starts watching, which
-    the diff-based edge segmenter then reports as "rose but did not fall"
-    even though the device completed a normal window. With lock-step, the
-    firmware parks in ``hpx_sync_wait_go()`` until the host has confirmed the
-    poller is armed and asserts GO, so reset latency can no longer race the
-    gated window regardless of how slow the chosen reset strategy is.
-
-    This is the one place both the firmware generator (which must bake
-    ``kSyncLockstep`` in at build time) and the host-side capture path (which
-    must arm/wait/signal accordingly) resolve the *same* answer -- callers
-    must not read ``config.power.lockstep`` directly.
+    Thin context-level accessor for :attr:`PowerConfig.lockstep_resolved`,
+    which owns the policy (explicit setting wins; otherwise auto-enable when
+    the board is wired for it and gated external capture is requested). Kept
+    as a named function because it is the import both the capture path and the
+    firmware render context already reach for, and because the decision used
+    to depend on ``ctx.soc``; the *policy* now lives in exactly one place, so
+    the two consumers cannot resolve different answers.
     """
-    configured = ctx.config.power.lockstep
-    if configured is not None:
-        return configured
-    if ctx.soc is None:
-        return False
-    wired = ctx.config.power.state_gpio_pin > 0 and ctx.config.power.go_gpio_pin > 0
-    return wired and ctx.soc.capabilities.reset.requires_lockstep_for_gated_power
+    return ctx.config.power.lockstep_resolved
 
 
 def _execute_reset_strategy(ctx: PipelineContext, strategy: ResetStrategy) -> ResetAction:

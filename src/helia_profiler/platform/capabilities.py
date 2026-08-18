@@ -42,23 +42,21 @@ class ResetCapabilities:
     Apollo3/Apollo4.  The value equals a
     :class:`helia_profiler.target.lifecycle.ResetStrategy` member.
 
-    ``requires_lockstep_for_gated_power`` flags families whose default reset
-    policy needs the 3-wire GPIO lock-step handshake for gated power capture
-    to be race-free.  ``debug_reset+swpoi_reset`` issues *two* sequential
-    JLinkExe invocations (several seconds of extra host-side wall time versus
-    a single reset); without lock-step, the un-synchronized firmware gate
-    window can rise -- and, on a slow host, nearly finish -- before the
-    Joulescope GPI poller starts watching, which the diff-based edge
-    segmenter then reports as "rose but did not fall" even though the device
-    completed a normal window (confirmed via AP510 combo+RTT hardware
-    investigation; see the ``t2-gate-race`` report).  ``True`` only means
-    "recommend lock-step when this board is wired for it"; it never
-    overrides an explicit ``power.lockstep`` setting.
+    There is deliberately no per-family "needs lock-step for gated power"
+    flag here.  There used to be (``requires_lockstep_for_gated_power``, set
+    for Apollo5 only, justified by ``debug_reset+swpoi_reset`` spending
+    several seconds in *two* sequential JLinkExe invocations).  The hazard it
+    described is not family-specific: without lock-step the firmware
+    free-runs its measured window straight out of reset, so *any* host-side
+    reset latency can race the gate.  Apollo4 Blue Plus reproduced the same
+    degradation on a single-invocation ``debug_reset`` (issue #114), so the
+    default now keys on the wiring and the capture mode instead -- see
+    :attr:`helia_profiler.config.PowerConfig.lockstep_resolved`, which is the
+    single place that policy lives.
     """
 
     default_power_reset_strategy: str
     supports_swpoi: bool
-    requires_lockstep_for_gated_power: bool = False
 
 
 @dataclass(frozen=True)
@@ -284,7 +282,6 @@ def build_soc_capabilities(soc: SocDef) -> SocCapabilities:
     reset = ResetCapabilities(
         default_power_reset_strategy=(_RESET_DEBUG_THEN_SWPOI if is_ap5 else _RESET_DEBUG),
         supports_swpoi=is_ap5,
-        requires_lockstep_for_gated_power=is_ap5,
     )
     transport = TransportCapabilities(
         requires_attached_probe_for_cycles=is_cortex_m4f,

@@ -469,18 +469,70 @@ def assess_run_window_clock(
     )
 
 
+#: ``no_gate_rise`` hint for a run that had lock-step OFF on a board wired for
+#: it. This exact combination has a specific, non-wiring cause that presents as
+#: a wiring fault and has cost real bench time (issue #114: headers re-seated
+#: on an Apollo4 Blue Plus before the policy flag was found). Without
+#: lock-step, ``kSyncLockstep`` bakes false, ``hpx_sync_wait_go()`` compiles to
+#: a no-op, and the target free-runs its measured window straight out of reset
+#: -- so the gate can rise, and on a multi-second window also fall, before the
+#: host's GPI poller is armed. The fix names itself, so it goes first; the
+#: wiring checks stay as the fallback because a genuinely dead gate wire looks
+#: identical from here.
+NO_GATE_RISE_LOCKSTEP_HINT = (
+    "This capture ran with power.lockstep disabled while the state/GO pins ARE "
+    "configured, which is the likeliest cause: with lock-step off the firmware "
+    "never waits for the host, so it can open AND close its measured window "
+    "before the Joulescope GPI poller is armed. Set power.lockstep: true — or "
+    "drop an explicit power.lockstep: false and let it auto-enable. If the gate "
+    "is still missed with lock-step on, then check GO/state/gate wiring, "
+    "confirm the firmware reached the power window wait state, and verify the "
+    "selected reset strategy relaunches the firmware before capture."
+)
+
+#: ``no_gate_rise`` hint when lock-step cannot be the explanation -- it was
+#: already on, or the board has no state/GO wires to run it over.
+NO_GATE_RISE_WIRING_HINT = (
+    "Check GO/state/gate wiring, confirm the firmware reached the power "
+    "window wait state, and verify the selected reset strategy relaunches "
+    "the firmware before capture."
+)
+
+
 def classify_gate_failure(
-    *, saw_gate_rise: bool, saw_gate_fall: bool = False, duration_s: float
+    *,
+    saw_gate_rise: bool,
+    saw_gate_fall: bool = False,
+    duration_s: float,
+    lockstep: bool | None = None,
+    lockstep_wiring_available: bool = False,
 ) -> GateFailure:
-    """Classify why a gated capture produced no complete high window."""
+    """Classify why a gated capture produced no complete high window.
+
+    ``lockstep`` is the effective handshake state for this run and
+    ``lockstep_wiring_available`` whether the board carries the state/GO wires
+    at all (see :attr:`PowerConfig.lockstep_wiring_available`, the single
+    source of that predicate). Together they select which ``no_gate_rise``
+    hint applies. ``lockstep=None`` means the caller does not know, which
+    keeps the wiring-only hint.
+    """
     if not saw_gate_rise:
+        lockstep_is_the_suspect = lockstep is False and lockstep_wiring_available
         return GateFailure(
             kind=GateFailureKind.NO_GATE_RISE,
-            message="No GPIO gate rising edge detected during Joulescope gated capture",
+            message=(
+                "No GPIO gate rising edge detected during Joulescope gated capture"
+                + (
+                    " (lock-step is disabled but this board is wired for it — "
+                    "power.lockstep: true is the likely fix)"
+                    if lockstep_is_the_suspect
+                    else ""
+                )
+            ),
             hint=(
-                "Check GO/state/gate wiring, confirm the firmware reached the power "
-                "window wait state, and verify the selected reset strategy relaunches "
-                "the firmware before capture."
+                NO_GATE_RISE_LOCKSTEP_HINT
+                if lockstep_is_the_suspect
+                else NO_GATE_RISE_WIRING_HINT
             ),
         )
     if saw_gate_fall:
@@ -508,6 +560,8 @@ __all__ = [
     "EXTERNAL_WINDOW_CLOCK_TOLERANCE",
     "FROZEN_WINDOW_CLOCK_HINT",
     "INTERNAL_WINDOW_CLOCK_TOLERANCE",
+    "NO_GATE_RISE_LOCKSTEP_HINT",
+    "NO_GATE_RISE_WIRING_HINT",
     "WINDOW_CLOCK_CEILING_SLACK_S",
     "GateDurationIntegrity",
     "GateFailure",

@@ -271,26 +271,37 @@ armed and asserts GO, so reset latency and host scheduling jitter can never
 race the start of the gated window.
 
 - **Auto-enables** when both `state_gpio_pin` and `go_gpio_pin` are wired
-  (> 0) *and* the target SoC family's default power reset policy needs it to
-  stay race-free — currently true for all Apollo5-family SoCs (including
-  Apollo330P), because their default reset strategy chains two sequential
-  J-Link operations (`debug_reset+swpoi_reset`), leaving a window where an
-  unsynchronized gate can rise and fall before the host poller starts
-  watching.
+  (> 0) and the run is a gated **external** capture (`power.enabled: true`
+  with `power.mode: external`). It is *not* SoC-family dependent: without
+  lock-step the firmware free-runs its measured window straight out of
+  reset, so any host-side reset latency can race the gate on any board.
 - An **explicit** `true`/`false` always wins over the auto behavior.
 - Setting `lockstep: true` requires both `state_gpio_pin > 0` and
   `go_gpio_pin > 0` — heliaPROFILER raises a config error otherwise.
+- Internal (on-device monitor) mode never auto-enables it: the measurement
+  happens inside the firmware, so there is no host poller to race.
+
+!!! note "Changed in issue #114"
+    Auto-enable used to be Apollo5-only, justified by that family's
+    two-invocation `debug_reset+swpoi_reset`. Apollo4 Blue Plus reproduced
+    the same failure on a single-invocation `debug_reset`, so every wired
+    board now gets the handshake by default. If you have an Apollo3 or
+    Apollo4 config carrying an explicit `lockstep: true`, it is now
+    redundant — harmless to keep, safe to delete.
 
 ### Capture modes
 
 | Mode | Wiring | When to use |
 |---|---|---|
 | Gated capture | Gate only (`INPUT0`) | Initial board bring-up or a bench without state/GO wiring. The host can miss a short window after a slow reset. |
-| Lock-step capture **(preferred)** | Gate + state + GO (`INPUT0`, `INPUT1`, `OUTPUT0`) | Production measurements. Firmware waits at `READY`; the host arms the GPI poller and asserts GO before inference begins. |
+| Lock-step capture **(preferred, and now the default)** | Gate + state + GO (`INPUT0`, `INPUT1`, `OUTPUT0`) | Production measurements. Firmware waits at `READY`; the host arms the GPI poller and asserts GO before inference begins. |
 
-Apollo5-family boards auto-select lock-step when all three board GPIOs are
-configured. Set `power.lockstep: false` only while bringing up incomplete
-wiring; do not use it as the normal measurement mode.
+Every board wired for all three GPIOs auto-selects lock-step. Two registered
+boards are not wired for it — `apollo5b_evb` and `apollo330mP_evb` both ship
+`state_gpio_pin: 0` / `go_gpio_pin: 0` — so they stay on the gate-only path
+until you assign the two extra pins in config. Set `power.lockstep: false`
+only while bringing up incomplete wiring; do not use it as the normal
+measurement mode.
 
 ### Relay and passthrough behavior
 
@@ -881,7 +892,7 @@ comparison.
 | `io_voltage` | float | `1.8` | Joulescope GPI reference voltage — must match the board's I/O rail |
 | `sync_gpio_pin` | int | board default (`10` generic; `29` on `apollo510_evb`/`apollo510b_evb`) | Gate GPIO the firmware toggles around the clean window |
 | `sync_input_index` | int | `0` | Joulescope digital `INPUTn` wired to the sync GPIO |
-| `lockstep` | bool \| null | `null` (auto) | Force the 3-wire handshake on/off; `null` auto-enables per board/SoC (see [Lock-step](#lock-step-3-wire-handshake)) |
+| `lockstep` | bool \| null | `null` (auto) | Force the 3-wire handshake on/off; `null` auto-enables on any board wired for it doing a gated external capture (see [Lock-step](#lock-step-3-wire-handshake)) |
 | `state_gpio_pin` | int | board default (`0` generic; `36` on `apollo510_evb`/`apollo510b_evb`) | State/error GPIO (device → host); `0` disables the wire |
 | `go_gpio_pin` | int | board default (`0` generic; `14` on `apollo510_evb`/`apollo510b_evb`) | GO GPIO (host → device); `0` disables the wire |
 | `state_input_index` | int | `1` | Joulescope `INPUTn` wired to the state GPIO |
@@ -933,12 +944,27 @@ the JS320 bench.
     Another power source is also feeding the EVB. Disconnect target USB,
     debug USB power, or coin cell during the capture window.
 
-??? failure "No GPIO gate rising/falling edge detected"
-    Check the sync GPIO wiring and `power.sync_gpio_pin` /
-    `power.sync_input_index` against the board's `INPUTn` mapping.
-    Confirm the firmware reached the power window wait state, and — if
-    using a reset strategy that reflashes/resets twice — verify lock-step
-    is enabled so reset latency can't race the gate.
+??? failure "No GPIO gate rising edge detected (`no_gate_rise`)"
+    **Check `power.lockstep` before you check the wiring.** If lock-step is
+    disabled while `state_gpio_pin`/`go_gpio_pin` *are* configured, that is
+    the likeliest cause and heliaPROFILER now says so in the warning and in
+    the run's `gate_failure` metadata: with lock-step off the firmware never
+    waits for the host, so it can open **and close** its measured window
+    before the Joulescope GPI poller is armed. The run comes back
+    `integrity: degraded (no_gate_rise)` and looks exactly like a dead gate
+    wire. Set `power.lockstep: true`, or drop an explicit
+    `power.lockstep: false` and let it auto-enable.
+
+    Only if the gate is still missed with lock-step on: check the sync GPIO
+    wiring and `power.sync_gpio_pin` / `power.sync_input_index` against the
+    board's `INPUTn` mapping, and confirm the firmware reached the power
+    window wait state.
+
+??? failure "GPIO gate rose but did not fall (`no_gate_fall`)"
+    The firmware entered the measured window but did not close it before the
+    safety bound. Increase `power.duration_s`, or check for a firmware hang
+    inside the clean window. This one is *not* a lock-step problem — the gate
+    was observed rising, so the poller was armed in time.
 
 ??? failure "Wrong `io_voltage` or wrong input index"
     A GPI configured for the wrong voltage threshold, or wired to the wrong

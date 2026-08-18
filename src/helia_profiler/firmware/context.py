@@ -249,7 +249,7 @@ class FirmwareRenderContext:
         arena_region = ctx.arena_region or Placement.TCM
         weights_region = ctx.weights_region or Placement.MRAM
         aot_arena_regions = tuple(arena_regions or ())
-        power_sync_enabled = config.power.enabled and config.power.mode == "external"
+        power_sync_enabled = config.power.gated_external_capture
         profiling_backends = tuple(soc.profiling_backends)
         clock = ctx.run_metadata.platform
         assert clock is not None

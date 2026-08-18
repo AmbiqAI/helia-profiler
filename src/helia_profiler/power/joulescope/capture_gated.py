@@ -62,11 +62,15 @@ def _degraded_observation_result(
     saw_gate_fall: bool,
     short_pulses_ignored: int,
     gating_diagnostics: dict[str, Any] | None = None,
+    lockstep: bool | None = None,
+    lockstep_wiring_available: bool = False,
 ) -> PowerResult:
     failure = classify_gate_failure(
         saw_gate_rise=saw_gate_rise,
         saw_gate_fall=saw_gate_fall,
         duration_s=duration_s,
+        lockstep=lockstep,
+        lockstep_wiring_available=lockstep_wiring_available,
     )
     whole_summary = _whole_summary_from_stats(packets)
     return PowerResult(
@@ -115,6 +119,8 @@ def capture_gated(
     on_started: Callable[..., None] | None = None,
     on_gate_rise: Callable[[], None] | None = None,
     phase_getter: Callable[[], str] | None = None,
+    lockstep: bool | None = None,
+    lockstep_wiring_available: bool = False,
     **kwargs: Any,
 ) -> PowerResult:
     """Capture GPIO-gated power using on-device-integrated host stats.
@@ -415,6 +421,8 @@ def capture_gated(
                 saw_gate_rise=saw_any_gate_rise,
                 saw_gate_fall=saw_any_gate_fall,
                 duration_s=duration_s,
+                lockstep=lockstep,
+                lockstep_wiring_available=lockstep_wiring_available,
             )
             if not packets:
                 raise PowerError(failure.message, hint=failure.hint)
@@ -434,11 +442,17 @@ def capture_gated(
                 saw_gate_fall=saw_any_gate_fall,
                 short_pulses_ignored=short_pulses_ignored,
                 gating_diagnostics=gating_diagnostics,
+                lockstep=lockstep,
+                lockstep_wiring_available=lockstep_wiring_available,
             )
+            # The hint is logged, not just stored in metadata: on the degraded
+            # path there is no PowerError to carry it, so the terminal warning
+            # is the only place the user is told what to change (issue #114).
             log.warning(
-                "%s; retaining %.3fs free-form capture for post-run diagnostics",
+                "%s; retaining %.3fs free-form capture for post-run diagnostics. %s",
                 failure.message,
                 result.summary.duration_s,
+                failure.hint,
             )
             return result
         if short_pulses_ignored:

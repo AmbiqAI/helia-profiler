@@ -421,7 +421,7 @@ def generate_app(ctx: PipelineContext) -> Path:
     artifacts = ctx.engine_artifacts
     weights_region = ctx.weights_region or Placement.MRAM
     arena_region = ctx.arena_region or Placement.TCM
-    power_sync_enabled = config.power.enabled and config.power.mode == "external"
+    power_sync_enabled = config.power.gated_external_capture
     # Dedicated power binary (hpx_profiler_power): rendered/built only when
     # power capture is actually requested AND the dedicated firmware mode is
     # selected, so non-power runs (and "shared"-mode power runs, which reuse

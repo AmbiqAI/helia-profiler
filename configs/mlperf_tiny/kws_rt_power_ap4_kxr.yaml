@@ -36,10 +36,13 @@ power:
   duration_s: 45
   io_voltage: 1.8
   firmware: dedicated
-  # Force the 3-wire GPIO lock-step handshake (state+go) instead of the
-  # gate-only free-run. lockstep currently auto-enables only on Apollo5
-  # (requires_lockstep_for_gated_power); forcing it here validates it on
-  # AP4 ahead of making it the cross-family default.
+  # The 3-wire GPIO lock-step handshake (state+go) instead of the gate-only
+  # free-run. As of issue #114 this is REDUNDANT -- lock-step auto-enables on
+  # every board wired for it (apollo4p_blue_kxr_evb: state=23, go=24) doing
+  # gated external capture, so a fresh config needs no lockstep line at all.
+  # It is kept here deliberately: this is a bench-qualified config whose
+  # numbers get cited, and pinning the handshake explicitly means a future
+  # change to the default cannot silently alter what it measures.
   lockstep: true
 
 output:
