@@ -289,6 +289,16 @@ race the start of the gated window.
     Apollo4 config carrying an explicit `lockstep: true`, it is now
     redundant — harmless to keep, safe to delete.
 
+    **This invalidates power comparison against older baselines, on purpose.**
+    A run recorded before this change had the target free-running its measured
+    window; a run after it is lock-stepped, and lock-step is a rail difference
+    — the state pin becomes an output, the GO pin's input buffer is enabled,
+    and the host holds GO high into it until gate rise. `hpx compare` therefore
+    reports `metric.power_power_lockstep_mismatch` and omits power deltas
+    between the two. Because `MissingMetricPolicy.FAIL` is the default, a
+    power-gated comparison against a stored pre-#114 baseline flips from pass
+    to fail. Re-record affected baselines rather than suppressing the check.
+
 ### Capture modes
 
 | Mode | Wiring | When to use |

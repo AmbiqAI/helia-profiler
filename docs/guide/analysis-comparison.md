@@ -54,7 +54,8 @@ reading a bundle. It then applies typed comparability rules:
 
 - invalid results or different model hashes block the comparison;
 - different layer topology suppresses only per-layer deltas;
-- incompatible power scope or integrity suppresses only power deltas;
+- incompatible power scope, mode, firmware, monitor presence, lock-step, or
+  integrity suppresses only power deltas;
 - engine, toolchain, board, clock, transport, and placement differences remain
   visible as experimental dimensions.
 

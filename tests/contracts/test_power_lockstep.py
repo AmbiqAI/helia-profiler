@@ -328,28 +328,59 @@ class TestLockstepDefaultsOnWhenWired:
         assert "static constexpr bool     kSyncLockstep     = true;" in rendered
         assert "static constexpr bool     kPowerSyncEnabled = true;" in rendered
 
-    def test_render_context_feeds_the_resolved_decision_to_the_template(self, tmp_path):
-        """The one wiring the test above does NOT cover.
+    # Three scenarios chosen so that power_sync_enabled and lockstep DISAGREE
+    # in at least one, and so that the expected answer is False in two. A
+    # single all-True fixture (the first version of this test) was shown by
+    # adversarial review to leave three realistic mutations of context.py
+    # completely green: reading `lockstep_wiring_available` instead of the
+    # resolved decision, hardcoding `True` in to_template_vars, and swapping
+    # the power_sync_enabled/lockstep arguments -- because in that one fixture
+    # all three sources happened to be True at once.
+    @pytest.mark.parametrize(
+        "scenario,extra,expect_sync,expect_lockstep",
+        [
+            ("wired external, auto", None, True, True),
+            (
+                "wired internal — wiring present but not a gated external capture",
+                {"power": {"mode": "internal", "driver": "ina228",
+                           "ina228": {"shunt_ohms": 0.1}}},
+                False,
+                False,
+            ),
+            (
+                "wired external, explicitly opted out",
+                {"power": {"lockstep": False}},
+                True,
+                False,
+            ),
+        ],
+    )
+    def test_render_context_feeds_the_resolved_decision_to_the_template(
+        self, tmp_path, scenario, extra, expect_sync, expect_lockstep
+    ):
+        """The hand-off that ``test_auto_enabled_lockstep...`` does NOT cover.
 
-        ``test_auto_enabled_lockstep_reaches_the_baked_firmware_constant``
-        calls ``resolve_power_lockstep`` itself and hands the result straight
-        to the template, so it re-implements the very hand-off it claims to
-        verify. Adversarial review proved the gap: replacing
-        ``FirmwareRenderContext``'s ``lockstep=resolve_power_lockstep(ctx)``
-        with a bare ``False`` -- or with ``bool(config.power.lockstep)``, the
-        plausible refactor slip that reads the raw tri-state field -- left the
-        entire suite green.
+        That test calls ``resolve_power_lockstep`` itself and hands the result
+        straight to the template, re-implementing the very hand-off it claims
+        to verify. Adversarial review proved the gap twice over: first that
+        replacing ``FirmwareRenderContext``'s
+        ``lockstep=resolve_power_lockstep(ctx)`` with a bare ``False`` left the
+        whole suite green, then that a single all-True fixture here still let
+        three further mutations through.
 
-        That divergence is #114 with the polarity reversed and is worse than
-        the bug this PR fixes: the host arms lock-step and holds GO low while
-        the binary free-runs, so the run blocks for the full ``power.duration_s``
-        and then dies with "Target did not signal READY", pointing the user at
-        wiring that is fine.
+        A divergence between host and baked constant is #114 with the polarity
+        reversed, and worse than the bug this PR fixes: the host arms lock-step
+        and holds GO low while the binary free-runs, so the run blocks for the
+        full ``power.duration_s`` and dies with "Target did not signal READY",
+        pointing the user at wiring that is fine.
 
-        So assert on the value the render context actually emits, taking the
-        same path ``firmware.generate_app`` takes.
+        So take the REAL context through the REAL template and read the emitted
+        C back -- which also covers the rendered ``false`` case, previously
+        pinned nowhere (the render snapshots hardcode both values to False and
+        their marker is a substring test that is true regardless).
         """
         from helia_profiler.engines.base import EngineArtifacts
+        from helia_profiler.firmware import _jinja_env
         from helia_profiler.firmware.context import FirmwareRenderContext
 
         ctx = make_pmu_ctx(
@@ -358,18 +389,27 @@ class TestLockstepDefaultsOnWhenWired:
             transport="rtt",
             power_enabled=True,
             lockstep=None,
+            extra=extra,
         )
         # from_pipeline_context asserts the engine stage has run; nothing about
-        # the lock-step hand-off depends on which engine, so the default TFLM
-        # artifacts are enough to reach to_template_vars().
+        # the lock-step hand-off depends on which engine.
         ctx.engine_artifacts = EngineArtifacts()
 
         template_vars = FirmwareRenderContext.from_pipeline_context(ctx).to_template_vars()
 
-        assert template_vars["lockstep"] == resolve_power_lockstep(ctx)
-        # Pin the value too, so a future change that makes BOTH sides wrong
-        # in the same direction still fails here.
-        assert template_vars["lockstep"] is True
+        assert template_vars["lockstep"] == resolve_power_lockstep(ctx), scenario
+        assert template_vars["lockstep"] is expect_lockstep, scenario
+        assert template_vars["power_sync_enabled"] is expect_sync, scenario
+
+        rendered = _jinja_env.get_template("_gpio_sync.j2").render(**template_vars)
+        assert (
+            f"static constexpr bool     kSyncLockstep     = "
+            f"{str(expect_lockstep).lower()};"
+        ) in rendered, scenario
+        assert (
+            f"static constexpr bool     kPowerSyncEnabled = "
+            f"{str(expect_sync).lower()};"
+        ) in rendered, scenario
 
 
 class TestAutoStrategyNeverCyclesRail:

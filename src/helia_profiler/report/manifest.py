@@ -206,14 +206,17 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
                 # therefore not power-comparable even when every other
                 # dimension matches.
                 "power_monitor": "ina228" if ctx.config.power.monitor_selected else "none",
-                # Lock-step is a measured-rail change, not just a handshake:
-                # it drives the state pin as an output and enables the GO pin's
-                # input buffer, and the host holds GO high into that input from
-                # signal_go() until gate rise. Same argument as power_monitor
-                # above, so it gets the same treatment -- otherwise flipping
-                # the default (#114) silently makes every pre-existing baseline
-                # incomparable while still reporting integrity: valid.
-                "power_lockstep": ctx.config.power.lockstep_resolved,
+                # NOTE: power_lockstep is deliberately NOT recorded here.
+                # It IS a measured-rail difference -- the state pin becomes
+                # an output, the GO pin's input buffer is enabled, and the
+                # host holds GO high into it until gate rise -- so it belongs
+                # in the comparability set. But only as the RUNTIME value,
+                # which lives in summary.power.sync.lockstep. Config intent
+                # answers the wrong question (a driver with no GO output
+                # degrades to the null controller even when config resolved
+                # lock-step on), and because the manifest is merged LAST it
+                # would silently overwrite the runtime value. See
+                # evaluation/comparability.py.
             }
         )
     return dimensions
