@@ -886,6 +886,23 @@ exceeds `host_envelope_s + slack_s`, so `slack_s` is part of the bound rather
 than a separate note. (The field is absent only if the deployment timestamp
 the envelope is measured from could not be read, which no shipped flow does.)
 
+The *profile* binary's clean window has its own clock problem, and its own
+code:
+
+- **`profile.clean_window_stalled`** — a warning: one or more clean-window
+  iterations reported exactly zero core cycles. An inference cannot take zero
+  cycles, so this means `DWT->CYCCNT` stopped mid-window. On the Cortex-M4F
+  families (Apollo3/3P, Apollo4/4P/4L) DWT only advances while a debugger
+  asserts `CDBGPWRUPREQ`, and nothing does between the J-Link reset
+  subprocess exiting and the host attach completing. The window then reads
+  **short** by the stalled fraction — 21% low on the Apollo4 Blue Plus KBR
+  runs that found this — which makes `clean_infer_avg_us`, the latency
+  reported from it, and any power window sized from it all short by the same
+  factor. The issue context carries `stalled_iters`, `total_iters` and
+  `understatement`. RTT builds avoid the exposure entirely by waiting for the
+  host to drain the RTT up-buffer before opening the window; the detector is
+  what covers the transports that have no such signal.
+
 `detailed/power_summary.csv` (with `output.detailed: true`) breaks all of
 this down per gated window, plus a `whole_capture_window` reference row for
 comparison.

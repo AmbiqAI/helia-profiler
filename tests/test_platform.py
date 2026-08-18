@@ -164,6 +164,50 @@ def test_list_socs_returns_all():
     assert "apollo330P" in names
 
 
+def test_clean_window_needs_probe_attach_tracks_both_conjuncts():
+    """``SocCapabilities.clean_window_needs_probe_attach`` is the single source
+    for "this window's clock stops when the probe goes away" (#121).
+
+    Written as the implication rather than an enumeration of today's families,
+    so it keeps meaning if a new SoC lands in either half. Both conjuncts must
+    stay load-bearing: a STIMER-timed window is indifferent to the probe even
+    on a Cortex-M4F part, and a DWT family that held the debug domain up
+    unaided would need no wait either.
+    """
+    checked = 0
+    for soc in list_socs():
+        caps = soc.capabilities
+        expected = (
+            caps.clock.clean_window_timer == "dwt"
+            and caps.transport.requires_attached_probe_for_cycles
+        )
+        assert caps.clean_window_needs_probe_attach is expected, soc.name
+        if expected:
+            checked += 1
+        if caps.clock.clean_window_timer == "stimer":
+            assert not caps.clean_window_needs_probe_attach, soc.name
+    assert checked, (
+        "no registered SoC times its clean window with a probe-dependent "
+        "counter — this test lost its subject"
+    )
+
+
+def test_cortex_m4f_profile_windows_need_the_probe_attached():
+    """The Cortex-M4F families are the concrete subject of #121.
+
+    Apollo3/3P and Apollo4/4P/4L keep DWT for the profile binary precisely
+    because a debugger holds the debug domain up for them; Apollo5 does not
+    use DWT there at all. Pinned per family so a capability refactor that
+    quietly flips a family shows up here and not on a bench.
+    """
+    for soc in list_socs():
+        needs = soc.capabilities.clean_window_needs_probe_attach
+        if soc.family in (SocFamily.AP3, SocFamily.AP4):
+            assert needs, soc.name
+        else:
+            assert not needs, soc.name
+
+
 def test_all_ap5_socs_have_full_pmu():
     for soc in list_socs():
         if soc.family is SocFamily.AP5:

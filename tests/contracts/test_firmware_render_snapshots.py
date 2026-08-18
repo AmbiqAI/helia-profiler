@@ -71,6 +71,15 @@ _MARKERS: dict[str, str] = {
     # tell #112's fixed and unfixed busy_loop renders apart). clean_stimer_t0
     # exists only where the window is actually bracketed by STIMER.
     "stimer_window": "clean_stimer_t0",
+    # Whether the clean window holds until the host debug probe has attached
+    # (#121), whether it self-checks for a stalled cycle counter, and whether
+    # it calibrates that counter against an independent clock first. Semantic,
+    # not cosmetic: without markers, losing any of them would show up only as a
+    # sha256 change -- which is how the DWT->STIMER switch nearly slipped past
+    # the reviewable layer of this snapshot.
+    "clean_window_attach_wait": "HPX_CLEAN_WINDOW_ATTACH_WAIT_MS",
+    "clean_window_stall_check": "HPX_CLEAN_STALLED_ITERS",
+    "clean_window_rate_probe": "HPX_CLEAN_DWT_RATE_CYC",
 }
 
 
@@ -119,6 +128,9 @@ def _common_kwargs(soc_name: str, transport: str) -> dict:
         "ssram_full_power_enum": soc.ssram_full_power_enum,
         "clean_window_timer": soc.capabilities.clock.clean_window_timer,
         "power_window_timer": soc.capabilities.power_window_timer,
+        # Sourced from the capability exactly as FirmwareRenderContext does, so
+        # the snapshot exercises the real per-SoC value rather than a default.
+        "clean_window_needs_probe_attach": soc.capabilities.clean_window_needs_probe_attach,
         "gate_debug_domain_in_window": soc.capabilities.clock.gate_debug_domain_in_window,
         "broad_peripheral_shutdown": soc.capabilities.clock.broad_peripheral_shutdown,
         "crypto_otp_shutdown": soc.capabilities.clock.crypto_otp_shutdown,
@@ -829,6 +841,136 @@ def test_busy_loop_terminal_report_requests_one_unit_not_the_inference_count():
             "planned inference count"
         )
     assert checked, "busy_loop power matrix is empty"
+
+
+def _clean_window_region(code: str) -> str:
+    """Code between the clean-window scope opening and the window closing.
+
+    Anchored on statements present in BOTH the fixed and unfixed renders
+    (``g_profiler...= false`` / ``hpx_sync_window_end();``) so slicing does not
+    depend on the change under test -- the failure mode #120 documented, where
+    a slice keyed on new spelling silently matched nothing.
+
+    The opener is searched BACKWARDS from ``hpx_sync_window_begin();``: the AOT
+    template's ``g_profiler_enabled = false;`` also appears as a file-scope
+    initializer hundreds of lines earlier, and anchoring on that would silently
+    widen the region to most of the file (and swallow unrelated DWT reads).
+    """
+    gate = code.index("hpx_sync_window_begin();")
+    starts = [
+        found
+        for opener in ("g_profiler.SetEnabled(false);", "g_profiler_enabled = false;")
+        if (found := code.rfind(opener, 0, gate)) != -1
+    ]
+    assert starts, "clean-window scope opener not found before the window gate"
+    end = code.index("hpx_sync_window_end();", gate)
+    return code[max(starts) : end]
+
+
+def test_dwt_timed_clean_window_waits_for_the_host_attach():
+    """A DWT-timed clean window must not open before the host probe attaches.
+
+    On the Cortex-M4F families DWT->CYCCNT only advances while a debugger
+    asserts CDBGPWRUPREQ, and the host does not hold the probe continuously:
+    the J-Link reset is a separate JLinkExe subprocess, and nothing holds the
+    debug domain up between that process exiting and the pylink attach
+    completing. Per-iteration deltas taken across that gap read exactly zero,
+    so the window comes back SHORT -- 21% low on two of five Apollo4 Blue Plus
+    KBR runs in #121, while the later profiled loop (host fully attached) held
+    at 875-876 us in all five.
+
+    The fix is sequencing: wait for the RTT up-buffer to drain, which the host
+    can only do with the DAP alive, before touching the counter. This pins that
+    the drain precedes the FIRST DWT read of the window -- covering the
+    adaptive sizing warmup as well as the measured loop -- and that it is
+    scoped to renders that actually need it, so no STIMER-timed or
+    probe-independent build inherits a pointless wait.
+    """
+    import re
+
+    def _code_only(src: str) -> str:
+        return "\n".join(re.sub(r"//.*$", "", line) for line in src.splitlines())
+
+    waited = 0
+    for soc, transport, engine in _all_combos():
+        caps = get_soc(soc).capabilities
+        rendered = _render(soc, transport, engine)
+        region = _clean_window_region(_code_only(rendered))
+        needs_wait = caps.clean_window_needs_probe_attach and transport == "rtt"
+        if not needs_wait:
+            assert "HPX_CLEAN_WINDOW_ATTACH_WAIT_MS" not in rendered, (
+                f"{soc}|{transport}|{engine}: waits for a probe attach it does "
+                "not depend on (window timer "
+                f"{caps.clock.clean_window_timer!r}, transport {transport!r})"
+            )
+            continue
+        waited += 1
+        drain = region.find("hpx_rtt_drain(HPX_CLEAN_WINDOW_ATTACH_WAIT_MS);")
+        assert drain != -1, (
+            f"{soc}|{transport}|{engine}: DWT-timed clean window opens without "
+            "waiting for the host attach that keeps DWT running"
+        )
+        first_dwt = region.find("DWT->CYCCNT")
+        assert first_dwt != -1, (
+            f"{soc}|{transport}|{engine}: expected a DWT-timed window here; "
+            "the render no longer reads DWT->CYCCNT at all, so this test has "
+            "lost its subject"
+        )
+        assert drain < first_dwt, (
+            f"{soc}|{transport}|{engine}: the clean window reads DWT->CYCCNT "
+            "before waiting for the host attach, so the reads can still land "
+            "in the probe-absence gap"
+        )
+
+    assert waited, (
+        "no render has a probe-dependent DWT-timed clean window — this test "
+        "lost its subject, so it is no longer pinning anything"
+    )
+
+
+def test_dwt_timed_clean_window_counts_stalled_iterations():
+    """Every per-iteration DWT-timed clean window must report zero-cycle
+    iterations, on every transport.
+
+    The attach wait above needs an observable host-attach signal and so only
+    covers RTT; SWO happens to be covered by its ~800 ms sync preamble, and
+    UART/USB are covered by nothing. This detector is the part that applies
+    everywhere: DWT does not run slow when the debug domain drops, it STOPS, so
+    an iteration wholly inside a stall reads a delta of exactly zero -- and an
+    inference cannot take zero core cycles. Counting those turns a future
+    regression into ``profile.clean_window_stalled`` instead of a plausible
+    average.
+
+    Pinned inside the measured window slice, so moving the counter outside the
+    loop (where it could never observe a stall) fails here.
+    """
+    import re
+
+    def _code_only(src: str) -> str:
+        return "\n".join(re.sub(r"//.*$", "", line) for line in src.splitlines())
+
+    checked = 0
+    for soc, transport, engine in _all_combos():
+        if get_soc(soc).capabilities.clock.clean_window_timer != "dwt":
+            continue
+        checked += 1
+        rendered = _render(soc, transport, engine)
+        code = _code_only(rendered)
+        begin = code.index("hpx_sync_window_begin();")
+        window = code[begin : code.index("hpx_sync_window_end();", begin)]
+        assert "clean_stalled_iters++" in window, (
+            f"{soc}|{transport}|{engine}: the DWT-timed clean loop does not "
+            "detect a stalled cycle counter"
+        )
+        assert "HPX_CLEAN_STALLED_ITERS" in rendered, (
+            f"{soc}|{transport}|{engine}: stalled iterations are counted but "
+            "never reported, so the host cannot act on them"
+        )
+
+    assert checked, (
+        "no render times its clean window with DWT — this test lost its "
+        "subject, so it is no longer pinning anything"
+    )
 
 
 def test_hal_umbrella_header_is_included_at_most_once():

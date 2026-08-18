@@ -279,6 +279,86 @@ def expected_terminal_requested_count(
     return inference_count
 
 
+# ---------------------------------------------------------------------------
+# Profile clean-window clock integrity
+# ---------------------------------------------------------------------------
+#
+# The two checks above police the *power* binary's window clock. This one
+# polices the clock that measures the PROFILE binary's clean window -- the
+# number published as clean_infer_avg_us, which is also the reference the power
+# plan sizes its window from (stages/plan_power.py). It is a different failure
+# with a different signature, which is why it is a different check:
+#
+#   * frozen power clock: elapsed_us == 0, or off by a large factor. Loud.
+#   * stalled profile clock: the window loses a *sub-interval*, so the average
+#     comes back some percentage low. It is never zero, never inverted, and
+#     lands squarely inside every plausible range -- 21% low on the Apollo4
+#     runs in #121, against a 3.9% legitimate build-to-build spread. Nothing
+#     downstream could tell.
+#
+# Detection does not need a reference measurement, because the firmware reports
+# the fault directly: DWT->CYCCNT does not slow down when the debug domain
+# drops, it STOPS, so every iteration wholly inside the stall reads a delta of
+# exactly zero. The firmware counts those (HPX_CLEAN_STALLED_ITERS) and the
+# host turns a non-zero count into a validity issue -- the same
+# firmware-reports/host-judges split as firmware_window_clock_is_frozen().
+
+
+@dataclass(frozen=True)
+class CleanWindowStall:
+    """Zero-cycle iterations observed inside the profile clean window."""
+
+    stalled_iters: int
+    total_iters: int
+
+    @property
+    def stalled_fraction(self) -> float:
+        return self.stalled_iters / self.total_iters if self.total_iters > 0 else 0.0
+
+    @property
+    def understatement(self) -> float:
+        """How far ``clean_infer_avg_us`` is below the true per-inference time.
+
+        The reported average is ``sum(deltas) / total``, and the stalled
+        iterations contributed 0 to that sum while really taking about as long
+        as the rest. So the true average is ``sum / (total - stalled)`` and the
+        reported one is low by exactly ``stalled / total``. Expressed as a
+        fraction of the true value, so 0.21 means "reads 21% low" -- directly
+        comparable to the 21% measured in #121.
+        """
+        return self.stalled_fraction
+
+    def to_metadata(self) -> dict[str, float | int]:
+        return {
+            "stalled_iters": self.stalled_iters,
+            "total_iters": self.total_iters,
+            "stalled_fraction": round(self.stalled_fraction, 6),
+            "understatement": round(self.understatement, 6),
+        }
+
+
+def assess_clean_window_stall(
+    *, stalled_iters: int | None, clean_infer_count: int | None
+) -> CleanWindowStall | None:
+    """Report a stalled profile clean window, or ``None`` when there is none.
+
+    ``None`` covers both "nothing to say" cases and they are deliberately not
+    distinguished here: the firmware did not report a count (a window that is
+    not DWT-timed per iteration, or firmware predating the check), or it
+    reported zero, which is the healthy answer. Callers treat ``None`` as no
+    issue; a returned object always describes a real fault, since an inference
+    cannot take zero core cycles.
+    """
+    if not stalled_iters or stalled_iters <= 0:
+        return None
+    if not clean_infer_count or clean_infer_count <= 0:
+        return None
+    return CleanWindowStall(
+        stalled_iters=int(stalled_iters),
+        total_iters=int(clean_infer_count),
+    )
+
+
 @dataclass(frozen=True)
 class WindowClockAgreement:
     """Agreement between the firmware's own window clock and a reference."""
@@ -605,6 +685,7 @@ __all__ = [
     "NO_GATE_RISE_LOCKSTEP_HINT",
     "NO_GATE_RISE_WIRING_HINT",
     "WINDOW_CLOCK_CEILING_SLACK_S",
+    "CleanWindowStall",
     "GateDurationIntegrity",
     "GateFailure",
     "GateFailureKind",
@@ -612,6 +693,7 @@ __all__ = [
     "SyncHandshakeMetadata",
     "WindowClockAgreement",
     "WindowClockCeiling",
+    "assess_clean_window_stall",
     "assess_gate_duration",
     "assess_run_window_clock",
     "assess_window_clock",

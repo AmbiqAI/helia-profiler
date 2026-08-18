@@ -236,6 +236,50 @@ class SocCapabilities:
             return "stimer"
         return "dwt"
 
+    @property
+    def clean_window_needs_probe_attach(self) -> bool:
+        """Whether the *profile* binary must see the host attach before it may
+        open its clean window.
+
+        The sibling :attr:`power_window_timer` asks "can the dedicated power
+        binary read DWT at all"; this asks the narrower question the
+        transport-attached profile binary faces: *when* is DWT readable.  It
+        keeps DWT (finer resolution, no XTAL dependency) precisely because a
+        debugger holds the CoreSight debug domain up for it -- but the host
+        does not hold that probe continuously across a run.  The J-Link reset
+        is a separate ``JLinkExe`` subprocess; once it exits nothing asserts
+        ``CDBGPWRUPREQ`` until the pylink attach completes, and for that span
+        ``DWT->CYCCNT`` simply stops advancing.  Any per-iteration delta taken
+        across it silently loses exactly that span, so the window reads SHORT
+        -- never long, and never zero, which is why it looks plausible.
+
+        Measured on Apollo4 Blue Plus KBR (#121): two of five otherwise
+        identical runs lost ~204 ms of a ~950 ms window, 21% low, while the
+        later profiled loop -- which runs with the host fully attached -- held
+        at 875-876 us in all five.  Across 7 runs the missing cycles regress on
+        that run's own ``sbl_settle + attach + api_probe`` host phases at
+        r = 0.996, slope 1.04.  Runs whose firmware happened to burn >= 500 ms
+        before the window lost 0-1 ms: the exposure is a race against boot, not
+        a constant.
+
+        True exactly when the window is DWT-timed AND DWT depends on an
+        attached probe.  Both conjuncts are load-bearing: Apollo5 times the
+        window with STIMER (its own XTAL, indifferent to the probe), and a
+        hypothetical DWT family that kept the domain up unaided would need no
+        wait either.
+
+        This is the predicate only.  Whether a given build can *act* on it
+        depends on the transport having an observable host-attach signal --
+        RTT's up-buffer drain, see ``_clean_window_attach_wait.j2``.  Builds
+        that cannot wait still carry the ``HPX_CLEAN_STALLED_ITERS`` detector,
+        so an unfixed stall surfaces as a validity issue instead of a
+        plausible-looking number.
+        """
+        return (
+            self.clock.clean_window_timer == "dwt"
+            and self.transport.requires_attached_probe_for_cycles
+        )
+
 
 @dataclass(frozen=True)
 class PowerCaptureCapabilities:

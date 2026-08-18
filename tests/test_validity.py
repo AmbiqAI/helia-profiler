@@ -481,3 +481,82 @@ def test_duration_fallback_matches_summary_policy(tmp_path: Path):
 
     assert evaluation.validity is ResultValidity.DEGRADED
     assert any(issue.code == "power.gate_duration_mismatch" for issue in evaluation.issues)
+
+
+class TestCleanWindowStall:
+    """``profile.clean_window_stalled`` — the #121 detector's host half.
+
+    The profile binary's clean window is DWT-timed on the Cortex-M4F families,
+    and DWT stops whenever no debugger holds the core debug power domain up.
+    Iterations wholly inside such a stall accumulate a delta of exactly zero,
+    so ``clean_infer_avg_us`` comes back low by the stalled fraction -- 21% on
+    the Apollo4 runs in #121, against a 3.9% legitimate build-to-build spread.
+    Nothing else in the result looks wrong, which is precisely why the firmware
+    counts the stalls and this turns the count into an issue.
+    """
+
+    def _profile_only(
+        self, tmp_path: Path, *, stalled: int | None, count: int | None = 1092
+    ) -> PipelineContext:
+        """A profile-phase-only run, so validity reflects this issue alone.
+
+        The shared fixture carries a gated power run whose own duration checks
+        would otherwise fire on these clean-window numbers and mask what is
+        being asserted.
+        """
+        ctx = _context(tmp_path)
+        ctx.power_run = None
+        ctx.power_result = None
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(
+                clean_infer_count=count,
+                clean_infer_avg_us=684,
+                clean_stalled_iters=stalled,
+            ),
+            layers=[],
+        )
+        return ctx
+
+    def test_stalled_clean_window_is_reported(self, tmp_path: Path):
+        ctx = self._profile_only(tmp_path, stalled=233)
+
+        evaluation = evaluate_run(ctx)
+
+        stalls = [
+            issue
+            for issue in evaluation.issues
+            if issue.code == "profile.clean_window_stalled"
+        ]
+        assert len(stalls) == 1
+        assert stalls[0].severity == "warning"
+        assert stalls[0].context["stalled_iters"] == 233
+        assert stalls[0].context["total_iters"] == 1092
+        # ~21% low, matching the measured Apollo4 shortfall.
+        assert 0.20 < stalls[0].context["understatement"] < 0.22
+        assert evaluation.validity is ResultValidity.DEGRADED
+
+    def test_issue_fires_only_when_the_firmware_reports_a_stall(
+        self, tmp_path: Path
+    ):
+        """Present when stalled, absent when not -- asserted together.
+
+        The negative rows are deliberately not their own tests: an
+        "issue absent" assertion also passes against a build with no detector
+        at all, so on its own it would guard nothing. Paired with the positive
+        row it both fails against the unfixed code and pins that the check
+        cannot over-fire on a healthy run or on firmware that never reports.
+        """
+        cases = {
+            233: True,  # stalled
+            0: False,  # checked, healthy
+            None: False,  # not reported -- unknown, not an issue
+        }
+        for stalled, expected in cases.items():
+            evaluation = evaluate_run(self._profile_only(tmp_path, stalled=stalled))
+            raised = any(
+                issue.code == "profile.clean_window_stalled"
+                for issue in evaluation.issues
+            )
+            assert raised is expected, f"clean_stalled_iters={stalled!r}"
+            if not expected:
+                assert evaluation.validity is ResultValidity.VALID, stalled

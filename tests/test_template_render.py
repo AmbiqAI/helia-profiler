@@ -833,13 +833,14 @@ class TestMainAotCcRender:
         tflm_out = _render_tflm(transport="rtt", has_armv8m_pmu=True)
         aot_out = _render_aot(transport="rtt", has_armv8m_pmu=True)
 
-        assert 'uint32_t t0 = DWT->CYCCNT;' in tflm_out
-        assert 'clean_cycles += (uint32_t)(DWT->CYCCNT - t0);' in tflm_out
-        assert 'am_hal_debug_disable();' not in tflm_out
-
-        assert 'uint32_t t0 = DWT->CYCCNT;' in aot_out
-        assert 'clean_cycles += (uint32_t)(DWT->CYCCNT - t0);' in aot_out
-        assert 'am_hal_debug_disable();' not in aot_out
+        # The per-iteration delta is bound to a name before it is accumulated
+        # so the loop can also test it for the zero that marks a stalled cycle
+        # counter (#121); the DWT-timed accumulation itself is unchanged.
+        for out in (tflm_out, aot_out):
+            assert 'uint32_t t0 = DWT->CYCCNT;' in out
+            assert 'const uint32_t clean_iter_cyc = (uint32_t)(DWT->CYCCNT - t0);' in out
+            assert 'clean_cycles += clean_iter_cyc;' in out
+            assert 'am_hal_debug_disable();' not in out
 
     def test_dwt_only_aot_render_avoids_armv8m_pmu_api(self):
         out = _render_aot(transport="rtt", has_armv8m_pmu=False)

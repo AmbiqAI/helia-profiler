@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from ..power.diagnostics import (
+    assess_clean_window_stall,
     assess_gate_duration,
     assess_run_window_clock,
     expected_terminal_requested_count,
@@ -39,6 +40,29 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 "One or more PMU counters overflowed.",
             )
         )
+
+    if ctx.pmu_result is not None:
+        # The profile binary's clean window is DWT-timed on the Cortex-M4F
+        # families, and DWT stops whenever no debugger holds the core debug
+        # power domain up -- which is exactly what happens between the J-Link
+        # reset subprocess exiting and the host attach completing (#121). The
+        # firmware counts the iterations that lost their whole delta to such a
+        # stall; a non-zero count means clean_infer_avg_us is short, and short
+        # by a plausible-looking amount rather than an obviously broken one.
+        stall = assess_clean_window_stall(
+            stalled_iters=ctx.pmu_result.meta.clean_stalled_iters,
+            clean_infer_count=ctx.pmu_result.meta.clean_infer_count,
+        )
+        if stall is not None:
+            issues.append(
+                _warning(
+                    "profile.clean_window_stalled",
+                    "The clean-inference window's cycle counter stalled: "
+                    "clean_infer_avg_us understates the true per-inference "
+                    "time, and any power window sized from it is short.",
+                    **stall.to_metadata(),
+                )
+            )
 
     power_run = ctx.power_run
     if power_run is not None:

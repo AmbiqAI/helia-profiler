@@ -2157,6 +2157,66 @@ class TestPowerFirmwareSelection:
         assert plan.target_duration_ms == 5000
         assert plan.count_source == "profile_guided"
 
+    def test_power_plan_flags_a_stalled_profile_reference(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ):
+        """A stalled clean window contaminates the window sizing too (#121).
+
+        ``clean_infer_avg_us`` reads low by the stalled fraction, so the
+        derived N -- and every ``active_window_estimated_*`` scaled by it --
+        comes out short by the same factor. The count is deliberately still
+        derived (dropping to ``firmware_auto`` would make
+        ``BuildPowerFirmwareStage`` skip the fixed-N build and change what runs
+        on the bench), so the contamination has to be stated rather than
+        silently absorbed.
+        """
+        import logging
+
+        from helia_profiler.stages.plan_power import plan_power_run
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(
+                clean_infer_avg_us=2226,
+                clean_infer_count=1092,
+                clean_stalled_iters=233,
+            ),
+            layers=[],
+        )
+
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            plan = plan_power_run(ctx)
+
+        assert plan.count_source == "profile_guided"
+        warnings = [
+            record.getMessage()
+            for record in caplog.records
+            if record.levelno >= logging.WARNING
+        ]
+        assert any("stalled clean-window reference" in message for message in warnings), (
+            f"power plan sized from a stalled reference without saying so: {warnings}"
+        )
+
+        # The healthy case is asserted here rather than as its own test: a lone
+        # "no warning" assertion also passes against a build that never checks,
+        # so on its own it would guard nothing.
+        caplog.clear()
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(
+                clean_infer_avg_us=2226,
+                clean_infer_count=1092,
+                clean_stalled_iters=0,
+            ),
+            layers=[],
+        )
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            plan_power_run(ctx)
+        assert not any(
+            "stalled clean-window reference" in record.getMessage()
+            for record in caplog.records
+        )
+
     def test_power_build_replaces_stale_output_and_publishes_artifact(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):

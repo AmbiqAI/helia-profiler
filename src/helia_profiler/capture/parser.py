@@ -181,6 +181,7 @@ def parse_firmware_output(
         clean_infer_total_cycles=meta_kv.get("clean_infer_total_cycles"),
         clean_infer_avg_cycles=meta_kv.get("clean_infer_avg_cycles"),
         clean_infer_avg_us=meta_kv.get("clean_infer_avg_us"),
+        clean_stalled_iters=meta_kv.get("clean_stalled_iters"),
         psram=psram,
         presets=preset_names,
     )

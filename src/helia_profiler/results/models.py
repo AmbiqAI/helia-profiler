@@ -108,6 +108,15 @@ class FirmwareMeta:
     clean_infer_total_cycles: int | None = None
     clean_infer_avg_cycles: int | None = None
     clean_infer_avg_us: int | None = None
+    #: Clean-window iterations whose DWT delta came back as exactly zero
+    #: (``HPX_CLEAN_STALLED_ITERS``).  An inference cannot take zero core
+    #: cycles, so any non-zero value means the cycle counter stopped mid-window
+    #: and the timing above is short by those iterations — see
+    #: ``power.diagnostics.assess_clean_window_stall``.  ``None`` means the
+    #: firmware did not report it: either a build whose window is not DWT-timed
+    #: per-iteration (Apollo5 / STIMER, or the busy_loop probe), or firmware
+    #: predating the check.  Absence is "unknown", never "healthy".
+    clean_stalled_iters: int | None = None
     psram: PsramInfo | None = None
     presets: tuple[str, ...] = ()
 

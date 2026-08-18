@@ -702,6 +702,9 @@ int main(void) {
     // power sync is disabled, hpx_sync_window_begin/end compile to no-ops.
     {
         g_profiler_enabled = false;
+{% if clean_window_needs_probe_attach | default(false) and transport == "rtt" and not power_only | default(false) -%}
+{% include "_clean_window_attach_wait.j2" %}
+{%- endif -%}
 {% if window_mode | default("fixed") == "auto" %}
         // Adaptive clean-window sizing.  Warm caches / branch predictor / MRAM
         // prefetch (uninstrumented) and capture the warm per-inference cycle
@@ -924,10 +927,25 @@ int main(void) {
 {% endif %}
         }
 {% else %}
+        // Self-check for the failure this window is exposed to (issue #121):
+        // DWT->CYCCNT lives in the core debug power domain and stops
+        // advancing whenever no debugger holds that domain up, so a delta
+        // taken across a stalled span comes back as exactly 0 and the window
+        // silently reads short.  An inference cannot take zero core cycles,
+        // so counting the zero deltas turns that into a reportable fact
+        // (HPX_CLEAN_STALLED_ITERS) instead of a plausible-looking average.
+        // Iterations only partly covered by a stall read low but non-zero;
+        // there are at most two of those per stall, so the count is a tight
+        // lower bound on how many inferences were lost.
+        uint32_t clean_stalled_iters = 0;
         for (int iter = 0; iter < clean_iters_n; iter++) {
             uint32_t t0 = DWT->CYCCNT;
             {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
-            clean_cycles += (uint32_t)(DWT->CYCCNT - t0);
+            const uint32_t clean_iter_cyc = (uint32_t)(DWT->CYCCNT - t0);
+            if (clean_iter_cyc == 0U) {
+                clean_stalled_iters++;
+            }
+            clean_cycles += clean_iter_cyc;
             clean_count++;
 {% if clean_window_trace | default(false) and transport not in ["swo", "uart"] %}
             // Sanity-check trace: prove the device is looping inferences for
@@ -1011,6 +1029,13 @@ int main(void) {
                        (unsigned long long)clean_cycles);
             hpx_printf("HPX_CLEAN_INFER_AVG_CYCLES=%lu\n",
                        (unsigned long)clean_avg_cycles);
+{%- if clean_window_probe | default("infer") != "busy_loop" %}
+            // Always emitted (0 on a healthy run) so the host can tell a
+            // firmware that checks from one that does not.  See the
+            // clean_stalled_iters declaration above.
+            hpx_printf("HPX_CLEAN_STALLED_ITERS=%lu\n",
+                       (unsigned long)clean_stalled_iters);
+{%- endif %}
             if (SystemCoreClock > 0U) {
                 const uint32_t clean_avg_us = (uint32_t)(
                     ((uint64_t)clean_avg_cycles * 1000000ULL +
