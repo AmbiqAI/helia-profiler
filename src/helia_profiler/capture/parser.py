@@ -173,6 +173,7 @@ def parse_firmware_output(
         num_presets=meta_kv.get("num_presets"),
         system_clock_hz=meta_kv.get("system_clock_hz"),
         core_freq_measured_hz=meta_kv.get("core_freq_measured_hz"),
+        core_freq_repeat_hz=meta_kv.get("core_freq_repeat_hz"),
         profiled_infer_count=meta_kv.get("profiled_infer_count"),
         profiled_infer_total_us=meta_kv.get("profiled_infer_total_us"),
         profiled_infer_avg_us=meta_kv.get("profiled_infer_avg_us"),

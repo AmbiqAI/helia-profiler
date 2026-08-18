@@ -102,6 +102,7 @@ class FirmwareMeta:
     # counting DWT cycles across a fixed STIMER (32.768 kHz XTAL) interval.
     # system_clock_hz above is the NOMINAL configured value; this is reality.
     core_freq_measured_hz: int | None = None
+    core_freq_repeat_hz: int | None = None
     profiled_infer_count: int | None = None
     profiled_infer_total_us: int | None = None
     profiled_infer_avg_us: int | None = None

@@ -636,28 +636,6 @@ int main(void) {
     // this to verify its registry assumption (used for SWO baud + cycle->time
     // math) matches reality instead of trusting a hardcoded frequency.
     hpx_printf("HPX_SYSTEM_CLOCK_HZ=%lu\n", (unsigned long)SystemCoreClock);
-{% if not power_only | default(false) %}
-    // EXPERIMENT (issue #111, do not merge): measure the ACTUAL core
-    // frequency against the 32.768 kHz crystal. DWT cycles are HFRC-anchored
-    // and every cycles->time conversion above trusts the NOMINAL SystemCoreClock;
-    // STIMER is crystal-anchored (ppm-class). Counting cycles across a fixed
-    // 8192-tick (exactly 250 ms) STIMER interval exposes any HFRC deviation:
-    // Hz = cycles * 4. Edge-aligned start bounds quantization at 1/8192
-    // (~122 ppm). Runs once at boot in the PROFILE binary only, where the
-    // attached probe keeps the DWT domain powered on AP3/AP4.
-    {
-        am_hal_stimer_config(AM_HAL_STIMER_CFG_CLEAR);
-        am_hal_stimer_config(AM_HAL_STIMER_XTAL_32KHZ | AM_HAL_STIMER_CFG_RUN);
-        uint32_t align = am_hal_stimer_counter_get();
-        while (am_hal_stimer_counter_get() == align) {}
-        uint32_t freq_c0 = DWT->CYCCNT;
-        uint32_t freq_t0 = am_hal_stimer_counter_get();
-        while ((uint32_t)(am_hal_stimer_counter_get() - freq_t0) < 8192U) {}
-        uint32_t freq_cycles = DWT->CYCCNT - freq_c0;
-        hpx_printf("HPX_CORE_FREQ_MEASURED_HZ=%lu\n",
-                   (unsigned long)(freq_cycles * 4U));
-    }
-{% endif %}
 {% if apollo3_burst %}
     hpx_printf("HPX_BURST_AVAIL=%d\n", hpx_burst_avail);
     hpx_printf("HPX_BURST_ENGAGED=%d\n", hpx_burst_engaged);
@@ -746,6 +724,47 @@ int main(void) {
         // already knows the iteration count from its own settings.
         hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=0\n",
                    clean_iters_n);
+{% endif %}
+{% if not power_only | default(false) %}
+        // EXPERIMENT (issue #111, do not merge): measure the ACTUAL core
+        // frequency against the 32.768 kHz crystal. DWT counts HFRC-anchored
+        // cycles and every cycles->time conversion trusts the NOMINAL
+        // SystemCoreClock; STIMER is crystal-anchored (ppm-class). Counting
+        // cycles across a fixed 8192-tick (exactly 250 ms) interval exposes
+        // any HFRC deviation: Hz = cycles * 4. Edge-aligned start bounds
+        // quantization at ~122 ppm.
+        //
+        // Placed HERE, not at boot: on AP3/AP4 the DWT domain is only held up
+        // while a debugger asserts CDBGPWRUPREQ, and at boot the flash session
+        // has exited while the transport reader has not attached yet. A first
+        // attempt at boot counted cycles for 0.6% of the window and reported
+        // 591 kHz. The clean_warm_cyc reads immediately above are proof DWT is
+        // live at this point -- they size the window and are sane.
+        {
+            am_hal_stimer_config(AM_HAL_STIMER_CFG_CLEAR);
+            am_hal_stimer_config(AM_HAL_STIMER_XTAL_32KHZ | AM_HAL_STIMER_CFG_RUN);
+            // XT SETTLE. Datasheet 6.4: "the XT is only enabled when an
+            // internal module is using it" -- the CFG_CLEAR above drops that
+            // request, so the crystal restarts here and needs time to
+            // stabilize. Three earlier attempts measured inside the startup
+            // transient and reported 584-858 kHz, varying 45% between
+            // identical builds. Production survives the same sequence only
+            // because its ~5 s window dilutes the transient.
+            nsx_delay_us(750000U);
+            // Two back-to-back measurements: if they disagree, the clock is
+            // still not stable and the number must not be trusted.
+            uint32_t freq_hz[2] = {0U, 0U};
+            for (int fi = 0; fi < 2; fi++) {
+                uint32_t align = am_hal_stimer_counter_get();
+                while (am_hal_stimer_counter_get() == align) {}
+                uint32_t freq_c0 = DWT->CYCCNT;
+                uint32_t freq_t0 = am_hal_stimer_counter_get();
+                while ((uint32_t)(am_hal_stimer_counter_get() - freq_t0) < 8192U) {}
+                freq_hz[fi] = (uint32_t)((DWT->CYCCNT - freq_c0) * 4U);
+            }
+            hpx_printf("HPX_CORE_FREQ_MEASURED_HZ=%lu\n", (unsigned long)freq_hz[0]);
+            hpx_printf("HPX_CORE_FREQ_REPEAT_HZ=%lu\n", (unsigned long)freq_hz[1]);
+        }
 {% endif %}
 {%- if not use_stimer_window %}
         uint64_t clean_cycles = 0;
