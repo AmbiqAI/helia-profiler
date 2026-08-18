@@ -36,16 +36,23 @@ def _context(
     *,
     build: dict | None = None,
     backend: str | None = None,
+    engine_type: str = "tflm",
+    engine_config: dict | None = None,
+    model_name: str = "model.tflite",
     model_bytes: bytes = b"TFL3",
 ) -> PipelineContext:
     tmp_path.mkdir(parents=True, exist_ok=True)
-    model = tmp_path / "model.tflite"
+    model = tmp_path / model_name
     model.write_bytes(model_bytes)
     config = load_config(
         None,
         {
             "model": {"path": str(model)},
-            "engine": {"type": "tflm", "backend": backend},
+            "engine": {
+                "type": engine_type,
+                "backend": backend,
+                "config": engine_config or {},
+            },
             "target": {"board": "apollo510_evb"},
             "build": build or {},
             "work_dir": str(tmp_path / "work"),
@@ -523,6 +530,41 @@ def test_explicit_module_override_exempts_project_from_baseline_check(
     provenance = prepare_locked_dependencies(ctx)
 
     assert provenance.modules[0].peeled_commit == "d" * 40
+
+
+@pytest.mark.parametrize(
+    ("engine_type", "backend", "model_name", "project"),
+    [
+        ("helia-rt", None, "model.tflite", "ns-cmsis-nn"),
+        ("executorch", "ns", "model.pte", "ns-cmsis-nn"),
+        ("executorch", "arm", "model.pte", "arm-cmsis-nn"),
+    ],
+)
+def test_engine_cmsis_nn_override_exempts_provider_project_from_baseline_check(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    engine_type: str,
+    backend: str | None,
+    model_name: str,
+    project: str,
+) -> None:
+    ctx = _context(
+        tmp_path,
+        engine_type=engine_type,
+        backend=backend,
+        engine_config={"cmsis_nn_ref": "feature/provider-test"},
+        model_name=model_name,
+    )
+    _write_valid_lock(ctx, project=project, commit="d" * 40)
+    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+
+    provenance = prepare_locked_dependencies(ctx)
+
+    assert provenance.modules[0].peeled_commit == "d" * 40
+    assert any(
+        override.scope == "engine" and override.name == "cmsis_nn_ref"
+        for override in provenance.overrides
+    )
 
 
 def test_unpinned_projects_are_not_baseline_checked(
