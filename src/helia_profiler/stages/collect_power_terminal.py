@@ -12,7 +12,9 @@ from ..power.diagnostics import (
     FROZEN_WINDOW_CLOCK_HINT,
     assess_run_window_clock,
     assess_window_clock_ceiling,
+    expected_terminal_requested_count,
     firmware_window_clock_is_frozen,
+    probe_runs_inferences,
 )
 
 
@@ -94,12 +96,17 @@ class CollectPowerTerminalStage:
         envelope = collector.collect(ctx, timeout_s=timeout_s)
         terminal = envelope.terminal
 
-        if plan.inference_count is not None and terminal.requested_count != plan.inference_count:
+        runs_inferences = probe_runs_inferences(ctx.config.profiling.clean_window_probe)
+        expected_requested = expected_terminal_requested_count(
+            inference_count=plan.inference_count,
+            clean_window_probe=ctx.config.profiling.clean_window_probe,
+        )
+        if expected_requested is not None and terminal.requested_count != expected_requested:
             raise PowerError(
                 "Power terminal requested count does not match the host plan.",
                 hint=(
-                    f"Firmware reported {terminal.requested_count}, host planned "
-                    f"{plan.inference_count}."
+                    f"Firmware reported {terminal.requested_count}, host expected "
+                    f"{expected_requested}."
                 ),
             )
         if terminal.status != "ok":
@@ -265,7 +272,14 @@ class CollectPowerTerminalStage:
                 if ctx.power_run.observation is not None
                 else None
             ),
-            planned_inference_count=plan.inference_count,
+            # Internal mode's reference is N x per-inference time. Under a probe
+            # that runs no inferences that product describes nothing the
+            # firmware did -- the window length comes from window_target_ms --
+            # so withhold it rather than warn about a disagreement that is
+            # really just the wrong reference. External mode is unaffected: its
+            # reference is the instrument's own gate, which timed the same
+            # physical window whatever ran inside it.
+            planned_inference_count=(plan.inference_count if runs_inferences else None),
             planned_inference_us=plan.reference_inference_us,
         )
         if agreement is not None and not agreement.agrees:

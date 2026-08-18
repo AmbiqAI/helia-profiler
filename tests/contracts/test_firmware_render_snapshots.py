@@ -63,11 +63,14 @@ _MARKERS: dict[str, str] = {
     "ssram_power_ap5": "ns_power",
     "newlib_syscalls": "_sbrk",
     "peripheral_power_down": "AM_HAL_PWRCTRL_PERIPH_IOM0",
-    # Which clock times the measured window. Without this marker the switch
-    # from DWT to STIMER shows up only as a sha256 change, so the semantic
-    # layer of the snapshot -- the part a reviewer actually reads -- stayed
-    # silent about the fix.
-    "stimer_window": "hpx_stimer_init(",
+    # Which clock times the measured window.  Keyed on the in-window BRACKET,
+    # not on hpx_stimer_init( -- the helper's `static inline` definitions
+    # render whenever window_timer == "stimer" even on paths that then time
+    # the window some other way, so keying on the definition made the marker
+    # read true for renders whose window STIMER never touched (it could not
+    # tell #112's fixed and unfixed busy_loop renders apart). clean_stimer_t0
+    # exists only where the window is actually bracketed by STIMER.
+    "stimer_window": "clean_stimer_t0",
 }
 
 
@@ -205,17 +208,28 @@ def _power_combos() -> list[tuple[str, str, str]]:
 # busy_loop diagnostic replaces the whole window body AND adds a calibration
 # pass ahead of it, so it is a genuinely different render -- and it went
 # unsnapshotted long enough for the calibration to end up reading a debug
-# domain the same binary had already powered down (issue #112).  Snapshot it
-# over the power matrix, which is where that is fatal: the profile binary runs
-# with a debugger attached, the power binary free-runs.
+# domain the same binary had already powered down (issue #112).
+#
+# Snapshotted for BOTH binaries.  The power binary is where a dead calibration
+# clock is fatal, but #112 also moved the profile binary onto STIMER, and with
+# only the power half pinned that change was guarded by nothing: reverting the
+# whole `power_only=False` half of the fix -- 48 of the 96 moved renders --
+# left the suite green.  The profile half uses the same rtt-only reduction as
+# the power matrix; transport interacts with printf teardown, not with which
+# clock times the window.
 _POWER_BUSY_LOOP_PROBE = "busy_loop"
 #: Every clean-window probe, for the invariant tests that must hold for all of
 #: them (not just the default the snapshot matrix above pins).
 _PROBES = ("infer", "busy_loop")
+_BUSY_LOOP_TRANSPORT = "rtt"
 
 
 def _power_busy_loop_combos() -> list[tuple[str, str, str]]:
     return _power_combos()
+
+
+def _profile_busy_loop_combos() -> list[tuple[str, str, str]]:
+    return [(soc, _BUSY_LOOP_TRANSPORT, engine) for soc in _SOCS for engine in _ENGINES]
 
 
 def _key(
@@ -262,6 +276,24 @@ def _build_all() -> dict:
                 )
             )
             for soc, transport, engine in _power_busy_loop_combos()
+        }
+    )
+    result.update(
+        {
+            _key(
+                soc,
+                transport,
+                engine,
+                clean_window_probe=_POWER_BUSY_LOOP_PROBE,
+            ): _digest(
+                _render(
+                    soc,
+                    transport,
+                    engine,
+                    clean_window_probe=_POWER_BUSY_LOOP_PROBE,
+                )
+            )
+            for soc, transport, engine in _profile_busy_loop_combos()
         }
     )
     return result
@@ -377,6 +409,43 @@ def test_power_only_busy_loop_render_matches_snapshot(soc, transport, engine):
             power_only=True,
             clean_window_probe=_POWER_BUSY_LOOP_PROBE,
         )
+    )
+    expected = _SNAPSHOTS[key]
+
+    assert current["markers"] == expected["markers"], (
+        f"[{key}] active feature blocks changed:\n"
+        f"  expected: {expected['markers']}\n"
+        f"  actual:   {current['markers']}\n{_REGEN_HINT}"
+    )
+    assert current["sha256"] == expected["sha256"], f"[{key}] render hash changed. {_REGEN_HINT}"
+
+
+@pytest.mark.parametrize(
+    "soc,transport,engine",
+    _profile_busy_loop_combos(),
+    ids=[
+        _key(*c, clean_window_probe=_POWER_BUSY_LOOP_PROBE)
+        for c in _profile_busy_loop_combos()
+    ],
+)
+def test_profile_busy_loop_render_matches_snapshot(soc, transport, engine):
+    """Transport-attached profile binary with the busy_loop probe.
+
+    #112 moved this half onto STIMER too, for uniformity rather than necessity
+    (a profile binary keeps a debugger attached, so its DWT is readable). Until
+    this matrix existed the entire ``power_only=False`` half of that change --
+    48 of the 96 renders it moved -- could be reverted with the suite staying
+    green.
+    """
+    assert _SNAPSHOTS, (
+        "no firmware render snapshot committed — generate it with "
+        "HPX_UPDATE_SNAPSHOTS=1"
+    )
+    key = _key(soc, transport, engine, clean_window_probe=_POWER_BUSY_LOOP_PROBE)
+    assert key in _SNAPSHOTS, f"{key} missing from snapshot. {_REGEN_HINT}"
+
+    current = _digest(
+        _render(soc, transport, engine, clean_window_probe=_POWER_BUSY_LOOP_PROBE)
     )
     expected = _SNAPSHOTS[key]
 
@@ -504,6 +573,64 @@ def test_window_is_never_timed_by_a_domain_the_binary_powers_down():
     )
 
 
+def test_no_render_reports_a_clean_cycles_it_never_accumulated():
+    """``clean_cycles`` must never be reported without being assigned first.
+
+    This is the single invariant that keeps a fabricated duration off the wire,
+    and it spans two independent decisions in each template: whether
+    ``uint64_t clean_cycles = 0;`` is DECLARED (``not use_stimer_window``) and
+    whether the window body ever ASSIGNS it.  Get those out of step and the
+    firmware emits HPX_CLEAN_INFER_TOTAL_CYCLES / AVG_CYCLES / AVG_US derived
+    from a variable that is still 0 -- ``elapsed_us == 0`` with completed work,
+    which is precisely ``firmware_window_clock_is_frozen()``'s signature.
+
+    Why it needs its own test rather than riding on the snapshots: the busy_loop
+    branch's assignment (``clean_cycles = clean_probe_target_cyc;``) was deleted
+    in #112 because that path moved to STIMER, so the declaration is now the
+    only thing standing between a reverted prelude and a zero duration.  A
+    reviewer reverted the STIMER forcing in main_aot.cc.j2 ALONE -- the exact
+    single-template drift shape filed as #118 -- and the whole suite stayed
+    green while the AOT render did exactly this.
+
+    Swept over every SoC x transport x engine x probe, power and profile, so
+    neither template can drift alone and neither half of the probe matrix is
+    unguarded.
+    """
+    import re
+
+    checked = 0
+    for probe in _PROBES:
+        combos = [(soc, transport, engine, False) for soc, transport, engine in _all_combos()]
+        combos += [(soc, transport, engine, True) for soc, transport, engine in _power_combos()]
+        for soc, transport, engine, power_only in combos:
+            code = _code_only(
+                _render(
+                    soc,
+                    transport,
+                    engine,
+                    power_only=power_only,
+                    clean_window_probe=probe,
+                )
+            )
+            if "uint64_t clean_cycles = 0;" not in code:
+                # STIMER path: the variable does not exist, so it cannot be
+                # reported stale. Nothing to check.
+                continue
+            checked += 1
+            begin = code.index("hpx_sync_window_begin();")
+            window = code[begin : code.index("hpx_sync_window_end();", begin)]
+            assert re.search(r"clean_cycles\s*(\+=|=)", window), (
+                f"{soc}|{transport}|{engine}|"
+                f"{'power' if power_only else 'profile'}|{probe}: declares "
+                "clean_cycles and reports it, but never assigns it inside the "
+                "measured window — elapsed_us would be a fabricated 0"
+            )
+    assert checked, (
+        "no render declares clean_cycles — this test lost its subject, so it "
+        "is no longer pinning anything"
+    )
+
+
 def test_every_soc_that_cannot_read_dwt_unwatched_resolves_to_stimer():
     """``SocCapabilities.power_window_timer`` is the single source of the
     predicate; check it directly for every registered SoC, not just the three
@@ -589,36 +716,41 @@ def test_busy_loop_probe_reports_a_measured_duration_not_the_nominal_target():
     (what this template did before issue #112) made the terminal report's
     elapsed_us come out at exactly the nominal value no matter how long the
     window actually ran: a fabricated number nothing downstream can flag,
-    unlike a merely wrong one.  Pinned across the power matrix; the fix is that
-    the STIMER bracket around the window is the only source of the duration.
+    unlike a merely wrong one.  The fix is that the STIMER bracket around the
+    window is the only source of the duration.
+
+    Swept over the power AND profile binaries: the fabrication was identical in
+    both, and pinning only the power half left the profile half revertible with
+    the suite staying green.
     """
     checked = 0
-    for soc, transport, engine in _power_busy_loop_combos():
+    combos = [(soc, t, e, True) for soc, t, e in _power_busy_loop_combos()]
+    combos += [(soc, t, e, False) for soc, t, e in _profile_busy_loop_combos()]
+    for soc, transport, engine, power_only in combos:
+        label = f"{soc}|{transport}|{engine}|{'power' if power_only else 'profile'}"
         code = _code_only(
             _render(
                 soc,
                 transport,
                 engine,
-                power_only=True,
+                power_only=power_only,
                 clean_window_probe=_POWER_BUSY_LOOP_PROBE,
             )
         )
         checked += 1
         assert "busy_loop_iters" in code, (
-            f"{soc}|{transport}|{engine}: busy_loop probe did not render — "
-            "this test lost its subject"
+            f"{label}: busy_loop probe did not render — this test lost its subject"
         )
         # The target may still be COMPUTED (it sizes the loop); what it must
         # never be is assigned into the reported cycle/duration accumulator.
         assert "clean_cycles = clean_probe_target" not in code, (
-            f"{soc}|{transport}|{engine}: busy_loop reports the nominal window "
-            "target as the measured duration"
+            f"{label}: busy_loop reports the nominal window target as the "
+            "measured duration"
         )
         assert "clean_stimer_total_us" in code, (
-            f"{soc}|{transport}|{engine}: busy_loop window has no measured "
-            "duration source"
+            f"{label}: busy_loop window has no measured duration source"
         )
-    assert checked, "busy_loop power matrix is empty"
+    assert checked, "busy_loop matrix is empty"
 
 
 def test_hal_umbrella_header_is_included_at_most_once():
@@ -631,10 +763,11 @@ def test_hal_umbrella_header_is_included_at_most_once():
     into a double include -- or, as the AOT template did before this change,
     into no include at all for a render that calls am_hal_stimer_*.
 
-    Swept over both clean-window probes: the busy_loop probe resolves to STIMER
-    on every family (it gates the debug domain off, so DWT is unreadable for it
-    by construction), which pulls am_hal_stimer_* into AP3/AP4 *profile*
-    renders that the infer probe leaves on DWT.
+    Swept over both clean-window probes: the busy_loop probe is pinned to
+    STIMER on every family (a deliberate simplification -- an AP3/AP4 profile
+    binary could still read DWT; see main.cc.j2's prelude), which pulls
+    am_hal_stimer_* into AP3/AP4 *profile* renders that the infer probe leaves
+    on DWT.
     """
     for probe in _PROBES:
         for soc, transport, engine in _all_combos():
@@ -675,6 +808,10 @@ def test_snapshot_covers_exactly_the_current_matrix():
         | {
             _key(*c, power_only=True, clean_window_probe=_POWER_BUSY_LOOP_PROBE)
             for c in _power_busy_loop_combos()
+        }
+        | {
+            _key(*c, clean_window_probe=_POWER_BUSY_LOOP_PROBE)
+            for c in _profile_busy_loop_combos()
         }
     )
     assert set(_SNAPSHOTS) == expected_keys, _REGEN_HINT

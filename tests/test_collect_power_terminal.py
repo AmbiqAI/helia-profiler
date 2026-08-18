@@ -50,6 +50,7 @@ def _make_ctx(
     gate_duration_s: float = 0.005,
     capture_duration_s: float | None = None,
     deployed_at: str = "2026-07-18T00:00:00+00:00",
+    clean_window_probe: str = "infer",
 ) -> PipelineContext:
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")
@@ -59,6 +60,7 @@ def _make_ctx(
             "model": {"path": str(model)},
             "engine": {"type": "helia-rt"},
             "target": {"board": "apollo510_evb", "transport": transport},
+            "profiling": {"clean_window_probe": clean_window_probe},
             "power": {
                 "enabled": True,
                 "firmware": "dedicated",
@@ -654,6 +656,104 @@ class TestFirmwareWindowClockIntegrity:
                 monkeypatch,
                 self._bench_measurement(planned),
             )
+        assert "window clock" not in caplog.text
+
+
+class TestBusyLoopProbeCompletesARun:
+    """The busy_loop diagnostic runs ONE spin window, not N inferences.
+
+    Firmware counts terminal work in units the window actually performed, so
+    it reports 1 requested / 1 completed for this probe
+    (``_power_terminal_success.j2``) and the host expects the same via
+    ``power.diagnostics.expected_terminal_requested_count``.
+
+    Before that agreement existed, firmware reported ``clean_iters_n``
+    requested against ``clean_count == 1`` completed and this stage raised
+    "Power firmware reported incomplete inference execution. Completed 1/5
+    inferences." on every busy_loop run -- so the probe could not finish a run
+    on any board, and ``elapsed_us``, the number it exists to produce, was
+    never consumed.
+    """
+
+    def test_busy_loop_terminal_is_accepted(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        ctx = _make_ctx(tmp_path, inference_count=5, clean_window_probe="busy_loop")
+        # One spin window, one unit of work, and a real measured duration.
+        record = _record(requested_count=1, completed_count=1, elapsed_us=5000)
+        monkeypatch.setattr(
+            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            lambda transport: _FakeTerminalTransport(record),
+        )
+
+        CollectPowerTerminalStage().run(ctx)
+
+        assert ctx.power_run is not None
+        assert ctx.power_run.terminal is record
+        # elapsed_us reaches the artifact -- the whole point of the probe.
+        assert ctx.power_run.terminal.elapsed_us == 5000
+
+    def test_the_old_firmware_shape_is_still_rejected(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """N requested against 1 completed stays an error.
+
+        The fix is that firmware no longer EMITS this shape, not that the host
+        started tolerating self-contradictory reports.
+        """
+        ctx = _make_ctx(tmp_path, inference_count=5, clean_window_probe="busy_loop")
+        record = _record(requested_count=5, completed_count=1, elapsed_us=5000)
+        monkeypatch.setattr(
+            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            lambda transport: _FakeTerminalTransport(record),
+        )
+
+        with pytest.raises(PowerError, match="does not match the host plan"):
+            CollectPowerTerminalStage().run(ctx)
+
+    def test_infer_probe_still_expects_the_planned_count(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """The busy_loop allowance must not leak into the default probe."""
+        ctx = _make_ctx(tmp_path, inference_count=5, clean_window_probe="infer")
+        record = _record(requested_count=1, completed_count=1, elapsed_us=5000)
+        monkeypatch.setattr(
+            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            lambda transport: _FakeTerminalTransport(record),
+        )
+
+        with pytest.raises(PowerError, match="does not match the host plan"):
+            CollectPowerTerminalStage().run(ctx)
+
+    def test_internal_mode_does_not_warn_about_a_plan_derived_reference(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        """The internal window-clock cross-check has no valid reference here.
+
+        Its reference is ``N x reference_inference_us`` (5 x 1000 us = 5 ms),
+        but a busy_loop window is sized from window_target_ms and legitimately
+        runs ~1 s. Comparing them would fire a ~200x "disagreement" warning on
+        every correct run, so the plan-derived reference is withheld.
+        """
+        import logging
+
+        ctx = _make_ctx(
+            tmp_path,
+            internal=True,
+            inference_count=5,
+            reference_inference_us=1000,
+            clean_window_probe="busy_loop",
+        )
+        record = _record(requested_count=1, completed_count=1, elapsed_us=1_000_000)
+        measurement = _measurement(duration_us=1_000_000, inference_count=1)
+        monkeypatch.setattr(
+            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            lambda transport: _FakeTerminalTransport(record, measurement),
+        )
+
+        with caplog.at_level(logging.WARNING):
+            CollectPowerTerminalStage().run(ctx)
+
         assert "window clock" not in caplog.text
 
 

@@ -1,8 +1,27 @@
-{# Successful fixed-N terminal report; included inside the clean-window scope. #}
+{# Successful fixed-N terminal report; included inside the clean-window scope.
+
+   requested_count/completed_count are counted in units of work the window
+   actually performed.  For the default infer probe that unit is an inference
+   and the count is the host's fixed N.  For the busy_loop probe there are no
+   inferences at all -- the window body is one calibrated spin sized from
+   window_target_ms -- so exactly one unit is requested and one completes.
+
+   Reporting clean_iters_n here under busy_loop is what shipped before, and it
+   made the report self-contradictory: N requested against clean_count == 1
+   completed, with status "complete".  collect_power_terminal.py reads that as
+   "Power firmware reported incomplete inference execution" and raises, so the
+   probe could never finish a run -- and elapsed_us, the number the probe
+   exists to produce, was never consumed.  The host half of this agreement
+   lives in power.diagnostics.expected_terminal_requested_count().
+
+   The tags below are kept INLINE so the infer render stays byte-identical: the
+   production Jinja env has trim_blocks off, so a control tag on its own line
+   emits a blank line into the generated C (issue #119). #}
 hpx_power_terminal_report(
     true,
-    (uint32_t)clean_iters_n,
-    clean_count,
+{% if busy_loop_probe %}    1U,
+{% else %}    (uint32_t)clean_iters_n,
+{% endif %}    clean_count,
 {% if use_stimer_window %}
     clean_stimer_total_us,
 {% else %}

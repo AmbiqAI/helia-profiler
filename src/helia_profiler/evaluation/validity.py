@@ -8,7 +8,9 @@ from typing import TYPE_CHECKING, Any
 from ..power.diagnostics import (
     assess_gate_duration,
     assess_run_window_clock,
+    expected_terminal_requested_count,
     firmware_window_clock_is_frozen,
+    probe_runs_inferences,
     window_clock_ceiling_from_metadata,
 )
 from ..results import ResultIssue, ResultValidity
@@ -116,12 +118,19 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 issues.append(
                     _error("power.gate_not_lowered", "Power firmware did not confirm GATE low.")
                 )
-            if plan.inference_count is not None and terminal.requested_count != plan.inference_count:
+            # Same helper the collect stage uses, so the two cannot disagree
+            # about what the firmware was supposed to report -- the busy_loop
+            # probe runs one spin window rather than N inferences.
+            expected_requested = expected_terminal_requested_count(
+                inference_count=plan.inference_count,
+                clean_window_probe=ctx.config.profiling.clean_window_probe,
+            )
+            if expected_requested is not None and terminal.requested_count != expected_requested:
                 issues.append(
                     _error(
                         "power.plan_count_mismatch",
                         "Power firmware requested count differs from the host plan.",
-                        planned_count=plan.inference_count,
+                        planned_count=expected_requested,
                         requested_count=terminal.requested_count,
                     )
                 )
@@ -171,7 +180,14 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                     elapsed_us=terminal.elapsed_us,
                     internal_mode=internal_mode,
                     gated_result=observation.result if observation is not None else None,
-                    planned_inference_count=plan.inference_count,
+                    # See the collect stage: the internal-mode reference is
+                    # N x per-inference time, which describes nothing a
+                    # no-inference probe did.
+                    planned_inference_count=(
+                        plan.inference_count
+                        if probe_runs_inferences(ctx.config.profiling.clean_window_probe)
+                        else None
+                    ),
                     planned_inference_us=plan.reference_inference_us,
                 )
                 if agreement is not None and not agreement.agrees:
