@@ -105,16 +105,18 @@
         // debug power domain up (issue #121).  Draining the RTT up-buffer is
         // the host-attach signal -- the J-Link advances RdOff over SWD, which
         // it can only do with the DAP alive.
-        {
-            uint32_t hpx_attach_waited_us = 0U;
+        // Reported, not just computed: "attached on the first poll" and
+        // "spun the whole budget and gave up" are the two ends of this fix
+        // working or not, and nothing else distinguishes them.  A run that
+        // times out here is the one whose detectors matter most.
+        uint32_t clean_attach_wait_us = 0U;
+        hpx_rtt_invalidate_cb();
+        while (SEGGER_RTT_HasDataUp(0) &&
+               clean_attach_wait_us <
+                   (HPX_CLEAN_WINDOW_ATTACH_WAIT_MS * 1000U)) {
+            nsx_delay_us(HPX_CLEAN_WINDOW_ATTACH_POLL_US);
+            clean_attach_wait_us += HPX_CLEAN_WINDOW_ATTACH_POLL_US;
             hpx_rtt_invalidate_cb();
-            while (SEGGER_RTT_HasDataUp(0) &&
-                   hpx_attach_waited_us <
-                       (HPX_CLEAN_WINDOW_ATTACH_WAIT_MS * 1000U)) {
-                nsx_delay_us(HPX_CLEAN_WINDOW_ATTACH_POLL_US);
-                hpx_attach_waited_us += HPX_CLEAN_WINDOW_ATTACH_POLL_US;
-                hpx_rtt_invalidate_cb();
-            }
         }
         // Re-assert the counter the attach we just waited for may have
         // reconfigured (DEMCR/TRCENA + CYCCNTENA).

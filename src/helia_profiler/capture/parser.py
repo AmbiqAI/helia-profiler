@@ -186,6 +186,7 @@ def parse_firmware_output(
         clean_ref_cycles=meta_kv.get("clean_ref_cycles"),
         clean_dwt_rate_cyc=meta_kv.get("clean_dwt_rate_cyc"),
         clean_dwt_rate_us=meta_kv.get("clean_dwt_rate_us"),
+        clean_attach_wait_us=meta_kv.get("clean_attach_wait_us"),
         psram=psram,
         presets=preset_names,
     )

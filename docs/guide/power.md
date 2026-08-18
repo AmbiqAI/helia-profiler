@@ -910,12 +910,52 @@ code:
     higher by an unknown amount. `device_clean_ref_cycles` in `summary.json`
     records the warm reference the floor came from.
 
-    RTT builds **reduce** the exposure by waiting, before opening the window,
-    for the host to drain the RTT up-buffer — which the J-Link can only do
-    with the DAP alive. That wait is bounded (1 s by default,
-    `HPX_CLEAN_WINDOW_ATTACH_WAIT_MS`), so an unusually slow host attach can
-    still outlast it; the detector is what covers that case, and the
-    transports with no such signal (UART, USB CDC).
+    Issue context: `stalled_iters`, `partial_iters`, `total_iters`,
+    `affected_fraction`, `understatement_lower_bound`, `ref_cycles`, and —
+    only when they apply — `counts_are_inconsistent` (more affected iterations
+    than the window ran, so the report itself is corrupt),
+    `total_is_unknown`, and `partial_check_inoperative`.
+
+    `understatement_lower_bound` charges a frozen iteration the full `1/total`
+    and a partial one `0.875/total` (partials are bounded above by the floor).
+    It stays a lower bound: partials are capped by the floor, not pinned to it.
+
+- **`profile.clean_window_clock_rate_low`** — a warning, and the only
+  clean-window check whose reference is not itself DWT. Before the window
+  opens the firmware times a fixed `nsx_delay_us` interval with DWT and
+  reports the cycle count (`device_clean_dwt_rate_cyc` /
+  `device_clean_dwt_rate_us` in `summary.json`). `nsx_delay_us` is the
+  AmbiqSuite BOOTROM cycle loop: no DWT, no CoreSight register, no debug power
+  domain, so it keeps its calibration exactly when DWT loses its. Expected is
+  `SystemCoreClock × probe_us / 1e6` in closed form, and the warning fires
+  below half of that.
+
+    This exists because the two counters above are **DWT-relative and
+    therefore scale-invariant**: the partial floor is a warm sample taken with
+    the same counter moments earlier, so a slowdown of factor `k` scales both
+    sides and cancels. A perfectly uniform slowdown reports zero of both —
+    replaying the measured ~0.6%-of-rate case gives exactly that — and only
+    this check sees it.
+
+- **`profile.clean_window_check_inoperative`** — a warning: the partial floor
+  was zero (every warm sample was itself frozen), so no iteration could fall
+  below it. Zero counts in that state are not evidence of a healthy window,
+  and this says so rather than letting silence read as health.
+
+**What none of them cover**, stated plainly: a slowdown that begins exactly at
+window open, ends exactly at window close, and is perfectly uniform throughout.
+The rate probe is taken before the window and the counters are relative, so
+that shape is the residual. A GPIO-gated run catches it anyway via
+`gated_window_duration_ratio`.
+
+RTT builds **reduce** the exposure by waiting, before opening the window,
+for the host to drain the RTT up-buffer — which the J-Link can only do with
+the DAP alive. That wait is bounded (1 s by default,
+`HPX_CLEAN_WINDOW_ATTACH_WAIT_MS`) and reports how long it actually spent as
+`HPX_CLEAN_ATTACH_WAIT_US`, so a run that timed out is distinguishable from
+one that attached on the first poll. An unusually slow host attach can still
+outlast the budget; the detectors above are what cover that case, and the
+transports with no such signal (UART, USB CDC).
 
 `detailed/power_summary.csv` (with `output.detailed: true`) breaks all of
 this down per gated window, plus a `whole_capture_window` reference row for

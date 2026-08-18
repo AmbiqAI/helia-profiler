@@ -339,6 +339,8 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             timing["device_clean_dwt_rate_cyc"] = meta.clean_dwt_rate_cyc
         if meta.clean_dwt_rate_us is not None:
             timing["device_clean_dwt_rate_us"] = meta.clean_dwt_rate_us
+        if meta.clean_attach_wait_us is not None:
+            timing["device_clean_attach_wait_us"] = meta.clean_attach_wait_us
         if timing:
             summary["latency"] = timing
     elif any(
@@ -355,6 +357,7 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             meta.clean_ref_cycles,
             meta.clean_dwt_rate_cyc,
             meta.clean_dwt_rate_us,
+            meta.clean_attach_wait_us,
         )
     ):
         summary["latency"] = {
@@ -372,6 +375,7 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                 "device_clean_ref_cycles": meta.clean_ref_cycles,
                 "device_clean_dwt_rate_cyc": meta.clean_dwt_rate_cyc,
                 "device_clean_dwt_rate_us": meta.clean_dwt_rate_us,
+                "device_clean_attach_wait_us": meta.clean_attach_wait_us,
             }.items()
             if value is not None
         }

@@ -136,6 +136,11 @@ class FirmwareMeta:
     #: DWT, and so the only one that can see a uniform slowdown.
     clean_dwt_rate_cyc: int | None = None
     clean_dwt_rate_us: int | None = None
+    #: Microseconds the firmware spent waiting for the host debug probe to
+    #: attach before opening the window (``HPX_CLEAN_ATTACH_WAIT_US``).  0 means
+    #: the host was already draining RTT; a value at the budget means the wait
+    #: timed out and the detectors above are the only cover for that run.
+    clean_attach_wait_us: int | None = None
     psram: PsramInfo | None = None
     presets: tuple[str, ...] = ()
 

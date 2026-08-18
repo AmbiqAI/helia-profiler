@@ -1122,6 +1122,10 @@ int main(void) {
                        (unsigned long)clean_dwt_rate_cyc);
             hpx_printf("HPX_CLEAN_DWT_RATE_US=%lu\n",
                        (unsigned long)HPX_CLEAN_DWT_RATE_PROBE_US);
+{%- if clean_window_needs_probe_attach | default(false) and transport == "rtt" and not power_only | default(false) %}
+            hpx_printf("HPX_CLEAN_ATTACH_WAIT_US=%lu\n",
+                       (unsigned long)clean_attach_wait_us);
+{%- endif %}
 {%- endif %}
             if (SystemCoreClock > 0U) {
                 const uint32_t clean_avg_us = (uint32_t)(

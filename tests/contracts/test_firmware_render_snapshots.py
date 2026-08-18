@@ -994,6 +994,97 @@ def test_dwt_timed_clean_window_counts_stalled_iterations():
     )
 
 
+def test_partial_floor_comes_from_the_lowest_warm_sample_not_the_highest():
+    """The floor must not be derivable from a single cold-cache warm sample.
+
+    ``clean_warm_cyc`` is a MAX, chosen so a warm sample that itself lost time
+    to a stall cannot drag the window sizing down. That makes it the wrong
+    reference for the partial-stall floor: one cold sample inflates it, the
+    floor rises with it, and every healthy iteration in the window is marked
+    partial (a 9x sample marks all 1091). The floor therefore comes from the
+    lowest NON-ZERO warm sample -- conservative in the only safe direction,
+    since it can under-report partials but never invent them -- and skipping
+    zeros keeps a frozen warm pass from silently zeroing the floor.
+
+    Pinned semantically rather than left to the snapshot sha256, which changes
+    for any edit and so says nothing about which reference was used.
+    """
+    checked = 0
+    for soc, transport, engine in _all_combos():
+        if get_soc(soc).capabilities.clock.clean_window_timer != "dwt":
+            continue
+        for window_mode in ("fixed", "auto"):
+            checked += 1
+            case = f"{soc}|{transport}|{engine}|{window_mode}"
+            code = _code_only(_render(soc, transport, engine, window_mode=window_mode))
+            region = _clean_window_region(code)
+
+            assert "clean_low_cyc = clean_warm_min_cyc" in region, (
+                f"{case}: the partial floor is derived from the MAX warm "
+                "sample, so one cold-cache warmup marks a whole healthy "
+                "window partial"
+            )
+            # The min tracker must skip zero samples, or a frozen warm pass
+            # zeroes the floor and disables the check it is meant to arm.
+            assert "wc > 0U" in region, (
+                f"{case}: the warm minimum does not skip zero samples, so a "
+                "frozen warmup silently disables the partial check"
+            )
+            # And the check itself must not fire when the floor is dead.
+            assert "clean_low_cyc > 0U" in region, (
+                f"{case}: the partial check does not guard against a zero "
+                "floor"
+            )
+
+    assert checked, (
+        "no render times its clean window with DWT -- this test lost its "
+        "subject, so it is no longer pinning anything"
+    )
+
+
+def test_dwt_rate_probe_uses_a_clock_that_cannot_share_the_fault():
+    """Every DWT-timed clean window must calibrate DWT before trusting it.
+
+    The in-window counters are DWT-relative: the partial floor is a warm sample
+    taken with the same counter in the same fault window, so a uniform slowdown
+    scales both sides and cancels exactly. The probe is the only check with an
+    outside reference -- ``nsx_delay_us`` resolves to the BOOTROM cycle loop,
+    which touches no DWT, no CoreSight register and no debug power domain.
+
+    Rendered on every transport, not just the ones with an attach signal: UART
+    and USB CDC have no host-drain signal to wait on, so this is all they get.
+    """
+    checked = 0
+    for soc, transport, engine in _all_combos():
+        if get_soc(soc).capabilities.clock.clean_window_timer != "dwt":
+            continue
+        checked += 1
+        case = f"{soc}|{transport}|{engine}"
+        rendered = _render(soc, transport, engine)
+        region = _clean_window_region(_code_only(rendered))
+
+        probe = region.find("nsx_delay_us(HPX_CLEAN_DWT_RATE_PROBE_US)")
+        assert probe != -1, (
+            f"{case}: the clean window trusts DWT without ever calibrating it "
+            "against an independent clock"
+        )
+        window_begin = region.find("hpx_sync_window_begin();")
+        if window_begin != -1:
+            assert probe < window_begin, (
+                f"{case}: the rate probe runs inside the measured window"
+            )
+        for line in ("HPX_CLEAN_DWT_RATE_CYC", "HPX_CLEAN_DWT_RATE_US"):
+            assert line in rendered, (
+                f"{case}: {line} is measured but never reported, so the host "
+                "cannot act on it"
+            )
+
+    assert checked, (
+        "no render times its clean window with DWT -- this test lost its "
+        "subject, so it is no longer pinning anything"
+    )
+
+
 def test_attach_wait_budget_fits_the_power_capture_boot_allowance():
     """The attach wait is reachable-to-timeout on a supported path, so its
     stated budget has to be both small and honest.
