@@ -145,11 +145,15 @@ def test_clean_window_stalled_iterations_are_captured():
                 "clean_infer_count": "1092",
                 "clean_infer_avg_us": "684",
                 "clean_stalled_iters": "233",
+                "clean_partial_iters": "17",
+                "clean_ref_cycles": "83300",
             },
             csv_block,
         )
     )
     assert reported.meta.clean_stalled_iters == 233
+    assert reported.meta.clean_partial_iters == 17
+    assert reported.meta.clean_ref_cycles == 83300
 
     # Firmware that emits no such line leaves it None, not 0: a build whose
     # window is not DWT-timed per iteration (Apollo5/STIMER, or the busy_loop
@@ -159,6 +163,8 @@ def test_clean_window_stalled_iterations_are_captured():
         _wrap_session({"presets": "basic_cpu", "clean_infer_count": "5"}, csv_block)
     )
     assert silent.meta.clean_stalled_iters is None
+    assert silent.meta.clean_partial_iters is None
+    assert silent.meta.clean_ref_cycles is None
 
 
 def test_psram_diagnostics_metadata():

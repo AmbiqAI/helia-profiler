@@ -46,11 +46,13 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         # families, and DWT stops whenever no debugger holds the core debug
         # power domain up -- which is exactly what happens between the J-Link
         # reset subprocess exiting and the host attach completing (#121). The
-        # firmware counts the iterations that lost their whole delta to such a
-        # stall; a non-zero count means clean_infer_avg_us is short, and short
-        # by a plausible-looking amount rather than an obviously broken one.
+        # firmware counts the iterations that lost their delta -- both the
+        # frozen (exactly zero) and the partial (implausibly low) shape; either
+        # means clean_infer_avg_us is short, and short by a plausible-looking
+        # amount rather than an obviously broken one.
         stall = assess_clean_window_stall(
             stalled_iters=ctx.pmu_result.meta.clean_stalled_iters,
+            partial_iters=ctx.pmu_result.meta.clean_partial_iters,
             clean_infer_count=ctx.pmu_result.meta.clean_infer_count,
         )
         if stall is not None:

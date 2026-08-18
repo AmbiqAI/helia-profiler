@@ -70,10 +70,22 @@
    NOT RENDERED FOR: Apollo5 (STIMER-timed window, indifferent to the probe),
    the dedicated power binary (no transport, and its window is STIMER-timed on
    every family -- SocCapabilities.power_window_timer), and the non-RTT
-   transports, which have no host-drain signal to poll.  SWO already covers the
-   attach window by construction with its ~800 ms HPX_READY sync preamble;
-   UART/USB do not, and are left to the HPX_CLEAN_STALLED_ITERS detector rather
-   than given a blind delay. #}
+   transports, which have no host-drain signal to poll.
+
+   What the other transports do instead, stated precisely because the whole
+   point of this note is which of them are covered:
+     * SWO gets ~800 ms of HPX_READY sync preamble before HPX_START, and the
+       host must be decoding ITM to consume it -- which requires the same DAP
+       the debug domain needs.  Covered by construction.
+     * UART shares that preamble (it renders from the same bare {% else %} in
+       the main templates, not from an SWO-only branch), but a host opening a
+       serial port proves nothing about SWD: on these parts the probe is held
+       open separately, only so DWT keeps counting.  So UART burns the same
+       ~800 ms without establishing what SWO establishes.
+     * USB CDC blocks on DTR, which likewise says nothing about the probe.
+   UART and USB therefore depend on the HPX_CLEAN_STALLED_ITERS /
+   HPX_CLEAN_PARTIAL_ITERS detector, not on this wait.  Neither is given an
+   additional blind delay. #}
 #ifndef HPX_CLEAN_WINDOW_ATTACH_WAIT_MS
 // Covers the measured probe-absence gap (~204 ms lost, regressing on the
 // host's own sbl_settle + attach + api_probe phases with a 53 ms offset) with

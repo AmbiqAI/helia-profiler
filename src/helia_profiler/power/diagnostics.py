@@ -297,64 +297,117 @@ def expected_terminal_requested_count(
 #     downstream could tell.
 #
 # Detection does not need a reference measurement, because the firmware reports
-# the fault directly: DWT->CYCCNT does not slow down when the debug domain
-# drops, it STOPS, so every iteration wholly inside the stall reads a delta of
-# exactly zero. The firmware counts those (HPX_CLEAN_STALLED_ITERS) and the
-# host turns a non-zero count into a validity issue -- the same
-# firmware-reports/host-judges split as firmware_window_clock_is_frozen().
+# the fault directly. It reports TWO counts, because a dropped debug domain has
+# been seen doing two different things to the counter:
+#
+#   * FROZEN (the usual case, and what #121 measured): CYCCNT stops, so every
+#     iteration wholly inside the stall reads a delta of exactly zero. An
+#     inference cannot take zero core cycles, so this needs no threshold and
+#     cannot false-positive.
+#   * PARTIAL: the counter keeps advancing, but far too slowly. Observed at
+#     least once on Apollo4, with DWT running at ~0.6% of the expected rate
+#     through an early-boot window. Such a delta is small but non-zero, so it
+#     passes the zero test and accumulates uncounted -- which would be worse
+#     than silence, because the run would then assert "checked, clean" while
+#     still being wrong. The firmware counts these separately, against a floor
+#     derived from its own warm reference (an eighth of it; see the
+#     clean_stalled_iters declaration in main.cc.j2).
+#
+# Note the evidence for the frozen shape is an aggregate: #121's table records
+# per-run average cycles, which cannot by itself distinguish "N iterations read
+# exactly 0" from "a broader set read partially low" -- both fit the same
+# deficit total. The bimodal shape is the most likely reading of it, not a
+# demonstrated one, which is the other reason both counts exist.
+#
+# The host judges; the firmware only reports. Same split as
+# firmware_window_clock_is_frozen().
 
 
 @dataclass(frozen=True)
 class CleanWindowStall:
-    """Zero-cycle iterations observed inside the profile clean window."""
+    """Clean-window iterations whose DWT delta was zero or implausibly low."""
 
+    #: Deltas of exactly zero -- a frozen counter. Cannot be legitimate.
     stalled_iters: int
+    #: Deltas below the firmware's warm-derived floor but non-zero -- a counter
+    #: that kept advancing, far too slowly.
+    partial_iters: int
     total_iters: int
 
     @property
-    def stalled_fraction(self) -> float:
-        return self.stalled_iters / self.total_iters if self.total_iters > 0 else 0.0
+    def affected_iters(self) -> int:
+        return self.stalled_iters + self.partial_iters
 
     @property
-    def understatement(self) -> float:
-        """How far ``clean_infer_avg_us`` is below the true per-inference time.
+    def counts_are_inconsistent(self) -> bool:
+        """More affected iterations than the window ran.
 
-        The reported average is ``sum(deltas) / total``, and the stalled
-        iterations contributed 0 to that sum while really taking about as long
-        as the rest. So the true average is ``sum / (total - stalled)`` and the
-        reported one is low by exactly ``stalled / total``. Expressed as a
-        fraction of the true value, so 0.21 means "reads 21% low" -- directly
-        comparable to the 21% measured in #121.
+        Structurally impossible, so it means the report itself is corrupt -- a
+        torn transport line can inflate one field while the other parses
+        cleanly (the same class of corruption ``_UINT32_WRAP_THRESHOLD`` guards
+        against in the parser). Still a fault worth raising; just not one whose
+        fractions mean anything, so they are clamped rather than published as
+        the >100% nonsense a raw division gives.
         """
-        return self.stalled_fraction
+        return self.affected_iters > self.total_iters
 
-    def to_metadata(self) -> dict[str, float | int]:
-        return {
+    @property
+    def affected_fraction(self) -> float:
+        if self.total_iters <= 0:
+            return 0.0
+        return min(1.0, self.affected_iters / self.total_iters)
+
+    @property
+    def understatement_lower_bound(self) -> float:
+        """Minimum fraction by which ``clean_infer_avg_us`` reads low.
+
+        Only the frozen iterations are counted here, and for them it is exact:
+        each contributed 0 to a sum that should have carried a full inference,
+        so the reported average is low by at least ``stalled / total``. The
+        partial iterations push the true figure higher by an unknown amount --
+        they contributed *something*, just far too little -- which is why this
+        is a bound and not an estimate.
+        """
+        if self.total_iters <= 0:
+            return 0.0
+        return min(1.0, self.stalled_iters / self.total_iters)
+
+    def to_metadata(self) -> dict[str, float | int | bool]:
+        metadata: dict[str, float | int | bool] = {
             "stalled_iters": self.stalled_iters,
+            "partial_iters": self.partial_iters,
             "total_iters": self.total_iters,
-            "stalled_fraction": round(self.stalled_fraction, 6),
-            "understatement": round(self.understatement, 6),
+            "affected_fraction": round(self.affected_fraction, 6),
+            "understatement_lower_bound": round(self.understatement_lower_bound, 6),
         }
+        if self.counts_are_inconsistent:
+            metadata["counts_are_inconsistent"] = True
+        return metadata
 
 
 def assess_clean_window_stall(
-    *, stalled_iters: int | None, clean_infer_count: int | None
+    *,
+    stalled_iters: int | None,
+    partial_iters: int | None,
+    clean_infer_count: int | None,
 ) -> CleanWindowStall | None:
     """Report a stalled profile clean window, or ``None`` when there is none.
 
     ``None`` covers both "nothing to say" cases and they are deliberately not
-    distinguished here: the firmware did not report a count (a window that is
-    not DWT-timed per iteration, or firmware predating the check), or it
-    reported zero, which is the healthy answer. Callers treat ``None`` as no
-    issue; a returned object always describes a real fault, since an inference
-    cannot take zero core cycles.
+    distinguished: the firmware did not report the counts (a window that is not
+    DWT-timed per iteration, or firmware predating the check), or it reported
+    zero for both, which is the healthy answer. Callers treat ``None`` as no
+    issue; a returned object always describes a real fault.
     """
-    if not stalled_iters or stalled_iters <= 0:
+    stalled = max(0, int(stalled_iters or 0))
+    partial = max(0, int(partial_iters or 0))
+    if stalled <= 0 and partial <= 0:
         return None
     if not clean_infer_count or clean_infer_count <= 0:
         return None
     return CleanWindowStall(
-        stalled_iters=int(stalled_iters),
+        stalled_iters=stalled,
+        partial_iters=partial,
         total_iters=int(clean_infer_count),
     )
 

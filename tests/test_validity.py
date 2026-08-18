@@ -496,7 +496,12 @@ class TestCleanWindowStall:
     """
 
     def _profile_only(
-        self, tmp_path: Path, *, stalled: int | None, count: int | None = 1092
+        self,
+        tmp_path: Path,
+        *,
+        stalled: int | None,
+        partial: int | None = 0,
+        count: int | None = 1092,
     ) -> PipelineContext:
         """A profile-phase-only run, so validity reflects this issue alone.
 
@@ -512,6 +517,7 @@ class TestCleanWindowStall:
                 clean_infer_count=count,
                 clean_infer_avg_us=684,
                 clean_stalled_iters=stalled,
+                clean_partial_iters=partial,
             ),
             layers=[],
         )
@@ -532,7 +538,7 @@ class TestCleanWindowStall:
         assert stalls[0].context["stalled_iters"] == 233
         assert stalls[0].context["total_iters"] == 1092
         # ~21% low, matching the measured Apollo4 shortfall.
-        assert 0.20 < stalls[0].context["understatement"] < 0.22
+        assert 0.20 < stalls[0].context["understatement_lower_bound"] < 0.22
         assert evaluation.validity is ResultValidity.DEGRADED
 
     def test_issue_fires_only_when_the_firmware_reports_a_stall(
@@ -560,3 +566,56 @@ class TestCleanWindowStall:
             assert raised is expected, f"clean_stalled_iters={stalled!r}"
             if not expected:
                 assert evaluation.validity is ResultValidity.VALID, stalled
+
+    def test_partial_counting_is_caught_when_nothing_froze(self, tmp_path: Path):
+        """The shape the exact-zero test cannot see.
+
+        A dropped debug domain usually stops DWT outright, but it has been
+        observed on Apollo4 merely slowing it -- ~0.6% of the expected rate --
+        which produces deltas that are small but non-zero. Those satisfy no
+        zero test, accumulate into the total uncounted, and would leave the run
+        asserting "checked, clean" while still being wrong. That is worse than
+        the pre-fix silence, so a partial-only run must still raise.
+        """
+        ctx = self._profile_only(tmp_path, stalled=0, partial=233)
+
+        evaluation = evaluate_run(ctx)
+
+        stalls = [
+            issue
+            for issue in evaluation.issues
+            if issue.code == "profile.clean_window_stalled"
+        ]
+        assert len(stalls) == 1, "a slow-but-running counter went unreported"
+        assert stalls[0].context["partial_iters"] == 233
+        assert stalls[0].context["stalled_iters"] == 0
+        # The affected fraction sees them; the understatement bound does not,
+        # because a partial iteration contributed *something* and the exact
+        # arithmetic only holds for the frozen ones.
+        assert 0.20 < stalls[0].context["affected_fraction"] < 0.22
+        assert stalls[0].context["understatement_lower_bound"] == 0.0
+
+    def test_impossible_counts_are_flagged_not_published_as_nonsense(
+        self, tmp_path: Path
+    ):
+        """More affected iterations than the window ran means a corrupt report.
+
+        A torn transport line can inflate one field while the other parses
+        cleanly. The raw division would publish "reads 457.9% low", which is
+        both meaningless and more alarming than the truth. Clamp the fractions,
+        keep the raw counts, and say the record is inconsistent.
+        """
+        ctx = self._profile_only(tmp_path, stalled=5000, partial=0, count=1092)
+
+        evaluation = evaluate_run(ctx)
+
+        stall = next(
+            issue
+            for issue in evaluation.issues
+            if issue.code == "profile.clean_window_stalled"
+        )
+        assert stall.context["stalled_iters"] == 5000
+        assert stall.context["total_iters"] == 1092
+        assert stall.context["understatement_lower_bound"] == 1.0
+        assert stall.context["affected_fraction"] == 1.0
+        assert stall.context["counts_are_inconsistent"] is True

@@ -160,9 +160,11 @@ def _render(
     engine: str,
     power_only: bool = False,
     clean_window_probe: str = "infer",
+    window_mode: str = "fixed",
 ) -> str:
     kwargs = _common_kwargs(soc_name, transport)
     kwargs["clean_window_probe"] = clean_window_probe
+    kwargs["window_mode"] = window_mode
     if power_only:
         kwargs["power_only"] = True
     if engine == "helia-aot":
@@ -893,34 +895,37 @@ def test_dwt_timed_clean_window_waits_for_the_host_attach():
 
     waited = 0
     for soc, transport, engine in _all_combos():
-        caps = get_soc(soc).capabilities
-        rendered = _render(soc, transport, engine)
-        region = _clean_window_region(_code_only(rendered))
-        needs_wait = caps.clean_window_needs_probe_attach and transport == "rtt"
-        if not needs_wait:
-            assert "HPX_CLEAN_WINDOW_ATTACH_WAIT_MS" not in rendered, (
-                f"{soc}|{transport}|{engine}: waits for a probe attach it does "
-                "not depend on (window timer "
-                f"{caps.clock.clean_window_timer!r}, transport {transport!r})"
+        for window_mode in ("fixed", "auto"):
+            caps = get_soc(soc).capabilities
+            rendered = _render(soc, transport, engine, window_mode=window_mode)
+            region = _clean_window_region(_code_only(rendered))
+            case = f"{soc}|{transport}|{engine}|{window_mode}"
+            needs_wait = caps.clean_window_needs_probe_attach and transport == "rtt"
+            if not needs_wait:
+                assert "HPX_CLEAN_WINDOW_ATTACH_WAIT_MS" not in rendered, (
+                    f"{case}: waits for a probe attach it does not depend on "
+                    f"(window timer {caps.clock.clean_window_timer!r}, "
+                    f"transport {transport!r})"
+                )
+                continue
+            waited += 1
+            drain = region.find("HPX_CLEAN_WINDOW_ATTACH_WAIT_MS * 1000U")
+            assert drain != -1, (
+                f"{case}: DWT-timed clean window opens without waiting for the "
+                "host attach that keeps DWT running"
             )
-            continue
-        waited += 1
-        drain = region.find("hpx_rtt_drain(HPX_CLEAN_WINDOW_ATTACH_WAIT_MS);")
-        assert drain != -1, (
-            f"{soc}|{transport}|{engine}: DWT-timed clean window opens without "
-            "waiting for the host attach that keeps DWT running"
-        )
-        first_dwt = region.find("DWT->CYCCNT")
-        assert first_dwt != -1, (
-            f"{soc}|{transport}|{engine}: expected a DWT-timed window here; "
-            "the render no longer reads DWT->CYCCNT at all, so this test has "
-            "lost its subject"
-        )
-        assert drain < first_dwt, (
-            f"{soc}|{transport}|{engine}: the clean window reads DWT->CYCCNT "
-            "before waiting for the host attach, so the reads can still land "
-            "in the probe-absence gap"
-        )
+            first_dwt = region.find("DWT->CYCCNT")
+            assert first_dwt != -1, (
+                f"{case}: expected a DWT-timed window here; the render no "
+                "longer reads DWT->CYCCNT at all, so this test has lost its "
+                "subject"
+            )
+            assert drain < first_dwt, (
+                f"{case}: the clean window reads DWT->CYCCNT before waiting "
+                "for the host attach, so the reads can still land in the "
+                "probe-absence gap. In auto mode the sizing warmup is the "
+                "first such read, and it is inside the window this covers."
+            )
 
     assert waited, (
         "no render has a probe-dependent DWT-timed clean window — this test "
@@ -953,23 +958,91 @@ def test_dwt_timed_clean_window_counts_stalled_iterations():
     for soc, transport, engine in _all_combos():
         if get_soc(soc).capabilities.clock.clean_window_timer != "dwt":
             continue
-        checked += 1
-        rendered = _render(soc, transport, engine)
-        code = _code_only(rendered)
-        begin = code.index("hpx_sync_window_begin();")
-        window = code[begin : code.index("hpx_sync_window_end();", begin)]
-        assert "clean_stalled_iters++" in window, (
-            f"{soc}|{transport}|{engine}: the DWT-timed clean loop does not "
-            "detect a stalled cycle counter"
-        )
-        assert "HPX_CLEAN_STALLED_ITERS" in rendered, (
-            f"{soc}|{transport}|{engine}: stalled iterations are counted but "
-            "never reported, so the host cannot act on them"
-        )
+        for window_mode in ("fixed", "auto"):
+            checked += 1
+            case = f"{soc}|{transport}|{engine}|{window_mode}"
+            rendered = _render(soc, transport, engine, window_mode=window_mode)
+            code = _code_only(rendered)
+            begin = code.index("hpx_sync_window_begin();")
+            window = code[begin : code.index("hpx_sync_window_end();", begin)]
+            assert "clean_stalled_iters++" in window, (
+                f"{case}: the DWT-timed clean loop does not detect a frozen "
+                "cycle counter"
+            )
+            # The partial check is the one that matters for the shape the
+            # exact-zero test cannot see: a counter that keeps advancing at a
+            # fraction of the true rate produces small non-zero deltas, which
+            # would otherwise accumulate uncounted and let the run report
+            # itself healthy while still being wrong.
+            assert "clean_partial_iters++" in window, (
+                f"{case}: the DWT-timed clean loop detects a frozen counter "
+                "but not one that merely runs implausibly slow"
+            )
+            assert "clean_low_cyc" in window, (
+                f"{case}: the partial check has no floor to compare against"
+            )
+            for line in ("HPX_CLEAN_STALLED_ITERS", "HPX_CLEAN_PARTIAL_ITERS",
+                         "HPX_CLEAN_REF_CYCLES"):
+                assert line in rendered, (
+                    f"{case}: {line} is computed but never reported, so the "
+                    "host cannot act on it"
+                )
 
     assert checked, (
         "no render times its clean window with DWT — this test lost its "
         "subject, so it is no longer pinning anything"
+    )
+
+
+def test_attach_wait_budget_fits_the_power_capture_boot_allowance():
+    """The attach wait is reachable-to-timeout on a supported path, so its
+    stated budget has to be both small and honest.
+
+    With ``power.firmware: shared`` the profile binary is re-run as the gated
+    power window, and that pass free-runs -- ``capture_power`` drives only the
+    instrument and the reset, and ``capture_pmu`` has already closed its pylink
+    session. Nothing reads RTT, so this poll ALWAYS runs to timeout, and it
+    lands after ``capture_gated``'s ``on_started`` hook returns, which charges
+    it against the GPI poller's boot allowance. Overrun that and the poller
+    stops before or mid-window, reported as ``no_gate_rise``.
+
+    Two things are pinned, because the budget is only as good as the clock
+    enforcing it:
+
+    * the nominal budget is a small fraction of ``_BOOT_SETTLE_S``, read from
+      the host module rather than restated, so the two cannot drift apart;
+    * the loop paces itself with ``nsx_delay_us`` (calibrated) rather than
+      ``hpx_rtt_drain`` (whose spin assumes 2 cycles per iteration where a
+      Cortex-M4 spends 6-9, so a drain that times out takes 3-4x its stated
+      budget -- harmless on the park/failure paths it was written for, not
+      here).
+    """
+    import re
+
+    from helia_profiler.stages.capture_power import _BOOT_SETTLE_S
+
+    rendered = _render("apollo4p", "rtt", "tflm")
+    match = re.search(
+        r"#define\s+HPX_CLEAN_WINDOW_ATTACH_WAIT_MS\s+(\d+)U", rendered
+    )
+    assert match, "attach wait renders no nominal budget to check"
+    budget_s = int(match.group(1)) / 1000.0
+
+    assert 0 < budget_s <= _BOOT_SETTLE_S / 4, (
+        f"attach wait budget {budget_s:.3f}s is too large a share of the "
+        f"{_BOOT_SETTLE_S:.1f}s host boot allowance it is charged against on a "
+        "free-running shared-firmware power pass"
+    )
+
+    region = _clean_window_region(rendered)
+    assert "nsx_delay_us(HPX_CLEAN_WINDOW_ATTACH_POLL_US)" in region, (
+        "the attach wait must pace itself with a calibrated delay, or its "
+        "budget does not bound anything"
+    )
+    assert "hpx_rtt_drain(" not in region, (
+        "the attach wait must not use hpx_rtt_drain's uncalibrated spin: it "
+        "overruns its stated budget by 3-4x, which the free-running "
+        "shared-firmware pass pays in full"
     )
 
 

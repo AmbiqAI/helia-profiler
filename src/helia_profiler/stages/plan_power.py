@@ -25,8 +25,10 @@ def _derive_inference_count(
     ``clean_infer_avg_us`` comes from the profile binary's clean window, and on
     the Cortex-M4F families that window is DWT-timed and can stall (#121). A
     reference that reads N% low makes this pick N% too FEW iterations, so the
-    power window comes out short by the same factor -- and
-    ``active_window_estimated_*`` scale by it too. The contamination is flagged
+    power window comes out short by the same factor. (The
+    ``active_window_estimated_*`` fields are NOT affected: ``report/summary.py``
+    derives those from ``profiled_infer_total_us``, a different measurement.)
+    The contamination is flagged
     rather than corrected: the alternative, dropping to ``firmware_auto``,
     makes ``BuildPowerFirmwareStage`` skip the fixed-N build entirely and
     changes what runs on the bench. See :func:`_warn_if_reference_stalled` and
@@ -45,18 +47,22 @@ def _warn_if_reference_stalled(ctx: PipelineContext) -> None:
         return
     stall = assess_clean_window_stall(
         stalled_iters=ctx.pmu_result.meta.clean_stalled_iters,
+        partial_iters=ctx.pmu_result.meta.clean_partial_iters,
         clean_infer_count=ctx.pmu_result.meta.clean_infer_count,
     )
     if stall is None:
         return
     log.warning(
         "Power window sized from a stalled clean-window reference: %d of %d "
-        "profile iterations lost their cycle delta, so clean_infer_avg_us "
-        "reads ~%.1f%% low and the planned window will be short by about the "
-        "same factor (see the profile.clean_window_stalled validity issue).",
-        stall.stalled_iters,
+        "profile iterations lost their cycle delta (%d frozen, %d partial), so "
+        "clean_infer_avg_us reads at least ~%.1f%% low and the planned window "
+        "will be short by about the same factor (see the "
+        "profile.clean_window_stalled validity issue).",
+        stall.affected_iters,
         stall.total_iters,
-        stall.understatement * 100.0,
+        stall.stalled_iters,
+        stall.partial_iters,
+        stall.understatement_lower_bound * 100.0,
     )
 
 

@@ -625,8 +625,13 @@ class TestMainAotCcRender:
         for render in (_render_tflm, _render_aot):
             out = render(transport="rtt")
             assert "const int clean_iters_n = 3;" in out
-            assert "clean_warm_cyc" not in out
+            # Keyed on the SIZING machinery, not on clean_warm_cyc: fixed mode
+            # now measures the warm cost too (it is the floor the in-window
+            # stall check compares against, #121), it just does not size the
+            # window from it. Asserting the variable's absence would have been
+            # asserting the wrong thing.
             assert "target_cyc" not in out
+            assert "clean_est_ms" not in out
             # Fixed mode announces the window as pure state with est_ms=0
             # (no runtime warm measurement to estimate from).
             assert "phase=clean_window_begin iters=%d est_ms=0" in out
@@ -665,7 +670,11 @@ class TestMainAotCcRender:
                 clean_iters=2247,
             )
             assert "const int clean_iters_n = 2247;" in out
-            assert "uint32_t clean_warm_cyc = 0U;" not in out
+            # As above: the property is "no adaptive sizing", not "no warm
+            # measurement" -- a DWT-timed window measures the warm cost for its
+            # stall floor regardless of window mode.
+            assert "target_cyc" not in out
+            assert "clean_est_ms" not in out
 
     def test_busy_loop_probe_replaces_clean_window_body(self):
         tflm_out = _render_tflm(

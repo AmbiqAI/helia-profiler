@@ -109,14 +109,26 @@ class FirmwareMeta:
     clean_infer_avg_cycles: int | None = None
     clean_infer_avg_us: int | None = None
     #: Clean-window iterations whose DWT delta came back as exactly zero
-    #: (``HPX_CLEAN_STALLED_ITERS``).  An inference cannot take zero core
-    #: cycles, so any non-zero value means the cycle counter stopped mid-window
-    #: and the timing above is short by those iterations — see
-    #: ``power.diagnostics.assess_clean_window_stall``.  ``None`` means the
-    #: firmware did not report it: either a build whose window is not DWT-timed
-    #: per-iteration (Apollo5 / STIMER, or the busy_loop probe), or firmware
-    #: predating the check.  Absence is "unknown", never "healthy".
+    #: (``HPX_CLEAN_STALLED_ITERS``) -- a frozen cycle counter.  An inference
+    #: cannot take zero core cycles, so any non-zero value means the counter
+    #: stopped mid-window and the timing above is short by those iterations.
     clean_stalled_iters: int | None = None
+    #: Clean-window iterations whose delta was non-zero but below the
+    #: firmware's warm-derived floor (``HPX_CLEAN_PARTIAL_ITERS``) -- a counter
+    #: that kept advancing far too slowly rather than stopping.  Observed on
+    #: Apollo4 at ~0.6% of the expected rate; such deltas pass the zero test,
+    #: so they are counted separately.
+    clean_partial_iters: int | None = None
+    #: The warm per-inference cycle count that floor was derived from
+    #: (``HPX_CLEAN_REF_CYCLES``), so the threshold is auditable from the
+    #: capture rather than taken on trust.
+    #:
+    #: For all three: ``None`` means the firmware did not report it -- either a
+    #: build whose window is not DWT-timed per-iteration (Apollo5 / STIMER, or
+    #: the busy_loop probe), or firmware predating the check.  Absence is
+    #: "unknown", never "healthy".  See
+    #: ``power.diagnostics.assess_clean_window_stall``.
+    clean_ref_cycles: int | None = None
     psram: PsramInfo | None = None
     presets: tuple[str, ...] = ()
 

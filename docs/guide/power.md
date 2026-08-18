@@ -890,18 +890,32 @@ The *profile* binary's clean window has its own clock problem, and its own
 code:
 
 - **`profile.clean_window_stalled`** — a warning: one or more clean-window
-  iterations reported exactly zero core cycles. An inference cannot take zero
-  cycles, so this means `DWT->CYCCNT` stopped mid-window. On the Cortex-M4F
-  families (Apollo3/3P, Apollo4/4P/4L) DWT only advances while a debugger
+  iterations lost their cycle measurement. On the Cortex-M4F families
+  (Apollo3/3P, Apollo4/4P/4L) `DWT->CYCCNT` only advances while a debugger
   asserts `CDBGPWRUPREQ`, and nothing does between the J-Link reset
   subprocess exiting and the host attach completing. The window then reads
-  **short** by the stalled fraction — 21% low on the Apollo4 Blue Plus KBR
-  runs that found this — which makes `clean_infer_avg_us`, the latency
-  reported from it, and any power window sized from it all short by the same
-  factor. The issue context carries `stalled_iters`, `total_iters` and
-  `understatement`. RTT builds avoid the exposure entirely by waiting for the
-  host to drain the RTT up-buffer before opening the window; the detector is
-  what covers the transports that have no such signal.
+  **short** — 21% low on the Apollo4 Blue Plus KBR runs that found this —
+  which makes `clean_infer_avg_us`, the latency reported from it, and any
+  power window sized from it all short by the same factor.
+
+    Two shapes are counted, because the counter has been seen doing both.
+    `stalled_iters` counts deltas of **exactly zero** (a stopped counter; an
+    inference cannot take zero cycles, so this cannot false-positive).
+    `partial_iters` counts deltas that are non-zero but below an eighth of the
+    run's own warm reference — a counter that kept advancing far too slowly,
+    observed once on Apollo4 at ~0.6% of the expected rate. Without the second
+    count that shape would accumulate uncounted and the run would report
+    itself healthy. `understatement_lower_bound` is derived from the frozen
+    count alone, where the arithmetic is exact; partials push the true figure
+    higher by an unknown amount. `device_clean_ref_cycles` in `summary.json`
+    records the warm reference the floor came from.
+
+    RTT builds **reduce** the exposure by waiting, before opening the window,
+    for the host to drain the RTT up-buffer — which the J-Link can only do
+    with the DAP alive. That wait is bounded (1 s by default,
+    `HPX_CLEAN_WINDOW_ATTACH_WAIT_MS`), so an unusually slow host attach can
+    still outlast it; the detector is what covers that case, and the
+    transports with no such signal (UART, USB CDC).
 
 `detailed/power_summary.csv` (with `output.detailed: true`) breaks all of
 this down per gated window, plus a `whole_capture_window` reference row for

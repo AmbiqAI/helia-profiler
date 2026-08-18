@@ -731,7 +731,7 @@ int main(void) {
         }
 {% else %}
         // Warm caches / branch predictor / MRAM prefetch (uninstrumented).
-{% if not use_stimer_window and clean_window_probe | default("infer") != "busy_loop" -%}
+{%- if not use_stimer_window and clean_window_probe | default("infer") != "busy_loop" %}
         // The warm cost is MEASURED here as well as primed: it is the
         // reference the in-window stall check compares against (#121).  Taking
         // the MAX rejects a warm iteration that itself lost time to a stalled
@@ -745,7 +745,7 @@ int main(void) {
             uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
             if (wc > clean_warm_cyc) clean_warm_cyc = wc;
         }
-{%- else -%}
+{%- else %}
         for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
             memset(input->data.raw, 0, input->bytes);
             interpreter.Invoke();

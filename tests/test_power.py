@@ -2163,8 +2163,9 @@ class TestPowerFirmwareSelection:
         """A stalled clean window contaminates the window sizing too (#121).
 
         ``clean_infer_avg_us`` reads low by the stalled fraction, so the
-        derived N -- and every ``active_window_estimated_*`` scaled by it --
-        comes out short by the same factor. The count is deliberately still
+        derived N comes out short by the same factor. (``report/summary.py``'s
+        ``active_window_estimated_*`` are NOT affected -- they come from
+        ``profiled_infer_total_us``.) The count is deliberately still
         derived (dropping to ``firmware_auto`` would make
         ``BuildPowerFirmwareStage`` skip the fixed-N build and change what runs
         on the bench), so the contamination has to be stated rather than
@@ -2181,6 +2182,7 @@ class TestPowerFirmwareSelection:
                 clean_infer_avg_us=2226,
                 clean_infer_count=1092,
                 clean_stalled_iters=233,
+                clean_partial_iters=0,
             ),
             layers=[],
         )
@@ -2207,6 +2209,7 @@ class TestPowerFirmwareSelection:
                 clean_infer_avg_us=2226,
                 clean_infer_count=1092,
                 clean_stalled_iters=0,
+                clean_partial_iters=0,
             ),
             layers=[],
         )
