@@ -117,21 +117,14 @@ class ClockCapabilities:
     #: free.  A *free-running* binary has no such guarantee -- see the
     #: override note below.
     #:
-    #: This is the family's *preference*, not the final choice.  The dedicated
-    #: power binary overrides it to STIMER wherever
-    #: ``broad_peripheral_shutdown`` is set, because that shutdown disables
-    #: AM_HAL_PWRCTRL_PERIPH_DEBUG — a different mechanism from the
-    #: ``gate_debug_domain_in_window`` path below, and one that leaves DWT
-    #: unreadable regardless of this preference.  See the ``window_timer``
-    #: derivation at the top of ``main.cc.j2``; the invariant is pinned by
-    #: ``test_window_is_never_timed_by_a_domain_the_binary_powers_down``.
-    #:
-    #: KNOWN GAP: ``broad_peripheral_shutdown`` is a proxy for "this binary
-    #: cannot read DWT", not the condition itself.  Apollo3 has
-    #: ``requires_attached_probe_for_cycles=True`` and no broad shutdown, so
-    #: it keeps DWT here even though its free-running power binary has no
-    #: debugger holding the domain up either.  Widening the predicate needs
-    #: AP3 hardware to verify; tracked separately.
+    #: This is the family's *preference*, not the final choice.  It is the
+    #: timer the *transport-attached profile* binary uses; the dedicated power
+    #: binary resolves its own via
+    #: :attr:`SocCapabilities.power_window_timer`, which overrides this to
+    #: STIMER wherever that binary cannot rely on the debug domain being
+    #: readable.  The invariant is pinned by
+    #: ``test_window_is_never_timed_by_a_domain_the_binary_powers_down`` and
+    #: ``test_free_running_power_binary_never_times_the_window_with_dwt``.
     clean_window_timer: str
     #: Whether the firmware should call am_hal_debug_disable()/enable() around
     #: the *default* ``infer`` clean-window probe (not just the opt-in
@@ -180,6 +173,53 @@ class SocCapabilities:
     transport: TransportCapabilities
     memory: MemoryCapabilities
     clock: ClockCapabilities
+
+    @property
+    def power_window_timer(self) -> str:
+        """Timer the *dedicated power binary* must use for its measured window.
+
+        The question is not "which clock is nicest" but "can this binary read
+        ``DWT->CYCCNT`` while the window is open".  There are two independent
+        ways the answer is no, and either one is sufficient:
+
+        * The binary powers the CoreSight debug domain down itself —
+          ``clock.broad_peripheral_shutdown`` disables
+          ``AM_HAL_PWRCTRL_PERIPH_DEBUG`` (AP4 family, see
+          ``_peripheral_power_down.j2``).
+        * Nothing holds that domain up — on the Cortex-M4F families
+          ``transport.requires_attached_probe_for_cycles`` records that DWT
+          only stays powered while a debugger asserts ``CDBGPWRUPREQ``, a
+          signal firmware cannot set.  The dedicated power binary free-runs
+          unwatched once flashed (WP4), so no debugger is holding it.
+
+        Either way an in-window DWT read is frozen or garbage, the accumulated
+        cycle count is meaningless, and the terminal report's ``elapsed_us`` —
+        derived from it — is wrong.  What that costs depends on who measures:
+        with an on-device monitor (internal mode) that duration is also the
+        denominator for average power and current, so both are scaled by the
+        same error and only the hardware-integrated energy and charge survive;
+        with an external instrument the host owns those numbers and only
+        ``elapsed_us`` is affected.  STIMER runs off its own 32.768 kHz XTAL
+        and is readable in both situations, so it is the answer whenever DWT is
+        not trustworthy.
+
+        The two mechanisms are kept as separate disjuncts rather than
+        collapsed: AP4 happens to satisfy both, but a future family could
+        acquire the broad shutdown without being Cortex-M4F, or vice versa.
+
+        Consumed by ``main.cc.j2`` / ``main_aot.cc.j2`` through
+        ``FirmwareRenderContext``; this is the single place the predicate
+        lives, so the two templates cannot drift apart (the class of bug that
+        produced the original AP4 miss).
+        """
+        if self.clock.clean_window_timer == "stimer":
+            return "stimer"
+        if (
+            self.clock.broad_peripheral_shutdown
+            or self.transport.requires_attached_probe_for_cycles
+        ):
+            return "stimer"
+        return "dwt"
 
 
 @dataclass(frozen=True)

@@ -3,10 +3,55 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from ..errors import PowerError
 from ..pipeline import PipelineContext
 from ..power.base import PowerResult, PowerSummary
+from ..power.diagnostics import (
+    FROZEN_WINDOW_CLOCK_HINT,
+    assess_run_window_clock,
+    assess_window_clock_ceiling,
+    firmware_window_clock_is_frozen,
+)
+
+
+def _host_phase_envelope_s(ctx: PipelineContext) -> float | None:
+    """Host wall time from starting the power binary to collecting its record.
+
+    ``DeploymentRecord.deployed_at`` is the cleanest timestamp already in the
+    pipeline for "the power phase began": ``FlashPowerFirmwareStage`` stamps it
+    immediately after the J-Link recipe programs and releases the target, and
+    in internal mode nothing touches the device again before this stage (the
+    capture stage is skipped -- see ``CapturePowerStage.should_skip``). No new
+    plumbing is needed. Note the record itself is never serialized -- what
+    reaches an artifact is the derived ``window_clock_ceiling`` metadata this
+    stage stores, not ``deployed_at``.
+
+    The interval is a deliberate over-estimate of the measured window: it also
+    contains flash-tool exit, boot, engine/model init, and the post-window
+    terminal emit plus this stage's own wait. That makes it a loose ceiling, not
+    a duration estimate -- see ``WindowClockCeiling`` for what that costs in
+    sensitivity.
+
+    Returns ``None`` when there is no deployment record or the timestamp cannot
+    be parsed, so the caller simply has nothing to check rather than inventing
+    a bound. Note this reads the host wall clock, not a monotonic one -- a clock
+    step between the two reads would skew it, which is a reason this check warns
+    rather than fails.
+    """
+    deployment = ctx.power_run.deployment if ctx.power_run is not None else None
+    if deployment is None:
+        return None
+    try:
+        started = datetime.fromisoformat(deployment.deployed_at)
+    except (ValueError, TypeError):
+        # Unreachable while deployed_at is always an ISO string, but a
+        # warn-only diagnostic must never be the thing that crashes a run.
+        return None
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - started).total_seconds()
 
 log = logging.getLogger("hpx")
 
@@ -73,6 +118,22 @@ class CollectPowerTerminalStage:
             )
         if not terminal.gate_lowered:
             raise PowerError("Power firmware did not confirm that GATE was lowered.")
+        frozen_window_clock = firmware_window_clock_is_frozen(
+            elapsed_us=terminal.elapsed_us,
+            completed_count=terminal.completed_count,
+        )
+        if frozen_window_clock and internal_mode:
+            # The firmware says it ran N inferences in zero time, and in
+            # internal mode that number IS the denominator: the parser requires
+            # MEASUREMENT_DURATION_US == ELAPSED_US, so average power and
+            # current are wrong by the same factor. The measurement of record
+            # is corrupt, which is terminal here for the same reason the
+            # all-zero INA228 reading above is.
+            raise PowerError(
+                "Power firmware reported zero elapsed time for "
+                f"{terminal.completed_count} completed inferences.",
+                hint=FROZEN_WINDOW_CLOCK_HINT,
+            )
         if envelope.measurement is not None and envelope.measurement.overflow:
             if not internal_mode:
                 # The monitor is present but is not this run's measurement of
@@ -172,6 +233,89 @@ class CollectPowerTerminalStage:
                     "inference_count": measurement.inference_count,
                 },
             )
+        if frozen_window_clock:
+            # External mode: warn, do not raise. The instrument owns every
+            # published power number here, so a frozen firmware clock corrupts
+            # elapsed_us and nothing else -- the Apollo3 baseline capture
+            # reported elapsed_us=0 with average power still correct to 0.19%.
+            # Raising would throw away a good capture, and would do it before
+            # GenerateReportStage, so the run would produce no artifact at all
+            # and the downstream validity issue could never be seen. Same shape
+            # as the bystander-overflow path below.
+            log.warning(
+                "Power firmware reported zero elapsed time for %d completed "
+                "inferences: its window clock never advanced. The %s owns this "
+                "run's power numbers and they are unaffected; only the "
+                "firmware-reported window duration is meaningless. %s",
+                terminal.completed_count,
+                ctx.config.power.driver,
+                FROZEN_WINDOW_CLOCK_HINT,
+            )
+        # Non-fatal cross-check of the firmware's own window clock against an
+        # independent measurement of the same work. Warning-only: the tolerances
+        # here are set from a narrow bench envelope -- wide enough that only a
+        # real timing fault trips them, not wide enough to promise no false
+        # positives on hardware nobody has run yet. See
+        # power.diagnostics.EXTERNAL_/INTERNAL_WINDOW_CLOCK_TOLERANCE.
+        agreement = assess_run_window_clock(
+            elapsed_us=terminal.elapsed_us,
+            internal_mode=internal_mode,
+            gated_result=(
+                ctx.power_run.observation.result
+                if ctx.power_run.observation is not None
+                else None
+            ),
+            planned_inference_count=plan.inference_count,
+            planned_inference_us=plan.reference_inference_us,
+        )
+        if agreement is not None and not agreement.agrees:
+            log.warning(
+                "Power firmware reported a %.6f s window but the %s measured "
+                "%.6f s (%.1f%% apart, tolerance %.0f%%). The firmware's "
+                "window clock and the reference disagree, so elapsed time, "
+                "average power and average current derived from it are "
+                "suspect; integrated energy and charge are not.",
+                agreement.elapsed_s,
+                agreement.reference_source,
+                agreement.reference_s,
+                agreement.relative_error * 100.0,
+                agreement.relative_tolerance * 100.0,
+            )
+        if internal_mode:
+            # Plan- and hardware-independent ceiling. The plan comparison above
+            # can only ever be as good as a different binary's timing, but the
+            # host knows for a fact when it started this binary and when it
+            # collected the record -- the measured window is strictly inside
+            # that interval. This is what catches the AP4-style ~7x inflation
+            # for a user with no external instrument.
+            ceiling = assess_window_clock_ceiling(
+                elapsed_us=terminal.elapsed_us,
+                host_envelope_s=_host_phase_envelope_s(ctx),
+            )
+            if ceiling is not None:
+                if ctx.power_result is not None:
+                    # Recorded so evaluation.validity can re-derive the same
+                    # verdict later; it has no "now" of its own. Note this does
+                    # NOT reach summary.json -- report/summary.py copies power
+                    # metadata through an explicit allowlist and this key is not
+                    # in it (adding it is a schema change, deliberately out of
+                    # scope). The numbers surface only in the validity issue's
+                    # context.
+                    ctx.power_result.metadata["window_clock_ceiling"] = (
+                        ceiling.to_metadata()
+                    )
+                if ceiling.exceeded:
+                    log.warning(
+                        "Power firmware reported a %.6f s window, but only "
+                        "%.6f s of host wall time elapsed between starting the "
+                        "power binary and collecting its record (%.1fx). A "
+                        "window cannot outlast the interval that contains it, "
+                        "so the firmware's window clock is wrong; integrated "
+                        "energy and charge are unaffected.",
+                        ceiling.elapsed_s,
+                        ceiling.host_envelope_s,
+                        ceiling.ratio,
+                    )
         log.info(
             "Power terminal: status=%s count=%d elapsed_us=%s phase=%s",
             terminal.status,

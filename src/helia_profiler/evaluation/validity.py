@@ -5,7 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from ..power.diagnostics import assess_gate_duration
+from ..power.diagnostics import (
+    assess_gate_duration,
+    assess_run_window_clock,
+    firmware_window_clock_is_frozen,
+    window_clock_ceiling_from_metadata,
+)
 from ..results import ResultIssue, ResultValidity
 
 if TYPE_CHECKING:
@@ -120,6 +125,85 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                         requested_count=terminal.requested_count,
                     )
                 )
+            # Same policy the collect stage applies at capture time, from the
+            # same helpers, so the two cannot disagree about severity: a run
+            # the stage refuses to accept must not evaluate as VALID here if
+            # it reaches this path some other way (a resumed or replayed
+            # artifact, or a caller that skipped the stage). This mirrors the
+            # on_device_overflow shape below, where the stage's mode-aware
+            # fatal/warn split is reproduced rather than restated.
+            if firmware_window_clock_is_frozen(
+                elapsed_us=terminal.elapsed_us,
+                completed_count=terminal.completed_count,
+            ):
+                # Mode-aware for the same reason on_device_overflow is: whether
+                # this is fatal depends entirely on whether the broken number is
+                # the measurement of record. Internal mode divides energy by
+                # this duration, so the published power is corrupt. External
+                # mode gets its power from the instrument and only loses
+                # elapsed_us -- invalidating there would block comparability of
+                # a capture whose power metrics are sound.
+                if internal_mode:
+                    issues.append(
+                        _error(
+                            "power.window_clock_frozen",
+                            "Power firmware reported zero elapsed time for completed "
+                            "inferences; the on-device measurement derived from it is "
+                            "corrupt.",
+                            completed_count=terminal.completed_count,
+                            elapsed_us=terminal.elapsed_us,
+                        )
+                    )
+                else:
+                    issues.append(
+                        _warning(
+                            "power.window_clock_frozen",
+                            "Power firmware reported zero elapsed time for completed "
+                            "inferences; the external instrument's power numbers are "
+                            "unaffected, but the firmware-reported window duration is "
+                            "meaningless.",
+                            completed_count=terminal.completed_count,
+                            elapsed_us=terminal.elapsed_us,
+                        )
+                    )
+            else:
+                agreement = assess_run_window_clock(
+                    elapsed_us=terminal.elapsed_us,
+                    internal_mode=internal_mode,
+                    gated_result=observation.result if observation is not None else None,
+                    planned_inference_count=plan.inference_count,
+                    planned_inference_us=plan.reference_inference_us,
+                )
+                if agreement is not None and not agreement.agrees:
+                    issues.append(
+                        _warning(
+                            "power.window_clock_mismatch",
+                            "Firmware-reported window duration does not agree with "
+                            "the independently measured window.",
+                            **agreement.to_metadata(),
+                        )
+                    )
+                # Host wall-clock ceiling, recorded by the collect stage (which
+                # is the only place that knows "now"). The verdict is
+                # re-derived from the stored measurements rather than read from
+                # a cached boolean, the same way _duration_integrity_valid()
+                # re-derives the gate-duration verdict.
+                ceiling_meta = (
+                    ctx.power_result.metadata.get("window_clock_ceiling")
+                    if ctx.power_result is not None
+                    else None
+                )
+                if isinstance(ceiling_meta, dict):
+                    ceiling = window_clock_ceiling_from_metadata(ceiling_meta)
+                    if ceiling is not None and ceiling.exceeded:
+                        issues.append(
+                            _warning(
+                                "power.window_clock_exceeds_host_time",
+                                "Firmware-reported window is longer than the host "
+                                "wall time that contained it.",
+                                **ceiling.to_metadata(),
+                            )
+                        )
 
         if on_device is not None:
             if on_device.overflow:

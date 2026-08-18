@@ -1,10 +1,13 @@
 {# main_aot.cc — heliaPROFILER firmware for heliaAOT engine #}
-{#- See main.cc.j2 for the full rationale: the dedicated power binary disables
-   the CoreSight debug domain wherever broad_peripheral_shutdown is set (AP4
-   families) and DWT->CYCCNT lives there, so those renders must time the window
-   with STIMER or the reported duration is garbage and average power/current
-   are silently divided by the inflation factor. -#}
-{%- set window_timer = "stimer" if (clean_window_timer | default("dwt") == "stimer" or (power_only | default(false) and broad_peripheral_shutdown | default(false))) else "dwt" %}
+{#- See main.cc.j2 for the full rationale, and
+   SocCapabilities.power_window_timer for the predicate: the dedicated power
+   binary cannot rely on DWT->CYCCNT (the CoreSight debug domain is either
+   powered down by the binary itself or held up by nobody), so those renders
+   must time the window with STIMER or the reported duration is wrong. With an
+   on-device monitor (internal mode) that duration is also the denominator for
+   average power and current, so both are scaled by the same error; with an
+   external instrument only elapsed_us is affected. -#}
+{%- set window_timer = power_window_timer if power_only | default(false) else (clean_window_timer | default("dwt")) %}
 {%- set use_stimer_window = (window_timer == "stimer") and (clean_window_probe | default("infer") != "busy_loop") %}
 /**
  * @file main.cc
@@ -47,10 +50,15 @@
 // Apollo3/3P TurboSPOT (burst) control lives in the AmbiqSuite HAL umbrella.
 #include "am_mcu_apollo.h"
 {% endif %}
-{% if power_only | default(false) and (broad_peripheral_shutdown | default(false) or crypto_otp_shutdown | default(false)) and not apollo3_burst and not has_armv8m_pmu %}
-// Broad peripheral power-down (_peripheral_power_down.j2) / crypto-otp
-// shutdown (_crypto_otp_shutdown.j2) needs VCOMP/_VAL2FLD register
-// definitions from the same AmbiqSuite HAL umbrella.
+{% if ((window_timer == "stimer") or (power_only | default(false) and (broad_peripheral_shutdown | default(false) or crypto_otp_shutdown | default(false)))) and not apollo3_burst and not has_armv8m_pmu %}
+// STIMER window timing (_stimer_init.j2), the broad peripheral power-down
+// (_peripheral_power_down.j2) and the crypto-otp shutdown
+// (_crypto_otp_shutdown.j2) all need register definitions from the same
+// AmbiqSuite HAL umbrella header.  Merged into one guard here (main.cc.j2
+// keeps them as two mutually-exclusive blocks) so the header can never be
+// emitted twice or, as before this guard covered STIMER, not at all: an AP3
+// power render needs STIMER without running either shutdown, and used to
+// reference am_hal_stimer_* with no HAL header in scope.
 #include "am_mcu_apollo.h"
 {% endif %}
 
@@ -896,13 +904,14 @@ int main(void) {
         clean_cycles = clean_probe_target_cyc;
         clean_count = 1;
 {% elif use_stimer_window %}
-        // Timed via STIMER (see hpx_stimer_init above), not DWT->CYCCNT: PD_DBG
-        // (and DWT with it) is disabled for this whole loop on this family, so
-        // an in-window DWT read would read frozen.  A single before/after
-        // STIMER read brackets the whole window rather than reading every
-        // iteration — fewer peripheral accesses inside the timed loop and no
-        // resolution concern at this scale (XTAL 32.768 kHz ticks are ~30.5us,
-        // negligible against a multi-ms clean window).
+        // Timed via STIMER (see hpx_stimer_init above), not DWT->CYCCNT: this
+        // build cannot rely on PD_DBG (and DWT with it) being readable for the
+        // whole loop -- it is either gated off deliberately or simply never
+        // powered -- so an in-window DWT read would read frozen or garbage.  A
+        // single before/after STIMER read brackets the whole window rather
+        // than reading every iteration — fewer peripheral accesses inside the
+        // timed loop and no resolution concern at this scale (XTAL 32.768 kHz
+        // ticks are ~30.5us, negligible against a multi-ms clean window).
         for (int iter = 0; iter < clean_iters_n; iter++) {
             {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
             clean_count++;

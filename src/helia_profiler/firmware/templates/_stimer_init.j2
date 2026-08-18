@@ -2,11 +2,19 @@
 
    Used instead of DWT->CYCCNT to time the silent clean/power window wherever
    the binary cannot rely on the CoreSight debug power domain staying up:
-   Apollo5 always (ClockCapabilities.clean_window_timer == "stimer"), and
-   Apollo4 dedicated power binaries, whose broad peripheral shutdown disables
-   that domain outright (see the window_timer derivation in the main
-   templates).  STIMER is clock-mode-independent (own XTAL) and, critically,
-   keeps ticking with the debug domain powered off.
+   Apollo5 always (ClockCapabilities.clean_window_timer == "stimer"), and every
+   Cortex-M4F (Apollo3/3P, Apollo4/4P/4L) dedicated power binary -- AP4's broad
+   peripheral shutdown disables that domain outright, and both families' power
+   binaries free-run with no debugger asserting CDBGPWRUPREQ to hold it up.
+   See SocCapabilities.power_window_timer.  STIMER is clock-mode-independent
+   (own XTAL) and, critically, keeps ticking with the debug domain powered off.
+
+   Apollo3/3P validity: am_hal_stimer_config / am_hal_stimer_counter_get and
+   the AM_HAL_STIMER_XTAL_32KHZ / CFG_CLEAR / CFG_RUN literals all exist in the
+   apollo3 and apollo3p HALs, and this exact two-call sequence is what
+   AmbiqSuite's own apollo3p STIMER widget uses (CFG_RUN is 0 there --
+   CTIMER_STCFG_CLEAR_RUN -- so the second write both selects the clock and
+   releases the counter from reset).
 #}
 // STIMER cycle-independent wall clock for the clean/power window.
 #define HPX_STIMER_HZ 32768U
