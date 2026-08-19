@@ -2314,6 +2314,58 @@ class TestPowerFirmwareSelection:
         with pytest.raises(PowerError, match="runs no inferences"):
             plan_power_run(ctx, inference_count=50)
 
+    def test_every_count_source_has_a_gate_tolerance(self):
+        """A new count_source must not inherit the tight branch by omission.
+
+        `capture/__init__.py` used to pick the gate tolerance from an inline
+        `in {"configured", "profile_guided"}` set, so adding `probe_window` to
+        the Literal silently routed it to the 1% branch -- the branch meant
+        for a firmware-owned count, on the one plan shape whose length is
+        PREDICTED. `capture_gated` raises rather than warns, so that is a run
+        that cannot finish. Pinned against the Literal's own arguments rather
+        than a hand-copied list, so the two cannot drift.
+        """
+        from typing import get_args, get_type_hints
+
+        from helia_profiler.power.diagnostics import _GATE_RELATIVE_TOLERANCE
+        from helia_profiler.results import PowerRunPlan
+
+        declared = set(get_args(get_type_hints(PowerRunPlan)["count_source"]))
+
+        assert declared == set(_GATE_RELATIVE_TOLERANCE), (
+            "count_source values without an explicit gate tolerance: "
+            f"{declared - set(_GATE_RELATIVE_TOLERANCE)}"
+        )
+
+    def test_a_mis_sized_spin_is_not_absorbed_by_the_per_unit_slack(self):
+        """The gate check must actually bound a one-unit window.
+
+        `assess_gate_duration` allows half of one unit of work for a window
+        that ends part-way through a unit. When there is only ONE unit that
+        term is half the entire measurement, so it swamped every other bound
+        and left a +/-50% check: a spin 40% short of target read as valid.
+        A busy_loop plan is exactly that shape.
+        """
+        from helia_profiler.power.diagnostics import (
+            assess_gate_duration,
+            gate_relative_tolerance_for,
+        )
+
+        # One unit lasting 5 s -- the plan a busy_loop run produces.
+        def assess(measured_s: float):
+            return assess_gate_duration(
+                measured_s=measured_s,
+                clean_infer_count=1,
+                clean_infer_avg_us=5_000_000,
+                stats_rate_hz=1000,
+                relative_tolerance=gate_relative_tolerance_for("probe_window"),
+            )
+
+        assert assess(5.0).valid, "a perfect run must pass"
+        assert assess(4.0).valid, "a 20% miscalibrated spin is still usable"
+        assert not assess(3.0).valid, "a 40% short window must be caught"
+        assert not assess(0.006).valid, "the calibration-fallback shape must be caught"
+
     def test_power_plan_flags_a_stalled_profile_reference(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ):

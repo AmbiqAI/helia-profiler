@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 
 from ..results import PowerObservation
-from ..config import DEFAULT_POWER_DURATION_S, DEFAULT_POWER_WINDOW_TARGET_MS
+from ..config import DEFAULT_POWER_DURATION_S
 from ..errors import PowerError
 from ..pipeline import PipelineContext
 from ..target.lifecycle import CapturePhase, prepare_target_for_phase
@@ -88,7 +88,7 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
     profiled_run_s = profiled_inferences * inference_time_s
 
     if profiling.window_mode == "auto":
-        target_ms = max(profiling.window_target_ms, DEFAULT_POWER_WINDOW_TARGET_MS)
+        target_ms = ctx.config.effective_window_target_ms
         target_s = target_ms / 1000.0
         clean_iters = target_s / inference_time_s if inference_time_s > 0 else profiling.window_min
         clean_iters = max(profiling.window_min, min(profiling.window_max, clean_iters))

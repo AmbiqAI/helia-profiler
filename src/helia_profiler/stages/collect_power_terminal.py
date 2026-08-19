@@ -14,7 +14,6 @@ from ..power.diagnostics import (
     assess_window_clock_ceiling,
     expected_terminal_requested_count,
     firmware_window_clock_is_frozen,
-    probe_runs_inferences,
 )
 
 
@@ -96,7 +95,6 @@ class CollectPowerTerminalStage:
         envelope = collector.collect(ctx, timeout_s=timeout_s)
         terminal = envelope.terminal
 
-        runs_inferences = probe_runs_inferences(ctx.config.profiling.clean_window_probe)
         expected_requested = expected_terminal_requested_count(
             inference_count=plan.inference_count,
             clean_window_probe=ctx.config.profiling.clean_window_probe,

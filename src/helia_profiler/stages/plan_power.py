@@ -121,6 +121,12 @@ def plan_power_run(
     if ctx.pmu_result is not None:
         reference_us = ctx.pmu_result.meta.clean_infer_avg_us
 
+    # The host's own sizing goal for a COUNTED window: it picks N from this,
+    # renders the firmware with clean_iters=N, and the firmware runs exactly
+    # that many inferences -- so the goal is self-consistent whatever
+    # window_mode says, and raising it to the power floor unconditionally is
+    # what guarantees an integrable window. A probe that sizes its own window
+    # is the opposite case and must not use this; see below.
     target_duration_ms = max(
         ctx.config.profiling.window_target_ms,
         DEFAULT_POWER_WINDOW_TARGET_MS,
@@ -141,9 +147,17 @@ def plan_power_run(
         # default firmware: dedicated (#125).
         #
         # So describe the window in the probe's own units: one unit of work,
-        # lasting the target duration. Every downstream consumer computes
-        # count x reference_us, so they all now expect exactly the window the
-        # firmware actually runs.
+        # lasting the window the firmware was BUILT to spin for. That length
+        # is not the host's goal above -- this probe sizes its own window from
+        # the template variable, so the plan has to read the same property the
+        # render read (config.effective_window_target_ms), or the two disagree
+        # wherever the power floor does not apply. Under window_mode: fixed
+        # with a sub-floor target they diverged 5x: firmware built to spin
+        # 1000 ms, plan describing 5000 ms -- which left external mode still
+        # unable to complete the run #125 is about, made every CORRECT
+        # internal run evaluate degraded, and let _check_ina228_cadence pass a
+        # window that really gets a fifth of the accumulator updates it
+        # checked for (found by review).
         #
         # This overrides an explicitly requested count rather than honouring
         # it, because the firmware ignores it: a caller asking for N here
@@ -164,6 +178,7 @@ def plan_power_run(
                 ),
             )
         inference_count = 1
+        target_duration_ms = ctx.config.effective_window_target_ms
         reference_us = target_duration_ms * 1000
         count_source = "probe_window"
     elif inference_count is None:

@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 
 from ..config import DEFAULT_POWER_DURATION_S, Transport
 from ..errors import CaptureError, PowerError
+from ..power.diagnostics import gate_relative_tolerance_for
 from ..transport import (
     HPX_END,
     HPX_START,
@@ -419,10 +420,8 @@ def capture_power(
                 clean_infer_count=clean_count,
                 clean_infer_avg_us=clean_avg_us,
                 minimum_gate_s=DEFAULT_POWER_MIN_WINDOW_MS / 1000.0,
-                gate_relative_tolerance=(
-                    0.10
-                    if plan.count_source in {"configured", "profile_guided"}
-                    else 0.01
+                gate_relative_tolerance=gate_relative_tolerance_for(
+                    plan.count_source
                 ),
                 on_started=_release,
                 # The dedicated JS320 GPI stream provides the authoritative

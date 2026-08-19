@@ -101,6 +101,43 @@ class GateDurationIntegrity:
         return self.measured_s / self.expected_s if self.expected_s > 0 else 0.0
 
 
+#: How far the measured gate may sit from the plan, per ``count_source``.
+#:
+#: The question this answers is how well the host could KNOW the window length
+#: before the run, which is a property of where the count came from:
+#:
+#:   * ``firmware_auto`` -- no host plan; the firmware's own count is the
+#:     reference, so the two sides are the same measurement. Tight.
+#:   * ``configured`` / ``profile_guided`` -- N counted inferences, timed by a
+#:     DIFFERENT binary. Cross-binary timing spread is the error term.
+#:   * ``probe_window`` -- nothing is counted. The busy_loop window is a spin
+#:     whose length is PREDICTED from a calibration pass, so its error is the
+#:     calibration's transfer error rather than a timing spread, and it
+#:     deserves the loosest band. 0.25 still TIGHTENS this case: the
+#:     per-unit slack below used to work out to half the window (the unit is
+#:     the window here), which no other bound could ever exceed.
+#:
+#: A count_source missing from this map would silently take the tight branch
+#: and fail runs it should accept -- the failure #125 is about -- so
+#: tests/test_power.py pins the map against the Literal's own arguments.
+_GATE_RELATIVE_TOLERANCE: dict[str, float] = {
+    "firmware_auto": 0.01,
+    "configured": 0.10,
+    "profile_guided": 0.10,
+    "probe_window": 0.25,
+}
+
+#: Used when a count_source is not in the map. Loose rather than tight on
+#: purpose: an unmapped source is a bug, and the tight branch turns that bug
+#: into a run that cannot complete instead of one that merely warns.
+DEFAULT_GATE_RELATIVE_TOLERANCE = 0.10
+
+
+def gate_relative_tolerance_for(count_source: str) -> float:
+    """Gate tolerance implied by how the plan's count was chosen."""
+    return _GATE_RELATIVE_TOLERANCE.get(count_source, DEFAULT_GATE_RELATIVE_TOLERANCE)
+
+
 def assess_gate_duration(
     *,
     measured_s: float,
@@ -112,7 +149,15 @@ def assess_gate_duration(
 ) -> GateDurationIntegrity:
     """Compare a gate against ``N * inference_time`` with instrument jitter allowance."""
     expected_s = clean_infer_count * clean_infer_avg_us / 1_000_000.0
-    inference_slack_s = clean_infer_avg_us / 2_000_000.0
+    # Half of one unit of work, because a window can end part-way through a
+    # unit. With a SINGLE unit there is no partial-unit boundary to allow for,
+    # and the term would be half the entire measurement -- swamping every
+    # other bound and leaving a +/-50% check that calls almost anything valid.
+    # A probe_window plan is exactly that shape (one unit lasting the whole
+    # window), and so is a 1-inference counted window.
+    inference_slack_s = (
+        clean_infer_avg_us / 2_000_000.0 if clean_infer_count > 1 else 0.0
+    )
     packet_slack_s = 2.0 / max(1, stats_rate_hz)
     cross_binary_slack_s = expected_s * relative_tolerance
     return GateDurationIntegrity(

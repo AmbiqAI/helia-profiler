@@ -792,3 +792,10 @@ class TestBusyLoopProbeCompletesARun:
             CollectPowerTerminalStage().run(ctx)
 
         assert "window clock" in caplog.text
+
+
+@pytest.mark.parametrize("transport", ["rtt", "uart", "swo", "usb_cdc"])
+def test_collect_stage_supports_all_profile_transports(tmp_path: Path, transport: str):
+    ctx = _make_ctx(tmp_path, transport=transport)
+
+    assert CollectPowerTerminalStage().should_skip(ctx) is False
