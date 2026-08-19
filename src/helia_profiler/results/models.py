@@ -221,28 +221,6 @@ class EngineInfo:
     version: str | None = None
 
 
-@dataclass(frozen=True)
-class WindowSemantics:
-    """What the built firmware's measured window does, for comparability.
-
-    Two runs whose windows measure different quantities -- a model inference
-    versus a calibrated CPU spin, a DWT-timed window versus a STIMER-timed
-    one, a board with its radio subsystem shut down versus one without -- are
-    not comparable on power, however well every other dimension matches. The
-    fingerprint is what ``hpx compare`` keys on; ``fields`` is kept so a
-    mismatch can name WHICH property differed instead of showing the user two
-    opaque digests.
-
-    ``fields`` is a plain mapping rather than a mirror of
-    ``PowerWindowContext``'s 22 typed fields on purpose: it exists to be
-    diffed and rendered, and duplicating the type here would reintroduce
-    exactly the hand-maintained second list this dimension replaces.
-    """
-
-    fingerprint: str
-    fields: dict[str, Any] = field(default_factory=dict)
-
-
 @dataclass
 class RunMetadata:
     """Accumulated run metadata — enriched by stages, consumed by reports."""
@@ -260,7 +238,6 @@ class RunMetadata:
     timing: TimingInfo | None = None
     compatibility: CompatibilityResolution | None = None
     dependencies: "DependencyProvenance | None" = None
-    window_semantics: "WindowSemantics | None" = None
 
 
 # ---------------------------------------------------------------------------

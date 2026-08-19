@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from ..config import DEFAULT_ARENA_SIZE_BYTES, Transport
@@ -211,32 +209,6 @@ class PowerWindowContext:
     crypto_otp_shutdown: bool
     has_radio_subsystem: bool
     ble_reset_gpio_pin: int | None
-
-    @property
-    def semantics(self) -> dict[str, Any]:
-        """Every field of this object, as comparable scalars.
-
-        This dataclass exists to say what the measured window DOES, so its
-        field set is exactly the set of things that make two power runs
-        measure different quantities. Deriving the comparability key from the
-        whole object rather than from a hand-picked list is the point: adding
-        a field here extends the key automatically, where a hand-maintained
-        list of dimensions has to be remembered -- and was not, three times
-        over, in #125.
-
-        Deliberately NOT included: the ``clean_iters`` / ``window_mode``
-        overrides ``render_power_source()`` applies to the dedicated power
-        binary. That N is derived from a live measurement and so differs
-        between two runs of the same configuration; it is carried by
-        ``power_plan`` instead, which is where a run-derived value belongs.
-        """
-        return {field.name: getattr(self, field.name) for field in fields(self)}
-
-    @property
-    def fingerprint(self) -> str:
-        """Stable digest of :attr:`semantics`, for equality comparison."""
-        canonical = json.dumps(self.semantics, sort_keys=True, separators=(",", ":"))
-        return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 
 @dataclass(frozen=True)

@@ -312,22 +312,17 @@ def test_partial_manifest_dimensions_fall_back_to_metadata():
     assert not assessment.run_metrics_comparable
 
 
-def _manifest_with_window(fingerprint: str, **window_fields):
-    """A manifest carrying the window-semantics dimension and its field set."""
+
+def _manifest_with_probe(probe: str | None):
+    """A manifest carrying the probe dimension, as the writer records it."""
+    from helia_profiler.results import ResultValidity
     from helia_profiler.results.manifest import (
         RESULT_MANIFEST_SCHEMA,
         RESULT_MANIFEST_SCHEMA_VERSION,
         ResultManifest,
         RunStatus,
     )
-    from helia_profiler.results import ResultValidity
 
-    fields = {
-        "clean_window_probe": "infer",
-        "window_mode": "auto",
-        "window_target_ms": 5000,
-        **window_fields,
-    }
     return ResultManifest(
         schema=RESULT_MANIFEST_SCHEMA,
         schema_version=RESULT_MANIFEST_SCHEMA_VERSION,
@@ -337,86 +332,106 @@ def _manifest_with_window(fingerprint: str, **window_fields):
         status=RunStatus.COMPLETE,
         validity=ResultValidity.VALID,
         issues=(),
-        provenance={"power_window": fields},
-        comparability={"power_window_semantics": fingerprint},
+        provenance={},
+        comparability=(
+            {"power_clean_window_probe": probe} if probe is not None else {}
+        ),
         artifacts=(),
     )
 
 
-def _gated(manifest=None):
+def _powered(probe: str | None = "infer", **kwargs):
     run = _run(
-        power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid"}
+        power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid"},
+        **kwargs,
     )
-    return replace(run, manifest=manifest) if manifest is not None else run
+    return replace(run, manifest=_manifest_with_probe(probe))
 
 
 def test_a_spin_window_is_not_power_comparable_with_an_inference_window():
     """#125 item 4: `hpx compare` diffed a CPU spin against a model inference.
 
     The busy_loop probe replaces the window body with a calibrated spin, so
-    the two runs measure different quantities -- but every dimension the
-    comparison checked matched, and the delta was published as a regression.
+    the two runs measure different physical quantities -- but every dimension
+    the comparison checked matched, and the delta was published as a real
+    regression.
     """
-    baseline = _gated(_manifest_with_window("aaaa1111"))
-    candidate = _gated(
-        _manifest_with_window("bbbb2222", clean_window_probe="busy_loop")
-    )
+    assessment = assess_comparability(_powered("infer"), _powered("busy_loop"))
 
-    assessment = assess_comparability(baseline, candidate)
-
+    assert assessment.run_metrics_comparable, "only power deltas are affected"
     assert not assessment.power_metrics_comparable
     issue = next(
         issue
         for issue in assessment.issues
-        if issue.code == "metric.power_power_window_semantics_mismatch"
+        if issue.code == "metric.power_power_clean_window_probe_mismatch"
     )
     assert issue.severity is ComparabilitySeverity.METRIC_BLOCKING
+    assert issue.context["baseline"] == "infer"
+    assert issue.context["candidate"] == "busy_loop"
 
 
-def test_the_mismatch_names_the_property_that_differs():
-    """Two digests explain nothing; the user needs the field that moved."""
-    baseline = _gated(_manifest_with_window("aaaa1111"))
-    candidate = _gated(
-        _manifest_with_window("bbbb2222", clean_window_probe="busy_loop")
-    )
-
-    assessment = assess_comparability(baseline, candidate)
-    issue = next(
-        issue
-        for issue in assessment.issues
-        if issue.code == "metric.power_power_window_semantics_mismatch"
-    )
-
-    assert issue.context["changed"] == {
-        "clean_window_probe": ("infer", "busy_loop")
-    }
-    assert "clean_window_probe" in issue.message
-    assert "busy_loop" in issue.message
-
-
-def test_identical_window_semantics_stay_comparable():
+def test_the_same_probe_stays_comparable():
     """The dimension must not block two runs of the same setup."""
-    baseline = _gated(_manifest_with_window("aaaa1111"))
-    candidate = _gated(_manifest_with_window("aaaa1111"))
-
-    assessment = assess_comparability(baseline, candidate)
+    assessment = assess_comparability(_powered("infer"), _powered("infer"))
 
     assert assessment.power_metrics_comparable
     assert not any(
-        issue.code == "metric.power_power_window_semantics_mismatch"
+        issue.code == "metric.power_power_clean_window_probe_mismatch"
         for issue in assessment.issues
     )
 
 
 def test_a_baseline_predating_the_dimension_is_skipped_not_blocked():
-    """Stored baselines carry no manifest dimension and must still compare.
+    """Stored baselines carry no value and must still compare.
 
-    Same policy every other dimension here applies: a missing value is
-    unknown, not different.
+    Same policy every dimension here applies: missing is unknown, not
+    different.
     """
-    legacy = _gated()
-    current = _gated(_manifest_with_window("aaaa1111"))
+    assessment = assess_comparability(_powered(None), _powered("busy_loop"))
 
-    assessment = assess_comparability(legacy, current)
+    assert assessment.power_metrics_comparable
+
+
+def test_a_run_that_measured_no_power_does_not_block_one_that_did():
+    """The regression an earlier, broader version of this dimension caused.
+
+    A digest over the whole window context moved on `power.enabled` alone --
+    the power floor raises `window_target_ms` only when power is on -- so
+    comparing a quick latency run against a power-instrumented one suppressed
+    the candidate's real power numbers and told the user "the measured window
+    differs", which they had not chosen. Recording the dimension only for runs
+    that measured power is what keeps that from happening: a run with no power
+    result has nothing to say about how it measured power.
+    """
+    unpowered = replace(_run(), manifest=_manifest_with_probe(None))
+
+    assessment = assess_comparability(unpowered, _powered("busy_loop"))
+
+    assert not any(
+        issue.code == "metric.power_power_clean_window_probe_mismatch"
+        for issue in assessment.issues
+    )
+
+
+def test_two_socs_running_the_same_probe_stay_power_comparable():
+    """Cross-SoC power comparison is a supported question, not a defect.
+
+    The same earlier version folded 8 SoC capability values into the digest,
+    so apollo510 vs apollo4p stopped comparing on power entirely -- silently
+    reversing the documented decision that board differences stay visible as
+    experimental dimensions rather than blocking. What the probe dimension
+    asks is narrower and correct: given whatever hardware, did the two runs
+    put the same thing inside the window?
+    """
+    baseline = _powered("infer")
+    candidate = replace(
+        _powered("infer"),
+        metadata={
+            **_powered("infer").metadata,
+            "platform": {"soc": "apollo4p", "cpu_clock_name": "hp"},
+        },
+    )
+
+    assessment = assess_comparability(baseline, candidate)
 
     assert assessment.power_metrics_comparable
