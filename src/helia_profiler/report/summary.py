@@ -12,6 +12,7 @@ from .memory import _CACHE_COUNTERS, _serialise_memory_plan
 from .power import _power_summary_to_dict
 from .contracts import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION
 from ..evaluation import evaluate_run
+from ..power.diagnostics import probe_runs_inferences
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -192,7 +193,29 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                 summary["power"]["median_power_w"] = round(gw.median_power_w, 9)
                 summary["power"]["p95_power_w"] = round(gw.p95_power_w, 9)
                 summary["power"]["p99_power_w"] = round(gw.p99_power_w, 9)
-            if meta and meta.clean_infer_count and meta.clean_infer_count > 0:
+            # Per-inference figures need a window that actually ran inferences.
+            # The busy_loop probe runs a calibrated CPU spin instead, so
+            # dividing gated energy by any count produces a plausible-looking
+            # number for zero inferences -- and the gate-duration integrity
+            # check cannot catch it, because "N inferences" and "one spin of
+            # the same total length" are timing-identical by construction.
+            # probe_runs_inferences() is the same predicate collect_power_
+            # terminal and evaluation.validity already ask; this was the third
+            # consumer that never asked (#125).
+            probe_ran_inferences = probe_runs_inferences(
+                ctx.config.profiling.clean_window_probe
+            )
+            if not probe_ran_inferences:
+                summary["power"]["per_inference_metrics_omitted"] = (
+                    "clean_window_probe="
+                    f"{ctx.config.profiling.clean_window_probe} runs no inferences"
+                )
+            if (
+                probe_ran_inferences
+                and meta
+                and meta.clean_infer_count
+                and meta.clean_infer_count > 0
+            ):
                 plan_meta = power_meta.get("power_plan")
                 effective_count = meta.clean_infer_count
                 effective_avg_us = meta.clean_infer_avg_us

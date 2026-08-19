@@ -695,6 +695,49 @@ def test_window_clock_ceiling_metadata_keys_are_the_documented_set():
     }
 
 
+def test_busy_loop_probe_publishes_no_per_inference_power_metrics(tmp_path: Path):
+    """A window that ran zero inferences must not report energy per inference.
+
+    The busy_loop probe replaces the inference loop with a calibrated CPU spin.
+    Dividing real gated energy by any count then yields a plausible-looking
+    figure under an ordinary field name -- adversarial review measured
+    `energy_per_inference_j: 0.0021` and `inferences_per_joule: 476` for a
+    window with no inferences in it, alongside `gated_window_duration_ratio:
+    1.0` looking perfectly healthy (#125).
+
+    The integrity check cannot catch this and never could: "N inferences" and
+    "one spin of the same total length" are timing-identical by construction.
+    So the report has to ask the probe, which is what collect_power_terminal
+    and evaluation.validity already do via probe_runs_inferences().
+    """
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=1, clean_infer_avg_us=1_000_000, duration_s=1.0
+    )
+    object.__setattr__(ctx.config.profiling, "clean_window_probe", "busy_loop")
+
+    summary = json.loads(_write_summary(ctx, tmp_path).read_text())
+
+    assert "energy_per_inference_j" not in summary["power"]
+    assert "inferences_per_joule" not in summary["power"]
+    # and it says why, rather than silently omitting them
+    assert "busy_loop" in summary["power"]["per_inference_metrics_omitted"]
+    # the window's own measurements are untouched -- only the per-inference
+    # division is withheld
+    assert summary["power"]["energy_j"] == 0.0016
+
+
+def test_infer_probe_still_publishes_per_inference_power_metrics(tmp_path: Path):
+    """The guard above must not withhold the normal case."""
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=10, clean_infer_avg_us=100_000, duration_s=1.0
+    )
+
+    summary = json.loads(_write_summary(ctx, tmp_path).read_text())
+
+    assert summary["power"]["energy_per_inference_j"] > 0
+    assert "per_inference_metrics_omitted" not in summary["power"]
+
+
 def test_degraded_free_form_capture_suppresses_derived_efficiency(tmp_path: Path):
     config = load_config(
         None,
