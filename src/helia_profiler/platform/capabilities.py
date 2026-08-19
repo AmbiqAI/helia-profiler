@@ -88,6 +88,12 @@ class MemoryCapabilities:
     #: Physical base address of each arena/weights-eligible placement region.
     #: Sizes come from the SoC ``MemoryLayout``; only the bases are family-wide.
     placement_bases: Mapping[Placement, int]
+    #: Address the NSX build programs application images at (the ``LoadFile``
+    #: address in its generated ``flash_cmds.jlink``) -- the first MRAM/flash
+    #: address above the part's bootloader-reserved region, NOT the MRAM
+    #: *region* base in ``placement_bases``.  ``None`` when the family has no
+    #: known value; the J-Link flash fallback refuses to guess an address then.
+    app_flash_load_addr: int | None
 
 
 @dataclass(frozen=True)
@@ -330,6 +336,77 @@ def _family_placement_bases(family: SocFamily) -> Mapping[Placement, int]:
     return MappingProxyType(dict(_FAMILY_MEMORY_BASES.get(family, {})))
 
 
+# App-image flash (``LoadFile``) address per family: ``NSX_SEGGER_PF_ADDR`` from
+# nsx-ambiq-sdk's per-SoC facts (``cmake/socs/facts/*.cmake``) -- the exact
+# address the NSX-generated ``flash_cmds.jlink`` recipes program, i.e. the first
+# MRAM/flash address above each part's bootloader-reserved region, NOT the MRAM
+# region base.  Verified 2026-08 against the facts file of every registered SoC
+# (apollo3p; apollo4p/4l; apollo510/510b/5b/330P) plus real generated recipes,
+# and cross-checked against the AP5 linker script's MCU_MRAM origin (see the
+# apollo330P memory note in soc.py).  Keying by family is safe today: no
+# registered family mixes addresses across its parts.  Two unregistered parts
+# also agree with their families, from the sources that exist for each:
+# apollo510L from its facts file, apollo4b (which has no facts file) from a
+# real generated recipe.
+#
+# Each value is whichever linker layout that part's DEFAULT NSX_LINKER_PROFILE
+# resolves to -- not "the SBL layout" as a blanket rule, because that differs
+# per part.  For the Apollo families here it happens to be SBL: `default` and
+# `itcm` are both sbl-based, and the nbl script (which would move AP5 MRAM to
+# 0x00400000) is not selectable from hpx.  Do NOT generalize that to new parts;
+# atomiq110 below defaults to *nbl*.  Keying is also coarser than NSX's own SoC
+# family axis -- NSX treats apollo330P and atomiq110 as separate families -- so
+# a part whose flash window departs from its family needs a per-SoC entry.
+_FAMILY_APP_FLASH_LOAD_ADDR: dict[SocFamily, int] = {
+    SocFamily.AP3: 0x0000C000,
+    SocFamily.AP4: 0x00018000,
+    SocFamily.AP5: 0x00410000,
+}
+
+# Per-SoC overrides, which win over the family baseline for BUILT-IN SoCs only
+# (see ``_app_flash_load_addr``).  PR #98 adds the same shape for placement
+# bases (``_SOC_MEMORY_BASES``); it is not on this branch yet, so do not expect
+# to find it by grep until that lands.
+#
+# atomiq110 is the motivating case and is NOT an Apollo5 part.  It heads a
+# separate Atomiq series (binned AP6 internally; the eventual family tag is
+# expected to be something like AT1).  ``SocFamily`` has no such member yet, so
+# it is provisionally tagged AP5 on the strength of the shared Cortex-M55/MVE
+# core -- a placeholder for the core tier, not a claim about its memory map.
+#
+# 0x22000000 is the **nbl** (no-bootloader) origin, and it is correct because
+# nsx's atomiq110.cmake makes nbl the default profile: the FPGA realization is
+# flashed straight over J-Link with no secure bootloader.  Its *sbl* scripts sit
+# at 0x22010000 and nsx keeps them "for a future silicon AT110" -- so when real
+# AT110 silicon arrives this value very likely becomes 0x22010000.  Do not
+# "correct" it to the sbl address for the FPGA part.  When a real Atomiq family
+# member is added, move this there and re-check every other AP5-keyed
+# capability for the same placeholder problem.
+_SOC_APP_FLASH_LOAD_ADDR: dict[str, int] = {
+    "atomiq110": 0x22000000,
+}
+
+
+def _app_flash_load_addr(soc: SocDef) -> int | None:
+    """Resolve *soc*'s app-image flash address, per-SoC overriding family.
+
+    The override applies only to the built-in ``SocDef`` it was written for,
+    matched by identity.  ``target.custom_socs`` lets a user pick any name and
+    those entries replace built-ins in the merged registry, so a name match
+    alone would let a user-chosen string silently outrank the ``family`` that
+    same user declared -- handing their part an address belonging to something
+    else entirely, past the ``load_addr is None`` guard that exists to stop
+    exactly that.  A custom SoC therefore always resolves through its family.
+    """
+    from .soc import _SOCS
+
+    if _SOCS.get(soc.name) is soc:
+        override = _SOC_APP_FLASH_LOAD_ADDR.get(soc.name)
+        if override is not None:
+            return override
+    return _FAMILY_APP_FLASH_LOAD_ADDR.get(soc.family)
+
+
 def build_soc_capabilities(soc: SocDef) -> SocCapabilities:
     """Resolve the typed capability records for *soc*.
 
@@ -354,6 +431,7 @@ def build_soc_capabilities(soc: SocDef) -> SocCapabilities:
         has_dcache=is_ap5,
         has_shared_ssram_power_domain=is_ap5,
         placement_bases=_family_placement_bases(family),
+        app_flash_load_addr=_app_flash_load_addr(soc),
     )
     clock = ClockCapabilities(
         direct_burst_base_mhz=48 if family is SocFamily.AP3 else None,
