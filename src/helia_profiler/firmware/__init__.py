@@ -27,6 +27,7 @@ from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
 from ..placement import Placement
 from ..platform import get_soc_for_board
+from ..results.models import WindowSemantics
 from .context import FirmwareRenderContext, _resolve_pmu_passes
 from .project import (
     NsxModuleSpec,
@@ -605,6 +606,14 @@ def generate_app(ctx: PipelineContext) -> Path:
         arena_regions=aot_arena_regions,
     )
     template_vars = render_context.to_template_vars()
+    # Record what this build's measured window DOES, so comparability can see
+    # it. Taken from the render context rather than re-derived at report time:
+    # this is the firmware that was actually built, not what a later read of
+    # the config would reconstruct.
+    ctx.run_metadata.window_semantics = WindowSemantics(
+        fingerprint=render_context.power_window.fingerprint,
+        fields=render_context.power_window.semantics,
+    )
     profiling_backends = list(render_context.pmu.profiling_backends)
     has_armv8m_pmu = render_context.pmu.has_armv8m_pmu
 

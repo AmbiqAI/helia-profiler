@@ -137,26 +137,53 @@ def assess_comparability(
     # bench-measurable current adder and must not be power-compared.
     # Baselines predating the dimension carry None and are skipped, like
     # every other dimension here.
+    # power_window_semantics: a digest of everything the firmware render makes
+    # the measured window DO -- which probe runs inside it, which clock times
+    # it, whether the radio and crypto blocks are shut down. A busy_loop run
+    # measures a CPU spin and an infer run measures the model; comparing them
+    # reports the difference between two different quantities as a regression.
+    # Keyed on a digest of PowerWindowContext's whole field set rather than on
+    # a hand-listed subset, because that list is what kept being incomplete
+    # (#125).
     for dimension in (
         "power_scope",
         "power_mode",
         "power_firmware",
         "power_monitor",
         "power_lockstep",
+        "power_window_semantics",
     ):
         baseline_value = baseline_dimensions.get(dimension)
         candidate_value = candidate_dimensions.get(dimension)
         if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:
+            context: dict[str, Any] = {
+                "metric_group": "power",
+                "baseline": baseline_value,
+                "candidate": candidate_value,
+            }
+            message = f"Power metrics omitted because {dimension} differs."
+            if dimension == "power_window_semantics":
+                # A digest pair tells the user nothing actionable, so name the
+                # properties that actually differ.
+                changed = _window_semantics_diff(baseline, candidate)
+                if changed:
+                    context["changed"] = changed
+                    named = ", ".join(
+                        f"{key} {old!r} -> {new!r}" for key, (old, new) in changed.items()
+                    )
+                    message = (
+                        "Power metrics omitted because the measured window "
+                        f"differs: {named}."
+                    )
             issues.append(
                 ComparabilityIssue(
+                    # The doubled "power_" is pre-existing and load-bearing:
+                    # these codes are documented and asserted. Renaming them
+                    # here would be a silent break of a public surface.
                     code=f"metric.power_{dimension}_mismatch",
                     severity=ComparabilitySeverity.METRIC_BLOCKING,
-                    message=f"Power metrics omitted because {dimension} differs.",
-                    context={
-                        "metric_group": "power",
-                        "baseline": baseline_value,
-                        "candidate": candidate_value,
-                    },
+                    message=message,
+                    context=context,
                 )
             )
     for role, dimensions in (("baseline", baseline_dimensions), ("candidate", candidate_dimensions)):
@@ -206,6 +233,28 @@ def assess_comparability(
                 )
             )
     return ComparabilityAssessment(issues=tuple(issues))
+
+
+def _window_semantics_diff(
+    baseline: RunArtifacts, candidate: RunArtifacts
+) -> dict[str, tuple[Any, Any]]:
+    """Which window properties differ, from the manifests' provenance."""
+    base = _window_semantics_fields(baseline)
+    cand = _window_semantics_fields(candidate)
+    if not base or not cand:
+        return {}
+    return {
+        key: (base.get(key), cand.get(key))
+        for key in sorted(set(base) | set(cand))
+        if base.get(key) != cand.get(key)
+    }
+
+
+def _window_semantics_fields(run: RunArtifacts) -> dict[str, Any]:
+    if run.manifest is None:
+        return {}
+    fields = run.manifest.provenance.get("power_window")
+    return fields if isinstance(fields, dict) else {}
 
 
 def _dimensions(run: RunArtifacts) -> dict[str, Any]:

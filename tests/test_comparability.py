@@ -310,3 +310,113 @@ def test_partial_manifest_dimensions_fall_back_to_metadata():
     assessment = assess_comparability(baseline, candidate)
 
     assert not assessment.run_metrics_comparable
+
+
+def _manifest_with_window(fingerprint: str, **window_fields):
+    """A manifest carrying the window-semantics dimension and its field set."""
+    from helia_profiler.results.manifest import (
+        RESULT_MANIFEST_SCHEMA,
+        RESULT_MANIFEST_SCHEMA_VERSION,
+        ResultManifest,
+        RunStatus,
+    )
+    from helia_profiler.results import ResultValidity
+
+    fields = {
+        "clean_window_probe": "infer",
+        "window_mode": "auto",
+        "window_target_ms": 5000,
+        **window_fields,
+    }
+    return ResultManifest(
+        schema=RESULT_MANIFEST_SCHEMA,
+        schema_version=RESULT_MANIFEST_SCHEMA_VERSION,
+        run_id="r",
+        timestamp="2026-08-19T00:00:00Z",
+        hpx_version="0.1.0",
+        status=RunStatus.COMPLETE,
+        validity=ResultValidity.VALID,
+        issues=(),
+        provenance={"power_window": fields},
+        comparability={"power_window_semantics": fingerprint},
+        artifacts=(),
+    )
+
+
+def _gated(manifest=None):
+    run = _run(
+        power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid"}
+    )
+    return replace(run, manifest=manifest) if manifest is not None else run
+
+
+def test_a_spin_window_is_not_power_comparable_with_an_inference_window():
+    """#125 item 4: `hpx compare` diffed a CPU spin against a model inference.
+
+    The busy_loop probe replaces the window body with a calibrated spin, so
+    the two runs measure different quantities -- but every dimension the
+    comparison checked matched, and the delta was published as a regression.
+    """
+    baseline = _gated(_manifest_with_window("aaaa1111"))
+    candidate = _gated(
+        _manifest_with_window("bbbb2222", clean_window_probe="busy_loop")
+    )
+
+    assessment = assess_comparability(baseline, candidate)
+
+    assert not assessment.power_metrics_comparable
+    issue = next(
+        issue
+        for issue in assessment.issues
+        if issue.code == "metric.power_power_window_semantics_mismatch"
+    )
+    assert issue.severity is ComparabilitySeverity.METRIC_BLOCKING
+
+
+def test_the_mismatch_names_the_property_that_differs():
+    """Two digests explain nothing; the user needs the field that moved."""
+    baseline = _gated(_manifest_with_window("aaaa1111"))
+    candidate = _gated(
+        _manifest_with_window("bbbb2222", clean_window_probe="busy_loop")
+    )
+
+    assessment = assess_comparability(baseline, candidate)
+    issue = next(
+        issue
+        for issue in assessment.issues
+        if issue.code == "metric.power_power_window_semantics_mismatch"
+    )
+
+    assert issue.context["changed"] == {
+        "clean_window_probe": ("infer", "busy_loop")
+    }
+    assert "clean_window_probe" in issue.message
+    assert "busy_loop" in issue.message
+
+
+def test_identical_window_semantics_stay_comparable():
+    """The dimension must not block two runs of the same setup."""
+    baseline = _gated(_manifest_with_window("aaaa1111"))
+    candidate = _gated(_manifest_with_window("aaaa1111"))
+
+    assessment = assess_comparability(baseline, candidate)
+
+    assert assessment.power_metrics_comparable
+    assert not any(
+        issue.code == "metric.power_power_window_semantics_mismatch"
+        for issue in assessment.issues
+    )
+
+
+def test_a_baseline_predating_the_dimension_is_skipped_not_blocked():
+    """Stored baselines carry no manifest dimension and must still compare.
+
+    Same policy every other dimension here applies: a missing value is
+    unknown, not different.
+    """
+    legacy = _gated()
+    current = _gated(_manifest_with_window("aaaa1111"))
+
+    assessment = assess_comparability(legacy, current)
+
+    assert assessment.power_metrics_comparable

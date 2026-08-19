@@ -168,6 +168,11 @@ def _provenance(ctx: PipelineContext) -> dict[str, Any]:
         provenance["compatibility"] = ctx.run_metadata.compatibility.to_dict()
     if ctx.run_metadata.dependencies is not None:
         provenance["dependencies"] = ctx.run_metadata.dependencies.to_dict()
+    if ctx.run_metadata.window_semantics is not None:
+        # The fields go in provenance, not in comparability: only the
+        # fingerprint is a dimension. These are here so a mismatch can name
+        # the property that differs rather than showing two digests.
+        provenance["power_window"] = dict(ctx.run_metadata.window_semantics.fields)
     return provenance
 
 
@@ -192,6 +197,15 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
         "transport": _nested(config, "target", "transport"),
         "arena_location": _nested(config, "model", "arena_location"),
         "weights_location": _nested(config, "model", "weights_location"),
+        # What the measured window DOES -- probe, window mode and bounds, both
+        # window timers, attach behaviour, peripheral/crypto/radio shutdown.
+        # Derived from PowerWindowContext's whole field set, so a new field
+        # extends this automatically (see WindowSemantics).
+        "power_window_semantics": (
+            ctx.run_metadata.window_semantics.fingerprint
+            if ctx.run_metadata.window_semantics is not None
+            else None
+        ),
     }
     if ctx.power_result is not None:
         dimensions.update(
