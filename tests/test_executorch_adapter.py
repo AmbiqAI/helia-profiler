@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import jinja2
+from helia_profiler.firmware import _jinja_env
 import pytest
 
 import helia_profiler.engines.executorch as executorch_mod
@@ -232,13 +232,8 @@ def test_adapter_rejects_incomplete_io_contract(tmp_path: Path):
 
 
 def test_executorch_template_has_counter_health_and_true_overflow_mask():
-    env = jinja2.Environment(
-        loader=jinja2.PackageLoader("helia_profiler.firmware", "templates"),
-        trim_blocks=True,
-        lstrip_blocks=True,
-        keep_trailing_newline=True,
-        undefined=jinja2.StrictUndefined,
-    )
+    # Production's env, not a look-alike -- see issue #119.
+    env = _jinja_env
     out = env.get_template("main_executorch.cc.j2").render(
         cmsis_device_header="apollo510.h",
         pmu_max_ops=4096,
@@ -285,13 +280,8 @@ def test_executorch_template_has_counter_health_and_true_overflow_mask():
 
 
 def test_executorch_template_places_complete_workspace_in_sram():
-    env = jinja2.Environment(
-        loader=jinja2.PackageLoader("helia_profiler.firmware", "templates"),
-        trim_blocks=True,
-        lstrip_blocks=True,
-        keep_trailing_newline=True,
-        undefined=jinja2.StrictUndefined,
-    )
+    # Production's env, not a look-alike -- see issue #119.
+    env = _jinja_env
     out = env.get_template("main_executorch.cc.j2").render(
         cmsis_device_header="apollo330P.h",
         pmu_max_ops=512,

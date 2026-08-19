@@ -83,6 +83,41 @@ _MARKERS: dict[str, str] = {
 }
 
 
+def test_no_test_renders_firmware_through_a_look_alike_jinja_env():
+    """Firmware must only ever be rendered through the production env (#119).
+
+    Tests used to build their own ``jinja2.Environment`` with ``trim_blocks``
+    and ``lstrip_blocks`` enabled, which production does not set. Output then
+    differed from what ships, so those tests were structurally incapable of
+    seeing a whitespace-control mistake. Three got through and were caught only
+    by hand-diffing full renders: a ``{% for %}`` rewrite, a hoisted
+    ``{% set %}``, and a ``-%}`` that silently reindented 128 renders while the
+    suite stayed green.
+
+    Deleting the divergent envs fixed the instances; this stops new ones. Any
+    test that needs to render firmware imports ``helia_profiler.firmware
+    ._jinja_env``. A test that legitimately needs a different env for something
+    that is NOT a firmware template should load it from its own package.
+    """
+    import re
+
+    tests_root = Path(__file__).resolve().parents[1]
+    offenders = []
+    for path in tests_root.rglob("test_*.py"):
+        text = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"jinja2\.Environment\((.*?)\)", text, re.DOTALL):
+            block = match.group(1)
+            if "helia_profiler.firmware" in block and "templates" in block:
+                offenders.append(f"{path.relative_to(tests_root)}: {block.strip()[:60]}...")
+
+    assert not offenders, (
+        "these tests build their own Jinja env for firmware templates instead of "
+        "importing helia_profiler.firmware._jinja_env, so they render whitespace "
+        "differently from production and cannot see whitespace-control mistakes:\n  "
+        + "\n  ".join(offenders)
+    )
+
+
 def _sample_pmu_passes() -> list[dict[str, object]]:
     return [
         {
