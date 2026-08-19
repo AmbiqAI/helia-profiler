@@ -9,6 +9,33 @@ release pull requests from Conventional Commits.
 ## [0.1.6](https://github.com/AmbiqAI/helia-profiler/compare/v0.1.5...v0.1.6) (2026-08-19)
 
 
+### Reporting changes for existing users
+
+* **`binary.bss` no longer includes the linker's `.heap` reservation
+  ([#24](https://github.com/AmbiqAI/helia-profiler/issues/24),
+  [#131](https://github.com/AmbiqAI/helia-profiler/issues/131)).** GCC
+  toolchains reserve the heap as a NOBITS section inside `.bss`, so previous
+  releases over-reported static RAM usage by the heap size. `bss` now reads
+  lower and the reservation appears as its own `reserved` line; the totals are
+  unchanged. Size expectations pinned against 0.1.5 reports need updating.
+* **`clean_window_probe: busy_loop` power runs now complete
+  ([#125](https://github.com/AmbiqAI/helia-profiler/issues/125),
+  [#136](https://github.com/AmbiqAI/helia-profiler/issues/136)).** The
+  diagnostic probe could never finish an external capture on the default
+  `firmware: dedicated` — the host expected an N-inference window against a
+  single calibrated spin and rejected every run. The window-duration check
+  also uses honest bands now (10% for a counted window, 25% for a predicted
+  one, replacing a bound that was ±50% in practice), so a mis-sized window is
+  flagged where it previously passed.
+* **`hpx compare` refuses power deltas between different clean-window probes
+  ([#137](https://github.com/AmbiqAI/helia-profiler/issues/137)).** A
+  `busy_loop` window measures a calibrated CPU spin, not the model, so an
+  infer-vs-busy_loop pair now reports
+  `metric.power_power_clean_window_probe_mismatch` instead of a phantom
+  regression. Baselines recorded before 0.1.6 carry no probe dimension and are
+  skipped, so existing comparisons do not flip to failing.
+
+
 ### Features
 
 * **compatibility:** promote nsx-executorch to the PR [#4](https://github.com/AmbiqAI/helia-profiler/issues/4) merge ([d3d649c](https://github.com/AmbiqAI/helia-profiler/commit/d3d649c9e20089386df53c22c4488c9b223cd796))
