@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 from ..power.diagnostics import (
     assess_clean_window_clock_rate,
     assess_clean_window_stall,
-    DEFAULT_GATE_RELATIVE_TOLERANCE,
     assess_gate_duration,
     assess_run_window_clock,
     expected_terminal_requested_count,
@@ -406,9 +405,9 @@ def _assess_unrecorded_duration(ctx: PipelineContext, measured_s: float) -> Resu
         # check. Dormant today (capture_gated records gate_duration_integrity
         # whenever it runs, so this fallback needs an artifact that lacks it),
         # but the two must not be free to drift.
-        relative_tolerance=gate_relative_tolerance_for(plan.count_source)
-        if plan is not None
-        else DEFAULT_GATE_RELATIVE_TOLERANCE,
+        relative_tolerance=gate_relative_tolerance_for(
+            ctx.config.profiling.clean_window_probe
+        ),
     )
     if integrity.valid:
         return None

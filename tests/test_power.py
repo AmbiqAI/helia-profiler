@@ -1566,9 +1566,11 @@ class TestEstimateCaptureDuration:
         estimated = _estimate_capture_duration(ctx)
 
         assert estimated is not None
-        # profiled pass: 1 * (1 + 3) = 4 inferences = 4 ms. The clean window is
-        # the spin itself: 20 s, whatever the inference count says.
-        expected = _BOOT_SETTLE_S + (0.004 + 20.0) + _SAFETY_MARGIN_S
+        # profiled pass: 1 * (1 + 3) = 4 inferences = 4 ms. The clean pass is
+        # the spin itself -- 20 s, whatever the inference count says -- plus
+        # the warm reps, which main.cc.j2 runs above the spin whatever the
+        # probe is: max(1, warmup) = 1 inference = 1 ms in fixed mode.
+        expected = _BOOT_SETTLE_S + (0.004 + 20.0 + 0.001) + _SAFETY_MARGIN_S
         assert estimated == pytest.approx(expected, rel=1e-6)
         assert estimated > 20.0, "the bound must outlast the window it contains"
 
@@ -2382,27 +2384,54 @@ class TestPowerFirmwareSelection:
         with pytest.raises(PowerError, match="runs no inferences"):
             plan_power_run(ctx, inference_count=50)
 
-    def test_every_count_source_has_a_gate_tolerance(self):
-        """A new count_source must not inherit the tight branch by omission.
+    def test_the_gate_band_follows_the_probe_not_the_firmware_mode(self):
+        """The same probe must get the same band in both firmware modes.
 
-        `capture/__init__.py` used to pick the gate tolerance from an inline
-        `in {"configured", "profile_guided"}` set, so adding `probe_window` to
-        the Literal silently routed it to the 1% branch -- the branch meant
-        for a firmware-owned count, on the one plan shape whose length is
-        PREDICTED. `capture_gated` raises rather than warns, so that is a run
-        that cannot finish. Pinned against the Literal's own arguments rather
-        than a hand-copied list, so the two cannot drift.
+        This band was first keyed on `plan.count_source`, which structurally
+        cannot name "busy_loop on a shared binary": count_source is
+        `probe_window` under `dedicated` but `firmware_auto` under `shared`.
+        So the shared case -- which has MORE error, being two independent
+        per-boot calibrations rather than one -- got the tighter band, on a
+        check that RAISES. A spin 11% off target raised on shared and passed
+        on dedicated (found by review).
         """
-        from typing import get_args, get_type_hints
+        from helia_profiler.power.diagnostics import (
+            COUNTED_WINDOW_TOLERANCE,
+            PREDICTED_WINDOW_TOLERANCE,
+            gate_relative_tolerance_for,
+        )
 
-        from helia_profiler.power.diagnostics import _GATE_RELATIVE_TOLERANCE
-        from helia_profiler.results import PowerRunPlan
+        assert gate_relative_tolerance_for("busy_loop") == PREDICTED_WINDOW_TOLERANCE
+        assert gate_relative_tolerance_for("infer") == COUNTED_WINDOW_TOLERANCE
+        # A predicted window is never bounded more tightly than a counted one:
+        # its length was calibrated, not counted.
+        assert PREDICTED_WINDOW_TOLERANCE > COUNTED_WINDOW_TOLERANCE
 
-        declared = set(get_args(get_type_hints(PowerRunPlan)["count_source"]))
+    def test_a_shared_and_a_dedicated_busy_loop_run_get_the_same_band(
+        self, tmp_path: Path
+    ):
+        """Driven through the real plan, so the count_source difference is real."""
+        from helia_profiler.power.diagnostics import gate_relative_tolerance_for
+        from helia_profiler.results import FirmwareMeta, PmuResult
+        from helia_profiler.stages.plan_power import plan_power_run
 
-        assert declared == set(_GATE_RELATIVE_TOLERANCE), (
-            "count_source values without an explicit gate tolerance: "
-            f"{declared - set(_GATE_RELATIVE_TOLERANCE)}"
+        bands = {}
+        for firmware in ("dedicated", "shared"):
+            ctx = self._make_ctx(tmp_path, firmware=firmware)
+            object.__setattr__(ctx.config.profiling, "clean_window_probe", "busy_loop")
+            ctx.pmu_result = PmuResult(
+                meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
+                layers=[],
+            )
+            plan = plan_power_run(ctx)
+            bands[firmware] = (
+                plan.count_source,
+                gate_relative_tolerance_for(ctx.config.profiling.clean_window_probe),
+            )
+
+        assert bands["dedicated"][0] != bands["shared"][0], "count_source differs"
+        assert bands["dedicated"][1] == bands["shared"][1], (
+            f"same probe, different band: {bands}"
         )
 
     def test_a_mis_sized_spin_is_not_absorbed_by_the_per_unit_slack(self):
@@ -2426,13 +2455,66 @@ class TestPowerFirmwareSelection:
                 clean_infer_count=1,
                 clean_infer_avg_us=5_000_000,
                 stats_rate_hz=1000,
-                relative_tolerance=gate_relative_tolerance_for("probe_window"),
+                relative_tolerance=gate_relative_tolerance_for("busy_loop"),
             )
 
         assert assess(5.0).valid, "a perfect run must pass"
         assert assess(4.0).valid, "a 20% miscalibrated spin is still usable"
         assert not assess(3.0).valid, "a 40% short window must be caught"
         assert not assess(0.006).valid, "the calibration-fallback shape must be caught"
+
+
+    def test_shared_infer_reports_the_window_the_firmware_was_built_with(
+        self, tmp_path: Path
+    ):
+        """`shared` never re-renders the binary, so the host's floor is fiction.
+
+        The unconditional power floor exists to size N on a DEDICATED binary,
+        which is then rebuilt with clean_iters=N. Nothing is rebuilt in shared
+        mode, so applying the floor there published a 5000 ms window for a
+        `window_mode: fixed` run the firmware was built to run at 1000 ms --
+        the same defect this PR fixed for shared busy_loop, left standing for
+        shared infer (found by review).
+        """
+        from helia_profiler.results import FirmwareMeta, PmuResult
+        from helia_profiler.stages.plan_power import plan_power_run
+
+        ctx = self._make_ctx(tmp_path, firmware="shared")
+        object.__setattr__(ctx.config.profiling, "window_mode", "fixed")
+        object.__setattr__(ctx.config.profiling, "window_target_ms", 1000)
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(clean_infer_avg_us=2226), layers=[]
+        )
+
+        plan = plan_power_run(ctx)
+
+        assert plan.inference_count is None, "shared plans no count"
+        assert plan.target_duration_ms == ctx.config.effective_window_target_ms == 1000
+
+    def test_dedicated_infer_keeps_the_power_floor_that_sizes_n(
+        self, tmp_path: Path
+    ):
+        """And the one case that DOES pick N keeps its floor.
+
+        Here the goal is the window: N is derived from it and the binary is
+        rebuilt with clean_iters=N, so raising a 1 s target to the 5 s power
+        floor is what guarantees an integrable window.
+        """
+        from helia_profiler.results import FirmwareMeta, PmuResult
+        from helia_profiler.stages.plan_power import plan_power_run
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        object.__setattr__(ctx.config.profiling, "window_mode", "fixed")
+        object.__setattr__(ctx.config.profiling, "window_target_ms", 1000)
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(clean_infer_avg_us=2226), layers=[]
+        )
+
+        plan = plan_power_run(ctx)
+
+        assert plan.count_source == "profile_guided"
+        assert plan.target_duration_ms == 5000
+        assert plan.inference_count == 2247
 
     def test_power_plan_flags_a_stalled_profile_reference(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture

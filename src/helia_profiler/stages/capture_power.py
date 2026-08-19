@@ -97,7 +97,22 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
         # put the poller's deadline inside the window for any target the
         # inference count did not happen to cover: exactly the failure this
         # function's docstring says it exists to prevent (found by review).
-        clean_run_s = ctx.config.effective_window_target_ms / 1000.0
+        #
+        # The warm reps still cost real inference time: main.cc.j2's warm loop
+        # sits ABOVE the `{% if busy_loop_probe %}` spin and runs whatever the
+        # probe is, so the spin replaces the measured window only, not the
+        # priming before it. Omitting them narrows the margin by
+        # warmup x per-inference, which is noise on a 21 ms model and 15 s on
+        # a 3 s one (found by review).
+        clean_warmup_reps = (
+            _AUTO_WINDOW_WARMUP_REPS
+            if profiling.window_mode == "auto"
+            else max(1, profiling.warmup)
+        )
+        clean_run_s = (
+            ctx.config.effective_window_target_ms / 1000.0
+            + clean_warmup_reps * inference_time_s
+        )
     else:
         if profiling.window_mode == "auto":
             target_s = ctx.config.effective_window_target_ms / 1000.0

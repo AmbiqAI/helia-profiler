@@ -421,7 +421,7 @@ def capture_power(
                 clean_infer_avg_us=clean_avg_us,
                 minimum_gate_s=DEFAULT_POWER_MIN_WINDOW_MS / 1000.0,
                 gate_relative_tolerance=gate_relative_tolerance_for(
-                    plan.count_source
+                    ctx.config.profiling.clean_window_probe
                 ),
                 on_started=_release,
                 # The dedicated JS320 GPI stream provides the authoritative
