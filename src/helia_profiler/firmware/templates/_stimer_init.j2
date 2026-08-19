@@ -19,9 +19,50 @@
 // STIMER cycle-independent wall clock for the clean/power window.
 #define HPX_STIMER_HZ 32768U
 
+// Settle-and-verify budget.  AM_HAL_STIMER_CFG_CLEAR drops the XT request and
+// the crystal restarts (Apollo4 datasheet 6.4: "the XT is only enabled when an
+// internal module is using it").  Bench-measured cold on Apollo4 Blue Plus
+// (issue #124): 25 ms and 100 ms settles read garbage, at 400 ms the first
+// measurement is still in the transient while the second is settled, and
+// 750 ms repeats to 20 ppm -- so the transient is ~500-650 ms.
+//
+// A FIXED delay was rejected: it would tax every power run for a transient
+// that usually does not happen, because the XT is normally already running by
+// the time a window opens (which is why production 5 s windows measured 0.064%
+// against the JS110 gate despite this hazard).  Verify instead, and pay only
+// when the crystal really is cold.
+//
+// The reference is nsx_delay_us, a calibrated BOOTROM cycle loop -- no DWT, no
+// debug domain -- so it cannot share this clock's fault.  Same construction as
+// the clean window's DWT rate probe (#121), inverted.
+#define HPX_STIMER_SETTLE_PROBE_US   10000U   // 10 ms -> 327.68 ticks nominal
+#define HPX_STIMER_SETTLE_MIN_TICKS  245U     // -25%: rejects a stopped/slow XT
+#define HPX_STIMER_SETTLE_MAX_TICKS  410U     // +25%: rejects transient overshoot
+#define HPX_STIMER_SETTLE_MAX_US     1000000U // 1 s deadline, ~1.6x the measured worst case
+
+// Microseconds spent waiting for the XT to settle.  Equal to
+// HPX_STIMER_SETTLE_MAX_US means it never did -- a dead or unpopulated
+// crystal, which is a different fault from the debug-domain one the
+// frozen-clock hint names, and worth telling apart.
+static uint32_t g_hpx_stimer_settle_us = 0U;
+
 static inline void hpx_stimer_init(void) {
     am_hal_stimer_config(AM_HAL_STIMER_CFG_CLEAR);
     am_hal_stimer_config(AM_HAL_STIMER_XTAL_32KHZ | AM_HAL_STIMER_CFG_RUN);
+
+    // Costs one 10 ms probe when the crystal is already up -- the common case.
+    g_hpx_stimer_settle_us = 0U;
+    while (g_hpx_stimer_settle_us < HPX_STIMER_SETTLE_MAX_US) {
+        const uint32_t settle_t0 = am_hal_stimer_counter_get();
+        nsx_delay_us(HPX_STIMER_SETTLE_PROBE_US);
+        const uint32_t settle_ticks =
+            (uint32_t)(am_hal_stimer_counter_get() - settle_t0);
+        if (settle_ticks >= HPX_STIMER_SETTLE_MIN_TICKS &&
+            settle_ticks <= HPX_STIMER_SETTLE_MAX_TICKS) {
+            break;
+        }
+        g_hpx_stimer_settle_us += HPX_STIMER_SETTLE_PROBE_US;
+    }
 }
 
 static inline uint32_t hpx_stimer_ticks(void) {
