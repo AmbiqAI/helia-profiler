@@ -106,14 +106,24 @@ def _sections_via_size(
     reserved = _reserved_via_size_sysv(
         binary_path, size_cmd=size_cmd, timeout_s=timeout_s
     )
-    if reserved is None:
-        # Could not classify; report exactly what the tool said rather than
-        # guess, so the numbers stay explainable.
+    if reserved is None or reserved > bss:
+        # Either the section list could not be read, or the reserved regions
+        # are not all inside what Berkeley called bss -- `size -A` reports no
+        # section TYPE, so a `.heap` carrying contents (PROGBITS) would land
+        # in Berkeley's data instead, and subtracting it from bss would be
+        # wrong in a way a clamp would hide. Report exactly what the tool
+        # said rather than guess; the numbers stay explainable either way.
+        if reserved is not None and reserved > bss:
+            log.debug(
+                "reserved sections (%d B) exceed bss (%d B); not adjusting",
+                reserved,
+                bss,
+            )
         return BinarySections(text=text, data=data, bss=bss, total=total)
     return BinarySections(
         text=text,
         data=data,
-        bss=max(0, bss - reserved),
+        bss=bss - reserved,
         total=total,
         reserved=reserved,
     )

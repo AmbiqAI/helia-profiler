@@ -112,3 +112,25 @@ def test_a_binary_with_no_reservation_is_unchanged(tmp_path: Path, monkeypatch) 
     assert sections is not None
     assert sections.bss == 260
     assert sections.reserved == 0
+
+
+def test_reserved_exceeding_bss_is_not_subtracted(tmp_path: Path, monkeypatch) -> None:
+    """`size -A` reports no section TYPE, so trust it only when it adds up.
+
+    A `.heap` carrying contents (PROGBITS rather than NOBITS) is counted by
+    Berkeley in data, not bss. Subtracting it from bss would then be wrong --
+    and a max(0, ...) clamp would hide that by silently reporting bss = 0.
+    When the arithmetic does not hold, report what the tool said.
+    """
+    berkeley = "text data bss dec hex filename\n32 4 100 136 88 firmware\n"
+    sysv = (
+        "firmware  :\nsection   size   addr\n.text  32  98304\n"
+        ".bss  100  268435460\n.heap  5000  268435560\nTotal  5132\n"
+    )
+    _size_stub(monkeypatch, berkeley, sysv)
+
+    sections = binary_sections(tmp_path / "firmware", Toolchain.ARM_NONE_EABI_GCC, timeout_s=5)
+
+    assert sections is not None
+    assert sections.bss == 100, "bss was adjusted despite inconsistent section data"
+    assert sections.reserved == 0
