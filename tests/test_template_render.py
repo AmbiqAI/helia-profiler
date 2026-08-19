@@ -10,16 +10,16 @@ These tests do not compile the output; they verify that:
 
 from __future__ import annotations
 
-import jinja2
 import pytest
 
-_env = jinja2.Environment(
-    loader=jinja2.PackageLoader("helia_profiler.firmware", "templates"),
-    trim_blocks=True,
-    lstrip_blocks=True,
-    keep_trailing_newline=True,
-    undefined=jinja2.StrictUndefined,
-)
+# The PRODUCTION environment, not a look-alike (issue #119). These tests used
+# to build their own with trim_blocks/lstrip_blocks on, which production does
+# not set -- so they rendered whitespace differently from what actually ships
+# and were structurally blind to whitespace-control mistakes. Three such slips
+# got through this suite and were caught only by hand-diffing full renders:
+# a `{% for %}` rewrite, a hoisted `{% set %}`, and a `-%}` that reindented
+# 128 renders. Importing the real env removes the divergence at the source.
+from helia_profiler.firmware import _jinja_env as _env
 
 
 def _sample_pmu_passes() -> list[dict[str, object]]:
