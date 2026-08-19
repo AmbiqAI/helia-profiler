@@ -78,6 +78,12 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
             "bss": bs.bss,
             "total": bs.total,
         }
+        if bs.reserved:
+            # Linker-reserved NOBITS (the .heap fill claiming all remaining
+            # TCM, and .stack). Never touched at runtime, and excluded from
+            # bss above -- reported so the footprint stays explainable
+            # against `size`'s own Berkeley totals, which lump it into bss.
+            data["binary_sections"]["reserved"] = bs.reserved
 
     # Arena / tensor info from firmware meta
     arena: dict[str, Any] = {}

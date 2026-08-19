@@ -247,12 +247,23 @@ class RunMetadata:
 
 @dataclass(frozen=True)
 class BinarySections:
-    """ELF binary section sizes (from ``arm-none-eabi-size``)."""
+    """ELF binary section sizes (from ``arm-none-eabi-size``).
+
+    ``bss`` counts zero-initialized state the program actually uses.
+    ``reserved`` is separate: linker-reserved NOBITS regions that are never
+    touched at runtime, chiefly the ``.heap`` fill NSX linker scripts use to
+    claim all remaining TCM. ``size``'s Berkeley output lumps those into bss,
+    which overstated the reported footprint by orders of magnitude on AP5
+    boards -- 392 KB of "bss" for 260 bytes of real state in the #24
+    reproduction. ``total`` keeps the tool's own sum, so it still includes the
+    reservation.
+    """
 
     text: int = 0
     data: int = 0
     bss: int = 0
     total: int = 0
+    reserved: int = 0
 
 
 @dataclass(frozen=True)

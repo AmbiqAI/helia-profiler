@@ -277,6 +277,8 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         bin_table.add_row("text", f"{bs.text:,}")
         bin_table.add_row("data", f"{bs.data:,}")
         bin_table.add_row("bss", f"{bs.bss:,}")
+        if bs.reserved:
+            bin_table.add_row("reserved", f"[dim]{bs.reserved:,}[/dim]")
         bin_table.add_row("[bold]total[/bold]", f"[bold]{bs.total:,}[/bold]")
 
         if mem_parts:

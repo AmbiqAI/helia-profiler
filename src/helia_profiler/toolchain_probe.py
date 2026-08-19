@@ -103,10 +103,87 @@ def _sections_via_size(
     except ValueError:
         return None
     log.info("Binary sections: text=%d data=%d bss=%d total=%d", text, data, bss, total)
-    return BinarySections(text=text, data=data, bss=bss, total=total)
+    reserved = _reserved_via_size_sysv(
+        binary_path, size_cmd=size_cmd, timeout_s=timeout_s
+    )
+    if reserved is None:
+        # Could not classify; report exactly what the tool said rather than
+        # guess, so the numbers stay explainable.
+        return BinarySections(text=text, data=data, bss=bss, total=total)
+    return BinarySections(
+        text=text,
+        data=data,
+        bss=max(0, bss - reserved),
+        total=total,
+        reserved=reserved,
+    )
 
 
 _FROMELF_TOTALS_RE = re.compile(r"\s*Grand Totals?\s*[:\s]+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)")
+
+
+
+#: Linker-reserved NOBITS section names: allocated and counted by ``size`` as
+#: bss, but never written at runtime. NSX's AP5 linker scripts fill all
+#: remaining DTCM as ``.heap`` (NOLOAD) so ``_sbrk`` has a bounded region, and
+#: the stack is reserved the same way. Matched on the section-name stem so
+#: ``.heap``, ``.heap.foo`` and ``.stack_dummy`` all count.
+_RESERVED_NOBITS_STEMS = ("heap", "stack")
+
+
+def _reserved_via_size_sysv(
+    binary_path: Path,
+    *,
+    size_cmd: str,
+    timeout_s: int,
+) -> int | None:
+    """Bytes of linker-reserved NOBITS regions, via ``size -A``.
+
+    Berkeley output (the default, parsed above) is four totals with no
+    per-section detail, so the reservation cannot be separated from real bss
+    there. ``-A`` prints SysV per-section output, supported by GNU ``size``
+    and ``llvm-size`` alike::
+
+        section             size        addr
+        .text                 32       98304
+        .bss                 260   268435460
+        .heap             391928   268435720
+
+    Returns ``None`` when the tool is unavailable or the output cannot be
+    parsed, so the caller keeps the unadjusted numbers instead of inventing
+    an adjustment.
+    """
+    try:
+        result = subprocess.run(
+            [size_cmd, "-A", str(binary_path)],
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+        log.debug("%s -A probe failed: %s", size_cmd, exc)
+        return None
+    if result.returncode != 0:
+        log.debug("%s -A failed: %s", size_cmd, (result.stderr or "").strip())
+        return None
+
+    reserved = 0
+    seen_section = False
+    for line in (result.stdout or "").splitlines():
+        parts = line.split()
+        if len(parts) < 2 or not parts[0].startswith("."):
+            continue
+        try:
+            size_bytes = int(parts[1])
+        except ValueError:
+            continue
+        seen_section = True
+        stem = parts[0].lstrip(".").split(".")[0].split("_")[0]
+        if stem in _RESERVED_NOBITS_STEMS:
+            reserved += size_bytes
+    if not seen_section:
+        return None
+    return reserved
 
 
 def _sections_via_fromelf(
