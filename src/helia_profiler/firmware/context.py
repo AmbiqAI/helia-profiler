@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from ..config import DEFAULT_ARENA_SIZE_BYTES, DEFAULT_POWER_WINDOW_TARGET_MS, Transport
+from ..config import DEFAULT_ARENA_SIZE_BYTES, Transport
 from ..counters import (
     plan_passes,
     resolve_counters,
@@ -329,7 +329,7 @@ class FirmwareRenderContext:
                 clean_warmup=max(1, config.profiling.warmup),
                 clean_iters=max(1, config.profiling.iterations),
                 window_mode=config.profiling.window_mode,
-                window_target_ms=_effective_window_target_ms(config),
+                window_target_ms=config.effective_window_target_ms,
                 window_min=config.profiling.window_min,
                 window_max=config.profiling.window_max,
                 clean_window_probe=config.profiling.clean_window_probe,
@@ -509,13 +509,6 @@ def _executorch_default_region(arena_region: Placement) -> str:
     so anything else here is a planner artifact; clamp it to tcm.
     """
     return arena_region.value if arena_region.value in ("tcm", "sram") else "tcm"
-
-
-def _effective_window_target_ms(config: "ProfileConfig") -> int:
-    target_ms = config.profiling.window_target_ms
-    if config.power.enabled and config.profiling.window_mode == "auto":
-        target_ms = max(target_ms, DEFAULT_POWER_WINDOW_TARGET_MS)
-    return target_ms
 
 
 def _resolve_pmu_passes(config: Any, soc: Any | None = None) -> list[PmuPassContext]:

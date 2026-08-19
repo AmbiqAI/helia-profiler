@@ -224,6 +224,7 @@ def _friendly_metric_name(name: str) -> str:
         "binary.text": "Binary .text",
         "binary.data": "Binary .data",
         "binary.bss": "Binary .bss",
+        "binary.reserved": "Binary reserved",
         "binary.total": "Binary total",
         "memory.arena_size": "Arena size",
         "memory.allocated_arena": "Allocated arena",

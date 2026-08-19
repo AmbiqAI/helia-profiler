@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from ..results import PowerRunPlan
 from ..config import DEFAULT_POWER_WINDOW_TARGET_MS
 from ..errors import PowerError
+from ..power.diagnostics import probe_runs_inferences
 from ..pipeline import PipelineContext
+
+if TYPE_CHECKING:
+    from ..config import ProfileConfig
 from ..power.diagnostics import assess_clean_window_stall
 
 log = logging.getLogger("hpx")
@@ -107,6 +112,45 @@ def _check_ina228_cadence(ctx: PipelineContext, plan: PowerRunPlan) -> None:
         )
 
 
+def predicted_window_ms(config: "ProfileConfig", *, reference_us: int | None) -> int:
+    """How long the firmware's clean window will actually last.
+
+    One question with one answer per (probe, firmware mode, window mode), in
+    one place. It was previously answered inline at the point of use, and each
+    round of review found another branch where the inline answer was wrong for
+    a combination nobody had enumerated -- the plan claiming 5000 ms against a
+    1000 ms spin, then the same against a 100-iteration counted window. The
+    matrix in tests/contracts/test_window_matrix.py checks every combination
+    against this function rather than against a hand-copied expectation.
+
+    Three cases, in order of who decides the length:
+
+    1. A probe that sizes its own window (busy_loop) -- the FIRMWARE decides,
+       from the same template variable the render read.
+    2. A counted window on a DEDICATED binary -- the HOST decides: it picks N
+       from this goal and render_power_source() rebuilds with clean_iters=N,
+       so the goal is the window whatever window_mode says. This is the only
+       case the power floor belongs to, because it is the only one where
+       raising the goal actually lengthens the window.
+    3. A counted window on a SHARED binary -- nothing is rebuilt, so the
+       firmware runs what it was already built to run: exactly
+       ``profiling.iterations`` in fixed mode, or an auto-sized loop hitting
+       the effective target.
+    """
+    if not probe_runs_inferences(config.profiling.clean_window_probe):
+        return config.effective_window_target_ms
+    if config.power.firmware == "dedicated":
+        return max(
+            config.profiling.window_target_ms,
+            DEFAULT_POWER_WINDOW_TARGET_MS,
+        )
+    if config.profiling.window_mode == "fixed" and reference_us:
+        # Nearest millisecond, not truncated: this field is the window's
+        # only statement of length when no count is planned.
+        return max(1, (config.profiling.iterations * reference_us + 500) // 1000)
+    return config.effective_window_target_ms
+
+
 def plan_power_run(
     ctx: PipelineContext,
     *,
@@ -120,13 +164,56 @@ def plan_power_run(
     if ctx.pmu_result is not None:
         reference_us = ctx.pmu_result.meta.clean_infer_avg_us
 
-    target_duration_ms = max(
-        ctx.config.profiling.window_target_ms,
-        DEFAULT_POWER_WINDOW_TARGET_MS,
-    )
+    target_duration_ms = predicted_window_ms(ctx.config, reference_us=reference_us)
     if ctx.config.power.firmware != "dedicated":
         inference_count = None
         count_source = "firmware_auto"
+    elif not probe_runs_inferences(ctx.config.profiling.clean_window_probe):
+        # The busy_loop probe runs no inferences: the window body is one
+        # calibrated spin sized from window_target_ms (see
+        # _busy_loop_calibration.j2), and the firmware reports 1 unit
+        # requested / 1 completed (#112). Deriving N from a per-inference
+        # reference is therefore meaningless here -- and actively broke the
+        # run, because clean_infer_avg_us under this probe is the WHOLE spin,
+        # so N came out as window_min and the host expected window_min x the
+        # full window. capture_gated then RAISED on the resulting ~10x gate
+        # mismatch, which is why external mode could never complete on the
+        # default firmware: dedicated (#125).
+        #
+        # So describe the window in the probe's own units: one unit of work,
+        # lasting the window the firmware was BUILT to spin for. That length
+        # is not the host's goal above -- this probe sizes its own window from
+        # the template variable, so the plan has to read the same property the
+        # render read (config.effective_window_target_ms), or the two disagree
+        # wherever the power floor does not apply. Under window_mode: fixed
+        # with a sub-floor target they diverged 5x: firmware built to spin
+        # 1000 ms, plan describing 5000 ms -- which left external mode still
+        # unable to complete the run #125 is about, made every CORRECT
+        # internal run evaluate degraded, and let _check_ina228_cadence pass a
+        # window that really gets a fifth of the accumulator updates it
+        # checked for (found by review).
+        #
+        # This overrides an explicitly requested count rather than honouring
+        # it, because the firmware ignores it: a caller asking for N here
+        # would otherwise get a plan describing N spins against a window that
+        # runs exactly one, which is the same spurious-mismatch shape #112
+        # removed. Refuse loudly instead of silently planning a window that
+        # cannot happen.
+        if inference_count is not None:
+            raise PowerError(
+                f"clean_window_probe="
+                f"{ctx.config.profiling.clean_window_probe} runs no inferences, "
+                "so an explicit power inference count cannot be honoured.",
+                hint=(
+                    "This probe replaces the window body with one calibrated "
+                    "CPU spin sized from profiling.window_target_ms. Set that "
+                    "instead, or use clean_window_probe: infer to run a "
+                    "counted inference window."
+                ),
+            )
+        inference_count = 1
+        reference_us = target_duration_ms * 1000
+        count_source = "probe_window"
     elif inference_count is None:
         inference_count = _derive_inference_count(
             clean_infer_avg_us=reference_us,

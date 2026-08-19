@@ -78,6 +78,14 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
             "bss": bs.bss,
             "total": bs.total,
         }
+        if bs.reserved:
+            # The linker's .heap reservation: sized to whatever remained in
+            # the region rather than to a requirement, so it states leftover
+            # space, not need. Excluded from bss above and reported here so
+            # the footprint stays reconcilable against `size`'s own Berkeley
+            # totals, which fold it into bss. (.stack is deliberately NOT
+            # counted here -- it is the live MSP/PSP stack.)
+            data["binary_sections"]["reserved"] = bs.reserved
 
     # Arena / tensor info from firmware meta
     arena: dict[str, Any] = {}

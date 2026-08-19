@@ -247,12 +247,28 @@ class RunMetadata:
 
 @dataclass(frozen=True)
 class BinarySections:
-    """ELF binary section sizes (from ``arm-none-eabi-size``)."""
+    """ELF binary section sizes (from ``arm-none-eabi-size``).
+
+    ``bss`` counts zero-initialized state the program actually uses --
+    including the stack, which is live memory whatever its section says.
+
+    ``reserved`` is separate: the linker's ``.heap`` region, which NSX scripts
+    size to whatever remained in the memory region rather than to a
+    requirement, purely so ``_sbrk`` has a bounded area. Its size states
+    leftover space, not need. ``size``'s Berkeley output folds it into bss,
+    which overstated the reported footprint by hundreds of KB on the affected
+    boards -- 392 KB of "bss" against 260 bytes of real state in the #24
+    reproduction.
+
+    ``total`` keeps the tool's own inclusive sum, so
+    ``text + data + bss + reserved`` reconciles against it.
+    """
 
     text: int = 0
     data: int = 0
     bss: int = 0
     total: int = 0
+    reserved: int = 0
 
 
 @dataclass(frozen=True)

@@ -724,3 +724,44 @@ def test_config_snapshot_serialization_is_json_safe():
     assert snapshot["engine"]["type"] == "helia-rt"
     assert snapshot["target"]["clock"]["cpu"] == "hp"
     json.dumps(snapshot)
+
+
+@pytest.mark.parametrize(
+    ("power_enabled", "window_mode", "window_target_ms", "expected_ms"),
+    [
+        # The power floor applies only where the window is auto-sized.
+        (True, "auto", 1000, 5000),
+        (True, "auto", 9000, 9000),
+        # "fixed" means use my number -- raising it here would silently run a
+        # 5x longer window than the user asked for.
+        (True, "fixed", 1000, 1000),
+        (True, "fixed", 9000, 9000),
+        # No power capture, no reason to lengthen anything.
+        (False, "auto", 1000, 1000),
+        (False, "fixed", 1000, 1000),
+    ],
+)
+def test_effective_window_target_applies_the_power_floor_only_when_auto_sized(
+    power_enabled: bool, window_mode: str, window_target_ms: int, expected_ms: int
+):
+    """The single source both the firmware render and the power plan read.
+
+    These two used to derive the rule separately and disagreed: the render
+    gated the floor on ``window_mode == "auto"`` while the plan applied it
+    unconditionally, so a ``fixed`` sub-floor window produced a plan
+    describing a 5 s window against firmware built to spin for 1 s.
+    """
+    config = load_config(
+        None,
+        {
+            "model": {"path": "m.tflite"},
+            "engine": {"type": "helia-rt"},
+            "profiling": {
+                "window_mode": window_mode,
+                "window_target_ms": window_target_ms,
+            },
+            "power": {"enabled": power_enabled},
+        },
+    )
+
+    assert config.effective_window_target_ms == expected_ms

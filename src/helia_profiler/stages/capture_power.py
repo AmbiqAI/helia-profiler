@@ -15,9 +15,10 @@ from __future__ import annotations
 import logging
 
 from ..results import PowerObservation
-from ..config import DEFAULT_POWER_DURATION_S, DEFAULT_POWER_WINDOW_TARGET_MS
+from ..config import DEFAULT_POWER_DURATION_S
 from ..errors import PowerError
 from ..pipeline import PipelineContext
+from ..power.diagnostics import probe_runs_inferences
 from ..target.lifecycle import CapturePhase, prepare_target_for_phase
 
 log = logging.getLogger("hpx")
@@ -87,17 +88,43 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
     profiled_inferences = num_presets * (profiling.warmup + profiling.iterations)
     profiled_run_s = profiled_inferences * inference_time_s
 
-    if profiling.window_mode == "auto":
-        target_ms = max(profiling.window_target_ms, DEFAULT_POWER_WINDOW_TARGET_MS)
-        target_s = target_ms / 1000.0
-        clean_iters = target_s / inference_time_s if inference_time_s > 0 else profiling.window_min
-        clean_iters = max(profiling.window_min, min(profiling.window_max, clean_iters))
-        clean_warmup_reps = _AUTO_WINDOW_WARMUP_REPS
+    if not probe_runs_inferences(profiling.clean_window_probe):
+        # This probe's window is a calibrated CPU spin, not inferences, and it
+        # is sized from the target in BOTH window modes -- so an
+        # inference-count estimate describes nothing it runs. The fixed-mode
+        # branch below sized it as iterations x inference_time, which on a
+        # shared run (no plan, so this fallback is what bounds the capture)
+        # put the poller's deadline inside the window for any target the
+        # inference count did not happen to cover: exactly the failure this
+        # function's docstring says it exists to prevent (found by review).
+        #
+        # The warm reps still cost real inference time: main.cc.j2's warm loop
+        # sits ABOVE the `{% if busy_loop_probe %}` spin and runs whatever the
+        # probe is, so the spin replaces the measured window only, not the
+        # priming before it. Omitting them narrows the margin by
+        # warmup x per-inference, which is noise on a 21 ms model and 15 s on
+        # a 3 s one (found by review).
+        clean_warmup_reps = (
+            _AUTO_WINDOW_WARMUP_REPS
+            if profiling.window_mode == "auto"
+            else max(1, profiling.warmup)
+        )
+        clean_run_s = (
+            ctx.config.effective_window_target_ms / 1000.0
+            + clean_warmup_reps * inference_time_s
+        )
     else:
-        clean_iters = max(1, profiling.iterations)
-        clean_warmup_reps = max(1, profiling.warmup)
-
-    clean_run_s = (clean_iters + clean_warmup_reps) * inference_time_s
+        if profiling.window_mode == "auto":
+            target_s = ctx.config.effective_window_target_ms / 1000.0
+            clean_iters = (
+                target_s / inference_time_s if inference_time_s > 0 else profiling.window_min
+            )
+            clean_iters = max(profiling.window_min, min(profiling.window_max, clean_iters))
+            clean_warmup_reps = _AUTO_WINDOW_WARMUP_REPS
+        else:
+            clean_iters = max(1, profiling.iterations)
+            clean_warmup_reps = max(1, profiling.warmup)
+        clean_run_s = (clean_iters + clean_warmup_reps) * inference_time_s
 
     firmware_run_s = profiled_run_s + clean_run_s
 

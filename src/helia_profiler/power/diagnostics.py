@@ -101,6 +101,44 @@ class GateDurationIntegrity:
         return self.measured_s / self.expected_s if self.expected_s > 0 else 0.0
 
 
+#: How far the measured gate may sit from the expected window.
+#:
+#: The question is how well the host could KNOW the window length before the
+#: run, and there are exactly two answers -- so this keys on the PROBE, which
+#: is what decides them, rather than on the plan's ``count_source``.
+#:
+#: Keying on ``count_source`` was the first attempt and it could not express
+#: the case it most needed to: ``count_source`` is ``probe_window`` for a
+#: busy_loop run on a dedicated binary but ``firmware_auto`` for the same
+#: probe on a shared one, so the shared case -- which has MORE error, being
+#: two independent per-boot calibrations rather than one -- was handed the
+#: tighter band. On a check that raises, that kills healthy runs (found by
+#: review; a spin 11% off target raised on shared and passed on dedicated).
+#:
+#: Every case here is cross-boot: the gate belongs to the power boot while the
+#: reference was timed by the profile boot, and in ``shared`` mode
+#: capture/__init__.py reads both count and reference straight off
+#: ``pmu_result.meta``. So the cross-boot spread is the floor either way.
+COUNTED_WINDOW_TOLERANCE = 0.10
+#: A window nothing counted: the busy_loop spin's length is PREDICTED from a
+#: per-boot calibration pass, so the error is that calibration's transfer
+#: error, not a timing spread. ``_busy_loop_calibration.j2`` accepts a
+#: calibration reading anywhere in [16, 8192] STIMER ticks, which at 32768 Hz
+#: puts the per-boot quantization floor between 0.02% and 6.25% -- and a
+#: shared run pays it twice. 0.25 covers the template's own realistic worst
+#: case with margin, and still TIGHTENS what shipped: the per-unit slack in
+#: assess_gate_duration() used to work out to half the window here (the unit
+#: IS the window), which no other bound could exceed.
+PREDICTED_WINDOW_TOLERANCE = 0.25
+
+
+def gate_relative_tolerance_for(clean_window_probe: str) -> float:
+    """Gate tolerance implied by how the window's length was arrived at."""
+    if probe_runs_inferences(clean_window_probe):
+        return COUNTED_WINDOW_TOLERANCE
+    return PREDICTED_WINDOW_TOLERANCE
+
+
 def assess_gate_duration(
     *,
     measured_s: float,
@@ -108,11 +146,24 @@ def assess_gate_duration(
     clean_infer_avg_us: int,
     stats_rate_hz: int,
     minimum_s: float = 0.0,
+    # Deliberately tighter than either named tolerance above. Those are for a
+    # caller that knows which probe ran; a caller that does not is looking at
+    # an artifact with no plan, where this check is only advisory -- and
+    # loosening it there would silently stop flagging real truncation
+    # (tests/test_report.py::test_write_summary_flags_truncated_gated_window).
     relative_tolerance: float = 0.01,
 ) -> GateDurationIntegrity:
     """Compare a gate against ``N * inference_time`` with instrument jitter allowance."""
     expected_s = clean_infer_count * clean_infer_avg_us / 1_000_000.0
-    inference_slack_s = clean_infer_avg_us / 2_000_000.0
+    # Half of one unit of work, because a window can end part-way through a
+    # unit. With a SINGLE unit there is no partial-unit boundary to allow for,
+    # and the term would be half the entire measurement -- swamping every
+    # other bound and leaving a +/-50% check that calls almost anything valid.
+    # A probe_window plan is exactly that shape (one unit lasting the whole
+    # window), and so is a 1-inference counted window.
+    inference_slack_s = (
+        clean_infer_avg_us / 2_000_000.0 if clean_infer_count > 1 else 0.0
+    )
     packet_slack_s = 2.0 / max(1, stats_rate_hz)
     cross_binary_slack_s = expected_s * relative_tolerance
     return GateDurationIntegrity(

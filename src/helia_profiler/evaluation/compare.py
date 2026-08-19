@@ -168,6 +168,10 @@ _METRIC_FIELDS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     ("binary.text", ("binary", "text"), "bytes"),
     ("binary.data", ("binary", "data"), "bytes"),
     ("binary.bss", ("binary", "bss"), "bytes"),
+    # Reported alongside bss so a comparison across the #24 boundary shows
+    # where the bytes went, instead of a bss row and a total row that
+    # contradict each other with nothing to reconcile them.
+    ("binary.reserved", ("binary", "reserved"), "bytes"),
     ("binary.total", ("binary", "total"), "bytes"),
     ("memory.arena_size", ("memory", "arena_size"), "bytes"),
     ("memory.allocated_arena", ("memory", "allocated_arena"), "bytes"),

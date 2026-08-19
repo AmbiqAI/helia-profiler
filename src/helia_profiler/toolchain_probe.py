@@ -70,6 +70,7 @@ def _sections_via_size(
     binary_path: Path,
     *,
     size_cmd: str,
+    readelf_cmd: str | None,
     timeout_s: int,
 ) -> BinarySections | None:
     """Parse Berkeley-format ``size`` output for GCC ELF binaries.
@@ -103,10 +104,127 @@ def _sections_via_size(
     except ValueError:
         return None
     log.info("Binary sections: text=%d data=%d bss=%d total=%d", text, data, bss, total)
-    return BinarySections(text=text, data=data, bss=bss, total=total)
+    reserved = (
+        _reserved_via_readelf(
+            binary_path, readelf_cmd=readelf_cmd, timeout_s=timeout_s
+        )
+        if readelf_cmd is not None
+        else None
+    )
+    if reserved is None or reserved > bss:
+        # Either the section list could not be read, or the reserved regions
+        # are not all inside what Berkeley called bss -- `size -A` reports no
+        # section TYPE, so a `.heap` carrying contents (PROGBITS) would land
+        # in Berkeley's data instead, and subtracting it from bss would be
+        # wrong in a way a clamp would hide. Report exactly what the tool
+        # said rather than guess; the numbers stay explainable either way.
+        if reserved is not None and reserved > bss:
+            log.debug(
+                "reserved sections (%d B) exceed bss (%d B); not adjusting",
+                reserved,
+                bss,
+            )
+        return BinarySections(text=text, data=data, bss=bss, total=total)
+    return BinarySections(
+        text=text,
+        data=data,
+        bss=bss - reserved,
+        total=total,
+        reserved=reserved,
+    )
 
 
 _FROMELF_TOTALS_RE = re.compile(r"\s*Grand Totals?\s*[:\s]+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)")
+
+
+
+#: Section-name tokens treated as linker reservations rather than program
+#: state. Matched only among sections already known to be **NOBITS and
+#: allocated** -- the name alone is not evidence.
+#:
+#: Only ``.heap``. Review corrected an earlier version that also claimed
+#: ``.stack``: on every NSX SoC the ``.stack`` region IS the live stack --
+#: ``startup_gcc.c`` loads the initial MSP from its top and sets MSPLIM/PSPLIM
+#: from its base -- so it is memory the firmware genuinely needs, and it
+#: belongs in the reported footprint.
+#:
+#: ``.heap`` is different in kind on these parts, and that difference is the
+#: whole point of issue #24: NSX linker scripts do not size it to a
+#: requirement, they run it to the end of the region
+#: (``. = ORIGIN(MCU_TCM) + LENGTH(MCU_TCM);``) purely so ``_sbrk`` has a
+#: bounded area. Its size states what was left over, not what is needed, so
+#: counting it as footprint tells the reader nothing useful about the build.
+_RESERVED_NOBITS_NAMES = frozenset({"heap"})
+
+#: ``readelf -S -W`` row: ``[Nr] Name Type Addr Off Size ES Flg ...`` with the
+#: numeric columns in hex. The name is anchored to a leading dot so the empty
+#: name of section 0 cannot shift the field positions.
+_READELF_SECTION_RE = re.compile(
+    r"^\s*\[\s*\d+\]\s+(\.\S+)\s+(\S+)\s+"
+    r"[0-9a-fA-F]+\s+[0-9a-fA-F]+\s+([0-9a-fA-F]+)\s+[0-9a-fA-F]+\s+(\S*)"
+)
+
+
+def _reserved_via_readelf(
+    binary_path: Path,
+    *,
+    readelf_cmd: str,
+    timeout_s: int,
+) -> int | None:
+    """Bytes of linker-reserved NOBITS regions, from the section headers.
+
+    An earlier version of this used ``size -A``, which reports name, size and
+    address but **no TYPE** -- so a ``.heap`` carrying contents (PROGBITS,
+    which ``size`` correctly counts in *data*) was indistinguishable from the
+    NOLOAD reservation, and subtracting it from bss understated real
+    zero-initialized state while double-counting those bytes. Adversarial
+    review caught that on a purpose-built ELF; issue #24 had named readelf
+    for this reason from the start.
+
+    So the type is checked: only ``NOBITS`` sections carrying the ``A``
+    (alloc) flag are candidates, which is exactly the set ``size`` folds into
+    its bss column. The name then selects the reserved ones among them.
+
+    Returns ``None`` when the tool is unavailable or the output cannot be
+    parsed, so the caller keeps the unadjusted numbers rather than inventing
+    an adjustment.
+    """
+    try:
+        result = subprocess.run(
+            [readelf_cmd, "-S", "-W", str(binary_path)],
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+        log.debug("%s section probe failed: %s", readelf_cmd, exc)
+        return None
+    if result.returncode != 0:
+        log.debug("%s failed: %s", readelf_cmd, (result.stderr or "").strip())
+        return None
+
+    reserved = 0
+    seen_section = False
+    for line in (result.stdout or "").splitlines():
+        match = _READELF_SECTION_RE.match(line)
+        if match is None:
+            continue
+        name, sec_type, size_hex, flags = match.groups()
+        seen_section = True
+        if sec_type != "NOBITS" or "A" not in flags:
+            continue
+        # Any dot- or underscore-separated token, not just the first. A
+        # region-qualified name like `.ram_heap` or `.tcm_heap` stems to
+        # "ram"/"tcm" under first-token-only matching and was silently missed
+        # -- proven by review on a real ELF. Over-matching is cheap here
+        # because the type and alloc filters above already excluded
+        # everything that is not in `size`'s bss column.
+        tokens = set(name.lstrip(".").replace("_", ".").split("."))
+        if tokens & _RESERVED_NOBITS_NAMES:
+            reserved += int(size_hex, 16)
+    if not seen_section:
+        return None
+    return reserved
 
 
 def _sections_via_fromelf(
@@ -172,6 +290,11 @@ def binary_sections(
     return _sections_via_size(
         binary_path,
         size_cmd=resolve_toolchain_executable(toolchain, spec.size),
+        readelf_cmd=(
+            resolve_toolchain_executable(toolchain, spec.readelf)
+            if spec.readelf is not None
+            else None
+        ),
         timeout_s=timeout_s,
     )
 

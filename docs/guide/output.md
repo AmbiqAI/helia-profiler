@@ -149,7 +149,7 @@ The top-level summary — start here for a quick overview.
 | Top-level | Engine, layer count, total cycles, overflow flag |
 | `top_layers` | Top 5 layers by cycle count with percentages |
 | `memory` | Arena allocation, model size, tensor counts |
-| `binary` | ELF section sizes (text, data, bss) from `arm-none-eabi-size` |
+| `binary` | ELF section sizes (text, data, bss, total, and `reserved` when non-zero) — see [Reserved vs bss](#reserved-vs-bss) |
 | `cache` | Aggregated cache/memory PMU counters + derived L1D hit rate |
 | `power` | Power summary (when Joulescope capture is enabled) |
 
@@ -278,6 +278,49 @@ Deep memory breakdown (only with `--detailed`):
   }
 }
 ```
+
+
+### Reserved vs bss
+
+`bss` counts zero-initialized state the program actually uses. `reserved` is
+separate: linker-reserved NOBITS regions that are never written at runtime.
+
+This matters most on Apollo5 boards, where the NSX linker script deliberately
+fills **all remaining DTCM** as a `.heap` region so `_sbrk` has a bounded area
+to allocate from. `arm-none-eabi-size`'s default output has no per-section
+detail, so before HPX 0.1.6 that reservation was reported as `bss` — on a
+measured build, 392 KB of "bss" for 248 bytes of real state.
+
+HPX now reads the ELF section headers and reports the two separately:
+
+```json
+"binary": {
+  "text": 45000,
+  "data": 1200,
+  "bss": 248,
+  "reserved": 392960,
+  "total": 393264
+}
+```
+
+`reserved` is omitted entirely when a board's linker script does not reserve
+anything, and `total` is unchanged — it remains the size tool's own inclusive
+sum, so `text + data + bss + reserved` reconciles against it.
+
+!!! note "Comparing against older baselines"
+    Because `bss` no longer includes the reservation, an Apollo5 run recorded
+    with HPX 0.1.5 or earlier reports a far larger `bss` than the same binary
+    does today. `summary.json`'s `schema_version` moves from 1 to 2 so the
+    change is detectable, and `hpx compare` reports it as a
+    `run_summary_schema_version` difference rather than silently as a memory
+    improvement. Re-record affected baselines.
+
+!!! warning "armclang reports the old shape"
+    The section-header probe runs for the GCC and ATfE toolchains. armclang
+    binaries are measured with `fromelf`, which is not yet split the same way,
+    so an armclang build still folds the reservation into `bss`. Comparing an
+    armclang run against a GCC run of the same source will show a large `bss`
+    difference that is entirely an artifact of the measuring tool.
 
 ## Terminal summary
 
