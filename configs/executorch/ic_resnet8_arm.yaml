@@ -1,0 +1,45 @@
+# MLPerf Tiny ic-resnet8 LFS fixture on the arm CMSIS-NN provider.
+# Same PTE both providers (stock cortex_m:: ops only) — hpx compare works
+# directly on the paired runs.
+model:
+  path: tests/fixtures/mlperf_tiny/ic/ic_resnet8_random_int8.pte
+  arena_size: 49152
+  arena_location: sram
+  weights_location: mram
+
+engine:
+  type: executorch
+  backend: arm
+  config:
+    source_path: /home/nmysore/nsx-executorch-package
+    method_arena_size: 65536
+    temporary_arena_size: 32768
+    input_size: 12288
+    output_size: 40
+    portable_ops: []
+
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+    mve: default
+    memory: default
+  per_layer: true
+  iterations: 25
+  warmup: 5
+  aggregation: median
+
+power:
+  enabled: false
+
+output:
+  format: json
+  dir: ./results/ic_resnet8_arm
+  model_explorer: false
+  detailed: true
