@@ -138,7 +138,7 @@ _FROMELF_TOTALS_RE = re.compile(r"\s*Grand Totals?\s*[:\s]+(\d+)\s+(\d+)\s+(\d+)
 
 
 
-#: Section-name stems treated as linker reservations rather than program
+#: Section-name tokens treated as linker reservations rather than program
 #: state. Matched only among sections already known to be **NOBITS and
 #: allocated** -- the name alone is not evidence.
 #:
@@ -154,7 +154,7 @@ _FROMELF_TOTALS_RE = re.compile(r"\s*Grand Totals?\s*[:\s]+(\d+)\s+(\d+)\s+(\d+)
 #: (``. = ORIGIN(MCU_TCM) + LENGTH(MCU_TCM);``) purely so ``_sbrk`` has a
 #: bounded area. Its size states what was left over, not what is needed, so
 #: counting it as footprint tells the reader nothing useful about the build.
-_RESERVED_NOBITS_STEMS = ("heap",)
+_RESERVED_NOBITS_NAMES = frozenset({"heap"})
 
 #: ``readelf -S -W`` row: ``[Nr] Name Type Addr Off Size ES Flg ...`` with the
 #: numeric columns in hex. The name is anchored to a leading dot so the empty
@@ -213,8 +213,14 @@ def _reserved_via_readelf(
         seen_section = True
         if sec_type != "NOBITS" or "A" not in flags:
             continue
-        stem = name.lstrip(".").split(".")[0].split("_")[0]
-        if stem in _RESERVED_NOBITS_STEMS:
+        # Any dot- or underscore-separated token, not just the first. A
+        # region-qualified name like `.ram_heap` or `.tcm_heap` stems to
+        # "ram"/"tcm" under first-token-only matching and was silently missed
+        # -- proven by review on a real ELF. Over-matching is cheap here
+        # because the type and alloc filters above already excluded
+        # everything that is not in `size`'s bss column.
+        tokens = set(name.lstrip(".").replace("_", ".").split("."))
+        if tokens & _RESERVED_NOBITS_NAMES:
             reserved += int(size_hex, 16)
     if not seen_section:
         return None

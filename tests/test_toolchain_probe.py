@@ -234,3 +234,27 @@ def test_a_non_allocated_section_named_like_a_reservation_is_ignored(
     assert sections is not None
     assert sections.bss == 392_188
     assert sections.reserved == 0
+
+
+def test_a_region_qualified_heap_name_is_matched(tmp_path: Path, monkeypatch) -> None:
+    """`.ram_heap` / `.tcm_heap` are real reservations under a qualified name.
+
+    First-token-only stem matching kept "ram"/"tcm" and silently missed them;
+    review proved it on a real ELF. Matching any dot- or underscore-separated
+    token fixes it, and is safe because the NOBITS+alloc filter has already
+    excluded everything outside `size`'s bss column.
+    """
+    berkeley = "text data bss dec hex filename\n32 4 8452 8488 2128 firmware\n"
+    readelf = """Section Headers:
+  [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
+  [ 3] .bss              NOBITS          10000004 002004 000104 00  WA  0   0  4
+  [ 4] .ram_heap         NOBITS          10000108 002108 000fa0 00  WA  0   0  8
+  [ 5] .tcm_heap         NOBITS          100010a8 0030a8 001004 00  WA  0   0  8
+"""
+    _probe_stub(monkeypatch, berkeley, readelf)
+
+    sections = binary_sections(tmp_path / "firmware", Toolchain.ARM_NONE_EABI_GCC, timeout_s=5)
+
+    assert sections is not None
+    assert sections.reserved == 0x0FA0 + 0x1004
+    assert sections.bss == 8452 - (0x0FA0 + 0x1004)
