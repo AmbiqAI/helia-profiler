@@ -274,6 +274,35 @@ class ExecuTorchAdapter:
             size = entries[0].get("size_bytes") if entries else None
             return size if isinstance(size, int) and size > 0 else None
 
+        # ExecuTorch runtime buffers are RAM-resident; the coarse
+        # model.arena_location knob and the per-buffer overrides below may
+        # only name RAM regions.
+        if config.model.arena_location is not None and config.model.arena_location.value not in (
+            "tcm",
+            "sram",
+        ):
+            raise EngineError(
+                f"model.arena_location '{config.model.arena_location.value}' is not "
+                "valid for ExecuTorch runtime buffers",
+                hint="Use tcm or sram; weights_location controls the PTE placement.",
+            )
+
+        def _buffer_region(name: str) -> str | None:
+            value = engine_config.get(name)
+            if value is None:
+                return None
+            if value not in ("tcm", "sram"):
+                raise EngineError(
+                    f"engine.config.{name} must be 'tcm' or 'sram'",
+                    hint="Each ExecuTorch runtime buffer is a static RAM allocation.",
+                )
+            return value
+
+        planned_region = _buffer_region("planned_arena_location")
+        method_region = _buffer_region("method_arena_location")
+        temporary_region = _buffer_region("temporary_arena_location")
+        io_region = _buffer_region("io_location")
+
         planned_size = _positive_int(
             engine_config,
             "planned_arena_size",
@@ -347,4 +376,8 @@ class ExecuTorchAdapter:
             executorch_temporary_arena_size=temporary_size,
             executorch_input_size=input_size,
             executorch_output_size=output_size,
+            executorch_planned_arena_region=planned_region,
+            executorch_method_arena_region=method_region,
+            executorch_temporary_arena_region=temporary_region,
+            executorch_io_region=io_region,
         )

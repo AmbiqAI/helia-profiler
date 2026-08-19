@@ -128,6 +128,12 @@ class EngineArtifacts:
     executorch_temporary_arena_size: int | None = None
     executorch_input_size: int | None = None
     executorch_output_size: int | None = None
+    # Per-buffer memory regions ("tcm" | "sram"); None = follow the run's
+    # resolved arena region (model.arena_location or the planner's choice).
+    executorch_planned_arena_region: str | None = None
+    executorch_method_arena_region: str | None = None
+    executorch_temporary_arena_region: str | None = None
+    executorch_io_region: str | None = None
 
 
 @runtime_checkable

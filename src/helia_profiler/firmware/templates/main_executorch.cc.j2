@@ -37,19 +37,16 @@ static uint32_t g_logical_overflow_mask = 0U;
 static bool g_profile_enabled = false;
 static bool g_layer_capacity_exceeded = false;
 
-{% if arena_region == "sram" %}
-NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_planned_arena[{{ executorch_planned_arena_size }}];
-NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_method_arena[{{ executorch_method_arena_size }}];
-NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_temporary_arena[{{ executorch_temporary_arena_size }}];
-NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_input[{{ executorch_input_size }}];
-NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_output[{{ executorch_output_size }}];
-{% else %}
-NSX_MEM_FAST_BSS alignas(16) static uint8_t g_planned_arena[{{ executorch_planned_arena_size }}];
-alignas(16) static uint8_t g_method_arena[{{ executorch_method_arena_size }}];
-alignas(16) static uint8_t g_temporary_arena[{{ executorch_temporary_arena_size }}];
-alignas(16) static uint8_t g_input[{{ executorch_input_size }}];
-alignas(16) static uint8_t g_output[{{ executorch_output_size }}];
-{% endif %}
+{#- Every runtime buffer is placed explicitly: its own engine.config
+    *_location override when given, otherwise the run's arena region. -#}
+{% macro exec_buffer(name, size, region) -%}
+{% if region == "sram" %}NSX_MEM_SRAM_BSS {% else %}NSX_MEM_FAST_BSS {% endif %}alignas(16) static uint8_t {{ name }}[{{ size }}];
+{%- endmacro %}
+{{ exec_buffer("g_planned_arena", executorch_planned_arena_size, executorch_planned_arena_region) }}
+{{ exec_buffer("g_method_arena", executorch_method_arena_size, executorch_method_arena_region) }}
+{{ exec_buffer("g_temporary_arena", executorch_temporary_arena_size, executorch_temporary_arena_region) }}
+{{ exec_buffer("g_input", executorch_input_size, executorch_io_region) }}
+{{ exec_buffer("g_output", executorch_output_size, executorch_io_region) }}
 
 static bool profiler_init(
     const uint32_t event_ids[], const char *const names[], int count) {

@@ -357,6 +357,10 @@ def test_executorch_template_has_counter_health_and_true_overflow_mask():
         executorch_input_size=64,
         executorch_output_size=16,
         arena_region="tcm",
+        executorch_planned_arena_region="tcm",
+        executorch_method_arena_region="tcm",
+        executorch_temporary_arena_region="tcm",
+        executorch_io_region="tcm",
         weights_region="mram",
         transport="rtt",
         power_sync_enabled=False,
@@ -405,6 +409,10 @@ def test_executorch_template_places_complete_workspace_in_sram():
         executorch_input_size=110592,
         executorch_output_size=8,
         arena_region="sram",
+        executorch_planned_arena_region="sram",
+        executorch_method_arena_region="sram",
+        executorch_temporary_arena_region="sram",
+        executorch_io_region="sram",
         weights_region="mram",
         transport="rtt",
         power_sync_enabled=False,
@@ -429,3 +437,101 @@ def test_executorch_template_places_complete_workspace_in_sram():
         "g_output",
     ):
         assert f"NSX_MEM_SRAM_BSS alignas(16) static uint8_t {name}" in out
+
+
+def test_adapter_resolves_per_buffer_regions(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    artifacts = ExecuTorchAdapter().prepare(
+        _config(
+            tmp_path,
+            source,
+            planned_arena_location="tcm",
+            method_arena_location="sram",
+            temporary_arena_location="sram",
+            io_location="sram",
+        ),
+        tmp_path / "work",
+    )
+    assert artifacts.executorch_planned_arena_region == "tcm"
+    assert artifacts.executorch_method_arena_region == "sram"
+    assert artifacts.executorch_temporary_arena_region == "sram"
+    assert artifacts.executorch_io_region == "sram"
+
+
+def test_adapter_defaults_buffer_regions_to_follow_arena(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    artifacts = ExecuTorchAdapter().prepare(_config(tmp_path, source), tmp_path / "work")
+    assert artifacts.executorch_planned_arena_region is None
+    assert artifacts.executorch_io_region is None
+
+
+def test_adapter_rejects_non_ram_buffer_region(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    with pytest.raises(EngineError, match="planned_arena_location must be 'tcm' or 'sram'"):
+        ExecuTorchAdapter().prepare(
+            _config(tmp_path, source, planned_arena_location="psram"),
+            tmp_path / "work",
+        )
+
+
+def test_adapter_rejects_non_ram_arena_location(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = load_config(
+        None,
+        {
+            "model": {
+                "path": str(tmp_path / "model.pte"),
+                "arena_size": 2048,
+                "arena_location": "psram",
+            },
+            "engine": {
+                "type": "executorch",
+                "backend": "arm",
+                "config": {
+                    "source_path": str(source),
+                    "input_size": 64,
+                    "output_size": 16,
+                },
+            },
+        },
+    )
+    (tmp_path / "model.pte").write_bytes(b"\x00\x00\x00\x00ET" + b"\x00" * 32)
+    with pytest.raises(EngineError, match="not\\s+valid for ExecuTorch runtime buffers"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+
+def test_executorch_template_splits_buffer_regions():
+    # Production's env, not a look-alike -- see issue #119.
+    out = _jinja_env.get_template("main_executorch.cc.j2").render(
+        cmsis_device_header="apollo510.h",
+        pmu_max_ops=4096,
+        executorch_planned_arena_size=2048,
+        executorch_method_arena_size=1024,
+        executorch_temporary_arena_size=512,
+        executorch_input_size=64,
+        executorch_output_size=16,
+        arena_region="tcm",
+        executorch_planned_arena_region="tcm",
+        executorch_method_arena_region="sram",
+        executorch_temporary_arena_region="sram",
+        executorch_io_region="sram",
+        weights_region="mram",
+        transport="rtt",
+        power_sync_enabled=False,
+        extreme_mode=False,
+        manages_shared_ssram_power=True,
+        ssram_full_power_enum="AM_HAL_PWRCTRL_SRAM_3M",
+        perf_mode_symbol="NSX_PERF_LOW",
+        perf_mode_mhz=96,
+        iterations=3,
+        warmup=1,
+        clean_iters=3,
+        pmu_passes=[],
+        pmu_pass_names=[],
+        psram_clock_hz=48_000_000,
+    )
+    assert "NSX_MEM_FAST_BSS alignas(16) static uint8_t g_planned_arena[2048]" in out
+    assert "NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_method_arena[1024]" in out
+    assert "NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_temporary_arena[512]" in out
+    assert "NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_input[64]" in out
+    assert "NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_output[16]" in out

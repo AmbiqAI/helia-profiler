@@ -177,6 +177,15 @@ model flatbuffer (50 KB) goes in SRAM.
   controls constants. Use
   `engine.config.aot_args.memory.tensors` to specify `constant`, `persistent`,
   and `scratch` placement more precisely; those rules override the coarse fields.
+* **ExecuTorch**: the runner owns five static RAM buffers — the memory-planned
+  (activation) arena, method arena, temporary arena, and the input/output
+  buffers. `arena_location` (tcm or sram only) places all of them; each can be
+  moved individually with `engine.config.planned_arena_location`,
+  `method_arena_location`, `temporary_arena_location`, and `io_location`
+  (e.g. planned arena in DTCM for speed, the cold-after-load method arena and
+  large I/O buffers in SRAM). `weights_location` places the PTE program.
+  Splitting *within* the planned arena (per-tensor, heliaAOT-style) is not
+  supported yet; the exporter pins the PTE to a single memory-planned buffer.
 
 ---
 
