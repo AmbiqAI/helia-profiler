@@ -1,6 +1,8 @@
-# MLPerf Tiny ic-resnet8 LFS fixture on the ns CMSIS-NN provider.
-# Same PTE both providers (stock cortex_m:: ops only) — hpx compare works
-# directly on the paired runs.
+# MLPerf Tiny ic-resnet8 re-exported through the nsx_cortex_m AOT package,
+# run on the ns CMSIS-NN provider. Regenerate the PTE with
+# tools/export/executorch_mlperf_tiny/export_nsx_aot.py (the AOT-exported
+# binaries are not checked in). For arm-vs-ns, this PTE is byte-identical
+# to the arm export — stock cortex_m:: ops only.
 model:
   path: examples/models/mlperf_nsx_aot/ic_ns.pte
   arena_size: 49152
@@ -11,7 +13,7 @@ engine:
   type: executorch
   backend: ns
   config:
-    source_path: /home/nmysore/nsx-executorch-package
+    source_path: /path/to/nsx-executorch
     method_arena_size: 65536
     temporary_arena_size: 32768
     input_size: 12288

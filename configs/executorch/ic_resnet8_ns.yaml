@@ -11,7 +11,7 @@ engine:
   type: executorch
   backend: ns
   config:
-    source_path: /home/nmysore/nsx-executorch-package
+    source_path: /path/to/nsx-executorch
     method_arena_size: 65536
     temporary_arena_size: 32768
     input_size: 12288

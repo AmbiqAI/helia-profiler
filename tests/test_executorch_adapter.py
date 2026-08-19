@@ -535,3 +535,30 @@ def test_executorch_template_splits_buffer_regions():
     assert "NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_temporary_arena[512]" in out
     assert "NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_input[64]" in out
     assert "NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_output[16]" in out
+
+
+def test_adapter_rejects_sidecar_with_non_boolean_requires_ns_ops(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    _write_sidecar(config.model.path, requires_ns_ops="false")
+
+    with pytest.raises(EngineError, match="requires_ns_ops.*JSON boolean"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+
+def test_adapter_rejects_sidecar_with_malformed_inputs(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    _write_sidecar(config.model.path, inputs=["not-a-tensor-object"])
+
+    with pytest.raises(EngineError, match="'inputs' must be a list of tensor objects"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+
+def test_adapter_rejects_sidecar_with_bad_planned_size(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    _write_sidecar(config.model.path, planned_arena_size="98304")
+
+    with pytest.raises(EngineError, match="planned_arena_size.*positive integer"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")

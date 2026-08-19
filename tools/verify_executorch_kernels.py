@@ -46,10 +46,19 @@ def main() -> int:
         action="store_true",
         help="Require the selective portable-op registration table (set when the PTE keeps aten:: fallbacks)",
     )
-    parser.add_argument("--nm", default=shutil.which("arm-none-eabi-nm") or "arm-none-eabi-nm")
+    parser.add_argument("--nm", default="arm-none-eabi-nm")
     args = parser.parse_args()
 
-    syms = _symbols(args.elf, args.nm)
+    nm = shutil.which(args.nm)
+    if nm is None:
+        parser.error(
+            f"{args.nm!r} not found on PATH; install the Arm GNU toolchain or "
+            "pass --nm /path/to/arm-none-eabi-nm"
+        )
+    if not args.elf.is_file():
+        parser.error(f"ELF not found: {args.elf}")
+
+    syms = _symbols(args.elf, nm)
     ns_abi = sorted({s for s in syms if any(s.startswith(k) for k in NS_ABI_SYMBOLS)})
     cortex_m_ns = sorted({s for s in syms if "cortex_m_ns" in s})
     # Named native symbols disappear when size optimization localizes the

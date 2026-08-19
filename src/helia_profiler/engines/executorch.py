@@ -164,7 +164,60 @@ def _load_pte_sidecar(model_path: Path) -> dict[str, Any] | None:
             f"model is {actual})",
             hint="Re-export the model so the PTE and its sidecar match.",
         )
+    _validate_sidecar_fields(sidecar, manifest)
     return manifest
+
+
+def _validate_sidecar_fields(sidecar: Path, manifest: dict[str, Any]) -> None:
+    """Type-check the sidecar fields the adapter consumes.
+
+    The sidecar is external file input; validate here so downstream reads
+    can trust the shapes and a hand-edited or truncated file fails with an
+    actionable error rather than a coercion surprise (e.g. the JSON string
+    "false" being truthy) or an AttributeError.
+    """
+
+    def fail(field: str, expected: str) -> None:
+        raise EngineError(
+            f"{sidecar}: field {field!r} must be {expected}",
+            hint="Re-export the model with helia-torch instead of editing the sidecar.",
+        )
+
+    provider = manifest.get("kernel_provider")
+    if provider is not None and provider not in ("arm", "ns"):
+        fail("kernel_provider", "'arm' or 'ns'")
+    requires_ns_ops = manifest.get("requires_ns_ops")
+    if requires_ns_ops is not None and not isinstance(requires_ns_ops, bool):
+        fail("requires_ns_ops", "a JSON boolean")
+    planned = manifest.get("planned_arena_size")
+    if planned is not None and (
+        not isinstance(planned, int) or isinstance(planned, bool) or planned <= 0
+    ):
+        fail("planned_arena_size", "a positive integer")
+    for key in ("inputs", "outputs"):
+        entries = manifest.get(key)
+        if entries is None:
+            continue
+        if not isinstance(entries, list) or not all(
+            isinstance(entry, dict) for entry in entries
+        ):
+            fail(key, "a list of tensor objects")
+        for entry in entries:
+            size = entry.get("size_bytes")
+            if size is not None and (
+                not isinstance(size, int) or isinstance(size, bool) or size <= 0
+            ):
+                fail(f"{key}[].size_bytes", "a positive integer")
+    operators = manifest.get("operators")
+    if operators is not None:
+        if not isinstance(operators, dict):
+            fail("operators", "an object of operator lists")
+        portable = operators.get("portable")
+        if portable is not None and (
+            not isinstance(portable, list)
+            or not all(isinstance(name, str) for name in portable)
+        ):
+            fail("operators.portable", "a list of operator names")
 
 
 class ExecuTorchAdapter:
