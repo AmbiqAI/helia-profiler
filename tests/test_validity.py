@@ -22,12 +22,15 @@ from helia_profiler.results import FirmwareMeta, PmuResult
 from helia_profiler.evaluation import evaluate_run
 
 
-def _context(tmp_path: Path, *, mode: str = "external") -> PipelineContext:
+def _context(
+    tmp_path: Path, *, mode: str = "external", probe: str = "infer"
+) -> PipelineContext:
     config = load_config(
         None,
         {
             "model": {"path": "test.tflite"},
             "engine": {"type": "helia-rt"},
+            "profiling": {"clean_window_probe": probe, "window_target_ms": 1000},
             "power": {
                 "enabled": True,
                 "mode": mode,
@@ -781,3 +784,135 @@ class TestCleanWindowStall:
         )
         assert stall.context["stalled_iters"] == 233
         assert stall.context["partial_iters"] == 0
+
+
+class TestNoInferenceProbeWindowDuration:
+    """The replay path must check a busy_loop window, like the stage does.
+
+    #125 item 2: with the plan-derived reference withheld, an internal-mode
+    busy_loop run had NO duration check anywhere -- and `elapsed_us` is the
+    denominator for average power and current, so a mis-sized window scales
+    both. Restoring the reference in the collect stage fixed capture time;
+    `evaluate_run` is the second consumer, and it is the one `hpx compare`
+    and replayed artifacts go through. Leaving it withheld here also made the
+    two modules disagree, which the comment above the call denies is possible.
+
+    Verified before the fix: a 7x inflated busy_loop window evaluated VALID
+    with no issues while the collect stage warned; the same window under
+    `infer` evaluated DEGRADED with power.window_clock_mismatch.
+    """
+
+    #: The #125 plan shape for busy_loop: one unit of work lasting the target
+    #: window, `count_source="probe_window"`.
+    PLAN_COUNT = 1
+    PLAN_REFERENCE_US = 1_000_000
+
+    def _run(self, ctx: PipelineContext, *, elapsed_us: int) -> None:
+        assert ctx.power_run is not None
+        # Firmware reports 1 requested / 1 completed under this probe (#112).
+        terminal = replace(
+            ctx.power_run.terminal,
+            requested_count=1,
+            completed_count=1,
+            elapsed_us=elapsed_us,
+        )
+        ctx.power_run = PowerRun(
+            plan=PowerRunPlan(
+                firmware_mode="dedicated",
+                inference_count=self.PLAN_COUNT,
+                reference_inference_us=self.PLAN_REFERENCE_US,
+                count_source="probe_window",
+            ),
+            observation=None,
+            terminal=terminal,
+            on_device_summary=OnDevicePowerSummary(
+                source="ina228",
+                scope="fixed_n_inference",
+                energy_nj=1_000_000,
+                duration_us=elapsed_us,
+                inference_count=1,
+                overflow=False,
+            ),
+        )
+
+    def test_mis_sized_busy_loop_window_is_flagged(self, tmp_path: Path):
+        """7 s of window against a 1 s plan -- the calibration-fallback shape
+        `_busy_loop_calibration.j2` warns about, and the one the one-sided
+        ceiling check can never see."""
+        ctx = _context(tmp_path, mode="internal", probe="busy_loop")
+        self._run(ctx, elapsed_us=7_000_000)
+
+        evaluation = evaluate_run(ctx)
+
+        mismatch = [
+            issue
+            for issue in evaluation.issues
+            if issue.code == "power.window_clock_mismatch"
+        ]
+        assert len(mismatch) == 1
+        assert evaluation.validity is ResultValidity.DEGRADED
+
+    def test_correctly_sized_busy_loop_window_stays_valid(self, tmp_path: Path):
+        """And the check must not fire on a correct run -- the spurious warning
+        #112 removed. The plan now describes the window, so they agree."""
+        ctx = _context(tmp_path, mode="internal", probe="busy_loop")
+        self._run(ctx, elapsed_us=self.PLAN_REFERENCE_US)
+
+        evaluation = evaluate_run(ctx)
+
+        codes = {issue.code for issue in evaluation.issues}
+        assert "power.window_clock_mismatch" not in codes
+        assert evaluation.validity is ResultValidity.VALID
+
+
+class TestGateToleranceAgreesAcrossCaptureAndEvaluate:
+    """The fallback duration check must use the tolerance capture used.
+
+    `_assess_unrecorded_duration` runs only for an artifact with no recorded
+    `gate_duration_integrity` -- an older or replayed capture. It took
+    `assess_gate_duration`'s conservative 1% default while capture picked the
+    band from `count_source`, so the same window could be accepted at capture
+    time and warned about here. That is the capture-vs-evaluate divergence
+    this module already closed for the window-clock check; leaving it open for
+    the sibling check is the same bug in the same shape (found by review
+    of #136).
+    """
+
+    def _ctx_with_plan(self, tmp_path: Path, count_source: str) -> PipelineContext:
+        ctx = _context(tmp_path, probe="busy_loop")
+        assert ctx.power_run is not None
+        ctx.power_run = PowerRun(
+            plan=PowerRunPlan(
+                firmware_mode="dedicated",
+                inference_count=1,
+                reference_inference_us=5_000_000,
+                target_duration_ms=5000,
+                count_source=count_source,
+            ),
+            observation=ctx.power_run.observation,
+            terminal=ctx.power_run.terminal,
+        )
+        return ctx
+
+    def test_a_predicted_window_gets_its_own_band_not_the_conservative_default(
+        self, tmp_path: Path
+    ):
+        """A 16% overrun on a 5 s spin is inside the 25% busy_loop band."""
+        from helia_profiler.evaluation.validity import _assess_unrecorded_duration
+
+        ctx = self._ctx_with_plan(tmp_path, "probe_window")
+
+        assert _assess_unrecorded_duration(ctx, 5.8) is None
+
+    def test_the_same_window_is_still_flagged_when_it_is_genuinely_wrong(
+        self, tmp_path: Path
+    ):
+        """Loosening the band must not disarm the check."""
+        from helia_profiler.evaluation.validity import _assess_unrecorded_duration
+
+        ctx = self._ctx_with_plan(tmp_path, "probe_window")
+
+        issue = _assess_unrecorded_duration(ctx, 9.0)
+
+        assert issue is not None
+        assert issue.code == "power.gate_duration_mismatch"

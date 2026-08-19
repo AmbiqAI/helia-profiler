@@ -12,7 +12,7 @@ from ..power.diagnostics import (
     assess_run_window_clock,
     expected_terminal_requested_count,
     firmware_window_clock_is_frozen,
-    probe_runs_inferences,
+    gate_relative_tolerance_for,
     window_clock_ceiling_from_metadata,
 )
 from ..results import ResultIssue, ResultValidity
@@ -266,14 +266,16 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                     elapsed_us=terminal.elapsed_us,
                     internal_mode=internal_mode,
                     gated_result=observation.result if observation is not None else None,
-                    # See the collect stage: the internal-mode reference is
-                    # N x per-inference time, which describes nothing a
-                    # no-inference probe did.
-                    planned_inference_count=(
-                        plan.inference_count
-                        if probe_runs_inferences(ctx.config.profiling.clean_window_probe)
-                        else None
-                    ),
+                    # Same reference the collect stage uses, unconditionally:
+                    # `count x reference_us`. #112 withheld it for probes that
+                    # run no inferences, because the plan then multiplied a
+                    # per-inference time it had no business using. #125 fixed
+                    # the PLAN instead -- a busy_loop window is one unit
+                    # lasting window_target_ms -- so the product now IS the
+                    # window for every probe, and withholding it here would
+                    # leave the replay/evaluate_run path with no duration
+                    # check at all while the stage has one.
+                    planned_inference_count=plan.inference_count,
                     planned_inference_us=plan.reference_inference_us,
                 )
                 if agreement is not None and not agreement.agrees:
@@ -397,6 +399,15 @@ def _assess_unrecorded_duration(ctx: PipelineContext, measured_s: float) -> Resu
         clean_infer_count=count,
         clean_infer_avg_us=average_us,
         stats_rate_hz=ctx.config.power.stats_rate_hz,
+        # Same policy capture/__init__.py applies, from the same helper: a
+        # tolerance that differs between capture time and evaluate time is the
+        # divergence class this module already fixed for the window-clock
+        # check. Dormant today (capture_gated records gate_duration_integrity
+        # whenever it runs, so this fallback needs an artifact that lacks it),
+        # but the two must not be free to drift.
+        relative_tolerance=gate_relative_tolerance_for(
+            ctx.config.profiling.clean_window_probe
+        ),
     )
     if integrity.valid:
         return None

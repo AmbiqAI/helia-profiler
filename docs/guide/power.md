@@ -392,15 +392,24 @@ clean inferences it ran. `window_mode: fixed` instead runs exactly
 `profiling.iterations` clean inferences, no matter how long that takes.
 
 Ordinary (non-power) runs target `window_target_ms: 1000` (1 s) by default.
-When `power.enabled: true`, heliaPROFILER automatically raises the *effective*
-target to at least 5000 ms (`max(profiling.window_target_ms, 5000)`), because
-host-side GPIO polling and Joulescope packet alignment need more time to
-settle than a plain PMU capture does.
+When `power.enabled: true` **and** `window_mode: auto`, heliaPROFILER raises
+the *effective* target to at least 5000 ms (`max(profiling.window_target_ms,
+5000)`), because host-side GPIO polling and Joulescope packet alignment need
+more time to settle than a plain PMU capture does. `window_mode: fixed` is
+left alone — it means "use my number" — so a fixed sub-5 s power window is
+built as written. Note the separate floor below it: an external capture
+rejects any measured gate shorter than 1 s, so a `fixed` target at or below
+about 1000 ms will fail the window contract even when the firmware runs
+exactly what it was told to.
 
 External captures enforce the window contract before reporting
 energy-per-inference. The measured gate must be at least one second and agree
 with `clean_infer_count * clean_infer_avg_us` within the larger of two stats
-packets, half an inference, or 1% cross-binary timing drift. Short GPIO pulses
+packets, half an inference (only when more than one inference was counted —
+with a single unit that allowance would be half the whole measurement), or a
+cross-boot timing allowance: 10% for a counted window, 25% for a `busy_loop`
+window, whose length is predicted from a calibration pass rather than counted.
+That allowance follows the probe in both `power.firmware` modes. Short GPIO pulses
 are ignored as glitches; a capture with no qualifying window fails rather than
 publishing a plausible but invalid power number. The accepted ratio and any
 ignored pulse count are recorded in `summary.json`.
@@ -1002,7 +1011,7 @@ comparison.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `profiling.window_mode` | string | `auto` | `auto` sizes the clean window at runtime; `fixed` runs exactly `iterations` |
-| `profiling.window_target_ms` | int | `1000` | Target wall-time for the clean window (auto-raised to ≥ 5000 when power is enabled) |
+| `profiling.window_target_ms` | int | `1000` | Target wall-time for the clean window (raised to ≥ 5000 when power is enabled **and** `window_mode: auto`) |
 | `profiling.window_min` / `window_max` | int | `10` / `500000` | Clamp bounds for the auto-sized clean-window iteration count |
 | `profiling.extreme_mode` | bool | `false` | See [Advanced power floors](#advanced-power-floors) |
 | `profiling.force_shared_sram` | bool | `false` | See [Advanced power floors](#advanced-power-floors) |

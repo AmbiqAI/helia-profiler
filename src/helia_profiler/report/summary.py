@@ -230,7 +230,10 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                     if plan_meta.get("reference_inference_us"):
                         effective_avg_us = int(plan_meta["reference_inference_us"])
                 if effective_avg_us and effective_avg_us > 0 and ps.duration_s > 0:
-                    from ..power.diagnostics import GateDurationIntegrity, assess_gate_duration
+                    from ..power.diagnostics import (
+                        GateDurationIntegrity,
+                        assess_gate_duration,
+                    )
 
                     integrity_meta = power_meta.get("gate_duration_integrity")
                     if isinstance(integrity_meta, dict):
@@ -241,6 +244,19 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                             minimum_s=float(integrity_meta.get("minimum_s", 0.0)),
                         )
                     else:
+                        # Deliberately the conservative default rather than
+                        # the probe-keyed band capture uses. This branch is
+                        # reached only for an artifact that recorded no
+                        # gate_duration_integrity, and it publishes an
+                        # advisory `suspect` flag rather than ending a run --
+                        # so the asymmetry that matters is the opposite one
+                        # from capture's: a band wide enough to keep a raising
+                        # check from killing healthy runs is also wide enough
+                        # to stop flagging real truncation. The 9% short
+                        # window in test_write_summary_flags_truncated_gated_window
+                        # is exactly that case. It is also unreachable for the
+                        # predicted-window probe, which the enclosing
+                        # probe_ran_inferences guard excludes.
                         integrity = assess_gate_duration(
                             measured_s=ps.duration_s,
                             clean_infer_count=effective_count,
