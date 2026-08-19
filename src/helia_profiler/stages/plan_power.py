@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from ..results import PowerRunPlan
 from ..config import DEFAULT_POWER_WINDOW_TARGET_MS
 from ..errors import PowerError
 from ..power.diagnostics import probe_runs_inferences
 from ..pipeline import PipelineContext
+
+if TYPE_CHECKING:
+    from ..config import ProfileConfig
 from ..power.diagnostics import assess_clean_window_stall
 
 log = logging.getLogger("hpx")
@@ -108,6 +112,45 @@ def _check_ina228_cadence(ctx: PipelineContext, plan: PowerRunPlan) -> None:
         )
 
 
+def predicted_window_ms(config: "ProfileConfig", *, reference_us: int | None) -> int:
+    """How long the firmware's clean window will actually last.
+
+    One question with one answer per (probe, firmware mode, window mode), in
+    one place. It was previously answered inline at the point of use, and each
+    round of review found another branch where the inline answer was wrong for
+    a combination nobody had enumerated -- the plan claiming 5000 ms against a
+    1000 ms spin, then the same against a 100-iteration counted window. The
+    matrix in tests/contracts/test_window_matrix.py checks every combination
+    against this function rather than against a hand-copied expectation.
+
+    Three cases, in order of who decides the length:
+
+    1. A probe that sizes its own window (busy_loop) -- the FIRMWARE decides,
+       from the same template variable the render read.
+    2. A counted window on a DEDICATED binary -- the HOST decides: it picks N
+       from this goal and render_power_source() rebuilds with clean_iters=N,
+       so the goal is the window whatever window_mode says. This is the only
+       case the power floor belongs to, because it is the only one where
+       raising the goal actually lengthens the window.
+    3. A counted window on a SHARED binary -- nothing is rebuilt, so the
+       firmware runs what it was already built to run: exactly
+       ``profiling.iterations`` in fixed mode, or an auto-sized loop hitting
+       the effective target.
+    """
+    if not probe_runs_inferences(config.profiling.clean_window_probe):
+        return config.effective_window_target_ms
+    if config.power.firmware == "dedicated":
+        return max(
+            config.profiling.window_target_ms,
+            DEFAULT_POWER_WINDOW_TARGET_MS,
+        )
+    if config.profiling.window_mode == "fixed" and reference_us:
+        # Nearest millisecond, not truncated: this field is the window's
+        # only statement of length when no count is planned.
+        return max(1, (config.profiling.iterations * reference_us + 500) // 1000)
+    return config.effective_window_target_ms
+
+
 def plan_power_run(
     ctx: PipelineContext,
     *,
@@ -121,34 +164,7 @@ def plan_power_run(
     if ctx.pmu_result is not None:
         reference_us = ctx.pmu_result.meta.clean_infer_avg_us
 
-    # The window length is resolved before anything else because it is a
-    # property of what will RUN, not of the plan -- and it is published into
-    # summary.json whether or not a count is planned.
-    #
-    # The unconditional power floor belongs to exactly one case: a counted
-    # window on a dedicated binary, where the host picks N from this goal,
-    # render_power_source() rebuilds the binary with clean_iters=N, and the
-    # firmware then runs exactly that many inferences. There the goal IS the
-    # window whatever window_mode says, and raising it guarantees something
-    # integrable.
-    #
-    # Every other case describes a window the host does not choose -- a shared
-    # binary is not re-rendered at all, and a no-inference probe sizes its own
-    # spin from the template variable -- so the plan must read the same
-    # property the firmware render read, or the two describe different
-    # windows. Both used to take the floor: a shared busy_loop run reported
-    # 5000 ms for a window that spun 1000 ms, and shared+infer still does
-    # (both found by review).
-    plans_the_count = ctx.config.power.firmware == "dedicated" and probe_runs_inferences(
-        ctx.config.profiling.clean_window_probe
-    )
-    if plans_the_count:
-        target_duration_ms = max(
-            ctx.config.profiling.window_target_ms,
-            DEFAULT_POWER_WINDOW_TARGET_MS,
-        )
-    else:
-        target_duration_ms = ctx.config.effective_window_target_ms
+    target_duration_ms = predicted_window_ms(ctx.config, reference_us=reference_us)
     if ctx.config.power.firmware != "dedicated":
         inference_count = None
         count_source = "firmware_auto"

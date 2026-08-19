@@ -2471,10 +2471,15 @@ class TestPowerFirmwareSelection:
 
         The unconditional power floor exists to size N on a DEDICATED binary,
         which is then rebuilt with clean_iters=N. Nothing is rebuilt in shared
-        mode, so applying the floor there published a 5000 ms window for a
-        `window_mode: fixed` run the firmware was built to run at 1000 ms --
-        the same defect this PR fixed for shared busy_loop, left standing for
-        shared infer (found by review).
+        mode: in `window_mode: fixed` the firmware runs exactly
+        `profiling.iterations`, and neither the 5000 ms floor NOR the
+        configured target has anything to do with how long that takes.
+
+        The first fix here reported the configured target (1000 ms), which the
+        window matrix then showed was wrong by up to 90x -- this test asserted
+        it, so the test was wrong too. See
+        tests/contracts/test_window_matrix.py, which enumerates every cell
+        rather than the one the fix happened to look at.
         """
         from helia_profiler.results import FirmwareMeta, PmuResult
         from helia_profiler.stages.plan_power import plan_power_run
@@ -2489,7 +2494,9 @@ class TestPowerFirmwareSelection:
         plan = plan_power_run(ctx)
 
         assert plan.inference_count is None, "shared plans no count"
-        assert plan.target_duration_ms == ctx.config.effective_window_target_ms == 1000
+        # 100 iterations x 2226 us = 222.6 ms, to the nearest millisecond --
+        # not the 1000 ms target and not the 5000 ms floor.
+        assert plan.target_duration_ms == 223
 
     def test_dedicated_infer_keeps_the_power_floor_that_sizes_n(
         self, tmp_path: Path
