@@ -6,6 +6,32 @@ This project follows [Semantic Versioning](https://semver.org/) and uses
 [Release Please](https://github.com/googleapis/release-please) to prepare
 release pull requests from Conventional Commits.
 
+## [0.1.5](https://github.com/AmbiqAI/helia-profiler/compare/v0.1.4...v0.1.5) (2026-08-19)
+
+
+### Features
+
+* add native ExecuTorch profiling ([dc4b5e3](https://github.com/AmbiqAI/helia-profiler/commit/dc4b5e35a57deaac019393da9d5289799f9015eb))
+* add native ExecuTorch profiling ([40b4ff3](https://github.com/AmbiqAI/helia-profiler/commit/40b4ff375b595ac09ed5b9ee53e15d1ebcecbf9f))
+* **power:** on-device INA228 power measurement ([#96](https://github.com/AmbiqAI/helia-profiler/issues/96)) ([80ebedc](https://github.com/AmbiqAI/helia-profiler/commit/80ebedc3d98ff9902ece38c0efb67407ba66f7c0)), closes [#95](https://github.com/AmbiqAI/helia-profiler/issues/95)
+
+
+### Bug Fixes
+
+* **compatibility:** promote neuralSPOT-X 0.7.17 ([#102](https://github.com/AmbiqAI/helia-profiler/issues/102)) ([2b20811](https://github.com/AmbiqAI/helia-profiler/commit/2b208116c4985c4c32462cafb220907a18f23eeb))
+* **compatibility:** record peeled commits for TFLM module baseline refs ([#105](https://github.com/AmbiqAI/helia-profiler/issues/105)) ([7ba6594](https://github.com/AmbiqAI/helia-profiler/commit/7ba659426eb35b1f1c572a10ea96fd9233fbf8dc))
+* **executorch:** align NSX module consumption ([1d3d826](https://github.com/AmbiqAI/helia-profiler/commit/1d3d82697df06a6bd3a461217b9fdd87ca1fa580))
+* **executorch:** consume nsx-executorch's real CMSIS-NN module contract ([7a70f40](https://github.com/AmbiqAI/helia-profiler/commit/7a70f4058a7f88a6569dd6174414410674595351))
+* **executorch:** consume qualified provider modules ([5c8c1ef](https://github.com/AmbiqAI/helia-profiler/commit/5c8c1ef9513a4d15525d309ef68b26e73b3d6e46))
+* **power:** auto-enable lockstep on any wired board, and name it in no_gate_rise ([#122](https://github.com/AmbiqAI/helia-profiler/issues/122)) ([dbbbbdc](https://github.com/AmbiqAI/helia-profiler/commit/dbbbbdcaa350982044817ffcfd1d3f91d2c73b4a))
+* **power:** hold the clean window shut until the host probe attaches ([#121](https://github.com/AmbiqAI/helia-profiler/issues/121)) ([#123](https://github.com/AmbiqAI/helia-profiler/issues/123)) ([56cc077](https://github.com/AmbiqAI/helia-profiler/commit/56cc0774c0ccaffa2b5c06e859786b2213399083))
+* **power:** INA228 Apollo4 bus shutdown + firmware gates, decouple monitor from driver ([#99](https://github.com/AmbiqAI/helia-profiler/issues/99)) ([9291e4b](https://github.com/AmbiqAI/helia-profiler/commit/9291e4b3c17f6645214598248c52f3167a5f3c8f))
+* **power:** stop timing the AP4 power window with a clock it powers down ([#106](https://github.com/AmbiqAI/helia-profiler/issues/106)) ([f044809](https://github.com/AmbiqAI/helia-profiler/commit/f0448099fa80b3fdffa2b84cd172769c0bf552e7))
+* **power:** time the busy-loop probe with a clock the binary can read ([#112](https://github.com/AmbiqAI/helia-profiler/issues/112)) ([#120](https://github.com/AmbiqAI/helia-profiler/issues/120)) ([e88a23d](https://github.com/AmbiqAI/helia-profiler/commit/e88a23d75296eee498b6afa927f3dc95a4c260ab))
+* **power:** time the free-running power window with a clock it can actually read ([#107](https://github.com/AmbiqAI/helia-profiler/issues/107)) ([3736ef7](https://github.com/AmbiqAI/helia-profiler/commit/3736ef7b6f526d264be7b43af536664453293de1))
+* **probe:** derive the J-Link fallback flash address per SoC ([#117](https://github.com/AmbiqAI/helia-profiler/issues/117)) ([df34b6e](https://github.com/AmbiqAI/helia-profiler/commit/df34b6e9b6cc78ea6ecbfc952d60c57b101391e3))
+* **probe:** require explicit J-Link flash confirmation for the power binary ([#103](https://github.com/AmbiqAI/helia-profiler/issues/103)) ([ac448c8](https://github.com/AmbiqAI/helia-profiler/commit/ac448c8b3844f8f44f0715fa60e38990e8a7eda2))
+
 ## [0.1.4](https://github.com/AmbiqAI/helia-profiler/compare/v0.1.3...v0.1.4) (2026-08-09)
 
 
