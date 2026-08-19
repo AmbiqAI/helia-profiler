@@ -48,7 +48,11 @@ engine:
 ```
 
 All sizes and the optional portable-operator list are explicit because the embedded runner does not
-run an export pipeline or infer a PTE's application I/O contract. The clean
+run an export pipeline or infer a PTE's application I/O contract. When the
+PTE was exported with `helia-torch` (the `nsx_cortex_m` AOT package), a
+`<model>.pte.json` sidecar travels with it and provides these values as
+defaults — see [Sidecar self-configuration](#sidecar-self-configuration)
+below. The clean
 whole-model measurement is the DWT cycle count of `Method::execute()` only;
 program loading, method loading, input/output copies, layer instrumentation,
 and report transport are excluded. Per-layer measurements are repeated for
@@ -78,6 +82,64 @@ the runtime's idempotent bridge prevents duplicate targets. The `ns` provider
 uses PR #1's private compatibility layer for the v7.29.2 `weight_sum_ctx` ABI.
 Set `engine.config.cmsis_nn_path` or `cmsis_nn_ref` to override the selected
 provider while preserving the same ordered module contract.
+
+### NS Tier-1 kernels (`ns_ops`)
+
+PTEs exported with `kernel_provider="ns"` may contain `cortex_m_ns::`
+operators (sub, hardswish, mean, standalone relu/relu6/hardtanh/clamp,
+leaky_relu) backed by ns-cmsis-nn kernels. Running one requires:
+
+```yaml
+engine:
+  type: executorch
+  backend: ns
+  config:
+    ns_ops: true   # passes NSX_EXECUTORCH_ENABLE_NS_OPS=ON
+```
+
+`ns_ops: true` is rejected with `backend: arm` — the kernels only exist in
+ns-cmsis-nn — and a `cortex_m_ns::` PTE on a build without NS ops fails fast
+at `Method::load()` rather than miscomputing. On the arm provider the same
+source model keeps those ops as portable ATen fallbacks (registered via
+`portable_ops`), which run in float and dominate per-op cost; see
+`TIER1_NS_OPS_COMPARISON.md` for measured deltas.
+
+### Sidecar self-configuration
+
+`helia-torch compile` writes a `<model>.pte.json` manifest next to every PTE
+(schema `nsx-executorch.pte-manifest/1`), SHA-256-bound to that exact file.
+When present, HPX uses it to default `backend`, `ns_ops`, `portable_ops`,
+`planned_arena_size`, `input_size`, and `output_size`, so a minimal config
+is just `model.path`, `engine.config.source_path`, and the target board.
+Explicit config values always override the sidecar. A sidecar whose hash
+does not match the PTE, or an ns PTE with `ns_ops` disabled, is a
+config-time error with a hint — never a silent fallback.
+
+### Memory placement
+
+The generated runner owns five static RAM buffers: the memory-planned
+(activation) arena, the method arena, the temporary arena, and the
+input/output buffers. `model.arena_location` (`tcm` or `sram` only — non-RAM
+values are rejected) places all five together; each can be moved
+individually:
+
+```yaml
+model:
+  arena_location: sram              # default for anything not overridden
+engine:
+  config:
+    planned_arena_location: tcm     # touched by every kernel — pays DTCM rent
+    method_arena_location: sram     # consumed at Method::load, cold afterwards
+    temporary_arena_location: sram  # kernel scratch (e.g. conv im2col buffers)
+    io_location: sram               # one memcpy per inference
+```
+
+Choose by access frequency: only the planned arena is hot on every operator,
+so the canonical split places it in DTCM and everything else in SRAM. Unlike
+heliaAOT there is no per-tensor placement — activations are packed inside
+the planned arena at export time — see the
+[memory guide](memory.md#placement-models-heliaaot-vs-executorch) for the
+comparison and the planned multi-region extension.
 
 ## heliaRT
 
