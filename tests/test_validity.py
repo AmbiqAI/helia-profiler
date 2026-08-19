@@ -863,3 +863,56 @@ class TestNoInferenceProbeWindowDuration:
         codes = {issue.code for issue in evaluation.issues}
         assert "power.window_clock_mismatch" not in codes
         assert evaluation.validity is ResultValidity.VALID
+
+
+class TestGateToleranceAgreesAcrossCaptureAndEvaluate:
+    """The fallback duration check must use the tolerance capture used.
+
+    `_assess_unrecorded_duration` runs only for an artifact with no recorded
+    `gate_duration_integrity` -- an older or replayed capture. It took
+    `assess_gate_duration`'s conservative 1% default while capture picked the
+    band from `count_source`, so the same window could be accepted at capture
+    time and warned about here. That is the capture-vs-evaluate divergence
+    this module already closed for the window-clock check; leaving it open for
+    the sibling check is the same bug in the same shape (found by review
+    of #136).
+    """
+
+    def _ctx_with_plan(self, tmp_path: Path, count_source: str) -> PipelineContext:
+        ctx = _context(tmp_path, probe="busy_loop")
+        assert ctx.power_run is not None
+        ctx.power_run = PowerRun(
+            plan=PowerRunPlan(
+                firmware_mode="dedicated",
+                inference_count=1,
+                reference_inference_us=5_000_000,
+                target_duration_ms=5000,
+                count_source=count_source,
+            ),
+            observation=ctx.power_run.observation,
+            terminal=ctx.power_run.terminal,
+        )
+        return ctx
+
+    def test_a_predicted_window_gets_its_own_band_not_the_conservative_default(
+        self, tmp_path: Path
+    ):
+        """A 16% overrun on a 5 s spin is inside the 25% busy_loop band."""
+        from helia_profiler.evaluation.validity import _assess_unrecorded_duration
+
+        ctx = self._ctx_with_plan(tmp_path, "probe_window")
+
+        assert _assess_unrecorded_duration(ctx, 5.8) is None
+
+    def test_the_same_window_is_still_flagged_when_it_is_genuinely_wrong(
+        self, tmp_path: Path
+    ):
+        """Loosening the band must not disarm the check."""
+        from helia_profiler.evaluation.validity import _assess_unrecorded_duration
+
+        ctx = self._ctx_with_plan(tmp_path, "probe_window")
+
+        issue = _assess_unrecorded_duration(ctx, 9.0)
+
+        assert issue is not None
+        assert issue.code == "power.gate_duration_mismatch"

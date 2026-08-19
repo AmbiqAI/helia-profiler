@@ -230,7 +230,11 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                     if plan_meta.get("reference_inference_us"):
                         effective_avg_us = int(plan_meta["reference_inference_us"])
                 if effective_avg_us and effective_avg_us > 0 and ps.duration_s > 0:
-                    from ..power.diagnostics import GateDurationIntegrity, assess_gate_duration
+                    from ..power.diagnostics import (
+                        GateDurationIntegrity,
+                        assess_gate_duration,
+                        gate_relative_tolerance_for,
+                    )
 
                     integrity_meta = power_meta.get("gate_duration_integrity")
                     if isinstance(integrity_meta, dict):
@@ -241,11 +245,25 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                             minimum_s=float(integrity_meta.get("minimum_s", 0.0)),
                         )
                     else:
+                        # Recompute only when the artifact says how its count
+                        # was chosen; then use the same policy capture applied,
+                        # so this cannot publish a "suspect" flag capture never
+                        # raised. Without a count_source there is nothing to
+                        # key a policy off, and the conservative default is
+                        # what has always flagged truncation here.
+                        gate_kwargs = {}
+                        if isinstance(plan_meta, dict) and plan_meta.get("count_source"):
+                            gate_kwargs["relative_tolerance"] = (
+                                gate_relative_tolerance_for(
+                                    str(plan_meta["count_source"])
+                                )
+                            )
                         integrity = assess_gate_duration(
                             measured_s=ps.duration_s,
                             clean_infer_count=effective_count,
                             clean_infer_avg_us=effective_avg_us,
                             stats_rate_hz=ctx.config.power.stats_rate_hz,
+                            **gate_kwargs,
                         )
                     summary["power"]["gated_window_expected_duration_s"] = round(
                         integrity.expected_s, 6

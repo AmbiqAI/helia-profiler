@@ -1535,6 +1535,43 @@ class TestEstimateCaptureDuration:
         expected = _BOOT_SETTLE_S + (0.004 + 0.503) + _SAFETY_MARGIN_S
         assert estimated == pytest.approx(expected, rel=1e-6)
 
+    def test_a_spin_window_is_estimated_in_seconds_not_inferences(
+        self, tmp_path: Path
+    ):
+        """The busy_loop window is a spin; sizing it in inferences under-bounds it.
+
+        Reached whenever there is no resolved plan to early-return from --
+        every `firmware: shared` run. The fixed-mode branch sized the clean
+        window as `iterations x inference_time`, which for a 20 s spin gave a
+        deadline well inside the window: exactly the miss this function's
+        docstring says it exists to prevent (found by review of #136).
+        """
+        from helia_profiler.stages.capture_power import (
+            _BOOT_SETTLE_S,
+            _SAFETY_MARGIN_S,
+            _estimate_capture_duration,
+        )
+
+        ctx = self._make_ctx(
+            tmp_path,
+            profiling_overrides={
+                "clean_window_probe": "busy_loop",
+                "window_mode": "fixed",
+                "window_target_ms": 20000,
+                "iterations": 3,
+                "warmup": 1,
+            },
+        )
+
+        estimated = _estimate_capture_duration(ctx)
+
+        assert estimated is not None
+        # profiled pass: 1 * (1 + 3) = 4 inferences = 4 ms. The clean window is
+        # the spin itself: 20 s, whatever the inference count says.
+        expected = _BOOT_SETTLE_S + (0.004 + 20.0) + _SAFETY_MARGIN_S
+        assert estimated == pytest.approx(expected, rel=1e-6)
+        assert estimated > 20.0, "the bound must outlast the window it contains"
+
     def test_fixed_power_plan_controls_capture_duration(self, tmp_path: Path):
         from helia_profiler.stages.capture_power import (
             _BOOT_SETTLE_S,
@@ -2236,43 +2273,74 @@ class TestPowerFirmwareSelection:
 
         assert plan.count_source == "probe_window"
         assert plan.inference_count == 1, "still sizing a spin window in inferences"
-        # The reference is the window itself, not a per-inference figure, so
-        # every consumer computing count x reference gets the real window.
-        assert plan.reference_inference_us == plan.target_duration_ms * 1000
+        # Against the config property the FIRMWARE render reads -- not against
+        # plan.target_duration_ms, which is the plan restating itself. Review
+        # found the earlier form tautological: inflating the probe target 3x
+        # left every test in this file passing.
+        assert plan.reference_inference_us == ctx.config.effective_window_target_ms * 1000
+        assert plan.target_duration_ms == ctx.config.effective_window_target_ms
 
-    def test_busy_loop_plan_matches_the_gate_the_firmware_actually_runs(
+    def test_a_shared_busy_loop_gate_tolerates_boot_to_boot_spin_variation(
         self, tmp_path: Path
     ):
-        """The plan must survive the check that used to reject it.
+        """A healthy shared run must not be rejected for ordinary jitter.
 
-        `assess_gate_duration` is what raised: it compares the measured gate
-        against `count x reference_us`. Drive it with the real plan and a gate
-        of the length the firmware actually spins for.
+        In `firmware: shared` the plan carries no count, so capture fills both
+        the count and the reference from `pmu_result.meta` -- the PROFILE
+        boot's spin -- and compares them against the POWER boot's gate. Two
+        boots, not one measurement. The `firmware_auto` band was 0.01 on the
+        claim that they were the same measurement, which only stayed harmless
+        while the per-unit slack (half the whole spin) dominated it. Gating
+        that slack on count > 1 exposed the 1% band, and `capture_gated`
+        RAISES: two boots' spins differing 1.2% killed a healthy run.
+        """
+        from helia_profiler.power.diagnostics import (
+            assess_gate_duration,
+            gate_relative_tolerance_for,
+        )
+
+        profile_boot_spin_us = 4_980_000
+        integrity = assess_gate_duration(
+            measured_s=5.04,  # the power boot's gate, 1.2% longer
+            clean_infer_count=1,
+            clean_infer_avg_us=profile_boot_spin_us,
+            stats_rate_hz=1000,
+            relative_tolerance=gate_relative_tolerance_for("firmware_auto"),
+        )
+
+        assert integrity.valid, (
+            f"a healthy shared run is rejected: ratio {integrity.ratio:.4f} "
+            f"against a {integrity.tolerance_s:.4f}s band"
+        )
+
+    def test_shared_busy_loop_reports_the_window_the_firmware_runs(
+        self, tmp_path: Path
+    ):
+        """`shared` produces no count, but still publishes a window length.
+
+        `target_duration_ms` reaches summary.json verbatim, and the
+        firmware-mode branch is tested before the probe branch -- so a shared
+        busy_loop run used to report the counted-window goal (5000 ms) for a
+        window the firmware spun for 1000 ms. The window length is a property
+        of the PROBE, not of the plan's firmware mode.
         """
         from helia_profiler.stages.plan_power import plan_power_run
-        from helia_profiler.power.diagnostics import assess_gate_duration
         from helia_profiler.results import FirmwareMeta, PmuResult
 
-        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        ctx = self._make_ctx(tmp_path, firmware="shared")
         object.__setattr__(ctx.config.profiling, "clean_window_probe", "busy_loop")
+        object.__setattr__(ctx.config.profiling, "window_mode", "fixed")
+        object.__setattr__(ctx.config.profiling, "window_target_ms", 1000)
         ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
+            meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=1_000_000),
             layers=[],
         )
+
         plan = plan_power_run(ctx)
 
-        integrity = assess_gate_duration(
-            measured_s=plan.target_duration_ms / 1000,
-            clean_infer_count=plan.inference_count,
-            clean_infer_avg_us=plan.reference_inference_us,
-            stats_rate_hz=1000,
-        )
-
-        assert integrity is not None
-        assert integrity.valid, (
-            f"gate check still rejects its own plan: measured "
-            f"{integrity.measured_s:.3f}s vs expected {integrity.expected_s:.3f}s"
-        )
+        assert plan.count_source == "firmware_auto"
+        assert plan.inference_count is None
+        assert plan.target_duration_ms == ctx.config.effective_window_target_ms == 1000
 
     def test_infer_probe_plan_is_unchanged(self, tmp_path: Path):
         """The default probe must keep deriving N from per-inference timing."""

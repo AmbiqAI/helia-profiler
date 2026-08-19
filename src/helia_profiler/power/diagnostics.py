@@ -101,27 +101,34 @@ class GateDurationIntegrity:
         return self.measured_s / self.expected_s if self.expected_s > 0 else 0.0
 
 
-#: How far the measured gate may sit from the plan, per ``count_source``.
+#: How far the measured gate may sit from the expected window, per
+#: ``count_source``.
 #:
 #: The question this answers is how well the host could KNOW the window length
-#: before the run, which is a property of where the count came from:
+#: before the run. EVERY case here is cross-boot -- the gate belongs to the
+#: power boot while the per-unit reference was timed by the profile boot, and
+#: in ``shared`` mode capture/__init__.py reads both count and reference
+#: straight off ``pmu_result.meta``. So the floor is the cross-boot spread:
 #:
-#:   * ``firmware_auto`` -- no host plan; the firmware's own count is the
-#:     reference, so the two sides are the same measurement. Tight.
-#:   * ``configured`` / ``profile_guided`` -- N counted inferences, timed by a
-#:     DIFFERENT binary. Cross-binary timing spread is the error term.
+#:   * ``firmware_auto`` -- the shared-firmware case, where the host has no
+#:     plan at all and BOTH numbers come from the other boot. This carried
+#:     0.01 until the per-unit slack below stopped masking it, which put a
+#:     shared busy_loop run on a +/-1% band: two boots' spins differing 1.2%
+#:     made `capture_gated` RAISE on a healthy run (found by review).
+#:   * ``configured`` / ``profile_guided`` -- N counted inferences, timed by
+#:     the other boot. The same cross-boot spread.
 #:   * ``probe_window`` -- nothing is counted. The busy_loop window is a spin
-#:     whose length is PREDICTED from a calibration pass, so its error is the
-#:     calibration's transfer error rather than a timing spread, and it
-#:     deserves the loosest band. 0.25 still TIGHTENS this case: the
-#:     per-unit slack below used to work out to half the window (the unit is
-#:     the window here), which no other bound could ever exceed.
+#:     whose length is PREDICTED from a per-boot calibration pass, so its
+#:     error is the calibration's transfer error rather than a timing spread,
+#:     and it gets the loosest band. 0.25 still TIGHTENS this case: the
+#:     per-unit slack used to work out to half the window (the unit IS the
+#:     window here), which no other bound could ever exceed.
 #:
-#: A count_source missing from this map would silently take the tight branch
-#: and fail runs it should accept -- the failure #125 is about -- so
-#: tests/test_power.py pins the map against the Literal's own arguments.
+#: A count_source missing from this map would take the default and could not
+#: state its own reasoning, so tests/test_power.py pins the map against the
+#: Literal's own arguments.
 _GATE_RELATIVE_TOLERANCE: dict[str, float] = {
-    "firmware_auto": 0.01,
+    "firmware_auto": 0.10,
     "configured": 0.10,
     "profile_guided": 0.10,
     "probe_window": 0.25,
@@ -145,6 +152,11 @@ def assess_gate_duration(
     clean_infer_avg_us: int,
     stats_rate_hz: int,
     minimum_s: float = 0.0,
+    # Deliberately NOT DEFAULT_GATE_RELATIVE_TOLERANCE: that default exists for
+    # a caller that HAS a count_source and finds it unmapped, where a loose
+    # band turns a bug into a warning instead of a failed run. A caller with no
+    # plan at all is the opposite situation -- this check is only advisory
+    # there, so loosening it would silently stop flagging real truncation.
     relative_tolerance: float = 0.01,
 ) -> GateDurationIntegrity:
     """Compare a gate against ``N * inference_time`` with instrument jitter allowance."""
