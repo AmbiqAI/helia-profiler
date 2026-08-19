@@ -21,7 +21,7 @@ from ...placement import ArenaRole, Placement
 from ...results import NsxModuleRef
 from .. import EngineType
 from ..base import ArenaRegion, EngineArtifacts
-from .cmsis_nn import cmsis_nn_module_ref
+from ..cmsis_nn import cmsis_nn_module_ref
 from .compile import (
     _DEFAULT_MODULE_NAME,
     _DEFAULT_PREFIX,

@@ -140,7 +140,7 @@ class HeliaRTAdapter:
                 or config.engine.config.get("cmsis_nn_ref")
                 or os.environ.get("CMSIS_NN_PATH")
             ):
-                from ..helia_aot import cmsis_nn_module_ref
+                from ..cmsis_nn import cmsis_nn_module_ref
 
                 extra_modules.append(cmsis_nn_module_ref(config, work_dir))
             if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
@@ -179,7 +179,7 @@ class HeliaRTAdapter:
             # being present in the build (the prebuilt static lib had
             # CMSIS-NN baked in; the source build does not). Resolve it
             # via the shared helper (NSX registry by default).
-            from ..helia_aot import cmsis_nn_module_ref
+            from ..cmsis_nn import cmsis_nn_module_ref
 
             extra_modules.append(cmsis_nn_module_ref(config, work_dir))
 
