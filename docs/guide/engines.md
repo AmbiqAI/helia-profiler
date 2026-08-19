@@ -62,8 +62,10 @@ targets `apollo330mP_evb` with `arena_location: sram` (that board's MCU_TCM is
 too small for the combined method/temporary/planned arenas) and accepts a
 caller-supplied PTE plus a single `nsx-executorch` checkout at `source_path`.
 The checkout must be at
-commit `88585066743dc21847541793191c558a647c2f6e`, the current head of
-`nsx-executorch` PR #1; HPX does not assume an unpublished release tag.
+commit `4a257def0c3ebd4ecd6a5d412f087d297f1b3492`, the current head of
+`nsx-executorch` `main` (the PR #2 merge that adds the out-of-tree
+`cortex_m_ns::` Tier 1 operators); HPX does not assume an unpublished
+release tag.
 
 `source_path` is the repository root containing `nsx-module.yaml`, not the
 embedded ExecuTorch submodule. Initialize the minimal Cortex-M submodules listed

@@ -13,7 +13,7 @@
     "note": "The other exporters do not embed an nsx-executorch generation revision."
   },
   "qualified_runtime": {
-    "nsx_executorch": "88585066743dc21847541793191c558a647c2f6e",
+    "nsx_executorch": "4a257def0c3ebd4ecd6a5d412f087d297f1b3492",
     "executorch": "3a97429b0ce0c192861fc3e3729fb81432fd22cf",
     "executorch_version": "1.3.0",
     "arm_cmsis_nn_project": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
