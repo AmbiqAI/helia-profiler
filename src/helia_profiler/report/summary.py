@@ -180,6 +180,27 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
         if ctx.power_result.gated_windows:
             summary["power"]["gated_window_count"] = len(ctx.power_result.gated_windows)
         meta = ctx.pmu_result.meta if ctx.pmu_result is not None else None
+        # Per-inference and inference-scaled figures need a window that ran
+        # inferences. The busy_loop probe runs a calibrated CPU spin instead,
+        # so BOTH derivation families below fabricate: the gated branch would
+        # divide real gated energy by an inference count, and the estimated
+        # branch would scale the whole-capture average power -- which measured
+        # the spin -- by real profiled inference time. The gate-duration
+        # integrity check cannot catch either, structurally: "N inferences"
+        # and "one spin of the same total length" are timing-identical by
+        # construction. probe_runs_inferences() is the same predicate
+        # collect_power_terminal and evaluation.validity already ask; this
+        # file was the third consumer and asked nowhere (#125) -- and the
+        # first version of this guard covered only the gated branch, leaving
+        # the internal-mode estimates publishing (found by review).
+        probe_ran_inferences = probe_runs_inferences(
+            ctx.config.profiling.clean_window_probe
+        )
+        if not probe_ran_inferences:
+            summary["power"]["per_inference_metrics_omitted"] = (
+                "clean_window_probe="
+                f"{ctx.config.profiling.clean_window_probe} runs no inferences"
+            )
         if measurement_scope == "gpio_gated_clean_window":
             if ctx.power_result.gated_windows:
                 gw = ctx.power_result.gated_windows[0]
@@ -193,23 +214,6 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                 summary["power"]["median_power_w"] = round(gw.median_power_w, 9)
                 summary["power"]["p95_power_w"] = round(gw.p95_power_w, 9)
                 summary["power"]["p99_power_w"] = round(gw.p99_power_w, 9)
-            # Per-inference figures need a window that actually ran inferences.
-            # The busy_loop probe runs a calibrated CPU spin instead, so
-            # dividing gated energy by any count produces a plausible-looking
-            # number for zero inferences -- and the gate-duration integrity
-            # check cannot catch it, because "N inferences" and "one spin of
-            # the same total length" are timing-identical by construction.
-            # probe_runs_inferences() is the same predicate collect_power_
-            # terminal and evaluation.validity already ask; this was the third
-            # consumer that never asked (#125).
-            probe_ran_inferences = probe_runs_inferences(
-                ctx.config.profiling.clean_window_probe
-            )
-            if not probe_ran_inferences:
-                summary["power"]["per_inference_metrics_omitted"] = (
-                    "clean_window_probe="
-                    f"{ctx.config.profiling.clean_window_probe} runs no inferences"
-                )
             if (
                 probe_ran_inferences
                 and meta
@@ -299,7 +303,8 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                         meta.clean_infer_avg_us,
                     )
         elif (
-            measurement_scope != "free_form_capture"
+            probe_ran_inferences
+            and measurement_scope != "free_form_capture"
             and meta
             and meta.profiled_infer_total_us is not None
         ):

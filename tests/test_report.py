@@ -700,10 +700,13 @@ def test_busy_loop_probe_publishes_no_per_inference_power_metrics(tmp_path: Path
 
     The busy_loop probe replaces the inference loop with a calibrated CPU spin.
     Dividing real gated energy by any count then yields a plausible-looking
-    figure under an ordinary field name -- adversarial review measured
-    `energy_per_inference_j: 0.0021` and `inferences_per_joule: 476` for a
-    window with no inferences in it, alongside `gated_window_duration_ratio:
-    1.0` looking perfectly healthy (#125).
+    figure under an ordinary field name -- driving the pre-guard code with THIS
+    fixture publishes `energy_per_inference_j: 0.0016` and
+    `inferences_per_joule: 625.0` for a window with no inferences in it,
+    alongside `gated_window_duration_ratio: 1.0` looking perfectly healthy
+    (#125; an earlier draft quoted a reviewer's fixture's digits here, which
+    was exactly the unreproducible-number discipline failure this arc keeps
+    finding in others).
 
     The integrity check cannot catch this and never could: "N inferences" and
     "one spin of the same total length" are timing-identical by construction.
@@ -719,11 +722,43 @@ def test_busy_loop_probe_publishes_no_per_inference_power_metrics(tmp_path: Path
 
     assert "energy_per_inference_j" not in summary["power"]
     assert "inferences_per_joule" not in summary["power"]
+    # The gate-duration integrity fields go too, deliberately: for busy_loop,
+    # expected == measured by construction (1 x the whole spin), so the ratio
+    # is definitionally 1.0 and carries no information -- publishing it would
+    # only lend false health to the fabricated figures it sat beside.
+    assert "gated_window_duration_ratio" not in summary["power"]
+    assert "gated_window_expected_duration_s" not in summary["power"]
     # and it says why, rather than silently omitting them
     assert "busy_loop" in summary["power"]["per_inference_metrics_omitted"]
     # the window's own measurements are untouched -- only the per-inference
     # division is withheld
     assert summary["power"]["energy_j"] == 0.0016
+
+
+def test_busy_loop_probe_publishes_no_active_window_estimates_either(tmp_path: Path):
+    """The OTHER fabrication branch (#125): internal-mode estimates.
+
+    The first version of this guard covered only the gpio-gated branch.
+    Review reproduced, on that version, `active_window_estimated_energy_per_
+    inference_j` still publishing for a zero-inference internal-mode window.
+    The estimated branch is worse than it looks: every figure in it scales
+    `ps.avg_power_w` -- the WHOLE-CAPTURE average, which for busy_loop
+    measured the CPU spin -- by real profiled inference time. Real time,
+    wrong power, plausible number.
+    """
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=1, clean_infer_avg_us=1_000_000, duration_s=1.0
+    )
+    object.__setattr__(ctx.config.profiling, "clean_window_probe", "busy_loop")
+    ctx.power_result.metadata["measurement_scope"] = "on_device_gated_inference"
+    object.__setattr__(ctx.pmu_result.meta, "profiled_infer_count", 200)
+    object.__setattr__(ctx.pmu_result.meta, "profiled_infer_total_us", 18_000_000)
+
+    summary = json.loads(_write_summary(ctx, tmp_path).read_text())
+
+    for key in list(summary["power"]):
+        assert not key.startswith("active_window_estimated"), key
+    assert "busy_loop" in summary["power"]["per_inference_metrics_omitted"]
 
 
 def test_infer_probe_still_publishes_per_inference_power_metrics(tmp_path: Path):
