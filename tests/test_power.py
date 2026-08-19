@@ -2288,6 +2288,32 @@ class TestPowerFirmwareSelection:
         assert plan.inference_count == 2247
         assert plan.reference_inference_us == 2226
 
+    def test_busy_loop_refuses_an_explicit_count_it_cannot_honour(
+        self, tmp_path: Path
+    ):
+        """An N the firmware ignores must not become a plan.
+
+        The busy_loop window runs exactly one calibrated spin whatever the
+        host asked for, so a `configured` plan of N spins describes a window
+        that cannot happen -- and every consumer computing `count x
+        reference_us` would then disagree with the real window by N, which is
+        the spurious-mismatch shape #112 removed. Reachable through the public
+        `plan_power_run(ctx, inference_count=...)` API; the shipping pipeline
+        constructs `PlanPowerRunStage()` with no count.
+        """
+        from helia_profiler.stages.plan_power import plan_power_run
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        object.__setattr__(ctx.config.profiling, "clean_window_probe", "busy_loop")
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
+            layers=[],
+        )
+
+        with pytest.raises(PowerError, match="runs no inferences"):
+            plan_power_run(ctx, inference_count=50)
+
     def test_power_plan_flags_a_stalled_profile_reference(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ):

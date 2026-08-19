@@ -22,12 +22,15 @@ from helia_profiler.results import FirmwareMeta, PmuResult
 from helia_profiler.evaluation import evaluate_run
 
 
-def _context(tmp_path: Path, *, mode: str = "external") -> PipelineContext:
+def _context(
+    tmp_path: Path, *, mode: str = "external", probe: str = "infer"
+) -> PipelineContext:
     config = load_config(
         None,
         {
             "model": {"path": "test.tflite"},
             "engine": {"type": "helia-rt"},
+            "profiling": {"clean_window_probe": probe, "window_target_ms": 1000},
             "power": {
                 "enabled": True,
                 "mode": mode,
@@ -781,3 +784,82 @@ class TestCleanWindowStall:
         )
         assert stall.context["stalled_iters"] == 233
         assert stall.context["partial_iters"] == 0
+
+
+class TestNoInferenceProbeWindowDuration:
+    """The replay path must check a busy_loop window, like the stage does.
+
+    #125 item 2: with the plan-derived reference withheld, an internal-mode
+    busy_loop run had NO duration check anywhere -- and `elapsed_us` is the
+    denominator for average power and current, so a mis-sized window scales
+    both. Restoring the reference in the collect stage fixed capture time;
+    `evaluate_run` is the second consumer, and it is the one `hpx compare`
+    and replayed artifacts go through. Leaving it withheld here also made the
+    two modules disagree, which the comment above the call denies is possible.
+
+    Verified before the fix: a 7x inflated busy_loop window evaluated VALID
+    with no issues while the collect stage warned; the same window under
+    `infer` evaluated DEGRADED with power.window_clock_mismatch.
+    """
+
+    #: The #125 plan shape for busy_loop: one unit of work lasting the target
+    #: window, `count_source="probe_window"`.
+    PLAN_COUNT = 1
+    PLAN_REFERENCE_US = 1_000_000
+
+    def _run(self, ctx: PipelineContext, *, elapsed_us: int) -> None:
+        assert ctx.power_run is not None
+        # Firmware reports 1 requested / 1 completed under this probe (#112).
+        terminal = replace(
+            ctx.power_run.terminal,
+            requested_count=1,
+            completed_count=1,
+            elapsed_us=elapsed_us,
+        )
+        ctx.power_run = PowerRun(
+            plan=PowerRunPlan(
+                firmware_mode="dedicated",
+                inference_count=self.PLAN_COUNT,
+                reference_inference_us=self.PLAN_REFERENCE_US,
+                count_source="probe_window",
+            ),
+            observation=None,
+            terminal=terminal,
+            on_device_summary=OnDevicePowerSummary(
+                source="ina228",
+                scope="fixed_n_inference",
+                energy_nj=1_000_000,
+                duration_us=elapsed_us,
+                inference_count=1,
+                overflow=False,
+            ),
+        )
+
+    def test_mis_sized_busy_loop_window_is_flagged(self, tmp_path: Path):
+        """7 s of window against a 1 s plan -- the calibration-fallback shape
+        `_busy_loop_calibration.j2` warns about, and the one the one-sided
+        ceiling check can never see."""
+        ctx = _context(tmp_path, mode="internal", probe="busy_loop")
+        self._run(ctx, elapsed_us=7_000_000)
+
+        evaluation = evaluate_run(ctx)
+
+        mismatch = [
+            issue
+            for issue in evaluation.issues
+            if issue.code == "power.window_clock_mismatch"
+        ]
+        assert len(mismatch) == 1
+        assert evaluation.validity is ResultValidity.DEGRADED
+
+    def test_correctly_sized_busy_loop_window_stays_valid(self, tmp_path: Path):
+        """And the check must not fire on a correct run -- the spurious warning
+        #112 removed. The plan now describes the window, so they agree."""
+        ctx = _context(tmp_path, mode="internal", probe="busy_loop")
+        self._run(ctx, elapsed_us=self.PLAN_REFERENCE_US)
+
+        evaluation = evaluate_run(ctx)
+
+        codes = {issue.code for issue in evaluation.issues}
+        assert "power.window_clock_mismatch" not in codes
+        assert evaluation.validity is ResultValidity.VALID

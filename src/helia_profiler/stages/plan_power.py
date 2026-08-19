@@ -128,9 +128,7 @@ def plan_power_run(
     if ctx.config.power.firmware != "dedicated":
         inference_count = None
         count_source = "firmware_auto"
-    elif inference_count is None and not probe_runs_inferences(
-        ctx.config.profiling.clean_window_probe
-    ):
+    elif not probe_runs_inferences(ctx.config.profiling.clean_window_probe):
         # The busy_loop probe runs no inferences: the window body is one
         # calibrated spin sized from window_target_ms (see
         # _busy_loop_calibration.j2), and the firmware reports 1 unit
@@ -146,6 +144,25 @@ def plan_power_run(
         # lasting the target duration. Every downstream consumer computes
         # count x reference_us, so they all now expect exactly the window the
         # firmware actually runs.
+        #
+        # This overrides an explicitly requested count rather than honouring
+        # it, because the firmware ignores it: a caller asking for N here
+        # would otherwise get a plan describing N spins against a window that
+        # runs exactly one, which is the same spurious-mismatch shape #112
+        # removed. Refuse loudly instead of silently planning a window that
+        # cannot happen.
+        if inference_count is not None:
+            raise PowerError(
+                f"clean_window_probe="
+                f"{ctx.config.profiling.clean_window_probe} runs no inferences, "
+                "so an explicit power inference count cannot be honoured.",
+                hint=(
+                    "This probe replaces the window body with one calibrated "
+                    "CPU spin sized from profiling.window_target_ms. Set that "
+                    "instead, or use clean_window_probe: infer to run a "
+                    "counted inference window."
+                ),
+            )
         inference_count = 1
         reference_us = target_duration_ms * 1000
         count_source = "probe_window"
