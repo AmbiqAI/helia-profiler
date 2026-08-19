@@ -916,3 +916,66 @@ class TestGateToleranceAgreesAcrossCaptureAndEvaluate:
 
         assert issue is not None
         assert issue.code == "power.gate_duration_mismatch"
+
+
+class TestReplayedBusyLoopPlanCount:
+    """`evaluate_run` must use the probe-aware expected count, like the stage.
+
+    #125 item 5. `expected_terminal_requested_count()` returns 1 for a probe
+    that runs no inferences, whatever the plan says, because the firmware
+    reports one unit of work (#112). Reverting `validity.py` to read
+    `plan.inference_count` directly left the whole suite green, because on
+    every plan `plan_power_run` can now produce the two agree -- busy_loop
+    plans exactly 1.
+
+    They part company on a plan this build did not make: a busy_loop artifact
+    stored BEFORE #136, whose plan carries the old derived count of 10 against
+    a firmware report of 1/1. That is the replay contract validity.py's own
+    comment says it defends, and `evaluate_run` is what `hpx compare` and
+    every stored-artifact path go through.
+    """
+
+    def test_a_pre_fix_artifact_is_not_reported_as_a_count_mismatch(
+        self, tmp_path: Path
+    ):
+        ctx = _context(tmp_path, probe="busy_loop")
+        assert ctx.power_run is not None
+        ctx.power_run = PowerRun(
+            plan=PowerRunPlan(
+                firmware_mode="dedicated",
+                inference_count=10,
+                reference_inference_us=5_000_000,
+            ),
+            observation=ctx.power_run.observation,
+            terminal=replace(
+                ctx.power_run.terminal, requested_count=1, completed_count=1
+            ),
+        )
+
+        codes = [issue.code for issue in evaluate_run(ctx).issues]
+
+        assert "power.plan_count_mismatch" not in codes, (
+            "the firmware reported the one unit of work this probe runs; "
+            "reading the plan's count directly calls that a mismatch"
+        )
+
+    def test_a_real_count_mismatch_is_still_reported(self, tmp_path: Path):
+        """The probe-aware expectation must not disarm the check.
+
+        Under the default probe the helper returns the plan's count unchanged,
+        so a firmware that ran a different number of inferences is still an
+        error.
+        """
+        ctx = _context(tmp_path)
+        assert ctx.power_run is not None
+        ctx.power_run = PowerRun(
+            plan=PowerRunPlan(firmware_mode="dedicated", inference_count=10),
+            observation=ctx.power_run.observation,
+            terminal=replace(
+                ctx.power_run.terminal, requested_count=9, completed_count=9
+            ),
+        )
+
+        codes = [issue.code for issue in evaluate_run(ctx).issues]
+
+        assert "power.plan_count_mismatch" in codes

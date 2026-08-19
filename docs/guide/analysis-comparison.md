@@ -54,10 +54,25 @@ reading a bundle. It then applies typed comparability rules:
 
 - invalid results or different model hashes block the comparison;
 - different layer topology suppresses only per-layer deltas;
-- incompatible power scope, mode, firmware, monitor presence, lock-step, or
-  integrity suppresses only power deltas;
+- incompatible power scope, mode, firmware, monitor presence, lock-step,
+  integrity, or **clean-window probe** suppresses only power deltas;
 - engine, toolchain, board, clock, transport, and placement differences remain
   visible as experimental dimensions.
+
+The clean-window probe is what ran *inside* the measured window. A
+`busy_loop` window measures a calibrated CPU spin rather than a model
+inference, so comparing one against an `infer` window reports the difference
+between two different physical quantities — `hpx compare` omits power deltas
+and says which probe each side used.
+
+Two things it deliberately does not do. It is recorded only for runs that
+actually measured power, so comparing a plain profiling run against a
+power-instrumented one is unaffected. And it says nothing about the board, so
+two SoCs running the same probe stay power-comparable, as the dimension list
+above intends.
+
+Baselines recorded before this dimension existed carry no value and are
+skipped, so stored comparisons do not flip to failing.
 
 The terminal highlights totals and the largest layer deltas.
 `--output-dir` also writes `compare_summary.json` and `layer_diff.csv`.

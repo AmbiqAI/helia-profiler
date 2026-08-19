@@ -137,12 +137,17 @@ def assess_comparability(
     # bench-measurable current adder and must not be power-compared.
     # Baselines predating the dimension carry None and are skipped, like
     # every other dimension here.
+    # power_clean_window_probe: WHAT ran inside the measured window. The
+    # busy_loop probe replaces the model with a calibrated CPU spin, so an
+    # infer baseline against a busy_loop candidate compares a model inference
+    # against a CPU spin and reports the difference as a regression (#125).
     for dimension in (
         "power_scope",
         "power_mode",
         "power_firmware",
         "power_monitor",
         "power_lockstep",
+        "power_clean_window_probe",
     ):
         baseline_value = baseline_dimensions.get(dimension)
         candidate_value = candidate_dimensions.get(dimension)

@@ -206,6 +206,17 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
                 # therefore not power-comparable even when every other
                 # dimension matches.
                 "power_monitor": "ina228" if ctx.config.power.monitor_selected else "none",
+                # What ran inside the measured window. The busy_loop probe
+                # replaces the model with a calibrated CPU spin, so an
+                # infer/busy_loop pair reports the difference between two
+                # different physical quantities as a regression (#125).
+                #
+                # Recorded here, inside the power_result gate, for the same
+                # reason every dimension above is: a run that measured no
+                # power has nothing to say about how it measured it, and a
+                # value on that side would block a power-vs-no-power
+                # comparison that used to work.
+                "power_clean_window_probe": ctx.config.profiling.clean_window_probe,
                 # NOTE: power_lockstep is deliberately NOT recorded here.
                 # It IS a measured-rail difference -- the state pin becomes
                 # an output, the GO pin's input buffer is enabled, and the
