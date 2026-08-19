@@ -6,6 +6,32 @@ This project follows [Semantic Versioning](https://semver.org/) and uses
 [Release Please](https://github.com/googleapis/release-please) to prepare
 release pull requests from Conventional Commits.
 
+## [0.1.6](https://github.com/AmbiqAI/helia-profiler/compare/v0.1.5...v0.1.6) (2026-08-19)
+
+
+### Features
+
+* **compatibility:** promote nsx-executorch to the PR [#4](https://github.com/AmbiqAI/helia-profiler/issues/4) merge ([d3d649c](https://github.com/AmbiqAI/helia-profiler/commit/d3d649c9e20089386df53c22c4488c9b223cd796))
+* **compatibility:** qualify nsx-executorch main at the PR [#2](https://github.com/AmbiqAI/helia-profiler/issues/2) merge ([9107d20](https://github.com/AmbiqAI/helia-profiler/commit/9107d205509c85f67d3280d969f3ef3d7a0e3d75))
+* **executorch:** ns_ops support and PTE sidecar self-configuration ([ec6f52e](https://github.com/AmbiqAI/helia-profiler/commit/ec6f52ef94ea04291a07b14ec6646f63652cf717))
+* **executorch:** per-buffer memory region placement ([3b294e7](https://github.com/AmbiqAI/helia-profiler/commit/3b294e700d9728a5ea92e9ad9e278641f32032ec))
+* **executorch:** Tier-1 arm-vs-ns comparison assets and kernel verification ([4ec084f](https://github.com/AmbiqAI/helia-profiler/commit/4ec084f510a019eaabe2de447119530a17f9811d))
+
+
+### Bug Fixes
+
+* **compare:** key power comparability on what the window measures ([#125](https://github.com/AmbiqAI/helia-profiler/issues/125)) ([#137](https://github.com/AmbiqAI/helia-profiler/issues/137)) ([39d5e53](https://github.com/AmbiqAI/helia-profiler/commit/39d5e53985ecc25c4c02533e7cd09bc04b0d0177))
+* **executorch:** address PR review — sidecar validation, nm resolution, portable config paths ([b2dbda1](https://github.com/AmbiqAI/helia-profiler/commit/b2dbda1183ca81b76f3721b75245c056575d980e))
+* **power:** let a no-inference probe complete an external run, and check its window ([#125](https://github.com/AmbiqAI/helia-profiler/issues/125)) ([#136](https://github.com/AmbiqAI/helia-profiler/issues/136)) ([8457a9c](https://github.com/AmbiqAI/helia-profiler/commit/8457a9c7e9cc39bd21e47108894ec8c0e7a72376))
+* **power:** verify the 32.768 kHz crystal has settled before timing a window ([#110](https://github.com/AmbiqAI/helia-profiler/issues/110)) ([#128](https://github.com/AmbiqAI/helia-profiler/issues/128)) ([6c22da7](https://github.com/AmbiqAI/helia-profiler/commit/6c22da7c376120e86c0ee5656e8caa5b55a819e1))
+* **report:** stop counting the linker's .heap reservation as bss ([#24](https://github.com/AmbiqAI/helia-profiler/issues/24)) ([#131](https://github.com/AmbiqAI/helia-profiler/issues/131)) ([3139e1b](https://github.com/AmbiqAI/helia-profiler/commit/3139e1b2724668961f4ae63044cf5074d049cb07))
+* **report:** stop publishing energy-per-inference for windows with no inferences ([#125](https://github.com/AmbiqAI/helia-profiler/issues/125)) ([#127](https://github.com/AmbiqAI/helia-profiler/issues/127)) ([f92658f](https://github.com/AmbiqAI/helia-profiler/commit/f92658fca984ba6532c4598f5cb80d0bc14dc43a))
+
+
+### Documentation
+
+* **executorch:** ns_ops, sidecar self-configuration, and memory placement ([6f7097b](https://github.com/AmbiqAI/helia-profiler/commit/6f7097bb5f6175eafdaef67c2c6f0e56fb6e3069))
+
 ## [0.1.5](https://github.com/AmbiqAI/helia-profiler/compare/v0.1.4...v0.1.5) (2026-08-19)
 
 
