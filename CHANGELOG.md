@@ -9,6 +9,31 @@ release pull requests from Conventional Commits.
 ## [0.1.5](https://github.com/AmbiqAI/helia-profiler/compare/v0.1.4...v0.1.5) (2026-08-19)
 
 
+### Measurement notes for existing users
+
+Two fixes in this release change reported numbers on Apollo3/Apollo4 boards —
+in both cases because the old numbers were wrong, not because the measurement
+changed:
+
+* **AP3/AP4 clean-window latency may read higher than in 0.1.4, by up to
+  ~21% ([#121](https://github.com/AmbiqAI/helia-profiler/issues/121)).** The
+  profile firmware's clean window was intermittently losing cycles while the
+  host probe attached, under-reporting `device_clean_infer_avg_us` on some
+  runs (bench-measured: 3.9% run-to-run spread on identical binaries, worst
+  case 21% low). The window now waits for the probe and self-checks its
+  clock; the higher, stable readings are the correct ones. Re-record AP3/AP4
+  latency baselines taken with earlier releases.
+* **Gated power capture on wired AP3/AP4 boards now uses the 3-wire
+  lock-step handshake by default
+  ([#114](https://github.com/AmbiqAI/helia-profiler/issues/114)).** This is a
+  real electrical difference on the measured rail, so `hpx compare` will
+  refuse power deltas against baselines recorded free-running
+  (`metric.power_power_lockstep_mismatch`) — a power-gated comparison
+  against an old baseline fails rather than reporting a phantom delta.
+  Re-record power baselines, or set `power.lockstep: false` to keep the old
+  behaviour. An explicit setting always wins.
+
+
 ### Features
 
 * add native ExecuTorch profiling ([dc4b5e3](https://github.com/AmbiqAI/helia-profiler/commit/dc4b5e35a57deaac019393da9d5289799f9015eb))
