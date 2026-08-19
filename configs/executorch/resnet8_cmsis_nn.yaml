@@ -16,7 +16,7 @@ engine:
   # Select `ns` to use the qualified ns-cmsis-nn v7.29.2 provider instead.
   backend: arm
   config:
-    # Exact commit: 4a257def0c3ebd4ecd6a5d412f087d297f1b3492
+    # Exact commit: 62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59
     source_path: /path/to/nsx-executorch
     method_arena_size: 65536
     temporary_arena_size: 32768
