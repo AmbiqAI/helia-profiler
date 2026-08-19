@@ -24,6 +24,51 @@ def test_source_modules_stay_below_size_ceiling() -> None:
     )
 
 
+def test_no_engine_adapter_imports_out_of_another_engines_package() -> None:
+    """Shared engine logic lives in engines/, not inside one engine (issue #7).
+
+    ``cmsis_nn_module_ref`` started inside the heliaAOT package, and heliaRT
+    and ExecuTorch both grew imports reaching into it -- three engines
+    depending on a fourth's internals for something none of them owns. It now
+    lives in ``engines/cmsis_nn.py``; this stops the pattern returning, for
+    that helper or any other.
+
+    An engine importing its OWN subpackage is fine; so is importing from
+    ``engines`` itself. What is flagged is one engine package naming another.
+    """
+    repo_root = Path(__file__).resolve().parent.parent
+    engines_root = repo_root / "src" / "helia_profiler" / "engines"
+    engine_packages = {
+        entry.name
+        for entry in engines_root.iterdir()
+        if entry.is_dir() and not entry.name.startswith("__")
+    }
+
+    offenders: list[str] = []
+    for path in sorted(engines_root.rglob("*.py")):
+        rel = path.relative_to(engines_root)
+        owner = rel.parts[0] if len(rel.parts) > 1 else None
+        for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            stripped = line.strip()
+            if "import" not in stripped:
+                continue
+            if owner is None:
+                # Lives directly in engines/ -- the registry and shared
+                # helpers legitimately name every adapter.
+                continue
+            for other in engine_packages:
+                if other == owner:
+                    continue  # its own package
+                if f".{other} import" in stripped or f".{other}." in stripped:
+                    offenders.append(f"{rel}:{line_no}: {stripped}")
+
+    assert not offenders, (
+        "these engine modules import from another engine's package; move the "
+        "shared piece up into helia_profiler.engines instead:\n  "
+        + "\n  ".join(offenders)
+    )
+
+
 def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parent.parent
     wheel_dir = tmp_path / "dist"

@@ -68,7 +68,7 @@ def _provider_module_ref(
 ) -> NsxModuleRef:
     """Resolve exactly one provider through the normal NSX module contract."""
     if provider == "ns":
-        from .helia_aot import cmsis_nn_module_ref
+        from .cmsis_nn import cmsis_nn_module_ref
 
         return cmsis_nn_module_ref(config, work_dir)
 

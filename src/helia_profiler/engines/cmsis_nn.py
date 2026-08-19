@@ -17,9 +17,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from ...config import ProfileConfig
-from ...errors import EngineError
-from ...results import NsxModuleRef
+from ..config import ProfileConfig
+from ..errors import EngineError
+from ..results import NsxModuleRef
 
 log = logging.getLogger("hpx")
 
