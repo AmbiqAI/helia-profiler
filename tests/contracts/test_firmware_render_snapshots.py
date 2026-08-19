@@ -83,38 +83,73 @@ _MARKERS: dict[str, str] = {
 }
 
 
-def test_no_test_renders_firmware_through_a_look_alike_jinja_env():
-    """Firmware must only ever be rendered through the production env (#119).
+def test_no_test_builds_a_look_alike_env_over_production_templates():
+    """Firmware/engine templates are only rendered through production envs (#119).
 
     Tests used to build their own ``jinja2.Environment`` with ``trim_blocks``
     and ``lstrip_blocks`` enabled, which production does not set. Output then
-    differed from what ships, so those tests were structurally incapable of
-    seeing a whitespace-control mistake. Three got through and were caught only
-    by hand-diffing full renders: a ``{% for %}`` rewrite, a hoisted
-    ``{% set %}``, and a ``-%}`` that silently reindented 128 renders while the
-    suite stayed green.
+    differed from what ships -- 42 lines on the ExecuTorch template alone -- so
+    those tests were structurally blind to whitespace-control mistakes. Three
+    such near-misses were caught in this arc only by hand-diffing full renders.
 
-    Deleting the divergent envs fixed the instances; this stops new ones. Any
-    test that needs to render firmware imports ``helia_profiler.firmware
-    ._jinja_env``. A test that legitimately needs a different env for something
-    that is NOT a firmware template should load it from its own package.
+    The first version of this guard matched ``jinja2.Environment(...)`` and was
+    proven evadable three ways by adversarial review: a loader hoisted into a
+    variable (the non-greedy match stopped at PackageLoader's own paren), an
+    env built in a helper module (only ``test_*.py`` was scanned), and
+    ``conftest.py`` (same glob gap) -- plus ``from jinja2 import Environment``
+    and ``_jinja_env.overlay(trim_blocks=True)``.
+
+    So key on what an evader cannot avoid instead: to render production
+    templates you must construct a loader over a production template package
+    (or overlay the production env with the divergent flags). Scan EVERY
+    Python file under tests/ for those constructions, wherever the Environment
+    itself is assembled. Production template packages are
+    ``helia_profiler.firmware`` and ``helia_profiler.engines`` (the heliaAOT
+    compile env) -- both envs set neither trim flag.
+
+    Known limits, stated rather than implied: a loader built outside tests/
+    or a path assembled dynamically at runtime is not caught. Byte-level
+    protection against actual render drift lives in the sha256 snapshots;
+    this guard polices the authoring pattern that made tests blind to it.
     """
     import re
 
-    tests_root = Path(__file__).resolve().parents[1]
+    tests_root = Path(__file__).resolve()
+    while tests_root.name != "tests":
+        tests_root = tests_root.parent
+        assert tests_root != tests_root.parent, "no tests/ ancestor found"
+    self_path = Path(__file__).resolve()
+
+    package_loader = re.compile(
+        r"PackageLoader\(\s*[\"']helia_profiler\.(?:firmware|engines)[\"']",
+        re.DOTALL,
+    )
+    fs_loader = re.compile(
+        r"FileSystemLoader\([^)]*(?:firmware|engines)[/\\]+templates",
+        re.DOTALL,
+    )
+    overlay = re.compile(r"\.overlay\(([^)]*)\)", re.DOTALL)
+
     offenders = []
-    for path in tests_root.rglob("test_*.py"):
+    for path in sorted(tests_root.rglob("*.py")):
+        if path.resolve() == self_path:
+            continue  # this file spells the patterns out
         text = path.read_text(encoding="utf-8")
-        for match in re.finditer(r"jinja2\.Environment\((.*?)\)", text, re.DOTALL):
-            block = match.group(1)
-            if "helia_profiler.firmware" in block and "templates" in block:
-                offenders.append(f"{path.relative_to(tests_root)}: {block.strip()[:60]}...")
+        rel = path.relative_to(tests_root)
+        for match in package_loader.finditer(text):
+            offenders.append(f"{rel}: {match.group(0)[:60]}")
+        for match in fs_loader.finditer(text):
+            offenders.append(f"{rel}: {match.group(0)[:60]}")
+        for match in overlay.finditer(text):
+            if "trim_blocks" in match.group(1) or "lstrip_blocks" in match.group(1):
+                offenders.append(f"{rel}: .overlay({match.group(1)[:50]}")
 
     assert not offenders, (
-        "these tests build their own Jinja env for firmware templates instead of "
-        "importing helia_profiler.firmware._jinja_env, so they render whitespace "
-        "differently from production and cannot see whitespace-control mistakes:\n  "
-        + "\n  ".join(offenders)
+        "these files build a loader (or overlay) over production templates "
+        "instead of importing the production env "
+        "(helia_profiler.firmware._jinja_env / the heliaAOT compile env), so "
+        "their renders differ from what ships and cannot see "
+        "whitespace-control mistakes:\n  " + "\n  ".join(offenders)
     )
 
 
