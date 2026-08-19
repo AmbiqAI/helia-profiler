@@ -23,8 +23,9 @@
 // the crystal restarts (Apollo4 datasheet 6.4: "the XT is only enabled when an
 // internal module is using it").  Bench-measured cold on Apollo4 Blue Plus
 // (issue #124): 25 ms and 100 ms settles read garbage, at 400 ms the first
-// measurement is still in the transient while the second is settled, and
-// 750 ms repeats to 20 ppm -- so the transient is ~500-650 ms.
+// 250 ms measurement is still in the transient while the second is settled,
+// and 750 ms repeats to tens of ppm -- so the transient ends somewhere in the
+// 400-650 ms the 400 ms row brackets.
 //
 // A FIXED delay was rejected: it would tax every power run for a transient
 // that usually does not happen, because the XT is normally already running by
@@ -35,33 +36,48 @@
 // The reference is nsx_delay_us, a calibrated BOOTROM cycle loop -- no DWT, no
 // debug domain -- so it cannot share this clock's fault.  Same construction as
 // the clean window's DWT rate probe (#121), inverted.
+//
+// Acceptance needs TWO consecutive in-band probes, not one.  The same bench
+// data shows why: the 400 ms row's first reading implies STIMER running ~36%
+// fast (446 apparent ticks against the 410 ceiling -- only 8.9% of headroom),
+// so a single-probe accept has a blind band just above the ceiling where a
+// still-ramping crystal squeaks through; and consecutive readings DISAGREEING
+// is exactly the unsettled signature that made the #124 sweep trustworthy.
+// Two probes make the ramp show itself.  Band is 245..410 ticks around the
+// 327.68 nominal (-25.2% / +25.1%; integer tick bounds, so not exactly 25).
 #define HPX_STIMER_SETTLE_PROBE_US   10000U   // 10 ms -> 327.68 ticks nominal
-#define HPX_STIMER_SETTLE_MIN_TICKS  245U     // -25%: rejects a stopped/slow XT
-#define HPX_STIMER_SETTLE_MAX_TICKS  410U     // +25%: rejects transient overshoot
-#define HPX_STIMER_SETTLE_MAX_US     1000000U // 1 s deadline, ~1.6x the measured worst case
-
-// Microseconds spent waiting for the XT to settle.  Equal to
-// HPX_STIMER_SETTLE_MAX_US means it never did -- a dead or unpopulated
-// crystal, which is a different fault from the debug-domain one the
-// frozen-clock hint names, and worth telling apart.
-static uint32_t g_hpx_stimer_settle_us = 0U;
+#define HPX_STIMER_SETTLE_MIN_TICKS  245U     // ~-25%: rejects a stopped/slow XT
+#define HPX_STIMER_SETTLE_MAX_TICKS  410U     // ~+25%: rejects transient overshoot
+#define HPX_STIMER_SETTLE_MAX_US     1000000U // 1 s deadline, ~1.5x the measured worst case
 
 static inline void hpx_stimer_init(void) {
     am_hal_stimer_config(AM_HAL_STIMER_CFG_CLEAR);
     am_hal_stimer_config(AM_HAL_STIMER_XTAL_32KHZ | AM_HAL_STIMER_CFG_RUN);
 
-    // Costs one 10 ms probe when the crystal is already up -- the common case.
-    g_hpx_stimer_settle_us = 0U;
-    while (g_hpx_stimer_settle_us < HPX_STIMER_SETTLE_MAX_US) {
+    // Warm cost: two 10 ms probes per init.  On deadline expiry this returns
+    // with the crystal still unfit and the window proceeds; a crystal that
+    // never ticks then yields elapsed_us == 0 with completed work, which the
+    // host flags (frozen-clock check on power runs, the zero-elapsed clean
+    // window rule on profile runs).  ATTRIBUTING that failure to the crystal
+    // rather than the debug domain is deliberately not done here -- that is
+    // what remains open on issue #110.
+    uint32_t settle_spent_us = 0U;
+    uint32_t settle_in_band = 0U;
+    while (settle_spent_us < HPX_STIMER_SETTLE_MAX_US) {
         const uint32_t settle_t0 = am_hal_stimer_counter_get();
         nsx_delay_us(HPX_STIMER_SETTLE_PROBE_US);
         const uint32_t settle_ticks =
             (uint32_t)(am_hal_stimer_counter_get() - settle_t0);
+        settle_spent_us += HPX_STIMER_SETTLE_PROBE_US;
         if (settle_ticks >= HPX_STIMER_SETTLE_MIN_TICKS &&
             settle_ticks <= HPX_STIMER_SETTLE_MAX_TICKS) {
-            break;
+            settle_in_band++;
+            if (settle_in_band >= 2U) {
+                break;
+            }
+        } else {
+            settle_in_band = 0U;
         }
-        g_hpx_stimer_settle_us += HPX_STIMER_SETTLE_PROBE_US;
     }
 }
 

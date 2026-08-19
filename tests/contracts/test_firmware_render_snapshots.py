@@ -636,10 +636,35 @@ def test_stimer_init_verifies_the_crystal_against_an_independent_clock():
             init = rendered[rendered.index("static inline void hpx_stimer_init(void)") :]
             init = init[: init.index("\n}")]
 
+            # Review proved the first version of these assertions vacuous
+            # against the exact design this PR rejects: replacing the whole
+            # verify loop with a blind nsx_delay_us(1s) fixed delay passed
+            # them all (they were substring checks for the constants). So
+            # assert the MEASUREMENT, not the vocabulary: the init must read
+            # the counter, compare against both band edges, and demand more
+            # than one in-band probe.
             assert "HPX_STIMER_SETTLE_MAX_US" in init, (
                 f"{case}: hpx_stimer_init() configures the XT and returns without "
                 "waiting for it to settle; the first reads land in the restart "
                 "transient (#110)"
+            )
+            assert init.count("am_hal_stimer_counter_get()") >= 2, (
+                f"{case}: a settle that never reads the counter is a blind "
+                "delay, the design this fix explicitly rejected -- it taxes "
+                "every warm run and still cannot notice a dead crystal"
+            )
+            assert (
+                "HPX_STIMER_SETTLE_MIN_TICKS" in init
+                and "HPX_STIMER_SETTLE_MAX_TICKS" in init
+            ), (
+                f"{case}: the probe reading is not compared against the band, "
+                "so any tick count -- including zero -- would count as settled"
+            )
+            assert "settle_in_band" in init and ">= 2U" in init, (
+                f"{case}: single-probe acceptance has a bench-demonstrated "
+                "blind band just above the ceiling (the 400 ms row's first "
+                "reading implied ~+36% with the ceiling at +25%); consecutive "
+                "agreement is the settled signature"
             )
             assert "nsx_delay_us" in init, (
                 f"{case}: the settle check needs a reference the STIMER fault "

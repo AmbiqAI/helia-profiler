@@ -483,6 +483,53 @@ def test_duration_fallback_matches_summary_policy(tmp_path: Path):
     assert any(issue.code == "power.gate_duration_mismatch" for issue in evaluation.issues)
 
 
+class TestProfileCleanWindowFrozen:
+    """``profile.clean_window_frozen`` — zero elapsed time, completed work.
+
+    The power binary's frozen-clock rule (firmware_window_clock_is_frozen)
+    only runs at the power terminal. Profile-only STIMER windows -- every
+    Apollo5 profile build, and AP3/AP4 busy_loop -- had NO dead-clock check
+    at all: a dead 32.768 kHz crystal yielded silent zeros with no issue code
+    (found by review of #128). Detection belongs everywhere; attributing the
+    fault (dead crystal vs dead debug domain) stays open on #110.
+    """
+
+    def _profile_only(
+        self, tmp_path: Path, *, count: int | None, avg_us: int | None
+    ) -> PipelineContext:
+        ctx = _context(tmp_path)
+        ctx.power_run = None
+        ctx.power_result = None
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(clean_infer_count=count, clean_infer_avg_us=avg_us),
+            layers=[],
+        )
+        return ctx
+
+    def test_zero_elapsed_with_completed_inferences_is_flagged(self, tmp_path):
+        ctx = self._profile_only(tmp_path, count=200, avg_us=0)
+
+        result = evaluate_run(ctx)
+
+        assert "profile.clean_window_frozen" in [i.code for i in result.issues]
+        assert result.validity is ResultValidity.DEGRADED
+
+    def test_healthy_window_is_not_flagged(self, tmp_path):
+        ctx = self._profile_only(tmp_path, count=200, avg_us=868)
+
+        result = evaluate_run(ctx)
+
+        assert "profile.clean_window_frozen" not in [i.code for i in result.issues]
+
+    def test_absent_fields_stay_unknown_not_frozen(self, tmp_path):
+        """A run with no clean-window record must not be accused of freezing."""
+        ctx = self._profile_only(tmp_path, count=None, avg_us=None)
+
+        result = evaluate_run(ctx)
+
+        assert "profile.clean_window_frozen" not in [i.code for i in result.issues]
+
+
 class TestCleanWindowStall:
     """``profile.clean_window_stalled`` — the #121 detector's host half.
 
