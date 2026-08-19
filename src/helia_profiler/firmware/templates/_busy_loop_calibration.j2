@@ -33,16 +33,13 @@
         // not transfer.  STIMER is the clock (see the file header): unlike
         // SystemCoreClock it is measured rather than assumed.
         //
-        // The window-begin block below calls hpx_stimer_init() again and reads
-        // its own t0 immediately after.  That keeps the window-begin block
-        // identical for every probe, but it is NOT free: every init issues
-        // AM_HAL_STIMER_CFG_CLEAR, which drops the XT request before
-        // re-requesting it (see the plausibility band below), so the measured
-        // window inherits the same crystal-restart transient this calibration
-        // does.  That is tolerable there only because the measured window is
-        // multiple seconds -- production gates land within 0.064-0.065% of the
-        // JS110 reference -- and it stops being a caveat once issue #110 puts
-        // the settle inside hpx_stimer_init() itself.
+        // The window-begin block below calls hpx_stimer_init() again -- each
+        // call drops and re-requests the XT, but since #110 landed the settle
+        // lives inside hpx_stimer_init() itself, so every call verifies the
+        // crystal before its caller reads a tick.  Cost per call: two 10 ms
+        // probes warm, up to the 1 s deadline cold -- so this probe pays it
+        // twice per run (calibration + window begin), all outside measured
+        // regions.
         hpx_stimer_init();
         const uint32_t busy_calib_t0 = hpx_stimer_ticks();
         volatile uint32_t busy_calib_i = 0;
@@ -63,17 +60,11 @@
         // busy_calib_ticks is a DENOMINATOR, so a bad one mis-sizes the window
         // by that same multiplicative factor -- which is exactly the failure
         // issue #112 was about, just arriving through a different door.  The
-        // known door: hpx_stimer_init() drops and re-requests the XT, and the
-        // XT is a crystal that has to restart ("the XT is only enabled when an
-        // internal module is using it", Apollo4 datasheet 6.4).  Reading STIMER
-        // straight after that sequence measured apparent rates varying 45%
-        // across identical builds on an Apollo4 Blue Plus KBR (584/591/858 kHz
-        // where the true answer was 95.771 MHz); a 750 ms settle made it
-        // repeatable to 20 ppm.  A transient that is negligible across a
-        // multi-second measured window can swallow this 6-8 ms pass whole.
-        //
-        // The settle belongs in hpx_stimer_init(), once, and needs a bench pass
-        // to size: issue #110.  Until it lands, refuse an implausible reading
+        // The remaining door for a bad reading is narrow: the settle inside
+        // hpx_stimer_init() (#110, landed) verifies the crystal against the
+        // BOOTROM clock before this calibration reads a tick, so the band
+        // below is a second line of defence, not the first -- it still
+        // refuses an implausible reading rather than scale from it.
         // rather than scale from it.  Falling back to the seed yields a short
         // (~6 ms) window, but the window is now MEASURED, so a fallback shows
         // up in HPX_CLEAN_INFER_AVG_US as the ~1000x miss it is instead of

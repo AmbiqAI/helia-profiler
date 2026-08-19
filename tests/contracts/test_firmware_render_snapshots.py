@@ -671,6 +671,83 @@ def test_window_is_never_timed_by_a_domain_the_binary_powers_down():
     )
 
 
+def test_stimer_init_verifies_the_crystal_against_an_independent_clock():
+    """The STIMER window clock must not be trusted before it has settled (#110).
+
+    ``am_hal_stimer_config(AM_HAL_STIMER_CFG_CLEAR)`` drops the XT request and
+    the crystal restarts -- Apollo4 datasheet 6.4, "the XT is only enabled when
+    an internal module is using it". Reading it immediately gave 584/591/858
+    kHz for a 96 MHz clock, a 45% spread across identical builds; a bench sweep
+    (#124) put the cold transient at ~500-650 ms.
+
+    Two properties matter, and both are asserted here rather than left to the
+    comment:
+
+    1. The init VERIFIES rather than assuming. A fixed delay was rejected -- it
+       would tax every power run for a transient that usually does not happen,
+       since the XT is normally already up by the time a window opens.
+    2. It verifies against ``nsx_delay_us``, a calibrated BOOTROM cycle loop.
+       That matters more than it looks: DWT is exactly the clock STIMER exists
+       to replace on these paths, so verifying against it would be circular --
+       the same mistake as deriving a stall floor from a possibly-stalled
+       reference.
+    """
+    checked = 0
+    for soc, transport, engine in _all_combos():
+        for power_only in (False, True):
+            if power_only and transport != _POWER_TRANSPORT:
+                continue
+            rendered = _render(soc, transport, engine, power_only=power_only)
+            if "hpx_stimer_init(" not in rendered:
+                continue
+            checked += 1
+            case = f"{soc}|{transport}|{engine}{'|power' if power_only else ''}"
+
+            init = rendered[rendered.index("static inline void hpx_stimer_init(void)") :]
+            init = init[: init.index("\n}")]
+
+            # Review proved the first version of these assertions vacuous
+            # against the exact design this PR rejects: replacing the whole
+            # verify loop with a blind nsx_delay_us(1s) fixed delay passed
+            # them all (they were substring checks for the constants). So
+            # assert the MEASUREMENT, not the vocabulary: the init must read
+            # the counter, compare against both band edges, and demand more
+            # than one in-band probe.
+            assert "HPX_STIMER_SETTLE_MAX_US" in init, (
+                f"{case}: hpx_stimer_init() configures the XT and returns without "
+                "waiting for it to settle; the first reads land in the restart "
+                "transient (#110)"
+            )
+            assert init.count("am_hal_stimer_counter_get()") >= 2, (
+                f"{case}: a settle that never reads the counter is a blind "
+                "delay, the design this fix explicitly rejected -- it taxes "
+                "every warm run and still cannot notice a dead crystal"
+            )
+            assert (
+                "HPX_STIMER_SETTLE_MIN_TICKS" in init
+                and "HPX_STIMER_SETTLE_MAX_TICKS" in init
+            ), (
+                f"{case}: the probe reading is not compared against the band, "
+                "so any tick count -- including zero -- would count as settled"
+            )
+            assert "settle_in_band" in init and ">= 2U" in init, (
+                f"{case}: single-probe acceptance has a bench-demonstrated "
+                "blind band just above the ceiling (the 400 ms row's first "
+                "reading implied ~+36% with the ceiling at +25%); consecutive "
+                "agreement is the settled signature"
+            )
+            assert "nsx_delay_us" in init, (
+                f"{case}: the settle check needs a reference the STIMER fault "
+                "cannot affect; nsx_delay_us is the BOOTROM cycle loop"
+            )
+            assert "DWT->CYCCNT" not in init, (
+                f"{case}: verifying STIMER against DWT is circular -- DWT is the "
+                "clock STIMER replaces on exactly these paths"
+            )
+
+    assert checked, "no render exercised hpx_stimer_init(); this test lost its subject"
+
+
 def test_no_render_reports_a_clean_cycles_it_never_accumulated():
     """``clean_cycles`` must never be reported without being assigned first.
 

@@ -44,6 +44,29 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
 
     if ctx.pmu_result is not None:
         meta = ctx.pmu_result.meta
+        # A clean window that completed inferences in zero elapsed time was
+        # timed by a clock that never moved. The power binary's twin of this
+        # rule (firmware_window_clock_is_frozen) only runs at the power
+        # terminal, so a PROFILE-only STIMER window -- every Apollo5 profile
+        # build, and AP3/AP4 busy_loop -- had no check at all: a dead 32.768
+        # kHz crystal yielded silent zeros with no issue code (found by
+        # review of #128, which added the settle these windows now rely on).
+        # Attribution (dead crystal vs dead debug domain) stays open on #110;
+        # detection should not.
+        if meta.clean_infer_count and (
+            meta.clean_infer_avg_us == 0 or meta.clean_infer_total_cycles == 0
+        ):
+            issues.append(
+                _warning(
+                    "profile.clean_window_frozen",
+                    "The clean window completed "
+                    f"{meta.clean_infer_count} inferences in zero elapsed "
+                    "time; the clock timing it never advanced. Latency "
+                    "figures from this window are meaningless.",
+                    clean_infer_count=meta.clean_infer_count,
+                )
+            )
+
         # The profile binary's clean window is DWT-timed on the Cortex-M4F
         # families, and DWT misbehaves whenever no debugger holds the core
         # debug power domain up -- which is exactly what happens between the
