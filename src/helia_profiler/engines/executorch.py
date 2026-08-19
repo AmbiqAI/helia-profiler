@@ -120,11 +120,51 @@ def _positive_int(config: dict[str, Any], name: str, default: int | None = None)
     return value
 
 
-def _operator_list(config: dict[str, Any], name: str) -> str:
-    value = config.get(name, [])
+def _operator_list(config: dict[str, Any], name: str, default: list[str] | None = None) -> str:
+    value = config.get(name, default if default is not None else [])
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise EngineError(f"engine.config.{name} must be a list of operator names")
     return ",".join(value)
+
+
+PTE_SIDECAR_SCHEMA = "nsx-executorch.pte-manifest/1"
+
+
+def _load_pte_sidecar(model_path: Path) -> dict[str, Any] | None:
+    """Load the export-time `<model>.pte.json` manifest, if one exists.
+
+    helia-torch (nsx_cortex_m.export) writes this sidecar next to every PTE
+    with the kernel and memory contract the target build needs. Sidecar
+    values act only as DEFAULTS — explicit engine.config keys always win —
+    but a sidecar that does not describe this exact PTE is a hard error,
+    never silently ignored.
+    """
+    import hashlib
+    import json
+
+    sidecar = Path(f"{model_path}.json")
+    if not sidecar.is_file():
+        return None
+    try:
+        manifest = json.loads(sidecar.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise EngineError(
+            f"Unreadable PTE sidecar: {sidecar}",
+            hint="Re-export the model with helia-torch, or delete the sidecar.",
+        ) from exc
+    if manifest.get("schema") != PTE_SIDECAR_SCHEMA:
+        raise EngineError(
+            f"{sidecar} has unsupported sidecar schema {manifest.get('schema')!r}",
+            hint=f"Expected {PTE_SIDECAR_SCHEMA}; re-export with a matching helia-torch.",
+        )
+    actual = hashlib.sha256(model_path.read_bytes()).hexdigest()
+    if manifest.get("pte_sha256") != actual:
+        raise EngineError(
+            f"{sidecar} describes a different PTE (sha {manifest.get('pte_sha256')}, "
+            f"model is {actual})",
+            hint="Re-export the model so the PTE and its sidecar match.",
+        )
+    return manifest
 
 
 class ExecuTorchAdapter:
@@ -182,7 +222,7 @@ class ExecuTorchAdapter:
         if actual_ref != expected_engine.ref:
             raise EngineError(
                 f"nsx-executorch checkout is at {actual_ref}, expected {expected_engine.ref}",
-                hint="Fetch PR #1 and check out the exact commit pinned by HPX.",
+                hint="Fetch nsx-executorch main and check out the exact commit pinned by HPX.",
             )
         if not (source_root / "external" / "executorch" / "version.txt").is_file():
             raise EngineError(
@@ -205,15 +245,48 @@ class ExecuTorchAdapter:
                 f"nsx-executorch checkout is missing its pinned torchgen sources: {source_root}"
             )
 
-        provider = config.engine.backend or "arm"
+        sidecar = _load_pte_sidecar(config.model.path)
+
+        provider = config.engine.backend or (sidecar or {}).get("kernel_provider") or "arm"
         if provider not in {"arm", "ns"}:
             raise EngineError("ExecuTorch backend must be 'arm' or 'ns'")
 
-        planned_size = _positive_int(engine_config, "planned_arena_size", config.model.arena_size)
+        sidecar_ns_ops = bool(sidecar.get("requires_ns_ops")) if sidecar else False
+        ns_ops = engine_config.get("ns_ops", sidecar_ns_ops)
+        if not isinstance(ns_ops, bool):
+            raise EngineError("engine.config.ns_ops must be a boolean")
+        if ns_ops and provider != "ns":
+            raise EngineError(
+                "engine.config.ns_ops requires engine.backend 'ns'",
+                hint="The cortex_m_ns:: kernels only exist in ns-cmsis-nn.",
+            )
+        if sidecar_ns_ops and not ns_ops:
+            raise EngineError(
+                "The PTE sidecar declares cortex_m_ns:: operators, but ns_ops is disabled",
+                hint="This PTE fails at Method::load without NS ops. Set "
+                "engine.config.ns_ops: true and engine.backend: ns.",
+            )
+
+        def _sidecar_io(key: str) -> int | None:
+            if not sidecar:
+                return None
+            entries = sidecar.get(key) or []
+            size = entries[0].get("size_bytes") if entries else None
+            return size if isinstance(size, int) and size > 0 else None
+
+        planned_size = _positive_int(
+            engine_config,
+            "planned_arena_size",
+            config.model.arena_size
+            or (sidecar.get("planned_arena_size") if sidecar else None),
+        )
         method_size = _positive_int(engine_config, "method_arena_size", 64 * 1024)
         temporary_size = _positive_int(engine_config, "temporary_arena_size", 32 * 1024)
-        input_size = _positive_int(engine_config, "input_size")
-        output_size = _positive_int(engine_config, "output_size")
+        input_size = _positive_int(engine_config, "input_size", _sidecar_io("inputs"))
+        output_size = _positive_int(engine_config, "output_size", _sidecar_io("outputs"))
+        sidecar_portable = (
+            list((sidecar.get("operators") or {}).get("portable") or []) if sidecar else None
+        )
 
         # Generate a thin NSX module wrapper around the local checkout: mirror
         # its own nsx-module.yaml and delegate build logic to its own
@@ -255,8 +328,9 @@ class ExecuTorchAdapter:
             cmake_vars={
                 "NSX_EXECUTORCH_ENABLE_PROFILING": "ON",
                 "NSX_EXECUTORCH_CMSIS_NN_PROVIDER": provider,
+                "NSX_EXECUTORCH_ENABLE_NS_OPS": "ON" if ns_ops else "OFF",
                 "NSX_EXECUTORCH_PORTABLE_SELECT_OPS_LIST": _operator_list(
-                    engine_config, "portable_ops"
+                    engine_config, "portable_ops", default=sidecar_portable
                 ),
                 # nsx-executorch wraps this interpreter with its pinned
                 # torchgen sources. Point CMake discovery at HPX's own Python
