@@ -7,6 +7,7 @@ import logging
 from ..results import PowerRunPlan
 from ..config import DEFAULT_POWER_WINDOW_TARGET_MS
 from ..errors import PowerError
+from ..power.diagnostics import probe_runs_inferences
 from ..pipeline import PipelineContext
 from ..power.diagnostics import assess_clean_window_stall
 
@@ -127,6 +128,27 @@ def plan_power_run(
     if ctx.config.power.firmware != "dedicated":
         inference_count = None
         count_source = "firmware_auto"
+    elif inference_count is None and not probe_runs_inferences(
+        ctx.config.profiling.clean_window_probe
+    ):
+        # The busy_loop probe runs no inferences: the window body is one
+        # calibrated spin sized from window_target_ms (see
+        # _busy_loop_calibration.j2), and the firmware reports 1 unit
+        # requested / 1 completed (#112). Deriving N from a per-inference
+        # reference is therefore meaningless here -- and actively broke the
+        # run, because clean_infer_avg_us under this probe is the WHOLE spin,
+        # so N came out as window_min and the host expected window_min x the
+        # full window. capture_gated then RAISED on the resulting ~10x gate
+        # mismatch, which is why external mode could never complete on the
+        # default firmware: dedicated (#125).
+        #
+        # So describe the window in the probe's own units: one unit of work,
+        # lasting the target duration. Every downstream consumer computes
+        # count x reference_us, so they all now expect exactly the window the
+        # firmware actually runs.
+        inference_count = 1
+        reference_us = target_duration_ms * 1000
+        count_source = "probe_window"
     elif inference_count is None:
         inference_count = _derive_inference_count(
             clean_infer_avg_us=reference_us,

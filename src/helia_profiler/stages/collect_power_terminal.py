@@ -272,14 +272,24 @@ class CollectPowerTerminalStage:
                 if ctx.power_run.observation is not None
                 else None
             ),
-            # Internal mode's reference is N x per-inference time. Under a probe
-            # that runs no inferences that product describes nothing the
-            # firmware did -- the window length comes from window_target_ms --
-            # so withhold it rather than warn about a disagreement that is
-            # really just the wrong reference. External mode is unaffected: its
-            # reference is the instrument's own gate, which timed the same
-            # physical window whatever ran inside it.
-            planned_inference_count=(plan.inference_count if runs_inferences else None),
+            # Internal mode's reference is `count x reference_us`. #112
+            # withheld it for probes that run no inferences, because the plan
+            # then multiplied a per-inference time it had no business using --
+            # against a ~1 s spin window that reference was ~5 ms, so it fired
+            # on every CORRECT run and stayed silent on a mis-sized one.
+            #
+            # The plan now describes a busy_loop window in the probe's own
+            # units (one unit lasting window_target_ms, count_source
+            # "probe_window"), so the same product IS the right reference and
+            # is passed through. Withholding it here would leave internal mode
+            # with no duration check at all -- which is what #125 flagged, and
+            # matters because in internal mode `elapsed_us` is the denominator
+            # for average power and current.
+            #
+            # External mode is unaffected either way: its reference is the
+            # instrument's own gate, which timed the same physical window
+            # whatever ran inside it.
+            planned_inference_count=plan.inference_count,
             planned_inference_us=plan.reference_inference_us,
         )
         if agreement is not None and not agreement.agrees:

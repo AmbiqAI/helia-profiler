@@ -2205,6 +2205,89 @@ class TestPowerFirmwareSelection:
         assert plan.target_duration_ms == 5000
         assert plan.count_source == "profile_guided"
 
+    def test_busy_loop_plan_sizes_the_window_in_probe_units(self, tmp_path: Path):
+        """#125: external busy_loop could never complete a run.
+
+        The busy_loop probe runs no inferences -- the window is ONE calibrated
+        spin sized from window_target_ms, and firmware reports 1 requested /
+        1 completed (#112). But the plan derived N from `clean_infer_avg_us`,
+        which under this probe is the WHOLE spin. With a 5 s window that gives
+        `ceil(5s / 5s) = 1`, clamped up to `window_min` = 10, so the host
+        expected 10 x 5 s = 50 s against a 5 s gate. `capture_gated` RAISES on
+        that mismatch rather than warning, so the default `firmware:
+        dedicated` path could not finish. `firmware: shared` only worked by
+        accident, because both binaries spin.
+
+        Verified against the pre-fix code: `count=10, ref_us=5,000,000`,
+        expected 50.000 s vs measured 5.000 s, ratio 0.100.
+        """
+        from helia_profiler.stages.plan_power import plan_power_run
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        object.__setattr__(ctx.config.profiling, "clean_window_probe", "busy_loop")
+        # What the profile pass reports under busy_loop: one spin, whole window.
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
+            layers=[],
+        )
+
+        plan = plan_power_run(ctx)
+
+        assert plan.count_source == "probe_window"
+        assert plan.inference_count == 1, "still sizing a spin window in inferences"
+        # The reference is the window itself, not a per-inference figure, so
+        # every consumer computing count x reference gets the real window.
+        assert plan.reference_inference_us == plan.target_duration_ms * 1000
+
+    def test_busy_loop_plan_matches_the_gate_the_firmware_actually_runs(
+        self, tmp_path: Path
+    ):
+        """The plan must survive the check that used to reject it.
+
+        `assess_gate_duration` is what raised: it compares the measured gate
+        against `count x reference_us`. Drive it with the real plan and a gate
+        of the length the firmware actually spins for.
+        """
+        from helia_profiler.stages.plan_power import plan_power_run
+        from helia_profiler.power.diagnostics import assess_gate_duration
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        object.__setattr__(ctx.config.profiling, "clean_window_probe", "busy_loop")
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
+            layers=[],
+        )
+        plan = plan_power_run(ctx)
+
+        integrity = assess_gate_duration(
+            measured_s=plan.target_duration_ms / 1000,
+            clean_infer_count=plan.inference_count,
+            clean_infer_avg_us=plan.reference_inference_us,
+            stats_rate_hz=1000,
+        )
+
+        assert integrity is not None
+        assert integrity.valid, (
+            f"gate check still rejects its own plan: measured "
+            f"{integrity.measured_s:.3f}s vs expected {integrity.expected_s:.3f}s"
+        )
+
+    def test_infer_probe_plan_is_unchanged(self, tmp_path: Path):
+        """The default probe must keep deriving N from per-inference timing."""
+        from helia_profiler.stages.plan_power import plan_power_run
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_avg_us=2226), layers=[])
+
+        plan = plan_power_run(ctx)
+
+        assert plan.count_source == "profile_guided"
+        assert plan.inference_count == 2247
+        assert plan.reference_inference_us == 2226
+
     def test_power_plan_flags_a_stalled_profile_reference(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ):

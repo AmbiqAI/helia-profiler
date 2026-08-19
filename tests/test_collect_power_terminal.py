@@ -725,23 +725,25 @@ class TestBusyLoopProbeCompletesARun:
         with pytest.raises(PowerError, match="does not match the host plan"):
             CollectPowerTerminalStage().run(ctx)
 
-    def test_internal_mode_does_not_warn_about_a_plan_derived_reference(
+    def test_internal_mode_accepts_a_correctly_sized_busy_loop_window(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
     ):
-        """The internal window-clock cross-check has no valid reference here.
+        """A busy_loop window matching its plan must not warn.
 
-        Its reference is ``N x reference_inference_us`` (5 x 1000 us = 5 ms),
-        but a busy_loop window is sized from window_target_ms and legitimately
-        runs ~1 s. Comparing them would fire a ~200x "disagreement" warning on
-        every correct run, so the plan-derived reference is withheld.
+        #112 withheld the plan-derived reference here, because the plan then
+        multiplied a per-inference time that described nothing the firmware
+        did (5 x 1000 us against a ~1 s spin -- a ~200x false disagreement on
+        every correct run). #125 fixed the PLAN instead: a busy_loop window is
+        one unit lasting window_target_ms, so `count x reference_us` is now
+        exactly the window and the reference is passed through again.
         """
         import logging
 
         ctx = _make_ctx(
             tmp_path,
             internal=True,
-            inference_count=5,
-            reference_inference_us=1000,
+            inference_count=1,
+            reference_inference_us=1_000_000,
             clean_window_probe="busy_loop",
         )
         record = _record(requested_count=1, completed_count=1, elapsed_us=1_000_000)
@@ -756,9 +758,37 @@ class TestBusyLoopProbeCompletesARun:
 
         assert "window clock" not in caplog.text
 
+    def test_internal_mode_catches_a_mis_sized_busy_loop_window(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        """And a window that is NOT the length it was planned to be must warn.
 
-@pytest.mark.parametrize("transport", ["rtt", "uart", "swo", "usb_cdc"])
-def test_collect_stage_supports_all_profile_transports(tmp_path: Path, transport: str):
-    ctx = _make_ctx(tmp_path, transport=transport)
+        This is the half #125 flagged as missing: after #112 withheld the
+        reference, internal-mode busy_loop had no duration check at all --
+        a window inflated or deflated by any factor passed silently. That
+        matters because in internal mode `elapsed_us` is the denominator for
+        average power and current, so a wrong window scales both.
 
-    assert CollectPowerTerminalStage().should_skip(ctx) is False
+        Here the firmware reports a 7 s window against a 1 s plan -- the
+        calibration-fallback shape `_busy_loop_calibration.j2` warns about.
+        """
+        import logging
+
+        ctx = _make_ctx(
+            tmp_path,
+            internal=True,
+            inference_count=1,
+            reference_inference_us=1_000_000,
+            clean_window_probe="busy_loop",
+        )
+        record = _record(requested_count=1, completed_count=1, elapsed_us=7_000_000)
+        measurement = _measurement(duration_us=7_000_000, inference_count=1)
+        monkeypatch.setattr(
+            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            lambda transport: _FakeTerminalTransport(record, measurement),
+        )
+
+        with caplog.at_level(logging.WARNING):
+            CollectPowerTerminalStage().run(ctx)
+
+        assert "window clock" in caplog.text

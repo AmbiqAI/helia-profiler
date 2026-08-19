@@ -35,9 +35,13 @@ class PowerRunPlan:
     inference_count: int | None = None
     reference_inference_us: int | None = None
     target_duration_ms: int | None = None
-    count_source: Literal["firmware_auto", "configured", "profile_guided"] = (
-        "firmware_auto"
-    )
+    #: How ``inference_count`` was chosen. ``probe_window`` means the probe
+    #: runs no inferences at all (``busy_loop``): the window is ONE calibrated
+    #: spin sized from ``window_target_ms``, so the plan describes one unit of
+    #: work lasting the target duration rather than N inferences.
+    count_source: Literal[
+        "firmware_auto", "configured", "profile_guided", "probe_window"
+    ] = "firmware_auto"
 
 
 @dataclass(frozen=True)
