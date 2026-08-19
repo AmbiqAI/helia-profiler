@@ -45,7 +45,7 @@ def _fake_source_refs(monkeypatch: pytest.MonkeyPatch):
                 else (
                     "631726420b04860a5c4236956a3741ff5a96bd7f"
                     if path.name.startswith("ns-cmsis-nn-")
-                    else "88585066743dc21847541793191c558a647c2f6e"
+                    else "62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59"
                 )
             )
         ),
@@ -130,6 +130,120 @@ def test_adapter_selects_only_ns_provider_module(tmp_path: Path):
     assert provider.local is False
 
 
+def test_adapter_enables_ns_ops_for_ns_provider(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    artifacts = ExecuTorchAdapter().prepare(
+        _config(tmp_path, source, backend="ns", ns_ops=True),
+        tmp_path / "work",
+    )
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_ENABLE_NS_OPS"] == "ON"
+
+
+def test_adapter_defaults_ns_ops_off(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    artifacts = ExecuTorchAdapter().prepare(_config(tmp_path, source), tmp_path / "work")
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_ENABLE_NS_OPS"] == "OFF"
+
+
+def test_adapter_rejects_ns_ops_on_arm_provider(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    with pytest.raises(EngineError, match="ns_ops requires engine.backend 'ns'"):
+        ExecuTorchAdapter().prepare(
+            _config(tmp_path, source, backend="arm", ns_ops=True),
+            tmp_path / "work",
+        )
+
+
+def test_adapter_rejects_non_boolean_ns_ops(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    with pytest.raises(EngineError, match="ns_ops must be a boolean"):
+        ExecuTorchAdapter().prepare(
+            _config(tmp_path, source, ns_ops="yes"),
+            tmp_path / "work",
+        )
+
+
+def _write_sidecar(model_path: Path, **overrides) -> Path:
+    import hashlib
+    import json
+
+    manifest = {
+        "schema": "nsx-executorch.pte-manifest/1",
+        "pte_sha256": hashlib.sha256(model_path.read_bytes()).hexdigest(),
+        "kernel_provider": "ns",
+        "requires_ns_ops": True,
+        "planned_arena_size": 98304,
+        "inputs": [{"shape": [1, 16, 32, 32], "dtype": "FLOAT", "size_bytes": 65536}],
+        "outputs": [{"shape": [1, 10], "dtype": "FLOAT", "size_bytes": 40}],
+        "operators": {
+            "cortex_m": ["cortex_m::quantized_conv2d.out"],
+            "cortex_m_ns": ["cortex_m_ns::quantized_sub.out"],
+            "portable": ["aten::mean.out"],
+        },
+    }
+    manifest.update(overrides)
+    sidecar = Path(f"{model_path}.json")
+    sidecar.write_text(json.dumps(manifest), encoding="utf-8")
+    return sidecar
+
+
+def _sidecar_config(tmp_path: Path, source: Path, *, backend=None, **engine_config):
+    """A config with no explicit sizes/ops — the sidecar must provide them."""
+    model = tmp_path / "model.pte"
+    model.write_bytes(b"\x00\x00\x00\x00ET" + b"\x00" * 32)
+    values = {"source_path": str(source)}
+    values.update(engine_config)
+    engine: dict = {"type": "executorch", "config": values}
+    if backend is not None:
+        engine["backend"] = backend
+    return load_config(None, {"model": {"path": str(model)}, "engine": engine})
+
+
+def test_adapter_self_configures_from_pte_sidecar(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    _write_sidecar(config.model.path)
+
+    artifacts = ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_CMSIS_NN_PROVIDER"] == "ns"
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_ENABLE_NS_OPS"] == "ON"
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_PORTABLE_SELECT_OPS_LIST"] == "aten::mean.out"
+    assert artifacts.executorch_planned_arena_size == 98304
+    assert artifacts.executorch_input_size == 65536
+    assert artifacts.executorch_output_size == 40
+
+
+def test_adapter_explicit_config_overrides_sidecar(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _config(tmp_path, source, backend="ns", ns_ops=True)
+    _write_sidecar(config.model.path, planned_arena_size=1)
+
+    artifacts = ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+    # Explicit engine.config values win over the sidecar.
+    assert artifacts.executorch_planned_arena_size == 2048
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_PORTABLE_SELECT_OPS_LIST"] == "aten::clamp.out"
+
+
+def test_adapter_rejects_sidecar_for_different_pte(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    _write_sidecar(config.model.path, pte_sha256="f" * 64)
+
+    with pytest.raises(EngineError, match="describes a different PTE"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+
+def test_adapter_rejects_disabling_ns_ops_for_ns_pte(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source, backend="ns", ns_ops=False)
+    _write_sidecar(config.model.path)
+
+    with pytest.raises(EngineError, match="ns_ops is disabled"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+
 def test_adapter_honors_explicit_provider_checkout(tmp_path: Path):
     source = _source_tree(tmp_path)
     provider = tmp_path / "custom-arm-cmsis-nn"
@@ -184,7 +298,7 @@ def test_adapter_rejects_wrong_nsx_executorch_commit(
     source = _source_tree(tmp_path)
     monkeypatch.setattr(executorch_mod, "_checkout_commit", lambda _path: "f" * 40)
 
-    with pytest.raises(EngineError, match="expected 885850"):
+    with pytest.raises(EngineError, match="expected 62b22f"):
         ExecuTorchAdapter().prepare(_config(tmp_path, source), tmp_path / "work")
 
 
@@ -196,7 +310,7 @@ def test_adapter_rejects_wrong_executorch_submodule_commit(
     def _commit(path: Path) -> str:
         if path.parent.name == "external":
             return "f" * 40
-        return "88585066743dc21847541793191c558a647c2f6e"
+        return "62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59"
 
     monkeypatch.setattr(executorch_mod, "_checkout_commit", _commit)
 
@@ -243,6 +357,10 @@ def test_executorch_template_has_counter_health_and_true_overflow_mask():
         executorch_input_size=64,
         executorch_output_size=16,
         arena_region="tcm",
+        executorch_planned_arena_region="tcm",
+        executorch_method_arena_region="tcm",
+        executorch_temporary_arena_region="tcm",
+        executorch_io_region="tcm",
         weights_region="mram",
         transport="rtt",
         power_sync_enabled=False,
@@ -291,6 +409,10 @@ def test_executorch_template_places_complete_workspace_in_sram():
         executorch_input_size=110592,
         executorch_output_size=8,
         arena_region="sram",
+        executorch_planned_arena_region="sram",
+        executorch_method_arena_region="sram",
+        executorch_temporary_arena_region="sram",
+        executorch_io_region="sram",
         weights_region="mram",
         transport="rtt",
         power_sync_enabled=False,
@@ -315,3 +437,128 @@ def test_executorch_template_places_complete_workspace_in_sram():
         "g_output",
     ):
         assert f"NSX_MEM_SRAM_BSS alignas(16) static uint8_t {name}" in out
+
+
+def test_adapter_resolves_per_buffer_regions(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    artifacts = ExecuTorchAdapter().prepare(
+        _config(
+            tmp_path,
+            source,
+            planned_arena_location="tcm",
+            method_arena_location="sram",
+            temporary_arena_location="sram",
+            io_location="sram",
+        ),
+        tmp_path / "work",
+    )
+    assert artifacts.executorch_planned_arena_region == "tcm"
+    assert artifacts.executorch_method_arena_region == "sram"
+    assert artifacts.executorch_temporary_arena_region == "sram"
+    assert artifacts.executorch_io_region == "sram"
+
+
+def test_adapter_defaults_buffer_regions_to_follow_arena(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    artifacts = ExecuTorchAdapter().prepare(_config(tmp_path, source), tmp_path / "work")
+    assert artifacts.executorch_planned_arena_region is None
+    assert artifacts.executorch_io_region is None
+
+
+def test_adapter_rejects_non_ram_buffer_region(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    with pytest.raises(EngineError, match="planned_arena_location must be 'tcm' or 'sram'"):
+        ExecuTorchAdapter().prepare(
+            _config(tmp_path, source, planned_arena_location="psram"),
+            tmp_path / "work",
+        )
+
+
+def test_adapter_rejects_non_ram_arena_location(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = load_config(
+        None,
+        {
+            "model": {
+                "path": str(tmp_path / "model.pte"),
+                "arena_size": 2048,
+                "arena_location": "psram",
+            },
+            "engine": {
+                "type": "executorch",
+                "backend": "arm",
+                "config": {
+                    "source_path": str(source),
+                    "input_size": 64,
+                    "output_size": 16,
+                },
+            },
+        },
+    )
+    (tmp_path / "model.pte").write_bytes(b"\x00\x00\x00\x00ET" + b"\x00" * 32)
+    with pytest.raises(EngineError, match="not\\s+valid for ExecuTorch runtime buffers"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+
+def test_executorch_template_splits_buffer_regions():
+    # Production's env, not a look-alike -- see issue #119.
+    out = _jinja_env.get_template("main_executorch.cc.j2").render(
+        cmsis_device_header="apollo510.h",
+        pmu_max_ops=4096,
+        executorch_planned_arena_size=2048,
+        executorch_method_arena_size=1024,
+        executorch_temporary_arena_size=512,
+        executorch_input_size=64,
+        executorch_output_size=16,
+        arena_region="tcm",
+        executorch_planned_arena_region="tcm",
+        executorch_method_arena_region="sram",
+        executorch_temporary_arena_region="sram",
+        executorch_io_region="sram",
+        weights_region="mram",
+        transport="rtt",
+        power_sync_enabled=False,
+        extreme_mode=False,
+        manages_shared_ssram_power=True,
+        ssram_full_power_enum="AM_HAL_PWRCTRL_SRAM_3M",
+        perf_mode_symbol="NSX_PERF_LOW",
+        perf_mode_mhz=96,
+        iterations=3,
+        warmup=1,
+        clean_iters=3,
+        pmu_passes=[],
+        pmu_pass_names=[],
+        psram_clock_hz=48_000_000,
+    )
+    assert "NSX_MEM_FAST_BSS alignas(16) static uint8_t g_planned_arena[2048]" in out
+    assert "NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_method_arena[1024]" in out
+    assert "NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_temporary_arena[512]" in out
+    assert "NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_input[64]" in out
+    assert "NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_output[16]" in out
+
+
+def test_adapter_rejects_sidecar_with_non_boolean_requires_ns_ops(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    _write_sidecar(config.model.path, requires_ns_ops="false")
+
+    with pytest.raises(EngineError, match="requires_ns_ops.*JSON boolean"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+
+def test_adapter_rejects_sidecar_with_malformed_inputs(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    _write_sidecar(config.model.path, inputs=["not-a-tensor-object"])
+
+    with pytest.raises(EngineError, match="'inputs' must be a list of tensor objects"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+
+def test_adapter_rejects_sidecar_with_bad_planned_size(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    _write_sidecar(config.model.path, planned_arena_size="98304")
+
+    with pytest.raises(EngineError, match="planned_arena_size.*positive integer"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")

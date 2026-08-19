@@ -166,34 +166,43 @@ class PlanMemoryStage:
 
         if engine_type is EngineType.EXECUTORCH and artifacts is not None:
             # The generated ExecuTorch runner owns several explicit buffers in
-            # addition to the PTE memory-planned arena. Keep the complete
-            # runtime workspace together so selecting SRAM also relieves DTCM.
+            # addition to the PTE memory-planned arena. Each buffer follows
+            # the run's arena region unless its engine.config *_location
+            # override places it elsewhere; account them where the firmware
+            # actually puts them.
+            def executorch_region(override: str | None) -> MemoryRegion:
+                if override == "tcm":
+                    return MemoryRegion.DTCM
+                if override == "sram":
+                    return MemoryRegion.SRAM
+                return arena_phys
+
             add(
-                arena_phys,
+                executorch_region(artifacts.executorch_planned_arena_region),
                 "planned_arena",
                 int(artifacts.executorch_planned_arena_size or arena),
                 "arena",
             )
             add(
-                arena_phys,
+                executorch_region(artifacts.executorch_method_arena_region),
                 "method_arena",
                 int(artifacts.executorch_method_arena_size or 0),
                 "other",
             )
             add(
-                arena_phys,
+                executorch_region(artifacts.executorch_temporary_arena_region),
                 "temporary_arena",
                 int(artifacts.executorch_temporary_arena_size or 0),
                 "other",
             )
             add(
-                arena_phys,
+                executorch_region(artifacts.executorch_io_region),
                 "input_buffer",
                 int(artifacts.executorch_input_size or 0),
                 "other",
             )
             add(
-                arena_phys,
+                executorch_region(artifacts.executorch_io_region),
                 "output_buffer",
                 int(artifacts.executorch_output_size or 0),
                 "other",

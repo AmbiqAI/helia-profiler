@@ -1,0 +1,47 @@
+# MLPerf Tiny ic-resnet8 re-exported through the nsx_cortex_m AOT package,
+# run on the ns CMSIS-NN provider. Regenerate the PTE with
+# tools/export/executorch_mlperf_tiny/export_nsx_aot.py (the AOT-exported
+# binaries are not checked in). For arm-vs-ns, this PTE is byte-identical
+# to the arm export — stock cortex_m:: ops only.
+model:
+  path: examples/models/mlperf_nsx_aot/ic_ns.pte
+  arena_size: 49152
+  arena_location: sram
+  weights_location: mram
+
+engine:
+  type: executorch
+  backend: ns
+  config:
+    source_path: /path/to/nsx-executorch
+    method_arena_size: 65536
+    temporary_arena_size: 32768
+    input_size: 12288
+    output_size: 40
+    portable_ops: []
+
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+    mve: default
+    memory: default
+  per_layer: true
+  iterations: 25
+  warmup: 5
+  aggregation: median
+
+power:
+  enabled: false
+
+output:
+  format: json
+  dir: ./results/ic_aot_ns
+  model_explorer: false
+  detailed: true

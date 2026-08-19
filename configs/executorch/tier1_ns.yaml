@@ -1,0 +1,47 @@
+# Tier-1 ns-ops comparison, conv trunk — ns candidate: hardswish/leaky_relu/sub/relu as cortex_m_ns:: int8 kernels.
+# Exported by tools/export/executorch_tier1/export_tier1.py; compare the
+# paired arm/ns runs with `hpx compare`.
+model:
+  path: examples/models/tier1/tier1_ns.pte
+  arena_size: 98304
+  arena_location: sram
+  weights_location: mram
+
+engine:
+  type: executorch
+  backend: ns
+  config:
+    # nsx-executorch main @ 62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59
+    source_path: /path/to/nsx-executorch
+    method_arena_size: 65536
+    temporary_arena_size: 32768
+    input_size: 65536
+    output_size: 65536
+    ns_ops: true
+    portable_ops: []
+
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+    mve: default
+    memory: default
+  per_layer: true
+  iterations: 25
+  warmup: 5
+  aggregation: median
+
+power:
+  enabled: false
+
+output:
+  format: json
+  dir: ./results/tier1_ns
+  model_explorer: false
+  detailed: true

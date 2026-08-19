@@ -177,6 +177,56 @@ model flatbuffer (50 KB) goes in SRAM.
   controls constants. Use
   `engine.config.aot_args.memory.tensors` to specify `constant`, `persistent`,
   and `scratch` placement more precisely; those rules override the coarse fields.
+* **ExecuTorch**: the runner owns five static RAM buffers — the memory-planned
+  (activation) arena, method arena, temporary arena, and the input/output
+  buffers. `arena_location` (tcm or sram only) places all of them; each can be
+  moved individually with `engine.config.planned_arena_location`,
+  `method_arena_location`, `temporary_arena_location`, and `io_location`
+  (e.g. planned arena in DTCM for speed, the cold-after-load method arena and
+  large I/O buffers in SRAM). `weights_location` places the PTE program.
+  Splitting *within* the planned arena (per-tensor, heliaAOT-style) is not
+  supported yet; the exporter pins the PTE to a single memory-planned buffer.
+
+---
+
+## Placement models: heliaAOT vs ExecuTorch
+
+The two engines expose placement at different granularities because they own
+memory differently. This is deliberate, not an inconsistency:
+
+| | heliaAOT | ExecuTorch |
+|---|---|---|
+| Placement unit | individual **tensors** (or tensor kinds) | five fixed **runtime buffers** |
+| Who owns the memory | the generated code — every tensor is a named C object | the caller — the runtime receives five opaque blocks |
+| Config surface | `engine.config.aot_args.memory.tensors` rules over `constant` / `persistent` / `scratch` | flat keys: `planned_arena_location`, `method_arena_location`, `temporary_arena_location`, `io_location` |
+| Where placement is enacted | AOT compiler emits per-tensor section attributes into generated C | HPX firmware template attributes each static buffer |
+| Activations | each activation tensor individually placeable | packed into the single planned arena **at export time**; individual tensors are invisible to the firmware |
+
+Rough vocabulary mapping: heliaAOT `scratch` ≈ ExecuTorch planned +
+temporary arenas; `persistent` ≈ (loosely) the method arena; `constant` ≈
+the PTE program, placed with `weights_location` like every other engine.
+
+Why the ceiling differs: heliaAOT is a code generator, so every tensor
+exists as a symbol the compiler can attribute. ExecuTorch is an interpreter
+with caller-owned arenas — the export-time memory planner bakes each
+activation's *offset within the planned arena* into the PTE, so the
+firmware's finest placement unit is that arena as a whole. A per-tensor rule
+language for ExecuTorch would promise control the engine cannot deliver.
+
+Practical guidance: only the planned arena is touched by every kernel on
+every inference, so it is the one buffer that rewards DTCM. Place it in
+`tcm`, leave the load-time method arena, kernel-scratch temporary arena, and
+once-per-inference I/O buffers in `sram`. Measured on `apollo510_evb`, that
+split recovered ~2.3% end-to-end versus an all-SRAM workspace — with a
+planned arena that fits DTCM only because the other buffers no longer have
+to move with it.
+
+Planned convergence: ExecuTorch's memory planner natively supports multiple
+memory-planned buffers, so a future export option can partition activations
+across two planned arenas (hot/small → DTCM, large → SRAM) — per-tensor
+placement decided at export by helia-torch, with HPX still placing whole
+buffers. Tracked in
+[nsx-executorch#3](https://github.com/AmbiqAI/nsx-executorch/issues/3).
 
 ---
 

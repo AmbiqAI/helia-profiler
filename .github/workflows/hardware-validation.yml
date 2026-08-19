@@ -108,7 +108,7 @@ env:
   UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
   UV_PYTHON_INSTALL_DIR: ${{ github.workspace }}/.uv-python
   SEGGER_RTT_PATH: ${{ github.workspace }}/segger-rtt
-  HPX_NSX_EXECUTORCH_REF: 88585066743dc21847541793191c558a647c2f6e
+  HPX_NSX_EXECUTORCH_REF: 62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59
   HPX_QUALIFIED_NS_CMSIS_NN_REF: 631726420b04860a5c4236956a3741ff5a96bd7f
   # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
   # with the manual defaults, except that nightly validation covers the full suite.

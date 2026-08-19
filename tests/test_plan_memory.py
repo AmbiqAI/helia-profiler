@@ -93,6 +93,51 @@ class TestPlanMemorySynthesise:
         assert {consumer.name for consumer in sram.consumers} == {"pmu_layer_records"}
         assert {consumer.name for consumer in mram.consumers} == {"pte_program"}
 
+    def test_executorch_per_buffer_region_overrides(self, tmp_path: Path):
+        model = tmp_path / "model.pte"
+        model.write_bytes(b"\x00\x00\x00\x00ET" + b"\x00" * 2048)
+        config = load_config(
+            None,
+            {
+                "model": {
+                    "path": str(model),
+                    "arena_size": 163840,
+                    "arena_location": "tcm",
+                    "weights_location": "mram",
+                },
+                "engine": {"type": "executorch"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
+        ResolvePlatformStage().run(ctx)
+        ctx.engine_artifacts = EngineArtifacts(
+            engine_type=config.engine.type,
+            executorch_method_arena_size=65536,
+            executorch_planned_arena_size=163840,
+            executorch_temporary_arena_size=32768,
+            executorch_input_size=12288,
+            executorch_output_size=40,
+            executorch_method_arena_region="sram",
+            executorch_temporary_arena_region="sram",
+            executorch_io_region="sram",
+        )
+        PlanMemoryStage().run(ctx)
+
+        dtcm = ctx.memory_plan.region("DTCM")
+        sram = ctx.memory_plan.region("SRAM")
+        assert dtcm is not None and sram is not None
+        # Only the planned arena follows arena_location; the overridden
+        # buffers are accounted in SRAM where the firmware places them.
+        assert {c.name for c in dtcm.consumers} == {"planned_arena"}
+        assert {c.name for c in sram.consumers} == {
+            "method_arena",
+            "temporary_arena",
+            "input_buffer",
+            "output_buffer",
+            "pmu_layer_records",
+        }
+
     def test_executorch_sram_places_complete_runtime_workspace_in_sram(self, tmp_path: Path):
         model = tmp_path / "model.pte"
         model.write_bytes(b"\x00\x00\x00\x00ET" + b"\x00" * 2048)

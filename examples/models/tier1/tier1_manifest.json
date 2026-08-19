@@ -1,0 +1,312 @@
+{
+  "seed": 20260819,
+  "torch_version": "2.12.0+cpu",
+  "models": {
+    "tier1": {
+      "input_shape": [
+        1,
+        16,
+        32,
+        32
+      ],
+      "output_shape": [
+        1,
+        16,
+        32,
+        32
+      ],
+      "channels_last": true,
+      "input_size_bytes": 65536,
+      "output_size_bytes": 65536,
+      "providers": {
+        "arm": {
+          "pte": "tier1_arm.pte",
+          "sha256": "056e99fd3c103af785bae418f712c7612e72b03a2df49f9e391824b8a14f9416",
+          "byte_size": 15809,
+          "edge_ops": {
+            "cortex_m::quantize_per_tensor": 2,
+            "cortex_m::quantized_conv2d": 2,
+            "cortex_m::minimum": 1,
+            "cortex_m::quantized_mul": 1,
+            "cortex_m::dequantize_per_tensor": 3,
+            "aten::leaky_relu": 1,
+            "aten::sub.Tensor": 1,
+            "aten::clamp": 1
+          },
+          "reported_portable_fallback_ops": [
+            "aten::sub.out"
+          ],
+          "portable_ops": [
+            "aten::clamp.out",
+            "aten::leaky_relu.out",
+            "aten::sub.out"
+          ],
+          "operators": [
+            "aten::clamp.out",
+            "aten::leaky_relu.out",
+            "aten::sub.out",
+            "cortex_m::dequantize_per_tensor.out",
+            "cortex_m::minimum.out",
+            "cortex_m::quantize_per_tensor.out",
+            "cortex_m::quantized_conv2d.out",
+            "cortex_m::quantized_mul.out"
+          ],
+          "instructions": [
+            {
+              "id": "c0i0",
+              "op": "cortex_m::quantize_per_tensor.out"
+            },
+            {
+              "id": "c0i1",
+              "op": "cortex_m::quantized_conv2d.out"
+            },
+            {
+              "id": "c0i2",
+              "op": "cortex_m::minimum.out"
+            },
+            {
+              "id": "c0i3",
+              "op": "cortex_m::quantized_mul.out"
+            },
+            {
+              "id": "c0i4",
+              "op": "cortex_m::dequantize_per_tensor.out"
+            },
+            {
+              "id": "c0i5",
+              "op": "cortex_m::quantized_conv2d.out"
+            },
+            {
+              "id": "c0i6",
+              "op": "cortex_m::dequantize_per_tensor.out"
+            },
+            {
+              "id": "c0i7",
+              "op": "aten::leaky_relu.out"
+            },
+            {
+              "id": "c0i8",
+              "op": "aten::sub.out"
+            },
+            {
+              "id": "c0i9",
+              "op": "cortex_m::quantize_per_tensor.out"
+            },
+            {
+              "id": "c0i10",
+              "op": "aten::clamp.out"
+            },
+            {
+              "id": "c0i11",
+              "op": "cortex_m::dequantize_per_tensor.out"
+            }
+          ],
+          "planned_arena_size": 196608,
+          "input_shape": [
+            1,
+            16,
+            32,
+            32
+          ],
+          "output_shape": [
+            1,
+            16,
+            32,
+            32
+          ]
+        },
+        "ns": {
+          "pte": "tier1_ns.pte",
+          "sha256": "41289ba5d294a56891564f6bb8ab92b51ac237ce6df84879cf06c46d6fcfb9fc",
+          "byte_size": 15424,
+          "edge_ops": {
+            "cortex_m::quantize_per_tensor": 1,
+            "cortex_m::quantized_conv2d": 2,
+            "cortex_m_ns::quantized_hardswish": 1,
+            "cortex_m_ns::quantized_leaky_relu": 1,
+            "cortex_m_ns::quantized_sub": 1,
+            "cortex_m_ns::quantized_relu": 1,
+            "cortex_m::dequantize_per_tensor": 1
+          },
+          "reported_portable_fallback_ops": [],
+          "portable_ops": [],
+          "operators": [
+            "cortex_m::dequantize_per_tensor.out",
+            "cortex_m::quantize_per_tensor.out",
+            "cortex_m::quantized_conv2d.out",
+            "cortex_m_ns::quantized_hardswish.out",
+            "cortex_m_ns::quantized_leaky_relu.out",
+            "cortex_m_ns::quantized_relu.out",
+            "cortex_m_ns::quantized_sub.out"
+          ],
+          "instructions": [
+            {
+              "id": "c0i0",
+              "op": "cortex_m::quantize_per_tensor.out"
+            },
+            {
+              "id": "c0i1",
+              "op": "cortex_m::quantized_conv2d.out"
+            },
+            {
+              "id": "c0i2",
+              "op": "cortex_m_ns::quantized_hardswish.out"
+            },
+            {
+              "id": "c0i3",
+              "op": "cortex_m::quantized_conv2d.out"
+            },
+            {
+              "id": "c0i4",
+              "op": "cortex_m_ns::quantized_leaky_relu.out"
+            },
+            {
+              "id": "c0i5",
+              "op": "cortex_m_ns::quantized_sub.out"
+            },
+            {
+              "id": "c0i6",
+              "op": "cortex_m_ns::quantized_relu.out"
+            },
+            {
+              "id": "c0i7",
+              "op": "cortex_m::dequantize_per_tensor.out"
+            }
+          ],
+          "planned_arena_size": 98304,
+          "input_shape": [
+            1,
+            16,
+            32,
+            32
+          ],
+          "output_shape": [
+            1,
+            16,
+            32,
+            32
+          ]
+        }
+      }
+    },
+    "tier1mean": {
+      "input_shape": [
+        1,
+        16,
+        32,
+        32
+      ],
+      "output_shape": [
+        1,
+        16,
+        1,
+        1
+      ],
+      "channels_last": false,
+      "input_size_bytes": 65536,
+      "output_size_bytes": 64,
+      "providers": {
+        "arm": {
+          "pte": "tier1mean_arm.pte",
+          "sha256": "b97064c76aada6fefaf3637c700e25d0a31c146dfc6a33628a70b3e74014c04f",
+          "byte_size": 2312,
+          "edge_ops": {
+            "cortex_m::quantize_per_tensor": 2,
+            "cortex_m::dequantize_per_tensor": 2,
+            "aten::mean.dim": 1
+          },
+          "reported_portable_fallback_ops": [
+            "aten::mean.out"
+          ],
+          "portable_ops": [
+            "aten::mean.out"
+          ],
+          "operators": [
+            "aten::mean.out",
+            "cortex_m::dequantize_per_tensor.out",
+            "cortex_m::quantize_per_tensor.out"
+          ],
+          "instructions": [
+            {
+              "id": "c0i0",
+              "op": "cortex_m::quantize_per_tensor.out"
+            },
+            {
+              "id": "c0i1",
+              "op": "cortex_m::dequantize_per_tensor.out"
+            },
+            {
+              "id": "c0i2",
+              "op": "aten::mean.out"
+            },
+            {
+              "id": "c0i3",
+              "op": "cortex_m::quantize_per_tensor.out"
+            },
+            {
+              "id": "c0i4",
+              "op": "cortex_m::dequantize_per_tensor.out"
+            }
+          ],
+          "planned_arena_size": 81920,
+          "input_shape": [
+            1,
+            16,
+            32,
+            32
+          ],
+          "output_shape": [
+            1,
+            16,
+            1,
+            1
+          ]
+        },
+        "ns": {
+          "pte": "tier1mean_ns.pte",
+          "sha256": "f0ad263a1851f7436b3a1375d761ffcf3837869df8940ffb60ccadc6c9f65eb5",
+          "byte_size": 1936,
+          "edge_ops": {
+            "cortex_m::quantize_per_tensor": 1,
+            "cortex_m_ns::quantized_mean": 1,
+            "cortex_m::dequantize_per_tensor": 1
+          },
+          "reported_portable_fallback_ops": [],
+          "portable_ops": [],
+          "operators": [
+            "cortex_m::dequantize_per_tensor.out",
+            "cortex_m::quantize_per_tensor.out",
+            "cortex_m_ns::quantized_mean.out"
+          ],
+          "instructions": [
+            {
+              "id": "c0i0",
+              "op": "cortex_m::quantize_per_tensor.out"
+            },
+            {
+              "id": "c0i1",
+              "op": "cortex_m_ns::quantized_mean.out"
+            },
+            {
+              "id": "c0i2",
+              "op": "cortex_m::dequantize_per_tensor.out"
+            }
+          ],
+          "planned_arena_size": 81920,
+          "input_shape": [
+            1,
+            16,
+            32,
+            32
+          ],
+          "output_shape": [
+            1,
+            16,
+            1,
+            1
+          ]
+        }
+      }
+    }
+  }
+}

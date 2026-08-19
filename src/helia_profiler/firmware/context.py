@@ -226,6 +226,11 @@ class EngineContext:
     executorch_temporary_arena_size: int
     executorch_input_size: int
     executorch_output_size: int
+    # Resolved per-buffer regions, always "tcm" or "sram".
+    executorch_planned_arena_region: str
+    executorch_method_arena_region: str
+    executorch_temporary_arena_region: str
+    executorch_io_region: str
 
 
 @dataclass(frozen=True)
@@ -365,6 +370,25 @@ class FirmwareRenderContext:
                 ),
                 executorch_input_size=artifacts.executorch_input_size or 0,
                 executorch_output_size=artifacts.executorch_output_size or 0,
+                # Per-buffer overrides win; otherwise every runtime buffer
+                # follows the run's resolved arena region (which the memory
+                # planner keeps within tcm/sram for ExecuTorch).
+                executorch_planned_arena_region=(
+                    artifacts.executorch_planned_arena_region
+                    or _executorch_default_region(arena_region)
+                ),
+                executorch_method_arena_region=(
+                    artifacts.executorch_method_arena_region
+                    or _executorch_default_region(arena_region)
+                ),
+                executorch_temporary_arena_region=(
+                    artifacts.executorch_temporary_arena_region
+                    or _executorch_default_region(arena_region)
+                ),
+                executorch_io_region=(
+                    artifacts.executorch_io_region
+                    or _executorch_default_region(arena_region)
+                ),
             ),
         )
 
@@ -469,7 +493,22 @@ class FirmwareRenderContext:
             ),
             "executorch_input_size": self.engine.executorch_input_size,
             "executorch_output_size": self.engine.executorch_output_size,
+            "executorch_planned_arena_region": self.engine.executorch_planned_arena_region,
+            "executorch_method_arena_region": self.engine.executorch_method_arena_region,
+            "executorch_temporary_arena_region": (
+                self.engine.executorch_temporary_arena_region
+            ),
+            "executorch_io_region": self.engine.executorch_io_region,
         }
+
+
+def _executorch_default_region(arena_region: Placement) -> str:
+    """RAM region every ExecuTorch runtime buffer follows unless overridden.
+
+    The adapter rejects non-RAM model.arena_location values for ExecuTorch,
+    so anything else here is a planner artifact; clamp it to tcm.
+    """
+    return arena_region.value if arena_region.value in ("tcm", "sram") else "tcm"
 
 
 def _resolve_pmu_passes(config: Any, soc: Any | None = None) -> list[PmuPassContext]:
