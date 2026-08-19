@@ -249,14 +249,19 @@ class RunMetadata:
 class BinarySections:
     """ELF binary section sizes (from ``arm-none-eabi-size``).
 
-    ``bss`` counts zero-initialized state the program actually uses.
-    ``reserved`` is separate: linker-reserved NOBITS regions that are never
-    touched at runtime, chiefly the ``.heap`` fill NSX linker scripts use to
-    claim all remaining TCM. ``size``'s Berkeley output lumps those into bss,
-    which overstated the reported footprint by orders of magnitude on AP5
-    boards -- 392 KB of "bss" for 260 bytes of real state in the #24
-    reproduction. ``total`` keeps the tool's own sum, so it still includes the
-    reservation.
+    ``bss`` counts zero-initialized state the program actually uses --
+    including the stack, which is live memory whatever its section says.
+
+    ``reserved`` is separate: the linker's ``.heap`` region, which NSX scripts
+    size to whatever remained in the memory region rather than to a
+    requirement, purely so ``_sbrk`` has a bounded area. Its size states
+    leftover space, not need. ``size``'s Berkeley output folds it into bss,
+    which overstated the reported footprint by hundreds of KB on the affected
+    boards -- 392 KB of "bss" against 260 bytes of real state in the #24
+    reproduction.
+
+    ``total`` keeps the tool's own inclusive sum, so
+    ``text + data + bss + reserved`` reconciles against it.
     """
 
     text: int = 0

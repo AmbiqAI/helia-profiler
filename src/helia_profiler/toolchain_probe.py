@@ -70,6 +70,7 @@ def _sections_via_size(
     binary_path: Path,
     *,
     size_cmd: str,
+    readelf_cmd: str | None,
     timeout_s: int,
 ) -> BinarySections | None:
     """Parse Berkeley-format ``size`` output for GCC ELF binaries.
@@ -103,8 +104,12 @@ def _sections_via_size(
     except ValueError:
         return None
     log.info("Binary sections: text=%d data=%d bss=%d total=%d", text, data, bss, total)
-    reserved = _reserved_via_size_sysv(
-        binary_path, size_cmd=size_cmd, timeout_s=timeout_s
+    reserved = (
+        _reserved_via_readelf(
+            binary_path, readelf_cmd=readelf_cmd, timeout_s=timeout_s
+        )
+        if readelf_cmd is not None
+        else None
     )
     if reserved is None or reserved > bss:
         # Either the section list could not be read, or the reserved regions
@@ -133,64 +138,84 @@ _FROMELF_TOTALS_RE = re.compile(r"\s*Grand Totals?\s*[:\s]+(\d+)\s+(\d+)\s+(\d+)
 
 
 
-#: Linker-reserved NOBITS section names: allocated and counted by ``size`` as
-#: bss, but never written at runtime. NSX's AP5 linker scripts fill all
-#: remaining DTCM as ``.heap`` (NOLOAD) so ``_sbrk`` has a bounded region, and
-#: the stack is reserved the same way. Matched on the section-name stem so
-#: ``.heap``, ``.heap.foo`` and ``.stack_dummy`` all count.
-_RESERVED_NOBITS_STEMS = ("heap", "stack")
+#: Section-name stems treated as linker reservations rather than program
+#: state. Matched only among sections already known to be **NOBITS and
+#: allocated** -- the name alone is not evidence.
+#:
+#: Only ``.heap``. Review corrected an earlier version that also claimed
+#: ``.stack``: on every NSX SoC the ``.stack`` region IS the live stack --
+#: ``startup_gcc.c`` loads the initial MSP from its top and sets MSPLIM/PSPLIM
+#: from its base -- so it is memory the firmware genuinely needs, and it
+#: belongs in the reported footprint.
+#:
+#: ``.heap`` is different in kind on these parts, and that difference is the
+#: whole point of issue #24: NSX linker scripts do not size it to a
+#: requirement, they run it to the end of the region
+#: (``. = ORIGIN(MCU_TCM) + LENGTH(MCU_TCM);``) purely so ``_sbrk`` has a
+#: bounded area. Its size states what was left over, not what is needed, so
+#: counting it as footprint tells the reader nothing useful about the build.
+_RESERVED_NOBITS_STEMS = ("heap",)
+
+#: ``readelf -S -W`` row: ``[Nr] Name Type Addr Off Size ES Flg ...`` with the
+#: numeric columns in hex. The name is anchored to a leading dot so the empty
+#: name of section 0 cannot shift the field positions.
+_READELF_SECTION_RE = re.compile(
+    r"^\s*\[\s*\d+\]\s+(\.\S+)\s+(\S+)\s+"
+    r"[0-9a-fA-F]+\s+[0-9a-fA-F]+\s+([0-9a-fA-F]+)\s+[0-9a-fA-F]+\s+(\S*)"
+)
 
 
-def _reserved_via_size_sysv(
+def _reserved_via_readelf(
     binary_path: Path,
     *,
-    size_cmd: str,
+    readelf_cmd: str,
     timeout_s: int,
 ) -> int | None:
-    """Bytes of linker-reserved NOBITS regions, via ``size -A``.
+    """Bytes of linker-reserved NOBITS regions, from the section headers.
 
-    Berkeley output (the default, parsed above) is four totals with no
-    per-section detail, so the reservation cannot be separated from real bss
-    there. ``-A`` prints SysV per-section output, supported by GNU ``size``
-    and ``llvm-size`` alike::
+    An earlier version of this used ``size -A``, which reports name, size and
+    address but **no TYPE** -- so a ``.heap`` carrying contents (PROGBITS,
+    which ``size`` correctly counts in *data*) was indistinguishable from the
+    NOLOAD reservation, and subtracting it from bss understated real
+    zero-initialized state while double-counting those bytes. Adversarial
+    review caught that on a purpose-built ELF; issue #24 had named readelf
+    for this reason from the start.
 
-        section             size        addr
-        .text                 32       98304
-        .bss                 260   268435460
-        .heap             391928   268435720
+    So the type is checked: only ``NOBITS`` sections carrying the ``A``
+    (alloc) flag are candidates, which is exactly the set ``size`` folds into
+    its bss column. The name then selects the reserved ones among them.
 
     Returns ``None`` when the tool is unavailable or the output cannot be
-    parsed, so the caller keeps the unadjusted numbers instead of inventing
+    parsed, so the caller keeps the unadjusted numbers rather than inventing
     an adjustment.
     """
     try:
         result = subprocess.run(
-            [size_cmd, "-A", str(binary_path)],
+            [readelf_cmd, "-S", "-W", str(binary_path)],
             capture_output=True,
             text=True,
             timeout=timeout_s,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
-        log.debug("%s -A probe failed: %s", size_cmd, exc)
+        log.debug("%s section probe failed: %s", readelf_cmd, exc)
         return None
     if result.returncode != 0:
-        log.debug("%s -A failed: %s", size_cmd, (result.stderr or "").strip())
+        log.debug("%s failed: %s", readelf_cmd, (result.stderr or "").strip())
         return None
 
     reserved = 0
     seen_section = False
     for line in (result.stdout or "").splitlines():
-        parts = line.split()
-        if len(parts) < 2 or not parts[0].startswith("."):
+        match = _READELF_SECTION_RE.match(line)
+        if match is None:
             continue
-        try:
-            size_bytes = int(parts[1])
-        except ValueError:
-            continue
+        name, sec_type, size_hex, flags = match.groups()
         seen_section = True
-        stem = parts[0].lstrip(".").split(".")[0].split("_")[0]
+        if sec_type != "NOBITS" or "A" not in flags:
+            continue
+        stem = name.lstrip(".").split(".")[0].split("_")[0]
         if stem in _RESERVED_NOBITS_STEMS:
-            reserved += size_bytes
+            reserved += int(size_hex, 16)
     if not seen_section:
         return None
     return reserved
@@ -259,6 +284,11 @@ def binary_sections(
     return _sections_via_size(
         binary_path,
         size_cmd=resolve_toolchain_executable(toolchain, spec.size),
+        readelf_cmd=(
+            resolve_toolchain_executable(toolchain, spec.readelf)
+            if spec.readelf is not None
+            else None
+        ),
         timeout_s=timeout_s,
     )
 

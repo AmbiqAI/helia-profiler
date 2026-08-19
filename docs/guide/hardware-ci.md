@@ -117,7 +117,8 @@ The initial schema includes:
 
 Schema v3 adds a per-case `resources` object to `validation_manifest.json` and
 `validation_report.json` for dashboard ingestion: `binary_sections` contains
-text/data/BSS/total sizes, `runtime_memory` contains firmware-reported arena and
+text/data/BSS/total sizes (BSS excludes linker-reserved regions; see the
+output guide), `runtime_memory` contains firmware-reported arena and
 tensor details, and `memory_plan` contains engine-agnostic region capacities,
 used/free bytes, overflow state, and named consumers. The existing flat binary
 and arena metrics remain available for backward-compatible comparisons.

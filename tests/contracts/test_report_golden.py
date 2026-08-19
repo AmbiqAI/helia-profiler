@@ -277,7 +277,13 @@ def _make_ctx(tmp_path: Path, engine: EngineType, fmt: str) -> PipelineContext:
     ctx.pmu_result = _sample_pmu()
     ctx.power_result = _sample_power()
     ctx.memory_plan = _sample_memory_plan(engine)
-    ctx.binary_sections = BinarySections(text=45000, data=1200, bss=8000, total=54200)
+    # reserved is non-zero on purpose: with it at the default 0 every
+    # `if bs.reserved:` emission is dead in the golden path, so the digests
+    # could not see the summary.json / memory.json / console additions at all
+    # (issue #24 review). total stays the tool's own inclusive sum.
+    ctx.binary_sections = BinarySections(
+        text=45000, data=1200, bss=8000, total=54200, reserved=32000
+    )
     ctx.model_analysis = _sample_model_analysis()
     ctx.run_metadata = _sample_run_metadata()
     dependency_lock = tmp_path / "_workspace" / "nsx.lock"
