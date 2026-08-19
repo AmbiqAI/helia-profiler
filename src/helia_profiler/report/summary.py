@@ -86,6 +86,8 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             "bss": bs.bss,
             "total": bs.total,
         }
+        if bs.reserved:
+            summary["binary"]["reserved"] = bs.reserved
 
     # Cache / memory counter totals (summed across all layers)
     cache: dict[str, float] = {}

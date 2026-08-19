@@ -17,6 +17,10 @@ class ToolchainSpec:
     nsx_name: str | None
     nm: str
     size: str | None
+    #: Section-header probe. Needed because ``size``'s output carries no
+    #: section TYPE, so a linker-reserved NOBITS region cannot be told from
+    #: an initialized one by name alone (issue #24).
+    readelf: str | None
     section_probe: Literal["size", "fromelf"]
     heliart_tag: str
     default_rtt_buffer_size_up: int = 32768
@@ -29,6 +33,7 @@ _SPECS = {
         nsx_name=None,
         nm="arm-none-eabi-nm",
         size="arm-none-eabi-size",
+        readelf="arm-none-eabi-readelf",
         section_probe="size",
         heliart_tag="gcc",
     ),
@@ -38,6 +43,7 @@ _SPECS = {
         nsx_name=None,
         nm="gcc-nm",
         size="gcc-size",
+        readelf="readelf",
         section_probe="size",
         heliart_tag="gcc",
     ),
@@ -47,6 +53,7 @@ _SPECS = {
         nsx_name="armclang",
         nm="llvm-nm",
         size=None,
+        readelf=None,
         section_probe="fromelf",
         heliart_tag="armclang",
     ),
@@ -56,6 +63,7 @@ _SPECS = {
         nsx_name="atfe",
         nm="llvm-nm",
         size="llvm-size",
+        readelf="llvm-readelf",
         section_probe="size",
         heliart_tag="atfe",
         default_rtt_buffer_size_up=12288,
