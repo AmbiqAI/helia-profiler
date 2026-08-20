@@ -29,7 +29,11 @@ from helia_profiler.stages.preflight import _check_softmax_scaling
 
 FIXTURES = Path(__file__).parent / "fixtures"
 BAD_MODEL = FIXTURES / "softmax_scale_unsupported.tflite"
-KWS_MODEL = FIXTURES / "mlperf_tiny" / "kws" / "kws_ref_model.tflite"
+# The root-level copy, NOT tests/fixtures/mlperf_tiny/kws/: everything under
+# mlperf_tiny/** is Git-LFS-tracked and the unit-test CI checks out without
+# LFS, so those paths hold 130-byte pointer files there -- the reader then
+# "parses" ASCII pointer text as offsets. Found by CI on the first push.
+KWS_MODEL = FIXTURES / "kws_ref_model.tflite"
 
 #: Ground truth from issue #57, verbatim.
 FAILING_SCALE = 4.305568790385905e-09
@@ -190,6 +194,8 @@ def test_reader_agrees_with_litert_on_every_fixture():
     checked = 0
     for path in sorted(FIXTURES.rglob("*.tflite")):
         buf = path.read_bytes()
+        if b"TFL3" not in buf[:16]:
+            continue  # a Git LFS pointer in a checkout without LFS content
         mine = [
             (op.subgraph_index, op.op_index, op.input_tensor, op.input_scale, op.beta)
             for op in read_quantized_softmax_ops(buf)
@@ -233,4 +239,7 @@ def test_reader_agrees_with_litert_on_every_fixture():
         assert mine == reference, f"parsers disagree on {path.name}"
         checked += 1
 
-    assert checked >= 5, "the fixture sweep found fewer models than the repo carries"
+    assert checked >= 2, (
+        "the sweep must at least cover the committed repro fixture and the "
+        "root KWS model; mlperf_tiny/** joins it only in LFS checkouts"
+    )
