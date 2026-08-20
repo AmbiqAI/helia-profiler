@@ -290,15 +290,15 @@ class TestFlashBinaryFallback:
         sends every caller down ``_verify_flash_address``'s fail-open branch,
         which warns and returns -- so the address check would be untested by
         each of these while still looking exercised.  ``None`` requests that
-        no-bank output deliberately, and only ``test_a_missing_bank_line_warns
-        _rather_than_failing_the_flash`` should ask for it.
+        no-bank output deliberately; only the fail-open test should ask for it.
         """
-        bank = (
-            ""
-            if bank_addr is None
-            else f"J-Link: Flash download: Bank 0 @ 0x{bank_addr:08X}: 1 range affected (4096 bytes)\n"
+        if bank_addr is None:
+            return "J-Link: Flash download: Total 1 range"
+        return (
+            f"J-Link: Flash download: Bank 0 @ 0x{bank_addr:08X}: "
+            "1 range affected (4096 bytes)\n"
+            "J-Link: Flash download: Total 1 range"
         )
-        return bank + "J-Link: Flash download: Total 1 range"
 
     @classmethod
     def _flash(
@@ -1126,20 +1126,33 @@ class TestFlashRecipeValidation(_FlashRecipeFixtures):
 
         assert read_text.call_args.kwargs.get("encoding") == "utf-8"
 
-    def test_an_unresolvable_loadfile_path_raises_the_modules_own_error(self, tmp_path) -> None:
-        """``[^"]+`` captures a NUL, and ``Path.resolve()`` raises ValueError on one.
+    def test_an_unresolvable_loadfile_path_never_escapes_as_an_untyped_error(
+        self, tmp_path
+    ) -> None:
+        """``[^"]+`` captures a NUL, and recipe text is arbitrary.
 
-        Windows adds ``OSError`` for its illegal-character paths.  Either would
-        escape a flash helper as an untyped internal error, past every caller
-        that catches this module's ``CaptureError`` -- including
-        ``FlashPowerFirmwareStage``'s power-cycle retry.
+        On POSIX -- and on Windows through 3.12 -- ``Path.resolve()`` raises
+        ``ValueError: embedded null character`` here.  Unconverted that escapes
+        a flash helper as an untyped internal error, past every caller that
+        catches this module's ``CaptureError``, including
+        ``FlashPowerFirmwareStage``'s power-cycle retry.  Windows' illegal
+        path characters raise ``OSError`` the same way.
+
+        On Windows 3.13+ ``ntpath.realpath`` swallows it instead and hands the
+        path straight back, so the NUL path simply fails to match this build's
+        image and the stale-recipe refusal fires.  Both outcomes are refusals
+        that programmed nothing, which is what ``_refuse`` checks; asserting
+        WHICH of the two messages appears would fail on one platform or the
+        other, and the platform split is not the property worth pinning.
         """
         binary = self._build(
             tmp_path,
             recipe='ExitOnError 1\nLoadFile "bad\x00path.bin", 0x00410000\nExit\n',
         )
 
-        assert "LoadFile" in str(self._refuse(binary))
+        # Naming the recipe is common to both refusals -- and is what the user
+        # needs either way, since the offending line is in that file.
+        assert "flash_cmds.jlink" in str(self._refuse(binary))
 
     def test_the_fallback_refusals_also_say_nothing_was_programmed(self, tmp_path) -> None:
         """The two refusals that never reach ``_refuse``'s shared assertion.
