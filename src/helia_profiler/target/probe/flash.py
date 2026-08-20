@@ -16,6 +16,18 @@ from .jlink import _DEFAULT_TIMEOUT_S, run_jlink_script
 
 log = logging.getLogger("hpx")
 
+# Every pre-flight refusal in this module has to tell the user the board was
+# left alone: "refused" and "failed halfway through programming" call for
+# opposite next steps.  ``TestFlashRecipeValidation._refuse`` asserts that
+# invariant across all of them by substring, so the phrase is pinned here
+# rather than respelled at each site -- eight sites had drifted into three
+# spellings (em-dash, colon, "this" versus "the recipe"), any of which a future
+# reword could push out from under the assertion without failing a test.
+_NOTHING_PROGRAMMED_RECIPE = "Nothing was programmed — the recipe was refused before JLinkExe ran."
+# The fallback branch has no recipe to name: it is reached precisely because
+# the recipe is missing, so "the recipe was refused" would be a lie there.
+_NOTHING_PROGRAMMED = "Nothing was programmed — this was refused before JLinkExe ran."
+
 # The recipe grammar below is NSX's, ported from ``validate_flash_recipe`` /
 # ``_LOAD_FILE_RE`` in ``neuralspotx.operations._hardware`` rather than
 # imported: that module is private and NSX is only optionally importable here
@@ -39,7 +51,12 @@ log = logging.getLogger("hpx")
 # NOT because J-Link is known to read it as decimal: J-Link's numeric
 # convention is per-command and unverified for ``LoadFile``.  Every real NSX
 # recipe uses the ``0x`` form, so this branch is tolerance, not a contract.
-_LOAD_FILE_RE = re.compile(
+#
+# Named for the property that separates it from ``_ANY_LOAD_FILE_RE`` below:
+# this one requires an ADDRESS, and is the only one whose matches hpx will
+# verify a flash against.  (NSX's own regex, referenced above, is the bare
+# ``_LOAD_FILE_RE``; the names diverge deliberately because the grammars do.)
+_ADDRESSED_LOAD_FILE_RE = re.compile(
     r'^\s*LoadFile\s+(?:"(?P<quoted>[^"]+)"|(?P<plain>.+?))\s*,\s*'
     r"(?P<address>0x[0-9a-fA-F]+|[0-9]+)"
     r"(?:\s*,\s*(?:no)?reset)?\s*(?://.*)?$",
@@ -47,13 +64,17 @@ _LOAD_FILE_RE = re.compile(
 )
 # Tolerates J-Link Commander's ``//`` line comments after the directive.
 _FAIL_FAST_RE = re.compile(r"^\s*ExitOnError\s+1\s*(?://.*)?$", re.IGNORECASE | re.MULTILINE)
-# Deliberately looser than ``_LOAD_FILE_RE``: this one answers "has anything
-# been programmed yet?" for the ordering check below, not "is this the line
-# whose address hpx verifies?", so it must also see a ``LoadFile`` that
-# ``_LOAD_FILE_RE`` rejects (no address, odd quoting) — such a line still
-# programs flash, and fail-fast must already be on when it runs.  Keeping the
-# two regexes separate also stops a future widening of ``_LOAD_FILE_RE`` from
-# quietly loosening the ordering guard along with it.
+# Deliberately looser than ``_ADDRESSED_LOAD_FILE_RE``: this one answers "has
+# anything been programmed yet?" for the ordering check below, not "is this the
+# line whose address hpx verifies?", so it must also see a ``LoadFile`` that
+# ``_ADDRESSED_LOAD_FILE_RE`` rejects (no address, odd quoting) — such a line
+# still programs flash, and fail-fast must already be on when it runs.  Keeping
+# the two regexes separate also stops a future widening of the addressed one
+# from quietly loosening the ordering guard along with it.
+#
+# The gap between the two is also what tells the two "no address to verify"
+# refusals apart below: matched here but not there means a ``LoadFile`` that
+# programs flash at a destination hpx cannot read.
 _ANY_LOAD_FILE_RE = re.compile(r"^\s*LoadFile\b", re.IGNORECASE | re.MULTILINE)
 # This is a flash-BANK IDENTITY check, NOT a destination check.  Read that
 # before trusting it for anything.
@@ -173,7 +194,7 @@ def _recipe_load_address(
             f"NSX flash recipe for {target_name} ({script_path}) is missing "
             "`ExitOnError 1`; without it JLinkExe can fail a command and still "
             "exit successfully, so a failed flash would look like a success. "
-            "Nothing was programmed — the recipe was refused before JLinkExe ran.",
+            f"{_NOTHING_PROGRAMMED_RECIPE}",
             hint="Add `ExitOnError 1` as the recipe's first line if it was "
             "hand-edited deliberately; re-running the build regenerates the "
             "recipe from NSX but discards any such edits.",
@@ -189,7 +210,7 @@ def _recipe_load_address(
     # practice — NSX's ``flash_cmds.jlink.in`` emits ``ExitOnError 1`` first,
     # and all 53 generated recipes on the bench host lead with it — so the two
     # differ only in what they refuse of a HAND-EDITED recipe, which is the
-    # case this module widened ``_LOAD_FILE_RE`` for one round earlier.
+    # case this module widened ``_ADDRESSED_LOAD_FILE_RE`` for one round earlier.
     # "First directive" additionally refuses a ``Reset`` / ``Halt`` /
     # ``SelectInterface`` preamble that JLinkExe accepts and that leaves the
     # LoadFile fully protected: a hard refusal of a working recipe, the same
@@ -207,8 +228,7 @@ def _recipe_load_address(
             "runs with fail-fast still off. J-Link executes the recipe in "
             "order, so enabling it afterwards protects nothing: JLinkExe can "
             "fail the `LoadFile` and still exit successfully, and a failed "
-            "flash would look like a success. Nothing was programmed — the "
-            "recipe was refused before JLinkExe ran.",
+            f"flash would look like a success. {_NOTHING_PROGRAMMED_RECIPE}",
             hint="Move `ExitOnError 1` above the first `LoadFile` line — NSX's "
             "own recipes open with it. Re-running the build regenerates the "
             "recipe from NSX, but discards any deliberate hand-edits.",
@@ -219,7 +239,7 @@ def _recipe_load_address(
     # cannot be the one that blows up.
     expected_bin = bin_path.resolve()
     loaded: list[Path] = []
-    for match in _LOAD_FILE_RE.finditer(script):
+    for match in _ADDRESSED_LOAD_FILE_RE.finditer(script):
         quoted = match.group("quoted")
         candidate = Path(quoted if quoted is not None else match.group("plain").strip())
         if not candidate.is_absolute():
@@ -234,7 +254,7 @@ def _recipe_load_address(
             raise CaptureError(
                 f"NSX flash recipe for {target_name} ({script_path}) names a "
                 f"`LoadFile` path this host cannot resolve ({candidate!r}): {exc}. "
-                "Nothing was programmed — the recipe was refused before JLinkExe ran.",
+                f"{_NOTHING_PROGRAMMED_RECIPE}",
                 hint="Inspect the recipe's LoadFile lines for stray quoting or "
                 "control characters, or re-run the build so NSX regenerates it.",
             ) from exc
@@ -243,21 +263,43 @@ def _recipe_load_address(
         loaded.append(candidate)
 
     if not loaded:
+        # TWO different recipes land here and they are not the same fault, so
+        # they must not share one message.  ``loaded`` is empty either because
+        # the recipe has no ``LoadFile`` at all, or because it has one that
+        # ``_ADDRESSED_LOAD_FILE_RE`` could not read an address out of — most
+        # plainly ``LoadFile "x.bin"``, which J-Link accepts and which DOES
+        # program flash (the destination comes from the image format).  Telling
+        # that second user "a recipe that loads nothing programs nothing" is
+        # simply false, and it contradicts what ``_ANY_LOAD_FILE_RE`` above says
+        # about the very same line.  ``first_load`` already distinguishes them
+        # for the ordering check, so reuse it rather than guess.
+        if first_load is None:
+            raise CaptureError(
+                f"NSX flash recipe for {target_name} ({script_path}) has no "
+                "`LoadFile` command at all, so it programs nothing and there is "
+                "no address to verify a flash against. "
+                f"{_NOTHING_PROGRAMMED_RECIPE}",
+                hint="Re-run the build so NSX regenerates the flash recipe.",
+            )
         raise CaptureError(
-            f"NSX flash recipe for {target_name} ({script_path}) has no usable "
-            "`LoadFile <image>, <address>` command, so there is no address to "
-            "verify a flash against — and a recipe that loads nothing programs "
-            "nothing. Nothing was programmed: the recipe was refused before "
-            "JLinkExe ran.",
-            hint="Re-run the build so NSX regenerates the flash recipe.",
+            f"NSX flash recipe for {target_name} ({script_path}) has a `LoadFile` "
+            "command, but none in the `LoadFile <image>, <address>` form hpx can "
+            "read a destination out of. J-Link accepts an addressless `LoadFile` "
+            "— it takes the destination from the image format — so this recipe "
+            "would program flash somewhere hpx cannot check, which is the one "
+            "thing this gate exists to refuse. "
+            f"{_NOTHING_PROGRAMMED_RECIPE}",
+            hint="Give the `LoadFile` line an explicit address "
+            '(`LoadFile "<image>", 0x…`) if the recipe was hand-edited '
+            "deliberately; re-running the build regenerates it from NSX, which "
+            "always bakes the address in, but discards any such edits.",
         )
     listed = ", ".join(str(path) for path in loaded)
     raise CaptureError(
         f"NSX flash recipe for {target_name} ({script_path}) loads {listed}, "
         f"not this build's image {bin_path}. Recipes bake absolute paths, so a "
         "stale recipe flashes an older image while hpx attributes the results "
-        "to the current build. Nothing was programmed — the recipe was refused "
-        "before JLinkExe ran.",
+        f"to the current build. {_NOTHING_PROGRAMMED_RECIPE}",
         hint="Delete the build directory and re-run the build so NSX "
         "regenerates the flash recipe against this build's artifacts.",
     )
@@ -358,10 +400,13 @@ def flash_binary(
     but they learn that address differently.  The fallback builds
     the script itself, so *load_addr* is authoritative.  The recipe path runs
     NSX's script verbatim and *load_addr* is frequently ``None`` there, so the
-    expected address is parsed out of the recipe itself; *load_addr* is neither
-    consulted nor required on that path.  Running a recipe verbatim also means
-    vetting it first the way NSX's own ``validate_flash_recipe`` does — see
-    :func:`_recipe_load_address`.
+    expected address is parsed out of the recipe itself; *load_addr* neither
+    sets it nor is required on that path.  It is not ignored outright, though:
+    a non-``None`` value that DISAGREES with the recipe is warned about, because
+    two conflicting statements about where the part boots are evidence the build
+    was configured for a different part.  The recipe still wins.  Running a
+    recipe verbatim also means vetting it first the way NSX's own
+    ``validate_flash_recipe`` does — see :func:`_recipe_load_address`.
 
     The target free-runs immediately after this returns, which is fine: a
     race-free reset happens again later, right before the gated capture window
@@ -379,21 +424,72 @@ def flash_binary(
         # decodes to mojibake.  Before this check that only corrupted the text
         # piped to JLinkExe; now it decides whether the flash runs at all, so a
         # mis-decode would refuse a perfectly correct flash.
-        script = script_path.read_text(encoding="utf-8")
+        #
+        # Stating the codec also makes a mis-encoded recipe RAISE rather than
+        # mojibake, and ``UnicodeDecodeError`` is not this module's contract
+        # with its caller: ``stages.flash_power`` catches ``CaptureError`` only,
+        # so an untyped escape is reported as "likely a bug in heliaPROFILER"
+        # for what is a user's mis-encoded file.  Converted the same way the
+        # unresolvable-path case below is, and for the same reason.
+        try:
+            script = script_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            raise CaptureError(
+                f"NSX flash recipe for {target_name} ({script_path}) is not valid "
+                f"UTF-8 ({exc}), so hpx cannot read the recipe it would have run. "
+                "NSX writes it as UTF-8, so this one was written or re-saved by "
+                "something using a different codec. "
+                f"{_NOTHING_PROGRAMMED_RECIPE}",
+                hint="Re-save the recipe as UTF-8 if it was hand-edited, or "
+                "re-run the build so NSX regenerates it.",
+            ) from exc
         # Validate before programming: everything below is cheap and static,
         # and a bad recipe should be refused rather than run and then blamed.
         if not bin_path.is_file():
             raise CaptureError(
                 f"NSX flash recipe for {target_name} ({script_path}) exists but "
                 f"this build's image ({bin_path}) does not, so the recipe can "
-                "only flash something other than what hpx just built. Nothing "
-                "was programmed — the recipe was refused before JLinkExe ran.",
+                "only flash something other than what hpx just built. "
+                f"{_NOTHING_PROGRAMMED_RECIPE}",
                 hint="Re-run the build; the NSX build emits both per target.",
             )
         expected_addr = _recipe_load_address(
             script, script_path=script_path, bin_path=bin_path, target_name=target_name
         )
         expected_source = f"its NSX flash recipe ({script_path})"
+        # The recipe still WINS (that is this path's whole contract, and the
+        # divergence is legitimate often enough that hard-refusing it would
+        # break working configs), but a declared address that disagrees with it
+        # must not be discarded in silence.  hpx holds two authoritative-looking
+        # statements about where this part boots and quietly picks one; the
+        # disagreement itself is free, high-quality evidence that the build's
+        # linker configuration is not for the part the user declared.  If the
+        # DECLARATION is the correct one, the image lands at the wrong offset
+        # and hpx publishes power numbers for stale firmware — #150's own
+        # failure mode, arriving through the one door this path leaves open.
+        #
+        # Warn, never raise: ``load_addr`` is frequently a legitimately
+        # different (or ``None``) value here.  #153 both makes a custom SoC's
+        # ``app_flash_load_addr`` declarable and documents ``based_on:
+        # apollo510`` alongside a declared address as a WORKING configuration,
+        # stating that the recipe is used verbatim and the value ignored — so
+        # refusing this outright would break a shape the guide recommends.
+        if load_addr is not None and load_addr != expected_addr:
+            log.warning(
+                "DECLARED FLASH ADDRESS IGNORED: %s declares an app flash load "
+                "address of 0x%08X, but its NSX flash recipe (%s) loads at "
+                "0x%08X. The recipe wins — hpx runs it verbatim and NSX baked "
+                "that address from the build's own linker configuration — so "
+                "the image is going to 0x%08X. If the declared address is the "
+                "right one for this part, then this build was configured for a "
+                "different part and the flash is landing at the wrong offset; "
+                "power numbers from this run would describe stale firmware.",
+                target_name,
+                load_addr,
+                script_path,
+                expected_addr,
+                expected_addr,
+            )
         # The generated script ends with Exit; run it verbatim.
         log.info(
             "Flashing %s via NSX-generated JLink script %s at 0x%08X (serial=%s)",
@@ -409,7 +505,7 @@ def flash_binary(
             raise CaptureError(
                 f"No flashable image for {target_name}: neither the NSX flash "
                 f"script ({script_path}) nor a .bin sibling ({bin_path}) exists. "
-                "Nothing was programmed — this was refused before JLinkExe ran.",
+                f"{_NOTHING_PROGRAMMED}",
                 hint="Re-run the build; the NSX build emits both per target.",
             )
         if load_addr is None:
@@ -419,11 +515,26 @@ def flash_binary(
             # reader looking for a setting that does not exist.  Config first,
             # because for a custom SoC that reached this branch the build is
             # not what is broken — nothing declared the address.
+            #
+            # ``device`` can be EMPTY here, and interpolating it blind leaves
+            # the sentence with a hole where the part belongs ("...known for
+            # device  to fall back to").  ``platform.custom`` defaults
+            # ``jlink_device`` to "" for a custom SoC entry that declares
+            # neither the device string nor a ``based_on`` to inherit one from
+            # — the same under-specified entry that leaves the address unknown.
+            # So an empty device is not a formatting nuisance to paper over; it
+            # is a second symptom of the same cause, worth saying out loud.
+            named = f"device {device}" if device else "this target's SoC"
+            also_unnamed = (
+                ""
+                if device
+                else " That SoC declares no J-Link device string either, so the "
+                "entry is under-specified in both fields rather than just this one."
+            )
             raise CaptureError(
                 f"Cannot flash {target_name}: the NSX flash script ({script_path}) is "
-                f"missing and no app flash load address is known for device {device} "
-                "to fall back to. Nothing was programmed — this was refused before "
-                "JLinkExe ran.",
+                f"missing and no app flash load address is known for {named} to fall "
+                f"back to.{also_unnamed} {_NOTHING_PROGRAMMED}",
                 hint="Declare the address for this SoC in your profile config: "
                 "`target.custom_socs.<name>.app_flash_load_addr: 0x…`, or give that "
                 "entry a `based_on:` naming the part whose address it should "
