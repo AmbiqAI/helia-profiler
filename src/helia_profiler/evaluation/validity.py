@@ -16,8 +16,7 @@ from ..power.diagnostics import (
     window_clock_ceiling_from_metadata,
 )
 from ..errors import ReportError
-from ..results import ResultIssue, ResultValidity
-from ..results.issues import ISSUE_REGISTRY, IssueCode
+from ..results import ISSUE_REGISTRY, IssueCode, ResultIssue, ResultValidity
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext

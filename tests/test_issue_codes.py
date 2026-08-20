@@ -69,6 +69,16 @@ def test_family_codes_pin_the_shipped_wire_format():
     )
 
 
+def test_families_partition_the_dimension_enum():
+    # Every dimension must belong to exactly one family: a member added to
+    # ComparisonDimension but not to a family's tuple would silently never be
+    # checked by assess_comparability, with every existing test staying green.
+    power = set(POWER_DIMENSION_MISMATCH.dimensions)
+    informative = set(DIMENSION_DIFFERS.dimensions)
+    assert power | informative == set(ComparisonDimension)
+    assert not power & informative
+
+
 def test_family_rejects_foreign_dimension():
     with pytest.raises(ReportError):
         POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.HPX_VERSION)
@@ -123,8 +133,11 @@ def test_no_bare_registered_code_literal_survives_in_src():
     for family in COMPARABILITY_FAMILIES:
         codes |= {family.code_for(dim) for dim in family.dimensions}
 
+    # Match either quote style. A composed string (f"power.{name}") is beyond
+    # a literal scan by construction; the emitter chokepoints and enum-typed
+    # factory signatures are the guard for that shape.
     pattern = re.compile(
-        "|".join(f'"{re.escape(code)}"' for code in sorted(codes))
+        "|".join(f"['\"]{re.escape(code)}['\"]" for code in sorted(codes))
     )
     offenders: list[str] = []
     for path in sorted(SRC.rglob("*.py")):

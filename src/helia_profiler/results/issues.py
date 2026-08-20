@@ -362,20 +362,25 @@ class ComparabilityCodeFamily:
     """One parameterized comparability-code family.
 
     ``pattern`` is the human-readable shape shown in docs; ``code_for``
-    produces the exact wire string for one dimension. The wire strings are
-    frozen: ``POWER_DIMENSION_MISMATCH`` embeds a dimension name that itself
-    starts with ``power_``, so the emitted code doubles the prefix
-    (``metric.power_power_scope_mismatch``). That is the shipped format the
-    report goldens and downstream consumers pin; renaming it is a deliberate
-    wire-format change for Phase 3 of #154, not a side effect of typing.
+    produces the exact wire string for one dimension. Both derive from the
+    same prefix/suffix pair, so the documented shape cannot drift from the
+    emitted one. The wire strings are frozen: ``POWER_DIMENSION_MISMATCH``
+    embeds a dimension name that itself starts with ``power_``, so the
+    emitted code doubles the prefix (``metric.power_power_scope_mismatch``).
+    That is the shipped format the report goldens and downstream consumers
+    pin; renaming it is a deliberate wire-format change for Phase 3 of #154,
+    not a side effect of typing.
     """
 
-    pattern: str
     severity: ComparabilitySeverity
     description: str
     dimensions: tuple[ComparisonDimension, ...]
     _prefix: str
     _suffix: str
+
+    @property
+    def pattern(self) -> str:
+        return f"{self._prefix}<dimension>{self._suffix}"
 
     def code_for(self, dimension: ComparisonDimension) -> str:
         if dimension not in self.dimensions:
@@ -387,7 +392,6 @@ class ComparabilityCodeFamily:
 
 
 POWER_DIMENSION_MISMATCH = ComparabilityCodeFamily(
-    pattern="metric.power_<dimension>_mismatch",
     severity=ComparabilitySeverity.METRIC_BLOCKING,
     description="Power metrics omitted because a power comparison dimension "
     "differs between the runs.",
@@ -404,7 +408,6 @@ POWER_DIMENSION_MISMATCH = ComparabilityCodeFamily(
 )
 
 DIMENSION_DIFFERS = ComparabilityCodeFamily(
-    pattern="dimension.<dimension>_differs",
     severity=ComparabilitySeverity.INFORMATIVE,
     description="A comparison dimension differs between the runs; deltas "
     "remain comparable but should be read in that light.",

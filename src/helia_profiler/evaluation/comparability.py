@@ -5,13 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from ..results import ResultValidity, RunStatus
-from ..results.issues import (
+from ..results import (
     COMPARABILITY_REGISTRY,
     DIMENSION_DIFFERS,
     POWER_DIMENSION_MISMATCH,
     ComparabilityCode,
+    ComparabilityCodeFamily,
     ComparabilitySeverity,
+    ComparisonDimension,
+    ResultValidity,
+    RunStatus,
 )
 
 if TYPE_CHECKING:
@@ -60,6 +63,23 @@ def _issue(code: ComparabilityCode, message: str, **context: Any) -> Comparabili
     return ComparabilityIssue(
         code=str(code),
         severity=COMPARABILITY_REGISTRY[code].severity,
+        message=message,
+        context=context,
+    )
+
+
+def _family_issue(
+    family: ComparabilityCodeFamily,
+    dimension: ComparisonDimension,
+    message: str,
+    **context: Any,
+) -> ComparabilityIssue:
+    """The same chokepoint for parameterized families: code and severity are
+    taken from one family object, so pairing a family's code with another
+    family's severity cannot compile its way in."""
+    return ComparabilityIssue(
+        code=family.code_for(dimension),
+        severity=family.severity,
         message=message,
         context=context,
     )
@@ -137,15 +157,13 @@ def assess_comparability(
         candidate_value = candidate_dimensions.get(dimension)
         if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:
             issues.append(
-                ComparabilityIssue(
-                    code=POWER_DIMENSION_MISMATCH.code_for(dimension),
-                    severity=POWER_DIMENSION_MISMATCH.severity,
-                    message=f"Power metrics omitted because {dimension} differs.",
-                    context={
-                        "metric_group": "power",
-                        "baseline": baseline_value,
-                        "candidate": candidate_value,
-                    },
+                _family_issue(
+                    POWER_DIMENSION_MISMATCH,
+                    dimension,
+                    f"Power metrics omitted because {dimension} differs.",
+                    metric_group="power",
+                    baseline=baseline_value,
+                    candidate=candidate_value,
                 )
             )
     for role, dimensions in (("baseline", baseline_dimensions), ("candidate", candidate_dimensions)):
@@ -184,11 +202,12 @@ def assess_comparability(
         candidate_value = candidate_dimensions.get(dimension)
         if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:
             issues.append(
-                ComparabilityIssue(
-                    code=DIMENSION_DIFFERS.code_for(dimension),
-                    severity=DIMENSION_DIFFERS.severity,
-                    message=f"Comparison dimension differs: {dimension}.",
-                    context={"baseline": baseline_value, "candidate": candidate_value},
+                _family_issue(
+                    DIMENSION_DIFFERS,
+                    dimension,
+                    f"Comparison dimension differs: {dimension}.",
+                    baseline=baseline_value,
+                    candidate=candidate_value,
                 )
             )
     return ComparabilityAssessment(issues=tuple(issues))
