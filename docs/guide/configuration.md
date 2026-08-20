@@ -128,6 +128,8 @@ below cover behavior that a schema table can't express.
 - `target.custom_socs` adds config-scoped SoC definitions for bring-up cases where the built-in SoC metadata is not sufficient.
 - `target.custom_boards.<name>.based_on` clones an existing built-in board and lets you override fields like `channel`, `psram_kb`, and `default_sync_gpio_pin`.
 - `target.custom_boards.<name>.starter_profile_board` reuses the NSX starter profile from a built-in board when the custom board should inherit its module graph.
+- `target.custom_socs.<name>.app_flash_load_addr` declares the first flash address above the part's bootloader-reserved region. It is inherited from `based_on` when you name one; with neither, HPX treats the address as unknown and refuses the fallback flash rather than guessing from `family`. See [Boards → App flash load address](boards.md#app-flash-load-address).
+- Unrecognized keys in `target.custom_socs` and `target.custom_boards` are rejected with the list of supported keys, rather than being silently discarded.
 
 ### Build-resolution notes
 

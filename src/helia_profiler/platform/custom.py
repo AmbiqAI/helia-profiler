@@ -4,9 +4,12 @@ This module owns the *config surface* of ``target.custom_socs`` /
 ``target.custom_boards``: which YAML keys exist, what they mean, and how they
 turn into the frozen :class:`~helia_profiler.platform.soc.SocDef` /
 :class:`~helia_profiler.platform.board.BoardDef` records the rest of hpx reads.
-The key names live in the ``Custom*Field`` enums below rather than as bare
-string literals scattered through the builders, so the parser and the
-"unknown key" check cannot disagree about what is accepted.
+The set of accepted key names is named once, in the ``Custom*Field`` enums
+below, and anything outside it is rejected rather than discarded.  Those enums
+are pinned against the dataclasses they feed by
+``tests/test_platform.py::test_the_custom_memory_keys_track_the_memory_layout_fields_exactly``
+and its ``SocDef`` sibling, so a field added to the platform model cannot
+quietly become an unwritable one here.
 """
 
 from __future__ import annotations
@@ -28,6 +31,13 @@ from .soc import (
     PmuTier,
     SocDef,
     SocFamily,
+)
+
+
+#: Told to every rejected address, so the user is always shown the shape to
+#: write rather than only what was wrong with what they wrote.
+_ADDRESS_HINT = (
+    "Write an unsigned decimal or 0x-prefixed hex literal, e.g. app_flash_load_addr: 0x22000000"
 )
 
 
@@ -208,7 +218,7 @@ def _address(raw: Any, *, field_name: str) -> int:
     if isinstance(raw, bool):
         raise ConfigError(
             f"{field_name} must be an address, not a boolean.",
-            hint="Write the flash load address, e.g. app_flash_load_addr: 0x22000000",
+            hint=_ADDRESS_HINT,
         )
     if isinstance(raw, str):
         try:
@@ -216,21 +226,19 @@ def _address(raw: Any, *, field_name: str) -> int:
         except ValueError as exc:
             raise ConfigError(
                 f"Invalid {field_name}: {raw!r} is not an integer address.",
-                hint="Write a decimal or 0x-prefixed hex literal, "
-                "e.g. app_flash_load_addr: 0x22000000",
+                hint=_ADDRESS_HINT,
             ) from exc
     elif isinstance(raw, int):
         value = raw
     else:
         raise ConfigError(
             f"Invalid {field_name}: {raw!r} is not an integer address.",
-            hint="Write a decimal or 0x-prefixed hex literal, "
-            "e.g. app_flash_load_addr: 0x22000000",
+            hint=_ADDRESS_HINT,
         )
     if value < 0:
         raise ConfigError(
-            f"Invalid {field_name}: {value} is negative.",
-            hint="Addresses are unsigned, e.g. app_flash_load_addr: 0x22000000",
+            f"Invalid {field_name}: {value} is negative -- addresses are unsigned.",
+            hint=_ADDRESS_HINT,
         )
     return value
 

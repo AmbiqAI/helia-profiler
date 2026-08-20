@@ -142,6 +142,7 @@ The important fields are still the same platform facts as the built-in registry:
 - Board name and SoC family
 - J-Link device string
 - Memory layout (MRAM/SRAM/TCM/PSRAM sizes)
+- App flash load address (see below)
 - Default sync GPIO pin (most built-in EVBs register a board-specific pin,
   e.g. `29` for `apollo510_evb` / `apollo510b_evb`, `22` for the Apollo4
   Plus EVBs, `61` for the Apollo4 Lite EVBs, and `26` for the Apollo3 Plus
@@ -150,6 +151,41 @@ The important fields are still the same platform facts as the built-in registry:
 `starter_profile_board` lets a custom board reuse the NSX starter-profile module
 graph from a built-in board while keeping its own board ID, channel, sync pin,
 and SoC metadata in HPX.
+
+Unrecognized keys are rejected, in `custom_socs`, `custom_boards`, and the
+`memory` block alike. A misspelt key used to be discarded in silence, leaving
+the built-in value in place while the config looked accepted.
+
+### App flash load address
+
+`app_flash_load_addr` is the first flash address above your part's
+bootloader-reserved region — the address NSX programs application images at.
+It is *not* the base of the MRAM region.
+
+You rarely need to set it. HPX only uses it as a fallback for one operation
+(flashing the dedicated power-measurement binary when the NSX-generated
+`flash_cmds.jlink` recipe is missing); when that recipe exists it is used
+verbatim and this value is ignored.
+
+- `based_on: <soc>` inherits the address of that part, along with everything
+  else. This is the usual case and needs nothing from you.
+- Set it explicitly when your part's bootloader reservation differs from the
+  part you based it on:
+
+    ```yaml
+    target:
+      custom_socs:
+        oem_ap5_variant:
+          based_on: apollo510
+          app_flash_load_addr: 0x22000000
+    ```
+
+- A custom SoC with no `app_flash_load_addr` **and** no `based_on` has no
+  address at all, and HPX will refuse the fallback flash rather than guess one
+  from your `family:` tag. `family` records a core tier here, not a memory map
+  — two parts can share it and load at completely different addresses — and a
+  guessed address is likely enough to be accepted by the silicon while landing
+  your image at the wrong offset. Declare the address, or declare a `based_on`.
 
 See [Architecture → Adding an Engine](../architecture/adding-an-engine.md)
 for the analogous engine path.
