@@ -5,6 +5,7 @@ from pathlib import Path
 
 from helia_profiler.evaluation import ComparabilitySeverity, assess_comparability
 from helia_profiler.evaluation import RunArtifacts
+from helia_profiler.results.issues import ComparabilityCode, ComparisonDimension, DIMENSION_DIFFERS, POWER_DIMENSION_MISMATCH
 
 
 def _run(
@@ -48,7 +49,7 @@ def test_engine_difference_is_informative():
 
     assert assessment.run_metrics_comparable
     assert assessment.layers_comparable
-    issue = next(issue for issue in assessment.issues if issue.code == "dimension.engine_differs")
+    issue = next(issue for issue in assessment.issues if issue.code == DIMENSION_DIFFERS.code_for(ComparisonDimension.ENGINE))
     assert issue.severity is ComparabilitySeverity.INFORMATIVE
 
 
@@ -57,7 +58,7 @@ def test_model_mismatch_blocks_all_deltas():
 
     assert not assessment.run_metrics_comparable
     assert not assessment.layers_comparable
-    assert assessment.issues[0].code == "identity.model_mismatch"
+    assert assessment.issues[0].code == ComparabilityCode.IDENTITY_MODEL_MISMATCH
 
 
 def test_topology_mismatch_blocks_only_layer_deltas():
@@ -65,7 +66,7 @@ def test_topology_mismatch_blocks_only_layer_deltas():
 
     assert assessment.run_metrics_comparable
     assert not assessment.layers_comparable
-    assert any(issue.code == "topology.layer_count_mismatch" for issue in assessment.issues)
+    assert any(issue.code == ComparabilityCode.TOPOLOGY_LAYER_COUNT_MISMATCH for issue in assessment.issues)
 
 
 def test_cross_machine_provenance_differences_are_structured():
@@ -76,8 +77,8 @@ def test_cross_machine_provenance_differences_are_structured():
 
     assert assessment.run_metrics_comparable
     assert {issue.code for issue in assessment.issues} >= {
-        "dimension.compiler_version_differs",
-        "dimension.system_clock_hz_differs",
+        DIMENSION_DIFFERS.code_for(ComparisonDimension.COMPILER_VERSION),
+        DIMENSION_DIFFERS.code_for(ComparisonDimension.SYSTEM_CLOCK_HZ),
     }
 
 
@@ -100,7 +101,7 @@ def test_cross_instrument_power_scopes_omit_power_metrics_only():
     issue = next(
         issue
         for issue in assessment.issues
-        if issue.code == "metric.power_power_scope_mismatch"
+        if issue.code == POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.POWER_SCOPE)
     )
     assert issue.severity is ComparabilitySeverity.METRIC_BLOCKING
     assert issue.context["baseline"] == "gpio_gated_clean_window"
@@ -131,7 +132,7 @@ def test_monitor_presence_mismatch_omits_power_metrics_only():
     issue = next(
         issue
         for issue in assessment.issues
-        if issue.code == "metric.power_power_monitor_mismatch"
+        if issue.code == POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.POWER_MONITOR)
     )
     assert issue.severity is ComparabilitySeverity.METRIC_BLOCKING
     assert issue.context["baseline"] == "none"
@@ -172,7 +173,7 @@ def test_lockstep_mismatch_omits_power_metrics_only():
     issue = next(
         issue
         for issue in assessment.issues
-        if issue.code == "metric.power_power_lockstep_mismatch"
+        if issue.code == POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.POWER_LOCKSTEP)
     )
     assert issue.severity is ComparabilitySeverity.METRIC_BLOCKING
     assert issue.context["baseline"] is False
@@ -205,7 +206,7 @@ def test_bundles_with_no_sync_record_at_all_are_skipped():
 
     assert assessment.power_metrics_comparable
     assert not any(
-        issue.code == "metric.power_power_lockstep_mismatch"
+        issue.code == POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.POWER_LOCKSTEP)
         for issue in assessment.issues
     )
 
@@ -363,7 +364,7 @@ def test_a_spin_window_is_not_power_comparable_with_an_inference_window():
     issue = next(
         issue
         for issue in assessment.issues
-        if issue.code == "metric.power_power_clean_window_probe_mismatch"
+        if issue.code == POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.POWER_CLEAN_WINDOW_PROBE)
     )
     assert issue.severity is ComparabilitySeverity.METRIC_BLOCKING
     assert issue.context["baseline"] == "infer"
@@ -376,7 +377,7 @@ def test_the_same_probe_stays_comparable():
 
     assert assessment.power_metrics_comparable
     assert not any(
-        issue.code == "metric.power_power_clean_window_probe_mismatch"
+        issue.code == POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.POWER_CLEAN_WINDOW_PROBE)
         for issue in assessment.issues
     )
 
@@ -408,7 +409,7 @@ def test_a_run_that_measured_no_power_does_not_block_one_that_did():
     assessment = assess_comparability(unpowered, _powered("busy_loop"))
 
     assert not any(
-        issue.code == "metric.power_power_clean_window_probe_mismatch"
+        issue.code == POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.POWER_CLEAN_WINDOW_PROBE)
         for issue in assessment.issues
     )
 

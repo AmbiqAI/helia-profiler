@@ -27,6 +27,7 @@ from helia_profiler.report import (
 )
 from helia_profiler.results import load_result_manifest
 from helia_profiler.evaluation import ModelAnalysis
+from helia_profiler.results.issues import IssueCode
 from helia_profiler.results import (
     EngineInfo,
     FirmwareMeta,
@@ -819,7 +820,7 @@ def test_degraded_free_form_capture_suppresses_derived_efficiency(tmp_path: Path
     assert "tops_per_watt" not in summary.get("model_analysis", {})
     assert summary["validity"] == "degraded"
     assert [issue["code"] for issue in summary["issues"]] == [
-        "power.observation_degraded"
+        IssueCode.POWER_OBSERVATION_DEGRADED
     ]
 
     json_path = _write_json(ctx.pmu_result, ctx.power_result, ctx.run_metadata, tmp_path)

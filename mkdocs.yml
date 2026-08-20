@@ -182,6 +182,7 @@ nav:
           - hpx cache: reference/cache.md
           - hpx validate: reference/validate.md
       - Configuration Reference: reference/configuration.md
+      - Issue Codes: reference/issue-codes.md
       - Python API:
           - Overview: reference/api/index.md
           - Interactive Sessions: reference/api/session.md
