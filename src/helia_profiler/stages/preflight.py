@@ -34,6 +34,7 @@ from ..counters import (
 )
 from ..engines import EngineType, get_adapter
 from ..errors import ConfigError
+from ..evaluation.softmax_preflight import scan_softmax_scaling
 from ..pipeline import PipelineContext
 from ..placement import Placement
 from ..platform import get_soc_for_board
@@ -64,6 +65,7 @@ class PreflightStage:
     def run(self, ctx: PipelineContext) -> None:
         cfg = ctx.config
         _check_model(cfg.model.path, cfg.engine.type)
+        _check_softmax_scaling(cfg.model.path, cfg.engine.type)
         _check_arena_size(cfg.model.arena_size)
         _check_rtt_buffer_size(cfg.target.rtt_buffer_size_up)
         _check_runtime_split_locations(cfg)
@@ -126,6 +128,53 @@ def _check_model(path: Path, engine: EngineType) -> None:
                 "Make sure the model export completed successfully."
             ),
         )
+
+
+def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
+    """Reject int8/uint8 Softmax scales the target cannot prepare (#57).
+
+    TFLM aborts inside ``AllocateTensors()`` when ``beta * input_scale * 2**26
+    <= 1`` -- from the host that is a HardFault / RTT timeout with no
+    indication the model was the problem, after the board was powered, the
+    firmware built, and the image flashed. The two numbers sit in the
+    flatbuffer, so the run dies here instead, before any of that.
+
+    Ordered after :func:`_check_model`, which has already verified the file
+    reads and carries the TFLite magic -- so a parse failure past that point
+    is a malformed flatbuffer, reported as such rather than as a stack trace.
+    """
+    if engine is EngineType.EXECUTORCH:
+        return  # .pte -- never reaches the TFLM Softmax helper
+    try:
+        findings = scan_softmax_scaling(path)
+    except Exception as exc:  # struct.error / IndexError on malformed bytes
+        raise ConfigError(
+            f"Model file could not be parsed as a TFLite flatbuffer: {path} ({exc})",
+            hint="The file carries the TFL3 marker but its structure is "
+            "damaged — re-export the model.",
+        ) from exc
+    unsupported = [f for f in findings if not f.supported]
+    if not unsupported:
+        return
+    detail = "; ".join(
+        f"op {f.op_index} (input '{f.input_tensor}'): beta={f.beta:g} x "
+        f"input_scale={f.input_scale:.9g} x 2^26 = {f.multiplier:.6g}"
+        for f in unsupported
+    )
+    raise ConfigError(
+        f"{len(unsupported)} quantized Softmax op(s) in {path.name} have an "
+        f"input scale TFLM cannot prepare: {detail}. The target would abort "
+        "inside AllocateTensors() (a HardFault / RTT timeout) before running "
+        "a single inference.",
+        hint=(
+            "TFLM requires beta x input_scale x 2^26 > 1 for int8/uint8 "
+            f"Softmax (at beta=1 that is input_scale > {1 / (1 << 26):.4g}). "
+            "A scale this small usually means the layer feeding the Softmax "
+            "produced a degenerate activation range during quantization — "
+            "re-quantize with a representative calibration dataset, or check "
+            "that the exported graph's final layers match the trained model."
+        ),
+    )
 
 
 def _check_arena_size(arena_size: int | None) -> None:

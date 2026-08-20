@@ -1,0 +1,51 @@
+# BENCH 2 — the default path #136 fixed — confirm it completes at all
+#
+# Before #136 this combination could NEVER finish: the plan derived N from
+# clean_infer_avg_us, which under busy_loop is the whole spin, so the host
+# expected window_min x the full window and capture_gated RAISED on a
+# perfectly good gate. Fixed host-side and proven in tests; never run on
+# hardware.
+#
+# PASS: the run completes and summary.power.gated_window_duration_ratio is
+# near 1.0. Also read HPX_CLEAN_INFER_AVG_US -- it should be ~= 5 s, the spin,
+# not a per-inference figure.
+#
+# jlink_serial deliberately unset: HPX auto-selects the attached probe.
+model:
+  path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
+  arena_size: 32768
+  weights_location: tcm
+  arena_location: tcm
+
+engine:
+  type: helia-rt
+
+target:
+  board: apollo4p_blue_kbr_evb
+  toolchain: arm-none-eabi-gcc
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+  per_layer: true
+  clean_window_probe: busy_loop
+  iterations: 200
+  warmup: 10
+  aggregation: median
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  # The whole point of this config. Do not change to `dedicated`.
+  firmware: dedicated
+
+output:
+  format: json
+  dir: ./results/bench/busy_loop_dedicated
+  detailed: true

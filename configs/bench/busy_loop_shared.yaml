@@ -1,0 +1,51 @@
+# BENCH 3 — the path that has been theoretical throughout
+#
+# `shared` + busy_loop is the combination #125 said 'only worked by
+# accident', and it is the one the new PREDICTED_WINDOW_TOLERANCE (0.25) was
+# sized for -- two independent per-boot calibrations of the spin rather than
+# one. That 0.25 is reasoned from _busy_loop_calibration.j2's own accepted
+# band ([16, 8192] STIMER ticks => a per-boot quantisation floor of up to
+# 6.25%, paid twice), never measured.
+#
+# PASS: completes, ratio near 1.0. Run it several times -- the spread across
+# runs is what says whether 0.25 is right, too tight, or far too loose.
+#
+# jlink_serial deliberately unset: HPX auto-selects the attached probe.
+model:
+  path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
+  arena_size: 32768
+  weights_location: tcm
+  arena_location: tcm
+
+engine:
+  type: helia-rt
+
+target:
+  board: apollo4p_blue_kbr_evb
+  toolchain: arm-none-eabi-gcc
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+  per_layer: true
+  clean_window_probe: busy_loop
+  iterations: 200
+  warmup: 10
+  aggregation: median
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  # The whole point of this config. Do not change to `dedicated`.
+  firmware: shared
+
+output:
+  format: json
+  dir: ./results/bench/busy_loop_shared
+  detailed: true

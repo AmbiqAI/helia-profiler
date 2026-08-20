@@ -1,0 +1,52 @@
+# BENCH 4 — #110 — the two-probe STIMER settle, from a cold board
+#
+# The settle-and-verify added in #128 waits for the 32.768 kHz crystal with
+# two consecutive in-band probes before timing a window. Warm it costs two
+# 10 ms probes; COLD the transient was measured at ~500-650 ms, so this only
+# means anything on a board that has been unpowered for a while.
+#
+# Power the board down for a minute, then run this FIRST in the session.
+#
+# PASS: no profile.clean_window_frozen and no
+# profile.clean_window_clock_rate_low issue, and clean_infer_avg_us is
+# plausible rather than zero. A dead crystal would previously have produced
+# silent zeros.
+#
+# jlink_serial deliberately unset: HPX auto-selects the attached probe.
+model:
+  path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
+  arena_size: 32768
+  weights_location: tcm
+  arena_location: tcm
+
+engine:
+  type: helia-rt
+
+target:
+  board: apollo4p_blue_kbr_evb
+  toolchain: arm-none-eabi-gcc
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+  per_layer: true
+  iterations: 200
+  warmup: 10
+  aggregation: median
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  # The whole point of this config. Do not change to `dedicated`.
+  firmware: shared
+
+output:
+  format: json
+  dir: ./results/bench/crystal_settle_cold
+  detailed: true

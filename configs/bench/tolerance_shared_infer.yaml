@@ -1,0 +1,55 @@
+# BENCH 1 — measure the cross-boot gate spread that the tolerances guess at.
+#
+# `firmware: shared` is the case the tolerance question turns on: the plan
+# carries no count, so capture fills BOTH the count and the per-inference
+# reference from the PROFILE boot's telemetry and compares them against the
+# POWER boot's gate. Two boots, not one measurement.
+#
+# `_GATE_RELATIVE_TOLERANCE` currently allows 0.10 for a counted window. That
+# number is reasoned, not measured: it was raised from 0.01 during review of
+# #136 because 1% across two boots is indefensible, but nobody has ever
+# recorded what the real spread is. Run this config >= 10 times and read
+# summary.power.gated_window_duration_ratio from each.
+#
+#   spread < 1%   -> 0.10 is ~10x looser than needed; tighten to ~0.03-0.05
+#   spread ~ 5%   -> 0.10 is about right
+#   spread > 10%  -> 0.10 is too tight and will kill healthy runs
+#
+# jlink_serial deliberately unset: HPX auto-selects the attached probe.
+model:
+  path: tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite
+  arena_size: 32768
+  weights_location: tcm
+  arena_location: tcm
+
+engine:
+  type: helia-rt
+
+target:
+  board: apollo4p_blue_kbr_evb
+  toolchain: arm-none-eabi-gcc
+  transport: rtt
+  clock:
+    cpu: lp
+
+profiling:
+  pmu_counters:
+    cpu: default
+  per_layer: true
+  iterations: 200
+  warmup: 10
+  aggregation: median
+
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 45
+  io_voltage: 1.8
+  # The whole point of this config. Do not change to `dedicated`.
+  firmware: shared
+
+output:
+  format: json
+  dir: ./results/bench/tolerance_shared_infer
+  detailed: true
