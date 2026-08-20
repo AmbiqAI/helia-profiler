@@ -82,12 +82,18 @@ class GateFailure:
 
 @dataclass(frozen=True)
 class GateDurationIntegrity:
-    """Agreement between a measured gate and the expected inference window."""
+    """Agreement between a measured gate and the expected inference window.
+
+    ``relative_tolerance`` records the policy band the verdict was assessed
+    under (``gate_relative_tolerance_for``); it rides along so the artifact
+    states which band applied, but plays no part in :attr:`valid`.
+    """
 
     measured_s: float
     expected_s: float
     tolerance_s: float
     minimum_s: float = 0.0
+    relative_tolerance: float | None = None
 
     @property
     def valid(self) -> bool:
@@ -99,6 +105,22 @@ class GateDurationIntegrity:
     @property
     def ratio(self) -> float:
         return self.measured_s / self.expected_s if self.expected_s > 0 else 0.0
+
+    def to_metadata(self) -> dict[str, object]:
+        """Artifact form — byte-compatible with the dict previously built by
+        hand in ``capture_gated.py``: seconds rounded to 6 places, and
+        ``valid`` DERIVED from the stored measurements rather than cached
+        (the old dict stored a constant ``True``, which held only because
+        that writer raises on mismatch; deriving keeps it honest everywhere)."""
+        return {
+            "measured_s": round(self.measured_s, 6),
+            "expected_s": round(self.expected_s, 6),
+            "tolerance_s": round(self.tolerance_s, 6),
+            "minimum_s": round(self.minimum_s, 6),
+            "relative_tolerance": self.relative_tolerance,
+            "ratio": round(self.ratio, 6),
+            "valid": self.valid,
+        }
 
 
 #: How far the measured gate may sit from the expected window.
