@@ -16,6 +16,15 @@ This section is expected to grow as more workflows get written up.
 
 <div class="grid cards" markdown>
 
+-   :material-check-decagram:{ .lg .middle } __Validating a Board Setup__
+
+    ---
+
+    Prove a new bench end to end — host tools, probe, flash, capture —
+    before you trust a single number off it.
+
+    [:octicons-arrow-right-24: Read](validating-a-board-setup.md)
+
 -   :material-memory:{ .lg .middle } __Memory Placement Tuning__
 
     ---

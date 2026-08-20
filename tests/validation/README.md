@@ -10,7 +10,7 @@ way to prove a bench works before trusting any numbers off it.
   the preset suites, custom model registries, and the manifest contract.
 - [Validating a Board Setup](../../docs/guides/validating-a-board-setup.md) —
   the bring-up walkthrough.
-- [Hardware Validation Artifacts](../../docs/guide/hardware-ci.md) — running
+- [`maintainers/hardware-ci.md`](../../maintainers/hardware-ci.md) — running
   the same suite under the self-hosted GitHub Actions runner.
 
 This file covers only what a contributor editing the suite needs.
