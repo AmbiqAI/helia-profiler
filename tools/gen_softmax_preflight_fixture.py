@@ -18,6 +18,10 @@ environment WITHOUT ai-edge-litert:
 The single OperatorCode stores SOFTMAX only in the DEPRECATED builtin field
 (``builtin_code`` left at its 0 default), exercising the pre-v3a fallback.
 
+``betas`` exists so tests can build variants (e.g. all-zero, meaning a
+model whose Softmax options carry no usable beta) without hand-editing
+bytes; the committed fixture always uses the default.
+
 Regenerate with::
 
     uv run --extra analysis python tools/gen_softmax_preflight_fixture.py
@@ -37,7 +41,7 @@ FIXTURE = Path(__file__).parent.parent / "tests" / "fixtures" / "softmax_scale_u
 FAILING_SCALE = 4.305568790385905e-09
 
 
-def generate() -> bytes:
+def generate(betas: tuple[float, ...] = (1.0, 1e9, 1.0)) -> bytes:
     import flatbuffers
     from ai_edge_litert import schema_py_generated as s
 
@@ -87,7 +91,7 @@ def generate() -> bytes:
         s.SoftmaxOptionsAddBeta(b, beta)
         return s.SoftmaxOptionsEnd(b)
 
-    opts = [softmax_opts(x) for x in (1.0, 1e9, 1.0)]
+    opts = [softmax_opts(x) for x in betas[:3]]
 
     def operator(i_in, i_out, opt):
         s.OperatorStartInputsVector(b, 1)

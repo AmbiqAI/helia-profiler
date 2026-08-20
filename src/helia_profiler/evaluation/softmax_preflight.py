@@ -39,9 +39,13 @@ wrong versions of this paragraph:
   and would abort under helia-rt, so it warns.
 * **ExecuTorch** consumes ``.pte`` and never reaches any of this.
 
-Float Softmax never quantizes the multiplier; int16 takes different prepare
-paths not shown to fail -- gating either without evidence would reject models
-that may run.
+Float Softmax never quantizes the multiplier. int16 is out of scope in both
+directions, and the asymmetry is worth knowing: TFLM's int16 prepare path has
+not been shown to abort, while helia-aot's int16 branch never calls
+calculate_input_radius at all -- a degenerate int16 scale reaches the
+generated source as a negative shift with no host-side check anywhere. So this
+gate protects int8/uint8 only. Gating int16 without evidence of a real failure
+would reject models that may run.
 """
 
 from __future__ import annotations
@@ -58,25 +62,54 @@ TFLM_SOFTMAX_INTEGER_BITS = 5
 _MULTIPLIER_SHIFT = 31 - TFLM_SOFTMAX_INTEGER_BITS
 
 
-#: Below this, helia-aot 0.18's own softmax path raises ``ValueError:
-#: negative shift count``: ``AirFixedPointScale.from_real_multiplier`` stores
-#: the frexp exponent as the shift, and multipliers in [0.5, 1) have exponent
-#: 0 while anything below 0.5 goes negative -- which ``calculate_input_radius``
-#: then feeds to ``1 << shift``. Exactly 0.5 has exponent 0 and compiles. The
-#: boundary is a property of the PINNED helia-aot; revisit on a version bump.
+#: helia-aot 0.18 raises ``ValueError: negative shift count`` for multipliers
+#: in ``[2**-32, 0.5)``, and ONLY that band.
+#:
+#: ``AirFixedPointScale.from_real_multiplier`` stores the frexp exponent as
+#: the shift, which ``calculate_input_radius`` then feeds to ``1 << shift``.
+#: Multipliers in [0.5, 1) have exponent 0; below 0.5 it goes negative and the
+#: shift raises. But ``quantize_multiplier`` FLUSHES TO (0, 0) once the
+#: exponent would fall below -31, so an even smaller multiplier gets shift 0
+#: and compiles again. Measured against the pinned 0.18:
+#:
+#:     2**-33  shift  0  compiles      0.2889 (the issue)  shift -1  raises
+#:     2**-32  shift -31 raises        0.49                shift -1  raises
+#:     2**-31  shift -30 raises        0.5                 shift  0  compiles
+#:
+#: The first version of this gate errored on everything below 0.5, which
+#: blocked the sub-flush band that helia-aot compiles fine -- the same
+#: over-blocking mistake as gating heliaAOT at all, one dimension over. Both
+#: bounds are properties of the PINNED helia-aot; revisit on a version bump.
 AOT_COMPILER_MIN_MULTIPLIER = 0.5
+AOT_FLUSH_TO_ZERO_MULTIPLIER = 2.0**-32
+
+#: What an ABSENT ``SoftmaxOptions`` table means for beta, per engine -- and
+#: they disagree, which is why the verdict cannot be computed once and shared.
+#: TFLM value-initialises the POD (``ParseSoftmax``'s no-options branch is a
+#: deliberate no-op, verified against the vendored source), so beta reaches
+#: the kernel as 0.0. helia-aot's ``SoftmaxOptions`` is a pydantic model whose
+#: field default is 1.0. Applying TFLM's convention to an AOT verdict is how
+#: this gate came to claim a crash that could not happen.
+TFLM_ABSENT_BETA = 0.0
+AOT_ABSENT_BETA = 1.0
 
 
 def aot_softmax_verdict(multiplier: float) -> str:
     """helia-aot's fate for one quantized Softmax: 'error', 'warn', or 'ok'.
 
-    'error': the compiler itself raises (negative shift count) -- the gate
+    'error': the compiler itself raises ``negative shift count`` -- the gate
     exists to replace that stage-2 crash with an actionable message. 'warn':
     it compiles, but the input can only represent a logit range orders of
     magnitude too small for a meaningful softmax, and the same model aborts
     under helia-rt -- worth telling the user, not worth blocking a profile.
+
+    NaN is checked first and errors: it can only come from a corrupt file, and
+    every ordered comparison against it is False, so falling through would
+    return 'ok' for a model helia-aot raises on (found by review).
     """
-    if multiplier < AOT_COMPILER_MIN_MULTIPLIER:
+    if multiplier != multiplier:  # NaN
+        return "error"
+    if AOT_FLUSH_TO_ZERO_MULTIPLIER <= multiplier < AOT_COMPILER_MIN_MULTIPLIER:
         return "error"
     if multiplier <= 1.0:
         return "warn"
@@ -109,9 +142,24 @@ class SoftmaxScaling:
         return self.multiplier > 1.0
 
     @property
+    def has_usable_beta(self) -> bool:
+        """Whether beta can rescue this op at all.
+
+        beta <= 0 means the model carries no usable ``SoftmaxOptions``: no
+        input scale makes ``beta * scale * 2**26`` exceed 1, so the advice
+        'use a larger scale' is false and :attr:`minimum_scale` is infinite.
+        """
+        return self.beta > 0.0
+
+    @property
     def minimum_scale(self) -> float:
-        """The smallest input scale this op's beta could run with."""
-        if self.beta <= 0.0:
+        """The smallest input scale this op's beta could run with.
+
+        ``inf`` when :attr:`has_usable_beta` is False -- callers must not
+        print it raw, which produced 'needs input_scale > inf' (found by
+        review).
+        """
+        if not self.has_usable_beta:
             return float("inf")
         return 1.0 / (self.beta * float(1 << _MULTIPLIER_SHIFT))
 

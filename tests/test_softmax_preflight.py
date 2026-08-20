@@ -193,24 +193,44 @@ class TestPreflightGate:
 
         _check_softmax_scaling(BAD_MODEL, EngineType.EXECUTORCH)
 
-    def test_the_aot_verdict_bands_match_the_pinned_compiler(self):
-        """The three bands, swept at their boundaries.
+    def test_the_aot_error_band_is_bounded_at_BOTH_ends(self):
+        """helia-aot raises in [2**-32, 0.5) -- and only there.
 
-        Verified against helia-aot 0.18 by running its softmax path: below
-        0.5 raises `negative shift count`; [0.5, 1.0] compiles with diff_min
-        seven orders of magnitude from healthy (warn); above 1.0 is fine.
-        Exactly 0.5 has frexp exponent 0 and compiles, so the error bound is
-        strict.
+        The first version errored on everything below 0.5. Review found the
+        lower edge: `quantize_multiplier` FLUSHES to (0, 0) once the frexp
+        exponent would fall below -31, so a smaller multiplier gets shift 0
+        and compiles again. The gate blocked that sub-flush band -- the same
+        over-blocking as gating heliaAOT at all, one dimension over, and
+        found only because nobody had swept below 0.5.
+
+        Measured against the pinned helia-aot 0.18 by running its real path.
         """
         from helia_profiler.evaluation.softmax_preflight import aot_softmax_verdict
 
+        # Below the flush point: compiles, so it must not error.
+        assert aot_softmax_verdict(2.0**-40) == "warn"
+        assert aot_softmax_verdict(2.0**-33) == "warn"
+        # The raise band, at both edges.
+        assert aot_softmax_verdict(2.0**-32) == "error"
         assert aot_softmax_verdict(0.2889418303966522) == "error"  # issue model
         assert aot_softmax_verdict(0.49) == "error"
+        # Exactly 0.5 has exponent 0 and compiles, so the bound is strict.
         assert aot_softmax_verdict(0.5) == "warn"
-        assert aot_softmax_verdict(0.99) == "warn"
         assert aot_softmax_verdict(1.0) == "warn"
         assert aot_softmax_verdict(1.0000001) == "ok"
         assert aot_softmax_verdict(9710150.0) == "ok"  # KWS reference
+
+    def test_a_nan_multiplier_does_not_fall_through_to_ok(self):
+        """Every ordered comparison against NaN is False.
+
+        A corrupt-but-parseable file can produce one (the fuzz corpus does),
+        and helia-aot raises on it -- so falling through the band checks to
+        'ok' would pass a model that crashes. TFLM's `supported` already
+        blocks it for the same reason.
+        """
+        from helia_profiler.evaluation.softmax_preflight import aot_softmax_verdict
+
+        assert aot_softmax_verdict(float("nan")) == "error"
 
     def test_the_aot_error_path_warns_on_the_degenerate_band_too(self, caplog):
         """A model can carry ops in BOTH bands; the sub-0.5 op raises and the
@@ -223,6 +243,97 @@ class TestPreflightGate:
         # BAD_MODEL has no 0.5..1.0 op, so nothing may be logged here either:
         # the warning must track the band exactly, in both directions.
         assert "degenerate input scale" not in caplog.text
+
+    def test_has_usable_beta_rejects_zero(self):
+        """Pure, so it pins the predicate in the BARE environment.
+
+        The end-to-end no-beta test below needs the generator (litert), so it
+        skips in CI's unit matrix -- where a mutation making has_usable_beta
+        always True went unnoticed. A guardrail that only runs in the
+        environment least likely to hit the bug is the shape this whole PR
+        keeps rediscovering.
+        """
+        from helia_profiler.evaluation.softmax_preflight import SoftmaxScaling
+
+        def scaling(beta: float) -> SoftmaxScaling:
+            return SoftmaxScaling(
+                subgraph_index=0,
+                op_index=0,
+                input_tensor="t",
+                input_type="int8",
+                beta=beta,
+                input_scale=1.0,
+                multiplier=beta * 1.0 * (1 << 26),
+            )
+
+        assert not scaling(0.0).has_usable_beta
+        assert not scaling(-1.0).has_usable_beta
+        assert scaling(1e-9).has_usable_beta
+        assert scaling(1.0).has_usable_beta
+
+    def test_the_gate_routes_a_no_beta_finding_to_its_own_error(
+        self, tmp_path, monkeypatch
+    ):
+        """Also bare-env: the BRANCH, not just the predicate.
+
+        Deleting the no_beta branch entirely survived the bare suite, because
+        the only test reaching it was litert-gated. Substituting the scanner
+        keeps this dependency-free while still driving the real gate.
+        """
+        from helia_profiler.evaluation.softmax_preflight import SoftmaxScaling
+
+        no_beta = SoftmaxScaling(
+            subgraph_index=0,
+            op_index=3,
+            input_tensor="orphaned_softmax",
+            input_type="int8",
+            beta=0.0,
+            input_scale=1.49011612e-08,
+            multiplier=0.0,
+        )
+        monkeypatch.setattr(
+            "helia_profiler.stages.preflight.scan_softmax_scaling",
+            lambda _path: [no_beta],
+        )
+
+        for engine in (EngineType.HELIA_RT, EngineType.TFLM, EngineType.HELIA_AOT):
+            with pytest.raises(ConfigError, match="no usable SoftmaxOptions") as exc:
+                _check_softmax_scaling(KWS_MODEL, engine)
+            message = str(exc.value)
+            assert "orphaned_softmax" in message
+            assert "inf" not in message
+            assert "calculate_input_radius" not in message
+
+    def test_an_op_with_no_usable_beta_gets_its_own_message(self, tmp_path):
+        """beta <= 0 is not a scale problem and must not be reported as one.
+
+        TFLM value-initialises beta to 0.0 when SoftmaxOptions is absent;
+        helia-aot's field default is 1.0. The engines disagree about what the
+        model even says, and neither runs it. Reporting it through the scale
+        path printed "needs input_scale > inf" (no scale can rescue a zero
+        beta) and, for helia-aot, named a crash in a function that model
+        never reaches -- both found by review.
+        """
+        import importlib.util
+
+        pytest.importorskip("ai_edge_litert.schema_py_generated")
+        tool = (
+            Path(__file__).parent.parent / "tools" / "gen_softmax_preflight_fixture.py"
+        )
+        spec = importlib.util.spec_from_file_location("gen_fixture_nobeta", tool)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        model = tmp_path / "no_beta.tflite"
+        model.write_bytes(module.generate(betas=(0.0, 0.0, 0.0, 0.0)))
+
+        for engine in (EngineType.HELIA_RT, EngineType.TFLM, EngineType.HELIA_AOT):
+            with pytest.raises(ConfigError, match="no usable SoftmaxOptions") as exc:
+                _check_softmax_scaling(model, engine)
+            message = str(exc.value)
+            assert "inf" not in message, "an infinite bound is not advice"
+            assert "calculate_input_radius" not in message, (
+                "beta=0 never reaches the AOT shift path"
+            )
 
     def test_a_clean_model_passes(self):
         _check_softmax_scaling(KWS_MODEL, EngineType.HELIA_RT)

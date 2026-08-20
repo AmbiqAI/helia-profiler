@@ -158,6 +158,31 @@ def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
             "damaged — re-export the model.",
         ) from exc
 
+    # An op with no usable beta is its own failure, ahead of any engine
+    # verdict: TFLM value-initialises beta to 0.0 while helia-aot's field
+    # default is 1.0, so the two engines do not even agree on what this model
+    # says -- and neither runs it. Reporting it as a scale problem printed
+    # "needs input_scale > inf" and, for helia-aot, named a crash in a
+    # function that model never reaches (both found by review).
+    no_beta = [f for f in findings if not f.has_usable_beta]
+    if no_beta:
+        where = "; ".join(
+            f"subgraph {f.subgraph_index} op {f.op_index} (input '{f.input_tensor}')"
+            for f in no_beta
+        )
+        raise ConfigError(
+            f"{len(no_beta)} quantized Softmax op(s) in {path.name} carry no "
+            f"usable SoftmaxOptions beta: {where}. TFLM reads beta as 0 for "
+            "these and cannot prepare them; heliaAOT reads 1.0 and fails "
+            "earlier still, while parsing the operator.",
+            hint=(
+                "No input scale can compensate — beta multiplies the scale, "
+                "so a zero beta zeroes the product whatever the scale is. The "
+                "exported graph is missing its Softmax options; re-export "
+                "from the source model rather than re-quantizing."
+            ),
+        )
+
     if engine in (EngineType.TFLM, EngineType.HELIA_RT):
         unsupported = [f for f in findings if not f.supported]
         consequence = (
@@ -165,13 +190,16 @@ def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
             "RTT timeout) before running a single inference."
         )
     elif engine is EngineType.HELIA_AOT:
-        verdicts = {f: aot_softmax_verdict(f.multiplier) for f in findings}
-        unsupported = [f for f, v in verdicts.items() if v == "error"]
+        verdicts = {
+            (f.subgraph_index, f.op_index): (f, aot_softmax_verdict(f.multiplier))
+            for f in findings
+        }
+        unsupported = [f for f, verdict in verdicts.values() if verdict == "error"]
         consequence = (
             "The heliaAOT compiler would crash at calculate_input_radius "
             "('ValueError: negative shift count') during model compilation."
         )
-        for f, verdict in verdicts.items():
+        for f, verdict in verdicts.values():
             if verdict == "warn":
                 log.warning(
                     "Softmax at subgraph %d op %d (input '%s') has a "
@@ -187,10 +215,21 @@ def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
                     f.multiplier,
                 )
     else:
+        # A future engine parses (so a corrupt file still dies here) but gets
+        # no verdict. Deliberately fail-OPEN: wrongly gating a working engine
+        # raises with no override, which is how v1 of this check shipped. An
+        # engine that runs TFLM's interpreter on target belongs in the tuple
+        # above -- note EngineArtifacts.engine_header DEFAULTS to TFLM's, so a
+        # new adapter can inherit TFLM firmware without inheriting this gate.
         return
 
     if not unsupported:
         return
+    # The printed bound is minimum_scale -- the TFLM threshold, which for a
+    # helia-aot error is 2x the compiler's own 0.5 boundary. Deliberate: a
+    # scale clearing it works on EVERY engine, whereas the tighter AOT bound
+    # lands the user in the 0.5..1.0 band that only warns here and still
+    # aborts under helia-rt. Portable advice over minimal advice.
     detail = "; ".join(
         f"subgraph {f.subgraph_index} op {f.op_index} (input "
         f"'{f.input_tensor}'): beta={f.beta:g} x input_scale="
