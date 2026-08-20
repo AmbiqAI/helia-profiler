@@ -333,6 +333,14 @@ def test_a_declared_app_flash_load_address_beats_both_lookup_tiers(monkeypatch):
 
     Without this, the tier order is unobservable and moving the declared tier
     below the tables leaves the whole suite green.
+
+    The two table reads below are *guard* asserts, not the subject: they show
+    what tiers 2 and 3 would have answered, so that a future reader can see the
+    declared tier beating something rather than beating nothing.  Tier 2's is
+    monkeypatched and therefore inert.  Tier 3's reads the production table, so
+    if ``_FAMILY_APP_FLASH_LOAD_ADDR[AP5]`` is ever revised this line fails
+    first -- deliberately.  When that happens, update the literal to whatever
+    the table now says; the assertion that matters is the last one.
     """
     from dataclasses import replace
 
@@ -341,7 +349,7 @@ def test_a_declared_app_flash_load_address_beats_both_lookup_tiers(monkeypatch):
     monkeypatch.setitem(capabilities._SOC_APP_FLASH_LOAD_ADDR, "apollo510", 0x22000000)
     soc = replace(get_soc("apollo510"), app_flash_load_addr=0x00040000)
 
-    assert soc.origin is SocOrigin.BUILTIN  # both tables are reachable for it
+    assert soc.is_builtin  # both tables are reachable for it
     assert capabilities._SOC_APP_FLASH_LOAD_ADDR["apollo510"] == 0x22000000  # tier 2 would say
     assert capabilities._FAMILY_APP_FLASH_LOAD_ADDR[SocFamily.AP5] == 0x00410000  # tier 3 would
     assert soc.capabilities.memory.app_flash_load_addr == 0x00040000
@@ -419,6 +427,22 @@ def test_an_unusable_declared_address_is_rejected_with_a_typed_error(value, expe
 
     assert expected in str(exc_info.value)
     assert "app_flash_load_addr" in str(exc_info.value)
+
+
+def test_the_32_bit_bound_is_printed_in_the_repo_wide_address_format():
+    """Addresses read as ``0x{value:08X}`` everywhere in hpx; this one drifted.
+
+    ``transport/rtt.py``, ``stages/verify_placement.py`` and the J-Link
+    ``LoadFile`` recipe itself all use the padded-uppercase form, and the
+    recipe's is the one the user will be comparing this message against.
+    Written as ``{value:#x}`` the bound printed ``0xffffffff`` -- same number,
+    different shape, in the one message whose whole job is to be held up
+    against an address the user wrote.
+    """
+    with pytest.raises(ConfigError) as exc_info:
+        _custom_soc("oem4", _scratch_soc_spec(app_flash_load_addr=0x220000000))
+
+    assert "0x220000000 does not fit in 32 bits (max 0xFFFFFFFF)" in str(exc_info.value)
 
 
 def test_the_widest_32_bit_address_is_still_accepted():
@@ -521,6 +545,14 @@ def test_a_custom_soc_named_after_an_override_part_still_refuses_to_guess():
     Deliberately not monkeypatched: this uses the production table, so it keeps
     holding when PR #98 registers ``atomiq110`` as a built-in and the entry
     stops being reachable only through a user-chosen name.
+
+    The cost of that choice is that the guard assert below pins a production
+    value, and ``platform/capabilities.py`` says this one is expected to move:
+    0x22000000 is the *nbl* origin correct for the atomiq110 FPGA realization,
+    and real AT110 silicon "very likely" shifts it to the *sbl* 0x22010000.
+    When that lands, this line fails first.  Update the literal -- do not
+    delete the assert, and do not "correct" the table to the sbl address for
+    the FPGA part.  The subject of the test is the two asserts after it.
     """
     from helia_profiler.platform import capabilities
 
@@ -591,7 +623,57 @@ def test_a_board_psram_override_does_not_cost_a_builtin_soc_its_address():
     assert soc is not get_soc("apollo3p")  # a replace() copy
     assert soc.memory.psram_kb == 8192
     assert soc.origin is SocOrigin.BUILTIN
+    assert soc.is_builtin  # the copy is still describing the part it was registered as
     assert soc.capabilities.memory.app_flash_load_addr == 0x0000C000
+
+
+def test_a_renamed_builtin_copy_does_not_inherit_the_name_it_was_given():
+    """The other half of the ``is_builtin`` rule, and the tighter half.
+
+    ``dataclasses.replace`` of a built-in is the obvious way to build a custom
+    ``SocDef`` programmatically -- ``docs/guide/boards.md`` points at that
+    path -- and ``origin`` survives it by design, which is exactly what the
+    sibling test above requires.  The cost is that a renamed copy survives it
+    too: an ``origin``-only gate lets
+    ``replace(get_soc("apollo510"), name="atomiq110")`` read atomiq110's
+    per-SoC override and flash an Apollo510 at 0x22000000, an address
+    belonging to a different part.  That is the df34b6e forgery reopened on
+    the programmatic path, one dimension over from the config path it closed.
+
+    Not reachable from YAML -- ``_build_custom_socs`` constructs fresh
+    ``SocDef``s, which default to ``CUSTOM`` (pinned by
+    ``test_a_custom_soc_is_stamped_custom_even_when_named_after_a_builtin``) --
+    so the copy has to be made by hand here, as a caller of the public API
+    would make it.
+    """
+    from dataclasses import replace
+
+    from helia_profiler.platform import capabilities
+
+    forged = replace(get_soc("apollo510"), name="atomiq110")
+
+    assert capabilities._SOC_APP_FLASH_LOAD_ADDR["atomiq110"] == 0x22000000  # waiting under it
+    assert forged.origin is SocOrigin.BUILTIN  # carried through by `replace`, as intended
+    assert forged.registered_name == "apollo510"  # ...but the stamp says what it really is
+    assert not forged.is_builtin
+    assert forged.capabilities.memory.app_flash_load_addr is None
+
+
+def test_a_builtin_copy_that_keeps_its_name_still_resolves_through_the_tables():
+    """The looser half: renaming is the disqualifier, copying is not.
+
+    Stated on its own rather than only through ``get_soc_for_board`` so that
+    tightening ``is_builtin`` into an identity check -- the bug ``origin``
+    replaced -- fails here even if the seven ``psram_kb`` boards ever stop
+    being the way a built-in copy is made.
+    """
+    from dataclasses import replace
+
+    copy = replace(get_soc("apollo510"), has_usb=not get_soc("apollo510").has_usb)
+
+    assert copy is not get_soc("apollo510")
+    assert copy.is_builtin
+    assert copy.capabilities.memory.app_flash_load_addr == 0x00410000
 
 
 def test_every_builtin_soc_is_stamped_builtin_and_states_no_address_itself():
@@ -604,6 +686,8 @@ def test_every_builtin_soc_is_stamped_builtin_and_states_no_address_itself():
     """
     for soc in list_socs():
         assert soc.origin is SocOrigin.BUILTIN, soc.name
+        assert soc.registered_name == soc.name, soc.name
+        assert soc.is_builtin, soc.name
         assert soc.app_flash_load_addr is None, soc.name
 
 
@@ -749,10 +833,11 @@ def test_the_custom_soc_keys_are_a_pinned_subset_of_the_soc_definition():
     """Adding a ``SocDef`` field must be a decision, not an omission.
 
     ``custom_socs`` deliberately exposes only part of ``SocDef``: ``name``
-    comes from the mapping key, ``origin`` is not the user's to claim, and the
-    rest below are HAL/silicon facts no config has needed to override yet.
-    Anything else new lands in the unknown-key rejection instead, so this
-    fails until someone chooses which side it belongs on.
+    comes from the mapping key, ``origin``/``registered_name`` are not the
+    user's to claim, and the rest below are HAL/silicon facts no config has
+    needed to override yet.  Anything else new lands in the unknown-key
+    rejection instead, so this fails until someone chooses which side it
+    belongs on.
     """
     from dataclasses import fields
 
@@ -761,6 +846,7 @@ def test_the_custom_soc_keys_are_a_pinned_subset_of_the_soc_definition():
     not_exposed = {
         "name",  # the mapping key
         "origin",  # stamped by the registry, never declared
+        "registered_name",  # stamped by the registry alongside `origin`
         "swo_trace_clock_mhz",
         "has_usb",
         "ssram_full_power_enum",
@@ -883,3 +969,257 @@ def test_an_unknown_key_in_a_custom_board_is_rejected():
 
     assert "target.custom_boards.apollo510_lab" in str(exc_info.value)
     assert "default_sync_gpio_pin" in (exc_info.value.hint or "")
+
+
+# ---------------------------------------------------------------------------
+# target.custom_boards: GPIO pin validation (issue #149)
+# ---------------------------------------------------------------------------
+
+#: The four ``custom_boards`` keys that name a GPIO pad.  Every one of them
+#: ends up configuring that pad as an output inside the measured window, so
+#: every one of them carries the same hazards; the tests below are parametrized
+#: over all four rather than over the one that prompted the audit.
+_BOARD_PIN_FIELDS = (
+    "default_sync_gpio_pin",
+    "default_state_gpio_pin",
+    "default_go_gpio_pin",
+    "ble_reset_gpio_pin",
+)
+
+
+def _custom_board(spec, *, based_on="apollo510_evb"):
+    target = {"custom_boards": {"lab": {"based_on": based_on, **spec}}}
+    return build_custom_platform_registry(target).boards["lab"]
+
+
+@pytest.mark.parametrize("field", _BOARD_PIN_FIELDS)
+@pytest.mark.parametrize("value", [True, False])
+def test_a_boolean_is_not_a_gpio_pad_number(field, value):
+    """``bool`` is an ``int`` subclass, and on these fields that is a power bug.
+
+    ``ble_reset_gpio_pin: true`` resolved to pad 1 and had the power binary
+    configure GPIO 1 as an output and hold it low for the entire measured
+    window -- an arbitrary, unrelated pin driven underneath a power capture,
+    which is the exact silent corruption this field exists to prevent.
+    ``false`` resolved to pad 0.  Nothing echoes the resolved pin back, so
+    neither is recoverable by the user.
+
+    The three sibling pins had the same hazard, so all four go through one
+    shared parser and one test shape.  A new pin field that skips the parser
+    fails as soon as it joins the list above.
+    """
+    with pytest.raises(ConfigError) as exc_info:
+        _custom_board({field: value})
+
+    assert f"target.custom_boards.lab.{field}" in str(exc_info.value)
+    assert "boolean" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("field", _BOARD_PIN_FIELDS)
+@pytest.mark.parametrize("value", ["abc", -1, 29.5, [29], None])
+def test_a_gpio_pin_that_is_not_a_pad_number_raises_config_error_not_a_traceback(field, value):
+    """``load_config`` documents "never a raw exception"; a bare ``int()`` broke it.
+
+    ``_prepare_merged_config`` is called *outside* ``load_config``'s ``try``,
+    so ``int("abc")`` there escaped as ``ValueError: invalid literal for int()``
+    with a traceback -- breaking the same contract this change's ``key=str``
+    sort fix cites.  ``None`` covers an explicit ``null`` (``TypeError`` from
+    ``int()``); ``29.5`` covers a float, which used to be truncated to pad 29
+    without a word.
+    """
+    if field == "ble_reset_gpio_pin" and value is None:
+        pytest.skip("null is a meaningful statement on this field -- see the test below")
+
+    with pytest.raises(ConfigError) as exc_info:
+        _custom_board({field: value})
+
+    assert f"target.custom_boards.lab.{field}" in str(exc_info.value)
+    assert exc_info.value.hint  # every rejection shows the shape to write
+
+
+@pytest.mark.parametrize("field", ["default_state_gpio_pin", "default_go_gpio_pin"])
+def test_zero_still_disables_the_sibling_wires(field):
+    """The sibling pins keep their documented ``0`` sentinel.
+
+    ``platform/board.py`` establishes 0 as "wire not present" for the 3-wire
+    lock-step handshake, which degrades to the 1-wire gate-only form.  Those
+    fields are plain ``int``s with no ``None`` spelling, so the sentinel is
+    all they have -- rejecting 0 across all four pins would have taken a
+    documented capability away to fix a problem only one of them has.
+    """
+    assert getattr(_custom_board({field: 0}), field) == 0
+
+
+def test_zero_is_refused_for_the_ble_reset_pin():
+    """The one pin where 0 has two readings, and both corrupt a capture silently.
+
+    ``ble_reset_gpio_pin`` is ``int | None`` and says "no onboard radio" by
+    being absent, so unlike its siblings it needs no sentinel -- which leaves 0
+    meaning either "disabled" (to anyone going by the siblings) or pad 0.  Read
+    as pad 0, the power binary drives an unrelated pad low for the whole
+    window.  Read as disabled, a board genuinely wired to pad 0 leaves its
+    radio free-running and reads high -- this change's own documented failure.
+    Refusing it turns both into an error naming the field and both meanings.
+    """
+    with pytest.raises(ConfigError) as exc_info:
+        _custom_board({"ble_reset_gpio_pin": 0}, based_on="apollo4p_blue_kxr_evb")
+
+    assert "target.custom_boards.lab.ble_reset_gpio_pin" in str(exc_info.value)
+    hint = exc_info.value.hint or ""
+    assert "no onboard radio" in hint and "pad 0" in hint
+
+
+def test_an_explicit_null_ble_reset_pin_declares_a_board_with_no_radio():
+    """``null`` is how a board derived from a Blue EVB says its radio is gone.
+
+    The counterpart to refusing 0: there has to be *some* way to drop an
+    inherited pin, and absence cannot be it once ``based_on`` supplies one.
+    """
+    assert get_board("apollo4p_blue_kxr_evb").ble_reset_gpio_pin == 55
+
+    board = _custom_board({"ble_reset_gpio_pin": None}, based_on="apollo4p_blue_kxr_evb")
+
+    assert board.ble_reset_gpio_pin is None
+
+
+def test_every_gate_on_the_ble_reset_pin_agrees_about_pad_zero():
+    """Three gates read this field, and they must not disagree about 0.
+
+    ``firmware/context.py`` (``power_binary_needs_gpio``) and
+    ``firmware/__init__.py`` (nsx-gpio module selection) test ``is not None``;
+    ``_ble_reset.j2`` used to test Jinja *truthiness*.  At pad 0 those split:
+    the module got linked and ``nsx_gpio.h`` emitted for a block that never
+    rendered.  The YAML surface now refuses 0, but ``BoardDef`` is public, so
+    this pins the model rather than only the parser -- past the parser, 0 is
+    an ordinary pad number everywhere.
+    """
+    from helia_profiler.firmware.render import _jinja_env
+
+    board = BoardDef("lab", soc="apollo4p", channel="preview", ble_reset_gpio_pin=0)
+    rendered = _jinja_env.get_template("_ble_reset.j2").render(
+        power_only=True, ble_reset_gpio_pin=board.ble_reset_gpio_pin
+    )
+
+    assert board.ble_reset_gpio_pin is not None  # what both firmware gates read
+    assert "nsx_gpio_init" in rendered  # ...and now what the template reads
+
+
+# ---------------------------------------------------------------------------
+# The key enums vs. what the builders actually read
+# ---------------------------------------------------------------------------
+
+
+def _keys_the_builders_read() -> set[str]:
+    """Every spec key ``platform/custom.py`` looks up, read out of its own AST.
+
+    String literals count only in *lookup* position -- ``spec.get("k", ...)``,
+    ``"k" in spec``, ``spec["k"]`` -- so a key that appears in a docstring or
+    an error-message hint cannot launder itself into looking read.  Enum member
+    references (``CustomSocField.APP_FLASH_LOAD_ADDR.value``) count wherever
+    they appear, because unlike a string they are already code that resolves to
+    a real member, and the builders bind them to a local before looking up.
+    Iterating an enum (``for field in CustomMemoryField``) counts for every
+    member, because that shape cannot drift by construction.
+    """
+    import ast
+    import inspect
+
+    from helia_profiler.platform import custom as custom_module
+    from helia_profiler.platform.custom import (
+        CustomBoardField,
+        CustomMemoryField,
+        CustomSocField,
+    )
+
+    enums = {
+        "CustomSocField": CustomSocField,
+        "CustomMemoryField": CustomMemoryField,
+        "CustomBoardField": CustomBoardField,
+    }
+    tree = ast.parse(inspect.getsource(custom_module))
+
+    def key_of(node) -> set[str]:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return {node.value}
+        # ``CustomSocField.APP_FLASH_LOAD_ADDR.value``
+        member = node.value if isinstance(node, ast.Attribute) and node.attr == "value" else None
+        if (
+            isinstance(member, ast.Attribute)
+            and isinstance(member.value, ast.Name)
+            and member.value.id in enums
+        ):
+            return {enums[member.value.id][member.attr].value}
+        return set()
+
+    read: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            if node.func.attr == "get" and node.args:
+                read |= key_of(node.args[0])
+        elif isinstance(node, ast.Compare) and any(
+            isinstance(op, (ast.In, ast.NotIn)) for op in node.ops
+        ):
+            read |= key_of(node.left)
+        elif isinstance(node, ast.Subscript):
+            read |= key_of(node.slice)
+        elif isinstance(node, (ast.For, ast.comprehension)):
+            if isinstance(node.iter, ast.Name) and node.iter.id in enums:
+                read |= {member.value for member in enums[node.iter.id]}
+        elif isinstance(node, ast.Attribute):
+            read |= key_of(node)
+    return read
+
+
+def test_every_accepted_key_is_a_key_the_builders_actually_read():
+    """The enums are rejection allow-lists; the builders read bare strings.
+
+    ``_reject_unknown_keys`` exists to stop a key being accepted and then
+    silently discarded.  But the allow-list and the reads are separate copies
+    of the same strings, so adding an enum member without a matching read
+    reopens that exact failure through the back door: the validator waves the
+    key through and the builder never looks at it -- indistinguishable, from
+    the user's side, from the typo case the rejection was built for.
+
+    This does not demand that the builders *use* the enums (21 of the reads are
+    bare literals, and converting them is a separate and noisier change); it
+    demands only that the two agree.  ``description`` is the documented
+    exception -- a free-form annotation accepted on both blocks and
+    deliberately backing no field, pinned by
+    ``test_both_custom_blocks_accept_the_same_free_form_description``.
+    """
+    from helia_profiler.platform.custom import (
+        CustomBoardField,
+        CustomMemoryField,
+        CustomSocField,
+    )
+
+    # Config surface only: accepted, read by nothing, and that is the point.
+    config_surface_only = {"description"}
+    accepted = {
+        member.value
+        for enum_cls in (CustomSocField, CustomMemoryField, CustomBoardField)
+        for member in enum_cls
+    }
+
+    assert (accepted - config_surface_only) <= _keys_the_builders_read()
+
+
+def test_the_key_scan_reads_lookups_and_not_prose():
+    """Guard on the guard above: a key named only in a docstring is not "read".
+
+    The three positives below each cover a different lookup shape the scan has
+    to recognise.  The negatives are the load-bearing half: ``custom.py`` is
+    full of string constants that are not lookups -- error messages, hints, and
+    above all the ``NAME = "value"`` lines of the enum declarations themselves.
+    A scan that swept every string literal would pick those declarations up and
+    make the test above vacuously true, passing with every builder read
+    deleted, so it must pick up none of the constants below either.
+    """
+    read = _keys_the_builders_read()
+
+    assert "starter_profile_board" in read  # bare literal in a `.get()`
+    assert "app_flash_load_addr" in read  # only ever reached via the enum member
+    assert "mram_kb" in read  # only ever reached by iterating CustomMemoryField
+    assert "not_a_key_anywhere" not in read
+    assert not any(s.startswith("target.custom_socs must be") for s in read)  # a message
+    assert not any("Supported keys" in s for s in read)  # a hint
