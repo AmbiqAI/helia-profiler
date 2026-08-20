@@ -128,8 +128,9 @@ below cover behavior that a schema table can't express.
 - `target.custom_socs` adds config-scoped SoC definitions for bring-up cases where the built-in SoC metadata is not sufficient.
 - `target.custom_boards.<name>.based_on` clones an existing built-in board and lets you override fields like `channel`, `psram_kb`, and `default_sync_gpio_pin`.
 - `target.custom_boards.<name>.starter_profile_board` reuses the NSX starter profile from a built-in board when the custom board should inherit its module graph.
-- `target.custom_socs.<name>.app_flash_load_addr` declares the first flash address above the part's bootloader-reserved region. It is inherited from `based_on` when you name one; with neither, HPX treats the address as unknown and refuses the fallback flash rather than guessing from `family`. See [Boards → App flash load address](boards.md#app-flash-load-address).
-- Unrecognized keys in `target.custom_socs` and `target.custom_boards` are rejected with the list of supported keys, rather than being silently discarded.
+- `target.custom_boards.<name>.ble_reset_gpio_pin` is the GPIO wired to an onboard Cooper BLE controller's reset line on a "Blue" board, held low during power captures. Inherited from `based_on`; leave it unset on boards with no onboard radio.
+- `target.custom_socs.<name>.app_flash_load_addr` declares the first flash address above the part's bootloader-reserved region. It is inherited from `based_on` when you name one; with neither — or with an explicit `null`, which overrides inheritance — HPX treats the address as unknown and refuses the fallback flash rather than guessing from `family`. **This changed:** an entry with no `based_on` previously inherited its family's address. See [Boards → App flash load address](boards.md#app-flash-load-address) for the upgrade note.
+- Unrecognized keys in `target.custom_socs` and `target.custom_boards` are rejected with the list of supported keys, a close-match suggestion where one applies, and no silent discarding. Both blocks accept a free-form `description:`.
 
 ### Build-resolution notes
 

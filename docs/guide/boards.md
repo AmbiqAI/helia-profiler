@@ -147,6 +147,11 @@ The important fields are still the same platform facts as the built-in registry:
   e.g. `29` for `apollo510_evb` / `apollo510b_evb`, `22` for the Apollo4
   Plus EVBs, `61` for the Apollo4 Lite EVBs, and `26` for the Apollo3 Plus
   EVBs; `10` is only the fallback for boards without a registered override)
+- `ble_reset_gpio_pin` on a "Blue" board — the GPIO wired to the onboard
+  Cooper BLE controller's reset line, held low during power captures so an
+  idling radio does not sit in your measurement. Inherited from `based_on`;
+  set it explicitly only if your board routes it differently. Leave it unset
+  on boards with no onboard radio.
 
 `starter_profile_board` lets a custom board reuse the NSX starter-profile module
 graph from a built-in board while keeping its own board ID, channel, sync pin,
@@ -186,6 +191,61 @@ verbatim and this value is ignored.
   — two parts can share it and load at completely different addresses — and a
   guessed address is likely enough to be accepted by the silicon while landing
   your image at the wrong offset. Declare the address, or declare a `based_on`.
+- Writing `app_flash_load_addr: null` explicitly is the same refusal, and it
+  overrides inheritance: use it when you want a `based_on` part's memory and
+  clock facts but do not trust its flash window. Leaving the key out is what
+  inherits.
+
+#### Upgrading an existing config
+
+!!! warning "Behaviour change"
+
+    A custom SoC that declares **no `based_on` and no `app_flash_load_addr`**
+    used to inherit its family's address. It now resolves to *no address*, and
+    the fallback flash refuses to run instead of programming at that inherited
+    value. The values that stop being handed out are `0x00410000` (`ap5`),
+    `0x00018000` (`ap4`) and `0x0000c000` (`ap3`).
+
+    Nothing else changes: an entry with a `based_on` keeps inheriting exactly
+    what it inherited before, including the worked example above.
+
+    If you hit this, add **one** of these two keys to the `custom_socs` entry:
+
+    ```yaml
+    target:
+      custom_socs:
+        my_part:
+          based_on: apollo510          # inherit a characterised part's address
+          # ...or state your own:
+          app_flash_load_addr: 0x00410000
+    ```
+
+    Only pass the old family value verbatim if you have checked it against your
+    part's own bootloader reservation. Being handed it unchecked is the failure
+    this change exists to close.
+
+The same applies to the programmatic API. `build_platform_registry(socs=...)`
+takes `SocDef` objects directly and has no `based_on` mechanism at all, so a
+`SocDef` you construct yourself must carry the address as a field:
+
+```python
+from helia_profiler.platform import SocDef, build_platform_registry, get_soc
+
+base = get_soc("apollo510")
+registry = build_platform_registry(
+    socs={
+        "apollo510_custom": SocDef(
+            name="apollo510_custom",
+            # ...platform facts...
+            app_flash_load_addr=0x00410000,  # required; previously implied by `family`
+        )
+    }
+)
+```
+
+Without it, `soc.capabilities.memory.app_flash_load_addr` is `None`. That is
+also true of a `SocDef` built for a test fixture — only the built-in registry
+is treated as characterised.
 
 See [Architecture → Adding an Engine](../architecture/adding-an-engine.md)
 for the analogous engine path.
