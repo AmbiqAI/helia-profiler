@@ -49,7 +49,10 @@ conv → hardswish → conv → leaky_relu → sub → relu.
 
 Configs live in `configs/executorch/tier1_{arm,ns}.yaml` and
 `configs/executorch/tier1mean_{arm,ns}.yaml`; the `ns` runs set
-`engine.config.ns_ops: true`.
+`engine.config.ns_ops: true`. The `tier1_{arm,ns}_atfe.yaml` variants build
+the same PTEs with ATfE (requires `ATFE_ROOT`), so a gcc-vs-ATfE toolchain
+comparison is one pair of runs plus
+`hpx compare results/tier1_arm results/tier1_arm_atfe`.
 
 ## Verifying the right kernels ran
 

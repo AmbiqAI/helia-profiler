@@ -69,8 +69,9 @@ runner should also read
 - `models-aot` — AOT sweep across all MLPerf Tiny models on Apollo510 +
   Apollo330mP with gcc + ATfE.
 - `complete` — combined heliaRT/ns, heliaAOT/ns, TFLM/ARM, ExecuTorch/ARM,
-  and ExecuTorch/ns sweep. ExecuTorch cases run only on the supported Cortex-M55
-  GCC axis.
+  and ExecuTorch/ns sweep. ExecuTorch cases run only on Cortex-M55 boards,
+  with gcc and ATfE (validated with ATfE 22.1.0); armclang is skipped until
+  validated separately.
 
 ## Custom models and comparison groups
 

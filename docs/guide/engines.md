@@ -61,6 +61,9 @@ each PMU pass and aggregated by the normal HPX parser.
 The profiler validates `nsx_pmu_init()`, runs a CPU-cycle counter self-test,
 checks every counter read, and reports true 32-bit chained-counter overflow.
 ExecuTorch power capture is not yet supported; keep `power.enabled: false`.
+The engine builds under `arm-none-eabi-gcc` and ATfE (validated with ATfE
+22.1.0; set `ATFE_ROOT`); armclang is not yet supported — validation skips
+it with a reason rather than failing.
 See `configs/executorch/resnet8_cmsis_nn.yaml` for the verified fixture — it
 targets `apollo330mP_evb` with `arena_location: sram` (that board's MCU_TCM is
 too small for the combined method/temporary/planned arenas) and accepts a

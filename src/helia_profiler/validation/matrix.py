@@ -177,8 +177,10 @@ def case_validity(case: CaseSpec) -> str | None:
             return "no ExecuTorch PTE contract is registered for this model"
         if soc.core.value != "cortex-m55":
             return "ExecuTorch validation requires a Cortex-M55 board"
-        if case.toolchain is not Toolchain.ARM_NONE_EABI_GCC:
-            return "ExecuTorch validation currently requires arm-none-eabi-gcc"
+        if case.toolchain is Toolchain.ARMCLANG:
+            # gcc and ATfE are validated (nsx-executorch#6); armclang is its
+            # own follow-up — Arm libc + scatter loading are unexercised there.
+            return "ExecuTorch validation does not yet cover armclang"
     if case.memory is MemoryProfile.PSRAM and case.transport is not Transport.RTT:
         return "psram weights require the rtt transport"
     if case.transport is Transport.USB_CDC and case.transport not in case.board.transports:
@@ -614,13 +616,18 @@ def build_matrix(
                 providers: tuple[CmsisNNProvider | None, ...] = (None,)
                 if engine is EngineType.EXECUTORCH:
                     providers = executorch_backend_filter or tuple(CmsisNNProvider)
+                # On the board-default toolchain axis, drop armclang for
+                # ExecuTorch so the default matrix contains only runnable
+                # cases. When toolchains were requested explicitly, keep the
+                # cases and let case_validity() record the armclang skip with
+                # its readable reason instead of silently enumerating nothing.
                 engine_toolchains = (
                     tuple(
                         toolchain
                         for toolchain in board_toolchains
-                        if toolchain is Toolchain.ARM_NONE_EABI_GCC
+                        if toolchain is not Toolchain.ARMCLANG
                     )
-                    if engine is EngineType.EXECUTORCH
+                    if engine is EngineType.EXECUTORCH and toolchain_filter is None
                     else board_toolchains
                 )
                 # The dedicated ExecuTorch firmware does not yet implement the
