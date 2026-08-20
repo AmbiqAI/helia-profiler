@@ -865,6 +865,36 @@ class TestFlashBinaryAddressVerification(_FlashRecipeFixtures):
         # J-Link reported the RECIPE's bank above, so had the declared address
         # displaced it the address check would have raised instead of warning.
 
+    def test_the_divergence_warning_names_the_config_key_to_edit(self, tmp_path, caplog) -> None:
+        """Detecting the disagreement is only half of it; say what to go and fix.
+
+        The warning's subject used to be ``target_name`` -- ``hpx_profiler_power``,
+        the firmware image being flashed, which declares no address at all.  The
+        declaration the reader has to act on lives at
+        ``target.custom_socs.<name>.app_flash_load_addr`` (or is inherited from
+        the part that entry's ``based_on:`` names, which #153 documents as a
+        working shape), and the warning named neither.  It therefore told a user
+        that two addresses disagree while pointing them at a file that contains
+        neither one.
+
+        The sibling refusal on the fallback branch already names both keys, and
+        its own test pins that; a warning about the same setting should not be
+        the less actionable of the two.
+        """
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            self._flash(tmp_path, self._PROGRAMMED, addr="0x00410000", load_addr=0x22000000)
+
+        assert "target.custom_socs.<name>.app_flash_load_addr" in caplog.text
+        # The address can be inherited rather than typed, so the entry that
+        # supplies it is the second place the fix might belong.
+        assert "based_on" in caplog.text
+        # The firmware target stays named -- it says WHICH flash this is about,
+        # which matters once more than one target has been flashed in a run.
+        # Asserted against the interpolated phrase, not the bare target name:
+        # the recipe path in the same message already contains that name, so a
+        # substring check for it alone would pass with the argument dropped.
+        assert "flashing hpx_profiler_power" in caplog.text
+
     def test_a_declared_address_agreeing_with_the_recipe_is_not_warned_about(
         self, tmp_path, caplog
     ) -> None:
@@ -1182,17 +1212,53 @@ class TestFlashRecipeValidation(_FlashRecipeFixtures):
         )
 
     def test_a_recipe_without_a_loadfile_is_refused(self, tmp_path) -> None:
-        """This recipe really does load nothing, so it is the one that may say so.
+        """A recipe with nothing to load has no address to verify; refuse it.
 
-        Kept distinct from the addressless-``LoadFile`` refusal below: that one
-        programs flash and this one does not, so a shared message has to be
-        wrong for one of them.
+        Kept distinct from the addressless-``LoadFile`` refusal below, which
+        names a ``LoadFile`` the user can see in front of them and so needs a
+        different message.  The stated reason here is deliberately the one that
+        is true of every recipe reaching this branch -- see the ``LoadBin`` test
+        below for why "programs nothing" is not.
         """
         binary = self._build(tmp_path, recipe="ExitOnError 1\nReset\nGo\nExit\n")
 
         message = str(self._refuse(binary))
         assert "no `LoadFile` command at all" in message
-        assert "programs nothing" in message
+        assert "no address to verify" in message
+
+    def test_a_recipe_programming_by_another_directive_is_not_told_it_programs_nothing(
+        self, tmp_path
+    ) -> None:
+        """``LoadFile`` is not J-Link's only way to write flash.
+
+        This branch fires on the absence of ``LoadFile``, and it used to report
+        that absence as "so it programs nothing".  ``LoadBin "<image>",
+        0x410000`` programs flash and is not a ``LoadFile``, so a hand-edited
+        recipe using it lands here and is told, falsely, that it flashes
+        nothing -- then sent hunting for a load command that is right there.  A
+        ``w4`` sequence writes flash the same way with even less to recognise.
+
+        The same defect class as the addressless-``LoadFile`` message below, one
+        command over: a refusal asserting more than the check actually
+        established.  Refusing is still correct -- hpx has no address to verify
+        a flash against either way, and guessing is what #150 is about -- so
+        only the false clause goes.
+
+        Widening ``_ANY_LOAD_FILE_RE`` to recognise these instead is
+        deliberately NOT the fix: it would grow the J-Link grammar this module
+        has to track for no gain, since NSX emits neither directive.
+        """
+        bin_path = tmp_path / "hpx_profiler_power.bin"
+        binary = self._build(
+            tmp_path, recipe=f'ExitOnError 1\nLoadBin "{bin_path}", 0x00410000\nExit\n'
+        )
+
+        message = str(self._refuse(binary))
+        # The refusal stays (fail-closed), and keeps naming what it looked for.
+        assert "no `LoadFile` command at all" in message
+        # ...but must no longer claim to know that nothing gets programmed.
+        assert "programs nothing" not in message
+        assert "no address to verify" in message
 
     def test_a_recipe_without_this_builds_image_is_refused(self, tmp_path) -> None:
         """The recipe branch never checked .bin existence; only the fallback did."""
@@ -1384,6 +1450,76 @@ class TestFlashRecipeValidation(_FlashRecipeFixtures):
             flash_binary(binary, device="AP510NFA-CBR", load_addr=None)
 
         assert read_text.call_args.kwargs.get("encoding") == "utf-8"
+
+    def test_an_unreadable_recipe_is_refused_not_raised_as_an_internal_error(
+        self, tmp_path
+    ) -> None:
+        """``is_file()`` passing does not make the read succeed.
+
+        The mis-encode above is not the only way this ``read_text`` fails.  The
+        recipe can be permission-denied, or deleted or renamed in the window
+        between the ``is_file()`` check and the read; each raises an ``OSError``
+        subclass, which ``except UnicodeDecodeError`` does not catch (it is a
+        ``ValueError``).  The consequence is verbatim the one the mis-encode
+        conversion exists to prevent: ``FlashPowerFirmwareStage`` catches
+        ``CaptureError`` only, so it surfaces as "likely a bug in
+        heliaPROFILER ... please file an issue" for a permissions problem on the
+        user's own disk, and skips that stage's power-cycle retry on the way.
+
+        Real permission bits rather than a mock, so this pins the actual
+        ``chmod 000`` reproduction.  It self-skips wherever they are not
+        enforced -- as root, and on Windows, where ``os.chmod`` moves only the
+        read-only bit and leaves reads working -- by checking whether the file
+        it just made unreadable is in fact unreadable.  The mocked test below
+        covers the conversion on those platforms.
+        """
+        binary = self._build(tmp_path)
+        recipe = tmp_path / "jlink" / "hpx_profiler_power" / "flash_cmds.jlink"
+        recipe.chmod(0o000)
+        try:
+            try:
+                recipe.read_text(encoding="utf-8")
+            except OSError:
+                pass
+            else:
+                pytest.skip("permission bits are not enforced here (root, or Windows)")
+
+            # Still a file as far as the branch's own guard is concerned: that
+            # is what makes this reachable rather than the missing-recipe path.
+            assert recipe.is_file()
+
+            error = self._refuse(binary)
+            message = str(error)
+            assert "cannot be read" in message
+            # A permission error is not a mis-encode, and must not be diagnosed
+            # as one -- "re-save it as UTF-8" is unactionable on a file the user
+            # cannot open in the first place.
+            assert "is not valid UTF-8" not in message
+            assert "readable" in (error.hint or "")
+        finally:
+            # Restore before teardown so the tmp_path cleanup is unencumbered.
+            recipe.chmod(0o644)
+
+    def test_a_recipe_that_vanishes_after_the_is_file_check_is_refused(self, tmp_path) -> None:
+        """The same conversion, pinned on every platform including Windows.
+
+        The permission test above self-skips where the bits are unenforced, so
+        on the Windows runners it proves nothing.  This one drives the identical
+        code path through the other real cause -- the recipe going away between
+        ``is_file()`` and ``read_text`` -- and fails everywhere if the ``OSError``
+        arm is dropped.
+        """
+        binary = self._build(tmp_path)
+        recipe = tmp_path / "jlink" / "hpx_profiler_power" / "flash_cmds.jlink"
+        # Patched rather than raced for real: the window is genuinely there, but
+        # hitting it from a test would make this flaky rather than a pin.
+        with patch.object(
+            Path, "read_text", autospec=True, side_effect=FileNotFoundError(2, "No such file")
+        ):
+            error = self._refuse(binary)
+
+        assert "cannot be read" in str(error)
+        assert str(recipe) in str(error)
 
     def test_an_unresolvable_loadfile_path_never_escapes_as_an_untyped_error(
         self, tmp_path

@@ -273,11 +273,22 @@ def _recipe_load_address(
         # simply false, and it contradicts what ``_ANY_LOAD_FILE_RE`` above says
         # about the very same line.  ``first_load`` already distinguishes them
         # for the ordering check, so reuse it rather than guess.
+        #
+        # "No ``LoadFile``" is NOT "programs nothing", and saying so here would
+        # repeat the error one command over.  ``LoadFile`` is not J-Link's only
+        # way to write flash -- ``LoadBin "x.bin", 0x410000`` and a bare ``w4``
+        # sequence both program it and neither is a ``LoadFile`` -- so a
+        # hand-edited recipe using one of those lands in this branch while
+        # programming perfectly well.  What hpx can say of ALL of them is the
+        # thing that forces the refusal: it found no address to verify against.
+        # (Widening the regex to chase those directives is the wrong repair: it
+        # grows the grammar this module has to keep correct, and NSX emits
+        # neither.)
         if first_load is None:
             raise CaptureError(
                 f"NSX flash recipe for {target_name} ({script_path}) has no "
-                "`LoadFile` command at all, so it programs nothing and there is "
-                "no address to verify a flash against. "
+                "`LoadFile` command at all, so there is no address to verify a "
+                "flash against. "
                 f"{_NOTHING_PROGRAMMED_RECIPE}",
                 hint="Re-run the build so NSX regenerates the flash recipe.",
             )
@@ -431,17 +442,34 @@ def flash_binary(
         # so an untyped escape is reported as "likely a bug in heliaPROFILER"
         # for what is a user's mis-encoded file.  Converted the same way the
         # unresolvable-path case below is, and for the same reason.
+        #
+        # ``OSError`` for exactly that reason too, and not as belt-and-braces:
+        # ``is_file()`` above answered about the file as it was a moment ago, so
+        # a recipe that is permission-denied (``chmod 000``), or deleted or
+        # renamed in the window between the two calls, passes the check and then
+        # fails the read.  That is a user's own file in both cases -- the same
+        # class as the mis-encode -- and letting it escape untyped costs the
+        # same two things: the "likely a bug" misattribution, and the skipped
+        # power-cycle retry.
         try:
             script = script_path.read_text(encoding="utf-8")
-        except UnicodeDecodeError as exc:
+        except (UnicodeDecodeError, OSError) as exc:
+            # One refusal, two causes, and the opening clause has to be true of
+            # whichever one fired: "is not valid UTF-8" would be a false
+            # diagnosis of a permission-denied read, and would send the user to
+            # re-save a file they cannot open.
+            fault = (
+                "is not valid UTF-8" if isinstance(exc, UnicodeDecodeError) else "cannot be read"
+            )
             raise CaptureError(
-                f"NSX flash recipe for {target_name} ({script_path}) is not valid "
-                f"UTF-8 ({exc}), so hpx cannot read the recipe it would have run. "
-                "NSX writes it as UTF-8, so this one was written or re-saved by "
-                "something using a different codec. "
+                f"NSX flash recipe for {target_name} ({script_path}) {fault} "
+                f"({exc}), so hpx cannot read the recipe it would have run. "
+                "NSX writes it as readable UTF-8, so this one was re-saved by "
+                "something using a different codec, or has since become "
+                "unreadable. "
                 f"{_NOTHING_PROGRAMMED_RECIPE}",
-                hint="Re-save the recipe as UTF-8 if it was hand-edited, or "
-                "re-run the build so NSX regenerates it.",
+                hint="Check the recipe is readable and saved as UTF-8 if it was "
+                "hand-edited, or re-run the build so NSX regenerates it.",
             ) from exc
         # Validate before programming: everything below is cheap and static,
         # and a bad recipe should be refused rather than run and then blamed.
@@ -474,10 +502,20 @@ def flash_binary(
         # apollo510`` alongside a declared address as a WORKING configuration,
         # stating that the recipe is used verbatim and the value ignored — so
         # refusing this outright would break a shape the guide recommends.
+        #
+        # Name the CONFIG KEY, not just the firmware target.  ``target_name`` is
+        # ``hpx_profiler_power`` -- the image being flashed, which declares
+        # nothing.  The declaration this warning is about lives under the SoC
+        # entry, and a warning that never names it leaves the reader knowing
+        # something disagrees but not which line to go and edit.  The sibling
+        # refusal below names both keys for the same reason; match it.
         if load_addr is not None and load_addr != expected_addr:
             log.warning(
-                "DECLARED FLASH ADDRESS IGNORED: %s declares an app flash load "
-                "address of 0x%08X, but its NSX flash recipe (%s) loads at "
+                "DECLARED FLASH ADDRESS IGNORED: flashing %s, the config "
+                "declares an app flash load address of 0x%08X "
+                "(`target.custom_socs.<name>.app_flash_load_addr`, or inherited "
+                "from the part that entry's `based_on:` names), but that "
+                "target's NSX flash recipe (%s) loads at "
                 "0x%08X. The recipe wins — hpx runs it verbatim and NSX baked "
                 "that address from the build's own linker configuration — so "
                 "the image is going to 0x%08X. If the declared address is the "
