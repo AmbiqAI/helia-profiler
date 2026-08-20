@@ -22,6 +22,7 @@ from helia_profiler.config import (
 from helia_profiler.errors import FirmwareError, PowerError
 from helia_profiler.firmware.context import PowerMonitorContext
 from helia_profiler.power import get_driver, list_drivers
+from helia_profiler.results.issues import IssueCode
 
 
 # ---------------------------------------------------------------------------
@@ -668,7 +669,7 @@ class TestOverflowValidityModeAware:
         issues = [
             issue
             for issue in evaluate_run(ctx).issues
-            if issue.code == "power.on_device_overflow"
+            if issue.code == IssueCode.POWER_ON_DEVICE_OVERFLOW
         ]
         assert len(issues) == 1
         assert issues[0].severity == expected_severity

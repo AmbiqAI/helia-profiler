@@ -23,6 +23,23 @@ from .artifacts import (
     PowerTerminalRecord,
     ProfileRun,
 )
+# Spec/family *classes* (IssueSpec, ComparabilitySpec, ComparabilityCodeFamily)
+# are deliberately not re-exported: their construction shape will change when
+# #154 Phase 3 derives family membership from the dimension model. Import them
+# from .issues directly where needed; only instances, registries, and the enum
+# vocabulary are public here.
+from .issues import (
+    COMPARABILITY_FAMILIES,
+    COMPARABILITY_REGISTRY,
+    DIMENSION_DIFFERS,
+    ISSUE_REGISTRY,
+    POWER_DIMENSION_MISMATCH,
+    ComparabilityCode,
+    ComparabilitySeverity,
+    ComparisonDimension,
+    IssueCode,
+    Severity,
+)
 from .manifest import (
     RESULT_MANIFEST_SCHEMA,
     RESULT_MANIFEST_SCHEMA_VERSION,
@@ -62,10 +79,14 @@ from .models import (
 
 __all__ = [
     "BinarySections",
+    "COMPARABILITY_FAMILIES",
+    "COMPARABILITY_REGISTRY",
+    "ComparabilityCode",
+    "ComparabilitySeverity",
+    "ComparisonDimension",
     "CompatibilityResolution",
-    "ContentDigest",
     "ConsumerKind",
-    "DeploymentRecord",
+    "ContentDigest",
     "DependencyLockMode",
     "DependencyLockProvenance",
     "DependencyLockState",
@@ -74,10 +95,15 @@ __all__ = [
     "DependencyProvenance",
     "DependencyRequest",
     "DependencyWorkspace",
+    "DeploymentRecord",
+    "DIMENSION_DIFFERS",
     "EngineInfo",
     "FirmwareArtifact",
     "FirmwareMeta",
+    "ISSUE_REGISTRY",
+    "IssueCode",
     "LayerResult",
+    "load_result_manifest",
     "MemoryConsumer",
     "MemoryPlan",
     "MemoryRegionUsage",
@@ -86,6 +112,7 @@ __all__ = [
     "OnDevicePowerSummary",
     "PlatformInfo",
     "PmuResult",
+    "POWER_DIMENSION_MISMATCH",
     "PowerObservation",
     "PowerRun",
     "PowerRunPlan",
@@ -103,11 +130,11 @@ __all__ = [
     "ResultValidity",
     "RunMetadata",
     "RunStatus",
+    "Severity",
     "SUPPORT_BUNDLE_SCHEMA",
     "SUPPORT_BUNDLE_SCHEMA_VERSION",
     "SupportBundleManifest",
     "SupportBundleSection",
     "TimingInfo",
     "ToolchainInfo",
-    "load_result_manifest",
 ]

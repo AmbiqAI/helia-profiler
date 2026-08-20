@@ -20,6 +20,7 @@ from helia_profiler.power.diagnostics import (
 from helia_profiler.results import ResultValidity
 from helia_profiler.results import FirmwareMeta, PmuResult
 from helia_profiler.evaluation import evaluate_run
+from helia_profiler.results.issues import IssueCode
 
 
 def _context(
@@ -105,8 +106,8 @@ def test_degraded_observation_and_duration_mismatch_are_structured(tmp_path: Pat
 
     assert evaluation.validity is ResultValidity.DEGRADED
     assert {issue.code for issue in evaluation.issues} == {
-        "power.observation_degraded",
-        "power.gate_duration_mismatch",
+        IssueCode.POWER_OBSERVATION_DEGRADED,
+        IssueCode.POWER_GATE_DURATION_MISMATCH,
     }
 
 
@@ -142,8 +143,8 @@ def test_terminal_plan_and_on_device_mismatches_are_invalid(tmp_path: Path):
 
     assert evaluation.validity is ResultValidity.INVALID
     assert {issue.code for issue in evaluation.issues} == {
-        "power.plan_count_mismatch",
-        "power.on_device_count_mismatch",
+        IssueCode.POWER_PLAN_COUNT_MISMATCH,
+        IssueCode.POWER_ON_DEVICE_COUNT_MISMATCH,
     }
 
 
@@ -155,7 +156,7 @@ def test_pmu_overflow_is_invalid_without_power(tmp_path: Path):
     evaluation = evaluate_run(ctx)
 
     assert evaluation.validity is ResultValidity.INVALID
-    assert [issue.code for issue in evaluation.issues] == ["pmu.counter_overflow"]
+    assert [issue.code for issue in evaluation.issues] == [IssueCode.PMU_COUNTER_OVERFLOW]
 
 
 class TestWindowClockValidity:
@@ -256,8 +257,8 @@ class TestWindowClockValidity:
         evaluation = evaluate_run(ctx)
 
         codes = {issue.code for issue in evaluation.issues}
-        assert "power.window_clock_frozen" not in codes
-        assert "power.window_clock_mismatch" not in codes
+        assert IssueCode.POWER_WINDOW_CLOCK_FROZEN not in codes
+        assert IssueCode.POWER_WINDOW_CLOCK_MISMATCH not in codes
 
     def test_frozen_window_clock_is_an_error_in_internal_mode(self, tmp_path: Path):
         """Internal mode divides energy by this duration, so the published
@@ -269,7 +270,7 @@ class TestWindowClockValidity:
 
         assert evaluation.validity is ResultValidity.INVALID
         frozen = [
-            issue for issue in evaluation.issues if issue.code == "power.window_clock_frozen"
+            issue for issue in evaluation.issues if issue.code == IssueCode.POWER_WINDOW_CLOCK_FROZEN
         ]
         assert len(frozen) == 1
         assert frozen[0].severity == "error"
@@ -287,7 +288,7 @@ class TestWindowClockValidity:
         evaluation = evaluate_run(ctx)
 
         frozen = [
-            issue for issue in evaluation.issues if issue.code == "power.window_clock_frozen"
+            issue for issue in evaluation.issues if issue.code == IssueCode.POWER_WINDOW_CLOCK_FROZEN
         ]
         assert len(frozen) == 1
         assert frozen[0].severity == "warning"
@@ -301,7 +302,7 @@ class TestWindowClockValidity:
 
         codes = [issue.code for issue in evaluate_run(ctx).issues]
 
-        assert codes.count("power.window_clock_mismatch") == 0
+        assert codes.count(IssueCode.POWER_WINDOW_CLOCK_MISMATCH) == 0
 
     def test_external_disagreement_is_a_warning_not_an_error(self, tmp_path: Path):
         """Apollo4's ~7x inflation: degraded, not invalid -- two boards is not
@@ -313,7 +314,7 @@ class TestWindowClockValidity:
 
         assert evaluation.validity is ResultValidity.DEGRADED
         mismatch = [
-            issue for issue in evaluation.issues if issue.code == "power.window_clock_mismatch"
+            issue for issue in evaluation.issues if issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH
         ]
         assert len(mismatch) == 1
         assert mismatch[0].severity == "warning"
@@ -360,7 +361,7 @@ class TestWindowClockValidity:
 
         codes = {issue.code for issue in evaluate_run(ctx).issues}
 
-        assert codes == {"power.observation_degraded"}
+        assert codes == {IssueCode.POWER_OBSERVATION_DEGRADED}
 
     def test_the_two_modes_apply_different_tolerances(self, tmp_path: Path):
         """One 14% deviation, two verdicts: a real fault against a host-timed
@@ -368,7 +369,7 @@ class TestWindowClockValidity:
         external = _context(tmp_path)
         self._bench_run(external, elapsed_us=int(self.BENCH_GATE_S * 1e6 * 1.14))
         assert any(
-            issue.code == "power.window_clock_mismatch"
+            issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH
             for issue in evaluate_run(external).issues
         )
 
@@ -379,7 +380,7 @@ class TestWindowClockValidity:
             internal=True,
         )
         assert not any(
-            issue.code == "power.window_clock_mismatch"
+            issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH
             for issue in evaluate_run(internal).issues
         )
 
@@ -394,7 +395,7 @@ class TestWindowClockValidity:
         mismatch = [
             issue
             for issue in evaluate_run(broken).issues
-            if issue.code == "power.window_clock_mismatch"
+            if issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH
         ]
         assert len(mismatch) == 1
         assert mismatch[0].context["reference_source"] == "planned_window"
@@ -410,7 +411,7 @@ class TestWindowClockValidity:
             internal=True,
         )
         assert not any(
-            issue.code == "power.window_clock_mismatch" for issue in evaluate_run(near).issues
+            issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH for issue in evaluate_run(near).issues
         )
 
         far = _context(tmp_path, mode="internal")
@@ -420,7 +421,7 @@ class TestWindowClockValidity:
             internal=True,
         )
         assert any(
-            issue.code == "power.window_clock_mismatch" for issue in evaluate_run(far).issues
+            issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH for issue in evaluate_run(far).issues
         )
 
     def test_window_longer_than_host_wall_time_is_a_warning(self, tmp_path: Path):
@@ -440,7 +441,7 @@ class TestWindowClockValidity:
         exceeded = [
             issue
             for issue in evaluation.issues
-            if issue.code == "power.window_clock_exceeds_host_time"
+            if issue.code == IssueCode.POWER_WINDOW_CLOCK_EXCEEDS_HOST_TIME
         ]
         assert len(exceeded) == 1
         assert exceeded[0].severity == "warning"
@@ -457,7 +458,7 @@ class TestWindowClockValidity:
         )
 
         assert not any(
-            issue.code == "power.window_clock_exceeds_host_time"
+            issue.code == IssueCode.POWER_WINDOW_CLOCK_EXCEEDS_HOST_TIME
             for issue in evaluate_run(ctx).issues
         )
 
@@ -483,7 +484,7 @@ def test_duration_fallback_matches_summary_policy(tmp_path: Path):
     evaluation = evaluate_run(ctx)
 
     assert evaluation.validity is ResultValidity.DEGRADED
-    assert any(issue.code == "power.gate_duration_mismatch" for issue in evaluation.issues)
+    assert any(issue.code == IssueCode.POWER_GATE_DURATION_MISMATCH for issue in evaluation.issues)
 
 
 class TestProfileCleanWindowFrozen:
@@ -514,7 +515,7 @@ class TestProfileCleanWindowFrozen:
 
         result = evaluate_run(ctx)
 
-        assert "profile.clean_window_frozen" in [i.code for i in result.issues]
+        assert IssueCode.PROFILE_CLEAN_WINDOW_FROZEN in [i.code for i in result.issues]
         assert result.validity is ResultValidity.DEGRADED
 
     def test_healthy_window_is_not_flagged(self, tmp_path):
@@ -522,7 +523,7 @@ class TestProfileCleanWindowFrozen:
 
         result = evaluate_run(ctx)
 
-        assert "profile.clean_window_frozen" not in [i.code for i in result.issues]
+        assert IssueCode.PROFILE_CLEAN_WINDOW_FROZEN not in [i.code for i in result.issues]
 
     def test_absent_fields_stay_unknown_not_frozen(self, tmp_path):
         """A run with no clean-window record must not be accused of freezing."""
@@ -530,7 +531,7 @@ class TestProfileCleanWindowFrozen:
 
         result = evaluate_run(ctx)
 
-        assert "profile.clean_window_frozen" not in [i.code for i in result.issues]
+        assert IssueCode.PROFILE_CLEAN_WINDOW_FROZEN not in [i.code for i in result.issues]
 
 
 class TestCleanWindowStall:
@@ -587,7 +588,7 @@ class TestCleanWindowStall:
         stalls = [
             issue
             for issue in evaluation.issues
-            if issue.code == "profile.clean_window_stalled"
+            if issue.code == IssueCode.PROFILE_CLEAN_WINDOW_STALLED
         ]
         assert len(stalls) == 1
         assert stalls[0].severity == "warning"
@@ -616,7 +617,7 @@ class TestCleanWindowStall:
         for stalled, expected in cases.items():
             evaluation = evaluate_run(self._profile_only(tmp_path, stalled=stalled))
             raised = any(
-                issue.code == "profile.clean_window_stalled"
+                issue.code == IssueCode.PROFILE_CLEAN_WINDOW_STALLED
                 for issue in evaluation.issues
             )
             assert raised is expected, f"clean_stalled_iters={stalled!r}"
@@ -640,7 +641,7 @@ class TestCleanWindowStall:
         stalls = [
             issue
             for issue in evaluation.issues
-            if issue.code == "profile.clean_window_stalled"
+            if issue.code == IssueCode.PROFILE_CLEAN_WINDOW_STALLED
         ]
         assert len(stalls) == 1, "a slow-but-running counter went unreported"
         assert stalls[0].context["partial_iters"] == 233
@@ -669,7 +670,7 @@ class TestCleanWindowStall:
         stall = next(
             issue
             for issue in evaluation.issues
-            if issue.code == "profile.clean_window_stalled"
+            if issue.code == IssueCode.PROFILE_CLEAN_WINDOW_STALLED
         )
         assert stall.context["stalled_iters"] == 5000
         assert stall.context["total_iters"] == 1092
@@ -691,7 +692,7 @@ class TestCleanWindowStall:
         stall = next(
             issue
             for issue in evaluate_run(ctx).issues
-            if issue.code == "profile.clean_window_stalled"
+            if issue.code == IssueCode.PROFILE_CLEAN_WINDOW_STALLED
         )
 
         assert stall.context["affected_fraction"] == 1.0
@@ -738,13 +739,13 @@ class TestCleanWindowStall:
         evaluation = evaluate_run(ctx)
         codes = {issue.code for issue in evaluation.issues}
 
-        assert "profile.clean_window_clock_rate_low" in codes, (
+        assert IssueCode.PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW in codes, (
             "a uniform slowdown that both in-window counters are blind to went "
             "unreported"
         )
         rate = next(
             i for i in evaluation.issues
-            if i.code == "profile.clean_window_clock_rate_low"
+            if i.code == IssueCode.PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW
         )
         assert rate.context["ratio"] < 0.01
         assert rate.context["expected_cycles"] == 96_000.0
@@ -761,7 +762,7 @@ class TestCleanWindowStall:
 
         codes = {issue.code for issue in evaluate_run(ctx).issues}
 
-        assert "profile.clean_window_check_inoperative" in codes
+        assert IssueCode.PROFILE_CLEAN_WINDOW_CHECK_INOPERATIVE in codes
 
     def test_a_torn_count_line_does_not_crash_evaluation(self, tmp_path: Path):
         """The parser passes through values it cannot int() as strings.
@@ -780,7 +781,7 @@ class TestCleanWindowStall:
         evaluation = evaluate_run(ctx)
 
         stall = next(
-            i for i in evaluation.issues if i.code == "profile.clean_window_stalled"
+            i for i in evaluation.issues if i.code == IssueCode.PROFILE_CLEAN_WINDOW_STALLED
         )
         assert stall.context["stalled_iters"] == 233
         assert stall.context["partial_iters"] == 0
@@ -847,7 +848,7 @@ class TestNoInferenceProbeWindowDuration:
         mismatch = [
             issue
             for issue in evaluation.issues
-            if issue.code == "power.window_clock_mismatch"
+            if issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH
         ]
         assert len(mismatch) == 1
         assert evaluation.validity is ResultValidity.DEGRADED
@@ -861,7 +862,7 @@ class TestNoInferenceProbeWindowDuration:
         evaluation = evaluate_run(ctx)
 
         codes = {issue.code for issue in evaluation.issues}
-        assert "power.window_clock_mismatch" not in codes
+        assert IssueCode.POWER_WINDOW_CLOCK_MISMATCH not in codes
         assert evaluation.validity is ResultValidity.VALID
 
 
@@ -915,7 +916,7 @@ class TestGateToleranceAgreesAcrossCaptureAndEvaluate:
         issue = _assess_unrecorded_duration(ctx, 9.0)
 
         assert issue is not None
-        assert issue.code == "power.gate_duration_mismatch"
+        assert issue.code == IssueCode.POWER_GATE_DURATION_MISMATCH
 
 
 class TestReplayedBusyLoopPlanCount:
@@ -954,7 +955,7 @@ class TestReplayedBusyLoopPlanCount:
 
         codes = [issue.code for issue in evaluate_run(ctx).issues]
 
-        assert "power.plan_count_mismatch" not in codes, (
+        assert IssueCode.POWER_PLAN_COUNT_MISMATCH not in codes, (
             "the firmware reported the one unit of work this probe runs; "
             "reading the plan's count directly calls that a mismatch"
         )
@@ -978,4 +979,4 @@ class TestReplayedBusyLoopPlanCount:
 
         codes = [issue.code for issue in evaluate_run(ctx).issues]
 
-        assert "power.plan_count_mismatch" in codes
+        assert IssueCode.POWER_PLAN_COUNT_MISMATCH in codes
