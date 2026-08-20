@@ -188,6 +188,15 @@ You rarely need to set it. HPX only uses it as a fallback for one operation
 `flash_cmds.jlink` recipe is missing); when that recipe exists it is used
 verbatim and this value is ignored.
 
+"Ignored" is not "unnoticed", though, and the split matters: what you declare
+here is authoritative only on the path where HPX builds the flash command
+itself. Once NSX has baked a recipe, the recipe wins — and whenever the two
+addresses disagree HPX logs a `DECLARED FLASH ADDRESS IGNORED` warning naming
+both. Investigate that warning rather than filtering it. It means the build and
+your declaration disagree about which part this is, and if the *declared*
+address is the right one, then the image is landing at the wrong offset and the
+run's power numbers describe stale firmware.
+
 - `based_on: <soc>` inherits the address of that part, along with everything
   else. This is the usual case and needs nothing from you.
 - Set it explicitly when your part's bootloader reservation differs from the
@@ -200,6 +209,13 @@ verbatim and this value is ignored.
           based_on: apollo510
           app_flash_load_addr: 0x22000000
     ```
+
+    Expect that warning from this entry for as long as the NSX build is still
+    an `apollo510` build, whose recipe bakes `0x00410000` — a normal state
+    during bring-up, and the reason the warning is a warning and not a refusal.
+    The declaration is not lost (it is what the fallback flash would use), but
+    the two cannot both be right about your silicon, so the entry is finished
+    only once NSX is generating a recipe for your part.
 
 - A custom SoC with no `app_flash_load_addr` **and** no `based_on` has no
   address at all, and HPX will refuse the fallback flash rather than guess one
