@@ -34,6 +34,7 @@ from ..counters import (
 )
 from ..engines import EngineType, get_adapter
 from ..errors import ConfigError
+from ..evaluation.softmax_preflight import aot_softmax_verdict, scan_softmax_scaling
 from ..pipeline import PipelineContext
 from ..placement import Placement
 from ..platform import get_soc_for_board
@@ -64,6 +65,7 @@ class PreflightStage:
     def run(self, ctx: PipelineContext) -> None:
         cfg = ctx.config
         _check_model(cfg.model.path, cfg.engine.type)
+        _check_softmax_scaling(cfg.model.path, cfg.engine.type)
         _check_arena_size(cfg.model.arena_size)
         _check_rtt_buffer_size(cfg.target.rtt_buffer_size_up)
         _check_runtime_split_locations(cfg)
@@ -126,6 +128,125 @@ def _check_model(path: Path, engine: EngineType) -> None:
                 "Make sure the model export completed successfully."
             ),
         )
+
+
+def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
+    """Reject quantized Softmax scales the selected engine cannot handle (#57).
+
+    TFLM aborts inside ``AllocateTensors()`` when ``beta * input_scale * 2**26
+    <= 1`` -- from the host that is a HardFault / RTT timeout with no
+    indication the model was the problem, after the board was powered, the
+    firmware built, and the image flashed. heliaAOT has no target-side abort,
+    but its compiler raises ``ValueError: negative shift count`` for
+    multipliers below 0.5 -- a stage-2 crash whose message names nothing. The
+    two numbers sit in the flatbuffer, so either run dies HERE instead, with
+    the quantization named. See ``evaluation/softmax_preflight`` for the
+    per-engine boundaries and how each was established.
+
+    Ordered after :func:`_check_model`, which has already verified the file
+    reads and carries the TFLite magic -- so a parse failure past that point
+    is a malformed flatbuffer, reported as such rather than as a stack trace.
+    """
+    if engine is EngineType.EXECUTORCH:
+        return  # .pte -- never parses a TFLite flatbuffer
+    try:
+        findings = scan_softmax_scaling(path)
+    except Exception as exc:  # struct.error / IndexError on malformed bytes
+        raise ConfigError(
+            f"Model file could not be parsed as a TFLite flatbuffer: {path} ({exc})",
+            hint="The file carries the TFL3 marker but its structure is "
+            "damaged — re-export the model.",
+        ) from exc
+
+    # An op with no usable beta is its own failure, ahead of any engine
+    # verdict: TFLM value-initialises beta to 0.0 while helia-aot's field
+    # default is 1.0, so the two engines do not even agree on what this model
+    # says -- and neither runs it. Reporting it as a scale problem printed
+    # "needs input_scale > inf" and, for helia-aot, named a crash in a
+    # function that model never reaches (both found by review).
+    no_beta = [f for f in findings if not f.has_usable_beta]
+    if no_beta:
+        where = "; ".join(
+            f"subgraph {f.subgraph_index} op {f.op_index} (input '{f.input_tensor}')"
+            for f in no_beta
+        )
+        raise ConfigError(
+            f"{len(no_beta)} quantized Softmax op(s) in {path.name} carry no "
+            f"usable SoftmaxOptions beta: {where}. TFLM reads beta as 0 for "
+            "these and cannot prepare them; heliaAOT reads 1.0 and fails "
+            "earlier still, while parsing the operator.",
+            hint=(
+                "No input scale can compensate — beta multiplies the scale, "
+                "so a zero beta zeroes the product whatever the scale is. The "
+                "exported graph is missing its Softmax options; re-export "
+                "from the source model rather than re-quantizing."
+            ),
+        )
+
+    if engine in (EngineType.TFLM, EngineType.HELIA_RT):
+        unsupported = [f for f in findings if not f.supported]
+        consequence = (
+            "The target would abort inside AllocateTensors() (a HardFault / "
+            "RTT timeout) before running a single inference."
+        )
+    elif engine is EngineType.HELIA_AOT:
+        verdicts = {
+            (f.subgraph_index, f.op_index): (f, aot_softmax_verdict(f.multiplier))
+            for f in findings
+        }
+        unsupported = [f for f, verdict in verdicts.values() if verdict == "error"]
+        consequence = (
+            "The heliaAOT compiler would crash at calculate_input_radius "
+            "('ValueError: negative shift count') during model compilation."
+        )
+        for f, verdict in verdicts.values():
+            if verdict == "warn":
+                log.warning(
+                    "Softmax at subgraph %d op %d (input '%s') has a "
+                    "degenerate input scale (beta=%g x %.9g x 2^26 = %.6g): "
+                    "heliaAOT compiles it, but the input can only represent "
+                    "a logit range far too small for a meaningful softmax, "
+                    "and the same model aborts under helia-rt.",
+                    f.subgraph_index,
+                    f.op_index,
+                    f.input_tensor,
+                    f.beta,
+                    f.input_scale,
+                    f.multiplier,
+                )
+    else:
+        # A future engine parses (so a corrupt file still dies here) but gets
+        # no verdict. Deliberately fail-OPEN: wrongly gating a working engine
+        # raises with no override, which is how v1 of this check shipped. An
+        # engine that runs TFLM's interpreter on target belongs in the tuple
+        # above -- note EngineArtifacts.engine_header DEFAULTS to TFLM's, so a
+        # new adapter can inherit TFLM firmware without inheriting this gate.
+        return
+
+    if not unsupported:
+        return
+    # The printed bound is minimum_scale -- the TFLM threshold, which for a
+    # helia-aot error is 2x the compiler's own 0.5 boundary. Deliberate: a
+    # scale clearing it works on EVERY engine, whereas the tighter AOT bound
+    # lands the user in the 0.5..1.0 band that only warns here and still
+    # aborts under helia-rt. Portable advice over minimal advice.
+    detail = "; ".join(
+        f"subgraph {f.subgraph_index} op {f.op_index} (input "
+        f"'{f.input_tensor}'): beta={f.beta:g} x input_scale="
+        f"{f.input_scale:.9g} x 2^26 = {f.multiplier:.6g}, needs input_scale "
+        f"> {f.minimum_scale:.4g}"
+        for f in unsupported
+    )
+    raise ConfigError(
+        f"{len(unsupported)} quantized Softmax op(s) in {path.name} have an "
+        f"input scale {engine.value} cannot handle: {detail}. {consequence}",
+        hint=(
+            "A scale this small usually means the layer feeding the Softmax "
+            "produced a degenerate activation range during quantization — "
+            "re-quantize with a representative calibration dataset, or check "
+            "that the exported graph's final layers match the trained model."
+        ),
+    )
 
 
 def _check_arena_size(arena_size: int | None) -> None:
