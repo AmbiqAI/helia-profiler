@@ -85,6 +85,34 @@ jobs:
         run: uv run --group test pytest tests/ -q
 
   # ---------------------------------------------------------------
+  # Analysis extra — the tests that need ai-edge-litert.
+  #
+  # The unit-test matrix deliberately installs no extras, so the litert
+  # cross-validation of the minimal flatbuffer reader (#57) skipped in every
+  # job and the reader shipped with its differential oracle disconnected
+  # (found by review of #143). One cell, one Python: the sweep is
+  # environment-independent and the matrix already covers the interpreters.
+  # ---------------------------------------------------------------
+  analysis-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install test dependencies with the analysis extra
+        run: uv sync --locked --group test --extra analysis
+
+      - name: Run the litert-dependent tests
+        run: |
+          uv run --group test pytest \
+            tests/test_softmax_preflight.py tests/test_model_analysis.py -q
+
+  # ---------------------------------------------------------------
   # Package — validate the exact wheel/sdist release boundaries
   # ---------------------------------------------------------------
   package:
@@ -151,13 +179,14 @@ jobs:
   # ---------------------------------------------------------------
   lint-and-test:
     if: always()
-    needs: [lint, unit-tests, package]
+    needs: [lint, unit-tests, analysis-tests, package]
     runs-on: ubuntu-latest
     steps:
       - name: Decide status
         run: |
           if [[ "${{ needs.lint.result }}" != "success" ]] ||
              [[ "${{ needs.unit-tests.result }}" != "success" ]] ||
+             [[ "${{ needs.analysis-tests.result }}" != "success" ]] ||
              [[ "${{ needs.package.result }}" != "success" ]]; then
             echo "One or more CI jobs failed."
             exit 1

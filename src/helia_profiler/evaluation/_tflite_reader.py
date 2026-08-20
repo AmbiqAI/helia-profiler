@@ -159,6 +159,10 @@ def read_quantized_softmax_ops(buf: bytes) -> list[SoftmaxOp]:
             if not inputs_len:
                 continue
             tensor_index = struct.unpack_from("<i", op.buf, inputs_start)[0]
+            if tensor_index < 0:
+                # TFLite uses -1 for an absent optional input; a bare Python
+                # index would silently read the LAST tensor instead.
+                continue
             tensor = tensors[tensor_index]
             tensor_type = tensor.scalar(_TENSOR_TYPE, "<b", 0)
             if tensor_type not in (TENSOR_TYPE_INT8, TENSOR_TYPE_UINT8):

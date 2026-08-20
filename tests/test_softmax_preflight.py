@@ -1,6 +1,6 @@
 """#57: host-side preflight for TFLM's quantized-Softmax scaling requirement.
 
-The fixture `softmax_scale_unsupported.tflite` (440 bytes, committed) carries
+The fixture `softmax_scale_unsupported.tflite` (936 bytes, committed) carries
 the issue's exact failing value: one int8 Softmax with input scale
 4.305568790385905e-09. TFLM computes `beta * input_scale * 2**26` and aborts
 on target unless it exceeds 1.0; that scale yields 0.2889418303966522 -- the
@@ -48,6 +48,30 @@ class TestMultiplier:
 
     def test_the_reference_models_scale_passes(self):
         assert softmax_input_multiplier(1.0, PASSING_SCALE) > 1.0
+
+    def test_the_exact_boundary_is_rejected(self):
+        """multiplier == 1.0 must fail: TFLM's check is CHECK_GT, strict.
+
+        Reachable in a real file -- 2^-26 is float32-exact, so a quantizer
+        emitting a power-of-two scale lands the product exactly on 1.0.
+        Review found the `>` unpinned: flipping it to `>=` survived the whole
+        suite (the PR's own mutation battery had reported it CAUGHT, off
+        stale bytecode a second time).
+        """
+        from helia_profiler.evaluation.softmax_preflight import SoftmaxScaling
+
+        boundary_scale = 2.0**-26
+        assert softmax_input_multiplier(1.0, boundary_scale) == 1.0
+        at_boundary = SoftmaxScaling(
+            subgraph_index=0,
+            op_index=0,
+            input_tensor="t",
+            input_type="int8",
+            beta=1.0,
+            input_scale=boundary_scale,
+            multiplier=1.0,
+        )
+        assert not at_boundary.supported, "TFLITE_CHECK_GT(1.0, 1.) aborts"
 
     def test_beta_participates(self):
         """A large beta can rescue a small scale, and a small beta can sink a
@@ -131,16 +155,22 @@ class TestPreflightGate:
         assert "1 quantized Softmax" in message
         assert "beta_rescued_input" not in message
 
-    def test_the_gate_applies_to_every_tflite_engine(self):
-        """TFLM, heliaRT, and heliaAOT share the aborting helper."""
-        for engine in (EngineType.HELIA_RT, EngineType.HELIA_AOT, EngineType.TFLM):
+    def test_the_gate_applies_only_to_engines_that_run_tflm_on_target(self):
+        """TFLM and heliaRT hit the aborting helper; nothing else does.
+
+        The first version of this test asserted heliaAOT was gated too, on a
+        misreading of the issue's "Helia-RT/Helia fail". Review proved
+        otherwise by running helia_aot's own preprocess_softmax_scaling on the
+        failing scale: it returns a negative-shift fixed-point scale with no
+        exception, and main_aot.cc.j2 never calls AllocateTensors -- so the
+        old gate rejected working models with a message describing a call
+        their firmware does not contain, and this test enshrined it.
+        """
+        for engine in (EngineType.HELIA_RT, EngineType.TFLM):
             with pytest.raises(ConfigError):
                 _check_softmax_scaling(BAD_MODEL, engine)
-
-    def test_executorch_is_exempt(self):
-        """A .pte never reaches the TFLM Softmax helper; the gate must not
-        try to parse it as a flatbuffer."""
-        _check_softmax_scaling(BAD_MODEL, EngineType.EXECUTORCH)
+        for engine in (EngineType.HELIA_AOT, EngineType.EXECUTORCH):
+            _check_softmax_scaling(BAD_MODEL, engine)
 
     def test_a_clean_model_passes(self):
         _check_softmax_scaling(KWS_MODEL, EngineType.HELIA_RT)
@@ -180,6 +210,27 @@ class TestPreflightGate:
             _check_softmax_scaling(mangled, EngineType.HELIA_RT)
 
 
+def test_fixture_matches_its_committed_generator():
+    """The committed fixture must be reproducible from tools/, byte for byte.
+
+    Same convention as tools/gen_example_model.py: the generator is the
+    fixture's documentation, and this pins the two together so a drifted
+    regeneration (or a hand-edited fixture) fails CI's analysis-tests job
+    instead of silently changing what these tests test. The generator needs
+    litert's builder, so this skips in the bare unit environment.
+    """
+    pytest.importorskip("ai_edge_litert.schema_py_generated")
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
+    try:
+        from gen_softmax_preflight_fixture import generate
+    finally:
+        sys.path.pop(0)
+
+    assert generate() == BAD_MODEL.read_bytes()
+
+
 def test_reader_agrees_with_litert_on_every_fixture():
     """Cross-validation: the minimal reader vs the reference parser.
 
@@ -211,6 +262,8 @@ def test_reader_agrees_with_litert_on_every_fixture():
                 builtin = opcode.BuiltinCode() or opcode.DeprecatedBuiltinCode()
                 if builtin != schema.BuiltinOperator.SOFTMAX:
                     continue
+                if op.Inputs(0) < 0:
+                    continue  # -1 marks an absent optional input (TFLite convention)
                 tensor = sg.Tensors(op.Inputs(0))
                 if tensor.Type() not in (
                     schema.TensorType.INT8,

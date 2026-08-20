@@ -143,8 +143,16 @@ def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
     reads and carries the TFLite magic -- so a parse failure past that point
     is a malformed flatbuffer, reported as such rather than as a stack trace.
     """
-    if engine is EngineType.EXECUTORCH:
-        return  # .pte -- never reaches the TFLM Softmax helper
+    if engine not in (EngineType.TFLM, EngineType.HELIA_RT):
+        # Only the engines that run TFLM's interpreter ON TARGET hit the
+        # aborting helper. heliaAOT computes its softmax scaling on the host
+        # with the general quantizer (helia_aot preprocess_softmax_scaling
+        # returns a negative-shift fixed-point scale for exactly the scale
+        # that aborts TFLM -- verified by running it) and its firmware never
+        # calls AllocateTensors; ExecuTorch consumes .pte. A whitelist, not
+        # an EXECUTORCH blacklist, because wrongly gating a working engine
+        # raises with no override -- the worse failure (found by review).
+        return
     try:
         findings = scan_softmax_scaling(path)
     except Exception as exc:  # struct.error / IndexError on malformed bytes
@@ -157,8 +165,10 @@ def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
     if not unsupported:
         return
     detail = "; ".join(
-        f"op {f.op_index} (input '{f.input_tensor}'): beta={f.beta:g} x "
-        f"input_scale={f.input_scale:.9g} x 2^26 = {f.multiplier:.6g}"
+        f"subgraph {f.subgraph_index} op {f.op_index} (input "
+        f"'{f.input_tensor}'): beta={f.beta:g} x input_scale="
+        f"{f.input_scale:.9g} x 2^26 = {f.multiplier:.6g}, needs input_scale "
+        f"> {f.minimum_scale:.4g}"
         for f in unsupported
     )
     raise ConfigError(
