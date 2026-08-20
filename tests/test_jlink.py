@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -359,7 +360,14 @@ class TestFlashBinaryFallback:
         binary = self._bin_only(tmp_path)
         script_dir = tmp_path / "jlink" / "hpx_profiler_power"
         script_dir.mkdir(parents=True)
-        recipe = "ExitOnError 1\nReset\nLoadFile x.bin, 0xDEADBEEF\nReset\nGo\nExit\n"
+        # Shaped like NSX's flash_cmds.jlink.in: quoted ABSOLUTE path to this
+        # build's .bin.  The address is deliberately not any SoC's, to prove the
+        # recipe -- not the caller's load_addr -- decides where the image goes.
+        recipe = (
+            "ExitOnError 1\nReset\n"
+            f'LoadFile "{binary.with_suffix(".bin")}", 0xDEADBEEF\n'
+            "Reset\nGo\nExit\n"
+        )
         (script_dir / "flash_cmds.jlink").write_text(recipe)
 
         # The recipe wins whatever load_addr is -- including a resolved one, the
@@ -516,14 +524,11 @@ def test_inspect_probe_target_retries_unknown_target() -> None:
     sleep.assert_called_once()
 
 
-class TestFlashBinaryVerification:
-    """flash_binary must demand explicit flash evidence, not a bare connection O.K.
+class _FlashRecipeFixtures:
+    """Captured hardware output and the NSX build layout the recipe path reads.
 
-    Command failures are already gated by exit status (``ExitOnError 1`` in
-    every recipe plus ``run_jlink_script``'s CaptureError on nonzero rc);
-    these tests pin the output tripwire that catches recipes which connect
-    successfully but never issue a program step (issue #101).  All three
-    outputs below were captured from real hardware.
+    Not collected by pytest (no ``Test`` prefix); the three classes below share
+    it so the JLinkExe wordings stay defined once, exactly as captured.
     """
 
     # Secure Apollo5 parts always erase+reprogram, printing the Total summary.
@@ -543,28 +548,263 @@ class TestFlashBinaryVerification:
     # anything — a recipe that connects and programs nothing looks like this.
     _CONNECTION_ONLY = "Connecting to J-Link via USB...O.K.\n"
 
-    def _flash(self, tmp_path, output: str) -> None:
+    @classmethod
+    def _programmed_at(cls, address: str) -> str:
+        """The captured "programmed" output, retargeted to another address.
+
+        Derived from the real capture rather than hand-written so the surrounding
+        wording that the parser has to survive stays byte-identical.
+        """
+        return cls._PROGRAMMED.replace("0x00410000", address)
+
+    @staticmethod
+    def _build(tmp_path: Path, *, recipe: str | None = None, addr: str = "0x00410000") -> Path:
+        """A built power target laid out the way NSX lays one out.
+
+        ELF and ``.bin`` side by side in the build dir, recipe under
+        ``jlink/<target>/``, and the recipe's ``LoadFile`` naming the ``.bin``
+        by ABSOLUTE path — which is what NSX's flash_cmds.jlink.in emits.
+        """
         binary = tmp_path / "hpx_profiler_power"
+        binary.write_bytes(b"\x00")
+        bin_path = binary.with_suffix(".bin")
+        bin_path.write_bytes(b"\x00")
         script_dir = tmp_path / "jlink" / "hpx_profiler_power"
-        script_dir.mkdir(parents=True)
-        (script_dir / "flash_cmds.jlink").write_text(
-            "ExitOnError 1\nLoadFile hpx_profiler_power.bin, 0x00410000\nExit\n"
-        )
+        script_dir.mkdir(parents=True, exist_ok=True)
+        if recipe is None:
+            recipe = f'ExitOnError 1\nReset\nLoadFile "{bin_path}", {addr}\nReset\nGo\nExit\n'
+        (script_dir / "flash_cmds.jlink").write_text(recipe)
+        return binary
+
+    def _flash(
+        self,
+        tmp_path,
+        output: str,
+        *,
+        recipe: str | None = None,
+        addr: str = "0x00410000",
+        load_addr: int | None = None,
+    ) -> None:
+        binary = self._build(tmp_path, recipe=recipe, addr=addr)
         with patch(
             "helia_profiler.target.probe.flash.run_jlink_script",
             return_value=SimpleNamespace(returncode=0, stdout=output, stderr=""),
         ):
             # These exercise the NSX-recipe path, which needs no load address.
             flash_binary(
-                binary, device="AP510NFA-CBR", load_addr=None, jlink_serial="1160002204"
+                binary, device="AP510NFA-CBR", load_addr=load_addr, jlink_serial="1160002204"
             )
+
+
+class TestFlashBinaryVerification(_FlashRecipeFixtures):
+    """flash_binary must demand explicit flash evidence, not a bare connection O.K.
+
+    Command failures are already gated by exit status (``ExitOnError 1`` in
+    every recipe plus ``run_jlink_script``'s CaptureError on nonzero rc);
+    these tests pin the output tripwire that catches recipes which connect
+    successfully but never issue a program step (issue #101).  All three
+    captured outputs above were taken from real hardware.
+    """
 
     def test_programmed_output_verifies(self, tmp_path) -> None:
         self._flash(tmp_path, self._PROGRAMMED)
 
     def test_skipped_identical_output_verifies(self, tmp_path) -> None:
-        self._flash(tmp_path, self._SKIPPED_IDENTICAL)
+        # The skip notice carries its own bank address, so the recipe here must
+        # be the AP4-class one that capture came from -- pairing it with the AP5
+        # recipe address is exactly the mismatch the next test asserts on.
+        self._flash(tmp_path, self._SKIPPED_IDENTICAL, addr="0x00018000")
 
     def test_connection_only_ok_is_rejected(self, tmp_path) -> None:
         with pytest.raises(CaptureError, match="no recognized flash confirmation"):
             self._flash(tmp_path, self._CONNECTION_ONLY)
+
+
+class TestFlashBinaryAddressVerification(_FlashRecipeFixtures):
+    """The flash must land where it was asked to land, not merely somewhere.
+
+    A flash to a wrong-but-writable address prints a byte-for-byte identical
+    ``Total:`` summary, so the marker tripwire above passes it and the device
+    then boots stale firmware from its real entry point while hpx publishes
+    power numbers attributed to the new build (issue #150).  J-Link names the
+    destination on every flash; these pin that hpx reads it.
+
+    Inherits the captured-hardware fixtures and layout helpers above.
+    """
+
+    def test_mismatched_address_raises_naming_both(self, tmp_path) -> None:
+        """The recipe asks for AP5's address; J-Link reports AP4's."""
+        with pytest.raises(CaptureError) as exc_info:
+            self._flash(tmp_path, self._programmed_at("0x00018000"), addr="0x00410000")
+
+        message = str(exc_info.value)
+        # Both addresses, or the message cannot be acted on.
+        assert "0x00410000" in message
+        assert "0x00018000" in message
+        assert exc_info.value.hint
+
+    def test_the_expected_address_comes_from_the_recipe_not_load_addr(self, tmp_path) -> None:
+        """On the recipe path ``load_addr`` is neither consulted nor required.
+
+        NSX bakes the address into the recipe hpx runs verbatim, so the recipe
+        is the authority.  Comparing against ``load_addr`` there would reject a
+        correct flash whenever the caller's value differs -- and #149 makes
+        ``app_flash_load_addr`` resolve to ``None`` more often for custom SoCs,
+        which would leave the check with nothing to compare against at all.
+        """
+        # A wrong caller value must not fail a flash the recipe got right...
+        self._flash(
+            tmp_path, self._programmed_at("0x00018000"), addr="0x00018000", load_addr=0x00410000
+        )
+
+    def test_recipe_path_verifies_when_load_addr_is_none(self, tmp_path) -> None:
+        """...and an absent caller value must not disable the check either."""
+        self._flash(tmp_path, self._programmed_at("0x0000C000"), addr="0x0000C000", load_addr=None)
+
+        with pytest.raises(CaptureError, match="0x0000C000"):
+            self._flash(
+                tmp_path, self._programmed_at("0x00410000"), addr="0x0000C000", load_addr=None
+            )
+
+    def test_a_decimal_recipe_address_is_understood(self, tmp_path) -> None:
+        """J-Link accepts bare decimal in LoadFile, so the parser must too.
+
+        Read as hex, 4259840 would compare against nothing sane and reject a
+        perfectly good flash.
+        """
+        self._flash(tmp_path, self._PROGRAMMED, addr=str(0x00410000))
+
+    def test_one_matching_bank_of_several_verifies(self, tmp_path) -> None:
+        """A multi-range image prints one bank line per range."""
+        output = (
+            "J-Link: Flash download: Bank 0 @ 0x00410000: 1 range affected (761856 bytes)\n"
+            "J-Link: Flash download: Bank 1 @ 0x00800000: 1 range affected (4096 bytes)\n"
+            "J-Link: Flash download: Total: 4.088s (Prepare: 0.139s, Compare: 0.000s, "
+            "Erase: 0.000s, Program: 3.549s, Verify: 0.308s, Restore: 0.090s)\n"
+        )
+        self._flash(tmp_path, output, addr="0x00410000")
+
+    def test_output_naming_no_bank_is_warned_not_rejected(self, tmp_path, caplog) -> None:
+        """Deliberate: no address in the output means no evidence either way.
+
+        The address line is corroboration on top of the exit-status gate and the
+        summary tripwire.  If J-Link reworded it, raising here would block every
+        correct flash on that part without any sign of a wrong one -- so this
+        degrades to a warning naming the address that could not be confirmed.
+        """
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            self._flash(tmp_path, "J-Link: Flash download: Total: 4.088s\nO.K.\n")
+
+        assert "0x00410000" in caplog.text
+
+    def test_fallback_path_verifies_against_the_resolved_load_addr(self, tmp_path) -> None:
+        """With no recipe, the script hpx built is the authority instead."""
+        binary = TestFlashBinaryFallback._bin_only(tmp_path)
+        with patch(
+            "helia_profiler.target.probe.flash.run_jlink_script",
+            return_value=SimpleNamespace(
+                returncode=0, stdout=self._programmed_at("0x00018000"), stderr=""
+            ),
+        ):
+            flash_binary(binary, device="AMAP42KP-KBR", load_addr=0x00018000)
+
+            with pytest.raises(CaptureError) as exc_info:
+                flash_binary(binary, device="AP510NFA-CBR", load_addr=0x00410000)
+
+        message = str(exc_info.value)
+        assert "0x00410000" in message
+        assert "0x00018000" in message
+
+
+class TestFlashRecipeValidation(_FlashRecipeFixtures):
+    """hpx runs NSX's recipe verbatim, so it must vet it the way NSX does.
+
+    ``validate_flash_recipe`` in ``neuralspotx.operations._hardware`` refuses a
+    recipe that loads the wrong artifact or omits ``ExitOnError 1``; hpx checked
+    neither on this path.  Recipes bake ABSOLUTE paths, so a stale one resolves
+    happily and flashes an older image while hpx reports the new build (#150).
+    """
+
+    @staticmethod
+    def _refuse(binary: Path) -> CaptureError:
+        """Flash and expect a refusal that never reached JLinkExe."""
+        with patch("helia_profiler.target.probe.flash.run_jlink_script") as run:
+            with pytest.raises(CaptureError) as exc_info:
+                flash_binary(binary, device="AP510NFA-CBR", load_addr=None)
+        run.assert_not_called()
+        return exc_info.value
+
+    def test_a_recipe_loading_another_build_is_refused(self, tmp_path) -> None:
+        stale = tmp_path / "previous-build"
+        stale.mkdir()
+        (stale / "hpx_profiler_power.bin").write_bytes(b"\x00")
+        binary = self._build(
+            tmp_path,
+            recipe=(
+                "ExitOnError 1\nReset\n"
+                f'LoadFile "{stale / "hpx_profiler_power.bin"}", 0x00410000\n'
+                "Reset\nGo\nExit\n"
+            ),
+        )
+
+        message = str(self._refuse(binary))
+        assert str(stale / "hpx_profiler_power.bin") in message
+        assert str(tmp_path / "hpx_profiler_power.bin") in message
+
+    def test_an_unquoted_relative_loadfile_resolves_against_the_recipe(self, tmp_path) -> None:
+        """NSX's regex accepts both forms; relative paths are recipe-relative.
+
+        ``hpx_profiler_power.bin`` next to the recipe is NOT the build dir's
+        image, so the same-basename near-miss must still be caught.
+        """
+        binary = self._build(
+            tmp_path,
+            recipe="ExitOnError 1\nLoadFile hpx_profiler_power.bin, 0x00410000\nExit\n",
+        )
+        assert "jlink" in str(self._refuse(binary))
+
+        # ...while the relative form that does point at the build dir passes.
+        (tmp_path / "jlink" / "hpx_profiler_power" / "flash_cmds.jlink").write_text(
+            "ExitOnError 1\nLoadFile ../../hpx_profiler_power.bin, 0x00410000\nExit\n"
+        )
+        with patch(
+            "helia_profiler.target.probe.flash.run_jlink_script",
+            return_value=SimpleNamespace(returncode=0, stdout=self._PROGRAMMED, stderr=""),
+        ):
+            flash_binary(binary, device="AP510NFA-CBR", load_addr=None)
+
+    def test_a_recipe_without_exit_on_error_is_refused(self, tmp_path) -> None:
+        binary = self._build(
+            tmp_path,
+            recipe=(
+                "Reset\n"
+                f'LoadFile "{tmp_path / "hpx_profiler_power.bin"}", 0x00410000\n'
+                "Reset\nGo\nExit\n"
+            ),
+        )
+
+        assert "ExitOnError 1" in str(self._refuse(binary))
+
+    def test_a_commented_exit_on_error_still_counts(self, tmp_path) -> None:
+        """J-Link Commander tolerates trailing `//` comments; so must we."""
+        self._flash(
+            tmp_path,
+            self._PROGRAMMED,
+            recipe=(
+                "ExitOnError 1  // fail fast\nReset\n"
+                f'LoadFile "{tmp_path / "hpx_profiler_power.bin"}", 0x00410000\n'
+                "Reset\nGo\nExit\n"
+            ),
+        )
+
+    def test_a_recipe_without_a_loadfile_is_refused(self, tmp_path) -> None:
+        binary = self._build(tmp_path, recipe="ExitOnError 1\nReset\nGo\nExit\n")
+
+        assert "LoadFile" in str(self._refuse(binary))
+
+    def test_a_recipe_without_this_builds_image_is_refused(self, tmp_path) -> None:
+        """The recipe branch never checked .bin existence; only the fallback did."""
+        binary = self._build(tmp_path)
+        binary.with_suffix(".bin").unlink()
+
+        assert "hpx_profiler_power.bin" in str(self._refuse(binary))
