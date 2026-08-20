@@ -254,12 +254,26 @@ class TestPreflightGate:
         with pytest.raises(ConfigError, match="Softmax"):
             PreflightStage().run(ctx)
 
-    def test_a_damaged_flatbuffer_is_an_error_not_a_stack_trace(self, tmp_path):
+    @pytest.mark.parametrize(
+        "engine", [EngineType.HELIA_RT, EngineType.TFLM, EngineType.HELIA_AOT]
+    )
+    def test_a_damaged_flatbuffer_is_an_error_not_a_stack_trace(
+        self, tmp_path, engine
+    ):
+        """Stage 0 must catch a corrupt file for EVERY TFLite engine.
+
+        The round-1 whitelist returned before the parse for helia-aot, so a
+        malformed model sailed through preflight and surfaced at stage 5 --
+        after the board was powered and the probe resolved, or on a laptop
+        with no board as a misleading "J-Link probe not found" (found by
+        review). The parse now runs for all TFLite engines; only the
+        VERDICTS are per-engine.
+        """
         mangled = tmp_path / "mangled.tflite"
         mangled.write_bytes(b"TFL3" + b"\xff" * 64)
 
         with pytest.raises(ConfigError, match="could not be parsed"):
-            _check_softmax_scaling(mangled, EngineType.HELIA_RT)
+            _check_softmax_scaling(mangled, engine)
 
 
 def test_fixture_matches_its_committed_generator():
@@ -272,15 +286,14 @@ def test_fixture_matches_its_committed_generator():
     litert's builder, so this skips in the bare unit environment.
     """
     pytest.importorskip("ai_edge_litert.schema_py_generated")
-    import sys
+    import importlib.util
 
-    sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
-    try:
-        from gen_softmax_preflight_fixture import generate
-    finally:
-        sys.path.pop(0)
+    tool = Path(__file__).parent.parent / "tools" / "gen_softmax_preflight_fixture.py"
+    spec = importlib.util.spec_from_file_location("gen_softmax_preflight_fixture", tool)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
 
-    assert generate() == BAD_MODEL.read_bytes()
+    assert module.generate() == BAD_MODEL.read_bytes()
 
 
 def test_reader_agrees_with_litert_on_every_fixture():
@@ -336,11 +349,16 @@ def test_reader_agrees_with_litert_on_every_fixture():
                     options = schema.SoftmaxOptions()
                     options.Init(op.BuiltinOptions().Bytes, op.BuiltinOptions().Pos)
                     beta = float(options.Beta())
+                raw_name = tensor.Name()
                 reference.append(
                     (
                         sg_index,
                         op_index,
-                        (tensor.Name() or b"").decode("utf-8", "replace"),
+                        (
+                            raw_name.decode("utf-8", "replace")
+                            if raw_name is not None
+                            else f"tensor_{op.Inputs(0)}"
+                        ),
                         scale,
                         beta,
                     )

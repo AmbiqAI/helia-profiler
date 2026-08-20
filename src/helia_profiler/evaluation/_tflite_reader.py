@@ -181,11 +181,16 @@ def read_quantized_softmax_ops(buf: bytes) -> list[SoftmaxOp]:
                 if options is not None:
                     beta = options.scalar(_SOFTMAX_BETA, "<f", 0.0)
 
+            name = tensor.string(_TENSOR_NAME)
             found.append(
                 SoftmaxOp(
                     subgraph_index=sg_index,
                     op_index=op_index,
-                    input_tensor=tensor.string(_TENSOR_NAME) or f"tensor_{tensor_index}",
+                    # Placeholder only when the field is ABSENT; an empty
+                    # string is a real (if useless) name and stays '' -- `or`
+                    # conflated the two, diverging from litert on 12 of 8,424
+                    # fuzz mutants (cosmetic, but the oracle should agree).
+                    input_tensor=name if name is not None else f"tensor_{tensor_index}",
                     input_type=tensor_type,
                     input_scale=scale,
                     beta=beta,
