@@ -15,7 +15,9 @@ from ..power.diagnostics import (
     gate_relative_tolerance_for,
     window_clock_ceiling_from_metadata,
 )
+from ..errors import ReportError
 from ..results import ResultIssue, ResultValidity
+from ..results.issues import ISSUE_REGISTRY, IssueCode
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -33,11 +35,11 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
     """Evaluate captured results without mutating pipeline state."""
     issues: list[ResultIssue] = []
     if ctx.pmu_result is None:
-        issues.append(_error("pmu.missing", "The run has no PMU result."))
+        issues.append(_error(IssueCode.PMU_MISSING, "The run has no PMU result."))
     elif ctx.pmu_result.overflow_detected:
         issues.append(
             _error(
-                "pmu.counter_overflow",
+                IssueCode.PMU_COUNTER_OVERFLOW,
                 "One or more PMU counters overflowed.",
             )
         )
@@ -58,7 +60,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         ):
             issues.append(
                 _warning(
-                    "profile.clean_window_frozen",
+                    IssueCode.PROFILE_CLEAN_WINDOW_FROZEN,
                     "The clean window completed "
                     f"{meta.clean_infer_count} inferences in zero elapsed "
                     "time; the clock timing it never advanced. Latency "
@@ -86,7 +88,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         if rate is not None and rate.is_broken:
             issues.append(
                 _warning(
-                    "profile.clean_window_clock_rate_low",
+                    IssueCode.PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW,
                     "The clean window's cycle counter was running far below "
                     "its expected rate when the window opened, measured "
                     "against an independent clock; every timing derived from "
@@ -107,7 +109,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
             if stall.partial_check_inoperative and stall.affected_iters == 0:
                 issues.append(
                     _warning(
-                        "profile.clean_window_check_inoperative",
+                        IssueCode.PROFILE_CLEAN_WINDOW_CHECK_INOPERATIVE,
                         "The clean window's partial-stall check could not run: "
                         "its warm reference was zero, so no iteration could "
                         "fall below the floor. Absence of stalls here is not "
@@ -118,7 +120,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
             else:
                 issues.append(
                     _warning(
-                        "profile.clean_window_stalled",
+                        IssueCode.PROFILE_CLEAN_WINDOW_STALLED,
                         "The clean-inference window's cycle counter stalled: "
                         "clean_infer_avg_us understates the true per-inference "
                         "time, and any power window sized from it is short.",
@@ -135,16 +137,16 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
 
         internal_mode = ctx.config.power.mode.value == "internal"
         if observation is None and not internal_mode:
-            issues.append(_error("power.observation_missing", "Power observation is missing."))
+            issues.append(_error(IssueCode.POWER_OBSERVATION_MISSING, "Power observation is missing."))
         if observation is not None:
             if observation.integrity == "invalid":
                 issues.append(
-                    _error("power.observation_invalid", "Power observation integrity is invalid.")
+                    _error(IssueCode.POWER_OBSERVATION_INVALID, "Power observation integrity is invalid.")
                 )
             elif observation.integrity == "degraded":
                 issues.append(
                     _warning(
-                        "power.observation_degraded",
+                        IssueCode.POWER_OBSERVATION_DEGRADED,
                         "Power observation is diagnostic and not valid for efficiency metrics.",
                     )
                 )
@@ -153,7 +155,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
             ):
                 issues.append(
                     _error(
-                        "power.gate_edges_missing",
+                        IssueCode.POWER_GATE_EDGES_MISSING,
                         "GPIO-gated power capture is missing a gate edge.",
                         gate_rise_observed=observation.gate_rise_observed,
                         gate_fall_observed=observation.gate_fall_observed,
@@ -163,7 +165,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
             if isinstance(duration, dict) and not _duration_integrity_valid(duration):
                 issues.append(
                     _warning(
-                        "power.gate_duration_mismatch",
+                        IssueCode.POWER_GATE_DURATION_MISMATCH,
                         "Measured power-gate duration does not agree with the expected fixed-N window.",
                         **duration,
                     )
@@ -176,7 +178,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         if plan.firmware_mode == "dedicated" and terminal is None:
             issues.append(
                 _error(
-                    "power.terminal_missing",
+                    IssueCode.POWER_TERMINAL_MISSING,
                     "Dedicated power firmware did not publish terminal status.",
                 )
             )
@@ -184,7 +186,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
             if terminal.status != "ok" or terminal.error_code != 0:
                 issues.append(
                     _error(
-                        "power.terminal_error",
+                        IssueCode.POWER_TERMINAL_ERROR,
                         "Power firmware reported an error.",
                         status=terminal.status,
                         error_code=terminal.error_code,
@@ -194,7 +196,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
             if terminal.completed_count != terminal.requested_count:
                 issues.append(
                     _error(
-                        "power.terminal_incomplete",
+                        IssueCode.POWER_TERMINAL_INCOMPLETE,
                         "Power firmware completed a different inference count than requested.",
                         requested_count=terminal.requested_count,
                         completed_count=terminal.completed_count,
@@ -202,7 +204,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 )
             if not terminal.gate_lowered:
                 issues.append(
-                    _error("power.gate_not_lowered", "Power firmware did not confirm GATE low.")
+                    _error(IssueCode.POWER_GATE_NOT_LOWERED, "Power firmware did not confirm GATE low.")
                 )
             # Same helper the collect stage uses, so the two cannot disagree
             # about what the firmware was supposed to report -- the busy_loop
@@ -214,7 +216,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
             if expected_requested is not None and terminal.requested_count != expected_requested:
                 issues.append(
                     _error(
-                        "power.plan_count_mismatch",
+                        IssueCode.POWER_PLAN_COUNT_MISMATCH,
                         "Power firmware requested count differs from the host plan.",
                         planned_count=expected_requested,
                         requested_count=terminal.requested_count,
@@ -241,7 +243,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 if internal_mode:
                     issues.append(
                         _error(
-                            "power.window_clock_frozen",
+                            IssueCode.POWER_WINDOW_CLOCK_FROZEN,
                             "Power firmware reported zero elapsed time for completed "
                             "inferences; the on-device measurement derived from it is "
                             "corrupt.",
@@ -252,7 +254,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 else:
                     issues.append(
                         _warning(
-                            "power.window_clock_frozen",
+                            IssueCode.POWER_WINDOW_CLOCK_FROZEN,
                             "Power firmware reported zero elapsed time for completed "
                             "inferences; the external instrument's power numbers are "
                             "unaffected, but the firmware-reported window duration is "
@@ -281,7 +283,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 if agreement is not None and not agreement.agrees:
                     issues.append(
                         _warning(
-                            "power.window_clock_mismatch",
+                            IssueCode.POWER_WINDOW_CLOCK_MISMATCH,
                             "Firmware-reported window duration does not agree with "
                             "the independently measured window.",
                             **agreement.to_metadata(),
@@ -302,7 +304,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                     if ceiling is not None and ceiling.exceeded:
                         issues.append(
                             _warning(
-                                "power.window_clock_exceeds_host_time",
+                                IssueCode.POWER_WINDOW_CLOCK_EXCEEDS_HOST_TIME,
                                 "Firmware-reported window is longer than the host "
                                 "wall time that contained it.",
                                 **ceiling.to_metadata(),
@@ -319,14 +321,14 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 if internal_mode:
                     issues.append(
                         _error(
-                            "power.on_device_overflow",
+                            IssueCode.POWER_ON_DEVICE_OVERFLOW,
                             "On-device power monitor reported accumulator overflow.",
                         )
                     )
                 else:
                     issues.append(
                         _warning(
-                            "power.on_device_overflow",
+                            IssueCode.POWER_ON_DEVICE_OVERFLOW,
                             "Bystander on-device monitor reported accumulator "
                             "overflow; the external measurement of record is "
                             "unaffected.",
@@ -336,7 +338,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
             if expected_count is not None and on_device.inference_count != expected_count:
                 issues.append(
                     _error(
-                        "power.on_device_count_mismatch",
+                        IssueCode.POWER_ON_DEVICE_COUNT_MISMATCH,
                         "On-device measurement count differs from completed work.",
                         measured_count=on_device.inference_count,
                         expected_count=expected_count,
@@ -345,18 +347,18 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         elif internal_mode:
             issues.append(
                 _error(
-                    "power.on_device_measurement_missing",
+                    IssueCode.POWER_ON_DEVICE_MEASUREMENT_MISSING,
                     "Internal power mode has no on-device measurement.",
                 )
             )
     elif ctx.power_result is not None:
         integrity = ctx.power_result.metadata.get("integrity")
         if integrity == "invalid":
-            issues.append(_error("power.observation_invalid", "Power observation integrity is invalid."))
+            issues.append(_error(IssueCode.POWER_OBSERVATION_INVALID, "Power observation integrity is invalid."))
         elif integrity == "degraded":
             issues.append(
                 _warning(
-                    "power.observation_degraded",
+                    IssueCode.POWER_OBSERVATION_DEGRADED,
                     "Power observation is diagnostic and not valid for efficiency metrics.",
                 )
             )
@@ -364,7 +366,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         if isinstance(duration, dict) and not _duration_integrity_valid(duration):
             issues.append(
                 _warning(
-                    "power.gate_duration_mismatch",
+                    IssueCode.POWER_GATE_DURATION_MISMATCH,
                     "Measured power-gate duration does not agree with the expected inference window.",
                     **duration,
                 )
@@ -388,7 +390,7 @@ def _assess_unrecorded_duration(ctx: PipelineContext, measured_s: float) -> Resu
     if not average_us:
         if ctx.pmu_result.meta.clean_infer_avg_cycles is not None:
             return _warning(
-                "power.gate_duration_unverifiable",
+                IssueCode.POWER_GATE_DURATION_UNVERIFIABLE,
                 "Power-gate duration cannot be verified because clean inference timing is invalid.",
                 inference_count=count,
                 clean_infer_avg_us=average_us,
@@ -412,7 +414,7 @@ def _assess_unrecorded_duration(ctx: PipelineContext, measured_s: float) -> Resu
     if integrity.valid:
         return None
     return _warning(
-        "power.gate_duration_mismatch",
+        IssueCode.POWER_GATE_DURATION_MISMATCH,
         "Measured power-gate duration does not agree with the expected fixed-N window.",
         measured_s=integrity.measured_s,
         expected_s=integrity.expected_s,
@@ -441,9 +443,23 @@ def _validity_for(issues: list[ResultIssue]) -> ResultValidity:
     return ResultValidity.VALID
 
 
-def _error(code: str, message: str, **context: Any) -> ResultIssue:
-    return ResultIssue(code=code, severity="error", message=message, context=context)
+def _error(code: IssueCode, message: str, **context: Any) -> ResultIssue:
+    return _issue(code, "error", message, context)
 
 
-def _warning(code: str, message: str, **context: Any) -> ResultIssue:
-    return ResultIssue(code=code, severity="warning", message=message, context=context)
+def _warning(code: IssueCode, message: str, **context: Any) -> ResultIssue:
+    return _issue(code, "warning", message, context)
+
+
+def _issue(code: IssueCode, severity: str, message: str, context: dict[str, Any]) -> ResultIssue:
+    """Single construction chokepoint: a code cannot ship at a severity its
+    registry entry does not allow, so severity drift fails a test instead of
+    landing in an artifact."""
+    spec = ISSUE_REGISTRY[code]
+    if severity not in spec.allowed_severities():
+        raise ReportError(
+            f"Issue code '{code}' may not be emitted at severity "
+            f"'{severity}' (registry allows: "
+            f"{', '.join(sorted(spec.allowed_severities()))})."
+        )
+    return ResultIssue(code=str(code), severity=severity, message=message, context=context)

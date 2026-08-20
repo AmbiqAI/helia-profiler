@@ -3,22 +3,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from ..results import ResultValidity, RunStatus
+from ..results.issues import (
+    COMPARABILITY_REGISTRY,
+    DIMENSION_DIFFERS,
+    POWER_DIMENSION_MISMATCH,
+    ComparabilityCode,
+    ComparabilitySeverity,
+)
 
 if TYPE_CHECKING:
     from .compare import RunArtifacts
-
-
-class ComparabilitySeverity(StrEnum):
-    """Effect of one compatibility issue on comparison output."""
-
-    BLOCKING = "blocking"
-    LAYER_BLOCKING = "layer_blocking"
-    METRIC_BLOCKING = "metric_blocking"
-    INFORMATIVE = "informative"
 
 
 @dataclass(frozen=True)
@@ -56,21 +53,16 @@ class ComparabilityAssessment:
         )
 
 
-_INFORMATIVE_DIMENSIONS = (
-    "hpx_version",
-    "engine",
-    "board",
-    "soc",
-    "cpu_clock",
-    "toolchain",
-    "compiler_version",
-    "system_clock_hz",
-    "run_summary_schema_version",
-    "run_metadata_schema_version",
-    "transport",
-    "arena_location",
-    "weights_location",
-)
+def _issue(code: ComparabilityCode, message: str, **context: Any) -> ComparabilityIssue:
+    """Construction chokepoint for static codes: severity comes from the
+    registry, so a code's effect on comparison output cannot drift from its
+    declaration."""
+    return ComparabilityIssue(
+        code=str(code),
+        severity=COMPARABILITY_REGISTRY[code].severity,
+        message=message,
+        context=context,
+    )
 
 
 def assess_comparability(
@@ -83,38 +75,37 @@ def assess_comparability(
         manifest = run.manifest
         if manifest is not None and manifest.status is not RunStatus.COMPLETE:
             issues.append(
-                ComparabilityIssue(
-                    code="result.incomplete",
-                    severity=ComparabilitySeverity.BLOCKING,
-                    message=f"The {role} result bundle is {manifest.status.value}.",
-                    context={"role": role, "run_id": manifest.run_id},
+                _issue(
+                    ComparabilityCode.RESULT_INCOMPLETE,
+                    f"The {role} result bundle is {manifest.status.value}.",
+                    role=role,
+                    run_id=manifest.run_id,
                 )
             )
         if manifest is not None and manifest.validity is ResultValidity.INVALID:
             issues.append(
-                ComparabilityIssue(
-                    code="result.invalid",
-                    severity=ComparabilitySeverity.BLOCKING,
-                    message=f"The {role} result is invalid and cannot be compared.",
-                    context={"role": role, "run_id": manifest.run_id},
+                _issue(
+                    ComparabilityCode.RESULT_INVALID,
+                    f"The {role} result is invalid and cannot be compared.",
+                    role=role,
+                    run_id=manifest.run_id,
                 )
             )
         elif manifest is None and run.summary.get("overflow_detected"):
             issues.append(
-                ComparabilityIssue(
-                    code="result.invalid_pmu_overflow",
-                    severity=ComparabilitySeverity.BLOCKING,
-                    message=f"The legacy {role} result has PMU counter overflow.",
-                    context={"role": role},
+                _issue(
+                    ComparabilityCode.RESULT_INVALID_PMU_OVERFLOW,
+                    f"The legacy {role} result has PMU counter overflow.",
+                    role=role,
                 )
             )
         elif manifest is not None and manifest.validity is ResultValidity.DEGRADED:
             issues.append(
-                ComparabilityIssue(
-                    code="result.degraded",
-                    severity=ComparabilitySeverity.INFORMATIVE,
-                    message=f"The {role} result is degraded; interpret affected metrics cautiously.",
-                    context={"role": role, "run_id": manifest.run_id},
+                _issue(
+                    ComparabilityCode.RESULT_DEGRADED,
+                    f"The {role} result is degraded; interpret affected metrics cautiously.",
+                    role=role,
+                    run_id=manifest.run_id,
                 )
             )
 
@@ -124,11 +115,11 @@ def assess_comparability(
     candidate_model = candidate_dimensions.get("model_sha256")
     if baseline_model and candidate_model and baseline_model != candidate_model:
         issues.append(
-            ComparabilityIssue(
-                code="identity.model_mismatch",
-                severity=ComparabilitySeverity.BLOCKING,
-                message="Model SHA-256 differs; run-level performance deltas are not comparable.",
-                context={"baseline": baseline_model, "candidate": candidate_model},
+            _issue(
+                ComparabilityCode.IDENTITY_MODEL_MISMATCH,
+                "Model SHA-256 differs; run-level performance deltas are not comparable.",
+                baseline=baseline_model,
+                candidate=candidate_model,
             )
         )
 
@@ -141,21 +132,14 @@ def assess_comparability(
     # busy_loop probe replaces the model with a calibrated CPU spin, so an
     # infer baseline against a busy_loop candidate compares a model inference
     # against a CPU spin and reports the difference as a regression (#125).
-    for dimension in (
-        "power_scope",
-        "power_mode",
-        "power_firmware",
-        "power_monitor",
-        "power_lockstep",
-        "power_clean_window_probe",
-    ):
+    for dimension in POWER_DIMENSION_MISMATCH.dimensions:
         baseline_value = baseline_dimensions.get(dimension)
         candidate_value = candidate_dimensions.get(dimension)
         if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:
             issues.append(
                 ComparabilityIssue(
-                    code=f"metric.power_{dimension}_mismatch",
-                    severity=ComparabilitySeverity.METRIC_BLOCKING,
+                    code=POWER_DIMENSION_MISMATCH.code_for(dimension),
+                    severity=POWER_DIMENSION_MISMATCH.severity,
                     message=f"Power metrics omitted because {dimension} differs.",
                     context={
                         "metric_group": "power",
@@ -168,11 +152,12 @@ def assess_comparability(
         integrity = dimensions.get("power_integrity")
         if integrity not in (None, "valid"):
             issues.append(
-                ComparabilityIssue(
-                    code="metric.power_integrity_invalid",
-                    severity=ComparabilitySeverity.METRIC_BLOCKING,
-                    message=f"Power metrics omitted because the {role} power result is {integrity}.",
-                    context={"metric_group": "power", "role": role, "integrity": integrity},
+                _issue(
+                    ComparabilityCode.METRIC_POWER_INTEGRITY_INVALID,
+                    f"Power metrics omitted because the {role} power result is {integrity}.",
+                    metric_group="power",
+                    role=role,
+                    integrity=integrity,
                 )
             )
 
@@ -180,32 +165,28 @@ def assess_comparability(
     candidate_ops = [row.get("op") for row in candidate.layers]
     if len(baseline.layers) != len(candidate.layers):
         issues.append(
-            ComparabilityIssue(
-                code="topology.layer_count_mismatch",
-                severity=ComparabilitySeverity.LAYER_BLOCKING,
-                message=(
-                    "Per-layer deltas omitted because layer counts differ "
-                    f"(baseline={len(baseline.layers)}, candidate={len(candidate.layers)})."
-                ),
+            _issue(
+                ComparabilityCode.TOPOLOGY_LAYER_COUNT_MISMATCH,
+                "Per-layer deltas omitted because layer counts differ "
+                f"(baseline={len(baseline.layers)}, candidate={len(candidate.layers)}).",
             )
         )
     elif baseline_ops != candidate_ops:
         issues.append(
-            ComparabilityIssue(
-                code="topology.operation_sequence_mismatch",
-                severity=ComparabilitySeverity.LAYER_BLOCKING,
-                message="Per-layer deltas omitted because operation sequences differ.",
+            _issue(
+                ComparabilityCode.TOPOLOGY_OPERATION_SEQUENCE_MISMATCH,
+                "Per-layer deltas omitted because operation sequences differ.",
             )
         )
 
-    for dimension in _INFORMATIVE_DIMENSIONS:
+    for dimension in DIMENSION_DIFFERS.dimensions:
         baseline_value = baseline_dimensions.get(dimension)
         candidate_value = candidate_dimensions.get(dimension)
         if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:
             issues.append(
                 ComparabilityIssue(
-                    code=f"dimension.{dimension}_differs",
-                    severity=ComparabilitySeverity.INFORMATIVE,
+                    code=DIMENSION_DIFFERS.code_for(dimension),
+                    severity=DIMENSION_DIFFERS.severity,
                     message=f"Comparison dimension differs: {dimension}.",
                     context={"baseline": baseline_value, "candidate": candidate_value},
                 )
