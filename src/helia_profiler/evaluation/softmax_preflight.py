@@ -22,11 +22,25 @@ install and from the CI unit-test environment, and a preflight that silently
 skips on exactly the installs that hit the bug is not a preflight. The reader
 is cross-validated against litert wherever litert is present.
 
-Applies to every TFLite-consuming engine -- TFLM, heliaRT, and heliaAOT share
-the reference helper (the issue reproduces the abort on all of them).
-ExecuTorch consumes ``.pte`` and never reaches this code. Float Softmax never
-quantizes the multiplier; int16 takes a different TFLM prepare path that has
-not been shown to abort -- gating either without evidence would reject models
+Engine scope -- established by running each engine's actual code, after two
+wrong versions of this paragraph:
+
+* **TFLM and heliaRT** run TFLM's interpreter on target; all three vendored
+  kernel implementations share the aborting ``CalculateSoftmaxParams`` chain.
+  Gate: ``multiplier <= 1.0`` is an error (strict ``TFLITE_CHECK_GT``).
+* **heliaAOT** does NOT share the helper -- it computes softmax scaling on
+  the host -- but its own path fails one call later: ``calculate_input_radius``
+  does ``1 << shift`` on the frexp exponent, so ``multiplier < 0.5`` raises
+  ``ValueError: negative shift count`` inside the compiler (verified against
+  the pinned helia-aot 0.18). The first fix exempted AOT entirely after
+  verifying only the first call. Gate: ``multiplier < 0.5`` is an error with
+  an AOT-specific message; ``0.5 <= multiplier <= 1.0`` compiles but is
+  numerically degenerate (diff_min lands 7 orders of magnitude from healthy)
+  and would abort under helia-rt, so it warns.
+* **ExecuTorch** consumes ``.pte`` and never reaches any of this.
+
+Float Softmax never quantizes the multiplier; int16 takes different prepare
+paths not shown to fail -- gating either without evidence would reject models
 that may run.
 """
 
@@ -42,6 +56,31 @@ from ._tflite_reader import TENSOR_TYPE_UINT8, read_quantized_softmax_ops
 TFLM_SOFTMAX_INTEGER_BITS = 5
 
 _MULTIPLIER_SHIFT = 31 - TFLM_SOFTMAX_INTEGER_BITS
+
+
+#: Below this, helia-aot 0.18's own softmax path raises ``ValueError:
+#: negative shift count``: ``AirFixedPointScale.from_real_multiplier`` stores
+#: the frexp exponent as the shift, and multipliers in [0.5, 1) have exponent
+#: 0 while anything below 0.5 goes negative -- which ``calculate_input_radius``
+#: then feeds to ``1 << shift``. Exactly 0.5 has exponent 0 and compiles. The
+#: boundary is a property of the PINNED helia-aot; revisit on a version bump.
+AOT_COMPILER_MIN_MULTIPLIER = 0.5
+
+
+def aot_softmax_verdict(multiplier: float) -> str:
+    """helia-aot's fate for one quantized Softmax: 'error', 'warn', or 'ok'.
+
+    'error': the compiler itself raises (negative shift count) -- the gate
+    exists to replace that stage-2 crash with an actionable message. 'warn':
+    it compiles, but the input can only represent a logit range orders of
+    magnitude too small for a meaningful softmax, and the same model aborts
+    under helia-rt -- worth telling the user, not worth blocking a profile.
+    """
+    if multiplier < AOT_COMPILER_MIN_MULTIPLIER:
+        return "error"
+    if multiplier <= 1.0:
+        return "warn"
+    return "ok"
 
 
 def softmax_input_multiplier(beta: float, input_scale: float) -> float:

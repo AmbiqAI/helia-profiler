@@ -1,6 +1,6 @@
 """Generate tests/fixtures/softmax_scale_unsupported.tflite (#57).
 
-A minimal, valid TFLite flatbuffer with three quantized Softmax ops, built so
+A minimal, valid TFLite flatbuffer with four Softmax ops, built so
 every branch of ``evaluation/_tflite_reader.py`` is load-bearing in a test
 environment WITHOUT ai-edge-litert:
 

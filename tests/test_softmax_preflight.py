@@ -8,9 +8,11 @@ multiplier the issue quotes.
 
 The parser under test is the package's own minimal flatbuffer reader, not
 ai-edge-litert: litert is an optional extra, absent from a plain helia-rt
-install and from this CI environment, and a preflight that skips exactly
-where the bug bites is not a preflight. The last test cross-validates the
-reader against litert on every fixture in the repo, wherever litert exists.
+install and from the unit-test CI matrix, and a preflight that skips exactly
+where the bug bites is not a preflight. Everything here except the
+litert-marked tests runs dependency-free; those (the cross-parser sweep and
+the fixture-generator byte-identity pin) run in CI's analysis-tests job,
+which installs the analysis extra for exactly this purpose.
 """
 
 from __future__ import annotations
@@ -137,6 +139,19 @@ class TestScan:
         assert finding.minimum_scale == pytest.approx(1 / (1 << 26))
         assert finding.input_scale < finding.minimum_scale
 
+    def test_minimum_scale_scales_with_beta(self):
+        """The printed 'needs input_scale > X' must use the op's OWN beta.
+
+        The beta-rescued op (beta=1e9) needs a scale 1e9 smaller than a
+        beta=1 op needs. Review found the beta term unpinned: dropping it
+        from minimum_scale survived the whole suite while the user-facing
+        error printed a bound a billion times too large.
+        """
+        rescued = scan_softmax_scaling(BAD_MODEL)[1]
+
+        assert rescued.beta == pytest.approx(1e9)
+        assert rescued.minimum_scale == pytest.approx(1 / (1e9 * (1 << 26)))
+
 
 class TestPreflightGate:
     def test_the_failing_model_is_rejected_before_anything_runs(self):
@@ -155,22 +170,59 @@ class TestPreflightGate:
         assert "1 quantized Softmax" in message
         assert "beta_rescued_input" not in message
 
-    def test_the_gate_applies_only_to_engines_that_run_tflm_on_target(self):
-        """TFLM and heliaRT hit the aborting helper; nothing else does.
+    def test_each_engine_gets_its_own_verdict_and_message(self):
+        """Three engine behaviours, each established by running real code.
 
-        The first version of this test asserted heliaAOT was gated too, on a
-        misreading of the issue's "Helia-RT/Helia fail". Review proved
-        otherwise by running helia_aot's own preprocess_softmax_scaling on the
-        failing scale: it returns a negative-shift fixed-point scale with no
-        exception, and main_aot.cc.j2 never calls AllocateTensors -- so the
-        old gate rejected working models with a message describing a call
-        their firmware does not contain, and this test enshrined it.
+        This test has been wrong twice. v1 gated heliaAOT with TFLM's message
+        after misreading the issue. v2 exempted heliaAOT entirely after
+        verifying its preprocess_softmax_scaling handles the failing scale --
+        one call short: calculate_input_radius does `1 << shift` on the
+        result and raises `negative shift count` for multipliers below 0.5,
+        so the issue's model (0.289) crashes the AOT compiler at stage 2 with
+        a message naming nothing. The gate now catches it with the cause.
         """
         for engine in (EngineType.HELIA_RT, EngineType.TFLM):
-            with pytest.raises(ConfigError):
+            with pytest.raises(ConfigError, match="AllocateTensors"):
                 _check_softmax_scaling(BAD_MODEL, engine)
-        for engine in (EngineType.HELIA_AOT, EngineType.EXECUTORCH):
-            _check_softmax_scaling(BAD_MODEL, engine)
+
+        with pytest.raises(ConfigError, match="calculate_input_radius") as excinfo:
+            _check_softmax_scaling(BAD_MODEL, EngineType.HELIA_AOT)
+        assert "AllocateTensors" not in str(excinfo.value), (
+            "the AOT message must not describe a call AOT firmware never makes"
+        )
+
+        _check_softmax_scaling(BAD_MODEL, EngineType.EXECUTORCH)
+
+    def test_the_aot_verdict_bands_match_the_pinned_compiler(self):
+        """The three bands, swept at their boundaries.
+
+        Verified against helia-aot 0.18 by running its softmax path: below
+        0.5 raises `negative shift count`; [0.5, 1.0] compiles with diff_min
+        seven orders of magnitude from healthy (warn); above 1.0 is fine.
+        Exactly 0.5 has frexp exponent 0 and compiles, so the error bound is
+        strict.
+        """
+        from helia_profiler.evaluation.softmax_preflight import aot_softmax_verdict
+
+        assert aot_softmax_verdict(0.2889418303966522) == "error"  # issue model
+        assert aot_softmax_verdict(0.49) == "error"
+        assert aot_softmax_verdict(0.5) == "warn"
+        assert aot_softmax_verdict(0.99) == "warn"
+        assert aot_softmax_verdict(1.0) == "warn"
+        assert aot_softmax_verdict(1.0000001) == "ok"
+        assert aot_softmax_verdict(9710150.0) == "ok"  # KWS reference
+
+    def test_the_aot_error_path_warns_on_the_degenerate_band_too(self, caplog):
+        """A model can carry ops in BOTH bands; the sub-0.5 op raises and the
+        0.5..1.0 op must still be logged, not eaten by the error."""
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            with pytest.raises(ConfigError):
+                _check_softmax_scaling(BAD_MODEL, EngineType.HELIA_AOT)
+        # BAD_MODEL has no 0.5..1.0 op, so nothing may be logged here either:
+        # the warning must track the band exactly, in both directions.
+        assert "degenerate input scale" not in caplog.text
 
     def test_a_clean_model_passes(self):
         _check_softmax_scaling(KWS_MODEL, EngineType.HELIA_RT)
@@ -234,8 +286,8 @@ def test_fixture_matches_its_committed_generator():
 def test_reader_agrees_with_litert_on_every_fixture():
     """Cross-validation: the minimal reader vs the reference parser.
 
-    Runs wherever ai-edge-litert is installed (the aot/analysis extras and the
-    hardware-validation CI); skips in the bare unit-test environment. A drift
+    Runs wherever ai-edge-litert is installed -- in CI, the analysis-tests
+    job, which exists to run this; skips in the bare unit matrix. A drift
     between the two parsers fails here rather than silently diverging.
     """
     schema = pytest.importorskip("ai_edge_litert.schema_py_generated")

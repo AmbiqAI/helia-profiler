@@ -107,10 +107,16 @@ jobs:
       - name: Install test dependencies with the analysis extra
         run: uv sync --locked --group test --extra analysis
 
+      - name: Fail loudly if litert is absent
+        # Without this the job goes green with every litert test skipped --
+        # the exact disconnected-oracle failure it exists to prevent.
+        run: uv run --group test --extra analysis python -c "import ai_edge_litert.schema_py_generated"
+
       - name: Run the litert-dependent tests
         run: |
-          uv run --group test pytest \
-            tests/test_softmax_preflight.py tests/test_model_analysis.py -q
+          uv run --group test --extra analysis pytest \
+            tests/test_softmax_preflight.py tests/test_model_analysis.py \
+            tests/test_example_models.py -q
 
   # ---------------------------------------------------------------
   # Package — validate the exact wheel/sdist release boundaries
