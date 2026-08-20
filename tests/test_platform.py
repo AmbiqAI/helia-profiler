@@ -272,6 +272,13 @@ def test_custom_soc_registry_can_override_jlink_and_rtt():
 
     assert soc.jlink_device == "AP510-CUSTOM"
     assert soc.rtt_scan_ranges == ((0x21000000, 0x100000),)
+    # Stated rather than left implicit because it CHANGED with issue #149, and
+    # nothing here noticed: this SocDef used to resolve 0x00410000 off its AP5
+    # family tag and now resolves None.  The programmatic path has no
+    # ``based_on`` to inherit through, so a caller building a SocDef by hand
+    # must pass ``app_flash_load_addr=`` to get an address at all.
+    assert soc.origin is SocOrigin.CUSTOM
+    assert soc.capabilities.memory.app_flash_load_addr is None
 
 
 # ---------------------------------------------------------------------------
@@ -312,13 +319,43 @@ def _custom_soc(name, spec):
 
 
 def test_a_declared_app_flash_load_address_beats_both_lookup_tiers(monkeypatch):
+    """The declared tier is consulted BEFORE the two tables, not after.
+
+    Observing that order needs a ``SocDef`` for which both sides could answer,
+    and no such part exists in normal use: built-ins declare no address of
+    their own (pinned by
+    ``test_every_builtin_soc_is_stamped_builtin_and_states_no_address_itself``)
+    and custom ones never reach the tables.  So the fixture is built by hand --
+    a ``replace`` copy of a built-in, which keeps ``SocOrigin.BUILTIN`` and
+    therefore keeps both tables in play, carrying a declared address as well.
+    Both tables are then stacked against it: a per-SoC override patched in
+    under its name, and its own family's baseline behind that.
+
+    Without this, the tier order is unobservable and moving the declared tier
+    below the tables leaves the whole suite green.
+    """
+    from dataclasses import replace
+
+    from helia_profiler.platform import capabilities
+
+    monkeypatch.setitem(capabilities._SOC_APP_FLASH_LOAD_ADDR, "apollo510", 0x22000000)
+    soc = replace(get_soc("apollo510"), app_flash_load_addr=0x00040000)
+
+    assert soc.origin is SocOrigin.BUILTIN  # both tables are reachable for it
+    assert capabilities._SOC_APP_FLASH_LOAD_ADDR["apollo510"] == 0x22000000  # tier 2 would say
+    assert capabilities._FAMILY_APP_FLASH_LOAD_ADDR[SocFamily.AP5] == 0x00410000  # tier 3 would
+    assert soc.capabilities.memory.app_flash_load_addr == 0x00040000
+
+
+def test_a_custom_socs_declared_address_survives_a_name_matched_override(monkeypatch):
     """What the user wrote about their own silicon outranks every table here.
 
-    Both tiers are stacked against it: the SoC is named after a built-in with
-    a per-SoC override patched in, and declares the family whose baseline
-    would otherwise answer.  Neither may win -- the user is describing a part
-    hpx has never seen, and is the only source of truth for its bootloader
-    reservation.
+    Sibling of the test above, from the other origin: this is the shape a real
+    ``target.custom_socs`` entry has, so the tables are gated off it entirely
+    and only the declared tier can answer.  What it pins is that naming the
+    part after a built-in with an override does not disturb that -- the user is
+    describing a part hpx has never seen, and is the only source of truth for
+    its bootloader reservation.
     """
     from helia_profiler.platform import capabilities
 
@@ -359,6 +396,8 @@ def test_a_declared_address_of_zero_is_honoured():
         ("0x1G000", "not an integer address"),
         (-4096, "negative"),
         ([0x40000], "not an integer address"),
+        (0x220000000, "does not fit in 32 bits"),
+        ("0x220000000", "does not fit in 32 bits"),
     ],
 )
 def test_an_unusable_declared_address_is_rejected_with_a_typed_error(value, expected):
@@ -367,12 +406,26 @@ def test_an_unusable_declared_address_is_rejected_with_a_typed_error(value, expe
     ``True`` is called out separately because ``bool`` is an ``int`` subclass:
     without an explicit check, ``app_flash_load_addr: true`` would quietly
     program the image at address 0x1.
+
+    ``0x220000000`` is the typo this field invites -- one hex digit too many on
+    an otherwise plausible value.  Magnitude was unchecked while sign and type
+    were, so it resolved verbatim and reached the J-Link recipe's
+    ``LoadFile ..., 0x{addr:08X}`` as a 36-bit literal.  No 32-bit Cortex-M
+    part has such an address, which makes it cheap to reject and expensive to
+    accept.
     """
     with pytest.raises(ConfigError) as exc_info:
         _custom_soc("oem4", _scratch_soc_spec(app_flash_load_addr=value))
 
     assert expected in str(exc_info.value)
     assert "app_flash_load_addr" in str(exc_info.value)
+
+
+def test_the_widest_32_bit_address_is_still_accepted():
+    """The bound is inclusive -- it rejects impossible values, not extreme ones."""
+    soc = _custom_soc("oem4", _scratch_soc_spec(app_flash_load_addr=0xFFFFFFFF))
+
+    assert soc.capabilities.memory.app_flash_load_addr == 0xFFFFFFFF
 
 
 def test_a_custom_soc_inherits_the_address_of_the_part_it_is_based_on():
@@ -455,6 +508,56 @@ def test_a_custom_soc_with_no_address_and_no_based_on_refuses_to_guess():
     assert soc.capabilities.memory.app_flash_load_addr is None
 
 
+def test_a_custom_soc_named_after_an_override_part_still_refuses_to_guess():
+    """The same refusal, with the per-SoC override table stacked against it.
+
+    Sibling of the test above, and the shape that actually observes the origin
+    gate: ``atomiq110`` is a real ``_SOC_APP_FLASH_LOAD_ADDR`` entry, so a
+    custom SoC that borrows the name has a live table value waiting under it.
+    With no address and no ``based_on`` there is nothing else that could
+    answer, so a non-``None`` result here means the name reached the table --
+    the forgery df34b6e closed.
+
+    Deliberately not monkeypatched: this uses the production table, so it keeps
+    holding when PR #98 registers ``atomiq110`` as a built-in and the entry
+    stops being reachable only through a user-chosen name.
+    """
+    from helia_profiler.platform import capabilities
+
+    assert capabilities._SOC_APP_FLASH_LOAD_ADDR["atomiq110"] == 0x22000000
+    soc = _custom_soc("atomiq110", _scratch_soc_spec())
+
+    assert soc.origin is SocOrigin.CUSTOM
+    assert soc.capabilities.memory.app_flash_load_addr is None
+
+
+def test_an_explicit_null_address_is_a_refusal_not_an_omission():
+    """``app_flash_load_addr: null`` must not be read as "key absent".
+
+    The two are opposite statements and only a sentinel keeps them apart --
+    ``spec.get(key) is None`` collapses them.  Writing ``null`` is the only way
+    the config surface offers to say "do not guess for this part", and the
+    user most likely to write it is one who wants a ``based_on``'s memory and
+    clock facts but not its flash window.  Collapsed, that user gets the
+    inherited address: the precise opposite of what they wrote.
+    """
+    soc = _custom_soc("apollo510_custom", {"based_on": "apollo510", "app_flash_load_addr": None})
+
+    assert soc.memory == get_soc("apollo510").memory  # based_on still supplies everything else
+    assert soc.capabilities.memory.app_flash_load_addr is None
+
+
+def test_omitting_the_address_key_still_inherits_from_based_on():
+    """The other half of the sentinel: absence must keep inheriting.
+
+    Pinned alongside the explicit-``null`` case because a sentinel applied to
+    both branches would silently turn every ``based_on`` entry into ``None``.
+    """
+    soc = _custom_soc("apollo510_custom", {"based_on": "apollo510"})
+
+    assert soc.capabilities.memory.app_flash_load_addr == 0x00410000
+
+
 def test_overriding_memory_does_not_drop_an_inherited_address():
     """The rejected alternative, pinned so it cannot creep back in.
 
@@ -529,19 +632,88 @@ def test_an_unknown_key_in_a_custom_soc_is_rejected():
 
     assert "target.custom_socs.oem4" in str(exc_info.value)
     assert "flash_load_address" in str(exc_info.value)
-    assert "app_flash_load_addr" in (exc_info.value.hint or "")
+    assert "Did you mean 'flash_load_address' -> 'app_flash_load_addr'?" in (
+        exc_info.value.hint or ""
+    )
 
 
 def test_an_unknown_key_error_names_every_offender_and_lists_what_is_supported():
-    """One pass, not one error per round-trip, and never a bare "invalid key"."""
+    """One pass, not one error per round-trip, and never a bare "invalid key".
+
+    Neither offender here is close enough to earn a suggestion -- ``jlink``
+    scores 0.588 against ``jlink_device``, just under difflib's 0.6 cutoff --
+    which is the point: the supported-key listing is unconditional, so the user
+    is never left with only the news that they were wrong.  (This test once
+    read ``assert "jlink_device" in hint  # close-match suggestion``, which
+    matched the listing.  The suggestion it named does not fire for this input
+    at all; the dedicated test below uses keys that do.)
+    """
     with pytest.raises(ConfigError) as exc_info:
         _custom_soc("oem4", _scratch_soc_spec(jlink="OEM4", nonsense=1))
 
     message = str(exc_info.value)
     assert "'jlink'" in message and "'nonsense'" in message
     hint = exc_info.value.hint or ""
-    assert "jlink_device" in hint  # close-match suggestion
-    assert "rtt_scan_ranges" in hint  # full supported-key listing
+    assert "Did you mean" not in hint
+    assert "Supported keys:" in hint and "rtt_scan_ranges" in hint  # full listing
+
+
+@pytest.mark.parametrize(
+    ("target", "typo", "expected"),
+    [
+        (
+            {"custom_socs": {"c": {"based_on": "apollo510", "flash_load_address": 1}}},
+            "flash_load_address",
+            "app_flash_load_addr",
+        ),
+        (
+            {"custom_socs": {"c": {"based_on": "apollo510", "memory": {"tcm_kb": 240}}}},
+            "tcm_kb",
+            "itcm_kb",
+        ),
+        (
+            {"custom_boards": {"lab": {"based_on": "apollo510_evb", "default_sync_pin": 27}}},
+            "default_sync_pin",
+            "default_sync_gpio_pin",
+        ),
+    ],
+)
+def test_a_near_miss_key_is_named_alongside_the_key_it_almost_is(target, typo, expected):
+    """The close-match suggestion must be asserted on its own literal text.
+
+    Every other assertion about it reads a key name out of the hint, and the
+    ``Supported keys: ...`` listing in the same string contains every key name
+    already -- so those assertions pass with the suggestion deleted outright.
+    They were checking the listing, not the suggestion.  Matching "Did you
+    mean" is the only phrasing that distinguishes the two.
+    """
+    with pytest.raises(ConfigError) as exc_info:
+        build_custom_platform_registry(target)
+
+    assert f"Did you mean {typo!r} -> {expected!r}?" in (exc_info.value.hint or "")
+
+
+def test_unknown_keys_of_mixed_types_are_reported_not_crashed_on():
+    """YAML keys are not all strings, and the offender list has to sort them.
+
+    PyYAML resolves a bare ``on``/``off``/``yes``/``no`` to a ``bool`` and bare
+    digits to an ``int``, so one unknown string key beside one unknown
+    non-string key compares ``str`` against ``bool``.  Unkeyed, that sort
+    raises ``TypeError`` from ``_prepare_merged_config`` -- which sits outside
+    ``load_config``'s ``try`` -- so it escapes as a traceback and breaks that
+    function's documented "never a raw exception" contract.
+    """
+    import yaml
+
+    target = yaml.safe_load(
+        "custom_socs:\n  apollo510_custom: {based_on: apollo510, on: 1, notes: hello}\n"
+    )
+    assert True in target["custom_socs"]["apollo510_custom"]  # PyYAML made `on:` a bool
+
+    with pytest.raises(ConfigError) as exc_info:
+        build_custom_platform_registry(target)
+
+    assert "'notes'" in str(exc_info.value)
 
 
 def test_an_unknown_key_inside_a_custom_soc_memory_block_is_rejected():
@@ -594,9 +766,101 @@ def test_the_custom_soc_keys_are_a_pinned_subset_of_the_soc_definition():
         "ssram_full_power_enum",
         "has_radio_subsystem",
     }
-    declared = {member.value for member in CustomSocField} - {"based_on"}
+    # Keys that are config surface only and back no SocDef field.
+    not_a_soc_field = {
+        "based_on",  # names the part to inherit from; never stored
+        "description",  # free-form annotation, accepted for parity with boards
+    }
+    declared = {member.value for member in CustomSocField} - not_a_soc_field
 
     assert declared == {field.name for field in fields(SocDef)} - not_exposed
+
+
+def test_the_custom_board_keys_cover_every_board_definition_field():
+    """Every ``BoardDef`` field except the mapping key must be writable.
+
+    ``custom_boards`` has no "deliberately not exposed" set the way
+    ``custom_socs`` does -- every field on it is board wiring a lab rig can
+    legitimately differ in.  A field missing here is not merely unwritable: it
+    is silently dropped when inherited through ``based_on`` AND a hard
+    ``ConfigError`` if written, which is how ``ble_reset_gpio_pin`` went
+    unnoticed.
+    """
+    from dataclasses import fields
+
+    from helia_profiler.platform.custom import CustomBoardField
+
+    declared = {member.value for member in CustomBoardField} - {"based_on"}
+
+    assert declared == {field.name for field in fields(BoardDef)} - {"name"}
+
+
+def test_both_custom_blocks_accept_the_same_free_form_description():
+    """Annotating a custom SoC must not be a hard error when boards allow it.
+
+    Unknown keys are now rejected outright, so a key one block accepts and the
+    other does not is no longer a difference in what gets stored -- it is a
+    config that loads or does not.  ``description:`` is the obvious thing to
+    write on either, and a user who commented their custom board the same way
+    has every reason to expect it.
+    """
+    from helia_profiler.platform.custom import CustomBoardField, CustomSocField
+
+    assert "description" in {member.value for member in CustomBoardField}
+    assert "description" in {member.value for member in CustomSocField}
+
+    soc = _custom_soc("oem4", _scratch_soc_spec(description="OEM part, rev B"))
+
+    assert soc.name == "oem4"  # accepted, and backs no SocDef field
+
+
+def test_a_custom_board_inherits_the_ble_reset_pin_of_the_board_it_is_based_on():
+    """A Blue board's Cooper radio reset line must survive ``based_on``.
+
+    ``_build_custom_boards`` never passed this through, so a custom board
+    derived from a Blue EVB silently lost it (55 -> None).  The consequence is
+    not cosmetic: ``_ble_reset.j2`` only emits the gating when the pin is set,
+    so the power binary leaves the radio ungated and the board reads a higher
+    idle current than the EVB it was copied from -- with nothing in the config
+    to point at.  Rejecting unknown keys turned the obvious workaround (write
+    the key) into a hard error, which is what makes passing it through the fix
+    rather than a nicety.
+    """
+    base = get_board("apollo4p_blue_kxr_evb")
+    registry = build_custom_platform_registry(
+        {"custom_boards": {"blue_lab": {"based_on": "apollo4p_blue_kxr_evb"}}}
+    )
+
+    assert base.ble_reset_gpio_pin == 55
+    assert registry.boards["blue_lab"].ble_reset_gpio_pin == 55
+
+
+def test_a_custom_board_may_state_its_own_ble_reset_pin():
+    """The point of the key: a rewired or differently-routed Blue board."""
+    registry = build_custom_platform_registry(
+        {
+            "custom_boards": {
+                "blue_lab": {"based_on": "apollo4p_blue_kxr_evb", "ble_reset_gpio_pin": 42}
+            }
+        }
+    )
+
+    assert registry.boards["blue_lab"].ble_reset_gpio_pin == 42
+
+
+def test_a_custom_board_based_on_a_non_blue_board_has_no_ble_reset_pin():
+    """Inheritance must not invent a pin for a board with no radio.
+
+    ``_ble_reset.j2`` keys the whole block on this being set, so a default
+    borrowed from somewhere would make a plain board drive an unrelated GPIO
+    during the measured window.
+    """
+    registry = build_custom_platform_registry(
+        {"custom_boards": {"plain_lab": {"based_on": "apollo510_evb"}}}
+    )
+
+    assert get_board("apollo510_evb").ble_reset_gpio_pin is None
+    assert registry.boards["plain_lab"].ble_reset_gpio_pin is None
 
 
 def test_an_unknown_key_in_a_custom_board_is_rejected():
