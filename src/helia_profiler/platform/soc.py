@@ -69,6 +69,11 @@ class SocOrigin(Enum):
     ``dataclasses.replace`` copy whenever the board overrides ``psram_kb`` (7
     of the built-in boards do).  An identity check silently reclassifies those
     copies as unknown parts; ``replace`` carries this field through untouched.
+
+    Carrying through untouched is exactly why this field is not the whole
+    test on its own: ``replace`` also carries it onto a copy whose ``name``
+    was changed to another part's.  Read provenance through
+    :attr:`SocDef.is_builtin`, never through this field alone.
     """
 
     BUILTIN = "builtin"
@@ -224,6 +229,38 @@ class SocDef:
     #: :class:`SocOrigin`; set by ``_register_soc`` and by nothing else.
     origin: SocOrigin = SocOrigin.CUSTOM
 
+    #: The name this definition was registered under, stamped alongside
+    #: :attr:`origin` by ``_register_soc``.  ``None`` on anything that never
+    #: went through the registry.  Read only via :attr:`is_builtin`, which is
+    #: where the reason it exists is written down.
+    registered_name: str | None = None
+
+    @property
+    def is_builtin(self) -> bool:
+        """Whether the name-keyed built-in tables may speak for this part.
+
+        Both halves are load-bearing, and each covers a hole the other leaves:
+
+        * :attr:`origin` alone is too loose.  It survives ``dataclasses.replace``
+          by design -- that is the point, see :class:`SocOrigin` -- but so does
+          a ``replace`` that *changes the name*, which is the obvious way to
+          build a custom ``SocDef`` from a built-in programmatically and is the
+          path ``docs/guide/boards.md`` points at.
+          ``replace(get_soc("apollo510"), name="atomiq110")`` would otherwise
+          keep ``BUILTIN`` and read atomiq110's per-SoC override -- an address
+          belonging to a different part, which is the df34b6e forgery reopened
+          one dimension over.
+        * An ``is _SOCS[name]`` identity check alone is too strict, and was the
+          bug ``origin`` replaced: ``get_soc_for_board`` returns a ``replace``
+          copy whenever the board overrides ``psram_kb`` (7 built-in boards do),
+          and identity silently reclassifies those as unknown parts.
+
+        Requiring the *stamped* name to still match :attr:`name` accepts every
+        copy that is still describing the part it was registered as, and
+        rejects every copy that has been renamed into another part's shoes.
+        """
+        return self.origin is SocOrigin.BUILTIN and self.registered_name == self.name
+
     def clock_domain(self, name: str) -> ClockDomain | None:
         """Return the named clock domain, or ``None`` if not present."""
         return next((d for d in self.clocks if d.name == name), None)
@@ -321,8 +358,12 @@ def _register_soc(soc: SocDef) -> SocDef:
     Stamping :attr:`SocOrigin.BUILTIN` here rather than on each definition
     below keeps "built-in" meaning exactly "registered by this module", with
     one place to read it and no way for a definition to claim it by omission.
+
+    The name is stamped alongside it, so that a later ``dataclasses.replace``
+    that renames the copy can be told apart from one that only resizes it --
+    see :attr:`SocDef.is_builtin`.
     """
-    registered = replace(soc, origin=SocOrigin.BUILTIN)
+    registered = replace(soc, origin=SocOrigin.BUILTIN, registered_name=soc.name)
     _SOCS[registered.name] = registered
     return registered
 

@@ -407,8 +407,9 @@ def resolve_app_flash_load_addr(soc: SocDef) -> int | None:
     3. ``_FAMILY_APP_FLASH_LOAD_ADDR`` -- the family baseline.
 
     Tiers 2 and 3 apply to **built-in** ``SocDef``s only, by
-    :class:`~helia_profiler.platform.soc.SocOrigin`.  Two separate reasons,
-    both load-bearing:
+    :attr:`~helia_profiler.platform.soc.SocDef.is_builtin` (which owns the
+    definition of "built-in" and why it is not a bare origin check).  Two
+    separate reasons for the gate itself, both load-bearing:
 
     * Tier 2 is keyed by name, and ``target.custom_socs`` lets a user pick any
       name -- those entries replace built-ins in the merged registry, so a name
@@ -432,11 +433,9 @@ def resolve_app_flash_load_addr(soc: SocDef) -> int | None:
     real answer meaning "nobody knows"; the J-Link flash fallback refuses to
     program rather than guess.
     """
-    from .soc import SocOrigin
-
     if soc.app_flash_load_addr is not None:
         return soc.app_flash_load_addr
-    if soc.origin is not SocOrigin.BUILTIN:
+    if not soc.is_builtin:
         return None
     override = _SOC_APP_FLASH_LOAD_ADDR.get(soc.name)
     if override is not None:

@@ -47,10 +47,14 @@ _ADDRESS_HINT = (
 #: program -- see :func:`_address`.
 _MAX_ADDRESS = 0xFFFFFFFF
 
-#: Distinguishes "key absent" from "key present, written as ``null``".  A plain
-#: ``spec.get(key)`` collapses the two, and they mean opposite things here (see
-#: :func:`_app_flash_load_addr`).
-_UNSET = object()
+#: Told to every rejected GPIO pad number, for the reason ``_ADDRESS_HINT`` is.
+_PIN_HINT = "Write the pad number as a plain non-negative integer, e.g. default_sync_gpio_pin: 29"
+
+#: As above, for the one pin whose "not wired" spelling is absence, not zero.
+_BLE_RESET_PIN_HINT = (
+    "Write the pad wired to the radio's reset line as a plain positive integer, "
+    "e.g. ble_reset_gpio_pin: 55. Omit the key entirely on a board with no onboard radio."
+)
 
 
 class CustomSocField(Enum):
@@ -215,13 +219,13 @@ def _app_flash_load_addr(
     to program and names this field.
 
     An explicit ``app_flash_load_addr: null`` is NOT the same as leaving the
-    key out, and the two are kept apart by a sentinel rather than by
-    ``spec.get(...) is None``.  Writing ``null`` is a statement -- the only one
-    the config surface offers for "do not guess an address for this part" --
-    and it is most plausibly reached for by someone who has a ``based_on`` they
-    want for its memory/clock facts but distrusts its flash window.  Collapsing
-    it into "unstated" hands that user the inherited address, i.e. the exact
-    opposite of what they wrote.
+    key out, which is why the key's *presence* is tested before its value
+    rather than collapsing both into ``spec.get(...) is None``.  Writing
+    ``null`` is a statement -- the only one the config surface offers for "do
+    not guess an address for this part" -- and it is most plausibly reached for
+    by someone who has a ``based_on`` they want for its memory/clock facts but
+    distrusts its flash window.  Collapsing it into "unstated" hands that user
+    the inherited address, i.e. the exact opposite of what they wrote.
 
     Note what this deliberately does NOT key on: whether the entry overrides
     ``memory:``.  :class:`~helia_profiler.platform.soc.MemoryLayout` carries
@@ -231,9 +235,10 @@ def _app_flash_load_addr(
     one memory fact from an unrelated one is the auto-magic this repo avoids;
     ``based_on`` is a statement the user actually made.
     """
-    raw = spec.get(CustomSocField.APP_FLASH_LOAD_ADDR.value, _UNSET)
-    if raw is _UNSET:
+    key = CustomSocField.APP_FLASH_LOAD_ADDR.value
+    if key not in spec:
         return resolve_app_flash_load_addr(base) if base is not None else None
+    raw = spec[key]
     if raw is None:
         return None
     return _address(raw, field_name=field_name)
@@ -274,14 +279,104 @@ def _address(raw: Any, *, field_name: str) -> int:
         )
     if value > _MAX_ADDRESS:
         raise ConfigError(
-            f"Invalid {field_name}: {value:#x} does not fit in 32 bits "
-            f"(max {_MAX_ADDRESS:#x}).",
+            f"Invalid {field_name}: 0x{value:08X} does not fit in 32 bits "
+            f"(max 0x{_MAX_ADDRESS:08X}).",
             hint=(
                 "Every part hpx supports is a 32-bit Cortex-M, so this is most likely "
                 "one hex digit too many. " + _ADDRESS_HINT
             ),
         )
     return value
+
+
+def _gpio_pin(raw: Any, *, field_name: str, hint: str = _PIN_HINT) -> int:
+    """Parse a GPIO pad number, rejecting every shape a bare ``int()`` mangles.
+
+    ``bool`` is excluded first and explicitly because it is an ``int``
+    subclass, and this is the field where that matters most: ``true`` resolves
+    to pad 1, and a pad number here is not inert data.  The generated firmware
+    configures that pad as an output and drives it for the duration of the
+    measured window, so a typo'd boolean buys an arbitrary GPIO toggling
+    underneath a power capture -- with nothing downstream echoing the resolved
+    number back.  Floats are rejected rather than silently truncated for the
+    same reason: pads are not fractional, so ``29.5`` is a mistake, not a value.
+
+    Every other bad shape becomes a :class:`ConfigError` rather than the
+    ``ValueError`` / ``TypeError`` a bare ``int()`` raises, because
+    ``_prepare_merged_config`` runs outside ``load_config``'s ``try``: a raw
+    exception from here escapes as a traceback and breaks that function's
+    documented "never a raw exception" contract.
+    """
+    if isinstance(raw, bool):
+        raise ConfigError(
+            f"{field_name} must be a GPIO pad number, not a boolean.",
+            hint=hint,
+        )
+    if isinstance(raw, str):
+        try:
+            value = int(raw, 10)
+        except ValueError as exc:
+            raise ConfigError(
+                f"Invalid {field_name}: {raw!r} is not a GPIO pad number.",
+                hint=hint,
+            ) from exc
+    elif isinstance(raw, int):
+        value = raw
+    else:
+        raise ConfigError(
+            f"Invalid {field_name}: {raw!r} is not a GPIO pad number.",
+            hint=hint,
+        )
+    if value < 0:
+        raise ConfigError(
+            f"Invalid {field_name}: {value} is negative -- pad numbers are unsigned.",
+            hint=hint,
+        )
+    return value
+
+
+def _ble_reset_gpio_pin(raw: Any, *, field_name: str) -> int | None:
+    """Parse ``ble_reset_gpio_pin``, where absent and ``0`` are not synonyms.
+
+    This field means "the pad wired to the onboard Cooper radio's reset line",
+    and it says "there is no onboard radio" by being ``None`` -- it is the only
+    pin on this block that is ``int | None`` rather than a plain ``int``.  Its
+    three siblings have no such spelling, which is why *they* need ``0`` as a
+    "wire not present" sentinel (see ``platform/board.py``).
+
+    So ``0`` arrives here carrying two incompatible readings, and both of the
+    ways to resolve it silently are measurement corruption:
+
+    * read as GPIO 0, a user who copied the siblings' sentinel gets pad 0
+      configured as an output and held low for the whole measured window;
+    * read as "disabled", a user who genuinely routed reset to pad 0 gets the
+      radio left free-running -- this change's own documented failure, an idle
+      current higher than the EVB the board was copied from with nothing in
+      the config to point at.
+
+    Neither is recoverable by the user, because nothing echoes the resolved pin
+    back.  ``0`` is therefore refused outright, which converts both into a
+    ``ConfigError`` that names the field and both meanings.  Everywhere past
+    this parser ``0`` is an ordinary pad number -- ``BoardDef``, the firmware
+    module gate and ``_ble_reset.j2`` all key on ``is not None`` alone -- so
+    this is a restriction on the YAML surface, not a second sentinel.
+    """
+    if raw is None:
+        return None
+    pin = _gpio_pin(raw, field_name=field_name, hint=_BLE_RESET_PIN_HINT)
+    if pin == 0:
+        raise ConfigError(
+            f"{field_name}: 0 is ambiguous on this field and is not accepted.",
+            hint=(
+                "The sibling pins in this block use 0 for 'wire not present', but this "
+                "one says 'no onboard radio' by being absent -- so 0 could mean either "
+                "that or pad 0, which the power binary would drive low for the whole "
+                "measured window. Omit the key (or write null) if there is no radio to "
+                "reset. If your board really does route the reset line to pad 0, please "
+                "open an issue: the config surface cannot express it today."
+            ),
+        )
+    return pin
 
 
 def _reject_unknown_keys(
@@ -356,34 +451,43 @@ def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, Boar
             soc=str(soc),
             channel=str(channel),
             psram_kb=_optional_int(spec.get("psram_kb", base_board.psram_kb if base_board else None)),
-            default_sync_gpio_pin=int(
+            # All four pins below go through a validating parser rather than a
+            # bare ``int()``.  See :func:`_gpio_pin`: these values end up
+            # configuring pads as outputs inside the measured window, so the
+            # ``bool``-is-an-``int`` hazard costs a corrupted power capture
+            # rather than a wrong number in a report.
+            default_sync_gpio_pin=_gpio_pin(
                 spec.get(
                     "default_sync_gpio_pin",
                     base_board.default_sync_gpio_pin if base_board else DEFAULT_SYNC_GPIO_PIN,
-                )
+                ),
+                field_name=f"target.custom_boards.{name}.default_sync_gpio_pin",
             ),
-            default_state_gpio_pin=int(
+            default_state_gpio_pin=_gpio_pin(
                 spec.get(
                     "default_state_gpio_pin",
                     base_board.default_state_gpio_pin if base_board else DEFAULT_STATE_GPIO_PIN,
-                )
+                ),
+                field_name=f"target.custom_boards.{name}.default_state_gpio_pin",
             ),
-            default_go_gpio_pin=int(
+            default_go_gpio_pin=_gpio_pin(
                 spec.get(
                     "default_go_gpio_pin",
                     base_board.default_go_gpio_pin if base_board else DEFAULT_GO_GPIO_PIN,
-                )
+                ),
+                field_name=f"target.custom_boards.{name}.default_go_gpio_pin",
             ),
             # Inherited rather than dropped: a Blue board's Cooper radio holds
             # its own reset line, and without this pin the power binary never
             # emits the gating in ``_ble_reset.j2``.  A custom board derived
             # from a Blue EVB would then read a higher idle current than the
             # EVB it was copied from, for a reason nothing in the config shows.
-            ble_reset_gpio_pin=_optional_int(
+            ble_reset_gpio_pin=_ble_reset_gpio_pin(
                 spec.get(
                     "ble_reset_gpio_pin",
                     base_board.ble_reset_gpio_pin if base_board else None,
-                )
+                ),
+                field_name=f"target.custom_boards.{name}.ble_reset_gpio_pin",
             ),
             starter_profile_board=(
                 str(starter_profile_board) if starter_profile_board is not None else None

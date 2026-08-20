@@ -40,6 +40,17 @@ class BoardDef:
     # un-reset Cooper radio idles at non-trivial standby current that a
     # non-Blue board doesn't have to begin with. None = no onboard BLE
     # radio on this board (nothing to hold in reset).
+    #
+    # Note the asymmetry with the three pins above: those are plain ints, so
+    # they need 0 as their "wire not present" sentinel. This one is
+    # `int | None` and spells that as None, so 0 here is an ordinary pad
+    # number and every gate on this field tests `is not None`, never
+    # truthiness (firmware/context.py's power_binary_needs_gpio,
+    # firmware/__init__.py's nsx-gpio selection, and _ble_reset.j2). Because
+    # 0 reads as a sentinel to anyone going by the siblings, and either
+    # reading of it corrupts a power capture in silence, the YAML surface
+    # refuses a literal 0 outright -- see platform/custom.py's
+    # _ble_reset_gpio_pin.
     ble_reset_gpio_pin: int | None = None
 
     @property
