@@ -11,7 +11,7 @@ family despite the "3" in its name.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -45,6 +45,34 @@ class PmuTier(Enum):
 
     DWT_ONLY = "dwt"  # Cortex-M4: DWT cycle counter, limited event support
     ARMV8M_PMU = "pmu"  # Cortex-M55: Full Armv8-M PMU, 70+ events, 8 counters
+
+
+class SocOrigin(Enum):
+    """Where a :class:`SocDef`'s platform facts came from.
+
+    This is not decoration: some policy in
+    :mod:`~helia_profiler.platform.capabilities` is only sound for parts this
+    repo has actually characterised.  The app-image flash address is the live
+    case -- its per-SoC and per-family tables were checked part by part against
+    NSX's ``cmake/socs/facts/*.cmake``, and neither table can speak for a SoC
+    that was never in them.
+
+    ``CUSTOM`` is the default precisely so that a ``SocDef`` arriving from
+    anywhere other than this module's registry -- ``target.custom_socs``, a
+    test fixture, a caller of the public API -- is treated as uncharacterised
+    unless something deliberately says otherwise.  ``_register_soc`` is that
+    something, and is the only place ``BUILTIN`` is set.
+
+    Provenance is a *field* rather than an ``is _SOCS[name]`` identity check
+    because a built-in SoC does not always survive as the registered object:
+    :func:`~helia_profiler.platform.registry.get_soc_for_board` returns a
+    ``dataclasses.replace`` copy whenever the board overrides ``psram_kb`` (7
+    of the built-in boards do).  An identity check silently reclassifies those
+    copies as unknown parts; ``replace`` carries this field through untouched.
+    """
+
+    BUILTIN = "builtin"
+    CUSTOM = "custom"
 
 # ---------------------------------------------------------------------------
 # SoC definition
@@ -176,6 +204,26 @@ class SocDef:
     #: per-part rather than assumed true for the whole AP5 family.
     has_radio_subsystem: bool = False
 
+    #: This part's own app-image flash (``LoadFile``) address -- the first
+    #: MRAM/flash address above its bootloader-reserved region, NOT the MRAM
+    #: *region* base.  ``None`` means "this SocDef does not state one"; the
+    #: address is then resolved by
+    #: :func:`~helia_profiler.platform.capabilities.resolve_app_flash_load_addr`,
+    #: which is the single place that policy lives.
+    #:
+    #: The built-in registry deliberately leaves this ``None`` and keeps its
+    #: addresses in that module's per-SoC/per-family tables, which are pinned
+    #: against NSX's ``cmake/socs/facts/*.cmake`` values part by part.  This
+    #: field exists for SoCs those tables cannot speak for -- above all
+    #: ``target.custom_socs`` entries, where a user-named novel part must be
+    #: able to say ``app_flash_load_addr:`` instead of being routed through a
+    #: family tag that, in this model, only records a core tier.
+    app_flash_load_addr: int | None = None
+
+    #: Whether this definition comes from the built-in registry below.  See
+    #: :class:`SocOrigin`; set by ``_register_soc`` and by nothing else.
+    origin: SocOrigin = SocOrigin.CUSTOM
+
     def clock_domain(self, name: str) -> ClockDomain | None:
         """Return the named clock domain, or ``None`` if not present."""
         return next((d for d in self.clocks if d.name == name), None)
@@ -268,8 +316,15 @@ _SOCS: dict[str, SocDef] = {}
 
 
 def _register_soc(soc: SocDef) -> SocDef:
-    _SOCS[soc.name] = soc
-    return soc
+    """Register *soc* as a built-in part.
+
+    Stamping :attr:`SocOrigin.BUILTIN` here rather than on each definition
+    below keeps "built-in" meaning exactly "registered by this module", with
+    one place to read it and no way for a definition to claim it by omission.
+    """
+    registered = replace(soc, origin=SocOrigin.BUILTIN)
+    _SOCS[registered.name] = registered
+    return registered
 
 # --- AP3 family (Cortex-M4F) ------------------------------------------------
 

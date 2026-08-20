@@ -1,11 +1,23 @@
-"""Custom SoC and board overlay parsing for profile configuration."""
+"""Custom SoC and board overlay parsing for profile configuration.
+
+This module owns the *config surface* of ``target.custom_socs`` /
+``target.custom_boards``: which YAML keys exist, what they mean, and how they
+turn into the frozen :class:`~helia_profiler.platform.soc.SocDef` /
+:class:`~helia_profiler.platform.board.BoardDef` records the rest of hpx reads.
+The key names live in the ``Custom*Field`` enums below rather than as bare
+string literals scattered through the builders, so the parser and the
+"unknown key" check cannot disagree about what is accepted.
+"""
 
 from __future__ import annotations
 
-from typing import Any
+import difflib
+from enum import Enum
+from typing import Any, Mapping
 
 from ..errors import ConfigError
 from .board import DEFAULT_GO_GPIO_PIN, DEFAULT_STATE_GPIO_PIN, DEFAULT_SYNC_GPIO_PIN, BoardDef
+from .capabilities import resolve_app_flash_load_addr
 from .registry import PlatformRegistry, build_platform_registry, get_board, get_soc
 from .soc import (
     ClockDomain,
@@ -17,6 +29,55 @@ from .soc import (
     SocDef,
     SocFamily,
 )
+
+
+class CustomSocField(Enum):
+    """Keys accepted inside a ``target.custom_socs.<name>`` mapping."""
+
+    BASED_ON = "based_on"
+    FAMILY = "family"
+    CORE = "core"
+    PMU_TIER = "pmu_tier"
+    HAS_MVE = "has_mve"
+    MEMORY = "memory"
+    CLOCKS = "clocks"
+    C_DEFINE = "c_define"
+    CMSIS_HEADER = "cmsis_header"
+    RTT_SCAN_RANGES = "rtt_scan_ranges"
+    JLINK_DEVICE = "jlink_device"
+    PMU_MAX_OPS = "pmu_max_ops"
+    APP_FLASH_LOAD_ADDR = "app_flash_load_addr"
+
+
+class CustomMemoryField(Enum):
+    """Keys accepted inside a ``target.custom_socs.<name>.memory`` mapping.
+
+    One per :class:`~helia_profiler.platform.soc.MemoryLayout` size field.  A
+    typo here used to vanish silently and leave the ``based_on`` part's size in
+    place -- and these sizes are the arena/weights capacity checks, so the
+    consequence is a placement that only fails at link time.
+    """
+
+    MRAM_KB = "mram_kb"
+    SRAM_KB = "sram_kb"
+    DTCM_KB = "dtcm_kb"
+    ITCM_KB = "itcm_kb"
+    PSRAM_KB = "psram_kb"
+    NVM_KB = "nvm_kb"
+
+
+class CustomBoardField(Enum):
+    """Keys accepted inside a ``target.custom_boards.<name>`` mapping."""
+
+    BASED_ON = "based_on"
+    SOC = "soc"
+    CHANNEL = "channel"
+    PSRAM_KB = "psram_kb"
+    DEFAULT_SYNC_GPIO_PIN = "default_sync_gpio_pin"
+    DEFAULT_STATE_GPIO_PIN = "default_state_gpio_pin"
+    DEFAULT_GO_GPIO_PIN = "default_go_gpio_pin"
+    STARTER_PROFILE_BOARD = "starter_profile_board"
+    DESCRIPTION = "description"
 
 
 def build_custom_platform_registry(target: dict[str, Any]) -> PlatformRegistry:
@@ -38,6 +99,7 @@ def _build_custom_socs(raw: Any, base: PlatformRegistry) -> dict[str, SocDef]:
     for name, spec in raw.items():
         if not isinstance(spec, dict):
             raise ConfigError(f"target.custom_socs.{name} must be a mapping")
+        _reject_unknown_keys(spec, allowed=CustomSocField, field_name=f"target.custom_socs.{name}")
         overlay = build_platform_registry(base=base, socs=custom)
         based_on = spec.get("based_on")
         base_soc = get_soc(based_on, registry=overlay) if based_on else None
@@ -89,8 +151,121 @@ def _build_custom_socs(raw: Any, base: PlatformRegistry) -> dict[str, SocDef]:
             ),
             jlink_device=str(spec.get("jlink_device", base_soc.jlink_device if base_soc else "")),
             pmu_max_ops=int(spec.get("pmu_max_ops", base_soc.pmu_max_ops if base_soc else 2048)),
+            app_flash_load_addr=_app_flash_load_addr(
+                spec,
+                field_name=f"target.custom_socs.{name}.app_flash_load_addr",
+                base=base_soc,
+            ),
         )
     return custom
+
+
+def _app_flash_load_addr(
+    spec: Mapping[str, Any],
+    *,
+    field_name: str,
+    base: SocDef | None,
+) -> int | None:
+    """Resolve the app-image flash address a custom SoC is declared with.
+
+    An explicit ``app_flash_load_addr:`` wins.  Otherwise the address is
+    inherited from ``based_on``, using that part's *resolved* address so the
+    inheritance carries whatever the base actually flashes at -- a built-in's
+    per-SoC override included -- rather than only the raw field.
+
+    With neither, the result is ``None`` and the part has no address at all.
+    That is deliberate.  The remaining case is a SoC declared from scratch
+    whose only platform statement is a ``family:`` tag, and in this model that
+    tag records a core tier, not a memory map (see
+    :func:`~helia_profiler.platform.capabilities.resolve_app_flash_load_addr`).
+    Handing such a part its family's stock address produces a *plausible*
+    guess -- likely enough to be accepted by the silicon and land the image at
+    the wrong offset -- where ``None`` produces a J-Link fallback that refuses
+    to program and names this field.
+
+    Note what this deliberately does NOT key on: whether the entry overrides
+    ``memory:``.  :class:`~helia_profiler.platform.soc.MemoryLayout` carries
+    sizes in KB and no addresses, so "resized a region" is not evidence about
+    the bootloader reservation -- bumping ``psram_kb`` for a board with a
+    larger PSRAM part would drop a perfectly good inherited address.  Deriving
+    one memory fact from an unrelated one is the auto-magic this repo avoids;
+    ``based_on`` is a statement the user actually made.
+    """
+    raw = spec.get(CustomSocField.APP_FLASH_LOAD_ADDR.value)
+    if raw is None:
+        return resolve_app_flash_load_addr(base) if base is not None else None
+    return _address(raw, field_name=field_name)
+
+
+def _address(raw: Any, *, field_name: str) -> int:
+    """Parse a physical address, accepting ``0x``-style strings.
+
+    YAML resolves an unquoted ``0x22000000`` to an int already; a quoted one
+    stays a string, which is a natural way to write a hex literal and should
+    not be a stack trace.  ``bool`` is excluded explicitly because it is an
+    ``int`` subclass and ``true`` would otherwise parse as address ``0x1``.
+    """
+    if isinstance(raw, bool):
+        raise ConfigError(
+            f"{field_name} must be an address, not a boolean.",
+            hint="Write the flash load address, e.g. app_flash_load_addr: 0x22000000",
+        )
+    if isinstance(raw, str):
+        try:
+            value = int(raw, 0)
+        except ValueError as exc:
+            raise ConfigError(
+                f"Invalid {field_name}: {raw!r} is not an integer address.",
+                hint="Write a decimal or 0x-prefixed hex literal, "
+                "e.g. app_flash_load_addr: 0x22000000",
+            ) from exc
+    elif isinstance(raw, int):
+        value = raw
+    else:
+        raise ConfigError(
+            f"Invalid {field_name}: {raw!r} is not an integer address.",
+            hint="Write a decimal or 0x-prefixed hex literal, "
+            "e.g. app_flash_load_addr: 0x22000000",
+        )
+    if value < 0:
+        raise ConfigError(
+            f"Invalid {field_name}: {value} is negative.",
+            hint="Addresses are unsigned, e.g. app_flash_load_addr: 0x22000000",
+        )
+    return value
+
+
+def _reject_unknown_keys(
+    spec: Mapping[str, Any],
+    *,
+    allowed: type[Enum],
+    field_name: str,
+) -> None:
+    """Fail on keys the builders would otherwise discard in silence.
+
+    Every key not named by *allowed* is dropped on the floor by the builders
+    below, so a misspelt or invented key changes nothing and says nothing --
+    the user's config looks accepted while the value they wrote never reaches
+    the platform model.  That is worst precisely when the key is one they
+    reached for after diagnosing a real problem.
+    """
+    known = {member.value for member in allowed}
+    unknown = sorted(key for key in spec if key not in known)
+    if not unknown:
+        return
+    suggestions = {
+        key: match[0]
+        for key in unknown
+        if (match := difflib.get_close_matches(str(key), sorted(known), n=1))
+    }
+    hint = f"Supported keys: {', '.join(sorted(known))}."
+    if suggestions:
+        did_you_mean = ", ".join(f"{key!r} -> {value!r}" for key, value in suggestions.items())
+        hint = f"Did you mean {did_you_mean}? {hint}"
+    raise ConfigError(
+        f"Unknown key(s) in {field_name}: {', '.join(repr(key) for key in unknown)}.",
+        hint=hint,
+    )
 
 
 def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, BoardDef]:
@@ -103,6 +278,9 @@ def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, Boar
     for name, spec in raw.items():
         if not isinstance(spec, dict):
             raise ConfigError(f"target.custom_boards.{name} must be a mapping")
+        _reject_unknown_keys(
+            spec, allowed=CustomBoardField, field_name=f"target.custom_boards.{name}"
+        )
         overlay = build_platform_registry(base=registry, boards=custom)
         based_on = spec.get("based_on")
         base_board = get_board(based_on, registry=overlay) if based_on else None
@@ -166,13 +344,9 @@ def _build_memory_layout(raw: Any, *, field_name: str, base: MemoryLayout | None
         return base
     if not isinstance(raw, dict):
         raise ConfigError(f"{field_name} must be a mapping")
+    _reject_unknown_keys(raw, allowed=CustomMemoryField, field_name=field_name)
     values = {
-        "mram_kb": base.mram_kb if base else 0,
-        "sram_kb": base.sram_kb if base else 0,
-        "dtcm_kb": base.dtcm_kb if base else 0,
-        "itcm_kb": base.itcm_kb if base else 0,
-        "psram_kb": base.psram_kb if base else 0,
-        "nvm_kb": base.nvm_kb if base else 0,
+        field.value: (getattr(base, field.value) if base else 0) for field in CustomMemoryField
     }
     for key in values:
         if key in raw:

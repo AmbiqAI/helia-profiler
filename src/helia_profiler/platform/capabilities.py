@@ -91,8 +91,11 @@ class MemoryCapabilities:
     #: Address the NSX build programs application images at (the ``LoadFile``
     #: address in its generated ``flash_cmds.jlink``) -- the first MRAM/flash
     #: address above the part's bootloader-reserved region, NOT the MRAM
-    #: *region* base in ``placement_bases``.  ``None`` when the family has no
-    #: known value; the J-Link flash fallback refuses to guess an address then.
+    #: *region* base in ``placement_bases``.  Resolved by
+    #: :func:`resolve_app_flash_load_addr`; ``None`` when no tier there has a
+    #: value it can stand behind for this part -- an unmapped family, or a
+    #: ``target.custom_socs`` part that stated no address and named no
+    #: ``based_on``.  The J-Link flash fallback refuses to guess an address then.
     app_flash_load_addr: int | None
 
 
@@ -357,6 +360,12 @@ def _family_placement_bases(family: SocFamily) -> Mapping[Placement, int]:
 # atomiq110 below defaults to *nbl*.  Keying is also coarser than NSX's own SoC
 # family axis -- NSX treats apollo330P and atomiq110 as separate families -- so
 # a part whose flash window departs from its family needs a per-SoC entry.
+#
+# "Verified against every registered SoC" is the whole warrant for keying by
+# family, and it does not extend past the registry: a ``target.custom_socs``
+# part was never checked against any facts file, so it does NOT read this table
+# (see ``resolve_app_flash_load_addr``).  Such a part states its own address or
+# inherits one from the ``based_on`` part it was derived from.
 _FAMILY_APP_FLASH_LOAD_ADDR: dict[SocFamily, int] = {
     SocFamily.AP3: 0x0000C000,
     SocFamily.AP4: 0x00018000,
@@ -364,7 +373,7 @@ _FAMILY_APP_FLASH_LOAD_ADDR: dict[SocFamily, int] = {
 }
 
 # Per-SoC overrides, which win over the family baseline for BUILT-IN SoCs only
-# (see ``_app_flash_load_addr``).  PR #98 adds the same shape for placement
+# (see ``resolve_app_flash_load_addr``).  PR #98 adds the same shape for placement
 # bases (``_SOC_MEMORY_BASES``); it is not on this branch yet, so do not expect
 # to find it by grep until that lands.
 #
@@ -387,23 +396,51 @@ _SOC_APP_FLASH_LOAD_ADDR: dict[str, int] = {
 }
 
 
-def _app_flash_load_addr(soc: SocDef) -> int | None:
-    """Resolve *soc*'s app-image flash address, per-SoC overriding family.
+def resolve_app_flash_load_addr(soc: SocDef) -> int | None:
+    """Resolve *soc*'s app-image flash address from the three tiers below.
 
-    The override applies only to the built-in ``SocDef`` it was written for,
-    matched by identity.  ``target.custom_socs`` lets a user pick any name and
-    those entries replace built-ins in the merged registry, so a name match
-    alone would let a user-chosen string silently outrank the ``family`` that
-    same user declared -- handing their part an address belonging to something
-    else entirely, past the ``load_addr is None`` guard that exists to stop
-    exactly that.  A custom SoC therefore always resolves through its family.
+    1. ``soc.app_flash_load_addr`` -- what the ``SocDef`` itself states.  Wins
+       over everything: it is the only tier a ``target.custom_socs`` entry can
+       write, and a user describing their own silicon outranks any table here.
+    2. ``_SOC_APP_FLASH_LOAD_ADDR`` -- the per-SoC override, for parts whose
+       flash window departs from their family's.
+    3. ``_FAMILY_APP_FLASH_LOAD_ADDR`` -- the family baseline.
+
+    Tiers 2 and 3 apply to **built-in** ``SocDef``s only, by
+    :class:`~helia_profiler.platform.soc.SocOrigin`.  Two separate reasons,
+    both load-bearing:
+
+    * Tier 2 is keyed by name, and ``target.custom_socs`` lets a user pick any
+      name -- those entries replace built-ins in the merged registry, so a name
+      match alone would let a user-chosen string silently outrank the ``family``
+      that same user declared, handing their part an address belonging to
+      something else entirely (df34b6e).
+    * Tier 3 is only as good as its verification, and that verification is
+      per-part: the table's addresses were checked against the NSX facts file
+      of every *registered* SoC.  Nothing was checked for a part hpx has never
+      seen.  Worse, ``SocFamily`` here is a core-tier axis coarser than NSX's
+      own -- ``AP5`` covers apollo330P and (provisionally) atomiq110, which
+      NSX treats as separate families and which load 0x00410000 and
+      0x22000000 respectively.  Reading a flash offset out of a tag that only
+      claims "Cortex-M55" is a guess, and a *plausible* one, which is the
+      dangerous kind: it is likely enough to be accepted by the part and land
+      the image at the wrong offset.
+
+    So a custom SoC resolves to ``None`` unless it states an address (directly
+    or inherited from the ``based_on`` part it was derived from, which
+    ``platform.custom`` resolves through this same function).  ``None`` is a
+    real answer meaning "nobody knows"; the J-Link flash fallback refuses to
+    program rather than guess.
     """
-    from .soc import _SOCS
+    from .soc import SocOrigin
 
-    if _SOCS.get(soc.name) is soc:
-        override = _SOC_APP_FLASH_LOAD_ADDR.get(soc.name)
-        if override is not None:
-            return override
+    if soc.app_flash_load_addr is not None:
+        return soc.app_flash_load_addr
+    if soc.origin is not SocOrigin.BUILTIN:
+        return None
+    override = _SOC_APP_FLASH_LOAD_ADDR.get(soc.name)
+    if override is not None:
+        return override
     return _FAMILY_APP_FLASH_LOAD_ADDR.get(soc.family)
 
 
@@ -431,7 +468,7 @@ def build_soc_capabilities(soc: SocDef) -> SocCapabilities:
         has_dcache=is_ap5,
         has_shared_ssram_power_domain=is_ap5,
         placement_bases=_family_placement_bases(family),
-        app_flash_load_addr=_app_flash_load_addr(soc),
+        app_flash_load_addr=resolve_app_flash_load_addr(soc),
     )
     clock = ClockCapabilities(
         direct_burst_base_mhz=48 if family is SocFamily.AP3 else None,

@@ -49,6 +49,7 @@ from .soc import (
     PmuTier,
     SocDef,
     SocFamily,
+    SocOrigin,
     soc_placement_ranges,
 )
 
@@ -72,6 +73,7 @@ __all__ = [
     "SocCapabilities",
     "SocDef",
     "SocFamily",
+    "SocOrigin",
     "TransportCapabilities",
     "build_platform_registry",
     "build_custom_platform_registry",
