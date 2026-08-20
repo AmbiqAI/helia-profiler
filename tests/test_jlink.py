@@ -31,6 +31,44 @@ def _match(serial: str, core: CoreArch | None, product: str = "J-Link") -> JLink
     return JLinkProbeMatch(probe=_probe(serial, product), detected_core=core)
 
 
+class _AsRequested:
+    """Sentinel: "J-Link reports the address that was asked for".
+
+    Distinct from ``None``, which the flash fixtures use to mean "J-Link named
+    no bank at all" -- a real and separately tested case.
+    """
+
+
+AS_REQUESTED = _AsRequested()
+
+
+class _HpxWarnings(logging.Handler):
+    """Collect hpx warnings inside a block, from a helper with no ``caplog``."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.WARNING)
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.messages.append(record.getMessage())
+
+    @property
+    def text(self) -> str:
+        return "\n".join(self.messages)
+
+    def __enter__(self) -> _HpxWarnings:
+        self._logger = logging.getLogger("hpx")
+        self._level = self._logger.level
+        self._logger.setLevel(logging.WARNING)
+        self._logger.addHandler(self)
+        return self
+
+    def __exit__(self, *exc: object) -> bool:
+        self._logger.removeHandler(self)
+        self._logger.setLevel(self._level)
+        return False
+
+
 def test_attached_session_does_not_reset_or_restart(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakeSession:
         def __init__(self) -> None:
@@ -245,13 +283,54 @@ class TestFlashBinaryFallback:
         return binary
 
     @staticmethod
-    def _flash(binary: Path, *, device: str, load_addr: int | None) -> str:
-        """Run the fallback against a stubbed JLinkExe; return the script."""
-        ok = SimpleNamespace(returncode=0, stdout="Flash download: Total 1 range", stderr="")
-        with patch(
-            "helia_profiler.target.probe.flash.run_jlink_script", return_value=ok
-        ) as run:
+    def _jlink_output(bank_addr: int | None) -> str:
+        """JLinkExe's success output, naming *bank_addr* the way it really does.
+
+        The bank line must be here.  A stub carrying only the ``Total:`` summary
+        sends every caller down ``_verify_flash_address``'s fail-open branch,
+        which warns and returns -- so the address check would be untested by
+        each of these while still looking exercised.  ``None`` requests that
+        no-bank output deliberately, and only ``test_a_missing_bank_line_warns
+        _rather_than_failing_the_flash`` should ask for it.
+        """
+        bank = (
+            ""
+            if bank_addr is None
+            else f"J-Link: Flash download: Bank 0 @ 0x{bank_addr:08X}: 1 range affected (4096 bytes)\n"
+        )
+        return bank + "J-Link: Flash download: Total 1 range"
+
+    @classmethod
+    def _flash(
+        cls,
+        binary: Path,
+        *,
+        device: str,
+        load_addr: int | None,
+        bank_addr: int | None | _AsRequested = AS_REQUESTED,
+    ) -> str:
+        """Run the fallback against a stubbed JLinkExe; return the script.
+
+        *bank_addr* is the address J-Link reports programming into, defaulting
+        to the one requested (the correct-flash case).  Pass it explicitly when
+        the expected address does not come from *load_addr* -- the recipe path
+        -- or as ``None`` to request the no-bank output.
+        """
+        if isinstance(bank_addr, _AsRequested):
+            bank_addr = load_addr
+        ok = SimpleNamespace(returncode=0, stdout=cls._jlink_output(bank_addr), stderr="")
+        with (
+            _HpxWarnings() as warnings,
+            patch("helia_profiler.target.probe.flash.run_jlink_script", return_value=ok) as run,
+        ):
             flash_binary(binary, device=device, load_addr=load_addr)
+        if bank_addr is not None:
+            # Whatever else each caller asserts, the flash must have gone
+            # through the real address check rather than the fail-open branch.
+            # Without this, dropping the bank line from ``_jlink_output`` would
+            # leave every test here green while silently testing nothing --
+            # which is what the stub used to do.
+            assert "UNVERIFIED FLASH DESTINATION" not in warnings.text
         return run.call_args.args[0]
 
     @pytest.mark.parametrize(
@@ -309,7 +388,7 @@ class TestFlashBinaryFallback:
         selects among several attached probes) be hardcoded or dropped while
         every other test stays green, sending the flash to the wrong target.
         """
-        ok = SimpleNamespace(returncode=0, stdout="Flash download: Total 1 range", stderr="")
+        ok = SimpleNamespace(returncode=0, stdout=self._jlink_output(0x00018000), stderr="")
         with patch(
             "helia_profiler.target.probe.flash.run_jlink_script", return_value=ok
         ) as run:
@@ -356,6 +435,48 @@ class TestFlashBinaryFallback:
         assert "SOME-NEW-PART" in message
         assert "app_flash_load_addr" in (exc_info.value.hint or "")
 
+    def test_unknown_load_address_hint_names_the_yaml_a_user_can_type(self, tmp_path: Path) -> None:
+        """The hint must name config keys, not the internal dataclass field.
+
+        ``MemoryCapabilities.app_flash_load_addr`` is a Python attribute -- a
+        user cannot write it anywhere, so naming it sends them looking for a
+        setting that does not exist.  #153 makes ``load_addr=None`` reachable
+        for a custom SoC for the first time, and the two ways to supply the
+        address there are ``target.custom_socs.<name>.app_flash_load_addr`` and
+        ``based_on``.  Both must be named, and the config fix must lead: for a
+        custom SoC that landed here, re-running the build fixes nothing.
+        """
+        with pytest.raises(CaptureError) as exc_info:
+            self._flash(self._bin_only(tmp_path), device="SOME-NEW-PART", load_addr=None)
+
+        hint = exc_info.value.hint or ""
+        assert "target.custom_socs" in hint
+        assert "based_on" in hint
+        assert "MemoryCapabilities" not in hint
+        # Config first, re-run-the-build second -- ordering is the finding.
+        assert hint.index("target.custom_socs") < hint.index("re-run the build")
+
+    def test_a_missing_bank_line_warns_rather_than_failing_the_flash(
+        self, tmp_path: Path, caplog
+    ) -> None:
+        """The one no-bank test, kept explicit now the stub carries a bank line.
+
+        ``_jlink_output`` names a bank for every other test here so they run
+        through the real address check; this pins the fail-open branch they used
+        to hit by accident, and that its warning says the destination is
+        UNVERIFIED rather than reporting a mere parse miss.
+        """
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            self._flash(
+                self._bin_only(tmp_path),
+                device="AMAP42KP-KBR",
+                load_addr=0x00018000,
+                bank_addr=None,
+            )
+
+        assert "UNVERIFIED FLASH DESTINATION" in caplog.text
+        assert "0x00018000" in caplog.text
+
     def test_generated_script_is_used_verbatim_and_ignores_load_addr(self, tmp_path: Path) -> None:
         binary = self._bin_only(tmp_path)
         script_dir = tmp_path / "jlink" / "hpx_profiler_power"
@@ -373,9 +494,17 @@ class TestFlashBinaryFallback:
         # The recipe wins whatever load_addr is -- including a resolved one, the
         # only case production actually hits.  Hand-rolling instead of running
         # the generated recipe is the regression the docstring warns about.
-        assert self._flash(binary, device="AMA3B2KK-KBR", load_addr=0x00018000) == recipe
+        # J-Link reports the RECIPE's bank, so passing the address check here is
+        # itself evidence that the recipe -- not load_addr -- set the expectation.
+        assert (
+            self._flash(binary, device="AMA3B2KK-KBR", load_addr=0x00018000, bank_addr=0xDEADBEEF)
+            == recipe
+        )
         # load_addr=None must not raise when the generated recipe exists.
-        assert self._flash(binary, device="AMA3B2KK-KBR", load_addr=None) == recipe
+        assert (
+            self._flash(binary, device="AMA3B2KK-KBR", load_addr=None, bank_addr=0xDEADBEEF)
+            == recipe
+        )
 
 
 def test_every_registered_soc_has_its_nsx_app_flash_load_address() -> None:
@@ -573,7 +702,10 @@ class _FlashRecipeFixtures:
         script_dir.mkdir(parents=True, exist_ok=True)
         if recipe is None:
             recipe = f'ExitOnError 1\nReset\nLoadFile "{bin_path}", {addr}\nReset\nGo\nExit\n'
-        (script_dir / "flash_cmds.jlink").write_text(recipe)
+        # UTF-8 on the write side too, the way NSX emits it -- otherwise the
+        # non-ASCII-path test would be measuring the locale codec twice and
+        # cancel its own bug out on Windows.
+        (script_dir / "flash_cmds.jlink").write_text(recipe, encoding="utf-8")
         return binary
 
     def _flash(
@@ -666,11 +798,14 @@ class TestFlashBinaryAddressVerification(_FlashRecipeFixtures):
                 tmp_path, self._programmed_at("0x00410000"), addr="0x0000C000", load_addr=None
             )
 
-    def test_a_decimal_recipe_address_is_understood(self, tmp_path) -> None:
-        """J-Link accepts bare decimal in LoadFile, so the parser must too.
+    def test_a_decimal_recipe_address_is_tolerated(self, tmp_path) -> None:
+        """hpx reads a bare decimal address as decimal; J-Link's rule is unknown.
 
-        Read as hex, 4259840 would compare against nothing sane and reject a
-        perfectly good flash.
+        Deliberately NOT a claim about J-Link.  Its numeric convention is
+        per-command -- ``sleep 100`` runs ``Sleep(100)`` while ``sleep 0x100``
+        runs ``Sleep(0)`` -- and nobody has checked which one ``LoadFile``
+        follows.  Every real NSX recipe uses the ``0x`` form, so this pins only
+        that hpx does not read 4259840 as hex and reject a flash over it.
         """
         self._flash(tmp_path, self._PROGRAMMED, addr=str(0x00410000))
 
@@ -683,6 +818,52 @@ class TestFlashBinaryAddressVerification(_FlashRecipeFixtures):
             "Erase: 0.000s, Program: 3.549s, Verify: 0.308s, Restore: 0.090s)\n"
         )
         self._flash(tmp_path, output, addr="0x00410000")
+
+    def test_only_a_programming_confirmation_counts_as_a_bank(self, tmp_path) -> None:
+        """A ``Bank N @ …`` that is not a flash-download line must not satisfy it.
+
+        Four J-Link format strings carry the shape; three are not confirmations
+        (``Start of determining flash info``, ``Error while determining flash
+        info``, and the sector-to-chip-erase notice).  Unanchored, the error
+        line below -- which names the RIGHT bank -- would mask the wrong bank
+        actually programmed on the line after it, and the check would pass the
+        exact flash it exists to refuse.  Not seen at default verbosity today,
+        so this pins a latent hole shut rather than a live one.
+        """
+        output = (
+            "Error while determining flash info (Bank 0 @ 0x00410000)\n"
+            "J-Link: Flash download: Bank 1 @ 0x00080000: 1 range affected (761856 bytes)\n"
+            "J-Link: Flash download: Total: 4.088s (Prepare: 0.139s)\n"
+        )
+        with pytest.raises(CaptureError) as exc_info:
+            self._flash(tmp_path, output, addr="0x00410000")
+
+        message = str(exc_info.value)
+        assert "0x00080000" in message
+        assert "0x00410000" in message
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "Start of determining flash info (Bank 0 @ 0x00410000)",
+            "Error while determining flash info (Bank 0 @ 0x00410000)",
+            "Bank 0 @ 0x00410000: Switched from sector erase to chip erase",
+        ],
+    )
+    def test_the_informational_bank_shapes_are_all_ignored(self, tmp_path, caplog, line) -> None:
+        """None of the three non-confirmation shapes may stand in for a bank.
+
+        With only the error-line case pinned above, restoring the unanchored
+        regex for either of the other two would go unnoticed.  Here the correct
+        bank is named by the informational line and by nothing else, so an
+        unanchored check would pass where hpx must instead warn that it
+        verified nothing.
+        """
+        output = f"{line}\nJ-Link: Flash download: Total: 4.088s (Prepare: 0.139s)\n"
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            self._flash(tmp_path, output, addr="0x00410000")
+
+        assert "UNVERIFIED FLASH DESTINATION" in caplog.text
 
     def test_output_naming_no_bank_is_warned_not_rejected(self, tmp_path, caplog) -> None:
         """Deliberate: no address in the output means no evidence either way.
@@ -727,11 +908,20 @@ class TestFlashRecipeValidation(_FlashRecipeFixtures):
 
     @staticmethod
     def _refuse(binary: Path) -> CaptureError:
-        """Flash and expect a refusal that never reached JLinkExe."""
+        """Flash and expect a refusal that never reached JLinkExe.
+
+        Every refusal on this path shares one invariant, asserted here so it
+        holds for all of them rather than only whichever ones a later test
+        remembers: the user is TOLD the board was left alone.  "Refused" and
+        "failed halfway through programming" call for opposite next steps, and
+        ``run.assert_not_called()`` proves it to the test suite but not to the
+        person reading the error.
+        """
         with patch("helia_profiler.target.probe.flash.run_jlink_script") as run:
             with pytest.raises(CaptureError) as exc_info:
                 flash_binary(binary, device="AP510NFA-CBR", load_addr=None)
         run.assert_not_called()
+        assert "Nothing was programmed" in str(exc_info.value)
         return exc_info.value
 
     def test_a_recipe_loading_another_build_is_refused(self, tmp_path) -> None:
@@ -808,3 +998,169 @@ class TestFlashRecipeValidation(_FlashRecipeFixtures):
         binary.with_suffix(".bin").unlink()
 
         assert "hpx_profiler_power.bin" in str(self._refuse(binary))
+
+    def test_the_exit_on_error_hint_acknowledges_a_hand_edited_recipe(self, tmp_path) -> None:
+        """Telling the user only to re-run the build discards a deliberate edit.
+
+        Hand-edited recipes are in scope for this whole module (see the
+        ``LoadFile`` shapes below), and regenerating from NSX throws those edits
+        away.  The hint must offer the one-line fix first and name the cost of
+        the rebuild.
+        """
+        binary = self._build(
+            tmp_path,
+            recipe=(
+                "Reset\n"
+                f'LoadFile "{tmp_path / "hpx_profiler_power.bin"}", 0x00410000\n'
+                "Reset\nGo\nExit\n"
+            ),
+        )
+
+        hint = self._refuse(binary).hint or ""
+        assert "hand-edited" in hint
+        assert "ExitOnError 1" in hint
+        assert hint.index("ExitOnError 1") < hint.index("re-running the build")
+
+    @pytest.mark.parametrize(
+        "tail",
+        [
+            "",
+            ", noreset",
+            ", reset",
+            " // the app",
+            ", noreset // the app",
+        ],
+        ids=["bare", "noreset", "reset", "comment", "noreset-and-comment"],
+    )
+    def test_every_loadfile_form_jlink_accepts_is_accepted(self, tmp_path, tail) -> None:
+        """JLinkExe's grammar, not NSX's regex, decides what hpx may refuse.
+
+        Its embedded help reads ``loadfile <filename> [, <Addr>] [, <noreset |
+        reset>]`` and the commander strips trailing ``//`` comments from every
+        command line, so all of these run correctly on hardware and all of them
+        flashed fine before this check existed.  NSX's ``_LOAD_FILE_RE``, which
+        this grammar was ported from, anchors the address at end-of-line and
+        rejects the last four -- NSX only ever reads recipes it generated
+        itself, so it never pays for that.  hpx puts hand-edited recipes in
+        scope, which is exactly where these forms turn up, so importing the gap
+        along with the grammar would have made this a new hard refusal of
+        recipes that work.
+        """
+        bin_path = tmp_path / "hpx_profiler_power.bin"
+        self._flash(
+            tmp_path,
+            self._PROGRAMMED,
+            recipe=f'ExitOnError 1\nReset\nLoadFile "{bin_path}", 0x00410000{tail}\nReset\nGo\nExit\n',
+        )
+
+    def test_a_tolerated_tail_still_yields_the_recipes_address(self, tmp_path) -> None:
+        """Accepting the new forms must not turn them into unverified ones.
+
+        The shapes above only prove the recipe is no longer refused.  J-Link's
+        grammar makes the address itself optional (``loadfile <filename> [,
+        <Addr>] [, <noreset | reset>]``), so the obvious next loosening is to
+        make the address group optional too -- at which point a tail-bearing
+        recipe parses, flashes, and is compared against nothing.  Here the
+        recipe says 0x00410000 and J-Link reports a different bank, so anything
+        short of "the recipe's address was extracted and used" passes silently.
+        """
+        bin_path = tmp_path / "hpx_profiler_power.bin"
+        recipe = f'ExitOnError 1\nLoadFile "{bin_path}", 0x00410000, noreset\nExit\n'
+
+        with pytest.raises(CaptureError) as exc_info:
+            self._flash(tmp_path, self._programmed_at("0x00018000"), recipe=recipe)
+
+        assert "0x00410000" in str(exc_info.value)
+
+    def test_a_loadfile_without_an_address_is_refused_not_guessed(self, tmp_path) -> None:
+        """J-Link's grammar makes the address optional; hpx's verification cannot.
+
+        ``loadfile <filename>`` with no address is legal (the destination comes
+        from the image format), and it names this build's own ``.bin`` here, so
+        nothing about the path is wrong.  hpx still has no address to compare a
+        bank against, and the only safe answer is to refuse.  Loosening the
+        address group to optional instead -- the natural companion to tolerating
+        the reset/comment tails above -- would carry ``None`` into the
+        comparison rather than refusing.
+        """
+        bin_path = tmp_path / "hpx_profiler_power.bin"
+        binary = self._build(tmp_path, recipe=f'ExitOnError 1\nLoadFile "{bin_path}"\nExit\n')
+
+        assert "LoadFile" in str(self._refuse(binary))
+
+    def test_a_utf8_recipe_is_read_as_utf8_not_the_locale_codec(self, tmp_path) -> None:
+        """``read_text()`` without an encoding is cp1252 on Windows, and CI runs Windows.
+
+        NSX writes the recipe as UTF-8.  Decoded as cp1252 a non-ASCII build
+        path becomes mojibake, the baked path stops matching this build's
+        ``.bin``, and a correct flash is refused as a stale recipe.  Before this
+        module gated the flash a mis-decode only corrupted the text piped to
+        JLinkExe; now it decides whether the flash runs at all.
+        """
+        build_dir = tmp_path / "café-build"
+        build_dir.mkdir()
+        binary = self._build(build_dir)
+
+        self._flash(build_dir, self._PROGRAMMED)
+        assert "café" in str(binary)
+
+    def test_the_recipe_encoding_is_stated_rather_than_inherited(self, tmp_path) -> None:
+        """Pin the argument, since this host's default already happens to be UTF-8.
+
+        The functional test above only fails where the locale codec differs
+        from UTF-8, so on macOS/Linux it would stay green with the encoding
+        dropped.  This one fails everywhere.
+        """
+        binary = self._build(tmp_path)
+        recipe = (tmp_path / "jlink" / "hpx_profiler_power" / "flash_cmds.jlink").read_text(
+            encoding="utf-8"
+        )
+        with (
+            patch.object(Path, "read_text", autospec=True, return_value=recipe) as read_text,
+            patch(
+                "helia_profiler.target.probe.flash.run_jlink_script",
+                return_value=SimpleNamespace(returncode=0, stdout=self._PROGRAMMED, stderr=""),
+            ),
+        ):
+            flash_binary(binary, device="AP510NFA-CBR", load_addr=None)
+
+        assert read_text.call_args.kwargs.get("encoding") == "utf-8"
+
+    def test_an_unresolvable_loadfile_path_raises_the_modules_own_error(self, tmp_path) -> None:
+        """``[^"]+`` captures a NUL, and ``Path.resolve()`` raises ValueError on one.
+
+        Windows adds ``OSError`` for its illegal-character paths.  Either would
+        escape a flash helper as an untyped internal error, past every caller
+        that catches this module's ``CaptureError`` -- including
+        ``FlashPowerFirmwareStage``'s power-cycle retry.
+        """
+        binary = self._build(
+            tmp_path,
+            recipe='ExitOnError 1\nLoadFile "bad\x00path.bin", 0x00410000\nExit\n',
+        )
+
+        assert "LoadFile" in str(self._refuse(binary))
+
+    def test_the_fallback_refusals_also_say_nothing_was_programmed(self, tmp_path) -> None:
+        """The two refusals that never reach ``_refuse``'s shared assertion.
+
+        Both fire on the no-recipe branch, so a user hitting them has even less
+        context for whether the board was touched.
+        """
+        no_image = tmp_path / "hpx_profiler_power"
+        no_image.write_bytes(b"\x00")  # ELF only; no .bin, no recipe
+        built = tmp_path / "built"
+        built.mkdir()
+        with patch("helia_profiler.target.probe.flash.run_jlink_script") as run:
+            with pytest.raises(CaptureError) as no_image_exc:
+                flash_binary(no_image, device="AP510NFA-CBR", load_addr=0x00410000)
+            with pytest.raises(CaptureError) as no_addr_exc:
+                flash_binary(
+                    TestFlashBinaryFallback._bin_only(built),
+                    device="SOME-NEW-PART",
+                    load_addr=None,
+                )
+        run.assert_not_called()
+
+        assert "Nothing was programmed" in str(no_image_exc.value)
+        assert "Nothing was programmed" in str(no_addr_exc.value)

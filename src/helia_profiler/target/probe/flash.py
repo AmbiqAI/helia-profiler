@@ -22,19 +22,68 @@ log = logging.getLogger("hpx")
 # (AGENTS.md "NSX as Build Backend"), but the recipe hpx runs verbatim is
 # emitted by NSX's own ``flash_cmds.jlink.in`` template, so the two must agree.
 # Handles the quoted form NSX generates and the unquoted form a hand-rolled or
-# hand-edited recipe may use, plus hex or decimal addresses.
+# hand-edited recipe may use.
+#
+# DELIBERATE DIVERGENCE FROM NSX: NSX's regex anchors the address at
+# end-of-line, which refuses three forms JLinkExe itself accepts.  Its embedded
+# help reads ``loadfile <filename> [, <Addr>] [, <noreset | reset>]``, and the
+# commander strips trailing ``//`` comments from every command line, so
+# ``LoadFile "x.bin", 0x410000, noreset`` and ``LoadFile "x.bin", 0x410000 //
+# the app`` are both valid and both flashed fine before this check existed.
+# NSX only ever reads its own generated recipes; hpx's docstring puts
+# hand-edited recipes in scope, which is exactly where those forms appear, so a
+# hard refusal here would be a regression NSX never risks.  The optional
+# reset/comment tail below closes that gap; keep it when re-syncing with NSX.
+#
+# A bare decimal address is tolerated because hpx has no reason to refuse one,
+# NOT because J-Link is known to read it as decimal: J-Link's numeric
+# convention is per-command and unverified for ``LoadFile``.  Every real NSX
+# recipe uses the ``0x`` form, so this branch is tolerance, not a contract.
 _LOAD_FILE_RE = re.compile(
     r'^\s*LoadFile\s+(?:"(?P<quoted>[^"]+)"|(?P<plain>.+?))\s*,\s*'
-    r"(?P<address>0x[0-9a-fA-F]+|[0-9]+)\s*$",
+    r"(?P<address>0x[0-9a-fA-F]+|[0-9]+)"
+    r"(?:\s*,\s*(?:no)?reset)?\s*(?://.*)?$",
     re.IGNORECASE | re.MULTILINE,
 )
 # Tolerates J-Link Commander's ``//`` line comments after the directive.
 _FAIL_FAST_RE = re.compile(r"^\s*ExitOnError\s+1\s*(?://.*)?$", re.IGNORECASE | re.MULTILINE)
-# J-Link names the destination on every flash, in both confirmation shapes:
+# This is a flash-BANK IDENTITY check, NOT a destination check.  Read that
+# before trusting it for anything.
+#
+# ``Bank N @ 0x…`` is the base of the flash bank J-Link programmed into, not
+# the address the image landed at.  J-Link's own format string is
+# ``Bank %d @ 0x%.8X: %d range%s affected`` — one address for N ranges — so it
+# cannot be a per-range start, and J-Link reports no exact destination at all.
+#
+# What that DOES catch: any requested address that falls in a bank J-Link never
+# touched.  That covers the wrong-board case #150 was filed for, because every
+# registered part's ``app_flash_load_addr`` is exactly its bank base (verified
+# against J-Link's device database: apollo3p 0xC000, apollo4p/apollo4l
+# 0x18000, apollo510/apollo510b/apollo5b 0x410000, plus all 23 NSX recipes on
+# the bench host), so requested-address equality and bank equality coincide
+# there.  apollo330P uses a custom Ambiq device entry absent from the stock
+# database and could not be verified this way.
+#
+# What it does NOT catch: a wrong address INSIDE a bank J-Link did program.
+# apollo3p is a four-bank part (0xC000, 0x80000, 0x100000, 0x180000), so a
+# recipe baking 0x00080000 passes this check while the device boots stale
+# firmware from 0xC000.  Making the check address-exact is not possible from
+# J-Link's output; do not "tighten" this regex into pretending otherwise.
+#
+# Anchored on ``Flash download:`` so only a programming confirmation counts.
+# Three other J-Link strings carry the same ``Bank %d @ …`` shape and are not
+# confirmations — ``Start of determining flash info (Bank %d @ …)``, ``Error
+# while determining flash info (Bank %d @ …)``, and the ``Switched from sector
+# erase to chip erase`` notice.  Unanchored, an *error* naming the right bank
+# would satisfy the check while a different bank was actually programmed.  If
+# J-Link ever drops the prefix from a real confirmation the cost is the
+# fail-open warning in ``_verify_flash_address``, not a refused flash, so the
+# anchor errs in the safe direction.
+# Both confirmation shapes keep the prefix:
 #   "J-Link: Flash download: Bank 0 @ 0x00410000: 1 range affected (761856 bytes)"
 #   "J-Link: Flash download: Bank 0 @ 0x00018000: Skipped. Contents already match"
-# A multi-range image prints one such line per bank, so collect them all.
-_BANK_ADDR_RE = re.compile(r"bank\s+\d+\s*@\s*(0x[0-9a-fA-F]+)", re.IGNORECASE)
+# A multi-bank image prints one such line per bank, so collect them all.
+_BANK_ADDR_RE = re.compile(r"flash\s+download:\s*bank\s+\d+\s*@\s*(0x[0-9a-fA-F]+)", re.IGNORECASE)
 
 
 def _parse_addr(text: str) -> int:
@@ -71,25 +120,48 @@ def _recipe_load_address(
         raise CaptureError(
             f"NSX flash recipe for {target_name} ({script_path}) is missing "
             "`ExitOnError 1`; without it JLinkExe can fail a command and still "
-            "exit successfully, so a failed flash would look like a success.",
-            hint="Re-run the build so NSX regenerates the flash recipe.",
+            "exit successfully, so a failed flash would look like a success. "
+            "Nothing was programmed — the recipe was refused before JLinkExe ran.",
+            hint="Add `ExitOnError 1` as the recipe's first line if it was "
+            "hand-edited deliberately; re-running the build regenerates the "
+            "recipe from NSX but discards any such edits.",
         )
 
+    # Resolved once: it is hpx's own build path and ``flash_binary`` has
+    # already confirmed it is a file, so unlike the recipe's paths below it
+    # cannot be the one that blows up.
+    expected_bin = bin_path.resolve()
     loaded: list[Path] = []
     for match in _LOAD_FILE_RE.finditer(script):
         quoted = match.group("quoted")
         candidate = Path(quoted if quoted is not None else match.group("plain").strip())
         if not candidate.is_absolute():
             candidate = script_path.parent / candidate
-        if candidate.resolve() == bin_path.resolve():
+        # Recipe text is arbitrary: a NUL inside the quotes raises ValueError
+        # here, and a Windows-illegal character raises OSError.  This module's
+        # contract with its caller is CaptureError, so convert rather than let
+        # an untyped exception escape a flash helper as an internal error.
+        try:
+            resolved = candidate.resolve()
+        except (OSError, ValueError) as exc:
+            raise CaptureError(
+                f"NSX flash recipe for {target_name} ({script_path}) names a "
+                f"`LoadFile` path this host cannot resolve ({candidate!r}): {exc}. "
+                "Nothing was programmed — the recipe was refused before JLinkExe ran.",
+                hint="Inspect the recipe's LoadFile lines for stray quoting or "
+                "control characters, or re-run the build so NSX regenerates it.",
+            ) from exc
+        if resolved == expected_bin:
             return _parse_addr(match.group("address"))
         loaded.append(candidate)
 
     if not loaded:
         raise CaptureError(
             f"NSX flash recipe for {target_name} ({script_path}) has no usable "
-            "`LoadFile <image>, <address>` command, so there is nothing to "
-            "verify the flash against and it may program nothing at all.",
+            "`LoadFile <image>, <address>` command, so there is no address to "
+            "verify a flash against — and a recipe that loads nothing programs "
+            "nothing. Nothing was programmed: the recipe was refused before "
+            "JLinkExe ran.",
             hint="Re-run the build so NSX regenerates the flash recipe.",
         )
     listed = ", ".join(str(path) for path in loaded)
@@ -97,7 +169,8 @@ def _recipe_load_address(
         f"NSX flash recipe for {target_name} ({script_path}) loads {listed}, "
         f"not this build's image {bin_path}. Recipes bake absolute paths, so a "
         "stale recipe flashes an older image while hpx attributes the results "
-        "to the current build.",
+        "to the current build. Nothing was programmed — the recipe was refused "
+        "before JLinkExe ran.",
         hint="Delete the build directory and re-run the build so NSX "
         "regenerates the flash recipe against this build's artifacts.",
     )
@@ -110,7 +183,7 @@ def _verify_flash_address(
     target_name: str,
     source: str,
 ) -> None:
-    """Require J-Link to report programming at the address we asked for.
+    """Require J-Link to name the flash bank the requested address lives in.
 
     A flash to a wrong-but-writable address prints the same ``Total:`` summary
     as a correct one, so the summary alone proves only that *something* was
@@ -118,16 +191,27 @@ def _verify_flash_address(
     real entry point while hpx publishes power numbers attributed to the new
     build — silent mis-measurement, the worst failure mode this tool has.
 
-    When J-Link names no address at all this warns instead of raising: the
-    address line is corroboration layered on top of the exit-status gate and
-    the summary-marker tripwire, and turning a cosmetic J-Link rewording into a
+    This narrows that to the BANK, which is all J-Link reports — see the
+    ``_BANK_ADDR_RE`` comment for what that does and does not catch, and for
+    why it nonetheless covers the wrong-board case on every registered part.
+
+    When J-Link names no bank at all this warns instead of raising: the bank
+    line is corroboration layered on top of the exit-status gate and the
+    summary-marker tripwire, and turning a cosmetic J-Link rewording into a
     hard stop would block correct flashes without any evidence of a wrong one.
     """
     observed = [_parse_addr(addr) for addr in _BANK_ADDR_RE.findall(output)]
     if not observed:
+        # Deliberately not an exception (see above), but this is the one path
+        # where the guard against silent mis-measurement has itself gone
+        # silent, so say that outright rather than reporting a parse miss.
         log.warning(
-            "JLinkExe confirmed a flash of %s but named no bank address, so the "
-            "destination could not be checked against the requested 0x%08X (%s).",
+            "UNVERIFIED FLASH DESTINATION: JLinkExe confirmed a flash of %s but "
+            "named no bank address, so hpx could not check where the image landed "
+            "against the requested 0x%08X (%s). The flash was allowed to proceed; "
+            "a wrong-address flash would look exactly like this, so treat any "
+            "power numbers from this run as unconfirmed until the destination is "
+            "checked by hand.",
             target_name,
             expected_addr,
             source,
@@ -137,10 +221,12 @@ def _verify_flash_address(
         return
     seen = ", ".join(f"0x{addr:08X}" for addr in observed)
     raise CaptureError(
-        f"JLinkExe programmed {target_name} at {seen}, but {source} requested "
-        f"0x{expected_addr:08X}. The flash succeeded at the wrong address: the "
-        "device boots stale firmware from its real entry point while hpx would "
-        "attribute the capture to this build.",
+        f"JLinkExe programmed {target_name} into the flash bank(s) based at "
+        f"{seen}, but {source} requested 0x{expected_addr:08X}, which is in "
+        "none of them. J-Link names the bank it programmed, not the exact "
+        "destination, so the image landed somewhere other than the requested "
+        "address: the device boots stale firmware from its real entry point "
+        "while hpx would attribute the capture to this build.",
         hint="Re-run the build to regenerate the NSX flash recipe, and confirm "
         "the board's app flash load address matches the linker script; a build "
         "directory carried over from another board is the usual cause.",
@@ -180,8 +266,9 @@ def flash_binary(
     address, ``MemoryCapabilities.app_flash_load_addr``) differs per family, so
     it is the caller's resolved value; ``None`` raises rather than guesses.
 
-    Both paths verify afterwards that J-Link programmed the address that was
-    asked for, but they learn that address differently.  The fallback builds
+    Both paths verify afterwards that J-Link programmed the flash bank the
+    requested address lives in (all J-Link reports — see ``_BANK_ADDR_RE``),
+    but they learn that address differently.  The fallback builds
     the script itself, so *load_addr* is authoritative.  The recipe path runs
     NSX's script verbatim and *load_addr* is frequently ``None`` there, so the
     expected address is parsed out of the recipe itself; *load_addr* is neither
@@ -199,14 +286,21 @@ def flash_binary(
     # dir, so both branches derive the same expected artifact the same way.
     bin_path = binary_path if binary_path.suffix == ".bin" else binary_path.with_suffix(".bin")
     if script_path.is_file():
-        script = script_path.read_text()
+        # Explicit utf-8, never the locale codec: NSX writes the recipe as
+        # utf-8 and reads it back the same way, but Python's default here is
+        # cp1252 on Windows, where a build path with a non-ASCII character
+        # decodes to mojibake.  Before this check that only corrupted the text
+        # piped to JLinkExe; now it decides whether the flash runs at all, so a
+        # mis-decode would refuse a perfectly correct flash.
+        script = script_path.read_text(encoding="utf-8")
         # Validate before programming: everything below is cheap and static,
         # and a bad recipe should be refused rather than run and then blamed.
         if not bin_path.is_file():
             raise CaptureError(
                 f"NSX flash recipe for {target_name} ({script_path}) exists but "
                 f"this build's image ({bin_path}) does not, so the recipe can "
-                "only flash something other than what hpx just built.",
+                "only flash something other than what hpx just built. Nothing "
+                "was programmed — the recipe was refused before JLinkExe ran.",
                 hint="Re-run the build; the NSX build emits both per target.",
             )
         expected_addr = _recipe_load_address(
@@ -227,16 +321,28 @@ def flash_binary(
         if not bin_path.is_file():
             raise CaptureError(
                 f"No flashable image for {target_name}: neither the NSX flash "
-                f"script ({script_path}) nor a .bin sibling ({bin_path}) exists.",
+                f"script ({script_path}) nor a .bin sibling ({bin_path}) exists. "
+                "Nothing was programmed — this was refused before JLinkExe ran.",
                 hint="Re-run the build; the NSX build emits both per target.",
             )
         if load_addr is None:
+            # The hint has to name the YAML a user can actually type.  The
+            # address reaches here as MemoryCapabilities.app_flash_load_addr,
+            # but that is an internal dataclass attribute: naming it sends the
+            # reader looking for a setting that does not exist.  Config first,
+            # because for a custom SoC that reached this branch the build is
+            # not what is broken — nothing declared the address.
             raise CaptureError(
                 f"Cannot flash {target_name}: the NSX flash script ({script_path}) is "
                 f"missing and no app flash load address is known for device {device} "
-                "to fall back to.",
-                hint="Re-run the build to regenerate the flash script; flashing this "
-                "SoC without it needs MemoryCapabilities.app_flash_load_addr set.",
+                "to fall back to. Nothing was programmed — this was refused before "
+                "JLinkExe ran.",
+                hint="Declare the address for this SoC in your profile config: "
+                "`target.custom_socs.<name>.app_flash_load_addr: 0x…`, or give that "
+                "entry a `based_on:` naming the part whose address it should "
+                "inherit. If the SoC is a built-in one, the flash script is what is "
+                "missing instead — re-run the build so NSX regenerates it (the "
+                "recipe carries its own address and this fallback is skipped).",
             )
         log.warning(
             "NSX flash script missing for %s; falling back to .bin load of %s at 0x%08X",
