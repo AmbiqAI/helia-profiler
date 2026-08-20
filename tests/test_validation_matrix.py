@@ -126,37 +126,46 @@ class TestCaseValidity:
     def test_ordinary_case_is_valid(self):
         assert case_validity(self._case()) is None
 
+    def test_executorch_armclang_gives_reason(self):
+        case = self._case(engine=EngineType.EXECUTORCH, toolchain=Toolchain.ARMCLANG)
+        assert case_validity(case) == "ExecuTorch validation does not yet cover armclang"
+
+    def test_executorch_atfe_is_valid(self):
+        case = self._case(engine=EngineType.EXECUTORCH, toolchain=Toolchain.ATFE)
+        assert case_validity(case) is None
+
 
 class TestBuildMatrix:
     def test_full_matrix_default(self):
         cases = build_matrix()
         # Power is intentionally off by default for PR reliability validation:
-        # Existing engines contribute 2700 cases. ExecuTorch adds 128 cases
-        # on each Cortex-M55 board: 4 models × 2 providers × GCC × 4 × 4.
+        # Existing engines contribute 2700 cases. ExecuTorch adds 256 cases
+        # on each Cortex-M55 board: 4 models × 2 providers × {gcc, atfe} ×
+        # 4 × 4 (armclang is excluded until validated separately).
         # PSRAM is omitted because the ExecuTorch adapter does not support it.
-        assert len(cases) == 2956
+        assert len(cases) == 3212
 
     def test_power_on_keeps_executorch_unpowered(self):
         # ExecuTorch remains unpowered until its dedicated firmware implements
         # the GPIO READY/GO/gate protocol, so power="on" flips only the 2700
         # non-ExecuTorch cases and leaves the case count unchanged.
         cases = build_matrix(power="on")
-        assert len(cases) == 2956
+        assert len(cases) == 3212
         assert sum(1 for case in cases if case.power) == 2700
 
     def test_power_both_adds_powered_variants(self):
         # "both" adds a powered variant for each powerable case:
-        # 2956 unpowered + 2700 powered.
+        # 3212 unpowered + 2700 powered.
         cases = build_matrix(power="both")
-        assert len(cases) == 5656
+        assert len(cases) == 5912
         assert sum(1 for case in cases if case.power) == 2700
 
     def test_repeat_multiplies_matrix(self):
-        assert len(build_matrix(power="off", repeat=3)) == 8868
+        assert len(build_matrix(power="off", repeat=3)) == 9636
 
     def test_model_filter(self):
         cases = build_matrix(models=["kws"], power="off")
-        assert len(cases) == 739
+        assert len(cases) == 803
         assert {c.model.id for c in cases} == {"kws"}
 
     def test_engine_filter(self):
@@ -228,7 +237,7 @@ class TestBuildMatrix:
         assert case.cmsis_nn_provider is expected
         assert f"-{engine.short_slug}-{expected.value}-" in case.case_id
 
-    def test_executorch_is_limited_to_m55_gcc(self):
+    def test_executorch_is_limited_to_m55_and_skips_armclang(self):
         assert not build_matrix(
             engines=["executorch"],
             boards=["apollo3p_evb"],
@@ -237,13 +246,26 @@ class TestBuildMatrix:
         assert not build_matrix(
             engines=["executorch"],
             boards=["apollo330mP_evb"],
-            toolchains=["atfe"],
+            toolchains=["armclang"],
         )
         assert not build_matrix(
             engines=["executorch"],
             boards=["apollo330mP_evb"],
             memories=["psram"],
         )
+
+    def test_executorch_enumerates_gcc_and_atfe(self):
+        cases = build_matrix(
+            models=["kws"],
+            engines=["executorch"],
+            boards=["apollo510_evb"],
+            transports=["rtt"],
+            memories=["auto"],
+        )
+        assert {c.toolchain for c in cases} == {
+            Toolchain.ARM_NONE_EABI_GCC,
+            Toolchain.ATFE,
+        }
 
     def test_executorch_cases_remain_unpowered(self):
         cases = build_matrix(
