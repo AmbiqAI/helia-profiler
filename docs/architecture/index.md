@@ -11,7 +11,7 @@ hardware performance data, and writes reports. It is:
 
 - A CLI tool (`hpx profile`) and a Python API (`helia_profiler.profile()`)
 - Pipeline-based: sequential stages, each with a single responsibility
-- Engine-agnostic: the same pipeline serves heliaRT and heliaAOT, with an internal TFLM adapter path retained in source
+- Engine-agnostic: the same pipeline serves all four engines — `tflm`, `helia-rt`, `helia-aot`, and `executorch`
 
 ## What heliaPROFILER is NOT
 
@@ -69,9 +69,14 @@ HpxError
 ├── EngineError          # Engine adapter failure
 ├── FirmwareError        # Template rendering failure
 ├── BuildError           # NSX build failure
-├── CaptureError         # SWO/PMU capture failure
+│   ├── NetworkError     # Transient network failure during sync/lock
+│   └── DependencyError  # Dependency lock/workspace failure
+│       ├── VersionError # Incompatible tool/package/engine/schema version
+│       └── LockError    # Missing, corrupt, or drifted lock file
+├── CaptureError         # Transport/PMU capture failure
 ├── PowerError           # Joulescope driver failure
 └── ReportError          # Report generation failure
+    └── ValidationBundleError  # Malformed or unsafe validation bundle
 ```
 
 ## High-level flow
@@ -136,6 +141,7 @@ src/helia_profiler/
 ├── engines/            # Engine adapters
 │   ├── base.py         # EngineAdapter protocol, EngineArtifacts
 │   ├── tflm.py         # Stock TFLM adapter
+│   ├── executorch.py   # ExecuTorch adapter
 │   ├── helia_rt/       # heliaRT adapter package
 │   └── helia_aot/      # heliaAOT adapter package
 │
@@ -152,7 +158,11 @@ src/helia_profiler/
 │   ├── verify_placement.py
 │   ├── flash.py
 │   ├── capture_pmu.py
+│   ├── plan_power.py
+│   ├── build_power_firmware.py
+│   ├── flash_power.py
 │   ├── capture_power.py
+│   ├── collect_power_terminal.py
 │   └── report.py
 │
 ├── firmware/           # Firmware generation
@@ -160,10 +170,15 @@ src/helia_profiler/
 │   └── templates/      # Jinja2 templates (CMakeLists, main.cc, etc.)
 │
 ├── capture/            # Data acquisition dispatch (capture_pmu/capture_power)
-│   └── parser.py         # HPX protocol parser → PmuResult
+│   ├── parser.py         # HPX protocol parser → PmuResult
+│   ├── power_terminal.py # Parser for power-firmware terminal status records
+│   ├── readiness.py      # Post-reset readiness helpers for capture transports
+│   └── rtt_symbol.py     # RTT control-block address lookup from build artifacts
 │
 ├── power/              # Power measurement drivers
 │   ├── base.py         # PowerDriver protocol, PowerResult
+│   ├── ina228_driver.py  # INA228 in-series power monitor driver
+│   ├── ondevice_driver.py # On-device (SoC-internal) power measurement driver
 │   └── joulescope/     # Joulescope JS110/JS220/JS320 driver package
 │
 └── report/             # Output formatting
@@ -194,8 +209,10 @@ its output back to the context. Stages never reach into other stages' internals.
 
 ## Next
 
+- [Compatibility Baseline](compatibility-baseline.md) — the qualified NSX project/module/engine baseline
 - [Pipeline & Stages](pipeline.md) — detailed stage-by-stage walkthrough
 - [Engine Adapters](engine-adapters.md) — how engines wire into the pipeline
 - [Firmware Generation](firmware.md) — templates, NSX modules, build process
-- [Data Capture](capture.md) — SWO protocol, parsing, multi-pass merging
+- [Data Capture](capture.md) — HPX protocol, transports, parsing, multi-pass merging
+- [Field Diagnostics](field-diagnostics.md) — redaction and the `hpx doctor --bundle` support bundle
 - [Contributing an Engine](adding-an-engine.md) — step-by-step guide

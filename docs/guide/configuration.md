@@ -54,7 +54,7 @@ output:
 1. Path to the `.tflite` model file.
 2. Optional tensor arena override in bytes. Start with the default, then tune
    from the reported `allocated_arena`. heliaAOT uses its own memory plan.
-3. Engine: `tflm`, `helia-rt`, or `helia-aot`.
+3. Engine: `tflm`, `helia-rt`, `helia-aot`, or `executorch`.
 4. Engine-specific config (passed through to the adapter).
 5. Target board — run `hpx boards` to see options.
 6. Toolchain selection. GCC and armclang are discovered on `PATH`; ATfE is

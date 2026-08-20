@@ -45,16 +45,11 @@ uv run hpx validate \
   --output-dir results/local-validation-dual
 ```
 
-The smoke suite uses RTT. For local development, put a SEGGER RTT checkout at
-`./segger-rtt`:
-
-```bash
-git clone https://github.com/SEGGERMicro/RTT.git segger-rtt
-```
-
-hpx first honors `SEGGER_RTT_PATH`; if it is unset, it also checks ignored
-local checkouts such as `./segger-rtt`, `./RTT`, `~/src/segger-rtt`, and
-`~/src/RTT`.
+The smoke suite uses RTT. No local SEGGER RTT checkout is required: hpx
+resolves RTT sources from `target.segger_rtt_path` in config, then the
+`SEGGER_RTT_PATH` environment variable, and otherwise falls back to the
+bundled copy in `src/helia_profiler/vendor/segger_rtt/`. Set the config key
+or environment variable only to override the bundled version.
 
 Optional Joulescope capture uses the same artifact layout:
 
@@ -213,6 +208,8 @@ only that axis.
 - `boards`: comma-separated board IDs, default `apollo510_evb,apollo330mP_evb`
 - `models`: optional comma-separated model IDs such as `kws` or `kws,vww`
 - `engines`: optional comma-separated engines such as `helia-rt` or `helia-aot`
+- `executorch_backends`: ExecuTorch CMSIS-NN provider selection — `both`
+  (default), `arm`, or `ns`
 - `ns_cmsis_nn_ref`: optional `ns-cmsis-nn` branch or full commit SHA.
   When empty, the workflow checks out HPX's qualified baseline commit. The
   requested ref and resolved commit are saved in
@@ -292,12 +289,9 @@ transport, and memory axes as `models-rt`, but runs `helia-aot`.
 
 For the full hardware regression, select `suite=complete`. It combines
 heliaRT/ns-cmsis-nn, heliaAOT/ns-cmsis-nn, the stock TFLM ARM CMSIS-NN
-baseline, and both ExecuTorch provider variants into a 64-case sweep:
-
-```text
-48 heliaRT + heliaAOT + TFLM cases
-+ 16 ExecuTorch cases (4 models × ARM/ns × 2 Cortex-M55 boards, GCC only)
-```
+baseline, and both ExecuTorch provider variants into one sweep. Run
+`uv run hpx validate --list --suite complete` for the exact current case
+count and axes.
 
 To compare runtime engines on the same smoke model, keep `suite=smoke` and set:
 

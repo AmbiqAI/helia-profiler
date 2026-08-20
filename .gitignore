@@ -35,6 +35,7 @@ hpx_*/
 experiments/
 /results/
 examples/notebooks/results/
+examples/quickstart/results/
 
 # Local SEGGER RTT checkouts used by RTT firmware generation
 segger-rtt/

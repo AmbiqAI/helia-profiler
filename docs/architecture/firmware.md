@@ -14,19 +14,28 @@ Firmware source files are generated from Jinja2 templates stored in
 | Template | Purpose |
 |---|---|
 | `CMakeLists.txt.j2` | Top-level CMake project file |
-| `nsx.yml.j2` | NSX module manifest (lists dependencies) |
+| `nsx.yml.j2` | NSX project manifest (module list + registry pins) |
+| `modules.cmake.j2` | Rendered to `cmake/nsx/modules.cmake` — module wiring |
 | `main.cc.j2` | Main for heliaRT / TFLM-style interpreter path |
 | `main_aot.cc.j2` | Main for heliaAOT (direct function calls) |
-| `hpx_pmu_profiler.cc.j2` | PMU capture harness |
+| `main_executorch.cc.j2` | Main for ExecuTorch (`Method` load + static buffers) |
+| `hpx_pmu_profiler.cc.j2` | PMU capture harness (interpreter path) |
 | `hpx_pmu_profiler.h.j2` | PMU capture header |
-| `modules.cmake.j2` | Local module path overrides |
+
+Alongside these, the directory holds ~20 underscore-prefixed **partials**
+(`_hpx_printf.j2`, `_dwt_init.j2`, `_system_includes.j2`,
+`_power_terminal.j2`, `_psram_metadata.j2`, ...) — shared fragments included
+by the main templates so transport setup, timer init, power-measurement
+hooks, and similar blocks are written once rather than per-engine.
 
 ### Template context
 
 Templates receive a merged context combining:
 
 1. **Config values** — board name, SoC, arena size, iteration count
-2. **Engine variables** — from `EngineArtifacts.template_vars`
+2. **Engine artifacts** — the typed fields of `EngineArtifacts`
+   (`engine_header`, `cmake_vars`, AOT arena regions, ExecuTorch buffer
+   sizes, ...; see `engines/base.py`)
 3. **Counter passes** — PMU counter IDs grouped by compute unit and hardware capacity
 4. **Platform features** — DSP, MVE, FPU flags
 
@@ -39,14 +48,17 @@ Example context for a heliaRT run:
     "arena_size": 131072,
     "iterations": 10,
     "warmup": 5,
-    "engine": "helia-rt",
+    "engine_type": "helia-rt",
     "pmu_passes": [
         {"name": "cpu_0", "event_ids": ["0x0011", "0x0008"], "counter_names": ["ARM_PMU_CPU_CYCLES", "ARM_PMU_INST_RETIRED"]},
         {"name": "memory_0", "event_ids": ["0x0004", "0x0003"], "counter_names": ["ARM_PMU_L1D_CACHE", "ARM_PMU_L1D_CACHE_REFILL"]},
     ],
     "has_mve": True,
     "has_dsp": True,
-    "modules": ["nsx-core", "nsx-harness", "ns-cmsis-nn", "helia-rt-local"],
+    # Module specs come from the board's NSX starter profile plus the
+    # engine's extra modules — e.g. nsx-core, nsx-cmsis-core, nsx-ambiq-bsp,
+    # nsx-board-apollo510-evb, ..., nsx-helia-rt
+    "modules": [...],
 }
 ```
 
@@ -58,49 +70,72 @@ After template rendering, the work directory contains a complete NSX app:
 work_dir/
 ├── CMakeLists.txt
 ├── nsx.yml
-├── modules.cmake
+├── cmake/
+│   └── nsx/
+│       └── modules.cmake
 ├── src/
-│   ├── main.cc              ← from main.cc.j2 or main_aot.cc.j2
-│   ├── hpx_pmu_profiler.cc  ← PMU capture harness
-│   └── hpx_pmu_profiler.h
-└── local_modules/           ← engine-created NSX modules
-    ├── helia-rt-local/      ← (heliaRT) wraps static lib
-    │   ├── nsx.yml
-    │   └── lib/
-    └── aot-model/           ← (heliaAOT) compiled model code
-        ├── nsx.yml
+│   ├── main.cc              ← main.cc.j2, main_aot.cc.j2, or main_executorch.cc.j2
+│   ├── main_power.cc        ← optional dedicated power binary (power_only render)
+│   ├── model_data.h         ← embedded model bytes (interpreter/ExecuTorch path)
+│   ├── hpx_pmu_profiler.cc  ← PMU capture harness (TFLM/heliaRT path)
+│   ├── hpx_pmu_profiler.h
+│   └── rtt/                 ← vendored SEGGER RTT sources (RTT transport)
+└── modules/                 ← vendored local NSX modules (engine-created)
+    └── hpx_model/           ← (heliaAOT) compiled model code — default module name
+        ├── nsx-module.yaml
         ├── include/
         └── src/
 ```
 
+Local engine modules are vendored under `modules/<project-or-name>` (with an
+alias directory when the module name differs from its owning project, e.g. a
+local `nsx-helia-rt` wrapper in project `helia-rt`). Registry-resolved engine
+modules (the common case for heliaRT, TFLM, and ExecuTorch's provider) are
+not copied — NSX fetches them during configure.
+
 ## NSX module wiring
 
-The firmware depends on NSX modules from multiple sources:
+The firmware depends on NSX modules from three sources:
 
-### System modules (from nsx-modules/)
+### Starter profile modules
+
+hpx does **not** maintain its own SDK-tier table. The board's NSX starter
+profile is the single source of truth for the base module set; hpx takes the
+profile's module list verbatim, minus the legacy `nsx-harness` / `nsx-utils`
+helpers it deliberately does not consume (`firmware/project.py`), plus
+`nsx-pmu-armv8m` when the SoC uses the Armv8-M PMU backend and the profile
+omits it. A typical Apollo510 profile contributes:
 
 | Module | Purpose |
 |---|---|
-| `nsx-core` | Startup, retarget, RTOS stubs |
-| `nsx-harness` | SWO print, GPIO, timer |
-| `ns-cmsis-nn` | AmbiqAI's CMSIS-NN fork |
-| `nsx-perf` | PMU helper macros |
-| `nsx-cmsis-startup` | Vector table, linker scripts |
+| `nsx-core` | Runtime helpers, retarget, RTOS stubs |
+| `nsx-cmsis-core` / `nsx-cmsis-startup` | CMSIS core headers, vector table, linker scripts |
+| `nsx-soc-hal` | SoC HAL abstraction |
+| `nsx-ambiqsuite`, `nsx-ambiq-hal`, `nsx-ambiq-bsp` | AmbiqSuite SDK, HAL, and BSP |
+| `nsx-board-<board>` | Board definition module |
+| `nsx-pmu-armv8m` | Armv8-M PMU driver (appended for PMU-capable SoCs) |
 
-### SDK tier modules
+The Ambiq SDK modules are owned by the unified `nsx-ambiq-sdk` project. Some
+starter profiles still list family-suffixed module names (e.g.
+`nsx-ambiqsuite-r5`), which the profile's `module_overrides` repoint onto the
+same unified project — hpx resolves ownership through the profile rather than
+hard-coding it. Project/module revisions are pinned by the compatibility
+baseline (`src/helia_profiler/data/compatibility-baseline-v1.json`).
 
-The board's SoC determines which SDK tier is used:
+### Engine modules (`EngineArtifacts.extra_modules`)
 
-| SoC | BSP | HAL | AmbiqSuite |
-|---|---|---|---|
-| Apollo3p | `nsx-ambiq-bsp-r3` | `nsx-ambiq-hal-r3` | `nsx-ambiqsuite-r3` |
-| Apollo4 | `nsx-ambiq-bsp-r4` | `nsx-ambiq-hal-r4` | `nsx-ambiqsuite-r4` |
-| Apollo510 | `nsx-ambiq-bsp-r5` | `nsx-ambiq-hal-r5` | `nsx-ambiqsuite-r5` |
+| Engine | Modules added |
+|---|---|
+| TFLM | `nsx-tflite-micro` (+ `arm-cmsis-nn` for the CMSIS-NN backend) |
+| heliaRT | `nsx-helia-rt` (registry; local wrapper only for source/dist overrides) |
+| heliaAOT | `hpx_model` (local, generated) + `nsx-cmsis-nn` |
+| ExecuTorch | provider (`arm-cmsis-nn` or `nsx-cmsis-nn`) + `nsx-executorch` wrapper |
 
 ### Local modules (engine-generated)
 
-Created by the engine adapter's `prepare()` method. These are placed in the
-work directory and referenced via `modules.cmake`.
+Created by the engine adapter's `prepare()` method and vendored into the
+work directory's `modules/` tree, where `cmake/nsx/modules.cmake` and the
+NSX lock can resolve them.
 
 ## The firmware's runtime behavior
 
@@ -108,18 +143,19 @@ At a high level, the generated firmware does:
 
 ```
 1. Initialize SoC (clocks, cache, selected transport)
-2. Print "HPX_START"
+2. Print "--- HPX_START ---" and HPX_<KEY>=<value> metadata lines
 3. For each PMU preset:
    a. Configure PMU with this preset's counter IDs
-   b. Run warmup iterations (PMU enabled but results discarded)
-   c. For each profiling iteration:
+   b. Print "--- HPX_PRESET <name> ---"
+   c. Run warmup iterations (PMU enabled but results discarded)
+   d. For each profiling iteration:
+      - Print "--- HPX_ITER <n> ---" and the CSV header row
       - For each layer:
         - Reset PMU counters
         - Execute layer
         - Read PMU counters
         - Print CSV row over the selected transport
-   d. Print "HPX_PRESET_DONE"
-4. Print "HPX_END"
+4. Print "--- HPX_END ---"
 5. Enter sleep (wait for reset)
 ```
 

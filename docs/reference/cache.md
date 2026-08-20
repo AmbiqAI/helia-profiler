@@ -30,4 +30,5 @@ network fetches and full rebuilds.
 - To rule out stale build state when debugging.
 
 For fast repeat builds with a verified, frozen module tree, see the
-`--frozen` flag on [`hpx profile`](profile.md).
+`--offline` flag on [`hpx profile`](profile.md) (`--frozen` is a
+deprecated alias).

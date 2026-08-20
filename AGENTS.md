@@ -97,7 +97,7 @@ If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
 | `evaluation/` | Model analysis, verified comparison, validity, and regression profiles |
 | `profiler.py` | Pipeline composition and logging setup |
 | `pipeline.py` | `PipelineContext`, `Stage` protocol, `PipelineRunner` |
-| `engines/` | One adapter per inference engine; `NsxModuleRef` in `base.py` |
+| `engines/` | One adapter per inference engine; `EngineAdapter` protocol and `EngineArtifacts` in `base.py` (`NsxModuleRef` lives in `results/models.py`) |
 | `firmware/` | NSX app generation from Jinja templates |
 | `capture/` | Capture orchestration, PMU parser → `PmuResult`, target readiness, power terminal records (transports themselves live in `transport/`) |
 | `power/` | Power measurement drivers, `PowerResult` in `base.py` |
@@ -112,6 +112,9 @@ If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
 | `redact.py` | Deterministic redaction of paths, URL credentials/tokens, secret assignments, and device serials for diagnostics output |
 | `support_bundle.py` | `hpx doctor --bundle` field-diagnostics collector and deterministic archive writer/verifier |
 | `errors.py` | Typed error hierarchy with `hint` field |
+| `session.py` | Immutable, branchable `Session` API for notebooks and scripts (backs `docs/reference/api/session.md`) |
+| `validation/` | `hpx validate` hardware-in-the-loop harness — case matrix, runner, report, and portable bundle |
+| `dependencies.py` | Locked-dependency preparation (`prepare_locked_dependencies`) for reproducible firmware builds |
 
 ### Data Contract
 

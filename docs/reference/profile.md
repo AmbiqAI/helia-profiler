@@ -91,7 +91,7 @@ and synchronization is frozen.
 | `--power-duration` | int | 30 | Capture window length in seconds. |
 | `--power-firmware` | `dedicated` \| `shared` | `dedicated` | Binary flashed during power capture. `dedicated` uses a transport-free image to avoid transport current contamination; `shared` reuses the transport binary. See [Power](../guide/power.md#dedicated-power-firmware). |
 | `--power-reset-strategy` | `auto` \| `power_cycle` \| `none` \| `debug_reset` \| `swpoi_reset` \| `debug_reset+swpoi_reset` | `auto` | Override reset behavior for board bring-up or controlled experiments. |
-| `--sync-gpio` | int | board default (`29` on `apollo510_evb` / `apollo510b_evb`, `10` on most other built-in EVBs) | GPIO pin the firmware toggles around inference. |
+| `--sync-gpio` | int | board default (per-board; see [Boards](../guide/boards.md) and [Power](../guide/power.md#wiring-reference)) | GPIO pin the firmware toggles around inference. Most built-in EVBs register a board-specific pin; `10` is only the fallback for boards without a registered override. |
 | `--ensure-power` | flag | off | Enable Joulescope passthrough before flashing when the board is powered from that rail. Implied by `--power`. |
 | `--no-ensure-power` | flag | — | Explicitly skip the passthrough power-on step. |
 | `--power-serial`, `--js-serial` | string | auto-detect | Select one instrument when multiple Joulescopes are connected. |

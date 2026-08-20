@@ -136,16 +136,20 @@ class TestBuildMatrix:
         # PSRAM is omitted because the ExecuTorch adapter does not support it.
         assert len(cases) == 2956
 
-    def test_power_off_halves_matrix(self):
-        assert len(build_matrix(power="off")) == 2956
-
-    def test_power_on_halves_matrix(self):
-        assert len(build_matrix(power="on")) == 2956
-
-    def test_power_both_doubles_matrix(self):
+    def test_power_on_keeps_executorch_unpowered(self):
         # ExecuTorch remains unpowered until its dedicated firmware implements
-        # the GPIO READY/GO/gate protocol.
-        assert len(build_matrix(power="both")) == 5656
+        # the GPIO READY/GO/gate protocol, so power="on" flips only the 2700
+        # non-ExecuTorch cases and leaves the case count unchanged.
+        cases = build_matrix(power="on")
+        assert len(cases) == 2956
+        assert sum(1 for case in cases if case.power) == 2700
+
+    def test_power_both_adds_powered_variants(self):
+        # "both" adds a powered variant for each powerable case:
+        # 2956 unpowered + 2700 powered.
+        cases = build_matrix(power="both")
+        assert len(cases) == 5656
+        assert sum(1 for case in cases if case.power) == 2700
 
     def test_repeat_multiplies_matrix(self):
         assert len(build_matrix(power="off", repeat=3)) == 8868

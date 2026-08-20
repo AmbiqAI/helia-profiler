@@ -121,7 +121,7 @@ Two broader presets exist for common sweeps:
 
 ```bash
 hpx validate --suite models-rt --list    # 16 cases: 2 boards x 4 models x 2 toolchains, helia-rt
-hpx validate --suite models-aot --list   # 12 cases: 3 boards x 4 models, gcc, helia-aot
+hpx validate --suite models-aot --list   # 16 cases: 2 boards x 4 models x 2 toolchains, helia-aot
 ```
 
 For multi-board setups, map each board to its own probe serial so the

@@ -349,8 +349,8 @@ def profile_command(
         None,
         "--sync-gpio",
         help=(
-            "GPIO pin for external power sync (default: board default; "
-            "29 on apollo510_evb / apollo510b_evb, 10 on most other built-in EVBs)"
+            "GPIO pin for external power sync (default: per-board; "
+            "10 only for boards without a registered override)"
         ),
         rich_help_panel=G_POWER,
     ),

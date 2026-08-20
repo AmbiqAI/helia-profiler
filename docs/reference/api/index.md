@@ -49,6 +49,7 @@ and annotation snapshots remain a release-candidate task.
 ## Pages
 
 - [Interactive sessions](session.md) — immutable, branchable configuration
+- [Power result types](power-results.md) — typed power capture results
 - [`profile()`](profile.md) — the entry point function
 - [Configuration](config.md) — `ProfileConfig` and its section classes
 - [Results](results.md) — `ProfileResult` and the typed data it carries

@@ -27,20 +27,25 @@ hpx profile $MODEL --engine helia-rt --toolchain atfe     \
     --output-dir results_compare/rt_atfe
 
 hpx profile $MODEL --engine helia-aot --toolchain gcc      \
-    --engine-config configs/aot.yml \
     --output-dir results_compare/aot_gcc
 
 hpx profile $MODEL --engine helia-aot --toolchain armclang \
-    --engine-config configs/aot.yml \
     --output-dir results_compare/aot_armclang
 
 hpx profile $MODEL --engine helia-aot --toolchain atfe     \
-    --engine-config configs/aot.yml \
     --output-dir results_compare/aot_atfe
 ```
 
-(`configs/aot.yml` should set `cmsis_nn_path`. See
-[Engines → heliaAOT](../guide/engines.md#heliaaot).)
+No engine config is needed by default — heliaAOT resolves its CMSIS-NN
+kernels from the NSX registry. To override that (or set other
+`engine.config` options), pass `--engine-config aot.yml` with a YAML file
+such as:
+
+```yaml
+cmsis_nn_path: /path/to/ns-cmsis-nn
+```
+
+See [Engines → heliaAOT](../guide/engines.md#heliaaot).
 
 ## What you get
 

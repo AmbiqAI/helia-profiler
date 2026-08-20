@@ -79,7 +79,7 @@ rule for non-root USB access.
 [Toolchains](../guide/toolchains.md). A Joulescope JS110/JS220/JS320 is optional
 and only needed for power capture — see [Power Measurement](../guide/power.md).
 Git and initial network access to GitHub are also needed while NSX resolves and
-clones firmware modules. After one successful build, `--frozen` can reuse the
+clones firmware modules. After one successful build, `--offline` can reuse the
 existing lock/module state for offline reruns.
 
 On Windows, enable long-path support before the first build — some NSX module
