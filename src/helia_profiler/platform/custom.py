@@ -8,8 +8,10 @@ The set of accepted key names is named once, in the ``Custom*Field`` enums
 below, and anything outside it is rejected rather than discarded.  Those enums
 are pinned against the dataclasses they feed by
 ``tests/test_platform.py::test_the_custom_memory_keys_track_the_memory_layout_fields_exactly``
-and its ``SocDef`` sibling, so a field added to the platform model cannot
-quietly become an unwritable one here.
+and its ``SocDef`` / ``BoardDef`` siblings, so a field added to the platform
+model cannot quietly become an unwritable one here.  Since unknown keys are now
+rejected, an omission is no longer just an unwritable field: it is a config
+that fails to load, which is how ``BoardDef.ble_reset_gpio_pin`` surfaced.
 """
 
 from __future__ import annotations
@@ -40,9 +42,26 @@ _ADDRESS_HINT = (
     "Write an unsigned decimal or 0x-prefixed hex literal, e.g. app_flash_load_addr: 0x22000000"
 )
 
+#: Widest address any supported part can hold.  Every SoC in this project is a
+#: 32-bit Cortex-M, so an address above this is not a part hpx could ever
+#: program -- see :func:`_address`.
+_MAX_ADDRESS = 0xFFFFFFFF
+
+#: Distinguishes "key absent" from "key present, written as ``null``".  A plain
+#: ``spec.get(key)`` collapses the two, and they mean opposite things here (see
+#: :func:`_app_flash_load_addr`).
+_UNSET = object()
+
 
 class CustomSocField(Enum):
-    """Keys accepted inside a ``target.custom_socs.<name>`` mapping."""
+    """Keys accepted inside a ``target.custom_socs.<name>`` mapping.
+
+    ``DESCRIPTION`` has no :class:`~helia_profiler.platform.soc.SocDef` field
+    behind it and is read by nothing -- it is here because
+    :class:`CustomBoardField` accepts one, and rejecting the same annotation on
+    the sibling block would mean a user who commented their custom *board* got
+    a hard ``ConfigError`` for commenting their custom *SoC* the same way.
+    """
 
     BASED_ON = "based_on"
     FAMILY = "family"
@@ -57,6 +76,7 @@ class CustomSocField(Enum):
     JLINK_DEVICE = "jlink_device"
     PMU_MAX_OPS = "pmu_max_ops"
     APP_FLASH_LOAD_ADDR = "app_flash_load_addr"
+    DESCRIPTION = "description"
 
 
 class CustomMemoryField(Enum):
@@ -86,6 +106,7 @@ class CustomBoardField(Enum):
     DEFAULT_SYNC_GPIO_PIN = "default_sync_gpio_pin"
     DEFAULT_STATE_GPIO_PIN = "default_state_gpio_pin"
     DEFAULT_GO_GPIO_PIN = "default_go_gpio_pin"
+    BLE_RESET_GPIO_PIN = "ble_reset_gpio_pin"
     STARTER_PROFILE_BOARD = "starter_profile_board"
     DESCRIPTION = "description"
 
@@ -193,6 +214,15 @@ def _app_flash_load_addr(
     the wrong offset -- where ``None`` produces a J-Link fallback that refuses
     to program and names this field.
 
+    An explicit ``app_flash_load_addr: null`` is NOT the same as leaving the
+    key out, and the two are kept apart by a sentinel rather than by
+    ``spec.get(...) is None``.  Writing ``null`` is a statement -- the only one
+    the config surface offers for "do not guess an address for this part" --
+    and it is most plausibly reached for by someone who has a ``based_on`` they
+    want for its memory/clock facts but distrusts its flash window.  Collapsing
+    it into "unstated" hands that user the inherited address, i.e. the exact
+    opposite of what they wrote.
+
     Note what this deliberately does NOT key on: whether the entry overrides
     ``memory:``.  :class:`~helia_profiler.platform.soc.MemoryLayout` carries
     sizes in KB and no addresses, so "resized a region" is not evidence about
@@ -201,9 +231,11 @@ def _app_flash_load_addr(
     one memory fact from an unrelated one is the auto-magic this repo avoids;
     ``based_on`` is a statement the user actually made.
     """
-    raw = spec.get(CustomSocField.APP_FLASH_LOAD_ADDR.value)
-    if raw is None:
+    raw = spec.get(CustomSocField.APP_FLASH_LOAD_ADDR.value, _UNSET)
+    if raw is _UNSET:
         return resolve_app_flash_load_addr(base) if base is not None else None
+    if raw is None:
+        return None
     return _address(raw, field_name=field_name)
 
 
@@ -240,6 +272,15 @@ def _address(raw: Any, *, field_name: str) -> int:
             f"Invalid {field_name}: {value} is negative -- addresses are unsigned.",
             hint=_ADDRESS_HINT,
         )
+    if value > _MAX_ADDRESS:
+        raise ConfigError(
+            f"Invalid {field_name}: {value:#x} does not fit in 32 bits "
+            f"(max {_MAX_ADDRESS:#x}).",
+            hint=(
+                "Every part hpx supports is a 32-bit Cortex-M, so this is most likely "
+                "one hex digit too many. " + _ADDRESS_HINT
+            ),
+        )
     return value
 
 
@@ -256,9 +297,17 @@ def _reject_unknown_keys(
     the user's config looks accepted while the value they wrote never reaches
     the platform model.  That is worst precisely when the key is one they
     reached for after diagnosing a real problem.
+
+    The ``key=str`` on the sort is load-bearing, not tidiness.  YAML keys are
+    not all strings: PyYAML resolves a bare ``on``/``off``/``yes``/``no`` to a
+    ``bool`` and bare digits to an ``int``, so a mapping with one unknown
+    string key and one unknown non-string key sorts a ``str`` against a
+    ``bool`` and raises ``TypeError`` -- from ``_prepare_merged_config``, which
+    sits outside ``load_config``'s ``try``, so it escapes as a traceback and
+    breaks that function's "never a raw exception" contract.
     """
     known = {member.value for member in allowed}
-    unknown = sorted(key for key in spec if key not in known)
+    unknown = sorted((key for key in spec if key not in known), key=str)
     if not unknown:
         return
     suggestions = {
@@ -323,6 +372,17 @@ def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, Boar
                 spec.get(
                     "default_go_gpio_pin",
                     base_board.default_go_gpio_pin if base_board else DEFAULT_GO_GPIO_PIN,
+                )
+            ),
+            # Inherited rather than dropped: a Blue board's Cooper radio holds
+            # its own reset line, and without this pin the power binary never
+            # emits the gating in ``_ble_reset.j2``.  A custom board derived
+            # from a Blue EVB would then read a higher idle current than the
+            # EVB it was copied from, for a reason nothing in the config shows.
+            ble_reset_gpio_pin=_optional_int(
+                spec.get(
+                    "ble_reset_gpio_pin",
+                    base_board.ble_reset_gpio_pin if base_board else None,
                 )
             ),
             starter_profile_board=(
