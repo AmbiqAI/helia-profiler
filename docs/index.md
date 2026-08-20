@@ -12,10 +12,10 @@ hide:
 ![heliaPROFILER](./assets/heliaprofiler-logo-light.png#only-light){ .hero-logo }
 ![heliaPROFILER](./assets/heliaprofiler-logo-dark.png#only-dark){ .hero-logo }
 
-# Profile LiteRT models on Ambiq hardware.
+# Profile LiteRT and ExecuTorch models on Ambiq hardware.
 
-Build, flash, measure, and compare LiteRT models with heliaRT, heliaAOT,
-or a stock TFLM baseline.
+Build, flash, measure, and compare models with heliaRT, heliaAOT, a stock
+TFLM baseline, or the Cortex-M ExecuTorch runtime.
 { .hero-sub }
 
 [Get Started :material-arrow-right:](getting-started/index.md){ .md-button .md-button--primary }

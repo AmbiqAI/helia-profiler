@@ -25,8 +25,10 @@ case is a full profile run — build, flash, capture, report — with
 pass/fail criteria, making this the recommended way to validate a board
 setup or gate hardware changes in CI.
 
-See [Validating a Board Setup](../guides/validating-a-board-setup.md) and
-[Hardware CI](../guide/hardware-ci.md) for workflow-oriented guidance.
+See [Validating a Board Setup](../guides/validating-a-board-setup.md) for
+workflow-oriented guidance. Maintainers running the suite on the self-hosted
+runner should also read
+[`maintainers/hardware-ci.md`](https://github.com/AmbiqAI/helia-profiler/blob/main/maintainers/hardware-ci.md).
 
 ## Options
 

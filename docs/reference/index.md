@@ -82,6 +82,14 @@ starting point.
 
   [:octicons-arrow-right-24: compare](compare.md)
 
+-   :material-check-decagram:{ .lg .middle } __`hpx validate`__
+
+  ---
+
+  Hardware-in-the-loop suite over MLPerf Tiny models.
+
+  [:octicons-arrow-right-24: validate](validate.md)
+
 -   :material-power:{ .lg .middle } __`hpx power-on`__
 
   ---

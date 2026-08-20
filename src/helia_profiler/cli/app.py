@@ -27,7 +27,7 @@ from . import inspect_app as _inspect_app
 
 app = typer.Typer(
     name="hpx",
-    help="Profile LiteRT models on Ambiq silicon.",
+    help="Profile LiteRT and ExecuTorch models on Ambiq silicon.",
     # Click 8.2+'s built-in no_args_is_help raises a UsageError (exit code 2)
     # instead of the historical "print help, exit 0" behavior. Replicate the
     # old argparse `hpx` bare-invocation contract explicitly in the callback
@@ -55,7 +55,7 @@ def _hpx_callback(
         is_eager=True,
     ),
 ) -> None:
-    """Profile LiteRT models on Ambiq silicon."""
+    """Profile LiteRT and ExecuTorch models on Ambiq silicon."""
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
         raise typer.Exit(0)

@@ -170,4 +170,4 @@ def test_ports_no_subcommand_prints_help_and_exits_zero() -> None:
 def test_bare_invocation_prints_help_and_exits_zero() -> None:
     result = runner.invoke(app, [])
     assert result.exit_code == 0
-    assert "Profile LiteRT models on Ambiq silicon." in result.output
+    assert "Profile LiteRT and ExecuTorch models on Ambiq silicon." in result.output

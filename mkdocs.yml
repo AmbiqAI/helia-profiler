@@ -1,19 +1,13 @@
 site_name: heliaPROFILER
-site_description: Profile LiteRT models on Ambiq Apollo hardware
+site_description: Profile LiteRT and ExecuTorch models on Ambiq Apollo hardware
 repo_url: https://github.com/AmbiqAI/helia-profiler
 repo_name: AmbiqAI/helia-profiler
 
-# Maintainer-only hardware validation, release operations, and completed design
-# plans stay in the repository but are intentionally not published on the
-# end-user documentation site.
-exclude_docs: |
-  architecture/profile-power-refactor-plan.md
-  architecture/public-release-readiness.md
-  architecture/validation-bundle-compare.md
-  guide/hardware-ci.md
-  guide/releasing.md
-  guides/validating-a-board-setup.md
-  reference/validate.md
+# Everything under docs/ is published. Maintainer-only material (release
+# operations, hardware CI, validation bundle internals) lives in
+# ../maintainers/ instead -- `exclude_docs` is honoured by mkdocs but ignored
+# by zensical, which is what actually builds the deployed site, so keeping
+# unpublished pages here would publish them.
 
 theme:
   name: material
@@ -169,7 +163,9 @@ nav:
       - Power Profiling: examples/power-profiling.md
   - In-Depth Guides:
       - Overview: guides/index.md
+      - Validating a Board Setup: guides/validating-a-board-setup.md
       - Memory Placement Tuning: guides/memory-placement-tuning.md
+      - ExecuTorch NS Tier-1 Kernels: guides/executorch-ns-kernels.md
   - Reference:
       - Overview: reference/index.md
       - CLI:
@@ -184,6 +180,7 @@ nav:
           - hpx target: reference/target.md
           - hpx power-on: reference/power-on.md
           - hpx cache: reference/cache.md
+          - hpx validate: reference/validate.md
       - Configuration Reference: reference/configuration.md
       - Python API:
           - Overview: reference/api/index.md

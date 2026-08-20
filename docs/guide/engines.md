@@ -102,7 +102,8 @@ ns-cmsis-nn — and a `cortex_m_ns::` PTE on a build without NS ops fails fast
 at `Method::load()` rather than miscomputing. On the arm provider the same
 source model keeps those ops as portable ATen fallbacks (registered via
 `portable_ops`), which run in float and dominate per-op cost; see
-`TIER1_NS_OPS_COMPARISON.md` for measured deltas.
+[ExecuTorch NS Tier-1 Kernels](../guides/executorch-ns-kernels.md) for
+measured deltas.
 
 ### Sidecar self-configuration
 

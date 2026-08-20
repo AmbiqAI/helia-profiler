@@ -149,7 +149,7 @@ a case that's flaky at `--repeat 2` will be flaky in CI.
 
 - `hpx validate --help` — every flag, alias, and the built-in suite
   descriptions.
-- [Hardware Validation Artifacts](../guide/hardware-ci.md) — what's written
+- [Hardware Validation Artifacts](https://github.com/AmbiqAI/helia-profiler/blob/main/maintainers/hardware-ci.md) — what's written
   to disk and how to wire `hpx validate` into CI.
 - [Boards & Platforms](../guide/boards.md) — board IDs and per-board
   defaults referenced by the axis flags above.

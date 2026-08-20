@@ -16,6 +16,15 @@ This section is expected to grow as more workflows get written up.
 
 <div class="grid cards" markdown>
 
+-   :material-check-decagram:{ .lg .middle } __Validating a Board Setup__
+
+    ---
+
+    Prove a new bench end to end — host tools, probe, flash, capture —
+    before you trust a single number off it.
+
+    [:octicons-arrow-right-24: Read](validating-a-board-setup.md)
+
 -   :material-memory:{ .lg .middle } __Memory Placement Tuning__
 
     ---
@@ -24,5 +33,14 @@ This section is expected to grow as more workflows get written up.
     arena/weights regions — and what to do when a plan overflows.
 
     [:octicons-arrow-right-24: Read](memory-placement-tuning.md)
+
+-   :material-chip:{ .lg .middle } __ExecuTorch NS Tier-1 Kernels__
+
+    ---
+
+    What the `ns` CMSIS-NN provider actually buys you over `arm` on a
+    Cortex-M55, measured op by op on real hardware.
+
+    [:octicons-arrow-right-24: Read](executorch-ns-kernels.md)
 
 </div>

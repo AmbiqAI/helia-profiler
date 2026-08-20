@@ -27,10 +27,11 @@ It does not invoke profiling, pytest, NSX, probes, or target hardware.
 
 ## Manifest Contract
 
-New validation runs emit manifest schema v2. The comparison loader also accepts
-schema v1 with compatibility warnings; unknown versions are rejected.
+New validation runs emit manifest schema v5 (`validation/report.py`
+`SCHEMA_VERSION`). The comparison loader accepts v1 through v5 — v1 loads with
+a compatibility warning — and rejects unknown versions.
 
-Schema v2 records:
+From v2 onwards the manifest records:
 
 - explicit case identity and repeat attempt;
 - requested memory and power configuration;

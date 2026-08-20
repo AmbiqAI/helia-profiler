@@ -7,8 +7,9 @@ should stay stable unless there is a deliberate design change.
 ## Purpose
 
 `helia-profiler` (`hpx`) is a cross-platform CLI tool that profiles LiteRT
-(TFLite) flatbuffer models on Ambiq Apollo hardware. It captures per-layer PMU
-counter breakdowns and optional power measurements.
+(TFLite) flatbuffer models and ExecuTorch (`.pte`) programs on Ambiq Apollo
+hardware. It captures per-layer PMU counter breakdowns and optional power
+measurements.
 
 It is **not** a build system, SDK exporter, or application framework. It is a
 profiler.
@@ -18,7 +19,8 @@ profiler.
 ### One Engine Per Run
 
 The user explicitly selects one inference engine (`tflm`, `helia-rt`,
-`helia-aot`) per invocation. Do not add multi-engine orchestration.
+`helia-aot`, `executorch`) per invocation. Do not add multi-engine
+orchestration.
 
 ### Explicit Over Auto-Magic
 
@@ -88,7 +90,7 @@ If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
 | Module | Responsibility |
 | --- | --- |
 | `api.py` | `profile()` — public programmatic entry point, returns `ProfileResult` |
-| `cli.py` | Thin argparse CLI, delegates to `api.profile()` |
+| `cli/` | Typer command package (`app.py` + one module per command); delegates to `api.profile()` and the console layer |
 | `config.py` | `ProfileConfig` dataclass, YAML + CLI merge |
 | `compatibility.py` | Typed HPX compatibility baseline (`data/compatibility-baseline-v1.json`) — qualified NSX project/module/engine refs and override classification |
 | `results/` | Typed result models, workflow artifacts, and bundle manifests |
@@ -97,10 +99,11 @@ If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
 | `pipeline.py` | `PipelineContext`, `Stage` protocol, `PipelineRunner` |
 | `engines/` | One adapter per inference engine; `NsxModuleRef` in `base.py` |
 | `firmware/` | NSX app generation from Jinja templates |
-| `capture/` | Serial data reader, PMU parser → `PmuResult` |
+| `capture/` | Capture orchestration, PMU parser → `PmuResult`, target readiness, power terminal records (transports themselves live in `transport/`) |
 | `power/` | Power measurement drivers, `PowerResult` in `base.py` |
-| `report/` | CSV, JSON, terminal summary, Model Explorer overlays |
-| `stages/` | Ordered pipeline stages s01–s08 |
+| `report/` | CSV, JSON, run summary, result manifest, Model Explorer overlays |
+| `console/` | All Rich rendering — progress, tables, results, comparisons. The library never prints; the CLI does |
+| `stages/` | One module per pipeline stage; `profiler.build_default_pipeline()` owns the order |
 | `platform/` | SoC families, board registry, capabilities, and custom overlays |
 | `transport/rtt.py` | RTT capture lifecycle; direct control-block access and low-level test patch points live in `rtt_control.py` |
 | `target/probe/jlink.py` | SEGGER J-Link helpers (discovery, reset, SWO commands) |
@@ -119,7 +122,8 @@ the `results/` package, never bare `dict[str, Any]`. The main exception is
 ## Working Rules
 
 - Prefer focused modules. Extract when a file accumulates multiple concerns.
-- Keep `cli.py` thin — it parses args and calls `api.profile()`.
+- Keep the `cli/` modules thin — they parse args, call `api`/`Session`, and
+  hand results to `console/` for rendering. No profiling logic in commands.
 - Use `subprocess.run()` with argument lists for all external tool calls.
 - Use dataclasses (frozen when possible) for internal models.
 - Tests should be fast, local, and mock external tools.
