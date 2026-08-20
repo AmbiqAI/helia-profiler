@@ -1,32 +1,41 @@
 # Pipeline & Stages
 
-The profiling pipeline is a sequence of stages executed in order. The
-summary below collapses some setup and verification work into the major
-phases most contributors interact with. Each phase reads from the shared
-`PipelineContext` and writes its outputs back.
+The profiling pipeline is a flat, ordered sequence of stages. Each stage
+reads from the shared `PipelineContext` and writes its outputs back.
 
 ## Stage execution
 
+The full list, from `profiler.py`:
+
 ```python
-# High-level phase grouping
-def build_default_pipeline() -> list[Stage]:
-    return [
-        ResolvePlatform(),      # S01
-        PrepareEngine(),        # S02
-        GenerateFirmware(),     # S03
-        BuildFirmware(),        # S04
-        FlashFirmware(),        # S05
-        CapturePmu(),           # S06
-        CapturePower(),         # S07
-        GenerateReport(),       # S08
-    ]
+def build_default_pipeline() -> PipelineRunner:
+    return PipelineRunner([
+        PreflightStage(),              # host-only dependency + config checks
+        EnsureBoardPoweredStage(),     # restore the rail before touching the probe
+        ResolvePlatformStage(),        # board -> SoC, model hash
+        ResolveJLinkProbeStage(),      # pick and open the probe
+        PrepareEngineStage(),          # engine adapter prepare()
+        AnalyzeModelStage(),           # host-side model analysis (optional)
+        PlanMemoryStage(),             # arena / weights placement
+        GenerateFirmwareStage(),       # render the NSX app
+        BuildFirmwareStage(),          # nsx configure + build
+        VerifyPlacementStage(),        # confirm the linker honoured the plan
+        FlashFirmwareStage(),
+        CapturePmuStage(),
+        PlanPowerRunStage(),           # fixed N from clean profile timing
+        BuildPowerFirmwareStage(),     # transport-free power image
+        FlashPowerFirmwareStage(),
+        CapturePowerStage(),
+        CollectPowerTerminalStage(),   # post-gate diagnostics from the target
+        GenerateReportStage(),
+    ])
 ```
 
-The concrete pipeline also runs preflight, board-power, probe-resolution,
-model-analysis, memory-planning, and placement-verification stages around
-these major phases. `PipelineRunner` still executes everything sequentially;
-if any stage raises an exception, the pipeline stops and reports the error
-with its typed hint.
+The five power stages are no-ops when `power.enabled` is false.
+`PipelineRunner` executes everything sequentially; if any stage raises, the
+pipeline stops and reports the error with its typed hint.
+
+The sections below detail the stages most contributors touch.
 
 ## PipelineContext
 
@@ -51,13 +60,17 @@ class PipelineContext:
     run_metadata: RunMetadata = field(default_factory=RunMetadata)
 ```
 
+(Abridged — `pipeline.py` carries the full field list, including the
+probe/flash/reset handles, dependency workspace, power plan, and the grouped
+`ProfileRun`/`PowerRun` workflow records.)
+
 Stages are expected to **set** their designated fields and **read** fields
 set by earlier stages. No stage should modify another stage's output after
 it's been set.
 
 ## Stage-by-stage detail
 
-### S01: Resolve Platform
+### Resolve Platform
 
 **File:** `stages/resolve_platform.py`
 **Sets:** `ctx.soc`, `ctx.board`, `ctx.run_metadata.platform`, `ctx.run_metadata.model`
@@ -68,12 +81,12 @@ hash (SHA-256), and populates platform and model metadata.
 If the board has `DWT_ONLY` PMU, logs a warning that only cycle counts will be
 captured.
 
-### S02: Prepare Engine
+### Prepare Engine
 
 **File:** `stages/prepare_engine.py`
 **Sets:** `ctx.engine_artifacts`
 
-Instantiates the selected heliaRT, heliaAOT, or TFLM adapter and calls its
+Instantiates the selected heliaRT, heliaAOT, TFLM, or ExecuTorch adapter and calls its
 `prepare()` method. The adapter produces an `EngineArtifacts` bundle that records
 engine identity plus any local NSX modules, static libraries, and memory-planning
 metadata needed by later stages.
@@ -81,9 +94,11 @@ metadata needed by later stages.
 For **heliaRT**, this normally declares the pinned registry module, with local
 source/prebuilt overrides available. For **heliaAOT**, this runs the compiler
 and creates the model module while resolving CMSIS-NN. For **TFLM**, it resolves
-the stock interpreter module and selected backend.
+the stock interpreter module and selected backend. For **ExecuTorch**, it
+validates the pinned `nsx-executorch` checkout and wraps it as a local module
+behind the selected CMSIS-NN provider.
 
-### S03: Generate Firmware
+### Generate Firmware
 
 **File:** `stages/generate_firmware.py`
 **Reads:** `ctx.engine_artifacts`, `ctx.config`
@@ -100,7 +115,7 @@ Renders Jinja2 templates into a complete NSX application:
 The template context includes engine-specific variables (e.g. operator manifest
 for AOT, library path for RT).
 
-### S04: Build Firmware
+### Build Firmware
 
 **File:** `stages/build_firmware.py`
 **Sets:** `ctx.build_dir`, `ctx.binary_path`, `ctx.binary_sections`, `ctx.run_metadata.toolchain`
@@ -114,7 +129,7 @@ After building, captures:
 - **Binary section sizes** via the toolchain-specific size probe (`arm-none-eabi-size` or `fromelf`)
 - **Toolchain info** — compiler and CMake versions
 
-### S05: Flash Firmware
+### Flash Firmware
 
 **File:** `stages/flash.py`
 **Reads:** `ctx.binary_path`
@@ -124,7 +139,7 @@ Flashes the built firmware to the target via `nsx flash` (which uses JLinkExe).
 If the debug domain is locked (common after power issues), retries with a
 power-cycle reset via the Joulescope (if available).
 
-### S06: Capture PMU
+### Capture PMU
 
 **File:** `stages/capture_pmu.py`
 **Sets:** `ctx.pmu_result`
@@ -145,19 +160,31 @@ The core data collection stage:
 The parser handles multi-preset firmware (one firmware binary can profile
 multiple PMU counter sets in sequence).
 
-### S07: Capture Power
+### Capture Power
 
 **File:** `stages/capture_power.py`
 **Sets:** `ctx.power_result`
 
-Skipped if `power.enabled` is false. The concrete pipeline first plans a fixed
-inference count from profile timing, rerenders and incrementally rebuilds the
-dedicated transport-free power target, and explicitly flashes that artifact.
-Capture then arms the configured power driver, resets the target without
+Skipped if `power.enabled` is false. Three stages run ahead of it:
+`PlanPowerRunStage` derives a fixed inference count from the clean profile
+timing, `BuildPowerFirmwareStage` rerenders and incrementally rebuilds the
+dedicated transport-free power target, and `FlashPowerFirmwareStage` deploys
+it. Capture then arms the configured power driver, resets the target without
 normally cycling its rail, observes the GPIO-gated clean window, and computes
 summary statistics from samples inside the accepted gate.
+`CollectPowerTerminalStage` follows, reading the target's one terminal record
+after the gate has closed.
 
-### S08: Generate Report
+**Why there is no `--power-only` flag.** The profile phase does more than
+collect optional PMU counters — its clean inference timing is the
+authoritative denominator used to choose fixed `N` and to verify the measured
+gate duration, and `ProfileResult`, reporting, and validity all currently
+require a `PmuResult`. Skipping `CapturePmuStage` would either remove that
+denominator or leave later stages with an invalid contract, so a real
+power-only workflow needs its own result type and pipeline composition rather
+than a flag.
+
+### Generate Report
 
 **File:** `stages/report.py`
 **Reads:** everything from `ctx`

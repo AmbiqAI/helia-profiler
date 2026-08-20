@@ -17,15 +17,17 @@ flashes the target, captures measurements, and writes a portable result bundle.
 - **Power & energy per inference** — GPIO-gated Joulescope capture
   (JS110/JS220/JS320) uses a dedicated transport-free firmware image to
   isolate the inference window from setup/teardown and capture traffic.
-- **Four engines** — `tflm` (vanilla TFLM baseline), `helia-rt` (Ambiq's
-  optimized TFLM interpreter), and `helia-aot` (Ambiq's ahead-of-time model
-  compiler), plus `executorch` for Cortex-M PTE programs, selected explicitly
-  per run.
+- **Four engines, one per run** — `tflm` (vanilla TFLM baseline),
+  `helia-rt` (Ambiq's optimized TFLM interpreter), `helia-aot` (Ambiq's
+  ahead-of-time model compiler), and `executorch` (Cortex-M ExecuTorch
+  programs, on the `arm` or `ns` CMSIS-NN provider). Selected explicitly —
+  never auto-detected.
 - **Multiple toolchains** — `arm-none-eabi-gcc`, `armclang`, and ATfE, so you
   can compare build/runtime trade-offs without changing your model.
 - **Memory placement control** — place the heliaRT tensor arena in TCM, SRAM,
   or PSRAM and weights in TCM, SRAM, MRAM, or PSRAM; heliaAOT exposes
-  per-tensor placement through its engine configuration.
+  per-tensor placement through its engine configuration, and ExecuTorch
+  places each of its five runtime buffers independently.
 - **Four capture transports** — lossless RTT by default, plus USB CDC, UART,
   and diagnostic SWO, with probe, port, and target-reset helpers for bring-up.
 - **Host-only model analysis** — inspect MACs, parameters, tensor sizes, and
@@ -41,6 +43,9 @@ flashes the target, captures measurements, and writes a portable result bundle.
 - **Verifiable result bundles** — summaries, per-layer data, provenance,
   validity/comparability issues, and a SHA-256 manifest designed for scripts
   as well as people.
+- **Hardware-in-the-loop validation** — `hpx validate` runs canonical MLPerf
+  Tiny models end-to-end across engines, toolchains, transports, and memory
+  placements, and emits a portable bundle two runs can be compared from.
 - **Typed Python API** — call `profile()` directly or use immutable,
   branchable `Session` workflows in notebooks and automation.
 
@@ -59,6 +64,7 @@ hpx profile model.tflite --power             # add Joulescope power capture
 hpx profile --config hpx.yml                 # reproducible, config-driven run
 hpx analyze model.tflite                     # inspect the model without hardware
 hpx compare results/baseline results/change  # compare two completed runs
+hpx validate --suite smoke                   # prove the whole bench works
 ```
 
 `hpx profile` defaults to heliaRT, GNU Arm, RTT, `apollo510_evb`, per-layer
@@ -82,14 +88,26 @@ for a real walkthrough.)*
 
 ```bash
 uv sync --locked --all-groups
-uv run ruff check src tests tools
+uv run ruff check .
 uv run pytest -q
-uv run mkdocs build --strict
+uv run --group docs zensical build
 ```
+
+`pytest` deselects the `hardware` marker by default, so the whole unit suite
+runs with no board attached. Hardware cases run through `hpx validate` (or
+`pytest -m hardware`).
+
+The docs site is built with [zensical](https://github.com/squidfunk/zensical)
+from `mkdocs.yml` and deployed to GitHub Pages from `main`; `uv run mkdocs
+build --strict` still works if you prefer it locally.
 
 Repository workflows use the committed `uv.lock` for reproducibility. PyPI
 installations continue to resolve the compatible dependency ranges published in
 `pyproject.toml`.
+
+Architectural rules, module responsibilities, and the repo workflows that
+should stay stable are documented in [`AGENTS.md`](AGENTS.md) — worth reading
+before a first change, whether you are a person or an agent.
 
 ## License
 

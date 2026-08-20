@@ -25,4 +25,13 @@ This section is expected to grow as more workflows get written up.
 
     [:octicons-arrow-right-24: Read](memory-placement-tuning.md)
 
+-   :material-chip:{ .lg .middle } __ExecuTorch NS Tier-1 Kernels__
+
+    ---
+
+    What the `ns` CMSIS-NN provider actually buys you over `arm` on a
+    Cortex-M55, measured op by op on real hardware.
+
+    [:octicons-arrow-right-24: Read](executorch-ns-kernels.md)
+
 </div>

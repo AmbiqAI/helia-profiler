@@ -1,4 +1,4 @@
-"""hpx CLI — Profile LiteRT models on Ambiq silicon."""
+"""hpx CLI — Profile LiteRT and ExecuTorch models on Ambiq silicon."""
 
 from __future__ import annotations
 

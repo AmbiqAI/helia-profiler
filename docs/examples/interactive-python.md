@@ -77,8 +77,13 @@ On supported modern EVBs, `usb_cdc` is the lossless alternative but requires
 both the J-Link and target USB cables. `uart` is broadly available through the
 J-Link OB virtual COM port, but is low-throughput and has no flow control.
 
-[:material-notebook-outline: Open the full interactive showcase](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/notebooks/hpx_walkthrough_v2.ipynb){ .md-button .md-button--primary }
-[:material-download: Download the notebook](https://raw.githubusercontent.com/AmbiqAI/helia-profiler/main/examples/notebooks/hpx_walkthrough_v2.ipynb){ .md-button }
+Two notebooks ship with the repository. **Analysis showcase** profiles the
+packaged example model and then digs into layer timing, compute-unit lanes,
+bottlenecks, and overlays. **Walkthrough** is the narrower beginner path:
+analyze, profile with heliaRT, profile with heliaAOT, compare, optional power.
+
+[:material-notebook-outline: Analysis showcase](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/notebooks/hpx_analysis_showcase.ipynb){ .md-button .md-button--primary }
+[:material-notebook-outline: Walkthrough](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/notebooks/hpx_walkthrough.ipynb){ .md-button }
 
 ## Start with safe discovery
 

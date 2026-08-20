@@ -10,8 +10,11 @@ letting the pipeline treat them uniformly.
 class EngineAdapter(Protocol):
     """Prepares engine-specific build artifacts for NSX firmware."""
 
-    name: str
-    engine_type: EngineType
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def engine_type(self) -> EngineType: ...
 
     def prepare(
         self,
@@ -31,13 +34,20 @@ Every adapter receives:
 And returns `EngineArtifacts`:
 
 ```python
-@dataclass(frozen=True)
+@dataclass
 class EngineArtifacts:
-    engine_type: EngineType
+    engine_type: EngineType = EngineType.TFLM
     extra_modules: list[NsxModuleRef] = field(default_factory=list)
+    cmake_vars: dict[str, str] = field(default_factory=dict)
+    source_files: list[Path] = field(default_factory=list)
+    include_dirs: list[Path] = field(default_factory=list)
     static_libs: list[Path] = field(default_factory=list)
-    memory_plan: MemoryPlan | None = None
+    engine_header: str = TFLM_ENGINE_HEADER
+    # ... plus the remaining typed template fields consumed by the renderer
 ```
+
+See `engines/base.py` for the full field list — it is the single source of
+truth and grows as engines need new template inputs.
 
 ## heliaRT adapter
 
@@ -123,6 +133,42 @@ TFLM is primarily useful for:
 - Establishing an upstream interpreter baseline
 - Generating baseline numbers for comparison with heliaRT/heliaAOT
 
+## ExecuTorch adapter
+
+**File:** `engines/executorch.py`
+
+ExecuTorch runs a `.pte` program — a graph lowered ahead of time by
+`helia-torch`/`nsx_cortex_m` — through the `nsx-executorch` runtime. Unlike
+the LiteRT engines, HPX does not compile the model itself; the PTE arrives
+already lowered against a chosen CMSIS-NN provider.
+
+### What `prepare()` does
+
+1. Validates `engine.config.source_path` — a local `nsx-executorch` checkout
+   whose `version.txt` **and commit** match the qualified pin in the
+   [compatibility baseline](compatibility-baseline.md), including its
+   `external/executorch` submodule gitlink and pinned torchgen sources.
+2. Loads the optional `<model>.pte.json` sidecar and uses it to default the
+   CMSIS-NN provider, `ns_ops`, portable op list, planned arena size, and
+   I/O sizes. Explicit config always wins; a hash mismatch is a hard error.
+3. Resolves the memory region and size for each of the five static RAM
+   buffers (planned arena, method arena, temporary arena, input, output).
+4. Generates a thin NSX wrapper module that `add_subdirectory()`s the
+   checkout, and emits the provider module ref **before** it so NSX
+   configures the provider exactly once.
+5. Returns both module refs plus the `NSX_EXECUTORCH_*` CMake variables.
+
+### Assumptions
+
+- The checkout is at the exact pinned commit — HPX refuses to build an
+  unqualified runtime rather than reporting drifted numbers.
+- The PTE was exported against the same provider being built. A
+  `cortex_m_ns::` PTE on a non-NS build fails at `Method::load()`, and HPX
+  rejects that combination at config time.
+- `arena_location` and the per-buffer overrides may only name RAM regions
+  (`tcm`, `sram`).
+- Power capture is not supported yet; keep `power.enabled: false`.
+
 ## How engines affect the firmware
 
 The engine choice affects three things in the generated firmware:
@@ -134,14 +180,20 @@ The engine choice affects three things in the generated firmware:
 | heliaRT | `main.cc.j2` | Interpreter setup, arena allocation |
 | heliaAOT | `main_aot.cc.j2` | Direct function calls, `arm_mve.h` pre-include |
 | TFLM | `main.cc.j2` | Standard TFLM interpreter path |
+| ExecuTorch | `main_executorch.cc.j2` | `Module`/`Method` load, five static RAM buffers |
 
 ### 2. NSX module graph
 
 ```
-heliaRT:   [nsx-core, nsx-harness, ns-cmsis-nn, helia-rt-local]
-heliaAOT:  [nsx-core, nsx-harness, ns-cmsis-nn, aot-model]
-TFLM:      [nsx-core, nsx-harness, ns-cmsis-nn, tflm]
+heliaRT:     [nsx-core, nsx-harness, ns-cmsis-nn, helia-rt-local]
+heliaAOT:    [nsx-core, nsx-harness, ns-cmsis-nn, aot-model]
+TFLM:        [nsx-core, nsx-harness, ns-cmsis-nn, tflm]
+ExecuTorch:  [nsx-core, nsx-harness, <arm|ns>-cmsis-nn, nsx-executorch]
 ```
+
+The ExecuTorch provider module is ordered *before* `nsx-executorch` on
+purpose — NSX must configure exactly one CMSIS-NN provider before the
+runtime creates its idempotent bridge target.
 
 ### 3. Binary size and layout
 

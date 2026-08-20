@@ -1,14 +1,12 @@
 site_name: heliaPROFILER
-site_description: Profile LiteRT models on Ambiq Apollo hardware
+site_description: Profile LiteRT and ExecuTorch models on Ambiq Apollo hardware
 repo_url: https://github.com/AmbiqAI/helia-profiler
 repo_name: AmbiqAI/helia-profiler
 
-# Maintainer-only hardware validation, release operations, and completed design
-# plans stay in the repository but are intentionally not published on the
-# end-user documentation site.
+# Maintainer-only hardware validation and release operations stay in the
+# repository but are intentionally not published on the end-user
+# documentation site.
 exclude_docs: |
-  architecture/profile-power-refactor-plan.md
-  architecture/public-release-readiness.md
   architecture/validation-bundle-compare.md
   guide/hardware-ci.md
   guide/releasing.md
@@ -170,6 +168,7 @@ nav:
   - In-Depth Guides:
       - Overview: guides/index.md
       - Memory Placement Tuning: guides/memory-placement-tuning.md
+      - ExecuTorch NS Tier-1 Kernels: guides/executorch-ns-kernels.md
   - Reference:
       - Overview: reference/index.md
       - CLI:
