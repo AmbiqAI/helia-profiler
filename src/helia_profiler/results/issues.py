@@ -28,11 +28,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
-from typing import Literal, Mapping
+from typing import Mapping
 
 from ..errors import ReportError
 
-Severity = Literal["error", "warning"]
+
+class Severity(StrEnum):
+    """Severity vocabulary for run-validity issues.
+
+    Wire-identical to the ``"error"``/``"warning"`` literals it replaces;
+    ``ResultIssue.severity`` stays ``str`` on the read side per the module's
+    rehydration rule.
+    """
+
+    ERROR = "error"
+    WARNING = "warning"
 
 
 class IssueCode(StrEnum):
@@ -95,7 +105,7 @@ class IssueSpec:
     def mode_dependent(self) -> bool:
         return self.severity is None
 
-    def allowed_severities(self) -> frozenset[str]:
+    def allowed_severities(self) -> frozenset[Severity]:
         if self.severity is not None:
             return frozenset((self.severity,))
         return frozenset((self.internal_severity, self.external_severity))
@@ -105,130 +115,130 @@ _ISSUE_SPECS: tuple[IssueSpec, ...] = (
     IssueSpec(
         IssueCode.PMU_MISSING,
         "The run has no PMU result.",
-        severity="error",
+        severity=Severity.ERROR,
     ),
     IssueSpec(
         IssueCode.PMU_COUNTER_OVERFLOW,
         "One or more PMU counters overflowed during capture.",
-        severity="error",
+        severity=Severity.ERROR,
     ),
     IssueSpec(
         IssueCode.PROFILE_CLEAN_WINDOW_FROZEN,
         "The clean window completed inferences in zero elapsed time; the "
         "clock timing it never advanced.",
-        severity="warning",
+        severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW,
         "The clean window's cycle counter ran far below its expected rate, "
         "measured against an independent clock.",
-        severity="warning",
+        severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.PROFILE_CLEAN_WINDOW_STALLED,
         "The clean-inference window's cycle counter stalled; derived timings "
         "understate the true per-inference time.",
-        severity="warning",
+        severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.PROFILE_CLEAN_WINDOW_CHECK_INOPERATIVE,
         "The clean window's partial-stall check could not run; absence of "
         "stalls is not evidence of a healthy window.",
-        severity="warning",
+        severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.POWER_OBSERVATION_MISSING,
         "Power observation is missing.",
-        severity="error",
+        severity=Severity.ERROR,
     ),
     IssueSpec(
         IssueCode.POWER_OBSERVATION_INVALID,
         "Power observation integrity is invalid.",
-        severity="error",
+        severity=Severity.ERROR,
     ),
     IssueSpec(
         IssueCode.POWER_OBSERVATION_DEGRADED,
         "Power observation is diagnostic and not valid for efficiency "
         "metrics.",
-        severity="warning",
+        severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.POWER_GATE_EDGES_MISSING,
         "GPIO-gated power capture is missing a gate edge.",
-        severity="error",
+        severity=Severity.ERROR,
     ),
     IssueSpec(
         IssueCode.POWER_GATE_NOT_LOWERED,
         "Power firmware did not confirm GATE low.",
-        severity="error",
+        severity=Severity.ERROR,
     ),
     IssueSpec(
         IssueCode.POWER_GATE_DURATION_MISMATCH,
         "Measured power-gate duration does not agree with the expected "
         "window.",
-        severity="warning",
+        severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.POWER_GATE_DURATION_UNVERIFIABLE,
         "Power-gate duration cannot be verified because clean inference "
         "timing is invalid.",
-        severity="warning",
+        severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.POWER_TERMINAL_MISSING,
         "Dedicated power firmware did not publish terminal status.",
-        severity="error",
+        severity=Severity.ERROR,
     ),
     IssueSpec(
         IssueCode.POWER_TERMINAL_ERROR,
         "Power firmware reported an error.",
-        severity="error",
+        severity=Severity.ERROR,
     ),
     IssueSpec(
         IssueCode.POWER_TERMINAL_INCOMPLETE,
         "Power firmware completed a different inference count than "
         "requested.",
-        severity="error",
+        severity=Severity.ERROR,
     ),
     IssueSpec(
         IssueCode.POWER_PLAN_COUNT_MISMATCH,
         "Power firmware requested count differs from the host plan.",
-        severity="error",
+        severity=Severity.ERROR,
     ),
     IssueSpec(
         IssueCode.POWER_WINDOW_CLOCK_FROZEN,
         "Power firmware reported zero elapsed time for completed "
         "inferences.",
-        internal_severity="error",
-        external_severity="warning",
+        internal_severity=Severity.ERROR,
+        external_severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.POWER_WINDOW_CLOCK_MISMATCH,
         "Firmware-reported window duration does not agree with the "
         "independently measured window.",
-        severity="warning",
+        severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.POWER_WINDOW_CLOCK_EXCEEDS_HOST_TIME,
         "Firmware-reported window is longer than the host wall time that "
         "contained it.",
-        severity="warning",
+        severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.POWER_ON_DEVICE_OVERFLOW,
         "On-device power monitor reported accumulator overflow.",
-        internal_severity="error",
-        external_severity="warning",
+        internal_severity=Severity.ERROR,
+        external_severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.POWER_ON_DEVICE_COUNT_MISMATCH,
         "On-device measurement count differs from completed work.",
-        severity="error",
+        severity=Severity.ERROR,
     ),
     IssueSpec(
         IssueCode.POWER_ON_DEVICE_MEASUREMENT_MISSING,
         "Internal power mode has no on-device measurement.",
-        severity="error",
+        severity=Severity.ERROR,
     ),
 )
 
@@ -299,11 +309,18 @@ class ComparisonDimension(StrEnum):
 
 @dataclass(frozen=True)
 class ComparabilitySpec:
-    """Contract for one static :class:`ComparabilityCode`."""
+    """Contract for one static :class:`ComparabilityCode`.
+
+    ``metric_group`` names the metric family a ``METRIC_BLOCKING`` code
+    blocks. It is part of the code's *meaning*, so it lives here and is
+    injected by the emitter chokepoint — an emit site cannot forget it and
+    silently un-block the metrics.
+    """
 
     code: ComparabilityCode
     severity: ComparabilitySeverity
     description: str
+    metric_group: str | None = None
 
 
 _COMPARABILITY_SPECS: tuple[ComparabilitySpec, ...] = (
@@ -339,6 +356,7 @@ _COMPARABILITY_SPECS: tuple[ComparabilitySpec, ...] = (
         ComparabilitySeverity.METRIC_BLOCKING,
         "Power metrics omitted because a power result's integrity is not "
         "valid.",
+        metric_group="power",
     ),
     ComparabilitySpec(
         ComparabilityCode.TOPOLOGY_LAYER_COUNT_MISMATCH,
@@ -377,6 +395,8 @@ class ComparabilityCodeFamily:
     dimensions: tuple[ComparisonDimension, ...]
     _prefix: str
     _suffix: str
+    #: Same semantics as :attr:`ComparabilitySpec.metric_group`.
+    metric_group: str | None = None
 
     @property
     def pattern(self) -> str:
@@ -405,6 +425,7 @@ POWER_DIMENSION_MISMATCH = ComparabilityCodeFamily(
     ),
     _prefix="metric.power_",
     _suffix="_mismatch",
+    metric_group="power",
 )
 
 DIMENSION_DIFFERS = ComparabilityCodeFamily(

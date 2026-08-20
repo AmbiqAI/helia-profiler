@@ -16,7 +16,7 @@ from ..power.diagnostics import (
     window_clock_ceiling_from_metadata,
 )
 from ..errors import ReportError
-from ..results import ISSUE_REGISTRY, IssueCode, ResultIssue, ResultValidity
+from ..results import ISSUE_REGISTRY, IssueCode, ResultIssue, ResultValidity, Severity
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -443,14 +443,14 @@ def _validity_for(issues: list[ResultIssue]) -> ResultValidity:
 
 
 def _error(code: IssueCode, message: str, **context: Any) -> ResultIssue:
-    return _issue(code, "error", message, context)
+    return _issue(code, Severity.ERROR, message, context)
 
 
 def _warning(code: IssueCode, message: str, **context: Any) -> ResultIssue:
-    return _issue(code, "warning", message, context)
+    return _issue(code, Severity.WARNING, message, context)
 
 
-def _issue(code: IssueCode, severity: str, message: str, context: dict[str, Any]) -> ResultIssue:
+def _issue(code: IssueCode, severity: Severity, message: str, context: dict[str, Any]) -> ResultIssue:
     """Single construction chokepoint: a code cannot ship at a severity its
     registry entry does not allow, so severity drift fails a test instead of
     landing in an artifact."""
@@ -461,4 +461,4 @@ def _issue(code: IssueCode, severity: str, message: str, context: dict[str, Any]
             f"'{severity}' (registry allows: "
             f"{', '.join(sorted(spec.allowed_severities()))})."
         )
-    return ResultIssue(code=str(code), severity=severity, message=message, context=context)
+    return ResultIssue(code=str(code), severity=str(severity), message=message, context=context)

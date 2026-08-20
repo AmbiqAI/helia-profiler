@@ -23,6 +23,11 @@ from .artifacts import (
     PowerTerminalRecord,
     ProfileRun,
 )
+# Spec/family *classes* (IssueSpec, ComparabilitySpec, ComparabilityCodeFamily)
+# are deliberately not re-exported: their construction shape will change when
+# #154 Phase 3 derives family membership from the dimension model. Import them
+# from .issues directly where needed; only instances, registries, and the enum
+# vocabulary are public here.
 from .issues import (
     COMPARABILITY_FAMILIES,
     COMPARABILITY_REGISTRY,
@@ -30,12 +35,10 @@ from .issues import (
     ISSUE_REGISTRY,
     POWER_DIMENSION_MISMATCH,
     ComparabilityCode,
-    ComparabilityCodeFamily,
     ComparabilitySeverity,
-    ComparabilitySpec,
     ComparisonDimension,
     IssueCode,
-    IssueSpec,
+    Severity,
 )
 from .manifest import (
     RESULT_MANIFEST_SCHEMA,
@@ -79,9 +82,7 @@ __all__ = [
     "COMPARABILITY_FAMILIES",
     "COMPARABILITY_REGISTRY",
     "ComparabilityCode",
-    "ComparabilityCodeFamily",
     "ComparabilitySeverity",
-    "ComparabilitySpec",
     "ComparisonDimension",
     "CompatibilityResolution",
     "ConsumerKind",
@@ -101,7 +102,6 @@ __all__ = [
     "FirmwareMeta",
     "ISSUE_REGISTRY",
     "IssueCode",
-    "IssueSpec",
     "LayerResult",
     "load_result_manifest",
     "MemoryConsumer",
@@ -130,6 +130,7 @@ __all__ = [
     "ResultValidity",
     "RunMetadata",
     "RunStatus",
+    "Severity",
     "SUPPORT_BUNDLE_SCHEMA",
     "SUPPORT_BUNDLE_SCHEMA_VERSION",
     "SupportBundleManifest",

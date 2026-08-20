@@ -10,12 +10,15 @@ from ..results import (
     DIMENSION_DIFFERS,
     POWER_DIMENSION_MISMATCH,
     ComparabilityCode,
-    ComparabilityCodeFamily,
     ComparabilitySeverity,
     ComparisonDimension,
     ResultValidity,
     RunStatus,
 )
+
+# Not re-exported by the results package (construction shape changes in #154
+# Phase 3); imported from the registry module directly.
+from ..results.issues import ComparabilityCodeFamily
 
 if TYPE_CHECKING:
     from .compare import RunArtifacts
@@ -57,12 +60,15 @@ class ComparabilityAssessment:
 
 
 def _issue(code: ComparabilityCode, message: str, **context: Any) -> ComparabilityIssue:
-    """Construction chokepoint for static codes: severity comes from the
-    registry, so a code's effect on comparison output cannot drift from its
-    declaration."""
+    """Construction chokepoint for static codes: severity and metric group
+    come from the registry, so a code's effect on comparison output cannot
+    drift from its declaration."""
+    spec = COMPARABILITY_REGISTRY[code]
+    if spec.metric_group is not None:
+        context = {"metric_group": spec.metric_group, **context}
     return ComparabilityIssue(
         code=str(code),
-        severity=COMPARABILITY_REGISTRY[code].severity,
+        severity=spec.severity,
         message=message,
         context=context,
     )
@@ -74,9 +80,11 @@ def _family_issue(
     message: str,
     **context: Any,
 ) -> ComparabilityIssue:
-    """The same chokepoint for parameterized families: code and severity are
-    taken from one family object, so pairing a family's code with another
-    family's severity cannot compile its way in."""
+    """The same chokepoint for parameterized families: code, severity, and
+    metric group are taken from one family object, so pairing a family's code
+    with another family's effect cannot compile its way in."""
+    if family.metric_group is not None:
+        context = {"metric_group": family.metric_group, **context}
     return ComparabilityIssue(
         code=family.code_for(dimension),
         severity=family.severity,
@@ -161,7 +169,6 @@ def assess_comparability(
                     POWER_DIMENSION_MISMATCH,
                     dimension,
                     f"Power metrics omitted because {dimension} differs.",
-                    metric_group="power",
                     baseline=baseline_value,
                     candidate=candidate_value,
                 )
@@ -173,7 +180,6 @@ def assess_comparability(
                 _issue(
                     ComparabilityCode.METRIC_POWER_INTEGRITY_INVALID,
                     f"Power metrics omitted because the {role} power result is {integrity}.",
-                    metric_group="power",
                     role=role,
                     integrity=integrity,
                 )
