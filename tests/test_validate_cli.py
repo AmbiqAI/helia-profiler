@@ -31,7 +31,7 @@ class TestValidateList:
     def test_list_default_shows_full_matrix(self):
         proc = _run_hpx("validate", "--list")
         assert proc.returncode == 0, proc.stderr
-        assert "848 case(s) would run" in proc.stdout
+        assert "976 case(s) would run" in proc.stdout
         assert "kws" in proc.stdout
         assert "vww" in proc.stdout
         assert "ic" in proc.stdout
@@ -95,7 +95,7 @@ class TestValidateList:
     def test_list_power_off(self):
         proc = _run_hpx("validate", "--list", "--power", "off")
         assert proc.returncode == 0, proc.stderr
-        assert "848 case(s)" in proc.stdout
+        assert "976 case(s)" in proc.stdout
 
     def test_list_power_boards_keeps_apollo330_unpowered(self):
         proc = _run_hpx(
