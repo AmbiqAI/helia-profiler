@@ -16,8 +16,16 @@
    block out entirely. Scoped to power_only: the dedicated power binary is
    the one this measurably affects; the transport-attached PMU-phase binary
    is left untouched to avoid perturbing existing snapshot/render
-   contracts. #}
-{% if power_only | default(false) and (ble_reset_gpio_pin | default(none)) %}
+   contracts.
+
+   The gate is `is not none`, NOT Jinja truthiness. None is the one spelling
+   of "no onboard radio" on this field, and pad 0 is an ordinary pad number
+   -- truthiness conflates them, and this block has to agree with the two
+   gates that select the nsx-gpio module (firmware/context.py's
+   power_binary_needs_gpio and firmware/__init__.py), both of which key on
+   `is not None`. When they disagreed, pin 0 linked nsx-gpio and emitted
+   nsx_gpio.h while skipping the only code that uses them. #}
+{% if power_only | default(false) and (ble_reset_gpio_pin | default(none)) is not none %}
 
     // ---------------------------------------------------------------------
     // Hold the onboard Cooper BLE controller in hardware reset (mirrors

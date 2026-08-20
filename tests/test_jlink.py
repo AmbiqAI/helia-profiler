@@ -625,25 +625,54 @@ def test_a_per_soc_address_of_zero_is_honoured(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_a_custom_soc_cannot_forge_a_per_soc_override(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A user-named custom SoC must not inherit a built-in's override.
+    """A user-named custom SoC must not pick up a built-in's override.
 
     ``target.custom_socs`` names are user-chosen and replace built-ins in the
     merged registry, so matching the override by name alone would let the name
     outrank the ``family`` the user explicitly declared -- and hand their part
     an address belonging to a different SoC, past the ``load_addr is None``
-    guard.  A custom SoC must always resolve through its declared family.
+    guard.
+
+    The entry deliberately states no address and names no ``based_on``: those
+    are the only two ways a custom SoC gets an address of its own, and either
+    of them answers before the origin gate is ever consulted.  With both
+    absent, the *only* thing that can produce a non-``None`` answer here is the
+    name matching the patched override -- which is exactly the forgery, so the
+    gate is what this observes.  (An earlier revision carried
+    ``based_on: apollo4p``, which made the assertion a statement about
+    inheritance and left the gate untested: deleting it kept the test green.)
     """
     from helia_profiler.platform import capabilities
     from helia_profiler.platform.custom import build_custom_platform_registry
 
     monkeypatch.setitem(capabilities._SOC_APP_FLASH_LOAD_ADDR, "apollo510", 0x22000000)
     registry = build_custom_platform_registry(
-        {"custom_socs": {"apollo510": {"based_on": "apollo4p", "family": "ap4"}}}
+        {
+            "custom_socs": {
+                "apollo510": {
+                    "family": "ap4",
+                    "core": "cortex-m4",
+                    "pmu_tier": "dwt",
+                    "has_mve": False,
+                    "c_define": "AM_PART_OEM4",
+                    "cmsis_header": "oem4.h",
+                    "memory": {"mram_kb": 2000, "sram_kb": 1024, "dtcm_kb": 384},
+                    "clocks": [
+                        {
+                            "name": "cpu",
+                            "speeds": [{"name": "lp", "mhz": 96}],
+                            "default": "lp",
+                        }
+                    ],
+                    "rtt_scan_ranges": [[0x10000000, 0x100000]],
+                }
+            }
+        }
     )
 
     soc = registry.socs["apollo510"]
     assert soc.family is SocFamily.AP4
-    assert soc.capabilities.memory.app_flash_load_addr == 0x00018000
+    assert soc.capabilities.memory.app_flash_load_addr is None
 
 
 def test_a_family_with_no_registered_address_resolves_to_none(

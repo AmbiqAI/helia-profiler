@@ -11,7 +11,7 @@ family despite the "3" in its name.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -45,6 +45,39 @@ class PmuTier(Enum):
 
     DWT_ONLY = "dwt"  # Cortex-M4: DWT cycle counter, limited event support
     ARMV8M_PMU = "pmu"  # Cortex-M55: Full Armv8-M PMU, 70+ events, 8 counters
+
+
+class SocOrigin(Enum):
+    """Where a :class:`SocDef`'s platform facts came from.
+
+    This is not decoration: some policy in
+    :mod:`~helia_profiler.platform.capabilities` is only sound for parts this
+    repo has actually characterised.  The app-image flash address is the live
+    case -- its per-SoC and per-family tables were checked part by part against
+    NSX's ``cmake/socs/facts/*.cmake``, and neither table can speak for a SoC
+    that was never in them.
+
+    ``CUSTOM`` is the default precisely so that a ``SocDef`` arriving from
+    anywhere other than this module's registry -- ``target.custom_socs``, a
+    test fixture, a caller of the public API -- is treated as uncharacterised
+    unless something deliberately says otherwise.  ``_register_soc`` is that
+    something, and is the only place ``BUILTIN`` is set.
+
+    Provenance is a *field* rather than an ``is _SOCS[name]`` identity check
+    because a built-in SoC does not always survive as the registered object:
+    :func:`~helia_profiler.platform.registry.get_soc_for_board` returns a
+    ``dataclasses.replace`` copy whenever the board overrides ``psram_kb`` (7
+    of the built-in boards do).  An identity check silently reclassifies those
+    copies as unknown parts; ``replace`` carries this field through untouched.
+
+    Carrying through untouched is exactly why this field is not the whole
+    test on its own: ``replace`` also carries it onto a copy whose ``name``
+    was changed to another part's.  Read provenance through
+    :attr:`SocDef.is_builtin`, never through this field alone.
+    """
+
+    BUILTIN = "builtin"
+    CUSTOM = "custom"
 
 # ---------------------------------------------------------------------------
 # SoC definition
@@ -176,6 +209,62 @@ class SocDef:
     #: per-part rather than assumed true for the whole AP5 family.
     has_radio_subsystem: bool = False
 
+    #: This part's own app-image flash (``LoadFile``) address -- the first
+    #: MRAM/flash address above its bootloader-reserved region, NOT the MRAM
+    #: *region* base.  ``None`` means "this SocDef does not state one"; the
+    #: address is then resolved by
+    #: :func:`~helia_profiler.platform.capabilities.resolve_app_flash_load_addr`,
+    #: which is the single place that policy lives.
+    #:
+    #: The built-in registry deliberately leaves this ``None`` and keeps its
+    #: addresses in that module's per-SoC/per-family tables, which are pinned
+    #: against NSX's ``cmake/socs/facts/*.cmake`` values part by part.  This
+    #: field exists for SoCs those tables cannot speak for -- above all
+    #: ``target.custom_socs`` entries, where a user-named novel part must be
+    #: able to say ``app_flash_load_addr:`` instead of being routed through a
+    #: family tag that, in this model, only records a core tier.
+    app_flash_load_addr: int | None = None
+
+    #: Whether this definition comes from the built-in registry below.  See
+    #: :class:`SocOrigin`; set by ``_register_soc`` and by nothing else.
+    origin: SocOrigin = SocOrigin.CUSTOM
+
+    #: The name this definition was registered under, stamped alongside
+    #: :attr:`origin` by ``_register_soc``.  ``None`` on anything that never
+    #: went through the registry.  Read only via :attr:`is_builtin`, which is
+    #: where the reason it exists is written down.
+    registered_name: str | None = None
+
+    @property
+    def is_builtin(self) -> bool:
+        """Whether the name-keyed built-in tables may speak for this part.
+
+        Both halves are load-bearing, and each covers a hole the other leaves:
+
+        * :attr:`origin` alone is too loose.  It survives ``dataclasses.replace``
+          by design -- that is the point, see :class:`SocOrigin` -- but so does
+          a ``replace`` that *changes the name*, which is the obvious way to
+          build a custom ``SocDef`` from a built-in programmatically.  Nothing
+          documents that path -- ``docs/guide/boards.md`` shows a fresh
+          ``SocDef(...)`` constructor instead, which defaults to
+          ``CUSTOM``/``None`` and is safe -- but a caller reaching for
+          ``replace`` unprompted is precisely the case a default-safe field
+          cannot catch.
+          ``replace(get_soc("apollo510"), name="atomiq110")`` would otherwise
+          keep ``BUILTIN`` and read atomiq110's per-SoC override -- an address
+          belonging to a different part, which is the df34b6e forgery reopened
+          one dimension over.
+        * An ``is _SOCS[name]`` identity check alone is too strict, and was the
+          bug ``origin`` replaced: ``get_soc_for_board`` returns a ``replace``
+          copy whenever the board overrides ``psram_kb`` (7 built-in boards do),
+          and identity silently reclassifies those as unknown parts.
+
+        Requiring the *stamped* name to still match :attr:`name` accepts every
+        copy that is still describing the part it was registered as, and
+        rejects every copy that has been renamed into another part's shoes.
+        """
+        return self.origin is SocOrigin.BUILTIN and self.registered_name == self.name
+
     def clock_domain(self, name: str) -> ClockDomain | None:
         """Return the named clock domain, or ``None`` if not present."""
         return next((d for d in self.clocks if d.name == name), None)
@@ -268,8 +357,19 @@ _SOCS: dict[str, SocDef] = {}
 
 
 def _register_soc(soc: SocDef) -> SocDef:
-    _SOCS[soc.name] = soc
-    return soc
+    """Register *soc* as a built-in part.
+
+    Stamping :attr:`SocOrigin.BUILTIN` here rather than on each definition
+    below keeps "built-in" meaning exactly "registered by this module", with
+    one place to read it and no way for a definition to claim it by omission.
+
+    The name is stamped alongside it, so that a later ``dataclasses.replace``
+    that renames the copy can be told apart from one that only resizes it --
+    see :attr:`SocDef.is_builtin`.
+    """
+    registered = replace(soc, origin=SocOrigin.BUILTIN, registered_name=soc.name)
+    _SOCS[registered.name] = registered
+    return registered
 
 # --- AP3 family (Cortex-M4F) ------------------------------------------------
 
