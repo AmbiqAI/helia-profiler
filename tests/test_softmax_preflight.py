@@ -262,6 +262,11 @@ def test_reader_agrees_with_litert_on_every_fixture():
                 builtin = opcode.BuiltinCode() or opcode.DeprecatedBuiltinCode()
                 if builtin != schema.BuiltinOperator.SOFTMAX:
                     continue
+                if op.InputsLength() == 0:
+                    # litert's generated accessor returns a hardcoded 0 for
+                    # Inputs(j) when the field is absent, which would read
+                    # tensor 0 -- the reference must skip, as the reader does.
+                    continue
                 if op.Inputs(0) < 0:
                     continue  # -1 marks an absent optional input (TFLite convention)
                 tensor = sg.Tensors(op.Inputs(0))
