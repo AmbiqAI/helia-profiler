@@ -1,0 +1,389 @@
+{
+  "_comment": "Census of every top-level key written into PowerResult.metadata, taken at 80fb77f for #154 Phase 2. 'writers' and 'readers' are src/ sites at census time (artifact-side readers of summary.json noted separately). 'disposition': 'typed' keys become PowerMetadata fields holding the named type; 'artifact_only' keys are written-never-read diagnostics kept for wire stability and documented as such. The completeness test asserts PowerMetadata covers exactly this key set.",
+  "keys": {
+    "capture_safety_bound_s": {
+      "type": "float",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [
+        "pipeline.py:publish_power_result",
+        "stages/capture_power.py"
+      ],
+      "disposition": "typed"
+    },
+    "capture_window_s": {
+      "type": "float",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "disposition": "typed"
+    },
+    "clean_infer_count": {
+      "type": "int",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [],
+      "disposition": "typed"
+    },
+    "device": {
+      "type": "str",
+      "writers": [
+        "power/joulescope/driver.py",
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [],
+      "disposition": "typed"
+    },
+    "driver": {
+      "type": "str",
+      "writers": [
+        "power/joulescope/driver.py",
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "disposition": "typed"
+    },
+    "early_stopped": {
+      "type": "bool",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [],
+      "disposition": "typed"
+    },
+    "fullrate_xcheck": {
+      "type": "dict",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [],
+      "disposition": "artifact_only"
+    },
+    "gate_duration_integrity": {
+      "type": "GateDurationIntegrity",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [
+        "evaluation/validity.py",
+        "report/summary.py"
+      ],
+      "artifact_readers": [
+        "validation/runner.py reads ['valid'] from summary.json \u2014 emitted dict must keep a derived 'valid' key"
+      ],
+      "disposition": "typed"
+    },
+    "gate_failure": {
+      "type": "GateFailure",
+      "writers": [
+        "power/joulescope/capture_gated.py:_degraded_observation_result"
+      ],
+      "readers": [
+        "report/json_writer.py"
+      ],
+      "disposition": "typed"
+    },
+    "gate_fall_observed": {
+      "type": "bool",
+      "writers": [
+        "pipeline.py:publish_power_observation",
+        "power/joulescope/capture_gated.py:_degraded_observation_result"
+      ],
+      "readers": [
+        "pipeline.py:publish_power_result",
+        "report/summary.py",
+        "report/json_writer.py"
+      ],
+      "disposition": "typed"
+    },
+    "gate_rise_observed": {
+      "type": "bool",
+      "writers": [
+        "pipeline.py:publish_power_observation",
+        "power/joulescope/capture_gated.py:_degraded_observation_result"
+      ],
+      "readers": [
+        "pipeline.py:publish_power_result",
+        "report/summary.py",
+        "report/json_writer.py"
+      ],
+      "disposition": "typed"
+    },
+    "gated_vs_whole_current_ok": {
+      "type": "bool",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [],
+      "disposition": "artifact_only"
+    },
+    "gating_diagnostics": {
+      "type": "dict",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "disposition": "artifact_only"
+    },
+    "gating_method": {
+      "type": "str",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "disposition": "typed"
+    },
+    "gpi_poll_count": {
+      "type": "int",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "disposition": "typed"
+    },
+    "inference_count": {
+      "type": "int",
+      "writers": [
+        "stages/collect_power_terminal.py"
+      ],
+      "readers": [],
+      "disposition": "typed"
+    },
+    "integrity": {
+      "type": "PowerIntegrity",
+      "writers": [
+        "pipeline.py:publish_power_observation",
+        "stages/collect_power_terminal.py",
+        "power/joulescope/capture_gated.py:_degraded_observation_result"
+      ],
+      "readers": [
+        "evaluation/validity.py",
+        "report/summary.py",
+        "report/json_writer.py"
+      ],
+      "disposition": "typed"
+    },
+    "io_voltage": {
+      "type": "float",
+      "writers": [
+        "power/joulescope/driver.py",
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "disposition": "typed"
+    },
+    "measurement_scope": {
+      "type": "MeasurementScope",
+      "writers": [
+        "power/joulescope/capture_gated.py",
+        "stages/collect_power_terminal.py"
+      ],
+      "readers": [
+        "pipeline.py:publish_power_result",
+        "stages/capture_power.py",
+        "report/summary.py",
+        "report/json_writer.py"
+      ],
+      "disposition": "typed"
+    },
+    "observation_deadline_s": {
+      "type": "float",
+      "writers": [
+        "pipeline.py:publish_power_observation"
+      ],
+      "readers": [
+        "report/json_writer.py"
+      ],
+      "disposition": "typed"
+    },
+    "observation_mode": {
+      "type": "ObservationMode",
+      "writers": [
+        "pipeline.py:publish_power_observation",
+        "stages/collect_power_terminal.py",
+        "power/joulescope/capture_gated.py:_degraded_observation_result"
+      ],
+      "readers": [
+        "report/summary.py",
+        "report/json_writer.py"
+      ],
+      "disposition": "typed"
+    },
+    "power_firmware": {
+      "type": "str",
+      "writers": [
+        "capture/__init__.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "disposition": "typed"
+    },
+    "power_plan": {
+      "type": "dict",
+      "writers": [
+        "capture/__init__.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "disposition": "typed"
+    },
+    "short_gate_pulse_diagnostics": {
+      "type": "dict",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "disposition": "artifact_only"
+    },
+    "short_gate_pulses_ignored": {
+      "type": "int",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "disposition": "typed"
+    },
+    "source": {
+      "type": "str",
+      "writers": [
+        "stages/collect_power_terminal.py"
+      ],
+      "readers": [],
+      "disposition": "typed"
+    },
+    "stat_packets": {
+      "type": "int",
+      "writers": [
+        "power/joulescope/driver.py",
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "disposition": "typed"
+    },
+    "stats_rate_hz": {
+      "type": "int",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [],
+      "disposition": "typed"
+    },
+    "stats_scnt": {
+      "type": "int",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [],
+      "disposition": "typed"
+    },
+    "sync": {
+      "type": "SyncHandshakeMetadata",
+      "writers": [
+        "capture/__init__.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "artifact_readers": [
+        "evaluation/comparability.py reads summary.power.sync.lockstep from the artifact"
+      ],
+      "disposition": "typed"
+    },
+    "sync_input_index": {
+      "type": "int",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "disposition": "typed"
+    },
+    "sync_timing_s": {
+      "type": "GateTransitionTiming",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "disposition": "typed"
+    },
+    "target_lifecycle": {
+      "type": "TargetLifecyclePlan",
+      "writers": [
+        "capture/__init__.py"
+      ],
+      "readers": [
+        "report/summary.py"
+      ],
+      "disposition": "typed"
+    },
+    "whole_capture_summary": {
+      "type": "dict",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [],
+      "disposition": "artifact_only"
+    },
+    "window_clock_ceiling": {
+      "type": "WindowClockCeiling",
+      "writers": [
+        "stages/collect_power_terminal.py"
+      ],
+      "readers": [
+        "evaluation/validity.py",
+        "report/summary.py"
+      ],
+      "disposition": "typed"
+    },
+    "window_count": {
+      "type": "int",
+      "writers": [
+        "power/joulescope/capture_gated.py"
+      ],
+      "readers": [],
+      "disposition": "typed"
+    }
+  },
+  "measurement_scope_values": [
+    "gpio_gated_clean_window",
+    "free_form_capture",
+    "on_device_gated_inference",
+    "whole_capture_window (reader-side default in report/summary.py only)"
+  ],
+  "observation_mode_values": [
+    "gpio_gated",
+    "free_form",
+    "on_device"
+  ],
+  "integrity_values": [
+    "valid",
+    "degraded",
+    "invalid"
+  ]
+}
