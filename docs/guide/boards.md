@@ -151,7 +151,23 @@ The important fields are still the same platform facts as the built-in registry:
   Cooper BLE controller's reset line, held low during power captures so an
   idling radio does not sit in your measurement. Inherited from `based_on`;
   set it explicitly only if your board routes it differently. Leave it unset
-  on boards with no onboard radio.
+  on boards with no onboard radio, or write `null` to drop a pin inherited
+  from a `based_on` board whose radio yours does not have.
+
+All four GPIO pin keys take a plain integer pad number. `true` / `false` are
+rejected rather than read as pads 1 and 0 — a pin here is configured as an
+output and driven for the whole measured window, so a typo'd boolean would
+put an unrelated GPIO underneath your power capture.
+
+`0` means different things on different pins, so read this before writing it:
+
+- `default_state_gpio_pin: 0` and `default_go_gpio_pin: 0` **disable that
+  wire**, degrading the 3-wire lock-step handshake to the 1-wire gate-only
+  form. That is the documented sentinel for those pins.
+- `ble_reset_gpio_pin: 0` is **rejected**. That field says "no onboard radio"
+  by being absent, so `0` could equally mean the sentinel above or pad 0 — and
+  both readings quietly spoil a measurement (an unrelated pad driven low, or a
+  radio left free-running and reading high). Omit the key, or write `null`.
 
 `starter_profile_board` lets a custom board reuse the NSX starter-profile module
 graph from a built-in board while keeping its own board ID, channel, sync pin,
@@ -209,7 +225,12 @@ verbatim and this value is ignored.
     Nothing else changes: an entry with a `based_on` keeps inheriting exactly
     what it inherited before, including the worked example above.
 
-    If you hit this, add **one** of these two keys to the `custom_socs` entry.
+    If you hit this, add **one** of these two keys to the `custom_socs` entry
+    you already have. Both snippets below are *fragments* — they show the key
+    to add, not a config that loads on its own, so keep the rest of the
+    entry's platform facts (`family`, `core`, `memory`, `clocks`, ...) exactly
+    as they are.
+
     Either name the characterised part to inherit from:
 
     ```yaml
@@ -217,6 +238,7 @@ verbatim and this value is ignored.
       custom_socs:
         my_part:
           based_on: apollo510
+          # ...the rest of your existing entry, unchanged...
     ```
 
     ...or state the address yourself:
@@ -226,6 +248,7 @@ verbatim and this value is ignored.
       custom_socs:
         my_part:
           app_flash_load_addr: 0x00410000
+          # ...the rest of your existing entry, unchanged...
     ```
 
     Only pass the old family value verbatim if you have checked it against your
