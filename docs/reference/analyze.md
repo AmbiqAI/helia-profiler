@@ -5,7 +5,7 @@ Analyze a model's compute and parameter breakdown without hardware.
 ## Synopsis
 
 ```bash
-hpx analyze MODEL [--engine tflm|helia-rt|helia-aot] [--compare]
+hpx analyze MODEL [--engine tflm|helia-rt|helia-aot|executorch] [--compare]
             [--format table|csv|json] [--output FILE] [--board BOARD]
 ```
 
@@ -17,7 +17,8 @@ build is involved.
 
 - With no `--engine`, the raw `.tflite` graph is analyzed as-is.
 - `--engine helia-rt` analyzes the original graph (heliaRT executes the
-  tflite graph directly).
+  tflite graph directly). `tflm` and `executorch` likewise analyze the
+  original graph.
 - `--engine helia-aot` runs AOT compilation first and analyzes the
   transformed graph, so operator fusion and layout changes are reflected.
 - `--compare` shows a side-by-side view of the original vs the
@@ -27,7 +28,7 @@ build is involved.
 
 | Flag | Description |
 | --- | --- |
-| `--engine` | Analyze as this engine would execute it (default: raw graph). |
+| `--engine` | Analyze as this engine would execute it: `tflm`, `helia-rt`, `helia-aot`, or `executorch` (default: raw graph). Only `helia-aot` changes the analysis; every other engine analyzes the raw graph. |
 | `--compare` | Side-by-side comparison of original vs transformed graph. |
 | `--format` | Output format: `table` (default), `csv`, or `json`. |
 | `--output`, `-o` | Write output to a file instead of the terminal. |

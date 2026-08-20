@@ -89,19 +89,24 @@ eliminating the interpreter overhead.
     - Emits C source files for each layer
     - Produces `hpx_model.h` and `hpx_model.cc`
 2. Creates or resolves two NSX modules:
-    - **aot-model/** — the generated C code
+    - **hpx_model** — the generated C code, vendored as a local module
+      (default name; override with `engine.config.module_name`)
     - **nsx-cmsis-nn** — AmbiqAI's CMSIS-NN fork, from the registry by
       default or an explicit local override
 3. Returns the artifact bundle and AOT-specific metadata
 
-### Template variables
+### AOT fields on `EngineArtifacts`
 
 ```python
-{
-    "engine": "helia-aot",
-    "aot_model_dir": "<work_dir>/aot-model",
-    "aot_op_manifest": [...],  # list of ops for #include generation
-}
+EngineArtifacts(
+    engine_type=EngineType.HELIA_AOT,
+    extra_modules=[cmsis_nn_ref, NsxModuleRef(name="hpx_model", ...)],
+    aot_prefix=...,            # C symbol prefix of the generated model API
+    aot_module_name="hpx_model",
+    aot_cmake_target=...,      # CMake target the firmware links against
+    aot_op_manifest=[...],     # ordered per-op descriptors for main_aot.cc.j2
+    aot_arena_regions=[...],   # typed ArenaRegion list bound by bind_arena()
+)
 ```
 
 ### Assumptions
@@ -184,11 +189,16 @@ The engine choice affects three things in the generated firmware:
 
 ### 2. NSX module graph
 
+Every run starts from the board's NSX starter profile modules (`nsx-core`,
+`nsx-cmsis-core`, the Ambiq SDK/BSP tier, the board module, ... — see
+[Firmware Generation](firmware.md)); the adapter appends its
+`extra_modules` on top:
+
 ```
-heliaRT:     [nsx-core, nsx-harness, ns-cmsis-nn, helia-rt-local]
-heliaAOT:    [nsx-core, nsx-harness, ns-cmsis-nn, aot-model]
-TFLM:        [nsx-core, nsx-harness, ns-cmsis-nn, tflm]
-ExecuTorch:  [nsx-core, nsx-harness, <arm|ns>-cmsis-nn, nsx-executorch]
+heliaRT:     base + [nsx-helia-rt]
+heliaAOT:    base + [nsx-cmsis-nn, hpx_model]
+TFLM:        base + [nsx-tflite-micro]        (arm-cmsis-nn first for the cmsis_nn backend)
+ExecuTorch:  base + [<arm|nsx>-cmsis-nn, nsx-executorch]
 ```
 
 The ExecuTorch provider module is ordered *before* `nsx-executorch` on

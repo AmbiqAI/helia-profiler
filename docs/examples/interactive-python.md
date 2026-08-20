@@ -77,13 +77,12 @@ On supported modern EVBs, `usb_cdc` is the lossless alternative but requires
 both the J-Link and target USB cables. `uart` is broadly available through the
 J-Link OB virtual COM port, but is low-throughput and has no flow control.
 
-Two notebooks ship with the repository. **Analysis showcase** profiles the
-packaged example model and then digs into layer timing, compute-unit lanes,
-bottlenecks, and overlays. **Walkthrough** is the narrower beginner path:
-analyze, profile with heliaRT, profile with heliaAOT, compare, optional power.
+A walkthrough notebook ships with the repository. It profiles the packaged
+example model with heliaRT and heliaAOT, then digs into layer timing
+distributions, PMU compute lanes, hotspots and filtering, memory placement,
+engine comparisons, and exports, with optional power capture.
 
-[:material-notebook-outline: Analysis showcase](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/notebooks/hpx_analysis_showcase.ipynb){ .md-button .md-button--primary }
-[:material-notebook-outline: Walkthrough](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/notebooks/hpx_walkthrough.ipynb){ .md-button }
+[:material-notebook-outline: Walkthrough](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/notebooks/hpx_walkthrough.ipynb){ .md-button .md-button--primary }
 
 ## Start with safe discovery
 
@@ -183,7 +182,7 @@ firmware metadata, memory placement, optional power data, run provenance, and
 all generated report paths. Model Explorer overlays are included in
 `result.report_paths`.
 
-## What the showcase covers
+## What the walkthrough covers
 
 The notebook demonstrates:
 

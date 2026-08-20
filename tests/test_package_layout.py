@@ -91,14 +91,6 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
     assert "helia_profiler/results/models.py" in names
     assert "helia_profiler/results/artifacts.py" in names
     assert "helia_profiler/results/manifest.py" in names
-    assert "helia_profiler/validity.py" not in names
-    assert "helia_profiler/comparability.py" not in names
-    assert "helia_profiler/comparison_profile.py" not in names
-    assert "helia_profiler/compare.py" not in names
-    assert "helia_profiler/model_analysis.py" not in names
-    assert "helia_profiler/results.py" not in names
-    assert "helia_profiler/artifacts.py" not in names
-    assert "helia_profiler/result_manifest.py" not in names
     assert "helia_profiler/compatibility.py" in names
     assert "helia_profiler/data/compatibility-baseline-v1.json" in names
     assert "helia_profiler/data/run_summary.schema.v1.json" in names

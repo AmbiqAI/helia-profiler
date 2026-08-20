@@ -14,7 +14,8 @@ hpx validate [--models IDS] [--engines LIST] [--boards LIST]
              [--suite NAME] [--repeat N]
              [--jlink-serials BOARD=SERIAL,...] [--power-serials BOARD=SERIAL,...]
              [--power-gpios BOARD=GATE:STATE:GO,...] [--timeout SECONDS]
-             [--output-dir DIR] [--junit-xml FILE] [-k EXPR] [--list]
+             [--ns-cmsis-nn-ref REF] [--output-dir DIR] [--junit-xml FILE]
+             [-k EXPR] [--list] [-v]
 ```
 
 ## Description
@@ -41,6 +42,7 @@ runner should also read
 | `--model-arena-size` | Arena size for `--model-paths` models (default: 524288 bytes). |
 | `--engines` | Comma-separated engines: `helia-rt`, `helia-aot`, `tflm`, `executorch` (aliases `rt`, `aot`, `et`). Default: all. |
 | `--executorch-backends` | ExecuTorch CMSIS-NN providers: `arm`, `ns`, or `both` (default). TFLM always uses ARM CMSIS-NN; heliaRT and heliaAOT always use ns-cmsis-nn. |
+| `--ns-cmsis-nn-ref` | Exact ns-cmsis-nn commit/ref used by heliaRT, heliaAOT, and ExecuTorch/ns. |
 | `--boards` | Comma-separated board IDs (default: `apollo510_evb`). |
 | `--toolchains` | Comma-separated toolchains: `gcc`, `armclang`/`acfe`, `atfe` (default: board defaults). |
 | `--interfaces`, `--transports` | Comma-separated transports: `rtt`, `uart`, `swo`, `usb_cdc` (default: board defaults). |
@@ -57,6 +59,7 @@ runner should also read
 | `--junit-xml` | Emit a JUnit-XML report (for CI consumption). |
 | `-k` | Pytest-style keyword expression to filter cases (e.g. `kws-aot`). |
 | `--list` | List matching cases and exit without running. |
+| `-v`, `--verbose` | Increase output verbosity (repeatable). |
 
 ## Preset suites
 

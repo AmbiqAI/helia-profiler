@@ -20,7 +20,7 @@ Ambiq SoCs typically expose four tiers of memory. From fastest to slowest:
 | **TCM**     | Tightly-Coupled Memory — DTCM/ITCM private to the CM55 core | Single-cycle     | Inside the core        | DTCM 512 KB, ITCM 256 KB |
 | **SRAM**    | Shared on-chip SRAM                                  | A few cycles     | On-chip, outside core  | 3 MB                  |
 | **MRAM**    | Non-volatile flash (program + rodata)                | Slowest on-chip  | On-chip, NVM           | 4 MB                  |
-| **PSRAM**   | External pseudo-static RAM                           | External-bus     | Off-chip               | up to ~32 MB         |
+| **PSRAM**   | External pseudo-static RAM                           | External-bus     | Off-chip               | up to 64 MB          |
 
 Two things to remember:
 
@@ -106,7 +106,7 @@ stack, heap, and BSS so the rest of the firmware still builds.
 
 ## Worked examples (Apollo510)
 
-Apollo510 has DTCM 512 KB, SRAM 3 MB, MRAM 4 MB, PSRAM up to 32 MB.
+Apollo510 has DTCM 512 KB, SRAM 3 MB, MRAM 4 MB, PSRAM up to 64 MB.
 
 ### Tiny KWS model (~50 KB weights, ~30 KB arena)
 

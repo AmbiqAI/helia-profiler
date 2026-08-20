@@ -5,7 +5,7 @@ Enable Joulescope current passthrough so the target board stays powered.
 ## Synopsis
 
 ```bash
-hpx power-on [--driver joulescope|jsdrv]
+hpx power-on [--driver joulescope] [--power-serial SERIAL]
 ```
 
 ## Description
@@ -26,5 +26,6 @@ Joulescope-wired board.
 | Flag | Description |
 | --- | --- |
 | `--driver` | Joulescope driver to use (default: auto-detect). |
+| `--power-serial`, `--js-serial` | Joulescope serial number to select when multiple are connected. |
 
 See [Power Profiling](../guide/power.md) for wiring and capture details.

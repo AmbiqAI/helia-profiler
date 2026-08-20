@@ -6,7 +6,7 @@ session.
 ## Synopsis
 
 ```bash
-hpx probes list [--board BOARD] [--json]
+hpx probes list [--board BOARD] [--inspect] [--json]
 hpx probes match --board BOARD [--jlink-serial SERIAL] [--json]
 ```
 
@@ -23,6 +23,9 @@ Inspect which probes can reach a board's expected core:
 ```bash
 hpx probes list --board apollo510_evb
 ```
+
+`--inspect` requests the same target-core inspection explicitly and requires
+`--board`; passing `--board` alone already implies it.
 
 Resolve the serial HPX would use for a board:
 

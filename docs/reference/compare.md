@@ -27,9 +27,9 @@ Comparison applies typed compatibility policy before calculating deltas:
 
 - invalid results and different model hashes block the comparison;
 - different layer topology suppresses only per-layer deltas;
-- incompatible power scope, mode, firmware, monitor presence, lock-step, or
-  integrity suppresses only power
-  metrics;
+- incompatible power scope, mode, firmware, monitor presence, lock-step,
+  integrity, or clean-window probe suppresses only power metrics (see
+  [Analysis & Comparison](../guide/analysis-comparison.md) for details);
 - engine, toolchain, board, clock, transport, and placement differences remain
   visible as informative dimensions.
 

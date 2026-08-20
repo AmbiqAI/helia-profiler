@@ -83,7 +83,7 @@ flashes, and captures. Subsequent runs are faster because module and build
 artifacts are cached.
 
 !!! tip "Rerunning without touching the network"
-    Once a run has succeeded, `hpx profile ... --frozen` skips NSX
+    Once a run has succeeded, `hpx profile ... --offline` skips NSX
     dependency resolution and reuses the existing `nsx.lock`/module state
     — useful for fast, reproducible reruns once your setup is stable.
 

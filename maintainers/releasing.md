@@ -15,8 +15,9 @@ publishes to PyPI.
 Create a GitHub environment named `pypi`. Add required reviewers and
 deployment-branch rules where the repository plan supports them.
 
-Until the first successful upload creates the project, configure the pending
-PyPI trusted publisher with these values:
+The PyPI project exists and publishes through a trusted publisher configured
+with these values (recreate them if the publisher ever needs to be set up
+again):
 
 | Setting | PyPI value |
 | --- | --- |
@@ -47,12 +48,10 @@ Before merging it:
 3. Run the appropriate hardware release matrix against the release branch and
    archive its validation bundle.
 
-The existing `v0.1.0` tag predates this workflow. Release Please starts from
-the tracked `0.1.0` manifest and will create a new immutable version and tag.
-The top-level `bootstrap-sha` in `release-please-config.json` deliberately
-anchors the first release to the current `main` history instead of that
-unrelated legacy tag. Remove the bootstrap setting only after the first Release
-Please release pull request has been merged.
+Release Please tracks the current version in `.release-please-manifest.json`
+and creates a new immutable version and tag on each merged release pull
+request. (The one-time `bootstrap-sha` used to anchor the first release has
+served its purpose and was removed from `release-please-config.json`.)
 
 ## Publish to PyPI
 
