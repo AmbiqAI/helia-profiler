@@ -610,9 +610,9 @@ class TestFlashBinaryVerification(_FlashRecipeFixtures):
         self._flash(tmp_path, self._PROGRAMMED)
 
     def test_skipped_identical_output_verifies(self, tmp_path) -> None:
-        # The skip notice carries its own bank address, so the recipe here must
-        # be the AP4-class one that capture came from -- pairing it with the AP5
-        # recipe address is exactly the mismatch the next test asserts on.
+        # The skip notice carries its own bank address, so the recipe here has
+        # to be the AP4-class one that capture came from; pairing it with an AP5
+        # recipe address is the mismatch TestFlashBinaryAddressVerification pins.
         self._flash(tmp_path, self._SKIPPED_IDENTICAL, addr="0x00018000")
 
     def test_connection_only_ok_is_rejected(self, tmp_path) -> None:
