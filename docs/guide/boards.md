@@ -209,14 +209,22 @@ verbatim and this value is ignored.
     Nothing else changes: an entry with a `based_on` keeps inheriting exactly
     what it inherited before, including the worked example above.
 
-    If you hit this, add **one** of these two keys to the `custom_socs` entry:
+    If you hit this, add **one** of these two keys to the `custom_socs` entry.
+    Either name the characterised part to inherit from:
 
     ```yaml
     target:
       custom_socs:
         my_part:
-          based_on: apollo510          # inherit a characterised part's address
-          # ...or state your own:
+          based_on: apollo510
+    ```
+
+    ...or state the address yourself:
+
+    ```yaml
+    target:
+      custom_socs:
+        my_part:
           app_flash_load_addr: 0x00410000
     ```
 
