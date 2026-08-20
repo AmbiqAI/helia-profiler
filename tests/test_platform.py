@@ -631,10 +631,11 @@ def test_a_renamed_builtin_copy_does_not_inherit_the_name_it_was_given():
     """The other half of the ``is_builtin`` rule, and the tighter half.
 
     ``dataclasses.replace`` of a built-in is the obvious way to build a custom
-    ``SocDef`` programmatically -- ``docs/guide/boards.md`` points at that
-    path -- and ``origin`` survives it by design, which is exactly what the
-    sibling test above requires.  The cost is that a renamed copy survives it
-    too: an ``origin``-only gate lets
+    ``SocDef`` programmatically -- no guide points at it (``docs/guide/boards.md``
+    shows a fresh ``SocDef(...)`` constructor, which defaults to ``CUSTOM``), but
+    it is the shape a caller invents -- and ``origin`` survives it by design,
+    which is exactly what the sibling test above requires.  The cost is that a
+    renamed copy survives it too: an ``origin``-only gate lets
     ``replace(get_soc("apollo510"), name="atomiq110")`` read atomiq110's
     per-SoC override and flash an Apollo510 at 0x22000000, an address
     belonging to a different part.  That is the df34b6e forgery reopened on
@@ -657,6 +658,56 @@ def test_a_renamed_builtin_copy_does_not_inherit_the_name_it_was_given():
     assert forged.registered_name == "apollo510"  # ...but the stamp says what it really is
     assert not forged.is_builtin
     assert forged.capabilities.memory.app_flash_load_addr is None
+
+
+def test_a_self_stamped_registered_name_does_not_confer_builtin_provenance():
+    """The ``origin`` half of the ``is_builtin`` rule, which nothing else observes.
+
+    The sibling above pins the *name* half.  Nothing pinned this one: deleting
+    ``self.origin is SocOrigin.BUILTIN`` and returning only
+    ``self.registered_name == self.name`` passes the entire suite, even though
+    :attr:`SocDef.is_builtin` states that both halves are load-bearing.
+
+    It passes because no path in the codebase builds the shape that tells the
+    two halves apart.  ``registered_name`` is stamped by ``_register_soc`` and
+    by nothing else, so every object carrying one also carries ``BUILTIN``;
+    everything that skips the registry -- ``_build_custom_socs``' fresh
+    ``SocDef``s, fixtures, callers of the public API -- leaves it ``None``,
+    which cannot equal a non-empty ``name``.  So the name half already answers
+    every case that exists, and ``origin`` sits unobservable behind it.
+
+    That argues for pinning it, not for dropping it.  ``registered_name`` is an
+    ordinary field: ``replace`` sets it to anything, and the day something
+    stamps it outside ``_register_soc`` -- a serialisation round-trip, a
+    registry that re-keys on merge, a fixture builder that copies a built-in
+    "properly" -- the name half stops being sufficient and ``origin`` is the
+    only thing still refusing.  Untested, that refusal could be deleted in a
+    tidy-up with zero signal, reopening the df34b6e forgery against a live
+    per-SoC override: ``atomiq110``'s address read for an object that is
+    holding Apollo510's platform facts.
+
+    Hence the shape below, which is deliberately not reachable today.  It is a
+    mutation guard, and the mutation it guards is a one-line simplification
+    that looks obviously safe.
+    """
+    from dataclasses import replace
+
+    from helia_profiler.platform import capabilities
+
+    claimed = replace(
+        get_soc("apollo510"),
+        name="atomiq110",
+        registered_name="atomiq110",
+        origin=SocOrigin.CUSTOM,
+    )
+
+    # Membership, not the value: the sibling above already pins 0x22000000, and
+    # `capabilities` says that literal is expected to move.  All this assert
+    # needs is that *some* table tier would answer if the gate opened.
+    assert "atomiq110" in capabilities._SOC_APP_FLASH_LOAD_ADDR
+    assert claimed.registered_name == claimed.name  # the name half is satisfied...
+    assert not claimed.is_builtin  # ...so only `origin` is left to refuse
+    assert claimed.capabilities.memory.app_flash_load_addr is None
 
 
 def test_a_builtin_copy_that_keeps_its_name_still_resolves_through_the_tables():

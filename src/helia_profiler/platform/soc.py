@@ -244,8 +244,12 @@ class SocDef:
         * :attr:`origin` alone is too loose.  It survives ``dataclasses.replace``
           by design -- that is the point, see :class:`SocOrigin` -- but so does
           a ``replace`` that *changes the name*, which is the obvious way to
-          build a custom ``SocDef`` from a built-in programmatically and is the
-          path ``docs/guide/boards.md`` points at.
+          build a custom ``SocDef`` from a built-in programmatically.  Nothing
+          documents that path -- ``docs/guide/boards.md`` shows a fresh
+          ``SocDef(...)`` constructor instead, which defaults to
+          ``CUSTOM``/``None`` and is safe -- but a caller reaching for
+          ``replace`` unprompted is precisely the case a default-safe field
+          cannot catch.
           ``replace(get_soc("apollo510"), name="atomiq110")`` would otherwise
           keep ``BUILTIN`` and read atomiq110's per-SoC override -- an address
           belonging to a different part, which is the df34b6e forgery reopened
