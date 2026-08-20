@@ -243,10 +243,18 @@ class TestBuildMatrix:
             boards=["apollo3p_evb"],
             toolchains=["gcc"],
         )
-        assert not build_matrix(
+        # An explicit armclang request still enumerates the cases so the
+        # harness records the case_validity() skip reason; only the
+        # board-default axis drops armclang for ExecuTorch.
+        explicit_armclang = build_matrix(
             engines=["executorch"],
             boards=["apollo330mP_evb"],
             toolchains=["armclang"],
+        )
+        assert explicit_armclang
+        assert all(
+            case_validity(case) == "ExecuTorch validation does not yet cover armclang"
+            for case in explicit_armclang
         )
         assert not build_matrix(
             engines=["executorch"],

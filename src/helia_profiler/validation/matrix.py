@@ -616,13 +616,18 @@ def build_matrix(
                 providers: tuple[CmsisNNProvider | None, ...] = (None,)
                 if engine is EngineType.EXECUTORCH:
                     providers = executorch_backend_filter or tuple(CmsisNNProvider)
+                # On the board-default toolchain axis, drop armclang for
+                # ExecuTorch so the default matrix contains only runnable
+                # cases. When toolchains were requested explicitly, keep the
+                # cases and let case_validity() record the armclang skip with
+                # its readable reason instead of silently enumerating nothing.
                 engine_toolchains = (
                     tuple(
                         toolchain
                         for toolchain in board_toolchains
                         if toolchain is not Toolchain.ARMCLANG
                     )
-                    if engine is EngineType.EXECUTORCH
+                    if engine is EngineType.EXECUTORCH and toolchain_filter is None
                     else board_toolchains
                 )
                 # The dedicated ExecuTorch firmware does not yet implement the
