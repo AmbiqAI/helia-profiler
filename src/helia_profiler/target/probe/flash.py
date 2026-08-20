@@ -47,6 +47,14 @@ _LOAD_FILE_RE = re.compile(
 )
 # Tolerates J-Link Commander's ``//`` line comments after the directive.
 _FAIL_FAST_RE = re.compile(r"^\s*ExitOnError\s+1\s*(?://.*)?$", re.IGNORECASE | re.MULTILINE)
+# Deliberately looser than ``_LOAD_FILE_RE``: this one answers "has anything
+# been programmed yet?" for the ordering check below, not "is this the line
+# whose address hpx verifies?", so it must also see a ``LoadFile`` that
+# ``_LOAD_FILE_RE`` rejects (no address, odd quoting) — such a line still
+# programs flash, and fail-fast must already be on when it runs.  Keeping the
+# two regexes separate also stops a future widening of ``_LOAD_FILE_RE`` from
+# quietly loosening the ordering guard along with it.
+_ANY_LOAD_FILE_RE = re.compile(r"^\s*LoadFile\b", re.IGNORECASE | re.MULTILINE)
 # This is a flash-BANK IDENTITY check, NOT a destination check.  Read that
 # before trusting it for anything.
 #
@@ -91,6 +99,46 @@ def _parse_addr(text: str) -> int:
     return int(text, 16) if text.lower().startswith("0x") else int(text, 10)
 
 
+def _names_this_builds_image(candidate: Path, expected: Path) -> bool:
+    """Does *candidate* name the same file on disk as *expected*?
+
+    Path equality is kept as the fast path — it needs no filesystem access and
+    settles every recipe NSX generates — but on its own it compares path TEXT,
+    and that answer is platform-dependent.  ``Path.resolve()`` does NOT
+    case-fold on POSIX, while on Windows it canonicalises the case of a path
+    that exists, so a recipe whose baked path differs from this build's
+    ``.bin`` only in case is refused as stale on macOS/Linux and accepted on
+    Windows: a spurious hard refusal of a correct flash on one platform, and a
+    gate that disagrees with itself across the two.
+
+    ``samefile`` settles it on stat identity instead — device plus inode, and
+    the volume-serial plus file-index equivalent on Windows — so it is case-
+    correct wherever the volume is, and equally correct where it is not: on a
+    case-SENSITIVE volume the two names really are different files and it says
+    so.  That is the invariant worth asserting here, and unlike ``resolve()``
+    its semantics do not shift between platforms or Python versions.
+
+    Widening only: every pair the text comparison already accepted is still
+    accepted, and ``samefile`` is true solely on a same-file answer from the
+    OS, so the stale-recipe refusal cannot be loosened by this.
+    """
+    if candidate == expected:
+        return True
+    try:
+        return candidate.samefile(expected)
+    except (OSError, ValueError):
+        # ``samefile`` stats BOTH paths and raises if either is unreadable.
+        # *expected* is this build's own image, which ``flash_binary`` has
+        # already confirmed is a file, so in practice this is the recipe
+        # naming something that is not there — a stale recipe, the case the
+        # caller must keep refusing with its own message.  A path the OS will
+        # not stat at all lands here too (an embedded NUL raises ValueError,
+        # which ``ntpath.realpath`` waves through on Windows 3.13+).  None of
+        # those is this build's image, so ``False`` is the answer for all of
+        # them and the refusal below stays exactly as it was.
+        return False
+
+
 def _recipe_load_address(
     script: str,
     *,
@@ -107,16 +155,20 @@ def _recipe_load_address(
     NSX's ``validate_flash_recipe``, and the two further checks NSX makes are
     adopted with it:
 
-    * The ``LoadFile`` path must resolve to *this build's* ``.bin``.  Recipes
-      bake ABSOLUTE paths, so a recipe left behind by an earlier build can
-      still resolve happily and flash a stale image while hpx reports the new
-      build's identity — the same silent mis-measurement a wrong address
-      causes, by a different route.
-    * ``ExitOnError 1`` must be present.  It is what makes JLinkExe's exit
-      status trustworthy: without it J-Link can fail a command and still exit
-      zero, demoting the output-text checks from corroboration to sole gate.
+    * The ``LoadFile`` path must name *this build's* ``.bin`` (see
+      :func:`_names_this_builds_image` for why that is a stat-identity
+      question rather than a string one).  Recipes bake ABSOLUTE paths, so a
+      recipe left behind by an earlier build can still resolve happily and
+      flash a stale image while hpx reports the new build's identity — the
+      same silent mis-measurement a wrong address causes, by a different
+      route.
+    * ``ExitOnError 1`` must be present *and armed before the first*
+      ``LoadFile``.  It is what makes JLinkExe's exit status trustworthy:
+      without it J-Link can fail a command and still exit zero, demoting the
+      output-text checks from corroboration to sole gate.
     """
-    if _FAIL_FAST_RE.search(script) is None:
+    fail_fast = _FAIL_FAST_RE.search(script)
+    if fail_fast is None:
         raise CaptureError(
             f"NSX flash recipe for {target_name} ({script_path}) is missing "
             "`ExitOnError 1`; without it JLinkExe can fail a command and still "
@@ -125,6 +177,41 @@ def _recipe_load_address(
             hint="Add `ExitOnError 1` as the recipe's first line if it was "
             "hand-edited deliberately; re-running the build regenerates the "
             "recipe from NSX but discards any such edits.",
+        )
+    # ORDER, not just presence.  ``search`` is position-independent and J-Link
+    # runs a script strictly top to bottom, so ``LoadFile … / ExitOnError 1 /
+    # Exit`` satisfies a presence-only check while giving the flash NO
+    # fail-fast protection whatsoever — precisely the failure the directive is
+    # demanded for, passing the check meant to demand it.
+    #
+    # The rule is "before the first LoadFile" rather than the stricter "the
+    # recipe's first directive".  Both accept every recipe that exists in
+    # practice — NSX's ``flash_cmds.jlink.in`` emits ``ExitOnError 1`` first,
+    # and all 53 generated recipes on the bench host lead with it — so the two
+    # differ only in what they refuse of a HAND-EDITED recipe, which is the
+    # case this module widened ``_LOAD_FILE_RE`` for one round earlier.
+    # "First directive" additionally refuses a ``Reset`` / ``Halt`` /
+    # ``SelectInterface`` preamble that JLinkExe accepts and that leaves the
+    # LoadFile fully protected: a hard refusal of a working recipe, the same
+    # regression this module already declines to risk.  "Before the first
+    # LoadFile" refuses exactly the recipes that program something with
+    # fail-fast still off, and nothing else.
+    #
+    # A later ``ExitOnError 0`` could disarm it again; that is not modelled,
+    # because nothing generates one and the check would stop being readable.
+    first_load = _ANY_LOAD_FILE_RE.search(script)
+    if first_load is not None and fail_fast.start() > first_load.start():
+        raise CaptureError(
+            f"NSX flash recipe for {target_name} ({script_path}) puts "
+            "`ExitOnError 1` after its first `LoadFile`, so the flash itself "
+            "runs with fail-fast still off. J-Link executes the recipe in "
+            "order, so enabling it afterwards protects nothing: JLinkExe can "
+            "fail the `LoadFile` and still exit successfully, and a failed "
+            "flash would look like a success. Nothing was programmed — the "
+            "recipe was refused before JLinkExe ran.",
+            hint="Move `ExitOnError 1` above the first `LoadFile` line — NSX's "
+            "own recipes open with it. Re-running the build regenerates the "
+            "recipe from NSX, but discards any deliberate hand-edits.",
         )
 
     # Resolved once: it is hpx's own build path and ``flash_binary`` has
@@ -151,7 +238,7 @@ def _recipe_load_address(
                 hint="Inspect the recipe's LoadFile lines for stray quoting or "
                 "control characters, or re-run the build so NSX regenerates it.",
             ) from exc
-        if resolved == expected_bin:
+        if _names_this_builds_image(resolved, expected_bin):
             return _parse_addr(match.group("address"))
         loaded.append(candidate)
 
@@ -363,8 +450,9 @@ def flash_binary(
         timeout_s=timeout_s,
         op_label="JLinkExe flash",
     )
-    # Exit status is the primary gate: every recipe (NSX-generated and the
-    # fallback above) starts with ``ExitOnError 1``, and run_jlink_script
+    # Exit status is the primary gate: every recipe that reaches here arms
+    # ``ExitOnError 1`` before its first ``LoadFile`` (the fallback above
+    # opens with it; a recipe is vetted for it), and run_jlink_script
     # raises CaptureError on nonzero rc — so the marker check below is a
     # tripwire for J-Link wording drift, not the gate.  Exactly two markers
     # confirm a flash: the "Flash download: Total" summary, or "Skipped.

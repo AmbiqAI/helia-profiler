@@ -963,6 +963,54 @@ class TestFlashRecipeValidation(_FlashRecipeFixtures):
         ):
             flash_binary(binary, device="AP510NFA-CBR", load_addr=None)
 
+    def test_a_case_only_path_difference_is_not_a_stale_recipe(self, tmp_path) -> None:
+        """Same file, different spelling — accepted, and on every platform alike.
+
+        ``Path.resolve()`` compares path TEXT.  It does not case-fold on POSIX,
+        but on Windows it canonicalises the case of a path that exists, so a
+        resolve-equality check answers this recipe differently depending on the
+        host: refused as stale on macOS/Linux, accepted on Windows.  One of
+        those is a spurious hard refusal of a correct flash, and a gate that
+        disagrees with itself across platforms is the worse half of the bug.
+
+        Run against the real filesystem, because the whole question is what the
+        OS considers one file; a mock would only re-assert the answer.  On a
+        case-sensitive volume the two names ARE different files and refusing is
+        right, so this skips there rather than pinning the wrong expectation.
+        """
+        self._build(tmp_path)
+        recased = tmp_path / "HPX_Profiler_Power.BIN"
+        if not recased.exists():
+            pytest.skip("case-sensitive volume: the two spellings are genuinely two files")
+
+        self._flash(
+            tmp_path,
+            self._PROGRAMMED,
+            recipe=f'ExitOnError 1\nReset\nLoadFile "{recased}", 0x00410000\nReset\nGo\nExit\n',
+        )
+
+    def test_a_recipe_naming_an_absent_image_is_still_refused_as_stale(self, tmp_path) -> None:
+        """Widening to stat identity must not cost the stale-recipe refusal.
+
+        ``samefile`` answers the case question correctly but raises when either
+        path is missing — which is the commonest stale recipe of all, one left
+        behind by a build directory that has since been cleaned.  Swallowing
+        that into anything other than "not this build's image" would let a
+        recipe pointing at a deleted artifact through to JLinkExe.
+        """
+        binary = self._build(
+            tmp_path,
+            recipe=(
+                "ExitOnError 1\nReset\n"
+                f'LoadFile "{tmp_path / "previous-build" / "hpx_profiler_power.bin"}", 0x00410000\n'
+                "Reset\nGo\nExit\n"
+            ),
+        )
+
+        message = str(self._refuse(binary))
+        assert "not this build's image" in message
+        assert str(tmp_path / "previous-build" / "hpx_profiler_power.bin") in message
+
     def test_a_recipe_without_exit_on_error_is_refused(self, tmp_path) -> None:
         binary = self._build(
             tmp_path,
@@ -982,6 +1030,58 @@ class TestFlashRecipeValidation(_FlashRecipeFixtures):
             self._PROGRAMMED,
             recipe=(
                 "ExitOnError 1  // fail fast\nReset\n"
+                f'LoadFile "{tmp_path / "hpx_profiler_power.bin"}", 0x00410000\n'
+                "Reset\nGo\nExit\n"
+            ),
+        )
+
+    def test_exit_on_error_after_the_loadfile_it_protects_is_refused(self, tmp_path) -> None:
+        """Presence is not enough; J-Link runs the recipe in order.
+
+        A position-independent search accepts this recipe, yet the ``LoadFile``
+        runs before fail-fast is ever armed — so JLinkExe can fail the flash
+        and still exit zero, which is the exact outcome the directive is
+        demanded for.  The guard would be passing the check meant to enforce
+        it.  Hand-edited recipes are in scope for this module, and a
+        misordered directive is precisely what a hand-edit produces; NSX's
+        generated recipes always lead with it.
+        """
+        binary = self._build(
+            tmp_path,
+            recipe=(
+                "Reset\n"
+                f'LoadFile "{tmp_path / "hpx_profiler_power.bin"}", 0x00410000\n'
+                "ExitOnError 1\nReset\nGo\nExit\n"
+            ),
+        )
+
+        error = self._refuse(binary)
+        message = str(error)
+        assert "ExitOnError 1" in message
+        assert "LoadFile" in message
+        # The complaint has to be about ORDER.  The directive IS in the file,
+        # so reusing the "missing" wording would send the user hunting for a
+        # line already sitting in front of them.
+        assert "missing" not in message.lower()
+        assert "Move `ExitOnError 1` above the first `LoadFile`" in (error.hint or "")
+
+    def test_exit_on_error_need_not_be_the_recipes_very_first_directive(self, tmp_path) -> None:
+        """The rule is "before the first LoadFile", not "before everything".
+
+        Both rules accept every recipe NSX generates, so this is the only case
+        that tells them apart — and it is a working recipe.  A ``Reset``
+        preamble is legal JLinkExe, and fail-fast is armed before anything
+        programs flash, so the flash is fully protected.  Demanding the
+        directive be the literal first line would refuse it: a new hard
+        refusal of a recipe that flashes correctly, which is the regression
+        this module already declined to risk when it widened the accepted
+        ``LoadFile`` shapes.
+        """
+        self._flash(
+            tmp_path,
+            self._PROGRAMMED,
+            recipe=(
+                "Reset\nExitOnError 1\n"
                 f'LoadFile "{tmp_path / "hpx_profiler_power.bin"}", 0x00410000\n'
                 "Reset\nGo\nExit\n"
             ),
