@@ -35,7 +35,11 @@ def _source(name: str) -> str:
     combination that happens to reach it.
     """
     source, _, _ = _jinja_env.loader.get_source(_jinja_env, name)  # type: ignore[union-attr]
-    return source
+    # Windows checkouts materialize the templates with CRLF endings
+    # (core.autocrlf), which would make every "opens with its own newline"
+    # check below see "\r" instead of "\n". The rules are about logical line
+    # structure, not byte-level endings, so normalize before matching.
+    return source.replace("\r\n", "\n")
 
 
 _BLOCK_OPEN = re.compile(r"\{%-?\s*block\s+(\w+)(?:\s+scoped)?(?:\s+required)?\s*-?%\}")
