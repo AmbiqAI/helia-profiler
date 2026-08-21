@@ -246,13 +246,18 @@ def _dimensions(run: RunArtifacts) -> dict[str, Any]:
             dimensions[spec.dimension] = _nested(run.metadata, *spec.path)
         elif spec.source is ArtifactSource.SUMMARY:
             dimensions[spec.dimension] = _nested(run.summary, *spec.path)
-        elif spec.source is ArtifactSource.SUMMARY_POWER and power_dict is not None:
-            dimensions[spec.dimension] = (
-                spec.derive(power_dict)
-                if spec.derive is not None
-                else _nested(power_dict, *spec.path)
-            )
-        # ArtifactSource.MANIFEST_ONLY: no artifact fallback by design.
+        elif spec.source is ArtifactSource.SUMMARY_POWER:
+            if power_dict is not None:
+                dimensions[spec.dimension] = (
+                    spec.derive(power_dict)
+                    if spec.derive is not None
+                    else _nested(power_dict, *spec.path)
+                )
+        elif spec.source is not ArtifactSource.MANIFEST_ONLY:
+            # A new ArtifactSource must be dispatched here explicitly — a
+            # silently dropped dimension is the failure mode this registry
+            # exists to prevent.
+            raise AssertionError(f"Unhandled artifact source: {spec.source}")
     if run.manifest is not None:
         protected = {
             spec.dimension

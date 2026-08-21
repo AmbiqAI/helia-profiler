@@ -69,32 +69,40 @@ def test_family_codes_pin_the_shipped_wire_format():
     )
 
 
-def test_families_derive_from_the_dimension_registry():
-    # Phase 3 replaced the hand-listed family tuples with derivation from
-    # DIMENSION_REGISTRY by effect class, so a dimension cannot be silently
-    # absent from its family: every registry entry lands in exactly the
-    # family (or non-family effect class) its spec declares.
-    from helia_profiler.results.dimensions import (
-        DIMENSION_REGISTRY,
-        DimensionEffect,
-        dimensions_with_effect,
-    )
-
-    assert POWER_DIMENSION_MISMATCH.dimensions == dimensions_with_effect(
-        DimensionEffect.POWER_METRIC_BLOCKING
-    )
-    assert DIMENSION_DIFFERS.dimensions == dimensions_with_effect(
-        DimensionEffect.INFORMATIVE
-    )
-    # Families plus the two non-family effect classes cover the enum exactly.
-    covered = (
-        set(POWER_DIMENSION_MISMATCH.dimensions)
-        | set(DIMENSION_DIFFERS.dimensions)
-        | set(dimensions_with_effect(DimensionEffect.IDENTITY_BLOCKING))
-        | set(dimensions_with_effect(DimensionEffect.METRIC_GATE))
-    )
-    assert covered == set(ComparisonDimension) == set(DIMENSION_REGISTRY)
-    assert not set(POWER_DIMENSION_MISMATCH.dimensions) & set(DIMENSION_DIFFERS.dimensions)
+def test_family_membership_and_order_are_the_documented_sets():
+    # Families derive from DIMENSION_REGISTRY, so asserting them against the
+    # derivation would be X == X. These literals are the independent pin:
+    # membership, effect-class bucketing, AND order (family order reaches the
+    # emitted-issue order in compare artifacts). A dimension classified into
+    # the wrong effect fails here even though every derivation still holds.
+    assert [d.value for d in POWER_DIMENSION_MISMATCH.dimensions] == [
+        "power_scope",
+        "power_mode",
+        "power_firmware",
+        "power_monitor",
+        "power_lockstep",
+        "power_clean_window_probe",
+    ]
+    assert [d.value for d in DIMENSION_DIFFERS.dimensions] == [
+        "hpx_version",
+        "engine",
+        "board",
+        "soc",
+        "cpu_clock",
+        "toolchain",
+        "compiler_version",
+        "system_clock_hz",
+        "run_summary_schema_version",
+        "run_metadata_schema_version",
+        "transport",
+        "arena_location",
+        "weights_location",
+    ]
+    # The remaining enum members are exactly the two non-family classes.
+    non_family = set(ComparisonDimension) - set(
+        POWER_DIMENSION_MISMATCH.dimensions
+    ) - set(DIMENSION_DIFFERS.dimensions)
+    assert {d.value for d in non_family} == {"model_sha256", "power_integrity"}
 
 
 def test_family_rejects_foreign_dimension():
