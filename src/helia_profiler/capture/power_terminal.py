@@ -105,7 +105,8 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
         elapsed_us = int(elapsed_raw, 10)
     except ValueError as exc:
         raise PowerError(
-            f"Malformed power terminal field HPX_POWER_ELAPSED_US={elapsed_raw!r}."
+            "Malformed power terminal field "
+            f"{PowerTerminalKey.ELAPSED_US.value}={elapsed_raw!r}."
         ) from exc
     if requested_count < 0 or completed_count < 0 or error_code < 0:
         raise PowerError("Power terminal count and error fields must be non-negative.")

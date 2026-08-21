@@ -21,6 +21,17 @@ appear against the tokens the registry predicts — in *both* directions:
 Plus literal catalogue pins (error codes, heartbeat phases, power-terminal key
 sets, the CSV header shape) in the style of #154 Phase 3, and the grep-guard
 that keeps bare ``HPX_`` protocol literals out of ``src/``.
+
+Stated limit of the census: every assertion here is *set-valued* per render —
+"this render can print this token", never "this render prints it from these N
+sites". A token with more than one emission site is therefore only protected
+against losing *all* of them; delete one site and the set is unchanged. The
+known case is ``HPX_ERROR=unsupported_op``, which the TFLM template prints from
+a custom-op and a builtin-op site with different payload fields, and the
+per-operator ``HPX_HEARTBEAT phase=infer``, which has three sites across three
+engines. Where losing one site matters, it is pinned by hand
+(:func:`test_tflm_init_heartbeat_keeps_its_t0_payload` and the CSV row-format
+pins are that shape).
 """
 
 from __future__ import annotations
@@ -37,6 +48,11 @@ from helia_profiler.capture import _ERROR_HINTS
 from helia_profiler.engines import EngineType
 from helia_profiler.firmware import _jinja_env
 from helia_profiler.wire import (
+    EST_MS_GAP,
+    HPX_ITER_SENTINEL_PATTERN,
+    HPX_PRESET_SENTINEL_PATTERN,
+    KEY_VALUE_PATTERN,
+    POWER_BINARY_ENGINES,
     POWER_TERMINAL_OPTIONAL_KEYS,
     POWER_TERMINAL_REQUIRED_KEYS,
     WIRE_CONDITIONS,
@@ -45,6 +61,7 @@ from helia_profiler.wire import (
     FirmwareWarnCode,
     HeartbeatPhase,
     PowerTerminalKey,
+    WireBinary,
     WireDirection,
     WireKey,
     WireKind,
@@ -80,9 +97,19 @@ def _split_c(text: str) -> tuple[list[str], str]:
     templates are full of comments that name wire tokens in prose (one even
     quotes ``"HPX_GO"``, which the firmware never puts on any wire: it counts
     six received characters instead).
+
+    Adjacent literals separated only by whitespace are *concatenated*, because
+    C concatenates them: ``"HPX_POWER_" "ELAPSED_US=%llu\\n"`` is one format
+    string at runtime and has to be one string here, or a token split across
+    the join reaches the wire while the census sees two harmless fragments.
+    The templates are full of the shape — an INA228 power render joins twenty
+    adjacent literals, and the whole terminal record (eleven wire lines, both
+    envelope markers included) is a single such concatenation — so this is the
+    normal case rather than a corner.
     """
     literals: list[str] = []
     code: list[str] = []
+    pending: list[str] = []
     i, n = 0, len(text)
     while i < n:
         char = text[i]
@@ -102,11 +129,23 @@ def _split_c(text: str) -> tuple[list[str], str]:
             start = i
             while i < n and text[i] != '"':
                 i += 2 if text[i] == "\\" else 1
-            literals.append(text[start:i])
+            pending.append(text[start:i])
             i += 1
+            # Only whitespace may separate two halves of one C string literal;
+            # anything else (a comma, an operator, an identifier) ends it.
+            ahead = i
+            while ahead < n and text[ahead] in " \t\r\n":
+                ahead += 1
+            if ahead < n and text[ahead] == '"':
+                i = ahead
+                continue
+            literals.append("".join(pending))
+            pending = []
         else:
             code.append(char)
             i += 1
+    if pending:  # pragma: no cover - unterminated literal in a render
+        literals.append("".join(pending))
     return literals, "".join(code)
 
 
@@ -121,23 +160,31 @@ def _emitted_tokens(text: str) -> set[str]:
     registry key; everything else is the bare token. A bare ``HPX_ERROR`` with
     no recognisable code stays bare on purpose, so it surfaces as an
     undeclared emission rather than being silently absorbed.
+
+    The absorption is decided **per position**, not per literal: one C literal
+    routinely carries several tokens (and, since adjacent literals are joined,
+    now carries whole records), so "some code matched somewhere in this string"
+    is not evidence that *this* ``HPX_ERROR`` occurrence had one. Suppressing
+    per literal hid a codeless ``HPX_ERROR=%s`` sharing a format string with a
+    concrete one.
     """
     tokens: set[str] = set()
     for literal in _string_literals(text):
-        phases = _HEARTBEAT_RE.findall(literal)
-        errors = _ERROR_RE.findall(literal)
-        warns = _WARN_RE.findall(literal)
-        tokens |= {f"HPX_HEARTBEAT phase={phase}" for phase in phases}
-        tokens |= {f"HPX_ERROR={code}" for code in errors}
-        tokens |= {f"HPX_WARN={code}" for code in warns}
-        for token in _TOKEN_RE.findall(literal):
-            if token == "HPX_HEARTBEAT" and phases:
+        qualified: dict[int, str] = {}
+        for pattern, shape in (
+            (_HEARTBEAT_RE, "HPX_HEARTBEAT phase={}"),
+            (_ERROR_RE, "HPX_ERROR={}"),
+            (_WARN_RE, "HPX_WARN={}"),
+        ):
+            for match in pattern.finditer(literal):
+                qualified[match.start()] = shape.format(match.group(1))
+        tokens |= set(qualified.values())
+        for match in _TOKEN_RE.finditer(literal):
+            # The qualified match starts exactly where the bare token does, so
+            # a same-position hit means this occurrence *is* the qualified one.
+            if match.start() in qualified:
                 continue
-            if token == "HPX_ERROR" and errors:
-                continue
-            if token == "HPX_WARN" and warns:
-                continue
-            tokens.add(token)
+            tokens.add(match.group(0))
     return tokens
 
 
@@ -193,6 +240,12 @@ _PSRAM_BLOB_REGION = {
     "size": 8192,
     "blob_filename": "psram_weights.bin",
 }
+#: A PSRAM arena region with NO sidecar blob. Without it every PSRAM-placed
+#: region in the matrix also carried a blob, which made
+#: ``GATE_AOT_PSRAM_ARENAS`` and ``GATE_AOT_CONST_BLOBS_IN_PSRAM`` true on
+#: exactly the same renders: swapping the two conditions between specs left the
+#: census green.
+_PSRAM_REGION = {**_PSRAM_BLOB_REGION, "region_id": 3, "blob_filename": None}
 
 
 class _Render:
@@ -317,10 +370,23 @@ def _matrix() -> list[_Render]:
             "apollo510", "rtt", "helia-aot", power_only=True,
             overrides={"arena_regions": [_TCM_REGION, _PSRAM_BLOB_REGION]},
         ),
-        # Apollo3 burst.
+        # A PSRAM arena with no blob: the one render where the psram-arena and
+        # blob-in-psram gates disagree, which is what makes them separable.
+        _Render(
+            "ap510|rtt|helia-aot|arenas-psram-noblob",
+            "apollo510", "rtt", "helia-aot",
+            overrides={"arena_regions": [_TCM_REGION, _PSRAM_REGION]},
+        ),
+        # Apollo3 burst, both engines that can reach an Apollo3 build (the
+        # gate is per-engine, and heliaAOT renders its own template).
         _Render(
             "ap3p|rtt|tflm|burst",
             "apollo3p", "rtt", "tflm",
+            overrides={"apollo3_burst": True},
+        ),
+        _Render(
+            "ap3p|rtt|helia-aot|burst",
+            "apollo3p", "rtt", "helia-aot",
             overrides={"apollo3_burst": True},
         ),
         # Clean-window trace: emitted on RTT, suppressed on SWO/UART.
@@ -337,6 +403,22 @@ def _matrix() -> list[_Render]:
         _Render(
             "ap510|rtt|executorch|trace",
             "apollo510", "rtt", "executorch",
+            overrides={"clean_window_trace": True},
+        ),
+        # The trace marker has THREE emission sites, one per window body, and
+        # only two were covered: ap3p reaches the DWT body and ExecuTorch its
+        # own override, leaving the STIMER body's site (_main_base.cc.j2, the
+        # `elif use_stimer_window` branch) emitted by no render in the matrix.
+        # Both engines that render the base window on a STIMER SoC are here,
+        # because they take that branch through different templates.
+        _Render(
+            "ap510|rtt|tflm|trace",
+            "apollo510", "rtt", "tflm",
+            overrides={"clean_window_trace": True},
+        ),
+        _Render(
+            "ap510|rtt|helia-aot|trace",
+            "apollo510", "rtt", "helia-aot",
             overrides={"clean_window_trace": True},
         ),
         # Busy-loop probe: replaces the window body and forces the DWT clock,
@@ -361,10 +443,23 @@ def _matrix() -> list[_Render]:
             "ap3p|rtt|tflm|busy-loop|power",
             "apollo3p", "rtt", "tflm", power_only=True, clean_window_probe="busy_loop",
         ),
-        # Adaptive window sizing.
+        # Adaptive window sizing — the DEFAULT (config.DEFAULT_WINDOW_MODE is
+        # "auto"; the matrix above pins "fixed" everywhere else). Rendered on
+        # the STIMER SoC too, because that is where the auto branch is
+        # interesting: it measures a warm DWT reference before the window
+        # whatever clock times the window itself, so these builds send a real
+        # est_ms rather than the 0 a STIMER-timed *fixed* window sends.
         _Render(
             "ap3p|rtt|tflm|auto-window",
             "apollo3p", "rtt", "tflm", window_mode="auto",
+        ),
+        _Render(
+            "ap510|rtt|tflm|auto-window",
+            "apollo510", "rtt", "tflm", window_mode="auto",
+        ),
+        _Render(
+            "ap510|rtt|executorch|auto-window",
+            "apollo510", "rtt", "executorch", window_mode="auto",
         ),
         # GPIO power gate armed.
         _Render(
@@ -387,6 +482,17 @@ def _matrix() -> list[_Render]:
             "ap510|uart|helia-aot|ina228|power",
             "apollo510", "uart", "helia-aot", power_only=True,
             overrides=dict(_INA228_VARS),
+        ),
+        # Bystander INA228: an external instrument owns the measurement, so a
+        # monitor failure is recorded and the run continues. The wire scope is
+        # unchanged (the terminal record's shape is a power_monitor question,
+        # not an ina228_required one) — which is the point: the difference is
+        # entirely in the runtime gates, so the census must see the same
+        # tokens from both.
+        _Render(
+            "ap510|rtt|tflm|ina228-bystander|power",
+            "apollo510", "rtt", "tflm", power_only=True,
+            overrides={**_INA228_VARS, "ina228_required": False},
         ),
     ]
     return renders
@@ -531,6 +637,138 @@ def test_every_condition_is_flipped_both_ways_by_the_matrix():
     assert not never_false, f"conditions satisfied by every render: {never_false}"
 
 
+#: (condition, engine) pairs the matrix cannot flip both ways because the
+#: combination does not exist in production. Pinned literally, with the reason,
+#: because the alternative — letting the gate-flip test skip whatever it cannot
+#: reach — is how a condition ends up proven for one engine and assumed for the
+#: other two. Reachability depends only on the condition and the engine, so
+#: specs sharing a condition share an entry.
+#:
+#: Every entry is asserted to still be unreachable, so widening the matrix
+#: turns a stale exemption into a failure rather than dead weight.
+_UNFLIPPABLE_PAIRS: dict[tuple[str, str], str] = {
+    ("not power_only", "executorch"): (
+        "ExecuTorch has no power binary at all: preflight rejects "
+        "engine.type=executorch with power.enabled, so power_only is never "
+        "true for it and the gate has only one reachable side."
+    ),
+    ("busy_loop_probe", "helia-rt"): (
+        "heliaRT renders main.cc.j2 byte-identically to tflm, which carries "
+        "the busy-loop renders; a second identical render would prove nothing."
+    ),
+    ("apollo3_burst", "executorch"): (
+        "ExecuTorch is Cortex-M55 (apollo510) only and burst is an Apollo3 "
+        "feature, so no build has both."
+    ),
+    ("apollo3_burst", "helia-rt"): (
+        "heliaRT renders main.cc.j2 byte-identically to tflm, which carries "
+        "the burst render; a second identical render would prove nothing."
+    ),
+    ("weights_region == psram and transport == rtt and not power_only", "helia-rt"): (
+        "Same template as tflm, which carries the PSRAM-weights renders."
+    ),
+    ("weights_region == psram", "helia-rt"): (
+        "Same template as tflm, which carries the PSRAM-weights renders."
+    ),
+    ("arena_region == psram", "helia-rt"): (
+        "Same template as tflm, which carries the PSRAM-arena renders."
+    ),
+    ("psram_needed", "helia-rt"): (
+        "Same template as tflm, which carries every PSRAM render."
+    ),
+    ("psram_needed and not power_only", "helia-rt"): (
+        "Same template as tflm, which carries every PSRAM render."
+    ),
+    ("power_only and power_monitor == ina228", "helia-rt"): (
+        "Same template as tflm, which carries the INA228 power renders."
+    ),
+    ("clean_window_trace and transport not in (swo, uart)", "helia-rt"): (
+        "Same template as tflm, which carries the trace renders on both the "
+        "DWT and STIMER window bodies."
+    ),
+}
+
+
+def test_helia_rt_renders_identically_to_tflm_but_for_the_engine_id():
+    """The premise most of :data:`_UNFLIPPABLE_PAIRS` rests on, proven.
+
+    Eight exemptions read "same template as tflm, which flips it both ways".
+    That is a claim about the firmware, not an excuse, so it is checked rather
+    than trusted: if heliaRT ever grows a branch of its own, those exemptions
+    stop being harmless and this test says so before the census silently loses
+    an engine's coverage.
+    """
+    for soc in _SOCS:
+        for transport in _TRANSPORTS:
+            tflm = _render(soc, transport, "tflm")
+            helia_rt = _render(soc, transport, "helia-rt")
+            assert helia_rt.replace("HPX_ENGINE=helia_rt", "HPX_ENGINE=tflm") == tflm, (
+                f"{soc}|{transport}: heliaRT no longer renders main.cc.j2 "
+                "identically to tflm — the _UNFLIPPABLE_PAIRS entries that "
+                "defer heliaRT coverage to tflm need real renders now"
+            )
+
+
+def test_every_gate_is_flipped_both_ways_for_every_engine_in_its_scope():
+    """Per (spec, engine), not per condition.
+
+    ``test_every_condition_is_flipped_both_ways_by_the_matrix`` asks only
+    whether the matrix contains *some* render on each side of each condition.
+    That is satisfied by a single engine: ``psram_needed`` flipped by tflm
+    renders says nothing about whether heliaAOT's template still honours it,
+    and the two do not even share a template. This asks the sharper question —
+    for every spec, and every engine that spec claims to be in scope for, does
+    the matrix hold a render of *that engine* on each side of the gate?
+
+    Unreachable combinations are whitelisted literally in
+    :data:`_UNFLIPPABLE_PAIRS` with a reason each, and the whitelist is checked
+    for staleness in both directions.
+    """
+    gaps: list[str] = []
+    exercised: set[tuple[str, str]] = set()
+    for token, spec in WIRE_REGISTRY.items():
+        if spec.direction is not WireDirection.DEVICE_TO_HOST:
+            continue
+        if not spec.emitted_by_firmware:
+            continue
+        for engine in sorted(spec.engines, key=lambda e: e.value):
+            condition = spec.condition_for(engine)
+            if condition is None:
+                continue
+            predicate = _PREDICATES[condition]
+            results = {
+                predicate(render.vars)
+                for render in _MATRIX
+                if render.engine is engine
+            }
+            if True in results and False in results:
+                exercised.add((condition, engine.value))
+                continue
+            if (condition, engine.value) in _UNFLIPPABLE_PAIRS:
+                continue
+            side = "never true" if True not in results else "never false"
+            gaps.append(f"{token} x {engine.value}: `{condition}` is {side}")
+
+    assert not gaps, (
+        "these gates are asserted for an engine the matrix never flips them "
+        "for, so the spec's engine scope is documentation rather than a "
+        "tested claim — add a render, or whitelist the pair in "
+        "_UNFLIPPABLE_PAIRS with the reason it cannot exist:\n  "
+        + "\n  ".join(sorted(gaps))
+    )
+    stale = sorted(pair for pair in _UNFLIPPABLE_PAIRS if pair in exercised)
+    assert not stale, (
+        "_UNFLIPPABLE_PAIRS claims these cannot be flipped, but the matrix "
+        f"now flips them — drop the exemption: {stale}"
+    )
+    unknown = sorted(
+        pair
+        for pair in _UNFLIPPABLE_PAIRS
+        if pair[0] not in _PREDICATES or pair[1] not in _ENGINES
+    )
+    assert not unknown, f"_UNFLIPPABLE_PAIRS names a condition or engine that no longer exists: {unknown}"
+
+
 def test_wire_key_round_trips_between_its_two_spellings():
     for key in WireKey:
         spec = WIRE_REGISTRY[key.wire]
@@ -551,6 +789,43 @@ def test_wire_key_round_trips_between_its_two_spellings():
 def test_every_registry_key_is_the_specs_own_token():
     for token, spec in WIRE_REGISTRY.items():
         assert token == spec.token
+
+
+#: The gates that place a token's source inside the dedicated power binary.
+_POWER_ONLY_GATES = frozenset({"power_only", "power_only and power_monitor == ina228"})
+
+
+def test_the_binary_axis_agrees_with_the_condition():
+    """``binary`` is derivable, so it must never be hand-set out of step.
+
+    :attr:`WireSpec.binary` is the one axis the render census cannot check: it
+    records which firmware *prints* the token at runtime, and the power
+    binary's silence comes from ``hpx_printf`` compiling to a no-op rather than
+    from anything visible in the render. Left unchecked it is a free-text field
+    that drifts — and it is the field the generated reference turns into
+    "Power binary only", so a wrong value misinforms every reader.
+
+    It is not free-text in practice: a token is power-binary iff it belongs to
+    the terminal grammar or its condition is one of the power-only gates.
+    Everything else belongs to the transport-attached profiler, including the
+    many tokens whose source is compiled into both.
+    """
+    for token, spec in WIRE_REGISTRY.items():
+        conditions = {spec.condition, *spec.engine_conditions.values()}
+        power_shaped = spec.kind is WireKind.TERMINAL or bool(
+            conditions & _POWER_ONLY_GATES
+        )
+        expected = WireBinary.POWER if power_shaped else WireBinary.TRANSPORT
+        assert spec.binary is expected, (
+            f"{token}: binary={spec.binary.value} but its grammar/condition "
+            f"({spec.kind.value}, {sorted(c for c in conditions if c)}) puts it "
+            f"in the {expected.value} binary"
+        )
+        if spec.binary is WireBinary.POWER:
+            assert spec.engines == POWER_BINARY_ENGINES, (
+                f"{token}: a power-binary token scoped to {sorted(e.value for e in spec.engines)}; "
+                "the power binary exists for exactly POWER_BINARY_ENGINES"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -728,6 +1003,38 @@ def test_clean_window_begin_is_the_protocol_critical_phase():
     assert "HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=" in text
 
 
+def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
+    """The gap statement is single-sourced, and the firmware agrees with it.
+
+    The claim used to be that ``est_ms=0`` covers "every apollo510 profile
+    build and therefore every ExecuTorch build", copied verbatim into three
+    files. It was false: ``config.DEFAULT_WINDOW_MODE`` is ``auto``, and the
+    auto branch measures a warm DWT reference and sends a real estimate
+    whatever clock times the window. So the statement now lives once, in
+    :data:`EST_MS_GAP`, and the renders below are the proof of it — a
+    STIMER-timed apollo510 build sends a real ``est_ms`` under the default and
+    the hardcoded zero only under ``window_mode: fixed``.
+    """
+    assert EST_MS_GAP in WIRE_REGISTRY[
+        heartbeat_token(HeartbeatPhase.CLEAN_WINDOW_BEGIN)
+    ].note
+
+    zero = "HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=0\\n"
+    measured = (
+        "HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\\n"
+    )
+    for engine in ("tflm", "helia-aot", "executorch"):
+        fixed = _render("apollo510", "rtt", engine, window_mode="fixed")
+        auto = _render("apollo510", "rtt", engine, window_mode="auto")
+        assert zero in fixed, engine
+        assert measured not in fixed, engine
+        assert measured in auto, engine
+        assert zero not in auto, engine
+    # ...and a DWT-timed fixed window derives one from its stall-check warmup,
+    # which is the other half of the corrected claim.
+    assert measured in _render("apollo3p", "rtt", "tflm", window_mode="fixed")
+
+
 def test_power_terminal_key_sets():
     assert POWER_TERMINAL_REQUIRED_KEYS == {
         "HPX_POWER_TERMINAL_VERSION",
@@ -767,6 +1074,24 @@ def test_power_terminal_parser_derives_its_schema_from_the_registry():
     assert power_terminal._OPTIONAL_KEYS == POWER_TERMINAL_OPTIONAL_KEYS
 
 
+def _csv_emitter(soc: str, engine: str, *, has_armv8m_pmu: bool = True) -> str:
+    """Everything that can print a CSV row for this engine.
+
+    TFLM/heliaRT print theirs from the profiler class rather than from
+    main.cc, so both translation units are concatenated — the earlier version
+    of this helper *replaced* the app render with the profiler render, which
+    meant the tflm case silently asserted nothing about main.cc and the
+    profiler case asserted nothing about the SoC it claimed to cover.
+    """
+    text = _render(soc, "rtt", engine)
+    if engine in ("tflm", "helia-rt"):
+        text += _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
+            profiling_backends=["armv8m-pmu"] if has_armv8m_pmu else ["dwt"],
+            has_armv8m_pmu=has_armv8m_pmu,
+        )
+    return text
+
+
 def test_csv_header_shape_is_the_same_for_every_engine():
     """The CSV body has no HPX_ token, so the census cannot see it."""
     for soc, engine in (
@@ -774,13 +1099,49 @@ def test_csv_header_shape_is_the_same_for_every_engine():
         ("apollo510", "helia-aot"),
         ("apollo510", "executorch"),
     ):
-        text = _render(soc, "rtt", engine)
-        if engine == "tflm":
-            text = _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
-                profiling_backends=["armv8m-pmu"], has_armv8m_pmu=True
-            )
-        assert '\\"Layer\\",\\"Op\\"' in text
-        assert ',\\"overflow\\"\\n' in text
+        text = _csv_emitter(soc, engine)
+        assert '\\"Layer\\",\\"Op\\"' in text, engine
+        assert ',\\"overflow\\"\\n' in text, engine
+
+    # The Cortex-M4 profiler is a second, independent emitter: no Armv8-M PMU,
+    # so it prints a fixed single-counter header from its own printf rather
+    # than looping over the pass's counter names. Rendering only the Armv8-M
+    # variant left that whole branch — half the file — unpinned.
+    m4 = _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
+        profiling_backends=["dwt"], has_armv8m_pmu=False
+    )
+    assert '\\"Layer\\",\\"Op\\",\\"ARM_PMU_CPU_CYCLES\\",\\"overflow\\"\\n' in m4
+
+
+def test_csv_row_format_is_pinned_per_engine():
+    """The Op column, which is the only thing the engines differ in.
+
+    ``CSV_GRAMMAR`` says these row shapes are "pinned by the census
+    contracts"; before this test that sentence was aspirational — the header
+    was pinned and the rows were not, so an engine could start emitting a bare
+    index where the host expects ``OPTYPE:opid`` and nothing would notice
+    until a parse produced unlabelled layers.
+    """
+    tflm = _csv_emitter("apollo510", "tflm")
+    # The tag comes from TFLM's per-op tag string, with `?` where it has none.
+    assert 'hpx_printf("%d,%s", i, rec.tag ? rec.tag : "?");' in tflm
+    # ...and the non-Armv8-M profiler prints the whole row in one call.
+    m4 = _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
+        profiling_backends=["dwt"], has_armv8m_pmu=False
+    )
+    assert 'hpx_printf("%d,%s,%lu,%d\\n",' in m4
+
+    aot = _render("apollo510", "rtt", "helia-aot")
+    assert 'hpx_printf("%d,%s:%ld", i, aot_op_name(i), (long)aot_op_id(i));' in aot
+
+    et = _render("apollo510", "rtt", "executorch")
+    assert 'hpx_printf("%d,%s:c%ldi%lu", i,' in et
+    assert '? "OPERATOR_CALL" : "DELEGATE_CALL",' in et
+
+    # The three loop-based emitters close the row with the overflow flag; the
+    # Cortex-M4 profiler folds it into the single call pinned above.
+    for label, text in (("tflm", tflm), ("helia-aot", aot), ("executorch", et)):
+        assert 'hpx_printf(",%d\\n"' in text, label
 
 
 # ---------------------------------------------------------------------------
@@ -805,6 +1166,81 @@ def _dunder_all_positions(source: str) -> set[tuple[int, int]]:
     return positions
 
 
+#: The f-string token types, absent before 3.12 (where an f-string arrives as
+#: one ``STRING`` token instead and is recovered through the AST below).
+_FSTRING_START = getattr(tokenize, "FSTRING_START", None)
+_FSTRING_MIDDLE = getattr(tokenize, "FSTRING_MIDDLE", None)
+_FSTRING_END = getattr(tokenize, "FSTRING_END", None)
+
+
+def _placeholder_free_fstring(text: str) -> str | None:
+    """The content of ``f"..."`` when it interpolates nothing, else ``None``."""
+    try:
+        node = ast.parse(text, mode="eval").body
+    except SyntaxError:
+        return None
+    if isinstance(node, ast.JoinedStr) and all(
+        isinstance(value, ast.Constant) and isinstance(value.value, str)
+        for value in node.values
+    ):
+        return "".join(value.value for value in node.values)
+    return None
+
+
+def _constant_strings(source: str) -> list[tuple[tuple[int, int], str, str]]:
+    """Every string constant in *source* as (position, content, source text).
+
+    Constant f-strings are included: ``f"HPX_START"`` is a wire literal wearing
+    a disguise the tokenizer used to hide, because CPython 3.12 splits an
+    f-string into FSTRING_START / FSTRING_MIDDLE / FSTRING_END and the guard
+    only looked at ``STRING``. F-strings that *do* interpolate are excluded —
+    ``f"HPX_{name}"`` composes a token rather than duplicating one, which is
+    the documented limit of this scan and the reason the registry ships
+    ``heartbeat_token()`` and friends.
+    """
+    found: list[tuple[tuple[int, int], str, str]] = []
+    stack: list[dict] = []
+    for token in tokenize.generate_tokens(io.StringIO(source).readline):
+        if _FSTRING_START is not None and token.type == _FSTRING_START:
+            stack.append(
+                {"pos": token.start, "parts": [], "text": [token.string], "interp": False}
+            )
+            continue
+        if stack:
+            frame = stack[-1]
+            if token.type == _FSTRING_MIDDLE:
+                frame["parts"].append(token.string)
+                frame["text"].append(token.string)
+                continue
+            if token.type == _FSTRING_END:
+                stack.pop()
+                frame["text"].append(token.string)
+                if not frame["interp"]:
+                    found.append(
+                        (frame["pos"], "".join(frame["parts"]), "".join(frame["text"]))
+                    )
+                continue
+            # Anything else inside the braces makes this an interpolation —
+            # but a plain string nested in a placeholder is still a literal in
+            # its own right, so fall through rather than skipping it.
+            frame["interp"] = True
+        if token.type is not tokenize.STRING:
+            continue
+        try:
+            content = ast.literal_eval(token.string)
+        except (ValueError, SyntaxError):
+            recovered = _placeholder_free_fstring(token.string)
+            if recovered is None:
+                continue
+            found.append((token.start, recovered, token.string))
+            continue
+        if isinstance(content, bytes):
+            content = content.decode("utf-8", errors="replace")
+        if isinstance(content, str):
+            found.append((token.start, content, token.string))
+    return found
+
+
 def test_no_bare_wire_literal_survives_in_src():
     """No module but ``wire.py`` may spell a protocol token as a literal.
 
@@ -815,14 +1251,26 @@ def test_no_bare_wire_literal_survives_in_src():
     flagged when its whole content *is* a registered token, a token with its
     ``=``, or a ``--- HPX_`` sentinel frame.
 
+    The *grammars* are covered too, not just the tokens: a reintroduced
+    ``r"^HPX_(\\w+)=(.+)$"`` or ``r"^--- HPX_ITER (\\d+) ---$"`` is a second
+    copy of the protocol exactly as a duplicated sentinel is, so the registry's
+    three pattern constants are matched as literals and the leading ``^`` is
+    stripped before the sentinel-frame check.
+
     Stated limits, as in ``tests/test_issue_codes.py``: a token mentioned
-    mid-sentence in a log message is fine and not flagged, and a composed
-    string (``f"HPX_{name}"``) is beyond a literal scan — the registry's
-    helper functions are the guard for that shape.
+    mid-sentence in a log message is fine and not flagged, and an f-string that
+    *interpolates* (``f"HPX_{name}"``) composes a token rather than duplicating
+    one — the registry's helper functions are the guard for that shape. A
+    placeholder-free f-string is a plain literal and is flagged like one.
     """
     exact = set(WIRE_REGISTRY) | {f"{token}=" for token in WIRE_REGISTRY}
     exact |= {spec.literal for spec in WIRE_REGISTRY.values() if spec.literal}
     exact |= {"HPX_", "HPX_HEARTBEAT", "HPX_ERROR=", "HPX_WARN="}
+    exact |= {
+        KEY_VALUE_PATTERN,
+        HPX_PRESET_SENTINEL_PATTERN,
+        HPX_ITER_SENTINEL_PATTERN,
+    }
 
     offenders: list[str] = []
     for path in sorted(SRC.rglob("*.py")):
@@ -833,23 +1281,11 @@ def test_no_bare_wire_literal_survives_in_src():
         # token (transport re-exports HPX_START/HPX_END under those names);
         # they are not wire literals.
         exported = _dunder_all_positions(source)
-        for token in tokenize.generate_tokens(io.StringIO(source).readline):
-            if token.start in exported:
+        for position, content, text in _constant_strings(source):
+            if position in exported:
                 continue
-            if token.type is not tokenize.STRING:
-                continue
-            try:
-                content = ast.literal_eval(token.string)
-            except (ValueError, SyntaxError):  # pragma: no cover - f-strings
-                continue
-            if not isinstance(content, (str, bytes)):
-                continue
-            if isinstance(content, bytes):
-                content = content.decode("utf-8", errors="replace")
-            if content in exact or content.startswith("--- HPX_"):
-                offenders.append(
-                    f"{path.relative_to(ROOT)}:{token.start[0]}: {token.string}"
-                )
+            if content in exact or content.lstrip("^").startswith("--- HPX_"):
+                offenders.append(f"{path.relative_to(ROOT)}:{position[0]}: {text}")
     assert not offenders, (
         "bare HPX wire literals found in src/ — import them from "
         "helia_profiler.wire:\n" + "\n".join(offenders)

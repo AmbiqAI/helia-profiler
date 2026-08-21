@@ -5,6 +5,7 @@ from __future__ import annotations
 from ..engines import EngineType
 from ._model import (
     AOT_ENGINES,
+    EST_MS_GAP,
     ET_ENGINES,
     GATE_AOT_CONST_BLOBS,
     GATE_AOT_EXTERNAL_ARENAS,
@@ -102,6 +103,12 @@ SENTINEL_SPECS: tuple[WireSpec, ...] = (
         binary=WireBinary.POWER,
         condition=GATE_POWER_ONLY,
         literal=POWER_TERMINAL_START_SENTINEL,
+        note="Delivery differs by transport: on RTT the whole record is "
+        "written once and the firmware parks, while UART, SWO and USB CDC "
+        "retransmit it in full every 250 ms forever (the binary never "
+        "terminates and the host may attach late). The envelope parser's "
+        "find-a-complete-start/end-pair-and-discard-partials loop exists for "
+        "exactly that repetition.",
     ),
     _spec(
         "HPX_POWER_TERMINAL_END",
@@ -252,7 +259,9 @@ START_HEADER_SPECS: tuple[WireSpec, ...] = (
         key=WireKey.SYSTEM_CLOCK_HZ,
         value_shape="Hz",
         note="Checked against the platform registry (>5% divergence warns) "
-        "and used by the clean-window clock-rate validity check.",
+        "and used by the clean-window clock-rate validity check: it is the "
+        "expected-rate term of PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW, with "
+        "HPX_CLEAN_DWT_RATE_CYC and HPX_CLEAN_DWT_RATE_US.",
     ),
     _spec(
         WireKey.BURST_AVAIL.wire,
@@ -524,6 +533,20 @@ PSRAM_SPECS: tuple[WireSpec, ...] = tuple(
 )
 
 
+#: The six clean-window check keys live inside ``engine_clean_window`` in
+#: ``_main_base.cc.j2``, and ExecuTorch overrides that block wholesale (it
+#: accumulates the runtime's own execute-only cycle count instead), so their
+#: absence there is template-structural rather than a consequence of
+#: apollo510's STIMER window. The busy-loop probe delegates back to the base,
+#: but it is STIMER-timed, so it does not restore them either.
+_DWT_CLEAN_WINDOW_ENGINES = TFLM_ENGINES | AOT_ENGINES
+_ET_OMITS_THE_CHECK_BLOCK = (
+    "Out of ExecuTorch's scope because its engine_clean_window block override "
+    "replaces the shared window and emits none of the check keys — a template "
+    "structure, not an apollo510 coincidence."
+)
+
+
 CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
     _spec(
         WireKey.CLEAN_WINDOW_PROBE.wire,
@@ -557,6 +580,7 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         WireCriticality.METRIC,
         key=WireKey.CLEAN_INFER_COUNT,
         value_shape="int",
+        runtime_gate="clean_count > 0",
         note="Divides the gated energy, so losing it downgrades power results "
         "to whole-capture estimates. The clean_window_begin heartbeat's "
         "iters= is the host's fallback for exactly that case.",
@@ -569,7 +593,11 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         WireCriticality.METRIC,
         key=WireKey.CLEAN_INFER_TOTAL_CYCLES,
         value_shape="cycles",
-        note="Back-derived from the STIMER measurement on the STIMER path.",
+        runtime_gate="clean_count > 0",
+        note="Back-derived from the STIMER measurement on the STIMER path. "
+        "With HPX_CLEAN_INFER_AVG_US it feeds PROFILE_CLEAN_WINDOW_FROZEN "
+        "(zero elapsed time against completed inferences); the verdict warns, "
+        "so the criticality stays metric.",
     ),
     _spec(
         WireKey.CLEAN_INFER_AVG_CYCLES.wire,
@@ -579,6 +607,7 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         WireCriticality.METRIC,
         key=WireKey.CLEAN_INFER_AVG_CYCLES,
         value_shape="cycles",
+        runtime_gate="clean_count > 0",
     ),
     _spec(
         WireKey.CLEAN_INFER_AVG_US.wire,
@@ -588,9 +617,13 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         WireCriticality.METRIC,
         key=WireKey.CLEAN_INFER_AVG_US,
         value_shape="microseconds",
-        runtime_gate="SystemCoreClock > 0 (cycle-counter path only)",
+        runtime_gate="clean_count > 0; on the cycle-counter path additionally "
+        "SystemCoreClock > 0",
         note="Seeds the power-window iteration count, so a stalled or zero "
-        "value undersizes the next power run.",
+        "value undersizes the next power run. With "
+        "HPX_CLEAN_INFER_TOTAL_CYCLES it feeds PROFILE_CLEAN_WINDOW_FROZEN "
+        "(zero elapsed time against completed inferences); the verdict warns, "
+        "so the criticality stays metric.",
     ),
     _spec(
         WireKey.CLEAN_STALLED_ITERS.wire,
@@ -599,12 +632,13 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         WireConsumer.FIRMWARE_META,
         WireCriticality.METRIC,
         key=WireKey.CLEAN_STALLED_ITERS,
+        engines=_DWT_CLEAN_WINDOW_ENGINES,
         condition=GATE_NOT_STIMER_WINDOW,
         value_shape="int (0 on a healthy run)",
         note="Always emitted on the cycle-counter path so the host can tell a "
-        "firmware that checks from one that does not. No ExecuTorch build "
-        "reaches it: ExecuTorch enters the shared window only through the "
-        "busy-loop probe, and that probe times the window with STIMER.",
+        "firmware that checks from one that does not. Feeds "
+        "PROFILE_CLEAN_WINDOW_STALLED with HPX_CLEAN_PARTIAL_ITERS. "
+        + _ET_OMITS_THE_CHECK_BLOCK,
     ),
     _spec(
         WireKey.CLEAN_PARTIAL_ITERS.wire,
@@ -613,8 +647,12 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         WireConsumer.FIRMWARE_META,
         WireCriticality.METRIC,
         key=WireKey.CLEAN_PARTIAL_ITERS,
+        engines=_DWT_CLEAN_WINDOW_ENGINES,
         condition=GATE_NOT_STIMER_WINDOW,
         value_shape="int (0 on a healthy run)",
+        note="Feeds PROFILE_CLEAN_WINDOW_STALLED with HPX_CLEAN_STALLED_ITERS "
+        "— the two failure shapes are counted separately and neither is "
+        "inferred from the other. " + _ET_OMITS_THE_CHECK_BLOCK,
     ),
     _spec(
         WireKey.CLEAN_REF_CYCLES.wire,
@@ -623,10 +661,15 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         WireConsumer.FIRMWARE_META,
         WireCriticality.DIAGNOSTIC,
         key=WireKey.CLEAN_REF_CYCLES,
+        engines=_DWT_CLEAN_WINDOW_ENGINES,
         condition=GATE_NOT_STIMER_WINDOW,
         value_shape="cycles",
         note="Emitted so the stall threshold is auditable from the capture "
-        "rather than taken on trust.",
+        "rather than taken on trust. Sole input to "
+        "PROFILE_CLEAN_WINDOW_CHECK_INOPERATIVE: a zero reference means no "
+        "iteration could fall below the floor, so losing this key silently "
+        "disables the verdict that says the partial-stall check did not run. "
+        + _ET_OMITS_THE_CHECK_BLOCK,
     ),
     _spec(
         WireKey.CLEAN_DWT_RATE_CYC.wire,
@@ -635,10 +678,13 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         WireConsumer.FIRMWARE_META,
         WireCriticality.METRIC,
         key=WireKey.CLEAN_DWT_RATE_CYC,
+        engines=_DWT_CLEAN_WINDOW_ENGINES,
         condition=GATE_NOT_STIMER_WINDOW,
         value_shape="cycles",
-        note="With HPX_SYSTEM_CLOCK_HZ this detects a counter running far "
-        "below its expected rate.",
+        note="With HPX_CLEAN_DWT_RATE_US and HPX_SYSTEM_CLOCK_HZ this feeds "
+        "PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW — the only check that can see a "
+        "uniform slowdown, since the in-window counters are DWT-relative and "
+        "cancel under one. " + _ET_OMITS_THE_CHECK_BLOCK,
     ),
     _spec(
         WireKey.CLEAN_DWT_RATE_US.wire,
@@ -647,10 +693,14 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         WireConsumer.FIRMWARE_META,
         WireCriticality.METRIC,
         key=WireKey.CLEAN_DWT_RATE_US,
+        engines=_DWT_CLEAN_WINDOW_ENGINES,
         condition=GATE_NOT_STIMER_WINDOW,
         value_shape="microseconds",
         note="Printed from the HPX_CLEAN_DWT_RATE_PROBE_US macro — one of the "
-        "few cases where a compile-time constant travels on the wire.",
+        "few cases where a compile-time constant travels on the wire. The "
+        "denominator of PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW, with "
+        "HPX_CLEAN_DWT_RATE_CYC and HPX_SYSTEM_CLOCK_HZ. "
+        + _ET_OMITS_THE_CHECK_BLOCK,
     ),
     _spec(
         WireKey.CLEAN_ATTACH_WAIT_US.wire,
@@ -659,8 +709,10 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         WireConsumer.FIRMWARE_META,
         WireCriticality.DIAGNOSTIC,
         key=WireKey.CLEAN_ATTACH_WAIT_US,
+        engines=_DWT_CLEAN_WINDOW_ENGINES,
         condition=GATE_ATTACH_WAIT,
         value_shape="microseconds",
+        note=_ET_OMITS_THE_CHECK_BLOCK,
     ),
     _spec(
         WireKey.PROFILED_INFER_COUNT.wire,
@@ -671,6 +723,7 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         key=WireKey.PROFILED_INFER_COUNT,
         engines=TFLM_ENGINES | AOT_ENGINES,
         condition=GATE_NOT_POWER_ONLY,
+        runtime_gate="profiled_infer_count > 0 && SystemCoreClock > 0",
         value_shape="int",
         note="ExecuTorch overrides this block empty on purpose: its invoke "
         "path is not a pure inference call, so the same keys would carry "
@@ -685,6 +738,7 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         key=WireKey.PROFILED_INFER_TOTAL_US,
         engines=TFLM_ENGINES | AOT_ENGINES,
         condition=GATE_NOT_POWER_ONLY,
+        runtime_gate="profiled_infer_count > 0 && SystemCoreClock > 0",
         value_shape="microseconds",
     ),
     _spec(
@@ -696,6 +750,7 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         key=WireKey.PROFILED_INFER_AVG_US,
         engines=TFLM_ENGINES | AOT_ENGINES,
         condition=GATE_NOT_POWER_ONLY,
+        runtime_gate="profiled_infer_count > 0 && SystemCoreClock > 0",
         value_shape="microseconds",
         note="Fallback latency source when the clean window produced none.",
     ),
@@ -734,12 +789,7 @@ HEARTBEAT_SPECS: tuple[WireSpec, ...] = (
         WireCriticality.PROTOCOL,
         value_shape="iters=<n> est_ms=<n>",
         note="The host widens its capture deadline from est_ms and keeps "
-        "iters as a fallback for HPX_CLEAN_INFER_COUNT. Documented gap: "
-        "est_ms is a real estimate only where a warm measurement exists — "
-        "window_mode=auto, or a fixed window timed by the cycle counter. A "
-        "STIMER-timed fixed window sends est_ms=0, which the host reads as "
-        "'no estimate' and leaves its deadline alone; that covers every "
-        "apollo510 profile build and therefore every ExecuTorch build.",
+        "iters as a fallback for HPX_CLEAN_INFER_COUNT. " + EST_MS_GAP,
     ),
     _spec(
         heartbeat_token(HeartbeatPhase.INIT),

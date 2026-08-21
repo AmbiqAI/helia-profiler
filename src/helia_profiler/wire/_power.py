@@ -67,6 +67,16 @@ TERMINAL_SPECS: tuple[WireSpec, ...] = tuple(
         engines=POWER_BINARY_ENGINES,
         binary=WireBinary.POWER,
         condition=GATE_POWER_ONLY if required else GATE_POWER_INA228,
+        runtime_gate=(
+            None
+            # SAMPLE_COUNT has no emission site at all (see its note), so a
+            # runtime gate would describe a guard that guards nothing.
+            if required or key is PowerTerminalKey.SAMPLE_COUNT
+            # One `if` guards the whole optional block, which is why the group
+            # is all-or-none on the wire rather than by convention.
+            else "success && g_hpx_ina228_ok && the envelope written so far "
+            "still fits the record buffer"
+        ),
         value_shape=value_shape,
         required=required,
         emitted_by_firmware=key is not PowerTerminalKey.SAMPLE_COUNT,
@@ -109,10 +119,14 @@ TERMINAL_SPECS: tuple[WireSpec, ...] = tuple(
         engines=POWER_BINARY_ENGINES,
         binary=WireBinary.POWER,
         condition=GATE_POWER_INA228,
-        runtime_gate="the bystander monitor actually failed",
+        runtime_gate="not ina228_required and the bystander monitor failed",
         value_shape="<phase>:<rc>",
         required=None,
-        note="Logged as a warning: the external capture is unaffected.",
+        note="Logged as a warning: the external capture is unaffected. The "
+        "fail-phase global it prints is assigned only in the "
+        "`not ina228_required` branches of the setup/arm/read sites, so a "
+        "build where the INA228 is itself the measurement calls "
+        "hpx_power_terminal_fail() instead and never reaches this line.",
     ),
 )
 

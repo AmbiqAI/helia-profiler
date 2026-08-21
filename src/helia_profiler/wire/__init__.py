@@ -69,10 +69,11 @@ bytes are frozen this phase):
 * ExecuTorch's ``HPX_ARENA_SIZE`` counts only the planned arena — its method
   and temporary arenas are excluded, so the figure is not comparable with
   TFLM's single-arena number.
-* The ``clean_window_begin`` heartbeat carries ``est_ms=0`` on every
-  STIMER-timed fixed window — every apollo510 profile build, and therefore
-  every ExecuTorch build — so the host's window-budget extension never fires
-  there and falls back to the flat heartbeat timeout.
+* The ``clean_window_begin`` heartbeat carries ``est_ms=0`` on a STIMER-timed
+  window built with ``window_mode: fixed``, so the host's window-budget
+  extension never fires there. Not the default and not every apollo510 build:
+  the exact statement is single-sourced as :data:`EST_MS_GAP`, which the
+  heartbeat's spec note and the generated reference both quote.
 * ``HPX_VERSION`` is checked against :data:`HPX_PROTOCOL_VERSION` and then
   discarded — it never reaches ``FirmwareMeta`` or ``summary.json``.
 * 6 of the 12 :class:`FirmwareErrorCode` members carry no host hint
@@ -103,6 +104,7 @@ from ._faults import ERROR_SPECS, WARN_SPECS
 from ._model import (
     ALL_ENGINES,
     AOT_ENGINES,
+    EST_MS_GAP,
     ET_ENGINES,
     HPX_END_SENTINEL,
     HPX_ERROR_PREFIX,
@@ -243,6 +245,7 @@ __all__ = [
     "ALL_ENGINES",
     "AOT_ENGINES",
     "CSV_GRAMMAR",
+    "EST_MS_GAP",
     "ET_ENGINES",
     "FirmwareErrorCode",
     "FirmwareWarnCode",

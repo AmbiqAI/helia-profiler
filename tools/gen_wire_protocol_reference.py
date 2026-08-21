@@ -21,6 +21,7 @@ from helia_profiler.engines import EngineType
 from helia_profiler.wire import (
     ALL_ENGINES,
     CSV_GRAMMAR,
+    EST_MS_GAP,
     POWER_TERMINAL_OPTIONAL_KEYS,
     POWER_TERMINAL_REQUIRED_KEYS,
     HeartbeatPhase,
@@ -128,6 +129,30 @@ _KIND_SECTIONS: tuple[tuple[WireKind, str, str], ...] = (
 )
 
 
+#: Kinds this page narrates in prose instead of tabulating. The CSV body
+#: carries no ``HPX_`` token, so no spec has that kind and ``_rows`` would emit
+#: an empty table for it; its grammar is written out under "CSV body" instead.
+_NARRATED_KINDS: frozenset[WireKind] = frozenset({WireKind.CSV})
+
+
+def _check_every_kind_is_covered() -> None:
+    """Fail loudly if a new :class:`WireKind` has no home on the page.
+
+    Without this, adding a kind and forgetting to add a section here produces a
+    page that is silently missing every token of that kind — the exact failure
+    the generated-from-the-registry design exists to prevent, arriving as a
+    quiet omission rather than an error.
+    """
+    covered = {kind for kind, _, _ in _KIND_SECTIONS} | _NARRATED_KINDS
+    uncovered = sorted(kind.value for kind in set(WireKind) - covered)
+    if uncovered:
+        raise AssertionError(
+            "these WireKinds have neither a table section nor prose on the "
+            f"generated page: {uncovered}. Add them to _KIND_SECTIONS (or to "
+            "_NARRATED_KINDS with the prose that covers them)."
+        )
+
+
 def _cell(text: str) -> str:
     """Escape a value for a Markdown table cell (pipes end columns)."""
     return text.replace("|", "\\|")
@@ -191,6 +216,7 @@ def _rows(kind: WireKind) -> list[str]:
 
 
 def render() -> str:
+    _check_every_kind_is_covered()
     lines: list[str] = [_HEADER]
 
     for kind, title, blurb in _KIND_SECTIONS:
@@ -260,10 +286,7 @@ _GAPS = (
     "ExecuTorch's `HPX_ARENA_SIZE` counts only the planned arena — its method "
     "and temporary arenas are excluded, so the figure is not comparable with "
     "TFLM's single-arena number.",
-    "The `clean_window_begin` heartbeat carries `est_ms=0` on every "
-    "STIMER-timed fixed window — every apollo510 profile build, and therefore "
-    "every ExecuTorch build — so the host's window-budget extension never "
-    "fires there and falls back to the flat heartbeat timeout.",
+    EST_MS_GAP,
     "`HPX_VERSION` is checked against the expected protocol version and then "
     "discarded: it never reaches `FirmwareMeta` or `summary.json`.",
     "Six of the twelve error codes carry no host hint, so those failures reach "
