@@ -498,6 +498,11 @@ class FirmwareRenderContext:
             "ina228_shunt_cal": self.power_monitor.ina228_shunt_cal,
             "ina228_current_lsb_divisor": self.power_monitor.ina228_current_lsb_divisor,
             "ina228_calibration_id": self.power_monitor.ina228_calibration_id,
+            # Wire-protocol spelling of the engine, emitted as HPX_ENGINE= by
+            # every firmware template (_main_base.cc.j2).  The host parser
+            # takes any HPX_(\w+)=value line, so the hyphenated EngineType
+            # values are underscored here rather than shipped as-is.
+            "engine_wire_name": self.engine.engine_type.value.replace("-", "_"),
             "engine_header": self.engine.engine_header,
             "resolver_mode": self.engine.resolver_mode,
             "resolver_max_ops": self.engine.resolver_max_ops,

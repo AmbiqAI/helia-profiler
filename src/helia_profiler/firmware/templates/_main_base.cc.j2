@@ -1,8 +1,10 @@
 {# _main_base.cc.j2 — engine-agnostic heliaPROFILER firmware skeleton. #}
-{#- Extracted from main.cc.j2 (#154 phase 4).  Everything outside an
-   `engine_*` block is shared by every inference engine; the blocks are the
-   only place engine-specific code may appear.  Keep it that way: a child
-   template can override a block, but it can never remove base text.
+{#- Extracted from main.cc.j2 (#154 phase 4); main_aot.cc.j2 joined as a
+   second child in step 3.  Everything outside an `engine_*` block is shared
+   by every inference engine; the blocks are the only place engine-specific
+   code may appear.  Keep it that way: a child template can override a block,
+   but it can never remove base text.  main_executorch.cc.j2 is still
+   standalone and is converted next.
 
    Whitespace contract -- the render env has trim_blocks=False and
    lstrip_blocks=False, so every newline around a tag is real output:
@@ -33,7 +35,7 @@
 #include <cstring>
 
 // Pre-include arm_mve.h in C++ context BEFORE any extern "C" headers
-// (nsx_core.h, TFLM) to avoid GCC 14 overload conflicts.
+// (the NSX and engine umbrella headers) to avoid GCC 14 overload conflicts.
 #if defined(__ARM_FEATURE_MVE)
 #include <arm_mve.h>
 #endif
@@ -49,15 +51,15 @@
 #include "am_mcu_apollo.h"
 {% endif %}
 {% endif %}
-{% if window_timer == "stimer" and not apollo3_burst and not has_armv8m_pmu %}
-// STIMER (used to time the clean/power window debug-domain-free) lives in
-// the same AmbiqSuite HAL umbrella header as the other MCU peripherals.
-#include "am_mcu_apollo.h"
-{% endif %}
-{% if power_only | default(false) and (broad_peripheral_shutdown | default(false) or crypto_otp_shutdown | default(false)) and not apollo3_burst and not has_armv8m_pmu and not (window_timer == "stimer") %}
-// Broad peripheral power-down (_peripheral_power_down.j2) / crypto-otp
-// shutdown (_crypto_otp_shutdown.j2) needs VCOMP/_VAL2FLD register
-// definitions from the same AmbiqSuite HAL umbrella.
+{% if ((window_timer == "stimer") or (power_only | default(false) and (broad_peripheral_shutdown | default(false) or crypto_otp_shutdown | default(false)))) and not apollo3_burst and not has_armv8m_pmu %}
+// STIMER window timing (_stimer_init.j2), the broad peripheral power-down
+// (_peripheral_power_down.j2) and the crypto-otp shutdown
+// (_crypto_otp_shutdown.j2) all need register definitions from the same
+// AmbiqSuite HAL umbrella header.  One merged guard rather than several
+// mutually-exclusive ones so the header can never be emitted twice or, as
+// happened before the guard covered STIMER, not at all: an AP3 power render
+// needs STIMER without running either shutdown, and used to reference
+// am_hal_stimer_* with no HAL header in scope.
 #include "am_mcu_apollo.h"
 {% endif %}
 
@@ -113,7 +115,11 @@
 {% endif %}
 
 
-{% set psram_needed = (arena_region == "psram") or (weights_region == "psram") %}
+{# psram_needed covers both placement shapes: the coarse whole-arena /
+   whole-weights regions (heliaRT, TFLM, and heliaAOT's auto placement) and
+   heliaAOT's fully-resolved per-region arena_regions list, where an
+   individual tensor group can land in PSRAM with arena_region/weights_region
+   pointing elsewhere entirely. #}{% set psram_needed =(arena_region == "psram") or (weights_region == "psram") or ((arena_regions | default([])) | selectattr("placement", "equalto", "psram") | list | length > 0) %}
 {% if psram_needed %}
 #include "nsx_psram.h"
 {% endif %}
@@ -259,7 +265,8 @@ int main(void) {
 {# Runtime PSRAM bring-up and the host model handshake belong to whichever engine owns the weights, so the whole region is engine-supplied. #}{% block engine_pre_start %}{% endblock %}
 
 {% if not power_only | default(false) %}    hpx_printf("\n--- HPX_START ---\n");
-    hpx_printf("HPX_VERSION=1\n");{% block engine_banner %}{% endblock %}
+    hpx_printf("HPX_VERSION=1\n");
+    hpx_printf("HPX_ENGINE={{ engine_wire_name }}\n");
     hpx_printf("HPX_EXTREME_MODE=%d\n", {{ 1 if extreme_mode and arena_region == "tcm" and weights_region == "tcm" else 0 }});{% block engine_start_metadata %}{% endblock %}
     hpx_printf("HPX_ITERATIONS={{ iterations }}\n");
     hpx_printf("HPX_WARMUP={{ warmup }}\n");
@@ -287,14 +294,16 @@ int main(void) {
 {% if not power_only | default(false) %}    uint64_t profiled_infer_cycles = 0;
     uint32_t profiled_infer_count = 0;{% endif %}
 
-    // --- Clean end-to-end inference timing (no per-layer instrumentation) ---{% block engine_clean_window_comment %}
-    // The per-layer PMU passes below bracket every op (BeginEvent/EndEvent +
-    // counter resets), which perturbs caches/pipeline and adds overhead the
+    // --- Clean end-to-end inference timing (no per-layer instrumentation) ---
+    // The per-layer PMU passes below bracket every op (through whichever hook
+    // the engine exposes — the interpreter's profiler callbacks or the
+    // compiled model's operator callback — resetting and reading counters
+    // around each one), which perturbs caches/pipeline and adds overhead the
     // sum-of-layers cannot see.  To report the most representative whole-model
     // latency, run a warmed, UNinstrumented timing pass FIRST: prime caches
-    // with warmup iterations, then DWT-time clean Invoke()s with the profiler
-    // disabled.  Emitted as HPX_CLEAN_INFER_* — these never replace the
-    // per-layer numbers, they sit alongside them for comparison.{% endblock %}
+    // with warmup iterations, then DWT-time clean inference calls with the
+    // profiler disabled.  Emitted as HPX_CLEAN_INFER_* — these never replace
+    // the per-layer numbers, they sit alongside them for comparison.
     //
     // This pass is also the canonical window for external power measurement:
     // it is the only inference loop free of instrumentation/transport overhead,
@@ -423,10 +432,10 @@ int main(void) {
         uint32_t clean_count = 0;
         // READY means initialization and adaptive warmup are complete. Keep
         // host GO low until this point so it cannot backfeed/couple into the
-        // gate line during the comparatively long heliaRT setup path.
+        // gate line during the comparatively long engine setup path.
         hpx_sync_ready();
         hpx_sync_wait_go();
-        // Set the input once before the gated window, not on every
+        // Set the inputs once before the gated window, not on every
         // iteration — AutoDeploy's power loop re-invokes on the same fixed
         // input every run rather than re-zeroing it each time, and
         // re-memset()ing per iteration adds real, avoidable overhead inside
@@ -470,11 +479,11 @@ int main(void) {
         nsx_itm_printf_disable();
 {% endif %}
 {% if has_armv8m_pmu %}
-        // g_profiler.Init() (called earlier) leaves the ARM PMU counters
+        // The per-layer PMU init (run earlier) leaves the ARM PMU counters
         // running and the AM_HAL_PWRCTRL_PERIPH_DEBUG power domain powered
         // (via am_hal_debug_enable()) for the rest of firmware execution —
-        // SetEnabled(false) above only gates software instrumentation, it
-        // never touches this hardware.  AutoDeploy's power firmware never
+        // disabling the profiler above only gates software instrumentation,
+        // it never touches this hardware.  AutoDeploy's power firmware never
         // calls any PMU code, so it never powers this domain at all.
         //
         // Releasing the PMU counters for the gated/clean window still avoids
@@ -656,8 +665,9 @@ int main(void) {
 {% endif %}
 {% if transport == "usb_cdc" %}
         usb_timer_resume();
-{% endif %}
-{% block engine_profiler_on %}{% endblock %}{% endif %}
+{# engine_profiler_on is a region anchor glued to the endif above, not a line
+   of its own: an engine with nothing to re-enable here overrides it empty and
+   the line vanishes entirely rather than leaving a blank one behind. #}{% endif %}{% block engine_profiler_on %}{% endblock %}{% endif %}
         if (clean_count > 0) {
 {% if use_stimer_window %}
             // Derive avg_us directly from the device-independent STIMER
@@ -726,7 +736,8 @@ int main(void) {
 {% if power_only | default(false) %}
 {% else %}{% if transport == "rtt" %}
     // Boot header was captured losslessly; restore droppable writes for the
-    // timed window so an in-flight heartbeat can never stall interpreter.Invoke().
+    // timed window so an in-flight heartbeat can never stall the timed
+    // inference call.
     hpx_rtt_set_nonblocking();
 {% if power_sync_enabled %}
     // This build ran a gated power/clean window (external power capture): the
@@ -778,8 +789,9 @@ int main(void) {
 {% if transport == "usb_cdc" %}
         usb_timer_pause();
 {% elif transport == "rtt" %}
-        // Restore non-blocking before the next timed Invoke() so heartbeats
-        // emitted mid-inference can never stall and skew measurements.
+        // Restore non-blocking before the next timed inference call so
+        // heartbeats emitted mid-inference can never stall and skew
+        // measurements.
         hpx_rtt_set_nonblocking();
 {% endif %}
     }

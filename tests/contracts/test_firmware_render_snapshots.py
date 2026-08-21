@@ -222,7 +222,22 @@ def _common_kwargs(soc_name: str, transport: str) -> dict:
         "heartbeat_every_n_ops": 4,
         "heartbeat_every_ms": 0,
         "psram_clock_hz": 48_000_000,
+        # HPX_ENGINE= is emitted by the shared skeleton for every engine, so
+        # every render needs the wire name.  Defaulted to the tflm spelling
+        # here and overridden per engine by _render(); the direct render sites
+        # in this file all go through _common_kwargs and render main.cc.j2.
+        "engine_wire_name": "tflm",
     }
+
+
+# EngineType value -> HPX_ENGINE= wire spelling (hyphens are not legal in the
+# host parser's HPX_(\w+)=value key, so they become underscores; mirrors
+# FirmwareRenderContext.to_template_vars()).
+_ENGINE_WIRE_NAMES = {
+    "tflm": "tflm",
+    "helia-rt": "helia_rt",
+    "helia-aot": "helia_aot",
+}
 
 
 def _finalize(kwargs: dict) -> dict:
@@ -258,6 +273,9 @@ def _render(
     kwargs = _common_kwargs(soc_name, transport)
     kwargs["clean_window_probe"] = clean_window_probe
     kwargs["window_mode"] = window_mode
+    # .get() with the production derivation as the fallback so an unknown
+    # engine still reaches the informative AssertionError below.
+    kwargs["engine_wire_name"] = _ENGINE_WIRE_NAMES.get(engine, engine.replace("-", "_"))
     if power_only:
         kwargs["power_only"] = True
     if engine == "helia-aot":
@@ -1311,10 +1329,11 @@ def test_hal_umbrella_header_is_included_at_most_once():
     """``am_mcu_apollo.h`` has several independent consumers in the main
     templates (Apollo3 burst, the Armv8-M PMU, STIMER window timing, the broad
     peripheral / crypto-otp shutdowns) guarded by separate blocks. They must
-    stay mutually exclusive: main.cc.j2 keeps them as separate blocks, while
-    main_aot.cc.j2 merges the STIMER and shutdown cases into one guard. This
-    pins the shared invariant so the two structures cannot silently diverge
-    into a double include -- or, as the AOT template did before this change,
+    stay mutually exclusive: the shared skeleton (_main_base.cc.j2, extended
+    by both main.cc.j2 and main_aot.cc.j2) keeps burst and the Armv8-M PMU as
+    their own guards and merges the STIMER and shutdown cases into a third.
+    This pins the invariant so the guards cannot silently drift into a double
+    include -- or, as the AOT template did before the merged guard existed,
     into no include at all for a render that calls am_hal_stimer_*.
 
     Swept over both clean-window probes: the busy_loop probe is pinned to

@@ -400,7 +400,8 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
 
 {% block engine_invoke %}interpreter.Invoke();{% endblock %}
 
-{% block engine_profiler_on %}        g_profiler.SetEnabled(true);{% endblock %}
+{% block engine_profiler_on %}
+        g_profiler.SetEnabled(true);{% endblock %}
 
 {% block engine_pass_init %}
 {% if pass.custom %}

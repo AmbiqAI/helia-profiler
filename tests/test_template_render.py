@@ -119,6 +119,9 @@ def _render_tflm(
         heartbeat_every_n_ops=4,
         heartbeat_every_ms=0,
         psram_clock_hz=psram_clock_hz,
+        # HPX_ENGINE= is emitted by the shared skeleton for every engine
+        # (_main_base.cc.j2); production derives this from EngineType.
+        engine_wire_name="tflm",
         **extra_vars,
     )
 
@@ -184,6 +187,9 @@ def _render_aot(
         heartbeat_every_ms=0,
         pmu_max_ops=4096,
         psram_clock_hz=psram_clock_hz,
+        # See _render_tflm; the hyphen in the EngineType value becomes an
+        # underscore so the line parses as HPX_<KEY>=<value>.
+        engine_wire_name="helia_aot",
         **extra_vars,
     )
 
@@ -363,6 +369,7 @@ class TestMainCcRender:
             busy_loop_probe=False,
             window_timer="dwt",
             use_stimer_window=False,
+            engine_wire_name="tflm",
             engine_header="tensorflow/lite/micro/micro_interpreter.h",
             cmsis_device_header="apollo3p.h",
             arena_size=65_536,
@@ -475,6 +482,7 @@ class TestMainCcRender:
             busy_loop_probe=False,
             window_timer="dwt",
             use_stimer_window=False,
+            engine_wire_name="tflm",
             engine_header="tensorflow/lite/micro/micro_interpreter.h",
             cmsis_device_header="apollo510.h",
             arena_size=65_536,

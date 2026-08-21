@@ -10,7 +10,7 @@
      - IOM0-7, ADC, GFX, DISP/DISPPHY, PDM0-3, I2S0/1, SDIO, AUDREC/AUDPB/
        AUDADC: never used by any hpx engine/transport.
      - UART0-3: power_only never brings up a transport (NSX_DEBUG_NONE is
-       forced regardless of the requested transport -- see main.cc.j2), so
+       forced regardless of the requested transport -- see _main_base.cc.j2), so
        all four are always safe to disable here.
      - USB/USBPHY: same reasoning -- power_only never enumerates USB.
      - MSPI0-2: skipped when PSRAM is actually in use for the arena/weights
