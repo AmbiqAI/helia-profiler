@@ -23,11 +23,15 @@ from .artifacts import (
     PowerTerminalRecord,
     ProfileRun,
 )
-# Spec/family *classes* (IssueSpec, ComparabilitySpec, ComparabilityCodeFamily)
-# are deliberately not re-exported: their construction shape will change when
-# #154 Phase 3 derives family membership from the dimension model. Import them
-# from .issues directly where needed; only instances, registries, and the enum
-# vocabulary are public here.
+# Spec/family *classes* (IssueSpec, ComparabilitySpec, ComparabilityCodeFamily,
+# DimensionSpec) are deliberately not re-exported — only instances, registries,
+# and the enum vocabulary are public here. Import the classes from their
+# modules directly where needed.
+from .dimensions import (
+    DIMENSION_REGISTRY,
+    DimensionEffect,
+    dimensions_with_effect,
+)
 from .issues import (
     COMPARABILITY_FAMILIES,
     COMPARABILITY_REGISTRY,
@@ -97,6 +101,9 @@ __all__ = [
     "DependencyWorkspace",
     "DeploymentRecord",
     "DIMENSION_DIFFERS",
+    "DIMENSION_REGISTRY",
+    "DimensionEffect",
+    "dimensions_with_effect",
     "EngineInfo",
     "FirmwareArtifact",
     "FirmwareMeta",

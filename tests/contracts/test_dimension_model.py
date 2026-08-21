@@ -73,6 +73,82 @@ def test_runtime_only_dimensions_have_a_summary_power_source():
             assert spec.source is ArtifactSource.SUMMARY_POWER, spec.dimension
 
 
+def _run_artifacts(tmp_path: Path, *, power: dict | None, manifest=None):
+    from helia_profiler.evaluation.compare import RunArtifacts
+
+    summary: dict = {"schema_version": 2}
+    if power is not None:
+        summary["power"] = power
+    return RunArtifacts(
+        path=tmp_path,
+        summary=summary,
+        metadata={"hpx_version": "0.0.0", "schema_version": 1},
+        layers=[],
+        manifest=manifest,
+    )
+
+
+def test_reader_reads_every_artifact_sourced_dimension(tmp_path: Path):
+    from helia_profiler.evaluation.comparability import _dimensions
+
+    without_power = set(_dimensions(_run_artifacts(tmp_path, power=None)))
+    with_power = set(
+        _dimensions(_run_artifacts(tmp_path, power={"measurement_scope": "x"}))
+    )
+    base = {
+        spec.dimension
+        for spec in DIMENSION_REGISTRY.values()
+        if spec.source in (ArtifactSource.RUN_METADATA, ArtifactSource.SUMMARY)
+    }
+    summary_power = {
+        spec.dimension
+        for spec in DIMENSION_REGISTRY.values()
+        if spec.source is ArtifactSource.SUMMARY_POWER
+    }
+    assert without_power == base
+    assert with_power == base | summary_power
+    # MANIFEST_ONLY dimensions never appear from artifacts alone.
+    assert not with_power & {
+        spec.dimension
+        for spec in DIMENSION_REGISTRY.values()
+        if spec.source is ArtifactSource.MANIFEST_ONLY
+    }
+
+
+def test_manifest_merge_cannot_override_runtime_only_dimensions(tmp_path: Path):
+    # The #115 phantom-comparability rule as an executable contract: a
+    # manifest value for power_lockstep (config intent) must never override
+    # the runtime record in summary.power.sync.lockstep.
+    from helia_profiler.evaluation.comparability import _dimensions
+    from helia_profiler.results import ResultManifest
+
+    manifest = ResultManifest.from_dict(
+        {
+            "schema": "hpx.result-manifest",
+            "schema_version": 1,
+            "run_id": "r",
+            "timestamp": "2026-08-20T00:00:00+00:00",
+            "hpx_version": "0.0.0",
+            "status": "complete",
+            "validity": "valid",
+            "issues": [],
+            "provenance": {},
+            "comparability": {"power_lockstep": False, "power_mode": "external"},
+            "artifacts": [],
+        }
+    )
+    dims = _dimensions(
+        _run_artifacts(
+            tmp_path,
+            power={"sync": {"lockstep": True}},
+            manifest=manifest,
+        )
+    )
+    assert dims.get(ComparisonDimension.POWER_LOCKSTEP) is True
+    # Authoritative manifest values still merge normally.
+    assert dims.get(ComparisonDimension.POWER_MODE) == "external"
+
+
 def test_manifest_only_dimensions_declare_no_artifact_path():
     for spec in DIMENSION_REGISTRY.values():
         if spec.source is ArtifactSource.MANIFEST_ONLY:
