@@ -166,6 +166,12 @@ static uint32_t g_op_start_cyccnt = 0;
 // per-tensor TCM placement overrides. power_only builds never run
 // per-layer profiling, so this only needs the SRAM move in the
 // transport-attached binary.
+//
+// AP5 family requires the shared SSRAM power domain to be explicitly
+// powered on for this array to be readable/writable (see
+// _ssram_power.j2, driven by pmu_profiler_sram_resident before its
+// include in main()) -- without it a TCM-resident-arena render leaves
+// the domain off and per-layer writes land in an unbacked bank.
 NSX_MEM_SRAM_BSS static HpxLayerRecord g_layers[kMaxLayers];
 {% else %}
 static HpxLayerRecord g_layers[kMaxLayers];
@@ -454,6 +460,10 @@ int main(void) {
     // clock.  Harmless when it already matches (lp tiers).
     SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
 {% endif %}
+{# g_layers (NSX_MEM_SRAM_BSS in the transport binary -- see its declaration
+   comment) needs the shared SSRAM domain MCU-active on AP5, same as
+   main.cc.j2's SRAM-resident g_profiler. #}
+{% set pmu_profiler_sram_resident = not (power_only | default(false)) %}
 {% include "_ssram_power.j2" %}
 {% include "_extreme_mode.j2" %}
 {% include "_ble_reset.j2" %}

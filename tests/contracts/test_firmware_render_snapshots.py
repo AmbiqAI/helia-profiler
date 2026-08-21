@@ -1518,6 +1518,22 @@ def test_pmu_profiler_sram_placement_transport_only_on_ap5():
     assert "NSX_MEM_SRAM static HpxPmuProfiler g_profiler;" in ap3_transport
     assert "Shared SSRAM power-on" not in ap3_transport
 
+    # main_aot.cc.j2's per-layer storage (g_layers, NSX_MEM_SRAM_BSS -- POD,
+    # so NOLOAD zero-fill is safe, unlike the polymorphic g_profiler) follows
+    # the same rule: SRAM-resident in the transport binary only, with the
+    # SSRAM domain powered on AP5. Regression pin: the AOT template used to
+    # leave pmu_profiler_sram_resident unset, so an AP5 render with a
+    # TCM-resident arena never powered the domain and per-layer profiling
+    # wrote to an unbacked SSRAM bank.
+    aot_transport = _render("apollo510", "rtt", "helia-aot", power_only=False)
+    assert "NSX_MEM_SRAM_BSS static HpxLayerRecord g_layers[kMaxLayers];" in aot_transport
+    assert "Shared SSRAM power-on" in aot_transport
+
+    aot_power = _render("apollo510", "rtt", "helia-aot", power_only=True)
+    assert "NSX_MEM_SRAM_BSS static HpxLayerRecord g_layers" not in aot_power
+    assert "static HpxLayerRecord g_layers[kMaxLayers];" in aot_power
+    assert "Shared SSRAM power-on" not in aot_power
+
 
 def test_ssram_full_power_enum_is_per_soc():
     """The AmbiqSuite HAL enum for "power on the entire shared SSRAM array"
