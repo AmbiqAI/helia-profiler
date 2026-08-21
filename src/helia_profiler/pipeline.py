@@ -35,6 +35,7 @@ from .platform import BoardDef, SocDef
 from .evaluation import ModelAnalysis
 from .placement import Placement
 from .power.base import PowerResult
+from .power.metadata import ObservationMode, classify_observation
 from .results import MemoryPlan, PmuResult, RunMetadata, BinarySections
 from .target.probe.base import FlashBackend, Probe, ResetController
 
@@ -221,14 +222,12 @@ class PipelineContext:
             and self.power_run.deployment is None
         ):
             raise ValueError("Dedicated power firmware must be deployed before capture.")
-        observation.result.metadata.update(
-            {
-                "observation_mode": observation.mode,
-                "integrity": observation.integrity,
-                "gate_rise_observed": observation.gate_rise_observed,
-                "gate_fall_observed": observation.gate_fall_observed,
-                "observation_deadline_s": observation.deadline_s,
-            }
+        observation.result.metadata.set_observation(
+            observation_mode=ObservationMode(observation.mode),
+            integrity=observation.integrity,
+            gate_rise_observed=observation.gate_rise_observed,
+            gate_fall_observed=observation.gate_fall_observed,
+            observation_deadline_s=observation.deadline_s,
         )
         self.power_run = replace(self.power_run, observation=observation)
         self.power_result = observation.result
@@ -252,21 +251,17 @@ class PipelineContext:
 
     def publish_power_result(self, result: PowerResult) -> None:
         """Compatibility publisher for non-observing drivers and tests."""
-        metadata = result.metadata
-        valid_gate = metadata.get("measurement_scope") == "gpio_gated_clean_window"
-        mode: Literal["gpio_gated", "free_form"] = (
-            "gpio_gated" if valid_gate else "free_form"
-        )
+        mode, integrity, rise, fall, deadline = classify_observation(result.metadata)
         self.publish_power_observation(
             PowerObservation(
                 mode=mode,
                 result=result,
-                gate_rise_observed=bool(metadata.get("gate_rise_observed", valid_gate)),
-                gate_fall_observed=bool(metadata.get("gate_fall_observed", valid_gate)),
+                gate_rise_observed=rise,
+                gate_fall_observed=fall,
                 deadline_s=float(
-                    metadata.get("capture_safety_bound_s", result.summary.duration_s)
+                    deadline if deadline is not None else result.summary.duration_s
                 ),
-                integrity="valid" if valid_gate else "degraded",
+                integrity=integrity,
             )
         )
 

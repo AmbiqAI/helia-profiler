@@ -12,12 +12,14 @@ import logging
 import os
 import threading
 import time
+from dataclasses import replace
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from ...errors import PowerError
 from ..base import PowerResult
 from ..diagnostics import GateTransitionTiming, classify_gate_failure
+from ..metadata import MeasurementScope, ObservationMode, PowerIntegrity, PowerMetadata
 from .device import (
     _HOST_STATS,
     _NATIVE_SAMPLE_RATE,
@@ -75,29 +77,29 @@ def _degraded_observation_result(
     whole_summary = _whole_summary_from_stats(packets)
     return PowerResult(
         summary=whole_summary,
-        metadata={
-            "driver": f"joulescope-{family}",
-            "device": device_path,
-            "io_voltage": io_voltage,
-            "measurement_scope": "free_form_capture",
-            "gating_method": "gpi_snapshot_poll+host_stats_integral",
-            "observation_mode": "free_form",
-            "integrity": "degraded",
-            "gate_rise_observed": saw_gate_rise,
-            "gate_fall_observed": saw_gate_fall,
-            "gate_failure": failure.to_metadata(),
-            "sync_input_index": sync_input_index,
-            "stats_rate_hz": stats_rate_hz,
-            "stats_scnt": scnt,
-            "window_count": 0,
-            "gpi_poll_count": poll_count,
-            "stat_packets": len(packets),
-            "capture_window_s": round(captured_s, 4),
-            "capture_safety_bound_s": duration_s,
-            "short_gate_pulses_ignored": short_pulses_ignored,
-            "whole_capture_summary": _summary_to_dict(whole_summary),
-            **({"gating_diagnostics": gating_diagnostics} if gating_diagnostics else {}),
-        },
+        metadata=PowerMetadata(
+            driver=f"joulescope-{family}",
+            device=device_path,
+            io_voltage=io_voltage,
+            measurement_scope=MeasurementScope.FREE_FORM_CAPTURE,
+            gating_method="gpi_snapshot_poll+host_stats_integral",
+            observation_mode=ObservationMode.FREE_FORM,
+            integrity=PowerIntegrity.DEGRADED,
+            gate_rise_observed=saw_gate_rise,
+            gate_fall_observed=saw_gate_fall,
+            gate_failure=failure,
+            sync_input_index=sync_input_index,
+            stats_rate_hz=stats_rate_hz,
+            stats_scnt=scnt,
+            window_count=0,
+            gpi_poll_count=poll_count,
+            stat_packets=len(packets),
+            capture_window_s=round(captured_s, 4),
+            capture_safety_bound_s=duration_s,
+            short_gate_pulses_ignored=short_pulses_ignored,
+            whole_capture_summary=_summary_to_dict(whole_summary),
+            gating_diagnostics=gating_diagnostics if gating_diagnostics else None,
+        ),
     )
 
 
@@ -499,25 +501,25 @@ def capture_gated(
                 )
 
         captured_s = time.monotonic() - capture_start
-        metadata: dict[str, Any] = {
-            "driver": f"joulescope-{family}",
-            "device": device_path,
-            "io_voltage": io_voltage,
-            "measurement_scope": "gpio_gated_clean_window",
-            "gating_method": "gpi_snapshot_poll+host_stats_integral",
-            "sync_input_index": sync_input_index,
-            "stats_rate_hz": stats_rate_hz,
-            "stats_scnt": scnt,
-            "window_count": len(windows),
-            "gpi_poll_count": len(poll_samples),
-            "stat_packets": len(packets),
-            "early_stopped": windows_done >= min_high_windows,
-            "capture_window_s": round(captured_s, 4),
-            "capture_safety_bound_s": duration_s,
-            "short_gate_pulses_ignored": short_pulses_ignored,
-        }
+        metadata = PowerMetadata(
+            driver=f"joulescope-{family}",
+            device=device_path,
+            io_voltage=io_voltage,
+            measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
+            gating_method="gpi_snapshot_poll+host_stats_integral",
+            sync_input_index=sync_input_index,
+            stats_rate_hz=stats_rate_hz,
+            stats_scnt=scnt,
+            window_count=len(windows),
+            gpi_poll_count=len(poll_samples),
+            stat_packets=len(packets),
+            early_stopped=windows_done >= min_high_windows,
+            capture_window_s=round(captured_s, 4),
+            capture_safety_bound_s=duration_s,
+            short_gate_pulses_ignored=short_pulses_ignored,
+        )
         if short_pulses_ignored:
-            metadata["short_gate_pulse_diagnostics"] = {
+            metadata.short_gate_pulse_diagnostics = {
                 "by_phase": dict(short_pulse_phases),
                 "first_rise_s": round(short_pulse_first_s or 0.0, 6),
                 "last_rise_s": round(short_pulse_last_s or 0.0, 6),
@@ -539,21 +541,14 @@ def capture_gated(
                 else None
             ),
         )
-        sync_timing = gate_timing.to_metadata()
-        if sync_timing:
-            metadata["sync_timing_s"] = sync_timing
+        if gate_timing.to_metadata():
+            metadata.sync_timing_s = gate_timing
         if clean_infer_count is not None:
-            metadata["clean_infer_count"] = clean_infer_count
+            metadata.clean_infer_count = clean_infer_count
         if gate_integrity is not None:
-            metadata["gate_duration_integrity"] = {
-                "measured_s": round(gate_integrity.measured_s, 6),
-                "expected_s": round(gate_integrity.expected_s, 6),
-                "tolerance_s": round(gate_integrity.tolerance_s, 6),
-                "minimum_s": round(gate_integrity.minimum_s, 6),
-                "relative_tolerance": gate_relative_tolerance,
-                "ratio": round(gate_integrity.ratio, 6),
-                "valid": True,
-            }
+            metadata.gate_duration_integrity = replace(
+                gate_integrity, relative_tolerance=gate_relative_tolerance
+            )
         if fr_xcheck:
             fr = _fullrate_energy_over_windows(
                 cur_chunks=fr_cur,
@@ -562,7 +557,7 @@ def capture_gated(
                 poll_samples=aligned_poll_samples,
             )
             if fr:
-                metadata["fullrate_xcheck"] = fr
+                metadata.fullrate_xcheck = fr
                 stats_energy_per = (
                     gated_summary.energy_j / len(windows) if windows else 0.0
                 )
@@ -590,15 +585,15 @@ def capture_gated(
                 )
         if packets:
             whole_summary = _whole_summary_from_stats(packets)
-            metadata["whole_capture_summary"] = _summary_to_dict(whole_summary)
+            metadata.whole_capture_summary = _summary_to_dict(whole_summary)
             diagnostics = _gated_stats_diagnostics(
                 packets=packets,
                 poll_samples=aligned_poll_samples,
                 prefer_device_time=use_device_time_axis,
             )
-            metadata["gating_diagnostics"] = diagnostics
+            metadata.gating_diagnostics = diagnostics
             sane_window = gated_summary.avg_current_a > whole_summary.avg_current_a
-            metadata["gated_vs_whole_current_ok"] = sane_window
+            metadata.gated_vs_whole_current_ok = sane_window
             if not sane_window:
                 log.warning(
                     "Joulescope gated avg current %.3f mA <= whole-capture avg %.3f mA; "

@@ -8,6 +8,7 @@ from typing import Any
 
 from ...errors import PowerError
 from ..base import PowerMode, PowerResult
+from ..metadata import PowerMetadata
 from ..sync import NullSyncController, SyncController, SyncWiring
 from .capture_gated import capture_gated
 from .device import (
@@ -177,12 +178,12 @@ class JoulescopeDriver:
             return PowerResult(
                 summary=summary,
                 samples=samples,
-                metadata={
-                    "driver": f"joulescope-{family}",
-                    "device": device_path,
-                    "io_voltage": io_voltage,
-                    "stat_packets": len(packets),
-                },
+                metadata=PowerMetadata(
+                    driver=f"joulescope-{family}",
+                    device=device_path,
+                    io_voltage=io_voltage,
+                    stat_packets=len(packets),
+                ),
             )
 
         except PowerError:

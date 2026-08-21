@@ -33,6 +33,17 @@ from pathlib import Path
 
 import pytest
 
+from helia_profiler.power.diagnostics import (
+    GateTransitionTiming,
+    SyncHandshakeMetadata,
+)
+from helia_profiler.power.metadata import MeasurementScope, PowerMetadata
+from helia_profiler.target.lifecycle import (
+    CapturePhase,
+    ResetAction,
+    ResetStrategy,
+    TargetLifecyclePlan,
+)
 from helia_profiler.config import load_config
 from helia_profiler.engines.base import EngineArtifacts
 from helia_profiler.engines import EngineType
@@ -172,14 +183,30 @@ def _sample_power() -> PowerResult:
                 p99_power_w=0.108,
             ),
         ],
-        metadata={
-            "measurement_scope": "gpio_gated_clean_window",
-            "sync_input_index": 0,
-            "gating_method": "gpio_edge",
-            "target_lifecycle": "flashed",
-            "sync": True,
-            "sync_timing_s": 0.002,
-            "whole_capture_summary": {
+        # Well-formed typed metadata. The previous fixture deliberately held
+        # the degenerate shapes shipped before #154 Phase 2 ("sync": True,
+        # "target_lifecycle": "flashed", "sync_timing_s": 0.002) — the exact
+        # bool-`sync` state behind the #135 crash. The typed PowerMetadata
+        # makes those states unrepresentable, so this fixture (and the golden
+        # digests derived from it) moved to the shapes production actually
+        # writes. Reader-side tolerance for old on-disk artifacts lives in
+        # evaluation/comparability.py's _nested and is tested separately.
+        metadata=PowerMetadata(
+            measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
+            sync_input_index=0,
+            gating_method="gpio_edge",
+            target_lifecycle=TargetLifecyclePlan(
+                phase=CapturePhase.POWER,
+                power_cycle_attempted=True,
+                power_cycle_succeeded=True,
+                reset_strategy=ResetStrategy.AUTO,
+                reset_action=ResetAction.DEBUG_RESET,
+                actions=(),
+                timings_s={},
+            ),
+            sync=SyncHandshakeMetadata(lockstep=True, ready_wait_s=0.012, ready_observed=True),
+            sync_timing_s=GateTransitionTiming(capture_to_gate_rise_s=0.002),
+            whole_capture_summary={
                 "avg_current_a": 0.009,
                 "avg_power_w": 0.0324,
                 "peak_current_a": 0.045,
@@ -187,7 +214,7 @@ def _sample_power() -> PowerResult:
                 "duration_s": 0.25,
                 "sample_count": 12000,
             },
-        },
+        ),
     )
 
 

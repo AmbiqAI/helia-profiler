@@ -13,7 +13,6 @@ from ..power.diagnostics import (
     expected_terminal_requested_count,
     firmware_window_clock_is_frozen,
     gate_relative_tolerance_for,
-    window_clock_ceiling_from_metadata,
 )
 from ..errors import ReportError
 from ..results import ISSUE_REGISTRY, IssueCode, ResultIssue, ResultValidity, Severity
@@ -160,13 +159,13 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                         gate_fall_observed=observation.gate_fall_observed,
                     )
                 )
-            duration = observation.result.metadata.get("gate_duration_integrity")
-            if isinstance(duration, dict) and not _duration_integrity_valid(duration):
+            duration = observation.result.metadata.gate_duration_integrity
+            if duration is not None and not duration.valid:
                 issues.append(
                     _warning(
                         IssueCode.POWER_GATE_DURATION_MISMATCH,
                         "Measured power-gate duration does not agree with the expected fixed-N window.",
-                        **duration,
+                        **duration.to_metadata(),
                     )
                 )
             elif duration is None and observation.mode == "gpio_gated":
@@ -289,18 +288,16 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                         )
                     )
                 # Host wall-clock ceiling, recorded by the collect stage (which
-                # is the only place that knows "now"). The verdict is
-                # re-derived from the stored measurements rather than read from
-                # a cached boolean, the same way _duration_integrity_valid()
-                # re-derives the gate-duration verdict.
-                ceiling_meta = (
-                    ctx.power_result.metadata.get("window_clock_ceiling")
+                # is the only place that knows "now"). The verdict is a
+                # property derived from the stored measurements, never a
+                # cached boolean — same rule as GateDurationIntegrity.valid.
+                ceiling = (
+                    ctx.power_result.metadata.window_clock_ceiling
                     if ctx.power_result is not None
                     else None
                 )
-                if isinstance(ceiling_meta, dict):
-                    ceiling = window_clock_ceiling_from_metadata(ceiling_meta)
-                    if ceiling is not None and ceiling.exceeded:
+                if ceiling is not None:
+                    if ceiling.exceeded:
                         issues.append(
                             _warning(
                                 IssueCode.POWER_WINDOW_CLOCK_EXCEEDS_HOST_TIME,
@@ -351,7 +348,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 )
             )
     elif ctx.power_result is not None:
-        integrity = ctx.power_result.metadata.get("integrity")
+        integrity = ctx.power_result.metadata.integrity
         if integrity == "invalid":
             issues.append(_error(IssueCode.POWER_OBSERVATION_INVALID, "Power observation integrity is invalid."))
         elif integrity == "degraded":
@@ -361,13 +358,13 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                     "Power observation is diagnostic and not valid for efficiency metrics.",
                 )
             )
-        duration = ctx.power_result.metadata.get("gate_duration_integrity")
-        if isinstance(duration, dict) and not _duration_integrity_valid(duration):
+        duration = ctx.power_result.metadata.gate_duration_integrity
+        if duration is not None and not duration.valid:
             issues.append(
                 _warning(
                     IssueCode.POWER_GATE_DURATION_MISMATCH,
                     "Measured power-gate duration does not agree with the expected inference window.",
-                    **duration,
+                    **duration.to_metadata(),
                 )
             )
 
@@ -421,17 +418,6 @@ def _assess_unrecorded_duration(ctx: PipelineContext, measured_s: float) -> Resu
         minimum_s=integrity.minimum_s,
         ratio=integrity.ratio,
     )
-
-
-def _duration_integrity_valid(data: dict[str, Any]) -> bool:
-    try:
-        measured = float(data["measured_s"])
-        expected = float(data["expected_s"])
-        tolerance = float(data["tolerance_s"])
-        minimum = float(data.get("minimum_s", 0.0))
-    except (KeyError, TypeError, ValueError):
-        return False
-    return measured >= minimum and abs(measured - expected) <= tolerance
 
 
 def _validity_for(issues: list[ResultIssue]) -> ResultValidity:

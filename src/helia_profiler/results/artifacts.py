@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 from ..power.base import PowerResult
+from ..power.metadata import ObservationMode, PowerIntegrity
 from .models import BinarySections, PmuResult
 
 
@@ -66,12 +67,12 @@ class ProfileRun:
 class PowerObservation:
     """Host instrument observation, independent of firmware terminal status."""
 
-    mode: Literal["gpio_gated", "free_form"]
+    mode: ObservationMode
     result: PowerResult
     gate_rise_observed: bool
     gate_fall_observed: bool
     deadline_s: float
-    integrity: Literal["valid", "degraded", "invalid"]
+    integrity: PowerIntegrity
 
 
 @dataclass(frozen=True)

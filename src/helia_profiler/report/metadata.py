@@ -62,9 +62,9 @@ def _write_run_metadata(ctx: PipelineContext, output_dir: Path) -> Path:
     if ctx.pmu_result is not None:
         meta_dict["firmware"] = _firmware_meta_to_dict(ctx.pmu_result.meta)
     if ctx.power_result is not None:
-        lifecycle = ctx.power_result.metadata.get("target_lifecycle")
+        lifecycle = ctx.power_result.metadata.target_lifecycle
         if lifecycle is not None:
-            meta_dict["target_lifecycle"] = lifecycle
+            meta_dict["target_lifecycle"] = lifecycle.to_metadata()
     if ctx.power_run is not None and ctx.power_run.terminal is not None:
         meta_dict["power_terminal"] = asdict(ctx.power_run.terminal)
     if ctx.power_run is not None and ctx.power_run.on_device_summary is not None:

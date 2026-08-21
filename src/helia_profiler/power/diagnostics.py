@@ -82,12 +82,18 @@ class GateFailure:
 
 @dataclass(frozen=True)
 class GateDurationIntegrity:
-    """Agreement between a measured gate and the expected inference window."""
+    """Agreement between a measured gate and the expected inference window.
+
+    ``relative_tolerance`` records the policy band the verdict was assessed
+    under (``gate_relative_tolerance_for``); it rides along so the artifact
+    states which band applied, but plays no part in :attr:`valid`.
+    """
 
     measured_s: float
     expected_s: float
     tolerance_s: float
     minimum_s: float = 0.0
+    relative_tolerance: float | None = None
 
     @property
     def valid(self) -> bool:
@@ -99,6 +105,26 @@ class GateDurationIntegrity:
     @property
     def ratio(self) -> float:
         return self.measured_s / self.expected_s if self.expected_s > 0 else 0.0
+
+    def to_metadata(self) -> dict[str, object]:
+        """Artifact form — byte-compatible with the dict previously built by
+        hand in ``capture_gated.py``: seconds rounded to 6 places, and
+        ``valid`` DERIVED from the stored measurements rather than cached
+        (the old dict stored a constant ``True``, which held only because
+        that writer raises on mismatch; deriving keeps it honest everywhere)."""
+        metadata: dict[str, object] = {
+            "measured_s": round(self.measured_s, 6),
+            "expected_s": round(self.expected_s, 6),
+            "tolerance_s": round(self.tolerance_s, 6),
+            "minimum_s": round(self.minimum_s, 6),
+        }
+        # Production capture always records the band; omitted only in
+        # hand-built fixtures, where emitting a null would be a new key.
+        if self.relative_tolerance is not None:
+            metadata["relative_tolerance"] = self.relative_tolerance
+        metadata["ratio"] = round(self.ratio, 6)
+        metadata["valid"] = self.valid
+        return metadata
 
 
 #: How far the measured gate may sit from the expected window.
@@ -761,25 +787,6 @@ def assess_window_clock_ceiling(
     )
 
 
-def window_clock_ceiling_from_metadata(
-    data: dict[str, object],
-) -> WindowClockCeiling | None:
-    """Rebuild a ceiling from stored metadata, re-deriving the verdict.
-
-    The collect stage records the two measurements; downstream policy recomputes
-    ``exceeded`` from them rather than trusting a stored boolean, so the two
-    cannot drift apart the way a cached verdict would.
-    """
-    try:
-        return WindowClockCeiling(
-            elapsed_us=int(data["elapsed_us"]),  # type: ignore[arg-type]
-            host_envelope_s=float(data["host_envelope_s"]),  # type: ignore[arg-type]
-            slack_s=float(data["slack_s"]),  # type: ignore[arg-type]
-        )
-    except (KeyError, TypeError, ValueError):
-        return None
-
-
 def assess_run_window_clock(
     *,
     elapsed_us: int | None,
@@ -937,5 +944,4 @@ __all__ = [
     "classify_gate_failure",
     "firmware_window_clock_is_frozen",
     "gated_window_reference_s",
-    "window_clock_ceiling_from_metadata",
 ]

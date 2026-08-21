@@ -196,8 +196,8 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
     if ctx.power_result is not None:
         dimensions.update(
             {
-                "power_scope": ctx.power_result.metadata.get("measurement_scope"),
-                "power_integrity": ctx.power_result.metadata.get("integrity"),
+                "power_scope": ctx.power_result.metadata.measurement_scope,
+                "power_integrity": ctx.power_result.metadata.integrity,
                 "power_mode": ctx.config.power.mode.value,
                 "power_firmware": ctx.power_run.plan.firmware_mode if ctx.power_run else None,
                 # An on-target monitor keeps its IOM powered on the measured

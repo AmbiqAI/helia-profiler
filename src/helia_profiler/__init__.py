@@ -67,6 +67,12 @@ from .placement import Placement
 from .pipeline import ProgressUpdate
 from .platform import BoardDef
 from .power.base import PowerMode, PowerResult
+from .power.metadata import (
+    MeasurementScope,
+    ObservationMode,
+    PowerIntegrity,
+    PowerMetadata,
+)
 from .results import (
     DependencyLockProvenance,
     FirmwareMeta,
@@ -130,6 +136,10 @@ __all__ = [
     "Placement",
     "PowerMode",
     "PowerResult",
+    "MeasurementScope",
+    "ObservationMode",
+    "PowerIntegrity",
+    "PowerMetadata",
     "PowerObservation",
     "PowerTerminalRecord",
     "OnDevicePowerSummary",
@@ -244,6 +254,10 @@ _STABLE_API = {
 }
 
 _EXPERIMENTAL_API = {
+    "MeasurementScope",
+    "ObservationMode",
+    "PowerIntegrity",
+    "PowerMetadata",
     "PowerObservation",
     "PowerTerminalRecord",
     "OnDevicePowerSummary",

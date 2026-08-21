@@ -30,12 +30,22 @@ from .base import (
     PowerSample,
     PowerSummary,
 )
+from .metadata import (
+    MeasurementScope,
+    ObservationMode,
+    PowerIntegrity,
+    PowerMetadata,
+)
 
 log = logging.getLogger("hpx")
 
 __all__ = [
     "PowerDriver",
     "GatedPowerWindow",
+    "MeasurementScope",
+    "ObservationMode",
+    "PowerIntegrity",
+    "PowerMetadata",
     "PowerMode",
     "PowerResult",
     "PowerSample",

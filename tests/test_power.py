@@ -11,6 +11,12 @@ import pytest
 from helia_profiler.errors import PowerError
 from helia_profiler.results import DeploymentRecord, FirmwareArtifact, PowerRunPlan
 from helia_profiler.power import get_driver, list_drivers, register_driver
+from helia_profiler.power.metadata import (
+    MeasurementScope,
+    ObservationMode,
+    PowerIntegrity,
+    PowerMetadata,
+)
 from helia_profiler.power.base import (
     GatedPowerWindow,
     PowerMode,
@@ -77,7 +83,7 @@ class TestPowerTypes:
         assert result.per_layer is None
         assert result.samples == []
         assert result.gated_windows == []
-        assert result.metadata == {}
+        assert result.metadata == PowerMetadata()
 
     def test_gated_window_is_typed(self):
         window = GatedPowerWindow(
@@ -596,12 +602,12 @@ class TestGatedStatsProcessing:
 
         assert result.gated_windows == []
         assert result.summary.sample_count == 10
-        assert result.metadata["measurement_scope"] == "free_form_capture"
-        assert result.metadata["observation_mode"] == "free_form"
-        assert result.metadata["integrity"] == "degraded"
-        assert result.metadata["gate_failure"]["kind"] == failure_kind
-        assert result.metadata["gate_rise_observed"] is saw_rise
-        assert result.metadata["gate_fall_observed"] is saw_fall
+        assert result.metadata.measurement_scope == "free_form_capture"
+        assert result.metadata.observation_mode == "free_form"
+        assert result.metadata.integrity == "degraded"
+        assert result.metadata.gate_failure.kind == failure_kind
+        assert result.metadata.gate_rise_observed is saw_rise
+        assert result.metadata.gate_fall_observed is saw_fall
 
     def test_degraded_artifact_records_the_lockstep_diagnosis(self):
         """The retained degraded artifact must carry the lock-step diagnosis.
@@ -638,10 +644,10 @@ class TestGatedStatsProcessing:
             lockstep_wiring_available=True,
         )
 
-        gate_failure = result.metadata["gate_failure"]
-        assert gate_failure["kind"] == "no_gate_rise"
-        assert "power.lockstep: true" in gate_failure["message"]
-        assert "power.lockstep: true" in gate_failure["hint"]
+        gate_failure = result.metadata.gate_failure
+        assert gate_failure.kind == "no_gate_rise"
+        assert "power.lockstep: true" in gate_failure.message
+        assert "power.lockstep: true" in gate_failure.hint
 
 
 class TestMissedGateWarningNamesTheFix:
@@ -711,8 +717,8 @@ class TestMissedGateWarningNamesTheFix:
         with caplog.at_level(logging.WARNING, logger="hpx"):
             result = self._run_capture(monkeypatch, lockstep=False, wired=True)
 
-        assert result.metadata["integrity"] == "degraded"
-        assert result.metadata["gate_failure"]["kind"] == "no_gate_rise"
+        assert result.metadata.integrity == "degraded"
+        assert result.metadata.gate_failure.kind == "no_gate_rise"
         warnings = "\n".join(
             record.getMessage()
             for record in caplog.records
@@ -727,7 +733,7 @@ class TestMissedGateWarningNamesTheFix:
         with caplog.at_level(logging.WARNING, logger="hpx"):
             result = self._run_capture(monkeypatch, lockstep=True, wired=True)
 
-        assert result.metadata["gate_failure"]["kind"] == "no_gate_rise"
+        assert result.metadata.gate_failure.kind == "no_gate_rise"
         warnings = "\n".join(
             record.getMessage()
             for record in caplog.records
@@ -1075,7 +1081,7 @@ class TestCapturePowerStage:
             plan = kwargs["prepare_target"](FakeDriver(), "joulescope")
             return PowerResult(
                 summary=PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0),
-                metadata={"target_lifecycle": plan.to_metadata()},
+                metadata=PowerMetadata(target_lifecycle=plan),
             )
 
         monkeypatch.setattr(
@@ -1086,7 +1092,7 @@ class TestCapturePowerStage:
         assert reset_calls["jlink_serial"] == "1160002204"
         assert reset_calls["device"] == ctx.soc.jlink_device
         assert ctx.power_result is not None
-        lifecycle = ctx.power_result.metadata["target_lifecycle"]
+        lifecycle = ctx.power_result.metadata.target_lifecycle.to_metadata()
         assert {k: v for k, v in lifecycle.items() if k != "timings_s"} == {
             "phase": "power",
             "power_cycle_attempted": False,
@@ -1118,13 +1124,13 @@ class TestCapturePowerStage:
         ctx.publish_power_plan(PowerRunPlan(firmware_mode="shared"))
         degraded = PowerResult(
             summary=PowerSummary(0.01, 0.018, 0.02, 0.18, 10.0, 10000),
-            metadata={
-                "measurement_scope": "free_form_capture",
-                "observation_mode": "free_form",
-                "gate_rise_observed": False,
-                "gate_fall_observed": False,
-                "integrity": "degraded",
-            },
+            metadata=PowerMetadata(
+                measurement_scope=MeasurementScope.FREE_FORM_CAPTURE,
+                observation_mode=ObservationMode.FREE_FORM,
+                gate_rise_observed=False,
+                gate_fall_observed=False,
+                integrity=PowerIntegrity.DEGRADED,
+            ),
         )
         monkeypatch.setattr(
             "helia_profiler.capture.capture_power",
@@ -1180,7 +1186,7 @@ class TestCapturePowerStage:
         ctx.publish_power_plan(PowerRunPlan(firmware_mode="shared"))
         result = PowerResult(
             summary=PowerSummary(0.01, 0.018, 0.02, 0.18, 10.0, 10000),
-            metadata={"measurement_scope": "custom_gated"},
+            metadata=PowerMetadata(measurement_scope="custom_gated"),
         )
 
         ctx.publish_power_result(result)
@@ -1189,8 +1195,8 @@ class TestCapturePowerStage:
         assert ctx.power_run.observation is not None
         assert ctx.power_run.observation.mode == "free_form"
         assert ctx.power_run.observation.integrity == "degraded"
-        assert result.metadata["observation_mode"] == "free_form"
-        assert result.metadata["integrity"] == "degraded"
+        assert result.metadata.observation_mode == "free_form"
+        assert result.metadata.integrity == "degraded"
 
 
 class TestTargetLifecycle:
@@ -1673,7 +1679,7 @@ class TestCapturePowerWrapper:
                 called["capture_gated"] = kwargs
                 return PowerResult(
                     summary=summary,
-                    metadata={"measurement_scope": "gpio_gated_clean_window"},
+                    metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
                 )
 
         def fake_get_driver(name: str, *, serial: str | None = None):
@@ -1685,7 +1691,7 @@ class TestCapturePowerWrapper:
 
         result = capture_power(ctx, duration_override_s=7.0)
 
-        assert result.metadata["measurement_scope"] == "gpio_gated_clean_window"
+        assert result.metadata.measurement_scope == "gpio_gated_clean_window"
         assert called["name"] == "joulescope"
         assert called["serial"] == "004204"
         assert called["checked"] is True
@@ -1814,10 +1820,10 @@ class TestCapturePowerWrapper:
             "go",
             "release",
         ]
-        assert result.metadata["sync"]["lockstep"] is True
-        assert result.metadata["sync"]["ready_wait_s"] >= 0.0
-        assert result.metadata["sync"]["ready_observed"] is True
-        assert result.metadata["target_lifecycle"] == {"reset_action": "debug_reset"}
+        assert result.metadata.sync.lockstep is True
+        assert result.metadata.sync.ready_wait_s >= 0.0
+        assert result.metadata.sync.ready_observed is True
+        assert result.metadata.target_lifecycle.to_metadata() == {"reset_action": "debug_reset"}
 
     def test_capture_power_releases_sync_when_prepare_raises_after_arm(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -2012,7 +2018,7 @@ class TestPowerFirmwareSelection:
         # The stage resolves the SoC's app flash load address for the .bin
         # fallback; apollo510_evb is AP5, so it must not be an AP3/AP4 address.
         assert flash_calls[0]["load_addr"] == 0x00410000
-        assert result.metadata["power_firmware"] == "dedicated"
+        assert result.metadata.power_firmware == "dedicated"
         assert ctx.power_run is not None
         assert ctx.power_run.deployment is not None
         assert ctx.power_run.deployment.firmware is ctx.power_firmware
@@ -2135,7 +2141,7 @@ class TestPowerFirmwareSelection:
 
         assert flash_calls == []
         assert dtr_calls == ["init", "open", "close"]
-        assert result.metadata["power_firmware"] == "shared"
+        assert result.metadata.power_firmware == "shared"
 
     def test_dedicated_flash_stage_requires_built_artifact(self, tmp_path: Path):
         from helia_profiler.errors import BuildError
@@ -2213,7 +2219,7 @@ class TestPowerFirmwareSelection:
             "helia_profiler.power.get_driver", lambda *a, **k: self._FakeDriver(calls)
         )
         result = capture_power(ctx, duration_override_s=7.0)
-        assert result.metadata["power_firmware"] == "shared"
+        assert result.metadata.power_firmware == "shared"
 
     def test_power_plan_accepts_external_count_without_pmu_result(self, tmp_path: Path):
         from helia_profiler.stages.plan_power import plan_power_run
@@ -2852,7 +2858,7 @@ class TestGatedCaptureCapabilityDetection:
             def capture_gated(self, **kwargs):
                 calls.append("capture_gated")
                 return PowerResult(
-                    summary=summary, metadata={"measurement_scope": "custom_gated"}
+                    summary=summary, metadata=PowerMetadata(measurement_scope="custom_gated")
                 )
 
         register_driver("custom-gated-test-driver", CustomGatedDriver)
@@ -2875,7 +2881,7 @@ class TestGatedCaptureCapabilityDetection:
 
         assert "capture_gated" in calls
         assert "check" in calls
-        assert result.metadata["measurement_scope"] == "custom_gated"
+        assert result.metadata.measurement_scope == "custom_gated"
 
     def test_driver_without_capability_flag_uses_ungated_path(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -2898,7 +2904,7 @@ class TestGatedCaptureCapabilityDetection:
 
             def capture(self, **kwargs):
                 calls.append("capture")
-                return PowerResult(summary=summary, metadata={"measurement_scope": "ungated"})
+                return PowerResult(summary=summary, metadata=PowerMetadata(measurement_scope="ungated"))
 
             def capture_gated(self, **kwargs):  # pragma: no cover - unreachable
                 raise AssertionError("gated capture should not be reached")
@@ -2922,4 +2928,4 @@ class TestGatedCaptureCapabilityDetection:
         result = capture_power(ctx, duration_override_s=3.0)
 
         assert calls == ["check", "capture"]
-        assert result.metadata["measurement_scope"] == "ungated"
+        assert result.metadata.measurement_scope == "ungated"

@@ -13,8 +13,10 @@ from helia_profiler.results import (
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
+from helia_profiler.power.metadata import MeasurementScope, PowerMetadata
 from helia_profiler.power.diagnostics import (
     WINDOW_CLOCK_CEILING_SLACK_S,
+    GateDurationIntegrity,
     WindowClockCeiling,
 )
 from helia_profiler.results import ResultValidity
@@ -43,7 +45,7 @@ def _context(
     ctx.pmu_result = PmuResult(meta=FirmwareMeta(), layers=[])
     result = PowerResult(
         summary=PowerSummary(0.01, 0.02, 0.03, 0.1, 1.0, 10),
-        metadata={"measurement_scope": "gpio_gated_clean_window"},
+        metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
     )
     observation = PowerObservation(
         mode="gpio_gated",
@@ -83,12 +85,12 @@ def test_degraded_observation_and_duration_mismatch_are_structured(tmp_path: Pat
     ctx = _context(tmp_path)
     assert ctx.power_run is not None and ctx.power_run.observation is not None
     observation = ctx.power_run.observation
-    observation.result.metadata["gate_duration_integrity"] = {
-        "measured_s": 0.1,
-        "expected_s": 1.0,
-        "tolerance_s": 0.01,
-        "minimum_s": 0.5,
-    }
+    observation.result.metadata.gate_duration_integrity = GateDurationIntegrity(
+        measured_s=0.1,
+        expected_s=1.0,
+        tolerance_s=0.01,
+        minimum_s=0.5,
+    )
     ctx.power_run = PowerRun(
         plan=ctx.power_run.plan,
         observation=PowerObservation(
@@ -197,7 +199,7 @@ class TestWindowClockValidity:
             gated_windows=[
                 GatedPowerWindow(0.0, gate_s, gate_s, 0.0, 0.0, 0.0, 0.0, 0.0, 0)
             ],
-            metadata=dict(observation.result.metadata),
+            metadata=replace(observation.result.metadata),
         )
         terminal = replace(
             ctx.power_run.terminal,
@@ -240,14 +242,14 @@ class TestWindowClockValidity:
             # `exceeded` from these numbers rather than trusting a verdict.
             ctx.power_result = PowerResult(
                 summary=replace(observation.result.summary, duration_s=gate_s),
-                metadata={
-                    "measurement_scope": "on_device_gated_inference",
-                    "window_clock_ceiling": WindowClockCeiling(
+                metadata=PowerMetadata(
+                    measurement_scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
+                    window_clock_ceiling=WindowClockCeiling(
                         elapsed_us=elapsed_us,
                         host_envelope_s=host_envelope_s,
                         slack_s=WINDOW_CLOCK_CEILING_SLACK_S,
-                    ).to_metadata(),
-                },
+                    ),
+                ),
             )
 
     def test_bench_agreement_is_valid(self, tmp_path: Path):
@@ -335,7 +337,7 @@ class TestWindowClockValidity:
             # Whole 19.2 s capture retained for diagnostics; no gated window.
             summary=replace(observation.result.summary, duration_s=19.2),
             gated_windows=[],
-            metadata={"measurement_scope": "free_form_capture"},
+            metadata=PowerMetadata(measurement_scope=MeasurementScope.FREE_FORM_CAPTURE),
         )
         ctx.power_run = PowerRun(
             plan=PowerRunPlan(

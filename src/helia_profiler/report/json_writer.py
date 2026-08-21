@@ -61,8 +61,9 @@ def _write_json(
             "duration_s": power.summary.duration_s,
             "sample_count": power.summary.sample_count,
         }
+        flat_meta = power.metadata.to_metadata_dict()
         observation = {
-            key: power.metadata[key]
+            key: flat_meta[key]
             for key in (
                 "measurement_scope",
                 "observation_mode",
@@ -71,10 +72,10 @@ def _write_json(
                 "gate_fall_observed",
                 "observation_deadline_s",
             )
-            if key in power.metadata
+            if key in flat_meta
         }
-        if "gate_failure" in power.metadata:
-            observation["gate_failure"] = power.metadata["gate_failure"]
+        if "gate_failure" in flat_meta:
+            observation["gate_failure"] = flat_meta["gate_failure"]
         if observation:
             data["power"]["observation"] = observation
         if power_terminal is not None:
