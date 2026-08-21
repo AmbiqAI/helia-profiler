@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 
 from ..results import PowerObservation
-from ..config import DEFAULT_POWER_DURATION_S
+from ..config import DEFAULT_POWER_DURATION_S, WindowMode
 from ..errors import PowerError
 from ..pipeline import PipelineContext
 from ..power.diagnostics import probe_runs_inferences
@@ -107,7 +107,7 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
         # a 3 s one (found by review).
         clean_warmup_reps = (
             _AUTO_WINDOW_WARMUP_REPS
-            if profiling.window_mode == "auto"
+            if profiling.window_mode is WindowMode.AUTO
             else max(1, profiling.warmup)
         )
         clean_run_s = (
@@ -115,7 +115,7 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
             + clean_warmup_reps * inference_time_s
         )
     else:
-        if profiling.window_mode == "auto":
+        if profiling.window_mode is WindowMode.AUTO:
             target_s = ctx.config.effective_window_target_ms / 1000.0
             clean_iters = (
                 target_s / inference_time_s if inference_time_s > 0 else profiling.window_min

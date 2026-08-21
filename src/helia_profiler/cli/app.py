@@ -19,7 +19,7 @@ import click
 import typer
 
 from .._version import __version__
-from ..config import AGGREGATION_METHODS, POWER_FIRMWARE_MODES, Transport
+from ..config import Aggregation, PowerFirmware, Transport
 from ..engines import EngineType
 from ..placement import Placement
 from ..target.lifecycle import ResetStrategy
@@ -71,10 +71,10 @@ _ARENA_LOCATION_CHOICE = click.Choice([p.value for p in Placement if p is not Pl
 _WEIGHTS_LOCATION_CHOICE = click.Choice([p.value for p in Placement])
 _CORE_OVERRIDE_CHOICE = click.Choice(["cm4", "cm55"])
 _TRANSPORT_CHOICE = click.Choice([t.value for t in Transport])
-_AGGREGATION_CHOICE = click.Choice(list(AGGREGATION_METHODS))
+_AGGREGATION_CHOICE = click.Choice([a.value for a in Aggregation])
 _POWER_DRIVER_CHOICE = click.Choice(["joulescope", "ondevice"])
 _POWER_MODE_CHOICE = click.Choice(["external", "internal"])
-_POWER_FIRMWARE_CHOICE = click.Choice(list(POWER_FIRMWARE_MODES))
+_POWER_FIRMWARE_CHOICE = click.Choice([f.value for f in PowerFirmware])
 _POWER_RESET_STRATEGY_CHOICE = click.Choice([strategy.value for strategy in ResetStrategy])
 _OUTPUT_FORMAT_CHOICE = click.Choice(["csv", "json"])
 

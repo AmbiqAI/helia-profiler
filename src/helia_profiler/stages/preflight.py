@@ -27,7 +27,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from ..config import Transport
+from ..config import CleanWindowProbe, Transport
 from ..counters import (
     supported_groups_for_domains,
     validate_group_selection,
@@ -342,7 +342,7 @@ def _check_transport_support(cfg) -> None:
         )
     if (
         cfg.engine.type is EngineType.EXECUTORCH
-        and cfg.profiling.clean_window_probe == "busy_loop"
+        and cfg.profiling.clean_window_probe is CleanWindowProbe.BUSY_LOOP
     ):
         # The busy_loop probe is a power-window diagnostic: it replaces the
         # model with a calibrated CPU spin so an external instrument has a

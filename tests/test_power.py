@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from helia_profiler.config import CleanWindowProbe, WindowMode
 from helia_profiler.errors import PowerError
 from helia_profiler.results import DeploymentRecord, FirmwareArtifact, PowerRunPlan
 from helia_profiler.power import get_driver, list_drivers, register_driver
@@ -2270,7 +2271,9 @@ class TestPowerFirmwareSelection:
         from helia_profiler.results import FirmwareMeta, PmuResult
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
-        object.__setattr__(ctx.config.profiling, "clean_window_probe", "busy_loop")
+        object.__setattr__(
+            ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
+        )
         # What the profile pass reports under busy_loop: one spin, whole window.
         ctx.pmu_result = PmuResult(
             meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
@@ -2336,8 +2339,10 @@ class TestPowerFirmwareSelection:
         from helia_profiler.results import FirmwareMeta, PmuResult
 
         ctx = self._make_ctx(tmp_path, firmware="shared")
-        object.__setattr__(ctx.config.profiling, "clean_window_probe", "busy_loop")
-        object.__setattr__(ctx.config.profiling, "window_mode", "fixed")
+        object.__setattr__(
+            ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
+        )
+        object.__setattr__(ctx.config.profiling, "window_mode", WindowMode.FIXED)
         object.__setattr__(ctx.config.profiling, "window_target_ms", 1000)
         ctx.pmu_result = PmuResult(
             meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=1_000_000),
@@ -2381,7 +2386,9 @@ class TestPowerFirmwareSelection:
         from helia_profiler.results import FirmwareMeta, PmuResult
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
-        object.__setattr__(ctx.config.profiling, "clean_window_probe", "busy_loop")
+        object.__setattr__(
+            ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
+        )
         ctx.pmu_result = PmuResult(
             meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
             layers=[],
@@ -2424,7 +2431,9 @@ class TestPowerFirmwareSelection:
         bands = {}
         for firmware in ("dedicated", "shared"):
             ctx = self._make_ctx(tmp_path, firmware=firmware)
-            object.__setattr__(ctx.config.profiling, "clean_window_probe", "busy_loop")
+            object.__setattr__(
+            ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
+        )
             ctx.pmu_result = PmuResult(
                 meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
                 layers=[],
@@ -2491,7 +2500,7 @@ class TestPowerFirmwareSelection:
         from helia_profiler.stages.plan_power import plan_power_run
 
         ctx = self._make_ctx(tmp_path, firmware="shared")
-        object.__setattr__(ctx.config.profiling, "window_mode", "fixed")
+        object.__setattr__(ctx.config.profiling, "window_mode", WindowMode.FIXED)
         object.__setattr__(ctx.config.profiling, "window_target_ms", 1000)
         ctx.pmu_result = PmuResult(
             meta=FirmwareMeta(clean_infer_avg_us=2226), layers=[]
@@ -2517,7 +2526,7 @@ class TestPowerFirmwareSelection:
         from helia_profiler.stages.plan_power import plan_power_run
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
-        object.__setattr__(ctx.config.profiling, "window_mode", "fixed")
+        object.__setattr__(ctx.config.profiling, "window_mode", WindowMode.FIXED)
         object.__setattr__(ctx.config.profiling, "window_target_ms", 1000)
         ctx.pmu_result = PmuResult(
             meta=FirmwareMeta(clean_infer_avg_us=2226), layers=[]

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
+from ..config import PowerFirmware
 from ..results import DeploymentRecord
 from ..errors import BuildError, CaptureError
 from ..pipeline import PipelineContext
@@ -26,7 +27,7 @@ class FlashPowerFirmwareStage:
         )
         return (
             not ctx.config.power.enabled
-            or firmware_mode != "dedicated"
+            or firmware_mode != PowerFirmware.DEDICATED
         )
 
     def run(self, ctx: PipelineContext) -> None:

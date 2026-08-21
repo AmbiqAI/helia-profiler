@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.config import load_config
+from helia_profiler.config import CleanWindowProbe, load_config
 from helia_profiler.results import (
     OnDevicePowerSummary,
     PowerRun,
@@ -746,7 +746,9 @@ def test_busy_loop_probe_publishes_no_per_inference_power_metrics(tmp_path: Path
     ctx = _gated_power_ctx(
         tmp_path, clean_infer_count=1, clean_infer_avg_us=1_000_000, duration_s=1.0
     )
-    object.__setattr__(ctx.config.profiling, "clean_window_probe", "busy_loop")
+    object.__setattr__(
+        ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
+    )
 
     summary = json.loads(_write_summary(ctx, tmp_path).read_text())
 
@@ -779,7 +781,9 @@ def test_busy_loop_probe_publishes_no_active_window_estimates_either(tmp_path: P
     ctx = _gated_power_ctx(
         tmp_path, clean_infer_count=1, clean_infer_avg_us=1_000_000, duration_s=1.0
     )
-    object.__setattr__(ctx.config.profiling, "clean_window_probe", "busy_loop")
+    object.__setattr__(
+        ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
+    )
     ctx.power_result.metadata.measurement_scope = MeasurementScope.ON_DEVICE_GATED_INFERENCE
     object.__setattr__(ctx.pmu_result.meta, "profiled_infer_count", 200)
     object.__setattr__(ctx.pmu_result.meta, "profiled_infer_total_us", 18_000_000)

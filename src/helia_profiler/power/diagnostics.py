@@ -318,6 +318,11 @@ def firmware_window_clock_is_frozen(
 #: diagnostic replaces the whole window body with one calibrated CPU spin whose
 #: length comes from ``window_target_ms``, so a run using it does exactly one
 #: unit of work no matter what the host planned.
+#: Spelled as a literal rather than :class:`~helia_profiler.config.CleanWindowProbe`
+#: because this module sits *below* ``config`` in the import graph
+#: (``power.base`` -> ``power.metadata`` -> here, and ``config`` imports
+#: ``power.base``).  ``StrEnum`` members hash and compare as their values,
+#: so membership works for both spellings.
 _NON_INFERENCE_PROBES = frozenset({"busy_loop"})
 
 
