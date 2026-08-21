@@ -57,6 +57,7 @@ from .protocol import (
     HPX_START,
     collect_lines,
 )
+from ..wire import HPX_ERROR_PREFIX, HPX_GO_COMMAND, HPX_READY_LINE, WireKey
 from .timing import SBL_SETTLE_S
 from .rtt_control import (
     RTT_LIVE_NAMED_SCORE,
@@ -80,12 +81,16 @@ _RTT_READY_TIMEOUT_S = 15  # wait for firmware/host RTT startup handshake
 
 _RTT_DISCOVERY_SETTLE_S = 2.0
 
+#: The PSRAM handshake line, built from its registry key so the host pattern
+#: and the firmware format string cannot drift apart.
+_PSRAM_READY_RE = re.compile(rf"{WireKey.PSRAM_READY.wire}=0x([0-9a-fA-F]+),(\d+)")
+
 # The firmware always names up-channel 0 "HPX" (see firmware/templates/
 # main*.cc.j2: SEGGER_RTT_ConfigUpBuffer(0, "HPX", ...)).  This is the
 # strongest, board-agnostic way to tell *our* RTT control block apart from
 # unrelated ones (e.g. a bootloader/monitor's default "Terminal" block, or a
 # stale block left in retained SRAM by a previous firmware).
-_RTT_READY_LINE = "HPX_READY"
+_RTT_READY_LINE = HPX_READY_LINE
 
 
 def _wait_for_rtt_line(
@@ -115,7 +120,7 @@ def _wait_for_rtt_line(
                     continue
                 if line == expected_line:
                     return captured + buf
-                if line.startswith("HPX_ERROR="):
+                if line.startswith(HPX_ERROR_PREFIX):
                     raise CaptureError(
                         f"Firmware reported RTT startup error: {line}",
                         hint="Check target boot logs and RTT handshake state.",
@@ -239,13 +244,13 @@ def _upload_model_to_psram(
     # waiting for HPX_GO — no further chunk ever arrives.
     while True:
         text = buf.decode("ascii", errors="replace")
-        m = re.search(r"HPX_PSRAM_READY=0x([0-9a-fA-F]+),(\d+)", text)
+        m = _PSRAM_READY_RE.search(text)
         if m:
             psram_addr = int(m.group(1), 16)
             expected_size = int(m.group(2))
             break
         # Check for init errors
-        if "HPX_ERROR=" in text:
+        if HPX_ERROR_PREFIX in text:
             raise CaptureError(
                 f"Firmware error during PSRAM init: {text.strip()}",
                 hint="Check that the board has PSRAM and it is connected.",
@@ -294,7 +299,7 @@ def _upload_model_to_psram(
     log.info("Model uploaded to PSRAM in %.1fs (%.0f KB/s)", elapsed, rate_kbps)
 
     # --- Send HPX_GO to resume firmware ---
-    _write_rtt_command_api(jlink, command=b"HPX_GO")
+    _write_rtt_command_api(jlink, command=HPX_GO_COMMAND.encode("ascii"))
     log.info("Sent HPX_GO — firmware resuming")
 
 

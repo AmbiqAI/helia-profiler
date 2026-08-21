@@ -36,8 +36,25 @@ from typing import Any
 
 from ..results import FirmwareMeta, LayerResult, PmuResult, PresetResult, PsramInfo
 from ..transport.protocol import HPX_PROTOCOL_VERSION
+from ..wire import (
+    HPX_END_SENTINEL,
+    HPX_HEARTBEAT_PREFIX,
+    HPX_ITER_SENTINEL_RE,
+    HPX_PRESET_SENTINEL_RE,
+    HPX_START_SENTINEL,
+    KEY_VALUE_RE,
+    HeartbeatPhase,
+    WireKey,
+)
 
 log = logging.getLogger("hpx")
+
+# Keys the parser synthesizes from heartbeat lines.  They are NOT wire keys —
+# no firmware ever prints them — so they are named here rather than in the wire
+# registry, which declares only what actually travels.
+_HEARTBEAT_COUNT = "heartbeat_count"
+_LAST_HEARTBEAT = "last_heartbeat"
+_ANNOUNCED_CLEAN_ITERS = "announced_clean_iters"
 
 # Columns that carry string identifiers, not numeric values.
 _STRING_COLS = frozenset({"Layer", "Op", "tag", "name", "overflow"})
@@ -71,11 +88,11 @@ def parse_firmware_output(
         if not line:
             continue
 
-        if line == "--- HPX_START ---":
+        if line == HPX_START_SENTINEL:
             in_session = True
             continue
 
-        if line == "--- HPX_END ---":
+        if line == HPX_END_SENTINEL:
             if current_preset is not None:
                 current_preset.flush_iteration()
             break
@@ -88,9 +105,9 @@ def parse_firmware_output(
         # they must NOT feed into the CSV parser.  Matched before the
         # ``HPX_KEY=value`` regex below because heartbeat lines may contain
         # ``key=value`` pairs after the ``HPX_HEARTBEAT`` prefix.
-        if line.startswith("HPX_HEARTBEAT"):
-            meta_kv["heartbeat_count"] = meta_kv.get("heartbeat_count", 0) + 1
-            meta_kv["last_heartbeat"] = line
+        if line.startswith(HPX_HEARTBEAT_PREFIX):
+            meta_kv[_HEARTBEAT_COUNT] = meta_kv.get(_HEARTBEAT_COUNT, 0) + 1
+            meta_kv[_LAST_HEARTBEAT] = line
             # The clean_window_begin heartbeat announces the iteration count
             # BEFORE the window runs, while the transport is still reliably
             # alive.  Keep it as a fallback for clean_infer_count: the
@@ -100,13 +117,15 @@ def parse_firmware_output(
             # nsx_itm_printf_disable/enable dropped the whole result block,
             # silently downgrading the power capture to the ungated
             # whole-capture path).
-            m_iters = re.search(r"phase=clean_window_begin iters=(\d+)", line)
+            m_iters = re.search(
+                rf"phase={HeartbeatPhase.CLEAN_WINDOW_BEGIN} iters=(\d+)", line
+            )
             if m_iters:
-                meta_kv["announced_clean_iters"] = int(m_iters.group(1))
+                meta_kv[_ANNOUNCED_CLEAN_ITERS] = int(m_iters.group(1))
             continue
 
         # HPX_KEY=value metadata lines
-        m = re.match(r"^HPX_(\w+)=(.+)$", line)
+        m = KEY_VALUE_RE.match(line)
         if m:
             key = m.group(1).lower()
             val: Any = m.group(2)
@@ -118,7 +137,7 @@ def parse_firmware_output(
             continue
 
         # --- HPX_PRESET name ---
-        m = re.match(r"^--- HPX_PRESET (\S+) ---$", line)
+        m = HPX_PRESET_SENTINEL_RE.match(line)
         if m:
             if current_preset is not None:
                 current_preset.flush_iteration()
@@ -128,7 +147,7 @@ def parse_firmware_output(
             continue
 
         # Iteration boundary
-        m = re.match(r"^--- HPX_ITER (\d+) ---$", line)
+        m = HPX_ITER_SENTINEL_RE.match(line)
         if m:
             # Auto-create a default preset for legacy single-preset streams
             if current_preset is None:
@@ -142,51 +161,51 @@ def parse_firmware_output(
             current_preset.feed_line(line)
 
     # Build FirmwareMeta from key-value pairs
-    preset_names_str = meta_kv.get("presets", "")
+    preset_names_str = meta_kv.get(WireKey.PRESETS, "")
     preset_names = (
         tuple(preset_names_str.split(","))
         if isinstance(preset_names_str, str) and preset_names_str
         else ()
     )
     psram = None
-    if "psram_clock_hz" in meta_kv:
+    if WireKey.PSRAM_CLOCK_HZ in meta_kv:
         psram = PsramInfo(
-            size_bytes=meta_kv.get("psram_size_bytes", 0),
-            clock_hz=meta_kv["psram_clock_hz"],
-            capabilities=meta_kv.get("psram_capabilities", 0),
-            state=meta_kv.get("psram_state", 0),
-            last_init_status=meta_kv.get("psram_last_init_status", 0),
-            xip_enabled=bool(meta_kv.get("psram_xip_enabled", 0)),
-            timing_status=meta_kv.get("psram_timing_status", 0),
-            rxdqs_delay=meta_kv.get("psram_rxdqs_delay", 0),
+            size_bytes=meta_kv.get(WireKey.PSRAM_SIZE_BYTES, 0),
+            clock_hz=meta_kv[WireKey.PSRAM_CLOCK_HZ],
+            capabilities=meta_kv.get(WireKey.PSRAM_CAPABILITIES, 0),
+            state=meta_kv.get(WireKey.PSRAM_STATE, 0),
+            last_init_status=meta_kv.get(WireKey.PSRAM_LAST_INIT_STATUS, 0),
+            xip_enabled=bool(meta_kv.get(WireKey.PSRAM_XIP_ENABLED, 0)),
+            timing_status=meta_kv.get(WireKey.PSRAM_TIMING_STATUS, 0),
+            rxdqs_delay=meta_kv.get(WireKey.PSRAM_RXDQS_DELAY, 0),
         )
 
     firmware_meta = FirmwareMeta(
-        model_size=meta_kv.get("model_size"),
-        arena_size=meta_kv.get("arena_size"),
-        allocated_arena=meta_kv.get("allocated_arena"),
-        input_size=meta_kv.get("input_size"),
-        output_size=meta_kv.get("output_size"),
-        num_tensors=meta_kv.get("num_tensors"),
-        num_inputs=meta_kv.get("num_inputs"),
-        num_outputs=meta_kv.get("num_outputs"),
-        num_presets=meta_kv.get("num_presets"),
-        system_clock_hz=meta_kv.get("system_clock_hz"),
-        profiled_infer_count=meta_kv.get("profiled_infer_count"),
-        profiled_infer_total_us=meta_kv.get("profiled_infer_total_us"),
-        profiled_infer_avg_us=meta_kv.get("profiled_infer_avg_us"),
+        model_size=meta_kv.get(WireKey.MODEL_SIZE),
+        arena_size=meta_kv.get(WireKey.ARENA_SIZE),
+        allocated_arena=meta_kv.get(WireKey.ALLOCATED_ARENA),
+        input_size=meta_kv.get(WireKey.INPUT_SIZE),
+        output_size=meta_kv.get(WireKey.OUTPUT_SIZE),
+        num_tensors=meta_kv.get(WireKey.NUM_TENSORS),
+        num_inputs=meta_kv.get(WireKey.NUM_INPUTS),
+        num_outputs=meta_kv.get(WireKey.NUM_OUTPUTS),
+        num_presets=meta_kv.get(WireKey.NUM_PRESETS),
+        system_clock_hz=meta_kv.get(WireKey.SYSTEM_CLOCK_HZ),
+        profiled_infer_count=meta_kv.get(WireKey.PROFILED_INFER_COUNT),
+        profiled_infer_total_us=meta_kv.get(WireKey.PROFILED_INFER_TOTAL_US),
+        profiled_infer_avg_us=meta_kv.get(WireKey.PROFILED_INFER_AVG_US),
         clean_infer_count=meta_kv.get(
-            "clean_infer_count", meta_kv.get("announced_clean_iters")
+            WireKey.CLEAN_INFER_COUNT, meta_kv.get(_ANNOUNCED_CLEAN_ITERS)
         ),
-        clean_infer_total_cycles=meta_kv.get("clean_infer_total_cycles"),
-        clean_infer_avg_cycles=meta_kv.get("clean_infer_avg_cycles"),
-        clean_infer_avg_us=meta_kv.get("clean_infer_avg_us"),
-        clean_stalled_iters=meta_kv.get("clean_stalled_iters"),
-        clean_partial_iters=meta_kv.get("clean_partial_iters"),
-        clean_ref_cycles=meta_kv.get("clean_ref_cycles"),
-        clean_dwt_rate_cyc=meta_kv.get("clean_dwt_rate_cyc"),
-        clean_dwt_rate_us=meta_kv.get("clean_dwt_rate_us"),
-        clean_attach_wait_us=meta_kv.get("clean_attach_wait_us"),
+        clean_infer_total_cycles=meta_kv.get(WireKey.CLEAN_INFER_TOTAL_CYCLES),
+        clean_infer_avg_cycles=meta_kv.get(WireKey.CLEAN_INFER_AVG_CYCLES),
+        clean_infer_avg_us=meta_kv.get(WireKey.CLEAN_INFER_AVG_US),
+        clean_stalled_iters=meta_kv.get(WireKey.CLEAN_STALLED_ITERS),
+        clean_partial_iters=meta_kv.get(WireKey.CLEAN_PARTIAL_ITERS),
+        clean_ref_cycles=meta_kv.get(WireKey.CLEAN_REF_CYCLES),
+        clean_dwt_rate_cyc=meta_kv.get(WireKey.CLEAN_DWT_RATE_CYC),
+        clean_dwt_rate_us=meta_kv.get(WireKey.CLEAN_DWT_RATE_US),
+        clean_attach_wait_us=meta_kv.get(WireKey.CLEAN_ATTACH_WAIT_US),
         psram=psram,
         presets=preset_names,
     )
@@ -208,7 +227,7 @@ def parse_firmware_output(
     # --- Post-parse validation ---
 
     # HPX protocol version check
-    version = meta_kv.get("version")
+    version = meta_kv.get(WireKey.VERSION)
     if version is not None and version != HPX_PROTOCOL_VERSION:
         log.warning(
             "HPX protocol version mismatch: firmware=%s, expected=%d. "

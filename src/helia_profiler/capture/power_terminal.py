@@ -13,36 +13,26 @@ from ..results import (
     PowerTerminalRecord,
 )
 from ..errors import PowerError
+from ..wire import (
+    HPX_POWER_PREFIX,
+    POWER_TERMINAL_END_SENTINEL,
+    POWER_TERMINAL_OPTIONAL_KEYS,
+    POWER_TERMINAL_REQUIRED_KEYS,
+    POWER_TERMINAL_START_SENTINEL,
+    POWER_TERMINAL_VERSION,
+    PowerTerminalKey,
+)
 
 log = logging.getLogger("hpx")
 
-POWER_TERMINAL_START = "--- HPX_POWER_TERMINAL_START ---"
-POWER_TERMINAL_END = "--- HPX_POWER_TERMINAL_END ---"
-POWER_TERMINAL_VERSION = 1
+POWER_TERMINAL_START = POWER_TERMINAL_START_SENTINEL
+POWER_TERMINAL_END = POWER_TERMINAL_END_SENTINEL
 
-_REQUIRED_KEYS = {
-    "HPX_POWER_TERMINAL_VERSION",
-    "HPX_POWER_STATUS",
-    "HPX_POWER_REQUESTED_COUNT",
-    "HPX_POWER_COMPLETED_COUNT",
-    "HPX_POWER_ELAPSED_US",
-    "HPX_POWER_FINAL_PHASE",
-    "HPX_POWER_ERROR_CODE",
-    "HPX_POWER_GATE_ASSERTED",
-    "HPX_POWER_GATE_LOWERED",
-}
-_OPTIONAL_KEYS = {
-    "HPX_POWER_MEASUREMENT_SOURCE",
-    "HPX_POWER_MEASUREMENT_SCOPE",
-    "HPX_POWER_ENERGY_NJ",
-    "HPX_POWER_MEASUREMENT_DURATION_US",
-    "HPX_POWER_MEASUREMENT_COUNT",
-    "HPX_POWER_MEASUREMENT_OVERFLOW",
-    "HPX_POWER_CHARGE_NC",
-    "HPX_POWER_BUS_VOLTAGE_UV",
-    "HPX_POWER_SAMPLE_COUNT",
-    "HPX_POWER_CALIBRATION_ID",
-}
+# The schema is *derived* from the wire registry rather than restated: which
+# fields are required and which belong to the all-or-none measurement payload
+# is a property of the protocol, declared once in ``helia_profiler.wire``.
+_REQUIRED_KEYS = POWER_TERMINAL_REQUIRED_KEYS
+_OPTIONAL_KEYS = POWER_TERMINAL_OPTIONAL_KEYS
 
 
 def _parse_int(fields: dict[str, str], key: str) -> int:
@@ -98,19 +88,19 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
     if unknown:
         raise PowerError(f"Power terminal record has unknown fields: {', '.join(unknown)}.")
 
-    version = _parse_int(fields, "HPX_POWER_TERMINAL_VERSION")
+    version = _parse_int(fields, PowerTerminalKey.TERMINAL_VERSION)
     if version != POWER_TERMINAL_VERSION:
         raise PowerError(
             f"Unsupported power terminal version {version}; expected {POWER_TERMINAL_VERSION}."
         )
-    status = fields["HPX_POWER_STATUS"]
+    status = fields[PowerTerminalKey.STATUS]
     if status not in {"ok", "error"}:
         raise PowerError(f"Malformed power terminal status: {status!r}.")
 
-    requested_count = _parse_int(fields, "HPX_POWER_REQUESTED_COUNT")
-    completed_count = _parse_int(fields, "HPX_POWER_COMPLETED_COUNT")
-    error_code = _parse_int(fields, "HPX_POWER_ERROR_CODE")
-    elapsed_raw = fields["HPX_POWER_ELAPSED_US"]
+    requested_count = _parse_int(fields, PowerTerminalKey.REQUESTED_COUNT)
+    completed_count = _parse_int(fields, PowerTerminalKey.COMPLETED_COUNT)
+    error_code = _parse_int(fields, PowerTerminalKey.ERROR_CODE)
+    elapsed_raw = fields[PowerTerminalKey.ELAPSED_US]
     try:
         elapsed_us = int(elapsed_raw, 10)
     except ValueError as exc:
@@ -127,7 +117,7 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
         raise PowerError("Successful power terminal status requires error code 0.")
     if status == "error" and error_code == 0:
         raise PowerError("Error power terminal status requires a nonzero error code.")
-    final_phase = fields["HPX_POWER_FINAL_PHASE"]
+    final_phase = fields[PowerTerminalKey.FINAL_PHASE]
     if not final_phase:
         raise PowerError("Power terminal final phase must not be empty.")
 
@@ -139,11 +129,11 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
         elapsed_us=elapsed_us,
         final_phase=final_phase,
         error_code=error_code,
-        gate_asserted=_parse_bool(fields, "HPX_POWER_GATE_ASSERTED"),
-        gate_lowered=_parse_bool(fields, "HPX_POWER_GATE_LOWERED"),
+        gate_asserted=_parse_bool(fields, PowerTerminalKey.GATE_ASSERTED),
+        gate_lowered=_parse_bool(fields, PowerTerminalKey.GATE_LOWERED),
     )
-    measurement_source = fields.get("HPX_POWER_MEASUREMENT_SOURCE")
-    energy_raw = fields.get("HPX_POWER_ENERGY_NJ")
+    measurement_source = fields.get(PowerTerminalKey.MEASUREMENT_SOURCE)
+    energy_raw = fields.get(PowerTerminalKey.ENERGY_NJ)
     if (measurement_source is None) != (energy_raw is None):
         raise PowerError(
             "Power measurement source and energy fields must be provided together."
@@ -153,10 +143,10 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
         if not measurement_source:
             raise PowerError("Power measurement source must not be empty.")
         required_measurement = {
-            "HPX_POWER_MEASUREMENT_SCOPE",
-            "HPX_POWER_MEASUREMENT_DURATION_US",
-            "HPX_POWER_MEASUREMENT_COUNT",
-            "HPX_POWER_MEASUREMENT_OVERFLOW",
+            PowerTerminalKey.MEASUREMENT_SCOPE,
+            PowerTerminalKey.MEASUREMENT_DURATION_US,
+            PowerTerminalKey.MEASUREMENT_COUNT,
+            PowerTerminalKey.MEASUREMENT_OVERFLOW,
         }
         missing_measurement = sorted(required_measurement - fields.keys())
         if missing_measurement:
@@ -165,20 +155,20 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
                 + ", ".join(missing_measurement)
                 + "."
             )
-        scope = fields["HPX_POWER_MEASUREMENT_SCOPE"]
+        scope = fields[PowerTerminalKey.MEASUREMENT_SCOPE]
         if scope != "fixed_n_inference":
             raise PowerError(f"Unsupported power measurement scope: {scope!r}.")
         try:
             measurement_fields = {
                 key: int(fields[key], 10)
                 for key in (
-                    "HPX_POWER_ENERGY_NJ",
-                    "HPX_POWER_CHARGE_NC",
-                    "HPX_POWER_BUS_VOLTAGE_UV",
-                    "HPX_POWER_SAMPLE_COUNT",
-                    "HPX_POWER_MEASUREMENT_DURATION_US",
-                    "HPX_POWER_MEASUREMENT_COUNT",
-                    "HPX_POWER_MEASUREMENT_OVERFLOW",
+                    PowerTerminalKey.ENERGY_NJ,
+                    PowerTerminalKey.CHARGE_NC,
+                    PowerTerminalKey.BUS_VOLTAGE_UV,
+                    PowerTerminalKey.SAMPLE_COUNT,
+                    PowerTerminalKey.MEASUREMENT_DURATION_US,
+                    PowerTerminalKey.MEASUREMENT_COUNT,
+                    PowerTerminalKey.MEASUREMENT_OVERFLOW,
                 )
                 if key in fields
             }
@@ -186,11 +176,11 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
             raise PowerError("Malformed integer in power measurement payload.") from exc
         if any(value < 0 for value in measurement_fields.values()):
             raise PowerError("Power measurement fields must be non-negative.")
-        overflow_value = measurement_fields["HPX_POWER_MEASUREMENT_OVERFLOW"]
+        overflow_value = measurement_fields[PowerTerminalKey.MEASUREMENT_OVERFLOW]
         if overflow_value not in {0, 1}:
             raise PowerError("Power measurement overflow must be 0 or 1.")
-        measured_count = measurement_fields["HPX_POWER_MEASUREMENT_COUNT"]
-        measured_duration_us = measurement_fields["HPX_POWER_MEASUREMENT_DURATION_US"]
+        measured_count = measurement_fields[PowerTerminalKey.MEASUREMENT_COUNT]
+        measured_duration_us = measurement_fields[PowerTerminalKey.MEASUREMENT_DURATION_US]
         if measured_count > 0 and measured_duration_us == 0:
             raise PowerError("Power measurement duration must be positive for completed work.")
         if measured_count != terminal.completed_count:
@@ -200,14 +190,14 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
         measurement = OnDevicePowerSummary(
             source=measurement_source,
             scope="fixed_n_inference",
-            energy_nj=measurement_fields["HPX_POWER_ENERGY_NJ"],
+            energy_nj=measurement_fields[PowerTerminalKey.ENERGY_NJ],
             duration_us=measured_duration_us,
             inference_count=measured_count,
             overflow=bool(overflow_value),
-            charge_nc=measurement_fields.get("HPX_POWER_CHARGE_NC"),
-            bus_voltage_uv=measurement_fields.get("HPX_POWER_BUS_VOLTAGE_UV"),
-            sample_count=measurement_fields.get("HPX_POWER_SAMPLE_COUNT"),
-            calibration_id=fields.get("HPX_POWER_CALIBRATION_ID"),
+            charge_nc=measurement_fields.get(PowerTerminalKey.CHARGE_NC),
+            bus_voltage_uv=measurement_fields.get(PowerTerminalKey.BUS_VOLTAGE_UV),
+            sample_count=measurement_fields.get(PowerTerminalKey.SAMPLE_COUNT),
+            calibration_id=fields.get(PowerTerminalKey.CALIBRATION_ID),
         )
     return PowerTerminalEnvelope(terminal=terminal, measurement=measurement)
 
@@ -227,7 +217,7 @@ def _log_pre_record_diagnostics(text: str) -> None:
     """
     for line in text.splitlines():
         line = line.strip()
-        if line.startswith("HPX_POWER_INA228_BYSTANDER_FAILED="):
+        if line.startswith(f"{PowerTerminalKey.INA228_BYSTANDER_FAILED}="):
             # A bystander monitor (configured but not the measurement of
             # record) failed and was dropped; the external capture stands.
             log.warning(
@@ -237,7 +227,7 @@ def _log_pre_record_diagnostics(text: str) -> None:
                 "monitor is no longer connected.",
                 line,
             )
-        elif line.startswith("HPX_POWER_"):
+        elif line.startswith(HPX_POWER_PREFIX):
             log.info("Power firmware diagnostic: %s", line)
 
 
