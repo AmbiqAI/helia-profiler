@@ -12,7 +12,53 @@ Before starting, you need:
 - A way to run inference that can be instrumented per-layer
 - Familiarity with the [Engine Adapters](engine-adapters.md) architecture
 
-## Step 1: Create the adapter
+## Step 1: Define your artifact type
+
+Every engine owns an `EngineArtifacts` subclass in
+`src/helia_profiler/engines/base.py`. The base class carries only what *every*
+engine produces (`engine_type`, `engine_header`, `extra_modules`, `cmake_vars`,
+`source_files`, `include_dirs`, `static_libs`, `memory_plan`); everything
+engine-specific lives on your subclass, so a consumer that reads another
+engine's field gets an `AttributeError` at the access site instead of a silent
+`None`:
+
+```python
+@dataclass(frozen=True, kw_only=True)
+class YourEngineArtifacts(EngineArtifacts):
+    """YourEngine adapter outputs."""
+
+    engine_type: EngineType = EngineType.YOUR_ENGINE
+
+    # Required — no default — for anything your adapter always sets: the
+    # point of the split is that consumers read it without a fallback.
+    your_engine_blob_name: str
+    your_engine_scratch_size: int
+    # Optional only where the adapter genuinely may not produce it.
+    your_engine_manifest: list[dict[str, Any]] | None = None
+
+    _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.YOUR_ENGINE
+```
+
+`_PINNED_ENGINE_TYPE` binds the type to the engine: constructing it with any
+other `engine_type` raises `ValueError`, so the pairing cannot drift.
+
+If your engine resolves a backend, version, variant, or toolchain tag, override
+the corresponding `resolved_*` property to return it. Those four properties are
+how `dependencies.py` records engine identity in the workspace fingerprint
+without knowing which engine it is holding — a value you do not surface there
+does not invalidate a cached workspace when it changes:
+
+```python
+    @property
+    def resolved_version(self) -> str | None:
+        return self.your_engine_version
+```
+
+Then register the pairing in `ARTIFACT_TYPE_FOR_ENGINE` in
+`tests/contracts/test_engine_artifact_types.py` — that map is asserted complete
+over `EngineType`, so the contract fails until your engine has a type.
+
+## Step 2: Create the adapter
 
 Create `src/helia_profiler/engines/your_engine.py`:
 
@@ -25,7 +71,7 @@ from ..config import ProfileConfig
 from ..placement import Placement
 from ..results import NsxModuleRef
 from . import EngineType
-from .base import ArenaRegion, EngineArtifacts
+from .base import ArenaRegion, YourEngineArtifacts
 
 
 class YourEngineAdapter:
@@ -37,7 +83,7 @@ class YourEngineAdapter:
 
     @property
     def engine_type(self) -> EngineType:
-        return EngineType.YOUR_ENGINE  # added in Step 3
+        return EngineType.YOUR_ENGINE  # added in Step 4
 
     def default_auto_placement(
         self, *, tcm_cap: int, sram_cap: int
@@ -51,7 +97,7 @@ class YourEngineAdapter:
         # Identity unless your engine emits AOT-style arena regions.
         return regions
 
-    def prepare(self, config: ProfileConfig, work_dir: Path) -> EngineArtifacts:
+    def prepare(self, config: ProfileConfig, work_dir: Path) -> YourEngineArtifacts:
         # 1. Validate engine-specific config (config.engine.*)
         # 2. Create local NSX module(s) under work_dir if needed
         # 3. Return artifacts
@@ -65,11 +111,13 @@ class YourEngineAdapter:
             ),
         ]
 
-        return EngineArtifacts(
+        return YourEngineArtifacts(
             engine_type=EngineType.YOUR_ENGINE,
             extra_modules=extra_modules,
             cmake_vars={"NSX_YOUR_ENGINE_OPTION": "value"},
             engine_header="your_engine/api.h",
+            your_engine_blob_name="blob.bin",
+            your_engine_scratch_size=32 * 1024,
         )
 ```
 
@@ -80,13 +128,15 @@ Your `prepare()` method must:
 1. **Return only *extra* NSX module refs** — the base module set (board, SDK,
    core runtime) comes from the board's NSX starter profile; you only declare
    what your engine adds on top (see `EngineArtifacts.extra_modules`)
-2. **Fill the typed template fields** — the firmware renderer consumes typed
-   fields on `EngineArtifacts` (`engine_header`, `cmake_vars`, and any
-   engine-specific fields you add to `engines/base.py`), not a free-form dict
+2. **Return your own artifact type, fully populated** — the firmware renderer
+   consumes typed fields (`engine_header`, `cmake_vars`, and the
+   engine-specific fields on your subclass from Step 1), not a free-form dict.
+   `engine_header` has no default: state your engine's own header, or TFLM's
+   if your firmware runs TFLM's interpreter (as heliaRT does)
 3. **Be idempotent** — calling `prepare()` twice with the same inputs should
    produce the same output
 
-## Step 2: Create the firmware template
+## Step 3: Create the firmware template
 
 Create `src/helia_profiler/firmware/templates/main_your_engine.cc.j2`:
 
@@ -168,7 +218,7 @@ layers. If your engine only supports full-model inference, you'll need to:
 - Add per-layer hooks to the engine, OR
 - Profile at whole-model granularity (less useful but still valid)
 
-## Step 3: Register the engine
+## Step 4: Register the engine
 
 Registration lives in `engines/__init__.py`. Add a value to the `EngineType`
 enum, a deferred factory, and an entry in the adapter registry — factories are
@@ -203,7 +253,7 @@ def get_adapter(engine_type: EngineType) -> "EngineAdapter":
 
 Tests can swap in a stub with `register_engine_adapter(engine_type, factory)`.
 
-## Step 4: Add a firmware template
+## Step 5: Add a firmware template
 
 If your engine can run through the interpreter path's `main.cc.j2`, skip this
 step. Otherwise write a **child of the shared skeleton** — never a standalone
@@ -263,7 +313,7 @@ silently (the ExecuTorch one did, and had to be converted back in #154).
    it to `_MATRIX_ENGINES` only if it supports the dedicated power binary, then
    regenerate with `HPX_UPDATE_SNAPSHOTS=1` and review the JSON diff.
 
-## Step 5: Add tests
+## Step 6: Add tests
 
 Create `tests/test_your_engine.py` with at minimum (see
 `tests/test_tflm_adapter.py` for the pattern):
@@ -284,8 +334,9 @@ def _config(tmp_path):
 
 
 def test_prepare_returns_valid_artifacts(tmp_path):
-    """prepare() returns EngineArtifacts with required fields."""
+    """prepare() returns this engine's artifact type, fully populated."""
     artifacts = YourEngineAdapter().prepare(_config(tmp_path), tmp_path)
+    assert isinstance(artifacts, YourEngineArtifacts)
     assert artifacts.engine_type is EngineType.YOUR_ENGINE
     assert [m.name for m in artifacts.extra_modules] == ["your-engine-module"]
 
@@ -296,7 +347,7 @@ def test_prepare_creates_nsx_module(tmp_path):
     assert (tmp_path / "your-engine-module" / "nsx-module.yaml").exists()
 ```
 
-## Step 6: Document the engine
+## Step 7: Document the engine
 
 Add a section to [Engines](../guide/engines.md) describing:
 
@@ -307,8 +358,12 @@ Add a section to [Engines](../guide/engines.md) describing:
 
 ## Checklist
 
+- [ ] `EngineArtifacts` subclass for the engine, with its `engine_type` pinned
+      and any `resolved_*` identity override it needs
 - [ ] Adapter class implementing `EngineAdapter` protocol
-- [ ] `prepare(config, work_dir)` returns valid `EngineArtifacts`
+- [ ] `prepare(config, work_dir)` returns that subclass, fully populated
+- [ ] Engine added to `ARTIFACT_TYPE_FOR_ENGINE` in
+      `tests/contracts/test_engine_artifact_types.py`
 - [ ] Firmware template following HPX protocol
 - [ ] Per-layer instrumentation (or documented limitation)
 - [ ] `EngineType` value and factory registered in `engines/__init__.py`

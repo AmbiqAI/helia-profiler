@@ -20,7 +20,8 @@ from neuralspotx.nsx_lock import LockKind, NsxLock, ResolvedModule, hash_manifes
 
 from helia_profiler.config import load_config
 from helia_profiler.dependencies import create_workspace, prepare_locked_dependencies
-from helia_profiler.engines.base import EngineArtifacts
+from helia_profiler.engines import TFLM_ENGINE_HEADER
+from helia_profiler.engines.base import TflmArtifacts
 from helia_profiler.errors import ReportError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.results.support_bundle import (
@@ -70,7 +71,7 @@ def _prepared_workspace(
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
     ResolvePlatformStage().run(ctx)
-    ctx.engine_artifacts = EngineArtifacts()
+    ctx.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
     ctx.dependency_workspace = create_workspace(ctx)
     ctx.firmware_dir = ctx.dependency_workspace.root / "profiler_app"
     ctx.firmware_dir.mkdir(parents=True, exist_ok=True)

@@ -49,5 +49,5 @@ class PrepareEngineStage:
         ctx.engine_artifacts = artifacts
         ctx.run_metadata.engine = EngineInfo(
             type=engine_type.value,
-            version=artifacts.heliart_version or artifacts.helia_aot_version,
+            version=artifacts.resolved_version,
         )

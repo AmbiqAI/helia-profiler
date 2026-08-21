@@ -22,7 +22,7 @@ from .. import nsx as nsx_cli
 from ..compatibility import ENGINE_OWNED_MODULE_NAMES
 from ..config import Transport
 from ..engines import EngineType
-from ..engines.base import ArenaRegion
+from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError
 from ..errors import BuildError, FirmwareError
 from ..placement import Placement
@@ -659,6 +659,9 @@ def generate_app(ctx: PipelineContext) -> Path:
         )
 
     if engine_type is EngineType.EXECUTORCH:
+        # No ExecuTorch-specific artifact field is read here — the PTE runtime
+        # contract reaches the template through render_context.engine, which
+        # narrowed once in FirmwareRenderContext.from_pipeline_context.
         if weights_region != "psram":
             _write_text(
                 src_dir / "model_data.h",
@@ -670,8 +673,9 @@ def generate_app(ctx: PipelineContext) -> Path:
         )
     elif engine_type is EngineType.HELIA_AOT:
         # --- AOT engine: use AOT-specific main template, no model embedding ---
-        aot_prefix = artifacts.aot_prefix
-        assert aot_prefix is not None  # heliaAOT adapter always sets this
+        # The heliaAOT adapter is the only producer of this engine_type, and
+        # HeliaAotArtifacts pins the pairing, so the narrowing is total.
+        assert isinstance(artifacts, HeliaAotArtifacts)
 
         # Generate C headers for constant arena sidecar blobs.
         # In external-arena mode the AOT compiler emits constant data as
@@ -804,17 +808,18 @@ def generate_app(ctx: PipelineContext) -> Path:
 
 def _resolved_aot_arena_regions(ctx: PipelineContext) -> list[ArenaRegion]:
     """Return the same effective AOT arena placement for every render pass."""
-    assert ctx.engine_artifacts is not None
-    if ctx.engine_artifacts.engine_type is not EngineType.HELIA_AOT:
+    artifacts = ctx.engine_artifacts
+    assert artifacts is not None
+    if not isinstance(artifacts, HeliaAotArtifacts):
         return []
     assert ctx.engine_adapter is not None
     has_custom_aot_memory = ctx.config.engine.config_path is not None or bool(
         ctx.config.engine.config.get("aot_args", {}).get("memory", {}).get("tensors")
     )
     if has_custom_aot_memory:
-        return list(ctx.engine_artifacts.aot_arena_regions)
+        return list(artifacts.aot_arena_regions)
     return ctx.engine_adapter.apply_arena_placement_override(
-        list(ctx.engine_artifacts.aot_arena_regions),
+        list(artifacts.aot_arena_regions),
         ctx.arena_region or Placement.TCM,
     )
 

@@ -20,7 +20,7 @@ from ...errors import EngineError
 from ...placement import ArenaRole, Placement
 from ...results import NsxModuleRef
 from .. import EngineType
-from ..base import ArenaRegion, EngineArtifacts
+from ..base import ArenaRegion, HeliaAotArtifacts
 from ..cmsis_nn import cmsis_nn_module_ref
 from .compile import (
     _DEFAULT_MODULE_NAME,
@@ -46,7 +46,7 @@ class HeliaAOTAdapter:
     4. Resolve the ns-cmsis-nn (CMSIS-NN fork) source tree.
     5. Generate an attribute header mapping AOT macros → Ambiq sections.
     6. Wrap ns-cmsis-nn as a local NSX module (AOT output is already NSX-native).
-    7. Return ``EngineArtifacts`` with template vars and cmake_vars.
+    7. Return ``HeliaAotArtifacts`` with template vars and cmake_vars.
     """
 
     @property
@@ -77,7 +77,7 @@ class HeliaAOTAdapter:
             _dc_replace(r, placement=target) if r.role is ArenaRole.SCRATCH else r for r in regions
         ]
 
-    def prepare(self, config: ProfileConfig, work_dir: Path) -> EngineArtifacts:
+    def prepare(self, config: ProfileConfig, work_dir: Path) -> HeliaAotArtifacts:
         prefix = config.engine.config.get("prefix", _DEFAULT_PREFIX)
         module_name = config.engine.config.get("module_name", _DEFAULT_MODULE_NAME)
 
@@ -157,7 +157,7 @@ class HeliaAOTAdapter:
         )
         arena_regions = _extract_arena_regions(codegen_ctx, prefix)
 
-        return EngineArtifacts(
+        return HeliaAotArtifacts(
             engine_type=EngineType.HELIA_AOT,
             extra_modules=[
                 cmsis_nn_ref,

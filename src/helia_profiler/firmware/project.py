@@ -13,6 +13,7 @@ import yaml
 from .. import nsx as nsx_cli
 from ..compatibility import CompatibilityBaseline
 from ..config import Transport
+from ..engines.base import HeliaAotArtifacts
 from ..errors import ConfigError, FirmwareError
 from ..platform import get_soc_for_board
 from .context import FirmwareRenderContext
@@ -420,7 +421,13 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
             engine_type=ctx.artifacts.engine_type,
             cmake_vars=ctx.artifacts.cmake_vars,
             compiler_launcher=ctx.compiler_launcher,
-            aot_cmake_target=ctx.artifacts.aot_cmake_target or "",
+            # Only heliaAOT links a generated engine target; every other
+            # engine renders the empty string the template already expects.
+            aot_cmake_target=(
+                ctx.artifacts.aot_cmake_target
+                if isinstance(ctx.artifacts, HeliaAotArtifacts)
+                else ""
+            ),
             transport=ctx.config.target.transport,
             toolchain=ctx.config.target.toolchain,
             rtt_buffer_size_up=ctx.rtt_buffer_size_up,

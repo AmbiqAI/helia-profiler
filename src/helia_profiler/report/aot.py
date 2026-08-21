@@ -8,6 +8,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ..engines.base import HeliaAotArtifacts
+
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
 
@@ -24,7 +26,7 @@ def _write_aot_manifest(ctx: PipelineContext, output_dir: Path) -> Path | None:
     or when the manifest is empty.
     """
     artifacts = getattr(ctx, "engine_artifacts", None)
-    if artifacts is None:
+    if not isinstance(artifacts, HeliaAotArtifacts):
         return None
     manifest = artifacts.aot_op_manifest
     if not manifest:
@@ -48,7 +50,7 @@ def _write_aot_memory_layers(ctx: PipelineContext, output_dir: Path) -> Path | N
     """
 
     artifacts = getattr(ctx, "engine_artifacts", None)
-    if artifacts is None or not artifacts.aot_op_manifest:
+    if not isinstance(artifacts, HeliaAotArtifacts) or not artifacts.aot_op_manifest:
         return None
 
     rows: list[dict[str, Any]] = []

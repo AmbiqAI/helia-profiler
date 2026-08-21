@@ -17,7 +17,7 @@ from ...errors import EngineError
 from ...placement import Placement
 from ...results import NsxModuleRef
 from .. import EngineType, TFLM_ENGINE_HEADER
-from ..base import ArenaRegion, EngineArtifacts
+from ..base import ArenaRegion, HeliaRtArtifacts
 from .artifacts import (
     HELIART_MODULE,
     HELIART_PROJECT,
@@ -69,7 +69,7 @@ class HeliaRTAdapter:
         del target
         return regions
 
-    def prepare(self, config: ProfileConfig, work_dir: Path) -> EngineArtifacts:
+    def prepare(self, config: ProfileConfig, work_dir: Path) -> HeliaRtArtifacts:
         backend = config.engine.backend or "helia"
         variant = config.engine.config.get("variant", "release-with-logs")
         core_override = config.engine.config.get("core_override")
@@ -145,7 +145,7 @@ class HeliaRTAdapter:
                 extra_modules.append(cmsis_nn_module_ref(config, work_dir))
             if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
                 cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
-            return EngineArtifacts(
+            return HeliaRtArtifacts(
                 engine_type=EngineType.HELIA_RT,
                 extra_modules=extra_modules,
                 cmake_vars=cmake_vars,
@@ -244,7 +244,7 @@ class HeliaRTAdapter:
             ),
         )
 
-        return EngineArtifacts(
+        return HeliaRtArtifacts(
             engine_type=EngineType.HELIA_RT,
             extra_modules=extra_modules,
             cmake_vars=cmake_vars,

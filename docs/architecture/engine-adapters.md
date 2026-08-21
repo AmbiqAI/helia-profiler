@@ -31,22 +31,32 @@ Every adapter receives:
 | `config` | Resolved profile config, including engine-specific settings |
 | `work_dir` | Writable directory for generated files |
 
-And returns `EngineArtifacts`:
+And returns its own `EngineArtifacts` subclass — `TflmArtifacts`,
+`HeliaRtArtifacts`, `HeliaAotArtifacts`, or `ExecutorchArtifacts`. The base
+carries only what every engine produces:
 
 ```python
-@dataclass
+@dataclass(frozen=True, kw_only=True)
 class EngineArtifacts:
-    engine_type: EngineType = EngineType.TFLM
+    engine_type: EngineType          # pinned by each subclass
+    engine_header: str               # no default — every adapter states its own
     extra_modules: list[NsxModuleRef] = field(default_factory=list)
     cmake_vars: dict[str, str] = field(default_factory=dict)
     source_files: list[Path] = field(default_factory=list)
     include_dirs: list[Path] = field(default_factory=list)
     static_libs: list[Path] = field(default_factory=list)
-    engine_header: str = TFLM_ENGINE_HEADER
-    # ... plus the remaining typed template fields consumed by the renderer
+    memory_plan: MemoryPlan | None = None
 ```
 
-See `engines/base.py` for the full field list — it is the single source of
+Engine-specific outputs live on the subclass, so reading another engine's field
+is an `AttributeError` at the access site rather than a silent `None`;
+consumers narrow with `isinstance` at the `engine_type` branch points they
+already have. The base also exposes four identity properties —
+`resolved_backend`, `resolved_version`, `resolved_variant`,
+`resolved_toolchain_tag` — which each subclass routes to its own fields so the
+workspace fingerprint in `dependencies.py` stays engine-agnostic.
+
+See `engines/base.py` for the full type list — it is the single source of
 truth and grows as engines need new template inputs.
 
 ## heliaRT adapter
@@ -98,7 +108,7 @@ eliminating the interpreter overhead.
 ### AOT fields on `EngineArtifacts`
 
 ```python
-EngineArtifacts(
+HeliaAotArtifacts(
     engine_type=EngineType.HELIA_AOT,
     extra_modules=[cmsis_nn_ref, NsxModuleRef(name="hpx_model", ...)],
     aot_prefix=...,            # C symbol prefix of the generated model API
