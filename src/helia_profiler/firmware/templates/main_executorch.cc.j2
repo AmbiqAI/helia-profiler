@@ -17,10 +17,12 @@
    lines, phase heartbeats and in-op heartbeats -- the host's only hang
    detector), the RTT lossless/non-blocking discipline around CSV dumps and
    the final sentinel, the USB DTR settle and usb_timer pause/resume, the
-   named-constant SWO sync preamble, UART support at all, and the
-   HPX_PROFILED_INFER_* summary.  Inheriting the skeleton restores all of
-   them.  What it must NOT inherit is the clean window's measurement
-   semantics -- see engine_clean_window below.
+   named-constant SWO sync preamble, and UART support at all.  Inheriting the
+   skeleton restores all of them.  What it must NOT inherit is the clean
+   window's measurement semantics (see engine_clean_window below) or the
+   HPX_PROFILED_INFER_* summary (see engine_profiled_summary at the bottom):
+   both would put this engine's load+execute cost on the wire under keys every
+   other engine uses for execute-only inference timing.
 
    ExecuTorch has no dedicated power binary: stages.preflight
    _check_transport_support rejects engine.type=executorch with power.enabled
@@ -311,13 +313,20 @@ static void print_layers(void) {
 
     Two consequences worth stating rather than leaving to be discovered:
 
-      * The base's per-pass profiled loop still DWT-brackets engine_invoke, so
-        HPX_PROFILED_INFER_* for this engine measures whole-run_once cost
-        (load + execute).  That is a new line for ExecuTorch and is correctly
-        named -- it is the profiled call's cost -- but it is not comparable
-        with the clean numbers above, and the host's own comparability model
-        (evaluation/comparability.py) is what keeps engines from being compared
-        on it blindly.
+      * The base's per-pass profiled loop still DWT-brackets engine_invoke,
+        which for this engine measures whole-run_once cost (load + execute),
+        not the execute-only cost every other engine reports under the same
+        HPX_PROFILED_INFER_* keys.  Nothing downstream would catch that: the
+        comparability model treats ComparisonDimension.ENGINE as INFORMATIVE
+        (results/dimensions.py -- a difference is reported, never blocking; the
+        only identity dimension is MODEL_SHA256), so two engines' runs of the
+        same model compare freely, and validation/runner.py falls back to
+        device_profiled_infer_avg_us as the run latency when the clean number
+        is absent -- silently substituting load+execute for inference time.  So
+        ExecuTorch emits no HPX_PROFILED_INFER_* line at all (overriding
+        engine_profiled_summary empty), exactly as it did before the template
+        unification.  The profiled_infer_cycles accumulation in the shared loop
+        still runs; nothing reads it here.
       * The base gates the CoreSight debug power domain off for the measured
         window on families where the window clock does not live there
         (gate_debug_domain_in_window, AP5).  ExecuTorch's window clock is the
@@ -432,3 +441,23 @@ static void print_layers(void) {
             hpx_park();
         }
         print_layers();{% endblock %}
+
+{#- engine_profiled_summary: overridden EMPTY, so this engine emits no
+    HPX_PROFILED_INFER_COUNT / _TOTAL_US / _AVG_US at all -- the same wire
+    surface it had before it became a child.
+
+    nsx::executorch::run_once_profiled() is load + execute, and the base's
+    per-pass loop DWT-brackets exactly that call, so the base's default would
+    publish load+execute cost under the keys every other engine uses for
+    execute-only timing.  Two independent consumers would take it at face
+    value: the comparability model treats ComparisonDimension.ENGINE as
+    INFORMATIVE (results/dimensions.py -- reported, never blocking; MODEL_SHA256
+    is the only identity dimension), so cross-engine comparisons are not gated
+    on it; and validation/runner.py falls back to device_profiled_infer_avg_us
+    as the run latency, which would silently become "time to load and run".
+
+    The base's profiled_infer_cycles/count accumulation still happens inside the
+    loop -- it is a couple of DWT reads per iteration and keeping it in the
+    shared path keeps that loop identical for every engine.  Nothing reads the
+    result here. -#}
+{% block engine_profiled_summary %}{% endblock %}

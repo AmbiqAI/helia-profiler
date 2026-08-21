@@ -5,9 +5,8 @@
    surfaces as "dangerous relocation: unsupported relocation".  Armv8-M (M55)
    targets do not need them, and Arm Compiler 6 (armclang) supplies its own
    _sys_exit/heap management and lacks <sys/types.h>/caddr_t, so both are gated
-   out there.  Included once from the shared skeleton (_main_base.cc.j2, which
-   main.cc.j2 and main_aot.cc.j2 both extend) and from main_executorch.cc.j2,
-   so the engines cannot drift apart on it.
+   out there.  Included once from the shared skeleton (_main_base.cc.j2), which
+   all three engine templates extend, so the engines cannot drift apart on it.
 
    Must be included at global scope AFTER the CMSIS device header (for __WFI).
 #}

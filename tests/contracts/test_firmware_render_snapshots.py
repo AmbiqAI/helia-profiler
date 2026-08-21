@@ -104,6 +104,14 @@ _MARKERS: dict[str, str] = {
     "clean_window_attach_wait": "HPX_CLEAN_WINDOW_ATTACH_WAIT_MS",
     "clean_window_stall_check": "HPX_CLEAN_STALLED_ITERS",
     "clean_window_rate_probe": "HPX_CLEAN_DWT_RATE_CYC",
+    # Whether the render announces which engine produced it. Emitted by the
+    # shared skeleton for every transport-attached binary and by none of the
+    # power binaries (which never bring a transport up), so this marker also
+    # says which of the two a render is. The per-engine SPELLING is pinned
+    # separately by test_every_render_declares_its_engine_on_the_wire below --
+    # a marker can only see presence, and every engine sharing one wrong name
+    # would look identical here.
+    "engine_wire_id": "HPX_ENGINE=",
 }
 
 
@@ -178,17 +186,34 @@ def test_no_test_builds_a_look_alike_env_over_production_templates():
 
 
 def _sample_pmu_passes() -> list[dict[str, object]]:
+    """One pass, in the shape production actually emits.
+
+    ``FirmwareRenderContext._resolve_pmu_passes`` builds every pass with
+    ``custom=True``, real ``0xNNNN`` event ids and ``c_enum=None`` -- the
+    preset branch of the pass-init blocks is unreachable from a real run.
+    This used to pin ``custom=False`` with an EMPTY ``event_ids``, which is
+    not a shape production can produce, and on the ExecuTorch template (whose
+    ``engine_pass_init`` has no preset branch) it snapshotted invalid C: a
+    zero-size ``static const uint32_t ids[]`` that ``profiler_init`` then
+    indexes. Mirroring production keeps the pinned renders compilable and
+    keeps the snapshotted branch the one that ships.
+
+    tests/test_template_render.py keeps a ``custom=False`` sample on purpose --
+    its smoke coverage of the preset branch is the only thing exercising it.
+    """
     return [
         {
             "name": "Cache",
-            "custom": False,
-            "event_ids": [],
+            "custom": True,
+            "event_ids": ["0x0011", "0x0008", "0x0023", "0x0024"],
             "counter_names": [
                 "ARM_PMU_CPU_CYCLES",
                 "ARM_PMU_INST_RETIRED",
+                "ARM_PMU_STALL_FRONTEND",
+                "ARM_PMU_STALL_BACKEND",
             ],
-            "num_counters": 2,
-            "c_enum": "NSX_PMU_PRESET_BASIC_CPU",
+            "num_counters": 4,
+            "c_enum": None,
             "group": "cpu",
         }
     ]
@@ -1452,6 +1477,46 @@ def test_snapshot_covers_exactly_the_current_matrix():
     assert set(_SNAPSHOTS) == expected_keys, _REGEN_HINT
 
 
+def test_every_render_declares_its_engine_on_the_wire():
+    """``HPX_ENGINE=<wire name>`` must be right for every engine, everywhere.
+
+    The host reads this key to label the run (and to populate the
+    ``ComparisonDimension.ENGINE`` field), and the shared skeleton emits it
+    from a single ``engine_wire_name`` variable -- so a wrong or missing
+    mapping is one edit away from mislabelling an entire engine's results
+    while every other assertion in this file stays green. main.cc.j2 is
+    rendered for BOTH tflm and helia-rt, which is exactly the case a
+    template-side hardcoding would get wrong.
+
+    The power binaries are the negative half: they force
+    ``NSX_DEBUG_NONE`` and emit no HPX_* header at all, so ``HPX_ENGINE=``
+    must be absent rather than merely unread.
+    """
+    for probe in _PROBES:
+        for soc, transport, engine in _all_combos():
+            rendered = _render(soc, transport, engine, clean_window_probe=probe)
+            expected = _ENGINE_WIRE_NAMES[engine]
+            case = f"{soc}|{transport}|{engine}|{probe}"
+            assert f'hpx_printf("HPX_ENGINE={expected}\\n")' in rendered, (
+                f"{case}: render does not declare HPX_ENGINE={expected}"
+            )
+            # Exactly one engine name on the wire, and it is this engine's.
+            for other in set(_ENGINE_WIRE_NAMES.values()) - {expected}:
+                assert f"HPX_ENGINE={other}\\n" not in rendered, (
+                    f"{case}: also declares itself as {other}"
+                )
+
+        for soc, transport, engine in _power_combos():
+            rendered = _render(
+                soc, transport, engine, power_only=True, clean_window_probe=probe
+            )
+            assert "HPX_ENGINE=" not in rendered, (
+                f"{soc}|{transport}|{engine}|{probe}|power: the dedicated power "
+                "binary emits an HPX_ENGINE line, but it never brings a "
+                "transport up -- nothing can read it"
+            )
+
+
 def test_transport_specific_blocks_are_pinned():
     """Sanity anchors so a broken harness can't silently pin empty output."""
     usb = _digest(_render("apollo510", "usb_cdc", "tflm"))
@@ -1637,6 +1702,19 @@ def test_pmu_profiler_sram_placement_transport_only_on_ap5():
     assert "NSX_MEM_SRAM_BSS static HpxLayerRecord g_layers" not in aot_power
     assert "static HpxLayerRecord g_layers[kMaxLayers];" in aot_power
     assert "Shared SSRAM power-on" not in aot_power
+
+    # main_executorch.cc.j2's g_layers is the third instance of the same rule.
+    # It has only a transport half to check -- ExecuTorch has no dedicated
+    # power binary (preflight rejects engine.type=executorch with power, see
+    # test_executorch_power_tripwire.py), so there is no power render to
+    # assert the negative against and none is attempted here.
+    #
+    # Regression pin for the same bug shape the AOT lines above pin: the flag
+    # that drives this (pmu_profiler_sram_resident) is set once by
+    # _main_base.cc.j2, and ExecuTorch is the child that used to set it itself.
+    et_transport = _render("apollo510", "rtt", "executorch", power_only=False)
+    assert "NSX_MEM_SRAM_BSS static LayerRecord g_layers[kMaxLayers];" in et_transport
+    assert "Shared SSRAM power-on" in et_transport
 
 
 def test_ssram_full_power_enum_is_per_soc():

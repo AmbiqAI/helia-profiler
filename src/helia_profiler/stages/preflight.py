@@ -340,6 +340,30 @@ def _check_transport_support(cfg) -> None:
             "ExecuTorch profiling does not yet support the dedicated power binary.",
             hint="Disable power capture; clean end-to-end cycle measurements are supported.",
         )
+    if (
+        cfg.engine.type is EngineType.EXECUTORCH
+        and cfg.profiling.clean_window_probe == "busy_loop"
+    ):
+        # The busy_loop probe is a power-window diagnostic: it replaces the
+        # model with a calibrated CPU spin so an external instrument has a
+        # known-shape window to gate on, and reports HPX_CLEAN_INFER_COUNT=1
+        # for the single unit of work it performs.  ExecuTorch has no power
+        # support at all (rejected just above), so the probe has nothing to
+        # gate -- and since #154 phase 4 the render would silently succeed:
+        # main_executorch.cc.j2's engine_clean_window override delegates the
+        # busy_loop branch straight back to the base, so the firmware would
+        # come back with a nop-loop window reporting COUNT=1 where this
+        # engine's HPX_CLEAN_INFER_* are defined as real execute-only
+        # inference timing.
+        raise ConfigError(
+            "The busy_loop clean-window probe requires an engine with "
+            "power-window support; engine.type=executorch has none.",
+            hint=(
+                "Use profiling.clean_window_probe=infer with ExecuTorch, or "
+                "switch to an engine that supports the dedicated power binary "
+                "(tflm, helia-rt, helia-aot)."
+            ),
+        )
     if cfg.target.transport != Transport.USB_CDC:
         return
     try:

@@ -143,3 +143,54 @@ def test_preflight_accepting_executorch_power_requires_engine_matrix_coverage(
         # raising for an unrelated reason (e.g. a bad tmp_path model).
         with pytest.raises(ConfigError, match="ExecuTorch profiling"):
             _check_transport_support(cfg)
+
+
+@pytest.mark.parametrize("board", ["apollo3p_evb", "apollo4p_evb", "apollo510_evb"])
+def test_preflight_rejects_executorch_with_the_busy_loop_clean_window_probe(
+    tmp_path, board
+):
+    """The busy_loop probe is the second door into the same room.
+
+    ``clean_window_probe=busy_loop`` replaces the model with a calibrated CPU
+    spin so an external instrument has a known-shape window to gate on, and the
+    firmware reports ``HPX_CLEAN_INFER_COUNT=1`` for that single unit of work.
+    It exists only to serve a power capture, which ExecuTorch does not support.
+
+    Before #154 phase 4 this combination was harmless by accident: the
+    standalone template had no busy_loop branch, so the option simply did
+    nothing. As a child of ``_main_base.cc.j2`` it now inherits one --
+    ``engine_clean_window``'s override delegates the busy_loop case straight
+    back to ``super()`` -- so the render would succeed and ship a nop-loop
+    window under keys this engine defines as real execute-only inference
+    timing. Power is off on this path, so none of the power-side integrity
+    checks would ever look at it.
+
+    Rejected in preflight instead, and pinned here per SoC family for the same
+    reason the power tripwire above is: a narrowing that exempts one family is
+    a likelier relaxation than a deletion.
+    """
+    model = tmp_path / "model.pte"
+    cfg = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "executorch"},
+            "target": {"board": board},
+            "profiling": {"clean_window_probe": "busy_loop"},
+        },
+    )
+
+    with pytest.raises(ConfigError, match="busy_loop"):
+        _check_transport_support(cfg)
+
+    # And the default probe is untouched -- the rejection must be about the
+    # probe, not about ExecuTorch reaching this function at all.
+    ok_cfg = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "executorch"},
+            "target": {"board": board},
+        },
+    )
+    _check_transport_support(ok_cfg)

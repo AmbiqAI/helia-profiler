@@ -17,6 +17,27 @@
        is one line with no newlines (indentation included where the site is
        used only once, supplied by the base where the same one-liner is
        reused at several indents -- see engine_invoke).
+     * A THIRD shape, and the one with teeth: an anchor glued to the end of a
+       `//` COMMENT line (engine_pass_preamble, engine_pass_warmup_arm,
+       engine_pass_profile_arm).  The override's content MUST begin with its
+       own newline -- content that does not is appended to the comment and is
+       silently commented out of the firmware, with no render error and no
+       compile error.  Enforced at source level by
+       tests/contracts/test_template_blocks.py so it cannot regress quietly.
+
+   Two deviations from the two clean shapes exist and are deliberate; they are
+   written down here so the contract above is the whole truth:
+
+     * engine_window_restore inverts the region convention -- heliaAOT's
+       override glues its first line to the block tag and carries the TRAILING
+       newline instead of the leading one, because the base anchors it to the
+       END of an `if not power_only` opening tag that is itself at the start of
+       a line, so there is no preceding text for the region's first line to be
+       appended to.  Overriding it empty still deletes the region cleanly.
+     * engine_iteration_setup's anchor is glued to a self.engine_reset_inputs()
+       expansion rather than to a comment: its overrides lead with a newline
+       for the same reason the comment-glued anchors must, but a mistake there
+       merely joins two statements on one line instead of commenting one out.
 
    The measured window must not be timed by a clock this binary cannot read:
    DWT->CYCCNT dies with the CoreSight debug domain, which the dedicated
@@ -40,7 +61,20 @@
 #include <arm_mve.h>
 #endif
 {% block engine_includes %}{% endblock %}
-{% include "_system_includes.j2" %}
+{# pmu_profiler_sram_resident -- the per-layer instrumentation storage (heliaRT's
+   g_profiler, heliaAOT's and ExecuTorch's g_layers) is SRAM-resident in every
+   transport-attached render and left in default .bss in the dedicated power
+   binary, where it is unused and an SSRAM power-on would perturb the very
+   measurement that binary exists to keep clean.
+
+   Set HERE, at the top, because TWO partials read it and one of them is the
+   very next line: _system_includes.j2's narrow `#include "am_hal_pwrctrl.h"`
+   guard folds this flag into its SRAM-residency test, and _ssram_power.j2
+   (included ~160 lines below, next to main()'s SSRAM bring-up) folds it into
+   the same test again.  Setting it down there instead left the include guard
+   reading an undefined name -- StrictUndefined never fired because the guard
+   spells it `pmu_profiler_sram_resident | default(false)`, so the disjunct was
+   simply dead and the narrow header silently stopped being emitted. #}{% set pmu_profiler_sram_resident = not (power_only | default(false)) %}{% include "_system_includes.j2" %}
 {% if apollo3_burst %}
 // Apollo3/3P TurboSPOT (burst) control lives in the AmbiqSuite HAL umbrella.
 #include "am_mcu_apollo.h"
@@ -203,7 +237,10 @@ int main(void) {
     // clock.  Harmless when it already matches (lp tiers).
     SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
 {% endif %}
-{% set pmu_profiler_sram_resident = not (power_only | default(false)) %}
+{# pmu_profiler_sram_resident is set at the TOP of this file, glued to the
+   _system_includes.j2 include -- that partial reads it too (its narrow
+   am_hal_pwrctrl.h guard), and it used to be set here, 160 lines after the
+   only other reader had already tested it. #}
 {% include "_ssram_power.j2" %}
 {% include "_extreme_mode.j2" %}
 {% include "_ble_reset.j2" %}
@@ -301,14 +338,19 @@ int main(void) {
     // around each one), which perturbs caches/pipeline and adds overhead the
     // sum-of-layers cannot see.  To report the most representative whole-model
     // latency, run a warmed, UNinstrumented timing pass FIRST: prime caches
-    // with warmup iterations, then DWT-time clean inference calls with the
-    // profiler disabled.  Emitted as HPX_CLEAN_INFER_* — these never replace
-    // the per-layer numbers, they sit alongside them for comparison.
+    // with warmup iterations, then time clean inference calls with the profiler
+    // disabled.  Which clock does that timing is not fixed here: it is the
+    // engine's window clock, resolved host-side for the default window (see the
+    // engine_clean_window seam comment below, and resolve_window_timer in the
+    // prelude) and supplied by the engine's own runtime where the engine owns
+    // the window.  Emitted as HPX_CLEAN_INFER_* — these never replace the
+    // per-layer numbers, they sit alongside them for comparison.
     //
     // This pass is also the canonical window for external power measurement:
     // it is the only inference loop free of instrumentation/transport overhead,
-    // so the GPIO sync brackets it (not the instrumented passes below).  When
-    // power sync is disabled, hpx_sync_window_begin/end compile to no-ops.
+    // so the GPIO sync brackets it (not the instrumented passes below) for
+    // every engine that uses the default window.  When power sync is disabled,
+    // hpx_sync_window_begin/end compile to no-ops.
     {
 {% block engine_profiler_off %}{% endblock %}
 {% if clean_window_needs_probe_attach | default(false) and transport == "rtt" and not power_only | default(false) and not use_stimer_window -%}
@@ -469,13 +511,22 @@ int main(void) {
         // bNeedAlternativeUART=false and never enables this at all.
         nsx_uart_printf_disable();
 {% elif transport == "swo" and not power_only | default(false) %}
-        // ITM/SWO's own enable request can hold PD_DBG powered independently
-        // of am_hal_debug_disable() below, the same way the ARM PMU's
-        // counters do (see the has_armv8m_pmu comment) -- this is a measurable
-        // current increase on an AP510 EVB, matching the known PD_DBG cost,
-        // even though
-        // am_hal_debug_disable() already runs for this family/probe.
-        // Dropping ITM here lets that call actually release the domain.
+        // Quiesce SWO/ITM for the measured window.  Two independent reasons,
+        // which is why this is unconditional rather than gated on whether the
+        // debug domain is being powered down:
+        //  1. Every engine: ITM traffic emitted mid-window is real work inside
+        //     the region being measured.  Silencing the transport keeps it out
+        //     of the clean numbers and out of an external power capture.
+        //  2. Engines using the default window on families that gate PD_DBG:
+        //     ITM/SWO's own enable request can hold PD_DBG powered
+        //     independently of am_hal_debug_disable() below, the same way the
+        //     ARM PMU's counters do (see the has_armv8m_pmu comment) -- a
+        //     measurable current increase on an AP510 EVB, matching the known
+        //     PD_DBG cost, even though am_hal_debug_disable() already runs for
+        //     this family/probe.  Dropping ITM here lets that call actually
+        //     release the domain.  An engine whose window override never gates
+        //     PD_DBG (ExecuTorch times the window with its runtime's own
+        //     counter) gets reason 1 alone, which stands on its own.
         nsx_itm_printf_disable();
 {% endif %}{# engine_clean_window -- the measured window itself, from quiescing
    the profiling hardware through reporting HPX_CLEAN_INFER_*.  The default
@@ -817,7 +868,14 @@ int main(void) {
 {% if transport == "usb_cdc" %}
     usb_timer_resume();
 {% endif %}
-{% endfor %}
+{# engine_profiled_summary -- the HPX_PROFILED_INFER_* wire lines derived from
+   the per-pass loop's DWT bracket around self.engine_invoke().  A region block
+   (anchor glued to the endfor above, content leading with its own newline), so
+   an engine whose invoke is not a pure inference call can override it empty and
+   emit nothing at all rather than emitting the same keys with different
+   semantics.  The profiled_infer_cycles/count accumulation in the loop is
+   unconditional and stays that way -- it is cheap, and keeping it out of the
+   seam keeps the loop identical for every engine. #}{% endfor %}{% block engine_profiled_summary %}
 
     if (profiled_infer_count > 0 && SystemCoreClock > 0U) {
         const uint32_t profiled_infer_total_us = (uint32_t)(
@@ -830,7 +888,7 @@ int main(void) {
         hpx_printf("HPX_PROFILED_INFER_COUNT=%lu\n", (unsigned long)profiled_infer_count);
         hpx_printf("HPX_PROFILED_INFER_TOTAL_US=%lu\n", (unsigned long)profiled_infer_total_us);
         hpx_printf("HPX_PROFILED_INFER_AVG_US=%lu\n", (unsigned long)profiled_infer_avg_us);
-    }
+    }{% endblock %}
 
 {% if transport == "rtt" %}
     // All timed inference work is done — switch to lossless blocking mode so

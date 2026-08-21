@@ -36,10 +36,11 @@
    dedicated power binary) to free TCM for the model -- main.cc.j2's
    HpxPmuProfiler (g_profiler, NSX_MEM_SRAM, in its engine_globals block),
    main_aot.cc.j2's g_layers array (NSX_MEM_SRAM_BSS, likewise), and
-   main_executorch.cc.j2's g_layers (NSX_MEM_SRAM_BSS). _main_base.cc.j2
-   sets pmu_profiler_sram_resident on behalf of its child templates right
-   before including this partial; main_executorch.cc.j2 is still a
-   standalone template and sets it itself. This needs
+   main_executorch.cc.j2's g_layers (NSX_MEM_SRAM_BSS). All three mains are
+   children of _main_base.cc.j2, which sets pmu_profiler_sram_resident once,
+   for all of them, at the top of the file -- before _system_includes.j2,
+   which reads the same flag for its narrow am_hal_pwrctrl.h guard and so has
+   to be included after it is set. This needs
    eActiveWithMCU like arena/weights residency (1), NOT the retain-only
    mode of lever (2), since the instrumentation is actively written to
    throughout every profiled inference, not just parked for a static-

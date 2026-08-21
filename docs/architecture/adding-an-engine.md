@@ -203,13 +203,65 @@ def get_adapter(engine_type: EngineType) -> "EngineAdapter":
 
 Tests can swap in a stub with `register_engine_adapter(engine_type, factory)`.
 
-## Step 4: Update template selection
+## Step 4: Add a firmware template
 
-Template selection is inline in `firmware/__init__.py` (there is no separate
-helper): the render code picks `main_aot.cc.j2` for `EngineType.HELIA_AOT`,
-`main_executorch.cc.j2` for `EngineType.EXECUTORCH`, and `main.cc.j2` for
-everything else. If your engine needs its own main template, extend that
-conditional to select `main_your_engine.cc.j2` for your `EngineType`.
+If your engine can run through the interpreter path's `main.cc.j2`, skip this
+step. Otherwise write a **child of the shared skeleton** — never a standalone
+main. Every engine template is a child of `_main_base.cc.j2`, which owns boot,
+the transport preamble, GPIO sync, the clean window, the PMU pass loop and
+teardown; a standalone template drifts away from that and loses features
+silently (the ExecuTorch one did, and had to be converted back in #154).
+
+1. **Create `main_your_engine.cc.j2`** opening with
+   `{% extends "_main_base.cc.j2" %}`, and read the base's prelude first: the
+   render env has `trim_blocks`/`lstrip_blocks` OFF, so the whitespace shape of
+   each override is part of the contract (a region block leads with its own
+   newline; a single-line block carries exactly one line; an override anchored
+   to a `//` comment that does not lead with a newline is silently commented
+   out of the firmware).
+
+2. **Override the required blocks.** These are the ones the base renders
+   nothing for, so a missing one ships firmware without your engine's code:
+   `engine_file_header`, `engine_includes`, `engine_globals`,
+   `engine_heartbeat_arm`, `engine_invoke`, `engine_iteration_setup`,
+   `engine_pass_init`, `engine_print_csv`, `engine_profiler_off`,
+   `engine_reset_inputs`, `engine_reset_inputs_warm`, `engine_start_metadata`.
+   The optional seams (`engine_model_storage`, `engine_model_setup`,
+   `engine_pre_start`, `engine_window_prologue`, `engine_window_restore`,
+   `engine_profiler_on`, `engine_psram_metadata`, `engine_io_metadata`,
+   `engine_early_globals`, `engine_profiled_summary`, ...) have working
+   defaults — override one only where the default is wrong for your engine.
+
+   `engine_clean_window` is the seam to think hardest about, and only applies if
+   your engine's invoke is **not** a pure inference call. The default brackets
+   `self.engine_invoke()` with the window clock, which is correct whenever the
+   invoke IS the inference (heliaRT, TFLM, heliaAOT). ExecuTorch overrides it
+   because `run_once_profiled()` reloads the model per call and reports its own
+   execute-only cycle count, so inheriting the default would silently redefine
+   `HPX_CLEAN_INFER_*` as load+execute. If you override it, you own everything
+   nested inside it too (`engine_window_prologue`, `engine_window_restore`,
+   `engine_profiler_on`) — overriding those as well is a no-op that
+   `tests/contracts/test_template_blocks.py` rejects.
+
+3. **Select it in `firmware/__init__.py`.** Template selection is inline (there
+   is no separate helper): the render code picks `main_aot.cc.j2` for
+   `EngineType.HELIA_AOT`, `main_executorch.cc.j2` for `EngineType.EXECUTORCH`,
+   and `main.cc.j2` for everything else. Extend that conditional — in both
+   `generate_app()` and `render_power_source()` — to select
+   `main_your_engine.cc.j2` for your `EngineType`.
+
+4. **Update `tests/contracts/test_template_blocks.py`**: add the file to
+   `CHILDREN` and add your override set to
+   `test_child_override_sets_are_the_documented_ones`. The reserved-defaults
+   pin will also shift if your child claims a seam no other engine had.
+
+5. **Add the engine to the snapshot matrix** in
+   `tests/contracts/test_firmware_render_snapshots.py`: add it to `_ENGINES`,
+   give `_render()` a branch that renders your template with the variables
+   production hands it (a missing branch raises rather than silently rendering
+   `main.cc.j2`), narrow `_ENGINE_SOCS` if it does not run on every family, add
+   it to `_MATRIX_ENGINES` only if it supports the dedicated power binary, then
+   regenerate with `HPX_UPDATE_SNAPSHOTS=1` and review the JSON diff.
 
 ## Step 5: Add tests
 

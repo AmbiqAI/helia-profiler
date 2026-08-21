@@ -454,20 +454,22 @@ def test_executorch_template_has_counter_health_and_true_overflow_mask():
     assert 'hpx_printf("HPX_READY\\n")' in out
     assert "HPX_ERROR=operator_count_exceeds_capacity" in out
     # g_layers is SRAM-resident, so the AP5 shared SSRAM domain must be powered
-    # on for it -- with the HAL declarations for that call actually in scope.
-    # Which header provides them is the shared skeleton's policy, not this
-    # engine's: on an Armv8-M PMU part the umbrella am_mcu_apollo.h carries
-    # am_hal_pwrctrl.h, and _system_includes.j2's narrower guard deliberately
-    # does not fire a second time (test_hal_umbrella_header_is_included_at_most_once
-    # pins that the two can never both land). This used to assert the narrow
-    # header because the template stood alone and set
-    # pmu_profiler_sram_resident before including _system_includes.j2; as a
-    # child of _main_base.cc.j2 it now gets the same headers TFLM and heliaAOT
-    # have always had here.
+    # on for it -- with the HAL declarations for that call actually in scope
+    # via the narrow header, not merely by accident of some other guard pulling
+    # in the umbrella.
+    #
+    # This assertion was briefly weakened to `am_mcu_apollo.h OR
+    # am_hal_pwrctrl.h` when the template became a child of _main_base.cc.j2,
+    # on the theory that the narrow guard "deliberately does not fire a second
+    # time". That was wrong: the extraction had moved
+    # `{% set pmu_profiler_sram_resident %}` 160 lines BELOW the
+    # _system_includes.j2 include that reads it, so the guard's third disjunct
+    # was simply testing an undefined name -- dead, not deliberate, and
+    # invisible under StrictUndefined because the guard spells it
+    # `| default(false)`. The flag is set at the top of the base now, so the
+    # narrow include is emitted again for every SRAM-resident render.
     assert "am_hal_pwrctrl_sram_config(&sramCfg)" in out
-    assert (
-        '#include "am_mcu_apollo.h"' in out or '#include "am_hal_pwrctrl.h"' in out
-    )
+    assert '#include "am_hal_pwrctrl.h"' in out
     assert "g_logical_overflow_mask |= 1UL << (2 * i + 1)" in out
     end_operator = out[out.index("static void end_operator") :]
     assert end_operator.index("ARM_PMU_Get_CNTR_OVS()") < end_operator.index(
