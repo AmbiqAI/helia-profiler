@@ -50,10 +50,10 @@ from .config_power import (
     INA228_AVERAGING_COUNTS,
     INA228_BOARD_PRESETS,
     INA228_CONVERSION_TIMES_US,
-    POWER_FIRMWARE_MODES,
     Ina228Config,
     MonitorBoardPreset,
     PowerConfig,
+    PowerFirmware,
 )
 from .target.lifecycle import ResetStrategy
 
@@ -139,32 +139,62 @@ class OutputFormat(StrEnum):
     MODEL_EXPLORER = "model-explorer"
 
 
+class WindowMode(StrEnum):
+    """Clean / GPIO-gated end-to-end window sizing.
+
+    ``FIXED`` reuses ``iterations`` for the clean pass (historical
+    behaviour).  ``AUTO`` (default) lets the firmware size the gated window
+    at runtime from the measured clean-inference time so short models run
+    more iterations and big models run fewer — filling a consistent ~1 s
+    wall-clock window for ordinary profiling.  External power capture raises
+    this to a longer minimum window so host-side GPIO polling and Joulescope
+    packet alignment have several seconds to settle.
+    """
+
+    FIXED = "fixed"
+    AUTO = "auto"
+
+
+class CleanWindowProbe(StrEnum):
+    """What runs inside the clean GPIO-gated window.
+
+    ``INFER`` runs the model.  ``BUSY_LOOP`` is an opt-in bench probe that
+    keeps the gate high around a calibrated CPU spin for roughly
+    ``window_target_ms`` so bring-up can distinguish wrong gate semantics
+    from inference behaviour.
+    """
+
+    INFER = "infer"
+    BUSY_LOOP = "busy_loop"
+
+
+class Aggregation(StrEnum):
+    """Per-iteration aggregation estimator for per-layer counters.
+
+    ``MEDIAN`` is the default because it rejects the occasional corrupted
+    iteration (e.g. an Apollo4 DWT->CYCCNT uint32 wrap or a frozen-zero read
+    while the host probe is still settling) that a plain ``MEAN`` would smear
+    across the whole layer.  ``TRIMMED`` drops the high/low extremes, then
+    means.
+    """
+
+    MEAN = "mean"
+    MEDIAN = "median"
+    TRIMMED = "trimmed"
+
+
 DEFAULT_BOARD = "apollo510_evb"
 DEFAULT_TOOLCHAIN = Toolchain.ARM_NONE_EABI_GCC
 DEFAULT_ITERATIONS = 100
 DEFAULT_WARMUP = 5
-# Clean / GPIO-gated end-to-end window sizing.  ``"fixed"`` reuses
-# ``iterations`` for the clean pass (historical behaviour).  ``"auto"`` (default)
-# lets the firmware size the gated window at runtime from the measured
-# clean-inference time so short models run more iterations and big models run
-# fewer — filling a consistent ~1 s wall-clock window for ordinary profiling.
-# External power capture raises this to a longer minimum window so host-side
-# GPIO polling and Joulescope packet alignment have several seconds to settle.
-WINDOW_MODES = ("fixed", "auto")
-DEFAULT_WINDOW_MODE = "auto"
+DEFAULT_WINDOW_MODE = WindowMode.AUTO
 DEFAULT_WINDOW_TARGET_MS = 1000
 DEFAULT_POWER_WINDOW_TARGET_MS = 5000
 DEFAULT_POWER_MIN_WINDOW_MS = 1000
 DEFAULT_WINDOW_MIN = 10
 DEFAULT_WINDOW_MAX = 500000
-CLEAN_WINDOW_PROBES = ("infer", "busy_loop")
-DEFAULT_CLEAN_WINDOW_PROBE = "infer"
-# Per-iteration aggregation estimator for per-layer counters.  ``median`` is
-# the default because it rejects the occasional corrupted iteration (e.g. an
-# Apollo4 DWT->CYCCNT uint32 wrap or a frozen-zero read while the host probe is
-# still settling) that a plain mean would smear across the whole layer.
-DEFAULT_AGGREGATION = "median"
-AGGREGATION_METHODS = ("mean", "median", "trimmed")
+DEFAULT_CLEAN_WINDOW_PROBE = CleanWindowProbe.INFER
+DEFAULT_AGGREGATION = Aggregation.MEDIAN
 DEFAULT_TRANSPORT = Transport.RTT
 
 # Heartbeat defaults — firmware emits progress lines so the host can detect
@@ -384,20 +414,18 @@ class ProfilingConfig:
     per_layer: bool = True
     iterations: int = DEFAULT_ITERATIONS
     warmup: int = DEFAULT_WARMUP
-    # Clean / GPIO-gated end-to-end window sizing.  ``"fixed"`` (default) runs
-    # exactly ``iterations`` clean inferences.  ``"auto"`` lets the firmware
-    # choose the clean-window iteration count at runtime to fill
-    # ``window_target_ms`` of wall-time, clamped to ``[window_min, window_max]``.
-    # The firmware reports the actual count it ran (``HPX_CLEAN_INFER_COUNT``),
-    # which the host divides into the gated energy for per-inference numbers.
-    window_mode: str = DEFAULT_WINDOW_MODE
+    # See :class:`WindowMode`.  Under ``auto`` the firmware chooses the
+    # clean-window iteration count at runtime to fill ``window_target_ms`` of
+    # wall-time, clamped to ``[window_min, window_max]``, and reports the
+    # actual count it ran (``HPX_CLEAN_INFER_COUNT``), which the host divides
+    # into the gated energy for per-inference numbers.
+    window_mode: WindowMode = DEFAULT_WINDOW_MODE
     window_target_ms: int = DEFAULT_WINDOW_TARGET_MS
     window_min: int = DEFAULT_WINDOW_MIN
     window_max: int = DEFAULT_WINDOW_MAX
-    # Optional bench probe for the clean GPIO-gated window. ``busy_loop`` keeps
-    # the gate high around a calibrated CPU spin for roughly window_target_ms
-    # so bring-up can distinguish wrong gate semantics from inference behavior.
-    clean_window_probe: str = DEFAULT_CLEAN_WINDOW_PROBE
+    # Optional bench probe for the clean GPIO-gated window — see
+    # :class:`CleanWindowProbe`.
+    clean_window_probe: CleanWindowProbe = DEFAULT_CLEAN_WINDOW_PROBE
     # Sanity-check diagnostic: when true, the firmware emits an
     # ``HPX_CLEAN_ITER=<n>`` line over the active transport on every iteration
     # of the clean (GPIO-gated power) window.  This proves the device is
@@ -412,11 +440,10 @@ class ProfilingConfig:
     # the power floor.  SRAM-resident arena/weights power the array on
     # regardless; this flag forces it on for the TCM case too.
     force_shared_sram: bool = False
-    # How per-layer counters are aggregated across profiled iterations:
-    # ``mean`` (arithmetic mean), ``median`` (robust default), or ``trimmed``
-    # (drop the high/low extremes, then mean).  All methods first reject
-    # structurally-invalid samples (uint32-wrap / frozen-zero) and log them.
-    aggregation: str = DEFAULT_AGGREGATION
+    # How per-layer counters are aggregated across profiled iterations — see
+    # :class:`Aggregation`.  All methods first reject structurally-invalid
+    # samples (uint32-wrap / frozen-zero) and log them.
+    aggregation: Aggregation = DEFAULT_AGGREGATION
     # Extreme benchmarking mode: power down memory regions the model does not
     # use to lower the energy floor.  Currently powers down SSRAM (3 MB) and
     # collapses MRAM to a single bank (NVM0 only).  Only safe when the model
@@ -436,16 +463,6 @@ class ProfilingConfig:
 
     @model_validator(mode="after")
     def _validate(self) -> ProfilingConfig:
-        if self.aggregation not in AGGREGATION_METHODS:
-            raise ValueError(
-                f"Invalid aggregation '{self.aggregation}'. "
-                f"Choose one of: {', '.join(AGGREGATION_METHODS)}."
-            )
-        if self.window_mode not in WINDOW_MODES:
-            raise ValueError(
-                f"Invalid window_mode '{self.window_mode}'. "
-                f"Choose one of: {', '.join(WINDOW_MODES)}."
-            )
         if self.window_min < 1:
             raise ValueError(f"window_min must be >= 1, got {self.window_min}.")
         if self.window_max < self.window_min:
@@ -454,11 +471,6 @@ class ProfilingConfig:
             )
         if self.window_target_ms < 1:
             raise ValueError(f"window_target_ms must be >= 1, got {self.window_target_ms}.")
-        if self.clean_window_probe not in CLEAN_WINDOW_PROBES:
-            raise ValueError(
-                f"Invalid clean_window_probe '{self.clean_window_probe}'. "
-                f"Choose one of: {', '.join(CLEAN_WINDOW_PROBES)}."
-            )
         return self
 
 
@@ -668,7 +680,7 @@ class ProfileConfig:
         is invisible under the default ``auto``, which is why nothing caught
         it (found by review of #136).
         """
-        if self.power.enabled and self.profiling.window_mode == "auto":
+        if self.power.enabled and self.profiling.window_mode is WindowMode.AUTO:
             return max(self.profiling.window_target_ms, DEFAULT_POWER_WINDOW_TARGET_MS)
         return self.profiling.window_target_ms
 

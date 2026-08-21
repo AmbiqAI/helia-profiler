@@ -36,7 +36,7 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.engines import TFLM_ENGINE_HEADER
+from helia_profiler.engines import TFLM_ENGINE_HEADER, EngineType
 from helia_profiler.firmware import _jinja_env
 from helia_profiler.firmware.context import resolve_window_timer
 from helia_profiler.platform import get_soc, list_socs
@@ -287,6 +287,21 @@ _ENGINE_WIRE_NAMES = {
     "helia-aot": "helia_aot",
     "executorch": "executorch",
 }
+
+
+def test_engine_wire_names_mirror_the_engine_type_property():
+    """Bind this file's hand-mirrored wire names to the production derivation.
+
+    ``FirmwareRenderContext.to_template_vars`` sources ``engine_wire_name``
+    from ``EngineType.wire_name``; the map above mirrors it so renders can be
+    built without a PipelineContext.  Unbound, the HPX_ENGINE contract below
+    would only prove the mirror is self-consistent -- exactly the dead-branch
+    shape #162 Phase 2 review found.  The literals are pinned too: these
+    values go out on the wire and label every result for their engine.
+    """
+    assert _ENGINE_WIRE_NAMES == {
+        engine.value: engine.wire_name for engine in EngineType
+    }
 
 
 def _finalize(kwargs: dict) -> dict:

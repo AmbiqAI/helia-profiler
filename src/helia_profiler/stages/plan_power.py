@@ -6,7 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from ..results import PowerRunPlan
-from ..config import DEFAULT_POWER_WINDOW_TARGET_MS
+from ..config import DEFAULT_POWER_WINDOW_TARGET_MS, PowerFirmware, WindowMode
 from ..errors import PowerError
 from ..power.diagnostics import probe_runs_inferences
 from ..pipeline import PipelineContext
@@ -139,12 +139,12 @@ def predicted_window_ms(config: "ProfileConfig", *, reference_us: int | None) ->
     """
     if not probe_runs_inferences(config.profiling.clean_window_probe):
         return config.effective_window_target_ms
-    if config.power.firmware == "dedicated":
+    if config.power.firmware is PowerFirmware.DEDICATED:
         return max(
             config.profiling.window_target_ms,
             DEFAULT_POWER_WINDOW_TARGET_MS,
         )
-    if config.profiling.window_mode == "fixed" and reference_us:
+    if config.profiling.window_mode is WindowMode.FIXED and reference_us:
         # Nearest millisecond, not truncated: this field is the window's
         # only statement of length when no count is planned.
         return max(1, (config.profiling.iterations * reference_us + 500) // 1000)
@@ -165,7 +165,7 @@ def plan_power_run(
         reference_us = ctx.pmu_result.meta.clean_infer_avg_us
 
     target_duration_ms = predicted_window_ms(ctx.config, reference_us=reference_us)
-    if ctx.config.power.firmware != "dedicated":
+    if ctx.config.power.firmware is not PowerFirmware.DEDICATED:
         inference_count = None
         count_source = "firmware_auto"
     elif not probe_runs_inferences(ctx.config.profiling.clean_window_probe):
@@ -228,7 +228,7 @@ def plan_power_run(
         count_source = "configured"
 
     plan = PowerRunPlan(
-        firmware_mode=ctx.config.power.firmware,
+        firmware_mode=ctx.config.power.firmware.value,
         inference_count=inference_count,
         reference_inference_us=reference_us,
         target_duration_ms=target_duration_ms,

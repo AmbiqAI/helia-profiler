@@ -8,6 +8,7 @@ surface (``from helia_profiler.config import PowerConfig`` keeps working).
 from __future__ import annotations
 
 import re
+from enum import StrEnum
 
 from pydantic import ConfigDict, model_validator
 from pydantic.dataclasses import dataclass as pydantic_dataclass
@@ -23,17 +24,26 @@ from .target.lifecycle import ResetStrategy
 DEFAULT_POWER_DURATION_S = 30
 DEFAULT_IO_VOLTAGE = 1.8
 DEFAULT_POWER_DRIVER = "joulescope"
-# Which binary is on the target during power capture. "dedicated" flashes the
-# transport-free hpx_profiler_power image (see firmware/__init__.py WP2)
-# before capture; SWO/UART/RTT/USB traffic on the shared transport binary was
-# measured to add significant current contamination into the GPIO-gated
-# Joulescope window on AP510 depending on transport, so "dedicated" is the
-# default. "shared" restores the pre-WP2 behavior of reusing the
-# already-flashed transport binary for power capture (useful when no J-Link
-# is free to reflash, or for bring-up comparisons against the contaminated
-# baseline).
-POWER_FIRMWARE_MODES = ("dedicated", "shared")
-DEFAULT_POWER_FIRMWARE = "dedicated"
+
+
+class PowerFirmware(StrEnum):
+    """Which binary is on the target during power capture.
+
+    ``DEDICATED`` flashes the transport-free ``hpx_profiler_power`` image
+    (see ``firmware/__init__.py`` WP2) before capture; SWO/UART/RTT/USB
+    traffic on the shared transport binary was measured to add significant
+    current contamination into the GPIO-gated Joulescope window on AP510
+    depending on transport, so ``DEDICATED`` is the default.  ``SHARED``
+    restores the pre-WP2 behavior of reusing the already-flashed transport
+    binary for power capture (useful when no J-Link is free to reflash, or
+    for bring-up comparisons against the contaminated baseline).
+    """
+
+    DEDICATED = "dedicated"
+    SHARED = "shared"
+
+
+DEFAULT_POWER_FIRMWARE = PowerFirmware.DEDICATED
 DEFAULT_POWER_MODE = PowerMode.EXTERNAL
 # On-target INA228 power monitor (power.driver: ina228). The ADC conversion
 # time and averaging window are the INA228's own discrete hardware steps —
@@ -230,8 +240,8 @@ class PowerConfig:
     driver: str = DEFAULT_POWER_DRIVER
     # "dedicated" flashes hpx_profiler_power (transport-free) before capture;
     # "shared" reuses the already-flashed transport binary. See
-    # POWER_FIRMWARE_MODES above for the contamination rationale.
-    firmware: str = DEFAULT_POWER_FIRMWARE
+    # :class:`PowerFirmware` above for the contamination rationale.
+    firmware: PowerFirmware = DEFAULT_POWER_FIRMWARE
     mode: PowerMode = DEFAULT_POWER_MODE
     # ``None`` means "not explicitly set": consumers use
     # DEFAULT_POWER_DURATION_S and may auto-tune the bound from PMU-phase
@@ -354,11 +364,6 @@ class PowerConfig:
             raise ValueError(f"power.stats_rate_hz must be >= 1, got {self.stats_rate_hz}.")
         if self.lockstep and not self.lockstep_wiring_available:
             raise ValueError("power.lockstep requires both state_gpio_pin and go_gpio_pin > 0.")
-        if self.firmware not in POWER_FIRMWARE_MODES:
-            raise ValueError(
-                f"Unknown power.firmware '{self.firmware}'. "
-                f"Choose one of: {', '.join(POWER_FIRMWARE_MODES)}."
-            )
         if self.driver == "ina228":
             # The INA228 is read by firmware around the fixed-N window, so the
             # driver only works as an internal-mode measurement in the
@@ -373,7 +378,7 @@ class PowerConfig:
                 raise ValueError(
                     "power.driver: ina228 measures on-device; set power.mode: internal."
                 )
-            if self.firmware != "dedicated":
+            if self.firmware is not PowerFirmware.DEDICATED:
                 raise ValueError(
                     "power.driver: ina228 requires power.firmware: dedicated "
                     "(the measurement lives in the fixed-N power binary)."

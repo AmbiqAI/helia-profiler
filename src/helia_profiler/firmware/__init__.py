@@ -20,7 +20,7 @@ import yaml
 
 from .. import nsx as nsx_cli
 from ..compatibility import ENGINE_OWNED_MODULE_NAMES
-from ..config import Transport
+from ..config import PowerFirmware, Transport, WindowMode
 from ..engines import EngineType
 from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError
@@ -427,7 +427,7 @@ def generate_app(ctx: PipelineContext) -> Path:
     # selected, so non-power runs (and "shared"-mode power runs, which reuse
     # the transport binary and never touch hpx_profiler_power) keep an
     # unchanged CMakeLists.txt / firmware-render digest (see AGENTS.md WP2).
-    power_binary_enabled = config.power.enabled and config.power.firmware == "dedicated"
+    power_binary_enabled = config.power.enabled and config.power.firmware is PowerFirmware.DEDICATED
     aot_arena_regions = _resolved_aot_arena_regions(ctx)
 
     # --- Resolve module list ---
@@ -836,7 +836,7 @@ def render_power_source(ctx: PipelineContext, *, inference_count: int) -> Path:
     )
     template_vars = render_context.to_template_vars(power_only=True)
     template_vars.update(
-        window_mode="fixed",
+        window_mode=WindowMode.FIXED,
         clean_iters=inference_count,
     )
     template_name = (

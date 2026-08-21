@@ -34,6 +34,7 @@ import re
 import statistics
 from typing import Any
 
+from ..config import Aggregation
 from ..results import FirmwareMeta, LayerResult, PmuResult, PresetResult, PsramInfo
 from ..transport.protocol import HPX_PROTOCOL_VERSION
 from ..wire import (
@@ -67,7 +68,7 @@ _UINT32_WRAP_THRESHOLD = 1 << 31
 
 
 def parse_firmware_output(
-    lines: list[str], aggregation: str = "median"
+    lines: list[str], aggregation: Aggregation = Aggregation.MEDIAN
 ) -> PmuResult:
     """Parse HPX protocol output into structured profiling data.
 
@@ -387,15 +388,15 @@ def _row_is_frozen(row: dict[str, Any], numeric_cols: list[str]) -> bool:
     return seen
 
 
-def _aggregate(vals: list[float], method: str) -> float:
+def _aggregate(vals: list[float], method: Aggregation) -> float:
     """Reduce per-iteration samples to a single value via *method*."""
     if not vals:
         return 0.0
-    if method == "mean":
+    if method == Aggregation.MEAN:
         return sum(vals) / len(vals)
-    if method == "median":
+    if method == Aggregation.MEDIAN:
         return float(statistics.median(vals))
-    if method == "trimmed":
+    if method == Aggregation.TRIMMED:
         # Drop one low and one high extreme, then mean.  Needs >=3 samples to
         # trim; otherwise fall back to a plain mean.
         if len(vals) >= 3:
@@ -409,7 +410,7 @@ def _aggregate(vals: list[float], method: str) -> float:
 def _average_iterations(
     iterations: list[list[dict[str, Any]]],
     header: list[str],
-    aggregation: str = "median",
+    aggregation: Aggregation = Aggregation.MEDIAN,
 ) -> list[LayerResult]:
     """Aggregate numeric columns across iterations, returning typed LayerResult.
 

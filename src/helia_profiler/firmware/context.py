@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from ..config import DEFAULT_ARENA_SIZE_BYTES, Transport
+from ..config import DEFAULT_ARENA_SIZE_BYTES, CleanWindowProbe, Transport
 from ..counters import (
     plan_passes,
     resolve_counters,
@@ -531,7 +531,7 @@ class FirmwareRenderContext:
             # every firmware template (_main_base.cc.j2).  The host parser
             # takes any HPX_(\w+)=value line, so the hyphenated EngineType
             # values are underscored here rather than shipped as-is.
-            "engine_wire_name": self.engine.engine_type.value.replace("-", "_"),
+            "engine_wire_name": self.engine.engine_type.wire_name,
             "engine_header": self.engine.engine_header,
             "resolver_mode": self.engine.resolver_mode,
             "resolver_max_ops": self.engine.resolver_max_ops,
@@ -592,7 +592,12 @@ def resolve_window_timer(
     to close, one layer up (#118). The templates now read the resolved
     names and carry no policy of their own.
     """
-    busy_loop_probe = clean_window_probe == "busy_loop"
+    # ``==`` rather than ``is``: the parameter is annotated ``str`` because
+    # this is the render boundary — production passes the config's
+    # ``CleanWindowProbe`` member through, while hand-built render contexts
+    # pass the bare wire string.  A ``StrEnum`` member compares equal to its
+    # value, so one comparison covers both.
+    busy_loop_probe = clean_window_probe == CleanWindowProbe.BUSY_LOOP
     window_timer = (
         "stimer"
         if busy_loop_probe

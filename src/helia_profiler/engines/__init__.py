@@ -28,6 +28,17 @@ class EngineType(StrEnum):
     EXECUTORCH = "executorch"
 
     @property
+    def wire_name(self) -> str:
+        """Identifier the firmware emits on the wire (``HPX_ENGINE=``).
+
+        The wire protocol predates the hyphenated config spelling and uses
+        C-identifier-safe names, so ``helia-aot`` goes out as ``helia_aot``.
+        Owned here rather than derived inline at the render boundary so the
+        two spellings cannot drift apart.
+        """
+        return self.value.replace("-", "_")
+
+    @property
     def short_slug(self) -> str:
         """Compact identifier used in case IDs and report tables."""
         if self is EngineType.HELIA_RT:

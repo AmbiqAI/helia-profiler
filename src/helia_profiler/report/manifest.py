@@ -231,7 +231,7 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
                 # What ran inside the measured window: the busy_loop probe
                 # replaces the model with a calibrated CPU spin (#125).
                 ComparisonDimension.POWER_CLEAN_WINDOW_PROBE: (
-                    ctx.config.profiling.clean_window_probe
+                    ctx.config.profiling.clean_window_probe.value
                 ),
             }
         )

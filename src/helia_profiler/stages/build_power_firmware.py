@@ -6,6 +6,7 @@ import logging
 from dataclasses import replace
 from pathlib import Path
 
+from ..config import PowerFirmware
 from ..results import FirmwareArtifact
 from ..errors import BuildError, FirmwareError
 from ..pipeline import PipelineContext
@@ -34,7 +35,7 @@ class BuildPowerFirmwareStage:
     def should_skip(self, ctx: PipelineContext) -> bool:
         return (
             not ctx.config.power.enabled
-            or ctx.config.power.firmware != "dedicated"
+            or ctx.config.power.firmware is not PowerFirmware.DEDICATED
             or ctx.power_run is None
             or ctx.power_run.plan.inference_count is None
         )

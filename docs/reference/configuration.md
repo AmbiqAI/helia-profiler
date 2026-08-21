@@ -117,14 +117,14 @@ compute-unit group (``cpu``, ``mve``, ``memory``) to a selection:
 | `per_layer` | bool | `true` |  |
 | `iterations` | int | `100` |  |
 | `warmup` | int | `5` |  |
-| `window_mode` | str | `auto` |  |
+| `window_mode` | fixed \| auto | `auto` |  |
 | `window_target_ms` | int | `1000` | units: milliseconds |
 | `window_min` | int | `10` |  |
 | `window_max` | int | `500000` |  |
-| `clean_window_probe` | str | `infer` |  |
+| `clean_window_probe` | infer \| busy_loop | `infer` |  |
 | `clean_window_trace` | bool | `false` |  |
 | `force_shared_sram` | bool | `false` |  |
-| `aggregation` | str | `median` |  |
+| `aggregation` | mean \| median \| trimmed | `median` |  |
 | `extreme_mode` | bool | `false` |  |
 
 ## `power`
@@ -135,7 +135,7 @@ Power measurement settings.
 |---|---|---|---|
 | `enabled` | bool | `false` |  |
 | `driver` | str | `joulescope` |  |
-| `firmware` | str | `dedicated` |  |
+| `firmware` | dedicated \| shared | `dedicated` |  |
 | `mode` | external \| internal | `external` |  |
 | `duration_s` | int \| null | `null` | units: seconds |
 | `io_voltage` | float | `1.8` |  |

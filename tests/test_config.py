@@ -7,15 +7,19 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.config import (
+    Aggregation,
+    CleanWindowProbe,
     EngineConfig,
     EngineType,
     ModelConfig,
     NsxModuleOverride,
     PowerConfig,
+    PowerFirmware,
     ProfileConfig,
     ProfilingConfig,
     TargetConfig,
     Toolchain,
+    WindowMode,
     load_config,
 )
 from helia_profiler.errors import ConfigError
@@ -75,18 +79,122 @@ def test_aggregation_cli_override():
     assert config.profiling.aggregation == "trimmed"
 
 
-def test_invalid_aggregation_rejected():
-    from helia_profiler.config import ProfilingConfig
+# ---------------------------------------------------------------------------
+# Closed config vocabularies (#162 Phase 3)
+# ---------------------------------------------------------------------------
+# Each member VALUE is user- and wire-visible: it is what a config YAML says,
+# what the CLI --choices accept, what the Jinja render compares against, and
+# what lands in config_snapshot / config_sha256 / the run manifest.  Renaming
+# one silently changes every one of those, so the literals are pinned here
+# rather than derived from the enum under test.
 
-    with pytest.raises(ValueError, match="Invalid aggregation"):
-        ProfilingConfig(aggregation="bogus")
+_ENUM_VOCABULARIES = [
+    (WindowMode, {"FIXED": "fixed", "AUTO": "auto"}),
+    (CleanWindowProbe, {"INFER": "infer", "BUSY_LOOP": "busy_loop"}),
+    (Aggregation, {"MEAN": "mean", "MEDIAN": "median", "TRIMMED": "trimmed"}),
+    (PowerFirmware, {"DEDICATED": "dedicated", "SHARED": "shared"}),
+]
+_ENUM_VOCABULARY_IDS = [enum_cls.__name__ for enum_cls, _ in _ENUM_VOCABULARIES]
+
+#: section, field, enum, default member, the legal-values text an unknown
+#: value must produce.
+_ENUM_FIELDS = [
+    ("profiling", "window_mode", WindowMode, WindowMode.AUTO, "Input should be 'fixed' or 'auto'"),
+    (
+        "profiling",
+        "clean_window_probe",
+        CleanWindowProbe,
+        CleanWindowProbe.INFER,
+        "Input should be 'infer' or 'busy_loop'",
+    ),
+    (
+        "profiling",
+        "aggregation",
+        Aggregation,
+        Aggregation.MEDIAN,
+        "Input should be 'mean', 'median' or 'trimmed'",
+    ),
+    (
+        "power",
+        "firmware",
+        PowerFirmware,
+        PowerFirmware.DEDICATED,
+        "Input should be 'dedicated' or 'shared'",
+    ),
+]
+_ENUM_FIELD_IDS = [f"{section}.{field}" for section, field, *_ in _ENUM_FIELDS]
 
 
-def test_invalid_clean_window_probe_rejected():
-    from helia_profiler.config import ProfilingConfig
+def _load_with(section: str | None = None, field: str | None = None, value=None):
+    cli = {"model": {"path": "m.tflite"}, "engine": {"type": "helia-rt"}}
+    if section is not None:
+        cli[section] = {field: value}
+    return load_config(None, cli)
 
-    with pytest.raises(ValueError, match="Invalid clean_window_probe"):
-        ProfilingConfig(clean_window_probe="bogus")
+
+@pytest.mark.parametrize(
+    ("enum_cls", "expected"), _ENUM_VOCABULARIES, ids=_ENUM_VOCABULARY_IDS
+)
+def test_config_enum_wire_values_are_stable(enum_cls, expected):
+    assert {member.name: member.value for member in enum_cls} == expected
+
+
+@pytest.mark.parametrize(
+    ("enum_cls", "expected"), _ENUM_VOCABULARIES, ids=_ENUM_VOCABULARY_IDS
+)
+def test_config_enum_members_stay_interchangeable_with_their_strings(enum_cls, expected):
+    """StrEnum interop is load-bearing, not cosmetic.
+
+    Templates compare these against string literals, ``power/diagnostics.py``
+    tests set membership against a literal frozenset, and json.dumps writes
+    them into the manifest — all of which rely on a member comparing, hashing
+    and serializing exactly as its value.
+    """
+    for name, value in expected.items():
+        member = enum_cls[name]
+        assert member == value
+        assert f"{member}" == value
+        assert {value: name}[member] == name  # dict-key interop
+        assert member in frozenset({value})  # set-membership interop
+        assert json.dumps(member) == json.dumps(value)
+
+
+@pytest.mark.parametrize(
+    ("section", "field", "enum_cls", "default", "legal_values"),
+    _ENUM_FIELDS,
+    ids=_ENUM_FIELD_IDS,
+)
+def test_config_enum_field_default_when_absent(section, field, enum_cls, default, legal_values):
+    config = _load_with()
+    assert getattr(getattr(config, section), field) is default
+
+
+@pytest.mark.parametrize(
+    ("section", "field", "enum_cls", "default", "legal_values"),
+    _ENUM_FIELDS,
+    ids=_ENUM_FIELD_IDS,
+)
+def test_config_enum_field_accepts_every_legal_string(
+    section, field, enum_cls, default, legal_values
+):
+    for member in enum_cls:
+        config = _load_with(section, field, member.value)
+        assert getattr(getattr(config, section), field) is member
+
+
+@pytest.mark.parametrize(
+    ("section", "field", "enum_cls", "default", "legal_values"),
+    _ENUM_FIELDS,
+    ids=_ENUM_FIELD_IDS,
+)
+def test_config_enum_field_rejects_unknown_value(
+    section, field, enum_cls, default, legal_values
+):
+    with pytest.raises(ConfigError) as excinfo:
+        _load_with(section, field, "bogus")
+    message = str(excinfo.value)
+    assert f"{section}.{field}" in message
+    assert legal_values in message
 
 
 def test_jlink_serial_from_cli():
@@ -541,13 +649,13 @@ def test_load_config_duration_s_explicit_null_is_none():
 
 
 def test_load_config_profiling_value_error_wrapped_as_config_error():
-    """A bad ProfilingConfig value (e.g. aggregation) surfaces as ConfigError via load_config."""
+    """A bad ProfilingConfig value (e.g. window_min) surfaces as ConfigError via load_config."""
     cli = {
         "model": {"path": "m.tflite"},
         "engine": {"type": "helia-rt"},
-        "profiling": {"aggregation": "bogus"},
+        "profiling": {"window_min": 0},
     }
-    with pytest.raises(ConfigError, match="Invalid aggregation"):
+    with pytest.raises(ConfigError, match="window_min must be >= 1"):
         load_config(None, cli)
 
 
@@ -701,13 +809,18 @@ def test_non_dict_heartbeat_is_rejected():
 
 
 def test_direct_construction_still_coerces_strings():
-    profiling = ProfilingConfig(aggregation="median")
+    profiling = ProfilingConfig(
+        aggregation="median", window_mode="fixed", clean_window_probe="busy_loop"
+    )
     target = TargetConfig(toolchain="gcc")
-    power = PowerConfig(mode="external")
+    power = PowerConfig(mode="external", firmware="shared")
 
-    assert profiling.aggregation == "median"
+    assert profiling.aggregation is Aggregation.MEDIAN
+    assert profiling.window_mode is WindowMode.FIXED
+    assert profiling.clean_window_probe is CleanWindowProbe.BUSY_LOOP
     assert target.toolchain is Toolchain.ARM_NONE_EABI_GCC
     assert power.mode is PowerMode.EXTERNAL
+    assert power.firmware is PowerFirmware.SHARED
 
 
 
