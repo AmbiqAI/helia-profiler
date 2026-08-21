@@ -2432,8 +2432,8 @@ class TestPowerFirmwareSelection:
         for firmware in ("dedicated", "shared"):
             ctx = self._make_ctx(tmp_path, firmware=firmware)
             object.__setattr__(
-            ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
-        )
+                ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
+            )
             ctx.pmu_result = PmuResult(
                 meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
                 layers=[],

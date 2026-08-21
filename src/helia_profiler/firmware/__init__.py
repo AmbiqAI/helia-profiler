@@ -20,7 +20,7 @@ import yaml
 
 from .. import nsx as nsx_cli
 from ..compatibility import ENGINE_OWNED_MODULE_NAMES
-from ..config import PowerFirmware, Transport
+from ..config import PowerFirmware, Transport, WindowMode
 from ..engines import EngineType
 from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError
@@ -836,7 +836,7 @@ def render_power_source(ctx: PipelineContext, *, inference_count: int) -> Path:
     )
     template_vars = render_context.to_template_vars(power_only=True)
     template_vars.update(
-        window_mode="fixed",
+        window_mode=WindowMode.FIXED,
         clean_iters=inference_count,
     )
     template_name = (
