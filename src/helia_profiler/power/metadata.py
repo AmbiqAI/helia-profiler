@@ -215,7 +215,10 @@ def classify_observation(
     ``free_form`` one. Edge observations default to the scope verdict unless
     the capture recorded them explicitly.
     """
-    gated = metadata.measurement_scope is MeasurementScope.GPIO_GATED_CLEAN_WINDOW
+    # Equality, not identity: the field is mutable and str-typed for the
+    # third-party extension point, so a raw-string assignment after
+    # construction must still classify correctly.
+    gated = metadata.measurement_scope == MeasurementScope.GPIO_GATED_CLEAN_WINDOW
     mode = ObservationMode.GPIO_GATED if gated else ObservationMode.FREE_FORM
     integrity = PowerIntegrity.VALID if gated else PowerIntegrity.DEGRADED
     rise = metadata.gate_rise_observed if metadata.gate_rise_observed is not None else gated

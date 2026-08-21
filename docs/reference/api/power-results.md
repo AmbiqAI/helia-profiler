@@ -39,6 +39,14 @@ result.power.metadata["sync"]["lockstep"]    result.power.metadata.sync.lockstep
 The flat dict (exactly the shape written into `summary.json`) remains
 available as `result.power.metadata.to_metadata_dict()`.
 
+::: helia_profiler.PowerMetadata
+
+::: helia_profiler.MeasurementScope
+
+::: helia_profiler.ObservationMode
+
+::: helia_profiler.PowerIntegrity
+
 `measurement_scope` may hold a plain string for scopes reported by
 registered third-party drivers that HPX does not know; unknown scopes
 classify as not-gated.

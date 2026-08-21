@@ -707,6 +707,24 @@ def test_window_clock_ceiling_metadata_keys_are_the_documented_set():
     }
 
 
+def test_target_lifecycle_metadata_is_the_documented_shape():
+    # Independent pin for TargetLifecyclePlan.to_metadata(): the summary and
+    # run_metadata assertions above compare production output against
+    # _LIFECYCLE_PLAN.to_metadata() — the same method on the same object —
+    # which proves round-tripping, not the emitted shape. This literal is the
+    # shape, hand-written, so a renamed or dropped key fails here even while
+    # the round-trip assertions stay green (same rule as the
+    # window_clock_ceiling key-set pin above).
+    assert _LIFECYCLE_PLAN.to_metadata() == {
+        "phase": "power",
+        "power_cycle_attempted": True,
+        "power_cycle_succeeded": True,
+        "reset_strategy": "auto",
+        "reset_action": "debug_reset",
+        "actions": [],
+    }
+
+
 def test_busy_loop_probe_publishes_no_per_inference_power_metrics(tmp_path: Path):
     """A window that ran zero inferences must not report energy per inference.
 

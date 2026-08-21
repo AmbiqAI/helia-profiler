@@ -787,25 +787,6 @@ def assess_window_clock_ceiling(
     )
 
 
-def window_clock_ceiling_from_metadata(
-    data: dict[str, object],
-) -> WindowClockCeiling | None:
-    """Rebuild a ceiling from stored metadata, re-deriving the verdict.
-
-    The collect stage records the two measurements; downstream policy recomputes
-    ``exceeded`` from them rather than trusting a stored boolean, so the two
-    cannot drift apart the way a cached verdict would.
-    """
-    try:
-        return WindowClockCeiling(
-            elapsed_us=int(data["elapsed_us"]),  # type: ignore[arg-type]
-            host_envelope_s=float(data["host_envelope_s"]),  # type: ignore[arg-type]
-            slack_s=float(data["slack_s"]),  # type: ignore[arg-type]
-        )
-    except (KeyError, TypeError, ValueError):
-        return None
-
-
 def assess_run_window_clock(
     *,
     elapsed_us: int | None,
@@ -963,5 +944,4 @@ __all__ = [
     "classify_gate_failure",
     "firmware_window_clock_is_frozen",
     "gated_window_reference_s",
-    "window_clock_ceiling_from_metadata",
 ]

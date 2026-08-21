@@ -432,14 +432,14 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     if (
         ctx.model_analysis is not None
         and ctx.power_result is not None
-        and ctx.power_result.metadata.measurement_scope is not MeasurementScope.FREE_FORM_CAPTURE
+        and ctx.power_result.metadata.measurement_scope != MeasurementScope.FREE_FORM_CAPTURE
     ):
         ma = ctx.model_analysis
         ps = ctx.power_result.summary
         if ps.avg_power_w and ps.avg_power_w > 0 and ps.duration_s and ps.duration_s > 0:
             infer_count = 1
             if (
-                ctx.power_result.metadata.measurement_scope is MeasurementScope.GPIO_GATED_CLEAN_WINDOW
+                ctx.power_result.metadata.measurement_scope == MeasurementScope.GPIO_GATED_CLEAN_WINDOW
                 and ctx.pmu_result is not None
                 and ctx.pmu_result.meta.clean_infer_count
             ):
