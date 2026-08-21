@@ -28,7 +28,8 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.engines.base import EngineArtifacts
+from helia_profiler.engines import TFLM_ENGINE_HEADER
+from helia_profiler.engines.base import TflmArtifacts
 from helia_profiler.firmware import _jinja_env
 from helia_profiler.firmware.context import FirmwareRenderContext
 from helia_profiler.pipeline import PipelineContext
@@ -47,7 +48,7 @@ def _firmware_spin_target_ms(ctx: PipelineContext) -> int:
     """The window length the generated C is actually built to spin for."""
     # from_pipeline_context asserts the engine stage has run; nothing about the
     # window target depends on which engine.
-    ctx.engine_artifacts = EngineArtifacts()
+    ctx.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
     template_vars = FirmwareRenderContext.from_pipeline_context(ctx).to_template_vars()
     rendered = _jinja_env.get_template("_busy_loop_calibration.j2").render(
         **template_vars

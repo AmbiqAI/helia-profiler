@@ -45,7 +45,7 @@ from helia_profiler.target.lifecycle import (
     TargetLifecyclePlan,
 )
 from helia_profiler.config import load_config
-from helia_profiler.engines.base import EngineArtifacts
+from helia_profiler.engines.base import HeliaAotArtifacts
 from helia_profiler.engines import EngineType
 from helia_profiler.evaluation import LayerOps, ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
@@ -322,8 +322,13 @@ def _make_ctx(tmp_path: Path, engine: EngineType, fmt: str) -> PipelineContext:
 
 def _make_aot_ctx(tmp_path: Path) -> PipelineContext:
     ctx = _make_ctx(tmp_path, EngineType.HELIA_AOT, "csv")
-    ctx.engine_artifacts = EngineArtifacts(
+    ctx.engine_artifacts = HeliaAotArtifacts(
         engine_type=EngineType.HELIA_AOT,
+        engine_header="model_model.h",
+        aot_prefix="model",
+        aot_module_name="aot-model",
+        aot_cmake_target="nsx::aot_model",
+        helia_aot_version="0.18.4",
         aot_op_manifest=[
             {
                 "idx": 0,

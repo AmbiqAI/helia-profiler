@@ -9,7 +9,7 @@ from ..errors import EngineError
 from ..placement import Placement
 from ..results import NsxModuleRef
 from . import EngineType, TFLM_ENGINE_HEADER
-from .base import ArenaRegion, EngineArtifacts
+from .base import ArenaRegion, TflmArtifacts
 
 
 TFLITE_MICRO_MODULE = "nsx-tflite-micro"
@@ -45,7 +45,7 @@ class TFLMAdapter:
         del target
         return regions
 
-    def prepare(self, config: ProfileConfig, work_dir: Path) -> EngineArtifacts:
+    def prepare(self, config: ProfileConfig, work_dir: Path) -> TflmArtifacts:
         """Resolve the reference or upstream-CMSIS-NN TFLM NSX modules."""
         del work_dir
 
@@ -77,7 +77,7 @@ class TFLMAdapter:
             )
         )
 
-        return EngineArtifacts(
+        return TflmArtifacts(
             engine_type=EngineType.TFLM,
             extra_modules=extra_modules,
             cmake_vars={"NSX_TFLITE_MICRO_BACKEND": backend},

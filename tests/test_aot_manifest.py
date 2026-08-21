@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from helia_profiler.engines.base import HeliaAotArtifacts
 from helia_profiler.engines.helia_aot.compile import _BOARD_TO_AOT_PLATFORM
 from helia_profiler.engines.helia_aot.manifest import (
     _arena_region_id_lookup,
@@ -275,14 +276,25 @@ class TestExtractOperatorManifest:
 # ---------- _write_aot_manifest ----------------------------------------------
 
 
-class _StubArtifacts:
-    def __init__(self, manifest: list[dict[str, Any]] | None):
-        self.aot_op_manifest = manifest
+def _aot_artifacts(manifest: list[dict[str, Any]] | None) -> HeliaAotArtifacts:
+    """A real heliaAOT artifact bundle carrying *manifest*.
+
+    The writers narrow on the artifact type, so this is the type the
+    production path actually hands them.
+    """
+    return HeliaAotArtifacts(
+        engine_header="model_model.h",
+        aot_prefix="model",
+        aot_module_name="aot-model",
+        aot_cmake_target="nsx::aot_model",
+        helia_aot_version="0.18.4",
+        aot_op_manifest=manifest,
+    )
 
 
 class _StubCtx:
     def __init__(self, manifest: list[dict[str, Any]] | None):
-        self.engine_artifacts = _StubArtifacts(manifest)
+        self.engine_artifacts = _aot_artifacts(manifest)
 
 
 class TestWriteAotManifest:

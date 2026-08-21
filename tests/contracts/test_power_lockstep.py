@@ -379,7 +379,8 @@ class TestLockstepDefaultsOnWhenWired:
         pinned nowhere (the render snapshots hardcode both values to False and
         their marker is a substring test that is true regardless).
         """
-        from helia_profiler.engines.base import EngineArtifacts
+        from helia_profiler.engines import TFLM_ENGINE_HEADER
+        from helia_profiler.engines.base import TflmArtifacts
         from helia_profiler.firmware import _jinja_env
         from helia_profiler.firmware.context import FirmwareRenderContext
 
@@ -393,7 +394,7 @@ class TestLockstepDefaultsOnWhenWired:
         )
         # from_pipeline_context asserts the engine stage has run; nothing about
         # the lock-step hand-off depends on which engine.
-        ctx.engine_artifacts = EngineArtifacts()
+        ctx.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
 
         template_vars = FirmwareRenderContext.from_pipeline_context(ctx).to_template_vars()
 

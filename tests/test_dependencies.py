@@ -22,7 +22,8 @@ from helia_profiler.dependencies import (
     prepare_locked_dependencies,
     read_dependency_lock_provenance,
 )
-from helia_profiler.engines.base import EngineArtifacts
+from helia_profiler.engines import TFLM_ENGINE_HEADER
+from helia_profiler.engines.base import TflmArtifacts
 from helia_profiler.errors import DependencyError, LockError, VersionError
 from helia_profiler.errors import BuildError
 from helia_profiler.pipeline import PipelineContext
@@ -60,7 +61,7 @@ def _context(
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
     ResolvePlatformStage().run(ctx)
-    ctx.engine_artifacts = EngineArtifacts()
+    ctx.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
     ctx.dependency_workspace = create_workspace(ctx)
     ctx.firmware_dir = ctx.dependency_workspace.root / "profiler_app"
     ctx.firmware_dir.mkdir(parents=True, exist_ok=True)
@@ -196,7 +197,7 @@ def test_engine_release_source_mapping_is_fingerprinted_and_serialized(
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
     ResolvePlatformStage().run(ctx)
-    ctx.engine_artifacts = EngineArtifacts()
+    ctx.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
 
     workspace = create_workspace(ctx)
 
@@ -369,7 +370,7 @@ def test_model_and_firmware_config_changes_isolate_workspaces(tmp_path: Path) ->
     )
     third = PipelineContext(config=config, work_dir=tmp_path / "three" / "work")
     ResolvePlatformStage().run(third)
-    third.engine_artifacts = EngineArtifacts()
+    third.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
     third.dependency_workspace = create_workspace(third)
 
     assert first.dependency_workspace.fingerprint != second.dependency_workspace.fingerprint

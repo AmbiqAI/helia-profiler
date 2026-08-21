@@ -292,10 +292,13 @@ def create_workspace(ctx: PipelineContext) -> DependencyWorkspace:
                     if ctx.config.engine.config_path is not None
                     else None
                 ),
-                "resolved_backend": artifacts.engine_backend,
-                "resolved_variant": artifacts.heliart_variant,
-                "resolved_version": artifacts.heliart_version or artifacts.helia_aot_version,
-                "toolchain_tag": artifacts.heliart_toolchain_tag,
+                # Engine-agnostic identity: each artifact subtype routes these
+                # to its own fields (None where the engine has no such notion),
+                # so the fingerprint inputs are unchanged for every engine.
+                "resolved_backend": artifacts.resolved_backend,
+                "resolved_variant": artifacts.resolved_variant,
+                "resolved_version": artifacts.resolved_version,
+                "toolchain_tag": artifacts.resolved_toolchain_tag,
                 "cmake_vars": artifacts.cmake_vars,
                 "extra_modules": extra_modules,
             },

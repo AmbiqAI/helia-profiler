@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING
 from ..config import DEFAULT_ARENA_SIZE_BYTES
 from ..errors import PlatformError
 from ..engines import EngineType, get_adapter
+from ..engines.base import ExecutorchArtifacts
 from ..pipeline import PipelineContext
 from ..placement import MemoryRegion, Placement, resolve_fastest_fit_placement
 from ..platform import MemoryLayout, SocDef
@@ -164,7 +165,7 @@ class PlanMemoryStage:
                 "weights",
             )
 
-        if engine_type is EngineType.EXECUTORCH and artifacts is not None:
+        if engine_type is EngineType.EXECUTORCH and isinstance(artifacts, ExecutorchArtifacts):
             # The generated ExecuTorch runner owns several explicit buffers in
             # addition to the PTE memory-planned arena. Each buffer follows
             # the run's arena region unless its engine.config *_location
@@ -177,34 +178,37 @@ class PlanMemoryStage:
                     return MemoryRegion.SRAM
                 return arena_phys
 
+            # Every size below is a required positive int on
+            # ExecutorchArtifacts (the adapter resolves each through
+            # _positive_int), so none of them needs a fallback.
             add(
                 executorch_region(artifacts.executorch_planned_arena_region),
                 "planned_arena",
-                int(artifacts.executorch_planned_arena_size or arena),
+                artifacts.executorch_planned_arena_size,
                 "arena",
             )
             add(
                 executorch_region(artifacts.executorch_method_arena_region),
                 "method_arena",
-                int(artifacts.executorch_method_arena_size or 0),
+                artifacts.executorch_method_arena_size,
                 "other",
             )
             add(
                 executorch_region(artifacts.executorch_temporary_arena_region),
                 "temporary_arena",
-                int(artifacts.executorch_temporary_arena_size or 0),
+                artifacts.executorch_temporary_arena_size,
                 "other",
             )
             add(
                 executorch_region(artifacts.executorch_io_region),
                 "input_buffer",
-                int(artifacts.executorch_input_size or 0),
+                artifacts.executorch_input_size,
                 "other",
             )
             add(
                 executorch_region(artifacts.executorch_io_region),
                 "output_buffer",
-                int(artifacts.executorch_output_size or 0),
+                artifacts.executorch_output_size,
                 "other",
             )
             # sizeof(LayerRecord) is 32 bytes on the 32-bit target ABI: a

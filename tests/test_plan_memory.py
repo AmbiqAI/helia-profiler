@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.config import load_config
-from helia_profiler.engines.base import EngineArtifacts
+from helia_profiler.engines.base import ExecutorchArtifacts, HeliaAotArtifacts
 from helia_profiler.errors import PlatformError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.platform import BoardDef, MemoryLayout, SocDef, SocFamily, CoreArch, PmuTier
@@ -67,8 +67,9 @@ class TestPlanMemorySynthesise:
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
         ResolvePlatformStage().run(ctx)
-        ctx.engine_artifacts = EngineArtifacts(
+        ctx.engine_artifacts = ExecutorchArtifacts(
             engine_type=config.engine.type,
+            engine_header="nsx_executorch.h",
             executorch_method_arena_size=65536,
             executorch_planned_arena_size=163840,
             executorch_temporary_arena_size=32768,
@@ -111,8 +112,9 @@ class TestPlanMemorySynthesise:
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
         ResolvePlatformStage().run(ctx)
-        ctx.engine_artifacts = EngineArtifacts(
+        ctx.engine_artifacts = ExecutorchArtifacts(
             engine_type=config.engine.type,
+            engine_header="nsx_executorch.h",
             executorch_method_arena_size=65536,
             executorch_planned_arena_size=163840,
             executorch_temporary_arena_size=32768,
@@ -156,8 +158,9 @@ class TestPlanMemorySynthesise:
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
         ResolvePlatformStage().run(ctx)
-        ctx.engine_artifacts = EngineArtifacts(
+        ctx.engine_artifacts = ExecutorchArtifacts(
             engine_type=config.engine.type,
+            engine_header="nsx_executorch.h",
             executorch_method_arena_size=65536,
             executorch_planned_arena_size=138240,
             executorch_temporary_arena_size=32768,
@@ -407,7 +410,14 @@ class TestPlanMemoryEngineProvided:
             ),
             model_weight_bytes=12_000,
         )
-        ctx.engine_artifacts = EngineArtifacts(memory_plan=plan)
+        ctx.engine_artifacts = HeliaAotArtifacts(
+            engine_header="model_model.h",
+            aot_prefix="model",
+            aot_module_name="aot-model",
+            aot_cmake_target="nsx::aot_model",
+            helia_aot_version="0.18.4",
+            memory_plan=plan,
+        )
         PlanMemoryStage().run(ctx)
 
         assert ctx.memory_plan.engine == "helia-aot"
@@ -434,7 +444,14 @@ class TestPlanMemoryOverflow:
                 ),
             ),
         )
-        ctx.engine_artifacts = EngineArtifacts(memory_plan=plan)
+        ctx.engine_artifacts = HeliaAotArtifacts(
+            engine_header="model_model.h",
+            aot_prefix="model",
+            aot_module_name="aot-model",
+            aot_cmake_target="nsx::aot_model",
+            helia_aot_version="0.18.4",
+            memory_plan=plan,
+        )
 
         with pytest.raises(PlatformError) as exc_info:
             PlanMemoryStage().run(ctx)

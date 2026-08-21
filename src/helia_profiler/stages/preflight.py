@@ -219,8 +219,8 @@ def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
         # no verdict. Deliberately fail-OPEN: wrongly gating a working engine
         # raises with no override, which is how v1 of this check shipped. An
         # engine that runs TFLM's interpreter on target belongs in the tuple
-        # above -- note EngineArtifacts.engine_header DEFAULTS to TFLM's, so a
-        # new adapter can inherit TFLM firmware without inheriting this gate.
+        # above -- a new adapter can name TFLM's engine_header (as heliaRT
+        # does) and inherit TFLM firmware without inheriting this gate.
         return
 
     if not unsupported:

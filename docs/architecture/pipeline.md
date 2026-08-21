@@ -87,7 +87,7 @@ captured.
 **Sets:** `ctx.engine_artifacts`
 
 Instantiates the selected heliaRT, heliaAOT, TFLM, or ExecuTorch adapter and calls its
-`prepare()` method. The adapter produces an `EngineArtifacts` bundle that records
+`prepare()` method. The adapter produces its engine's `EngineArtifacts` subtype that records
 engine identity plus any local NSX modules, static libraries, and memory-planning
 metadata needed by later stages.
 

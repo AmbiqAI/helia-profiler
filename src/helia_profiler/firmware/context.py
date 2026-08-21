@@ -13,6 +13,7 @@ from ..counters import (
     validate_group_selection,
 )
 from ..engines import EngineType
+from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
 from ..errors import FirmwareError
 from ..placement import Placement
 from ..target.lifecycle import resolve_power_lockstep
@@ -280,10 +281,55 @@ class FirmwareRenderContext:
             for layer in (ctx.model_analysis.layers if ctx.model_analysis else ())
             if layer.op == "VAR_HANDLE"
         )
-        aot_manifest = tuple(
-            AotOpContext(id=int(op["id"]), op_type=str(op["op_type"]))
-            for op in (artifacts.aot_op_manifest or [])
-        )
+        # Engine-specific render inputs, narrowed once here. EngineContext
+        # keeps a field per engine's inputs, so an engine that does not own a
+        # given field renders the same neutral value it always has: aot_prefix
+        # "", no operator manifest, arenas allocated by the engine, ExecuTorch
+        # sizes 0, and every ExecuTorch buffer following the resolved arena
+        # region.
+        if isinstance(artifacts, HeliaAotArtifacts):
+            aot_prefix = artifacts.aot_prefix
+            allocate_arenas = artifacts.aot_allocate_arenas
+            aot_manifest = tuple(
+                AotOpContext(id=int(op["id"]), op_type=str(op["op_type"]))
+                for op in (artifacts.aot_op_manifest or [])
+            )
+        else:
+            aot_prefix = ""
+            allocate_arenas = True
+            aot_manifest = ()
+
+        default_executorch_region = _executorch_default_region(arena_region)
+        if isinstance(artifacts, ExecutorchArtifacts):
+            method_arena_size = artifacts.executorch_method_arena_size
+            planned_arena_size = artifacts.executorch_planned_arena_size
+            temporary_arena_size = artifacts.executorch_temporary_arena_size
+            input_size = artifacts.executorch_input_size
+            output_size = artifacts.executorch_output_size
+            # Per-buffer overrides win; otherwise every runtime buffer follows
+            # the run's resolved arena region (which the memory planner keeps
+            # within tcm/sram for ExecuTorch).
+            planned_arena_region = (
+                artifacts.executorch_planned_arena_region or default_executorch_region
+            )
+            method_arena_region = (
+                artifacts.executorch_method_arena_region or default_executorch_region
+            )
+            temporary_arena_region = (
+                artifacts.executorch_temporary_arena_region or default_executorch_region
+            )
+            io_region = artifacts.executorch_io_region or default_executorch_region
+        else:
+            method_arena_size = 0
+            planned_arena_size = 0
+            temporary_arena_size = 0
+            input_size = 0
+            output_size = 0
+            planned_arena_region = default_executorch_region
+            method_arena_region = default_executorch_region
+            temporary_arena_region = default_executorch_region
+            io_region = default_executorch_region
+
         pmu_passes = tuple(_resolve_pmu_passes(config, soc))
         transport = config.target.transport
         printf_linkage = "static " if engine_type is EngineType.HELIA_AOT else ""
@@ -309,7 +355,7 @@ class FirmwareRenderContext:
                 arena_size=config.model.arena_size or DEFAULT_ARENA_SIZE_BYTES,
                 model_size=config.model.path.stat().st_size if config.model.path.exists() else 0,
                 arena_regions=aot_arena_regions,
-                allocate_arenas=artifacts.aot_allocate_arenas,
+                allocate_arenas=allocate_arenas,
                 has_dcache=soc.capabilities.memory.has_dcache,
                 manages_shared_ssram_power=soc.capabilities.memory.has_shared_ssram_power_domain,
                 ssram_full_power_enum=soc.ssram_full_power_enum,
@@ -365,34 +411,17 @@ class FirmwareRenderContext:
                 resolver_max_ops=resolver_plan.max_ops,
                 resolver_registrations=tuple(resolver_plan.registrations),
                 resource_variable_count=resource_variable_count,
-                aot_prefix=artifacts.aot_prefix or "",
+                aot_prefix=aot_prefix,
                 aot_op_manifest=aot_manifest,
-                executorch_method_arena_size=artifacts.executorch_method_arena_size or 0,
-                executorch_planned_arena_size=artifacts.executorch_planned_arena_size or 0,
-                executorch_temporary_arena_size=(
-                    artifacts.executorch_temporary_arena_size or 0
-                ),
-                executorch_input_size=artifacts.executorch_input_size or 0,
-                executorch_output_size=artifacts.executorch_output_size or 0,
-                # Per-buffer overrides win; otherwise every runtime buffer
-                # follows the run's resolved arena region (which the memory
-                # planner keeps within tcm/sram for ExecuTorch).
-                executorch_planned_arena_region=(
-                    artifacts.executorch_planned_arena_region
-                    or _executorch_default_region(arena_region)
-                ),
-                executorch_method_arena_region=(
-                    artifacts.executorch_method_arena_region
-                    or _executorch_default_region(arena_region)
-                ),
-                executorch_temporary_arena_region=(
-                    artifacts.executorch_temporary_arena_region
-                    or _executorch_default_region(arena_region)
-                ),
-                executorch_io_region=(
-                    artifacts.executorch_io_region
-                    or _executorch_default_region(arena_region)
-                ),
+                executorch_method_arena_size=method_arena_size,
+                executorch_planned_arena_size=planned_arena_size,
+                executorch_temporary_arena_size=temporary_arena_size,
+                executorch_input_size=input_size,
+                executorch_output_size=output_size,
+                executorch_planned_arena_region=planned_arena_region,
+                executorch_method_arena_region=method_arena_region,
+                executorch_temporary_arena_region=temporary_arena_region,
+                executorch_io_region=io_region,
             ),
         )
 

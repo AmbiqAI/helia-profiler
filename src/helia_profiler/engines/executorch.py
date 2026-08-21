@@ -13,7 +13,7 @@ from ..errors import EngineError
 from ..placement import Placement
 from ..results import NsxModuleRef
 from . import EngineType
-from .base import ArenaRegion, EngineArtifacts
+from .base import ArenaRegion, ExecutorchArtifacts
 
 EXECUTORCH_MODULE = "nsx-executorch"
 EXECUTORCH_PROJECT = "nsx-executorch"
@@ -243,7 +243,7 @@ class ExecuTorchAdapter:
         del target
         return regions
 
-    def prepare(self, config: ProfileConfig, work_dir: Path) -> EngineArtifacts:
+    def prepare(self, config: ProfileConfig, work_dir: Path) -> ExecutorchArtifacts:
         engine_config = config.engine.config
         source_value = engine_config.get("source_path")
         if not isinstance(source_value, (str, Path)):
@@ -394,7 +394,7 @@ class ExecuTorchAdapter:
         )
 
         provider_module = _provider_module_ref(config, work_dir, provider)
-        return EngineArtifacts(
+        return ExecutorchArtifacts(
             engine_type=EngineType.EXECUTORCH,
             extra_modules=[
                 # The provider must precede nsx-executorch so NSX configures it

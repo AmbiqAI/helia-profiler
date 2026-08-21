@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, ClassVar, Protocol, runtime_checkable
 
 from ..config import ProfileConfig
 from ..placement import ArenaRole, Placement
 from ..results import NsxModuleRef, MemoryPlan
-from . import EngineType, TFLM_ENGINE_HEADER
+from . import EngineType
 
 
 @dataclass(frozen=True)
@@ -60,16 +60,32 @@ class ArenaRegion:
     blob_filename: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class EngineArtifacts:
-    """Outputs produced by an engine adapter's prepare step.
+    """Common core of the outputs produced by an engine adapter's prepare step.
 
-    These are consumed by the firmware template renderer.
+    Every adapter returns a per-engine subclass (:class:`TflmArtifacts`,
+    :class:`HeliaRtArtifacts`, :class:`HeliaAotArtifacts`,
+    :class:`ExecutorchArtifacts`).  This base carries only what *every*
+    engine produces; engine-specific outputs live on the subclass, so a
+    wrong-engine read is an ``AttributeError`` at the access site instead
+    of a silently-defaulted ``None``.
+
+    Consumers that need engine-specific fields narrow with ``isinstance``
+    at their existing ``engine_type`` branch points.  The four
+    ``resolved_*`` identity properties stay on the base so the workspace
+    fingerprint (``dependencies.py``) remains engine-agnostic.
     """
 
-    # Identity of the producing engine — single source of truth.  Use
-    # this for engine-specific dispatch instead of branching on a string.
-    engine_type: EngineType = EngineType.TFLM
+    #: Identity of the producing engine — single source of truth.  Use
+    #: this for engine-specific dispatch instead of branching on a string.
+    #: Each subclass pins it; a mismatched value raises ``ValueError``.
+    engine_type: EngineType
+
+    #: C/C++ header included by the firmware main template to pull in the
+    #: engine's public API.  Every adapter states its own — there is no
+    #: cross-engine default for a new adapter to inherit by accident.
+    engine_header: str
 
     # Additional NSX modules the profiler app needs (e.g. a local heliaRT wrapper)
     extra_modules: list[NsxModuleRef] = field(default_factory=list)
@@ -86,54 +102,173 @@ class EngineArtifacts:
     # Paths to static libraries to link
     static_libs: list[Path] = field(default_factory=list)
 
-    # --- Typed engine-output fields (consumed by firmware/template renderer) ---
-
-    # C/C++ header included by the firmware main template to pull in the
-    # engine's public API.  All engines provide this.  Defaults to the
-    # stock TFLM interpreter header so adapters that omit it still render.
-    engine_header: str = TFLM_ENGINE_HEADER
-
-    # heliaRT-only metadata (None for other engines).  Surfaced in
-    # report metadata and used by version-compat assertions in tests.
-    engine_backend: str | None = None
-    heliart_version: str | None = None
-    heliart_variant: str | None = None
-    heliart_toolchain_tag: str | None = None
-    helia_aot_version: str | None = None
-
-    # heliaAOT-only fields (None / defaults for other engines).
-    aot_prefix: str | None = None
-    aot_module_name: str | None = None
-    aot_cmake_target: str | None = None
-    aot_allocate_arenas: bool = True
-    aot_arena_regions: list[ArenaRegion] = field(default_factory=list)
-
-    # AOT operator manifest \u2014 ordered list of post-codegen operator
-    # descriptors (idx, id, op_type, name, inputs, outputs).  Set by
-    # :class:`HeliaAOTAdapter`; consumed by the firmware template
-    # (``main_aot.cc.j2``) for the per-op callback table and by the
-    # report stage to emit ``ops.json``.  ``None`` for non-AOT engines.
-    aot_op_manifest: list[dict[str, Any]] | None = None
-
     # Optional memory plan built from engine-specific internals (e.g.
     # heliaAOT's ``codegen_ctx.memory_plan``).  If None, ``plan_memory``
     # stage synthesises a conservative plan from ``model.arena_size`` and
     # the resolved split placement.
     memory_plan: MemoryPlan | None = None
 
-    # ExecuTorch PTE runtime contract. ExecuTorch intentionally keeps these
-    # explicit because a PTE does not expose a stable host-side sizing API.
-    executorch_method_arena_size: int | None = None
-    executorch_planned_arena_size: int | None = None
-    executorch_temporary_arena_size: int | None = None
-    executorch_input_size: int | None = None
-    executorch_output_size: int | None = None
-    # Per-buffer memory regions ("tcm" | "sram"); None = follow the run's
-    # resolved arena region (model.arena_location or the planner's choice).
+    #: Engine type this class is pinned to — ``None`` on the base, which
+    #: accepts any.  Read by :meth:`__post_init__`.
+    _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = None
+
+    def __post_init__(self) -> None:
+        if type(self) is EngineArtifacts:
+            # The base is a common core, not a constructible engine identity:
+            # a bare instance would silently take every non-matching branch at
+            # the isinstance dispatch sites (the exact failure mode the split
+            # exists to make loud).
+            raise TypeError(
+                "EngineArtifacts is abstract - construct the engine's artifact "
+                "type (TflmArtifacts, HeliaRtArtifacts, HeliaAotArtifacts, "
+                "ExecutorchArtifacts) instead."
+            )
+        pinned = type(self)._PINNED_ENGINE_TYPE
+        # Identity, not equality: EngineType is a StrEnum, so `!=` would let a
+        # raw string like "helia-aot" pass the pin and then fail every
+        # downstream `engine_type is EngineType.X` dispatch.
+        if pinned is not None and self.engine_type is not pinned:
+            raise ValueError(
+                f"{type(self).__name__} is pinned to engine_type {pinned.value!r}, "
+                f"got {self.engine_type!r}"
+            )
+
+    # -- Resolved engine identity (workspace fingerprint inputs) ------------
+    #
+    # ``dependencies.py`` records the identity the adapter actually
+    # resolved.  These four properties keep that call site engine-agnostic:
+    # the base answers ``None`` and each subclass routes to its own fields.
+
+    @property
+    def resolved_backend(self) -> str | None:
+        """Engine backend the adapter resolved (None when the engine has none)."""
+        return None
+
+    @property
+    def resolved_version(self) -> str | None:
+        """Engine version the adapter resolved (None when the engine has none)."""
+        return None
+
+    @property
+    def resolved_variant(self) -> str | None:
+        """Engine build variant the adapter resolved (None when the engine has none)."""
+        return None
+
+    @property
+    def resolved_toolchain_tag(self) -> str | None:
+        """Engine toolchain tag the adapter resolved (None when the engine has none)."""
+        return None
+
+
+@dataclass(frozen=True, kw_only=True)
+class TflmArtifacts(EngineArtifacts):
+    """Stock TFLM adapter outputs — the common core, nothing more."""
+
+    engine_type: EngineType = EngineType.TFLM
+
+    _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.TFLM
+
+
+@dataclass(frozen=True, kw_only=True)
+class HeliaRtArtifacts(EngineArtifacts):
+    """heliaRT adapter outputs.
+
+    All four identity fields are required: both construction paths in
+    ``engines/helia_rt/adapter.py`` — the NSX-registry release and the
+    local/custom module (source build or prebuilt distribution) — set every
+    one of them unconditionally.  They are surfaced in report metadata,
+    used by version-compat assertions, and recorded in the workspace
+    fingerprint.
+    """
+
+    engine_type: EngineType = EngineType.HELIA_RT
+
+    engine_backend: str
+    heliart_version: str
+    heliart_variant: str
+    heliart_toolchain_tag: str
+
+    _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.HELIA_RT
+
+    @property
+    def resolved_backend(self) -> str | None:
+        return self.engine_backend
+
+    @property
+    def resolved_version(self) -> str | None:
+        return self.heliart_version
+
+    @property
+    def resolved_variant(self) -> str | None:
+        return self.heliart_variant
+
+    @property
+    def resolved_toolchain_tag(self) -> str | None:
+        return self.heliart_toolchain_tag
+
+
+@dataclass(frozen=True, kw_only=True)
+class HeliaAotArtifacts(EngineArtifacts):
+    """heliaAOT adapter outputs — generated module, arenas, operator manifest."""
+
+    engine_type: EngineType = EngineType.HELIA_AOT
+
+    #: Symbol prefix of the generated AOT module.  Required: the firmware
+    #: template names every generated entry point through it (the consumer
+    #: used to assert it non-None).
+    aot_prefix: str
+    #: NSX module name of the generated AOT module.
+    aot_module_name: str
+    #: CMake target the app links against (``nsx::<module>``).
+    aot_cmake_target: str
+    #: Version of the installed ``helia-aot`` compiler that produced this.
+    helia_aot_version: str
+
+    #: False when the AOT module expects externally bound arenas.
+    aot_allocate_arenas: bool = True
+    #: Arena buffers the firmware binds individually via ``bind_arena()``.
+    aot_arena_regions: list[ArenaRegion] = field(default_factory=list)
+
+    #: AOT operator manifest — ordered list of post-codegen operator
+    #: descriptors (idx, id, op_type, name, inputs, outputs).  Consumed by
+    #: the firmware template (``main_aot.cc.j2``) for the per-op callback
+    #: table and by the report stage.  ``None`` when the manifest could not
+    #: be extracted from the codegen context.
+    aot_op_manifest: list[dict[str, Any]] | None = None
+
+    _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.HELIA_AOT
+
+    @property
+    def resolved_version(self) -> str | None:
+        return self.helia_aot_version
+
+
+@dataclass(frozen=True, kw_only=True)
+class ExecutorchArtifacts(EngineArtifacts):
+    """ExecuTorch adapter outputs — the explicit PTE runtime contract.
+
+    ExecuTorch keeps the buffer sizes explicit because a PTE does not
+    expose a stable host-side sizing API.  All five are required: the
+    adapter resolves each through ``_positive_int``, which either returns
+    a positive ``int`` or raises.
+    """
+
+    engine_type: EngineType = EngineType.EXECUTORCH
+
+    executorch_method_arena_size: int
+    executorch_planned_arena_size: int
+    executorch_temporary_arena_size: int
+    executorch_input_size: int
+    executorch_output_size: int
+
+    #: Per-buffer memory regions ("tcm" | "sram"); None = follow the run's
+    #: resolved arena region (model.arena_location or the planner's choice).
     executorch_planned_arena_region: str | None = None
     executorch_method_arena_region: str | None = None
     executorch_temporary_arena_region: str | None = None
     executorch_io_region: str | None = None
+
+    _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.EXECUTORCH
 
 
 @runtime_checkable
