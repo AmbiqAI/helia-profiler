@@ -1,10 +1,15 @@
 """Contract: firmware render snapshots across SoC x transport x engine.
 
-Renders the real firmware templates (``main.cc.j2`` for TFLM/heliaRT and
-``main_aot.cc.j2`` for heliaAOT) through the profiler's real Jinja environment
-for the supported (SoC x transport x engine) matrix, with template variables
-sourced from platform metadata exactly as ``firmware.generate_app`` sources
-them.
+Renders the real firmware templates (``main.cc.j2`` for TFLM/heliaRT,
+``main_aot.cc.j2`` for heliaAOT and ``main_executorch.cc.j2`` for ExecuTorch)
+through the profiler's real Jinja environment for the supported
+(SoC x transport x engine) matrix, with template variables sourced from
+platform metadata exactly as ``firmware.generate_app`` sources them.
+
+The matrix is not a full cross product: ExecuTorch is Cortex-M55-only in
+production and has no dedicated power binary, so it pairs with apollo510
+alone and appears in neither the power nor the busy-loop matrices (see
+``_ENGINE_SOCS`` / ``_MATRIX_ENGINES``).
 
 For each combination we snapshot a STABLE digest:
 
@@ -43,8 +48,26 @@ _UPDATE = os.environ.get("HPX_UPDATE_SNAPSHOTS") == "1"
 _SOCS = ["apollo3p", "apollo4p", "apollo510"]
 _TRANSPORTS = ["rtt", "usb_cdc", "swo", "uart"]
 # tflm and helia-rt both render main.cc.j2 with the same engine header, so they
-# produce identical output; helia-aot renders the distinct AOT template.
-_ENGINES = ["tflm", "helia-rt", "helia-aot"]
+# produce identical output; helia-aot and executorch render their own templates.
+_ENGINES = ["tflm", "helia-rt", "helia-aot", "executorch"]
+
+#: Engines whose supported SoC set is narrower than ``_SOCS``.  ExecuTorch is
+#: built for Cortex-M55 only (the NSX ExecuTorch runtime needs Helium; every
+#: AP3/AP4 part in this matrix is Cortex-M4F), so pairing it with apollo3p or
+#: apollo4p would snapshot a render production can never produce.
+_ENGINE_SOCS: dict[str, list[str]] = {"executorch": ["apollo510"]}
+
+#: Engines that appear in the power_only and busy-loop matrices.  ExecuTorch is
+#: excluded from both: ``stages.preflight._check_transport_support`` rejects
+#: engine.type=executorch with power.enabled (pinned by
+#: ``test_executorch_power_tripwire.py``), and the busy_loop clean-window probe
+#: exists only to gate an external power capture, so neither combination is
+#: reachable from a supported configuration.
+_MATRIX_ENGINES = [e for e in _ENGINES if e != "executorch"]
+
+
+def _socs_for(engine: str) -> list[str]:
+    return _ENGINE_SOCS.get(engine, _SOCS)
 
 # Feature markers: substring -> human name.  Presence is the semantic snapshot.
 _MARKERS: dict[str, str] = {
@@ -237,6 +260,7 @@ _ENGINE_WIRE_NAMES = {
     "tflm": "tflm",
     "helia-rt": "helia_rt",
     "helia-aot": "helia_aot",
+    "executorch": "executorch",
 }
 
 
@@ -287,6 +311,27 @@ def _render(
             arena_regions=[],
         )
         return _jinja_env.get_template("main_aot.cc.j2").render(**_finalize(kwargs))
+    if engine == "executorch":
+        # Mirrors the executorch_* block of FirmwareRenderContext.to_template_vars()
+        # (EngineContext), which is what production hands
+        # main_executorch.cc.j2 in firmware/__init__.py.  Sizes are arbitrary
+        # but distinct so a buffer swapped between two placements is visible in
+        # the sha256.
+        kwargs.update(
+            printf_linkage="",
+            executorch_planned_arena_size=65_536,
+            executorch_method_arena_size=16_384,
+            executorch_temporary_arena_size=8_192,
+            executorch_input_size=1_960,
+            executorch_output_size=12,
+            executorch_planned_arena_region="tcm",
+            executorch_method_arena_region="tcm",
+            executorch_temporary_arena_region="tcm",
+            executorch_io_region="tcm",
+        )
+        return _jinja_env.get_template("main_executorch.cc.j2").render(
+            **_finalize(kwargs)
+        )
     if engine not in ("tflm", "helia-rt"):
         # Production picks the template three ways (firmware/__init__.py:
         # HELIA_AOT -> main_aot.cc.j2, EXECUTORCH -> main_executorch.cc.j2,
@@ -328,6 +373,7 @@ def _all_combos() -> list[tuple[str, str, str]]:
         for soc in _SOCS
         for transport in _TRANSPORTS
         for engine in _ENGINES
+        if soc in _socs_for(engine)
     ]
 
 
@@ -340,7 +386,9 @@ _POWER_TRANSPORT = "rtt"
 
 
 def _power_combos() -> list[tuple[str, str, str]]:
-    return [(soc, _POWER_TRANSPORT, engine) for soc in _SOCS for engine in _ENGINES]
+    return [
+        (soc, _POWER_TRANSPORT, engine) for soc in _SOCS for engine in _MATRIX_ENGINES
+    ]
 
 
 # The matrices above pin clean_window_probe="infer" (the default).  The opt-in
@@ -368,7 +416,11 @@ def _power_busy_loop_combos() -> list[tuple[str, str, str]]:
 
 
 def _profile_busy_loop_combos() -> list[tuple[str, str, str]]:
-    return [(soc, _BUSY_LOOP_TRANSPORT, engine) for soc in _SOCS for engine in _ENGINES]
+    return [
+        (soc, _BUSY_LOOP_TRANSPORT, engine)
+        for soc in _SOCS
+        for engine in _MATRIX_ENGINES
+    ]
 
 
 def _key(
@@ -1045,11 +1097,21 @@ def _clean_window_region(code: str) -> str:
     template's ``g_profiler_enabled = false;`` also appears as a file-scope
     initializer hundreds of lines earlier, and anchoring on that would silently
     widen the region to most of the file (and swallow unrelated DWT reads).
+
+    One opener spelling per engine, since each names its own profiler-arm flag
+    (heliaRT ``g_profiler.SetEnabled``, heliaAOT ``g_profiler_enabled``,
+    ExecuTorch ``g_profile_enabled``).  All three render from the same
+    ``engine_profiler_off`` seam in ``_main_base.cc.j2``, so the list is
+    exhaustive by construction: a fourth engine adds a fourth spelling here.
     """
     gate = code.index("hpx_sync_window_begin();")
     starts = [
         found
-        for opener in ("g_profiler.SetEnabled(false);", "g_profiler_enabled = false;")
+        for opener in (
+            "g_profiler.SetEnabled(false);",
+            "g_profiler_enabled = false;",
+            "g_profile_enabled = false;",
+        )
         if (found := code.rfind(opener, 0, gate)) != -1
     ]
     assert starts, "clean-window scope opener not found before the window gate"

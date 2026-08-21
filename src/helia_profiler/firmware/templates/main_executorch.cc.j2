@@ -1,24 +1,70 @@
-{# ExecuTorch PTE profiler firmware. #}
-#include <cstdarg>
-#include <cstdint>
-#include <cstdio>
-#include <cstring>
+{% extends "_main_base.cc.j2" %}
+{#- main_executorch.cc — heliaPROFILER firmware entry point for ExecuTorch.
 
-#if defined(__ARM_FEATURE_MVE)
-#include <arm_mve.h>
-#endif
+   The firmware skeleton -- boot, transport preamble, GPIO sync, clean-window
+   machinery, PMU pass loop, teardown -- lives in _main_base.cc.j2; this
+   template only fills in the engine_* blocks with the nsx::executorch runtime
+   API and its per-operator profiling callbacks.  Read that file's prelude for
+   the whitespace contract these definitions follow: a region block opens with
+   a newline and closes with `{%- endblock %}` (the base supplies the newline
+   that terminates the last line), and a single-line block holds exactly one
+   line with no newlines of its own.
 
+   This conversion is a deliberate, disclosed BEHAVIOUR CHANGE (#154 phase 4,
+   step 4).  Standing alone, this template had drifted away from the skeleton
+   and lost features the other engines carry: the HPX_ENGINE / HPX_ITERATIONS
+   / HPX_WARMUP / HPX_POWER_SYNC wire lines, the heartbeat protocol (config
+   lines, phase heartbeats and in-op heartbeats -- the host's only hang
+   detector), the RTT lossless/non-blocking discipline around CSV dumps and
+   the final sentinel, the USB DTR settle and usb_timer pause/resume, the
+   named-constant SWO sync preamble, UART support at all, and the
+   HPX_PROFILED_INFER_* summary.  Inheriting the skeleton restores all of
+   them.  What it must NOT inherit is the clean window's measurement
+   semantics -- see engine_clean_window below.
+
+   ExecuTorch has no dedicated power binary: stages.preflight
+   _check_transport_support rejects engine.type=executorch with power.enabled
+   (pinned by tests/contracts/test_executorch_power_tripwire.py), so no
+   `power_only` render of this template is reachable from a supported
+   configuration and none of the blocks here carry a power_only branch. #}
+
+{% block engine_file_header %}
+/**
+ * @file main.cc
+ * @brief heliaPROFILER firmware (ExecuTorch) — auto-generated, do not edit.
+ *
+ * Loads and runs an embedded ExecuTorch .pte program through the NSX
+ * ExecuTorch runtime, with per-operator PMU profiling via the runtime's
+ * begin/end operator callbacks.  Emits CSV results over {{ transport | upper }}
+ * for the host-side capture stage to parse.
+ */
+{%- endblock %}
+
+{% block engine_includes %}
+// NSX ExecuTorch runtime (PTE loader + profiled runner)
 #include "nsx_executorch.h"
+{% if has_armv8m_pmu %}
+{# nsx_pmu_utils.h is the nsx_pmu_* config/counter API the ExecuTorch operator
+   callbacks drive directly, exactly as heliaAOT's operator callback does
+   (heliaRT reaches the same hardware through HpxPmuProfiler instead, so the
+   base's Armv8-M block carries only nsx_ambiq_pmu.h / am_mcu_apollo.h).  Gated
+   the same way the AOT child gates it so the umbrella HAL header can never be
+   pulled in twice or, on a part without the Armv8-M PMU, at all. #}
 #include "nsx_pmu_utils.h"
-#include "nsx_ambiq_pmu.h"
-{% set pmu_profiler_sram_resident = true %}
-{% include "_system_includes.j2" %}
-{% include "_cache_shims.j2" %}
+{% endif %}
+{%- endblock %}
+
+{% block engine_model_storage %}
+// PTE program data (xxd-style include).  ExecuTorch always embeds the
+// program: there is no runtime PSRAM upload path for this engine (preflight
+// rejects psram model/arena placement for it), which is also why
+// engine_pre_start stays at the base's empty default.
 #include "model_data.h"
+{%- endblock %}
 
-{% include "_dwt_init.j2" %}
-{% include "_hpx_printf.j2" %}
-
+{% block engine_globals %}
+// Sized from soc.pmu_max_ops rather than hardcoded -- see hpx_pmu_profiler.h.j2's
+// kMaxLayers and main_aot.cc.j2's for the same per-part reasoning.
 static constexpr int kMaxLayers = {{ pmu_max_ops }};
 static constexpr int kMaxCounters = 4;
 
@@ -29,6 +75,10 @@ struct LayerRecord {
 };
 
 static nsx_pmu_config_t g_pmu_cfg = {};
+// POD (no vtable), so a NOLOAD/zero-init section is safe -- see the AOT
+// template's g_layers comment.  The base powers the AP5 shared SSRAM domain
+// for it via pmu_profiler_sram_resident (true for every non-power render, and
+// ExecuTorch has no power render at all).
 NSX_MEM_SRAM_BSS static LayerRecord g_layers[kMaxLayers];
 static const char *g_counter_names[kMaxCounters] = {};
 static int g_num_layers = 0;
@@ -36,6 +86,18 @@ static int g_num_counters = 0;
 static uint32_t g_logical_overflow_mask = 0U;
 static bool g_profile_enabled = false;
 static bool g_layer_capacity_exceeded = false;
+
+// Heartbeat state — cheap counters/timestamps updated on each operator finish
+// so the host can detect a hung run without wall-clock timeouts.  Ported from
+// the heliaAOT callback in step 4: standing alone this template emitted no
+// in-op heartbeats at all, so a stalled ExecuTorch run looked identical to a
+// slow one from the host side.
+static uint32_t g_hb_every_cyc = 0;
+static int      g_hb_every_ops = 0;
+static uint32_t g_hb_last_cyc = 0;
+static int      g_hb_ops_since = 0;
+static int      g_hb_pass = 0;
+static int      g_hb_iter = 0;
 
 {#- Every runtime buffer is placed explicitly: its own engine.config
     *_location override when given, otherwise the run's arena region. -#}
@@ -125,14 +187,38 @@ static void end_operator(void *, uint32_t handle) {
     for (int i = 0; i < g_num_counters; ++i) {
         record.counters[i] = g_pmu_cfg.counter[i].counterValue;
     }
+
+    // Heartbeat emission (inter-op gap, not contaminating a layer) — the
+    // counters above are already latched, so the printf cost lands between
+    // operators exactly as it does in the heliaAOT callback.
+    ++g_hb_ops_since;
+    const bool by_ops = (g_hb_every_ops > 0) &&
+                        (g_hb_ops_since >= g_hb_every_ops);
+    bool by_time = false;
+    if (g_hb_every_cyc > 0) {
+        uint32_t now = DWT->CYCCNT;
+        uint32_t delta = now - g_hb_last_cyc;
+        by_time = (delta >= g_hb_every_cyc);
+    }
+    if (by_ops || by_time) {
+        hpx_printf("HPX_HEARTBEAT phase=infer pass=%d iter=%d layer=%d\n",
+                   g_hb_pass, g_hb_iter, g_num_layers);
+        g_hb_last_cyc = DWT->CYCCNT;
+        g_hb_ops_since = 0;
+    }
 }
 
 static const nsx::executorch::ProfilingCallbacks g_callbacks = {
     nullptr, begin_operator, end_operator};
 
-static nsx::executorch::RunResult run_model(bool profiled) {
-    memset(g_input, 0, sizeof(g_input));
-    memset(g_output, 0, sizeof(g_output));
+// One parameterless run wrapper for every call site.  The base skeleton has a
+// single engine_invoke seam reused by the warmup, clean-window and profiled
+// loops, so whether a run is profiled is read from g_profile_enabled (armed by
+// engine_pass_warmup_arm / engine_pass_profile_arm / engine_profiler_off)
+// rather than passed as an argument.  The input/output memsets that used to
+// live here moved out to engine_reset_inputs / engine_reset_inputs_warm:
+// skeleton discipline puts input setup outside the measured region.
+static nsx::executorch::RunResult run_model(void) {
     const nsx::executorch::Buffer inputs[] = { {g_input, sizeof(g_input)} };
     nsx::executorch::Buffer outputs[] = { {g_output, sizeof(g_output)} };
     return nsx::executorch::run_once_profiled(
@@ -140,7 +226,7 @@ static nsx::executorch::RunResult run_model(bool profiled) {
         {g_method_arena, sizeof(g_method_arena)},
         {g_planned_arena, sizeof(g_planned_arena)},
         {g_temporary_arena, sizeof(g_temporary_arena)},
-        inputs, 1, outputs, 1, profiled ? &g_callbacks : nullptr);
+        inputs, 1, outputs, 1, g_profile_enabled ? &g_callbacks : nullptr);
 }
 
 static void require_ok(const nsx::executorch::RunResult &result) {
@@ -171,64 +257,142 @@ static void print_layers(void) {
         hpx_printf(",%d\n", record.overflow ? 1 : 0);
     }
 }
+{%- endblock %}
 
-int main(void) {
-    nsx_system_config_t sys_cfg = {};
-    sys_cfg.perf_mode = {{ perf_mode_symbol }};
-    sys_cfg.enable_cache = true;
-    sys_cfg.enable_sram = true;
-    sys_cfg.debug.transport = {% if transport == "swo" %}NSX_DEBUG_ITM{% elif transport == "uart" %}NSX_DEBUG_UART{% else %}NSX_DEBUG_NONE{% endif %};
-    sys_cfg.skip_bsp_init = false;
-    sys_cfg.spot_mgr_profile = true;
-    NSX_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
-    SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
-    dwt_init();
-{% include "_ssram_power.j2" %}
-{% if transport == "usb_cdc" %}
-    NSX_TRY(nsx_usb_init(&g_usb_cfg), "USB CDC init failed\n");
-    while (!nsx_usb_connected(&g_usb_cfg)) { nsx_delay_us(10000U); }
-{% elif transport == "rtt" %}
-    SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0, SEGGER_RTT_MODE_NO_BLOCK_TRIM);
-    HPX_CLEAN_DCACHE();
-    hpx_rtt_set_blocking();
-    hpx_printf("HPX_READY\n");
-    HPX_CLEAN_DCACHE();
-{% elif transport == "swo" %}
-    for (int i = 0; i < 40; ++i) {
-        hpx_printf("HPX_READY %d\n", i);
-        nsx_delay_us(20000U);
-    }
-{% endif %}
-
-    hpx_printf("\n--- HPX_START ---\n");
-    hpx_printf("HPX_VERSION=1\n");
+{% block engine_start_metadata %}
     hpx_printf("HPX_MODEL_SIZE=%u\n", model_data_len);
     hpx_printf("HPX_ARENA_SIZE=%u\n", (unsigned)sizeof(g_planned_arena));
     hpx_printf("HPX_INPUT_SIZE=%u\n", (unsigned)sizeof(g_input));
     hpx_printf("HPX_OUTPUT_SIZE=%u\n", (unsigned)sizeof(g_output));
-    hpx_printf("HPX_SYSTEM_CLOCK_HZ=%lu\n", (unsigned long)SystemCoreClock);
-    hpx_printf("HPX_NUM_PRESETS={{ pmu_passes | length }}\n");
-    hpx_printf("HPX_PRESETS={{ pmu_pass_names | join(',') }}\n");
-    hpx_printf("HPX_HEARTBEAT phase=init t=0\n");
+{%- endblock %}
 
-    for (int i = 0; i < {{ warmup }}; ++i) require_ok(run_model(false));
-    uint64_t clean_total = 0;
-    for (int i = 0; i < {{ clean_iters }}; ++i) {
-        const auto result = run_model(false);
-        require_ok(result);
-        clean_total += result.execution_cycles;
-    }
-    const uint32_t clean_avg =
-        (uint32_t)((clean_total + ({{ clean_iters }} / 2U)) / {{ clean_iters }}U);
-    hpx_printf("HPX_CLEAN_INFER_COUNT={{ clean_iters }}\n");
-    hpx_printf("HPX_CLEAN_INFER_TOTAL_CYCLES=%llu\n", (unsigned long long)clean_total);
-    hpx_printf("HPX_CLEAN_INFER_AVG_CYCLES=%lu\n", (unsigned long)clean_avg);
-    hpx_printf("HPX_CLEAN_INFER_AVG_US=%lu\n",
-               (unsigned long)(((uint64_t)clean_avg * 1000000ULL +
-                                SystemCoreClock / 2U) / SystemCoreClock));
+{% block engine_heartbeat_arm %}
+    // --- Heartbeat config (matches the TFLM/heliaAOT templates for protocol
+    // consistency) ---
+    static constexpr bool     kHbEnabled   = {{ heartbeat_enabled | lower }};
+    static constexpr int      kHbEveryNOps = {{ heartbeat_every_n_ops }};
+    static constexpr uint32_t kHbEveryMs   = {{ heartbeat_every_ms }};
+    hpx_printf("HPX_HEARTBEAT_ENABLED=%d\n", (int)kHbEnabled);
+    hpx_printf("HPX_HEARTBEAT_EVERY_N_OPS=%d\n", kHbEveryNOps);
+    hpx_printf("HPX_HEARTBEAT_EVERY_MS=%lu\n", (unsigned long)kHbEveryMs);
+    g_hb_every_cyc = (kHbEnabled && kHbEveryMs > 0)
+        ? (uint32_t)((uint64_t)SystemCoreClock / 1000U * kHbEveryMs)
+        : 0U;
+    g_hb_every_ops = kHbEnabled ? kHbEveryNOps : 0;
 
-{% for pass in pmu_passes %}
-    hpx_printf("\n--- HPX_PRESET {{ pass.name }} ---\n");
+    hpx_printf("HPX_HEARTBEAT phase=init\n");
+{%- endblock %}
+
+{% block engine_profiler_off %}        g_profile_enabled = false;{% endblock %}
+
+{# The two reset-inputs blocks are multi-line but carry NO leading or trailing
+   newline of their own: the base reuses each at several sites by calling it
+   back through self, which supplies the surrounding newlines. #}
+{% block engine_reset_inputs_warm %}            memset(g_input, 0, sizeof(g_input));
+            memset(g_output, 0, sizeof(g_output));{% endblock %}
+
+{% block engine_reset_inputs %}        memset(g_input, 0, sizeof(g_input));
+        memset(g_output, 0, sizeof(g_output));{% endblock %}
+
+{% block engine_invoke %}require_ok(run_model());{% endblock %}
+
+{#- engine_clean_window: the one block ExecuTorch overrides for a MEASUREMENT
+    reason rather than an API one.
+
+    nsx::executorch::run_once_profiled() reloads and re-initialises the program
+    on every call and returns `execution_cycles` measured by the runtime around
+    the execute step alone.  The base's default window brackets
+    self.engine_invoke() with the window clock, which for this engine would
+    silently redefine HPX_CLEAN_INFER_* as load+execute -- a semantics change
+    the wire protocol has no way to express.  So the clean window accumulates
+    result.execution_cycles instead, keeping HPX_CLEAN_INFER_* execute-only and
+    byte-for-byte comparable with what this template reported before it became
+    a child.
+
+    Two consequences worth stating rather than leaving to be discovered:
+
+      * The base's per-pass profiled loop still DWT-brackets engine_invoke, so
+        HPX_PROFILED_INFER_* for this engine measures whole-run_once cost
+        (load + execute).  That is a new line for ExecuTorch and is correctly
+        named -- it is the profiled call's cost -- but it is not comparable
+        with the clean numbers above, and the host's own comparability model
+        (evaluation/comparability.py) is what keeps engines from being compared
+        on it blindly.
+      * The base gates the CoreSight debug power domain off for the measured
+        window on families where the window clock does not live there
+        (gate_debug_domain_in_window, AP5).  ExecuTorch's window clock is the
+        runtime's own cycle counter, which this template cannot prove is
+        independent of that domain, so this override does NOT call
+        am_hal_debug_disable(): freezing the counter HPX_CLEAN_INFER_* is
+        derived from is exactly the #106/#107 bug class.  Releasing the ARM PMU
+        counters is kept -- that is pure win with no clock exposure.  Nothing
+        is lost by this: PD_DBG gating exists to keep a POWER window clean, and
+        ExecuTorch has no power binary.
+
+    The busy_loop probe is a power-window diagnostic whose window body runs no
+    inference at all (a calibrated nop loop, timed by the STIMER bracket), so
+    it is engine-independent and delegates straight back to the base via
+    super() -- both to keep the one code path and so the calibration the base
+    emits above this block can never become an unused variable. -#}
+{% block engine_clean_window %}{% if busy_loop_probe %}{{ super() }}{% else %}
+{% if has_armv8m_pmu %}
+        // Release the ARM PMU counters for the clean window (no PMU traffic
+        // during the measurement).  Deliberately NOT paired with
+        // am_hal_debug_disable() here -- see this block's template comment.
+        nsx_ambiq_pmu_disable();
+{% endif %}
+        // Execute-only cycles, reported by the ExecuTorch runtime itself.  The
+        // host sees the same HPX_CLEAN_INFER_* semantics this engine has always
+        // had; run_once_profiled()'s per-call model load is deliberately NOT in
+        // this total.
+        uint64_t clean_exec_cycles = 0;
+        hpx_sync_window_begin();
+        for (int iter = 0; iter < clean_iters_n; iter++) {
+            const nsx::executorch::RunResult result = run_model();
+            require_ok(result);
+            clean_exec_cycles += result.execution_cycles;
+            clean_count++;
+{% if clean_window_trace | default(false) and transport not in ["swo", "uart"] %}
+            // Sanity-check trace: prove the device is looping inferences for
+            // the whole gated window.  Perturbs power — diagnostic use only.
+            // Excluded on SWO/UART: their printf peripherals are disabled
+            // above for the same window (nsx_itm/uart_printf_disable()).
+            hpx_printf("HPX_CLEAN_ITER=%d\n", iter);
+{% endif %}
+        }
+        hpx_sync_window_end();
+{% if has_armv8m_pmu %}
+        // Restore the PMU for the instrumented per-layer passes below.
+        nsx_ambiq_pmu_enable();
+{% endif %}
+{% if transport == "uart" %}
+        nsx_uart_printf_enable();
+        nsx_delay_us(HPX_DEBUG_REENABLE_SETTLE_US);
+{% elif transport == "swo" %}
+        nsx_itm_printf_enable();
+        nsx_delay_us(HPX_DEBUG_REENABLE_SETTLE_US);
+{% elif transport == "usb_cdc" %}
+        usb_timer_resume();
+{% endif %}
+        if (clean_count > 0) {
+            const uint32_t clean_avg_cycles =
+                (uint32_t)((clean_exec_cycles + (clean_count / 2U)) / clean_count);
+            hpx_printf("HPX_CLEAN_INFER_COUNT=%lu\n", (unsigned long)clean_count);
+            hpx_printf("HPX_CLEAN_INFER_TOTAL_CYCLES=%llu\n",
+                       (unsigned long long)clean_exec_cycles);
+            hpx_printf("HPX_CLEAN_INFER_AVG_CYCLES=%lu\n",
+                       (unsigned long)clean_avg_cycles);
+            if (SystemCoreClock > 0U) {
+                const uint32_t clean_avg_us = (uint32_t)(
+                    ((uint64_t)clean_avg_cycles * 1000000ULL +
+                     ((uint64_t)SystemCoreClock / 2ULL)) /
+                    (uint64_t)SystemCoreClock);
+                hpx_printf("HPX_CLEAN_INFER_AVG_US=%lu\n",
+                           (unsigned long)clean_avg_us);
+            }
+        }{% endif %}{% endblock %}
+
+{% block engine_pass_init %}
     {
         static const uint32_t ids[] = { {{ pass.event_ids | join(', ') }} };
         static const char *names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
@@ -237,32 +401,34 @@ int main(void) {
             hpx_park();
         }
     }
-    for (int w = 0; w < {{ warmup }}; ++w) require_ok(run_model(false));
-    for (int iter = 0; iter < {{ iterations }}; ++iter) {
+{%- endblock %}
+
+{% block engine_pass_warmup_arm %}
+    g_profile_enabled = false;
+{%- endblock %}
+
+{% block engine_pass_profile_arm %}
+    g_profile_enabled = true;
+{%- endblock %}
+
+{% block engine_iteration_setup %}
         g_num_layers = 0;
         g_layer_capacity_exceeded = false;
-        g_profile_enabled = true;
-        const auto result = run_model(true);
-        g_profile_enabled = false;
-        require_ok(result);
-        if (g_layer_capacity_exceeded) {
+        g_hb_pass = {{ loop.index0 }};
+        g_hb_iter = iter;
+        g_hb_last_cyc = DWT->CYCCNT;
+        g_hb_ops_since = 0;
+{%- endblock %}
+
+{# The capacity check has to run AFTER the invoke, and the skeleton's only
+   post-invoke seam in the iteration is this one, so it leads the CSV dump
+   rather than sitting between the run and the HPX_ITER header as it did when
+   this template stood alone.  The error and the park are unchanged; what
+   changed is that the iteration header is already on the wire when they fire,
+   which if anything tells the host which iteration overflowed. #}
+{% block engine_print_csv %}        if (g_layer_capacity_exceeded) {
             hpx_printf("HPX_ERROR=operator_count_exceeds_capacity capacity=%d\n",
                        kMaxLayers);
             hpx_park();
         }
-        hpx_printf("\n--- HPX_ITER %d ---\n", iter);
-        print_layers();
-    }
-{% endfor %}
-
-{% if transport == "rtt" %}
-    hpx_rtt_set_blocking();
-{% endif %}
-    hpx_printf("\n--- HPX_END ---\n");
-{% if transport == "rtt" %}
-    HPX_CLEAN_DCACHE();
-    hpx_rtt_drain(500U);
-{% endif %}
-    hpx_park();
-    return 0;
-}
+        print_layers();{% endblock %}

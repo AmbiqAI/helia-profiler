@@ -1,10 +1,10 @@
 {# _main_base.cc.j2 — engine-agnostic heliaPROFILER firmware skeleton. #}
 {#- Extracted from main.cc.j2 (#154 phase 4); main_aot.cc.j2 joined as a
-   second child in step 3.  Everything outside an `engine_*` block is shared
-   by every inference engine; the blocks are the only place engine-specific
-   code may appear.  Keep it that way: a child template can override a block,
-   but it can never remove base text.  main_executorch.cc.j2 is still
-   standalone and is converted next.
+   second child in step 3 and main_executorch.cc.j2 as the third in step 4.
+   Everything outside an `engine_*` block is shared by every inference engine;
+   the blocks are the only place engine-specific code may appear.  Keep it
+   that way: a child template can override a block, but it can never remove
+   base text.
 
    Whitespace contract -- the render env has trim_blocks=False and
    lstrip_blocks=False, so every newline around a tag is real output:
@@ -477,7 +477,25 @@ int main(void) {
         // am_hal_debug_disable() already runs for this family/probe.
         // Dropping ITM here lets that call actually release the domain.
         nsx_itm_printf_disable();
-{% endif %}
+{% endif %}{# engine_clean_window -- the measured window itself, from quiescing
+   the profiling hardware through reporting HPX_CLEAN_INFER_*.  The default
+   content below IS the machinery every engine used before this seam existed,
+   so an engine that does not override it renders byte-identically.
+
+   It is a block because the window's measurement semantics are not
+   engine-agnostic: the default brackets `self.engine_invoke()` with the
+   window clock, which is only correct for an engine whose invoke IS the
+   inference.  heliaAOT and heliaRT/TFLM qualify; ExecuTorch does not --
+   nsx::executorch::run_once_profiled() reloads the model on every call and
+   reports its own execute-only `execution_cycles`, so inheriting this would
+   silently redefine HPX_CLEAN_INFER_* as load+execute.  The boundary starts
+   here, at the PMU/debug-domain quiesce, rather than at hpx_sync_window_begin,
+   because WHICH hardware may be gated off for the window is decided by which
+   clock measures it -- an engine timing the window with its runtime's own
+   counter cannot let this binary power down the domain that counter lives in.
+   Everything before it (transport quiesce, window sizing, sync ready/GO,
+   reset-inputs, busy-loop calibration) and after it (the power terminal
+   record) is genuinely shared. #}{% block engine_clean_window %}
 {% if has_armv8m_pmu %}
         // The per-layer PMU init (run earlier) leaves the ARM PMU counters
         // running and the AM_HAL_PWRCTRL_PERIPH_DEBUG power domain powered
@@ -727,7 +745,7 @@ int main(void) {
                            (unsigned long)clean_avg_us);
             }
 {% endif %}
-        }
+        }{% endblock %}
 {% if power_only | default(false) %}
 {% include "_power_terminal_success.j2" with context %}
 {% endif %}

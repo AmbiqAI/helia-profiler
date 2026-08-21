@@ -4,12 +4,102 @@ import sys
 from pathlib import Path
 
 from helia_profiler.firmware import _jinja_env
+from helia_profiler.firmware.context import resolve_window_timer
 import pytest
 
 import helia_profiler.engines.executorch as executorch_mod
 from helia_profiler.config import load_config
 from helia_profiler.engines.executorch import ExecuTorchAdapter
 from helia_profiler.errors import EngineError
+
+
+def _render_executorch_template(**overrides) -> str:
+    """Render ``main_executorch.cc.j2`` through the production env (#119).
+
+    Since #154 phase 4 that template is a child of ``_main_base.cc.j2``, so a
+    render needs the shared skeleton's whole variable set, not just the
+    ExecuTorch-specific half these tests care about.  The defaults below are
+    the Apollo5/Cortex-M55 shape ExecuTorch actually ships on (it is the only
+    family the engine supports); callers override whatever their assertion is
+    about.
+
+    This helper deliberately does NOT build its own Jinja environment — the
+    production ``_jinja_env`` is the only legal way to render these templates
+    (see ``test_no_test_builds_a_look_alike_env_over_production_templates``).
+    The full per-SoC x transport matrix lives in
+    ``tests/contracts/test_firmware_render_snapshots.py``; this is the
+    minimum context for the feature-level assertions here.
+    """
+    kwargs: dict = {
+        # ExecuTorch engine inputs (EngineContext half of the render context).
+        "cmsis_device_header": "apollo510.h",
+        "pmu_max_ops": 4096,
+        "executorch_planned_arena_size": 2048,
+        "executorch_method_arena_size": 1024,
+        "executorch_temporary_arena_size": 512,
+        "executorch_input_size": 64,
+        "executorch_output_size": 16,
+        "executorch_planned_arena_region": "tcm",
+        "executorch_method_arena_region": "tcm",
+        "executorch_temporary_arena_region": "tcm",
+        "executorch_io_region": "tcm",
+        "engine_wire_name": "executorch",
+        "printf_linkage": "",
+        # Shared skeleton inputs.
+        "arena_region": "tcm",
+        "weights_region": "mram",
+        "transport": "rtt",
+        "usb_serial_marker": None,
+        "usb_serial_product": "NSX HPX Profiler",
+        "perf_mode_symbol": "NSX_PERF_LOW",
+        "perf_mode_mhz": 96,
+        "apollo3_burst": False,
+        "iterations": 3,
+        "warmup": 1,
+        "clean_warmup": 1,
+        "clean_iters": 3,
+        "window_mode": "fixed",
+        "window_target_ms": 1000,
+        "window_min": 10,
+        "window_max": 2000,
+        "clean_window_probe": "infer",
+        "clean_window_trace": False,
+        "pmu_passes": [],
+        "pmu_pass_names": [],
+        "power_sync_enabled": False,
+        "sync_gpio_pin": 22,
+        "lockstep": False,
+        "state_gpio_pin": 23,
+        "go_gpio_pin": 24,
+        "extreme_mode": False,
+        "heartbeat_enabled": True,
+        "heartbeat_every_n_ops": 4,
+        "heartbeat_every_ms": 0,
+        "psram_clock_hz": 48_000_000,
+        "force_shared_sram": False,
+        # Apollo5 capability shape (ExecuTorch is Cortex-M55 only).
+        "has_armv8m_pmu": True,
+        "has_dcache": True,
+        "has_radio_subsystem": False,
+        "manages_shared_ssram_power": True,
+        "ssram_full_power_enum": "AM_HAL_PWRCTRL_SRAM_3M",
+        "clean_window_timer": "stimer",
+        "power_window_timer": "stimer",
+        "clean_window_needs_probe_attach": False,
+        "gate_debug_domain_in_window": True,
+        "broad_peripheral_shutdown": False,
+        "crypto_otp_shutdown": True,
+    }
+    kwargs.update(overrides)
+    kwargs.update(
+        resolve_window_timer(
+            clean_window_probe=str(kwargs["clean_window_probe"]),
+            power_only=False,
+            power_window_timer=str(kwargs["power_window_timer"]),
+            clean_window_timer=str(kwargs["clean_window_timer"]),
+        )
+    )
+    return _jinja_env.get_template("main_executorch.cc.j2").render(**kwargs)
 
 
 def _source_tree(tmp_path: Path) -> Path:
@@ -347,31 +437,7 @@ def test_adapter_rejects_incomplete_io_contract(tmp_path: Path):
 
 def test_executorch_template_has_counter_health_and_true_overflow_mask():
     # Production's env, not a look-alike -- see issue #119.
-    env = _jinja_env
-    out = env.get_template("main_executorch.cc.j2").render(
-        cmsis_device_header="apollo510.h",
-        pmu_max_ops=4096,
-        executorch_planned_arena_size=2048,
-        executorch_method_arena_size=1024,
-        executorch_temporary_arena_size=512,
-        executorch_input_size=64,
-        executorch_output_size=16,
-        arena_region="tcm",
-        executorch_planned_arena_region="tcm",
-        executorch_method_arena_region="tcm",
-        executorch_temporary_arena_region="tcm",
-        executorch_io_region="tcm",
-        weights_region="mram",
-        transport="rtt",
-        power_sync_enabled=False,
-        extreme_mode=False,
-        manages_shared_ssram_power=True,
-        ssram_full_power_enum="AM_HAL_PWRCTRL_SRAM_3M",
-        perf_mode_symbol="NSX_PERF_LOW",
-        perf_mode_mhz=96,
-        iterations=3,
-        warmup=1,
-        clean_iters=3,
+    out = _render_executorch_template(
         pmu_passes=[
             {
                 "name": "cpu_0",
@@ -381,14 +447,27 @@ def test_executorch_template_has_counter_health_and_true_overflow_mask():
             }
         ],
         pmu_pass_names=["cpu_0"],
-        psram_clock_hz=48_000_000,
     )
 
     assert "HPX_PMU_INIT_STATUS" in out
     assert "HPX_PMU_SELFTEST_CPU_CYCLES" in out
     assert 'hpx_printf("HPX_READY\\n")' in out
     assert "HPX_ERROR=operator_count_exceeds_capacity" in out
-    assert '#include "am_hal_pwrctrl.h"' in out
+    # g_layers is SRAM-resident, so the AP5 shared SSRAM domain must be powered
+    # on for it -- with the HAL declarations for that call actually in scope.
+    # Which header provides them is the shared skeleton's policy, not this
+    # engine's: on an Armv8-M PMU part the umbrella am_mcu_apollo.h carries
+    # am_hal_pwrctrl.h, and _system_includes.j2's narrower guard deliberately
+    # does not fire a second time (test_hal_umbrella_header_is_included_at_most_once
+    # pins that the two can never both land). This used to assert the narrow
+    # header because the template stood alone and set
+    # pmu_profiler_sram_resident before including _system_includes.j2; as a
+    # child of _main_base.cc.j2 it now gets the same headers TFLM and heliaAOT
+    # have always had here.
+    assert "am_hal_pwrctrl_sram_config(&sramCfg)" in out
+    assert (
+        '#include "am_mcu_apollo.h"' in out or '#include "am_hal_pwrctrl.h"' in out
+    )
     assert "g_logical_overflow_mask |= 1UL << (2 * i + 1)" in out
     end_operator = out[out.index("static void end_operator") :]
     assert end_operator.index("ARM_PMU_Get_CNTR_OVS()") < end_operator.index(
@@ -399,8 +478,7 @@ def test_executorch_template_has_counter_health_and_true_overflow_mask():
 
 def test_executorch_template_places_complete_workspace_in_sram():
     # Production's env, not a look-alike -- see issue #119.
-    env = _jinja_env
-    out = env.get_template("main_executorch.cc.j2").render(
+    out = _render_executorch_template(
         cmsis_device_header="apollo330P.h",
         pmu_max_ops=512,
         executorch_planned_arena_size=138240,
@@ -413,20 +491,10 @@ def test_executorch_template_places_complete_workspace_in_sram():
         executorch_method_arena_region="sram",
         executorch_temporary_arena_region="sram",
         executorch_io_region="sram",
-        weights_region="mram",
-        transport="rtt",
-        power_sync_enabled=False,
-        extreme_mode=False,
-        manages_shared_ssram_power=True,
         ssram_full_power_enum="AM_HAL_PWRCTRL_SRAM_1P75M",
-        perf_mode_symbol="NSX_PERF_LOW",
-        perf_mode_mhz=96,
         iterations=5,
         warmup=2,
         clean_iters=5,
-        pmu_passes=[],
-        pmu_pass_names=[],
-        psram_clock_hz=48_000_000,
     )
 
     for name in (
@@ -502,33 +570,10 @@ def test_adapter_rejects_non_ram_arena_location(tmp_path: Path):
 
 def test_executorch_template_splits_buffer_regions():
     # Production's env, not a look-alike -- see issue #119.
-    out = _jinja_env.get_template("main_executorch.cc.j2").render(
-        cmsis_device_header="apollo510.h",
-        pmu_max_ops=4096,
-        executorch_planned_arena_size=2048,
-        executorch_method_arena_size=1024,
-        executorch_temporary_arena_size=512,
-        executorch_input_size=64,
-        executorch_output_size=16,
-        arena_region="tcm",
-        executorch_planned_arena_region="tcm",
+    out = _render_executorch_template(
         executorch_method_arena_region="sram",
         executorch_temporary_arena_region="sram",
         executorch_io_region="sram",
-        weights_region="mram",
-        transport="rtt",
-        power_sync_enabled=False,
-        extreme_mode=False,
-        manages_shared_ssram_power=True,
-        ssram_full_power_enum="AM_HAL_PWRCTRL_SRAM_3M",
-        perf_mode_symbol="NSX_PERF_LOW",
-        perf_mode_mhz=96,
-        iterations=3,
-        warmup=1,
-        clean_iters=3,
-        pmu_passes=[],
-        pmu_pass_names=[],
-        psram_clock_hz=48_000_000,
     )
     assert "NSX_MEM_FAST_BSS alignas(16) static uint8_t g_planned_arena[2048]" in out
     assert "NSX_MEM_SRAM_BSS alignas(16) static uint8_t g_method_arena[1024]" in out
