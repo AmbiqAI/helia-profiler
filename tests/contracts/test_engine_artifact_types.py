@@ -236,3 +236,113 @@ def test_common_core_stays_on_the_base():
         assert artifacts.include_dirs == []
         assert artifacts.static_libs == []
         assert artifacts.memory_plan is None
+
+
+# ---------------------------------------------------------------------------
+# from_pipeline_context: the consumer this split actually rewrote
+# ---------------------------------------------------------------------------
+#
+# The render-snapshot suite hand-mirrors template variables and never calls
+# FirmwareRenderContext.from_pipeline_context, so "snapshots untouched" says
+# nothing about the narrowing branches in firmware/context.py — the #166
+# review proved all four AOT/ExecuTorch branches were dead under the suite
+# (a raise inserted in any of them left 2330 tests green). These contracts
+# drive a real PipelineContext through every branch and pin both the
+# engine-owned values and the neutral values non-owning engines must get.
+
+
+def _render_engine_context(tmp_path, engine: str, artifacts, arena_regions=None):
+    from helia_profiler.firmware.context import FirmwareRenderContext
+
+    from .conftest import make_pmu_ctx
+
+    ctx = make_pmu_ctx(tmp_path, board="apollo510_evb", engine=engine)
+    ctx.engine_artifacts = artifacts
+    return FirmwareRenderContext.from_pipeline_context(
+        ctx, arena_regions=arena_regions
+    ).engine
+
+
+def test_from_pipeline_context_carries_the_aot_fields(tmp_path):
+    artifacts = _build(
+        EngineType.HELIA_AOT,
+        aot_op_manifest=[{"id": 7, "op_type": "conv_2d"}],
+        aot_allocate_arenas=False,
+    )
+    engine = _render_engine_context(tmp_path, "helia-aot", artifacts)
+    assert engine.engine_type is EngineType.HELIA_AOT
+    assert engine.engine_header == "sentinel_model.h"
+    assert engine.aot_prefix == "sentinel"
+    assert [(op.id, op.op_type) for op in engine.aot_op_manifest] == [(7, "conv_2d")]
+
+
+def test_from_pipeline_context_carries_the_executorch_fields(tmp_path):
+    artifacts = _build(
+        EngineType.EXECUTORCH,
+        executorch_planned_arena_region="sram",
+        executorch_io_region="tcm",
+    )
+    engine = _render_engine_context(tmp_path, "executorch", artifacts)
+    assert engine.engine_type is EngineType.EXECUTORCH
+    assert engine.executorch_method_arena_size == 1
+    assert engine.executorch_planned_arena_size == 2
+    assert engine.executorch_temporary_arena_size == 3
+    assert engine.executorch_input_size == 4
+    assert engine.executorch_output_size == 5
+    assert engine.executorch_planned_arena_region == "sram"
+    assert engine.executorch_io_region == "tcm"
+    # Unset regions follow the run's resolved arena region (tcm by default).
+    assert engine.executorch_method_arena_region == "tcm"
+    assert engine.executorch_temporary_arena_region == "tcm"
+
+
+@pytest.mark.parametrize("engine_name", ["helia-rt", "tflm"])
+def test_from_pipeline_context_neutralizes_foreign_engine_fields(
+    tmp_path, engine_name
+):
+    """The neutral values non-owning engines receive are a contract, not an
+    accident: aot_prefix reaches main_aot.cc.j2 only, so no render digest can
+    see it change for a TFLM run — the #166 review's mutation of "" to "x"
+    left the whole suite green. Pinned here directly instead."""
+    engine_type = EngineType(engine_name)
+    engine = _render_engine_context(
+        tmp_path, engine_name, _build(engine_type)
+    )
+    assert engine.engine_type is engine_type
+    assert engine.aot_prefix == ""
+    assert engine.aot_op_manifest == ()
+    assert engine.executorch_method_arena_size == 0
+    assert engine.executorch_planned_arena_size == 0
+    assert engine.executorch_temporary_arena_size == 0
+    assert engine.executorch_input_size == 0
+    assert engine.executorch_output_size == 0
+    for region in (
+        engine.executorch_planned_arena_region,
+        engine.executorch_method_arena_region,
+        engine.executorch_temporary_arena_region,
+        engine.executorch_io_region,
+    ):
+        assert region == "tcm"
+
+
+def test_replace_honours_the_engine_type_pin():
+    import dataclasses
+
+    artifacts = _build(EngineType.TFLM)
+    with pytest.raises(ValueError, match="pinned to engine_type"):
+        dataclasses.replace(artifacts, engine_type=EngineType.HELIA_RT)
+
+
+def test_the_pin_rejects_a_raw_string_engine_type():
+    # EngineType is a StrEnum: an equality pin would accept "helia-aot" and
+    # then fail every downstream `engine_type is EngineType.X` dispatch.
+    kwargs = _required_kwargs(EngineType.HELIA_AOT)
+    with pytest.raises(ValueError, match="pinned to engine_type"):
+        HeliaAotArtifacts(engine_type="helia-aot", **kwargs)  # type: ignore[arg-type]
+
+
+def test_the_base_class_is_not_constructible():
+    with pytest.raises(TypeError, match="abstract"):
+        EngineArtifacts(
+            engine_type=EngineType.TFLM, engine_header=TFLM_ENGINE_HEADER
+        )

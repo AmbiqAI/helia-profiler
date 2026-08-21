@@ -113,8 +113,21 @@ class EngineArtifacts:
     _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = None
 
     def __post_init__(self) -> None:
+        if type(self) is EngineArtifacts:
+            # The base is a common core, not a constructible engine identity:
+            # a bare instance would silently take every non-matching branch at
+            # the isinstance dispatch sites (the exact failure mode the split
+            # exists to make loud).
+            raise TypeError(
+                "EngineArtifacts is abstract - construct the engine's artifact "
+                "type (TflmArtifacts, HeliaRtArtifacts, HeliaAotArtifacts, "
+                "ExecutorchArtifacts) instead."
+            )
         pinned = type(self)._PINNED_ENGINE_TYPE
-        if pinned is not None and self.engine_type != pinned:
+        # Identity, not equality: EngineType is a StrEnum, so `!=` would let a
+        # raw string like "helia-aot" pass the pin and then fail every
+        # downstream `engine_type is EngineType.X` dispatch.
+        if pinned is not None and self.engine_type is not pinned:
             raise ValueError(
                 f"{type(self).__name__} is pinned to engine_type {pinned.value!r}, "
                 f"got {self.engine_type!r}"

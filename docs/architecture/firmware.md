@@ -65,9 +65,11 @@ itself.
 Templates receive a merged context combining:
 
 1. **Config values** — board name, SoC, arena size, iteration count
-2. **Engine artifacts** — the typed fields of `EngineArtifacts`
-   (`engine_header`, `cmake_vars`, AOT arena regions, ExecuTorch buffer
-   sizes, ...; see `engines/base.py`)
+2. **Engine artifacts** — the typed fields of the engine's artifact type
+   (`TflmArtifacts` / `HeliaRtArtifacts` / `HeliaAotArtifacts` /
+   `ExecutorchArtifacts`: `engine_header` and `cmake_vars` on the common
+   core, AOT arena regions and ExecuTorch buffer sizes on their owning
+   subtypes; see `engines/base.py`)
 3. **Counter passes** — PMU counter IDs grouped by compute unit and hardware capacity
 4. **Platform features** — DSP, MVE, FPU flags
 

@@ -139,7 +139,7 @@ src/helia_profiler/
 │   └── usb_cdc.py      # USB CDC capture backend
 │
 ├── engines/            # Engine adapters
-│   ├── base.py         # EngineAdapter protocol, EngineArtifacts
+│   ├── base.py         # EngineAdapter protocol, EngineArtifacts + subtypes
 │   ├── tflm.py         # Stock TFLM adapter
 │   ├── executorch.py   # ExecuTorch adapter
 │   ├── helia_rt/       # heliaRT adapter package

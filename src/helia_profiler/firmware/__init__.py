@@ -730,9 +730,6 @@ def generate_app(ctx: PipelineContext) -> Path:
             model_header = _model_to_header(config.model.path, weights_region)
             _write_text(src_dir / "model_data.h", model_header)
 
-        model_size = config.model.path.stat().st_size
-
-        engine_header = artifacts.engine_header
         _write_text(
             src_dir / "main.cc",
             _jinja_env.get_template("main.cc.j2").render(
