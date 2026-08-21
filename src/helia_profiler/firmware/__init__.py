@@ -666,10 +666,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             )
         _write_text(
             src_dir / "main.cc",
-            _jinja_env.get_template("main_executorch.cc.j2").render(
-                **template_vars,
-                pmu_max_ops=soc.pmu_max_ops,
-            ),
+            _jinja_env.get_template("main_executorch.cc.j2").render(**template_vars),
         )
     elif engine_type is EngineType.HELIA_AOT:
         # --- AOT engine: use AOT-specific main template, no model embedding ---
@@ -712,10 +709,7 @@ def generate_app(ctx: PipelineContext) -> Path:
 
         _write_text(
             src_dir / "main.cc",
-            _jinja_env.get_template("main_aot.cc.j2").render(
-                **template_vars,
-                pmu_max_ops=soc.pmu_max_ops,
-            ),
+            _jinja_env.get_template("main_aot.cc.j2").render(**template_vars),
         )
         if power_binary_enabled:
             # Same template, power_only=True: no transport init, no per-layer
@@ -723,8 +717,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             _write_text(
                 src_dir / "main_power.cc",
                 _jinja_env.get_template("main_aot.cc.j2").render(
-                    **{**template_vars, "power_only": True},
-                    pmu_max_ops=soc.pmu_max_ops,
+                    **render_context.to_template_vars(power_only=True),
                 ),
             )
     else:
@@ -748,7 +741,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             _write_text(
                 src_dir / "main_power.cc",
                 _jinja_env.get_template("main.cc.j2").render(
-                    **{**template_vars, "power_only": True},
+                    **render_context.to_template_vars(power_only=True),
                 ),
             )
 
@@ -839,9 +832,8 @@ def render_power_source(ctx: PipelineContext, *, inference_count: int) -> Path:
         ctx,
         arena_regions=_resolved_aot_arena_regions(ctx),
     )
-    template_vars = render_context.to_template_vars()
+    template_vars = render_context.to_template_vars(power_only=True)
     template_vars.update(
-        power_only=True,
         window_mode="fixed",
         clean_iters=inference_count,
     )
@@ -857,10 +849,7 @@ def render_power_source(ctx: PipelineContext, *, inference_count: int) -> Path:
     destination = ctx.firmware_dir / "src" / "main_power.cc"
     _write_text(
         destination,
-        _jinja_env.get_template(template_name).render(
-            **template_vars,
-            pmu_max_ops=ctx.soc.pmu_max_ops,
-        ),
+        _jinja_env.get_template(template_name).render(**template_vars),
     )
     log.info("Rendered fixed-N power source: %s (N=%d)", destination, inference_count)
     return destination

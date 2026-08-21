@@ -33,6 +33,7 @@ import pytest
 
 from helia_profiler.engines import TFLM_ENGINE_HEADER
 from helia_profiler.firmware import _jinja_env
+from helia_profiler.firmware.context import resolve_window_timer
 from helia_profiler.platform import get_soc, list_socs
 
 _SNAPSHOT_PATH = Path(__file__).parent / "snapshots" / "firmware_render.json"
@@ -224,6 +225,28 @@ def _common_kwargs(soc_name: str, transport: str) -> dict:
     }
 
 
+def _finalize(kwargs: dict) -> dict:
+    """Derive the host-side window variables exactly as production does.
+
+    The window-clock resolution moved from a template prelude to
+    ``FirmwareRenderContext.to_template_vars()`` (#118); every render now
+    receives ``busy_loop_probe`` / ``window_timer`` / ``use_stimer_window``
+    as inputs. Deriving them through the production resolver keeps these
+    snapshots pinned to the values production ships, while the rendered-text
+    guard tests below (window-timed-by-dead-domain, free-running-DWT) remain
+    the independent check on the resolution itself.
+    """
+    return {
+        **kwargs,
+        **resolve_window_timer(
+            clean_window_probe=str(kwargs.get("clean_window_probe", "infer")),
+            power_only=bool(kwargs.get("power_only", False)),
+            power_window_timer=str(kwargs["power_window_timer"]),
+            clean_window_timer=str(kwargs["clean_window_timer"]),
+        ),
+    }
+
+
 def _render(
     soc_name: str,
     transport: str,
@@ -245,7 +268,7 @@ def _render(
             allocate_arenas=False,
             arena_regions=[],
         )
-        return _jinja_env.get_template("main_aot.cc.j2").render(**kwargs)
+        return _jinja_env.get_template("main_aot.cc.j2").render(**_finalize(kwargs))
     if engine not in ("tflm", "helia-rt"):
         # Production picks the template three ways (firmware/__init__.py:
         # HELIA_AOT -> main_aot.cc.j2, EXECUTORCH -> main_executorch.cc.j2,
@@ -270,7 +293,7 @@ def _render(
         resource_variable_count=0,
         printf_linkage="",
     )
-    return _jinja_env.get_template("main.cc.j2").render(**kwargs)
+    return _jinja_env.get_template("main.cc.j2").render(**_finalize(kwargs))
 
 
 def _digest(rendered: str) -> dict:
@@ -1385,13 +1408,13 @@ def test_ble_reset_only_in_power_only_binary_for_blue_boards():
         power_binary_needs_gpio=True,
     )
 
-    power_rendered = _jinja_env.get_template("main.cc.j2").render(**{**kwargs, "power_only": True})
+    power_rendered = _jinja_env.get_template("main.cc.j2").render(**_finalize({**kwargs, "power_only": True}))
     assert "bleResetCfg" in power_rendered
     assert "NSX_GPIO_LEVEL_LOW" in power_rendered
     assert "nsx_gpio.h" in power_rendered
 
     transport_rendered = _jinja_env.get_template("main.cc.j2").render(
-        **{**kwargs, "power_only": False}
+        **_finalize({**kwargs, "power_only": False})
     )
     assert "bleResetCfg" not in transport_rendered
 
@@ -1400,7 +1423,7 @@ def test_ble_reset_only_in_power_only_binary_for_blue_boards():
     no_ble_kwargs = dict(kwargs)
     no_ble_kwargs.pop("ble_reset_gpio_pin")
     no_ble_rendered = _jinja_env.get_template("main.cc.j2").render(
-        **{**no_ble_kwargs, "power_only": True}
+        **_finalize({**no_ble_kwargs, "power_only": True})
     )
     assert "bleResetCfg" not in no_ble_rendered
 
@@ -1470,12 +1493,12 @@ def test_extreme_mode_power_only_only():
         weights_region="tcm",
         extreme_mode=True,
     )
-    power_rendered = _jinja_env.get_template("main.cc.j2").render(**{**kwargs, "power_only": True})
+    power_rendered = _jinja_env.get_template("main.cc.j2").render(**_finalize({**kwargs, "power_only": True}))
     assert "AM_HAL_PWRCTRL_NVM0_ONLY" in power_rendered
     assert "EXTREME MODE" in power_rendered
 
     transport_rendered = _jinja_env.get_template("main.cc.j2").render(
-        **{**kwargs, "power_only": False}
+        **_finalize({**kwargs, "power_only": False})
     )
     assert "AM_HAL_PWRCTRL_NVM0_ONLY" not in transport_rendered
     assert "EXTREME MODE" not in transport_rendered
@@ -1483,7 +1506,7 @@ def test_extreme_mode_power_only_only():
     # Still requires TCM/TCM even in the power_only binary.
     non_tcm_kwargs = {**kwargs, "arena_region": "sram", "weights_region": "mram"}
     non_tcm_rendered = _jinja_env.get_template("main.cc.j2").render(
-        **{**non_tcm_kwargs, "power_only": True}
+        **_finalize({**non_tcm_kwargs, "power_only": True})
     )
     assert "AM_HAL_PWRCTRL_NVM0_ONLY" not in non_tcm_rendered
 
@@ -1558,7 +1581,7 @@ def test_ssram_full_power_enum_is_per_soc():
         arena_region="sram",
         weights_region="mram",
     )
-    ap330_rendered = _jinja_env.get_template("main.cc.j2").render(**kwargs)
+    ap330_rendered = _jinja_env.get_template("main.cc.j2").render(**_finalize(kwargs))
     assert "AM_HAL_PWRCTRL_SRAM_1P75M" in ap330_rendered
     assert "AM_HAL_PWRCTRL_SRAM_3M" not in ap330_rendered
 
@@ -1592,6 +1615,6 @@ def test_peripheral_power_down_skips_mspi_when_psram_in_use():
         arena_region="psram",
         power_only=True,
     )
-    rendered = _jinja_env.get_template("main.cc.j2").render(**kwargs)
+    rendered = _jinja_env.get_template("main.cc.j2").render(**_finalize(kwargs))
     assert "AM_HAL_PWRCTRL_PERIPH_IOM0" in rendered  # rest of the block still fires
     assert "AM_HAL_PWRCTRL_PERIPH_MSPI0" not in rendered

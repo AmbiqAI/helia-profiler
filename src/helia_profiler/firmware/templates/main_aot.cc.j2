@@ -1,25 +1,10 @@
 {# main_aot.cc — heliaPROFILER firmware for heliaAOT engine #}
-{#- See main.cc.j2 for the full rationale, and
-   SocCapabilities.power_window_timer for the predicate: the dedicated power
-   binary cannot rely on DWT->CYCCNT (the CoreSight debug domain is either
-   powered down by the binary itself or held up by nobody), so those renders
-   must time the window with STIMER or the reported duration is wrong. With an
-   on-device monitor (internal mode) that duration is also the denominator for
-   average power and current, so both are scaled by the same error; with an
-   external instrument only elapsed_us is affected.
-
-   The opt-in busy_loop probe is pinned to STIMER on every family. That is a
-   deliberate simplification rather than a per-family necessity: only Apollo5
-   and the Apollo3/Apollo4 POWER binaries actually lose DWT (the first gates
-   the domain off via am_hal_debug_disable(), the second never had it held up),
-   while an Apollo3/Apollo4 PROFILE binary could still read it. One clock is
-   used for all three, trading DWT's cycle resolution for STIMER's ~30.5 us
-   tick -- negligible on a window measured in milliseconds to seconds. See
-   main.cc.j2's prelude for the full reasoning and _busy_loop_calibration.j2
-   for the failure the old per-family answer produced (issue #112). -#}
-{%- set busy_loop_probe = (clean_window_probe | default("infer") == "busy_loop") %}
-{%- set window_timer = "stimer" if busy_loop_probe else (power_window_timer if power_only | default(false) else (clean_window_timer | default("dwt"))) %}
-{%- set use_stimer_window = (window_timer == "stimer") %}
+{#- Which clock times the measured window (busy_loop_probe / window_timer /
+   use_stimer_window) is resolved HOST-SIDE, once, and arrives here as plain
+   variables: the per-SoC half in SocCapabilities.power_window_timer, the
+   per-render half in firmware/context.py resolve_window_timer() (#118).
+   Read those docstrings — and main.cc.j2's prelude — for the full
+   dead-DWT / busy-loop-STIMER rationale (issues #106/#107/#112). #}
 /**
  * @file main.cc
  * @brief heliaPROFILER firmware (heliaAOT) — auto-generated, do not edit.
@@ -867,9 +852,10 @@ int main(void) {
         usb_timer_pause();
 {% endif %}
 {% set gate_dbg = busy_loop_probe or (gate_debug_domain_in_window | default(false)) %}
-{# busy_loop_probe / window_timer / use_stimer_window are set in the prelude:
-   the clean_cycles declaration above depends on use_stimer_window, and
-   gate_dbg here is exactly why the busy-loop probe is forced onto STIMER. #}
+{# busy_loop_probe / window_timer / use_stimer_window are resolved host-side
+   (firmware/context.py resolve_window_timer): the clean_cycles declaration
+   above depends on use_stimer_window, and gate_dbg here is exactly why the
+   busy-loop probe is forced onto STIMER. #}
 {% if transport == "uart" and not power_only | default(false) %}
         // The UART peripheral (PWRSTUART0-3) lives in the peripheral device
         // power domain, NOT the debug domain am_hal_debug_disable() below
