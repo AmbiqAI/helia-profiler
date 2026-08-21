@@ -69,14 +69,32 @@ def test_family_codes_pin_the_shipped_wire_format():
     )
 
 
-def test_families_partition_the_dimension_enum():
-    # Every dimension must belong to exactly one family: a member added to
-    # ComparisonDimension but not to a family's tuple would silently never be
-    # checked by assess_comparability, with every existing test staying green.
-    power = set(POWER_DIMENSION_MISMATCH.dimensions)
-    informative = set(DIMENSION_DIFFERS.dimensions)
-    assert power | informative == set(ComparisonDimension)
-    assert not power & informative
+def test_families_derive_from_the_dimension_registry():
+    # Phase 3 replaced the hand-listed family tuples with derivation from
+    # DIMENSION_REGISTRY by effect class, so a dimension cannot be silently
+    # absent from its family: every registry entry lands in exactly the
+    # family (or non-family effect class) its spec declares.
+    from helia_profiler.results.dimensions import (
+        DIMENSION_REGISTRY,
+        DimensionEffect,
+        dimensions_with_effect,
+    )
+
+    assert POWER_DIMENSION_MISMATCH.dimensions == dimensions_with_effect(
+        DimensionEffect.POWER_METRIC_BLOCKING
+    )
+    assert DIMENSION_DIFFERS.dimensions == dimensions_with_effect(
+        DimensionEffect.INFORMATIVE
+    )
+    # Families plus the two non-family effect classes cover the enum exactly.
+    covered = (
+        set(POWER_DIMENSION_MISMATCH.dimensions)
+        | set(DIMENSION_DIFFERS.dimensions)
+        | set(dimensions_with_effect(DimensionEffect.IDENTITY_BLOCKING))
+        | set(dimensions_with_effect(DimensionEffect.METRIC_GATE))
+    )
+    assert covered == set(ComparisonDimension) == set(DIMENSION_REGISTRY)
+    assert not set(POWER_DIMENSION_MISMATCH.dimensions) & set(DIMENSION_DIFFERS.dimensions)
 
 
 def test_family_rejects_foreign_dimension():
