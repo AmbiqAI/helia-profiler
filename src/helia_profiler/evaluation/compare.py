@@ -15,7 +15,8 @@ from .comparison_profile import (
     evaluate_comparison_profile,
 )
 from ..errors import ReportError
-from ..results import ResultManifest, load_result_manifest
+from ..results import ComparisonDimension, ResultManifest, load_result_manifest
+from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
 
 
 @dataclass(frozen=True)
@@ -138,26 +139,41 @@ class CompareResult:
     verdict: ComparisonVerdict | None = None
 
 
+def _dimension_row(dimension: ComparisonDimension) -> tuple[str, str, tuple[str, ...]]:
+    """Config-diff row for a comparison dimension: label and artifact path
+    come from the dimension registry, so the table cannot drift from it.
+    Row ORDER stays hand-controlled below — it is rendered artifact content."""
+    spec = DIMENSION_REGISTRY[dimension]
+    if spec.source is not ArtifactSource.RUN_METADATA or spec.label is None:
+        raise ValueError(
+            f"{dimension} is not a run-metadata dimension with a display label."
+        )
+    return (dimension.value, spec.label, spec.path)
+
+
+#: Rows are either dimension-derived (data from DIMENSION_REGISTRY) or
+#: explicit config-diff-only entries that are deliberately NOT comparability
+#: dimensions (they change results without gating comparison).
 _CONFIG_FIELDS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("model_path", "Model path", ("config", "model", "path")),
-    ("model_sha256", "Model SHA256", ("model", "sha256")),
-    ("engine", "Engine", ("config", "engine", "type")),
+    _dimension_row(ComparisonDimension.MODEL_SHA256),
+    _dimension_row(ComparisonDimension.ENGINE),
     ("backend", "Backend", ("config", "engine", "backend")),
-    ("board", "Board", ("config", "target", "board")),
-    ("soc", "SoC", ("platform", "soc")),
-    ("toolchain", "Toolchain", ("config", "target", "toolchain")),
-    ("transport", "Transport", ("config", "target", "transport")),
-    ("cpu_clock", "CPU clock", ("platform", "cpu_clock_name")),
+    _dimension_row(ComparisonDimension.BOARD),
+    _dimension_row(ComparisonDimension.SOC),
+    _dimension_row(ComparisonDimension.TOOLCHAIN),
+    _dimension_row(ComparisonDimension.TRANSPORT),
+    _dimension_row(ComparisonDimension.CPU_CLOCK),
     ("iterations", "Iterations", ("config", "profiling", "iterations")),
     ("warmup", "Warmup", ("config", "profiling", "warmup")),
     ("pmu_counters", "PMU counters", ("config", "profiling", "pmu_counters")),
     ("arena_size", "Arena size", ("config", "model", "arena_size")),
-    ("arena_location", "Arena location", ("config", "model", "arena_location")),
-    ("weights_location", "Weights location", ("config", "model", "weights_location")),
-    ("hpx_version", "hpx version", ("hpx_version",)),
-    ("compiler_version", "Compiler version", ("toolchain", "compiler_version")),
-    ("system_clock_hz", "System clock", ("firmware", "system_clock_hz")),
-    ("run_metadata_schema_version", "Metadata schema", ("schema_version",)),
+    _dimension_row(ComparisonDimension.ARENA_LOCATION),
+    _dimension_row(ComparisonDimension.WEIGHTS_LOCATION),
+    _dimension_row(ComparisonDimension.HPX_VERSION),
+    _dimension_row(ComparisonDimension.COMPILER_VERSION),
+    _dimension_row(ComparisonDimension.SYSTEM_CLOCK_HZ),
+    _dimension_row(ComparisonDimension.RUN_METADATA_SCHEMA_VERSION),
 )
 
 _METRIC_FIELDS: tuple[tuple[str, tuple[str, ...], str], ...] = (
