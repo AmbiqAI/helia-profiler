@@ -318,8 +318,24 @@ def _render(
     power_only: bool = False,
     clean_window_probe: str = "infer",
     window_mode: str = "fixed",
+    overrides: dict | None = None,
 ) -> str:
+    """Render one production template for this (soc, transport, engine).
+
+    ``overrides`` is applied last, after the engine-specific variables and
+    before the window resolution, so a caller can flip one render input
+    (a PSRAM placement, a burst flag, an INA228 block) without restating the
+    engine branches below. The snapshot matrices pass none, so their renders
+    are unaffected; ``test_wire_protocol.py`` uses it to reach the condition
+    variants the wire census has to flip.
+    """
     kwargs = _common_kwargs(soc_name, transport)
+
+    def _resolve(kw: dict) -> dict:
+        if overrides:
+            kw.update(overrides)
+        return _finalize(kw)
+
     kwargs["clean_window_probe"] = clean_window_probe
     kwargs["window_mode"] = window_mode
     # .get() with the production derivation as the fallback so an unknown
@@ -335,7 +351,7 @@ def _render(
             allocate_arenas=False,
             arena_regions=[],
         )
-        return _jinja_env.get_template("main_aot.cc.j2").render(**_finalize(kwargs))
+        return _jinja_env.get_template("main_aot.cc.j2").render(**_resolve(kwargs))
     if engine == "executorch":
         # Mirrors the executorch_* block of FirmwareRenderContext.to_template_vars()
         # (EngineContext), which is what production hands
@@ -355,7 +371,7 @@ def _render(
             executorch_io_region="tcm",
         )
         return _jinja_env.get_template("main_executorch.cc.j2").render(
-            **_finalize(kwargs)
+            **_resolve(kwargs)
         )
     if engine not in ("tflm", "helia-rt"):
         # Production picks the template three ways (firmware/__init__.py:
@@ -381,7 +397,7 @@ def _render(
         resource_variable_count=0,
         printf_linkage="",
     )
-    return _jinja_env.get_template("main.cc.j2").render(**_finalize(kwargs))
+    return _jinja_env.get_template("main.cc.j2").render(**_resolve(kwargs))
 
 
 def _digest(rendered: str) -> dict:

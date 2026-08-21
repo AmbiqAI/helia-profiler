@@ -30,6 +30,14 @@ import re
 import time
 from collections.abc import Callable
 
+from ..wire import (
+    HPX_END_SENTINEL,
+    HPX_HEARTBEAT_PREFIX,
+    HPX_PROTOCOL_VERSION,
+    HPX_START_SENTINEL,
+    HeartbeatPhase,
+)
+
 log = logging.getLogger("hpx")
 
 #: Matches a run of non-ASCII/control characters at the start of a line --
@@ -42,14 +50,17 @@ _LEADING_GLITCH_RE = re.compile(r"^[^\x20-\x7e]+")
 
 
 # ---------------------------------------------------------------------------
-# HPX protocol sentinels — must match firmware templates exactly
+# HPX protocol sentinels
 # ---------------------------------------------------------------------------
+#
+# Declared once in ``helia_profiler.wire`` and re-exported here under the names
+# every transport already imports, so no transport had to change when the
+# registry landed.  ``HPX_PROTOCOL_VERSION`` comes along for the same reason.
 
-HPX_START = "--- HPX_START ---"
-HPX_END = "--- HPX_END ---"
-
-#: Current protocol version emitted by firmware and expected by the parser.
-HPX_PROTOCOL_VERSION = 1
+HPX_START = HPX_START_SENTINEL
+HPX_END = HPX_END_SENTINEL
+#: ``HPX_PROTOCOL_VERSION`` is re-exported by the import above: ``capture``
+#: and ``capture.parser`` both reach it through this module.
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +97,7 @@ HEARTBEAT_TIMEOUT_S = 30
 # safety factor, so a long-but-healthy blackout is not mistaken for a hang.
 
 #: Phase marker that precedes the silent clean-inference window.
-CLEAN_WINDOW_BEGIN_PHASE = "phase=clean_window_begin"
+CLEAN_WINDOW_BEGIN_PHASE = f"phase={HeartbeatPhase.CLEAN_WINDOW_BEGIN}"
 
 #: Multiplier applied to the firmware's est_ms so jitter / a slightly slower
 #: run than the warm estimate cannot trip the deadline.
@@ -222,7 +233,7 @@ def collect_lines(
                 lines.append(line)
                 if on_line is not None:
                     on_line(line, line_ts)
-                if line.startswith("HPX_HEARTBEAT"):
+                if line.startswith(HPX_HEARTBEAT_PREFIX):
                     log.info("%s heartbeat: %s", transport_name, line)
                     budget = window_budget_s(line)
                     if budget is not None:

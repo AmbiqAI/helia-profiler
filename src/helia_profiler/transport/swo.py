@@ -36,6 +36,7 @@ from ..target.probe.jlink import (
 )
 from .timing import SBL_SETTLE_S
 from .protocol import DEFAULT_TIMEOUT_S, collect_lines
+from ..wire import HPX_END_SENTINEL, HPX_START_SENTINEL
 
 log = logging.getLogger("hpx")
 
@@ -55,7 +56,7 @@ _SWO_POLL_INTERVAL_S = 0.001
 
 #: Protocol start sentinel.  A capture that has lines but lacks this marker
 #: lost its head to the SWO startup race and is worth one more attempt.
-_HPX_START_SENTINEL = "--- HPX_START ---"
+_HPX_START_SENTINEL = HPX_START_SENTINEL
 
 
 def capture_swo_output(
@@ -88,7 +89,7 @@ def capture_swo_output(
         nonlocal hpx_start_s, hpx_end_s
         if line == _HPX_START_SENTINEL and hpx_start_s is None:
             hpx_start_s = line_ts
-        elif line == "--- HPX_END ---":
+        elif line == HPX_END_SENTINEL:
             hpx_end_s = line_ts
 
     def finalize_timing() -> None:

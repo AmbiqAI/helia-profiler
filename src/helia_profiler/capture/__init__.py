@@ -29,6 +29,7 @@ from ..transport import (
     resolve_transport,
 )
 from ..usb_identity import usb_marker_serial
+from ..wire import HPX_ERROR_PREFIX, FirmwareErrorCode
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -469,37 +470,40 @@ def capture_power(
 # Firmware error classifier
 # ---------------------------------------------------------------------------
 
-# Maps the short ``HPX_ERROR=<kind>`` token to a human-readable hint.  The
+# Maps a registered ``HPX_ERROR=<code>`` to a human-readable hint.  The
 # firmware emits these after its own preflight checks so the host can point
 # the user at the real cause instead of blaming the arena for every failure.
-_ERROR_HINTS: dict[str, str] = {
-    "schema_mismatch": (
+# Six of the twelve codes in ``wire.FirmwareErrorCode`` have no entry here and
+# reach the user with a generic message; that gap is pinned by
+# tests/contracts/test_wire_protocol.py so growing it stays a review decision.
+_ERROR_HINTS: dict[FirmwareErrorCode, str] = {
+    FirmwareErrorCode.SCHEMA_MISMATCH: (
         "The model's schema version does not match what the firmware was "
         "built for.  Re-export the model with a matching TFLite version."
     ),
-    "unsupported_op": (
+    FirmwareErrorCode.UNSUPPORTED_OP: (
         "The model uses an operator the firmware resolver did not register.  "
         "Add the missing op to the resolver (firmware/templates/main.cc.j2 "
         "get_resolver()) or re-export the model without that op."
     ),
-    "missing_ops": (
+    FirmwareErrorCode.MISSING_OPS: (
         "One or more operators in the model are not registered in the "
         "MicroMutableOpResolver.  See the preceding HPX_ERROR=unsupported_op "
         "lines for the specific ops."
     ),
-    "alloc_tensors_failed": (
+    FirmwareErrorCode.ALLOC_TENSORS_FAILED: (
         "TFLM AllocateTensors() failed.  Likely causes, in order of "
         "probability: (1) the arena is too small — increase --arena-size; "
         "(2) a kernel's Prepare() rejected an op (shape/dtype/parameter "
         "mismatch not caught by preflight).  The firmware reports the "
         "configured arena size in the error line."
     ),
-    "model_init_failed": (
+    FirmwareErrorCode.MODEL_INIT_FAILED: (
         "heliaAOT model init returned a non-zero status.  Check that the "
         "generated module was built against the correct board and that any "
         "required memories (PSRAM, SHARED_SRAM) are initialised."
     ),
-    "psram_init_failed": (
+    FirmwareErrorCode.PSRAM_INIT_FAILED: (
         "PSRAM initialisation failed on the target.  Verify the board "
         "actually has PSRAM populated and that --model-location=psram is "
         "appropriate for this hardware."
@@ -588,10 +592,10 @@ def _raise_on_firmware_error(lines: list[str]) -> None:
     """
     for line in lines:
         s = line.strip()
-        if not s.startswith("HPX_ERROR="):
+        if not s.startswith(HPX_ERROR_PREFIX):
             continue
 
-        payload = s[len("HPX_ERROR=") :]
+        payload = s[len(HPX_ERROR_PREFIX) :]
         # Kind is the first token up to a space or ':'.  e.g.
         #   "unsupported_op kind=builtin ..."
         #   "schema_mismatch:1234_vs_3"
@@ -601,6 +605,9 @@ def _raise_on_firmware_error(lines: list[str]) -> None:
                 kind = kind.split(sep, 1)[0]
                 break
 
+        # FirmwareErrorCode is a StrEnum, so the raw ``kind`` string off the
+        # wire indexes this dict directly — including a code from firmware
+        # newer than this host, which simply misses and gets the generic hint.
         hint = _ERROR_HINTS.get(
             kind,
             "Firmware reported an error.  The payload is shown above.",
