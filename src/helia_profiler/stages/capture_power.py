@@ -19,6 +19,7 @@ from ..config import DEFAULT_POWER_DURATION_S
 from ..errors import PowerError
 from ..pipeline import PipelineContext
 from ..power.diagnostics import probe_runs_inferences
+from ..power.metadata import classify_observation
 from ..target.lifecycle import CapturePhase, prepare_target_for_phase
 
 log = logging.getLogger("hpx")
@@ -223,32 +224,22 @@ class CapturePowerStage:
                 hint=(f"Check that the {driver_name} is connected and powered on. Mode: {mode}."),
             ) from exc
 
-        valid_gate = (
-            power_result.metadata.get("measurement_scope")
-            == "gpio_gated_clean_window"
+        # Mode/integrity/edges derive from capture metadata in one place
+        # (previously duplicated here and in publish_power_result with
+        # different defaults). The deadline stays this stage's own capture
+        # budget: classify_observation's fallback is for callers that have
+        # no budget of their own.
+        obs_mode, obs_integrity, rise, fall, _ = classify_observation(
+            power_result.metadata
         )
-        if not valid_gate:
-            observation = PowerObservation(
-                mode="free_form",
-                result=power_result,
-                gate_rise_observed=bool(
-                    power_result.metadata.get("gate_rise_observed", False)
-                ),
-                gate_fall_observed=bool(
-                    power_result.metadata.get("gate_fall_observed", False)
-                ),
-                deadline_s=capture_duration,
-                integrity="degraded",
-            )
-        else:
-            observation = PowerObservation(
-                mode="gpio_gated",
-                result=power_result,
-                gate_rise_observed=True,
-                gate_fall_observed=True,
-                deadline_s=capture_duration,
-                integrity="valid",
-            )
+        observation = PowerObservation(
+            mode=obs_mode,
+            result=power_result,
+            gate_rise_observed=rise,
+            gate_fall_observed=fall,
+            deadline_s=capture_duration,
+            integrity=obs_integrity,
+        )
         ctx.publish_power_observation(observation)
         log.info(
             "Captured power data (%.1fs, driver=%s, mode=%s)",

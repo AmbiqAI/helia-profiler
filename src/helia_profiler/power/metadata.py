@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Any
 from .diagnostics import (
     GateDurationIntegrity,
     GateFailure,
+    GateTransitionTiming,
     SyncHandshakeMetadata,
     WindowClockCeiling,
 )
@@ -71,7 +72,14 @@ class PowerIntegrity(StrEnum):
 #: Fields whose values are typed objects flattened via their own
 #: ``to_metadata()`` at serialization time.
 _TO_METADATA_FIELDS = frozenset(
-    {"sync", "gate_failure", "gate_duration_integrity", "window_clock_ceiling", "target_lifecycle"}
+    {
+        "sync",
+        "sync_timing_s",
+        "gate_failure",
+        "gate_duration_integrity",
+        "window_clock_ceiling",
+        "target_lifecycle",
+    }
 )
 
 
@@ -107,7 +115,13 @@ class PowerMetadata:
     source: str | None = None
 
     # -- Observation classification (set by capture / pipeline publishers) -
-    measurement_scope: MeasurementScope | None = None
+    #: ``measurement_scope`` is an extension point: registered third-party
+    #: drivers may report scopes HPX does not know (a custom gating scheme).
+    #: Known values coerce to the enum in ``__post_init__``; unknown strings
+    #: are kept verbatim and classify as not-gated, exactly as before.
+    #: ``observation_mode`` and ``integrity`` are HPX-owned closed
+    #: vocabularies and coerce strictly.
+    measurement_scope: MeasurementScope | str | None = None
     observation_mode: ObservationMode | None = None
     integrity: PowerIntegrity | None = None
     gate_rise_observed: bool | None = None
@@ -120,7 +134,9 @@ class PowerMetadata:
 
     # -- Typed diagnostics — the objects, not their dicts ------------------
     sync: SyncHandshakeMetadata | None = None
-    sync_timing_s: dict[str, Any] | None = None
+    #: Assigned only when at least one transition was timed (the old writer
+    #: skipped the key when ``to_metadata()`` came back empty).
+    sync_timing_s: GateTransitionTiming | None = None
     gate_failure: GateFailure | None = None
     gate_duration_integrity: GateDurationIntegrity | None = None
     window_clock_ceiling: WindowClockCeiling | None = None
@@ -133,6 +149,21 @@ class PowerMetadata:
     fullrate_xcheck: dict[str, Any] | None = None
     gating_diagnostics: dict[str, Any] | None = None
     gated_vs_whole_current_ok: bool | None = None
+
+    def __post_init__(self) -> None:
+        if isinstance(self.measurement_scope, str) and not isinstance(
+            self.measurement_scope, MeasurementScope
+        ):
+            try:
+                self.measurement_scope = MeasurementScope(self.measurement_scope)
+            except ValueError:
+                pass  # third-party driver scope — kept verbatim
+        if isinstance(self.observation_mode, str) and not isinstance(
+            self.observation_mode, ObservationMode
+        ):
+            self.observation_mode = ObservationMode(self.observation_mode)
+        if isinstance(self.integrity, str) and not isinstance(self.integrity, PowerIntegrity):
+            self.integrity = PowerIntegrity(self.integrity)
 
     def to_metadata_dict(self) -> dict[str, Any]:
         """Flat dict view, byte-compatible with the pre-#154 metadata bag.

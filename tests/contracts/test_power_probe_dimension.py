@@ -27,6 +27,7 @@ from pathlib import Path
 
 import pytest
 
+from helia_profiler.power.metadata import MeasurementScope, PowerMetadata
 from helia_profiler.power.base import PowerResult, PowerSummary
 from helia_profiler.report.manifest import _comparability
 
@@ -44,7 +45,7 @@ def _ctx(tmp_path: Path, *, probe: str, measured_power: bool):
     if measured_power:
         ctx.power_result = PowerResult(
             summary=PowerSummary(0.01, 0.02, 0.03, 0.1, 1.0, 10),
-            metadata={"measurement_scope": "gpio_gated_clean_window"},
+            metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
         )
     return ctx
 

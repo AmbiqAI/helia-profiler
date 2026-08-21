@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 
 from ..config import DEFAULT_POWER_DURATION_S, Transport
 from ..errors import CaptureError, PowerError
-from ..power.diagnostics import gate_relative_tolerance_for
+from ..power.diagnostics import SyncHandshakeMetadata, gate_relative_tolerance_for
 from ..transport import (
     HPX_END,
     HPX_START,
@@ -279,9 +279,10 @@ def capture_power(
             lifecycle_plan = prepare_target(driver, driver_name)
 
     def _attach_lifecycle_metadata(result: PowerResult) -> PowerResult:
-        result.metadata.setdefault("power_firmware", effective_firmware)
-        if lifecycle_plan is not None:
-            result.metadata.setdefault("target_lifecycle", lifecycle_plan.to_metadata())
+        if result.metadata.power_firmware is None:
+            result.metadata.power_firmware = effective_firmware
+        if lifecycle_plan is not None and result.metadata.target_lifecycle is None:
+            result.metadata.target_lifecycle = lifecycle_plan
         return result
 
     duration = (
@@ -352,7 +353,9 @@ def capture_power(
         prepare_error: list[BaseException] = []
         try:
             sync.arm()
-            sync_metadata_holder: dict[str, object] = {}
+            # Filled inside the driver-thread callback; a one-slot holder so
+            # the typed object survives the thread boundary.
+            sync_metadata_holder: list[SyncHandshakeMetadata] = []
             capture_phase = {"name": "poller_armed"}
 
             def _release(wait_gpi_state=None) -> None:
@@ -361,7 +364,6 @@ def capture_power(
                     # input is open, and the GPI poller is live.
                     capture_phase["name"] = "resetting_target"
                     _prepare_target_once()
-                    from ..power.diagnostics import SyncHandshakeMetadata
 
                     if sync.lockstep:
                         # GPIO levels during flash/reset are undefined protocol
@@ -388,17 +390,15 @@ def capture_power(
                                     f"{ready_wait_s:.3f}s."
                                 ),
                             )
-                        sync_metadata_holder.update(
+                        sync_metadata_holder.append(
                             SyncHandshakeMetadata(
                                 lockstep=True,
                                 ready_wait_s=ready_wait_s,
                                 ready_observed=True,
-                            ).to_metadata()
+                            )
                         )
                     else:
-                        sync_metadata_holder.update(
-                            SyncHandshakeMetadata(lockstep=False).to_metadata()
-                        )
+                        sync_metadata_holder.append(SyncHandshakeMetadata(lockstep=False))
                     if dtr_holder is not None:
                         dtr_holder.open()
                     # Make the poller accept a fresh GATE edge before GO is
@@ -440,16 +440,15 @@ def capture_power(
             )
             if prepare_error:
                 raise prepare_error[0]
-            result.metadata.setdefault("sync", dict(sync_metadata_holder))
-            result.metadata.setdefault(
-                "power_plan",
-                {
+            if result.metadata.sync is None and sync_metadata_holder:
+                result.metadata.sync = sync_metadata_holder[-1]
+            if result.metadata.power_plan is None:
+                result.metadata.power_plan = {
                     "inference_count": plan.inference_count,
                     "reference_inference_us": plan.reference_inference_us,
                     "target_duration_ms": plan.target_duration_ms,
                     "count_source": plan.count_source,
-                },
-            )
+                }
             return _attach_lifecycle_metadata(result)
         except PowerError:
             if prepare_error and isinstance(prepare_error[0], PowerError):

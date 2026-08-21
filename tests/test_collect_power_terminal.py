@@ -20,6 +20,7 @@ from helia_profiler.config import load_config
 from helia_profiler.errors import PowerError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
+from helia_profiler.power.metadata import MeasurementScope, PowerMetadata
 from helia_profiler.stages.collect_power_terminal import CollectPowerTerminalStage
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
@@ -112,7 +113,7 @@ def _make_ctx(
                 5000,
             ),
             gated_windows=[_gated_window(gate_duration_s)],
-            metadata={"measurement_scope": "gpio_gated_clean_window"},
+            metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
         )
         ctx.publish_power_observation(
             PowerObservation(
@@ -204,7 +205,7 @@ def test_internal_terminal_measurement_becomes_power_result(
     assert ctx.power_result.summary.energy_j == pytest.approx(0.09)
     assert ctx.power_result.summary.duration_s == pytest.approx(0.005)
     assert ctx.power_result.summary.avg_current_a == pytest.approx(10.0)
-    assert ctx.power_result.metadata["source"] == "ina228"
+    assert ctx.power_result.metadata.source == "ina228"
 
 
 @pytest.mark.parametrize(
@@ -503,7 +504,7 @@ class TestFirmwareWindowClockIntegrity:
                 result=PowerResult(
                     summary=PowerSummary(0.001, 0.002, 0.02, 0.04, 19.2, 19200),
                     gated_windows=[],
-                    metadata={"measurement_scope": "free_form_capture"},
+                    metadata=PowerMetadata(measurement_scope=MeasurementScope.FREE_FORM_CAPTURE),
                 ),
                 gate_rise_observed=True,
                 gate_fall_observed=False,
@@ -595,7 +596,7 @@ class TestFirmwareWindowClockIntegrity:
             )
         assert "cannot outlast the interval that contains it" in caplog.text
         assert ctx.power_result is not None
-        assert ctx.power_result.metadata["window_clock_ceiling"]["elapsed_us"] == inflated
+        assert ctx.power_result.metadata.window_clock_ceiling.elapsed_us == inflated
 
     def test_internal_window_inside_host_wall_time_does_not_warn(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
@@ -612,7 +613,7 @@ class TestFirmwareWindowClockIntegrity:
             )
         assert "cannot outlast" not in caplog.text
         assert ctx.power_result is not None
-        assert "window_clock_ceiling" in ctx.power_result.metadata
+        assert ctx.power_result.metadata.window_clock_ceiling is not None
 
     def test_ceiling_is_internal_mode_only(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog

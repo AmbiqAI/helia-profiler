@@ -13,6 +13,7 @@ from .power import _power_summary_to_dict
 from .contracts import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION
 from ..evaluation import evaluate_run
 from ..power.diagnostics import probe_runs_inferences
+from ..power.metadata import MeasurementScope
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -123,7 +124,8 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     # Power summary
     if ctx.power_result is not None:
         ps = ctx.power_result.summary
-        power_meta = ctx.power_result.metadata
+        # Serialization boundary: the report is built from the flat view.
+        power_meta = ctx.power_result.metadata.to_metadata_dict()
         measurement_scope = power_meta.get("measurement_scope", "whole_capture_window")
         summary["power"] = _power_summary_to_dict(ps)
         summary["power"]["measurement_scope"] = measurement_scope
@@ -430,14 +432,14 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     if (
         ctx.model_analysis is not None
         and ctx.power_result is not None
-        and ctx.power_result.metadata.get("measurement_scope") != "free_form_capture"
+        and ctx.power_result.metadata.measurement_scope is not MeasurementScope.FREE_FORM_CAPTURE
     ):
         ma = ctx.model_analysis
         ps = ctx.power_result.summary
         if ps.avg_power_w and ps.avg_power_w > 0 and ps.duration_s and ps.duration_s > 0:
             infer_count = 1
             if (
-                ctx.power_result.metadata.get("measurement_scope") == "gpio_gated_clean_window"
+                ctx.power_result.metadata.measurement_scope is MeasurementScope.GPIO_GATED_CLEAN_WINDOW
                 and ctx.pmu_result is not None
                 and ctx.pmu_result.meta.clean_infer_count
             ):

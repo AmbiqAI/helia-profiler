@@ -112,15 +112,19 @@ class GateDurationIntegrity:
         ``valid`` DERIVED from the stored measurements rather than cached
         (the old dict stored a constant ``True``, which held only because
         that writer raises on mismatch; deriving keeps it honest everywhere)."""
-        return {
+        metadata: dict[str, object] = {
             "measured_s": round(self.measured_s, 6),
             "expected_s": round(self.expected_s, 6),
             "tolerance_s": round(self.tolerance_s, 6),
             "minimum_s": round(self.minimum_s, 6),
-            "relative_tolerance": self.relative_tolerance,
-            "ratio": round(self.ratio, 6),
-            "valid": self.valid,
         }
+        # Production capture always records the band; omitted only in
+        # hand-built fixtures, where emitting a null would be a new key.
+        if self.relative_tolerance is not None:
+            metadata["relative_tolerance"] = self.relative_tolerance
+        metadata["ratio"] = round(self.ratio, 6)
+        metadata["valid"] = self.valid
+        return metadata
 
 
 #: How far the measured gate may sit from the expected window.

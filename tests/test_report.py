@@ -17,6 +17,26 @@ from helia_profiler.pipeline import PipelineContext
 from helia_profiler.errors import ReportError
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
 from helia_profiler.power.diagnostics import WindowClockCeiling
+from helia_profiler.power.diagnostics import (
+    GateDurationIntegrity,
+    GateFailure,
+    GateFailureKind,
+    GateTransitionTiming,
+    SyncHandshakeMetadata,
+)
+from helia_profiler.power.metadata import (
+    MeasurementScope,
+    ObservationMode,
+    PowerIntegrity,
+    PowerMetadata,
+)
+from helia_profiler.target.lifecycle import (
+    CapturePhase,
+    ResetAction,
+    ResetStrategy,
+    TargetLifecyclePlan,
+)
+
 from helia_profiler.report import (
     _metadata_to_dict,
     _write_csv,
@@ -38,6 +58,18 @@ from helia_profiler.results import (
     RunMetadata,
     TimingInfo,
     ToolchainInfo,
+)
+
+# Built from the real producer type: the old hand-written lifecycle dicts
+# were under-specified (four keys) relative to what production always wrote.
+_LIFECYCLE_PLAN = TargetLifecyclePlan(
+    phase=CapturePhase.POWER,
+    power_cycle_attempted=True,
+    power_cycle_succeeded=True,
+    reset_strategy=ResetStrategy.AUTO,
+    reset_action=ResetAction.DEBUG_RESET,
+    actions=(),
+    timings_s={},
 )
 
 
@@ -287,25 +319,15 @@ def test_write_run_metadata_includes_target_lifecycle(tmp_path: Path):
     )
     ctx.power_result = PowerResult(
         summary=PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0),
-        metadata={
-            "target_lifecycle": {
-                "phase": "power",
-                "power_cycle_attempted": True,
-                "power_cycle_succeeded": True,
-                "reset_action": "debug_reset",
-            },
-        },
+        metadata=PowerMetadata(
+            target_lifecycle=_LIFECYCLE_PLAN,
+        ),
     )
 
     out_path = _write_run_metadata(ctx, tmp_path)
     metadata = json.loads(out_path.read_text())
 
-    assert metadata["target_lifecycle"] == {
-        "phase": "power",
-        "power_cycle_attempted": True,
-        "power_cycle_succeeded": True,
-        "reset_action": "debug_reset",
-    }
+    assert metadata["target_lifecycle"] == _LIFECYCLE_PLAN.to_metadata()
 
 
 def test_write_csv_includes_layer_cycle_percentages(tmp_path: Path):
@@ -509,20 +531,15 @@ def test_write_summary_prefers_gpio_gated_power_when_present(tmp_path: Path):
                 sample_count=100,
             )
         ],
-        metadata={
-            "measurement_scope": "gpio_gated_clean_window",
-            "sync_input_index": 0,
-            "gating_method": "gpi_snapshot_poll",
-            "target_lifecycle": {
-                "phase": "power",
-                "power_cycle_attempted": True,
-                "power_cycle_succeeded": True,
-                "reset_action": "debug_reset",
-            },
-            "sync": {"lockstep": True, "ready_wait_s": 0.012},
-            "sync_timing_s": {"go_release_to_gate_rise_s": 0.004},
-            "short_gate_pulses_ignored": 3,
-            "whole_capture_summary": {
+        metadata=PowerMetadata(
+            measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
+            sync_input_index=0,
+            gating_method="gpi_snapshot_poll",
+            target_lifecycle=_LIFECYCLE_PLAN,
+            sync=SyncHandshakeMetadata(lockstep=True, ready_wait_s=0.012),
+            sync_timing_s=GateTransitionTiming(go_release_to_gate_rise_s=0.004),
+            short_gate_pulses_ignored=3,
+            whole_capture_summary={
                 "avg_current_a": 0.003,
                 "avg_power_w": 0.006,
                 "peak_current_a": 0.02,
@@ -530,7 +547,7 @@ def test_write_summary_prefers_gpio_gated_power_when_present(tmp_path: Path):
                 "duration_s": 7.0,
                 "sample_count": 14,
             },
-        },
+        ),
     )
 
     out_path = _write_summary(ctx, tmp_path)
@@ -543,12 +560,7 @@ def test_write_summary_prefers_gpio_gated_power_when_present(tmp_path: Path):
     # window must NOT leak into summary.json (it belongs in the detailed CSV).
     assert "whole_capture_window" not in summary["power"]
     assert summary["power"]["sync_input_index"] == 0
-    assert summary["power"]["target_lifecycle"] == {
-        "phase": "power",
-        "power_cycle_attempted": True,
-        "power_cycle_succeeded": True,
-        "reset_action": "debug_reset",
-    }
+    assert summary["power"]["target_lifecycle"] == _LIFECYCLE_PLAN.to_metadata()
     assert summary["power"]["sync"] == {"lockstep": True, "ready_wait_s": 0.012}
     assert summary["power"]["sync_timing_s"] == {"go_release_to_gate_rise_s": 0.004}
     assert summary["power"]["short_gate_pulses_ignored"] == 3
@@ -595,7 +607,7 @@ def _gated_power_ctx(
                 sample_count=100,
             )
         ],
-        metadata={"measurement_scope": "gpio_gated_clean_window"},
+        metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
     )
     return ctx
 
@@ -636,19 +648,18 @@ def test_write_summary_uses_fixed_power_plan_count(tmp_path: Path):
     ctx = _gated_power_ctx(
         tmp_path, clean_infer_count=10, clean_infer_avg_us=10000, duration_s=0.08
     )
-    ctx.power_result.metadata["power_plan"] = {
+    ctx.power_result.metadata.power_plan = {
         "inference_count": 8,
         "reference_inference_us": 10000,
         "target_duration_ms": 80,
         "count_source": "profile_guided",
     }
-    ctx.power_result.metadata["gate_duration_integrity"] = {
-        "measured_s": 0.08,
-        "expected_s": 0.08,
-        "tolerance_s": 0.008,
-        "minimum_s": 0.0,
-        "valid": True,
-    }
+    ctx.power_result.metadata.gate_duration_integrity = GateDurationIntegrity(
+        measured_s=0.08,
+        expected_s=0.08,
+        tolerance_s=0.008,
+        minimum_s=0.0,
+    )
 
     out_path = _write_summary(ctx, tmp_path)
     summary = json.loads(out_path.read_text())
@@ -671,7 +682,7 @@ def test_write_summary_surfaces_window_clock_ceiling(tmp_path: Path):
     ctx = _gated_power_ctx(
         tmp_path, clean_infer_count=10, clean_infer_avg_us=10000, duration_s=0.1
     )
-    ctx.power_result.metadata["window_clock_ceiling"] = ceiling.to_metadata()
+    ctx.power_result.metadata.window_clock_ceiling = ceiling
 
     out_path = _write_summary(ctx, tmp_path)
     summary = json.loads(out_path.read_text())
@@ -751,7 +762,7 @@ def test_busy_loop_probe_publishes_no_active_window_estimates_either(tmp_path: P
         tmp_path, clean_infer_count=1, clean_infer_avg_us=1_000_000, duration_s=1.0
     )
     object.__setattr__(ctx.config.profiling, "clean_window_probe", "busy_loop")
-    ctx.power_result.metadata["measurement_scope"] = "on_device_gated_inference"
+    ctx.power_result.metadata.measurement_scope = MeasurementScope.ON_DEVICE_GATED_INFERENCE
     object.__setattr__(ctx.pmu_result.meta, "profiled_infer_count", 200)
     object.__setattr__(ctx.pmu_result.meta, "profiled_infer_total_us", 18_000_000)
 
@@ -798,14 +809,14 @@ def test_degraded_free_form_capture_suppresses_derived_efficiency(tmp_path: Path
     )
     ctx.power_result = PowerResult(
         summary=PowerSummary(0.01, 0.018, 0.02, 0.18, 10.0, 10000),
-        metadata={
-            "measurement_scope": "free_form_capture",
-            "observation_mode": "free_form",
-            "integrity": "degraded",
-            "gate_failure": {"kind": "no_gate_rise"},
-            "gate_rise_observed": False,
-            "gate_fall_observed": False,
-        },
+        metadata=PowerMetadata(
+            measurement_scope=MeasurementScope.FREE_FORM_CAPTURE,
+            observation_mode=ObservationMode.FREE_FORM,
+            integrity=PowerIntegrity.DEGRADED,
+            gate_failure=GateFailure(kind=GateFailureKind.NO_GATE_RISE, message="", hint=""),
+            gate_rise_observed=False,
+            gate_fall_observed=False,
+        ),
     )
     path = _write_summary(ctx, tmp_path)
     summary = json.loads(path.read_text())
@@ -829,7 +840,7 @@ def test_degraded_free_form_capture_suppresses_derived_efficiency(tmp_path: Path
         "measurement_scope": "free_form_capture",
         "observation_mode": "free_form",
         "integrity": "degraded",
-        "gate_failure": {"kind": "no_gate_rise"},
+        "gate_failure": {"kind": "no_gate_rise", "message": "", "hint": ""},
         "gate_rise_observed": False,
         "gate_fall_observed": False,
     }
@@ -874,7 +885,7 @@ def test_summary_serializes_power_terminal_status(tmp_path: Path):
     )
     ctx.power_result = PowerResult(
         summary=PowerSummary(0.01, 0.018, 0.02, 0.09, 5.0, 5000),
-        metadata={"measurement_scope": "gpio_gated_clean_window"},
+        metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
     )
 
     path = _write_summary(ctx, tmp_path)
@@ -909,7 +920,7 @@ def test_write_summary_handles_sub_inference_dedicated_gate(tmp_path: Path):
     ctx = _gated_power_ctx(
         tmp_path, clean_infer_count=235, clean_infer_avg_us=21159, duration_s=0.008
     )
-    ctx.power_result.metadata["power_firmware"] = "dedicated"
+    ctx.power_result.metadata.power_firmware = "dedicated"
 
     out_path = _write_summary(ctx, tmp_path)
     summary = json.loads(out_path.read_text())

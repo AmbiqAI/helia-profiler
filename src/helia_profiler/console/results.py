@@ -12,6 +12,7 @@ from rich.table import Table
 from rich.text import Text
 
 from .tables import _fmt_bytes, _progress_bar, _to_float
+from ..power.metadata import PowerIntegrity
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -353,7 +354,7 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     # ── Power ─────────────────────────────────────────────────
     if ctx.power_result is not None:
         ps = ctx.power_result.summary
-        degraded = ctx.power_result.metadata.get("integrity") == "degraded"
+        degraded = ctx.power_result.metadata.integrity is PowerIntegrity.DEGRADED
         power_table = Table(
             title=(
                 "[bold yellow]Power diagnostics (degraded)[/bold yellow]"
@@ -376,9 +377,9 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
             f"{ps.energy_j * 1e6:.3f} µJ",
         )
         if degraded:
-            failure = ctx.power_result.metadata.get("gate_failure", {})
-            if isinstance(failure, dict) and failure.get("kind"):
-                power_table.add_row("Integrity", f"degraded ({failure['kind']})")
+            failure = ctx.power_result.metadata.gate_failure
+            if failure is not None:
+                power_table.add_row("Integrity", f"degraded ({failure.kind})")
         if ctx.power_run is not None and ctx.power_run.terminal is not None:
             terminal = ctx.power_run.terminal
             power_table.add_row(

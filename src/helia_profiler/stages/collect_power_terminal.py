@@ -8,6 +8,12 @@ from datetime import datetime, timezone
 from ..errors import PowerError
 from ..pipeline import PipelineContext
 from ..power.base import PowerResult, PowerSummary
+from ..power.metadata import (
+    MeasurementScope,
+    ObservationMode,
+    PowerIntegrity,
+    PowerMetadata,
+)
 from ..power.diagnostics import (
     FROZEN_WINDOW_CLOCK_HINT,
     assess_run_window_clock,
@@ -230,13 +236,13 @@ class CollectPowerTerminalStage:
                     duration_s=duration_s,
                     sample_count=measurement.sample_count or 0,
                 ),
-                metadata={
-                    "measurement_scope": "on_device_gated_inference",
-                    "observation_mode": "on_device",
-                    "integrity": "valid",
-                    "source": measurement.source,
-                    "inference_count": measurement.inference_count,
-                },
+                metadata=PowerMetadata(
+                    measurement_scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
+                    observation_mode=ObservationMode.ON_DEVICE,
+                    integrity=PowerIntegrity.VALID,
+                    source=measurement.source,
+                    inference_count=measurement.inference_count,
+                ),
             )
         if frozen_window_clock:
             # External mode: warn, do not raise. The instrument owns every
@@ -323,9 +329,7 @@ class CollectPowerTerminalStage:
                     # power.window_clock_exceeds_host_time warning refers to
                     # is visible from the summary alone, not just the
                     # validity issue's context.
-                    ctx.power_result.metadata["window_clock_ceiling"] = (
-                        ceiling.to_metadata()
-                    )
+                    ctx.power_result.metadata.window_clock_ceiling = ceiling
                 if ceiling.exceeded:
                     log.warning(
                         "Power firmware reported a %.6f s window, but only "

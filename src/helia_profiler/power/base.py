@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Protocol, runtime_checkable
 
+from .metadata import PowerMetadata
+
 
 class PowerMode(str, Enum):
     """Power measurement mode."""
@@ -72,13 +74,20 @@ class GatedPowerWindow:
 
 @dataclass(frozen=True)
 class PowerResult:
-    """Complete result of a power capture."""
+    """Complete result of a power capture.
+
+    ``metadata`` is the typed :class:`~helia_profiler.power.metadata.PowerMetadata`
+    (#154 Phase 2 breaking change — previously ``dict[str, Any]``; the flat
+    dict view is ``metadata.to_metadata_dict()``). The result is frozen but
+    its metadata is deliberately mutable: pipeline stages enrich it after
+    capture, like ``RunMetadata``.
+    """
 
     summary: PowerSummary
     samples: list[PowerSample] = field(default_factory=list)
     gated_windows: list[GatedPowerWindow] = field(default_factory=list)
     per_layer: dict[str, Any] | None = None  # internal mode only
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: PowerMetadata = field(default_factory=PowerMetadata)
 
 
 @runtime_checkable

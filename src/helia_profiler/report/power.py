@@ -33,7 +33,8 @@ def _write_power_csv(power: PowerResult, output_dir: Path) -> Path:
     """
     out_path = output_dir / "power_summary.csv"
     summary = power.summary
-    meta = power.metadata or {}
+    # Serialization boundary: the CSV is built from the flat view.
+    meta = power.metadata.to_metadata_dict()
     scope = meta.get("measurement_scope", "whole_capture_window")
     with open(out_path, "w", newline="") as f:
         writer = csv.writer(f)
