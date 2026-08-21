@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 from ..results import (
     RESULT_MANIFEST_SCHEMA,
     RESULT_MANIFEST_SCHEMA_VERSION,
+    ComparisonDimension,
     ResultArtifact,
     ResultManifest,
     RunStatus,
@@ -172,65 +173,69 @@ def _provenance(ctx: PipelineContext) -> dict[str, Any]:
 
 
 def _comparability(ctx: PipelineContext) -> dict[str, Any]:
+    """Authoritative comparability record, one entry per registry dimension.
+
+    Extraction from the typed context stays here (declaring extractors in
+    ``results/`` would couple it to the pipeline), but the key set is
+    contract-tested against ``DIMENSION_REGISTRY``: every dimension is
+    recorded except those whose spec says ``manifest_authoritative=False``
+    (``power_lockstep`` — the runtime value in ``summary.power.sync.lockstep``
+    is the record; a config-derived value here would be merged last by the
+    reader and silently overwrite it — see the spec's rationale).
+    """
     config = ctx.run_metadata.config_snapshot
     model = ctx.run_metadata.model
     platform = ctx.run_metadata.platform
     toolchain = ctx.run_metadata.toolchain
     firmware = ctx.pmu_result.meta if ctx.pmu_result is not None else None
-    dimensions = {
-        "model_sha256": model.sha256 if model is not None else None,
-        "hpx_version": ctx.run_metadata.hpx_version,
-        "engine": _nested(config, "engine", "type"),
-        "board": platform.board if platform is not None else None,
-        "soc": platform.soc if platform is not None else None,
-        "cpu_clock": platform.cpu_clock_name if platform is not None else None,
-        "toolchain": _nested(config, "target", "toolchain"),
-        "compiler_version": toolchain.compiler_version if toolchain is not None else None,
-        "system_clock_hz": firmware.system_clock_hz if firmware is not None else None,
-        "run_summary_schema_version": RUN_SUMMARY_SCHEMA_VERSION,
-        "run_metadata_schema_version": RUN_METADATA_SCHEMA_VERSION,
-        "transport": _nested(config, "target", "transport"),
-        "arena_location": _nested(config, "model", "arena_location"),
-        "weights_location": _nested(config, "model", "weights_location"),
+    values: dict[ComparisonDimension, Any] = {
+        ComparisonDimension.MODEL_SHA256: model.sha256 if model is not None else None,
+        ComparisonDimension.HPX_VERSION: ctx.run_metadata.hpx_version,
+        ComparisonDimension.ENGINE: _nested(config, "engine", "type"),
+        ComparisonDimension.BOARD: platform.board if platform is not None else None,
+        ComparisonDimension.SOC: platform.soc if platform is not None else None,
+        ComparisonDimension.CPU_CLOCK: platform.cpu_clock_name if platform is not None else None,
+        ComparisonDimension.TOOLCHAIN: _nested(config, "target", "toolchain"),
+        ComparisonDimension.COMPILER_VERSION: (
+            toolchain.compiler_version if toolchain is not None else None
+        ),
+        ComparisonDimension.SYSTEM_CLOCK_HZ: (
+            firmware.system_clock_hz if firmware is not None else None
+        ),
+        ComparisonDimension.RUN_SUMMARY_SCHEMA_VERSION: RUN_SUMMARY_SCHEMA_VERSION,
+        ComparisonDimension.RUN_METADATA_SCHEMA_VERSION: RUN_METADATA_SCHEMA_VERSION,
+        ComparisonDimension.TRANSPORT: _nested(config, "target", "transport"),
+        ComparisonDimension.ARENA_LOCATION: _nested(config, "model", "arena_location"),
+        ComparisonDimension.WEIGHTS_LOCATION: _nested(config, "model", "weights_location"),
     }
     if ctx.power_result is not None:
-        dimensions.update(
+        # A run that measured no power has nothing to say about how it
+        # measured it; a value on this side would block a power-vs-no-power
+        # comparison that used to work.
+        values.update(
             {
-                "power_scope": ctx.power_result.metadata.measurement_scope,
-                "power_integrity": ctx.power_result.metadata.integrity,
-                "power_mode": ctx.config.power.mode.value,
-                "power_firmware": ctx.power_run.plan.firmware_mode if ctx.power_run else None,
+                ComparisonDimension.POWER_SCOPE: ctx.power_result.metadata.measurement_scope,
+                ComparisonDimension.POWER_INTEGRITY: ctx.power_result.metadata.integrity,
+                ComparisonDimension.POWER_MODE: ctx.config.power.mode.value,
+                ComparisonDimension.POWER_FIRMWARE: (
+                    ctx.power_run.plan.firmware_mode if ctx.power_run else None
+                ),
                 # An on-target monitor keeps its IOM powered on the measured
                 # rail for the whole run — a double-digit-percent current
                 # adder on a low-power target. A block/no-block pair is
                 # therefore not power-comparable even when every other
                 # dimension matches.
-                "power_monitor": "ina228" if ctx.config.power.monitor_selected else "none",
-                # What ran inside the measured window. The busy_loop probe
-                # replaces the model with a calibrated CPU spin, so an
-                # infer/busy_loop pair reports the difference between two
-                # different physical quantities as a regression (#125).
-                #
-                # Recorded here, inside the power_result gate, for the same
-                # reason every dimension above is: a run that measured no
-                # power has nothing to say about how it measured it, and a
-                # value on that side would block a power-vs-no-power
-                # comparison that used to work.
-                "power_clean_window_probe": ctx.config.profiling.clean_window_probe,
-                # NOTE: power_lockstep is deliberately NOT recorded here.
-                # It IS a measured-rail difference -- the state pin becomes
-                # an output, the GO pin's input buffer is enabled, and the
-                # host holds GO high into it until gate rise -- so it belongs
-                # in the comparability set. But only as the RUNTIME value,
-                # which lives in summary.power.sync.lockstep. Config intent
-                # answers the wrong question (a driver with no GO output
-                # degrades to the null controller even when config resolved
-                # lock-step on), and because the manifest is merged LAST it
-                # would silently overwrite the runtime value. See
-                # evaluation/comparability.py.
+                ComparisonDimension.POWER_MONITOR: (
+                    "ina228" if ctx.config.power.monitor_selected else "none"
+                ),
+                # What ran inside the measured window: the busy_loop probe
+                # replaces the model with a calibrated CPU spin (#125).
+                ComparisonDimension.POWER_CLEAN_WINDOW_PROBE: (
+                    ctx.config.profiling.clean_window_probe
+                ),
             }
         )
-    return dimensions
+    return {dimension.value: value for dimension, value in values.items()}
 
 
 def _nested(value: dict[str, Any], *keys: str) -> Any:
