@@ -15,6 +15,7 @@ from ..results import (
     ResultValidity,
     RunStatus,
 )
+from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
 
 # Not re-exported by the results package (construction shape changes in #154
 # Phase 3); imported from the registry module directly.
@@ -139,8 +140,8 @@ def assess_comparability(
 
     baseline_dimensions = _dimensions(baseline)
     candidate_dimensions = _dimensions(candidate)
-    baseline_model = baseline_dimensions.get("model_sha256")
-    candidate_model = candidate_dimensions.get("model_sha256")
+    baseline_model = baseline_dimensions.get(ComparisonDimension.MODEL_SHA256)
+    candidate_model = candidate_dimensions.get(ComparisonDimension.MODEL_SHA256)
     if baseline_model and candidate_model and baseline_model != candidate_model:
         issues.append(
             _issue(
@@ -174,7 +175,7 @@ def assess_comparability(
                 )
             )
     for role, dimensions in (("baseline", baseline_dimensions), ("candidate", candidate_dimensions)):
-        integrity = dimensions.get("power_integrity")
+        integrity = dimensions.get(ComparisonDimension.POWER_INTEGRITY)
         if integrity not in (None, "valid"):
             issues.append(
                 _issue(
@@ -220,66 +221,50 @@ def assess_comparability(
 
 
 def _dimensions(run: RunArtifacts) -> dict[str, Any]:
-    metadata = run.metadata
-    config = metadata.get("config", {})
-    platform = metadata.get("platform", {})
-    model = metadata.get("model", {})
-    toolchain = metadata.get("toolchain", {})
-    firmware = metadata.get("firmware", {})
-    dimensions = {
-        "model_sha256": model.get("sha256"),
-        "hpx_version": metadata.get("hpx_version"),
-        "engine": _nested(config, "engine", "type"),
-        "board": _nested(config, "target", "board"),
-        "soc": platform.get("soc"),
-        "cpu_clock": platform.get("cpu_clock_name"),
-        "toolchain": _nested(config, "target", "toolchain"),
-        "compiler_version": toolchain.get("compiler_version"),
-        "system_clock_hz": firmware.get("system_clock_hz"),
-        "run_summary_schema_version": run.summary.get("schema_version"),
-        "run_metadata_schema_version": metadata.get("schema_version"),
-        "transport": _nested(config, "target", "transport"),
-        "arena_location": _nested(config, "model", "arena_location"),
-        "weights_location": _nested(config, "model", "weights_location"),
-    }
+    """Registry-driven read of every dimension from the run artifacts.
+
+    Each spec declares its source and path (``results/dimensions.py``); the
+    ``_nested`` traversal is deliberately crash-tolerant because artifacts
+    from other HPX versions may hold shapes this build would not write —
+    pre-#154-Phase-2 artifacts on disk store ``summary.power.sync`` as a
+    bare bool, which an unguarded ``.get()`` chain dies on with an
+    ``AttributeError`` that is not an ``HpxError``, aborting a whole
+    multi-case validation compare instead of recording one COMPARE_ERROR.
+
+    The manifest merges last as the authoritative record — except for the
+    dimensions whose spec says ``manifest_authoritative=False``
+    (``power_lockstep``): those record the RUNTIME state of the rail, config
+    intent answers the wrong question, and a manifest value must never
+    override them (the #115 phantom-comparability rule; rationale on the
+    spec).
+    """
+    dimensions: dict[str, Any] = {}
     power = run.summary.get("power")
-    if isinstance(power, dict):
+    power_dict = power if isinstance(power, dict) else None
+    for spec in DIMENSION_REGISTRY.values():
+        if spec.source is ArtifactSource.RUN_METADATA:
+            dimensions[spec.dimension] = _nested(run.metadata, *spec.path)
+        elif spec.source is ArtifactSource.SUMMARY:
+            dimensions[spec.dimension] = _nested(run.summary, *spec.path)
+        elif spec.source is ArtifactSource.SUMMARY_POWER and power_dict is not None:
+            dimensions[spec.dimension] = (
+                spec.derive(power_dict)
+                if spec.derive is not None
+                else _nested(power_dict, *spec.path)
+            )
+        # ArtifactSource.MANIFEST_ONLY: no artifact fallback by design.
+    if run.manifest is not None:
+        protected = {
+            spec.dimension
+            for spec in DIMENSION_REGISTRY.values()
+            if not spec.manifest_authoritative
+        }
         dimensions.update(
             {
-                "power_scope": power.get("measurement_scope"),
-                "power_integrity": power.get("integrity"),
-                "power_firmware": power.get("power_firmware"),
-                # Manifest-less fallback: a published on-device payload means
-                # monitor firmware was live. The manifest's config-derived
-                # value (merged below) is authoritative when present.
-                "power_monitor": "ina228" if power.get("on_device_summary") else "none",
-                # Lock-step is read from the RUNTIME record only -- the state
-                # the rail was actually in, written by capture/__init__.py as
-                # summary.power.sync.lockstep. Deliberately NOT carried in the
-                # manifest alongside the config-derived dimensions above: the
-                # manifest is merged last and would overwrite this, and config
-                # intent is the wrong question. capture/__init__.py's own
-                # comment says why -- "a driver with no GO output degrades to
-                # the null controller even when the config resolved lock-step
-                # on" -- so an intent-derived value would compare two runs as
-                # equivalent while one of them actually free-ran its window,
-                # which is the phantom-comparability failure this dimension
-                # exists to prevent.
-                #
-                # _nested, not a hand-rolled .get chain: report/summary.py
-                # copies power metadata's "sync" through on an is-not-None
-                # check alone, so it reaches disk as whatever was stored --
-                # the repo's own report golden fixture holds the bool True,
-                # which an unguarded .get() dies on with AttributeError. That
-                # is not an HpxError, so cli/compare_cmd.py would print a
-                # traceback and validation/compare.py would abort a whole
-                # multi-case run instead of recording one COMPARE_ERROR.
-                "power_lockstep": _nested(power, "sync", "lockstep"),
+                key: value
+                for key, value in run.manifest.comparability.items()
+                if value is not None and key not in protected
             }
-        )
-    if run.manifest is not None:
-        dimensions.update(
-            {key: value for key, value in run.manifest.comparability.items() if value is not None}
         )
     return dimensions
 
