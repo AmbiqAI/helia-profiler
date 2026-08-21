@@ -31,6 +31,15 @@ from types import MappingProxyType
 from typing import Mapping
 
 from ..errors import ReportError
+# Re-exported for compatibility: ComparisonDimension moved to the dimension
+# model in Phase 3; both import paths remain valid.
+from .dimensions import (
+    DIMENSION_REGISTRY,
+    ComparisonDimension,
+    DimensionEffect,
+    dimensions_with_effect,
+    uniform_metric_group,
+)
 
 
 class Severity(StrEnum):
@@ -274,39 +283,6 @@ class ComparabilityCode(StrEnum):
     TOPOLOGY_OPERATION_SEQUENCE_MISMATCH = "topology.operation_sequence_mismatch"
 
 
-class ComparisonDimension(StrEnum):
-    """Comparison dimensions that parameterize comparability codes.
-
-    Provisional home: Phase 3 of #154 replaces the parallel dimension lists
-    in ``report/manifest.py`` and ``evaluation/comparability.py`` with a full
-    dimension model, which will own these names. Until then this enum only
-    needs to cover the dimensions that appear inside emitted code strings.
-    """
-
-    # Power dimensions — a mismatch blocks power metrics.
-    POWER_SCOPE = "power_scope"
-    POWER_MODE = "power_mode"
-    POWER_FIRMWARE = "power_firmware"
-    POWER_MONITOR = "power_monitor"
-    POWER_LOCKSTEP = "power_lockstep"
-    POWER_CLEAN_WINDOW_PROBE = "power_clean_window_probe"
-
-    # Informative dimensions — a difference is reported, never blocking.
-    HPX_VERSION = "hpx_version"
-    ENGINE = "engine"
-    BOARD = "board"
-    SOC = "soc"
-    CPU_CLOCK = "cpu_clock"
-    TOOLCHAIN = "toolchain"
-    COMPILER_VERSION = "compiler_version"
-    SYSTEM_CLOCK_HZ = "system_clock_hz"
-    RUN_SUMMARY_SCHEMA_VERSION = "run_summary_schema_version"
-    RUN_METADATA_SCHEMA_VERSION = "run_metadata_schema_version"
-    TRANSPORT = "transport"
-    ARENA_LOCATION = "arena_location"
-    WEIGHTS_LOCATION = "weights_location"
-
-
 @dataclass(frozen=True)
 class ComparabilitySpec:
     """Contract for one static :class:`ComparabilityCode`.
@@ -356,7 +332,7 @@ _COMPARABILITY_SPECS: tuple[ComparabilitySpec, ...] = (
         ComparabilitySeverity.METRIC_BLOCKING,
         "Power metrics omitted because a power result's integrity is not "
         "valid.",
-        metric_group="power",
+        metric_group=DIMENSION_REGISTRY[ComparisonDimension.POWER_INTEGRITY].metric_group,
     ),
     ComparabilitySpec(
         ComparabilityCode.TOPOLOGY_LAYER_COUNT_MISMATCH,
@@ -415,38 +391,19 @@ POWER_DIMENSION_MISMATCH = ComparabilityCodeFamily(
     severity=ComparabilitySeverity.METRIC_BLOCKING,
     description="Power metrics omitted because a power comparison dimension "
     "differs between the runs.",
-    dimensions=(
-        ComparisonDimension.POWER_SCOPE,
-        ComparisonDimension.POWER_MODE,
-        ComparisonDimension.POWER_FIRMWARE,
-        ComparisonDimension.POWER_MONITOR,
-        ComparisonDimension.POWER_LOCKSTEP,
-        ComparisonDimension.POWER_CLEAN_WINDOW_PROBE,
-    ),
+    dimensions=dimensions_with_effect(DimensionEffect.POWER_METRIC_BLOCKING),
     _prefix="metric.power_",
     _suffix="_mismatch",
-    metric_group="power",
+    metric_group=uniform_metric_group(
+        dimensions_with_effect(DimensionEffect.POWER_METRIC_BLOCKING)
+    ),
 )
 
 DIMENSION_DIFFERS = ComparabilityCodeFamily(
     severity=ComparabilitySeverity.INFORMATIVE,
     description="A comparison dimension differs between the runs; deltas "
     "remain comparable but should be read in that light.",
-    dimensions=(
-        ComparisonDimension.HPX_VERSION,
-        ComparisonDimension.ENGINE,
-        ComparisonDimension.BOARD,
-        ComparisonDimension.SOC,
-        ComparisonDimension.CPU_CLOCK,
-        ComparisonDimension.TOOLCHAIN,
-        ComparisonDimension.COMPILER_VERSION,
-        ComparisonDimension.SYSTEM_CLOCK_HZ,
-        ComparisonDimension.RUN_SUMMARY_SCHEMA_VERSION,
-        ComparisonDimension.RUN_METADATA_SCHEMA_VERSION,
-        ComparisonDimension.TRANSPORT,
-        ComparisonDimension.ARENA_LOCATION,
-        ComparisonDimension.WEIGHTS_LOCATION,
-    ),
+    dimensions=dimensions_with_effect(DimensionEffect.INFORMATIVE),
     _prefix="dimension.",
     _suffix="_differs",
 )

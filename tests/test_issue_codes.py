@@ -69,14 +69,40 @@ def test_family_codes_pin_the_shipped_wire_format():
     )
 
 
-def test_families_partition_the_dimension_enum():
-    # Every dimension must belong to exactly one family: a member added to
-    # ComparisonDimension but not to a family's tuple would silently never be
-    # checked by assess_comparability, with every existing test staying green.
-    power = set(POWER_DIMENSION_MISMATCH.dimensions)
-    informative = set(DIMENSION_DIFFERS.dimensions)
-    assert power | informative == set(ComparisonDimension)
-    assert not power & informative
+def test_family_membership_and_order_are_the_documented_sets():
+    # Families derive from DIMENSION_REGISTRY, so asserting them against the
+    # derivation would be X == X. These literals are the independent pin:
+    # membership, effect-class bucketing, AND order (family order reaches the
+    # emitted-issue order in compare artifacts). A dimension classified into
+    # the wrong effect fails here even though every derivation still holds.
+    assert [d.value for d in POWER_DIMENSION_MISMATCH.dimensions] == [
+        "power_scope",
+        "power_mode",
+        "power_firmware",
+        "power_monitor",
+        "power_lockstep",
+        "power_clean_window_probe",
+    ]
+    assert [d.value for d in DIMENSION_DIFFERS.dimensions] == [
+        "hpx_version",
+        "engine",
+        "board",
+        "soc",
+        "cpu_clock",
+        "toolchain",
+        "compiler_version",
+        "system_clock_hz",
+        "run_summary_schema_version",
+        "run_metadata_schema_version",
+        "transport",
+        "arena_location",
+        "weights_location",
+    ]
+    # The remaining enum members are exactly the two non-family classes.
+    non_family = set(ComparisonDimension) - set(
+        POWER_DIMENSION_MISMATCH.dimensions
+    ) - set(DIMENSION_DIFFERS.dimensions)
+    assert {d.value for d in non_family} == {"model_sha256", "power_integrity"}
 
 
 def test_family_rejects_foreign_dimension():
