@@ -1,10 +1,15 @@
 """Contract: firmware render snapshots across SoC x transport x engine.
 
-Renders the real firmware templates (``main.cc.j2`` for TFLM/heliaRT and
-``main_aot.cc.j2`` for heliaAOT) through the profiler's real Jinja environment
-for the supported (SoC x transport x engine) matrix, with template variables
-sourced from platform metadata exactly as ``firmware.generate_app`` sources
-them.
+Renders the real firmware templates (``main.cc.j2`` for TFLM/heliaRT,
+``main_aot.cc.j2`` for heliaAOT and ``main_executorch.cc.j2`` for ExecuTorch)
+through the profiler's real Jinja environment for the supported
+(SoC x transport x engine) matrix, with template variables sourced from
+platform metadata exactly as ``firmware.generate_app`` sources them.
+
+The matrix is not a full cross product: ExecuTorch is Cortex-M55-only in
+production and has no dedicated power binary, so it pairs with apollo510
+alone and appears in neither the power nor the busy-loop matrices (see
+``_ENGINE_SOCS`` / ``_MATRIX_ENGINES``).
 
 For each combination we snapshot a STABLE digest:
 
@@ -33,6 +38,7 @@ import pytest
 
 from helia_profiler.engines import TFLM_ENGINE_HEADER
 from helia_profiler.firmware import _jinja_env
+from helia_profiler.firmware.context import resolve_window_timer
 from helia_profiler.platform import get_soc, list_socs
 
 _SNAPSHOT_PATH = Path(__file__).parent / "snapshots" / "firmware_render.json"
@@ -42,8 +48,26 @@ _UPDATE = os.environ.get("HPX_UPDATE_SNAPSHOTS") == "1"
 _SOCS = ["apollo3p", "apollo4p", "apollo510"]
 _TRANSPORTS = ["rtt", "usb_cdc", "swo", "uart"]
 # tflm and helia-rt both render main.cc.j2 with the same engine header, so they
-# produce identical output; helia-aot renders the distinct AOT template.
-_ENGINES = ["tflm", "helia-rt", "helia-aot"]
+# produce identical output; helia-aot and executorch render their own templates.
+_ENGINES = ["tflm", "helia-rt", "helia-aot", "executorch"]
+
+#: Engines whose supported SoC set is narrower than ``_SOCS``.  ExecuTorch is
+#: built for Cortex-M55 only (the NSX ExecuTorch runtime needs Helium; every
+#: AP3/AP4 part in this matrix is Cortex-M4F), so pairing it with apollo3p or
+#: apollo4p would snapshot a render production can never produce.
+_ENGINE_SOCS: dict[str, list[str]] = {"executorch": ["apollo510"]}
+
+#: Engines that appear in the power_only and busy-loop matrices.  ExecuTorch is
+#: excluded from both: ``stages.preflight._check_transport_support`` rejects
+#: engine.type=executorch with power.enabled (pinned by
+#: ``test_executorch_power_tripwire.py``), and the busy_loop clean-window probe
+#: exists only to gate an external power capture, so neither combination is
+#: reachable from a supported configuration.
+_MATRIX_ENGINES = [e for e in _ENGINES if e != "executorch"]
+
+
+def _socs_for(engine: str) -> list[str]:
+    return _ENGINE_SOCS.get(engine, _SOCS)
 
 # Feature markers: substring -> human name.  Presence is the semantic snapshot.
 _MARKERS: dict[str, str] = {
@@ -80,6 +104,14 @@ _MARKERS: dict[str, str] = {
     "clean_window_attach_wait": "HPX_CLEAN_WINDOW_ATTACH_WAIT_MS",
     "clean_window_stall_check": "HPX_CLEAN_STALLED_ITERS",
     "clean_window_rate_probe": "HPX_CLEAN_DWT_RATE_CYC",
+    # Whether the render announces which engine produced it. Emitted by the
+    # shared skeleton for every transport-attached binary and by none of the
+    # power binaries (which never bring a transport up), so this marker also
+    # says which of the two a render is. The per-engine SPELLING is pinned
+    # separately by test_every_render_declares_its_engine_on_the_wire below --
+    # a marker can only see presence, and every engine sharing one wrong name
+    # would look identical here.
+    "engine_wire_id": "HPX_ENGINE=",
 }
 
 
@@ -154,17 +186,34 @@ def test_no_test_builds_a_look_alike_env_over_production_templates():
 
 
 def _sample_pmu_passes() -> list[dict[str, object]]:
+    """One pass, in the shape production actually emits.
+
+    ``FirmwareRenderContext._resolve_pmu_passes`` builds every pass with
+    ``custom=True``, real ``0xNNNN`` event ids and ``c_enum=None`` -- the
+    preset branch of the pass-init blocks is unreachable from a real run.
+    This used to pin ``custom=False`` with an EMPTY ``event_ids``, which is
+    not a shape production can produce, and on the ExecuTorch template (whose
+    ``engine_pass_init`` has no preset branch) it snapshotted invalid C: a
+    zero-size ``static const uint32_t ids[]`` that ``profiler_init`` then
+    indexes. Mirroring production keeps the pinned renders compilable and
+    keeps the snapshotted branch the one that ships.
+
+    tests/test_template_render.py keeps a ``custom=False`` sample on purpose --
+    its smoke coverage of the preset branch is the only thing exercising it.
+    """
     return [
         {
             "name": "Cache",
-            "custom": False,
-            "event_ids": [],
+            "custom": True,
+            "event_ids": ["0x0011", "0x0008", "0x0023", "0x0024"],
             "counter_names": [
                 "ARM_PMU_CPU_CYCLES",
                 "ARM_PMU_INST_RETIRED",
+                "ARM_PMU_STALL_FRONTEND",
+                "ARM_PMU_STALL_BACKEND",
             ],
-            "num_counters": 2,
-            "c_enum": "NSX_PMU_PRESET_BASIC_CPU",
+            "num_counters": 4,
+            "c_enum": None,
             "group": "cpu",
         }
     ]
@@ -221,6 +270,44 @@ def _common_kwargs(soc_name: str, transport: str) -> dict:
         "heartbeat_every_n_ops": 4,
         "heartbeat_every_ms": 0,
         "psram_clock_hz": 48_000_000,
+        # HPX_ENGINE= is emitted by the shared skeleton for every engine, so
+        # every render needs the wire name.  Defaulted to the tflm spelling
+        # here and overridden per engine by _render(); the direct render sites
+        # in this file all go through _common_kwargs and render main.cc.j2.
+        "engine_wire_name": "tflm",
+    }
+
+
+# EngineType value -> HPX_ENGINE= wire spelling (hyphens are not legal in the
+# host parser's HPX_(\w+)=value key, so they become underscores; mirrors
+# FirmwareRenderContext.to_template_vars()).
+_ENGINE_WIRE_NAMES = {
+    "tflm": "tflm",
+    "helia-rt": "helia_rt",
+    "helia-aot": "helia_aot",
+    "executorch": "executorch",
+}
+
+
+def _finalize(kwargs: dict) -> dict:
+    """Derive the host-side window variables exactly as production does.
+
+    The window-clock resolution moved from a template prelude to
+    ``FirmwareRenderContext.to_template_vars()`` (#118); every render now
+    receives ``busy_loop_probe`` / ``window_timer`` / ``use_stimer_window``
+    as inputs. Deriving them through the production resolver keeps these
+    snapshots pinned to the values production ships, while the rendered-text
+    guard tests below (window-timed-by-dead-domain, free-running-DWT) remain
+    the independent check on the resolution itself.
+    """
+    return {
+        **kwargs,
+        **resolve_window_timer(
+            clean_window_probe=str(kwargs.get("clean_window_probe", "infer")),
+            power_only=bool(kwargs.get("power_only", False)),
+            power_window_timer=str(kwargs["power_window_timer"]),
+            clean_window_timer=str(kwargs["clean_window_timer"]),
+        ),
     }
 
 
@@ -235,6 +322,9 @@ def _render(
     kwargs = _common_kwargs(soc_name, transport)
     kwargs["clean_window_probe"] = clean_window_probe
     kwargs["window_mode"] = window_mode
+    # .get() with the production derivation as the fallback so an unknown
+    # engine still reaches the informative AssertionError below.
+    kwargs["engine_wire_name"] = _ENGINE_WIRE_NAMES.get(engine, engine.replace("-", "_"))
     if power_only:
         kwargs["power_only"] = True
     if engine == "helia-aot":
@@ -245,7 +335,28 @@ def _render(
             allocate_arenas=False,
             arena_regions=[],
         )
-        return _jinja_env.get_template("main_aot.cc.j2").render(**kwargs)
+        return _jinja_env.get_template("main_aot.cc.j2").render(**_finalize(kwargs))
+    if engine == "executorch":
+        # Mirrors the executorch_* block of FirmwareRenderContext.to_template_vars()
+        # (EngineContext), which is what production hands
+        # main_executorch.cc.j2 in firmware/__init__.py.  Sizes are arbitrary
+        # but distinct so a buffer swapped between two placements is visible in
+        # the sha256.
+        kwargs.update(
+            printf_linkage="",
+            executorch_planned_arena_size=65_536,
+            executorch_method_arena_size=16_384,
+            executorch_temporary_arena_size=8_192,
+            executorch_input_size=1_960,
+            executorch_output_size=12,
+            executorch_planned_arena_region="tcm",
+            executorch_method_arena_region="tcm",
+            executorch_temporary_arena_region="tcm",
+            executorch_io_region="tcm",
+        )
+        return _jinja_env.get_template("main_executorch.cc.j2").render(
+            **_finalize(kwargs)
+        )
     if engine not in ("tflm", "helia-rt"):
         # Production picks the template three ways (firmware/__init__.py:
         # HELIA_AOT -> main_aot.cc.j2, EXECUTORCH -> main_executorch.cc.j2,
@@ -270,7 +381,7 @@ def _render(
         resource_variable_count=0,
         printf_linkage="",
     )
-    return _jinja_env.get_template("main.cc.j2").render(**kwargs)
+    return _jinja_env.get_template("main.cc.j2").render(**_finalize(kwargs))
 
 
 def _digest(rendered: str) -> dict:
@@ -287,6 +398,7 @@ def _all_combos() -> list[tuple[str, str, str]]:
         for soc in _SOCS
         for transport in _TRANSPORTS
         for engine in _ENGINES
+        if soc in _socs_for(engine)
     ]
 
 
@@ -299,7 +411,9 @@ _POWER_TRANSPORT = "rtt"
 
 
 def _power_combos() -> list[tuple[str, str, str]]:
-    return [(soc, _POWER_TRANSPORT, engine) for soc in _SOCS for engine in _ENGINES]
+    return [
+        (soc, _POWER_TRANSPORT, engine) for soc in _SOCS for engine in _MATRIX_ENGINES
+    ]
 
 
 # The matrices above pin clean_window_probe="infer" (the default).  The opt-in
@@ -327,7 +441,11 @@ def _power_busy_loop_combos() -> list[tuple[str, str, str]]:
 
 
 def _profile_busy_loop_combos() -> list[tuple[str, str, str]]:
-    return [(soc, _BUSY_LOOP_TRANSPORT, engine) for soc in _SOCS for engine in _ENGINES]
+    return [
+        (soc, _BUSY_LOOP_TRANSPORT, engine)
+        for soc in _SOCS
+        for engine in _MATRIX_ENGINES
+    ]
 
 
 def _key(
@@ -1004,11 +1122,21 @@ def _clean_window_region(code: str) -> str:
     template's ``g_profiler_enabled = false;`` also appears as a file-scope
     initializer hundreds of lines earlier, and anchoring on that would silently
     widen the region to most of the file (and swallow unrelated DWT reads).
+
+    One opener spelling per engine, since each names its own profiler-arm flag
+    (heliaRT ``g_profiler.SetEnabled``, heliaAOT ``g_profiler_enabled``,
+    ExecuTorch ``g_profile_enabled``).  All three render from the same
+    ``engine_profiler_off`` seam in ``_main_base.cc.j2``, so the list is
+    exhaustive by construction: a fourth engine adds a fourth spelling here.
     """
     gate = code.index("hpx_sync_window_begin();")
     starts = [
         found
-        for opener in ("g_profiler.SetEnabled(false);", "g_profiler_enabled = false;")
+        for opener in (
+            "g_profiler.SetEnabled(false);",
+            "g_profiler_enabled = false;",
+            "g_profile_enabled = false;",
+        )
         if (found := code.rfind(opener, 0, gate)) != -1
     ]
     assert starts, "clean-window scope opener not found before the window gate"
@@ -1288,10 +1416,11 @@ def test_hal_umbrella_header_is_included_at_most_once():
     """``am_mcu_apollo.h`` has several independent consumers in the main
     templates (Apollo3 burst, the Armv8-M PMU, STIMER window timing, the broad
     peripheral / crypto-otp shutdowns) guarded by separate blocks. They must
-    stay mutually exclusive: main.cc.j2 keeps them as separate blocks, while
-    main_aot.cc.j2 merges the STIMER and shutdown cases into one guard. This
-    pins the shared invariant so the two structures cannot silently diverge
-    into a double include -- or, as the AOT template did before this change,
+    stay mutually exclusive: the shared skeleton (_main_base.cc.j2, extended
+    by both main.cc.j2 and main_aot.cc.j2) keeps burst and the Armv8-M PMU as
+    their own guards and merges the STIMER and shutdown cases into a third.
+    This pins the invariant so the guards cannot silently drift into a double
+    include -- or, as the AOT template did before the merged guard existed,
     into no include at all for a render that calls am_hal_stimer_*.
 
     Swept over both clean-window probes: the busy_loop probe is pinned to
@@ -1348,6 +1477,46 @@ def test_snapshot_covers_exactly_the_current_matrix():
     assert set(_SNAPSHOTS) == expected_keys, _REGEN_HINT
 
 
+def test_every_render_declares_its_engine_on_the_wire():
+    """``HPX_ENGINE=<wire name>`` must be right for every engine, everywhere.
+
+    The host reads this key to label the run (and to populate the
+    ``ComparisonDimension.ENGINE`` field), and the shared skeleton emits it
+    from a single ``engine_wire_name`` variable -- so a wrong or missing
+    mapping is one edit away from mislabelling an entire engine's results
+    while every other assertion in this file stays green. main.cc.j2 is
+    rendered for BOTH tflm and helia-rt, which is exactly the case a
+    template-side hardcoding would get wrong.
+
+    The power binaries are the negative half: they force
+    ``NSX_DEBUG_NONE`` and emit no HPX_* header at all, so ``HPX_ENGINE=``
+    must be absent rather than merely unread.
+    """
+    for probe in _PROBES:
+        for soc, transport, engine in _all_combos():
+            rendered = _render(soc, transport, engine, clean_window_probe=probe)
+            expected = _ENGINE_WIRE_NAMES[engine]
+            case = f"{soc}|{transport}|{engine}|{probe}"
+            assert f'hpx_printf("HPX_ENGINE={expected}\\n")' in rendered, (
+                f"{case}: render does not declare HPX_ENGINE={expected}"
+            )
+            # Exactly one engine name on the wire, and it is this engine's.
+            for other in set(_ENGINE_WIRE_NAMES.values()) - {expected}:
+                assert f"HPX_ENGINE={other}\\n" not in rendered, (
+                    f"{case}: also declares itself as {other}"
+                )
+
+        for soc, transport, engine in _power_combos():
+            rendered = _render(
+                soc, transport, engine, power_only=True, clean_window_probe=probe
+            )
+            assert "HPX_ENGINE=" not in rendered, (
+                f"{soc}|{transport}|{engine}|{probe}|power: the dedicated power "
+                "binary emits an HPX_ENGINE line, but it never brings a "
+                "transport up -- nothing can read it"
+            )
+
+
 def test_transport_specific_blocks_are_pinned():
     """Sanity anchors so a broken harness can't silently pin empty output."""
     usb = _digest(_render("apollo510", "usb_cdc", "tflm"))
@@ -1385,13 +1554,13 @@ def test_ble_reset_only_in_power_only_binary_for_blue_boards():
         power_binary_needs_gpio=True,
     )
 
-    power_rendered = _jinja_env.get_template("main.cc.j2").render(**{**kwargs, "power_only": True})
+    power_rendered = _jinja_env.get_template("main.cc.j2").render(**_finalize({**kwargs, "power_only": True}))
     assert "bleResetCfg" in power_rendered
     assert "NSX_GPIO_LEVEL_LOW" in power_rendered
     assert "nsx_gpio.h" in power_rendered
 
     transport_rendered = _jinja_env.get_template("main.cc.j2").render(
-        **{**kwargs, "power_only": False}
+        **_finalize({**kwargs, "power_only": False})
     )
     assert "bleResetCfg" not in transport_rendered
 
@@ -1400,7 +1569,7 @@ def test_ble_reset_only_in_power_only_binary_for_blue_boards():
     no_ble_kwargs = dict(kwargs)
     no_ble_kwargs.pop("ble_reset_gpio_pin")
     no_ble_rendered = _jinja_env.get_template("main.cc.j2").render(
-        **{**no_ble_kwargs, "power_only": True}
+        **_finalize({**no_ble_kwargs, "power_only": True})
     )
     assert "bleResetCfg" not in no_ble_rendered
 
@@ -1470,12 +1639,12 @@ def test_extreme_mode_power_only_only():
         weights_region="tcm",
         extreme_mode=True,
     )
-    power_rendered = _jinja_env.get_template("main.cc.j2").render(**{**kwargs, "power_only": True})
+    power_rendered = _jinja_env.get_template("main.cc.j2").render(**_finalize({**kwargs, "power_only": True}))
     assert "AM_HAL_PWRCTRL_NVM0_ONLY" in power_rendered
     assert "EXTREME MODE" in power_rendered
 
     transport_rendered = _jinja_env.get_template("main.cc.j2").render(
-        **{**kwargs, "power_only": False}
+        **_finalize({**kwargs, "power_only": False})
     )
     assert "AM_HAL_PWRCTRL_NVM0_ONLY" not in transport_rendered
     assert "EXTREME MODE" not in transport_rendered
@@ -1483,7 +1652,7 @@ def test_extreme_mode_power_only_only():
     # Still requires TCM/TCM even in the power_only binary.
     non_tcm_kwargs = {**kwargs, "arena_region": "sram", "weights_region": "mram"}
     non_tcm_rendered = _jinja_env.get_template("main.cc.j2").render(
-        **{**non_tcm_kwargs, "power_only": True}
+        **_finalize({**non_tcm_kwargs, "power_only": True})
     )
     assert "AM_HAL_PWRCTRL_NVM0_ONLY" not in non_tcm_rendered
 
@@ -1518,6 +1687,35 @@ def test_pmu_profiler_sram_placement_transport_only_on_ap5():
     assert "NSX_MEM_SRAM static HpxPmuProfiler g_profiler;" in ap3_transport
     assert "Shared SSRAM power-on" not in ap3_transport
 
+    # main_aot.cc.j2's per-layer storage (g_layers, NSX_MEM_SRAM_BSS -- POD,
+    # so NOLOAD zero-fill is safe, unlike the polymorphic g_profiler) follows
+    # the same rule: SRAM-resident in the transport binary only, with the
+    # SSRAM domain powered on AP5. Regression pin: the AOT template used to
+    # leave pmu_profiler_sram_resident unset, so an AP5 render with a
+    # TCM-resident arena never powered the domain and per-layer profiling
+    # wrote to an unbacked SSRAM bank.
+    aot_transport = _render("apollo510", "rtt", "helia-aot", power_only=False)
+    assert "NSX_MEM_SRAM_BSS static HpxLayerRecord g_layers[kMaxLayers];" in aot_transport
+    assert "Shared SSRAM power-on" in aot_transport
+
+    aot_power = _render("apollo510", "rtt", "helia-aot", power_only=True)
+    assert "NSX_MEM_SRAM_BSS static HpxLayerRecord g_layers" not in aot_power
+    assert "static HpxLayerRecord g_layers[kMaxLayers];" in aot_power
+    assert "Shared SSRAM power-on" not in aot_power
+
+    # main_executorch.cc.j2's g_layers is the third instance of the same rule.
+    # It has only a transport half to check -- ExecuTorch has no dedicated
+    # power binary (preflight rejects engine.type=executorch with power, see
+    # test_executorch_power_tripwire.py), so there is no power render to
+    # assert the negative against and none is attempted here.
+    #
+    # Regression pin for the same bug shape the AOT lines above pin: the flag
+    # that drives this (pmu_profiler_sram_resident) is set once by
+    # _main_base.cc.j2, and ExecuTorch is the child that used to set it itself.
+    et_transport = _render("apollo510", "rtt", "executorch", power_only=False)
+    assert "NSX_MEM_SRAM_BSS static LayerRecord g_layers[kMaxLayers];" in et_transport
+    assert "Shared SSRAM power-on" in et_transport
+
 
 def test_ssram_full_power_enum_is_per_soc():
     """The AmbiqSuite HAL enum for "power on the entire shared SSRAM array"
@@ -1542,7 +1740,7 @@ def test_ssram_full_power_enum_is_per_soc():
         arena_region="sram",
         weights_region="mram",
     )
-    ap330_rendered = _jinja_env.get_template("main.cc.j2").render(**kwargs)
+    ap330_rendered = _jinja_env.get_template("main.cc.j2").render(**_finalize(kwargs))
     assert "AM_HAL_PWRCTRL_SRAM_1P75M" in ap330_rendered
     assert "AM_HAL_PWRCTRL_SRAM_3M" not in ap330_rendered
 
@@ -1576,6 +1774,6 @@ def test_peripheral_power_down_skips_mspi_when_psram_in_use():
         arena_region="psram",
         power_only=True,
     )
-    rendered = _jinja_env.get_template("main.cc.j2").render(**kwargs)
+    rendered = _jinja_env.get_template("main.cc.j2").render(**_finalize(kwargs))
     assert "AM_HAL_PWRCTRL_PERIPH_IOM0" in rendered  # rest of the block still fires
     assert "AM_HAL_PWRCTRL_PERIPH_MSPI0" not in rendered

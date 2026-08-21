@@ -16,17 +16,49 @@ Firmware source files are generated from Jinja2 templates stored in
 | `CMakeLists.txt.j2` | Top-level CMake project file |
 | `nsx.yml.j2` | NSX project manifest (module list + registry pins) |
 | `modules.cmake.j2` | Rendered to `cmake/nsx/modules.cmake` — module wiring |
-| `main.cc.j2` | Main for heliaRT / TFLM-style interpreter path |
-| `main_aot.cc.j2` | Main for heliaAOT (direct function calls) |
-| `main_executorch.cc.j2` | Main for ExecuTorch (`Method` load + static buffers) |
+| `_main_base.cc.j2` | **Shared firmware skeleton** — boot, transport preamble, GPIO sync, clean window, PMU pass loop, teardown. Not rendered directly. |
+| `main.cc.j2` | Child of `_main_base.cc.j2` — heliaRT / TFLM-style interpreter path |
+| `main_aot.cc.j2` | Child of `_main_base.cc.j2` — heliaAOT (direct function calls) |
+| `main_executorch.cc.j2` | Child of `_main_base.cc.j2` — ExecuTorch (`Method` load + static buffers) |
 | `hpx_pmu_profiler.cc.j2` | PMU capture harness (interpreter path) |
 | `hpx_pmu_profiler.h.j2` | PMU capture header |
 
 Alongside these, the directory holds ~20 underscore-prefixed **partials**
 (`_hpx_printf.j2`, `_dwt_init.j2`, `_system_includes.j2`,
 `_power_terminal.j2`, `_psram_metadata.j2`, ...) — shared fragments included
-by the main templates so transport setup, timer init, power-measurement
-hooks, and similar blocks are written once rather than per-engine.
+by the skeleton so transport setup, timer init, power-measurement hooks, and
+similar blocks are written once rather than per-engine.
+
+```
+templates/
+├── _main_base.cc.j2          ← the skeleton; owns everything engine-agnostic
+│   ├── main.cc.j2            ← {% extends %} — heliaRT / TFLM
+│   ├── main_aot.cc.j2        ← {% extends %} — heliaAOT
+│   └── main_executorch.cc.j2 ← {% extends %} — ExecuTorch
+└── _*.j2                     ← partials, {% include %}d by the skeleton
+```
+
+### The block contract
+
+Everything outside an `engine_*` block in `_main_base.cc.j2` is shared by every
+engine; the blocks are the only place engine-specific code may appear. A child
+can override a block, but it can never remove base text. Twelve of them
+(`engine_invoke`, `engine_globals`, `engine_pass_init`, `engine_print_csv`, ...)
+are **required** — the base renders nothing for them, so a child that misses one
+ships firmware with that engine's code simply absent. The rest have working
+defaults; a child overrides one only when the default is wrong for it (the
+clearest case is `engine_clean_window`, which ExecuTorch owns because its invoke
+reloads the model and reports its own execute-only cycle count).
+
+The failure mode inheritance introduces is silence: a child block whose name
+matches nothing in the base is ignored, the base's default renders in its place,
+and nothing errors. `tests/contracts/test_template_blocks.py` makes that a test
+failure — it pins the base's block inventory, each child's override set, the
+required set, and the whitespace shape of every override (the render env runs
+with `trim_blocks`/`lstrip_blocks` off, so an override that does not lead with a
+newline where the base anchors it to a `//` comment is silently commented out of
+the firmware). Read `_main_base.cc.j2`'s prelude for the whitespace contract
+itself.
 
 ### Template context
 

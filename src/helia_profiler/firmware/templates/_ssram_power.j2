@@ -31,15 +31,19 @@
       persistent, constant) in SRAM independently of arena_region/
       weights_region, which a hand-written --config can bypass entirely.
 
-   A third, independent trigger: main.cc.j2's HpxPmuProfiler (g_profiler)
-   is itself placed in NSX_MEM_SRAM_BSS in the transport-attached PMU-phase
-   binary (not the dedicated power binary -- see main.cc.j2's g_profiler
-   comment) to free TCM for the model instead of per-layer instrumentation
-   accumulators. Set via pmu_profiler_sram_resident (main.cc.j2 only;
-   undefined/false for main_aot.cc.j2, which has no such profiler). This
-   needs eActiveWithMCU like arena/weights residency (1), NOT the
-   retain-only mode of lever (2), since the profiler is actively written
-   to throughout every profiled inference, not just parked for a static-
+   A third, independent trigger: the per-layer instrumentation storage is
+   itself SRAM-resident in the transport-attached PMU-phase binary (not the
+   dedicated power binary) to free TCM for the model -- main.cc.j2's
+   HpxPmuProfiler (g_profiler, NSX_MEM_SRAM, in its engine_globals block),
+   main_aot.cc.j2's g_layers array (NSX_MEM_SRAM_BSS, likewise), and
+   main_executorch.cc.j2's g_layers (NSX_MEM_SRAM_BSS). All three mains are
+   children of _main_base.cc.j2, which sets pmu_profiler_sram_resident once,
+   for all of them, at the top of the file -- before _system_includes.j2,
+   which reads the same flag for its narrow am_hal_pwrctrl.h guard and so has
+   to be included after it is set. This needs
+   eActiveWithMCU like arena/weights residency (1), NOT the retain-only
+   mode of lever (2), since the instrumentation is actively written to
+   throughout every profiled inference, not just parked for a static-
    power comparison.
 #}
 {% set _aot_sram_resident = ((arena_regions | default([])) | selectattr("placement", "equalto", "sram") | list | length) > 0 %}

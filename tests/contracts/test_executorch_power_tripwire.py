@@ -1,22 +1,29 @@
 """Tripwire: preflight lifting the ExecuTorch+power rejection must not go
 unnoticed by the render-contract matrix.
 
-``main_executorch.cc.j2`` (added in #100) times its clean loop with
-``DWT->CYCCNT`` and has none of the ``power_only`` machinery (window
-bracketing, terminal record, ``SocCapabilities.power_window_timer``
-consumption) that #106/#107 added to ``main.cc.j2``/``main_aot.cc.j2`` to
-avoid the frozen/garbage-window bug class: on AP4, ``broad_peripheral_shutdown``
-powers the debug domain (where DWT lives) down; on AP3, nothing asserts
+``main_executorch.cc.j2`` (added in #100) has none of the ``power_only``
+machinery -- window bracketing by a clock the power binary can read, the
+terminal record, ``SocCapabilities.power_window_timer`` consumption -- that
+#106/#107 added to ``main.cc.j2``/``main_aot.cc.j2`` to avoid the
+frozen/garbage-window bug class: on AP4, ``broad_peripheral_shutdown`` powers
+the debug domain (where DWT lives) down; on AP3, nothing asserts
 ``CDBGPWRUPREQ`` for a free-running binary, so the counter never advances.
 
-Today this is dead code: ``stages.preflight._check_transport_support``
-rejects ``engine.type == executorch`` combined with ``power.enabled``. But
-the render-contract tests in ``test_firmware_render_snapshots.py`` iterate
-``_ENGINES = ["tflm", "helia-rt", "helia-aot"]`` -- executorch is not in that
-matrix, so nothing pins the DWT-timing invariant for it. If someone lifts the
-preflight gate without also doing the ExecuTorch power work (extending
-``_ENGINES``, regenerating snapshots, adding ``power_only`` machinery to
-``main_executorch.cc.j2``), the bug class comes back with nothing watching.
+Since #154 phase 4 the template is a CHILD of ``_main_base.cc.j2`` and its
+non-power renders are pinned by the contract matrix (``_ENGINES`` now
+contains ``executorch``, paired with apollo510 alone). What it still does not
+have is a power path: its ``engine_clean_window`` override reports
+``HPX_CLEAN_INFER_*`` from the ExecuTorch runtime's own execute-only
+``execution_cycles`` and declares neither the STIMER bracket nor
+``clean_cycles``, so a ``power_only`` render would reach
+``_power_terminal_success.j2`` with no duration source in scope. That is by
+design and is why the matrix pairs executorch with neither ``_power_combos``
+nor the busy-loop probe.
+
+Today the whole question is moot: ``stages.preflight._check_transport_support``
+rejects ``engine.type == executorch`` combined with ``power.enabled``. If
+someone lifts that gate without doing the ExecuTorch power work, the bug class
+comes back with nothing watching.
 
 This test does not implement the fix. It fails loudly at exactly the moment
 described above, so the gap can no longer be silent.
@@ -30,28 +37,32 @@ from helia_profiler.config import load_config
 from helia_profiler.errors import ConfigError
 from helia_profiler.stages.preflight import _check_transport_support
 
-from .test_firmware_render_snapshots import _ENGINES
+from .test_firmware_render_snapshots import _ENGINES, _MATRIX_ENGINES
 
 _BUG_CLASS_MESSAGE = (
     "stages.preflight._check_transport_support now accepts "
     "engine.type=executorch with power.enabled=True, but "
-    "'executorch' is still absent from the render-contract engine matrix "
+    "'executorch' is absent from the render-contract engine matrix "
     "(_ENGINES in tests/contracts/test_firmware_render_snapshots.py). Lifting "
     "the preflight rejection in stages/preflight.py resurrects the #106/#107 "
-    "frozen/garbage-window DWT bug class for main_executorch.cc.j2: that "
-    "template still times its clean loop with DWT->CYCCNT and has no "
-    "power_only window bracketing, terminal record, or "
-    "SocCapabilities.power_window_timer consumption. Before removing this "
-    "rejection: (1) add the power_only machinery to main_executorch.cc.j2 "
-    "(mirroring main.cc.j2/main_aot.cc.j2); (2) give _render() in "
-    "tests/contracts/test_firmware_render_snapshots.py an executorch branch "
-    "that renders main_executorch.cc.j2 -- WITHOUT this, adding the engine to "
-    "_ENGINES renders main.cc.j2 under an executorch key and writes snapshot "
-    "entries byte-identical to tflm, so the DWT guards below pass while "
-    "covering nothing; (3) add 'executorch' to _ENGINES and regenerate "
-    "tests/contracts/snapshots/firmware_render.json; (4) confirm "
+    "frozen/garbage-window bug class for main_executorch.cc.j2: it has no "
+    "power_only window bracketing, no terminal record, and no "
+    "SocCapabilities.power_window_timer consumption -- its engine_clean_window "
+    "override reports HPX_CLEAN_INFER_* from the runtime's own "
+    "execution_cycles and declares neither clean_stimer_total_us nor "
+    "clean_cycles, so a power_only render reaches _power_terminal_success.j2 "
+    "with no duration source in scope. Before removing this rejection: "
+    "(1) add the power_only machinery to main_executorch.cc.j2's "
+    "engine_clean_window override (mirroring what _main_base.cc.j2's default "
+    "does for main.cc.j2/main_aot.cc.j2); (2) add 'executorch' to "
+    "_MATRIX_ENGINES in tests/contracts/test_firmware_render_snapshots.py so "
+    "it joins _power_combos()/the busy-loop matrices, and regenerate "
+    "tests/contracts/snapshots/firmware_render.json; (3) confirm "
     "test_window_is_never_timed_by_a_domain_the_binary_powers_down / "
-    "test_free_running_power_binary_never_times_the_window_with_dwt cover it. "
+    "test_free_running_power_binary_never_times_the_window_with_dwt cover it "
+    "(note _ENGINE_SOCS pairs executorch with apollo510 only, which is a "
+    "Cortex-M55 part -- if ExecuTorch ever ships on AP3/AP4, both of those "
+    "guards become load-bearing for it). "
     "(If you MOVED the rejection to another function rather than removing it, "
     "production is fine and this test just needs to call the new one -- it "
     "names _check_transport_support deliberately so this stays a loud, "
@@ -114,10 +125,72 @@ def test_preflight_accepting_executorch_power_requires_engine_matrix_coverage(
         preflight_accepts_executorch_power = True
 
     if preflight_accepts_executorch_power:
+        # Two matrices, because #154 phase 4 split them. ``_ENGINES`` is the
+        # non-power render matrix and executorch joined it when
+        # main_executorch.cc.j2 became a child of _main_base.cc.j2 -- so
+        # keying only on that would leave this tripwire vacuous, passing the
+        # moment the preflight gate is lifted while nothing pinned a single
+        # power render. ``_MATRIX_ENGINES`` is the one that still excludes
+        # executorch (power_only + busy-loop combos), so it is the live half
+        # of the guard; ``_ENGINES`` is kept as the weaker precondition so a
+        # future removal of executorch from the render matrix altogether also
+        # trips here rather than silently satisfying the check.
         assert "executorch" in _ENGINES, _BUG_CLASS_MESSAGE
+        assert "executorch" in _MATRIX_ENGINES, _BUG_CLASS_MESSAGE
     else:
         # Still gated -- nothing to pin yet, but assert the gate directly so
         # this test doesn't pass vacuously if _check_transport_support starts
         # raising for an unrelated reason (e.g. a bad tmp_path model).
         with pytest.raises(ConfigError, match="ExecuTorch profiling"):
             _check_transport_support(cfg)
+
+
+@pytest.mark.parametrize("board", ["apollo3p_evb", "apollo4p_evb", "apollo510_evb"])
+def test_preflight_rejects_executorch_with_the_busy_loop_clean_window_probe(
+    tmp_path, board
+):
+    """The busy_loop probe is the second door into the same room.
+
+    ``clean_window_probe=busy_loop`` replaces the model with a calibrated CPU
+    spin so an external instrument has a known-shape window to gate on, and the
+    firmware reports ``HPX_CLEAN_INFER_COUNT=1`` for that single unit of work.
+    It exists only to serve a power capture, which ExecuTorch does not support.
+
+    Before #154 phase 4 this combination was harmless by accident: the
+    standalone template had no busy_loop branch, so the option simply did
+    nothing. As a child of ``_main_base.cc.j2`` it now inherits one --
+    ``engine_clean_window``'s override delegates the busy_loop case straight
+    back to ``super()`` -- so the render would succeed and ship a nop-loop
+    window under keys this engine defines as real execute-only inference
+    timing. Power is off on this path, so none of the power-side integrity
+    checks would ever look at it.
+
+    Rejected in preflight instead, and pinned here per SoC family for the same
+    reason the power tripwire above is: a narrowing that exempts one family is
+    a likelier relaxation than a deletion.
+    """
+    model = tmp_path / "model.pte"
+    cfg = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "executorch"},
+            "target": {"board": board},
+            "profiling": {"clean_window_probe": "busy_loop"},
+        },
+    )
+
+    with pytest.raises(ConfigError, match="busy_loop"):
+        _check_transport_support(cfg)
+
+    # And the default probe is untouched -- the rejection must be about the
+    # probe, not about ExecuTorch reaching this function at all.
+    ok_cfg = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "executorch"},
+            "target": {"board": board},
+        },
+    )
+    _check_transport_support(ok_cfg)

@@ -1,10 +1,11 @@
 {# _busy_loop_calibration.j2 — size the busy-loop probe's iteration count.
 
-   Shared verbatim by main.cc.j2 and main_aot.cc.j2 (both render it at 8-space
-   indentation, immediately before the clean/power window is armed) so the two
-   cannot drift apart -- the class of bug that produced the original AP4 miss.
+   Included once from the shared skeleton (_main_base.cc.j2), which all three
+   engine templates extend, always at 8-space indentation immediately before
+   the clean/power window is armed, so the engines cannot drift apart -- the
+   class of bug that produced the original AP4 miss.
 
-   Timed by STIMER, never DWT.  main.cc.j2's prelude pins
+   Timed by STIMER, never DWT.  _main_base.cc.j2's prelude pins
    window_timer == "stimer" for this probe on every family (read it for the
    per-family reasoning and the resolution trade that choice accepts), which is
    what puts hpx_stimer_* in scope here.  The case this block exists to survive

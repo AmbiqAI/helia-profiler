@@ -21,6 +21,14 @@ import pytest
 # 128 renders. Importing the real env removes the divergence at the source.
 from helia_profiler.firmware import _jinja_env as _env
 
+# The window-clock resolution moved host-side (#118); renders receive the
+# derived busy_loop_probe / window_timer / use_stimer_window variables. The
+# helpers derive them through the production resolver so these smoke tests
+# exercise exactly the values FirmwareRenderContext.to_template_vars() ships;
+# the rendered-output guard tests in tests/contracts/ stay the independent
+# check on the resolution itself.
+from helia_profiler.firmware.context import resolve_window_timer
+
 
 def _sample_pmu_passes() -> list[dict[str, object]]:
     return [
@@ -67,6 +75,12 @@ def _render_tflm(
 ) -> str:
     registrations = resolver_registrations or ["r.AddConv2D();", "r.AddSoftmax();"]
     return _env.get_template("main.cc.j2").render(
+        **resolve_window_timer(
+            clean_window_probe=clean_window_probe,
+            power_only=power_only,
+            power_window_timer=power_window_timer,
+            clean_window_timer=str(extra_vars.get("clean_window_timer", "dwt")),
+        ),
         engine_header="tensorflow/lite/micro/micro_interpreter.h",
         cmsis_device_header="apollo510.h",
         arena_size=65_536,
@@ -105,6 +119,9 @@ def _render_tflm(
         heartbeat_every_n_ops=4,
         heartbeat_every_ms=0,
         psram_clock_hz=psram_clock_hz,
+        # HPX_ENGINE= is emitted by the shared skeleton for every engine
+        # (_main_base.cc.j2); production derives this from EngineType.
+        engine_wire_name="tflm",
         **extra_vars,
     )
 
@@ -129,6 +146,12 @@ def _render_aot(
     **extra_vars: object,
 ) -> str:
     return _env.get_template("main_aot.cc.j2").render(
+        **resolve_window_timer(
+            clean_window_probe=clean_window_probe,
+            power_only=power_only,
+            power_window_timer=power_window_timer,
+            clean_window_timer=str(extra_vars.get("clean_window_timer", "dwt")),
+        ),
         aot_prefix="fake",
         cmsis_device_header=cmsis_device_header,
         aot_op_manifest=[{"id": 0, "op_type": "CONV_2D"}],
@@ -164,6 +187,9 @@ def _render_aot(
         heartbeat_every_ms=0,
         pmu_max_ops=4096,
         psram_clock_hz=psram_clock_hz,
+        # See _render_tflm; the hyphen in the EngineType value becomes an
+        # underscore so the line parses as HPX_<KEY>=<value>.
+        engine_wire_name="helia_aot",
         **extra_vars,
     )
 
@@ -340,6 +366,10 @@ class TestMainCcRender:
         # No burst when the flag is off (default in helper).
         assert "am_hal_burst_mode_enable" not in out
         out = _env.get_template("main.cc.j2").render(
+            busy_loop_probe=False,
+            window_timer="dwt",
+            use_stimer_window=False,
+            engine_wire_name="tflm",
             engine_header="tensorflow/lite/micro/micro_interpreter.h",
             cmsis_device_header="apollo3p.h",
             arena_size=65_536,
@@ -449,6 +479,10 @@ class TestMainCcRender:
 
     def test_external_power_sync_uses_nsx_gpio(self):
         out = _env.get_template("main.cc.j2").render(
+            busy_loop_probe=False,
+            window_timer="dwt",
+            use_stimer_window=False,
+            engine_wire_name="tflm",
             engine_header="tensorflow/lite/micro/micro_interpreter.h",
             cmsis_device_header="apollo510.h",
             arena_size=65_536,

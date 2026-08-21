@@ -1,60 +1,17 @@
-{# main.cc — heliaPROFILER firmware entry point #}
-{#- The measured window must not be timed by a clock this binary cannot read.
-   DWT->CYCCNT lives in the CoreSight debug domain, which the dedicated power
-   binary either powers down itself (AM_HAL_PWRCTRL_PERIPH_DEBUG, see
-   _peripheral_power_down.j2) or simply has nothing holding up, since it
-   free-runs with no debugger asserting CDBGPWRUPREQ. Reads are then frozen or
-   garbage, so the accumulated cycle count is meaningless; because the terminal
-   report derives elapsed_us from it, the window duration is wrong -- measured
-   ~7x on Apollo4 Blue Plus, where a 24-second wall-clock run reported a
-   38.6-second window.
+{% extends "_main_base.cc.j2" %}
+{#- main.cc — heliaPROFILER firmware entry point for the TFLM / heliaRT
+   engine (engine_header is the engine's interpreter umbrella header).
 
-   What that costs depends on who is measuring. With an ON-DEVICE monitor
-   (internal mode) the reported duration is the denominator for average power
-   and current, so both are scaled by the same error and only integrated energy
-   and charge survive. With an EXTERNAL instrument the host owns those numbers
-   and only elapsed_us is affected.
+   The firmware skeleton -- boot, transport preamble, PSRAM/clean-window
+   machinery, GPIO sync, INA228 bracketing, PMU pass loop, teardown -- lives
+   in _main_base.cc.j2; this template only fills in the engine_* blocks with
+   the TFLM MicroInterpreter code.  Read that file's prelude for the
+   whitespace contract these definitions follow: a region block opens with a
+   newline and closes with `{%- endblock %}` (the base supplies the newline
+   that terminates the last line), and a single-line block holds exactly one
+   line with no newlines of its own. #}
 
-   The predicate itself lives host-side, once, in
-   SocCapabilities.power_window_timer -- read that docstring for the two
-   independent mechanisms. This template only picks between the power binary's
-   answer and the family preference the transport-attached profile binary uses
-   (it runs with a debugger attached, so it keeps DWT's finer resolution).
-
-   The opt-in busy_loop probe is pinned to STIMER on every family. That is a
-   DELIBERATE SIMPLIFICATION, not a per-family necessity -- the three cases
-   genuinely differ:
-
-     * Apollo5: gate_dbg renders am_hal_debug_disable() (that call sits inside
-       the has_armv8m_pmu guard), so the debug domain really is off for the
-       window and DWT really is unreadable.
-     * Apollo3/Apollo4 POWER binaries: the domain is already gone before the
-       probe runs -- AP4's broad shutdown disabled it at boot, and nothing
-       asserts CDBGPWRUPREQ in a free-running binary. This is the case issue
-       #112 was filed against.
-     * Apollo3/Apollo4 PROFILE binaries: gate_dbg is true, but
-       am_hal_debug_disable() does NOT render (it is AP5-gated) and a debugger
-       is attached, so DWT would work perfectly well here.
-
-   One clock is used for all three anyway. The cost is resolution: STIMER's
-   32.768 kHz XTAL ticks every ~30.5 us, against DWT's single core cycle. On
-   the calibration pass (~6-8 ms) that is well under 1%; on the measured
-   window -- milliseconds at minimum, and window_target_ms is auto-raised to
-   >= 5000 when power is enabled -- it is far below noise. Cheap next to a
-   second code path whose only reachable configuration is the one family
-   combination that does not need it.
-
-   What the probe used to do instead was inherit the per-family answer, which
-   on an AP3/AP4 power binary meant calibrating against an already-dead DWT:
-   busy_calib_cyc read 0, the scaling branch was skipped, the iteration count
-   silently fell back to its hardcoded seed, and the window ran for an
-   arbitrary length -- while clean_cycles was assigned the nominal target, so
-   the report claimed the window had lasted exactly window_target_ms. A
-   fabricated duration is worse than a wrong one: nothing downstream can tell
-   it is wrong (issue #112). -#}
-{%- set busy_loop_probe = (clean_window_probe | default("infer") == "busy_loop") %}
-{%- set window_timer = "stimer" if busy_loop_probe else (power_window_timer if power_only | default(false) else (clean_window_timer | default("dwt"))) %}
-{%- set use_stimer_window = (window_timer == "stimer") %}
+{% block engine_file_header %}
 /**
  * @file main.cc
  * @brief heliaPROFILER firmware — auto-generated, do not edit.
@@ -66,18 +23,9 @@
  * HIGH during inference and LOW otherwise so the host instrument can
  * identify the measurement window.
  */
+{%- endblock %}
 
-#include <cstdint>
-#include <cstdio>
-#include <cstdarg>
-#include <cstring>
-
-// Pre-include arm_mve.h in C++ context BEFORE any extern "C" headers
-// (nsx_core.h, TFLM) to avoid GCC 14 overload conflicts.
-#if defined(__ARM_FEATURE_MVE)
-#include <arm_mve.h>
-#endif
-
+{% block engine_includes %}
 #include "{{ engine_header }}"
 #if {{ resource_variable_count }} > 0
 #include "tensorflow/lite/micro/micro_allocator.h"
@@ -90,86 +38,9 @@
 #include "tensorflow/compiler/mlir/lite/schema/schema_utils.h"
 
 #include "hpx_pmu_profiler.h"
-{% include "_system_includes.j2" %}
-{% if apollo3_burst %}
-// Apollo3/3P TurboSPOT (burst) control lives in the AmbiqSuite HAL umbrella.
-#include "am_mcu_apollo.h"
-{% endif %}
-{% if has_armv8m_pmu %}
-#include "nsx_ambiq_pmu.h"
-{% if not apollo3_burst %}
-#include "am_mcu_apollo.h"
-{% endif %}
-{% endif %}
-{% if window_timer == "stimer" and not apollo3_burst and not has_armv8m_pmu %}
-// STIMER (used to time the clean/power window debug-domain-free) lives in
-// the same AmbiqSuite HAL umbrella header as the other MCU peripherals.
-#include "am_mcu_apollo.h"
-{% endif %}
-{% if power_only | default(false) and (broad_peripheral_shutdown | default(false) or crypto_otp_shutdown | default(false)) and not apollo3_burst and not has_armv8m_pmu and not (window_timer == "stimer") %}
-// Broad peripheral power-down (_peripheral_power_down.j2) / crypto-otp
-// shutdown (_crypto_otp_shutdown.j2) needs VCOMP/_VAL2FLD register
-// definitions from the same AmbiqSuite HAL umbrella.
-#include "am_mcu_apollo.h"
-{% endif %}
+{%- endblock %}
 
-{% include "_cache_shims.j2" %}
-
-// --- Boot-time host-attach delays (microseconds) ---
-// These are the few unavoidable firmware-side waits where the host has no
-// observable signal to poll: the host SWO/ITM viewer needs time to attach
-// after reset, and USB CDC needs a brief settle after the host asserts DTR.
-// Keep them named here so they stay discoverable and do not accrete as bare
-// magic numbers throughout main().  The host side polls wherever it can
-// (see capture/readiness.py); these cover only the genuinely-blind windows.
-// SWO/ITM has no back-pressure, so a one-shot "delay then print the header"
-// races the host's attach+enable: when the host enables SWO a hair late the
-// HPX_START sentinel has already been clocked into the undrained ITM FIFO and
-// is lost (the host then catches the stream from the second line on).  Emit
-// disposable HPX_READY sync lines across the whole attach window instead; once
-// the host enables SWO mid-preamble it stays synced and draining, so the real
-// HPX_START header is guaranteed to be captured.  The parser ignores every
-// line before "--- HPX_START ---".
-#define HPX_SWO_SYNC_PREAMBLE_LINES  40            // disposable sync lines before the header
-#define HPX_SWO_SYNC_GAP_US          (20U * 1000U) // gap per sync line (~800ms total grace)
-#define HPX_USB_POLL_DELAY_US     (10U * 1000U)   // re-poll cadence while waiting for DTR
-#define HPX_USB_SETTLE_DELAY_US   (200U * 1000U)  // settle after host asserts DTR
-// UART/ITM re-enable settle: nsx_uart_printf_enable()/nsx_itm_printf_enable()
-// re-powers the peripheral (clock/FIFO bring-up) right before the very next
-// hpx_printf() call reports the clean-window results -- with zero settle
-// margin that first line (HPX_CLEAN_INFER_COUNT=...) can be dropped or
-// garbled, silently losing clean_infer_count and falling the host back to
-// an unrelated whole-capture-window power estimate (found 2026-07-06 on the
-// first hardware test of the UART teardown fix). 5ms is generous versus a
-// UART/ITM clock-domain-crossing settle.
-#define HPX_DEBUG_REENABLE_SETTLE_US (5U * 1000U)
-
-{% include "_newlib_syscalls.j2" %}
-
-{% include "_dwt_init.j2" %}
-
-{% if window_timer == "stimer" %}
-{% include "_stimer_init.j2" %}
-{% endif %}
-
-{% include "_gpio_sync.j2" %}
-
-{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
-#include "nsx_i2c.h"
-#include "nsx_ina228.h"
-{% include "_ina228_power.j2" %}
-{% endif %}
-
-{% if transport == "usb_cdc" and not power_only | default(false) %}
-{% include "_usb_timer.j2" %}
-{% endif %}
-
-
-{% set psram_needed = (arena_region == "psram") or (weights_region == "psram") %}
-{% if psram_needed %}
-#include "nsx_psram.h"
-{% endif %}
-
+{% block engine_model_storage %}
 {% if weights_region == "psram" %}
 // PSRAM model loading — model data is written by J-Link at runtime
 static const unsigned char *model_data = nullptr;
@@ -178,9 +49,9 @@ static unsigned int model_data_len = {{ model_size }};
 // Model data (xxd-style include)
 #include "model_data.h"
 {% endif %}
+{%- endblock %}
 
-{% include "_hpx_printf.j2" %}
-
+{% block engine_globals %}
 static constexpr int kArenaSize = {{ arena_size }};
 static constexpr int kMaxOps = {{ resolver_max_ops }};
 #if {{ resource_variable_count }} > 0
@@ -271,142 +142,9 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
     }
     return r;
 }
+{%- endblock %}
 
-int main(void) {
-    nsx_system_config_t sys_cfg = {};
-    sys_cfg.perf_mode = {{ perf_mode_symbol }};  // {{ perf_mode_mhz }} MHz — target.clock.cpu
-    sys_cfg.enable_cache = true;
-    sys_cfg.enable_sram = true;
-    sys_cfg.debug.transport = {% if power_only | default(false) %}NSX_DEBUG_NONE{% elif transport == "swo" %}NSX_DEBUG_ITM{% elif transport == "uart" %}NSX_DEBUG_UART{% else %}NSX_DEBUG_NONE{% endif %};
-    sys_cfg.skip_bsp_init = false;
-    sys_cfg.spot_mgr_profile = true;
-    NSX_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
-    // NOTE: do NOT call nsx_itm_printf_enable()/nsx_uart_printf_enable()
-    // here -- nsx_system_init() already brought the transport up via
-    // sys_cfg.debug.transport above.  A second enable double-increments
-    // the AmbiqSuite TPIU/ITM refcount on BSP-managed parts (e.g.
-    // apollo330P), so the single pre-window nsx_itm_printf_disable()
-    // below only decrements it to 1, am_hal_tpiu_disable() returns
-    // AM_HAL_STATUS_IN_USE, and am_bsp_itm_printf_disable()'s error
-    // path is while(1) -- firmware hangs forever at clean_window_begin.
-    dwt_init();
-    hpx_sync_init();
-{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
-    // Bring up the on-target INA228 before any heavy setup.
-    {
-        uint32_t ina228_rc = hpx_ina228_setup();
-        if (ina228_rc == 0U) {
-            g_hpx_ina228_active = true;
-        } else {
-{% if ina228_required | default(false) %}
-            // The monitor IS the measurement (driver: ina228): a missing or
-            // mis-wired chip makes the run worthless, so fail fast with the
-            // setup sub-step as the error code.
-            hpx_power_terminal_fail("ina228_init", ina228_rc);
-{% else %}
-            // Bystander monitor (an external instrument owns the
-            // measurement): record the failure and continue — the run is
-            // still a perfectly good external capture. The terminal report
-            // emits the failure as a pre-record diagnostic; it will carry
-            // no measurement payload.
-            g_hpx_ina228_bystander_fail_phase = "init";
-            g_hpx_ina228_bystander_fail_rc = ina228_rc;
-{% endif %}
-        }
-    }
-{% endif %}
-{% if apollo3_burst %}
-    // --- Apollo3/3P TurboSPOT (96 MHz burst) ------------------------------
-    // NSX exposes no perf-mode selector on Apollo3, so request burst directly
-    // through the AmbiqSuite HAL.  Burst raises ONLY the CPU clock, so mirror
-    // it into SystemCoreClock to keep every device-side cycle->time value (and
-    // the host's registry clock assumption) consistent.  If burst is
-    // unavailable the host's device-clock cross-check flags the mismatch.
-    int hpx_burst_avail = 0;
-    int hpx_burst_engaged = 0;
-    {
-        am_hal_burst_avail_e burst_avail = AM_HAL_BURST_NOTAVAIL;
-        am_hal_burst_mode_e burst_state = AM_HAL_NORMAL_MODE;
-        am_hal_burst_mode_initialize(&burst_avail);
-        if (burst_avail == AM_HAL_BURST_AVAIL) {
-            am_hal_burst_mode_enable(&burst_state);
-        }
-        hpx_burst_avail = (burst_avail == AM_HAL_BURST_AVAIL);
-        hpx_burst_engaged = (burst_state == AM_HAL_BURST_MODE);
-        if (hpx_burst_engaged) {
-            SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
-        }
-    }
-{% else %}
-    // NSX applies the perf mode inside nsx_system_init, but the CMSIS
-    // SystemCoreClock global is NOT updated to match: on Apollo4/5
-    // SystemCoreClockUpdate() is hardcoded to the 96 MHz reset default, so at
-    // the hp tier it understates the real core clock (e.g. 192/250 MHz).  Set
-    // it to the resolved operating point so every device-side cycle->time
-    // value (profiled/clean inference us, heartbeat cadence) uses the real
-    // clock.  Harmless when it already matches (lp tiers).
-    SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
-{% endif %}
-{% set pmu_profiler_sram_resident = not (power_only | default(false)) %}
-{% include "_ssram_power.j2" %}
-{% include "_extreme_mode.j2" %}
-{% include "_ble_reset.j2" %}
-{% include "_peripheral_power_down.j2" %}
-{% include "_crypto_otp_shutdown.j2" %}
-{% if power_only | default(false) %}
-
-    // power_only: no transport init/attach preamble at all -- there is no
-    // host-attach race to close because no transport is ever brought up.
-    // See sys_cfg.debug.transport (forced NSX_DEBUG_NONE) above.
-{% elif transport == "usb_cdc" %}
-
-    // Initialize USB CDC and wait for host to connect (DTR)
-    NSX_TRY(nsx_usb_init(&g_usb_cfg), "USB CDC init failed\n");
-    while (!nsx_usb_connected(&g_usb_cfg)) {
-        nsx_delay_us(HPX_USB_POLL_DELAY_US);
-    }
-    // Brief settling delay after host connects
-    nsx_delay_us(HPX_USB_SETTLE_DELAY_US);
-    dwt_init();
-{% elif transport == "rtt" %}
-
-    // Configure buffer 0 in non-blocking trim mode for the boot/timed phases
-    // (writes that don't fit are dropped rather than stalling the CPU).
-    // hpx_rtt_set_blocking() later switches to lossless blocking mode around
-    // CSV dumps and HPX_END so no profiling row or the sentinel is ever lost.
-    // BUFFER_SIZE_UP is set via CMake so _DoInit() already allocates the
-    // compile-time buffer size. ConfigUpBuffer(0) can only change flags, not the
-    // buffer pointer/size (SEGGER RTT design for the default terminal).
-    SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,
-                              SEGGER_RTT_MODE_NO_BLOCK_TRIM);
-    // Flush the RTT control block metadata so J-Link can see the configured
-    // buffer counts/flags before the host attaches on cached M55 targets.
-    HPX_CLEAN_DCACHE();
-    // Lossless from boot: put the up-buffer in wait-for-space (blocking) mode
-    // so HPX_READY and the entire HPX_START header are captured no matter when
-    // the host attaches.  The firmware applies back-pressure (spins until the
-    // host drains) instead of waiting on a host->target down-channel command.
-    // That down-channel handshake is the fragile path that kept regressing
-    // across SEGGER / SDK updates (stale D-cache on the down-buffer descriptor),
-    // so we drop it entirely.  hpx_rtt_set_nonblocking() is restored before the
-    // timed inference window so mid-inference heartbeats stay droppable and
-    // never skew counts.
-    hpx_rtt_set_blocking();
-    hpx_printf("HPX_READY\n");
-    HPX_CLEAN_DCACHE();
-{% else %}
-
-    // SWO/ITM sync preamble (see HPX_SWO_SYNC_* above): keep the link warm with
-    // disposable HPX_READY lines so the host is guaranteed to be enabled and
-    // draining the ITM FIFO before the real HPX_START header is emitted.  This
-    // closes the attach race that intermittently dropped the start sentinel.
-    // NSX owns the ITM/SWO bring-up when debug.transport=NSX_DEBUG_ITM.
-    for (int hpx_sync_i = 0; hpx_sync_i < HPX_SWO_SYNC_PREAMBLE_LINES; ++hpx_sync_i) {
-        hpx_printf("HPX_READY\n");
-        nsx_delay_us(HPX_SWO_SYNC_GAP_US);
-    }
-{% endif %}
-
+{% block engine_pre_start %}
 {% if psram_needed %}
 
     // Flush any pending data to SRAM before PSRAM init. The platform backend may invalidate D-cache during
@@ -478,24 +216,14 @@ int main(void) {
     }
 {% endif %}
 {% endif %}
+{%- endblock %}
 
-{% if not power_only | default(false) %}    hpx_printf("\n--- HPX_START ---\n");
-    hpx_printf("HPX_VERSION=1\n");
-    hpx_printf("HPX_EXTREME_MODE=%d\n", {{ 1 if extreme_mode and arena_region == "tcm" and weights_region == "tcm" else 0 }});
+{% block engine_start_metadata %}
     hpx_printf("HPX_MODEL_SIZE=%u\n", model_data_len);
     hpx_printf("HPX_ARENA_SIZE=%d\n", kArenaSize);
-    hpx_printf("HPX_ITERATIONS={{ iterations }}\n");
-    hpx_printf("HPX_WARMUP={{ warmup }}\n");
-    hpx_printf("HPX_NUM_PRESETS=%d\n", {{ pmu_passes | length }});
-    hpx_printf("HPX_PRESETS={{ pmu_pass_names | join(',') }}\n");
-    hpx_printf("HPX_POWER_SYNC=%s\n", kPowerSyncEnabled ? "gpio" : "none");
-{% if psram_needed %}
-{% include "_psram_metadata.j2" %}
-{% endif %}
-    if constexpr (kPowerSyncEnabled) {
-        hpx_printf("HPX_SYNC_GPIO=%lu\n", (unsigned long)kSyncGpioPin);
-    }
+{%- endblock %}
 
+{% block engine_heartbeat_arm %}
     // --- Heartbeat config (emitted so the host knows what to expect) -----
     static constexpr bool     kHbEnabled    = {{ heartbeat_enabled | lower }};
     static constexpr int      kHbEveryNOps  = {{ heartbeat_every_n_ops }};
@@ -511,8 +239,10 @@ int main(void) {
         : 0U;
     const int hb_every_ops = kHbEnabled ? kHbEveryNOps : 0;
 
-    hpx_printf("HPX_HEARTBEAT phase=init t=0\n");{% endif %}
+    hpx_printf("HPX_HEARTBEAT phase=init t=0\n");
+{%- endblock %}
 
+{% block engine_model_setup %}
     tflite::InitializeTarget();
 
     const tflite::Model *model = tflite::GetModel(model_data);
@@ -660,476 +390,20 @@ int main(void) {
     hpx_printf("HPX_NUM_TENSORS=%d\n", (int)model->subgraphs()->Get(0)->tensors()->size());
     hpx_printf("HPX_NUM_INPUTS=%d\n", (int)interpreter.inputs_size());
     hpx_printf("HPX_NUM_OUTPUTS=%d\n", (int)interpreter.outputs_size());
-    // Ground-truth CPU clock as actually configured on-device.  The host uses
-    // this to verify its registry assumption (used for SWO baud + cycle->time
-    // math) matches reality instead of trusting a hardcoded frequency.
-    hpx_printf("HPX_SYSTEM_CLOCK_HZ=%lu\n", (unsigned long)SystemCoreClock);
-{% if apollo3_burst %}
-    hpx_printf("HPX_BURST_AVAIL=%d\n", hpx_burst_avail);
-    hpx_printf("HPX_BURST_ENGAGED=%d\n", hpx_burst_engaged);
-{% endif %}
+{%- endblock %}
 
-    // Target-side profiled inference timing (excludes CSV/transport output).
-{% if not power_only | default(false) %}    uint64_t profiled_infer_cycles = 0;
-    uint32_t profiled_infer_count = 0;{% endif %}
+{% block engine_profiler_off %}        g_profiler.SetEnabled(false);{% endblock %}
 
-    // --- Clean end-to-end inference timing (no per-layer instrumentation) ---
-    // The per-layer PMU passes below bracket every op (BeginEvent/EndEvent +
-    // counter resets), which perturbs caches/pipeline and adds overhead the
-    // sum-of-layers cannot see.  To report the most representative whole-model
-    // latency, run a warmed, UNinstrumented timing pass FIRST: prime caches
-    // with warmup iterations, then DWT-time clean Invoke()s with the profiler
-    // disabled.  Emitted as HPX_CLEAN_INFER_* — these never replace the
-    // per-layer numbers, they sit alongside them for comparison.
-    //
-    // This pass is also the canonical window for external power measurement:
-    // it is the only inference loop free of instrumentation/transport overhead,
-    // so the GPIO sync brackets it (not the instrumented passes below).  When
-    // power sync is disabled, hpx_sync_window_begin/end compile to no-ops.
-    {
-        g_profiler.SetEnabled(false);
-{% if clean_window_needs_probe_attach | default(false) and transport == "rtt" and not power_only | default(false) and not use_stimer_window -%}
-{% include "_clean_window_attach_wait.j2" %}
-{%- endif -%}
-{% if not use_stimer_window -%}
-{% include "_clean_window_rate_probe.j2" %}
-{%- endif -%}
-{% if window_mode | default("fixed") == "auto" %}
-        // Adaptive clean-window sizing.  Warm caches / branch predictor / MRAM
-        // prefetch (uninstrumented) and capture the warm per-inference cycle
-        // cost, then choose how many gated iterations to run so the window
-        // fills ~{{ window_target_ms }} ms of wall-time, clamped to
-        // [{{ window_min }}, {{ window_max }}].  Short models run more
-        // iterations and big models fewer, giving a consistent window for
-        // reliable external power gating.  The host divides the gated energy by
-        // the reported HPX_CLEAN_INFER_COUNT.
-        //
-        // Robustness: a debugger attaching over SWD (notably the J-Link RTT
-        // background engine) can reset/reconfigure DEMCR/DWT *after* our boot
-        // dwt_init() runs, transiently freezing DWT->CYCCNT during an early
-        // warmup iteration.  A frozen counter yields a near-zero cycle reading,
-        // which would size the window to window_max (thousands of iterations →
-        // minutes of silence that trip the host capture heartbeat).  The reset
-        // is a single one-shot event during attach, so we re-assert the counter,
-        // warm several times, and take the MAX reading: a transient freeze only
-        // ever makes a reading too *low*, so the maximum rejects it.  If the
-        // counter never advances at all we fall back to window_min.
-        dwt_init();
-        uint32_t clean_warm_cyc = 0U;
-{%- if not use_stimer_window %}
-        uint32_t clean_warm_min_cyc = 0U;
-{%- endif %}
-        for (int w = 0; w < 3; w++) {
-            memset(input->data.raw, 0, input->bytes);
-            uint32_t wt0 = DWT->CYCCNT;
-            interpreter.Invoke();
-            uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
-            if (wc > clean_warm_cyc) clean_warm_cyc = wc;
-{%- if not use_stimer_window %}
-            if (wc > 0U && (clean_warm_min_cyc == 0U || wc < clean_warm_min_cyc)) {
-                clean_warm_min_cyc = wc;
-            }
-{%- endif %}
-        }
-        int clean_iters_n = {{ window_min }};
-        if (clean_warm_cyc > 0U) {
-            const uint64_t target_cyc =
-                ((uint64_t)SystemCoreClock / 1000ULL) * (uint64_t){{ window_target_ms }}U;
-            uint64_t n = target_cyc / (uint64_t)clean_warm_cyc;
-            if (n < {{ window_min }}ULL) n = {{ window_min }}ULL;
-            if (n > {{ window_max }}ULL) n = {{ window_max }}ULL;
-            clean_iters_n = (int)n;
-        }
-{% else %}
-        // Warm caches / branch predictor / MRAM prefetch (uninstrumented).
-{%- if not use_stimer_window %}
-        // The warm cost is MEASURED here as well as primed: it is the
-        // reference the in-window stall check compares against (#121).  Taking
-        // the MAX rejects a warm iteration that itself lost time to a stalled
-        // counter, since a stall only ever reads low.  The auto path above
-        // already measures this for its own window sizing.
-        uint32_t clean_warm_cyc = 0U;
-        uint32_t clean_warm_min_cyc = 0U;
-        for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
-            memset(input->data.raw, 0, input->bytes);
-            uint32_t wt0 = DWT->CYCCNT;
-            interpreter.Invoke();
-            uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
-            if (wc > clean_warm_cyc) clean_warm_cyc = wc;
-            if (wc > 0U && (clean_warm_min_cyc == 0U || wc < clean_warm_min_cyc)) {
-                clean_warm_min_cyc = wc;
-            }
-        }
-{%- else %}
-        for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
-            memset(input->data.raw, 0, input->bytes);
-            interpreter.Invoke();
-        }
-{%- endif %}
-        const int clean_iters_n = {{ clean_iters | default(1) }};
-{% endif %}
-        // Announce the upcoming silent clean (power) window so the host can
-        // widen its capture deadline for the blackout.  Firmware only reports
-        // state + the one runtime scalar the host cannot know a priori — how
-        // long a single inference takes — folded into est_ms (iters * warm
-        // cycles / clock).  The host owns the actual timeout policy.
-{% if window_mode | default("fixed") == "auto" %}
-        uint64_t clean_est_ms = 0;
-        if (SystemCoreClock >= 1000U) {
-            clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)
-                           / ((uint64_t)SystemCoreClock / 1000ULL);
-        }
-        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\n",
-                   clean_iters_n, (unsigned long long)clean_est_ms);
-{% else %}
-{%- if not use_stimer_window %}
-        // Fixed window on a DWT-timed build: the warmup above measures the
-        // per-inference cost for the stall floor, so the blackout estimate is
-        // derivable here too.  Emitting it lets the host widen its capture
-        // deadline (transport/protocol.py: window_budget_s) instead of
-        // falling back to the flat heartbeat timeout, which a long fixed
-        // window can outlast.
-        uint64_t clean_est_ms = 0;
-        if (SystemCoreClock >= 1000U) {
-            clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)
-                           / ((uint64_t)SystemCoreClock / 1000ULL);
-        }
-        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\n",
-                   clean_iters_n, (unsigned long long)clean_est_ms);
-{%- else %}
-        // Fixed window: no runtime warm measurement, so est_ms=0 — the host
-        // already knows the iteration count from its own settings.
-        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=0\n",
-                   clean_iters_n);
-{%- endif %}
-{% endif %}
-{%- if not use_stimer_window %}
-        uint64_t clean_cycles = 0;
-{%- endif %}
-        uint32_t clean_count = 0;
-        // READY means initialization and adaptive warmup are complete. Keep
-        // host GO low until this point so it cannot backfeed/couple into the
-        // gate line during the comparatively long heliaRT setup path.
-        hpx_sync_ready();
-        hpx_sync_wait_go();
-        // Set the input once before the gated window, not on every
-        // iteration — AutoDeploy's power loop re-invokes on the same fixed
-        // input every run rather than re-zeroing it each time, and
-        // re-memset()ing per iteration adds real, avoidable overhead inside
-        // the timed/measured window (a measurable share of per-inference
-        // energy for a small KWS model; found 2026-07-02 while diagnosing
-        // the HPX-vs-AutoDeploy power gap).
-        memset(input->data.raw, 0, input->bytes);
-{% if busy_loop_probe %}
-{% include "_busy_loop_calibration.j2" %}
-{% endif %}
-{% if transport == "usb_cdc" and not power_only | default(false) %}
-        // Silence the 1 kHz tud_task() polling timer for the duration of the
-        // clean window.  Its ISR otherwise fires mid-inference and pollutes the
-        // E2E cycle count (and the external-power window) — this adds measurable
-        // per-inference latency overhead on DWT-timer parts (AP4).  The PMU
-        // window below already does this.
-        usb_timer_pause();
-{% endif %}
-{% set gate_dbg = busy_loop_probe or (gate_debug_domain_in_window | default(false)) %}
-{# busy_loop_probe / window_timer / use_stimer_window are set in the prelude:
-   the clean_cycles declaration above depends on use_stimer_window, and
-   gate_dbg here is exactly why the busy-loop probe is forced onto STIMER. #}
-{% if transport == "uart" and not power_only | default(false) %}
-        // The UART peripheral (PWRSTUART0-3) lives in the peripheral device
-        // power domain, NOT the debug domain am_hal_debug_disable() below
-        // gates -- it stays powered for the whole run otherwise.  This
-        // measurably inflates current on AP5 EVBs (UART0-3 all ON during the
-        // gated window per a live PWRCTRL->DEVPWRSTATUS snapshot) vs RTT's
-        // zero-peripheral window.  AutoDeploy's power firmware has
-        // bNeedAlternativeUART=false and never enables this at all.
-        nsx_uart_printf_disable();
-{% elif transport == "swo" and not power_only | default(false) %}
-        // ITM/SWO's own enable request can hold PD_DBG powered independently
-        // of am_hal_debug_disable() below, the same way the ARM PMU's
-        // counters do (see the has_armv8m_pmu comment) -- this is a measurable
-        // current increase on an AP510 EVB, matching the known PD_DBG cost,
-        // even though
-        // am_hal_debug_disable() already runs for this family/probe.
-        // Dropping ITM here lets that call actually release the domain.
-        nsx_itm_printf_disable();
-{% endif %}
-{% if has_armv8m_pmu %}
-        // g_profiler.Init() (called earlier) leaves the ARM PMU counters
-        // running and the AM_HAL_PWRCTRL_PERIPH_DEBUG power domain powered
-        // (via am_hal_debug_enable()) for the rest of firmware execution —
-        // SetEnabled(false) above only gates software instrumentation, it
-        // never touches this hardware.  AutoDeploy's power firmware never
-        // calls any PMU code, so it never powers this domain at all.
-        //
-        // Releasing the PMU counters for the gated/clean window still avoids
-        // PMU traffic during the measurement.  On families where
-        // clean_window_timer=="stimer" (Apollo5), the in-window timer no
-        // longer lives in the debug power domain (STIMER runs off its own
-        // XTAL), so PD_DBG can be gated off for the *default* infer probe
-        // too, not just the opt-in busy_loop probe — closing most of a
-        // measurable current gap vs the reference baseline (which never powers this
-        // domain at all).  Renders still timing the window with DWT
-        // (window_timer=="dwt") keep the domain powered for the infer
-        // probe -- note AP4 *power* binaries are no longer in that set:
-        // their broad shutdown kills the domain, so they use STIMER.
-        nsx_ambiq_pmu_disable();
-{% if gate_dbg %}
-        am_hal_debug_disable();
-{% endif %}
-{% endif %}
-{% if use_stimer_window %}
-        hpx_stimer_init();
-        uint32_t clean_stimer_t0 = hpx_stimer_ticks();
-{% endif %}
-{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
-        // Zero the INA228 energy/charge accumulators immediately before the
-        // window opens — an RSTACC read-modify-write, strictly outside the
-        // measured region. Skipped when a bystander monitor failed setup.
-        if (g_hpx_ina228_active) {
-            uint32_t ina228_rc = hpx_ina228_window_begin();
-            if (ina228_rc != 0U) {
-{% if ina228_required | default(false) %}
-                hpx_power_terminal_fail("ina228_arm", ina228_rc);
-{% else %}
-                // Bystander: drop the monitor for this run rather than the
-                // run itself. No printf here — UART/ITM are disabled for the
-                // window (an ITM write with PD_DBG off hangs, ERR003); the
-                // failure is reported by hpx_power_terminal_report().
-                g_hpx_ina228_active = false;
-                g_hpx_ina228_bystander_fail_phase = "arm";
-                g_hpx_ina228_bystander_fail_rc = ina228_rc;
-{% endif %}
-            }
-        }
-{% endif %}
-        hpx_sync_window_begin();
-{% if busy_loop_probe %}
-        hpx_printf("HPX_CLEAN_WINDOW_PROBE=busy_loop\n");
-        // No clock reads here.  DWT is unreadable on the builds that matter
-        // (see the prelude: AP5 gates the domain off, and the AP3/AP4 power
-        // binary never had it held up), and STIMER polling would put
-        // peripheral traffic inside the measured region.  A plain bounded
-        // counter loop reads neither.  Its duration
-        // comes from the STIMER bracket around the whole window
-        // (clean_stimer_t0, read just above).  It is NOT assumed to equal
-        // window_target_ms: reporting the target as if it had been measured
-        // fabricated elapsed_us whenever the calibration missed, which is
-        // exactly what a dead calibration clock caused (issue #112).
-        for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++) {
-            __asm volatile("nop");
-        }
-        clean_count = 1;
-{% elif use_stimer_window %}
-        // Timed via STIMER (see hpx_stimer_init above), not DWT->CYCCNT: this
-        // build cannot rely on PD_DBG (and DWT with it) being readable for the
-        // whole loop -- it is either gated off deliberately or simply never
-        // powered -- so an in-window DWT read would read frozen or garbage.  A
-        // single before/after STIMER read brackets the whole window rather
-        // than reading every iteration — fewer peripheral accesses inside the
-        // timed loop and no resolution concern at this scale (XTAL 32.768 kHz
-        // ticks are ~30.5us, negligible against a multi-ms clean window).
-        for (int iter = 0; iter < clean_iters_n; iter++) {
-            interpreter.Invoke();
-            clean_count++;
-{% if clean_window_trace | default(false) and transport not in ["swo", "uart"] %}
-            // Sanity-check trace: prove the device is looping inferences for
-            // the whole gated window.  Perturbs power — diagnostic use only.
-            // Never emitted on SWO builds here: PD_DBG is disabled for this
-            // whole loop, and a TPIU/ITM write while PD_DBG is off hangs the
-            // part unconditionally (DS510 erratum ERR003).  Never emitted on
-            // UART builds either: nsx_uart_printf_disable() above powers off
-            // the UART peripheral for the same window.
-            hpx_printf("HPX_CLEAN_ITER=%d\n", iter);
-{% endif %}
-        }
-{% else %}
-        // Self-check for the failure this window is exposed to (issue #121):
-        // DWT->CYCCNT lives in the core debug power domain, and when no
-        // debugger holds that domain up the window silently reads short.
-        //
-        // TWO shapes, because the counter has been seen doing both:
-        //  * FROZEN -- the usual case.  Every delta wholly inside the stall
-        //    reads exactly 0.  An inference cannot take zero core cycles, so
-        //    this needs no threshold and cannot false-positive.
-        //  * PARTIAL -- observed at least once on AP4, where DWT advanced at
-        //    ~0.6% of the expected rate through an early-boot window.  A delta
-        //    that is small but non-zero passes the zero test, accumulates
-        //    uncounted, and would let the run report itself healthy while
-        //    still being wrong.  So it is checked separately, against a floor
-        //    derived from this run's own warm reference.
-        //
-        // The floor is deliberately far below any legitimate reading: a warm
-        // reference is if anything an over-estimate (colder caches), and a
-        // genuine steady-state iteration being under an EIGHTH of it would
-        // mean the warm pass ran 8x slow.  The observed pathological regime
-        // (~0.6% of expected) sits two orders of magnitude below the floor.
-        // Both counters are exported; neither is inferred from the other.
-        uint32_t clean_stalled_iters = 0;
-        uint32_t clean_partial_iters = 0;
-        // Floor for the partial check, from the LOWEST non-zero warm sample --
-        // not the highest.  clean_warm_cyc is a MAX, chosen so a warm sample
-        // that itself lost time to a stall cannot drag the window sizing down;
-        // that same choice makes it the wrong reference here, because a single
-        // cold-cache warm sample inflates it and would mark every healthy
-        // iteration partial (one 9x sample marks all 1091).  Taking the
-        // smallest non-zero sample instead is conservative in the direction
-        // that matters: it can only ever under-report partials, never invent
-        // them.  Zero samples are skipped rather than minimised over, so a
-        // frozen warm pass cannot zero the floor and silently disable the
-        // check -- when every sample is zero the floor is 0, the check is
-        // inert, and clean_warm_min_cyc == 0 says so on the wire.
-        const uint32_t clean_low_cyc = clean_warm_min_cyc >> 3;
-        for (int iter = 0; iter < clean_iters_n; iter++) {
-            uint32_t t0 = DWT->CYCCNT;
-            interpreter.Invoke();
-            const uint32_t clean_iter_cyc = (uint32_t)(DWT->CYCCNT - t0);
-            if (clean_iter_cyc == 0U) {
-                clean_stalled_iters++;
-            } else if (clean_low_cyc > 0U && clean_iter_cyc < clean_low_cyc) {
-                clean_partial_iters++;
-            }
-            clean_cycles += clean_iter_cyc;
-            clean_count++;
-{% if clean_window_trace | default(false) and transport not in ["swo", "uart"] %}
-            // Sanity-check trace: prove the device is looping inferences for
-            // the whole gated window.  Perturbs power — diagnostic use only.
-            // Excluded on SWO/UART: their printf peripherals are disabled
-            // above for the same window (nsx_itm/uart_printf_disable()).
-            hpx_printf("HPX_CLEAN_ITER=%d\n", iter);
-{% endif %}
-        }
-{% endif %}
-        hpx_sync_window_end();
-{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
-        // Read the integrated energy/charge (plus bus voltage and the
-        // accumulator-overflow flags) now that the window is closed.
-        if (g_hpx_ina228_active) {
-            uint32_t ina228_rc = hpx_ina228_window_end();
-            if (ina228_rc != 0U) {
-{% if ina228_required | default(false) %}
-                // The window itself completed, but an internal-mode run
-                // without a measurement is useless — treat as terminal.
-                hpx_power_terminal_fail("ina228_read", ina228_rc);
-{% else %}
-                // Bystander: the external capture stands on its own. No
-                // printf here — the transport may still be disabled; the
-                // failure is reported by hpx_power_terminal_report().
-                g_hpx_ina228_bystander_fail_phase = "read";
-                g_hpx_ina228_bystander_fail_rc = ina228_rc;
-{% endif %}
-            }
-        }
-{% endif %}
-{% if use_stimer_window %}
-        uint64_t clean_stimer_total_us =
-            hpx_stimer_ticks_to_us((uint64_t)(uint32_t)(hpx_stimer_ticks() - clean_stimer_t0));
-{% endif %}
-{% if not power_only | default(false) %}{% if has_armv8m_pmu %}
-        // Restore PMU/debug state for the instrumented per-layer passes below.
-{% if gate_dbg %}
-        am_hal_debug_enable();
-{% endif %}
-        nsx_ambiq_pmu_enable();
-{% endif %}
-{% if transport == "uart" %}
-        nsx_uart_printf_enable();
-        nsx_delay_us(HPX_DEBUG_REENABLE_SETTLE_US);
-{% elif transport == "swo" %}
-        nsx_itm_printf_enable();
-        nsx_delay_us(HPX_DEBUG_REENABLE_SETTLE_US);
-{% endif %}
-{% if transport == "usb_cdc" %}
-        usb_timer_resume();
-{% endif %}
-        g_profiler.SetEnabled(true);{% endif %}
-        if (clean_count > 0) {
-{% if use_stimer_window %}
-            // Derive avg_us directly from the device-independent STIMER
-            // measurement (native protocol unit); back-derive avg/total
-            // cycles from SystemCoreClock so the HPX_CLEAN_INFER_* wire
-            // protocol and host parser (capture/parser.py) stay unchanged —
-            // those two fields are informational/derived on this path, not
-            // independently measured.
-            const uint32_t clean_avg_us =
-                (uint32_t)((clean_stimer_total_us + (clean_count / 2U)) / clean_count);
-            const uint32_t clean_avg_cycles = (uint32_t)(
-                ((uint64_t)clean_avg_us * (uint64_t)SystemCoreClock) / 1000000ULL);
-            const uint64_t clean_cycles_reported =
-                (uint64_t)clean_avg_cycles * (uint64_t)clean_count;
-            hpx_printf("HPX_CLEAN_INFER_COUNT=%lu\n", (unsigned long)clean_count);
-            hpx_printf("HPX_CLEAN_INFER_TOTAL_CYCLES=%llu\n",
-                       (unsigned long long)clean_cycles_reported);
-            hpx_printf("HPX_CLEAN_INFER_AVG_CYCLES=%lu\n",
-                       (unsigned long)clean_avg_cycles);
-            hpx_printf("HPX_CLEAN_INFER_AVG_US=%lu\n",
-                       (unsigned long)clean_avg_us);
-{% else %}
-            const uint32_t clean_avg_cycles =
-                (uint32_t)((clean_cycles + (clean_count / 2U)) / clean_count);
-            hpx_printf("HPX_CLEAN_INFER_COUNT=%lu\n", (unsigned long)clean_count);
-            hpx_printf("HPX_CLEAN_INFER_TOTAL_CYCLES=%llu\n",
-                       (unsigned long long)clean_cycles);
-            hpx_printf("HPX_CLEAN_INFER_AVG_CYCLES=%lu\n",
-                       (unsigned long)clean_avg_cycles);
-{%- if not use_stimer_window %}
-            // Always emitted (0 on a healthy run) so the host can tell a
-            // firmware that checks from one that does not.  The warm
-            // reference goes out too, so the partial-count threshold is
-            // auditable from the capture rather than taken on trust.  See the
-            // clean_stalled_iters declaration above.
-            hpx_printf("HPX_CLEAN_STALLED_ITERS=%lu\n",
-                       (unsigned long)clean_stalled_iters);
-            hpx_printf("HPX_CLEAN_PARTIAL_ITERS=%lu\n",
-                       (unsigned long)clean_partial_iters);
-            hpx_printf("HPX_CLEAN_REF_CYCLES=%lu\n",
-                       (unsigned long)clean_warm_min_cyc);
-            hpx_printf("HPX_CLEAN_DWT_RATE_CYC=%lu\n",
-                       (unsigned long)clean_dwt_rate_cyc);
-            hpx_printf("HPX_CLEAN_DWT_RATE_US=%lu\n",
-                       (unsigned long)HPX_CLEAN_DWT_RATE_PROBE_US);
-{%- if clean_window_needs_probe_attach | default(false) and transport == "rtt" and not power_only | default(false) %}
-            hpx_printf("HPX_CLEAN_ATTACH_WAIT_US=%lu\n",
-                       (unsigned long)clean_attach_wait_us);
-{%- endif %}
-{%- endif %}
-            if (SystemCoreClock > 0U) {
-                const uint32_t clean_avg_us = (uint32_t)(
-                    ((uint64_t)clean_avg_cycles * 1000000ULL +
-                     ((uint64_t)SystemCoreClock / 2ULL)) /
-                    (uint64_t)SystemCoreClock);
-                hpx_printf("HPX_CLEAN_INFER_AVG_US=%lu\n",
-                           (unsigned long)clean_avg_us);
-            }
-{% endif %}
-        }
-{% if power_only | default(false) %}
-{% include "_power_terminal_success.j2" with context %}
-{% endif %}
-    }
+{% block engine_reset_inputs_warm %}            memset(input->data.raw, 0, input->bytes);{% endblock %}
 
-{% if power_only | default(false) %}
-{% else %}{% if transport == "rtt" %}
-    // Boot header was captured losslessly; restore droppable writes for the
-    // timed window so an in-flight heartbeat can never stall interpreter.Invoke().
-    hpx_rtt_set_nonblocking();
-{% if power_sync_enabled %}
-    // This build ran a gated power/clean window (external power capture): the
-    // host is watching the GPIO gate via a separate instrument, not draining
-    // RTT, so treat "host absent" as the expected case for everything printed
-    // from here on, not a rare dead-host edge case.  See
-    // HPX_RTT_LOSSLESS_TIMEOUT_POST_WINDOW_MS in _hpx_printf.j2.
-    hpx_rtt_shorten_lossless_timeout();
-{% endif %}
-{% endif %}
-    // --- Multi-pass PMU profiling ---
-    // Each pass configures a specific set of PMU counters.  When the user
-    // requests more counters than fit in a single pass (4 with 32-bit
-    // chaining), the profiler runs multiple passes and the host merges
-    // the results.  Warmup iterations are repeated per-pass to ensure
-    // stable cache / pipeline state.
-{% for pass in pmu_passes %}
-    hpx_printf("\n--- HPX_PRESET {{ pass.name }} ---\n");
+{% block engine_reset_inputs %}        memset(input->data.raw, 0, input->bytes);{% endblock %}
+
+{% block engine_invoke %}interpreter.Invoke();{% endblock %}
+
+{% block engine_profiler_on %}
+        g_profiler.SetEnabled(true);{% endblock %}
+
+{% block engine_pass_init %}
 {% if pass.custom %}
 {% if has_armv8m_pmu %}
     {
@@ -1154,80 +428,11 @@ int main(void) {
 {% endif %}
     // Init resets PMU state; re-arm heartbeat thresholds.
     g_profiler.SetHeartbeat(hb_every_cyc, hb_every_ops);
+{%- endblock %}
 
-{% if transport == "usb_cdc" %}
-    usb_timer_pause();
-{% endif %}
-
-    // Warmup for this pass (profiler disabled, no GPIO sync)
-    for (int w = 0; w < {{ warmup }}; w++) {
-        memset(input->data.raw, 0, input->bytes);
-        interpreter.Invoke();
-    }
-    hpx_printf("HPX_HEARTBEAT phase=warmup_done pass={{ loop.index0 }}\n");
-
-    // Profiled iterations — per-layer PMU instrumentation (no GPIO sync; the
-    // clean pass above owns the external-power window).
-    for (int iter = 0; iter < {{ iterations }}; iter++) {
-        memset(input->data.raw, 0, input->bytes);
+{% block engine_iteration_setup %}
         g_profiler.ClearEvents();
         g_profiler.SetIterationContext({{ loop.index0 }}, iter);
+{%- endblock %}
 
-        uint32_t infer_start_cyc = DWT->CYCCNT;
-        interpreter.Invoke();
-        profiled_infer_cycles += (uint32_t)(DWT->CYCCNT - infer_start_cyc);
-        profiled_infer_count++;
-
-{% if transport == "usb_cdc" %}
-        usb_timer_resume();
-{% elif transport == "rtt" %}
-        // CSV dump is outside the timed window — make it lossless.
-        hpx_rtt_set_blocking();
-{% endif %}
-        hpx_printf("\n--- HPX_ITER %d ---\n", iter);
-        g_profiler.PrintCsv();
-{% if transport == "usb_cdc" %}
-        usb_timer_pause();
-{% elif transport == "rtt" %}
-        // Restore non-blocking before the next timed Invoke() so heartbeats
-        // emitted mid-inference can never stall and skew measurements.
-        hpx_rtt_set_nonblocking();
-{% endif %}
-    }
-
-{% if transport == "usb_cdc" %}
-    usb_timer_resume();
-{% endif %}
-{% endfor %}
-
-    if (profiled_infer_count > 0 && SystemCoreClock > 0U) {
-        const uint32_t profiled_infer_total_us = (uint32_t)(
-            (profiled_infer_cycles * 1000000ULL + ((uint64_t)SystemCoreClock / 2ULL)) /
-            (uint64_t)SystemCoreClock);
-        const uint32_t profiled_infer_avg_us = (uint32_t)(
-            (profiled_infer_cycles * 1000000ULL +
-             (((uint64_t)SystemCoreClock * (uint64_t)profiled_infer_count) / 2ULL)) /
-            ((uint64_t)SystemCoreClock * (uint64_t)profiled_infer_count));
-        hpx_printf("HPX_PROFILED_INFER_COUNT=%lu\n", (unsigned long)profiled_infer_count);
-        hpx_printf("HPX_PROFILED_INFER_TOTAL_US=%lu\n", (unsigned long)profiled_infer_total_us);
-        hpx_printf("HPX_PROFILED_INFER_AVG_US=%lu\n", (unsigned long)profiled_infer_avg_us);
-    }
-
-{% if transport == "rtt" %}
-    // All timed inference work is done — switch to lossless blocking mode so
-    // the final sentinel can never be dropped, then flush and drain as a
-    // belt-and-braces measure.  Emit a phase heartbeat so the host inactivity
-    // timer refreshes while we drain.
-    hpx_rtt_set_blocking();
-    hpx_printf("HPX_HEARTBEAT phase=flushing\n");
-    HPX_CLEAN_DCACHE();
-    hpx_rtt_drain(500 /* ms */);
-{% endif %}
-    hpx_printf("\n--- HPX_END ---\n");
-{% if transport == "rtt" %}
-    HPX_CLEAN_DCACHE();
-    hpx_rtt_drain(500 /* ms */);
-{% endif %}{% endif %}
-    hpx_park();
-    return 0;
-}
+{% block engine_print_csv %}        g_profiler.PrintCsv();{% endblock %}

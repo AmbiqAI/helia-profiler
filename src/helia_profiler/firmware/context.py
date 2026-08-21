@@ -173,6 +173,9 @@ class PmuContext:
     perf_mode_symbol: str
     perf_mode_mhz: int
     apollo3_burst: bool
+    #: ``soc.pmu_max_ops`` — sizes the per-layer instrumentation storage in
+    #: every engine's firmware (kMaxLayers / kMaxOps).
+    pmu_max_ops: int
 
 
 @dataclass(frozen=True)
@@ -322,6 +325,7 @@ class FirmwareRenderContext:
                 perf_mode_symbol=clock.cpu_perf_tier,
                 perf_mode_mhz=perf_mode_mhz,
                 apollo3_burst=burst_base_mhz is not None and perf_mode_mhz > burst_base_mhz,
+                pmu_max_ops=soc.pmu_max_ops,
             ),
             power_window=PowerWindowContext(
                 iterations=config.profiling.iterations,
@@ -410,9 +414,23 @@ class FirmwareRenderContext:
             or self.power_window.ble_reset_gpio_pin is not None
         )
 
-    def to_template_vars(self) -> dict[str, object]:
-        """Flatten typed fields to the legacy Jinja variable names."""
+    def to_template_vars(self, *, power_only: bool = False) -> dict[str, object]:
+        """Flatten typed fields to the legacy Jinja variable names.
+
+        ``power_only`` selects which binary this render produces: the
+        transport-attached PMU-phase binary (False, the default) or the
+        dedicated free-running power binary (True). It is passed here rather
+        than stored on the context because one context renders both binaries
+        of a run — and the window-timer resolution below depends on it.
+        """
         return {
+            "power_only": power_only,
+            **resolve_window_timer(
+                clean_window_probe=self.power_window.clean_window_probe,
+                power_only=power_only,
+                power_window_timer=self.power_window.power_window_timer,
+                clean_window_timer=self.power_window.clean_window_timer,
+            ),
             "power_sync_enabled": self.sync.power_sync_enabled,
             "power_binary_needs_gpio": self.power_binary_needs_gpio,
             "sync_gpio_pin": self.sync.sync_gpio_pin,
@@ -442,6 +460,7 @@ class FirmwareRenderContext:
             "perf_mode_symbol": self.pmu.perf_mode_symbol,
             "perf_mode_mhz": self.pmu.perf_mode_mhz,
             "apollo3_burst": self.pmu.apollo3_burst,
+            "pmu_max_ops": self.pmu.pmu_max_ops,
             "iterations": self.power_window.iterations,
             "warmup": self.power_window.warmup,
             "clean_warmup": self.power_window.clean_warmup,
@@ -479,6 +498,11 @@ class FirmwareRenderContext:
             "ina228_shunt_cal": self.power_monitor.ina228_shunt_cal,
             "ina228_current_lsb_divisor": self.power_monitor.ina228_current_lsb_divisor,
             "ina228_calibration_id": self.power_monitor.ina228_calibration_id,
+            # Wire-protocol spelling of the engine, emitted as HPX_ENGINE= by
+            # every firmware template (_main_base.cc.j2).  The host parser
+            # takes any HPX_(\w+)=value line, so the hyphenated EngineType
+            # values are underscored here rather than shipped as-is.
+            "engine_wire_name": self.engine.engine_type.value.replace("-", "_"),
             "engine_header": self.engine.engine_header,
             "resolver_mode": self.engine.resolver_mode,
             "resolver_max_ops": self.engine.resolver_max_ops,
@@ -500,6 +524,56 @@ class FirmwareRenderContext:
             ),
             "executorch_io_region": self.engine.executorch_io_region,
         }
+
+
+def resolve_window_timer(
+    *,
+    clean_window_probe: str,
+    power_only: bool,
+    power_window_timer: str,
+    clean_window_timer: str,
+) -> dict[str, object]:
+    """Resolve which clock times the measured window — host-side, once (#118).
+
+    The measured window must not be timed by a clock the binary cannot read.
+    ``DWT->CYCCNT`` lives in the CoreSight debug domain, which the dedicated
+    power binary either powers down itself or simply has nothing holding up
+    (it free-runs with no debugger asserting CDBGPWRUPREQ) — reads are then
+    frozen or garbage and the reported window duration is wrong (#106, #107).
+    The per-SoC half of that predicate lives in
+    ``SocCapabilities.power_window_timer``; this function owns the
+    per-render half: pick the power binary's answer under ``power_only``,
+    the family preference (``clean_window_timer``, finer DWT resolution
+    under an attached debugger) otherwise.
+
+    The opt-in busy_loop probe is pinned to STIMER on every family — a
+    deliberate simplification, not a per-family necessity: only Apollo5 and
+    the Apollo3/4 power binaries actually lose DWT, but one clock for all
+    three trades DWT's cycle resolution for STIMER's ~30.5 us tick,
+    negligible on a multi-millisecond window and cheap next to a second
+    code path whose only reachable configuration is the one family
+    combination that does not need it. What the probe used to do instead —
+    inherit the per-family answer — meant calibrating against an
+    already-dead DWT on AP3/AP4 power binaries, which fabricated the
+    reported window duration (#112).
+
+    This resolution used to live as three ``{% set %}`` lines duplicated
+    verbatim at the top of ``main.cc.j2`` and ``main_aot.cc.j2`` — the
+    exact drift vector ``SocCapabilities.power_window_timer`` was created
+    to close, one layer up (#118). The templates now read the resolved
+    names and carry no policy of their own.
+    """
+    busy_loop_probe = clean_window_probe == "busy_loop"
+    window_timer = (
+        "stimer"
+        if busy_loop_probe
+        else (power_window_timer if power_only else clean_window_timer)
+    )
+    return {
+        "busy_loop_probe": busy_loop_probe,
+        "window_timer": window_timer,
+        "use_stimer_window": window_timer == "stimer",
+    }
 
 
 def _executorch_default_region(arena_region: Placement) -> str:

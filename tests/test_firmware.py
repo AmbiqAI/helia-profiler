@@ -25,6 +25,7 @@ from helia_profiler.firmware import (
     build_app,
     flash_app,
     generate_app,
+    render_power_source,
 )
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
@@ -954,6 +955,138 @@ class TestGenerateApp:
         assert "NSX_DEBUG_NONE" in main_power_cc
         assert "nsx_uart_printf_enable();" not in main_power_cc
         assert "nsx_itm_printf_enable();" not in main_power_cc
+
+    def _ap4_power_ctx(self, tmp_path: Path, fake_dist: Path) -> PipelineContext:
+        """Apollo4 Blue Plus + dedicated power binary.
+
+        AP4 is the board that makes this a real test rather than a tautology:
+        ``clean_window_timer`` is ``dwt`` and ``power_window_timer`` is
+        ``stimer``, so the two binaries generated from the SAME render context
+        MUST resolve to different window clocks. Every other end-to-end power
+        test in this file uses apollo510, where both resolve to ``stimer`` and
+        a bug that leaks the transport binary's window resolution into the
+        power binary is invisible.
+        """
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "apollo4p_evb"},
+                "power": {"enabled": True, "firmware": "dedicated"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        return PipelineContext(config=config, work_dir=work_dir)
+
+    @staticmethod
+    def _measured_window(source: str) -> str:
+        """The measured window's span, comments stripped.
+
+        Adapted from ``_clock_dependent_region`` in
+        tests/contracts/test_firmware_render_snapshots.py, and for the same two
+        reasons:
+
+        * ``//`` comments are dropped first, because the templates *talk* about
+          DWT->CYCCNT at length right next to the code that must not read it --
+          a naive substring check over the raw render asserts nothing.
+        * the span is anchored on the ``hpx_sync_window_begin();`` /
+          ``hpx_sync_window_end();`` CALL sites, not on the bare names: both
+          appear earlier as no-op ``static inline`` definitions, and slicing on
+          those yields an empty (or inverted) region that silently passes.
+        """
+        import re
+
+        code = "\n".join(re.sub(r"//.*$", "", line) for line in source.splitlines())
+        begin = code.index("hpx_sync_window_begin();")
+        return code[begin : code.index("hpx_sync_window_end();", begin)]
+
+    def _assert_window_is_stimer_bracketed(self, source: str, label: str) -> None:
+        """The measured window reads no DWT and is bracketed by STIMER."""
+        import re
+
+        window = self._measured_window(source)
+        assert "DWT->CYCCNT" not in window, (
+            f"{label}: the measured window is timed by DWT->CYCCNT. DWT lives "
+            "in the CoreSight debug power domain, which this binary powers "
+            "down (AP4 broad_peripheral_shutdown) and which no attached probe "
+            "holds up once it free-runs -- issues #106/#107."
+        )
+        code = "\n".join(re.sub(r"//.*$", "", line) for line in source.splitlines())
+        t0 = code.index("uint32_t clean_stimer_t0 = hpx_stimer_ticks();")
+        begin = code.index("hpx_sync_window_begin();")
+        end = code.index("hpx_sync_window_end();", begin)
+        assert t0 < begin, f"{label}: STIMER t0 is not read before the window opens"
+        read_back = code.index("hpx_stimer_ticks() - clean_stimer_t0", end)
+        assert read_back > end, f"{label}: the STIMER bracket never closes"
+
+    def test_ap4_power_binary_window_is_not_timed_by_dwt(
+        self, tmp_path: Path, fake_dist: Path
+    ):
+        """End-to-end guard for the #106/#107 bug class, through generate_app.
+
+        The window-clock resolution is per-render state: ``power_only`` decides
+        whether ``power_window_timer`` or ``clean_window_timer`` wins
+        (firmware/context.py ``resolve_window_timer``), so the power binary has
+        to be rendered from a context built for ``power_only=True`` -- NOT from
+        the transport binary's already-resolved variables with ``power_only``
+        spliced on top. That splice compiles, renders, and produces a power
+        binary that times its window with DWT on AP4.
+
+        Adversarial review proved the whole suite stayed green through exactly
+        that revert, because every other end-to-end power test here targets
+        apollo510, where both timers resolve to stimer anyway. This test is
+        that gap closed: it asserts the two binaries from ONE generate_app call
+        resolved DIFFERENTLY -- power on STIMER, transport on DWT -- which is
+        the property the splice destroys.
+        """
+        ctx = self._ap4_power_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        main_power_cc = (app_dir / "src" / "main_power.cc").read_text()
+        main_cc = (app_dir / "src" / "main.cc").read_text()
+
+        self._assert_window_is_stimer_bracketed(main_power_cc, "main_power.cc")
+
+        # The other half of the property: the transport binary from the SAME
+        # run keeps the family's DWT window. Without this, a change that put
+        # every AP4 render on STIMER would satisfy the assertion above while
+        # having lost the per-binary resolution entirely.
+        transport_window = self._measured_window(main_cc)
+        assert "DWT->CYCCNT" in transport_window, (
+            "main.cc: the transport binary no longer times its window with "
+            "DWT on a family whose clean_window_timer is 'dwt' -- the two "
+            "binaries are no longer resolving independently"
+        )
+        assert "clean_stimer_t0" not in transport_window
+
+    def test_ap4_render_power_source_window_is_not_timed_by_dwt(
+        self, tmp_path: Path, fake_dist: Path
+    ):
+        """Same invariant for the counted-N re-render path.
+
+        ``render_power_source()`` rewrites main_power.cc with a host-selected
+        fixed iteration count after the transport pass has run, so it builds
+        its own render context -- a second, independent place the power window
+        clock can be resolved wrongly. Rendered for real here (no mocks): a
+        mocked render cannot show which clock ended up in the file.
+        """
+        ctx = self._ap4_power_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        ctx.firmware_dir = generate_app(ctx)
+
+        destination = render_power_source(ctx, inference_count=17)
+        rendered = destination.read_text()
+
+        assert "const int clean_iters_n = 17;" in rendered
+        self._assert_window_is_stimer_bracketed(rendered, "render_power_source")
 
     def test_power_binary_not_generated_when_power_disabled(
         self, tmp_path: Path, fake_dist: Path
