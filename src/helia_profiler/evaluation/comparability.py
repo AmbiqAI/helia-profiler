@@ -162,6 +162,20 @@ def assess_comparability(
     # infer baseline against a busy_loop candidate compares a model inference
     # against a CPU spin and reports the difference as a regression (#125).
     for dimension in POWER_DIMENSION_MISMATCH.dimensions:
+        # A spec may scope itself to other dimensions (registry data, not
+        # comparator special-casing): it is consulted only when every scope
+        # dimension is present AND equal on both sides. The firmware
+        # fingerprint is the user: cross-platform renders trivially differ,
+        # and board/SoC differences are documented visible-not-blocking, so
+        # its mismatch only means something on a matching platform (#138).
+        scoped_to = DIMENSION_REGISTRY[dimension].scoped_to
+        if scoped_to and any(
+            baseline_dimensions.get(scope) is None
+            or candidate_dimensions.get(scope) is None
+            or baseline_dimensions.get(scope) != candidate_dimensions.get(scope)
+            for scope in scoped_to
+        ):
+            continue
         baseline_value = baseline_dimensions.get(dimension)
         candidate_value = candidate_dimensions.get(dimension)
         if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:

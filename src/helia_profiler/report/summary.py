@@ -12,6 +12,7 @@ from .memory import _CACHE_COUNTERS, _serialise_memory_plan
 from .power import _power_summary_to_dict
 from .contracts import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION
 from ..evaluation import evaluate_run
+from ..firmware.fingerprint import measured_power_fingerprint
 from ..power.diagnostics import probe_runs_inferences
 from ..power.metadata import MeasurementScope
 
@@ -128,6 +129,13 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
         measurement_scope = power_meta.get("measurement_scope", "whole_capture_window")
         summary["power"] = _power_summary_to_dict(ps)
         summary["power"]["measurement_scope"] = measurement_scope
+        # Comparability dimension POWER_FIRMWARE_FINGERPRINT (#138/#115):
+        # the code hash of the binary this power result was measured from.
+        # None (unreadable source, no plan) is simply not written — absent
+        # is the legacy value the comparability reader skips.
+        fingerprint = measured_power_fingerprint(ctx)
+        if fingerprint is not None:
+            summary["power"]["firmware_code_fingerprint"] = fingerprint
         if power_meta.get("observation_mode") is not None:
             summary["power"]["observation_mode"] = power_meta["observation_mode"]
         if power_meta.get("integrity") is not None:

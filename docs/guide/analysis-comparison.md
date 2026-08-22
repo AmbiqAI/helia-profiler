@@ -74,6 +74,19 @@ above intends.
 Baselines recorded before this dimension existed carry no value and are
 skipped, so stored comparisons do not flip to failing.
 
+**Power firmware fingerprint.** Every power run also records a code hash of
+the exact binary that was measured (`summary.power.firmware_code_fingerprint`
+— comments and whitespace normalized away, so documentation-only firmware
+changes leave it untouched). When two runs on the *same board, SoC, and
+firmware mode* carry different fingerprints, the measured binaries ran
+different code, and hpx cannot vouch that their power numbers answer the same
+question — power deltas are omitted and the comparison says so. This closes
+the failure where a firmware-semantics fix produced a +678% "regression"
+against a stored baseline that every other dimension called fully comparable.
+The fingerprint is consulted **only** on a matching platform: cross-board
+comparisons keep the behavior documented above, and baselines predating the
+fingerprint are skipped like any other absent dimension.
+
 The terminal highlights totals and the largest layer deltas.
 `--output-dir` also writes `compare_summary.json` and `layer_diff.csv`.
 

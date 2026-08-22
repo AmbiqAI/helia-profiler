@@ -436,3 +436,86 @@ def test_two_socs_running_the_same_probe_stay_power_comparable():
     assessment = assess_comparability(baseline, candidate)
 
     assert assessment.power_metrics_comparable
+
+
+def _powered_run(
+    fingerprint: str | None,
+    *,
+    board: str = "apollo510_evb",
+    power_firmware: str = "dedicated",
+):
+    """A power run with the platform scope dimensions present (#138)."""
+    power = {
+        "measurement_scope": "gpio_gated_clean_window",
+        "integrity": "valid",
+        "power_firmware": power_firmware,
+    }
+    if fingerprint is not None:
+        power["firmware_code_fingerprint"] = fingerprint
+    run = _run(power=power)
+    run.metadata["config"]["target"]["board"] = board
+    return run
+
+
+class TestPowerFirmwareFingerprint:
+    """#138 / #115 item 1: the measured binary's code hash as a dimension."""
+
+    CODE = POWER_DIMENSION_MISMATCH.code_for(
+        ComparisonDimension.POWER_FIRMWARE_FINGERPRINT
+    )
+
+    def test_same_platform_fingerprint_mismatch_blocks_power(self):
+        """The #115 shape: identical on every prior dimension, different
+        measured-binary code — +678% must not present as a real regression."""
+        assessment = assess_comparability(_powered_run("aaa"), _powered_run("bbb"))
+
+        assert not assessment.power_metrics_comparable
+        assert any(issue.code == self.CODE for issue in assessment.issues)
+
+    def test_equal_fingerprints_compare_freely(self):
+        assessment = assess_comparability(_powered_run("aaa"), _powered_run("aaa"))
+
+        assert assessment.power_metrics_comparable
+        assert not any(issue.code == self.CODE for issue in assessment.issues)
+
+    def test_legacy_baseline_without_fingerprint_is_skipped(self):
+        """Baselines predating the dimension carry no key — zero migration."""
+        assessment = assess_comparability(_powered_run(None), _powered_run("bbb"))
+
+        assert assessment.power_metrics_comparable
+        assert not any(issue.code == self.CODE for issue in assessment.issues)
+
+    def test_cross_board_pairs_never_consult_the_fingerprint(self):
+        """#138 attempt-1 regression 3: board differences are documented as
+        visible-not-blocking, and cross-platform renders trivially differ —
+        a fingerprint mismatch only means something on a matching platform."""
+        assessment = assess_comparability(
+            _powered_run("aaa", board="apollo510_evb"),
+            _powered_run("bbb", board="apollo4p_evb"),
+        )
+
+        assert assessment.power_metrics_comparable
+        assert not any(issue.code == self.CODE for issue in assessment.issues)
+
+    def test_firmware_mode_mismatch_scopes_the_fingerprint_out(self):
+        """dedicated-vs-shared already blocks via POWER_FIRMWARE; the
+        fingerprint (which hashes DIFFERENT binaries in the two modes) must
+        not add a second, misleading issue on top."""
+        assessment = assess_comparability(
+            _powered_run("aaa", power_firmware="dedicated"),
+            _powered_run("bbb", power_firmware="shared"),
+        )
+
+        assert not assessment.power_metrics_comparable  # POWER_FIRMWARE blocks
+        assert not any(issue.code == self.CODE for issue in assessment.issues)
+
+    def test_absent_scope_dimension_skips_the_fingerprint(self):
+        """A legacy artifact that cannot even establish the platform match
+        (no board recorded) is skipped, not blocked."""
+        left = _powered_run("aaa")
+        right = _powered_run("bbb")
+        del left.metadata["config"]["target"]["board"]
+
+        assessment = assess_comparability(left, right)
+
+        assert not any(issue.code == self.CODE for issue in assessment.issues)
