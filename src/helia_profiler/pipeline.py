@@ -61,7 +61,7 @@ ProgressSink = Callable[[ProgressUpdate], None]
 _T = TypeVar("_T")
 
 
-def _require(value: _T | None, field: str, stage: str) -> _T:
+def _require(value: _T | None, field_name: str, stage: str) -> _T:
     """Return *value*, or explain which stage should have produced it.
 
     Shared by every :class:`PipelineContext` narrowing accessor so a
@@ -70,9 +70,9 @@ def _require(value: _T | None, field: str, stage: str) -> _T:
     """
     if value is None:
         raise PipelineError(
-            f"ctx.{field} is not available — {stage} has not run.",
-            hint=f"{stage} must run before ctx.{field} is read; "
-            "check the stage order of the pipeline being run.",
+            f"ctx.{field_name} is not available — {stage} has not run.",
+            hint=f"{stage} must run before ctx.{field_name} is read. "
+            "This is a bug in heliaPROFILER — please file an issue.",
         )
     return value
 
@@ -318,7 +318,10 @@ class PipelineContext:
 
     def publish_power_terminal_envelope(self, envelope: PowerTerminalEnvelope) -> None:
         self.publish_power_terminal(envelope.terminal)
-        assert self.power_run is not None
+        # publish_power_terminal raised if power_run was None, so this is a
+        # post-condition restated for the type-narrowing, not a stage gate.
+        if self.power_run is None:  # pragma: no cover - unreachable
+            raise ValueError("publish_power_terminal left power_run unset.")
         self.power_run = replace(
             self.power_run,
             on_device_summary=envelope.measurement,

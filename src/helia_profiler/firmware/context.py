@@ -14,7 +14,7 @@ from ..counters import (
 )
 from ..engines import EngineType
 from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
-from ..errors import FirmwareError
+from ..errors import FirmwareError, PipelineError
 from ..placement import Placement
 from ..target.lifecycle import resolve_power_lockstep
 from ..usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
@@ -265,7 +265,17 @@ class FirmwareRenderContext:
         power_sync_enabled = config.power.gated_external_capture
         profiling_backends = tuple(soc.profiling_backends)
         clock = ctx.run_metadata.platform
-        assert clock is not None
+        if clock is None:
+            # A sub-field of the (non-optional) run_metadata, so no
+            # PipelineContext accessor covers it — same stage-ordering
+            # precondition, stated the same way.
+            raise PipelineError(
+                "ctx.run_metadata.platform is not available — "
+                "ResolvePlatformStage has not run.",
+                hint="ResolvePlatformStage must run before firmware render "
+                "context construction. This is a bug in heliaPROFILER — "
+                "please file an issue.",
+            )
         perf_mode_mhz = clock.cpu_clock_mhz
         burst_base_mhz = soc.capabilities.clock.direct_burst_base_mhz
         resolver_plan = build_resolver_plan(

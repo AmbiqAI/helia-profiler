@@ -98,7 +98,8 @@ soc = ctx.resolved_soc          # SocDef, not SocDef | None
 Read stage products through the accessors rather than through
 `assert ctx.<field> is not None`: an `assert` is compiled out under `-O` and
 names no producer when it fires. A test in `tests/test_pipeline.py` enforces
-this — no assert-narrowing of context fields survives in `src/`. Reads that
+this — no `assert`-narrowing of `ctx.<field>` survives anywhere in `src/`,
+nor of `self.<field>` inside `pipeline.py` itself. Reads that
 already handle `None` deliberately (`ctx.arena_region or Placement.TCM`, or an
 early return when a field is unset) stay on the raw field.
 

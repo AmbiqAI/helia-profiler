@@ -543,13 +543,29 @@ class TestNarrowingAccessors:
     def test_named_producer_is_a_real_stage(
         self, accessor: str, field: str, stage: str
     ):
-        """The stage named in the error must exist, or the message misleads."""
-        del accessor, field
+        """The stage named in the error must exist AND produce the field.
+
+        Review-hardened: the existence half alone let a wrong-but-real
+        producer pass (naming BuildFirmwareStage for dependency_workspace
+        stayed green), so the error text could lie. The source check pins
+        the attribution: the named stage's module must assign the field
+        (or publish it through a ctx.publish_* method — pmu_result's path).
+        """
+        del accessor
+        import inspect
+
         from helia_profiler import stages
 
         cls = getattr(stages, stage, None)
         assert cls is not None, f"{stage} is not a stage class in helia_profiler.stages"
         assert isinstance(cls(), Stage)
+        module_src = inspect.getsource(inspect.getmodule(cls))
+        assigns = re.search(rf"ctx\.{field}\s*=", module_src) is not None
+        publishes = "ctx.publish_" in module_src
+        assert assigns or publishes, (
+            f"{stage} does not appear to set ctx.{field} — the accessor's "
+            "error text would name the wrong producer"
+        )
 
     def test_accessors_cover_every_documented_field(self, tmp_path: Path):
         # Guards a rename on either side of the pair: every listed accessor is
@@ -567,12 +583,23 @@ def test_no_assert_narrowing_of_context_fields_survives_in_src():
     a crash costume: it is compiled out under ``-O`` and names no producer when
     it fires.  New sites must read through the narrowing accessors instead.
     """
-    pattern = re.compile(r"^\s*assert\s+(self\.)?ctx\.")
+    # Two patterns, deliberately scoped (the review round proved both blind
+    # spots with mutations):
+    #  * ctx-field narrowing anywhere in src/, anchored on `is not None` so a
+    #    legitimate absence assertion is not banned with a misleading
+    #    use-the-accessor message;
+    #  * `assert self.<field> is not None` within pipeline.py itself, where
+    #    PipelineContext lives — one such assert falsified this test's claim
+    #    until the review round caught it. Other files' self-asserts narrow
+    #    their own objects, not pipeline products, and stay legal.
+    ctx_pattern = re.compile(r"^\s*assert\s+(self\.)?ctx\.\w+(\.\w+)*\s+is\s+not\s+None\b")
+    self_pattern = re.compile(r"^\s*assert\s+self\.\w+\s+is\s+not\s+None\b")
     src = Path(__file__).resolve().parents[1] / "src" / "helia_profiler"
     offenders: list[str] = []
     for path in sorted(src.rglob("*.py")):
+        in_pipeline_module = path.name == "pipeline.py"
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if pattern.match(line):
+            if ctx_pattern.match(line) or (in_pipeline_module and self_pattern.match(line)):
                 offenders.append(f"{path.relative_to(src.parent.parent)}:{lineno}: {line.strip()}")
     assert not offenders, (
         "assert-narrowing of PipelineContext fields found in src/ — read the "

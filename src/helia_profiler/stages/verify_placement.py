@@ -62,7 +62,7 @@ class VerifyPlacementStage:
         arena_region = ctx.planned_arena_region
 
         ranges = soc_placement_ranges(soc)
-        expected = ranges.get(Placement(arena_region))
+        expected = ranges.get(arena_region)
         if expected is None:
             log.debug(
                 "No address range for %s on %s; skipping placement verify.",
