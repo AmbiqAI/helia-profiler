@@ -140,8 +140,15 @@ def _sections_via_size(
 #: the last-resort fallback so an unrecognised variant degrades to the old
 #: behaviour instead of reporting nothing (#132).
 #: Totals-row labels in the component-sizes table ("ROM Totals for x.axf",
-#: "Object Totals", "Library Totals", "Grand Totals").
-_FROMELF_TOTALS_LABEL_RE = re.compile(r"(?:ROM|Object|Library|Grand)\s+Totals\b")
+#: "Object Totals", "Library Totals", "Grand Totals", and armlink's own
+#: "ELF Image Totals" for defense). FULL-match, not prefix: fromelf echoes
+#: the input path in the Object Name column, so a relative path whose
+#: LEADING component is a totals label ("ROM Totals/fw.axf") must still
+#: read as an image row (#175 round-2 review m-1 — the prefix version
+#: traded the substring hazard for this narrower one).
+_FROMELF_TOTALS_LABEL_RE = re.compile(
+    r"(?:ROM|Object|Library|Grand|ELF Image)\s+Totals(?:\s+for\s+.*)?"
+)
 _FROMELF_TOTALS_RE = re.compile(r"\s*Grand Totals?\s*[:\s]+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)")
 
 #: Column header of ``fromelf --text -z``'s "Object/Image Component Sizes"
@@ -393,16 +400,15 @@ def _fromelf_totals(stdout: str) -> tuple[int, int, int, int] | None:
         # substring test skip the image row too and the probe silently
         # returned no sections (#175 review m1, reproduced on the real
         # tool).
-        if name.startswith("Grand Totals"):
-            return row
-        if _FROMELF_TOTALS_LABEL_RE.match(name):
+        if _FROMELF_TOTALS_LABEL_RE.fullmatch(name):
             continue
         image_rows.append(row)
     # A LINKED image emits exactly one image row (verified across single-
     # and multi-load-region, C++, and production .axf inputs on the real
     # tool). More than one data row means we were handed something else —
-    # a library or object listing — where "first row" would be silently
-    # wrong numbers; degrade instead (#175 review m2).
+    # a library or object listing, or multiple images at once — where
+    # "first row" would be silently wrong (or arbitrarily chosen) numbers;
+    # degrade instead (#175 review m2/round-2 m-2).
     if len(image_rows) == 1:
         return image_rows[0]
     for line in stdout.splitlines():

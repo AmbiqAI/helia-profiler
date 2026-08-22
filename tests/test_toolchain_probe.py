@@ -7,7 +7,10 @@ from pathlib import Path
 
 from helia_profiler.config import Toolchain
 from helia_profiler.results import BinarySections
-from helia_profiler.toolchain_probe import binary_sections
+from helia_profiler.toolchain_probe import (
+    _reserved_from_section_listing,
+    binary_sections,
+)
 
 
 def test_atfe_binary_sections_uses_llvm_size_from_atfe_root(tmp_path: Path, monkeypatch) -> None:
@@ -265,9 +268,10 @@ def test_a_region_qualified_heap_name_is_matched(tmp_path: Path, monkeypatch) ->
 # ---------------------------------------------------------------------------
 #
 # Real output captured from Arm Compiler for Embedded 6.23 (fromelf
-# [5f102800]) on an ELF built to reproduce the #24 shape for armlink:  (fromelf's own --vsn serial; the capture's
-    # ELF headers show armlink [5f102400]/armclang [5f103000] — different tools,
-    # different serials, same AC6 6.23 install)
+# [5f102800] — fromelf's own --vsn serial; the capture's ELF headers show
+# armlink [5f102400] / armclang [5f103000]: different tools, different
+# serials, same AC6 6.23 install) on an ELF built to reproduce the #24
+# shape for armlink:
 # 248 bytes of genuine zero-init state, an ARM_LIB_HEAP execution region of
 # 391,928 bytes (the reservation), and a 4,096-byte ARM_LIB_STACK (the live
 # stack). ARM_LIB_HEAP / ARM_LIB_STACK are the exact region names NSX's own
@@ -427,16 +431,46 @@ def test_size_and_fromelf_parsers_agree_on_the_same_binary_shape(
     assert via_fromelf.reserved == _REAL_HEAP
 
 
-def test_combined_stackheap_region_stays_bss():
-    """#175 review NIT: ARM_LIB_STACKHEAP (combined region) contains the
-    live stack and cannot be split — per #131's never-invent rule it stays
-    in bss with reserved=0. Verified against a real armlink build by the
-    #175 review (bss=65784, reserved=0); pinned here with a synthetic -v
-    listing in the real output shape."""
-    listing = (
-        "** Section #4 'ARM_LIB_STACKHEAP' (SHT_NOBITS) [SHF_ALLOC + SHF_WRITE]\n"
-        "    Size   : 65536 bytes (alignment 8)\n"
+def _section_listing(name: str) -> str:
+    """A -v section block in the REAL fromelf shape: bare '** Section #N'
+    header, fields on indented lines (#175 round-2 review M-1 — the first
+    version put the fields inline on the header, where the parser never
+    reads them, so it returned 0 for ANY name and pinned nothing)."""
+    return (
+        "** Section #4\n"
+        "\n"
+        f"    Name        : {name}\n"
+        "    Type        : SHT_NOBITS (0x00000008)\n"
+        "    Flags       : SHF_ALLOC + SHF_WRITE (0x00000003)\n"
+        "    Size        : 65536 bytes (alignment 8)\n"
     )
-    from helia_profiler.toolchain_probe import _reserved_from_section_listing
 
-    assert _reserved_from_section_listing(listing) == 0
+
+def test_combined_stackheap_region_stays_bss():
+    """ARM_LIB_STACKHEAP (combined region) contains the live stack and
+    cannot be split — per #131's never-invent rule it stays in bss with
+    reserved=0. Verified against a real armlink build by the #175 review
+    (bss=65784, reserved=0). The ARM_LIB_HEAP positive control proves the
+    parser actually READ the name — without it, "correctly classified as
+    live stack" is indistinguishable from "parser saw nothing"."""
+    assert _reserved_from_section_listing(_section_listing("ARM_LIB_STACKHEAP")) == 0
+    assert _reserved_from_section_listing(_section_listing("ARM_LIB_HEAP")) == 65536
+    assert _reserved_from_section_listing(_section_listing(".heap")) == 65536
+
+
+def test_totals_label_in_the_image_path_is_not_a_totals_row():
+    """#175 round-2 m-1: fromelf echoes the input path in the Object Name
+    column, so a relative path whose LEADING component is a totals label
+    must still parse as the image row. The prefix-match version of the fix
+    skipped it (verified against the real tool: 'ROM Totals/fw.axf' ->
+    None); the full-match version reads it correctly."""
+    table = (
+        "** Object/Image Component Sizes\n"
+        "\n"
+        "      Code (inc. data)   RO Data    RW Data    ZI Data      Debug   Object Name\n"
+        "       296         16         32          4     396272        652   ROM Totals/fw.axf\n"
+        "       296         16         32          4          0          0   ROM Totals for ROM Totals/fw.axf\n"
+    )
+    from helia_profiler.toolchain_probe import _fromelf_totals
+
+    assert _fromelf_totals(table) == (296, 32, 4, 396272)

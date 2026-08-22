@@ -530,8 +530,9 @@ _ERROR_HINTS: dict[FirmwareErrorCode, str] = {
         "module and its arena table come from the SAME compiler run, so "
         "re-running changes nothing.  The known way a region id goes "
         "missing host-side is an arena whose memory kind hpx cannot map: "
-        "that is skipped with only a log warning, so re-run with -v and "
-        "look for 'unknown AOT arena memory' just before the build."
+        "that is skipped with a warning printed at NORMAL verbosity — look "
+        "above the build output for 'AOT planner emitted unrecognised "
+        "memory ... skipping'."
     ),
     FirmwareErrorCode.CONST_BLOB_PSRAM_WRITE_FAILED: (
         "Copying a constant sidecar blob into its PSRAM-placed arena region "
@@ -556,9 +557,11 @@ _ERROR_HINTS: dict[FirmwareErrorCode, str] = {
         "(the payload reports the capacity); the firmware PARKS here, so no "
         "CSV follows at all.  Capacity comes from the SoC's pmu_max_ops — "
         "raise it via target.custom_socs.<name>.pmu_max_ops (a custom SoC "
-        "based_on this one, with the board repointed at it), noting each "
-        "entry costs ~24 bytes of reserved RAM — or profile a model with "
-        "fewer executed operators."
+        "based_on this one, with the board repointed at it) — each entry "
+        "reserves a per-record struct of RAM (see the engine template's "
+        "LayerRecord), so a large raise can turn this into a link failure "
+        "on a small part — or profile a model with fewer executed "
+        "operators."
     ),
     FirmwareErrorCode.PMU_INIT_OR_SELFTEST_FAILED: (
         "PMU bring-up failed for the named counter pass: either the PMU "
@@ -568,8 +571,8 @@ _ERROR_HINTS: dict[FirmwareErrorCode, str] = {
         "(the self-test also fails on a read error, not only a frozen "
         "counter).  Check that every selected --pmu-counters event exists "
         "on this core.  Over-selecting counters does NOT cause this error — "
-        "the firmware clamps to the hardware maximum and silently drops the "
-        "extra columns."
+        "the firmware clamps to its own per-pass counter capacity (4) and "
+        "silently drops the extra columns."
     ),
 }
 

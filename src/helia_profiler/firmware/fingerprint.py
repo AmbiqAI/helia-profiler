@@ -17,7 +17,8 @@ the hash — build configuration is a different comparison axis than "what
 code ran in the window", and dependency identity is partially covered by
 the toolchain/compiler dimensions. (The nsx.yml set-ordering
 nondeterminism that originally forced its exclusion was fixed in #174;
-including build config is now possible if ever worth the blast radius.) The claim is
+including build config is now possible if ever worth the blast
+radius.) The claim is
 therefore "the rendered C sources of the measured target", not "the exact
 binary".
 
