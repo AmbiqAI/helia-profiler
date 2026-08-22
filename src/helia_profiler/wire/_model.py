@@ -73,19 +73,31 @@ HPX_WARN_PREFIX = "HPX_WARN="
 
 #: The one statement of the ``est_ms`` gap, single-sourced because it is told
 #: in three places (the ``clean_window_begin`` spec note, the package
-#: docstring's gap list and the generated reference's). Narrower than it looks:
-#: ``config.DEFAULT_WINDOW_MODE`` is ``auto``, and the auto branch of
-#: ``_main_base.cc.j2`` measures a warm DWT reference before the window
-#: whatever clock times the window itself, so the zero is specific to
-#: ``window_mode: fixed`` on a STIMER-timed build.
+#: docstring's gap list and the generated reference's). Since #164 the gap is
+#: no longer structural for any host listening to an *inference* window: the
+#: fixed+STIMER profile infer arm measures the same warm DWT reference the
+#: auto arm always has — the debug domain is gated only *inside* the window,
+#: so pre-window DWT is valid even where STIMER times the window itself —
+#: and announces a computed estimate. The hardcoded zeros that remain are
+#: stated below; the busy-loop estimate mismatch that remains is #170's.
 EST_MS_GAP = (
-    "The `clean_window_begin` heartbeat carries `est_ms=0` only where the "
-    "firmware has no warm measurement to estimate from: a STIMER-timed window "
-    "configured with `window_mode: fixed`. There the host reads 0 as 'no "
-    "estimate' and leaves its capture deadline at the flat heartbeat timeout. "
-    "Under the default `window_mode: auto` the firmware measures a warm DWT "
-    "reference before the window and sends a real estimate — on every SoC and "
-    "engine, the STIMER-timed apollo510 and ExecuTorch builds included."
+    "The `clean_window_begin` heartbeat carries a hardcoded `est_ms=0` in "
+    "exactly two places. Dedicated power binaries: `hpx_printf` compiles to "
+    "a no-op there and the host times the capture from its planned duration, "
+    "so no listener exists for the announce (the only power image that is "
+    "ever compiled is the dedicated power target's, rendered with "
+    "`window_mode: fixed` pinned, so the minimal power image also takes no "
+    "pre-window DWT reads). And `clean_window_probe: busy_loop` windows with "
+    "`window_mode: fixed`: that window runs a calibrated busy loop sized to "
+    "`window_target_ms`, not `clean_iters` inferences, so no "
+    "inference-derived estimate describes it (in `window_mode: auto` a "
+    "busy-loop build still sends the auto arm's inference-derived estimate — "
+    "a pre-existing mismatch tracked in #170). Every profile build with the "
+    "default infer probe, in both window modes, measures a warm DWT "
+    "reference before the window and sends a real estimate; a runtime "
+    "`est_ms=0` can still appear if that measurement degrades (DWT frozen "
+    "through every warmup by a debugger-attach transient), and the host then "
+    "reads 0 as 'no estimate' and keeps its flat heartbeat timeout."
 )
 
 

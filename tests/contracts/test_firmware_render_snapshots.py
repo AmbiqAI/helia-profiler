@@ -81,7 +81,12 @@ _MARKERS: dict[str, str] = {
     "debug_uart": "NSX_DEBUG_UART",
     "rtt_config": "SEGGER_RTT_ConfigUpBuffer",
     "armv8m_pmu": "ARM_PMU_",
-    "busy_loop_probe": "busy_loop",
+    # Keyed on the emitted wire token, not the bare word: "busy_loop" appears
+    # in template comments on every STIMER render (found in the #169 round-2
+    # review, where a new comment flipped the last four discriminating
+    # apollo510 cases), so the bare word made this marker a constant there.
+    # The probe announce line renders exactly when the probe is active.
+    "busy_loop_probe": "HPX_CLEAN_WINDOW_PROBE=busy_loop",
     "auto_window": "window_min",
     "heartbeat": "HPX_HEARTBEAT",
     "ssram_power_ap5": "ns_power",
@@ -112,6 +117,13 @@ _MARKERS: dict[str, str] = {
     # a marker can only see presence, and every engine sharing one wrong name
     # would look identical here.
     "engine_wire_id": "HPX_ENGINE=",
+    # Whether the clean-window announce carries a computed est_ms (the printf
+    # conversion, present in the auto arm, the DWT-fixed arm, and — since
+    # #164 — the STIMER-fixed profile infer arm) rather than the hardcoded 0
+    # that survives only in power and busy-loop renders. Semantic for the
+    # same reason as the clean-window trio above: losing the #164 arm again
+    # would otherwise read as pure sha256 drift.
+    "est_ms_measured": "est_ms=%llu",
 }
 
 

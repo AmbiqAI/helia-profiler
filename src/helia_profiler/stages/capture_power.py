@@ -30,8 +30,12 @@ _SAFETY_MARGIN_S = 6.0  # extra headroom beyond estimated runtime
 
 
 #: Auto window mode warms the clean pass with 3 hardcoded uninstrumented
-#: reps before timing (main.cc.j2 / main_aot.cc.j2), independent of
-#: profiling.warmup which only applies to the per-layer PMU passes.
+#: reps before timing (_main_base.cc.j2), independent of profiling.warmup
+#: which only applies to the per-layer PMU passes. Since #164 the
+#: fixed+STIMER profile arm floors its measured warmup at the same 3, so the
+#: fixed-mode estimate below floors too — for DWT-timed fixed builds (whose
+#: warmup is exactly profiling.warmup) that overestimates by at most
+#: (3 - warmup) inferences, which only ADDS headroom to the auto-terminate.
 _AUTO_WINDOW_WARMUP_REPS = 3
 
 
@@ -124,7 +128,7 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
             clean_warmup_reps = _AUTO_WINDOW_WARMUP_REPS
         else:
             clean_iters = max(1, profiling.iterations)
-            clean_warmup_reps = max(1, profiling.warmup)
+            clean_warmup_reps = max(_AUTO_WINDOW_WARMUP_REPS, profiling.warmup)
         clean_run_s = (clean_iters + clean_warmup_reps) * inference_time_s
 
     firmware_run_s = profiled_run_s + clean_run_s

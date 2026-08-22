@@ -12,6 +12,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -38,6 +39,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -64,6 +66,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -90,6 +93,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -116,6 +120,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -142,6 +147,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -168,6 +174,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -194,6 +201,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -220,6 +228,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -246,6 +255,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -272,6 +282,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -298,6 +309,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -324,6 +336,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -350,6 +363,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -376,6 +390,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -402,6 +417,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -428,6 +444,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -454,6 +471,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -480,6 +498,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -506,6 +525,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -532,6 +552,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -558,6 +579,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -584,6 +606,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -610,6 +633,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -636,6 +660,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -662,6 +687,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -688,6 +714,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -714,6 +741,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -740,6 +768,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -766,6 +795,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -792,6 +822,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -818,6 +849,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -844,6 +876,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -870,6 +903,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -896,6 +930,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -922,6 +957,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -948,6 +984,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -974,6 +1011,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1000,6 +1038,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1026,6 +1065,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1052,6 +1092,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1078,6 +1119,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1104,6 +1146,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1115,13 +1158,13 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "3998f0b021c23abffd9f7f1f4a6d36da6a7cfa2293e738e3192d55967c473edc"
+    "sha256": "913aa6384d2282dc1eaf87b6b6115295097ae694174925a20d9e1bb06ecb5730"
   },
   "apollo510|rtt|helia-aot": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1130,6 +1173,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1141,7 +1185,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "2d78c379224a1553d25e2e4e1a532ae25d4ec8baf4bcc8260ffe2e8c414af017"
+    "sha256": "03f6af1e68c7bc5e6f80682ba62b6fff2bd492cd047093a03dbd607086c4a97c"
   },
   "apollo510|rtt|helia-aot|busy_loop": {
     "markers": {
@@ -1156,6 +1200,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1173,7 +1218,7 @@
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1182,6 +1227,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1208,6 +1254,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1225,7 +1272,7 @@
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1234,6 +1281,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1245,7 +1293,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "879a7c3e6e778679c0ba6bb21b36f442b7e7131883e84992977fe0c5b6a3d2d8"
+    "sha256": "8f93e6e4212d07f432dd6f6b7dda9b2f2f8627ffb49ec26c24a6a61dc7d3bb13"
   },
   "apollo510|rtt|helia-rt|busy_loop": {
     "markers": {
@@ -1260,6 +1308,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1277,7 +1326,7 @@
     "markers": {
       "armv8m_pmu": false,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1286,6 +1335,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1312,6 +1362,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1329,7 +1380,7 @@
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1338,6 +1389,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1349,7 +1401,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "9e954414f357f2ed704ecf9880b126d130c1983e0ba788ad1289a0ce1fd2fa82"
+    "sha256": "b5b2eecce6955c415aa5b9e7f6f159050c94f9aa18f8be1899d10205e5df994b"
   },
   "apollo510|rtt|tflm|busy_loop": {
     "markers": {
@@ -1364,6 +1416,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1381,7 +1434,7 @@
     "markers": {
       "armv8m_pmu": false,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1390,6 +1443,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1416,6 +1470,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1442,6 +1497,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1453,13 +1509,13 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "7b9ed09d7d41dd139edfa34eb3947a7687147df8ca4c16114edfbd40cde9fd23"
+    "sha256": "e12658557da5e58b3ffaa8106832c3ad26a4b84aac27f06c8107e76eadaf0735"
   },
   "apollo510|swo|helia-aot": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1468,6 +1524,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1479,13 +1536,13 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "e73c9873dee5fdad21f985a6de3f650cda7f4239d51df184aab8843a87d2f762"
+    "sha256": "ffae296824b460c53bc4a24b537c7f14fb42258c3df260b75bb24ce91dc41a5c"
   },
   "apollo510|swo|helia-rt": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1494,6 +1551,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1505,13 +1563,13 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "1a20c7eb2f140fdbee15faa762716dc7d25586d28a299aadf35f62467110a553"
+    "sha256": "4ff26c0b36630a1631276a96dfb560b7a02f43090b48e2c3cf4e66185adea522"
   },
   "apollo510|swo|tflm": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1520,6 +1578,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1531,7 +1590,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "4a4058d195b9184ba9b2b39d27083fa2d2c09e3f760b64585fdcf3d672af16c2"
+    "sha256": "19740bbb89f9b5a38591f460dbedc552e730f2c33ff3d85226128affb1527299"
   },
   "apollo510|uart|executorch": {
     "markers": {
@@ -1546,6 +1605,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1557,13 +1617,13 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "e666a41384084e200f78821b106931c977a6c011a3eb2a138eacc60036896cde"
+    "sha256": "5f7759a85125e30b4e2cc8b70cc29a828f1fb560cb949dc4fb9ad6d8d60eeb2a"
   },
   "apollo510|uart|helia-aot": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1572,6 +1632,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1583,13 +1644,13 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "75c5ce46787cb40149ae3544386eb73a3f6357d3b0d63d451df660645f0773d0"
+    "sha256": "879a2806238799660764be7291580557d05579aaf08d9cc9d6bda6b94c49a04f"
   },
   "apollo510|uart|helia-rt": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1598,6 +1659,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1609,13 +1671,13 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "7ce36d7aaf9c1545340a385c28a44d2f59f1936a3b6484cc82d0df099d9bbdfd"
+    "sha256": "ad022a316d9f113b347a1eabaca2bab983392f5b2abb2bb6e769cfacc194d737"
   },
   "apollo510|uart|tflm": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1624,6 +1686,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1635,7 +1698,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "e7635ba20be9fec17a9d37698410d233481e82f04d195ae75628b96c386c97f0"
+    "sha256": "7ac1769ee22b925571be1ee5a4280e854c2522e1a1fd5eb062ba48ddb44a333b"
   },
   "apollo510|usb_cdc|executorch": {
     "markers": {
@@ -1650,6 +1713,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1661,13 +1725,13 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "addf4a870781d4ed8abe3781c2565d2c77949586dadfa7a5a9664121e120db4c"
+    "sha256": "188db49c45e7f1b8757009c1da23006a26fe36b4d3d0fab7ab4ea2836a1efaf1"
   },
   "apollo510|usb_cdc|helia-aot": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1676,6 +1740,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1687,13 +1752,13 @@
       "stimer_window": true,
       "usb_timer": true
     },
-    "sha256": "f13449006f5d148a446fc8bd070f1561cf7ee744f77e1c3412421e2eeb68df3d"
+    "sha256": "5d39c024dba04b5564c178dcf71357b90f63d6379ea30806687b7e6e1be3570b"
   },
   "apollo510|usb_cdc|helia-rt": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1702,6 +1767,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1713,13 +1779,13 @@
       "stimer_window": true,
       "usb_timer": true
     },
-    "sha256": "1622c5b33d08c58ee939df11ae35668ed75942be6bee7cb23fc82560775d1c38"
+    "sha256": "5633423577d9c8d4133c6891144e07ca146fbfc9f977ca5631a9ca0e73e2f854"
   },
   "apollo510|usb_cdc|tflm": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1728,6 +1794,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
       "heartbeat": true,
@@ -1739,6 +1806,6 @@
       "stimer_window": true,
       "usb_timer": true
     },
-    "sha256": "ffc99ba07aaeff6a3bccee3f9b88ab3f7156d2135df1bd6e932b43c08de02241"
+    "sha256": "786f134cda73859aafb93c736947b01354a81a4064bc1381f913852505aec3d8"
   }
 }
