@@ -70,12 +70,10 @@ bytes are frozen this phase):
   and temporary arenas are excluded, so the figure is not comparable with
   TFLM's single-arena number.
 * The ``clean_window_begin`` heartbeat carries a hardcoded ``est_ms=0`` only
-  in dedicated power binaries (the announce compiles to a no-op there; no
-  host listens) and in fixed-mode busy-loop-probe windows (no
-  inference-derived estimate describes a busy loop sized to
-  ``window_target_ms``). #164 closed the gap everywhere a host listens to an
-  inference window: every other profile build measures pre-window and
-  announces a computed estimate in both window modes. The exact statement is
+  in dedicated power binaries, where the announce compiles to a no-op and no
+  host listens. #164 gave infer windows a measured estimate in both window
+  modes; #170 gave busy-loop windows the compile-time ``window_target_ms``
+  and made the power exclusion structural. The exact statement is
   single-sourced as :data:`EST_MS_GAP`, which the heartbeat's spec note and
   the generated reference both quote.
 * ``HPX_VERSION`` is checked against :data:`HPX_PROTOCOL_VERSION` and then

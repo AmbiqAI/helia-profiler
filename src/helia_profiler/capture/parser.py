@@ -109,8 +109,9 @@ def parse_firmware_output(
         if line.startswith(HPX_HEARTBEAT_PREFIX):
             meta_kv[_HEARTBEAT_COUNT] = meta_kv.get(_HEARTBEAT_COUNT, 0) + 1
             meta_kv[_LAST_HEARTBEAT] = line
-            # The clean_window_begin heartbeat announces the iteration count
-            # BEFORE the window runs, while the transport is still reliably
+            # The clean_window_begin heartbeat announces the count the window
+            # will complete (planned iterations; 1 for a busy-loop pass,
+            # #170) BEFORE it runs, while the transport is still reliably
             # alive.  Keep it as a fallback for clean_infer_count: the
             # authoritative HPX_CLEAN_INFER_COUNT line is printed right after
             # the transport peripheral is re-enabled post-window and can be

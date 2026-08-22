@@ -12,6 +12,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -24,7 +25,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "ef0471967b6748f7ab4f209c6f15b61079972118ed153d860adb17cc4e4f1ab8"
+    "sha256": "a0058eceab9dc76fdda0d45eb34b6fe16c03b5452f4c729aa0f6db7b30115bcc"
   },
   "apollo3p|rtt|helia-aot|busy_loop": {
     "markers": {
@@ -39,6 +40,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -51,7 +53,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "fe76cb80b31f9bac0554aeebb30b49a019a8aa6048e10e62aa0d008c437e7c79"
+    "sha256": "27de5459dabd4c2a33558b4269b90fe146c8b0db108a6b8d6c31f35c4805d2b8"
   },
   "apollo3p|rtt|helia-aot|power": {
     "markers": {
@@ -66,6 +68,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -93,6 +96,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -120,6 +124,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -132,7 +137,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "e8a249533513a76d7fd44c5461a4a5dc8dd6d16955b198f6e4435fd530d19e90"
+    "sha256": "2231bbbf6d40ae7bfa7a46e228d9516a3cc5a1c6fd37c5a51dcd1f9a97329f16"
   },
   "apollo3p|rtt|helia-rt|busy_loop": {
     "markers": {
@@ -147,6 +152,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -159,7 +165,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "8b38632fd357b96ac62d663e995b9db11730abf2a701e096d25880f6b5c8bba3"
+    "sha256": "72080b25332420eaa7eca9ca0904e9421cfd48956c4d08cb948198d710dbd6ad"
   },
   "apollo3p|rtt|helia-rt|power": {
     "markers": {
@@ -174,6 +180,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -201,6 +208,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -228,6 +236,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -240,7 +249,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "bb345965b69566390e7fce42b46ae9e58c0458b264e2bd0923fc972dfa21f700"
+    "sha256": "d08a090bb393e64dde790b9872e4615ed6e5d54baf2751d360131e65359abd97"
   },
   "apollo3p|rtt|tflm|busy_loop": {
     "markers": {
@@ -255,6 +264,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -267,7 +277,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "8fe68bb6f8a4ede49004f2f73134c77f5ae33c0f9f0cd7d7e7e2776f494a01aa"
+    "sha256": "d1c21da5b606cdb174f94158a7dd9c3797df8d4d4d43ecd69e63c533e33be84d"
   },
   "apollo3p|rtt|tflm|power": {
     "markers": {
@@ -282,6 +292,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -309,6 +320,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -336,6 +348,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -348,7 +361,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "9ce56ba8cdc280dc5a992c67fe16ad6ab93141ed777c5157ebed07602d597072"
+    "sha256": "18399dade8437d9cf088f5ad565a39b3a41a4c1d77cc10850bdbeb9de49ddefc"
   },
   "apollo3p|swo|helia-rt": {
     "markers": {
@@ -363,6 +376,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -375,7 +389,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "8b6bd7722916a506ee83b47a56b805e5d4b51f9728214495165b514e9bb5c372"
+    "sha256": "b4aae4463f3296fb2fd085423c6ff2092bfad6a15afdbf773295cffa42949c83"
   },
   "apollo3p|swo|tflm": {
     "markers": {
@@ -390,6 +404,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -402,7 +417,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "eb4dc27561c33e32d056f54f1415c1d10e4eb3b653142f214cb083c89079d502"
+    "sha256": "f7f74321069b03ff7ed5dca3754103a4079746b481e597cc3709edd92a1eec19"
   },
   "apollo3p|uart|helia-aot": {
     "markers": {
@@ -417,6 +432,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -429,7 +445,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "60c14e8ae9adc23092aa3b194c82f9cfdd91f3fa5e4105166d3a6b98e15dacd0"
+    "sha256": "762a6ba45ee1f52c2a61ae5e5cb0519177fb36450658769f908b354a85f1dce1"
   },
   "apollo3p|uart|helia-rt": {
     "markers": {
@@ -444,6 +460,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -456,7 +473,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "99dbfc00b9d438c197d92849f15dc6375a877f9139a6378c3e20334d3984b3f9"
+    "sha256": "b5ee5c998384757a218a2b1064550fe4c800133b974077cc6d69a70d9a9b8b28"
   },
   "apollo3p|uart|tflm": {
     "markers": {
@@ -471,6 +488,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -483,7 +501,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "a5f24be1c9248b63fd0ed653ce70f07950ab2387277f9f136bfd5c160f786d9f"
+    "sha256": "c21de632543f928eaf43532eef300bb58e8dfa38632d2fad2746102d1275ebe5"
   },
   "apollo3p|usb_cdc|helia-aot": {
     "markers": {
@@ -498,6 +516,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -510,7 +529,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "d325dab87b378f63f39bfdf84fa93f6b5aeacaf36d06db397d60f4a7db715691"
+    "sha256": "7f13154665720485d11ca2879ba5eef5cc43728251b67f418646de4c8c211f30"
   },
   "apollo3p|usb_cdc|helia-rt": {
     "markers": {
@@ -525,6 +544,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -537,7 +557,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "a204b90c6859e44ed35e20d4667535a5c5efde15fdc8f0bd0f862f8b6b287bf0"
+    "sha256": "bb340ea373f9bbf7e99907d0ae3adf0a565a497f5913ab7062bee46d477334dd"
   },
   "apollo3p|usb_cdc|tflm": {
     "markers": {
@@ -552,6 +572,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -564,7 +585,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "9b980264775b74afab0de477391bbc46502b06d7181da2bf470ec05aca051e25"
+    "sha256": "a1d069a28bd5c1b3815b6986ea670728a8a54a69e81a5fc1c44ee84bf4530357"
   },
   "apollo4p|rtt|helia-aot": {
     "markers": {
@@ -579,6 +600,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -591,7 +613,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "787e5d37ebe54fc0b539b85a989fdbba92c77bef751acd84e3111762ec7f3038"
+    "sha256": "95651311a36a9f74dc2492018c1e9d737737a26f12374414afc25a3118722165"
   },
   "apollo4p|rtt|helia-aot|busy_loop": {
     "markers": {
@@ -606,6 +628,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -618,7 +641,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "28137f68f077303ebd1ff0f0855116568da50d801dd06e9837054ff8b1892191"
+    "sha256": "ebacbd06975547e82efa835aea5eabb08942087b93416d074fb76852654e983a"
   },
   "apollo4p|rtt|helia-aot|power": {
     "markers": {
@@ -633,6 +656,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -660,6 +684,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -687,6 +712,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -699,7 +725,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "dce0e4c04e9cda60d952935881dbe159f1bf3f50759f2918ea697dab793f718c"
+    "sha256": "60784a248169584af728b104a876c485f563e886f54defa08064c51271c129fb"
   },
   "apollo4p|rtt|helia-rt|busy_loop": {
     "markers": {
@@ -714,6 +740,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -726,7 +753,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "e52130013f599dc37344053c683107b27a95f181f54de209708343df069b984b"
+    "sha256": "0aa27a604de31a41b91e617cda8a2f40a8f92d359da6e98a88fcedd4bd29636a"
   },
   "apollo4p|rtt|helia-rt|power": {
     "markers": {
@@ -741,6 +768,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -768,6 +796,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -795,6 +824,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -807,7 +837,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "6e2f154c8232ad924d9433d1aaac91b9b33ce681d577cffde583ca99393305d4"
+    "sha256": "a288aad39a21e5e394e56474e42c14eb384fbe5d781a06457b143e1b8db9b5f8"
   },
   "apollo4p|rtt|tflm|busy_loop": {
     "markers": {
@@ -822,6 +852,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -834,7 +865,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "75b0d701fbf2002823789ff5b5ba06908dabf7df3451a4af78f58ef7ffe139f1"
+    "sha256": "dc0cf422ff2454332cdd0b530cbcb8ce69fdf95e3ac44bf7ec1588c6cde2fafd"
   },
   "apollo4p|rtt|tflm|power": {
     "markers": {
@@ -849,6 +880,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -876,6 +908,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -903,6 +936,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -915,7 +949,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "b298bc7939f0de9e28c8bdc6cc8cfff791ecf86ee88e22b7e02455c12c399c00"
+    "sha256": "35c26d845c207840ac348eb5677599fd88843b13b87b6146856da7c68566f3b8"
   },
   "apollo4p|swo|helia-rt": {
     "markers": {
@@ -930,6 +964,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -942,7 +977,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "7ee2ad55d7c8cc6778564a10e508ccbe235b9f3518360f42f14e23687ee399a8"
+    "sha256": "d876c425f4fe8098e7933c67f12c28fe3b543b654b13b24b84adfedad995619b"
   },
   "apollo4p|swo|tflm": {
     "markers": {
@@ -957,6 +992,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -969,7 +1005,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "3eba398ae7a0d7e3ded33452e374b09e6ba2f38a0b5b947fa31fb56c47d66837"
+    "sha256": "6620e27f43d07e03260e8dbd41892bef02ccf13733fec364c5d95637b34dc7f4"
   },
   "apollo4p|uart|helia-aot": {
     "markers": {
@@ -984,6 +1020,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -996,7 +1033,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "8725a1136dbf01d5f5c01019dc1dd31989a78375f2e0ebfee0dce03480edf5cd"
+    "sha256": "56d0e21f107b72381b47d4533674931d132030c548aa18249c7822bef984cd6d"
   },
   "apollo4p|uart|helia-rt": {
     "markers": {
@@ -1011,6 +1048,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1023,7 +1061,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "764976f93439ea7ff4ba1582f21daa80c46dc56ba7ff7c80b767819100a99ddb"
+    "sha256": "da0f21139d357fd840d508ce85d353fa9222c599519223d00f76b2cb84a7c202"
   },
   "apollo4p|uart|tflm": {
     "markers": {
@@ -1038,6 +1076,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1050,7 +1089,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "3ce94a55f49452ac689b603d0b8dcf726d57a53c0f1578e52d46abbb7e945764"
+    "sha256": "b9cda74e59231d888f720630fb64dc432b8742fd95db3f1d6020bef0f85d92cb"
   },
   "apollo4p|usb_cdc|helia-aot": {
     "markers": {
@@ -1065,6 +1104,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1077,7 +1117,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "c6d6b510b52610b37aefe7a17b476b41229365597b61aceb924a03c81204af53"
+    "sha256": "71f1a9abd5949644ee22d317824147d82641b8dcff23d39293a5519f9f36d798"
   },
   "apollo4p|usb_cdc|helia-rt": {
     "markers": {
@@ -1092,6 +1132,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1104,7 +1145,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "683bf4e85a813c38a12c666de9d7481e3accd46c66fba834a5c6cece93f5d00e"
+    "sha256": "7ce3cce2f5a736ed49cbba6984fb4e605ac1a51a941c81715bc51087befd44e9"
   },
   "apollo4p|usb_cdc|tflm": {
     "markers": {
@@ -1119,6 +1160,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1131,7 +1173,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "bc3ad528eb9ed05f1811be83fd36c91114bb31fb44cbffa362730dba7d9041ac"
+    "sha256": "c44b297c4a3e978f168faa07954f7c003a5fadeaf36e85082d7c3c3a2871c59b"
   },
   "apollo510|rtt|executorch": {
     "markers": {
@@ -1146,6 +1188,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1158,7 +1201,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "913aa6384d2282dc1eaf87b6b6115295097ae694174925a20d9e1bb06ecb5730"
+    "sha256": "2f4444b34d649cee298633b29049daf2898282174293b2534dc7a1bfccea5a06"
   },
   "apollo510|rtt|helia-aot": {
     "markers": {
@@ -1173,6 +1216,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1185,7 +1229,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "03f6af1e68c7bc5e6f80682ba62b6fff2bd492cd047093a03dbd607086c4a97c"
+    "sha256": "4f7be1cb7bbd79d75f5f472270c8890320245bdbace871da0f1ae6454c732ebc"
   },
   "apollo510|rtt|helia-aot|busy_loop": {
     "markers": {
@@ -1200,6 +1244,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1212,7 +1257,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "475baf2216f2ef824665d03233c145648ddea0b2de3d53ba1ef8d0f2aea2d111"
+    "sha256": "1dbc8a96c61edd9d7ff7ec5e5edf6d67407ba5d936c84bf981620494470f9953"
   },
   "apollo510|rtt|helia-aot|power": {
     "markers": {
@@ -1227,6 +1272,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -1254,6 +1300,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -1281,6 +1328,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1293,7 +1341,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "8f93e6e4212d07f432dd6f6b7dda9b2f2f8627ffb49ec26c24a6a61dc7d3bb13"
+    "sha256": "0b3b1c552c576acbcea40c01db34183a5db3b9e59a31427b7340ca6652d2ad2c"
   },
   "apollo510|rtt|helia-rt|busy_loop": {
     "markers": {
@@ -1308,6 +1356,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1320,7 +1369,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "3c0dddc5a9c023cd04938373284c5faaf6652acd5146a148731d8990ae04f118"
+    "sha256": "334c89bfd20b95b9e13458db3843fe636d856cb76d108c255354c554ca439651"
   },
   "apollo510|rtt|helia-rt|power": {
     "markers": {
@@ -1335,6 +1384,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -1362,6 +1412,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -1389,6 +1440,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1401,7 +1453,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "b5b2eecce6955c415aa5b9e7f6f159050c94f9aa18f8be1899d10205e5df994b"
+    "sha256": "5f39e622848892225b50fb92fe9d143b6aa8773370b216cd80a9a23128b309cd"
   },
   "apollo510|rtt|tflm|busy_loop": {
     "markers": {
@@ -1416,6 +1468,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": false,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1428,7 +1481,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "65b7dd64ea69f14d0450c72cccad9b19182e51416762bb9469419cb32246fb98"
+    "sha256": "683ded7c16f1eeff5285076ae1d67e729dab96bd6c23dbb81950f4c2086e9a62"
   },
   "apollo510|rtt|tflm|power": {
     "markers": {
@@ -1443,6 +1496,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -1470,6 +1524,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": false,
+      "est_ms_hardcoded_zero": true,
       "est_ms_measured": false,
       "extreme_mode": false,
       "gpio_sync": true,
@@ -1497,6 +1552,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1509,7 +1565,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "e12658557da5e58b3ffaa8106832c3ad26a4b84aac27f06c8107e76eadaf0735"
+    "sha256": "4e1944d12b63af1353ddc843278a641426a1747c1d91817fb8ea8fdec09b83c7"
   },
   "apollo510|swo|helia-aot": {
     "markers": {
@@ -1524,6 +1580,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1536,7 +1593,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "ffae296824b460c53bc4a24b537c7f14fb42258c3df260b75bb24ce91dc41a5c"
+    "sha256": "2bfa12f3b52d1af20ae9c386d87977110bc82750136a9ca7d6a5535c75ed7602"
   },
   "apollo510|swo|helia-rt": {
     "markers": {
@@ -1551,6 +1608,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1563,7 +1621,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "4ff26c0b36630a1631276a96dfb560b7a02f43090b48e2c3cf4e66185adea522"
+    "sha256": "3c3d86bb5146dd1f282ffca180526c22f28c19073394d027b136e2e37f9caaa2"
   },
   "apollo510|swo|tflm": {
     "markers": {
@@ -1578,6 +1636,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1590,7 +1649,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "19740bbb89f9b5a38591f460dbedc552e730f2c33ff3d85226128affb1527299"
+    "sha256": "8e1ae7b3d4db0e6b126eb893aaf6785c946541481c46ecbc057b98cc27f8f13b"
   },
   "apollo510|uart|executorch": {
     "markers": {
@@ -1605,6 +1664,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1617,7 +1677,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "5f7759a85125e30b4e2cc8b70cc29a828f1fb560cb949dc4fb9ad6d8d60eeb2a"
+    "sha256": "d7b99e6cef764dbf7d8bf033c84827f5cfec911361eda320279894198b0866ee"
   },
   "apollo510|uart|helia-aot": {
     "markers": {
@@ -1632,6 +1692,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1644,7 +1705,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "879a2806238799660764be7291580557d05579aaf08d9cc9d6bda6b94c49a04f"
+    "sha256": "be5deb96397f521929c0be81edad273890f1f0929cefa2bea1fbcfd4a8c34c49"
   },
   "apollo510|uart|helia-rt": {
     "markers": {
@@ -1659,6 +1720,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1671,7 +1733,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "ad022a316d9f113b347a1eabaca2bab983392f5b2abb2bb6e769cfacc194d737"
+    "sha256": "950bc112dd532704042972765c8bf85e92d8b9f1fed57af269ae0c01d6f2572b"
   },
   "apollo510|uart|tflm": {
     "markers": {
@@ -1686,6 +1748,7 @@
       "debug_uart": true,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1698,7 +1761,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "7ac1769ee22b925571be1ee5a4280e854c2522e1a1fd5eb062ba48ddb44a333b"
+    "sha256": "6a6ec16f68991938beba5a4c2e910309b2e98ca985e93223cd40d160ca8f9e42"
   },
   "apollo510|usb_cdc|executorch": {
     "markers": {
@@ -1713,6 +1776,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1725,7 +1789,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "188db49c45e7f1b8757009c1da23006a26fe36b4d3d0fab7ab4ea2836a1efaf1"
+    "sha256": "236b94a18783ecddc21e2de202e4626c6ad13ed80274881d0ca90d1e88f948e5"
   },
   "apollo510|usb_cdc|helia-aot": {
     "markers": {
@@ -1740,6 +1804,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1752,7 +1817,7 @@
       "stimer_window": true,
       "usb_timer": true
     },
-    "sha256": "5d39c024dba04b5564c178dcf71357b90f63d6379ea30806687b7e6e1be3570b"
+    "sha256": "4189c08f2d30cbd6e99cb4b6b67a4c1d3c7e429d191c227e4809436a492ac555"
   },
   "apollo510|usb_cdc|helia-rt": {
     "markers": {
@@ -1767,6 +1832,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1779,7 +1845,7 @@
       "stimer_window": true,
       "usb_timer": true
     },
-    "sha256": "5633423577d9c8d4133c6891144e07ca146fbfc9f977ca5631a9ca0e73e2f854"
+    "sha256": "20db9a2d6920a488a6b37d799b28ceb60c459230f41b07fa44f4c49b8e8f029c"
   },
   "apollo510|usb_cdc|tflm": {
     "markers": {
@@ -1794,6 +1860,7 @@
       "debug_uart": false,
       "dwt_init": true,
       "engine_wire_id": true,
+      "est_ms_hardcoded_zero": false,
       "est_ms_measured": true,
       "extreme_mode": true,
       "gpio_sync": true,
@@ -1806,6 +1873,6 @@
       "stimer_window": true,
       "usb_timer": true
     },
-    "sha256": "786f134cda73859aafb93c736947b01354a81a4064bc1381f913852505aec3d8"
+    "sha256": "6f99af7f1e951c8ba4ec1cb30f15e2beaa97e771105b8faa6207c8eb94aeff55"
   }
 }

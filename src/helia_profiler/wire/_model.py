@@ -71,33 +71,40 @@ HPX_ERROR_PREFIX = "HPX_ERROR="
 HPX_WARN_PREFIX = "HPX_WARN="
 
 
-#: The one statement of the ``est_ms`` gap, single-sourced because it is told
-#: in three places (the ``clean_window_begin`` spec note, the package
-#: docstring's gap list and the generated reference's). Since #164 the gap is
-#: no longer structural for any host listening to an *inference* window: the
-#: fixed+STIMER profile infer arm measures the same warm DWT reference the
-#: auto arm always has — the debug domain is gated only *inside* the window,
-#: so pre-window DWT is valid even where STIMER times the window itself —
-#: and announces a computed estimate. The hardcoded zeros that remain are
-#: stated below; the busy-loop estimate mismatch that remains is #170's.
+#: The one statement of the ``est_ms`` contract, single-sourced because it is
+#: told in three places (the ``clean_window_begin`` spec note, the package
+#: docstring's gap list and the generated reference's). #164 gave the
+#: fixed+STIMER profile infer arm the auto arm's pre-window DWT measurement
+#: (the debug domain is gated only *inside* the window, so pre-window DWT is
+#: valid even where STIMER times the window itself); #170 gave busy-loop
+#: windows the honest compile-time target and structurally excluded power
+#: renders from measuring at all.
 EST_MS_GAP = (
-    "The `clean_window_begin` heartbeat carries a hardcoded `est_ms=0` in "
-    "exactly two places. Dedicated power binaries: `hpx_printf` compiles to "
-    "a no-op there and the host times the capture from its planned duration, "
-    "so no listener exists for the announce (the only power image that is "
-    "ever compiled is the dedicated power target's, rendered with "
-    "`window_mode: fixed` pinned, so the minimal power image also takes no "
-    "pre-window DWT reads). And `clean_window_probe: busy_loop` windows with "
-    "`window_mode: fixed`: that window runs a calibrated busy loop sized to "
-    "`window_target_ms`, not `clean_iters` inferences, so no "
-    "inference-derived estimate describes it (in `window_mode: auto` a "
-    "busy-loop build still sends the auto arm's inference-derived estimate — "
-    "a pre-existing mismatch tracked in #170). Every profile build with the "
-    "default infer probe, in both window modes, measures a warm DWT "
-    "reference before the window and sends a real estimate; a runtime "
-    "`est_ms=0` can still appear if that measurement degrades (DWT frozen "
-    "through every warmup by a debugger-attach transient), and the host then "
-    "reads 0 as 'no estimate' and keeps its flat heartbeat timeout."
+    "Every profile build's `clean_window_begin` heartbeat carries a real "
+    "duration statement: infer windows announce a measured warm-inference "
+    "estimate (both window modes), and busy-loop windows announce "
+    "`window_target_ms` itself as a compile-time constant — the busy loop is "
+    "calibrated to fill exactly that, and the iteration count drives nothing "
+    "inside it (#170). The hardcoded `est_ms=0` survives only in dedicated "
+    "power binaries, where `hpx_printf` compiles to a no-op and the host "
+    "times the capture from its planned duration — no listener exists, and "
+    "the power arm is the template's first branch in both window modes, so "
+    "no power render measures anything pre-window. A runtime `est_ms=0` can "
+    "still appear on an infer window if the measurement degrades (DWT frozen "
+    "through every warmup by a debugger-attach transient); the host then "
+    "reads 0 as 'no estimate' and keeps its flat heartbeat timeout. "
+    "Byte-stream transports (RTT/SWO/UART, via collect_lines) hold an "
+    "announced budget as a floor on their inactivity deadline until it "
+    "expires; USB CDC raises its overall capture deadline instead, and its "
+    "300 s per-read line gap is not widened — a silent window longer than "
+    "that is cut short on USB CDC regardless of the announce. Both derive "
+    "the budget from window_budget_s, capped at WINDOW_BUDGET_CAP_S. A "
+    "busy-loop announce carries iters=1 — the window completes exactly one "
+    "busy pass, and on a lossy transport that drops HPX_CLEAN_INFER_COUNT "
+    "the iters fallback feeds the gate-duration check, which a planned "
+    "inference count the window never runs would fail as a duration "
+    "mismatch. (Per-inference energy is never derived for busy windows — "
+    "the summary omits it by probe.)"
 )
 
 

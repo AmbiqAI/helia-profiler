@@ -1,8 +1,8 @@
 """Shared transport utilities for heliaPROFILER data capture.
 
 Defines HPX protocol constants and the byte-stream line-collection loop
-shared by RTT and SWO transports.  USB CDC uses pyserial's ``readline()``
-and handles line collection internally.
+shared by the RTT, SWO, and UART transports.  USB CDC uses pyserial's
+``readline()`` and handles line collection internally.
 
 HPX Protocol
 ------------
@@ -106,21 +106,35 @@ WINDOW_BUDGET_SAFETY = 2.0
 #: Flat cushion (seconds) added on top of the scaled estimate.
 WINDOW_BUDGET_MARGIN_S = 15.0
 
+#: Ceiling on any single announce's budget.  The estimate is firmware
+#: arithmetic on a live cycle counter: one garbage reading (a CYCCNT
+#: re-zeroed between the two bracket reads wraps to a ~1.3e9-cycle delta,
+#: ~13.6 s/iteration at 96 MHz) times a large iteration count would
+#: otherwise convert 30 s hang detection into a multi-hour zombie wait,
+#: because both consumers only ever *raise* their deadlines from it.  An
+#: hour is far above any sane window and far below what garbage fabricates.
+#: Accepted residual: a window genuinely longer than ~30 min announces a
+#: budget the cap truncates, and the capture then needs
+#: target.heartbeat.host_timeout_s raised past the window length — the
+#: inactivity deadline is the one that trips (#170).
+WINDOW_BUDGET_CAP_S = 3600.0
+
 
 def window_budget_s(line: str) -> float | None:
     """Return the deadline budget (seconds) for a clean-window announce.
 
-    Parses a ``HPX_HEARTBEAT phase=clean_window_begin ... est_ms=<n>`` line and
-    returns ``est_ms / 1000 * WINDOW_BUDGET_SAFETY + WINDOW_BUDGET_MARGIN_S``.
+    Parses a ``HPX_HEARTBEAT phase=clean_window_begin ... est_ms=<n>`` line
+    and returns ``est_ms / 1000 * WINDOW_BUDGET_SAFETY +
+    WINDOW_BUDGET_MARGIN_S``, capped at :data:`WINDOW_BUDGET_CAP_S`.
 
     Returns ``None`` when *line* is not a clean-window announce or carries no
-    usable (> 0) estimate. Since #164 every inference-window profile build
-    measures a warm reference pre-window and announces a computed estimate in
-    both window modes, so a zero here means either a fixed-mode busy-loop
-    window (its duration tracks ``window_target_ms``, not the iteration
-    count) or a measurement that degraded at runtime (DWT frozen through
-    every warmup by a debugger-attach transient) — the caller then keeps its
-    normal heartbeat behaviour.
+    usable (> 0) estimate. Since #164/#170 every profile build announces a
+    real duration statement — a measured warm-inference estimate for infer
+    windows (both window modes), the compile-time ``window_target_ms`` for
+    busy-loop windows — so a zero here means a dedicated power binary's
+    announce (which no host ever reads) or a measurement that degraded at
+    runtime (DWT frozen through every warmup by a debugger-attach
+    transient); the caller then keeps its normal heartbeat behaviour.
     """
     if CLEAN_WINDOW_BEGIN_PHASE not in line:
         return None
@@ -134,11 +148,12 @@ def window_budget_s(line: str) -> float | None:
             break
     if est_ms is None or est_ms <= 0:
         return None
-    return est_ms / 1000.0 * WINDOW_BUDGET_SAFETY + WINDOW_BUDGET_MARGIN_S
+    budget = est_ms / 1000.0 * WINDOW_BUDGET_SAFETY + WINDOW_BUDGET_MARGIN_S
+    return min(budget, WINDOW_BUDGET_CAP_S)
 
 
 # ---------------------------------------------------------------------------
-# Shared line-collection loop (byte-stream transports: RTT, SWO)
+# Shared line-collection loop (byte-stream transports: RTT, SWO, UART)
 # ---------------------------------------------------------------------------
 
 
@@ -183,6 +198,15 @@ def collect_lines(
         start + overall_timeout_s if overall_timeout_s is not None else None
     )
     hb_deadline = start + heartbeat_timeout_s
+    # A clean-window announce's budget is a FLOOR on the inactivity deadline
+    # until it expires, not a one-shot raise: the per-line reset below used
+    # to discard it on the very next received line, which for a busy-loop
+    # window is the in-window HPX_CLEAN_WINDOW_PROBE print — the widened
+    # deadline evaporated and the silent window was reported as a hang
+    # (#170).  Held across iterations and re-applied on every reset; once
+    # wall-clock passes it, it stops mattering on its own.
+    window_deadline: float | None = None
+    last_data_ts = start
     seen_start = False
 
     while True:
@@ -199,7 +223,10 @@ def collect_lines(
 
         if data:
             buf += data
-            hb_deadline = time.monotonic() + heartbeat_timeout_s
+            last_data_ts = time.monotonic()
+            hb_deadline = last_data_ts + heartbeat_timeout_s
+            if window_deadline is not None and window_deadline > hb_deadline:
+                hb_deadline = window_deadline
 
             # Extract complete newline-delimited lines from the buffer
             while b"\n" in buf:
@@ -241,6 +268,12 @@ def collect_lines(
                     log.info("%s heartbeat: %s", transport_name, line)
                     budget = window_budget_s(line)
                     if budget is not None:
+                        # One announce per capture (every render emits exactly
+                        # one clean_window_begin printf). A later one — none
+                        # exists today — would supersede the held FLOOR from
+                        # the next received byte onward; hb_deadline itself is
+                        # only ever raised, so a deadline already widened by
+                        # an earlier announce stands until data next arrives.
                         window_deadline = line_ts + budget
                         if window_deadline > hb_deadline:
                             hb_deadline = window_deadline
@@ -265,12 +298,17 @@ def collect_lines(
                     return lines
         else:
             if time.monotonic() > hb_deadline:
+                # Report the REAL silence, not the configured timeout: with a
+                # held window budget the two differ by up to the whole budget
+                # (#170), and "no data for 30s" after a 3-minute wait sent
+                # readers down the wrong path.
+                silent_s = time.monotonic() - last_data_ts
                 if seen_start:
                     log.warning(
                         "%s: no data for %.0fs after HPX_START (%d lines) — "
                         "firmware may be hung or HPX_END was lost",
                         transport_name,
-                        heartbeat_timeout_s,
+                        silent_s,
                         len(lines),
                     )
                 else:
@@ -278,7 +316,7 @@ def collect_lines(
                         "%s: no data for %.0fs — firmware may not be running "
                         "(check reset / transport / heartbeat config)",
                         transport_name,
-                        heartbeat_timeout_s,
+                        silent_s,
                     )
                 return lines
             time.sleep(poll_interval_s)
