@@ -315,12 +315,19 @@ sum, so `text + data + bss + reserved` reconciles against it.
     `run_summary_schema_version` difference rather than silently as a memory
     improvement. Re-record affected baselines.
 
-!!! warning "armclang reports the old shape"
-    The section-header probe runs for the GCC and ATfE toolchains. armclang
-    binaries are measured with `fromelf`, which is not yet split the same way,
-    so an armclang build still folds the reservation into `bss`. Comparing an
-    armclang run against a GCC run of the same source will show a large `bss`
-    difference that is entirely an artifact of the measuring tool.
+!!! note "armclang reports the same split"
+    armclang binaries are measured with `fromelf` rather than `size`, and
+    before HPX 0.1.7 that path had no per-section detail — an armclang build
+    folded the linker's heap reservation into `bss`, so comparing it against
+    a GCC run of the same source showed a large `bss` difference that was
+    entirely an artifact of the measuring tool. `fromelf`'s per-section
+    listing is now read the same way the section headers are on the GCC/ATfE
+    path: armlink's `ARM_LIB_HEAP` region (`SHT_NOBITS` + `SHF_ALLOC`) moves
+    to `reserved`, while `ARM_LIB_STACK` stays in `bss` — like `.stack` on
+    GCC, it is the live stack, not a reservation. If the per-section output
+    is unavailable or unparseable (for example, an older `fromelf`), the run
+    degrades to the unadjusted totals — `reserved` reads 0 and `bss` again
+    includes any reservation — rather than failing.
 
 ## Terminal summary
 

@@ -322,7 +322,12 @@ def _resolve_project_overrides(
                 ),
             )
         project_overrides[spec.project] = (mode, value)
-    for project in {spec.project for spec in module_specs}:
+    # sorted(): this insertion order reaches yaml.safe_dump(sort_keys=False)
+    # and becomes nsx.yml's module_registry block order — bare set iteration
+    # made the rendered file (and the workspace manifest hash computed from
+    # it) vary with PYTHONHASHSEED across processes (#174, demonstrated
+    # across seeds by two independent #173 review lenses).
+    for project in sorted({spec.project for spec in module_specs}):
         if project in project_overrides:
             continue
         if any(qualified.name == project for qualified in baseline.projects):

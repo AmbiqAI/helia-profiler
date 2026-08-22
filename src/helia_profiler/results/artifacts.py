@@ -118,7 +118,6 @@ class OnDevicePowerSummary:
     overflow: bool
     charge_nc: int | None = None
     bus_voltage_uv: int | None = None
-    sample_count: int | None = None
     calibration_id: str | None = None
 
     def __post_init__(self) -> None:
@@ -132,7 +131,6 @@ class OnDevicePowerSummary:
             self.inference_count,
             self.charge_nc,
             self.bus_voltage_uv,
-            self.sample_count,
         )
         if any(value is not None and value < 0 for value in values):
             raise ValueError("On-device power values must be non-negative.")

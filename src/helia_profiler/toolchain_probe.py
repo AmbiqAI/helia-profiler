@@ -134,8 +134,30 @@ def _sections_via_size(
     )
 
 
+#: Legacy ``Grand Totals: <code> <ro> <rw> <zi>`` line, label first. No
+#: shipping fromelf has been observed to emit this shape -- Arm Compiler
+#: 6.23's table puts the numbers BEFORE the row label -- but it is kept as
+#: the last-resort fallback so an unrecognised variant degrades to the old
+#: behaviour instead of reporting nothing (#132).
 _FROMELF_TOTALS_RE = re.compile(r"\s*Grand Totals?\s*[:\s]+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)")
 
+#: Column header of ``fromelf --text -z``'s "Object/Image Component Sizes"
+#: table. Rows are only trusted after this header has been seen.
+_FROMELF_SIZES_HEADER_RE = re.compile(
+    r"^\s*Code \(inc\. data\)\s+RO Data\s+RW Data\s+ZI Data\s+Debug\s+Object Name"
+)
+
+#: A data row of that table: six integers then the object name. Captured
+#: from a real Arm Compiler for Embedded 6.23 ``fromelf``::
+#:
+#:       Code (inc. data)   RO Data    RW Data    ZI Data      Debug   Object Name
+#:        288         16         32          4     396272        652   fw.axf
+#:        288         16         32          4          0          0   ROM Totals for fw.axf
+#:
+#: ``(inc. data)`` is an informational subset of Code, not an addend.
+_FROMELF_SIZES_ROW_RE = re.compile(
+    r"^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S.*?)\s*$"
+)
 
 
 #: Section-name tokens treated as linker reservations rather than program
@@ -155,6 +177,25 @@ _FROMELF_TOTALS_RE = re.compile(r"\s*Grand Totals?\s*[:\s]+(\d+)\s+(\d+)\s+(\d+)
 #: bounded area. Its size states what was left over, not what is needed, so
 #: counting it as footprint tells the reader nothing useful about the build.
 _RESERVED_NOBITS_NAMES = frozenset({"heap"})
+
+
+def _is_reserved_section_name(name: str) -> bool:
+    """True when a section NAME marks a linker reservation.
+
+    Matches any dot- or underscore-separated token, not just the first: a
+    region-qualified name like ``.ram_heap`` or ``.tcm_heap`` stems to
+    "ram"/"tcm" under first-token-only matching and was silently missed --
+    proven by review on a real ELF (#24). Case-insensitive because armlink's
+    execution-region sections are conventionally upper-case (``ARM_LIB_HEAP``
+    in NSX's own scatter files) where GNU linker scripts use ``.heap``.
+
+    Only meaningful for sections already known to be NOBITS and allocated --
+    the name alone is not evidence. Note ``ARM_LIB_STACK`` does NOT match,
+    for the same reason ``.stack`` does not: it is the live stack (armlink
+    points the initial SP at its top), so it belongs in the footprint.
+    """
+    tokens = set(name.lower().lstrip(".").replace("_", ".").split("."))
+    return bool(tokens & _RESERVED_NOBITS_NAMES)
 
 #: ``readelf -S -W`` row: ``[Nr] Name Type Addr Off Size ES Flg ...`` with the
 #: numeric columns in hex. The name is anchored to a leading dot so the empty
@@ -213,18 +254,135 @@ def _reserved_via_readelf(
         seen_section = True
         if sec_type != "NOBITS" or "A" not in flags:
             continue
-        # Any dot- or underscore-separated token, not just the first. A
-        # region-qualified name like `.ram_heap` or `.tcm_heap` stems to
-        # "ram"/"tcm" under first-token-only matching and was silently missed
-        # -- proven by review on a real ELF. Over-matching is cheap here
-        # because the type and alloc filters above already excluded
-        # everything that is not in `size`'s bss column.
-        tokens = set(name.lstrip(".").replace("_", ".").split("."))
-        if tokens & _RESERVED_NOBITS_NAMES:
+        # Over-matching on the name is cheap here because the type and alloc
+        # filters above already excluded everything that is not in `size`'s
+        # bss column.
+        if _is_reserved_section_name(name):
             reserved += int(size_hex, 16)
     if not seen_section:
         return None
     return reserved
+
+
+#: ``fromelf --text -v`` prints one block per section::
+#:
+#:     ** Section #4
+#:
+#:         Name        : ARM_LIB_HEAP
+#:         Type        : SHT_NOBITS (0x00000008)
+#:         Flags       : SHF_ALLOC + SHF_WRITE (0x00000003)
+#:         ...
+#:         Size        : 391928 bytes (0x5faf8)
+_FROMELF_SECTION_START_RE = re.compile(r"^\*\* Section #\d+")
+_FROMELF_SECTION_FIELD_RE = re.compile(r"^\s*(Name|Type|Flags|Size)\s*:\s*(.+?)\s*$")
+_FROMELF_SIZE_BYTES_RE = re.compile(r"^(\d+) bytes")
+
+
+def _reserved_via_fromelf(
+    binary_path: Path,
+    *,
+    timeout_s: int,
+) -> int | None:
+    """Bytes of linker-reserved NOBITS regions, from ``fromelf --text -v``.
+
+    The armclang counterpart of :func:`_reserved_via_readelf` (#132, closing
+    the gap #131 left): the verbose listing reports each section's Name, Type
+    and Flags, so armlink's ``ARM_LIB_HEAP`` reservation -- ``SHT_NOBITS`` +
+    ``SHF_ALLOC``, exactly what ``fromelf -z`` folds into ``ZI Data`` -- can
+    be separated from real zero-initialized state the same way readelf
+    separates ``.heap``. ``ARM_LIB_STACK`` is deliberately NOT a reservation;
+    see :func:`_is_reserved_section_name`.
+
+    Returns ``None`` when the tool is unavailable or no section block parses,
+    so the caller keeps the unadjusted totals rather than inventing an
+    adjustment -- the same degradation contract as the readelf probe.
+    """
+    try:
+        result = subprocess.run(
+            ["fromelf", "--text", "-v", str(binary_path)],
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+        log.debug("fromelf section probe failed: %s", exc)
+        return None
+    if result.returncode != 0:
+        log.debug("fromelf -v failed: %s", (result.stderr or "").strip())
+        return None
+
+    reserved = 0
+    seen_section = False
+    block: dict[str, str] | None = None
+
+    def _consume(fields: dict[str, str] | None) -> int:
+        if fields is None:
+            return 0
+        name = fields.get("Name")
+        if name is None or not _is_reserved_section_name(name):
+            return 0
+        if not fields.get("Type", "").startswith("SHT_NOBITS"):
+            return 0
+        if "SHF_ALLOC" not in fields.get("Flags", ""):
+            return 0
+        size_match = _FROMELF_SIZE_BYTES_RE.match(fields.get("Size", ""))
+        return int(size_match.group(1)) if size_match else 0
+
+    for line in (result.stdout or "").splitlines():
+        if _FROMELF_SECTION_START_RE.match(line):
+            reserved += _consume(block)
+            block = {}
+            seen_section = True
+            continue
+        if block is None:
+            continue
+        match = _FROMELF_SECTION_FIELD_RE.match(line)
+        if match is not None:
+            # First occurrence wins: embedded text (the `.comment` section
+            # echoes the armlink command line) must not overwrite the real
+            # header fields.
+            block.setdefault(match.group(1), match.group(2))
+    reserved += _consume(block)
+    if not seen_section:
+        return None
+    return reserved
+
+
+def _fromelf_totals(stdout: str) -> tuple[int, int, int, int] | None:
+    """``(code, ro_data, rw_data, zi_data)`` from ``fromelf --text -z``.
+
+    Real Arm Compiler 6.23 output is the "Object/Image Component Sizes"
+    table whose first data row is the image itself (a ``ROM Totals`` row
+    follows it with ZI zeroed -- never that one). A ``Grand Totals`` row is
+    preferred when present. The legacy label-first ``Grand Totals:`` line is
+    kept as a final fallback for unrecognised variants.
+    """
+    in_table = False
+    image_row: tuple[int, int, int, int] | None = None
+    for line in stdout.splitlines():
+        if _FROMELF_SIZES_HEADER_RE.match(line):
+            in_table = True
+            continue
+        if not in_table:
+            continue
+        m = _FROMELF_SIZES_ROW_RE.match(line)
+        if m is None:
+            continue
+        row = (int(m.group(1)), int(m.group(3)), int(m.group(4)), int(m.group(5)))
+        name = m.group(7)
+        if name.startswith("Grand Totals"):
+            return row
+        if "Totals" in name:
+            continue
+        if image_row is None:
+            image_row = row
+    if image_row is not None:
+        return image_row
+    for line in stdout.splitlines():
+        m = _FROMELF_TOTALS_RE.match(line)
+        if m:
+            return (int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)))
+    return None
 
 
 def _sections_via_fromelf(
@@ -232,11 +390,16 @@ def _sections_via_fromelf(
     *,
     timeout_s: int,
 ) -> BinarySections | None:
-    """Parse ``fromelf --text -z`` output for armclang/ATfE binaries.
+    """Parse ``fromelf`` output for armclang binaries.
 
-    The ``Grand Totals`` line reports ``Code RO_Data RW_Data ZI_Data``
-    which we collapse to ``(text=Code+RO, data=RW, bss=ZI)`` to match
-    the GCC ``size`` shape.
+    ``fromelf --text -z`` reports ``Code RO_Data RW_Data ZI_Data`` which we
+    collapse to ``(text=Code+RO, data=RW, bss=ZI)`` to match the GCC ``size``
+    shape. ``ZI Data`` folds armlink's ``ARM_LIB_HEAP`` reservation into the
+    same figure -- the armclang face of issue #24 -- so a second probe reads
+    the per-section detail (``fromelf --text -v``) and moves linker
+    reservations to ``reserved``, mirroring #131's size/readelf split. If
+    the per-section output is unavailable or unparseable, the totals are
+    reported unadjusted (#132's documented degradation) rather than failing.
     """
     try:
         result = subprocess.run(
@@ -251,24 +414,41 @@ def _sections_via_fromelf(
     if result.returncode != 0:
         log.debug("fromelf failed: %s", (result.stderr or "").strip())
         return None
-    for line in (result.stdout or "").splitlines():
-        m = _FROMELF_TOTALS_RE.match(line)
-        if m:
-            code, ro_data, rw_data, zi_data = (int(m.group(i)) for i in range(1, 5))
-            text = code + ro_data
-            data = rw_data
-            bss = zi_data
-            total = text + data + bss
-            log.info(
-                "Binary sections (fromelf): text=%d data=%d bss=%d total=%d",
-                text,
-                data,
+    totals = _fromelf_totals(result.stdout or "")
+    if totals is None:
+        log.debug("Could not find component sizes or Grand Totals in fromelf output")
+        return None
+    code, ro_data, rw_data, zi_data = totals
+    text = code + ro_data
+    data = rw_data
+    bss = zi_data
+    total = text + data + bss
+    log.info(
+        "Binary sections (fromelf): text=%d data=%d bss=%d total=%d",
+        text,
+        data,
+        bss,
+        total,
+    )
+    reserved = _reserved_via_fromelf(binary_path, timeout_s=timeout_s)
+    if reserved is None or reserved > bss:
+        # Same discipline as the size/readelf path: report exactly what the
+        # tool said rather than guess when the section detail is missing or
+        # does not add up.
+        if reserved is not None and reserved > bss:
+            log.debug(
+                "reserved sections (%d B) exceed bss (%d B); not adjusting",
+                reserved,
                 bss,
-                total,
             )
-            return BinarySections(text=text, data=data, bss=bss, total=total)
-    log.debug("Could not find Grand Totals in fromelf output")
-    return None
+        return BinarySections(text=text, data=data, bss=bss, total=total)
+    return BinarySections(
+        text=text,
+        data=data,
+        bss=bss - reserved,
+        total=total,
+        reserved=reserved,
+    )
 
 
 def binary_sections(

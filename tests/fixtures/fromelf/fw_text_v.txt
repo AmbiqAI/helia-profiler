@@ -1,0 +1,255 @@
+
+========================================================================
+
+** ELF Header Information
+
+    File Name: fw.axf
+
+    Machine class: ELFCLASS32 (32-bit)
+    Data encoding: ELFDATA2LSB (Little endian)
+    Header version: EV_CURRENT (Current version)
+    Operating System ABI: none
+    ABI Version: 0
+    File Type: ET_EXEC (Executable) (2)
+    Machine: EM_ARM (ARM)
+
+    Image Entry point: 0x000000ed
+    Flags: EF_ARM_HASENTRY (0x05000002)
+
+    ARM ELF revision: 5 (ABI version 2)
+
+    Conforms to Base float procedure-call standard
+
+    Built with
+    Component: Arm Compiler for Embedded 6.23 Tool: armlink [5f102400]
+
+    Header size: 52 bytes (0x34)
+    Program header entry size: 32 bytes (0x20)
+    Section header entry size: 40 bytes (0x28)
+
+    Program header entries: 1
+    Section header entries: 12
+
+    Program header offset: 8228 (0x00002024)
+    Section header offset: 8260 (0x00002044)
+
+    Section header string table index: 11
+
+========================================================================
+
+** Program header #0
+
+    Type          : PT_LOAD (1)
+    File Offset   : 52 (0x34)
+    Virtual Addr  : 0x00000000
+    Physical Addr : 0x00000000
+    Size in file  : 324 bytes (0x144)
+    Size in memory: 396596 bytes (0x60d34)
+    Flags         : PF_X + PF_W + PF_R + PF_ARM_ENTRY (0x80000007)
+    Alignment     : 4
+
+
+========================================================================
+
+** Section #1
+
+    Name        : ER_RO
+    Type        : SHT_PROGBITS (0x00000001)
+    Flags       : SHF_ALLOC + SHF_EXECINSTR (0x00000006)
+    Addr        : 0x00000000
+    File Offset : 52 (0x34)
+    Size        : 320 bytes (0x140)
+    Link        : SHN_UNDEF
+    Info        : 0
+    Alignment   : 4
+    Entry Size  : 0
+
+
+====================================
+
+** Section #2
+
+    Name        : ER_RW
+    Type        : SHT_PROGBITS (0x00000001)
+    Flags       : SHF_ALLOC + SHF_WRITE (0x00000003)
+    Addr        : 0x20000000
+    File Offset : 372 (0x174)
+    Size        : 4 bytes (0x4)
+    Link        : SHN_UNDEF
+    Info        : 0
+    Alignment   : 4
+    Entry Size  : 0
+
+
+====================================
+
+** Section #3
+
+    Name        : ER_ZI
+    Type        : SHT_NOBITS (0x00000008)
+    Flags       : SHF_ALLOC + SHF_WRITE (0x00000003)
+    Addr        : 0x20000004
+    File Offset : 376 (0x178)
+    Size        : 248 bytes (0xf8)
+    Link        : SHN_UNDEF
+    Info        : 0
+    Alignment   : 1
+    Entry Size  : 0
+
+
+====================================
+
+** Section #4
+
+    Name        : ARM_LIB_HEAP
+    Type        : SHT_NOBITS (0x00000008)
+    Flags       : SHF_ALLOC + SHF_WRITE (0x00000003)
+    Addr        : 0x200000fc
+    File Offset : 376 (0x178)
+    Size        : 391928 bytes (0x5faf8)
+    Link        : SHN_UNDEF
+    Info        : 0
+    Alignment   : 1
+    Entry Size  : 0
+
+
+====================================
+
+** Section #5
+
+    Name        : ARM_LIB_STACK
+    Type        : SHT_NOBITS (0x00000008)
+    Flags       : SHF_ALLOC + SHF_WRITE (0x00000003)
+    Addr        : 0x2005fbf4
+    File Offset : 376 (0x178)
+    Size        : 4096 bytes (0x1000)
+    Link        : SHN_UNDEF
+    Info        : 0
+    Alignment   : 1
+    Entry Size  : 0
+
+
+====================================
+
+** Section #6
+
+    Name        : .debug_frame
+    Type        : SHT_PROGBITS (0x00000001)
+    Flags       : None (0x00000000)
+    Addr        : 0x00000000
+    File Offset : 376 (0x178)
+    Size        : 652 bytes (0x28c)
+    Link        : SHN_UNDEF
+    Info        : 0
+    Alignment   : 1
+    Entry Size  : 0
+
+
+====================================
+
+** Section #7
+
+    Name        : .symtab
+    Type        : SHT_SYMTAB (0x00000002)
+    Flags       : None (0x00000000)
+    Addr        : 0x00000000
+    File Offset : 1028 (0x404)
+    Size        : 3056 bytes (0xbf0)
+    Link        : Section 8 (.strtab)
+    Info        : Last local symbol no = 125
+    Alignment   : 4
+    Entry Size  : 16
+
+
+====================================
+
+** Section #8
+
+    Name        : .strtab
+    Type        : SHT_STRTAB (0x00000003)
+    Flags       : None (0x00000000)
+    Addr        : 0x00000000
+    File Offset : 4084 (0xff4)
+    Size        : 3408 bytes (0xd50)
+    Link        : SHN_UNDEF
+    Info        : 0
+    Alignment   : 1
+    Entry Size  : 0
+
+
+====================================
+
+** Section #9
+
+    Name        : .note
+    Type        : SHT_NOTE (0x00000007)
+    Flags       : None (0x00000000)
+    Addr        : 0x00000000
+    File Offset : 7492 (0x1d44)
+    Size        : 36 bytes (0x24)
+    Link        : SHN_UNDEF
+    Info        : 0
+    Alignment   : 4
+    Entry Size  : 0
+
+        Section     Segment
+    ====================================
+
+              1           0
+              2           0
+              3           0
+              4           0
+              5           0
+
+====================================
+
+** Section #10
+
+    Name        : .comment
+    Type        : SHT_PROGBITS (0x00000001)
+    Flags       : None (0x00000000)
+    Addr        : 0x00000000
+    File Offset : 7528 (0x1d68)
+    Size        : 600 bytes (0x258)
+    Link        : SHN_UNDEF
+    Info        : 0
+    Alignment   : 1
+    Entry Size  : 0
+
+    Component: Arm Compiler for Embedded 6.23 Tool: armlink [5f102400]
+    armlink --output=fw.axf --scatter=scatter.scat --entry=main
+
+    /home/adamp/ACfE/bin/../lib/armlib/c_wu.l
+    /home/adamp/ACfE/bin/../lib/armlib/fz_wv.l
+    /home/adamp/ACfE/bin/../lib/armlib/h_wu.l
+    /home/adamp/ACfE/bin/../lib/libcxx/libcpp-experimental_wnu.l
+    /home/adamp/ACfE/bin/../lib/libcxx/libcpp_wnu.l
+    /home/adamp/ACfE/bin/../lib/libcxx/libcppabi_wnu.l
+    /home/adamp/ACfE/bin/../lib/armlib/m_wv.l
+    /home/adamp/ACfE/bin/../lib/armlib/vfpsupport.l
+    Input Comments:
+    
+    main.o
+    
+    
+    Component: Arm Compiler for Embedded 6.23 Tool: armclang [5f103000]
+    
+
+====================================
+
+** Section #11
+
+    Name        : .shstrtab
+    Type        : SHT_STRTAB (0x00000003)
+    Flags       : None (0x00000000)
+    Addr        : 0x00000000
+    File Offset : 8128 (0x1fc0)
+    Size        : 100 bytes (0x64)
+    Link        : SHN_UNDEF
+    Info        : 0
+    Alignment   : 1
+    Entry Size  : 0
+
+
+====================================
+

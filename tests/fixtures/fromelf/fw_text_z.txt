@@ -1,0 +1,9 @@
+
+========================================================================
+
+** Object/Image Component Sizes
+
+      Code (inc. data)   RO Data    RW Data    ZI Data      Debug   Object Name
+
+       288         16         32          4     396272        652   fw.axf
+       288         16         32          4          0          0   ROM Totals for fw.axf

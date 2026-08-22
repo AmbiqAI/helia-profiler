@@ -120,7 +120,6 @@ def test_parse_on_device_power_measurement_envelope() -> None:
             HPX_POWER_MEASUREMENT_OVERFLOW="0",
             HPX_POWER_CHARGE_NC="50000000",
             HPX_POWER_BUS_VOLTAGE_UV="1800000",
-            HPX_POWER_SAMPLE_COUNT="1000",
             HPX_POWER_CALIBRATION_ID="board-rev-a",
         )
     )
@@ -135,7 +134,6 @@ def test_parse_on_device_power_measurement_envelope() -> None:
     assert envelope.measurement.overflow is False
     assert envelope.measurement.charge_nc == 50000000
     assert envelope.measurement.bus_voltage_uv == 1800000
-    assert envelope.measurement.sample_count == 1000
     assert envelope.measurement.calibration_id == "board-rev-a"
 
 
@@ -181,6 +179,10 @@ def test_parse_rejects_partial_or_invalid_measurement(overrides: dict[str, str])
             "Error power terminal status",
         ),
         (_lines(HPX_POWER_FINAL_PHASE=""), "final phase must not be empty"),
+        # HPX_POWER_SAMPLE_COUNT was retired by #165 (host-accepted, never
+        # emitted); an envelope carrying it is unknown like any other
+        # unregistered key.
+        (_lines(HPX_POWER_SAMPLE_COUNT="1000"), "unknown fields"),
         (
             [
                 "--- HPX_POWER_TERMINAL_START ---",
