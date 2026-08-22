@@ -67,6 +67,17 @@ class CaptureError(HpxError):
     """Data capture failure — serial timeout, corrupt data, SWO framing."""
 
 
+class DeterministicCaptureError(CaptureError):
+    """A capture-path refusal no retry or power cycle can change.
+
+    Subclass of :class:`CaptureError` so existing ``except CaptureError``
+    handlers still catch it, but recovery paths that would otherwise cycle the
+    target rail and retry (``stages.flash_power``) re-raise it instead: these
+    are configuration/artifact gaps — a missing image, an unknown load
+    address — and cycling the rail only frames them as flaky hardware.
+    """
+
+
 class NetworkError(BuildError):
     """Transient network failure during sync/lock (git fetch, module download).
 

@@ -659,6 +659,28 @@ def test_load_config_profiling_value_error_wrapped_as_config_error():
         load_config(None, cli)
 
 
+def test_extreme_mode_and_force_shared_sram_are_mutually_exclusive():
+    """The two SSRAM levers pull opposite directions (#161): extreme mode
+    powers the shared array down, force_shared_sram forces it on, and the
+    firmware partials each assume the other is absent — template include
+    order used to decide the winner silently. Reject the pair at config."""
+    cli = {
+        "model": {"path": "m.tflite"},
+        "engine": {"type": "helia-rt"},
+        "profiling": {"extreme_mode": True, "force_shared_sram": True},
+    }
+    with pytest.raises(ConfigError, match="mutually exclusive"):
+        load_config(None, cli)
+    # Each lever alone stays valid.
+    for lever in ("extreme_mode", "force_shared_sram"):
+        cli_one = {
+            "model": {"path": "m.tflite"},
+            "engine": {"type": "helia-rt"},
+            "profiling": {lever: True},
+        }
+        load_config(None, cli_one)
+
+
 # ---------------------------------------------------------------------------
 # Output format restrictions (FIX 5)
 # ---------------------------------------------------------------------------

@@ -471,6 +471,14 @@ class ProfilingConfig:
             )
         if self.window_target_ms < 1:
             raise ValueError(f"window_target_ms must be >= 1, got {self.window_target_ms}.")
+        if self.extreme_mode and self.force_shared_sram:
+            raise ValueError(
+                "profiling.extreme_mode and profiling.force_shared_sram are "
+                "mutually exclusive: extreme mode powers the shared SSRAM "
+                "array down while force_shared_sram forces it on. The "
+                "firmware partials each assume the other lever is absent, "
+                "and template include order silently decided the winner."
+            )
         return self
 
 

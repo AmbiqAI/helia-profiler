@@ -50,10 +50,23 @@ would reject models that may run.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
 from ._tflite_reader import TENSOR_TYPE_UINT8, read_quantized_softmax_ops
+
+# helia-aot is an optional extra (same guard shape as model_analysis): the
+# verdict itself must stay pure arithmetic -- a preflight that needs the AOT
+# compiler installed to predict the AOT compiler is no preflight -- but where
+# the package IS present, constants that mirror its internals are read live
+# so a version bump moves them here instead of silently diverging (#147).
+try:
+    from helia_aot.air.options import (  # type: ignore[import-untyped]
+        AirSoftmaxOptions as _AirSoftmaxOptions,
+    )
+except ImportError:
+    _AirSoftmaxOptions = None
 
 #: ``kScaledDiffIntegerBits`` in TFLM's softmax_common.cc. The multiplier is
 #: scaled by ``2**(31 - this)``; 5 integer bits leaves 2**26.
@@ -78,8 +91,21 @@ _MULTIPLIER_SHIFT = 31 - TFLM_SOFTMAX_INTEGER_BITS
 #:
 #: The first version of this gate errored on everything below 0.5, which
 #: blocked the sub-flush band that helia-aot compiles fine -- the same
-#: over-blocking mistake as gating heliaAOT at all, one dimension over. Both
-#: bounds are properties of the PINNED helia-aot; revisit on a version bump.
+#: over-blocking mistake as gating heliaAOT at all, one dimension over.
+#:
+#: One refinement on top of the table: ``quantize_multiplier`` ROUNDS the
+#: frexp fraction to Q31 (round half up) and promotes the exponent when the
+#: fraction rounds to 1.0 -- BEFORE the flush check. So the band is exact for
+#: the ROUNDED multiplier, and off by one rounding step at each raw edge:
+#: [0.5 - 2**-33, 0.5) rounds up to 0.5 and compiles, while
+#: [2**-32 * (1 - 2**-32), 2**-32) rounds up to 2**-32 and raises.
+#: :func:`_aot_q31_rounded_multiplier` applies that rounding so the constants
+#: below delimit the observable band exactly (found by the #147 sweep).
+#:
+#: All of this mirrors the PINNED helia-aot's internals by hand. The tripwire
+#: sweep in tests/test_softmax_preflight.py drives the REAL
+#: ``preprocess_softmax_scaling`` / ``calculate_input_radius`` across every
+#: edge and fails CI's analysis-tests job if a version bump moves any of it.
 AOT_COMPILER_MIN_MULTIPLIER = 0.5
 AOT_FLUSH_TO_ZERO_MULTIPLIER = 2.0**-32
 
@@ -90,8 +116,33 @@ AOT_FLUSH_TO_ZERO_MULTIPLIER = 2.0**-32
 #: the kernel as 0.0. helia-aot's ``SoftmaxOptions`` is a pydantic model whose
 #: field default is 1.0. Applying TFLM's convention to an AOT verdict is how
 #: this gate came to claim a crash that could not happen.
+#:
+#: AOT_ABSENT_BETA is read LIVE from the installed helia-aot's pydantic field
+#: default whenever the optional extra is present, so a version bump that
+#: changes the default changes this constant with it; 1.0 is the fallback for
+#: installs without the extra, pinned by test_softmax_preflight (#147).
 TFLM_ABSENT_BETA = 0.0
-AOT_ABSENT_BETA = 1.0
+AOT_ABSENT_BETA = 1.0 if _AirSoftmaxOptions is None else float(_AirSoftmaxOptions().beta)
+
+
+def _aot_q31_rounded_multiplier(multiplier: float) -> float:
+    """The multiplier as helia-aot's ``quantize_multiplier`` actually sees it.
+
+    Mirrors, expression for expression, the rounding at the top of the pinned
+    ``helia_aot.air.utils.quantize_multiplier``: the frexp fraction becomes a
+    Q31 integer via ``floor(fraction * 2**31 + 0.5)`` (round HALF UP, not
+    banker's), and a fraction that rounds to 1.0 is promoted one exponent --
+    both before the sub-``2**-32`` flush check. Applying the band constants to
+    this rounded value instead of the raw one is what makes them exact at the
+    edges. Caller guarantees a finite argument (frexp of an infinity would
+    overflow the floor).
+    """
+    fraction, exponent = math.frexp(multiplier)
+    quantized = math.floor(fraction * (1 << 31) + 0.5)
+    if quantized == (1 << 31):
+        quantized //= 2
+        exponent += 1
+    return math.ldexp(quantized, exponent - 31)
 
 
 def aot_softmax_verdict(multiplier: float) -> str:
@@ -109,7 +160,12 @@ def aot_softmax_verdict(multiplier: float) -> str:
     """
     if multiplier != multiplier:  # NaN
         return "error"
-    if AOT_FLUSH_TO_ZERO_MULTIPLIER <= multiplier < AOT_COMPILER_MIN_MULTIPLIER:
+    if (
+        math.isfinite(multiplier)
+        and AOT_FLUSH_TO_ZERO_MULTIPLIER
+        <= _aot_q31_rounded_multiplier(multiplier)
+        < AOT_COMPILER_MIN_MULTIPLIER
+    ):
         return "error"
     if multiplier <= 1.0:
         return "warn"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -71,10 +72,26 @@ def test_no_engine_adapter_imports_out_of_another_engines_package() -> None:
 
 def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parent.parent
+    # Build from a staged copy, never from the real checkout: with
+    # cwd=repo_root, setuptools rewrites build/lib/** inside the working tree
+    # on every run — gitignored, so invisible, and a stale copy of the package
+    # can shadow imports (issue #151).  The version is static in pyproject.toml
+    # (no SCM-derived versioning), so no git metadata needs staging; the build
+    # reads pyproject.toml, the readme, the top-level license files, and src/
+    # (which holds the third pyproject-listed license, the vendored SEGGER one).
+    staged = tmp_path / "staged"
+    staged.mkdir()
+    for name in ("pyproject.toml", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md"):
+        shutil.copy2(repo_root / name, staged / name)
+    shutil.copytree(
+        repo_root / "src",
+        staged / "src",
+        ignore=shutil.ignore_patterns("__pycache__", "*.egg-info"),
+    )
     wheel_dir = tmp_path / "dist"
     subprocess.run(
         ["uv", "build", "--wheel", "--out-dir", str(wheel_dir)],
-        cwd=repo_root,
+        cwd=staged,
         check=True,
         capture_output=True,
         text=True,

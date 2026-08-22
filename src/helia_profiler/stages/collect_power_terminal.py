@@ -20,7 +20,21 @@ from ..power.diagnostics import (
     assess_window_clock_ceiling,
     expected_terminal_requested_count,
     firmware_window_clock_is_frozen,
+    probe_runs_inferences,
 )
+
+
+def _count_noun(clean_window_probe: str, count: int) -> str:
+    """Human-facing noun for *count*, aware that ``busy_loop`` runs no inferences.
+
+    The ``busy_loop`` clean-window probe replaces the window body with one
+    calibrated CPU spin (see ``power.diagnostics.probe_runs_inferences``) --
+    saying "N inferences" for it is simply false, since N counts spins, not
+    model runs.
+    """
+    if probe_runs_inferences(clean_window_probe):
+        return "inference" if count == 1 else "inferences"
+    return "busy-loop pass" if count == 1 else "busy-loop passes"
 
 
 def _host_phase_envelope_s(ctx: PipelineContext) -> float | None:
@@ -87,6 +101,7 @@ class CollectPowerTerminalStage:
             raise PowerError("Cannot collect terminal status before platform resolution.")
 
         plan = ctx.power_run.plan
+        clean_window_probe = ctx.config.profiling.clean_window_probe
         if ctx.power_run.observation is not None:
             timeout_s = max(2.0, min(10.0, ctx.power_run.observation.deadline_s / 10.0))
         else:
@@ -103,7 +118,7 @@ class CollectPowerTerminalStage:
 
         expected_requested = expected_terminal_requested_count(
             inference_count=plan.inference_count,
-            clean_window_probe=ctx.config.profiling.clean_window_probe,
+            clean_window_probe=clean_window_probe,
         )
         if expected_requested is not None and terminal.requested_count != expected_requested:
             raise PowerError(
@@ -117,14 +132,18 @@ class CollectPowerTerminalStage:
             raise PowerError(
                 f"Power firmware reported error {terminal.error_code} in phase "
                 f"{terminal.final_phase} after {terminal.completed_count}/"
-                f"{terminal.requested_count} inferences."
+                f"{terminal.requested_count} "
+                f"{_count_noun(clean_window_probe, terminal.requested_count)}."
             )
         if terminal.completed_count != terminal.requested_count:
             raise PowerError(
-                "Power firmware reported incomplete inference execution.",
+                "Power firmware reported incomplete "
+                f"{'inference' if probe_runs_inferences(clean_window_probe) else 'busy-loop'} "
+                "execution.",
                 hint=(
                     f"Completed {terminal.completed_count}/"
-                    f"{terminal.requested_count} inferences."
+                    f"{terminal.requested_count} "
+                    f"{_count_noun(clean_window_probe, terminal.requested_count)}."
                 ),
             )
         if not terminal.gate_lowered:
@@ -142,7 +161,8 @@ class CollectPowerTerminalStage:
             # all-zero INA228 reading above is.
             raise PowerError(
                 "Power firmware reported zero elapsed time for "
-                f"{terminal.completed_count} completed inferences.",
+                f"{terminal.completed_count} completed "
+                f"{_count_noun(clean_window_probe, terminal.completed_count)}.",
                 hint=FROZEN_WINDOW_CLOCK_HINT,
             )
         if envelope.measurement is not None and envelope.measurement.overflow:
@@ -255,10 +275,11 @@ class CollectPowerTerminalStage:
             # as the bystander-overflow path below.
             log.warning(
                 "Power firmware reported zero elapsed time for %d completed "
-                "inferences: its window clock never advanced. The %s owns this "
+                "%s: its window clock never advanced. The %s owns this "
                 "run's power numbers and they are unaffected; only the "
                 "firmware-reported window duration is meaningless. %s",
                 terminal.completed_count,
+                _count_noun(clean_window_probe, terminal.completed_count),
                 ctx.config.power.driver,
                 FROZEN_WINDOW_CLOCK_HINT,
             )
@@ -350,7 +371,8 @@ class CollectPowerTerminalStage:
             terminal.final_phase,
         )
         ctx.report_progress(
-            f"Firmware confirmed {terminal.completed_count:,} inferences",
+            f"Firmware confirmed {terminal.completed_count:,} "
+            f"{_count_noun(clean_window_probe, terminal.completed_count)}",
             kind="checkpoint",
             min_verbosity=0,
         )

@@ -72,11 +72,17 @@ def _socs_for(engine: str) -> list[str]:
 # Feature markers: substring -> human name.  Presence is the semantic snapshot.
 _MARKERS: dict[str, str] = {
     "gpio_sync": "kPowerSyncEnabled",
-    "dwt_init": "dwt_init(",
+    # Keyed on the CALL (semicolon), not the bare name: the definition is
+    # included in every render and comments name it, which made this marker
+    # a constant (#161). Since the boot call is gated off power renders, a
+    # call site exists exactly where the counter is actually used.
+    "dwt_init": "dwt_init();",
     "usb_timer": "usb_timer_pause(",
     "cache_shims": "hpx_cache_",
     "extreme_mode": "HPX_EXTREME_MODE",
-    "itm_swo": "nsx_itm_printf_enable(",
+    # Same constant-marker fix (#161): the boot-preamble NOTE comment names
+    # nsx_itm_printf_enable() in every render; the call carries a semicolon.
+    "itm_swo": "nsx_itm_printf_enable();",
     "debug_itm": "NSX_DEBUG_ITM",
     "debug_uart": "NSX_DEBUG_UART",
     "rtt_config": "SEGGER_RTT_ConfigUpBuffer",

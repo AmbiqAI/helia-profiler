@@ -1090,11 +1090,13 @@ def test_power_renders_measure_nothing_pre_window():
     arms so auto+power fell back into the auto arm's measurement left the
     whole suite green, because the snapshot matrices render fixed-only.
 
-    ``dwt_init();`` appears exactly once in a power render (the unconditional
-    boot call), never re-asserted pre-window, and the warmup DWT bracket
-    (``wt0 = DWT->CYCCNT``) never renders — in either window mode, either
-    probe. On AP4 power the debug domain is off at boot, so a leaked
-    pre-window read would be frozen garbage feeding the announce or sizing.
+    ``dwt_init();`` never renders in a power render at all — the boot call
+    is gated off power builds too (#161: DWT has no power-render consumer,
+    and TRCENA/CYCCNTENA there was debug circuitry enabled for nothing) —
+    and the warmup DWT bracket (``wt0 = DWT->CYCCNT``) never renders, in
+    either window mode, either probe. On AP4 power the debug domain is off
+    at boot, so a leaked pre-window read would be frozen garbage feeding
+    the announce or sizing.
     """
     for wm in ("fixed", "auto"):
         for probe in ("infer", "busy_loop"):
@@ -1102,7 +1104,7 @@ def test_power_renders_measure_nothing_pre_window():
                 "apollo4p", "rtt", "tflm",
                 power_only=True, clean_window_probe=probe, window_mode=wm,
             )
-            assert power.count("dwt_init();") == 1, (wm, probe)
+            assert power.count("dwt_init();") == 0, (wm, probe)
             assert "uint32_t wt0 = DWT->CYCCNT;" not in power, (wm, probe)
             assert "target_cyc" not in power, (wm, probe)
 

@@ -29,6 +29,19 @@ _BOOT_SETTLE_S = 8.0  # reset/SBL/firmware init allowance
 _SAFETY_MARGIN_S = 6.0  # extra headroom beyond estimated runtime
 
 
+def _count_noun(clean_window_probe: str, count: int) -> str:
+    """Human-facing noun for *count*, aware that ``busy_loop`` runs no inferences.
+
+    The ``busy_loop`` clean-window probe replaces the window body with one
+    calibrated CPU spin (see ``power.diagnostics.probe_runs_inferences``) --
+    saying "N inferences" for it is simply false, since N counts spins, not
+    model runs.
+    """
+    if probe_runs_inferences(clean_window_probe):
+        return "inference" if count == 1 else "inferences"
+    return "busy-loop pass" if count == 1 else "busy-loop passes"
+
+
 #: Auto window mode warms the clean pass with 3 hardcoded uninstrumented
 #: reps before timing (_main_base.cc.j2), independent of profiling.warmup
 #: which only applies to the per-layer PMU passes. Every fixed-mode
@@ -203,7 +216,8 @@ class CapturePowerStage:
         )
         message = "Arming instrument and resetting target"
         if planned_count is not None:
-            message += f" · {planned_count:,} inferences"
+            noun = _count_noun(ctx.config.profiling.clean_window_probe, planned_count)
+            message += f" · {planned_count:,} {noun}"
         ctx.report_progress(
             message,
             eta_s=(

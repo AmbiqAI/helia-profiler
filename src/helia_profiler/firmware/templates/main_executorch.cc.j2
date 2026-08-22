@@ -459,5 +459,10 @@ static void print_layers(void) {
     The base's profiled_infer_cycles/count accumulation still happens inside the
     loop -- it is a couple of DWT reads per iteration and keeping it in the
     shared path keeps that loop identical for every engine.  Nothing reads the
-    result here. -#}
-{% block engine_profiled_summary %}{% endblock %}
+    result here, so read it explicitly: the base's summary was the only
+    consumer, and without these the variables are set-but-unused under -Wall
+    in every ExecuTorch render (#161). -#}
+{% block engine_profiled_summary %}
+
+    (void)profiled_infer_cycles;
+    (void)profiled_infer_count;{% endblock %}

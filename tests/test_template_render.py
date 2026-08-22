@@ -10,6 +10,8 @@ These tests do not compile the output; they verify that:
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 # The PRODUCTION environment, not a look-alike (issue #119). These tests used
@@ -718,6 +720,50 @@ class TestMainAotCcRender:
             assert "target_cyc" not in out
             assert "uint32_t wt0 = DWT->CYCCNT;" not in out
             assert "uint32_t clean_warm_min_cyc = 0U;" in out
+
+    def test_busy_loop_terminal_count_agrees_in_all_three_places(self):
+        """The busy-loop work count must be 1 in the plan, the terminal
+        success path, AND the terminal failure path — as a property, not a
+        coincidence (#139).
+
+        The failure path previously rendered the plan's raw clean_iters and
+        agreed only because plan_power pins that count to 1 for this probe;
+        the success partial declared 1U itself. Pin the host half and both
+        rendered halves against each other so no one place can drift.
+        """
+        from helia_profiler.power.diagnostics import expected_terminal_requested_count
+
+        host_count = expected_terminal_requested_count(
+            inference_count=2247, clean_window_probe="busy_loop"
+        )
+        assert host_count == 1
+        out = _render_tflm(
+            transport="rtt",
+            power_only=True,
+            window_mode="fixed",
+            clean_window_probe="busy_loop",
+            clean_iters=2247,
+        )
+        # Success partial: literal 1U, never the plan's N.
+        # Failure partial: same — a busy firmware FAILURE also reports one
+        # unit of work, so the terminal parser's requested-count check reads
+        # the same number in every outcome.
+        report_counts = re.findall(
+            r"hpx_power_terminal_report\(\s*(?:true|false),\s*([^,\s]+),", out
+        )
+        assert report_counts, "no terminal report calls rendered"
+        assert set(report_counts) == {"1U"}, report_counts
+        assert "(uint32_t)2247" not in out
+        # ...and the infer probe still reports the plan's N in both paths.
+        infer = _render_tflm(
+            transport="rtt", power_only=True, window_mode="fixed", clean_iters=2247
+        )
+        infer_counts = re.findall(
+            r"hpx_power_terminal_report\(\s*(?:true|false),\s*([^,\s]+),", infer
+        )
+        assert set(infer_counts) == {"(uint32_t)clean_iters_n", "(uint32_t)2247"}, (
+            infer_counts
+        )
 
     def test_busy_loop_probe_replaces_clean_window_body(self):
         tflm_out = _render_tflm(
