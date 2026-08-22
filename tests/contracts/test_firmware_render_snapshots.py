@@ -117,10 +117,10 @@ _MARKERS: dict[str, str] = {
     # a marker can only see presence, and every engine sharing one wrong name
     # would look identical here.
     "engine_wire_id": "HPX_ENGINE=",
-    # Whether the clean-window announce carries a computed est_ms (the printf
-    # conversion, present in the auto arm, the DWT-fixed arm, and — since
-    # #164 — the STIMER-fixed profile infer arm) rather than the hardcoded 0
-    # that survives only in power and busy-loop renders. Semantic for the
+    # Whether the clean-window announce carries a MEASURED est_ms (the printf
+    # conversion, present in every infer profile arm since #164). Busy-loop
+    # renders announce the compile-time window_target_ms instead (#170) and
+    # power renders the hardcoded 0 — both read false here. Semantic for the
     # same reason as the clean-window trio above: losing the #164 arm again
     # would otherwise read as pure sha256 drift.
     "est_ms_measured": "est_ms=%llu",

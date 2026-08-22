@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from helia_profiler.transport.protocol import (
+    WINDOW_BUDGET_CAP_S,
     WINDOW_BUDGET_MARGIN_S,
     WINDOW_BUDGET_SAFETY,
     collect_lines,
@@ -184,6 +185,56 @@ def test_clean_window_announce_survives_blackout_longer_than_heartbeat():
         poll_interval_s=0.01,
     )
     # Without the announce, the 0.2s heartbeat would bail before 0.4s.
+    assert "--- HPX_END ---" in lines
+
+
+def test_window_budget_is_capped():
+    """A garbage warm reading (wrapped CYCCNT delta x large iters) cannot
+    fabricate a multi-hour deadline — the budget tops out at the cap (#170)."""
+    line = "HPX_HEARTBEAT phase=clean_window_begin iters=6000 est_ms=266000000"
+    assert window_budget_s(line) == WINDOW_BUDGET_CAP_S
+    # A sane large estimate below the cap is untouched.
+    sane = window_budget_s(
+        "HPX_HEARTBEAT phase=clean_window_begin iters=6000 est_ms=130000"
+    )
+    assert sane == 130.0 * WINDOW_BUDGET_SAFETY + WINDOW_BUDGET_MARGIN_S
+    assert sane < WINDOW_BUDGET_CAP_S
+
+
+def test_window_budget_survives_a_line_received_inside_the_window():
+    """The announce's budget is a FLOOR until it expires, not a one-shot
+    raise: a busy-loop window prints HPX_CLEAN_WINDOW_PROBE=busy_loop right
+    after the announce, and before #170 that line reset the inactivity
+    deadline to the flat heartbeat timeout — the widened deadline evaporated
+    and the silent window was reported as a hang."""
+    import time as _t
+
+    released = _t.monotonic() + 0.4  # silence > heartbeat_timeout, << budget
+    state = {"step": 0}
+
+    def read() -> bytes:
+        if state["step"] == 0:
+            state["step"] = 1
+            return (
+                b"--- HPX_START ---\n"
+                b"HPX_HEARTBEAT phase=clean_window_begin iters=100 est_ms=1000\n"
+            )
+        if state["step"] == 1:
+            # The in-window line that used to discard the held budget.
+            state["step"] = 2
+            return b"HPX_CLEAN_WINDOW_PROBE=busy_loop\n"
+        if _t.monotonic() >= released:
+            return b"--- HPX_END ---\n"
+        return b""
+
+    lines = collect_lines(
+        read,
+        transport_name="TEST",
+        heartbeat_timeout_s=0.2,
+        poll_interval_s=0.01,
+    )
+    # Without the hold-floor the 0.2s heartbeat bails ~0.2s after the probe
+    # line, well before the 0.4s release.
     assert "--- HPX_END ---" in lines
 
 
