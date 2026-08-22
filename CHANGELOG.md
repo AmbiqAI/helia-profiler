@@ -6,6 +6,42 @@ This project follows [Semantic Versioning](https://semver.org/) and uses
 [Release Please](https://github.com/googleapis/release-please) to prepare
 release pull requests from Conventional Commits.
 
+## [0.2.0](https://github.com/AmbiqAI/helia-profiler/compare/v0.1.6...v0.2.0) (2026-08-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **config:** config classes now hold enum members for these four fields; code constructing ProfilingConfig/PowerConfig directly with invalid strings fails at construction (valid strings coerce). YAML users are unaffected.
+* **power:** ProfileResult.power.metadata is a typed PowerMetadata, no longer a dict. String-keyed reads become attribute access (metadata.measurement_scope); the flat dict view is metadata.to_metadata_dict().
+* **platform:** a `target.custom_socs` entry that declares neither `based_on:` nor `app_flash_load_addr:` no longer inherits its family's app flash load address -- it resolves to no address at all, and the J-Link fallback flash refuses to run rather than programming at a guessed offset. The values that stop being handed out are 0x00410000 (ap5), 0x00018000 (ap4) and 0x0000c000 (ap3). Add either key to such an entry to restore an address: `based_on: <characterised part>` inherits one, `app_flash_load_addr: 0x…` states one. Entries that already name a `based_on` are unaffected. The same applies to the programmatic path: `build_platform_registry(socs={SocDef(...)})` has no `based_on` mechanism, so a hand-built `SocDef` must now pass `app_flash_load_addr=` explicitly.
+
+### Features
+
+* **platform:** let custom SoCs declare their own app flash load address ([#149](https://github.com/AmbiqAI/helia-profiler/issues/149)) ([#153](https://github.com/AmbiqAI/helia-profiler/issues/153)) ([efae917](https://github.com/AmbiqAI/helia-profiler/commit/efae917d7afa0b7d58704a4d13b6d76e61503351))
+* **preflight:** reject int8 Softmax scales the target cannot prepare ([#57](https://github.com/AmbiqAI/helia-profiler/issues/57)) ([#143](https://github.com/AmbiqAI/helia-profiler/issues/143)) ([66d76c6](https://github.com/AmbiqAI/helia-profiler/commit/66d76c676641011ca8ab8c60c8d0d48ab983444a))
+
+
+### Bug Fixes
+
+* **capture:** window budgets hold as a floor and cap; busy-loop windows announce their target ([#170](https://github.com/AmbiqAI/helia-profiler/issues/170)) ([#171](https://github.com/AmbiqAI/helia-profiler/issues/171)) ([01ae7b3](https://github.com/AmbiqAI/helia-profiler/commit/01ae7b319eb5ff1eb813f247b64238a9539dff12))
+* **firmware:** fixed+STIMER profile builds announce a measured est_ms ([#164](https://github.com/AmbiqAI/helia-profiler/issues/164)) ([#169](https://github.com/AmbiqAI/helia-profiler/issues/169)) ([229dced](https://github.com/AmbiqAI/helia-profiler/commit/229dced9b120f330f9ac4275b77e676b090bb0c9))
+* **probe:** verify a flash landed at the requested address ([#150](https://github.com/AmbiqAI/helia-profiler/issues/150)) ([#152](https://github.com/AmbiqAI/helia-profiler/issues/152)) ([439ab0c](https://github.com/AmbiqAI/helia-profiler/commit/439ab0c11aa14898eff48a70aa28beca95f0c7e8))
+
+
+### Documentation
+
+* make the maintainer-only boundary real, publish hpx validate ([f4808fb](https://github.com/AmbiqAI/helia-profiler/commit/f4808fbdeffdcf008a494944863b18b8fef24d0c))
+* retire stale specs and plans, publish the Tier-1 comparison ([792c0a4](https://github.com/AmbiqAI/helia-profiler/commit/792c0a4848749703c1a66813110159905ba03fd7))
+* retire stale specs, fix the maintainer-only boundary, unpin brittle notebook tests ([b3a2a3b](https://github.com/AmbiqAI/helia-profiler/commit/b3a2a3b074b54049298f450d0e682c55b207d012))
+* second-pass accuracy cleanup of docs and tests ([8543fa2](https://github.com/AmbiqAI/helia-profiler/commit/8543fa2d3f93f86875e0fa478440e6f0d4f2c060))
+* second-pass accuracy cleanup of docs and tests ([8f31db7](https://github.com/AmbiqAI/helia-profiler/commit/8f31db7b30f05a4613859ba5c1cfe3b83921d21b))
+
+
+### Code Refactoring
+
+* **config:** closed config vocabularies become StrEnums ([#162](https://github.com/AmbiqAI/helia-profiler/issues/162) Phase 3) ([#167](https://github.com/AmbiqAI/helia-profiler/issues/167)) ([b6c07fb](https://github.com/AmbiqAI/helia-profiler/commit/b6c07fbac5606592290f10a352c2ef178a9a2044))
+* **power:** typed PowerMetadata replaces the metadata dict ([#154](https://github.com/AmbiqAI/helia-profiler/issues/154) Phase 2) ([#157](https://github.com/AmbiqAI/helia-profiler/issues/157)) ([1d09456](https://github.com/AmbiqAI/helia-profiler/commit/1d0945679b26167fec8b7a7a85e80e55388118c8))
+
 ## [0.1.6](https://github.com/AmbiqAI/helia-profiler/compare/v0.1.5...v0.1.6) (2026-08-19)
 
 
