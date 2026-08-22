@@ -50,6 +50,7 @@ class ComparisonDimension(StrEnum):
     POWER_MONITOR = "power_monitor"
     POWER_LOCKSTEP = "power_lockstep"
     POWER_CLEAN_WINDOW_PROBE = "power_clean_window_probe"
+    POWER_FIRMWARE_FINGERPRINT = "power_firmware_fingerprint"
 
     # Metric gate — a non-valid value on either side blocks power metrics.
     POWER_INTEGRITY = "power_integrity"
@@ -119,6 +120,20 @@ class DimensionSpec:
     metric_group: str | None = None
     label: str | None = None
     derive: Callable[[dict[str, Any]], Any] | None = None
+    #: Optional human sentence for a mismatch issue, replacing the generic
+    #: "…because <dimension> differs." — used where the raw values (two
+    #: 64-hex digests) tell the user nothing actionable.
+    mismatch_hint: str | None = None
+    #: Dimensions that must MATCH (present and equal on both sides) before
+    #: this one is consulted at all. Declared here so the scoping is registry
+    #: data, not comparator special-casing. Used by the firmware fingerprint:
+    #: cross-platform renders trivially differ, and board/SoC differences are
+    #: documented as visible-not-blocking — a fingerprint mismatch only means
+    #: something when the platform and firmware mode agree (#138 regression 3).
+    #: If a scope dimension is absent on either side (a legacy artifact), the
+    #: platform match cannot be established and the dimension is skipped —
+    #: the same conservative non-blocking rule as an absent value itself.
+    scoped_to: tuple[ComparisonDimension, ...] = ()
 
 
 def _derive_power_monitor(power: dict[str, Any]) -> str:
@@ -270,6 +285,24 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
         DimensionEffect.POWER_METRIC_BLOCKING,
         ArtifactSource.MANIFEST_ONLY,
         metric_group="power",
+    ),
+    DimensionSpec(
+        ComparisonDimension.POWER_FIRMWARE_FINGERPRINT,
+        DimensionEffect.POWER_METRIC_BLOCKING,
+        ArtifactSource.SUMMARY_POWER,
+        ("firmware_code_fingerprint",),
+        metric_group="power",
+        mismatch_hint=(
+            "Power metrics omitted because the measured power firmware's "
+            "code fingerprint differs — the window's code changed, or the "
+            "fingerprint scheme changed across hpx versions. Re-baseline, "
+            "or compare the runs side by side knowingly."
+        ),
+        scoped_to=(
+            ComparisonDimension.SOC,
+            ComparisonDimension.BOARD,
+            ComparisonDimension.POWER_FIRMWARE,
+        ),
     ),
     DimensionSpec(
         ComparisonDimension.POWER_INTEGRITY,

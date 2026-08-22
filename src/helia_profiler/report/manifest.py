@@ -16,6 +16,7 @@ from ..results import (
     ResultManifest,
     RunStatus,
 )
+from ..firmware import measured_power_fingerprint
 from ..results.manifest import _sha256
 from ..evaluation import evaluate_run
 from .contracts import (
@@ -232,6 +233,12 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
                 # replaces the model with a calibrated CPU spin (#125).
                 ComparisonDimension.POWER_CLEAN_WINDOW_PROBE: (
                     ctx.config.profiling.clean_window_probe.value
+                ),
+                # Code hash of the measured binary (#138/#115) — same helper
+                # summary.py writes into summary.power, so the manifest and
+                # artifact values cannot disagree.
+                ComparisonDimension.POWER_FIRMWARE_FINGERPRINT: (
+                    measured_power_fingerprint(ctx)
                 ),
             }
         )

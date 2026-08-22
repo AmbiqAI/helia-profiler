@@ -690,6 +690,47 @@ def test_write_summary_surfaces_window_clock_ceiling(tmp_path: Path):
     assert summary["power"]["window_clock_ceiling"] == ceiling.to_metadata()
 
 
+def test_write_summary_carries_the_power_firmware_fingerprint(tmp_path: Path):
+    """#138: the measured binary's code hash must reach summary.power so the
+    POWER_FIRMWARE_FINGERPRINT comparability dimension has an artifact value
+    — and must be simply absent (legacy semantics) when no source exists."""
+    from helia_profiler.firmware import measured_power_fingerprint
+    from helia_profiler.results import PowerRunPlan
+
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=10, clean_infer_avg_us=10000, duration_s=0.1
+    )
+    # Direct assignment (the same-file PowerRun precedent): publish_power_plan resets
+    # power_result, which _gated_power_ctx already installed.
+    from helia_profiler.results import PowerRun
+
+    ctx.power_run = PowerRun(
+        plan=PowerRunPlan(
+            firmware_mode="dedicated", inference_count=10, count_source="configured"
+        )
+    )
+    src = tmp_path / "fw" / "src"
+    src.mkdir(parents=True)
+    (src / "main_power.cc").write_text("int main(void) { return 7; }\n")
+    ctx.firmware_dir = tmp_path / "fw"
+
+    summary = json.loads(_write_summary(ctx, tmp_path).read_text())
+
+    # The composite source-set hash (main + profiler TUs) — same helper the
+    # writer uses, so this pins passthrough, not the hash construction
+    # (tests/test_firmware_fingerprint.py owns that).
+    assert summary["power"]["firmware_code_fingerprint"] == measured_power_fingerprint(
+        ctx
+    )
+
+    # No rendered source (a hand-built or legacy context): key absent, run OK.
+    bare = _gated_power_ctx(
+        tmp_path, clean_infer_count=10, clean_infer_avg_us=10000, duration_s=0.1
+    )
+    bare_summary = json.loads(_write_summary(bare, tmp_path).read_text())
+    assert "firmware_code_fingerprint" not in bare_summary["power"]
+
+
 def test_window_clock_ceiling_metadata_keys_are_the_documented_set():
     # docs/guide/power.md names these fields for users reading summary.json,
     # and #115 put them in the summary's power block. Nothing else pins the

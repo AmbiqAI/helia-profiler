@@ -436,3 +436,114 @@ def test_two_socs_running_the_same_probe_stay_power_comparable():
     assessment = assess_comparability(baseline, candidate)
 
     assert assessment.power_metrics_comparable
+
+
+def _powered_run(
+    fingerprint: str | None,
+    *,
+    board: str = "apollo510_evb",
+    power_firmware: str = "dedicated",
+):
+    """A power run with the platform scope dimensions present (#138)."""
+    power = {
+        "measurement_scope": "gpio_gated_clean_window",
+        "integrity": "valid",
+        "power_firmware": power_firmware,
+    }
+    if fingerprint is not None:
+        power["firmware_code_fingerprint"] = fingerprint
+    run = _run(power=power)
+    run.metadata["config"]["target"]["board"] = board
+    return run
+
+
+class TestPowerFirmwareFingerprint:
+    """#138 / #115 item 1: the measured binary's code hash as a dimension."""
+
+    CODE = POWER_DIMENSION_MISMATCH.code_for(
+        ComparisonDimension.POWER_FIRMWARE_FINGERPRINT
+    )
+
+    def test_same_platform_fingerprint_mismatch_blocks_power(self):
+        """The #115 shape: identical on every prior dimension, different
+        measured-binary code — +678% must not present as a real regression."""
+        assessment = assess_comparability(_powered_run("aaa"), _powered_run("bbb"))
+
+        assert not assessment.power_metrics_comparable
+        mismatch = [issue for issue in assessment.issues if issue.code == self.CODE]
+        assert len(mismatch) == 1
+        # The registry-declared mismatch_hint, not the generic sentence —
+        # two 64-hex digests tell a user nothing actionable (#173 review
+        # n4; pinned per round-2 m-D).
+        assert "code fingerprint differs" in mismatch[0].message
+        assert "Re-baseline" in mismatch[0].message
+
+    def test_equal_fingerprints_compare_freely(self):
+        assessment = assess_comparability(_powered_run("aaa"), _powered_run("aaa"))
+
+        assert assessment.power_metrics_comparable
+        assert not any(issue.code == self.CODE for issue in assessment.issues)
+
+    def test_legacy_baseline_without_fingerprint_is_skipped(self):
+        """Baselines predating the dimension carry no key — zero migration."""
+        assessment = assess_comparability(_powered_run(None), _powered_run("bbb"))
+
+        assert assessment.power_metrics_comparable
+        assert not any(issue.code == self.CODE for issue in assessment.issues)
+
+    def test_cross_board_pairs_never_consult_the_fingerprint(self):
+        """#138 attempt-1 regression 3: board differences are documented as
+        visible-not-blocking, and cross-platform renders trivially differ —
+        a fingerprint mismatch only means something on a matching platform."""
+        assessment = assess_comparability(
+            _powered_run("aaa", board="apollo510_evb"),
+            _powered_run("bbb", board="apollo4p_evb"),
+        )
+
+        assert assessment.power_metrics_comparable
+        assert not any(issue.code == self.CODE for issue in assessment.issues)
+
+    def test_firmware_mode_mismatch_scopes_the_fingerprint_out(self):
+        """dedicated-vs-shared already blocks via POWER_FIRMWARE; the
+        fingerprint (which hashes DIFFERENT binaries in the two modes) must
+        not add a second, misleading issue on top."""
+        assessment = assess_comparability(
+            _powered_run("aaa", power_firmware="dedicated"),
+            _powered_run("bbb", power_firmware="shared"),
+        )
+
+        assert not assessment.power_metrics_comparable  # POWER_FIRMWARE blocks
+        assert not any(issue.code == self.CODE for issue in assessment.issues)
+
+    def test_absent_scope_dimension_skips_the_fingerprint(self):
+        """A legacy artifact that cannot even establish the platform match
+        (no board recorded) is skipped, not blocked."""
+        left = _powered_run("aaa")
+        right = _powered_run("bbb")
+        del left.metadata["config"]["target"]["board"]
+
+        assessment = assess_comparability(left, right)
+
+        assert not any(issue.code == self.CODE for issue in assessment.issues)
+
+
+def test_scoped_to_is_declared_only_where_the_comparator_honours_it():
+    """#173 review m3: only the POWER_DIMENSION_MISMATCH loop consults
+    scoped_to — a spec declaring it under any other effect would be silently
+    ignored, the exact failure mode the registry exists to prevent. Pin the
+    invariant as registry data until a second loop needs the mechanism."""
+    from helia_profiler.results.dimensions import (
+        DIMENSION_REGISTRY,
+        DimensionEffect,
+    )
+
+    for spec in DIMENSION_REGISTRY.values():
+        if spec.scoped_to:
+            assert spec.effect is DimensionEffect.POWER_METRIC_BLOCKING, (
+                f"{spec.dimension} declares scoped_to under {spec.effect}, "
+                "which no comparator loop honours"
+            )
+        # A scope member must itself be resolvable for both runs, i.e. a
+        # registry dimension.
+        for scope in spec.scoped_to:
+            assert scope in DIMENSION_REGISTRY
