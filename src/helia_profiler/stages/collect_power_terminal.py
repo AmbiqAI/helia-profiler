@@ -256,9 +256,7 @@ class CollectPowerTerminalStage:
                     # scope and the fingerprint gate silently skips
                     # (#173 review m4). External mode sets it in
                     # capture/__init__.py; this is the internal twin.
-                    power_firmware=ctx.power_run.plan.firmware_mode
-                    if ctx.power_run
-                    else None,
+                    power_firmware=plan.firmware_mode,
                 ),
             )
         if frozen_window_clock:

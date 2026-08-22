@@ -184,3 +184,76 @@ class TestMeasuredPowerFingerprint:
         ctx = self._ctx(tmp_path, "dedicated")
         (ctx.firmware_dir / "src" / "main_power.cc").unlink()
         assert measured_power_fingerprint(ctx) is None
+
+
+class TestCompositeConstruction:
+    """#173 round-2 review M-B: two of the three ways to silently change
+    every emitted fingerprint (part reorder, separator change) left the
+    whole suite green. This pin duplicates the framing ON PURPOSE — it is
+    the independent statement of the composite's wire format, scheme tag
+    included; changing the construction must be a reviewed edit here too."""
+
+    def test_composite_framing_is_pinned(self, tmp_path):
+        import hashlib
+
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.results import PowerRunPlan
+
+        model = tmp_path / "m.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {"enabled": True},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.publish_power_plan(
+            PowerRunPlan(
+                firmware_mode="dedicated", inference_count=1, count_source="configured"
+            )
+        )
+        src = tmp_path / "fw" / "src"
+        src.mkdir(parents=True)
+        (src / "main_power.cc").write_text("int main(void) { return 9; }\n")
+        (src / "hpx_pmu_profiler.cc").write_text("void p(void) {}\n")
+        # hpx_pmu_profiler.h deliberately absent -> the "absent" marker.
+        ctx.firmware_dir = tmp_path / "fw"
+
+        expected = hashlib.sha256(
+            "\n".join(
+                [
+                    "scheme\x00hpx-power-fingerprint-v2",
+                    "main_power.cc\x00"
+                    + firmware_code_fingerprint("int main(void) { return 9; }\n"),
+                    "hpx_pmu_profiler.cc\x00"
+                    + firmware_code_fingerprint("void p(void) {}\n"),
+                    "hpx_pmu_profiler.h\x00absent",
+                ]
+            ).encode("utf-8")
+        ).hexdigest()
+        assert measured_power_fingerprint(ctx) == expected
+
+
+class TestContinuationHardening:
+    """#173 round-2 review M-A: backslash continuation defeated the
+    directive carve-out in the dangerous (false-equal) direction."""
+
+    def test_continued_macro_body_boundary_survives(self):
+        a = (
+            "#define FOO(x) \\\n  do { bar(x); } while (0)\n"
+            "int main(void) { return 0; }\n"
+        )
+        b = (
+            "#define FOO(x) \\\n"
+            "  do { bar(x); } while (0) int main(void) { return 0; }\n"
+        )
+        assert firmware_code_fingerprint(a) != firmware_code_fingerprint(b)
+
+    def test_unterminated_literal_on_continued_line_cannot_swallow(self):
+        c = "int a = 1'000; \\\n#define X 1\nint b;\n"
+        d = "int a = 1'000; \\\n#define X 1 int b;\n"
+        assert firmware_code_fingerprint(c) != firmware_code_fingerprint(d)

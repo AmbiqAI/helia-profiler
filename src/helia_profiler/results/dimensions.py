@@ -294,9 +294,9 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
         metric_group="power",
         mismatch_hint=(
             "Power metrics omitted because the measured power firmware's "
-            "code differs between the runs — a firmware change altered what "
-            "the window executes. Re-baseline, or compare the runs side by "
-            "side knowingly."
+            "code fingerprint differs — the window's code changed, or the "
+            "fingerprint scheme changed across hpx versions. Re-baseline, "
+            "or compare the runs side by side knowingly."
         ),
         scoped_to=(
             ComparisonDimension.SOC,

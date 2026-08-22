@@ -2,7 +2,7 @@
 
 The power-comparability dimension ``POWER_FIRMWARE_FINGERPRINT`` hashes the
 RENDERED SOURCE SET of whichever binary ``CapturePowerStage`` measures — the
-main translation unit plus ``hpx_pmu_profiler.{h,cc}``, which the build
+main translation unit plus ``hpx_pmu_profiler.{cc,h}``, which the build
 compiles into the same target and whose per-operator hooks execute inside
 the gated window (#173 review M1) — so a firmware-semantics change stops
 comparing as "fully comparable" against a baseline captured by different
@@ -33,8 +33,14 @@ that a newline adjacent to a preprocessing-directive line survives as a
 newline: newline is significant in translation phases 3/4, and collapsing
 it let ``#define A 1\nint x;`` canonicalize equal to its one-line,
 semantically different join (#173 review m1, demonstrated on a real
-render). With that carve-out the canonicalization is token-stream- and
-directive-structure-preserving, and the whitespace collapse is what makes
+render), and the directive state survives a backslash-continued line
+(phase-2 splicing — round 2 proved a continued macro body's terminating
+newline otherwise collapsed, hashing two different programs equal). With
+those carve-outs the canonicalization is token-stream- and
+directive-structure-preserving for the C the templates emit; pathological
+inputs (an unterminated literal feeding a continuation) may canonicalize
+non-idempotently, which is harmless — the function is applied once, to
+rendered sources. The whitespace collapse is what makes
 comment-ONLY changes truly invisible: a line comment occupies a line, so
 merely deleting its text while keeping its newline would still shift the
 hash on every comment insertion (found by this module's own stability test
@@ -77,15 +83,23 @@ def canonical_code(text: str) -> str:
     pending_nl = False
     line_is_directive = False
     line_has_content = False
+    last_char = ""
 
     def emit(chunk: str) -> None:
-        nonlocal pending_ws, pending_nl, line_is_directive, line_has_content
+        nonlocal pending_ws, pending_nl, line_is_directive, line_has_content, last_char
         if pending_ws:
             if pending_nl and (line_is_directive or chunk.startswith("#")):
                 if out:
                     out.append("\n")
-                line_is_directive = False
-                line_has_content = False
+                # A directive line ending in a backslash CONTINUES past the
+                # newline (translation phase 2 splices it), so the directive
+                # state must survive onto the next physical line — resetting
+                # it here let a continued macro body's real terminating
+                # newline collapse, hashing two semantically different
+                # programs equal (#173 round-2 review M-A).
+                if not (line_is_directive and last_char == "\\"):
+                    line_is_directive = False
+                line_has_content = line_is_directive
             elif out:
                 out.append(" ")
             pending_ws = False
@@ -93,6 +107,7 @@ def canonical_code(text: str) -> str:
         if not line_has_content and chunk.startswith("#"):
             line_is_directive = True
         line_has_content = True
+        last_char = chunk[-1]
         out.append(chunk)
 
     def note_ws(newline: bool) -> None:
@@ -116,7 +131,11 @@ def canonical_code(text: str) -> str:
             j = i + 1
             buf = [quote]
             while j < n and text[j] != quote and text[j] != "\n":
-                if text[j] == "\\" and j + 1 < n:
+                # The newline guard outranks the escape pair: consuming a
+                # backslash-newline as an "escape" let an unterminated
+                # literal on a continued line swallow the next physical line
+                # (#173 round-2 review M-A, second route).
+                if text[j] == "\\" and j + 1 < n and text[j + 1] != "\n":
                     buf.append(text[j : j + 2])
                     j += 2
                 else:
@@ -169,20 +188,30 @@ def measured_power_fingerprint(ctx: PipelineContext) -> str | None:
         main_digest = firmware_code_fingerprint(
             (src_dir / main_name).read_text(encoding="utf-8")
         )
-    except OSError:
+    except (OSError, ValueError):
+        # ValueError covers UnicodeDecodeError: a partially-written or
+        # corrupt source must degrade to the absent/legacy value, never
+        # fail the run at report time (#173 round-2 review m-F).
         return None
-    parts = [f"{main_name}\x00{main_digest}"]
-    # The build compiles these into the SAME target, and the profiler's
-    # per-operator hooks execute inside the gated window — hashing only the
-    # main TU let a profiler-template edit reproduce the #115 shape
-    # undetected (#173 review M1). A missing file folds in as "absent":
-    # deterministic, and distinct from any present content.
+    # The scheme tag makes hasher changes legible: a canonicalizer or
+    # file-set change shifts every fingerprint, and without the tag that
+    # mismatch would present as "the firmware changed" — asserting a cause
+    # that is false (#173 round-2 review m-C). Bump it whenever the
+    # construction below changes.
+    parts = ["scheme\x00hpx-power-fingerprint-v2", f"{main_name}\x00{main_digest}"]
+    # The TFLM/heliaRT builds compile these into the SAME target (AOT and
+    # ExecuTorch render no profiler TU — they fold in as "absent", matching
+    # not-compiled). In the dedicated power binary the profiler's hooks
+    # early-return, but its code is linked and its prologue runs in-window —
+    # hashing only the main TU let a profiler-template edit reproduce the
+    # #115 shape undetected (#173 review M1). A missing file folds in as
+    # "absent": deterministic, and distinct from any present content.
     for name in ("hpx_pmu_profiler.cc", "hpx_pmu_profiler.h"):
         try:
             digest = firmware_code_fingerprint(
                 (src_dir / name).read_text(encoding="utf-8")
             )
-        except OSError:
+        except (OSError, ValueError):
             digest = "absent"
         parts.append(f"{name}\x00{digest}")
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()

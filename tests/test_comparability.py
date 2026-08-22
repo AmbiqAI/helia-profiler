@@ -470,7 +470,13 @@ class TestPowerFirmwareFingerprint:
         assessment = assess_comparability(_powered_run("aaa"), _powered_run("bbb"))
 
         assert not assessment.power_metrics_comparable
-        assert any(issue.code == self.CODE for issue in assessment.issues)
+        mismatch = [issue for issue in assessment.issues if issue.code == self.CODE]
+        assert len(mismatch) == 1
+        # The registry-declared mismatch_hint, not the generic sentence —
+        # two 64-hex digests tell a user nothing actionable (#173 review
+        # n4; pinned per round-2 m-D).
+        assert "code fingerprint differs" in mismatch[0].message
+        assert "Re-baseline" in mismatch[0].message
 
     def test_equal_fingerprints_compare_freely(self):
         assessment = assess_comparability(_powered_run("aaa"), _powered_run("aaa"))
