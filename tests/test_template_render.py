@@ -10,6 +10,8 @@ These tests do not compile the output; they verify that:
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 # The PRODUCTION environment, not a look-alike (issue #119). These tests used
@@ -51,6 +53,7 @@ def _sample_pmu_passes() -> list[dict[str, object]]:
 
 def _render_tflm(
     transport: str = "rtt",
+    template_name: str = "main.cc.j2",
     arena_region: str = "tcm",
     weights_region: str = "mram",
     has_armv8m_pmu: bool = True,
@@ -74,7 +77,7 @@ def _render_tflm(
     **extra_vars: object,
 ) -> str:
     registrations = resolver_registrations or ["r.AddConv2D();", "r.AddSoftmax();"]
-    return _env.get_template("main.cc.j2").render(
+    return _env.get_template(template_name).render(
         **resolve_window_timer(
             clean_window_probe=clean_window_probe,
             power_only=power_only,
@@ -128,6 +131,7 @@ def _render_tflm(
 
 def _render_aot(
     transport: str = "rtt",
+    template_name: str = "main_aot.cc.j2",
     arena_region: str = "tcm",
     weights_region: str = "mram",
     arena_regions: list[dict[str, object]] | None = None,
@@ -145,7 +149,7 @@ def _render_aot(
     psram_clock_hz: int = 48_000_000,
     **extra_vars: object,
 ) -> str:
-    return _env.get_template("main_aot.cc.j2").render(
+    return _env.get_template(template_name).render(
         **resolve_window_timer(
             clean_window_probe=clean_window_probe,
             power_only=power_only,
@@ -719,6 +723,56 @@ class TestMainAotCcRender:
             assert "uint32_t wt0 = DWT->CYCCNT;" not in out
             assert "uint32_t clean_warm_min_cyc = 0U;" in out
 
+    def test_busy_loop_terminal_count_agrees_in_all_three_places(self):
+        """The busy-loop work count must be 1 in the plan, the terminal
+        success path, AND the terminal failure path — as a property, not a
+        coincidence (#139).
+
+        The failure path previously rendered the plan's raw clean_iters and
+        agreed only because plan_power pins that count to 1 for this probe;
+        the success partial declared 1U itself. Pin the host half and both
+        rendered halves against each other so no one place can drift.
+
+        Scope: the agreement is a property of the FIXED-mode power render —
+        the only kind render_power_source ever pins for flashing. The infer
+        assertion below shows the two partials spell the count differently
+        (runtime variable vs render literal), which under an auto-mode
+        render could diverge; that render is compiled but never flashed.
+        """
+        from helia_profiler.power.diagnostics import expected_terminal_requested_count
+
+        host_count = expected_terminal_requested_count(
+            inference_count=2247, clean_window_probe="busy_loop"
+        )
+        assert host_count == 1
+        out = _render_tflm(
+            transport="rtt",
+            power_only=True,
+            window_mode="fixed",
+            clean_window_probe="busy_loop",
+            clean_iters=2247,
+        )
+        # Success partial: literal 1U, never the plan's N.
+        # Failure partial: same — a busy firmware FAILURE also reports one
+        # unit of work, so the terminal parser's requested-count check reads
+        # the same number in every outcome.
+        report_counts = re.findall(
+            r"hpx_power_terminal_report\(\s*(?:true|false),\s*([^,\s]+),", out
+        )
+        assert report_counts, "no terminal report calls rendered"
+        assert set(report_counts) == {"1U"}, report_counts
+        assert "(uint32_t)2247" not in out
+        # ...and the infer probe still reports the plan's N in both paths.
+        infer = _render_tflm(
+            transport="rtt", power_only=True, window_mode="fixed", clean_iters=2247
+        )
+        infer_counts = re.findall(
+            r"hpx_power_terminal_report\(\s*(?:true|false),\s*([^,\s]+),", infer
+        )
+        assert set(infer_counts) == {"(uint32_t)clean_iters_n", "(uint32_t)2247"}, (
+            infer_counts
+        )
+
     def test_busy_loop_probe_replaces_clean_window_body(self):
         tflm_out = _render_tflm(
             transport="rtt", window_mode="auto", clean_window_probe="busy_loop"
@@ -1058,3 +1112,46 @@ class TestIna228PowerRender:
         out = render(power_only=power_only)
         assert "ina228" not in out
         assert "HPX_POWER_MEASUREMENT_SOURCE" not in out
+
+
+def test_pmu_storage_seam_rejects_unknown_vocabulary(monkeypatch):
+    """#172 review: the engine_pmu_storage_sram_resident seam accepts exactly
+    "true"/"false" — a Python-spelled "True" used to silently mean false,
+    shipping a profile binary with its SRAM-resident per-layer storage
+    unbacked (the hang _ssram_power.j2 warns about). The dict lookup leaves
+    anything else undefined and StrictUndefined makes the render fail loudly.
+    """
+    from jinja2 import ChoiceLoader, DictLoader
+    from jinja2.exceptions import UndefinedError
+
+    for base_template, value, should_render in (
+        ("main.cc.j2", "true", True),
+        ("main.cc.j2", "false", True),
+        ("main.cc.j2", "True", False),
+        ("main.cc.j2", "1", False),
+        # The seam lives in the base; one AOT-chain case proves the guard is
+        # not a main.cc.j2 artifact.
+        ("main_aot.cc.j2", "True", False),
+    ):
+        child = (
+            '{% extends "' + base_template + '" %}'
+            "{% block engine_pmu_storage_sram_resident %}" + value + "{% endblock %}"
+        )
+        overlay = _env.overlay(
+            loader=ChoiceLoader([DictLoader({"seam_child.cc.j2": child}), _env.loader])
+        )
+        import sys
+        this_module = sys.modules[__name__]
+        monkeypatch.setattr(this_module, "_env", overlay)
+        render = _render_aot if base_template == "main_aot.cc.j2" else _render_tflm
+        if should_render:
+            out = render(transport="rtt", template_name="seam_child.cc.j2")
+            assert "int main(void)" in out
+        else:
+            # The error must NAME the seam and the vocabulary — a bare
+            # "'dict object' has no attribute" sent the engine author to
+            # the traceback (#172 round-2 review).
+            with pytest.raises(
+                UndefinedError, match="engine_pmu_storage_sram_resident"
+            ):
+                render(transport="rtt", template_name="seam_child.cc.j2")

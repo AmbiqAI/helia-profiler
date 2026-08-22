@@ -11,7 +11,7 @@ import logging
 import re
 from pathlib import Path
 
-from ...errors import CaptureError
+from ...errors import CaptureError, DeterministicCaptureError
 from .jlink import _DEFAULT_TIMEOUT_S, run_jlink_script
 
 log = logging.getLogger("hpx")
@@ -540,7 +540,9 @@ def flash_binary(
         # Fallback mirrors the generated script: explicit .bin, quoted path
         # (spaces), load address.  A raw ELF loadfile is NOT safe (docstring).
         if not bin_path.is_file():
-            raise CaptureError(
+            # Deterministic: the artifacts are absent on disk, so a power
+            # cycle and retry reproduce the same refusal (#151).
+            raise DeterministicCaptureError(
                 f"No flashable image for {target_name}: neither the NSX flash "
                 f"script ({script_path}) nor a .bin sibling ({bin_path}) exists. "
                 f"{_NOTHING_PROGRAMMED}",
@@ -569,7 +571,8 @@ def flash_binary(
                 else " That SoC declares no J-Link device string either, so the "
                 "entry is under-specified in both fields rather than just this one."
             )
-            raise CaptureError(
+            # Deterministic for the same reason as the missing-image refusal.
+            raise DeterministicCaptureError(
                 f"Cannot flash {target_name}: the NSX flash script ({script_path}) is "
                 f"missing and no app flash load address is known for {named} to fall "
                 f"back to.{also_unnamed} {_NOTHING_PROGRAMMED}",

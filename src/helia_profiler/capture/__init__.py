@@ -21,7 +21,11 @@ from typing import TYPE_CHECKING
 
 from ..config import DEFAULT_POWER_DURATION_S, Transport
 from ..errors import CaptureError, PowerError
-from ..power.diagnostics import SyncHandshakeMetadata, gate_relative_tolerance_for
+from ..power.diagnostics import (
+    SyncHandshakeMetadata,
+    count_noun,
+    gate_relative_tolerance_for,
+)
 from ..transport import (
     HPX_END,
     HPX_START,
@@ -423,6 +427,9 @@ def capture_power(
                 minimum_gate_s=DEFAULT_POWER_MIN_WINDOW_MS / 1000.0,
                 gate_relative_tolerance=gate_relative_tolerance_for(
                     ctx.config.profiling.clean_window_probe
+                ),
+                work_noun=count_noun(
+                    ctx.config.profiling.clean_window_probe, clean_count or 0
                 ),
                 on_started=_release,
                 # The dedicated JS320 GPI stream provides the authoritative

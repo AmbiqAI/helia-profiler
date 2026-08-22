@@ -283,7 +283,7 @@ WINDOW_CLOCK_CEILING_SLACK_S = 0.25
 #: registered SoC, so on current firmware the debug domain is no longer even
 #: the likelier of the two.
 FROZEN_WINDOW_CLOCK_HINT = (
-    "The firmware completed its inferences but timed the window with a clock "
+    "The firmware completed its measured work but timed the window with a clock "
     "that never advanced. Two causes produce this exact signature. (1) A DWT-"
     "timed window on a Cortex-M4F part: DWT->CYCCNT lives in the CoreSight "
     "debug power domain, which the dedicated power binary either powers down "
@@ -334,6 +334,22 @@ def probe_runs_inferences(clean_window_probe: str) -> bool:
     rules ask here rather than each spelling ``!= "busy_loop"`` for itself.
     """
     return clean_window_probe not in _NON_INFERENCE_PROBES
+
+
+def count_noun(clean_window_probe: str, count: int) -> str:
+    """Human-facing noun for *count*, aware that ``busy_loop`` runs no inferences.
+
+    The ``busy_loop`` clean-window probe replaces the window body with one
+    calibrated CPU spin (see :func:`probe_runs_inferences`) -- saying
+    "N inferences" for it is simply false, since N counts spins, not model
+    runs.  Lives HERE, next to the probe rule, because two stages grew
+    byte-identical private copies and a third stage then missed the wording
+    fix entirely (#172 review): every "N <what ran>" message asks this one
+    function.
+    """
+    if probe_runs_inferences(clean_window_probe):
+        return "inference" if count == 1 else "inferences"
+    return "busy-loop pass" if count == 1 else "busy-loop passes"
 
 
 def expected_terminal_requested_count(

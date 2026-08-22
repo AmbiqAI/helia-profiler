@@ -51,6 +51,7 @@ from .doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
 from .errors import (
     BuildError,
     CaptureError,
+    DeterministicCaptureError,
     ConfigError,
     DependencyError,
     EngineError,
@@ -202,6 +203,7 @@ __all__ = [
     "BuildError",
     "NetworkError",
     "CaptureError",
+    "DeterministicCaptureError",
     "PowerError",
     "ReportError",
 ]
@@ -249,6 +251,7 @@ _STABLE_API = {
     "BuildError",
     "NetworkError",
     "CaptureError",
+    "DeterministicCaptureError",
     "PowerError",
     "ReportError",
 }

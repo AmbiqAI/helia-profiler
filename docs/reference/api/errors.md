@@ -28,6 +28,8 @@ the exception is formatted as a string.
 
 ::: helia_profiler.CaptureError
 
+::: helia_profiler.DeterministicCaptureError
+
 ::: helia_profiler.PowerError
 
 ::: helia_profiler.ReportError

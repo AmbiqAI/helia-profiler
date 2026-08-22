@@ -17,6 +17,7 @@ which installs the analysis extra for exactly this purpose.
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -482,3 +483,180 @@ def test_reader_agrees_with_litert_on_every_fixture():
         "the sweep must at least cover the committed repro fixture and the "
         "root KWS model; mlperf_tiny/** joins it only in LFS checkouts"
     )
+
+
+# ---------------------------------------------------------------------------
+# #147: tripwire the hand-mirrored helia-aot boundary constants
+# ---------------------------------------------------------------------------
+
+#: Every observable edge of the pinned helia-aot 0.18 raise band, measured by
+#: running its real code (the six points from the module comment plus the
+#: one-rounding-step neighbours of each boundary). ``quantize_multiplier``
+#: rounds the frexp fraction to Q31 half-up and promotes the exponent when it
+#: rounds to 1.0 -- BEFORE the flush check -- so both raw edges sit one
+#: rounding step below the nominal constants: [0.5 - 2**-33, 0.5) rounds up
+#: and compiles, [2**-32 * (1 - 2**-32), 2**-32) rounds up and raises.
+_AOT_SWEEP = [
+    # (label, multiplier, what the pinned helia-aot 0.18 measurably does)
+    # Negatives are swept too (#172 round-2): the Q31 promotion fires only
+    # at +2**31, so the negative boundaries do NOT mirror the positive ones
+    # — a sign-blind guard disagreed with the compiler on 218/689 points.
+    ("negative in the raise band", -0.25, "raises"),
+    ("negative half-up edge keeps its shift", -0.49999999999999994, "raises"),
+    ("negative 0.5 has exponent 0", -0.5, "compiles"),
+    ("negative above the band", -0.75, "compiles"),
+    ("negative at 2**-32", -(2.0**-32), "raises"),
+    ("negative flush rounds toward zero", -(2.0**-32) * (1.0 - 2.0**-32), "compiles"),
+    ("negative large", -2.0, "compiles"),
+    ("deep sub-flush", 2.0**-40, "compiles"),
+    ("measured 2**-33", 2.0**-33, "compiles"),
+    (
+        "one ulp below the flush round-up band",
+        math.nextafter(2.0**-32 * (1.0 - 2.0**-32), 0.0),
+        "compiles",
+    ),
+    ("flush round-up band lower edge", 2.0**-32 * (1.0 - 2.0**-32), "raises"),
+    ("one ulp below 2**-32", math.nextafter(2.0**-32, 0.0), "raises"),
+    ("measured 2**-32", 2.0**-32, "raises"),
+    ("one ulp above 2**-32", math.nextafter(2.0**-32, 1.0), "raises"),
+    ("measured 2**-31", 2.0**-31, "raises"),
+    ("issue #57 model", 0.2889418303966522, "raises"),
+    ("measured 0.49", 0.49, "raises"),
+    (
+        "one ulp below the 0.5 round-up band",
+        math.nextafter(0.5 - 2.0**-33, 0.0),
+        "raises",
+    ),
+    ("0.5 round-up band lower edge", 0.5 - 2.0**-33, "compiles"),
+    ("one ulp below 0.5", math.nextafter(0.5, 0.0), "compiles"),
+    ("measured 0.5", 0.5, "compiles"),
+    ("one ulp above 0.5", math.nextafter(0.5, 1.0), "compiles"),
+    ("KWS reference", 9710150.0, "compiles"),
+]
+
+
+class TestAotCompilerBoundaryTripwire:
+    """#147: drive the REAL helia-aot softmax path across every band edge.
+
+    ``aot_softmax_verdict`` predicts the AOT compiler from three constants
+    mirrored by hand out of helia-aot 0.18's internals; until this sweep,
+    only comments guarded them, so a helia-aot version bump could move a
+    boundary and the gate would keep enforcing the old one -- blocking
+    models that now compile, or waving through models that now crash. This
+    runs helia-aot's own ``preprocess_softmax_scaling`` ->
+    ``calculate_input_radius`` (the exact int8 chain in its Softmax
+    operator's ``compute_values``) at each swept multiplier and fails if the
+    measured outcome no longer matches either the recorded ground truth or
+    the gate's verdict. Runs in CI's analysis-tests job, which installs the
+    aot extra and fails loudly if helia-aot is absent; skips cleanly in the
+    bare unit matrix, same as the litert-gated tests above.
+    """
+
+    @staticmethod
+    def _real_compiler_outcome(multiplier: float) -> str:
+        """'raises' or 'compiles', from helia-aot's actual code."""
+        from helia_aot.aot.operators.softmax import preprocess_softmax_scaling
+        from helia_aot.aot.operators.utils import calculate_input_radius
+
+        # preprocess_softmax_scaling computes beta * scale * 2**26; feed it
+        # a scale that reproduces the target multiplier exactly (dividing by
+        # a power of two is exact in binary floating point).
+        scale = multiplier / (1 << 26)
+        assert scale * (1 << 26) == multiplier, "sweep point not exactly representable"
+        fp = preprocess_softmax_scaling(
+            beta=1.0, input_scale=scale, scaled_diff_integer_bits=5
+        )
+        try:
+            calculate_input_radius(
+                input_integer_bits=5, input_left_shift=fp.shift, total_signed_bits=31
+            )
+        except ValueError:
+            return "raises"
+        return "compiles"
+
+    @pytest.mark.parametrize(
+        ("label", "multiplier", "measured"),
+        _AOT_SWEEP,
+        ids=[label.replace(" ", "-") for label, _, _ in _AOT_SWEEP],
+    )
+    def test_verdict_agrees_with_the_real_compiler(
+        self, label: str, multiplier: float, measured: str
+    ):
+        pytest.importorskip("helia_aot")
+        from helia_profiler.evaluation.softmax_preflight import aot_softmax_verdict
+
+        real = self._real_compiler_outcome(multiplier)
+        assert real == measured, (
+            f"{label} (multiplier {multiplier!r}): the installed helia-aot "
+            f"{real} where the pinned 0.18 measurably {measured} -- a version "
+            "bump moved this boundary; re-measure the band and update "
+            "softmax_preflight's constants"
+        )
+
+        verdict = aot_softmax_verdict(multiplier)
+        assert (verdict == "error") == (real == "raises"), (
+            f"{label} (multiplier {multiplier!r}): aot_softmax_verdict says "
+            f"{verdict!r} but the real compiler {real} -- the gate and the "
+            "compiler disagree"
+        )
+
+
+def test_aot_absent_beta_matches_the_installed_helia_aot():
+    """#147: the beta-when-options-absent constant, against the live default.
+
+    helia-aot's ``AirSoftmaxOptions`` is a pydantic dataclass whose ``beta``
+    field defaults to 1.0 -- opposite of TFLM's value-initialised 0.0. The
+    module now reads it live when the extra is installed; this pins that the
+    read works and that a bump changing the default fails here rather than
+    silently re-diverging the two engines' absent-options semantics.
+    """
+    pytest.importorskip("helia_aot")
+    from helia_aot.air.options import AirSoftmaxOptions
+
+    from helia_profiler.evaluation.softmax_preflight import AOT_ABSENT_BETA
+
+    assert AOT_ABSENT_BETA == AirSoftmaxOptions().beta
+
+
+def test_aot_absent_beta_is_one_in_every_environment():
+    """Dependency-free pin of the value itself.
+
+    With the extra installed this checks the live read; without it, the
+    fallback. Both must be 1.0 -- the fallback exists so a bare install keeps
+    the documented 0.18 semantics, not so it can drift from them.
+    """
+    from helia_profiler.evaluation.softmax_preflight import AOT_ABSENT_BETA
+
+    assert AOT_ABSENT_BETA == 1.0
+
+
+def test_negative_multipliers_mirror_the_real_chain_not_a_blanket_error():
+    """#172 round-2: the first fix blanket-errored negatives; the real chain
+    compiles most of that domain. The asymmetry is the Q31 promotion (fires
+    only at +2**31), so the verdict mirrors the SHIFT — a sign-blind band
+    disagreed on 218 of 689 negative sweep points."""
+    from helia_profiler.evaluation.softmax_preflight import aot_softmax_verdict
+
+    # In the negative raise band (shift in [-31, -1]):
+    assert aot_softmax_verdict(-0.25) == "error"
+    assert aot_softmax_verdict(-1e-09) == "error"
+    assert aot_softmax_verdict(-0.49999999999999994) == "error"  # rounds to -2**31, NO promotion
+    assert aot_softmax_verdict(-(2.0**-32)) == "error"
+    # Outside it (the real compiler compiles these):
+    assert aot_softmax_verdict(-0.5) == "warn"  # exponent 0
+    assert aot_softmax_verdict(-0.75) == "warn"
+    assert aot_softmax_verdict(-2.0) == "warn"
+    assert aot_softmax_verdict(-(2.0**-32) * (1 - 2.0**-32)) == "warn"  # negative flush
+    # -inf overflows the Q31 floor inside preprocess_softmax_scaling:
+    assert aot_softmax_verdict(float("-inf")) == "error"
+
+
+def test_top_binade_multiplier_does_not_crash_the_verdict():
+    """#172 review: the Q31 rounding promotes the top float64 binade past
+    ldexp's range — the mirror must degrade to the raw value (far above the
+    raise band) instead of raising OverflowError from a preflight."""
+    import sys
+
+    from helia_profiler.evaluation.softmax_preflight import aot_softmax_verdict
+
+    assert aot_softmax_verdict(sys.float_info.max) == "ok"

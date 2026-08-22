@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from ..results import PowerRunPlan
 from ..config import DEFAULT_POWER_WINDOW_TARGET_MS, PowerFirmware, WindowMode
 from ..errors import PowerError
-from ..power.diagnostics import probe_runs_inferences
+from ..power.diagnostics import count_noun, probe_runs_inferences
 from ..pipeline import PipelineContext
 
 if TYPE_CHECKING:
@@ -288,8 +288,9 @@ class PlanPowerRunStage:
         reference_us = ctx.power_plan.reference_inference_us
         if count is not None and reference_us is not None:
             runtime_s = count * reference_us / 1_000_000
+            noun = count_noun(ctx.config.profiling.clean_window_probe, count)
             ctx.report_progress(
-                f"Power run planned · {count:,} inferences",
+                f"Power run planned · {count:,} {noun}",
                 kind="checkpoint",
                 eta_s=runtime_s,
                 min_verbosity=0,
