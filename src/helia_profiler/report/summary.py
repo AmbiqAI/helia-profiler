@@ -435,7 +435,18 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     ):
         ma = ctx.model_analysis
         ps = ctx.power_result.summary
-        if ps.avg_power_w and ps.avg_power_w > 0 and ps.duration_s and ps.duration_s > 0:
+        # TOPS is ops-derived: a busy-loop window ran ZERO model ops, so
+        # publishing a TOPS/W figure for it would be fabricated — the same
+        # probe guard every other per-inference derivation in this function
+        # applies (#172 review; the busy-loop clean_count of 1 would
+        # otherwise silently price one window as one inference).
+        if (
+            probe_ran_inferences
+            and ps.avg_power_w
+            and ps.avg_power_w > 0
+            and ps.duration_s
+            and ps.duration_s > 0
+        ):
             infer_count = 1
             if (
                 ctx.power_result.metadata.measurement_scope == MeasurementScope.GPIO_GATED_CLEAN_WINDOW

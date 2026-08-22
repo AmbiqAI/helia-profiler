@@ -296,6 +296,22 @@ class TestWindowClockValidity:
         assert frozen[0].severity == "warning"
         assert evaluation.validity is ResultValidity.DEGRADED
 
+    def test_frozen_window_clock_message_is_probe_aware(self, tmp_path: Path):
+        """#172 round-3: the ninth 'completed inferences' site — a busy-loop
+        run completes busy-loop passes, and this is exactly the diagnostic a
+        user reads while already distrusting the numbers."""
+        ctx = _context(tmp_path, probe="busy_loop")
+        self._bench_run(ctx, elapsed_us=0, gate_s=4.963)
+
+        evaluation = evaluate_run(ctx)
+
+        frozen = [
+            issue for issue in evaluation.issues if issue.code == IssueCode.POWER_WINDOW_CLOCK_FROZEN
+        ]
+        assert len(frozen) == 1
+        assert "busy-loop pass" in frozen[0].message
+        assert "inference" not in frozen[0].message
+
     def test_frozen_window_clock_suppresses_the_agreement_warning(self, tmp_path: Path):
         """Zero elapsed is reported once, as the error that explains it -- not
         also as a 100%-apart mismatch warning saying the same thing worse."""

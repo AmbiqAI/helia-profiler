@@ -167,10 +167,17 @@ static void hpx_power_terminal_report(
 static void hpx_power_terminal_fail(const char *phase, uint32_t error_code) {
     hpx_sync_window_end();
     hpx_sync_not_ready();
+{#- requested_count in the same units as the success partial: 1 for the
+   busy_loop probe (one calibrated spin), the plan's fixed N otherwise.  The
+   raw clean_iters here previously agreed with the busy plan only because
+   plan_power pins that count to 1 — a coincidence of the plan, not a
+   property of the template (#139).  Tags inline for the same
+   trim_blocks-off reason as _power_terminal_success.j2. #}
     hpx_power_terminal_report(
         false,
-        (uint32_t){{ clean_iters | default(1) }},
-        0U,
+{% if busy_loop_probe %}        1U,
+{% else %}        (uint32_t){{ clean_iters | default(1) }},
+{% endif %}        0U,
         0ULL,
         phase,
         error_code,

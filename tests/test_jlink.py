@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from helia_profiler.errors import CaptureError, ConfigError
+from helia_profiler.errors import CaptureError, ConfigError, DeterministicCaptureError
 from helia_profiler.target.probe.flash import flash_binary
 from helia_profiler.target.probe.jlink import (
     JLinkProbe,
@@ -427,7 +427,9 @@ class TestFlashBinaryFallback:
         binary = tmp_path / "hpx_profiler_power"
         binary.write_bytes(b"\x00")  # ELF only; no .bin sibling
 
-        with pytest.raises(CaptureError) as exc_info:
+        # The specific subclass matters: it is what tells flash_power's
+        # recovery path not to power-cycle and retry a config gap (#151).
+        with pytest.raises(DeterministicCaptureError) as exc_info:
             self._flash(binary, device="AMA3B2KK-KBR", load_addr=0x00018000)
 
         message = str(exc_info.value)
@@ -435,7 +437,8 @@ class TestFlashBinaryFallback:
         assert "hpx_profiler_power.bin" in message
 
     def test_unknown_load_address_raises_naming_recipe_and_device(self, tmp_path: Path) -> None:
-        with pytest.raises(CaptureError) as exc_info:
+        # DeterministicCaptureError, not the base: see the missing-.bin test.
+        with pytest.raises(DeterministicCaptureError) as exc_info:
             self._flash(_bin_only(tmp_path), device="SOME-NEW-PART", load_addr=None)
 
         message = str(exc_info.value)

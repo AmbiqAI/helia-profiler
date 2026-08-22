@@ -18,7 +18,7 @@ from ..results import PowerObservation
 from ..config import DEFAULT_POWER_DURATION_S, WindowMode
 from ..errors import PowerError
 from ..pipeline import PipelineContext
-from ..power.diagnostics import probe_runs_inferences
+from ..power.diagnostics import count_noun, probe_runs_inferences
 from ..power.metadata import classify_observation
 from ..target.lifecycle import CapturePhase, prepare_target_for_phase
 
@@ -203,7 +203,8 @@ class CapturePowerStage:
         )
         message = "Arming instrument and resetting target"
         if planned_count is not None:
-            message += f" · {planned_count:,} inferences"
+            noun = count_noun(ctx.config.profiling.clean_window_probe, planned_count)
+            message += f" · {planned_count:,} {noun}"
         ctx.report_progress(
             message,
             eta_s=(

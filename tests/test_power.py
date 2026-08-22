@@ -1146,6 +1146,58 @@ class TestCapturePowerStage:
         assert ctx.power_run.observation.integrity == "degraded"
         assert ctx.power_result is degraded
 
+    def test_busy_loop_progress_message_says_pass_not_inference(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """#139: the arm/reset progress message must not call the busy_loop
+        probe's one calibrated spin an "inference" -- it runs none."""
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.stages.capture_power import CapturePowerStage
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "profiling": {"clean_window_probe": "busy_loop"},
+                "power": {"enabled": True, "firmware": "shared"},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.publish_power_plan(
+            PowerRunPlan(
+                firmware_mode="shared",
+                inference_count=1,
+                reference_inference_us=1_000_000,
+                count_source="probe_window",
+            )
+        )
+        degraded = PowerResult(
+            summary=PowerSummary(0.01, 0.018, 0.02, 0.18, 10.0, 10000),
+            metadata=PowerMetadata(
+                measurement_scope=MeasurementScope.FREE_FORM_CAPTURE,
+                observation_mode=ObservationMode.FREE_FORM,
+                gate_rise_observed=False,
+                gate_fall_observed=False,
+                integrity=PowerIntegrity.DEGRADED,
+            ),
+        )
+        monkeypatch.setattr(
+            "helia_profiler.capture.capture_power",
+            lambda *_args, **_kwargs: degraded,
+        )
+        messages: list[str] = []
+        ctx.progress_sink = lambda update: messages.append(update.message)
+
+        CapturePowerStage().run(ctx)
+
+        arming = next(m for m in messages if m.startswith("Arming instrument"))
+        assert "1 busy-loop pass" in arming
+        assert "inference" not in arming
+
     def test_internal_mode_skips_host_capture(self, tmp_path: Path):
         from helia_profiler.config import load_config
         from helia_profiler.pipeline import PipelineContext
@@ -1716,6 +1768,7 @@ class TestCapturePowerWrapper:
             "state_input_index": 1,
             "stats_rate_hz": 1000,
             "clean_infer_count": 5,
+            "work_noun": "inferences",
             "clean_infer_avg_us": None,
             "minimum_gate_s": 1.0,
             "gate_relative_tolerance": 0.10,
@@ -2095,15 +2148,123 @@ class TestPowerFirmwareSelection:
                 raise CaptureError("debug domain unavailable")
 
         monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", flash_binary)
+        cycles: list[str] = []
         monkeypatch.setattr(
             "helia_profiler.stages.flash_power.try_power_cycle_for_context",
-            lambda _ctx: True,
+            lambda _ctx: cycles.append("cycle") or True,
         )
 
         FlashPowerFirmwareStage().run(ctx)
 
         assert attempts == 2
+        assert cycles == ["cycle"]
         assert ctx.power_run is not None and ctx.power_run.deployment is not None
+
+    def test_dedicated_flash_deterministic_error_does_not_power_cycle(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """A config-gap refusal raises straight through: no rail cycle, no retry.
+
+        The missing-image and unknown-load-address refusals are deterministic —
+        a power cycle reproduces them identically — so cycling the DUT rail and
+        retrying only frames a configuration gap as flaky hardware (#151).
+        """
+        from helia_profiler.errors import DeterministicCaptureError
+        from helia_profiler.stages.flash_power import FlashPowerFirmwareStage
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        power_bin = tmp_path / "hpx_profiler_power"
+        power_bin.write_bytes(b"\x00")
+        ctx.publish_power_plan(
+            PowerRunPlan(firmware_mode="dedicated", inference_count=5, count_source="configured")
+        )
+        ctx.publish_power_firmware(
+            FirmwareArtifact(
+                role="power",
+                target_name="hpx_profiler_power",
+                app_dir=tmp_path,
+                build_dir=tmp_path,
+                binary_path=power_bin,
+            )
+        )
+        attempts = 0
+
+        def flash_binary(*_args, **_kwargs):
+            nonlocal attempts
+            attempts += 1
+            raise DeterministicCaptureError(
+                "No flashable image for hpx_profiler_power",
+                hint="Re-run the build; the NSX build emits both per target.",
+            )
+
+        monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", flash_binary)
+        cycles: list[str] = []
+        monkeypatch.setattr(
+            "helia_profiler.stages.flash_power.try_power_cycle_for_context",
+            lambda _ctx: cycles.append("cycle") or True,
+        )
+
+        with pytest.raises(DeterministicCaptureError) as exc_info:
+            FlashPowerFirmwareStage().run(ctx)
+
+        assert attempts == 1
+        assert cycles == []
+        # Re-wrapped with the stage context (same type — the taxonomy signal
+        # survives) so the user still sees WHICH deployment step refused;
+        # the hint renders exactly once (#172 review).
+        assert str(exc_info.value).startswith("Power firmware deployment failed: ")
+        assert "No flashable image" in str(exc_info.value)
+        assert str(exc_info.value).count("Hint:") == 1
+
+    @pytest.mark.parametrize("cycle_succeeds", [True, False])
+    def test_dedicated_flash_failure_prints_the_hint_exactly_once(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cycle_succeeds: bool
+    ):
+        """Wrapping must not embed the already-hint-suffixed str(exc) (#151).
+
+        ``HpxError.__str__`` appends ``Hint: …``, and the stage re-attaches the
+        inner hint via ``hint=``; interpolating ``str(exc)`` into the wrapper's
+        message therefore printed the hint twice, on both the no-recovery and
+        the retry-exhausted paths.
+        """
+        from helia_profiler.errors import BuildError, CaptureError
+        from helia_profiler.stages.flash_power import FlashPowerFirmwareStage
+
+        ctx = self._make_ctx(tmp_path, firmware="dedicated")
+        power_bin = tmp_path / "hpx_profiler_power"
+        power_bin.write_bytes(b"\x00")
+        ctx.publish_power_plan(
+            PowerRunPlan(firmware_mode="dedicated", inference_count=5, count_source="configured")
+        )
+        ctx.publish_power_firmware(
+            FirmwareArtifact(
+                role="power",
+                target_name="hpx_profiler_power",
+                app_dir=tmp_path,
+                build_dir=tmp_path,
+                binary_path=power_bin,
+            )
+        )
+
+        def flash_binary(*_args, **_kwargs):
+            raise CaptureError(
+                "debug domain unavailable",
+                hint="Check the probe connection.",
+            )
+
+        monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", flash_binary)
+        monkeypatch.setattr(
+            "helia_profiler.stages.flash_power.try_power_cycle_for_context",
+            lambda _ctx: cycle_succeeds,
+        )
+
+        with pytest.raises(BuildError) as exc_info:
+            FlashPowerFirmwareStage().run(ctx)
+
+        message = str(exc_info.value)
+        assert message.count("Check the probe connection.") == 1
+        assert message.count("Hint:") == 1
+        assert "debug domain unavailable" in message
 
     def test_shared_mode_does_not_flash_and_uses_dtr_holder_for_usb_cdc(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -2941,3 +3102,54 @@ class TestGatedCaptureCapabilityDetection:
 
         assert calls == ["check", "capture"]
         assert result.metadata.measurement_scope == "ungated"
+
+
+def test_clean_window_probe_classification_is_exhaustive():
+    """#139 item 4: _NON_INFERENCE_PROBES is a hand-kept literal (the hard
+    circular import keeps power.diagnostics below config), so nothing forced
+    a new CleanWindowProbe member to get a classification decision. This
+    table IS that decision: extending the enum fails here until the new
+    probe is classified — and the classifier is checked against it."""
+    from helia_profiler.config import CleanWindowProbe
+    from helia_profiler.power.diagnostics import (
+        _NON_INFERENCE_PROBES,
+        probe_runs_inferences,
+    )
+
+    assert _NON_INFERENCE_PROBES <= {p.value for p in CleanWindowProbe}
+    classified = {
+        CleanWindowProbe.INFER: True,
+        CleanWindowProbe.BUSY_LOOP: False,
+    }
+    assert set(classified) == set(CleanWindowProbe)
+    for probe, runs_inferences in classified.items():
+        assert probe_runs_inferences(probe) is runs_inferences
+
+
+def test_plan_power_progress_message_is_probe_aware(tmp_path, monkeypatch):
+    """#172 review: the seventh 'inferences' site — 'Power run planned ·
+    1 inferences' for a busy-loop plan that runs none."""
+    from helia_profiler.config import load_config
+    from helia_profiler.pipeline import PipelineContext
+    from helia_profiler.stages.plan_power import PlanPowerRunStage
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "profiling": {"clean_window_probe": "busy_loop"},
+            "power": {"enabled": True},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    messages: list[str] = []
+    ctx.progress_sink = lambda update: messages.append(update.message)
+
+    PlanPowerRunStage().run(ctx)
+
+    planned = next(m for m in messages if m.startswith("Power run planned"))
+    assert "1 busy-loop pass" in planned
+    assert "inference" not in planned

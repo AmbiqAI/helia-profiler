@@ -6,6 +6,7 @@ import logging
 
 from ..errors import CaptureError
 from ..pipeline import PipelineContext
+from ..power.diagnostics import count_noun
 
 log = logging.getLogger("hpx")
 
@@ -39,7 +40,8 @@ class CapturePmuStage:
         ctx.publish_profile_result(pmu_result)
         log.info("Captured PMU data: %d layers", len(pmu_result.layers))
         clean_us = pmu_result.meta.clean_infer_avg_us
-        timing = f" · {clean_us / 1000:.3f} ms/inference" if clean_us else ""
+        per_unit = count_noun(ctx.config.profiling.clean_window_probe, 1)
+        timing = f" · {clean_us / 1000:.3f} ms/{per_unit}" if clean_us else ""
         ctx.report_progress(
             f"Profile captured · {len(pmu_result.layers)} layers{timing}",
             kind="checkpoint",

@@ -279,8 +279,13 @@ silently (the ExecuTorch one did, and had to be converted back in #154).
    The optional seams (`engine_model_storage`, `engine_model_setup`,
    `engine_pre_start`, `engine_window_prologue`, `engine_window_restore`,
    `engine_profiler_on`, `engine_psram_metadata`, `engine_io_metadata`,
-   `engine_early_globals`, `engine_profiled_summary`, ...) have working
+   `engine_early_globals`, `engine_profiled_summary`,
+   `engine_pmu_storage_sram_resident`, ...) have working
    defaults — override one only where the default is wrong for your engine.
+   `engine_pmu_storage_sram_resident` is a value seam, not a code seam: it
+   renders the literal `true` (the default — per-layer storage lives in
+   shared SSRAM, and the profile binary powers that array on) or `false`
+   (storage in TCM; no SSRAM power-on). Any other value is a render error.
 
    `engine_clean_window` is the seam to think hardest about, and only applies if
    your engine's invoke is **not** a pure inference call. The default brackets

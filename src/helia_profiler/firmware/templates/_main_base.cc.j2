@@ -74,7 +74,19 @@
    the same test again.  Setting it down there instead left the include guard
    reading an undefined name -- StrictUndefined never fired because the guard
    spells it `pmu_profiler_sram_resident | default(false)`, so the disjunct was
-   simply dead and the narrow header silently stopped being emitted. #}{% set pmu_profiler_sram_resident = not (power_only | default(false)) %}{% include "_system_includes.j2" %}
+   simply dead and the narrow header silently stopped being emitted.
+
+   The SRAM-residency itself is a CHILD-declared fact (#161): every current
+   engine keeps its per-layer storage SRAM-resident, so the block default is
+   "true", but an engine that moves its array to TCM overrides
+   engine_pmu_storage_sram_resident to "false" and its profile binary skips
+   the unnecessary SSRAM power-on.  The block is declared inside a
+   set-capture so it emits nothing; power stays an unconditional override
+   here, not a child decision.  The vocabulary is exactly "true"/"false":
+   anything else (a Python-spelled "True", a stray "1") hits the guarded
+   empty-dict lookup below, whose KEY is the error message — StrictUndefined
+   surfaces it verbatim, naming the seam, instead of a silently un-backed
+   SSRAM array (#172 review, message wording round 2). #}{% set _pmu_storage_decl %}{% block engine_pmu_storage_sram_resident %}true{% endblock %}{% endset %}{% set _pmu_storage_value = _pmu_storage_decl | trim %}{% if _pmu_storage_value not in ("true", "false") %}{{ {}["engine_pmu_storage_sram_resident must render exactly 'true' or 'false', got '" ~ _pmu_storage_value ~ "'"] }}{% endif %}{% set pmu_profiler_sram_resident = (_pmu_storage_value == "true") and not (power_only | default(false)) %}{% include "_system_includes.j2" %}
 {% if apollo3_burst %}
 // Apollo3/3P TurboSPOT (burst) control lives in the AmbiqSuite HAL umbrella.
 #include "am_mcu_apollo.h"
@@ -179,7 +191,14 @@ int main(void) {
     // below only decrements it to 1, am_hal_tpiu_disable() returns
     // AM_HAL_STATUS_IN_USE, and am_bsp_itm_printf_disable()'s error
     // path is while(1) -- firmware hangs forever at clean_window_begin.
+{#- The dedicated power binary never reads DWT: every consumer is
+   profile-only or lives behind not-use_stimer_window, and power windows are
+   STIMER on every SoC.  Enabling TRCENA/CYCCNTENA there was debug circuitry
+   turned on for nothing in the image whose whole design is minimal
+   circuitry (#161/#164 review finding). -#}
+{%- if not power_only | default(false) %}
     dwt_init();
+{%- endif %}
     hpx_sync_init();
 {% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
     // Bring up the on-target INA228 before any heavy setup.

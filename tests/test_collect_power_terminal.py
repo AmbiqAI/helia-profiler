@@ -694,6 +694,44 @@ class TestBusyLoopProbeCompletesARun:
         # elapsed_us reaches the artifact -- the whole point of the probe.
         assert ctx.power_run.terminal.elapsed_us == 5000
 
+    def test_busy_loop_checkpoint_says_pass_not_inference(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """#139: the busy_loop probe runs no inferences, so the checkpoint
+        progress message must not call its one calibrated spin an
+        "inference"."""
+        ctx = _make_ctx(tmp_path, inference_count=5, clean_window_probe="busy_loop")
+        record = _record(requested_count=1, completed_count=1, elapsed_us=5000)
+        monkeypatch.setattr(
+            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            lambda transport: _FakeTerminalTransport(record),
+        )
+        messages: list[str] = []
+        ctx.progress_sink = lambda update: messages.append(update.message)
+
+        CollectPowerTerminalStage().run(ctx)
+
+        checkpoint = next(m for m in messages if m.startswith("Firmware confirmed"))
+        assert "1 busy-loop pass" in checkpoint
+        assert "inference" not in checkpoint
+
+    def test_infer_probe_checkpoint_still_says_inferences(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        ctx = _make_ctx(tmp_path, inference_count=5, clean_window_probe="infer")
+        record = _record()
+        monkeypatch.setattr(
+            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            lambda transport: _FakeTerminalTransport(record),
+        )
+        messages: list[str] = []
+        ctx.progress_sink = lambda update: messages.append(update.message)
+
+        CollectPowerTerminalStage().run(ctx)
+
+        checkpoint = next(m for m in messages if m.startswith("Firmware confirmed"))
+        assert checkpoint == "Firmware confirmed 5 inferences"
+
     def test_the_old_firmware_shape_is_still_rejected(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
@@ -711,6 +749,25 @@ class TestBusyLoopProbeCompletesARun:
 
         with pytest.raises(PowerError, match="does not match the host plan"):
             CollectPowerTerminalStage().run(ctx)
+
+    def test_busy_loop_incomplete_execution_says_busy_loop_not_inference(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """#139: an incomplete busy_loop window must not be reported as an
+        incomplete "inference" -- the window never ran one."""
+        ctx = _make_ctx(tmp_path, inference_count=5, clean_window_probe="busy_loop")
+        # requested_count matches expected_terminal_requested_count (1), so
+        # this reaches the completed/requested mismatch branch, not the
+        # "does not match the host plan" one.
+        record = _record(requested_count=1, completed_count=0, elapsed_us=0)
+        monkeypatch.setattr(
+            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            lambda transport: _FakeTerminalTransport(record),
+        )
+
+        with pytest.raises(PowerError, match="incomplete busy-loop execution") as excinfo:
+            CollectPowerTerminalStage().run(ctx)
+        assert "0/1 busy-loop pass" in (excinfo.value.hint or "")
 
     def test_infer_probe_still_expects_the_planned_count(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

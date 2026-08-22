@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..power.diagnostics import (
     assess_clean_window_clock_rate,
+    count_noun,
     assess_clean_window_stall,
     assess_gate_duration,
     assess_run_window_clock,
@@ -60,7 +61,9 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 _warning(
                     IssueCode.PROFILE_CLEAN_WINDOW_FROZEN,
                     "The clean window completed "
-                    f"{meta.clean_infer_count} inferences in zero elapsed "
+                    f"{meta.clean_infer_count} "
+                    f"{count_noun(ctx.config.profiling.clean_window_probe, meta.clean_infer_count)} "
+                    "in zero elapsed "
                     "time; the clock timing it never advanced. Latency "
                     "figures from this window are meaningless.",
                     clean_infer_count=meta.clean_infer_count,
@@ -238,12 +241,17 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 # mode gets its power from the instrument and only loses
                 # elapsed_us -- invalidating there would block comparability of
                 # a capture whose power metrics are sound.
+                # count_noun(..., N or 2): when the count is unknown/zero the
+                # generic plural reads right ("completed busy-loop passes");
+                # a real count of 1 gets the singular.
                 if internal_mode:
                     issues.append(
                         _error(
                             IssueCode.POWER_WINDOW_CLOCK_FROZEN,
-                            "Power firmware reported zero elapsed time for completed "
-                            "inferences; the on-device measurement derived from it is "
+                            "Power firmware reported zero elapsed time for "
+                            "completed "
+                            f"{count_noun(ctx.config.profiling.clean_window_probe, terminal.completed_count or 2)}; "
+                            "the on-device measurement derived from it is "
                             "corrupt.",
                             completed_count=terminal.completed_count,
                             elapsed_us=terminal.elapsed_us,
@@ -253,8 +261,10 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                     issues.append(
                         _warning(
                             IssueCode.POWER_WINDOW_CLOCK_FROZEN,
-                            "Power firmware reported zero elapsed time for completed "
-                            "inferences; the external instrument's power numbers are "
+                            "Power firmware reported zero elapsed time for "
+                            "completed "
+                            f"{count_noun(ctx.config.profiling.clean_window_probe, terminal.completed_count or 2)}; "
+                            "the external instrument's power numbers are "
                             "unaffected, but the firmware-reported window duration is "
                             "meaningless.",
                             completed_count=terminal.completed_count,

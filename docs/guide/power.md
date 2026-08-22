@@ -471,6 +471,10 @@ you understand the tradeoff:
   (mirroring AutoDeploy's `ns_power_config(bNeedSharedSRAM=true)`), even when
   the model runs entirely from TCM. Use it to measure SSRAM's static/
   retention contribution to the power floor.
+
+  The two levers are **mutually exclusive**: one powers the shared SSRAM
+  array down, the other forces it on, and the config is rejected with a
+  `ConfigError` if both are set.
 - **Crypto/OTP/radio shutdown** — the dedicated power binary automatically
   shuts down the crypto and OTP subsystems (and the radio subsystem, where
   the HAL exposes it) on AP5-family SoCs. This is capability-gated and needs

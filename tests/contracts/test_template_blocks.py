@@ -92,6 +92,7 @@ def test_base_blocks_are_the_documented_set():
         "engine_pass_preamble",
         "engine_pass_profile_arm",
         "engine_pass_warmup_arm",
+        "engine_pmu_storage_sram_resident",
         "engine_pre_start",
         "engine_print_csv",
         "engine_profiled_summary",
@@ -109,7 +110,7 @@ def test_base_blocks_are_the_documented_set():
 def test_base_block_count_is_pinned():
     """Belt to the set assertion's braces: a rename that swaps one name for
     another keeps the count, but an accidental extra seam does not."""
-    assert len(_blocks(BASE)) == 26
+    assert len(_blocks(BASE)) == 27
 
 
 #: Blocks every engine must supply: the base renders nothing (or nothing
@@ -286,6 +287,11 @@ LEADING_NEWLINE_BLOCKS = {
 #: carries the TRAILING newline instead of the leading one.
 GLUED_BLOCKS = {
     "engine_invoke",
+    # Declared inside a set-capture at the top of the base (#161): the
+    # override is the bare literal "true"/"false"; any newline it adds is
+    # swallowed by the capture's `| trim`, but the single-line shape keeps
+    # the declaration site legible.
+    "engine_pmu_storage_sram_resident",
     "engine_print_csv",
     "engine_profiler_off",
     "engine_reset_inputs",
@@ -395,4 +401,9 @@ def test_reserved_default_blocks_are_the_documented_set():
     claimed: set[str] = set()
     for child in CHILDREN:
         claimed |= _blocks(child)
-    assert base_blocks - claimed == {"engine_pass_preamble"}
+    assert base_blocks - claimed == {
+        "engine_pass_preamble",
+        # No engine keeps its per-layer storage in TCM yet, so the "true"
+        # default stands for all three children (#161).
+        "engine_pmu_storage_sram_resident",
+    }

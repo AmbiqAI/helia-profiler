@@ -9,6 +9,7 @@ from pathlib import Path
 from ..config import PowerFirmware
 from ..results import FirmwareArtifact
 from ..errors import BuildError, FirmwareError
+from ..power.diagnostics import count_noun
 from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
@@ -54,8 +55,11 @@ class BuildPowerFirmwareStage:
         if ctx.firmware_dir is None or ctx.build_dir is None:
             raise BuildError("Profile firmware workspace must be configured before power rebuild.")
 
+        noun = count_noun(
+            ctx.config.profiling.clean_window_probe, ctx.power_run.plan.inference_count
+        )
         ctx.report_progress(
-            f"Rendering fixed-N source for {ctx.power_run.plan.inference_count:,} inferences"
+            f"Rendering fixed-N source for {ctx.power_run.plan.inference_count:,} {noun}"
         )
 
         try:

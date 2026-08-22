@@ -30,11 +30,15 @@ wrong versions of this paragraph:
   Gate: ``multiplier <= 1.0`` is an error (strict ``TFLITE_CHECK_GT``).
 * **heliaAOT** does NOT share the helper -- it computes softmax scaling on
   the host -- but its own path fails one call later: ``calculate_input_radius``
-  does ``1 << shift`` on the frexp exponent, so ``multiplier < 0.5`` raises
-  ``ValueError: negative shift count`` inside the compiler (verified against
-  the pinned helia-aot 0.18). The first fix exempted AOT entirely after
-  verifying only the first call. Gate: ``multiplier < 0.5`` is an error with
-  an AOT-specific message; ``0.5 <= multiplier <= 1.0`` compiles but is
+  does ``1 << shift`` on the quantized-multiplier shift, so the compiler
+  raises ``ValueError: negative shift count`` exactly when that shift is
+  negative. The gate mirrors the shift computation itself
+  (``_aot_quantized_shift``) -- for positive multipliers that is the
+  Q31-rounded band ``[2**-32, 0.5)``, for negatives the boundaries differ
+  because the Q31 promotion fires only at ``+2**31`` (see the comment block
+  above ``_aot_quantized_shift``). The first fix exempted AOT entirely after
+  verifying only the first call. Gate: a negative shift is an error with an
+  AOT-specific message; ``0.5 <= multiplier <= 1.0`` compiles but is
   numerically degenerate (diff_min lands 7 orders of magnitude from healthy)
   and would abort under helia-rt, so it warns.
 * **ExecuTorch** consumes ``.pte`` and never reaches any of this.
@@ -50,10 +54,23 @@ would reject models that may run.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
 from ._tflite_reader import TENSOR_TYPE_UINT8, read_quantized_softmax_ops
+
+# helia-aot is an optional extra (same guard shape as model_analysis): the
+# verdict itself must stay pure arithmetic -- a preflight that needs the AOT
+# compiler installed to predict the AOT compiler is no preflight -- but where
+# the package IS present, constants that mirror its internals are read live
+# so a version bump moves them here instead of silently diverging (#147).
+try:
+    from helia_aot.air.options import (  # type: ignore[import-untyped]
+        AirSoftmaxOptions as _AirSoftmaxOptions,
+    )
+except ImportError:
+    _AirSoftmaxOptions = None
 
 #: ``kScaledDiffIntegerBits`` in TFLM's softmax_common.cc. The multiplier is
 #: scaled by ``2**(31 - this)``; 5 integer bits leaves 2**26.
@@ -62,26 +79,35 @@ TFLM_SOFTMAX_INTEGER_BITS = 5
 _MULTIPLIER_SHIFT = 31 - TFLM_SOFTMAX_INTEGER_BITS
 
 
-#: helia-aot 0.18 raises ``ValueError: negative shift count`` for multipliers
-#: in ``[2**-32, 0.5)``, and ONLY that band.
-#:
-#: ``AirFixedPointScale.from_real_multiplier`` stores the frexp exponent as
-#: the shift, which ``calculate_input_radius`` then feeds to ``1 << shift``.
-#: Multipliers in [0.5, 1) have exponent 0; below 0.5 it goes negative and the
-#: shift raises. But ``quantize_multiplier`` FLUSHES TO (0, 0) once the
-#: exponent would fall below -31, so an even smaller multiplier gets shift 0
-#: and compiles again. Measured against the pinned 0.18:
-#:
-#:     2**-33  shift  0  compiles      0.2889 (the issue)  shift -1  raises
-#:     2**-32  shift -31 raises        0.49                shift -1  raises
-#:     2**-31  shift -30 raises        0.5                 shift  0  compiles
-#:
-#: The first version of this gate errored on everything below 0.5, which
-#: blocked the sub-flush band that helia-aot compiles fine -- the same
-#: over-blocking mistake as gating heliaAOT at all, one dimension over. Both
-#: bounds are properties of the PINNED helia-aot; revisit on a version bump.
-AOT_COMPILER_MIN_MULTIPLIER = 0.5
-AOT_FLUSH_TO_ZERO_MULTIPLIER = 2.0**-32
+# How helia-aot 0.18 decides a quantized Softmax's fate, measured and then
+# mirrored exactly (the history matters — this gate has been wrong three
+# times, each in a different direction):
+#
+#   * ``AirFixedPointScale.from_real_multiplier`` -> ``quantize_multiplier``
+#     stores the frexp exponent as the shift; ``calculate_input_radius`` does
+#     ``1 << shift``, so a NEGATIVE shift raises ``ValueError`` inside the
+#     compiler. Shift < -31 is flushed to (0, 0) first (compiles), > 30 is
+#     clamped.
+#   * v1 of this gate errored on everything below 0.5 — over-blocking the
+#     sub-flush band. v2 used band constants on the raw multiplier — off by
+#     one ULP at each edge, because quantize_multiplier ROUNDS the fraction
+#     to Q31 (half up, promoting at +2**31) BEFORE the flush check. v3
+#     banded the ROUNDED value — exact for positives, but the promotion
+#     fires only at +2**31, so for negatives the rounded value is AMBIGUOUS
+#     (-0.5 arises from both a compiling and a raising state; #172 round-2).
+#   * The verdict therefore mirrors the SHIFT itself
+#     (:func:`_aot_quantized_shift`): error iff shift < 0. Measured against
+#     the pinned 0.18 (positive column, negatives differ per the above):
+#
+#       2**-33  shift  0  compiles      0.2889 (the issue)  shift -1  raises
+#       2**-32  shift -31 raises        0.49                shift -1  raises
+#       2**-31  shift -30 raises        0.5                 shift  0  compiles
+#
+# All of this mirrors the PINNED helia-aot's internals by hand. The tripwire
+# sweep in tests/test_softmax_preflight.py drives the REAL
+# ``preprocess_softmax_scaling`` / ``calculate_input_radius`` across every
+# edge — both signs — and fails CI's analysis-tests job if a version bump
+# moves any of it.
 
 #: What an ABSENT ``SoftmaxOptions`` table means for beta, per engine -- and
 #: they disagree, which is why the verdict cannot be computed once and shared.
@@ -90,8 +116,62 @@ AOT_FLUSH_TO_ZERO_MULTIPLIER = 2.0**-32
 #: the kernel as 0.0. helia-aot's ``SoftmaxOptions`` is a pydantic model whose
 #: field default is 1.0. Applying TFLM's convention to an AOT verdict is how
 #: this gate came to claim a crash that could not happen.
+#:
+#: AOT_ABSENT_BETA is read LIVE from the installed helia-aot's pydantic field
+#: default whenever the optional extra is present, so a version bump that
+#: changes the default changes this constant with it; 1.0 is the fallback for
+#: installs without the extra, pinned by test_softmax_preflight (#147).
 TFLM_ABSENT_BETA = 0.0
-AOT_ABSENT_BETA = 1.0
+
+
+def _read_aot_absent_beta() -> float:
+    """Live-read helia-aot's beta default, degrading to 1.0 on ANY failure.
+
+    This runs at import time of a module that stages/preflight.py pulls in
+    for every engine, so a helia-aot bump that makes the field required or
+    renames it must not turn into "hpx won't start" — it degrades here and
+    fails LOUDLY in analysis-tests instead, where the aot-guarded pinning
+    test compares this value against the real default (#172 review).
+    """
+    if _AirSoftmaxOptions is None:
+        return 1.0
+    try:
+        return float(_AirSoftmaxOptions().beta)
+    except Exception:  # noqa: BLE001 - degrade, never block startup
+        return 1.0
+
+
+AOT_ABSENT_BETA = _read_aot_absent_beta()
+
+
+def _aot_quantized_shift(multiplier: float) -> int:
+    """The shift helia-aot's ``quantize_multiplier`` emits — sign included.
+
+    ``calculate_input_radius`` raises exactly when this is negative
+    (``1 << shift``), so the verdict asks THIS, not a band on the rounded
+    value: for negative multipliers the rounded value is ambiguous — the
+    ``== 1 << 31`` promotion fires only for positive fractions, so ``-0.5``
+    arises both from exponent 0 (compiles) and from ``-0.49999999999999994``
+    rounding to ``-2**31`` at exponent -1 (raises). Positives never hit the
+    ambiguity, which is why the band constants stayed exact there; the
+    round-2 review's negative sweep is what exposed the asymmetry (218/689
+    disagreements under a sign-blind guard). Mirrors the pinned
+    ``helia_aot.air.utils.quantize_multiplier`` expression for expression:
+    zero early-out, frexp, Q31 round-half-up, positive-only promotion, the
+    ``shift < -31`` flush to (0, 0), and the ``shift > 30`` clamp.
+    """
+    if multiplier == 0.0:
+        return 0
+    fraction, exponent = math.frexp(multiplier)
+    quantized = math.floor(fraction * (1 << 31) + 0.5)
+    if quantized == (1 << 31):
+        quantized //= 2
+        exponent += 1
+    if exponent < -31:
+        return 0
+    if exponent > 30:
+        return 30
+    return exponent
 
 
 def aot_softmax_verdict(multiplier: float) -> str:
@@ -103,13 +183,20 @@ def aot_softmax_verdict(multiplier: float) -> str:
     magnitude too small for a meaningful softmax, and the same model aborts
     under helia-rt -- worth telling the user, not worth blocking a profile.
 
-    NaN is checked first and errors: it can only come from a corrupt file, and
-    every ordered comparison against it is False, so falling through would
-    return 'ok' for a model helia-aot raises on (found by review).
+    NaN errors (only a corrupt file produces it, and every ordered
+    comparison against it is False, so falling through returned 'ok' for a
+    model helia-aot raises on). ``-inf`` errors: ``preprocess_softmax_scaling``
+    overflows the Q31 floor on it. Other negatives get the SAME shift mirror
+    as positives — the first #172 fix blanket-errored them, and the round-2
+    negative sweep showed the real chain compiles most of that domain
+    (e.g. -0.75, shift 0); the corrupt-file smell is real but the verdict's
+    contract is the compiler's fate, nothing else.
     """
     if multiplier != multiplier:  # NaN
         return "error"
-    if AOT_FLUSH_TO_ZERO_MULTIPLIER <= multiplier < AOT_COMPILER_MIN_MULTIPLIER:
+    if not math.isfinite(multiplier):
+        return "error" if multiplier < 0.0 else "ok"
+    if _aot_quantized_shift(multiplier) < 0:
         return "error"
     if multiplier <= 1.0:
         return "warn"
