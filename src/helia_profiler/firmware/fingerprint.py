@@ -13,9 +13,11 @@ leaves stored baselines untouched.
 Accepted residuals, documented rather than silently claimed: rendered build
 configuration (``CMakeLists.txt`` compile options/definitions,
 ``modules.cmake``, ``nsx.yml``) and external module sources are NOT part of
-the hash — ``nsx.yml`` carries a known set-ordering nondeterminism that
-would make the fingerprint differ run-to-run, and dependency identity is
-partially covered by the toolchain/compiler dimensions. The claim is
+the hash — build configuration is a different comparison axis than "what
+code ran in the window", and dependency identity is partially covered by
+the toolchain/compiler dimensions. (The nsx.yml set-ordering
+nondeterminism that originally forced its exclusion was fixed in #174;
+including build config is now possible if ever worth the blast radius.) The claim is
 therefore "the rendered C sources of the measured target", not "the exact
 binary".
 

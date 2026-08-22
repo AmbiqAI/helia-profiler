@@ -513,8 +513,8 @@ _ERROR_HINTS: dict[FirmwareErrorCode, str] = {
     ),
     FirmwareErrorCode.PSRAM_INIT_FAILED: (
         "PSRAM initialisation failed on the target.  Verify the board "
-        "actually has PSRAM populated and that --model-location=psram is "
-        "appropriate for this hardware."
+        "actually has PSRAM populated and that --weights-location / "
+        "--arena-location psram is appropriate for this hardware."
     ),
     FirmwareErrorCode.PSRAM_INFO_FAILED: (
         "PSRAM initialised but its info query failed, so the firmware has no "
@@ -527,40 +527,49 @@ _ERROR_HINTS: dict[FirmwareErrorCode, str] = {
     FirmwareErrorCode.BIND_ARENA_FAILED: (
         "heliaAOT rejected an externally allocated arena region — the "
         "payload carries the runtime's status and the region id.  The "
-        "profiler sizes and binds each buffer from the generated module's "
-        "own manifest, so this usually means the compiled module and the "
-        "manifest disagree: regenerate the heliaAOT module and rebuild so "
-        "region ids and sizes match."
+        "module and its arena table come from the SAME compiler run, so "
+        "re-running changes nothing.  The known way a region id goes "
+        "missing host-side is an arena whose memory kind hpx cannot map: "
+        "that is skipped with only a log warning, so re-run with -v and "
+        "look for 'unknown AOT arena memory' just before the build."
     ),
     FirmwareErrorCode.CONST_BLOB_PSRAM_WRITE_FAILED: (
         "Copying a constant sidecar blob into its PSRAM-placed arena region "
         "failed (the payload names the region).  PSRAM itself came up, so "
-        "this points at the MSPI write path: power-cycle and retry, try a "
-        "lower target.psram.clock_hz, or place that arena region in internal "
-        "memory instead of PSRAM."
+        "this points at the MSPI write path: power-cycle and retry, or try "
+        "a lower target.psram.clock_hz.  Constant arenas follow the "
+        "WEIGHTS placement (arena-location does not move them): set "
+        "--weights-location / model.weights_location off psram, or steer "
+        "the AOT planner via engine.config.aot_args.memory.tensors."
     ),
     FirmwareErrorCode.EXECUTORCH: (
         "An ExecuTorch runtime call failed: stage= names the failing call "
         "and error= is the numeric executorch::Error.  If planned= is "
         "non-zero the method needs that many planned-arena bytes — raise "
-        "model.arena_size to at least that value.  Otherwise check the "
+        "model.arena_size (or engine.config.planned_arena_size, which "
+        "overrides it when set) to at least that value.  Otherwise check the "
         "engine config's method_arena_size / temporary_arena_size and that "
         "the .pte was exported for this runtime version."
     ),
     FirmwareErrorCode.OPERATOR_COUNT_EXCEEDS_CAPACITY: (
         "The model ran more operators than the per-layer record array holds "
-        "(the payload reports the capacity), so the CSV rows that follow are "
-        "truncated.  Capacity comes from the platform's pmu_max_ops — raise "
-        "it via a custom platform spec (pmu_max_ops) or profile a model with "
+        "(the payload reports the capacity); the firmware PARKS here, so no "
+        "CSV follows at all.  Capacity comes from the SoC's pmu_max_ops — "
+        "raise it via target.custom_socs.<name>.pmu_max_ops (a custom SoC "
+        "based_on this one, with the board repointed at it), noting each "
+        "entry costs ~24 bytes of reserved RAM — or profile a model with "
         "fewer executed operators."
     ),
     FirmwareErrorCode.PMU_INIT_OR_SELFTEST_FAILED: (
         "PMU bring-up failed for the named counter pass: either the PMU "
         "driver rejected the event selection or the CPU-cycles self-test "
         "read zero from a frozen counter.  The preceding "
-        "HPX_PMU_INIT_STATUS / HPX_PMU_SELFTEST_CPU_CYCLES lines say which.  "
-        "Check that every selected --pmu-counters event exists on this core "
-        "and that the pass does not select more counters than the PMU has."
+        "HPX_PMU_INIT_STATUS / HPX_PMU_SELFTEST_CPU_CYCLES lines say which "
+        "(the self-test also fails on a read error, not only a frozen "
+        "counter).  Check that every selected --pmu-counters event exists "
+        "on this core.  Over-selecting counters does NOT cause this error — "
+        "the firmware clamps to the hardware maximum and silently drops the "
+        "extra columns."
     ),
 }
 

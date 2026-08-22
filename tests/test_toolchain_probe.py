@@ -265,7 +265,9 @@ def test_a_region_qualified_heap_name_is_matched(tmp_path: Path, monkeypatch) ->
 # ---------------------------------------------------------------------------
 #
 # Real output captured from Arm Compiler for Embedded 6.23 (fromelf
-# [5f102800]) on an ELF built to reproduce the #24 shape for armlink:
+# [5f102800]) on an ELF built to reproduce the #24 shape for armlink:  (fromelf's own --vsn serial; the capture's
+    # ELF headers show armlink [5f102400]/armclang [5f103000] — different tools,
+    # different serials, same AC6 6.23 install)
 # 248 bytes of genuine zero-init state, an ARM_LIB_HEAP execution region of
 # 391,928 bytes (the reservation), and a 4,096-byte ARM_LIB_STACK (the live
 # stack). ARM_LIB_HEAP / ARM_LIB_STACK are the exact region names NSX's own
@@ -423,3 +425,18 @@ def test_size_and_fromelf_parsers_agree_on_the_same_binary_shape(
     )
     assert via_fromelf.bss == _REAL_TRUE_BSS + _REAL_STACK
     assert via_fromelf.reserved == _REAL_HEAP
+
+
+def test_combined_stackheap_region_stays_bss():
+    """#175 review NIT: ARM_LIB_STACKHEAP (combined region) contains the
+    live stack and cannot be split — per #131's never-invent rule it stays
+    in bss with reserved=0. Verified against a real armlink build by the
+    #175 review (bss=65784, reserved=0); pinned here with a synthetic -v
+    listing in the real output shape."""
+    listing = (
+        "** Section #4 'ARM_LIB_STACKHEAP' (SHT_NOBITS) [SHF_ALLOC + SHF_WRITE]\n"
+        "    Size   : 65536 bytes (alignment 8)\n"
+    )
+    from helia_profiler.toolchain_probe import _reserved_from_section_listing
+
+    assert _reserved_from_section_listing(listing) == 0

@@ -317,7 +317,7 @@ sum, so `text + data + bss + reserved` reconciles against it.
 
 !!! note "armclang reports the same split"
     armclang binaries are measured with `fromelf` rather than `size`, and
-    before HPX 0.1.7 that path had no per-section detail — an armclang build
+    before #132 landed that path had no per-section detail — an armclang build
     folded the linker's heap reservation into `bss`, so comparing it against
     a GCC run of the same source showed a large `bss` difference that was
     entirely an artifact of the measuring tool. `fromelf`'s per-section

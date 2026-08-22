@@ -2137,10 +2137,12 @@ class TestNsxModuleOverrides:
 def test_project_override_order_is_hash_seed_independent():
     """#174: the fallback loop's insertion order reaches yaml.safe_dump
     (sort_keys=False) and becomes nsx.yml's module_registry block order —
-    bare set iteration made the rendered file and the workspace manifest
-    hash vary with PYTHONHASHSEED across processes (demonstrated across
-    seeds by two #173 review lenses). Run the resolver in subprocesses
-    under different seeds and require identical ordering."""
+    bare set iteration made the rendered BYTES vary with PYTHONHASHSEED
+    across processes. (The workspace manifest hash was never affected —
+    nsx's hash_manifest canonicalises with sort_keys=True; the #175 review
+    corrected the original claim.) Run the resolver in subprocesses under
+    different seeds and require identical ordering."""
+    import json
     import subprocess
     import sys
 
@@ -2163,11 +2165,11 @@ print(json.dumps(list(overrides)))
             [sys.executable, "-c", script],
             capture_output=True,
             text=True,
-            env={
-                **__import__("os").environ,
-                "PYTHONHASHSEED": seed,
-            },
+            env={**os.environ, "PYTHONHASHSEED": seed},
             check=True,
         )
         orders.append(proc.stdout.strip())
     assert orders[0] == orders[1] == orders[2], orders
+    # Vacuity guard (#175 review m9): an empty resolver result would pass
+    # the equality trivially while asserting nothing.
+    assert len(json.loads(orders[0])) >= 2

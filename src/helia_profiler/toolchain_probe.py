@@ -139,6 +139,9 @@ def _sections_via_size(
 #: 6.23's table puts the numbers BEFORE the row label -- but it is kept as
 #: the last-resort fallback so an unrecognised variant degrades to the old
 #: behaviour instead of reporting nothing (#132).
+#: Totals-row labels in the component-sizes table ("ROM Totals for x.axf",
+#: "Object Totals", "Library Totals", "Grand Totals").
+_FROMELF_TOTALS_LABEL_RE = re.compile(r"(?:ROM|Object|Library|Grand)\s+Totals\b")
 _FROMELF_TOTALS_RE = re.compile(r"\s*Grand Totals?\s*[:\s]+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)")
 
 #: Column header of ``fromelf --text -z``'s "Object/Image Component Sizes"
@@ -193,6 +196,13 @@ def _is_reserved_section_name(name: str) -> bool:
     the name alone is not evidence. Note ``ARM_LIB_STACK`` does NOT match,
     for the same reason ``.stack`` does not: it is the live stack (armlink
     points the initial SP at its top), so it belongs in the footprint.
+
+    Reachability note (#175 review m3): the case-insensitivity only matters
+    on the fromelf path — armlink's conventional upper-case region names
+    (ARM_LIB_HEAP) never reach the readelf caller, whose section regex
+    anchors on a leading dot. Known accepted false positive: a user section
+    whose name tokenizes to a heap token (e.g. MY_HEAP_STATS) counts as
+    reserved; no shipped NSX linker script or scatter produces one.
     """
     tokens = set(name.lower().lstrip(".").replace("_", ".").split("."))
     return bool(tokens & _RESERVED_NOBITS_NAMES)
@@ -310,7 +320,14 @@ def _reserved_via_fromelf(
     if result.returncode != 0:
         log.debug("fromelf -v failed: %s", (result.stderr or "").strip())
         return None
+    return _reserved_from_section_listing(result.stdout or "")
 
+
+def _reserved_from_section_listing(stdout: str) -> int | None:
+    """Parse a ``fromelf --text -v`` section listing for reserved bytes.
+
+    Split from :func:`_reserved_via_fromelf` so the classification rules are
+    testable without spawning the tool (#175 review)."""
     reserved = 0
     seen_section = False
     block: dict[str, str] | None = None
@@ -328,7 +345,7 @@ def _reserved_via_fromelf(
         size_match = _FROMELF_SIZE_BYTES_RE.match(fields.get("Size", ""))
         return int(size_match.group(1)) if size_match else 0
 
-    for line in (result.stdout or "").splitlines():
+    for line in stdout.splitlines():
         if _FROMELF_SECTION_START_RE.match(line):
             reserved += _consume(block)
             block = {}
@@ -358,7 +375,7 @@ def _fromelf_totals(stdout: str) -> tuple[int, int, int, int] | None:
     kept as a final fallback for unrecognised variants.
     """
     in_table = False
-    image_row: tuple[int, int, int, int] | None = None
+    image_rows: list[tuple[int, int, int, int]] = []
     for line in stdout.splitlines():
         if _FROMELF_SIZES_HEADER_RE.match(line):
             in_table = True
@@ -370,14 +387,24 @@ def _fromelf_totals(stdout: str) -> tuple[int, int, int, int] | None:
             continue
         row = (int(m.group(1)), int(m.group(3)), int(m.group(4)), int(m.group(5)))
         name = m.group(7)
+        # Totals rows are recognised by their LABEL PREFIX, never by
+        # substring: fromelf prints the full input path in the Object Name
+        # column, so a build directory containing "Totals" made the
+        # substring test skip the image row too and the probe silently
+        # returned no sections (#175 review m1, reproduced on the real
+        # tool).
         if name.startswith("Grand Totals"):
             return row
-        if "Totals" in name:
+        if _FROMELF_TOTALS_LABEL_RE.match(name):
             continue
-        if image_row is None:
-            image_row = row
-    if image_row is not None:
-        return image_row
+        image_rows.append(row)
+    # A LINKED image emits exactly one image row (verified across single-
+    # and multi-load-region, C++, and production .axf inputs on the real
+    # tool). More than one data row means we were handed something else —
+    # a library or object listing — where "first row" would be silently
+    # wrong numbers; degrade instead (#175 review m2).
+    if len(image_rows) == 1:
+        return image_rows[0]
     for line in stdout.splitlines():
         m = _FROMELF_TOTALS_RE.match(line)
         if m:
