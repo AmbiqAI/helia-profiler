@@ -250,6 +250,15 @@ class CollectPowerTerminalStage:
                     integrity=PowerIntegrity.VALID,
                     source=measurement.source,
                     inference_count=measurement.inference_count,
+                    # Artifact-level POWER_FIRMWARE: without it, a
+                    # manifest-less internal-mode pair — the very mode of
+                    # #115's phantom delta — cannot establish the platform
+                    # scope and the fingerprint gate silently skips
+                    # (#173 review m4). External mode sets it in
+                    # capture/__init__.py; this is the internal twin.
+                    power_firmware=ctx.power_run.plan.firmware_mode
+                    if ctx.power_run
+                    else None,
                 ),
             )
         if frozen_window_clock:

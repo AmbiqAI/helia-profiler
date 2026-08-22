@@ -42,6 +42,32 @@ class TestCanonicalCode:
         assert canonical_code("int a/* c */int b") == "int a int b"
         assert canonical_code("int a// c\nint b") == "int a int b"
 
+    def test_directive_line_structure_survives(self):
+        """#173 review m1: newline is significant to the preprocessor — a
+        directive line joined with the next code line is semantically
+        different and must not hash equal."""
+        split = canonical_code("#define A 1\nint x;")
+        joined = canonical_code("#define A 1 int x;")
+        assert split != joined
+        assert split == "#define A 1\nint x;"
+        # #if/#endif structure likewise:
+        assert canonical_code("#if X\nint a;\n#endif\nint b;") == (
+            "#if X\nint a;\n#endif\nint b;"
+        )
+        # ...but a block comment INSIDE a directive is phase-3 whitespace,
+        # not a directive break:
+        assert canonical_code("#define A 1 /* c\n c */ + 2\nint x;") == (
+            "#define A 1 + 2\nint x;"
+        )
+
+    def test_stray_apostrophe_cannot_swallow_the_file(self):
+        """#173 review m2: a digit separator (1'000) is not a char literal —
+        literal scanning stops at the newline, so stripping keeps working."""
+        src = "int a = 1'000;\n// gone\nint b = 2; // gone too\nchar c = 'x';"
+        out = canonical_code(src)
+        assert "gone" not in out
+        assert "'x'" in out
+
     def test_pure_comment_and_whitespace_lines_vanish(self):
         # The property that makes comment-only template churn invisible.
         assert canonical_code("a;\n\n// note\n\nb;") == canonical_code("a;\nb;")
@@ -86,6 +112,8 @@ class TestFingerprintStability:
 class TestMeasuredPowerFingerprint:
     def _ctx(self, tmp_path, firmware_mode: str):
         from helia_profiler.config import load_config
+
+        tmp_path.mkdir(parents=True, exist_ok=True)
         from helia_profiler.pipeline import PipelineContext
         from helia_profiler.results import PowerRunPlan
 
@@ -108,23 +136,38 @@ class TestMeasuredPowerFingerprint:
             )
         )
         src = tmp_path / "fw" / "src"
-        src.mkdir(parents=True)
+        src.mkdir(parents=True, exist_ok=True)
         (src / "main.cc").write_text("int main(void) { return 1; }\n")
         (src / "main_power.cc").write_text("int main(void) { return 2; }\n")
+        (src / "hpx_pmu_profiler.cc").write_text("void hpx_prof(void) {}\n")
+        (src / "hpx_pmu_profiler.h").write_text("void hpx_prof(void);\n")
         ctx.firmware_dir = tmp_path / "fw"
         return ctx
 
-    def test_dedicated_hashes_the_power_render(self, tmp_path):
-        ctx = self._ctx(tmp_path, "dedicated")
-        assert measured_power_fingerprint(ctx) == firmware_code_fingerprint(
-            "int main(void) { return 2; }\n"
-        )
+    def test_dedicated_and_shared_hash_their_own_main(self, tmp_path):
+        dedicated = measured_power_fingerprint(self._ctx(tmp_path, "dedicated"))
+        shared = measured_power_fingerprint(self._ctx(tmp_path, "shared"))
+        assert dedicated is not None and shared is not None
+        assert dedicated != shared  # routed to different main TUs
 
-    def test_shared_hashes_the_profile_render(self, tmp_path):
-        ctx = self._ctx(tmp_path, "shared")
-        assert measured_power_fingerprint(ctx) == firmware_code_fingerprint(
-            "int main(void) { return 1; }\n"
-        )
+    def test_profiler_translation_unit_is_part_of_the_hash(self, tmp_path):
+        """#173 review M1: hpx_pmu_profiler.cc is compiled into the measured
+        target and its per-op hooks run inside the gated window — an edit
+        there must shift the fingerprint like any main-TU edit."""
+        ctx = self._ctx(tmp_path, "dedicated")
+        before = measured_power_fingerprint(ctx)
+        prof = ctx.firmware_dir / "src" / "hpx_pmu_profiler.cc"
+        prof.write_text(prof.read_text() + "int hpx_extra;\n")
+        assert measured_power_fingerprint(ctx) != before
+
+    def test_missing_profiler_file_degrades_deterministically(self, tmp_path):
+        ctx = self._ctx(tmp_path, "dedicated")
+        (ctx.firmware_dir / "src" / "hpx_pmu_profiler.h").unlink()
+        one = measured_power_fingerprint(ctx)
+        two = measured_power_fingerprint(ctx)
+        assert one is not None and one == two
+        full = measured_power_fingerprint(self._ctx(tmp_path / "again", "dedicated"))
+        assert one != full  # absent differs from any present content
 
     def test_no_plan_or_missing_file_returns_none(self, tmp_path):
         from helia_profiler.config import load_config

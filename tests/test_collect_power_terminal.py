@@ -203,6 +203,11 @@ def test_internal_terminal_measurement_becomes_power_result(
     assert ctx.power_run.on_device_summary is measurement
     assert ctx.power_result is not None
     assert ctx.power_result.summary.energy_j == pytest.approx(0.09)
+    # Artifact-level POWER_FIRMWARE (#173 review m4): without it, a
+    # manifest-less INTERNAL-mode pair — the very mode of #115's phantom
+    # delta — cannot establish the fingerprint's platform scope and the
+    # POWER_METRIC_BLOCKING gate silently degrades to nothing.
+    assert ctx.power_result.metadata.power_firmware == "dedicated"
     assert ctx.power_result.summary.duration_s == pytest.approx(0.005)
     assert ctx.power_result.summary.avg_current_a == pytest.approx(10.0)
     assert ctx.power_result.metadata.source == "ina228"

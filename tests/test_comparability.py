@@ -519,3 +519,25 @@ class TestPowerFirmwareFingerprint:
         assessment = assess_comparability(left, right)
 
         assert not any(issue.code == self.CODE for issue in assessment.issues)
+
+
+def test_scoped_to_is_declared_only_where_the_comparator_honours_it():
+    """#173 review m3: only the POWER_DIMENSION_MISMATCH loop consults
+    scoped_to — a spec declaring it under any other effect would be silently
+    ignored, the exact failure mode the registry exists to prevent. Pin the
+    invariant as registry data until a second loop needs the mechanism."""
+    from helia_profiler.results.dimensions import (
+        DIMENSION_REGISTRY,
+        DimensionEffect,
+    )
+
+    for spec in DIMENSION_REGISTRY.values():
+        if spec.scoped_to:
+            assert spec.effect is DimensionEffect.POWER_METRIC_BLOCKING, (
+                f"{spec.dimension} declares scoped_to under {spec.effect}, "
+                "which no comparator loop honours"
+            )
+        # A scope member must itself be resolvable for both runs, i.e. a
+        # registry dimension.
+        for scope in spec.scoped_to:
+            assert scope in DIMENSION_REGISTRY

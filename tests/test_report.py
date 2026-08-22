@@ -694,13 +694,13 @@ def test_write_summary_carries_the_power_firmware_fingerprint(tmp_path: Path):
     """#138: the measured binary's code hash must reach summary.power so the
     POWER_FIRMWARE_FINGERPRINT comparability dimension has an artifact value
     — and must be simply absent (legacy semantics) when no source exists."""
-    from helia_profiler.firmware.fingerprint import firmware_code_fingerprint
+    from helia_profiler.firmware import measured_power_fingerprint
     from helia_profiler.results import PowerRunPlan
 
     ctx = _gated_power_ctx(
         tmp_path, clean_infer_count=10, clean_infer_avg_us=10000, duration_s=0.1
     )
-    # Direct assignment (the line-926 precedent): publish_power_plan resets
+    # Direct assignment (the same-file PowerRun precedent): publish_power_plan resets
     # power_result, which _gated_power_ctx already installed.
     from helia_profiler.results import PowerRun
 
@@ -716,8 +716,11 @@ def test_write_summary_carries_the_power_firmware_fingerprint(tmp_path: Path):
 
     summary = json.loads(_write_summary(ctx, tmp_path).read_text())
 
-    assert summary["power"]["firmware_code_fingerprint"] == firmware_code_fingerprint(
-        "int main(void) { return 7; }\n"
+    # The composite source-set hash (main + profiler TUs) — same helper the
+    # writer uses, so this pins passthrough, not the hash construction
+    # (tests/test_firmware_fingerprint.py owns that).
+    assert summary["power"]["firmware_code_fingerprint"] == measured_power_fingerprint(
+        ctx
     )
 
     # No rendered source (a hand-built or legacy context): key absent, run OK.

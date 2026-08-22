@@ -1,11 +1,23 @@
 """Code fingerprint of a rendered firmware source (#138 / #115).
 
 The power-comparability dimension ``POWER_FIRMWARE_FINGERPRINT`` hashes the
-rendered main source of whichever binary ``CapturePowerStage`` measures, so a
-firmware-semantics change stops comparing as "fully comparable" against a
-baseline captured by different code (#115's +678% phantom delta) — while a
-COMMENT-only template change (a frequent, deliberately byte-visible event in
-this repo's review culture) leaves stored baselines untouched.
+RENDERED SOURCE SET of whichever binary ``CapturePowerStage`` measures — the
+main translation unit plus ``hpx_pmu_profiler.{h,cc}``, which the build
+compiles into the same target and whose per-operator hooks execute inside
+the gated window (#173 review M1) — so a firmware-semantics change stops
+comparing as "fully comparable" against a baseline captured by different
+code (#115's +678% phantom delta), while a COMMENT-only template change (a
+frequent, deliberately byte-visible event in this repo's review culture)
+leaves stored baselines untouched.
+
+Accepted residuals, documented rather than silently claimed: rendered build
+configuration (``CMakeLists.txt`` compile options/definitions,
+``modules.cmake``, ``nsx.yml``) and external module sources are NOT part of
+the hash — ``nsx.yml`` carries a known set-ordering nondeterminism that
+would make the fingerprint differ run-to-run, and dependency identity is
+partially covered by the toolchain/compiler dimensions. The claim is
+therefore "the rendered C sources of the measured target", not "the exact
+binary".
 
 The comment stripper is the same C scanner discipline the render census uses
 (``tests/contracts/test_wire_protocol.py::_split_c``): character-walk the
@@ -16,11 +28,15 @@ every override is what makes attempt 1's four documented regressions
 structurally impossible (see #138).
 
 The canonical form replaces every comment with a single space and collapses
-whitespace runs (outside string/char literals) to single spaces. Both are
-token-stream-preserving in C — two sources equal under this canonicalization
-compile to identical token sequences — and the whitespace collapse is what
-makes comment-ONLY changes truly invisible: a line comment occupies a line,
-so merely deleting its text while keeping its newline would still shift the
+whitespace runs (outside string/char literals) to single spaces — EXCEPT
+that a newline adjacent to a preprocessing-directive line survives as a
+newline: newline is significant in translation phases 3/4, and collapsing
+it let ``#define A 1\nint x;`` canonicalize equal to its one-line,
+semantically different join (#173 review m1, demonstrated on a real
+render). With that carve-out the canonicalization is token-stream- and
+directive-structure-preserving, and the whitespace collapse is what makes
+comment-ONLY changes truly invisible: a line comment occupies a line, so
+merely deleting its text while keeping its newline would still shift the
 hash on every comment insertion (found by this module's own stability test
 against a real render).
 """
@@ -37,51 +53,85 @@ if TYPE_CHECKING:
 def canonical_code(text: str) -> str:
     """Canonical token-preserving form: comments and whitespace normalized.
 
-    Every ``//`` and ``/* */`` comment becomes a single space (never nothing —
-    ``int a// c<newline>int b`` must not glue to ``int aint b``), and every
-    whitespace run outside string/char literals collapses to a single space.
-    String literals (``"…"``) and character literals (``'…'``) are preserved
-    verbatim, escapes included, so comment markers and spacing inside them
-    survive. An unterminated literal or block comment consumes to
-    end-of-input rather than raising — a fingerprint must never fail a run
-    over malformed input; it only has to be deterministic.
+    Every comment becomes a single space (never nothing — ``int a// c`` plus
+    ``int b`` on the next line must not glue to ``int aint b``), and every
+    whitespace run outside string/char literals collapses to a single space —
+    except that a newline run touching a preprocessing-directive line (the
+    closed line began with ``#``, or the next content starts with ``#``)
+    survives as a newline, because newline is significant to the
+    preprocessor and collapsing it made semantically different sources hash
+    equal (#173 review m1). A ``/* */`` comment's INTERNAL newlines do not
+    count — translation phase 3 replaces the whole comment with one space
+    before directives are processed, so a directive continues across it.
+
+    String and char literals are preserved verbatim, escapes included, but
+    literal scanning terminates at an unescaped newline: C literals cannot
+    span lines without continuation, and consuming past the newline let one
+    stray apostrophe (a digit separator, ``1'000``) swallow the rest of the
+    file and silently disable comment stripping (#173 review m2). Malformed
+    input degrades — a fingerprint must never fail a run; it only has to be
+    deterministic.
     """
     out: list[str] = []
+    pending_ws = False
+    pending_nl = False
+    line_is_directive = False
+    line_has_content = False
 
-    def emit_space() -> None:
-        if out and out[-1] != " ":
-            out.append(" ")
+    def emit(chunk: str) -> None:
+        nonlocal pending_ws, pending_nl, line_is_directive, line_has_content
+        if pending_ws:
+            if pending_nl and (line_is_directive or chunk.startswith("#")):
+                if out:
+                    out.append("\n")
+                line_is_directive = False
+                line_has_content = False
+            elif out:
+                out.append(" ")
+            pending_ws = False
+            pending_nl = False
+        if not line_has_content and chunk.startswith("#"):
+            line_is_directive = True
+        line_has_content = True
+        out.append(chunk)
+
+    def note_ws(newline: bool) -> None:
+        nonlocal pending_ws, pending_nl
+        pending_ws = True
+        pending_nl = pending_nl or newline
 
     i, n = 0, len(text)
     while i < n:
         char = text[i]
         if char == "/" and text.startswith("//", i):
             end = text.find("\n", i)
-            i = n if end < 0 else end + 1
-            emit_space()
+            i = n if end < 0 else end
+            note_ws(False)
         elif char == "/" and text.startswith("/*", i):
             end = text.find("*/", i + 2)
             i = n if end < 0 else end + 2
-            emit_space()
+            note_ws(False)
         elif char == '"' or char == "'":
             quote = char
-            out.append(text[i])
-            i += 1
-            while i < n and text[i] != quote:
-                if text[i] == "\\" and i + 1 < n:
-                    out.append(text[i : i + 2])
-                    i += 2
+            j = i + 1
+            buf = [quote]
+            while j < n and text[j] != quote and text[j] != "\n":
+                if text[j] == "\\" and j + 1 < n:
+                    buf.append(text[j : j + 2])
+                    j += 2
                 else:
-                    out.append(text[i])
-                    i += 1
-            if i < n:
-                out.append(text[i])
-                i += 1
+                    buf.append(text[j])
+                    j += 1
+            if j < n and text[j] == quote:
+                buf.append(quote)
+                j += 1
+            emit("".join(buf))
+            i = j
         elif char.isspace():
-            emit_space()
+            note_ws(char == "\n")
             i += 1
         else:
-            out.append(char)
+            emit(char)
             i += 1
     return "".join(out).strip()
 
@@ -92,11 +142,13 @@ def firmware_code_fingerprint(rendered_source: str) -> str:
 
 
 def measured_power_fingerprint(ctx: PipelineContext) -> str | None:
-    """Fingerprint of the binary ``CapturePowerStage``/the terminal measured.
+    """Fingerprint of the measured target's rendered C source set.
 
     The measured binary is derived from the SAME fact the pipeline routed on
     (``power_run.plan.firmware_mode``): the dedicated ``main_power.cc``
-    render, or the profile ``main.cc`` for shared firmware. Returns ``None``
+    render, or the profile ``main.cc`` for shared firmware — plus
+    ``hpx_pmu_profiler.{cc,h}``, compiled into the same target (see the
+    module docstring for what is deliberately NOT covered). Returns ``None``
     — the legacy/no-power value the comparability reader skips — whenever no
     power run was planned or the rendered source is not readable: a
     fingerprint must never fail a run.
@@ -109,9 +161,28 @@ def measured_power_fingerprint(ctx: PipelineContext) -> str | None:
     """
     if ctx.power_run is None or ctx.firmware_dir is None:
         return None
-    name = "main_power.cc" if ctx.power_run.plan.firmware_mode == "dedicated" else "main.cc"
-    path = ctx.firmware_dir / "src" / name
+    src_dir = ctx.firmware_dir / "src"
+    main_name = (
+        "main_power.cc" if ctx.power_run.plan.firmware_mode == "dedicated" else "main.cc"
+    )
     try:
-        return firmware_code_fingerprint(path.read_text(encoding="utf-8"))
+        main_digest = firmware_code_fingerprint(
+            (src_dir / main_name).read_text(encoding="utf-8")
+        )
     except OSError:
         return None
+    parts = [f"{main_name}\x00{main_digest}"]
+    # The build compiles these into the SAME target, and the profiler's
+    # per-operator hooks execute inside the gated window — hashing only the
+    # main TU let a profiler-template edit reproduce the #115 shape
+    # undetected (#173 review M1). A missing file folds in as "absent":
+    # deterministic, and distinct from any present content.
+    for name in ("hpx_pmu_profiler.cc", "hpx_pmu_profiler.h"):
+        try:
+            digest = firmware_code_fingerprint(
+                (src_dir / name).read_text(encoding="utf-8")
+            )
+        except OSError:
+            digest = "absent"
+        parts.append(f"{name}\x00{digest}")
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()

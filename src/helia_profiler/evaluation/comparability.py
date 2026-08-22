@@ -179,11 +179,15 @@ def assess_comparability(
         baseline_value = baseline_dimensions.get(dimension)
         candidate_value = candidate_dimensions.get(dimension)
         if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:
+            message = (
+                DIMENSION_REGISTRY[dimension].mismatch_hint
+                or f"Power metrics omitted because {dimension} differs."
+            )
             issues.append(
                 _family_issue(
                     POWER_DIMENSION_MISMATCH,
                     dimension,
-                    f"Power metrics omitted because {dimension} differs.",
+                    message,
                     baseline=baseline_value,
                     candidate=candidate_value,
                 )

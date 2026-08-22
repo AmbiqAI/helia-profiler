@@ -55,7 +55,8 @@ reading a bundle. It then applies typed comparability rules:
 - invalid results or different model hashes block the comparison;
 - different layer topology suppresses only per-layer deltas;
 - incompatible power scope, mode, firmware, monitor presence, lock-step,
-  integrity, or **clean-window probe** suppresses only power deltas;
+  integrity, **clean-window probe**, or (same platform only) the measured
+  **firmware code fingerprint** suppresses only power deltas;
 - engine, toolchain, board, clock, transport, and placement differences remain
   visible as experimental dimensions.
 
@@ -75,9 +76,12 @@ Baselines recorded before this dimension existed carry no value and are
 skipped, so stored comparisons do not flip to failing.
 
 **Power firmware fingerprint.** Every power run also records a code hash of
-the exact binary that was measured (`summary.power.firmware_code_fingerprint`
-— comments and whitespace normalized away, so documentation-only firmware
-changes leave it untouched). When two runs on the *same board, SoC, and
+the measured target's rendered C sources — the main source plus the PMU
+profiler translation unit compiled into the same binary
+(`summary.power.firmware_code_fingerprint`; comments and whitespace are
+normalized away, so documentation-only firmware changes leave it
+untouched — rendered build configuration and external module sources are
+deliberately outside the hash). When two runs on the *same board, SoC, and
 firmware mode* carry different fingerprints, the measured binaries ran
 different code, and hpx cannot vouch that their power numbers answer the same
 question — power deltas are omitted and the comparison says so. This closes

@@ -28,6 +28,7 @@ from ..errors import BuildError, FirmwareError
 from ..placement import Placement
 from ..platform import get_soc_for_board
 from .context import FirmwareRenderContext, _resolve_pmu_passes
+from .fingerprint import measured_power_fingerprint
 from .project import (
     NsxModuleSpec,
     ProjectRenderContext,

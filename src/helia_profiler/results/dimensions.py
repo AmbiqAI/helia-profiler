@@ -120,6 +120,10 @@ class DimensionSpec:
     metric_group: str | None = None
     label: str | None = None
     derive: Callable[[dict[str, Any]], Any] | None = None
+    #: Optional human sentence for a mismatch issue, replacing the generic
+    #: "…because <dimension> differs." — used where the raw values (two
+    #: 64-hex digests) tell the user nothing actionable.
+    mismatch_hint: str | None = None
     #: Dimensions that must MATCH (present and equal on both sides) before
     #: this one is consulted at all. Declared here so the scoping is registry
     #: data, not comparator special-casing. Used by the firmware fingerprint:
@@ -288,7 +292,12 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
         ArtifactSource.SUMMARY_POWER,
         ("firmware_code_fingerprint",),
         metric_group="power",
-        label="Power firmware fingerprint",
+        mismatch_hint=(
+            "Power metrics omitted because the measured power firmware's "
+            "code differs between the runs — a firmware change altered what "
+            "the window executes. Re-baseline, or compare the runs side by "
+            "side knowingly."
+        ),
         scoped_to=(
             ComparisonDimension.SOC,
             ComparisonDimension.BOARD,

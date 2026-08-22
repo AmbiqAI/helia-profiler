@@ -12,7 +12,7 @@ from .memory import _CACHE_COUNTERS, _serialise_memory_plan
 from .power import _power_summary_to_dict
 from .contracts import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION
 from ..evaluation import evaluate_run
-from ..firmware.fingerprint import measured_power_fingerprint
+from ..firmware import measured_power_fingerprint
 from ..power.diagnostics import probe_runs_inferences
 from ..power.metadata import MeasurementScope
 

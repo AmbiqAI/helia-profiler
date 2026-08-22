@@ -16,7 +16,7 @@ from ..results import (
     ResultManifest,
     RunStatus,
 )
-from ..firmware.fingerprint import measured_power_fingerprint
+from ..firmware import measured_power_fingerprint
 from ..results.manifest import _sha256
 from ..evaluation import evaluate_run
 from .contracts import (
