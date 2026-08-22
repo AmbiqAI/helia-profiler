@@ -57,10 +57,16 @@ class FlashPowerFirmwareStage:
 
         try:
             deploy()
-        except DeterministicCaptureError:
+        except DeterministicCaptureError as exc:
             # Missing image / unknown load address: cycling the rail cannot
-            # change these, and retrying frames a config gap as flaky hardware.
-            raise
+            # change these, and retrying frames a config gap as flaky
+            # hardware. Re-wrap (same type, hint carried once via args[0])
+            # so the user still sees WHICH deployment step refused —
+            # escaping raw lost the stage context (#172 review).
+            raise DeterministicCaptureError(
+                f"Power firmware deployment failed: {exc.args[0]}",
+                hint=exc.hint,
+            ) from exc
         except CaptureError as exc:
             if try_power_cycle_for_context(ctx):
                 try:

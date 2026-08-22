@@ -2208,7 +2208,11 @@ class TestPowerFirmwareSelection:
 
         assert attempts == 1
         assert cycles == []
-        # Raised straight through, unwrapped: the hint renders exactly once.
+        # Re-wrapped with the stage context (same type — the taxonomy signal
+        # survives) so the user still sees WHICH deployment step refused;
+        # the hint renders exactly once (#172 review).
+        assert str(exc_info.value).startswith("Power firmware deployment failed: ")
+        assert "No flashable image" in str(exc_info.value)
         assert str(exc_info.value).count("Hint:") == 1
 
     @pytest.mark.parametrize("cycle_succeeds", [True, False])
@@ -3097,3 +3101,54 @@ class TestGatedCaptureCapabilityDetection:
 
         assert calls == ["check", "capture"]
         assert result.metadata.measurement_scope == "ungated"
+
+
+def test_clean_window_probe_classification_is_exhaustive():
+    """#139 item 4: _NON_INFERENCE_PROBES is a hand-kept literal (the hard
+    circular import keeps power.diagnostics below config), so nothing forced
+    a new CleanWindowProbe member to get a classification decision. This
+    table IS that decision: extending the enum fails here until the new
+    probe is classified — and the classifier is checked against it."""
+    from helia_profiler.config import CleanWindowProbe
+    from helia_profiler.power.diagnostics import (
+        _NON_INFERENCE_PROBES,
+        probe_runs_inferences,
+    )
+
+    assert _NON_INFERENCE_PROBES <= {p.value for p in CleanWindowProbe}
+    classified = {
+        CleanWindowProbe.INFER: True,
+        CleanWindowProbe.BUSY_LOOP: False,
+    }
+    assert set(classified) == set(CleanWindowProbe)
+    for probe, runs_inferences in classified.items():
+        assert probe_runs_inferences(probe) is runs_inferences
+
+
+def test_plan_power_progress_message_is_probe_aware(tmp_path, monkeypatch):
+    """#172 review: the seventh 'inferences' site — 'Power run planned ·
+    1 inferences' for a busy-loop plan that runs none."""
+    from helia_profiler.config import load_config
+    from helia_profiler.pipeline import PipelineContext
+    from helia_profiler.stages.plan_power import PlanPowerRunStage
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "profiling": {"clean_window_probe": "busy_loop"},
+            "power": {"enabled": True},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    messages: list[str] = []
+    ctx.progress_sink = lambda update: messages.append(update.message)
+
+    PlanPowerRunStage().run(ctx)
+
+    planned = next(m for m in messages if m.startswith("Power run planned"))
+    assert "1 busy-loop pass" in planned
+    assert "inference" not in planned

@@ -30,11 +30,13 @@ wrong versions of this paragraph:
   Gate: ``multiplier <= 1.0`` is an error (strict ``TFLITE_CHECK_GT``).
 * **heliaAOT** does NOT share the helper -- it computes softmax scaling on
   the host -- but its own path fails one call later: ``calculate_input_radius``
-  does ``1 << shift`` on the frexp exponent, so ``multiplier < 0.5`` raises
-  ``ValueError: negative shift count`` inside the compiler (verified against
-  the pinned helia-aot 0.18). The first fix exempted AOT entirely after
-  verifying only the first call. Gate: ``multiplier < 0.5`` is an error with
-  an AOT-specific message; ``0.5 <= multiplier <= 1.0`` compiles but is
+  does ``1 << shift`` on the frexp exponent, so a multiplier whose
+  Q31-ROUNDED value lands in ``[2**-32, 0.5)`` raises ``ValueError: negative
+  shift count`` inside the compiler (verified against the pinned helia-aot
+  0.18; the rounding happens before the flush check, so the raw-value
+  boundaries are off by up to one ULP — see ``_aot_q31_rounded_multiplier``).
+  The first fix exempted AOT entirely after verifying only the first call.
+  Gate: that rounded band is an error with an AOT-specific message; ``0.5 <= multiplier <= 1.0`` compiles but is
   numerically degenerate (diff_min lands 7 orders of magnitude from healthy)
   and would abort under helia-rt, so it warns.
 * **ExecuTorch** consumes ``.pte`` and never reaches any of this.
@@ -75,8 +77,10 @@ TFLM_SOFTMAX_INTEGER_BITS = 5
 _MULTIPLIER_SHIFT = 31 - TFLM_SOFTMAX_INTEGER_BITS
 
 
-#: helia-aot 0.18 raises ``ValueError: negative shift count`` for multipliers
-#: in ``[2**-32, 0.5)``, and ONLY that band.
+#: helia-aot 0.18 raises ``ValueError: negative shift count`` exactly when
+#: the Q31-ROUNDED multiplier (``_aot_q31_rounded_multiplier``) lands in
+#: ``[2**-32, 0.5)`` — the rounding precedes the flush check, so these
+#: constants are applied to the rounded value, never the raw one.
 #:
 #: ``AirFixedPointScale.from_real_multiplier`` stores the frexp exponent as
 #: the shift, which ``calculate_input_radius`` then feeds to ``1 << shift``.
@@ -122,7 +126,26 @@ AOT_FLUSH_TO_ZERO_MULTIPLIER = 2.0**-32
 #: changes the default changes this constant with it; 1.0 is the fallback for
 #: installs without the extra, pinned by test_softmax_preflight (#147).
 TFLM_ABSENT_BETA = 0.0
-AOT_ABSENT_BETA = 1.0 if _AirSoftmaxOptions is None else float(_AirSoftmaxOptions().beta)
+
+
+def _read_aot_absent_beta() -> float:
+    """Live-read helia-aot's beta default, degrading to 1.0 on ANY failure.
+
+    This runs at import time of a module that stages/preflight.py pulls in
+    for every engine, so a helia-aot bump that makes the field required or
+    renames it must not turn into "hpx won't start" — it degrades here and
+    fails LOUDLY in analysis-tests instead, where the aot-guarded pinning
+    test compares this value against the real default (#172 review).
+    """
+    if _AirSoftmaxOptions is None:
+        return 1.0
+    try:
+        return float(_AirSoftmaxOptions().beta)
+    except Exception:  # noqa: BLE001 - degrade, never block startup
+        return 1.0
+
+
+AOT_ABSENT_BETA = _read_aot_absent_beta()
 
 
 def _aot_q31_rounded_multiplier(multiplier: float) -> float:
@@ -134,15 +157,25 @@ def _aot_q31_rounded_multiplier(multiplier: float) -> float:
     banker's), and a fraction that rounds to 1.0 is promoted one exponent --
     both before the sub-``2**-32`` flush check. Applying the band constants to
     this rounded value instead of the raw one is what makes them exact at the
-    edges. Caller guarantees a finite argument (frexp of an infinity would
-    overflow the floor).
+    edges.
+
+    The overflow hazard is ``ldexp``, on FINITE input: a multiplier in the
+    top float64 binade rounds its fraction to 1.0, promotes, and
+    ``ldexp(2**30, 994)`` exceeds the float range (#172 review — the earlier
+    comment blamed frexp-of-infinity, which the isfinite caller guard already
+    excludes). Such a value is orders of magnitude above the raise band, so
+    report it as-is: unreachable from a real model anyway (both wire operands
+    are float32, capping the product near 8e84).
     """
     fraction, exponent = math.frexp(multiplier)
     quantized = math.floor(fraction * (1 << 31) + 0.5)
     if quantized == (1 << 31):
         quantized //= 2
         exponent += 1
-    return math.ldexp(quantized, exponent - 31)
+    try:
+        return math.ldexp(quantized, exponent - 31)
+    except OverflowError:
+        return multiplier
 
 
 def aot_softmax_verdict(multiplier: float) -> str:
@@ -154,11 +187,16 @@ def aot_softmax_verdict(multiplier: float) -> str:
     magnitude too small for a meaningful softmax, and the same model aborts
     under helia-rt -- worth telling the user, not worth blocking a profile.
 
-    NaN is checked first and errors: it can only come from a corrupt file, and
-    every ordered comparison against it is False, so falling through would
-    return 'ok' for a model helia-aot raises on (found by review).
+    NaN and negative values are checked first and error: both can only come
+    from a corrupt file, and both crash the real chain (every ordered
+    comparison against NaN is False, so falling through returned 'ok' for a
+    model helia-aot raises on; a negative multiplier reaches
+    ``calculate_input_radius`` with a negative shift and raises there —
+    the #172 review's fuzz found the sign half of the class unguarded).
     """
     if multiplier != multiplier:  # NaN
+        return "error"
+    if multiplier < 0.0:
         return "error"
     if (
         math.isfinite(multiplier)

@@ -18,7 +18,7 @@ from ..results import PowerObservation
 from ..config import DEFAULT_POWER_DURATION_S, WindowMode
 from ..errors import PowerError
 from ..pipeline import PipelineContext
-from ..power.diagnostics import probe_runs_inferences
+from ..power.diagnostics import count_noun, probe_runs_inferences
 from ..power.metadata import classify_observation
 from ..target.lifecycle import CapturePhase, prepare_target_for_phase
 
@@ -29,17 +29,6 @@ _BOOT_SETTLE_S = 8.0  # reset/SBL/firmware init allowance
 _SAFETY_MARGIN_S = 6.0  # extra headroom beyond estimated runtime
 
 
-def _count_noun(clean_window_probe: str, count: int) -> str:
-    """Human-facing noun for *count*, aware that ``busy_loop`` runs no inferences.
-
-    The ``busy_loop`` clean-window probe replaces the window body with one
-    calibrated CPU spin (see ``power.diagnostics.probe_runs_inferences``) --
-    saying "N inferences" for it is simply false, since N counts spins, not
-    model runs.
-    """
-    if probe_runs_inferences(clean_window_probe):
-        return "inference" if count == 1 else "inferences"
-    return "busy-loop pass" if count == 1 else "busy-loop passes"
 
 
 #: Auto window mode warms the clean pass with 3 hardcoded uninstrumented
@@ -216,7 +205,7 @@ class CapturePowerStage:
         )
         message = "Arming instrument and resetting target"
         if planned_count is not None:
-            noun = _count_noun(ctx.config.profiling.clean_window_probe, planned_count)
+            noun = count_noun(ctx.config.profiling.clean_window_probe, planned_count)
             message += f" · {planned_count:,} {noun}"
         ctx.report_progress(
             message,

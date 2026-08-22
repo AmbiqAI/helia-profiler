@@ -71,7 +71,12 @@ def _socs_for(engine: str) -> list[str]:
 
 # Feature markers: substring -> human name.  Presence is the semantic snapshot.
 _MARKERS: dict[str, str] = {
-    "gpio_sync": "kPowerSyncEnabled",
+    # Keyed on the ENABLED definition: _gpio_sync.j2 always emits the
+    # constexpr (false in every matrix render), so the bare name was a
+    # constant-true marker — the third of the class #161 fixed (found in the
+    # #172 review). Constant-FALSE across today's matrix, like auto_window:
+    # honest, and discriminating the moment a sync-enabled case is added.
+    "gpio_sync": "kPowerSyncEnabled = true;",
     # Keyed on the CALL (semicolon), not the bare name: the definition is
     # included in every render and comments name it, which made this marker
     # a constant (#161). Since the boot call is gated off power renders, a

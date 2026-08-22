@@ -82,7 +82,10 @@
    engine_pmu_storage_sram_resident to "false" and its profile binary skips
    the unnecessary SSRAM power-on.  The block is declared inside a
    set-capture so it emits nothing; power stays an unconditional override
-   here, not a child decision. #}{% set _pmu_storage_decl %}{% block engine_pmu_storage_sram_resident %}true{% endblock %}{% endset %}{% set pmu_profiler_sram_resident = (_pmu_storage_decl | trim == "true") and not (power_only | default(false)) %}{% include "_system_includes.j2" %}
+   here, not a child decision.  The vocabulary is exactly "true"/"false":
+   the dict lookup below leaves anything else (a Python-spelled "True", a
+   stray "1") undefined, and StrictUndefined turns that into a loud render
+   error instead of a silently un-backed SSRAM array (#172 review). #}{% set _pmu_storage_decl %}{% block engine_pmu_storage_sram_resident %}true{% endblock %}{% endset %}{% set pmu_profiler_sram_resident = ({"true": true, "false": false}[_pmu_storage_decl | trim]) and not (power_only | default(false)) %}{% include "_system_includes.j2" %}
 {% if apollo3_burst %}
 // Apollo3/3P TurboSPOT (burst) control lives in the AmbiqSuite HAL umbrella.
 #include "am_mcu_apollo.h"

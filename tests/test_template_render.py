@@ -53,6 +53,7 @@ def _sample_pmu_passes() -> list[dict[str, object]]:
 
 def _render_tflm(
     transport: str = "rtt",
+    template_name: str = "main.cc.j2",
     arena_region: str = "tcm",
     weights_region: str = "mram",
     has_armv8m_pmu: bool = True,
@@ -76,7 +77,7 @@ def _render_tflm(
     **extra_vars: object,
 ) -> str:
     registrations = resolver_registrations or ["r.AddConv2D();", "r.AddSoftmax();"]
-    return _env.get_template("main.cc.j2").render(
+    return _env.get_template(template_name).render(
         **resolve_window_timer(
             clean_window_probe=clean_window_probe,
             power_only=power_only,
@@ -730,6 +731,12 @@ class TestMainAotCcRender:
         agreed only because plan_power pins that count to 1 for this probe;
         the success partial declared 1U itself. Pin the host half and both
         rendered halves against each other so no one place can drift.
+
+        Scope: the agreement is a property of the FIXED-mode power render —
+        the only kind render_power_source ever pins for flashing. The infer
+        assertion below shows the two partials spell the count differently
+        (runtime variable vs render literal), which under an auto-mode
+        render could diverge; that render is compiled but never flashed.
         """
         from helia_profiler.power.diagnostics import expected_terminal_requested_count
 
@@ -1104,3 +1111,32 @@ class TestIna228PowerRender:
         out = render(power_only=power_only)
         assert "ina228" not in out
         assert "HPX_POWER_MEASUREMENT_SOURCE" not in out
+
+
+def test_pmu_storage_seam_rejects_unknown_vocabulary(monkeypatch):
+    """#172 review: the engine_pmu_storage_sram_resident seam accepts exactly
+    "true"/"false" — a Python-spelled "True" used to silently mean false,
+    shipping a profile binary with its SRAM-resident per-layer storage
+    unbacked (the hang _ssram_power.j2 warns about). The dict lookup leaves
+    anything else undefined and StrictUndefined makes the render fail loudly.
+    """
+    from jinja2 import ChoiceLoader, DictLoader
+    from jinja2.exceptions import UndefinedError
+
+    for value, should_render in (("true", True), ("false", True), ("True", False), ("1", False)):
+        child = (
+            '{% extends "main.cc.j2" %}'
+            "{% block engine_pmu_storage_sram_resident %}" + value + "{% endblock %}"
+        )
+        overlay = _env.overlay(
+            loader=ChoiceLoader([DictLoader({"seam_child.cc.j2": child}), _env.loader])
+        )
+        import sys
+        this_module = sys.modules[__name__]
+        monkeypatch.setattr(this_module, "_env", overlay)
+        if should_render:
+            out = _render_tflm(transport="rtt", template_name="seam_child.cc.j2")
+            assert "int main(void)" in out
+        else:
+            with pytest.raises(UndefinedError):
+                _render_tflm(transport="rtt", template_name="seam_child.cc.j2")

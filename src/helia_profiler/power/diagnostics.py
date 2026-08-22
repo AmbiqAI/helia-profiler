@@ -336,6 +336,22 @@ def probe_runs_inferences(clean_window_probe: str) -> bool:
     return clean_window_probe not in _NON_INFERENCE_PROBES
 
 
+def count_noun(clean_window_probe: str, count: int) -> str:
+    """Human-facing noun for *count*, aware that ``busy_loop`` runs no inferences.
+
+    The ``busy_loop`` clean-window probe replaces the window body with one
+    calibrated CPU spin (see :func:`probe_runs_inferences`) -- saying
+    "N inferences" for it is simply false, since N counts spins, not model
+    runs.  Lives HERE, next to the probe rule, because two stages grew
+    byte-identical private copies and a third stage then missed the wording
+    fix entirely (#172 review): every "N <what ran>" message asks this one
+    function.
+    """
+    if probe_runs_inferences(clean_window_probe):
+        return "inference" if count == 1 else "inferences"
+    return "busy-loop pass" if count == 1 else "busy-loop passes"
+
+
 def expected_terminal_requested_count(
     *, inference_count: int | None, clean_window_probe: str
 ) -> int | None:

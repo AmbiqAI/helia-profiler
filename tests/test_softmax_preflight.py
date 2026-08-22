@@ -618,3 +618,25 @@ def test_aot_absent_beta_is_one_in_every_environment():
     from helia_profiler.evaluation.softmax_preflight import AOT_ABSENT_BETA
 
     assert AOT_ABSENT_BETA == 1.0
+
+
+def test_negative_multiplier_is_an_error_like_the_real_chain():
+    """#172 review fuzz: a negative multiplier reaches calculate_input_radius
+    with a negative shift and raises in the real compiler; hpx said 'warn'.
+    Sign corruption is the same corrupt-file class the NaN guard covers."""
+    from helia_profiler.evaluation.softmax_preflight import aot_softmax_verdict
+
+    assert aot_softmax_verdict(-0.25) == "error"
+    assert aot_softmax_verdict(-1e-09) == "error"
+    assert aot_softmax_verdict(float("-inf")) == "error"
+
+
+def test_top_binade_multiplier_does_not_crash_the_verdict():
+    """#172 review: the Q31 rounding promotes the top float64 binade past
+    ldexp's range — the mirror must degrade to the raw value (far above the
+    raise band) instead of raising OverflowError from a preflight."""
+    import sys
+
+    from helia_profiler.evaluation.softmax_preflight import aot_softmax_verdict
+
+    assert aot_softmax_verdict(sys.float_info.max) == "ok"

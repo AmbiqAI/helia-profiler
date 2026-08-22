@@ -323,10 +323,10 @@ static void print_layers(void) {
         same model compare freely, and validation/runner.py falls back to
         device_profiled_infer_avg_us as the run latency when the clean number
         is absent -- silently substituting load+execute for inference time.  So
-        ExecuTorch emits no HPX_PROFILED_INFER_* line at all (overriding
-        engine_profiled_summary empty), exactly as it did before the template
-        unification.  The profiled_infer_cycles accumulation in the shared loop
-        still runs; nothing reads it here.
+        ExecuTorch emits no HPX_PROFILED_INFER_* line at all (its
+        engine_profiled_summary override only (void)-reads the accumulators,
+        #161), exactly as it did before the template unification.  The
+        profiled_infer_cycles accumulation in the shared loop still runs.
       * The base gates the CoreSight debug power domain off for the measured
         window on families where the window clock does not live there
         (gate_debug_domain_in_window, AP5).  ExecuTorch's window clock is the
@@ -442,9 +442,9 @@ static void print_layers(void) {
         }
         print_layers();{% endblock %}
 
-{#- engine_profiled_summary: overridden EMPTY, so this engine emits no
-    HPX_PROFILED_INFER_COUNT / _TOTAL_US / _AVG_US at all -- the same wire
-    surface it had before it became a child.
+{#- engine_profiled_summary: overridden to (void)-reads only, so this
+    engine emits no HPX_PROFILED_INFER_COUNT / _TOTAL_US / _AVG_US at all --
+    the same wire surface it had before it became a child.
 
     nsx::executorch::run_once_profiled() is load + execute, and the base's
     per-pass loop DWT-brackets exactly that call, so the base's default would

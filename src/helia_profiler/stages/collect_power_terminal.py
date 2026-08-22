@@ -18,23 +18,13 @@ from ..power.diagnostics import (
     FROZEN_WINDOW_CLOCK_HINT,
     assess_run_window_clock,
     assess_window_clock_ceiling,
+    count_noun,
     expected_terminal_requested_count,
     firmware_window_clock_is_frozen,
     probe_runs_inferences,
 )
 
 
-def _count_noun(clean_window_probe: str, count: int) -> str:
-    """Human-facing noun for *count*, aware that ``busy_loop`` runs no inferences.
-
-    The ``busy_loop`` clean-window probe replaces the window body with one
-    calibrated CPU spin (see ``power.diagnostics.probe_runs_inferences``) --
-    saying "N inferences" for it is simply false, since N counts spins, not
-    model runs.
-    """
-    if probe_runs_inferences(clean_window_probe):
-        return "inference" if count == 1 else "inferences"
-    return "busy-loop pass" if count == 1 else "busy-loop passes"
 
 
 def _host_phase_envelope_s(ctx: PipelineContext) -> float | None:
@@ -133,7 +123,7 @@ class CollectPowerTerminalStage:
                 f"Power firmware reported error {terminal.error_code} in phase "
                 f"{terminal.final_phase} after {terminal.completed_count}/"
                 f"{terminal.requested_count} "
-                f"{_count_noun(clean_window_probe, terminal.requested_count)}."
+                f"{count_noun(clean_window_probe, terminal.requested_count)}."
             )
         if terminal.completed_count != terminal.requested_count:
             raise PowerError(
@@ -143,7 +133,7 @@ class CollectPowerTerminalStage:
                 hint=(
                     f"Completed {terminal.completed_count}/"
                     f"{terminal.requested_count} "
-                    f"{_count_noun(clean_window_probe, terminal.requested_count)}."
+                    f"{count_noun(clean_window_probe, terminal.requested_count)}."
                 ),
             )
         if not terminal.gate_lowered:
@@ -162,7 +152,7 @@ class CollectPowerTerminalStage:
             raise PowerError(
                 "Power firmware reported zero elapsed time for "
                 f"{terminal.completed_count} completed "
-                f"{_count_noun(clean_window_probe, terminal.completed_count)}.",
+                f"{count_noun(clean_window_probe, terminal.completed_count)}.",
                 hint=FROZEN_WINDOW_CLOCK_HINT,
             )
         if envelope.measurement is not None and envelope.measurement.overflow:
@@ -279,7 +269,7 @@ class CollectPowerTerminalStage:
                 "run's power numbers and they are unaffected; only the "
                 "firmware-reported window duration is meaningless. %s",
                 terminal.completed_count,
-                _count_noun(clean_window_probe, terminal.completed_count),
+                count_noun(clean_window_probe, terminal.completed_count),
                 ctx.config.power.driver,
                 FROZEN_WINDOW_CLOCK_HINT,
             )
@@ -372,7 +362,7 @@ class CollectPowerTerminalStage:
         )
         ctx.report_progress(
             f"Firmware confirmed {terminal.completed_count:,} "
-            f"{_count_noun(clean_window_probe, terminal.completed_count)}",
+            f"{count_noun(clean_window_probe, terminal.completed_count)}",
             kind="checkpoint",
             min_verbosity=0,
         )
