@@ -378,8 +378,9 @@ int main(void) {
 {%- if not use_stimer_window %}
         // The DWT window body reads the stall floor (clean_low_cyc,
         // HPX_CLEAN_REF_CYCLES) unconditionally.  A power render measures no
-        // warm reference, so the floor is zero and the stall check is inert
-        // — consistent with the minimal power image.  No SoC routes a power
+        // warm reference, so the floor is zero and the low-floor comparison
+        // is inert (the frozen-counter tally, clean_stalled_iters, stays
+        // live) — consistent with the minimal power image.  No SoC routes a power
         // window through DWT today (SocCapabilities.power_window_timer is
         // stimer everywhere); this keeps the render compilable if one ever
         // does (#170 review).
@@ -514,10 +515,15 @@ int main(void) {
         // measured inference estimate here described a window that runs no
         // inferences, wrong in both directions.  iters=1 for the same
         // reason: the window completes exactly one busy pass
-        // (clean_count = 1), and the host keeps iters as a fallback for a
-        // lost HPX_CLEAN_INFER_COUNT — announcing the planned inference
-        // count here made that fallback divide gated energy by a number
-        // this window never runs.
+        // (clean_count = 1), and on a lossy transport that drops
+        // HPX_CLEAN_INFER_COUNT the host's iters fallback feeds the
+        // gate-duration check — the old planned-count announce made that
+        // check compute N x spin_us and kill a healthy run with a
+        // duration-mismatch PowerError.
+        //
+        // This announce was clean_iters_n's only busy-path consumer, so
+        // read it explicitly or -Wall flags every busy profile render.
+        (void)clean_iters_n;
         hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=1 est_ms={{ window_target_ms }}\n");
 {% elif window_mode | default("fixed") == "auto" %}
         uint64_t clean_est_ms = 0;

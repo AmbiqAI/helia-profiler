@@ -1,8 +1,8 @@
 """Shared transport utilities for heliaPROFILER data capture.
 
 Defines HPX protocol constants and the byte-stream line-collection loop
-shared by RTT and SWO transports.  USB CDC uses pyserial's ``readline()``
-and handles line collection internally.
+shared by the RTT, SWO, and UART transports.  USB CDC uses pyserial's
+``readline()`` and handles line collection internally.
 
 HPX Protocol
 ------------
@@ -153,7 +153,7 @@ def window_budget_s(line: str) -> float | None:
 
 
 # ---------------------------------------------------------------------------
-# Shared line-collection loop (byte-stream transports: RTT, SWO)
+# Shared line-collection loop (byte-stream transports: RTT, SWO, UART)
 # ---------------------------------------------------------------------------
 
 
@@ -269,10 +269,11 @@ def collect_lines(
                     budget = window_budget_s(line)
                     if budget is not None:
                         # One announce per capture (every render emits exactly
-                        # one clean_window_begin printf); a later one — none
-                        # exists today — would supersede the hold, not extend
-                        # it, so an early long window cannot mask a hang in a
-                        # later short one.
+                        # one clean_window_begin printf). A later one — none
+                        # exists today — would supersede the held FLOOR from
+                        # the next received byte onward; hb_deadline itself is
+                        # only ever raised, so a deadline already widened by
+                        # an earlier announce stands until data next arrives.
                         window_deadline = line_ts + budget
                         if window_deadline > hb_deadline:
                             hb_deadline = window_deadline

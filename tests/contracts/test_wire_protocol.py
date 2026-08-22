@@ -1035,8 +1035,9 @@ def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
         "HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\\n"
     )
     # iters=1 is part of the busy contract: the window completes exactly one
-    # busy pass, and the host's iters fallback for a lost
-    # HPX_CLEAN_INFER_COUNT must divide gated energy by that (#170).
+    # busy pass, and on a lossy transport that drops HPX_CLEAN_INFER_COUNT
+    # the host's iters fallback feeds the gate-duration check — a planned
+    # count would fail a healthy run as a duration mismatch (#170).
     target_literal = (
         f"HPX_HEARTBEAT phase=clean_window_begin iters=1 "
         f"est_ms={_common_kwargs('apollo510', 'rtt')['window_target_ms']}\\n"

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from helia_profiler.transport.protocol import (
     WINDOW_BUDGET_CAP_S,
     WINDOW_BUDGET_MARGIN_S,
@@ -236,6 +238,52 @@ def test_window_budget_survives_a_line_received_inside_the_window():
     # Without the hold-floor the 0.2s heartbeat bails ~0.2s after the probe
     # line, well before the 0.4s release.
     assert "--- HPX_END ---" in lines
+
+
+def test_hang_warning_reports_real_silence_not_configured_timeout(
+    caplog, monkeypatch
+):
+    """With a held window budget the wait can exceed the configured timeout by
+    the whole budget — the warning must report the actual silence (#170), or
+    'no data for 30s' after a minutes-long wait misdirects the reader.
+
+    The safety/margin knobs are shrunk so the divergence (a ~2s budget floor
+    against a 0.2s heartbeat timeout) plays out in test time.
+    """
+    import logging as _logging
+    import time as _t
+
+    from helia_profiler.transport import protocol as _proto
+
+    monkeypatch.setattr(_proto, "WINDOW_BUDGET_SAFETY", 1.0)
+    monkeypatch.setattr(_proto, "WINDOW_BUDGET_MARGIN_S", 1.0)
+
+    def read() -> bytes:
+        if not getattr(read, "sent", False):
+            read.sent = True
+            return (
+                b"--- HPX_START ---\n"
+                b"HPX_HEARTBEAT phase=clean_window_begin iters=1 est_ms=1000\n"
+            )
+        return b""
+
+    t0 = _t.monotonic()
+    with caplog.at_level(_logging.WARNING, logger="hpx"):
+        collect_lines(
+            read,
+            transport_name="TEST",
+            heartbeat_timeout_s=0.2,
+            poll_interval_s=0.01,
+        )
+    waited = _t.monotonic() - t0
+    # The 1s est at 1.0 safety + 1s margin holds a ~2s floor past the 0.2s
+    # timeout.
+    assert waited > 1.0
+    hang = [r for r in caplog.records if "no data for" in r.getMessage()]
+    assert hang, "expected the hang warning"
+    reported = float(re.search(r"no data for (\d+)s", hang[-1].getMessage()).group(1))
+    # Reports the real ~2s silence, not the configured 0.2s.
+    assert reported >= 1.0
 
 
 def test_no_announce_still_times_out_on_silence():

@@ -95,12 +95,16 @@ EST_MS_GAP = (
     "reads 0 as 'no estimate' and keeps its flat heartbeat timeout. "
     "Byte-stream transports (RTT/SWO/UART, via collect_lines) hold an "
     "announced budget as a floor on their inactivity deadline until it "
-    "expires; USB CDC raises its overall capture deadline instead. Both "
-    "derive the budget from window_budget_s, capped at WINDOW_BUDGET_CAP_S. "
-    "A busy-loop announce carries iters=1 — the window completes exactly one "
-    "busy pass, and the iters fallback for a lost HPX_CLEAN_INFER_COUNT must "
-    "divide gated energy by that, never by a planned inference count the "
-    "window does not run."
+    "expires; USB CDC raises its overall capture deadline instead, and its "
+    "300 s per-read line gap is not widened — a silent window longer than "
+    "that is cut short on USB CDC regardless of the announce. Both derive "
+    "the budget from window_budget_s, capped at WINDOW_BUDGET_CAP_S. A "
+    "busy-loop announce carries iters=1 — the window completes exactly one "
+    "busy pass, and on a lossy transport that drops HPX_CLEAN_INFER_COUNT "
+    "the iters fallback feeds the gate-duration check, which a planned "
+    "inference count the window never runs would fail as a duration "
+    "mismatch. (Per-inference energy is never derived for busy windows — "
+    "the summary omits it by probe.)"
 )
 
 

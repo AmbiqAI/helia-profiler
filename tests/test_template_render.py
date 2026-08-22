@@ -709,9 +709,15 @@ class TestMainAotCcRender:
             # Power renders take the first template arm and measure NOTHING
             # pre-window (#170) — no adaptive sizing, no DWT warm bracket;
             # the DWT window's stall floor is declared zeroed so the render
-            # stays compilable, with the check inert.
+            # stays compilable, with the low-floor comparison inert. The
+            # positive half matters: this helper renders power_window_timer
+            # "dwt", and deleting the zeroed declaration left the whole suite
+            # green in the #171 round-2 review while the render regressed to
+            # uncompilable C (clean_warm_min_cyc consumed by the window body,
+            # declared nowhere).
             assert "target_cyc" not in out
             assert "uint32_t wt0 = DWT->CYCCNT;" not in out
+            assert "uint32_t clean_warm_min_cyc = 0U;" in out
 
     def test_busy_loop_probe_replaces_clean_window_body(self):
         tflm_out = _render_tflm(
