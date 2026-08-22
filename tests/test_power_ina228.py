@@ -662,7 +662,6 @@ class TestOverflowValidityModeAware:
                 overflow=True,
                 charge_nc=1,
                 bus_voltage_uv=1_800_000,
-                sample_count=None,
                 calibration_id="x",
             ),
         )

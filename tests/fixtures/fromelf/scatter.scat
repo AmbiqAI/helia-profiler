@@ -1,0 +1,13 @@
+LR_ROM 0x00000000 0x00080000 {
+    ER_RO 0x00000000 {
+        *(+RO)
+    }
+    ER_RW 0x20000000 {
+        *(+RW)
+    }
+    ER_ZI +0 {
+        *(+ZI)
+    }
+    ARM_LIB_HEAP  +0 EMPTY 0x5FAF8 {}
+    ARM_LIB_STACK +0 EMPTY 0x1000  {}
+}

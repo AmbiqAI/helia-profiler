@@ -875,21 +875,19 @@ def test_no_spec_is_dead():
 
 
 def test_tokens_the_matrix_cannot_show_are_pinned_by_hand():
-    """The two specs deliberately outside the emitted census, stated here.
+    """The one spec deliberately outside the emitted census, stated here.
 
-    Both are real parts of the contract that no render can demonstrate, so
-    they are asserted directly rather than being quietly exempted.
+    HPX_GO is a real part of the contract that no render can demonstrate, so
+    it is asserted directly rather than being quietly exempted. (The other
+    census-invisible spec, the never-emitted HPX_POWER_SAMPLE_COUNT, was
+    retired by #165 — an envelope carrying it is now rejected as unknown.)
     """
     go = WIRE_REGISTRY["HPX_GO"]
     assert go.direction is WireDirection.HOST_TO_DEVICE
     assert not go.emitted_by_firmware
 
-    sample_count = WIRE_REGISTRY[PowerTerminalKey.SAMPLE_COUNT.value]
-    assert not sample_count.emitted_by_firmware
-    assert sample_count.token in POWER_TERMINAL_OPTIONAL_KEYS
-    assert not any(
-        sample_count.token in render.tokens for render in _MATRIX
-    ), "HPX_POWER_SAMPLE_COUNT is now emitted — update its spec and the docs gap"
+    assert "HPX_POWER_SAMPLE_COUNT" not in WIRE_REGISTRY
+    assert not any(key.value == "HPX_POWER_SAMPLE_COUNT" for key in PowerTerminalKey)
 
 
 def test_no_macro_name_ever_reaches_a_string():
@@ -956,24 +954,18 @@ def test_error_hints_are_keyed_by_the_enum_and_agree_with_the_registry():
     assert hinted == set(_ERROR_HINTS)
 
 
-def test_hintless_error_codes_are_the_disclosed_six():
+def test_every_error_code_carries_a_hint():
     """Adding a code without deciding on a hint has to be a conscious act.
 
-    Six of the twelve reach the user with a generic "the payload is shown
-    above" message. That is a known gap (#162 Phase 1 records it rather than
-    smuggling in hints); this pin makes growing it a review decision.
+    #163 disclosed six codes that reached the user with a generic "the
+    payload is shown above" message; #165 closed that gap. This pin makes
+    reopening it — an error code whose remediation nobody wrote down — a
+    review decision rather than an accident.
     """
     hintless = {code.value for code in FirmwareErrorCode} - {
         code.value for code in _ERROR_HINTS
     }
-    assert hintless == {
-        "psram_info_failed",
-        "bind_arena_failed",
-        "const_blob_psram_write_failed",
-        "executorch",
-        "operator_count_exceeds_capacity",
-        "pmu_init_or_selftest_failed",
-    }
+    assert hintless == set()
 
 
 def test_heartbeat_phase_catalogue():
@@ -1130,7 +1122,6 @@ def test_power_terminal_key_sets():
         "HPX_POWER_MEASUREMENT_OVERFLOW",
         "HPX_POWER_CHARGE_NC",
         "HPX_POWER_BUS_VOLTAGE_UV",
-        "HPX_POWER_SAMPLE_COUNT",
         "HPX_POWER_CALIBRATION_ID",
     }
     assert not POWER_TERMINAL_REQUIRED_KEYS & POWER_TERMINAL_OPTIONAL_KEYS

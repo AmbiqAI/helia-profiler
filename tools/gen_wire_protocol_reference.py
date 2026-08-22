@@ -289,11 +289,6 @@ _GAPS = (
     EST_MS_GAP,
     "`HPX_VERSION` is checked against the expected protocol version and then "
     "discarded: it never reaches `FirmwareMeta` or `summary.json`.",
-    "Six of the twelve error codes carry no host hint, so those failures reach "
-    "the user with a generic message.",
-    "`HPX_POWER_SAMPLE_COUNT` is accepted by the host envelope parser but no "
-    "template emits it, so the on-device summary's sample count is always "
-    "absent.",
     "`HPX_CONST_BLOB_LOADED region=… size=…` looks like a metadata key but is "
     "space-separated, so the generic key/value regex never matches it and it "
     "reaches no consumer.",

@@ -242,7 +242,10 @@ class CollectPowerTerminalStage:
                     peak_current_a=0.0,
                     energy_j=energy_j,
                     duration_s=duration_s,
-                    sample_count=measurement.sample_count or 0,
+                    # The on-device accumulator reports totals, not a sample
+                    # stream (HPX_POWER_SAMPLE_COUNT was retired by #165), so
+                    # the host-summary sample count is honestly zero here.
+                    sample_count=0,
                 ),
                 metadata=PowerMetadata(
                     measurement_scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,

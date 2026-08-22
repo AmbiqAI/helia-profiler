@@ -7,7 +7,10 @@ from pathlib import Path
 
 from helia_profiler.config import Toolchain
 from helia_profiler.results import BinarySections
-from helia_profiler.toolchain_probe import binary_sections
+from helia_profiler.toolchain_probe import (
+    _reserved_from_section_listing,
+    binary_sections,
+)
 
 
 def test_atfe_binary_sections_uses_llvm_size_from_atfe_root(tmp_path: Path, monkeypatch) -> None:
@@ -258,3 +261,216 @@ def test_a_region_qualified_heap_name_is_matched(tmp_path: Path, monkeypatch) ->
     assert sections is not None
     assert sections.reserved == 0x0FA0 + 0x1004
     assert sections.bss == 8452 - (0x0FA0 + 0x1004)
+
+
+# ---------------------------------------------------------------------------
+# armclang / fromelf (#132: the gap #131 left open)
+# ---------------------------------------------------------------------------
+#
+# Real output captured from Arm Compiler for Embedded 6.23 (fromelf
+# [5f102800] — fromelf's own --vsn serial; the capture's ELF headers show
+# armlink [5f102400] / armclang [5f103000]: different tools, different
+# serials, same AC6 6.23 install) on an ELF built to reproduce the #24
+# shape for armlink:
+# 248 bytes of genuine zero-init state, an ARM_LIB_HEAP execution region of
+# 391,928 bytes (the reservation), and a 4,096-byte ARM_LIB_STACK (the live
+# stack). ARM_LIB_HEAP / ARM_LIB_STACK are the exact region names NSX's own
+# armclang scatter files use (e.g. apollo510/armclang/linker_script_nbl.sct).
+# The source, scatter file, and both captures are checked in under
+# tests/fixtures/fromelf/ so the ELF can be regenerated.
+
+_FROMELF_FIXTURES = Path(__file__).parent / "fixtures" / "fromelf"
+_FROMELF_Z = (_FROMELF_FIXTURES / "fw_text_z.txt").read_text()
+_FROMELF_V = (_FROMELF_FIXTURES / "fw_text_v.txt").read_text()
+
+# The captured image: Code 288 + RO 32 = text 320, RW data 4, and
+# ZI 396,272 = 248 (ER_ZI) + 391,928 (ARM_LIB_HEAP) + 4,096 (ARM_LIB_STACK).
+_REAL_TEXT = 320
+_REAL_DATA = 4
+_REAL_ZI = 396_272
+_REAL_HEAP = 391_928
+_REAL_STACK = 4_096
+_REAL_TRUE_BSS = 248
+
+
+def _fromelf_stub(monkeypatch, z_out: str, v_out: str, calls: list | None = None):
+    """Stub both fromelf invocations: `-z` for totals, `-v` for section detail."""
+    import subprocess as _sp
+
+    def fake_run(command, **_kwargs):
+        if calls is not None:
+            calls.append(command)
+        out = v_out if "-v" in command else z_out
+        return _sp.CompletedProcess(command, 0, stdout=out, stderr="")
+
+    monkeypatch.setattr("helia_profiler.toolchain_probe.subprocess.run", fake_run)
+
+
+def test_armclang_linker_reservation_is_not_counted_as_bss(tmp_path: Path, monkeypatch) -> None:
+    """#132: fromelf's ZI figure folds ARM_LIB_HEAP in, exactly as Berkeley
+    `size` folded `.heap` into bss (#24). The per-section probe must pull the
+    reservation out so armclang reports the same meaning of bss as gcc."""
+    calls: list = []
+    _fromelf_stub(monkeypatch, _FROMELF_Z, _FROMELF_V, calls)
+
+    sections = binary_sections(tmp_path / "fw.axf", Toolchain.ARMCLANG, timeout_s=5)
+
+    assert sections is not None
+    assert sections.reserved == _REAL_HEAP
+    # The live stack stays in bss -- same rule as the gcc path (#131): armlink
+    # points the initial SP at ARM_LIB_STACK's top, it is memory the firmware
+    # genuinely needs.
+    assert sections.bss == _REAL_TRUE_BSS + _REAL_STACK
+    assert sections.text == _REAL_TEXT
+    assert sections.data == _REAL_DATA
+    assert sections.total == _REAL_TEXT + _REAL_DATA + _REAL_ZI, "total keeps the tool's own sum"
+    assert sections.bss + sections.reserved == _REAL_ZI
+    assert calls == [
+        ["fromelf", "--text", "-z", str(tmp_path / "fw.axf")],
+        ["fromelf", "--text", "-v", str(tmp_path / "fw.axf")],
+    ]
+
+
+def test_armclang_degrades_to_unadjusted_totals_without_section_detail(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Old fromelf / unexpected -v shape: keep the totals, never invent an
+    adjustment. Same degradation contract as the unreadable-readelf case."""
+    _fromelf_stub(monkeypatch, _FROMELF_Z, "some unexpected tool output\n")
+
+    sections = binary_sections(tmp_path / "fw.axf", Toolchain.ARMCLANG, timeout_s=5)
+
+    assert sections is not None
+    assert sections.bss == _REAL_ZI, "degraded path reports exactly what -z said"
+    assert sections.reserved == 0
+    assert sections.text == _REAL_TEXT
+    assert sections.data == _REAL_DATA
+
+
+def test_armclang_legacy_grand_totals_line_still_parses(tmp_path: Path, monkeypatch) -> None:
+    """The label-first `Grand Totals:` shape the old parser expected (no real
+    fromelf we have seen emits it) stays as the last-resort fallback, and on
+    its own reproduces the pre-#132 numbers -- the #132 reviewer's exact
+    BinarySections(text=608, data=4, bss=392188, total=392800, reserved=0)."""
+    legacy = "  Grand Totals: 600 8 4 392188\n"
+    _fromelf_stub(monkeypatch, legacy, "some unexpected tool output\n")
+
+    sections = binary_sections(tmp_path / "fw.axf", Toolchain.ARMCLANG, timeout_s=5)
+
+    assert sections == BinarySections(text=608, data=4, bss=392_188, total=392_800)
+
+
+def test_armclang_a_heap_with_contents_is_not_treated_as_reserved(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """SHT_PROGBITS means the region carries an image -- it is data, not a
+    reservation, whatever its name says. Mirrors the gcc-path type check."""
+    progbits_heap = """** Section #1
+
+    Name        : ARM_LIB_HEAP
+    Type        : SHT_PROGBITS (0x00000001)
+    Flags       : SHF_ALLOC + SHF_WRITE (0x00000003)
+    Size        : 8192 bytes (0x2000)
+"""
+    _fromelf_stub(monkeypatch, _FROMELF_Z, progbits_heap)
+
+    sections = binary_sections(tmp_path / "fw.axf", Toolchain.ARMCLANG, timeout_s=5)
+
+    assert sections is not None
+    assert sections.bss == _REAL_ZI, "a PROGBITS heap was wrongly taken out of bss"
+    assert sections.reserved == 0
+
+
+def test_armclang_reserved_exceeding_bss_is_not_subtracted(tmp_path: Path, monkeypatch) -> None:
+    """Belt-and-braces backstop behind the type check, same as the gcc path:
+    trust the section detail only if it adds up against the totals."""
+    small_zi = "  Grand Totals: 600 8 4 100\n"
+    _fromelf_stub(monkeypatch, small_zi, _FROMELF_V)
+
+    sections = binary_sections(tmp_path / "fw.axf", Toolchain.ARMCLANG, timeout_s=5)
+
+    assert sections is not None
+    assert sections.bss == 100, "bss was adjusted despite inconsistent section data"
+    assert sections.reserved == 0
+
+
+def test_size_and_fromelf_parsers_agree_on_the_same_binary_shape(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """#132 acceptance: the cross-toolchain divergence table collapses.
+
+    Feed both parsers semantically equivalent descriptions of the SAME image
+    -- the real armclang capture on one side, and the gcc tool output a
+    binary with identical sections would produce on the other -- and require
+    the identical (text, data, bss, reserved) split, so a cross-toolchain
+    compare no longer shows a ~1500x bss artifact of the measuring tool.
+    """
+    berkeley = "text data bss dec hex filename\n320 4 396272 396596 60d34 firmware\n"
+    readelf = """Section Headers:
+  [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
+  [ 1] .text             PROGBITS        00000000 000034 000140 00  AX  0   0  4
+  [ 2] .data             PROGBITS        20000000 000174 000004 00  WA  0   0  4
+  [ 3] .bss              NOBITS          20000004 000178 0000f8 00  WA  0   0  1
+  [ 4] .heap             NOBITS          200000fc 000178 05faf8 00  WA  0   0  1
+  [ 5] .stack            NOBITS          2005fbf4 000178 001000 00  WA  0   0  1
+"""
+    _probe_stub(monkeypatch, berkeley, readelf)
+    via_size = binary_sections(tmp_path / "firmware", Toolchain.ARM_NONE_EABI_GCC, timeout_s=5)
+
+    _fromelf_stub(monkeypatch, _FROMELF_Z, _FROMELF_V)
+    via_fromelf = binary_sections(tmp_path / "fw.axf", Toolchain.ARMCLANG, timeout_s=5)
+
+    assert via_size is not None and via_fromelf is not None
+    assert (via_size.text, via_size.data, via_size.bss, via_size.reserved) == (
+        via_fromelf.text,
+        via_fromelf.data,
+        via_fromelf.bss,
+        via_fromelf.reserved,
+    )
+    assert via_fromelf.bss == _REAL_TRUE_BSS + _REAL_STACK
+    assert via_fromelf.reserved == _REAL_HEAP
+
+
+def _section_listing(name: str) -> str:
+    """A -v section block in the REAL fromelf shape: bare '** Section #N'
+    header, fields on indented lines (#175 round-2 review M-1 — the first
+    version put the fields inline on the header, where the parser never
+    reads them, so it returned 0 for ANY name and pinned nothing)."""
+    return (
+        "** Section #4\n"
+        "\n"
+        f"    Name        : {name}\n"
+        "    Type        : SHT_NOBITS (0x00000008)\n"
+        "    Flags       : SHF_ALLOC + SHF_WRITE (0x00000003)\n"
+        "    Size        : 65536 bytes (alignment 8)\n"
+    )
+
+
+def test_combined_stackheap_region_stays_bss():
+    """ARM_LIB_STACKHEAP (combined region) contains the live stack and
+    cannot be split — per #131's never-invent rule it stays in bss with
+    reserved=0. Verified against a real armlink build by the #175 review
+    (bss=65784, reserved=0). The ARM_LIB_HEAP positive control proves the
+    parser actually READ the name — without it, "correctly classified as
+    live stack" is indistinguishable from "parser saw nothing"."""
+    assert _reserved_from_section_listing(_section_listing("ARM_LIB_STACKHEAP")) == 0
+    assert _reserved_from_section_listing(_section_listing("ARM_LIB_HEAP")) == 65536
+    assert _reserved_from_section_listing(_section_listing(".heap")) == 65536
+
+
+def test_totals_label_in_the_image_path_is_not_a_totals_row():
+    """#175 round-2 m-1: fromelf echoes the input path in the Object Name
+    column, so a relative path whose LEADING component is a totals label
+    must still parse as the image row. The prefix-match version of the fix
+    skipped it (verified against the real tool: 'ROM Totals/fw.axf' ->
+    None); the full-match version reads it correctly."""
+    table = (
+        "** Object/Image Component Sizes\n"
+        "\n"
+        "      Code (inc. data)   RO Data    RW Data    ZI Data      Debug   Object Name\n"
+        "       296         16         32          4     396272        652   ROM Totals/fw.axf\n"
+        "       296         16         32          4          0          0   ROM Totals for ROM Totals/fw.axf\n"
+    )
+    from helia_profiler.toolchain_probe import _fromelf_totals
+
+    assert _fromelf_totals(table) == (296, 32, 4, 396272)

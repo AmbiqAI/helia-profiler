@@ -480,9 +480,10 @@ def capture_power(
 # Maps a registered ``HPX_ERROR=<code>`` to a human-readable hint.  The
 # firmware emits these after its own preflight checks so the host can point
 # the user at the real cause instead of blaming the arena for every failure.
-# Six of the twelve codes in ``wire.FirmwareErrorCode`` have no entry here and
-# reach the user with a generic message; that gap is pinned by
-# tests/contracts/test_wire_protocol.py so growing it stays a review decision.
+# Every code in ``wire.FirmwareErrorCode`` has an entry here (#165 closed the
+# six-code gap #163 documented); that completeness is pinned by
+# tests/contracts/test_wire_protocol.py, so adding a code without deciding on
+# its hint stays a review decision.
 _ERROR_HINTS: dict[FirmwareErrorCode, str] = {
     FirmwareErrorCode.SCHEMA_MISMATCH: (
         "The model's schema version does not match what the firmware was "
@@ -512,8 +513,66 @@ _ERROR_HINTS: dict[FirmwareErrorCode, str] = {
     ),
     FirmwareErrorCode.PSRAM_INIT_FAILED: (
         "PSRAM initialisation failed on the target.  Verify the board "
-        "actually has PSRAM populated and that --model-location=psram is "
-        "appropriate for this hardware."
+        "actually has PSRAM populated and that --weights-location / "
+        "--arena-location psram is appropriate for this hardware."
+    ),
+    FirmwareErrorCode.PSRAM_INFO_FAILED: (
+        "PSRAM initialised but its info query failed, so the firmware has no "
+        "base address to place PSRAM data at.  This is a driver/hardware "
+        "fault, not a model problem: power-cycle the board and retry, and if "
+        "it persists check that target.psram.clock_hz suits the populated "
+        "PSRAM part.  If this board has no usable PSRAM, move the model and "
+        "arena off it (model/arena location settings)."
+    ),
+    FirmwareErrorCode.BIND_ARENA_FAILED: (
+        "heliaAOT rejected an externally allocated arena region — the "
+        "payload carries the runtime's status and the region id.  The "
+        "module and its arena table come from the SAME compiler run, so "
+        "re-running changes nothing.  The known way a region id goes "
+        "missing host-side is an arena whose memory kind hpx cannot map: "
+        "that is skipped with a warning printed at NORMAL verbosity — look "
+        "above the build output for 'AOT planner emitted unrecognised "
+        "memory ... skipping'."
+    ),
+    FirmwareErrorCode.CONST_BLOB_PSRAM_WRITE_FAILED: (
+        "Copying a constant sidecar blob into its PSRAM-placed arena region "
+        "failed (the payload names the region).  PSRAM itself came up, so "
+        "this points at the MSPI write path: power-cycle and retry, or try "
+        "a lower target.psram.clock_hz.  Constant arenas follow the "
+        "WEIGHTS placement (arena-location does not move them): set "
+        "--weights-location / model.weights_location off psram, or steer "
+        "the AOT planner via engine.config.aot_args.memory.tensors."
+    ),
+    FirmwareErrorCode.EXECUTORCH: (
+        "An ExecuTorch runtime call failed: stage= names the failing call "
+        "and error= is the numeric executorch::Error.  If planned= is "
+        "non-zero the method needs that many planned-arena bytes — raise "
+        "model.arena_size (or engine.config.planned_arena_size, which "
+        "overrides it when set) to at least that value.  Otherwise check the "
+        "engine config's method_arena_size / temporary_arena_size and that "
+        "the .pte was exported for this runtime version."
+    ),
+    FirmwareErrorCode.OPERATOR_COUNT_EXCEEDS_CAPACITY: (
+        "The model ran more operators than the per-layer record array holds "
+        "(the payload reports the capacity); the firmware PARKS here, so no "
+        "CSV follows at all.  Capacity comes from the SoC's pmu_max_ops — "
+        "raise it via target.custom_socs.<name>.pmu_max_ops (a custom SoC "
+        "based_on this one, with the board repointed at it) — each entry "
+        "reserves a per-record struct of RAM (see the engine template's "
+        "LayerRecord), so a large raise can turn this into a link failure "
+        "on a small part — or profile a model with fewer executed "
+        "operators."
+    ),
+    FirmwareErrorCode.PMU_INIT_OR_SELFTEST_FAILED: (
+        "PMU bring-up failed for the named counter pass: either the PMU "
+        "driver rejected the event selection or the CPU-cycles self-test "
+        "read zero from a frozen counter.  The preceding "
+        "HPX_PMU_INIT_STATUS / HPX_PMU_SELFTEST_CPU_CYCLES lines say which "
+        "(the self-test also fails on a read error, not only a frozen "
+        "counter).  Check that every selected --pmu-counters event exists "
+        "on this core.  Over-selecting counters does NOT cause this error — "
+        "the firmware clamps to its own per-pass counter capacity (4) and "
+        "silently drops the extra columns."
     ),
 }
 

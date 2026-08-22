@@ -942,7 +942,6 @@ def test_summary_serializes_power_terminal_status(tmp_path: Path):
             overflow=False,
             charge_nc=50_000_000,
             bus_voltage_uv=1_800_000,
-            sample_count=1000,
             calibration_id="board-rev-a",
         ),
     )
@@ -974,7 +973,6 @@ def test_summary_serializes_power_terminal_status(tmp_path: Path):
         "overflow": False,
         "charge_nc": 50_000_000,
         "bus_voltage_uv": 1_800_000,
-        "sample_count": 1000,
         "calibration_id": "board-rev-a",
     }
 

@@ -189,7 +189,6 @@ def test_internal_terminal_measurement_becomes_power_result(
         overflow=False,
         charge_nc=50_000_000,
         bus_voltage_uv=1_800_000,
-        sample_count=100,
         calibration_id="board-rev-a",
     )
     monkeypatch.setattr(
@@ -251,7 +250,6 @@ def _measurement(**overrides) -> OnDevicePowerSummary:
         "overflow": False,
         "charge_nc": 50_000_000,
         "bus_voltage_uv": 1_800_000,
-        "sample_count": 100,
         "calibration_id": "board-rev-a",
         **overrides,
     }

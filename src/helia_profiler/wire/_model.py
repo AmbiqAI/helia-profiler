@@ -218,8 +218,8 @@ class FirmwareErrorCode(StrEnum):
 
     The code is the first token of the payload, delimited by a space or a
     colon (``schema_mismatch:1234_vs_3``, ``unsupported_op kind=custom …``);
-    ``capture._raise_on_firmware_error`` splits it exactly that way. Six of
-    these carry a host hint — see :attr:`WireSpec.has_host_hint`.
+    ``capture._raise_on_firmware_error`` splits it exactly that way. Every
+    code carries a host hint — see :attr:`WireSpec.has_host_hint`.
     """
 
     SCHEMA_MISMATCH = "schema_mismatch"
@@ -358,7 +358,10 @@ class PowerTerminalKey(StrEnum):
     MEASUREMENT_OVERFLOW = "HPX_POWER_MEASUREMENT_OVERFLOW"
     CHARGE_NC = "HPX_POWER_CHARGE_NC"
     BUS_VOLTAGE_UV = "HPX_POWER_BUS_VOLTAGE_UV"
-    SAMPLE_COUNT = "HPX_POWER_SAMPLE_COUNT"
+    # HPX_POWER_SAMPLE_COUNT was retired by #165: the host accepted it but no
+    # template ever emitted it, and HPX_POWER_MEASUREMENT_COUNT already
+    # carries the accumulator count. An envelope carrying it is now rejected
+    # as an unknown field, like any other unregistered key.
     CALIBRATION_ID = "HPX_POWER_CALIBRATION_ID"
 
     # --- pre-record diagnostics (outside the envelope) -------------------

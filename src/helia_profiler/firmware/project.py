@@ -322,12 +322,20 @@ def _resolve_project_overrides(
                 ),
             )
         project_overrides[spec.project] = (mode, value)
-    for project in {spec.project for spec in module_specs}:
+    # sorted(): this insertion order reaches yaml.safe_dump(sort_keys=False)
+    # and becomes nsx.yml's module_registry block order — bare set iteration
+    # made the rendered BYTES vary with PYTHONHASHSEED across processes
+    # (#174). The workspace manifest hash was never affected: nsx's
+    # hash_manifest re-serialises with sort_keys=True, so key order cannot
+    # reach it (#175 review corrected the original claim). The full sort on
+    # return canonicalises the explicit-override half too, so two configs
+    # listing the same overrides in different order emit identical files.
+    for project in sorted({spec.project for spec in module_specs}):
         if project in project_overrides:
             continue
         if any(qualified.name == project for qualified in baseline.projects):
             project_overrides[project] = ("ref", baseline.project(project).ref)
-    return project_overrides
+    return dict(sorted(project_overrides.items()))
 
 
 def _module_names_by_project(module_specs: list[NsxModuleSpec]) -> dict[str, set[str]]:

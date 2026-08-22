@@ -268,7 +268,7 @@ def _upload_model_to_psram(
             "Timed out waiting for HPX_PSRAM_READY from firmware",
             hint=(
                 "Firmware did not signal PSRAM readiness. "
-                "Ensure the board has PSRAM and --model-location psram is correct."
+                "Ensure the board has PSRAM and --weights-location / --arena-location psram is correct."
             ),
         )
 

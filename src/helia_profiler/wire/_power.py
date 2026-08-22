@@ -50,8 +50,6 @@ _TERMINAL_FIELDS: tuple[tuple[PowerTerminalKey, bool | None, str, str], ...] = (
      "Charge accumulated across the window.", "nanocoulombs"),
     (PowerTerminalKey.BUS_VOLTAGE_UV, False,
      "Bus voltage sampled during the window.", "microvolts"),
-    (PowerTerminalKey.SAMPLE_COUNT, False,
-     "Monitor samples behind the accumulation.", "int"),
     (PowerTerminalKey.CALIBRATION_ID, False,
      "Identity of the shunt/current calibration used.", "string"),
 )
@@ -69,9 +67,7 @@ TERMINAL_SPECS: tuple[WireSpec, ...] = tuple(
         condition=GATE_POWER_ONLY if required else GATE_POWER_INA228,
         runtime_gate=(
             None
-            # SAMPLE_COUNT has no emission site at all (see its note), so a
-            # runtime gate would describe a guard that guards nothing.
-            if required or key is PowerTerminalKey.SAMPLE_COUNT
+            if required
             # One `if` guards the whole optional block, which is why the group
             # is all-or-none on the wire rather than by convention.
             else "success && g_hpx_ina228_ok && the envelope written so far "
@@ -79,18 +75,12 @@ TERMINAL_SPECS: tuple[WireSpec, ...] = tuple(
         ),
         value_shape=value_shape,
         required=required,
-        emitted_by_firmware=key is not PowerTerminalKey.SAMPLE_COUNT,
         note=(
-            "Documented gap: the host accepts this field but no template "
-            "emits it, so OnDevicePowerSummary.sample_count is always None."
-            if key is PowerTerminalKey.SAMPLE_COUNT
-            else (
-                "Optional measurement payload: all of these appear together "
-                "or not at all, and only for a successful window with valid "
-                "accumulator reads."
-                if required is False
-                else "Missing or malformed required fields raise PowerError."
-            )
+            "Optional measurement payload: all of these appear together "
+            "or not at all, and only for a successful window with valid "
+            "accumulator reads."
+            if required is False
+            else "Missing or malformed required fields raise PowerError."
         ),
     )
     for key, required, description, value_shape in _TERMINAL_FIELDS

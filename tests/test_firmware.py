@@ -2132,3 +2132,44 @@ class TestNsxModuleOverrides:
         # The override must not have been applied.
         nsx_yml = (app_dir / "nsx.yml").read_text()
         assert "some-other-ref" not in nsx_yml
+
+
+def test_project_override_order_is_hash_seed_independent():
+    """#174: the fallback loop's insertion order reaches yaml.safe_dump
+    (sort_keys=False) and becomes nsx.yml's module_registry block order —
+    bare set iteration made the rendered BYTES vary with PYTHONHASHSEED
+    across processes. (The workspace manifest hash was never affected —
+    nsx's hash_manifest canonicalises with sort_keys=True; the #175 review
+    corrected the original claim.) Run the resolver in subprocesses under
+    different seeds and require identical ordering."""
+    import json
+    import subprocess
+    import sys
+
+    script = r"""
+import json
+from helia_profiler.compatibility import load_compatibility_baseline
+from helia_profiler.firmware.project import NsxModuleSpec, _resolve_project_overrides
+
+baseline = load_compatibility_baseline()
+projects = [q.name for q in baseline.projects][:6]
+specs = [
+    NsxModuleSpec(name=f"mod-{name}", project=name) for name in projects
+]
+overrides = _resolve_project_overrides(specs, {}, baseline)
+print(json.dumps(list(overrides)))
+"""
+    orders = []
+    for seed in ("0", "1", "2"):
+        proc = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PYTHONHASHSEED": seed},
+            check=True,
+        )
+        orders.append(proc.stdout.strip())
+    assert orders[0] == orders[1] == orders[2], orders
+    # Vacuity guard (#175 review m9): an empty resolver result would pass
+    # the equality trivially while asserting nothing.
+    assert len(json.loads(orders[0])) >= 2

@@ -85,6 +85,7 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         engines=TFLM_ENGINES | AOT_ENGINES,
         condition=GATE_PSRAM_NEEDED,
         engine_conditions={EngineType.HELIA_AOT: GATE_AOT_PSRAM_ARENAS},
+        has_host_hint=True,
     ),
     _spec(
         error_token(FirmwareErrorCode.BIND_ARENA_FAILED),
@@ -95,6 +96,7 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         engines=AOT_ENGINES,
         condition=GATE_AOT_EXTERNAL_ARENAS,
         value_shape="bind_arena_failed:<status>:region=<id>",
+        has_host_hint=True,
     ),
     _spec(
         error_token(FirmwareErrorCode.CONST_BLOB_PSRAM_WRITE_FAILED),
@@ -105,6 +107,7 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         engines=AOT_ENGINES,
         condition=GATE_AOT_CONST_BLOBS_IN_PSRAM,
         value_shape="const_blob_psram_write_failed:region=<id>",
+        has_host_hint=True,
     ),
     _spec(
         error_token(FirmwareErrorCode.MODEL_INIT_FAILED),
@@ -124,6 +127,7 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         WireCriticality.PROTOCOL,
         engines=ET_ENGINES,
         value_shape="stage=<s> error=<n> planned=<n>",
+        has_host_hint=True,
         note="Single code for every ExecuTorch failure site.",
     ),
     _spec(
@@ -136,8 +140,11 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         condition=GATE_NOT_POWER_ONLY,
         value_shape="capacity=<n>",
         runtime_gate="the capacity was actually exceeded during the pass",
-        note="Printed just before the CSV body, so the rows that follow are "
-        "truncated rather than absent.",
+        has_host_hint=True,
+        note="The firmware parks immediately after printing this, so NO CSV "
+        "body follows at all — the pre-#175 claim that rows were merely "
+        "truncated described a print that is unreachable (hpx_park() "
+        "precedes print_layers()).",
     ),
     _spec(
         error_token(FirmwareErrorCode.PMU_INIT_OR_SELFTEST_FAILED),
@@ -148,6 +155,7 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         engines=ET_ENGINES,
         condition=GATE_NOT_POWER_ONLY,
         value_shape="pass=<name>",
+        has_host_hint=True,
     ),
 )
 

@@ -166,7 +166,6 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
                     PowerTerminalKey.ENERGY_NJ,
                     PowerTerminalKey.CHARGE_NC,
                     PowerTerminalKey.BUS_VOLTAGE_UV,
-                    PowerTerminalKey.SAMPLE_COUNT,
                     PowerTerminalKey.MEASUREMENT_DURATION_US,
                     PowerTerminalKey.MEASUREMENT_COUNT,
                     PowerTerminalKey.MEASUREMENT_OVERFLOW,
@@ -197,7 +196,6 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
             overflow=bool(overflow_value),
             charge_nc=measurement_fields.get(PowerTerminalKey.CHARGE_NC),
             bus_voltage_uv=measurement_fields.get(PowerTerminalKey.BUS_VOLTAGE_UV),
-            sample_count=measurement_fields.get(PowerTerminalKey.SAMPLE_COUNT),
             calibration_id=fields.get(PowerTerminalKey.CALIBRATION_ID),
         )
     return PowerTerminalEnvelope(terminal=terminal, measurement=measurement)

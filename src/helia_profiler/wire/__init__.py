@@ -64,7 +64,11 @@ Registry-documented gaps
 ------------------------
 
 These are true of the shipped protocol and deliberately *not* fixed here (wire
-bytes are frozen this phase):
+bytes are frozen this phase). Two gaps #163 documented were closed host-side by
+#165 — every :class:`FirmwareErrorCode` now carries a host hint, and the
+never-emitted ``HPX_POWER_SAMPLE_COUNT`` was retired outright (removed from
+:class:`PowerTerminalKey` and the envelope schema; ``HPX_POWER_MEASUREMENT_COUNT``
+already carries the accumulator count):
 
 * ExecuTorch's ``HPX_ARENA_SIZE`` counts only the planned arena — its method
   and temporary arenas are excluded, so the figure is not comparable with
@@ -78,11 +82,6 @@ bytes are frozen this phase):
   the generated reference both quote.
 * ``HPX_VERSION`` is checked against :data:`HPX_PROTOCOL_VERSION` and then
   discarded — it never reaches ``FirmwareMeta`` or ``summary.json``.
-* 6 of the 12 :class:`FirmwareErrorCode` members carry no host hint
-  (:attr:`WireSpec.has_host_hint`); those failures reach the user with a
-  generic message.
-* ``HPX_POWER_SAMPLE_COUNT`` is accepted by the host envelope parser but no
-  template emits it (:attr:`WireSpec.emitted_by_firmware` is ``False``).
 * ``HPX_CONST_BLOB_LOADED region=… size=…`` looks like a key/value line but is
   space-separated, so the generic regex never matches it: it is
   :attr:`WireKind.RECORD` and reaches no consumer at all.
