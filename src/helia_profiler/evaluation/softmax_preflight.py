@@ -30,14 +30,15 @@ wrong versions of this paragraph:
   Gate: ``multiplier <= 1.0`` is an error (strict ``TFLITE_CHECK_GT``).
 * **heliaAOT** does NOT share the helper -- it computes softmax scaling on
   the host -- but its own path fails one call later: ``calculate_input_radius``
-  does ``1 << shift`` on the frexp exponent, so a multiplier whose
-  Q31-ROUNDED value lands in ``[2**-32, 0.5)`` raises ``ValueError: negative
-  shift count`` inside the compiler (verified against the pinned helia-aot
-  0.18; the rounding happens before the flush check, so the raw-value
-  boundaries are off by up to one ULP — see ``_aot_q31_rounded_multiplier``).
-  The first fix exempted AOT entirely after verifying only the first call.
-  Gate: that rounded band is an error with an AOT-specific message;
-  ``0.5 <= multiplier <= 1.0`` compiles but is
+  does ``1 << shift`` on the quantized-multiplier shift, so the compiler
+  raises ``ValueError: negative shift count`` exactly when that shift is
+  negative. The gate mirrors the shift computation itself
+  (``_aot_quantized_shift``) -- for positive multipliers that is the
+  Q31-rounded band ``[2**-32, 0.5)``, for negatives the boundaries differ
+  because the Q31 promotion fires only at ``+2**31`` (see the comment block
+  above ``_aot_quantized_shift``). The first fix exempted AOT entirely after
+  verifying only the first call. Gate: a negative shift is an error with an
+  AOT-specific message; ``0.5 <= multiplier <= 1.0`` compiles but is
   numerically degenerate (diff_min lands 7 orders of magnitude from healthy)
   and would abort under helia-rt, so it warns.
 * **ExecuTorch** consumes ``.pte`` and never reaches any of this.
@@ -78,41 +79,35 @@ TFLM_SOFTMAX_INTEGER_BITS = 5
 _MULTIPLIER_SHIFT = 31 - TFLM_SOFTMAX_INTEGER_BITS
 
 
-#: helia-aot 0.18 raises ``ValueError: negative shift count`` exactly when
-#: the Q31-ROUNDED multiplier (``_aot_q31_rounded_multiplier``) lands in
-#: ``[2**-32, 0.5)`` — the rounding precedes the flush check, so these
-#: constants are applied to the rounded value, never the raw one.
-#:
-#: ``AirFixedPointScale.from_real_multiplier`` stores the frexp exponent as
-#: the shift, which ``calculate_input_radius`` then feeds to ``1 << shift``.
-#: Multipliers in [0.5, 1) have exponent 0; below 0.5 it goes negative and the
-#: shift raises. But ``quantize_multiplier`` FLUSHES TO (0, 0) once the
-#: exponent would fall below -31, so an even smaller multiplier gets shift 0
-#: and compiles again. Measured against the pinned 0.18:
-#:
-#:     2**-33  shift  0  compiles      0.2889 (the issue)  shift -1  raises
-#:     2**-32  shift -31 raises        0.49                shift -1  raises
-#:     2**-31  shift -30 raises        0.5                 shift  0  compiles
-#:
-#: The first version of this gate errored on everything below 0.5, which
-#: blocked the sub-flush band that helia-aot compiles fine -- the same
-#: over-blocking mistake as gating heliaAOT at all, one dimension over.
-#:
-#: One refinement on top of the table: ``quantize_multiplier`` ROUNDS the
-#: frexp fraction to Q31 (round half up) and promotes the exponent when the
-#: fraction rounds to 1.0 -- BEFORE the flush check. So the band is exact for
-#: the ROUNDED multiplier, and off by one rounding step at each raw edge:
-#: [0.5 - 2**-33, 0.5) rounds up to 0.5 and compiles, while
-#: [2**-32 * (1 - 2**-32), 2**-32) rounds up to 2**-32 and raises.
-#: :func:`_aot_q31_rounded_multiplier` applies that rounding so the constants
-#: below delimit the observable band exactly (found by the #147 sweep).
-#:
-#: All of this mirrors the PINNED helia-aot's internals by hand. The tripwire
-#: sweep in tests/test_softmax_preflight.py drives the REAL
-#: ``preprocess_softmax_scaling`` / ``calculate_input_radius`` across every
-#: edge and fails CI's analysis-tests job if a version bump moves any of it.
-AOT_COMPILER_MIN_MULTIPLIER = 0.5
-AOT_FLUSH_TO_ZERO_MULTIPLIER = 2.0**-32
+# How helia-aot 0.18 decides a quantized Softmax's fate, measured and then
+# mirrored exactly (the history matters — this gate has been wrong three
+# times, each in a different direction):
+#
+#   * ``AirFixedPointScale.from_real_multiplier`` -> ``quantize_multiplier``
+#     stores the frexp exponent as the shift; ``calculate_input_radius`` does
+#     ``1 << shift``, so a NEGATIVE shift raises ``ValueError`` inside the
+#     compiler. Shift < -31 is flushed to (0, 0) first (compiles), > 30 is
+#     clamped.
+#   * v1 of this gate errored on everything below 0.5 — over-blocking the
+#     sub-flush band. v2 used band constants on the raw multiplier — off by
+#     one ULP at each edge, because quantize_multiplier ROUNDS the fraction
+#     to Q31 (half up, promoting at +2**31) BEFORE the flush check. v3
+#     banded the ROUNDED value — exact for positives, but the promotion
+#     fires only at +2**31, so for negatives the rounded value is AMBIGUOUS
+#     (-0.5 arises from both a compiling and a raising state; #172 round-2).
+#   * The verdict therefore mirrors the SHIFT itself
+#     (:func:`_aot_quantized_shift`): error iff shift < 0. Measured against
+#     the pinned 0.18 (positive column, negatives differ per the above):
+#
+#       2**-33  shift  0  compiles      0.2889 (the issue)  shift -1  raises
+#       2**-32  shift -31 raises        0.49                shift -1  raises
+#       2**-31  shift -30 raises        0.5                 shift  0  compiles
+#
+# All of this mirrors the PINNED helia-aot's internals by hand. The tripwire
+# sweep in tests/test_softmax_preflight.py drives the REAL
+# ``preprocess_softmax_scaling`` / ``calculate_input_radius`` across every
+# edge — both signs — and fails CI's analysis-tests job if a version bump
+# moves any of it.
 
 #: What an ABSENT ``SoftmaxOptions`` table means for beta, per engine -- and
 #: they disagree, which is why the verdict cannot be computed once and shared.
@@ -147,36 +142,6 @@ def _read_aot_absent_beta() -> float:
 
 
 AOT_ABSENT_BETA = _read_aot_absent_beta()
-
-
-def _aot_q31_rounded_multiplier(multiplier: float) -> float:
-    """The multiplier as helia-aot's ``quantize_multiplier`` actually sees it.
-
-    Mirrors, expression for expression, the rounding at the top of the pinned
-    ``helia_aot.air.utils.quantize_multiplier``: the frexp fraction becomes a
-    Q31 integer via ``floor(fraction * 2**31 + 0.5)`` (round HALF UP, not
-    banker's), and a fraction that rounds to 1.0 is promoted one exponent --
-    both before the sub-``2**-32`` flush check. Applying the band constants to
-    this rounded value instead of the raw one is what makes them exact at the
-    edges.
-
-    The overflow hazard is ``ldexp``, on FINITE input: a multiplier in the
-    top float64 binade rounds its fraction to 1.0, promotes, and
-    ``ldexp(2**30, 994)`` exceeds the float range (#172 review — the earlier
-    comment blamed frexp-of-infinity, which the isfinite caller guard already
-    excludes). Such a value is orders of magnitude above the raise band, so
-    report it as-is: unreachable from a real model anyway (both wire operands
-    are float32, capping the product near 8e84).
-    """
-    fraction, exponent = math.frexp(multiplier)
-    quantized = math.floor(fraction * (1 << 31) + 0.5)
-    if quantized == (1 << 31):
-        quantized //= 2
-        exponent += 1
-    try:
-        return math.ldexp(quantized, exponent - 31)
-    except OverflowError:
-        return multiplier
 
 
 def _aot_quantized_shift(multiplier: float) -> int:

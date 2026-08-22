@@ -493,8 +493,8 @@ def capture_gated(
             )
             if not gate_integrity.valid:
                 raise PowerError(
-                    "GPIO-gated power window duration does not match the requested "
-                    "clean inference count",
+                    "GPIO-gated power window duration does not match the "
+                    f"requested {work_noun} count",
                     hint=(
                         f"Measured {gate_integrity.measured_s:.6f}s, expected "
                         f"{gate_integrity.expected_s:.6f}s for {clean_infer_count} "

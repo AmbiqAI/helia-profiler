@@ -241,12 +241,17 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 # mode gets its power from the instrument and only loses
                 # elapsed_us -- invalidating there would block comparability of
                 # a capture whose power metrics are sound.
+                # count_noun(..., N or 2): when the count is unknown/zero the
+                # generic plural reads right ("completed busy-loop passes");
+                # a real count of 1 gets the singular.
                 if internal_mode:
                     issues.append(
                         _error(
                             IssueCode.POWER_WINDOW_CLOCK_FROZEN,
-                            "Power firmware reported zero elapsed time for completed "
-                            "inferences; the on-device measurement derived from it is "
+                            "Power firmware reported zero elapsed time for "
+                            "completed "
+                            f"{count_noun(ctx.config.profiling.clean_window_probe, terminal.completed_count or 2)}; "
+                            "the on-device measurement derived from it is "
                             "corrupt.",
                             completed_count=terminal.completed_count,
                             elapsed_us=terminal.elapsed_us,
@@ -256,8 +261,10 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                     issues.append(
                         _warning(
                             IssueCode.POWER_WINDOW_CLOCK_FROZEN,
-                            "Power firmware reported zero elapsed time for completed "
-                            "inferences; the external instrument's power numbers are "
+                            "Power firmware reported zero elapsed time for "
+                            "completed "
+                            f"{count_noun(ctx.config.profiling.clean_window_probe, terminal.completed_count or 2)}; "
+                            "the external instrument's power numbers are "
                             "unaffected, but the firmware-reported window duration is "
                             "meaningless.",
                             completed_count=terminal.completed_count,
