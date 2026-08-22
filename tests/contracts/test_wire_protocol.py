@@ -1006,14 +1006,16 @@ def test_clean_window_begin_is_the_protocol_critical_phase():
 def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
     """The gap statement is single-sourced, and the firmware agrees with it.
 
-    The claim used to be that ``est_ms=0`` covers "every apollo510 profile
-    build and therefore every ExecuTorch build", copied verbatim into three
-    files. It was false: ``config.DEFAULT_WINDOW_MODE`` is ``auto``, and the
-    auto branch measures a warm DWT reference and sends a real estimate
-    whatever clock times the window. So the statement now lives once, in
-    :data:`EST_MS_GAP`, and the renders below are the proof of it — a
-    STIMER-timed apollo510 build sends a real ``est_ms`` under the default and
-    the hardcoded zero only under ``window_mode: fixed``.
+    The claim has narrowed twice. First (#163) from "every apollo510 profile
+    build" to "fixed+STIMER only": ``config.DEFAULT_WINDOW_MODE`` is ``auto``,
+    and the auto branch measures a warm DWT reference and sends a real
+    estimate whatever clock times the window. Then (#164) the fixed+STIMER
+    *profile* arm gained the same pre-window DWT measurement — the debug
+    domain is gated only inside the window, so DWT is valid where the
+    measurement happens — leaving the hardcoded zero exclusively in dedicated
+    power binaries, whose announce is compiled to a no-op and has no host
+    listener. The statement lives once, in :data:`EST_MS_GAP`, and the renders
+    below are the proof of it.
     """
     assert EST_MS_GAP in WIRE_REGISTRY[
         heartbeat_token(HeartbeatPhase.CLEAN_WINDOW_BEGIN)
@@ -1023,16 +1025,24 @@ def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
     measured = (
         "HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\\n"
     )
+    # Every profile render announces a computed estimate in BOTH window
+    # modes — the #164 false-timeout needed exactly one configuration,
+    # apollo510 (STIMER window) with window_mode: fixed, and these are the
+    # renders that prove it closed.
     for engine in ("tflm", "helia-aot", "executorch"):
         fixed = _render("apollo510", "rtt", engine, window_mode="fixed")
         auto = _render("apollo510", "rtt", engine, window_mode="auto")
-        assert zero in fixed, engine
-        assert measured not in fixed, engine
+        assert measured in fixed, engine
+        assert zero not in fixed, engine
         assert measured in auto, engine
         assert zero not in auto, engine
-    # ...and a DWT-timed fixed window derives one from its stall-check warmup,
-    # which is the other half of the corrected claim.
+    # ...a DWT-timed fixed window derives one from its stall-check warmup...
     assert measured in _render("apollo3p", "rtt", "tflm", window_mode="fixed")
+    # ...and the hardcoded zero survives ONLY in dedicated power binaries
+    # (#164 D2: minimal power image, no listener — hpx_printf is a no-op).
+    power = _render("apollo510", "rtt", "tflm", power_only=True)
+    assert zero in power
+    assert measured not in power
 
 
 def test_power_terminal_key_sets():

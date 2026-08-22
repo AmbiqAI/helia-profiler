@@ -73,19 +73,22 @@ HPX_WARN_PREFIX = "HPX_WARN="
 
 #: The one statement of the ``est_ms`` gap, single-sourced because it is told
 #: in three places (the ``clean_window_begin`` spec note, the package
-#: docstring's gap list and the generated reference's). Narrower than it looks:
-#: ``config.DEFAULT_WINDOW_MODE`` is ``auto``, and the auto branch of
-#: ``_main_base.cc.j2`` measures a warm DWT reference before the window
-#: whatever clock times the window itself, so the zero is specific to
-#: ``window_mode: fixed`` on a STIMER-timed build.
+#: docstring's gap list and the generated reference's). Since #164 the gap is
+#: no longer structural for any listening host: every profile build measures a
+#: warm DWT reference before the window — the debug domain is gated only
+#: *inside* the window, so pre-window DWT is valid even where STIMER times the
+#: window itself — and announces a computed estimate in both window modes.
 EST_MS_GAP = (
-    "The `clean_window_begin` heartbeat carries `est_ms=0` only where the "
-    "firmware has no warm measurement to estimate from: a STIMER-timed window "
-    "configured with `window_mode: fixed`. There the host reads 0 as 'no "
-    "estimate' and leaves its capture deadline at the flat heartbeat timeout. "
-    "Under the default `window_mode: auto` the firmware measures a warm DWT "
-    "reference before the window and sends a real estimate — on every SoC and "
-    "engine, the STIMER-timed apollo510 and ExecuTorch builds included."
+    "The `clean_window_begin` heartbeat carries a hardcoded `est_ms=0` only "
+    "in dedicated power binaries, where `hpx_printf` compiles to a no-op and "
+    "the host times the capture from its planned duration — no listener "
+    "exists for the announce, and the minimal power image takes no extra "
+    "pre-window DWT reads. Every profile build, in both window modes, "
+    "measures a warm DWT reference before the window and sends a real "
+    "estimate; a runtime `est_ms=0` can still appear if that measurement "
+    "degrades (DWT frozen through every warmup by a debugger-attach "
+    "transient), and the host then reads 0 as 'no estimate' and keeps its "
+    "flat heartbeat timeout."
 )
 
 

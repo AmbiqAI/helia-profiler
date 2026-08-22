@@ -148,7 +148,8 @@ def test_window_budget_parses_est_ms():
 
 
 def test_window_budget_none_for_zero_or_missing_est():
-    # Fixed-window builds emit est_ms=0 — no usable estimate.
+    # est_ms=0 means the pre-window measurement degraded (#164) — no usable
+    # estimate, keep the normal heartbeat behaviour.
     assert window_budget_s("HPX_HEARTBEAT phase=clean_window_begin iters=3 est_ms=0") is None
     # A normal heartbeat is not a window announce.
     assert window_budget_s("HPX_HEARTBEAT phase=infer pass=0 iter=0 layer=5") is None

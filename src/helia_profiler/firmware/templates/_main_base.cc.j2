@@ -425,6 +425,25 @@ int main(void) {
                 clean_warm_min_cyc = wc;
             }
         }
+{%- elif not power_only | default(false) %}
+        // STIMER-timed fixed window, profile binary: the in-window clock is
+        // STIMER, but the debug domain is still up HERE — it is gated only
+        // inside the window — so DWT can measure the warm cost purely to
+        // feed the est_ms announce below (#164).  Re-assert the counter
+        // first: a debugger attaching over SWD can reset DEMCR/DWT after the
+        // boot dwt_init() and transiently freeze DWT->CYCCNT (see the auto
+        // path above).  MAX rejects a frozen-low reading; if the counter
+        // never advances at all, est_ms degrades to 0 and the host keeps its
+        // normal heartbeat behaviour — never worse than no estimate.
+        dwt_init();
+        uint32_t clean_warm_cyc = 0U;
+        for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
+{{ self.engine_reset_inputs_warm() }}
+            uint32_t wt0 = DWT->CYCCNT;
+            {{ self.engine_invoke() }}
+            uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
+            if (wc > clean_warm_cyc) clean_warm_cyc = wc;
+        }
 {%- else %}
         for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
 {{ self.engine_reset_inputs_warm() }}
@@ -454,6 +473,19 @@ int main(void) {
         // deadline (transport/protocol.py: window_budget_s) instead of
         // falling back to the flat heartbeat timeout, which a long fixed
         // window can outlast.
+        uint64_t clean_est_ms = 0;
+        if (SystemCoreClock >= 1000U) {
+            clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)
+                           / ((uint64_t)SystemCoreClock / 1000ULL);
+        }
+        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\n",
+                   clean_iters_n, (unsigned long long)clean_est_ms);
+{%- elif not power_only | default(false) %}
+        // Fixed window on a STIMER-timed profile build: the warmup above
+        // measures the per-inference cost solely for this estimate (#164), so
+        // it is emitted the same way — the host widens its capture deadline
+        // instead of falling back to the flat heartbeat timeout, which a long
+        // fixed window can outlast.
         uint64_t clean_est_ms = 0;
         if (SystemCoreClock >= 1000U) {
             clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)
