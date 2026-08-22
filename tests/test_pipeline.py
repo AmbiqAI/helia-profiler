@@ -560,8 +560,13 @@ class TestNarrowingAccessors:
         assert cls is not None, f"{stage} is not a stage class in helia_profiler.stages"
         assert isinstance(cls(), Stage)
         module_src = inspect.getsource(inspect.getmodule(cls))
-        assigns = re.search(rf"ctx\.{field}\s*=", module_src) is not None
-        publishes = "ctx.publish_" in module_src
+        # (?!=) so a comparison (`ctx.field == x`) cannot count as producing
+        # the field, and the publish hatch is per-field, not module-wide —
+        # both holes let a wrong-but-real producer pass until the second
+        # review round mutation-proved them.
+        assigns = re.search(rf"ctx\.{field}\s*=(?!=)", module_src) is not None
+        field_publisher = {"pmu_result": "ctx.publish_profile_result("}.get(field)
+        publishes = field_publisher is not None and field_publisher in module_src
         assert assigns or publishes, (
             f"{stage} does not appear to set ctx.{field} — the accessor's "
             "error text would name the wrong producer"
@@ -592,16 +597,78 @@ def test_no_assert_narrowing_of_context_fields_survives_in_src():
     #    PipelineContext lives — one such assert falsified this test's claim
     #    until the review round caught it. Other files' self-asserts narrow
     #    their own objects, not pipeline products, and stay legal.
-    ctx_pattern = re.compile(r"^\s*assert\s+(self\.)?ctx\.\w+(\.\w+)*\s+is\s+not\s+None\b")
-    self_pattern = re.compile(r"^\s*assert\s+self\.\w+\s+is\s+not\s+None\b")
+    # Any assert rooted at ctx.<field> — is-not-None, truthiness, or the
+    # parenthesised forms — EXCEPT a deliberate absence assertion
+    # (`assert ctx.x is None`), which is an invariant check, not narrowing.
+    # The guard is SYNTACTIC: narrowing through an intermediate local or a
+    # walrus still evades it (one such survivor was found by review inside
+    # firmware/context.py and converted to an explicit raise) — reviewers
+    # stay the backstop for those spellings.
+    ctx_assert = re.compile(r"^\s*assert\s+\(?(self\.)?ctx\.")
+    absence_only = re.compile(r"^\s*assert\s+\(?(self\.)?ctx\.[\w.]+\s+is\s+None\b")
+    self_pattern = re.compile(r"^\s*assert\s+\(?self\.\w+(\s+is\s+not\s+None\b|\s*\)?\s*(#.*)?$)")
     src = Path(__file__).resolve().parents[1] / "src" / "helia_profiler"
     offenders: list[str] = []
     for path in sorted(src.rglob("*.py")):
         in_pipeline_module = path.name == "pipeline.py"
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if ctx_pattern.match(line) or (in_pipeline_module and self_pattern.match(line)):
+            hit = ctx_assert.match(line) and not absence_only.match(line)
+            if hit or (in_pipeline_module and self_pattern.match(line)):
                 offenders.append(f"{path.relative_to(src.parent.parent)}:{lineno}: {line.strip()}")
     assert not offenders, (
         "assert-narrowing of PipelineContext fields found in src/ — read the "
         "field through its PipelineContext accessor instead:\n" + "\n".join(offenders)
     )
+
+
+def test_docs_accessor_table_matches_the_code():
+    """docs/architecture/pipeline.md hand-duplicates the accessor table; the
+    second review round showed a mutated producer left the docs silently
+    divergent. Parse the table and hold it to NARROWING_ACCESSORS."""
+    doc = (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "architecture"
+        / "pipeline.md"
+    ).read_text(encoding="utf-8")
+    rows = re.findall(
+        r"^\| `(\w+)` \| `(\w+)` \| `(\w+)` \|$", doc, flags=re.MULTILINE
+    )
+    assert set(rows) == set(NARROWING_ACCESSORS), (
+        "the accessor table in docs/architecture/pipeline.md no longer "
+        "matches pipeline.py's accessors — update both together"
+    )
+
+
+def test_print_results_renders_a_captured_run(tmp_path: Path):
+    """The one migrated accessor site with no direct coverage: its
+    reachability rests on a three-file invariant (profiler.py's None guard +
+    CapturePmuStage always publishing) that nothing else pins. Exercise the
+    happy path directly."""
+    from helia_profiler.console import HpxConsole
+    from helia_profiler.console.results import print_results
+    from helia_profiler.results import FirmwareMeta, PmuResult
+
+    ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
+    ctx.pmu_result = PmuResult(
+        meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=1000),
+        layers=[],
+    )
+    print_results(HpxConsole(verbosity=0), ctx)  # must not raise
+
+
+def test_render_context_requires_resolved_platform_metadata(tmp_path: Path):
+    """firmware/context.py's hand-rolled PipelineError for
+    run_metadata.platform (a sub-field no accessor covers) — pinned like the
+    nine accessor raises are."""
+    from helia_profiler.engines import TFLM_ENGINE_HEADER
+    from helia_profiler.engines.base import TflmArtifacts
+    from helia_profiler.firmware.context import FirmwareRenderContext
+    from helia_profiler.platform import get_board, get_soc
+
+    ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
+    ctx.soc = get_soc("apollo510")
+    ctx.board = get_board("apollo510_evb")
+    ctx.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
+    with pytest.raises(PipelineError, match="run_metadata.platform.*ResolvePlatformStage"):
+        FirmwareRenderContext.from_pipeline_context(ctx)

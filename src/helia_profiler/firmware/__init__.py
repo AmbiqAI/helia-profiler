@@ -671,8 +671,15 @@ def generate_app(ctx: PipelineContext) -> Path:
     elif engine_type is EngineType.HELIA_AOT:
         # --- AOT engine: use AOT-specific main template, no model embedding ---
         # The heliaAOT adapter is the only producer of this engine_type, and
-        # HeliaAotArtifacts pins the pairing, so the narrowing is total.
-        assert isinstance(artifacts, HeliaAotArtifacts)
+        # HeliaAotArtifacts pins the pairing, so the narrowing is total — but
+        # stated as a raise, not an assert: this was the last place a stage
+        # product's narrowing rode on an -O-strippable assert.
+        if not isinstance(artifacts, HeliaAotArtifacts):
+            raise FirmwareError(
+                f"engine_type is helia-aot but the prepared artifacts are "
+                f"{type(artifacts).__name__} — adapter/artifact pairing broke. "
+                "This is a bug in heliaPROFILER — please file an issue."
+            )
 
         # Generate C headers for constant arena sidecar blobs.
         # In external-arena mode the AOT compiler emits constant data as
