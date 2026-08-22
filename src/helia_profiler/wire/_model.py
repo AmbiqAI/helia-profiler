@@ -79,16 +79,20 @@ HPX_WARN_PREFIX = "HPX_WARN="
 #: *inside* the window, so pre-window DWT is valid even where STIMER times the
 #: window itself — and announces a computed estimate in both window modes.
 EST_MS_GAP = (
-    "The `clean_window_begin` heartbeat carries a hardcoded `est_ms=0` only "
-    "in dedicated power binaries, where `hpx_printf` compiles to a no-op and "
-    "the host times the capture from its planned duration — no listener "
-    "exists for the announce, and the minimal power image takes no extra "
-    "pre-window DWT reads. Every profile build, in both window modes, "
-    "measures a warm DWT reference before the window and sends a real "
-    "estimate; a runtime `est_ms=0` can still appear if that measurement "
-    "degrades (DWT frozen through every warmup by a debugger-attach "
-    "transient), and the host then reads 0 as 'no estimate' and keeps its "
-    "flat heartbeat timeout."
+    "The `clean_window_begin` heartbeat carries a hardcoded `est_ms=0` in "
+    "exactly two places. Dedicated power binaries: `hpx_printf` compiles to "
+    "a no-op there and the host times the capture from its planned duration, "
+    "so no listener exists for the announce (every power build renders with "
+    "`window_mode: fixed`, so the minimal power image also takes no "
+    "pre-window DWT reads). And `clean_window_probe: busy_loop` windows with "
+    "`window_mode: fixed`: that window runs a calibrated busy loop sized to "
+    "`window_target_ms`, not `clean_iters` inferences, so no "
+    "inference-derived estimate describes it. Every other profile build, in "
+    "both window modes, measures a warm DWT reference before the window and "
+    "sends a real estimate; a runtime `est_ms=0` can still appear if that "
+    "measurement degrades (DWT frozen through every warmup by a "
+    "debugger-attach transient), and the host then reads 0 as 'no estimate' "
+    "and keeps its flat heartbeat timeout."
 )
 
 

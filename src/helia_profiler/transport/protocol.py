@@ -114,11 +114,13 @@ def window_budget_s(line: str) -> float | None:
     returns ``est_ms / 1000 * WINDOW_BUDGET_SAFETY + WINDOW_BUDGET_MARGIN_S``.
 
     Returns ``None`` when *line* is not a clean-window announce or carries no
-    usable (> 0) estimate. Every profile build measures a warm reference
-    pre-window and announces a computed estimate in both window modes (#164),
-    so a zero here means the measurement degraded at runtime (DWT frozen
-    through every warmup by a debugger-attach transient) — the caller then
-    keeps its normal heartbeat behaviour.
+    usable (> 0) estimate. Since #164 every inference-window profile build
+    measures a warm reference pre-window and announces a computed estimate in
+    both window modes, so a zero here means either a fixed-mode busy-loop
+    window (its duration tracks ``window_target_ms``, not the iteration
+    count) or a measurement that degraded at runtime (DWT frozen through
+    every warmup by a debugger-attach transient) — the caller then keeps its
+    normal heartbeat behaviour.
     """
     if CLEAN_WINDOW_BEGIN_PHASE not in line:
         return None
