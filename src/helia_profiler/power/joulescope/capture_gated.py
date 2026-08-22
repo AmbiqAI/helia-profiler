@@ -115,6 +115,12 @@ def capture_gated(
     clean_infer_avg_us: int | None = None,
     minimum_gate_s: float = 0.0,
     gate_relative_tolerance: float = 0.01,
+    # Human-facing noun for clean_infer_count in the duration-mismatch hint:
+    # the driver has no config access, so the caller passes the probe-aware
+    # word (power.diagnostics.count_noun) -- "inferences" is only a default
+    # for artifact-only callers (#172 review: the hint said "1 inferences"
+    # for a busy-loop window that ran none).
+    work_noun: str = "inferences",
     poll_interval_s: float = 0.004,
     min_high_windows: int = 1,
     guard_s: float = 0.15,
@@ -492,7 +498,7 @@ def capture_gated(
                     hint=(
                         f"Measured {gate_integrity.measured_s:.6f}s, expected "
                         f"{gate_integrity.expected_s:.6f}s for {clean_infer_count} "
-                        f"inferences at {clean_infer_avg_us}us each "
+                        f"{work_noun} at {clean_infer_avg_us}us each "
                         f"(allowed jitter {gate_integrity.tolerance_s:.6f}s). "
                         f"The minimum accepted power gate is {minimum_gate_s:.3f}s. "
                         "Rejecting the capture because its energy-per-inference "

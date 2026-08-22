@@ -29,8 +29,6 @@ _BOOT_SETTLE_S = 8.0  # reset/SBL/firmware init allowance
 _SAFETY_MARGIN_S = 6.0  # extra headroom beyond estimated runtime
 
 
-
-
 #: Auto window mode warms the clean pass with 3 hardcoded uninstrumented
 #: reps before timing (_main_base.cc.j2), independent of profiling.warmup
 #: which only applies to the per-layer PMU passes. Every fixed-mode

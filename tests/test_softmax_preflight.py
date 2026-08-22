@@ -498,6 +498,16 @@ def test_reader_agrees_with_litert_on_every_fixture():
 #: and compiles, [2**-32 * (1 - 2**-32), 2**-32) rounds up and raises.
 _AOT_SWEEP = [
     # (label, multiplier, what the pinned helia-aot 0.18 measurably does)
+    # Negatives are swept too (#172 round-2): the Q31 promotion fires only
+    # at +2**31, so the negative boundaries do NOT mirror the positive ones
+    # — a sign-blind guard disagreed with the compiler on 218/689 points.
+    ("negative in the raise band", -0.25, "raises"),
+    ("negative half-up edge keeps its shift", -0.49999999999999994, "raises"),
+    ("negative 0.5 has exponent 0", -0.5, "compiles"),
+    ("negative above the band", -0.75, "compiles"),
+    ("negative at 2**-32", -(2.0**-32), "raises"),
+    ("negative flush rounds toward zero", -(2.0**-32) * (1.0 - 2.0**-32), "compiles"),
+    ("negative large", -2.0, "compiles"),
     ("deep sub-flush", 2.0**-40, "compiles"),
     ("measured 2**-33", 2.0**-33, "compiles"),
     (
@@ -620,14 +630,24 @@ def test_aot_absent_beta_is_one_in_every_environment():
     assert AOT_ABSENT_BETA == 1.0
 
 
-def test_negative_multiplier_is_an_error_like_the_real_chain():
-    """#172 review fuzz: a negative multiplier reaches calculate_input_radius
-    with a negative shift and raises in the real compiler; hpx said 'warn'.
-    Sign corruption is the same corrupt-file class the NaN guard covers."""
+def test_negative_multipliers_mirror_the_real_chain_not_a_blanket_error():
+    """#172 round-2: the first fix blanket-errored negatives; the real chain
+    compiles most of that domain. The asymmetry is the Q31 promotion (fires
+    only at +2**31), so the verdict mirrors the SHIFT — a sign-blind band
+    disagreed on 218 of 689 negative sweep points."""
     from helia_profiler.evaluation.softmax_preflight import aot_softmax_verdict
 
+    # In the negative raise band (shift in [-31, -1]):
     assert aot_softmax_verdict(-0.25) == "error"
     assert aot_softmax_verdict(-1e-09) == "error"
+    assert aot_softmax_verdict(-0.49999999999999994) == "error"  # rounds to -2**31, NO promotion
+    assert aot_softmax_verdict(-(2.0**-32)) == "error"
+    # Outside it (the real compiler compiles these):
+    assert aot_softmax_verdict(-0.5) == "warn"  # exponent 0
+    assert aot_softmax_verdict(-0.75) == "warn"
+    assert aot_softmax_verdict(-2.0) == "warn"
+    assert aot_softmax_verdict(-(2.0**-32) * (1 - 2.0**-32)) == "warn"  # negative flush
+    # -inf overflows the Q31 floor inside preprocess_softmax_scaling:
     assert aot_softmax_verdict(float("-inf")) == "error"
 
 

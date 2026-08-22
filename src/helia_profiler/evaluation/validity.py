@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..power.diagnostics import (
     assess_clean_window_clock_rate,
+    count_noun,
     assess_clean_window_stall,
     assess_gate_duration,
     assess_run_window_clock,
@@ -60,7 +61,9 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 _warning(
                     IssueCode.PROFILE_CLEAN_WINDOW_FROZEN,
                     "The clean window completed "
-                    f"{meta.clean_infer_count} inferences in zero elapsed "
+                    f"{meta.clean_infer_count} "
+                    f"{count_noun(ctx.config.profiling.clean_window_probe, meta.clean_infer_count)} "
+                    "in zero elapsed "
                     "time; the clock timing it never advanced. Latency "
                     "figures from this window are meaningless.",
                     clean_infer_count=meta.clean_infer_count,

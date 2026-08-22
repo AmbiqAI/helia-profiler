@@ -131,6 +131,7 @@ def _render_tflm(
 
 def _render_aot(
     transport: str = "rtt",
+    template_name: str = "main_aot.cc.j2",
     arena_region: str = "tcm",
     weights_region: str = "mram",
     arena_regions: list[dict[str, object]] | None = None,
@@ -148,7 +149,7 @@ def _render_aot(
     psram_clock_hz: int = 48_000_000,
     **extra_vars: object,
 ) -> str:
-    return _env.get_template("main_aot.cc.j2").render(
+    return _env.get_template(template_name).render(
         **resolve_window_timer(
             clean_window_probe=clean_window_probe,
             power_only=power_only,
@@ -1123,9 +1124,17 @@ def test_pmu_storage_seam_rejects_unknown_vocabulary(monkeypatch):
     from jinja2 import ChoiceLoader, DictLoader
     from jinja2.exceptions import UndefinedError
 
-    for value, should_render in (("true", True), ("false", True), ("True", False), ("1", False)):
+    for base_template, value, should_render in (
+        ("main.cc.j2", "true", True),
+        ("main.cc.j2", "false", True),
+        ("main.cc.j2", "True", False),
+        ("main.cc.j2", "1", False),
+        # The seam lives in the base; one AOT-chain case proves the guard is
+        # not a main.cc.j2 artifact.
+        ("main_aot.cc.j2", "True", False),
+    ):
         child = (
-            '{% extends "main.cc.j2" %}'
+            '{% extends "' + base_template + '" %}'
             "{% block engine_pmu_storage_sram_resident %}" + value + "{% endblock %}"
         )
         overlay = _env.overlay(
@@ -1134,9 +1143,15 @@ def test_pmu_storage_seam_rejects_unknown_vocabulary(monkeypatch):
         import sys
         this_module = sys.modules[__name__]
         monkeypatch.setattr(this_module, "_env", overlay)
+        render = _render_aot if base_template == "main_aot.cc.j2" else _render_tflm
         if should_render:
-            out = _render_tflm(transport="rtt", template_name="seam_child.cc.j2")
+            out = render(transport="rtt", template_name="seam_child.cc.j2")
             assert "int main(void)" in out
         else:
-            with pytest.raises(UndefinedError):
-                _render_tflm(transport="rtt", template_name="seam_child.cc.j2")
+            # The error must NAME the seam and the vocabulary — a bare
+            # "'dict object' has no attribute" sent the engine author to
+            # the traceback (#172 round-2 review).
+            with pytest.raises(
+                UndefinedError, match="engine_pmu_storage_sram_resident"
+            ):
+                render(transport="rtt", template_name="seam_child.cc.j2")

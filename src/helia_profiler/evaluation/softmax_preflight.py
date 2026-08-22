@@ -36,7 +36,8 @@ wrong versions of this paragraph:
   0.18; the rounding happens before the flush check, so the raw-value
   boundaries are off by up to one ULP — see ``_aot_q31_rounded_multiplier``).
   The first fix exempted AOT entirely after verifying only the first call.
-  Gate: that rounded band is an error with an AOT-specific message; ``0.5 <= multiplier <= 1.0`` compiles but is
+  Gate: that rounded band is an error with an AOT-specific message;
+  ``0.5 <= multiplier <= 1.0`` compiles but is
   numerically degenerate (diff_min lands 7 orders of magnitude from healthy)
   and would abort under helia-rt, so it warns.
 * **ExecuTorch** consumes ``.pte`` and never reaches any of this.
@@ -178,6 +179,36 @@ def _aot_q31_rounded_multiplier(multiplier: float) -> float:
         return multiplier
 
 
+def _aot_quantized_shift(multiplier: float) -> int:
+    """The shift helia-aot's ``quantize_multiplier`` emits — sign included.
+
+    ``calculate_input_radius`` raises exactly when this is negative
+    (``1 << shift``), so the verdict asks THIS, not a band on the rounded
+    value: for negative multipliers the rounded value is ambiguous — the
+    ``== 1 << 31`` promotion fires only for positive fractions, so ``-0.5``
+    arises both from exponent 0 (compiles) and from ``-0.49999999999999994``
+    rounding to ``-2**31`` at exponent -1 (raises). Positives never hit the
+    ambiguity, which is why the band constants stayed exact there; the
+    round-2 review's negative sweep is what exposed the asymmetry (218/689
+    disagreements under a sign-blind guard). Mirrors the pinned
+    ``helia_aot.air.utils.quantize_multiplier`` expression for expression:
+    zero early-out, frexp, Q31 round-half-up, positive-only promotion, the
+    ``shift < -31`` flush to (0, 0), and the ``shift > 30`` clamp.
+    """
+    if multiplier == 0.0:
+        return 0
+    fraction, exponent = math.frexp(multiplier)
+    quantized = math.floor(fraction * (1 << 31) + 0.5)
+    if quantized == (1 << 31):
+        quantized //= 2
+        exponent += 1
+    if exponent < -31:
+        return 0
+    if exponent > 30:
+        return 30
+    return exponent
+
+
 def aot_softmax_verdict(multiplier: float) -> str:
     """helia-aot's fate for one quantized Softmax: 'error', 'warn', or 'ok'.
 
@@ -187,23 +218,20 @@ def aot_softmax_verdict(multiplier: float) -> str:
     magnitude too small for a meaningful softmax, and the same model aborts
     under helia-rt -- worth telling the user, not worth blocking a profile.
 
-    NaN and negative values are checked first and error: both can only come
-    from a corrupt file, and both crash the real chain (every ordered
-    comparison against NaN is False, so falling through returned 'ok' for a
-    model helia-aot raises on; a negative multiplier reaches
-    ``calculate_input_radius`` with a negative shift and raises there —
-    the #172 review's fuzz found the sign half of the class unguarded).
+    NaN errors (only a corrupt file produces it, and every ordered
+    comparison against it is False, so falling through returned 'ok' for a
+    model helia-aot raises on). ``-inf`` errors: ``preprocess_softmax_scaling``
+    overflows the Q31 floor on it. Other negatives get the SAME shift mirror
+    as positives — the first #172 fix blanket-errored them, and the round-2
+    negative sweep showed the real chain compiles most of that domain
+    (e.g. -0.75, shift 0); the corrupt-file smell is real but the verdict's
+    contract is the compiler's fate, nothing else.
     """
     if multiplier != multiplier:  # NaN
         return "error"
-    if multiplier < 0.0:
-        return "error"
-    if (
-        math.isfinite(multiplier)
-        and AOT_FLUSH_TO_ZERO_MULTIPLIER
-        <= _aot_q31_rounded_multiplier(multiplier)
-        < AOT_COMPILER_MIN_MULTIPLIER
-    ):
+    if not math.isfinite(multiplier):
+        return "error" if multiplier < 0.0 else "ok"
+    if _aot_quantized_shift(multiplier) < 0:
         return "error"
     if multiplier <= 1.0:
         return "warn"

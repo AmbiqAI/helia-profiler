@@ -25,8 +25,6 @@ from ..power.diagnostics import (
 )
 
 
-
-
 def _host_phase_envelope_s(ctx: PipelineContext) -> float | None:
     """Host wall time from starting the power binary to collecting its record.
 

@@ -70,11 +70,13 @@ def _socs_for(engine: str) -> list[str]:
     return _ENGINE_SOCS.get(engine, _SOCS)
 
 # Feature markers: substring -> human name.  Presence is the semantic snapshot.
-_MARKERS: dict[str, str] = {
+# A tuple token means any-of: used where the engine children spell the same
+# definition with different alignment padding, so no single substring exists.
+_MARKERS: dict[str, str | tuple[str, ...]] = {
     # Keyed on the ENABLED definition: _gpio_sync.j2 always emits the
     # constexpr (false in every matrix render), so the bare name was a
-    # constant-true marker — the third of the class #161 fixed (found in the
-    # #172 review). Constant-FALSE across today's matrix, like auto_window:
+    # constant-true marker — same class as dwt_init/itm_swo (#161) and
+    # heartbeat below (#172 round-2). Constant-FALSE across today's matrix, like auto_window:
     # honest, and discriminating the moment a sync-enabled case is added.
     "gpio_sync": "kPowerSyncEnabled = true;",
     # Keyed on the CALL (semicolon), not the bare name: the definition is
@@ -99,7 +101,11 @@ _MARKERS: dict[str, str] = {
     # The probe announce line renders exactly when the probe is active.
     "busy_loop_probe": "HPX_CLEAN_WINDOW_PROBE=busy_loop",
     "auto_window": "window_min",
-    "heartbeat": "HPX_HEARTBEAT",
+    # Keyed on the ENABLED definition (any-of across the children's
+    # alignment paddings): the bare HPX_HEARTBEAT token matched the
+    # unconditionally-emitted HPX_HEARTBEAT_ENABLED= announce, making this
+    # the fourth constant marker of the #161 class (#172 round-2 review).
+    "heartbeat": ("kHbEnabled    = true;", "kHbEnabled   = true;"),
     "ssram_power_ap5": "ns_power",
     "newlib_syscalls": "_sbrk",
     "peripheral_power_down": "AM_HAL_PWRCTRL_PERIPH_IOM0",
@@ -444,7 +450,14 @@ def _render(
 
 
 def _digest(rendered: str) -> dict:
-    markers = {name: (token in rendered) for name, token in _MARKERS.items()}
+    markers = {
+        name: (
+            any(tok in rendered for tok in token)
+            if isinstance(token, tuple)
+            else token in rendered
+        )
+        for name, token in _MARKERS.items()
+    }
     return {
         "markers": markers,
         "sha256": hashlib.sha256(rendered.encode("utf-8")).hexdigest(),

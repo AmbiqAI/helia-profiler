@@ -1768,6 +1768,7 @@ class TestCapturePowerWrapper:
             "state_input_index": 1,
             "stats_rate_hz": 1000,
             "clean_infer_count": 5,
+            "work_noun": "inferences",
             "clean_infer_avg_us": None,
             "minimum_gate_s": 1.0,
             "gate_relative_tolerance": 0.10,

@@ -283,7 +283,7 @@ WINDOW_CLOCK_CEILING_SLACK_S = 0.25
 #: registered SoC, so on current firmware the debug domain is no longer even
 #: the likelier of the two.
 FROZEN_WINDOW_CLOCK_HINT = (
-    "The firmware completed its inferences but timed the window with a clock "
+    "The firmware completed its measured work but timed the window with a clock "
     "that never advanced. Two causes produce this exact signature. (1) A DWT-"
     "timed window on a Cortex-M4F part: DWT->CYCCNT lives in the CoreSight "
     "debug power domain, which the dedicated power binary either powers down "

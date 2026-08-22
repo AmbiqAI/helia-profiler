@@ -60,7 +60,8 @@ class FlashPowerFirmwareStage:
         except DeterministicCaptureError as exc:
             # Missing image / unknown load address: cycling the rail cannot
             # change these, and retrying frames a config gap as flaky
-            # hardware. Re-wrap (same type, hint carried once via args[0])
+            # hardware. Re-wrap (same type; args[0] is the hint-free
+            # message, hint= re-attaches it so it renders exactly once)
             # so the user still sees WHICH deployment step refused —
             # escaping raw lost the stage context (#172 review).
             raise DeterministicCaptureError(
