@@ -362,18 +362,29 @@ int main(void) {
 {% if power_only | default(false) %}
 {#- Dedicated power binary, either window mode: warm the engine and MEASURE
    NOTHING — no dwt_init re-assert, no DWT bracket, no adaptive sizing.  The
-   compiled power image always renders with window_mode pinned to "fixed"
-   (render_power_source), but making power the FIRST arm keeps the property
-   structural: the auto arm below cannot leak a pre-window DWT read into a
-   power render that a build-plumbing change would then silently ship — on
-   AP4 power the debug domain is already off at boot, so that read would be
-   frozen garbage (#170).  The emitted text is byte-identical to the bare
-   fixed arm this replaces. #}
+   FLASHED power image always renders with window_mode pinned to "fixed"
+   (render_power_source); the initial main_power.cc render is compiled with
+   the config's window mode but never flashed.  Making power the FIRST arm
+   keeps the property structural for both: the auto arm below cannot leak a
+   pre-window DWT read into any power render — on AP4 power the debug domain
+   is already off at boot, so that read would be frozen garbage (#170).  The
+   emitted text is byte-identical to the bare fixed arm this replaces, plus
+   the zeroed stall-floor declaration below for DWT-windowed renders. #}
         // Warm caches / branch predictor / MRAM prefetch (uninstrumented).
         for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
 {{ self.engine_reset_inputs_warm() }}
             {{ self.engine_invoke() }}
         }
+{%- if not use_stimer_window %}
+        // The DWT window body reads the stall floor (clean_low_cyc,
+        // HPX_CLEAN_REF_CYCLES) unconditionally.  A power render measures no
+        // warm reference, so the floor is zero and the stall check is inert
+        // — consistent with the minimal power image.  No SoC routes a power
+        // window through DWT today (SocCapabilities.power_window_timer is
+        // stimer everywhere); this keeps the render compilable if one ever
+        // does (#170 review).
+        uint32_t clean_warm_min_cyc = 0U;
+{%- endif %}
         const int clean_iters_n = {{ clean_iters | default(1) }};
 {% elif window_mode | default("fixed") == "auto" %}
         // Adaptive clean-window sizing.  Warm caches / branch predictor / MRAM
@@ -478,10 +489,17 @@ int main(void) {
         const int clean_iters_n = {{ clean_iters | default(1) }};
 {% endif %}
         // Announce the upcoming silent clean (power) window so the host can
+{%- if busy_loop_probe and not power_only | default(false) %}
+        // widen its capture deadline for the blackout.  This window is a
+        // calibrated busy loop, so firmware reports state + the compile-time
+        // target the loop is sized to fill.  The host owns the actual
+        // timeout policy.
+{%- else %}
         // widen its capture deadline for the blackout.  Firmware only reports
         // state + the one runtime scalar the host cannot know a priori — how
         // long a single inference takes — folded into est_ms (iters * warm
         // cycles / clock).  The host owns the actual timeout policy.
+{%- endif %}
 {% if power_only | default(false) %}
         // Fixed window: no runtime warm measurement, so est_ms=0 — the host
         // already knows the iteration count from its own settings.
@@ -494,9 +512,13 @@ int main(void) {
         // inside it, so the target itself is the only honest duration
         // statement and is emitted as a compile-time constant (#170).  A
         // measured inference estimate here described a window that runs no
-        // inferences, wrong in both directions.
-        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms={{ window_target_ms }}\n",
-                   clean_iters_n);
+        // inferences, wrong in both directions.  iters=1 for the same
+        // reason: the window completes exactly one busy pass
+        // (clean_count = 1), and the host keeps iters as a fallback for a
+        // lost HPX_CLEAN_INFER_COUNT — announcing the planned inference
+        // count here made that fallback divide gated energy by a number
+        // this window never runs.
+        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=1 est_ms={{ window_target_ms }}\n");
 {% elif window_mode | default("fixed") == "auto" %}
         uint64_t clean_est_ms = 0;
         if (SystemCoreClock >= 1000U) {

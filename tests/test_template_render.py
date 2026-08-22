@@ -706,10 +706,12 @@ class TestMainAotCcRender:
                 clean_iters=2247,
             )
             assert "const int clean_iters_n = 2247;" in out
-            # As above: the property is "no adaptive sizing", not "no warm
-            # measurement" -- a DWT-timed window measures the warm cost for its
-            # stall floor regardless of window mode.
+            # Power renders take the first template arm and measure NOTHING
+            # pre-window (#170) — no adaptive sizing, no DWT warm bracket;
+            # the DWT window's stall floor is declared zeroed so the render
+            # stays compilable, with the check inert.
             assert "target_cyc" not in out
+            assert "uint32_t wt0 = DWT->CYCCNT;" not in out
 
     def test_busy_loop_probe_replaces_clean_window_body(self):
         tflm_out = _render_tflm(

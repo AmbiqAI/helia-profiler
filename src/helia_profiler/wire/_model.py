@@ -92,9 +92,15 @@ EST_MS_GAP = (
     "no power render measures anything pre-window. A runtime `est_ms=0` can "
     "still appear on an infer window if the measurement degrades (DWT frozen "
     "through every warmup by a debugger-attach transient); the host then "
-    "reads 0 as 'no estimate' and keeps its flat heartbeat timeout. The "
-    "host holds an announced budget as a floor on its inactivity deadline "
-    "until the budget expires, capped at WINDOW_BUDGET_CAP_S."
+    "reads 0 as 'no estimate' and keeps its flat heartbeat timeout. "
+    "Byte-stream transports (RTT/SWO/UART, via collect_lines) hold an "
+    "announced budget as a floor on their inactivity deadline until it "
+    "expires; USB CDC raises its overall capture deadline instead. Both "
+    "derive the budget from window_budget_s, capped at WINDOW_BUDGET_CAP_S. "
+    "A busy-loop announce carries iters=1 — the window completes exactly one "
+    "busy pass, and the iters fallback for a lost HPX_CLEAN_INFER_COUNT must "
+    "divide gated energy by that, never by a planned inference count the "
+    "window does not run."
 )
 
 

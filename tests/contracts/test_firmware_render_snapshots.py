@@ -124,6 +124,11 @@ _MARKERS: dict[str, str] = {
     # same reason as the clean-window trio above: losing the #164 arm again
     # would otherwise read as pure sha256 drift.
     "est_ms_measured": "est_ms=%llu",
+    # The zero-announce, which since #170 is the POWER signature: busy-loop
+    # renders carry the compile-time target, so this discriminates "power
+    # announce" from both profile shapes — reverting the busy arm to 0 flips
+    # this marker rather than hiding in a sha256 change.
+    "est_ms_hardcoded_zero": "est_ms=0\\n",
 }
 
 

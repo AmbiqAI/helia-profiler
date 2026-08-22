@@ -112,9 +112,11 @@ WINDOW_BUDGET_MARGIN_S = 15.0
 #: ~13.6 s/iteration at 96 MHz) times a large iteration count would
 #: otherwise convert 30 s hang detection into a multi-hour zombie wait,
 #: because both consumers only ever *raise* their deadlines from it.  An
-#: hour is far above any sane window and far below what garbage fabricates;
-#: a genuinely longer window needs target.heartbeat.overall_timeout_s
-#: anyway (#170).
+#: hour is far above any sane window and far below what garbage fabricates.
+#: Accepted residual: a window genuinely longer than ~30 min announces a
+#: budget the cap truncates, and the capture then needs
+#: target.heartbeat.host_timeout_s raised past the window length — the
+#: inactivity deadline is the one that trips (#170).
 WINDOW_BUDGET_CAP_S = 3600.0
 
 
@@ -204,6 +206,7 @@ def collect_lines(
     # (#170).  Held across iterations and re-applied on every reset; once
     # wall-clock passes it, it stops mattering on its own.
     window_deadline: float | None = None
+    last_data_ts = start
     seen_start = False
 
     while True:
@@ -220,7 +223,8 @@ def collect_lines(
 
         if data:
             buf += data
-            hb_deadline = time.monotonic() + heartbeat_timeout_s
+            last_data_ts = time.monotonic()
+            hb_deadline = last_data_ts + heartbeat_timeout_s
             if window_deadline is not None and window_deadline > hb_deadline:
                 hb_deadline = window_deadline
 
@@ -264,9 +268,12 @@ def collect_lines(
                     log.info("%s heartbeat: %s", transport_name, line)
                     budget = window_budget_s(line)
                     if budget is not None:
-                        held = line_ts + budget
-                        if window_deadline is None or held > window_deadline:
-                            window_deadline = held
+                        # One announce per capture (every render emits exactly
+                        # one clean_window_begin printf); a later one — none
+                        # exists today — would supersede the hold, not extend
+                        # it, so an early long window cannot mask a hang in a
+                        # later short one.
+                        window_deadline = line_ts + budget
                         if window_deadline > hb_deadline:
                             hb_deadline = window_deadline
                         if (
@@ -290,12 +297,17 @@ def collect_lines(
                     return lines
         else:
             if time.monotonic() > hb_deadline:
+                # Report the REAL silence, not the configured timeout: with a
+                # held window budget the two differ by up to the whole budget
+                # (#170), and "no data for 30s" after a 3-minute wait sent
+                # readers down the wrong path.
+                silent_s = time.monotonic() - last_data_ts
                 if seen_start:
                     log.warning(
                         "%s: no data for %.0fs after HPX_START (%d lines) — "
                         "firmware may be hung or HPX_END was lost",
                         transport_name,
-                        heartbeat_timeout_s,
+                        silent_s,
                         len(lines),
                     )
                 else:
@@ -303,7 +315,7 @@ def collect_lines(
                         "%s: no data for %.0fs — firmware may not be running "
                         "(check reset / transport / heartbeat config)",
                         transport_name,
-                        heartbeat_timeout_s,
+                        silent_s,
                     )
                 return lines
             time.sleep(poll_interval_s)
