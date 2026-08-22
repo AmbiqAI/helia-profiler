@@ -37,8 +37,14 @@ render), and the directive state survives a backslash-continued line
 (phase-2 splicing — round 2 proved a continued macro body's terminating
 newline otherwise collapsed, hashing two different programs equal). With
 those carve-outs the canonicalization is token-stream- and
-directive-structure-preserving for the C the templates emit; pathological
-inputs (an unterminated literal feeding a continuation) may canonicalize
+directive-structure-preserving for the C the templates emit. Known
+fail-safe over-sensitivities (#173 round-3 review), both unreachable in
+rendered C today: a backslash continuation on a NON-directive line is not
+spliced (the semantically identical one-line form hashes differently), and
+a comment between a directive's backslash and its newline is treated as a
+continuation even though real phase-2 splicing precedes comment stripping —
+each can only over-differentiate, never collide. Pathological inputs (an
+unterminated literal feeding a continuation) may canonicalize
 non-idempotently, which is harmless — the function is applied once, to
 rendered sources. The whitespace collapse is what makes
 comment-ONLY changes truly invisible: a line comment occupies a line, so
