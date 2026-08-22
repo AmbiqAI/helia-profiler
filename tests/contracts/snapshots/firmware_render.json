@@ -1137,7 +1137,7 @@
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1158,13 +1158,13 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "e3e875164f93d095860ae028f4464c893c1ccc026fcc1f09a257ae0a7d07089a"
+    "sha256": "913aa6384d2282dc1eaf87b6b6115295097ae694174925a20d9e1bb06ecb5730"
   },
   "apollo510|rtt|helia-aot": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1185,7 +1185,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "3a2218de9184608dd736a3d7fc61885508f0750f44466fd25fa38aff3a850a14"
+    "sha256": "03f6af1e68c7bc5e6f80682ba62b6fff2bd492cd047093a03dbd607086c4a97c"
   },
   "apollo510|rtt|helia-aot|busy_loop": {
     "markers": {
@@ -1218,7 +1218,7 @@
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1272,7 +1272,7 @@
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1293,7 +1293,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "d4de036997ceec7982ab1e9ed2cf3b79b2eea05fc0e14125bfc3de84389791e4"
+    "sha256": "8f93e6e4212d07f432dd6f6b7dda9b2f2f8627ffb49ec26c24a6a61dc7d3bb13"
   },
   "apollo510|rtt|helia-rt|busy_loop": {
     "markers": {
@@ -1326,7 +1326,7 @@
     "markers": {
       "armv8m_pmu": false,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1380,7 +1380,7 @@
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1401,7 +1401,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "bf51ad26950ad934f70a2255d4e95098ec4c6b3a3f6eba028e3d0b90240ad0c3"
+    "sha256": "b5b2eecce6955c415aa5b9e7f6f159050c94f9aa18f8be1899d10205e5df994b"
   },
   "apollo510|rtt|tflm|busy_loop": {
     "markers": {
@@ -1434,7 +1434,7 @@
     "markers": {
       "armv8m_pmu": false,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1488,7 +1488,7 @@
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1509,13 +1509,13 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "f15c84bae3d3288a97bccbdc73249db299d96e2c38a3bf99e359f3bc673d3188"
+    "sha256": "e12658557da5e58b3ffaa8106832c3ad26a4b84aac27f06c8107e76eadaf0735"
   },
   "apollo510|swo|helia-aot": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1536,13 +1536,13 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "0e55b37ba62e11cf06dfd2a5e5f32117eb8110ee0d936d48d2fc5311b1e4509a"
+    "sha256": "ffae296824b460c53bc4a24b537c7f14fb42258c3df260b75bb24ce91dc41a5c"
   },
   "apollo510|swo|helia-rt": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1563,13 +1563,13 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "51d80157306383684343e52347afd4c649cd44ac8952ac759de4456e485742e2"
+    "sha256": "4ff26c0b36630a1631276a96dfb560b7a02f43090b48e2c3cf4e66185adea522"
   },
   "apollo510|swo|tflm": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1590,13 +1590,13 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "f660394316bd72f26515cdcce06a362fe8ef22776a0453d5d19f02ff53208537"
+    "sha256": "19740bbb89f9b5a38591f460dbedc552e730f2c33ff3d85226128affb1527299"
   },
   "apollo510|uart|executorch": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1617,13 +1617,13 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "552ee96e2cc1720f2d6c3d7fda2eeaf5df6d49bbc396c4546b66907afb2bbc7a"
+    "sha256": "5f7759a85125e30b4e2cc8b70cc29a828f1fb560cb949dc4fb9ad6d8d60eeb2a"
   },
   "apollo510|uart|helia-aot": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1644,13 +1644,13 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "7e35bc0e8cf16e38a0a92a0091b3f2ecabb51f9c95b87256c5c5d59fbb8340cd"
+    "sha256": "879a2806238799660764be7291580557d05579aaf08d9cc9d6bda6b94c49a04f"
   },
   "apollo510|uart|helia-rt": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1671,13 +1671,13 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "abb2778bdade7d0bb97e63efa248543510f30f33ebedb5c4bfdb5c28dcbe7629"
+    "sha256": "ad022a316d9f113b347a1eabaca2bab983392f5b2abb2bb6e769cfacc194d737"
   },
   "apollo510|uart|tflm": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1698,13 +1698,13 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "45c6a38fd4e6668a40906429264bf5d11e1ad96233001b82223edd4ae66d8ab0"
+    "sha256": "7ac1769ee22b925571be1ee5a4280e854c2522e1a1fd5eb062ba48ddb44a333b"
   },
   "apollo510|usb_cdc|executorch": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1725,13 +1725,13 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "7073d5cd3cedec7c7a3be5ddfa282935d2a8455e7f92c7ca74b4f112dc977c0c"
+    "sha256": "188db49c45e7f1b8757009c1da23006a26fe36b4d3d0fab7ab4ea2836a1efaf1"
   },
   "apollo510|usb_cdc|helia-aot": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1752,13 +1752,13 @@
       "stimer_window": true,
       "usb_timer": true
     },
-    "sha256": "aeba9e19452b021115e38e59c4bb0577fe60f20dfa3cac8f5692fdfd7e9aa608"
+    "sha256": "5d39c024dba04b5564c178dcf71357b90f63d6379ea30806687b7e6e1be3570b"
   },
   "apollo510|usb_cdc|helia-rt": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1779,13 +1779,13 @@
       "stimer_window": true,
       "usb_timer": true
     },
-    "sha256": "0eba0f0598020cc9397ba6dd515d50d3c2d51436393e9711bc3971147c991e60"
+    "sha256": "5633423577d9c8d4133c6891144e07ca146fbfc9f977ca5631a9ca0e73e2f854"
   },
   "apollo510|usb_cdc|tflm": {
     "markers": {
       "armv8m_pmu": true,
       "auto_window": false,
-      "busy_loop_probe": true,
+      "busy_loop_probe": false,
       "cache_shims": false,
       "clean_window_attach_wait": false,
       "clean_window_rate_probe": false,
@@ -1806,6 +1806,6 @@
       "stimer_window": true,
       "usb_timer": true
     },
-    "sha256": "421828d4316d27939480255b3faa38010113d292b2b970b04bc9ad43a3dfd1a9"
+    "sha256": "786f134cda73859aafb93c736947b01354a81a4064bc1381f913852505aec3d8"
   }
 }

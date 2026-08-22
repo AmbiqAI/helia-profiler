@@ -1511,9 +1511,12 @@ class TestEstimateCaptureDuration:
         estimated = _estimate_capture_duration(ctx)
         assert estimated is not None
         # profiled pass: 1 * (1 + 300) = 301 inferences.
-        # clean pass (fixed): max(1, 300) + max(1, 1) = 301 inferences.
-        # total = 602 inferences * 1 ms/inference = 0.602 s.
-        expected = _BOOT_SETTLE_S + 0.602 + _SAFETY_MARGIN_S
+        # clean pass (fixed): max(1, 300) iterations + max(3, 1) warmups
+        # = 303 inferences — the warmup floors at 3 because the fixed+STIMER
+        # firmware arm floors its measured warmup there (#164), and for
+        # DWT-timed fixed builds the overestimate only adds headroom.
+        # total = 604 inferences * 1 ms/inference = 0.604 s.
+        expected = _BOOT_SETTLE_S + 0.604 + _SAFETY_MARGIN_S
         assert estimated == pytest.approx(expected, rel=1e-6)
 
     def test_auto_window_scales_with_target_ms(self, tmp_path: Path):

@@ -425,7 +425,7 @@ int main(void) {
                 clean_warm_min_cyc = wc;
             }
         }
-{%- elif (not power_only | default(false)) and (not busy_loop_probe | default(false)) %}
+{%- elif (not power_only | default(false)) and (not busy_loop_probe) %}
         // STIMER-timed fixed window, profile binary, default infer probe: the
         // in-window clock is STIMER, but the debug domain is still up HERE —
         // it is gated only inside the window — so DWT can measure the warm
@@ -437,10 +437,13 @@ int main(void) {
         // the loop floors at the auto path's 3 even when clean_warmup is
         // lower.  If the counter never advances at all, est_ms degrades to 0
         // and the host keeps its normal heartbeat behaviour — never worse
-        // than no estimate.  The busy_loop probe is EXCLUDED: its window
-        // runs a calibrated busy loop sized to window_target_ms, not
-        // clean_iters inferences, so an inference-derived estimate would
-        // describe nothing that window runs.
+        // than no estimate.  The busy_loop probe is EXCLUDED from this fixed
+        // arm: its window runs a calibrated busy loop sized to
+        // window_target_ms, not clean_iters inferences, so an
+        // inference-derived estimate would describe nothing that window
+        // runs.  (The auto arm above predates this rule and still sends its
+        // inference-derived estimate for a busy-loop window — pre-existing,
+        // tracked with the rest of the busy-loop budget story in #170.)
         dwt_init();
         uint32_t clean_warm_cyc = 0U;
         for (int w = 0; w < {{ [clean_warmup | default(1), 3] | max }}; w++) {
@@ -486,7 +489,7 @@ int main(void) {
         }
         hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\n",
                    clean_iters_n, (unsigned long long)clean_est_ms);
-{%- elif (not power_only | default(false)) and (not busy_loop_probe | default(false)) %}
+{%- elif (not power_only | default(false)) and (not busy_loop_probe) %}
         // Fixed window on a STIMER-timed profile build (infer probe): the
         // warmup above measures the per-inference cost solely for this
         // estimate (#164), so it is emitted the same way — the host widens

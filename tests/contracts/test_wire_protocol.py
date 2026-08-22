@@ -1018,11 +1018,13 @@ def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
     dedicated power binaries (announce compiled to a no-op, no host listener)
     and fixed-mode busy-loop windows (a busy loop sized to window_target_ms
     is not described by any inference-derived estimate). The statement lives
-    once, in :data:`EST_MS_GAP`. The renders below prove its render-visible
+    once, in :data:`EST_MS_GAP`. The renders below prove its printf-placement
     clauses — where the hardcoded-zero printf survives and where the computed
-    one appears; the *runtime* clauses (the no-op ``hpx_printf`` definition,
-    an estimate degrading to 0 under a frozen DWT) are firmware/runtime facts
-    a render census cannot observe and are not claimed here.
+    one appears; the *runtime and build-plumbing* clauses (the no-op
+    ``hpx_printf`` definition, an estimate degrading to 0 under a frozen DWT,
+    "the only power image ever compiled" being the FIXED-pinned dedicated
+    target) are facts of the firmware, the runtime, or the build pipeline
+    that a render census cannot observe and are not claimed here.
     """
     assert EST_MS_GAP in WIRE_REGISTRY[
         heartbeat_token(HeartbeatPhase.CLEAN_WINDOW_BEGIN)
@@ -1058,6 +1060,15 @@ def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
     busy = _render("apollo510", "rtt", "tflm", clean_window_probe="busy_loop")
     assert zero in busy
     assert measured not in busy
+    # In AUTO mode a busy-loop build still sends the auto arm's
+    # inference-derived estimate — the pre-existing mismatch EST_MS_GAP
+    # points at #170 for. Pinned so a change there is deliberate, not drift.
+    busy_auto = _render(
+        "apollo510", "rtt", "tflm",
+        clean_window_probe="busy_loop", window_mode="auto",
+    )
+    assert measured in busy_auto
+    assert zero not in busy_auto
 
 
 def test_power_terminal_key_sets():

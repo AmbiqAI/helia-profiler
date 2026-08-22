@@ -81,7 +81,12 @@ _MARKERS: dict[str, str] = {
     "debug_uart": "NSX_DEBUG_UART",
     "rtt_config": "SEGGER_RTT_ConfigUpBuffer",
     "armv8m_pmu": "ARM_PMU_",
-    "busy_loop_probe": "busy_loop",
+    # Keyed on the emitted wire token, not the bare word: "busy_loop" appears
+    # in template comments on every STIMER render (found in the #169 round-2
+    # review, where a new comment flipped the last four discriminating
+    # apollo510 cases), so the bare word made this marker a constant there.
+    # The probe announce line renders exactly when the probe is active.
+    "busy_loop_probe": "HPX_CLEAN_WINDOW_PROBE=busy_loop",
     "auto_window": "window_min",
     "heartbeat": "HPX_HEARTBEAT",
     "ssram_power_ap5": "ns_power",
