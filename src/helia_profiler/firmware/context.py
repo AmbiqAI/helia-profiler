@@ -254,13 +254,10 @@ class FirmwareRenderContext:
         *,
         arena_regions: list["ArenaRegion"] | None = None,
     ) -> "FirmwareRenderContext":
-        assert ctx.soc is not None
-        assert ctx.board is not None
-        assert ctx.engine_artifacts is not None
-
         config = ctx.config
-        soc = ctx.soc
-        artifacts = ctx.engine_artifacts
+        soc = ctx.resolved_soc
+        board = ctx.resolved_board
+        artifacts = ctx.prepared_artifacts
         engine_type = artifacts.engine_type
         arena_region = ctx.arena_region or Placement.TCM
         weights_region = ctx.weights_region or Placement.MRAM
@@ -401,7 +398,7 @@ class FirmwareRenderContext:
                 broad_peripheral_shutdown=soc.capabilities.clock.broad_peripheral_shutdown,
                 crypto_otp_shutdown=soc.capabilities.clock.crypto_otp_shutdown,
                 has_radio_subsystem=soc.has_radio_subsystem,
-                ble_reset_gpio_pin=ctx.board.ble_reset_gpio_pin,
+                ble_reset_gpio_pin=board.ble_reset_gpio_pin,
             ),
             power_monitor=PowerMonitorContext.from_config(config),
             engine=EngineContext(

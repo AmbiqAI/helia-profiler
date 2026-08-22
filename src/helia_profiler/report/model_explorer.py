@@ -198,8 +198,7 @@ def _write_model_explorer_overlays(
     paths: list[Path],
 ) -> None:
     """Build and save Model Explorer overlay files from PMU data."""
-    assert ctx.pmu_result is not None
-    layers = ctx.pmu_result.layers
+    layers = ctx.captured_pmu.layers
     if not layers:
         return
 

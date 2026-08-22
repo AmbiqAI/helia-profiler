@@ -40,10 +40,8 @@ def profile(
     else:
         ctx = run_profile(config, progress_sink=progress_sink)
 
-    assert ctx.pmu_result is not None
-
     return ProfileResult(
-        pmu=ctx.pmu_result,
+        pmu=ctx.captured_pmu,
         power=ctx.power_result,
         power_observation=(
             ctx.power_run.observation if ctx.power_run is not None else None

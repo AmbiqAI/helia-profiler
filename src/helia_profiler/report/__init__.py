@@ -57,7 +57,7 @@ def write_report(ctx: PipelineContext) -> list[Path]:
 
     Returns a list of paths to the files written.
     """
-    assert ctx.pmu_result is not None
+    pmu = ctx.captured_pmu
 
     output_dir = ctx.config.output.dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -66,7 +66,6 @@ def write_report(ctx: PipelineContext) -> list[Path]:
     paths: list[Path] = []
 
     fmt = ctx.config.output.format
-    pmu = ctx.pmu_result
     detailed = ctx.config.output.detailed
     analysis = ctx.model_analysis
 

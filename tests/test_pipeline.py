@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+import re
 from pathlib import Path
 from dataclasses import FrozenInstanceError
 
@@ -13,8 +15,13 @@ from helia_profiler.results import (
     PowerRunPlan,
 )
 from helia_profiler.config import load_config
-from helia_profiler.errors import CaptureError, HpxError
-from helia_profiler.pipeline import PipelineContext, PipelineRunner, ProgressUpdate
+from helia_profiler.errors import CaptureError, HpxError, PipelineError
+from helia_profiler.pipeline import (
+    PipelineContext,
+    PipelineRunner,
+    ProgressUpdate,
+    Stage,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers: minimal stage implementations for testing
@@ -468,3 +475,106 @@ def test_pipeline_runner_installs_progress_sink_before_stages(tmp_path: Path):
     PipelineRunner([ProgressStage()], progress_sink=updates.append).run(config)
 
     assert updates == [ProgressUpdate(message="stage running")]
+
+
+# ---------------------------------------------------------------------------
+# Narrowing accessors (#162 Phase 4)
+# ---------------------------------------------------------------------------
+
+
+#: (accessor property, backing field, stage that produces the field).
+#: The single source of truth for the read surface of ``PipelineContext``.
+NARROWING_ACCESSORS = [
+    ("resolved_soc", "soc", "ResolvePlatformStage"),
+    ("resolved_board", "board", "ResolvePlatformStage"),
+    ("prepared_artifacts", "engine_artifacts", "PrepareEngineStage"),
+    ("prepared_adapter", "engine_adapter", "PrepareEngineStage"),
+    ("resolved_firmware_dir", "firmware_dir", "GenerateFirmwareStage"),
+    ("resolved_workspace", "dependency_workspace", "GenerateFirmwareStage"),
+    ("built_binary_path", "binary_path", "BuildFirmwareStage"),
+    ("captured_pmu", "pmu_result", "CapturePmuStage"),
+    ("planned_arena_region", "arena_region", "PlanMemoryStage"),
+]
+
+
+class TestNarrowingAccessors:
+    """Reading a stage product before its stage ran is a named, typed failure.
+
+    The optional fields stay the *write* surface (a stage sets the field it
+    owns); these accessors are the *read* surface.  An ``assert`` vanishes
+    under ``-O`` and, when it does fire, says nothing about which stage was
+    supposed to run — a ``PipelineError`` naming field and producer does.
+    """
+
+    @pytest.mark.parametrize("accessor,field,stage", NARROWING_ACCESSORS)
+    def test_unset_raises_pipeline_error_naming_field_and_stage(
+        self, tmp_path: Path, accessor: str, field: str, stage: str
+    ):
+        ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
+        assert getattr(ctx, field) is None
+        with pytest.raises(PipelineError) as excinfo:
+            getattr(ctx, accessor)
+        message = str(excinfo.value)
+        assert f"ctx.{field}" in message
+        assert stage in message
+        assert "has not run" in message
+        # The hint is the actionable half of the contract, not decoration.
+        assert excinfo.value.hint is not None
+        assert stage in excinfo.value.hint
+
+    @pytest.mark.parametrize("accessor,field,stage", NARROWING_ACCESSORS)
+    def test_set_field_passes_straight_through(
+        self, tmp_path: Path, accessor: str, field: str, stage: str
+    ):
+        del stage
+        ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
+        sentinel = object()
+        setattr(ctx, field, sentinel)
+        assert getattr(ctx, accessor) is sentinel
+
+    def test_pipeline_error_is_an_hpx_error(self, tmp_path: Path):
+        # CLI and API callers catch HpxError; a stage-ordering bug must not
+        # escape that net as a bare AssertionError.
+        ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
+        with pytest.raises(HpxError):
+            ctx.captured_pmu
+
+    @pytest.mark.parametrize("accessor,field,stage", NARROWING_ACCESSORS)
+    def test_named_producer_is_a_real_stage(
+        self, accessor: str, field: str, stage: str
+    ):
+        """The stage named in the error must exist, or the message misleads."""
+        del accessor, field
+        from helia_profiler import stages
+
+        cls = getattr(stages, stage, None)
+        assert cls is not None, f"{stage} is not a stage class in helia_profiler.stages"
+        assert isinstance(cls(), Stage)
+
+    def test_accessors_cover_every_documented_field(self, tmp_path: Path):
+        # Guards a rename on either side of the pair: every listed accessor is
+        # a real property and every listed field a real context field.
+        ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
+        for accessor, field, _stage in NARROWING_ACCESSORS:
+            assert isinstance(getattr(type(ctx), accessor), property)
+            assert field in {f.name for f in dataclasses.fields(ctx)}
+
+
+def test_no_assert_narrowing_of_context_fields_survives_in_src():
+    """The acceptance criterion of #162 Phase 4, as a test.
+
+    ``assert ctx.<field> is not None`` is a stage-ordering precondition wearing
+    a crash costume: it is compiled out under ``-O`` and names no producer when
+    it fires.  New sites must read through the narrowing accessors instead.
+    """
+    pattern = re.compile(r"^\s*assert\s+(self\.)?ctx\.")
+    src = Path(__file__).resolve().parents[1] / "src" / "helia_profiler"
+    offenders: list[str] = []
+    for path in sorted(src.rglob("*.py")):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if pattern.match(line):
+                offenders.append(f"{path.relative_to(src.parent.parent)}:{lineno}: {line.strip()}")
+    assert not offenders, (
+        "assert-narrowing of PipelineContext fields found in src/ — read the "
+        "field through its PipelineContext accessor instead:\n" + "\n".join(offenders)
+    )

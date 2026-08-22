@@ -57,23 +57,23 @@ class VerifyPlacementStage:
         return False
 
     def run(self, ctx: PipelineContext) -> None:
-        assert ctx.soc is not None  # narrowed by should_skip
-        assert ctx.binary_path is not None
-        assert ctx.arena_region is not None
+        soc = ctx.resolved_soc
+        binary_path = ctx.built_binary_path
+        arena_region = ctx.planned_arena_region
 
-        ranges = soc_placement_ranges(ctx.soc)
-        expected = ranges.get(Placement(ctx.arena_region))
+        ranges = soc_placement_ranges(soc)
+        expected = ranges.get(Placement(arena_region))
         if expected is None:
             log.debug(
                 "No address range for %s on %s; skipping placement verify.",
-                ctx.arena_region,
-                ctx.soc.name,
+                arena_region,
+                soc.name,
             )
             return
 
         toolchain = ctx.config.target.toolchain
         resolved = symbol_address(
-            ctx.binary_path,
+            binary_path,
             toolchain,
             _ARENA_SYMBOL,
             timeout_s=ctx.config.timeouts.binary_probe_s,
@@ -90,7 +90,7 @@ class VerifyPlacementStage:
             log.info(
                 "Placement verified: arena in %s at 0x%08X "
                 "(0x%08X-0x%08X).",
-                str(ctx.arena_region).upper(),
+                str(arena_region).upper(),
                 address,
                 expected.start,
                 expected.end,
@@ -101,11 +101,11 @@ class VerifyPlacementStage:
         actual_label = actual.upper() if actual else "an unmapped region"
         raise BuildError(
             f"Arena landed in {actual_label} (0x{address:08X}) but the memory "
-            f"plan placed it in {str(ctx.arena_region).upper()} "
+            f"plan placed it in {str(arena_region).upper()} "
             f"(0x{expected.start:08X}-0x{expected.end:08X}).",
             hint=(
-                f"The {toolchain} linker script for {ctx.soc.name} is not "
-                f"relocating the arena section to {str(ctx.arena_region).upper()}. "
+                f"The {toolchain} linker script for {soc.name} is not "
+                f"relocating the arena section to {str(arena_region).upper()}. "
                 "Check that the scatter/linker script collects the arena's "
                 "section (e.g. '.sram_bss' for SRAM) into the intended region — "
                 "this is the armclang SHARED_SRAM scatter-gap class of bug."

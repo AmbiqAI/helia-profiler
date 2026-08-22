@@ -23,8 +23,7 @@ log = logging.getLogger("hpx")
 
 def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     """Write a high-level summary JSON with cycles, memory, cache, and binary info."""
-    assert ctx.pmu_result is not None
-    pmu = ctx.pmu_result
+    pmu = ctx.captured_pmu
     meta = pmu.meta
     layers = pmu.layers
 

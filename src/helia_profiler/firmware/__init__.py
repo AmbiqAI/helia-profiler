@@ -404,9 +404,9 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     Returns the path to the generated app directory inside ``ctx.work_dir``.
     """
-    assert ctx.soc is not None
-    assert ctx.board is not None
-    assert ctx.engine_artifacts is not None
+    soc = ctx.resolved_soc
+    board = ctx.resolved_board
+    artifacts = ctx.prepared_artifacts
 
     from ..dependencies import create_workspace
 
@@ -416,9 +416,6 @@ def generate_app(ctx: PipelineContext) -> Path:
     app_dir.mkdir(parents=True, exist_ok=True)
 
     config = ctx.config
-    soc = ctx.soc
-    board = ctx.board
-    artifacts = ctx.engine_artifacts
     weights_region = ctx.weights_region or Placement.MRAM
     arena_region = ctx.arena_region or Placement.TCM
     power_sync_enabled = config.power.gated_external_capture
@@ -805,17 +802,16 @@ def generate_app(ctx: PipelineContext) -> Path:
 
 def _resolved_aot_arena_regions(ctx: PipelineContext) -> list[ArenaRegion]:
     """Return the same effective AOT arena placement for every render pass."""
-    artifacts = ctx.engine_artifacts
-    assert artifacts is not None
+    artifacts = ctx.prepared_artifacts
     if not isinstance(artifacts, HeliaAotArtifacts):
         return []
-    assert ctx.engine_adapter is not None
+    adapter = ctx.prepared_adapter
     has_custom_aot_memory = ctx.config.engine.config_path is not None or bool(
         ctx.config.engine.config.get("aot_args", {}).get("memory", {}).get("tensors")
     )
     if has_custom_aot_memory:
         return list(artifacts.aot_arena_regions)
-    return ctx.engine_adapter.apply_arena_placement_override(
+    return adapter.apply_arena_placement_override(
         list(artifacts.aot_arena_regions),
         ctx.arena_region or Placement.TCM,
     )
@@ -862,11 +858,8 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
 
     Returns (build_dir, binary_path).
     """
-    assert ctx.firmware_dir is not None
-    assert ctx.board is not None
-
-    app_dir = ctx.firmware_dir
-    board = ctx.board.name
+    app_dir = ctx.resolved_firmware_dir
+    board = ctx.resolved_board.name
     timeouts = ctx.config.timeouts
     toolchain = ctx.config.target.toolchain
     verbose = ctx.config.verbose
@@ -878,8 +871,7 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
 
     from ..dependencies import prepare_locked_dependencies, workspace_mutex
 
-    assert ctx.dependency_workspace is not None
-    with workspace_mutex(ctx.dependency_workspace):
+    with workspace_mutex(ctx.resolved_workspace):
         dependency_state = prepare_locked_dependencies(ctx)
         if (
             not ninja_already_configured
@@ -934,7 +926,7 @@ def _find_target_binary(build_dir: Path, target_name: str) -> Path | None:
 
 def flash_app(ctx: PipelineContext) -> None:
     """Invoke ``nsx flash`` to deploy the binary to the target."""
-    assert ctx.firmware_dir is not None
+    firmware_dir = ctx.resolved_firmware_dir
     toolchain = ctx.config.target.toolchain
     nsx_tc = _nsx_toolchain(toolchain)
     from ..dependencies import workspace_mutex
@@ -946,7 +938,7 @@ def flash_app(ctx: PipelineContext) -> None:
     )
     with lock:
         nsx_cli.flash(
-            ctx.firmware_dir,
+            firmware_dir,
             toolchain=nsx_tc,
             jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
             frozen=True,

@@ -62,8 +62,7 @@ def _serialise_memory_plan(plan: MemoryPlan) -> dict[str, Any]:
 
 def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
     """Write detailed memory breakdown: binary sections, arena, per-layer cache."""
-    assert ctx.pmu_result is not None
-    pmu = ctx.pmu_result
+    pmu = ctx.captured_pmu
     meta = pmu.meta
     layers = pmu.layers
 
