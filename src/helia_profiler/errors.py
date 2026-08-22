@@ -22,6 +22,10 @@ class HpxError(Exception):
         return base
 
 
+class PipelineError(HpxError):
+    """A pipeline stage's product was read before the stage ran."""
+
+
 class ConfigError(HpxError):
     """Bad configuration — missing model path, invalid YAML, unknown board."""
 

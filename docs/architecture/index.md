@@ -64,6 +64,7 @@ for actionable guidance:
 
 ```
 HpxError
+├── PipelineError        # A stage's product was read before the stage ran
 ├── ConfigError          # Bad YAML, missing fields
 ├── PlatformError        # Unknown board/SoC
 ├── EngineError          # Engine adapter failure

@@ -14,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, TypeVar, runtime_checkable
 
 from ._version import __version__
 from .results import (
@@ -30,7 +30,7 @@ from .results import (
 )
 from .config import ProfileConfig
 from .engines.base import EngineAdapter, EngineArtifacts
-from .errors import HpxError
+from .errors import HpxError, PipelineError
 from .platform import BoardDef, SocDef
 from .evaluation import ModelAnalysis
 from .placement import Placement
@@ -56,6 +56,25 @@ class ProgressUpdate:
 
 
 ProgressSink = Callable[[ProgressUpdate], None]
+
+
+_T = TypeVar("_T")
+
+
+def _require(value: _T | None, field_name: str, stage: str) -> _T:
+    """Return *value*, or explain which stage should have produced it.
+
+    Shared by every :class:`PipelineContext` narrowing accessor so a
+    stage-ordering mistake names the missing product *and* its producer
+    rather than surfacing as a bare ``AssertionError``.
+    """
+    if value is None:
+        raise PipelineError(
+            f"ctx.{field_name} is not available — {stage} has not run.",
+            hint=f"{stage} must run before ctx.{field_name} is read. "
+            "This is a bug in heliaPROFILER — please file an issue.",
+        )
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +180,62 @@ class PipelineContext:
 
     progress_sink: ProgressSink | None = field(default=None, repr=False, compare=False)
 
+    # -- Narrowing accessors -------------------------------------------------
+    #
+    # The optional fields above are the *write* surface: each is set by the one
+    # stage that produces it.  These properties are the *read* surface — they
+    # return the non-optional type and, when the producing stage has not run,
+    # raise a :class:`PipelineError` naming both the field and that stage
+    # instead of an ``assert`` (which vanishes under ``-O``) or a ``None`` that
+    # propagates until something far away fails obscurely.
+
+    @property
+    def resolved_soc(self) -> SocDef:
+        """The resolved SoC definition (produced by ``ResolvePlatformStage``)."""
+        return _require(self.soc, "soc", "ResolvePlatformStage")
+
+    @property
+    def resolved_board(self) -> BoardDef:
+        """The resolved board definition (produced by ``ResolvePlatformStage``)."""
+        return _require(self.board, "board", "ResolvePlatformStage")
+
+    @property
+    def prepared_artifacts(self) -> EngineArtifacts:
+        """The engine's prepared artifacts (produced by ``PrepareEngineStage``)."""
+        return _require(self.engine_artifacts, "engine_artifacts", "PrepareEngineStage")
+
+    @property
+    def prepared_adapter(self) -> EngineAdapter:
+        """The prepared engine adapter (produced by ``PrepareEngineStage``)."""
+        return _require(self.engine_adapter, "engine_adapter", "PrepareEngineStage")
+
+    @property
+    def resolved_firmware_dir(self) -> Path:
+        """The generated NSX app directory (produced by ``GenerateFirmwareStage``)."""
+        return _require(self.firmware_dir, "firmware_dir", "GenerateFirmwareStage")
+
+    @property
+    def resolved_workspace(self) -> DependencyWorkspace:
+        """The deterministic dependency workspace (produced by ``GenerateFirmwareStage``)."""
+        return _require(
+            self.dependency_workspace, "dependency_workspace", "GenerateFirmwareStage"
+        )
+
+    @property
+    def built_binary_path(self) -> Path:
+        """The built profile ELF (produced by ``BuildFirmwareStage``)."""
+        return _require(self.binary_path, "binary_path", "BuildFirmwareStage")
+
+    @property
+    def captured_pmu(self) -> PmuResult:
+        """The captured PMU result (produced by ``CapturePmuStage``)."""
+        return _require(self.pmu_result, "pmu_result", "CapturePmuStage")
+
+    @property
+    def planned_arena_region(self) -> Placement:
+        """The resolved arena placement (produced by ``PlanMemoryStage``)."""
+        return _require(self.arena_region, "arena_region", "PlanMemoryStage")
+
     def publish_profile_firmware(self, firmware: FirmwareArtifact) -> None:
         if firmware.role != "profile":
             raise ValueError("Profile run requires a profile firmware artifact.")
@@ -243,7 +318,10 @@ class PipelineContext:
 
     def publish_power_terminal_envelope(self, envelope: PowerTerminalEnvelope) -> None:
         self.publish_power_terminal(envelope.terminal)
-        assert self.power_run is not None
+        # publish_power_terminal raised if power_run was None, so this is a
+        # post-condition restated for the type-narrowing, not a stage gate.
+        if self.power_run is None:  # pragma: no cover - unreachable
+            raise ValueError("publish_power_terminal left power_run unset.")
         self.power_run = replace(
             self.power_run,
             on_device_summary=envelope.measurement,

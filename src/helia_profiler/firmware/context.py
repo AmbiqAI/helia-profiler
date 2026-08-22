@@ -14,7 +14,7 @@ from ..counters import (
 )
 from ..engines import EngineType
 from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
-from ..errors import FirmwareError
+from ..errors import FirmwareError, PipelineError
 from ..placement import Placement
 from ..target.lifecycle import resolve_power_lockstep
 from ..usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
@@ -254,13 +254,10 @@ class FirmwareRenderContext:
         *,
         arena_regions: list["ArenaRegion"] | None = None,
     ) -> "FirmwareRenderContext":
-        assert ctx.soc is not None
-        assert ctx.board is not None
-        assert ctx.engine_artifacts is not None
-
         config = ctx.config
-        soc = ctx.soc
-        artifacts = ctx.engine_artifacts
+        soc = ctx.resolved_soc
+        board = ctx.resolved_board
+        artifacts = ctx.prepared_artifacts
         engine_type = artifacts.engine_type
         arena_region = ctx.arena_region or Placement.TCM
         weights_region = ctx.weights_region or Placement.MRAM
@@ -268,7 +265,17 @@ class FirmwareRenderContext:
         power_sync_enabled = config.power.gated_external_capture
         profiling_backends = tuple(soc.profiling_backends)
         clock = ctx.run_metadata.platform
-        assert clock is not None
+        if clock is None:
+            # A sub-field of the (non-optional) run_metadata, so no
+            # PipelineContext accessor covers it — same stage-ordering
+            # precondition, stated the same way.
+            raise PipelineError(
+                "ctx.run_metadata.platform is not available — "
+                "ResolvePlatformStage has not run.",
+                hint="ResolvePlatformStage must run before firmware render "
+                "context construction. This is a bug in heliaPROFILER — "
+                "please file an issue.",
+            )
         perf_mode_mhz = clock.cpu_clock_mhz
         burst_base_mhz = soc.capabilities.clock.direct_burst_base_mhz
         resolver_plan = build_resolver_plan(
@@ -401,7 +408,7 @@ class FirmwareRenderContext:
                 broad_peripheral_shutdown=soc.capabilities.clock.broad_peripheral_shutdown,
                 crypto_otp_shutdown=soc.capabilities.clock.crypto_otp_shutdown,
                 has_radio_subsystem=soc.has_radio_subsystem,
-                ble_reset_gpio_pin=ctx.board.ble_reset_gpio_pin,
+                ble_reset_gpio_pin=board.ble_reset_gpio_pin,
             ),
             power_monitor=PowerMonitorContext.from_config(config),
             engine=EngineContext(

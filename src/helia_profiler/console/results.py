@@ -107,8 +107,7 @@ def render_memory_plan(console: HpxConsole, plan: Any) -> None:
 
 def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     """Render the rich results panel after a successful run."""
-    assert ctx.pmu_result is not None
-    pmu = ctx.pmu_result
+    pmu = ctx.captured_pmu
     meta = pmu.meta
     layers = pmu.layers
 

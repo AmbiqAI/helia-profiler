@@ -229,15 +229,14 @@ def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[Depend
 def create_workspace(ctx: PipelineContext) -> DependencyWorkspace:
     """Compute and persist the deterministic workspace selected for *ctx*."""
 
-    assert ctx.board is not None
-    assert ctx.engine_artifacts is not None
+    board = ctx.resolved_board
+    artifacts = ctx.prepared_artifacts
     compatibility = ctx.config.compatibility
     if compatibility is None:
         raise DependencyError("Compatibility baseline is unavailable for dependency locking.")
 
     registry_hash = _registry_digest()
     module_overrides, explicit_overrides = _override_inputs(ctx)
-    artifacts = ctx.engine_artifacts
     extra_modules = []
     for module in sorted(artifacts.extra_modules, key=lambda item: item.name):
         entry: dict[str, Any] = {
@@ -259,7 +258,7 @@ def create_workspace(ctx: PipelineContext) -> DependencyWorkspace:
                 "fingerprint": compatibility.fingerprint,
             },
             "registry_hash": registry_hash.to_dict(),
-            "board": asdict(ctx.board),
+            "board": asdict(board),
             "soc": asdict(ctx.soc) if ctx.soc is not None else None,
             "target": {
                 "toolchain": ctx.config.target.toolchain,
@@ -420,11 +419,9 @@ def _offline_materialization_error(app_dir: Path, board: str) -> str | None:
 def prepare_locked_dependencies(ctx: PipelineContext) -> DependencyProvenance:
     """Reuse or explicitly resolve a lock, then materialize it frozen."""
 
-    assert ctx.firmware_dir is not None
-    assert ctx.board is not None
-    assert ctx.dependency_workspace is not None
-    app_dir = ctx.firmware_dir
-    board = ctx.board.name
+    app_dir = ctx.resolved_firmware_dir
+    board = ctx.resolved_board.name
+    workspace = ctx.resolved_workspace
     config = ctx.config
     update_requested = config.build.update_dependencies
     offline = config.build.offline or config.frozen
@@ -516,7 +513,7 @@ def prepare_locked_dependencies(ctx: PipelineContext) -> DependencyProvenance:
                 "Dependency module repair from the exact lock failed.",
                 details=repair_exc.details,
                 hint=(
-                    f"Remove the isolated workspace at {ctx.dependency_workspace.root} "
+                    f"Remove the isolated workspace at {workspace.root} "
                     "and retry. Use explicit path overrides for intentional local edits."
                 ),
             ) from repair_exc
@@ -708,13 +705,12 @@ def _collect_provenance(
     mode: DependencyLockMode,
     offline: bool,
 ) -> DependencyProvenance:
-    assert ctx.firmware_dir is not None
-    assert ctx.board is not None
-    assert ctx.dependency_workspace is not None
-    lock = read_lock(ctx.firmware_dir, ctx.board.name)
+    firmware_dir = ctx.resolved_firmware_dir
+    workspace = ctx.resolved_workspace
+    lock = read_lock(firmware_dir, ctx.resolved_board.name)
     if lock is None:
         raise LockError("Cannot record dependency provenance without an exact NSX lock.")
-    lock_path = ctx.firmware_dir / "nsx.lock"
+    lock_path = firmware_dir / "nsx.lock"
     compatibility = ctx.config.compatibility
     if compatibility is None:
         raise DependencyError("Cannot record dependency provenance without compatibility state.")
@@ -751,7 +747,7 @@ def _collect_provenance(
     )
     manifest_digest = lock.manifest_hash.removeprefix("sha256:")
     return DependencyProvenance(
-        workspace=ctx.dependency_workspace,
+        workspace=workspace,
         lock=DependencyLockState(
             mode=mode,
             update_requested=ctx.config.build.update_dependencies,

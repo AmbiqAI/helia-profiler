@@ -29,7 +29,7 @@ class ResolveJLinkProbeStage:
         return ctx.soc is None or not ctx.soc.jlink_device
 
     def run(self, ctx: PipelineContext) -> None:
-        assert ctx.soc is not None
+        soc = ctx.resolved_soc
         deadline = (
             time.monotonic() + _POST_POWER_PROBE_TIMEOUT_S
             if ctx.target_power_ensured
@@ -38,8 +38,8 @@ class ResolveJLinkProbeStage:
         while True:
             try:
                 serial = resolve_probe_serial(
-                    device=ctx.soc.jlink_device,
-                    expected_core=ctx.soc.core,
+                    device=soc.jlink_device,
+                    expected_core=soc.core,
                     requested_serial=ctx.config.target.jlink_serial,
                 )
                 break

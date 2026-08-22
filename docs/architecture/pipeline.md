@@ -68,6 +68,41 @@ Stages are expected to **set** their designated fields and **read** fields
 set by earlier stages. No stage should modify another stage's output after
 it's been set.
 
+### Narrowing accessors
+
+The optional fields above are the **write** surface — each is set by the one
+stage that produces it. The **read** surface is a matching set of narrowing
+accessors, one per stage product:
+
+| accessor | field | produced by |
+| --- | --- | --- |
+| `resolved_soc` | `soc` | `ResolvePlatformStage` |
+| `resolved_board` | `board` | `ResolvePlatformStage` |
+| `prepared_artifacts` | `engine_artifacts` | `PrepareEngineStage` |
+| `prepared_adapter` | `engine_adapter` | `PrepareEngineStage` |
+| `resolved_firmware_dir` | `firmware_dir` | `GenerateFirmwareStage` |
+| `resolved_workspace` | `dependency_workspace` | `GenerateFirmwareStage` |
+| `built_binary_path` | `binary_path` | `BuildFirmwareStage` |
+| `captured_pmu` | `pmu_result` | `CapturePmuStage` |
+| `planned_arena_region` | `arena_region` | `PlanMemoryStage` |
+
+Each returns the non-optional type, so downstream code needs no narrowing of
+its own; when the producing stage has not run it raises `PipelineError` naming
+both the field and that stage:
+
+```python
+soc = ctx.resolved_soc          # SocDef, not SocDef | None
+# ctx.pmu_result is not available — CapturePmuStage has not run.
+```
+
+Read stage products through the accessors rather than through
+`assert ctx.<field> is not None`: an `assert` is compiled out under `-O` and
+names no producer when it fires. A test in `tests/test_pipeline.py` enforces
+this — no `assert`-narrowing of `ctx.<field>` survives anywhere in `src/`,
+nor of `self.<field>` inside `pipeline.py` itself. Reads that
+already handle `None` deliberately (`ctx.arena_region or Placement.TCM`, or an
+early return when a field is unset) stay on the raw field.
+
 ## Stage-by-stage detail
 
 ### Resolve Platform
