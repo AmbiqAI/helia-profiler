@@ -57,7 +57,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
         json.dumps(
             {
                 "schema": "hpx.run-summary",
-                "schema_version": 1,
+                "schema_version": 3,
                 "binary": {"text": 80_000, "data": 2_000, "bss": 5_000, "total": 87_000},
                 "memory": {
                     "arena_size": 32_768,
@@ -68,19 +68,35 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
                 "memory_plan": {
                     "engine": "helia-rt",
                     "model_weight_bytes": 53_744,
-                    "has_overflow": False,
                     "regions": [
                         {
                             "region": "DTCM",
                             "capacity": 393_216,
                             "used": 32_768,
-                            "free": 360_448,
-                            "overflow": False,
                             "consumers": [
                                 {"name": "tensor_arena", "size": 32_768, "kind": "arena"}
                             ],
                         }
                     ],
+                },
+                "memory_regions": {
+                    "link_family": "gnu",
+                    "linker_profile": "default",
+                    "regions": [
+                        {
+                            "region": "DTCM",
+                            "window": {"start": 268435456, "length": 393216},
+                            "app_window": {"start": 268435456, "length": 393216},
+                            "used": 49_432,
+                            "reserved": 343_784,
+                            "free": 343_784,
+                            "load_image": 0,
+                            "window_provenance": "hardware-aperture",
+                            "app_provenance": "linker-script",
+                        }
+                    ],
+                    "unattributed": [],
+                    "unattributed_load_bytes": 0,
                 },
             }
         )
@@ -120,7 +136,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
         "validation_manifest.json",
     }
     manifest = json.loads((tmp_path / "validation_manifest.json").read_text())
-    assert manifest["schema_version"] == 5
+    assert manifest["schema_version"] == 6
     assert manifest["validation"]["suite"] == "smoke"
     assert manifest["summary"] == {"total": 1, "pass": 1, "fail": 0, "skip": 0}
     assert manifest["repo"] == {"sha": None, "branch": None, "dirty": None}
@@ -159,7 +175,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
     }
     assert case["provenance"]["system_clock_hz"] == 96_000_000
     assert case["provenance"]["run_metadata_schema_version"] == 1
-    assert case["provenance"]["run_summary_schema_version"] == 1
+    assert case["provenance"]["run_summary_schema_version"] == 3
     assert case["resources"]["binary_sections"] == {
         "text": 80_000,
         "data": 2_000,
@@ -171,10 +187,13 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
         "region": "DTCM",
         "capacity": 393_216,
         "used": 32_768,
-        "free": 360_448,
-        "overflow": False,
         "consumers": [{"name": "tensor_arena", "size": 32_768, "kind": "arena"}],
     }
+    # Schema v6 (#177 review M4): the measured block passes through
+    # verbatim — this assert is what makes deleting the passthrough line a
+    # red test instead of a silent contract regression.
+    assert case["resources"]["memory_regions"]["regions"][0]["free"] == 343_784
+    assert case["resources"]["memory_regions"]["link_family"] == "gnu"
     report = json.loads((tmp_path / "validation_report.json").read_text())
     assert report["cases"][0]["resources"] == case["resources"]
     assert case["artifacts"]["profile_results"]["path"] == f"{result.case_id}/profile_results.csv"

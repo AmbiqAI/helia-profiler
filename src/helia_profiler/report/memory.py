@@ -94,6 +94,7 @@ def _serialise_memory_regions(measured: MeasuredMemoryRegions) -> dict[str, Any]
             {"name": u.name, "address": u.address, "size": u.size}
             for u in measured.unattributed
         ],
+        "unattributed_load_bytes": measured.unattributed_load_bytes,
     }
 
 

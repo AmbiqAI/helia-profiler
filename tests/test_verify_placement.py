@@ -146,15 +146,81 @@ class TestRun:
         )
         VerifyPlacementStage().run(ctx)  # no raise
 
-    def test_unmodelled_soc_is_best_effort(self, tmp_path, monkeypatch):
+    def test_unmodelled_soc_without_declared_ranges_is_best_effort(
+        self, tmp_path, monkeypatch
+    ):
         ctx = _ctx(tmp_path, board="apollo3p_evb", arena_region=Placement.SRAM)
-        # Simulate a SoC whose memory model is not yet characterised (#133
-        # Phase 2: the stage now reads the verified linked-memory map):
-        # even a wildly wrong address must not raise when the map is empty.
+        # No verified map AND no declared ranges: nothing to hold the
+        # linker to — even a wildly wrong address must not raise.
+        monkeypatch.setattr(
+            verify_placement, "linked_memory_map", lambda soc: ()
+        )
+        monkeypatch.setattr(
+            verify_placement, "soc_placement_ranges", lambda soc: {}
+        )
+        monkeypatch.setattr(
+            verify_placement, "symbol_address", lambda *a, **k: (0x00001234, "b")
+        )
+        VerifyPlacementStage().run(ctx)  # no raise
+
+    def test_unmodelled_soc_falls_back_to_declared_ranges(
+        self, tmp_path, monkeypatch
+    ):
+        """#177 review m5: a custom SoC has no characterized map, but its
+        DECLARED placement bases are still worth holding the linker to —
+        the legacy check applies and a mislocated arena still raises."""
+        ctx = _ctx(tmp_path, board="apollo3p_evb", arena_region=Placement.SRAM)
         monkeypatch.setattr(
             verify_placement, "linked_memory_map", lambda soc: ()
         )
         monkeypatch.setattr(
             verify_placement, "symbol_address", lambda *a, **k: (0x00001234, "b")
         )
-        VerifyPlacementStage().run(ctx)  # no raise
+        with pytest.raises(BuildError, match="declared SRAM range"):
+            VerifyPlacementStage().run(ctx)
+
+
+class TestMigrationBehaviorPins:
+    """#177 review m6: the deltas the Phase-1 divergence pins exist to make
+    reviewable, pinned as stage behavior."""
+
+    def test_arena_inside_a_stack_reservation_now_fails(
+        self, tmp_path, monkeypatch
+    ):
+        """0x2003C000 on apollo330P is the armlink fixed stack (and one
+        byte past gcc's MCU_TCM top) — inside the hardware WINDOW but
+        outside every app extent. The pre-#133 stage never saw this
+        address class; the extent yardstick rejects it."""
+        ctx = _ctx(
+            tmp_path, board="apollo330mP_evb", arena_region=Placement.TCM
+        )
+        monkeypatch.setattr(
+            verify_placement, "symbol_address", lambda *a, **k: (0x2003C000, "b")
+        )
+        with pytest.raises(BuildError, match="app window"):
+            VerifyPlacementStage().run(ctx)
+
+    def test_apollo3p_stackmem_slot_fails_sram_verification(
+        self, tmp_path, monkeypatch
+    ):
+        """0x10010000 on apollo3p is the 4 KB STACKMEM slot: inside the
+        SRAM window, below the RWMEM app extent."""
+        ctx = _ctx(tmp_path, board="apollo3p_evb", arena_region=Placement.SRAM)
+        monkeypatch.setattr(
+            verify_placement, "symbol_address", lambda *a, **k: (0x10010000, "b")
+        )
+        with pytest.raises(BuildError, match="app window"):
+            VerifyPlacementStage().run(ctx)
+
+    def test_legitimate_extent_addresses_pass(self, tmp_path, monkeypatch):
+        for board, region, address in (
+            ("apollo510_evb", Placement.TCM, 0x20004000),
+            ("apollo510_evb", Placement.SRAM, 0x20080000),
+            ("apollo330mP_evb", Placement.TCM, 0x20000000),
+            ("apollo3p_evb", Placement.SRAM, 0x10011000),
+        ):
+            ctx = _ctx(tmp_path, board=board, arena_region=region)
+            monkeypatch.setattr(
+                verify_placement, "symbol_address", lambda *a, **k: (address, "b")
+            )
+            VerifyPlacementStage().run(ctx)  # no raise

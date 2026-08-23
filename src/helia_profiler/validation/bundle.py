@@ -117,7 +117,7 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
         )
 
     version = manifest.get("schema_version")
-    if not isinstance(version, int) or isinstance(version, bool) or version not in (1, 2, 3, 4, 5):
+    if not isinstance(version, int) or isinstance(version, bool) or version not in (1, 2, 3, 4, 5, 6):
         raise ValidationBundleError(f"Unsupported validation manifest schema_version: {version!r}")
     raw_cases = manifest.get("cases")
     if not isinstance(raw_cases, list):
@@ -142,7 +142,7 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
     repo = manifest.get("repo") if isinstance(manifest.get("repo"), dict) else {}
     run = manifest.get("run") if isinstance(manifest.get("run"), dict) else {}
     github = run.get("github") if isinstance(run.get("github"), dict) else {}
-    if version in (4, 5) and not isinstance(manifest.get("validation"), dict):
+    if version in (4, 5, 6) and not isinstance(manifest.get("validation"), dict):
         raise ValidationBundleError(
             f"Validation manifest schema v{version} field 'validation' must be an object"
         )
@@ -174,7 +174,7 @@ def _load_case(
     if status not in _STATUSES:
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid status {status!r}")
 
-    if version in (2, 3, 4, 5):
+    if version in (2, 3, 4, 5, 6):
         identity_raw = raw.get("identity")
         if not isinstance(identity_raw, dict):
             raise ValidationBundleError(f"Validation case {case_id!r} has no identity object")
@@ -185,7 +185,7 @@ def _load_case(
         provenance = raw.get("provenance", {})
         resources = raw.get("resources", {})
         comparison_group = identity_raw.get("comparison_group", identity_raw.get("model_id"))
-        if version in (4, 5):
+        if version in (4, 5, 6):
             repeat = raw.get("repeat")
             if not isinstance(repeat, dict):
                 raise ValidationBundleError(

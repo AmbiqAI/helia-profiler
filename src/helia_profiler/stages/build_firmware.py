@@ -55,7 +55,10 @@ class BuildFirmwareStage:
         # the verified per-SoC windows. The linker profile must be the one
         # the binary actually linked with — the engine knob, default
         # otherwise; non-default profiles degrade to None inside.
-        if ctx.soc is not None:  # best-effort, like binary_sections above
+        # Best-effort like binary_sections (degrades to None inside); the
+        # soc gate additionally covers test-shaped contexts that never ran
+        # ResolvePlatformStage.
+        if ctx.soc is not None:
             linker_profile = str(
                 ctx.config.engine.config.get("linker_profile") or "default"
             )

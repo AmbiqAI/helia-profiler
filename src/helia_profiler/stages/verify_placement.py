@@ -24,7 +24,8 @@ from ..engines import EngineType
 from ..errors import BuildError
 from ..pipeline import PipelineContext
 from ..placement import MemoryRegion, Placement
-from ..platform import classify_address, linked_memory_map
+from ..platform import classify_address, linked_memory_map, soc_placement_ranges
+from ..platform.memory_map import link_family_for_toolchain
 from ..toolchain_probe import symbol_address
 
 log = logging.getLogger("hpx")
@@ -70,31 +71,45 @@ class VerifyPlacementStage:
         binary_path = ctx.built_binary_path
         arena_region = ctx.planned_arena_region
 
+        toolchain = ctx.config.target.toolchain
         # #133 Phase 2 migration: verify against the characterized
         # linked-memory map, not the legacy family placement table (whose
         # AP5 MRAM base was entirely wrong — every divergence between the
-        # two is pinned by tests/test_memory_map.py). Interpreter builds
-        # (the only ones this stage checks) always link the DEFAULT
-        # profile — the linker_profile knob is AOT-only, and AOT skips.
+        # two is pinned by tests/test_memory_map.py). The yardstick is the
+        # link family's APP EXTENT, not the classification window: an
+        # arena inside the window but inside a stack reservation (330P's
+        # armlink stack at 0x2003C000, apollo3p's STACKMEM slot) is
+        # exactly the mislocation this stage exists to catch (#177 review
+        # m4). Interpreter builds (the only ones checked here) always
+        # link the DEFAULT profile — the linker_profile knob is AOT-only,
+        # and AOT skips.
         windows = linked_memory_map(soc)
-        expected_window = next(
+        if not windows:
+            # Custom SoCs have no characterized map, but they DO declare
+            # their own placement bases — the legacy table is built from
+            # the user's declaration and remains the right thing to
+            # verify against (#177 review m5: degrading the MEASURED
+            # block is correct; degrading this guard was a silent
+            # coverage regression).
+            self._run_legacy(ctx, soc, arena_region)
+            return
+        family = link_family_for_toolchain(toolchain)
+        expected = next(
             (
-                w.window
+                w.app_window[family]
                 for w in windows
                 if w.region is _PLACEMENT_REGION.get(arena_region)
             ),
             None,
         )
-        if expected_window is None:
+        if expected is None:
             log.debug(
                 "No verified window for %s on %s; skipping placement verify.",
                 arena_region,
                 soc.name,
             )
             return
-        expected = expected_window
 
-        toolchain = ctx.config.target.toolchain
         resolved = symbol_address(
             binary_path,
             toolchain,
@@ -125,13 +140,61 @@ class VerifyPlacementStage:
         raise BuildError(
             f"Arena landed in {actual_label} (0x{address:08X}) but the memory "
             f"plan placed it in {str(arena_region).upper()} "
-            f"(0x{expected.start:08X}-0x{expected.end:08X}).",
+            f"(app window 0x{expected.start:08X}-0x{expected.end:08X}).",
             hint=(
                 f"The {toolchain} linker script for {soc.name} is not "
                 f"relocating the arena section to {str(arena_region).upper()}. "
                 "Check that the scatter/linker script collects the arena's "
                 "section (e.g. '.sram_bss' for SRAM) into the intended region — "
-                "this is the armclang SHARED_SRAM scatter-gap class of bug."
+                "this is the armclang SHARED_SRAM scatter-gap class of bug. "
+                "An address inside the region but inside its stack/heap "
+                "reservation fails for the same reason."
+            ),
+        )
+
+    def _run_legacy(self, ctx: PipelineContext, soc, arena_region) -> None:
+        """The pre-#133 check against the user-declared placement table —
+        kept for custom SoCs, which the verified map deliberately does not
+        cover but whose declared bases are still worth holding the linker
+        to."""
+        ranges = soc_placement_ranges(soc)
+        expected = ranges.get(arena_region)
+        if expected is None:
+            log.debug(
+                "No address range for %s on %s; skipping placement verify.",
+                arena_region,
+                soc.name,
+            )
+            return
+        toolchain = ctx.config.target.toolchain
+        resolved = symbol_address(
+            ctx.built_binary_path,
+            toolchain,
+            _ARENA_SYMBOL,
+            timeout_s=ctx.config.timeouts.binary_probe_s,
+        )
+        if resolved is None:
+            log.debug(
+                "Could not resolve %s address; skipping placement verify.",
+                _ARENA_SYMBOL,
+            )
+            return
+        address, _nm_type = resolved
+        if expected.contains(address):
+            log.info(
+                "Placement verified (declared ranges): arena in %s at 0x%08X.",
+                str(arena_region).upper(),
+                address,
+            )
+            return
+        raise BuildError(
+            f"Arena landed at 0x{address:08X} but the declared "
+            f"{str(arena_region).upper()} range is "
+            f"0x{expected.start:08X}-0x{expected.end:08X}.",
+            hint=(
+                f"The custom SoC's declared memory bases for {soc.name} do "
+                "not contain the arena. Check the custom_socs memory "
+                "declaration and the linker script."
             ),
         )
 

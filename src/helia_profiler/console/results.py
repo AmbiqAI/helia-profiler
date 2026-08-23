@@ -6,6 +6,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from rich import box
+from rich.markup import escape
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.table import Table
@@ -108,10 +109,19 @@ def render_memory_regions(console: HpxConsole, measured: Any) -> None:
 
     console._console.print(table)
     for u in measured.unattributed:
+        # Section names are attacker-ish input from the ELF: escape them so
+        # a name containing rich markup can neither restyle nor crash the
+        # one line whose job is to report it exactly (#177 review M3).
         console._console.print(
-            f"  [bold red]unattributed[/bold red] {u.name} "
+            f"  [bold red]unattributed[/bold red] {escape(u.name)} "
             f"@0x{u.address:08X} ({_fmt_bytes(u.size)}) — outside every "
             f"verified window"
+        )
+    if getattr(measured, "unattributed_load_bytes", 0):
+        console._console.print(
+            f"  [bold red]unattributed load image[/bold red] "
+            f"{_fmt_bytes(measured.unattributed_load_bytes)} load outside "
+            f"every verified window"
         )
     console._console.print()
 
@@ -371,7 +381,9 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         console._console.print()
 
     # ── Memory plan (per-region capacity vs used) ─────────────────
-    if ctx.memory_regions is not None and ctx.memory_regions.regions:
+    if ctx.memory_regions is not None and any(
+        r.used or r.load_image for r in ctx.memory_regions.regions
+    ):
         # Measured first (#133): region truth comes from the ELF. The plan
         # renders only as a fallback — its numbers are the pre-build
         # decision record, not measurements.

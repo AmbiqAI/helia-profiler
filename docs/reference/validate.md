@@ -135,9 +135,12 @@ provenance, not part of the case identity used for comparisons.
 
 Schema v3 also includes `resources.binary_sections`,
 `resources.runtime_memory`, and `resources.memory_plan` for each case in both
-machine-readable validation reports. The memory plan exposes per-region
-capacity, used/free bytes, overflow state, and named consumers so dashboards do
-not need to parse individual run summaries.
+machine-readable validation reports. Since schema v6 the memory plan is the
+pre-build decision record (per-region capacity, planned usage, and named
+consumers — no free/overflow), and `resources.memory_regions` carries the
+measured per-region occupancy from the linked ELF (used/reserved/free,
+load-image bytes, unattributed sections) so dashboards do not need to parse
+individual run summaries.
 
 Schema v4 adds dashboard-ready power fields for powered cases and preserves the
 complete per-run power object as `power_metrics`. The portable artifact index

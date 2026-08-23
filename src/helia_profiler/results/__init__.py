@@ -66,10 +66,9 @@ from .models import (
     EngineInfo,
     FirmwareMeta,
     LayerResult,
-    MemoryConsumer,
     MeasuredMemoryRegions,
     MeasuredRegion,
-    UnattributedSection,
+    MemoryConsumer,
     MemoryPlan,
     MemoryRegionUsage,
     ModelInfo,
@@ -82,6 +81,7 @@ from .models import (
     RunMetadata,
     TimingInfo,
     ToolchainInfo,
+    UnattributedSection,
 )
 
 __all__ = [
@@ -114,10 +114,9 @@ __all__ = [
     "IssueCode",
     "LayerResult",
     "load_result_manifest",
-    "MemoryConsumer",
     "MeasuredMemoryRegions",
     "MeasuredRegion",
-    "UnattributedSection",
+    "MemoryConsumer",
     "MemoryPlan",
     "MemoryRegionUsage",
     "ModelInfo",
@@ -150,4 +149,5 @@ __all__ = [
     "SupportBundleSection",
     "TimingInfo",
     "ToolchainInfo",
+    "UnattributedSection",
 ]

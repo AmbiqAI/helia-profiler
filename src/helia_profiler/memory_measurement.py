@@ -79,13 +79,16 @@ def measure_memory_regions(
 
     family = link_family_for_toolchain(toolchain)
     allocated = [s for s in inventory.sections if s.allocated]
+    # Attribution runs against the ATTRIBUTABLE windows only: a
+    # section_attributable=False window (PSRAM) is a region no linker
+    # script maps, so anything landing there is just as anomalous as an
+    # address outside every window — classifying it silently would disable
+    # the police flag on exactly the region this block cannot report
+    # (#177 review m2).
+    attributable = tuple(w for w in windows if w.section_attributable)
 
     regions: list[MeasuredRegion] = []
-    for w in windows:
-        if not w.section_attributable:
-            # PSRAM: no linker region exists, so an inventory structurally
-            # cannot see it — the PLAN owns that region's accounting.
-            continue
+    for w in attributable:
         extent = w.app_window[family]
         used = 0
         reserved = 0
@@ -102,7 +105,7 @@ def measure_memory_regions(
         load_image = sum(
             seg.file_size
             for seg in inventory.segments
-            if classify_address(seg.physical_address, windows) is w.region
+            if classify_address(seg.physical_address, attributable) is w.region
         )
         regions.append(
             MeasuredRegion(
@@ -122,7 +125,8 @@ def measure_memory_regions(
     unattributed = tuple(
         UnattributedSection(name=s.name, address=s.address, size=s.size)
         for s in allocated
-        if classify_address(s.address, windows) is None
+        # Zero-length markers are noise, not lost bytes.
+        if s.size and classify_address(s.address, attributable) is None
     )
     if unattributed:
         log.warning(
@@ -132,9 +136,26 @@ def measure_memory_regions(
             ", ".join(f"{u.name}@0x{u.address:08X}" for u in unattributed[:5]),
         )
 
+    # Segments have the same police problem as sections (#177 review m3):
+    # PT_LOAD file bytes whose physical address classifies nowhere would
+    # otherwise vanish from load_image with no trace.
+    unattributed_load = sum(
+        seg.file_size
+        for seg in inventory.segments
+        if seg.file_size
+        and classify_address(seg.physical_address, attributable) is None
+    )
+    if unattributed_load:
+        log.warning(
+            "%d load-image byte(s) load outside every verified %s window.",
+            unattributed_load,
+            soc.name,
+        )
+
     return MeasuredMemoryRegions(
         link_family=str(family),
         linker_profile=linker_profile,
         regions=tuple(regions),
         unattributed=unattributed,
+        unattributed_load_bytes=unattributed_load,
     )

@@ -145,6 +145,117 @@ def test_unattributed_sections_are_flagged(monkeypatch):
     assert (flag.name, flag.address, flag.size) == (".mystery", 0x30000000, 64)
 
 
+def test_armlink_join_uses_the_extent_not_the_window(monkeypatch):
+    """#177 review M1: the armlink half of the two-mechanism rule, shaped
+    like a real NSX AP510 scatter link (numbers from the #176 fresh-review
+    real-armlink reproduction): two same-named MCU_TCM sections (PROGBITS
+    + NOBITS), the fixed 4 KB ARM_LIB_HEAP at the extent end 0x2007B000,
+    and the fixed 16 KB ARM_LIB_STACK at 0x2007C000 — inside the WINDOW,
+    outside the EXTENT. Kills both previously-surviving mutations:
+    extent.contains -> window.contains flips the stack into `used`;
+    deleting the outside-extent branch zeroes heap+stack out of
+    `reserved`."""
+    import helia_profiler.memory_measurement as mm
+    from helia_profiler.toolchain_probe import ElfSection, LoadSegment
+
+    inventory = SectionInventory(
+        sections=(
+            ElfSection(".text", 0x00410000, 40, False, True, index=1),
+            ElfSection("MCU_TCM", 0x20000000, 16384, False, True, index=2),
+            ElfSection("MCU_TCM", 0x20004000, 8192, True, True, index=3),
+            ElfSection(
+                "ARM_LIB_HEAP",
+                0x2007B000,
+                4096,
+                True,
+                True,
+                index=4,
+                linker_reserved=True,
+            ),
+            ElfSection("ARM_LIB_STACK", 0x2007C000, 16384, True, True, index=5),
+        ),
+        segments=(LoadSegment(0x00410000, 0x00410000, 16424, 45096),),
+    )
+    monkeypatch.setattr(mm, "section_inventory", lambda *a, **k: inventory)
+    measured = measure_memory_regions(
+        Path("fw.axf"), "armclang", get_soc("apollo510")
+    )
+    assert measured.link_family == "armlink"
+    dtcm = measured.region(MemoryRegion.DTCM)
+    # used: BOTH same-named MCU_TCM sections, nothing else.
+    assert dtcm.used == 16384 + 8192
+    # reserved: in-extent linker_reserved (none here — the heap sits at
+    # exactly the extent END, outside) + in-window/out-of-extent allocated
+    # (heap 4096 + stack 16384).
+    assert dtcm.reserved == 4096 + 16384
+    assert dtcm.app_length == 503_808
+    assert dtcm.free == 503_808 - (16384 + 8192)  # 479232, the real figure
+    # armlink's single aggregate PT_LOAD: all file bytes to MRAM by paddr.
+    mram = measured.region(MemoryRegion.MRAM)
+    assert mram.load_image == 16424
+    assert measured.unattributed == ()
+
+
+def test_psram_landing_bytes_are_flagged_not_swallowed(monkeypatch):
+    """#177 review m2: PSRAM is excluded from the measured regions (the
+    plan owns it), so a section at a PSRAM address must surface as
+    unattributed — classifying it silently would disable the police flag
+    on exactly the region this block cannot report."""
+    import helia_profiler.memory_measurement as mm
+    from helia_profiler.toolchain_probe import ElfSection
+
+    inventory = SectionInventory(
+        sections=(
+            ElfSection(".psram_data", 0x60000000, 4096, False, True, index=1),
+        ),
+        segments=(),
+    )
+    monkeypatch.setattr(mm, "section_inventory", lambda *a, **k: inventory)
+    measured = measure_memory_regions(
+        Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510")
+    )
+    assert [u.name for u in measured.unattributed] == [".psram_data"]
+
+
+def test_unattributed_load_bytes_are_counted(monkeypatch):
+    """#177 review m3: PT_LOAD file bytes whose paddr classifies nowhere
+    (below the app MRAM origin, a PSRAM address, anywhere uncharacterized)
+    must be counted, not vanish from load_image."""
+    import helia_profiler.memory_measurement as mm
+    from helia_profiler.toolchain_probe import ElfSection, LoadSegment
+
+    inventory = SectionInventory(
+        sections=(ElfSection(".text", 0x00410000, 60, False, True, index=1),),
+        segments=(
+            LoadSegment(0x00410000, 0x00410000, 60, 60),
+            LoadSegment(0x20000000, 0x00400000, 0x2000, 0x2000),  # below origin
+        ),
+    )
+    monkeypatch.setattr(mm, "section_inventory", lambda *a, **k: inventory)
+    measured = measure_memory_regions(
+        Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510")
+    )
+    assert measured.region(MemoryRegion.MRAM).load_image == 60
+    assert measured.unattributed_load_bytes == 0x2000
+
+
+def test_zero_length_orphan_sections_are_not_flagged(monkeypatch):
+    """A zero-byte end marker outside every window is noise, not lost
+    bytes (#177 review n3)."""
+    import helia_profiler.memory_measurement as mm
+    from helia_profiler.toolchain_probe import ElfSection
+
+    inventory = SectionInventory(
+        sections=(ElfSection(".marker", 0x30000000, 0, False, True, index=1),),
+        segments=(),
+    )
+    monkeypatch.setattr(mm, "section_inventory", lambda *a, **k: inventory)
+    measured = measure_memory_regions(
+        Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510")
+    )
+    assert measured.unattributed == ()
+
+
 def test_serialised_shape_is_the_contract():
     """The summary.json / memory.json key set for the measured block —
     schema v3's new surface, pinned independently of the golden digests."""
@@ -172,7 +283,13 @@ def test_serialised_shape_is_the_contract():
         unattributed=(UnattributedSection(name=".x", address=0x0, size=1),),
     )
     payload = _serialise_memory_regions(measured)
-    assert set(payload) == {"link_family", "linker_profile", "regions", "unattributed"}
+    assert set(payload) == {
+        "link_family",
+        "linker_profile",
+        "regions",
+        "unattributed",
+        "unattributed_load_bytes",
+    }
     (region,) = payload["regions"]
     assert set(region) == {
         "region",

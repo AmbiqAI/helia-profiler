@@ -317,11 +317,14 @@ class MemoryConsumer:
 
 @dataclass(frozen=True)
 class MemoryRegionUsage:
-    """Usage breakdown for a single memory region (e.g. DTCM, MRAM).
+    """PLANNED usage for a single memory region (e.g. DTCM, MRAM).
 
-    ``capacity`` reflects the SoC's physical size for this region (bytes).
-    ``used`` is the sum of ``consumers[i].size`` (what the plan allocates).
-    ``free`` is a convenience property.
+    Part of the memory-plan DECISION RECORD: ``capacity`` is the SoC's
+    declared size and ``used`` sums only what hpx itself placed. Since
+    run-summary schema v3 the ``free``/``overflow`` properties are
+    plan-time capacity checks (``plan_memory`` raises on oversubscription)
+    and are NOT serialized — the measured truth is
+    :class:`MeasuredRegion`, read from the linked ELF (#133).
     """
 
     region: MemoryRegion
@@ -400,6 +403,11 @@ class MeasuredRegion:
     bytes whose PHYSICAL address lands here — initialized data's flash
     image (summed per segment, never per section: armlink emits one
     aggregate PT_LOAD).
+
+    Attribution is by section START address, all-or-nothing: a section
+    straddling an extent boundary is charged entirely to where it begins.
+    No NSX script produces one; if a future link does, the per-region
+    numbers will show it (negative or inflated free), not hide it.
     """
 
     region: MemoryRegion
@@ -451,6 +459,10 @@ class MeasuredMemoryRegions:
     linker_profile: str
     regions: tuple[MeasuredRegion, ...]
     unattributed: tuple[UnattributedSection, ...] = ()
+    #: PT_LOAD file bytes whose PHYSICAL address classifies to no
+    #: attributable window — the segment-side police flag (sections have
+    #: ``unattributed``).
+    unattributed_load_bytes: int = 0
 
     def region(self, name: str | MemoryRegion) -> MeasuredRegion | None:
         key = MemoryRegion(str(name).upper()) if not isinstance(name, MemoryRegion) else name

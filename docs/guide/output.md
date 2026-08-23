@@ -372,14 +372,22 @@ questions:
 extent the link family's script gives the app image, and `free` is
 `app_window.length − used`. `used` includes the live stack (gcc links);
 `reserved` is the linker's own reservations — the fill-to-end heap plus
-armlink's fixed heap/stack regions. `load_image` is the flash bytes that
+armlink's fixed heap/stack regions. Note the two reservation kinds read
+differently: gcc's fill-to-end heap sits *inside* the app window, so its
+bytes appear in both `reserved` and `free` (the heap is sized to whatever
+was left — the example above shows both at 491240 for exactly that
+reason); armlink's fixed heap/stack sit *outside* the app window and are
+excluded from both. `load_image` is the flash bytes that
 initialize this region's data (summed from program headers by physical
 address, which is correct on both gcc and armlink). `unattributed` lists
 any allocated section that falls outside every verified window — either
 the binary put bytes somewhere uncharacterized, or the window table is
-wrong for that part; both deserve eyes. The whole block is **absent**
-whenever it cannot be true: a custom SoC, a non-default `linker_profile`,
-a failed tool probe, or a partial section inventory — never guessed.
+wrong for that part; both deserve eyes (`unattributed_load_bytes` is the
+same flag for program-header flash bytes). The block describes the
+**profile** binary — power-only firmware is not measured, matching
+`binary`. The whole block is **absent** whenever it cannot be true: a
+custom SoC, a non-default `linker_profile`, a failed tool probe, or a
+partial section inventory — never guessed.
 
 !!! note "Schema v3"
     `summary.json`'s `schema_version` moves from 2 to 3 with this split:
