@@ -149,7 +149,7 @@ class HeliaAOTAdapter:
         # Build a MemoryPlan from the AOT codegen context so the
         # plan_memory stage can validate placement against the SoC's
         # physical memory layout.
-        memory_plan = _extract_memory_plan(codegen_ctx)
+        memory_plan = _extract_memory_plan(codegen_ctx, prefix)
 
         # Extract arena binding info for external-arena mode
         allocate_arenas = (

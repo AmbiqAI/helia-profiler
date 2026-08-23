@@ -309,6 +309,12 @@ class MemoryConsumer:
     name: str
     size: int
     kind: ConsumerKind = ConsumerKind.ARENA
+    #: Optional linked-symbol hint for plan-vs-measured reconciliation
+    #: (#133 Phase 3). Set where the consumer name does not resemble its
+    #: symbol (heliaAOT: consumer ``dtcm_scratch_arena_0`` vs symbol
+    #: ``hpx_arena_dtcm_buffer``); the reconciler's name table covers the
+    #: rest. Serialized only when present.
+    symbol: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.kind, ConsumerKind):

@@ -57,7 +57,9 @@ def _serialise_memory_plan(plan: MemoryPlan) -> dict[str, Any]:
                 "capacity": r.capacity,
                 "used": r.used,
                 "consumers": [
-                    {"name": c.name, "size": c.size, "kind": c.kind} for c in r.consumers
+                    {"name": c.name, "size": c.size, "kind": c.kind}
+                    | ({"symbol": c.symbol} if c.symbol else {})
+                    for c in r.consumers
                 ],
             }
             for r in plan.regions

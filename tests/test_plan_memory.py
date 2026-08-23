@@ -90,6 +90,11 @@ class TestPlanMemorySynthesise:
             "temporary_arena": 32768,
             "input_buffer": 12288,
             "output_buffer": 40,
+            # hpx-owned (#133 Phase 3): 16 KB boot stack + RTT statics
+            # (32768 up + 16 down + 168 control block) land in DTCM on
+            # the AP5 family.
+            "boot_stack": 16384,
+            "rtt_buffers": 32952,
         }
         assert {consumer.name for consumer in sram.consumers} == {"pmu_layer_records"}
         assert {consumer.name for consumer in mram.consumers} == {"pte_program"}
@@ -131,7 +136,11 @@ class TestPlanMemorySynthesise:
         assert dtcm is not None and sram is not None
         # Only the planned arena follows arena_location; the overridden
         # buffers are accounted in SRAM where the firmware places them.
-        assert {c.name for c in dtcm.consumers} == {"planned_arena"}
+        assert {c.name for c in dtcm.consumers} == {
+            "planned_arena",
+            "boot_stack",
+            "rtt_buffers",
+        }
         assert {c.name for c in sram.consumers} == {
             "method_arena",
             "temporary_arena",
@@ -426,7 +435,10 @@ class TestPlanMemoryEngineProvided:
         dtcm = ctx.memory_plan.region("DTCM")
         assert mram.capacity > 0
         assert dtcm.capacity > 0
-        assert dtcm.used == 4_096
+        # 4 KiB engine arena + hpx-owned boot_stack (16384) +
+        # rtt_buffers (32952): the engine-supplied plan gains the shared
+        # consumers too (#133 Phase 3).
+        assert dtcm.used == 4_096 + 16_384 + 32_952
 
 
 class TestPlanMemoryOverflow:
@@ -466,3 +478,94 @@ class TestPlanMemoryOverflow:
         ctx = _make_ctx(tmp_path)
         PlanMemoryStage().run(ctx)  # Synthesised plan should fit.
         assert not ctx.memory_plan.has_overflow
+
+
+class TestHpxOwnedConsumers:
+    """#133 Phase 3 D1/D2: the consumers every firmware reserves that hpx
+    decides host-side. Sizes pin the frozen template-mirror tables so
+    drift is a reviewed edit."""
+
+    def test_record_size_table_is_the_frozen_contract(self):
+        from helia_profiler.engines import EngineType
+        from helia_profiler.stages.plan_memory import PMU_RECORD_SIZE_BYTES
+
+        assert PMU_RECORD_SIZE_BYTES == {
+            EngineType.TFLM: 24,
+            EngineType.HELIA_RT: 24,
+            EngineType.HELIA_AOT: 20,
+            EngineType.EXECUTORCH: 32,
+        }
+
+    def test_records_planned_for_every_engine_with_true_sizes(self, tmp_path):
+        # apollo510 (default board): pmu_max_ops = 4096.
+        for engine, expected in (("helia-rt", 4096 * 24), ("tflm", 4096 * 24)):
+            ctx = _make_ctx(tmp_path, {"engine": {"type": engine}})
+            PlanMemoryStage().run(ctx)
+            sram = ctx.memory_plan.region("SRAM")
+            records = [c for c in sram.consumers if c.name == "pmu_layer_records"]
+            assert [c.size for c in records] == [expected], engine
+
+    def test_rtt_lands_in_dtcm_on_ap5_and_sram_on_ap4(self, tmp_path):
+        ctx = _make_ctx(tmp_path)  # apollo510-family default, rtt
+        PlanMemoryStage().run(ctx)
+        dtcm_names = {c.name for c in ctx.memory_plan.region("DTCM").consumers}
+        assert "rtt_buffers" in dtcm_names  # the scarce-DTCM part gets it
+        rtt = [
+            c
+            for c in ctx.memory_plan.region("DTCM").consumers
+            if c.name == "rtt_buffers"
+        ]
+        assert [c.size for c in rtt] == [32768 + 16 + 168]
+
+        ctx4 = _make_ctx(tmp_path, {"target": {"board": "apollo4p_evb"}})
+        PlanMemoryStage().run(ctx4)
+        sram_names = {c.name for c in ctx4.memory_plan.region("SRAM").consumers}
+        assert "rtt_buffers" in sram_names  # .sram_bss parts pin it to SRAM
+
+    def test_boot_stack_is_family_keyed_not_stack_size_keyed(self, tmp_path):
+        """AP2/3/3P startup hardcodes g_pui32Stack[1024] (4 KB) and
+        ignores STACK_SIZE; AP4/AP5 declare [STACK_SIZE] uint32s (16 KB).
+        And on AP3 the STACKMEM slot sits inside the verified SRAM
+        window, not TCM."""
+        from helia_profiler.results import ConsumerKind
+
+        ctx = _make_ctx(tmp_path)
+        PlanMemoryStage().run(ctx)
+        stack = [
+            c
+            for c in ctx.memory_plan.region("DTCM").consumers
+            if c.name == "boot_stack"
+        ]
+        assert [(c.size, c.kind) for c in stack] == [(16_384, ConsumerKind.STACK)]
+
+        ctx3 = _make_ctx(tmp_path, {"target": {"board": "apollo3p_evb"}})
+        PlanMemoryStage().run(ctx3)
+        stack3 = [
+            c
+            for c in ctx3.memory_plan.region("SRAM").consumers
+            if c.name == "boot_stack"
+        ]
+        assert [c.size for c in stack3] == [4_096]
+
+    def test_aot_extraction_failure_no_longer_fabricates_a_tflm_plan(
+        self, tmp_path
+    ):
+        """#133 Phase 3 D5: a failed AOT extraction used to fall into the
+        TFLM synthesiser, booking a tensor_arena and model_flatbuffer
+        that do not exist in an AOT binary."""
+        ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-aot"}})
+        assert (
+            ctx.engine_artifacts is None
+            or ctx.engine_artifacts.memory_plan is None
+        )
+        PlanMemoryStage().run(ctx)
+        names = {
+            c.name for r in ctx.memory_plan.regions for c in r.consumers
+        }
+        assert "tensor_arena" not in names
+        assert "model_flatbuffer" not in names
+        # hpx-owned consumers still apply (they're engine-independent),
+        # with the AOT record size:
+        sram = ctx.memory_plan.region("SRAM")
+        records = [c for c in sram.consumers if c.name == "pmu_layer_records"]
+        assert [c.size for c in records] == [4096 * 20]

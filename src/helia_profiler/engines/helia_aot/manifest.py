@@ -287,7 +287,23 @@ def _arena_region_id_lookup(codegen_ctx: Any) -> dict[tuple[str, str, str], int]
 # ---------------------------------------------------------------------------
 
 
-def _extract_memory_plan(codegen_ctx: Any) -> MemoryPlan | None:
+def _aot_buffer_symbol(prefix: str, role: str, region_key: str) -> str:
+    """The buffer symbol heliaAOT's templates emit for an arena consumer
+    (tensors.c.j2 / constants.c.j2 in the helia-aot wheel):
+    scratch -> {prefix}_arena_{mem}_buffer;
+    persistent -> {prefix}_arena_persistent_{mem}_buffer;
+    constant (cold) -> {prefix}_arena_const_{mem}__blob. The reconciler
+    suffix-matches, so the staged-constant _buffer variant still resolves
+    from the __blob hint's prefix family if heliaAOT stages it."""
+    mem = region_key.lower()
+    if role == "persistent":
+        return f"{prefix}_arena_persistent_{mem}_buffer"
+    if role == ArenaRole.CONSTANT.value:
+        return f"{prefix}_arena_const_{mem}__blob"
+    return f"{prefix}_arena_{mem}_buffer"
+
+
+def _extract_memory_plan(codegen_ctx: Any, prefix: str = "hpx") -> MemoryPlan | None:
     """Build a ``MemoryPlan`` from the heliaAOT ``CodeGenContext``.
 
     The AOT render plan is the source of truth for runtime memory: generated C
@@ -308,12 +324,14 @@ def _extract_memory_plan(codegen_ctx: Any) -> MemoryPlan | None:
     return _extract_memory_plan_from_render_plan(
         render_plan,
         arena_usages,
+        prefix=prefix,
     )
 
 
 def _extract_memory_plan_from_render_plan(
     render_plan: Any,
     arena_usages: dict[Any, Any],
+    prefix: str = "hpx",
 ) -> MemoryPlan | None:
     """Build a MemoryPlan from the AOT render plan's concrete arenas.
 
@@ -348,6 +366,7 @@ def _extract_memory_plan_from_render_plan(
                     name=f"{runtime_key.lower()}_{role}_arena_{region_id}",
                     size=size,
                     kind=kind,
+                    symbol=_aot_buffer_symbol(prefix, role, runtime_key),
                 )
             )
             if role == ArenaRole.CONSTANT.value:
