@@ -51,6 +51,18 @@ def _format_mve_cells(counters: dict[str, float], cycles: float) -> list[str]:
     return [mve_pct, mac_density, ldst_density, stall_pct]
 
 
+def measured_memory_is_renderable(measured: Any) -> bool:
+    """True when the measured block has anything worth a table or a police
+    line: a nonzero region row, an unattributed section, or unattributed
+    load bytes. The all-zero-and-clean case falls back to the plan table
+    (#177 reviews n7 + follow-up MINOR-1: the police lines must not be
+    hidden by the very anomaly — everything landing outside the
+    characterized windows — they exist to surface)."""
+    return any(r.used or r.load_image or r.reserved for r in measured.regions) or bool(
+        measured.unattributed
+    ) or bool(getattr(measured, "unattributed_load_bytes", 0))
+
+
 def render_memory_regions(console: HpxConsole, measured: Any) -> None:
     """Render the MEASURED per-region occupancy (#133 Phase 2) — what the
     linker actually did, from the ELF classified into the verified map.
@@ -81,7 +93,7 @@ def render_memory_regions(console: HpxConsole, measured: Any) -> None:
     table.add_column("Reserved", justify="right", style="dim")
 
     for r in measured.regions:
-        if r.used == 0 and r.load_image == 0:
+        if r.used == 0 and r.load_image == 0 and r.reserved == 0:
             continue
         pct = (r.used / r.app_length * 100) if r.app_length else 0.0
         bar = _progress_bar(min(pct, 100.0), width=20)
@@ -381,8 +393,8 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         console._console.print()
 
     # ── Memory plan (per-region capacity vs used) ─────────────────
-    if ctx.memory_regions is not None and any(
-        r.used or r.load_image for r in ctx.memory_regions.regions
+    if ctx.memory_regions is not None and measured_memory_is_renderable(
+        ctx.memory_regions
     ):
         # Measured first (#133): region truth comes from the ELF. The plan
         # renders only as a fallback — its numbers are the pre-build

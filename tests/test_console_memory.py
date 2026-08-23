@@ -9,7 +9,10 @@ from __future__ import annotations
 from rich.console import Console
 
 from helia_profiler.console import HpxConsole
-from helia_profiler.console.results import render_memory_regions
+from helia_profiler.console.results import (
+    measured_memory_is_renderable,
+    render_memory_regions,
+)
 from helia_profiler.placement import MemoryRegion
 from helia_profiler.results import (
     MeasuredMemoryRegions,
@@ -92,15 +95,53 @@ def test_unattributed_load_bytes_line_renders():
 
 def test_all_zero_measured_block_falls_back_to_the_plan_table():
     """#177 review n7: a measured block whose every region is idle must
-    not suppress the plan table with a header-only shell — the call site
-    gates on any nonzero row."""
+    not suppress the plan table with a header-only shell. The call site
+    uses measured_memory_is_renderable — the REAL predicate, not a
+    mirror (follow-up NIT-3)."""
     idle = MeasuredMemoryRegions(
         link_family="gnu",
         linker_profile="default",
         regions=(_region(used=0, reserved=0, load_image=0),),
     )
-    # The call-site predicate (mirrored from print_results):
-    assert not any(r.used or r.load_image for r in idle.regions)
-    # And the renderer itself prints no rows for idle regions:
+    assert not measured_memory_is_renderable(idle)
     text = _render(idle)
     assert "DTCM" not in text
+
+
+def test_police_lines_render_even_when_every_region_is_zero():
+    """Follow-up MINOR-1: everything landing OUTSIDE the characterized
+    windows is the anomaly the police lines exist for — an all-zero
+    region set with unattributed content must still render, not fall back
+    to the plan table."""
+    anomalous = MeasuredMemoryRegions(
+        link_family="gnu",
+        linker_profile="default",
+        regions=(_region(used=0, reserved=0, load_image=0),),
+        unattributed=(
+            UnattributedSection(name=".rogue", address=0x70000000, size=4096),
+        ),
+    )
+    assert measured_memory_is_renderable(anomalous)
+    text = _render(anomalous)
+    assert ".rogue" in text and "unattributed" in text
+
+    load_only = MeasuredMemoryRegions(
+        link_family="gnu",
+        linker_profile="default",
+        regions=(_region(used=0, reserved=0, load_image=0),),
+        unattributed_load_bytes=512,
+    )
+    assert measured_memory_is_renderable(load_only)
+
+
+def test_reserved_only_region_renders_a_row():
+    """Follow-up NIT-2: an armlink DTCM holding only the fixed heap+stack
+    reservation is real information — the row must not vanish."""
+    reserved_only = MeasuredMemoryRegions(
+        link_family="armlink",
+        linker_profile="default",
+        regions=(_region(used=0, reserved=20_480, load_image=0),),
+    )
+    assert measured_memory_is_renderable(reserved_only)
+    text = _render(reserved_only)
+    assert "DTCM" in text
