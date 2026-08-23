@@ -29,7 +29,7 @@ Aperture rule (applied uniformly): every RAM classification ``window``
 ``am_reg_base_addresses.h`` for that part — never a single linker script's
 opinion of it — because the two link families carve the same silicon
 differently (gcc may decline to use the top of a TCM that armlink tiles
-exactly full). What differs per link family is only ``app_available``,
+exactly full). What differs per link family is only ``app_window``,
 which IS a linker-script fact. (#176 review M-1/M-2 corrected two windows
 that had drifted from this rule.) MRAM windows are deliberately NOT the
 hardware flash aperture: they start at the SBL-excluded app origin both
@@ -77,7 +77,7 @@ from .soc import MemoryRange, SocDef
 
 
 class LinkFamily(StrEnum):
-    """Which linker laid the image out — the axis app-available keys on."""
+    """Which linker laid the image out — the axis app_window keys on."""
 
     #: GNU ld / LLD linking the gcc ``*.ld`` scripts (gcc AND ATfE builds).
     GNU = "gnu"
@@ -246,9 +246,10 @@ _APOLLO3P = (
 # apollo4p / apollo4l — apollo4p/gcc/linker_script.ld:10-12 (4l's
 # ORIGIN/LENGTH values identical; only region attrs (rw)/(rwx) differ),
 # apollo4p/armclang/linker_script.sct:8-34. MRAM is 1952 KB from 0x18000
-# (NOT the 2000 KB datasheet figure in MemoryLayout). gcc: 16 KB .stack
-# inside the 384 KB window and a fill-to-end .heap → 368 KB for app data.
-# armlink: MCU_TCM is 364 KB with fixed 4 KB heap + 16 KB stack above it.
+# (NOT the 2000 KB datasheet figure in MemoryLayout). gcc: the floating
+# 16 KB .stack and the fill-to-end .heap live inside the full 384 KB
+# MCU_TCM region. armlink: MCU_TCM is 364 KB with its fixed 4 KB heap +
+# 16 KB stack above it.
 _APOLLO4 = (
     _window(
         MemoryRegion.MRAM,
