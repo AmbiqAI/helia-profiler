@@ -511,6 +511,15 @@ _ERROR_HINTS: dict[FirmwareErrorCode, str] = {
         "generated module was built against the correct board and that any "
         "required memories (PSRAM, SHARED_SRAM) are initialised."
     ),
+    FirmwareErrorCode.STIMER_DEAD: (
+        "The 32.768 kHz crystal (XT) that clocks the measurement window "
+        "never produced a plausible tick rate within the 1 s settle "
+        "deadline. This is a BOARD condition, not the debug-domain "
+        "frozen-clock bug: check the X32 crystal and its jumpers/straps on "
+        "the EVB, and any shield or rework touching the XT pins. The window "
+        "was aborted before opening, so no misleading power figures were "
+        "recorded."
+    ),
     FirmwareErrorCode.PSRAM_INIT_FAILED: (
         "PSRAM initialisation failed on the target.  Verify the board "
         "actually has PSRAM populated and that --weights-location / "

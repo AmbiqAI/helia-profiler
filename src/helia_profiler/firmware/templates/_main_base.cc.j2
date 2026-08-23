@@ -686,7 +686,13 @@ int main(void) {
 {% endif %}
 {% endif %}
 {% if use_stimer_window %}
-        hpx_stimer_init();
+        if (hpx_stimer_init() == 0U) {
+            // Dead/unfit 32.768 kHz XTAL: name it BEFORE the window opens so
+            // the host fails fast with the crystal as the cause, instead of
+            // completing a window into the frozen-clock check (#110).
+            hpx_printf("HPX_ERROR=stimer_dead settle_us=%u\n",
+                       (unsigned)HPX_STIMER_SETTLE_MAX_US);
+        }
         uint32_t clean_stimer_t0 = hpx_stimer_ticks();
 {% endif %}{% block engine_window_prologue %}{% endblock %}
 {% if power_only | default(false) and power_monitor | default(none) == "ina228" %}

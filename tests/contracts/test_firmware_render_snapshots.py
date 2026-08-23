@@ -893,7 +893,7 @@ def test_stimer_init_verifies_the_crystal_against_an_independent_clock():
             checked += 1
             case = f"{soc}|{transport}|{engine}{'|power' if power_only else ''}"
 
-            init = rendered[rendered.index("static inline void hpx_stimer_init(void)") :]
+            init = rendered[rendered.index("static inline uint32_t hpx_stimer_init(void)") :]
             init = init[: init.index("\n}")]
 
             # Review proved the first version of these assertions vacuous

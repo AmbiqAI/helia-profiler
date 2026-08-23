@@ -9,8 +9,10 @@ from ._model import (
     GATE_AOT_CONST_BLOBS_IN_PSRAM,
     GATE_AOT_EXTERNAL_ARENAS,
     GATE_AOT_PSRAM_ARENAS,
+    GATE_BUSY_LOOP_PROBE,
     GATE_NOT_POWER_ONLY,
     GATE_PSRAM_NEEDED,
+    GATE_STIMER_WINDOW,
     TFLM_ENGINES,
     FirmwareErrorCode,
     FirmwareWarnCode,
@@ -155,6 +157,26 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         engines=ET_ENGINES,
         condition=GATE_NOT_POWER_ONLY,
         value_shape="pass=<name>",
+        has_host_hint=True,
+    ),
+    _spec(
+        error_token(FirmwareErrorCode.STIMER_DEAD),
+        WireKind.ERROR,
+        "The 32.768 kHz XTAL failed the settle-and-verify probe at "
+        "hpx_stimer_init(): the STIMER window clock is dead or implausible. "
+        "Emitted BEFORE the window opens so the failure is attributed to the "
+        "crystal instead of completing a window into the frozen-clock check "
+        "(#110).",
+        WireConsumer.TRANSPORT_CONTROL,
+        WireCriticality.PROTOCOL,
+        # ExecuTorch's engine_clean_window override times the window
+        # without hpx_stimer_init; only its busy-loop arm (super()) inherits
+        # the base emission. That arm is preflight-rejected at runtime but
+        # RENDERED by the census matrix (#171 lesson), so it is declared.
+        engines=TFLM_ENGINES | AOT_ENGINES | ET_ENGINES,
+        condition=GATE_STIMER_WINDOW,
+        engine_conditions={EngineType.EXECUTORCH: GATE_BUSY_LOOP_PROBE},
+        value_shape="stimer_dead settle_us=<n>",
         has_host_hint=True,
     ),
 )
