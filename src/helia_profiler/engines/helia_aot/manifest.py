@@ -287,7 +287,51 @@ def _arena_region_id_lookup(codegen_ctx: Any) -> dict[tuple[str, str, str], int]
 # ---------------------------------------------------------------------------
 
 
-def _extract_memory_plan(codegen_ctx: Any) -> MemoryPlan | None:
+def _aot_buffer_symbol(
+    prefix: str,
+    role: str,
+    region_key: str,
+    *,
+    staged: bool,
+    allocate_arenas: bool,
+    region_id: int,
+) -> str | None:
+    """The symbol heliaAOT's templates ACTUALLY emit for an arena
+    consumer, per the installed wheel's tensors.c.j2 / constants.c.j2 and
+    hpx's main_aot.cc.j2 (#179 review M-3/M-4 corrected both families):
+
+    * cold constant -> {prefix}_arena_const_{mem}__blob (constants.c.j2,
+      emitted regardless of allocate_arenas);
+    * staged constant, internal arenas -> {prefix}_arena_const_{mem}_buffer
+      (tensors.c.j2, GATED on allocate_arenas — None in external mode);
+    * scratch/persistent, internal -> {prefix}_arena_{mem}_buffer /
+      {prefix}_arena_persistent_{mem}_buffer (same gate);
+    * scratch/persistent, external -> hpx_arena_buf_storage_{region_id}
+      (hpx's own main_aot.cc.j2 — literal "hpx_", not the AOT prefix).
+    None means no single symbol exists — the reconciler reports
+    unmatchable, never a false missing."""
+    mem = region_key.lower()
+    if role == ArenaRole.CONSTANT.value:
+        if not allocate_arenas:
+            # External-arena mode emits NO constant symbols at all: the
+            # cold __blob is inside {% if config.memory.allocate_arenas %}
+            # too, and constants ship as sidecar binary files instead
+            # (#179 Sonnet M-1 — the earlier unconditional __blob hint
+            # produced a false "missing" on every external-arena build).
+            return None
+        if not staged:
+            return f"{prefix}_arena_const_{mem}__blob"
+        return f"{prefix}_arena_const_{mem}_buffer"
+    if not allocate_arenas:
+        return f"hpx_arena_buf_storage_{region_id}"
+    if role == "persistent":
+        return f"{prefix}_arena_persistent_{mem}_buffer"
+    return f"{prefix}_arena_{mem}_buffer"
+
+
+def _extract_memory_plan(
+    codegen_ctx: Any, prefix: str = "hpx", *, allocate_arenas: bool = True
+) -> MemoryPlan | None:
     """Build a ``MemoryPlan`` from the heliaAOT ``CodeGenContext``.
 
     The AOT render plan is the source of truth for runtime memory: generated C
@@ -308,12 +352,16 @@ def _extract_memory_plan(codegen_ctx: Any) -> MemoryPlan | None:
     return _extract_memory_plan_from_render_plan(
         render_plan,
         arena_usages,
+        prefix=prefix,
+        allocate_arenas=allocate_arenas,
     )
 
 
 def _extract_memory_plan_from_render_plan(
     render_plan: Any,
     arena_usages: dict[Any, Any],
+    prefix: str = "hpx",
+    allocate_arenas: bool = True,
 ) -> MemoryPlan | None:
     """Build a MemoryPlan from the AOT render plan's concrete arenas.
 
@@ -343,11 +391,23 @@ def _extract_memory_plan_from_render_plan(
             role = str(getattr(arena, "role", arena_list_name.removesuffix("_arenas"))).lower()
             region_id = int(getattr(arena, "region_id", len(buckets)))
             kind = "weights" if role == ArenaRole.CONSTANT.value else "arena"
+            source_key_early = _aot_memory_region_key(
+                getattr(arena, "source_memory", None)
+            )
+            staged = source_key_early is not None and source_key_early != runtime_key
             buckets.setdefault(runtime_key, []).append(
                 MemoryConsumer(
                     name=f"{runtime_key.lower()}_{role}_arena_{region_id}",
                     size=size,
                     kind=kind,
+                    symbol=_aot_buffer_symbol(
+                        prefix,
+                        role,
+                        runtime_key,
+                        staged=staged,
+                        allocate_arenas=allocate_arenas,
+                        region_id=region_id,
+                    ),
                 )
             )
             if role == ArenaRole.CONSTANT.value:
@@ -361,6 +421,12 @@ def _extract_memory_plan_from_render_plan(
                             name=f"{source_key.lower()}_{role}_source_{region_id}",
                             size=size,
                             kind="weights",
+                            # constants.c.j2:44 — the staged SOURCE blob
+                            # is named by the RUNTIME memory, placed in
+                            # source memory (#179 review M-3).
+                            symbol=(
+                                f"{prefix}_arena_const_{runtime_key.lower()}__source"
+                            ),
                         )
                     )
 

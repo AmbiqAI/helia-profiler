@@ -384,3 +384,42 @@ class TestWriteAotMemoryLayers:
         assert out is not None
         rows = list(csv.DictReader(open(out)))
         assert rows[0]["size"] == "1024"
+
+
+class TestAotSymbolHints:
+    """#179 review M-3/M-4: the hints must name symbols the templates
+    ACTUALLY emit, per mode and staging."""
+
+    def _hint(self, role, *, staged=False, allocate=True, region_id=0):
+        from helia_profiler.engines.helia_aot.manifest import _aot_buffer_symbol
+
+        return _aot_buffer_symbol(
+            "hpx",
+            role,
+            "DTCM",
+            staged=staged,
+            allocate_arenas=allocate,
+            region_id=region_id,
+        )
+
+    def test_cold_constant_is_the_blob_only_with_internal_arenas(self):
+        assert self._hint("constant") == "hpx_arena_const_dtcm__blob"
+        # External-arena mode emits NO constant symbols (sidecar files);
+        # a __blob hint there produced a false "missing" (#179 Sonnet M-1).
+        assert self._hint("constant", allocate=False) is None
+
+    def test_staged_constant_is_the_gated_runtime_buffer(self):
+        assert self._hint("constant", staged=True) == "hpx_arena_const_dtcm_buffer"
+        # tensors.c.j2 gates that buffer on allocate_arenas: external mode
+        # has no single symbol -> None (unmatchable, never false-missing).
+        assert self._hint("constant", staged=True, allocate=False) is None
+
+    def test_scratch_and_persistent_by_mode(self):
+        assert self._hint("scratch") == "hpx_arena_dtcm_buffer"
+        assert self._hint("persistent") == "hpx_arena_persistent_dtcm_buffer"
+        # external mode: hpx's own main_aot.cc.j2 storage symbol, literal
+        # "hpx_" regardless of the AOT prefix, keyed by region_id.
+        assert (
+            self._hint("scratch", allocate=False, region_id=2)
+            == "hpx_arena_buf_storage_2"
+        )

@@ -151,3 +151,54 @@ def test_measured_regions_skipped_without_resolved_soc(
 
     BuildFirmwareStage().run(ctx)
     assert ctx.memory_regions is None
+
+
+def test_partial_nm_listing_is_refused(tmp_path: Path, monkeypatch) -> None:
+    """#179 review m1: the refuse-partial gate was untested (flipping it
+    survived the suite). A partial listing must yield NO symbols and NO
+    reconciliation — never an understated one."""
+    from helia_profiler.platform import get_soc
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "work_dir": str(tmp_path / "work"),
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
+    ctx.soc = get_soc("apollo510")
+    ctx.firmware_dir = tmp_path / "app"
+    ctx.firmware_dir.mkdir(parents=True)
+    ctx.progress_sink = lambda *_a, **_k: None
+
+    monkeypatch.setattr(
+        "helia_profiler.firmware.build_app",
+        lambda _ctx: (tmp_path / "build", tmp_path / "build" / "fw"),
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.binary_sections",
+        lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.measure_memory_regions",
+        lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.symbol_inventory",
+        lambda *_a, **_k: ((), 3),  # partial: 3 unparsed rows
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.compiler_version",
+        lambda *_a, **_k: "v",
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.cmake_version", lambda **_k: "v"
+    )
+
+    BuildFirmwareStage().run(ctx)
+    assert ctx.memory_symbols is None
+    assert ctx.memory_reconciliation is None

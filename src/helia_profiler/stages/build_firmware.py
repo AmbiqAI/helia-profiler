@@ -8,8 +8,13 @@ from ..results import FirmwareArtifact
 from ..errors import BuildError
 from ..pipeline import PipelineContext
 from ..results import ToolchainInfo
-from ..memory_measurement import measure_memory_regions
-from ..toolchain_probe import binary_sections, cmake_version, compiler_version
+from ..memory_measurement import measure_memory_regions, reconcile_memory
+from ..toolchain_probe import (
+    binary_sections,
+    cmake_version,
+    compiler_version,
+    symbol_inventory,
+)
 
 log = logging.getLogger("hpx")
 
@@ -68,6 +73,30 @@ class BuildFirmwareStage:
                 ctx.soc,
                 linker_profile=linker_profile,
                 timeout_s=ctx.config.timeouts.binary_probe_s,
+            )
+        # Symbol inventory + plan-vs-measured reconciliation (#133 Phase
+        # 3). A partial nm listing is refused like a partial section
+        # inventory — never understate.
+        inventory = symbol_inventory(
+            binary_path, toolchain, timeout_s=ctx.config.timeouts.binary_probe_s
+        )
+        if inventory is not None:
+            symbols, unparsed = inventory
+            if unparsed:
+                log.info(
+                    "nm listing is partial (%d unparsed rows); refusing "
+                    "symbol attribution.",
+                    unparsed,
+                )
+            else:
+                ctx.memory_symbols = symbols
+        if (
+            ctx.memory_symbols is not None
+            and ctx.memory_regions is not None
+            and ctx.memory_plan is not None
+        ):
+            ctx.memory_reconciliation = reconcile_memory(
+                ctx.memory_plan, ctx.memory_regions, ctx.memory_symbols
             )
         ctx.publish_profile_firmware(
             FirmwareArtifact(

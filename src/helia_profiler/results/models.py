@@ -309,6 +309,12 @@ class MemoryConsumer:
     name: str
     size: int
     kind: ConsumerKind = ConsumerKind.ARENA
+    #: Optional linked-symbol hint for plan-vs-measured reconciliation
+    #: (#133 Phase 3). Set where the consumer name does not resemble its
+    #: symbol (heliaAOT: consumer ``dtcm_scratch_arena_0`` vs symbol
+    #: ``hpx_arena_dtcm_buffer``); the reconciler's name table covers the
+    #: rest. Serialized only when present.
+    symbol: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.kind, ConsumerKind):
@@ -470,6 +476,64 @@ class MeasuredMemoryRegions:
             if r.region is key:
                 return r
         return None
+
+
+# ---------------------------------------------------------------------------
+# Plan-vs-measured reconciliation (#133 Phase 3)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ConsumerReconciliation:
+    """One plan consumer held against the linked binary's symbols.
+
+    ``status``: ``matched`` (symbols found; ``measured_size``/``delta``
+    populated — delta is measured minus planned, so positive means the
+    firmware reserves MORE than the plan booked), ``missing`` (planned
+    but no symbol found — either the plan is wrong or the symbol table
+    is), or ``unmatchable`` (structural: no symbol mapping exists for
+    this consumer — PSRAM-placed weights are a runtime pointer with no
+    sized symbol, armlink's stack is a scatter region, and some staged
+    entries have no single symbol)."""
+
+    name: str
+    kind: str
+    region: str
+    planned_size: int
+    status: str
+    matched_symbols: tuple[str, ...] = ()
+    measured_size: int | None = None
+    #: The measured region the DOMINANT matched symbol's address falls in
+    #: (None when nothing matched or the address is outside every
+    #: window). A matched consumer whose measured_region differs from
+    #: ``region`` landed somewhere the plan did not intend — the check
+    #: that catches wrong-region "clean" matches (#179 review M-6).
+    measured_region: str | None = None
+    delta: int | None = None
+
+
+@dataclass(frozen=True)
+class RegionReconciliation:
+    """Plan ``used`` vs measured ``used`` for one region — the honest
+    "the plan missed N bytes here" figure the hpx-owned consumers exist
+    to drive toward zero."""
+
+    region: str
+    planned_used: int
+    measured_used: int
+
+    @property
+    def delta(self) -> int:
+        return self.measured_used - self.planned_used
+
+
+@dataclass(frozen=True)
+class MemoryReconciliation:
+    """The #133 payoff artifact: what the plan intended vs what the
+    linker did, by name and by region."""
+
+    consumers: tuple[ConsumerReconciliation, ...] = ()
+    regions: tuple[RegionReconciliation, ...] = ()
 
 
 # ---------------------------------------------------------------------------

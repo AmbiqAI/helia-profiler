@@ -340,13 +340,15 @@ class TestSectionInventoryDispatch:
 
 def test_unknown_readelf_toolchain_degrades(monkeypatch):
     # armclang spec routes to fromelf; a spec with no readelf degrades.
-    import helia_profiler.toolchain_probe as tp
+    # (section_inventory lives in elf_inventory since the module split —
+    # patch the name where the implementation resolves it.)
+    import helia_profiler.elf_inventory as ei
 
     class _Spec:
         section_probe = "size"
         readelf = None
 
-    monkeypatch.setattr(tp, "get_toolchain_spec", lambda name: _Spec())
+    monkeypatch.setattr(ei, "get_toolchain_spec", lambda name: _Spec())
     assert section_inventory(Path("fw.elf"), "whatever") is None
 
 

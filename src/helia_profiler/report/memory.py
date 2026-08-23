@@ -16,7 +16,8 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
-    from ..results import MeasuredMemoryRegions, MemoryPlan
+    from ..results import MeasuredMemoryRegions, MemoryPlan, MemoryReconciliation
+    from ..toolchain_probe import SymbolEntry
 
 log = logging.getLogger("hpx")
 
@@ -57,7 +58,9 @@ def _serialise_memory_plan(plan: MemoryPlan) -> dict[str, Any]:
                 "capacity": r.capacity,
                 "used": r.used,
                 "consumers": [
-                    {"name": c.name, "size": c.size, "kind": c.kind} for c in r.consumers
+                    {"name": c.name, "size": c.size, "kind": c.kind}
+                    | ({"symbol": c.symbol} if c.symbol else {})
+                    for c in r.consumers
                 ],
             }
             for r in plan.regions
@@ -95,6 +98,92 @@ def _serialise_memory_regions(measured: MeasuredMemoryRegions) -> dict[str, Any]
             for u in measured.unattributed
         ],
         "unattributed_load_bytes": measured.unattributed_load_bytes,
+    }
+
+
+def _serialise_memory_reconciliation(rec: MemoryReconciliation) -> dict[str, Any]:
+    """The #133 Phase 3 payoff block: per-consumer verdicts + per-region
+    plan-vs-measured deltas. ``delta`` is measured minus planned."""
+    return {
+        "consumers": [
+            {
+                "name": c.name,
+                "kind": c.kind,
+                "region": c.region,
+                "planned_size": c.planned_size,
+                "status": c.status,
+                "matched_symbols": list(c.matched_symbols),
+                "measured_size": c.measured_size,
+                "measured_region": c.measured_region,
+                "delta": c.delta,
+            }
+            for c in rec.consumers
+        ],
+        "regions": [
+            {
+                "region": r.region,
+                "planned_used": r.planned_used,
+                "measured_used": r.measured_used,
+                "delta": r.delta,
+            }
+            for r in rec.regions
+        ],
+    }
+
+
+#: Per-region symbol rows emitted into detailed/memory.json. A real build
+#: carries ~2000 sized symbols; the aggregates-vs-enumerations convention
+#: (report/__init__.py) puts enumerations in detailed/, and even there a
+#: bounded, size-sorted view is what a reader can use.
+_SYMBOLS_PER_REGION = 32
+
+
+def _serialise_memory_symbols(
+    measured: MeasuredMemoryRegions, symbols: tuple[SymbolEntry, ...]
+) -> dict[str, Any]:
+    """Top-N sized symbols per measured region (by VIRTUAL address —
+    armlink load-image attribution is not per-symbol recoverable), deduped
+    by (address, size) so aliases do not repeat."""
+    per_region: dict[str, list[dict[str, Any]]] = {}
+    seen: set[tuple[int, int]] = set()
+    outside_windows = 0
+    considered = 0
+    ordered = sorted(symbols, key=lambda sym: sym.size, reverse=True)
+    for sym in ordered:
+        key = (sym.address, sym.size)
+        if key in seen or sym.size == 0:
+            continue
+        seen.add(key)
+        considered += 1
+        region = None
+        for r in measured.regions:
+            if r.window_start <= sym.address < r.window_start + r.window_length:
+                region = str(r.region)
+                break
+        if region is None:
+            # Outside every measured window (code below the app origin,
+            # linker markers): counted, never silently vanished.
+            outside_windows += 1
+            continue
+        rows = per_region.setdefault(region, [])
+        if len(rows) >= _SYMBOLS_PER_REGION:
+            continue
+        rows.append(
+            {
+                "name": sym.name,
+                "address": sym.address,
+                "size": sym.size,
+                "type": sym.type,
+            }
+        )
+    return {
+        # Nonzero-size symbols after alias dedup — the population the
+        # listing draws from (#179 review m3: the raw nm row count
+        # included zero-size and alias rows and described nothing).
+        "total_sized_symbols": considered,
+        "outside_windows": outside_windows,
+        "per_region_limit": _SYMBOLS_PER_REGION,
+        "regions": per_region,
     }
 
 
@@ -148,6 +237,17 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
     # Measured memory regions — the ELF classified into the verified map
     if ctx.memory_regions is not None:
         data["memory_regions"] = _serialise_memory_regions(ctx.memory_regions)
+
+    # Plan-vs-measured reconciliation + the per-symbol enumeration (#133
+    # Phase 3; symbols are detailed-only by the aggregates convention)
+    if ctx.memory_reconciliation is not None:
+        data["memory_reconciliation"] = _serialise_memory_reconciliation(
+            ctx.memory_reconciliation
+        )
+    if ctx.memory_symbols is not None and ctx.memory_regions is not None:
+        data["memory_symbols"] = _serialise_memory_symbols(
+            ctx.memory_regions, ctx.memory_symbols
+        )
 
     # Per-layer cache/memory counters
     per_layer: list[dict[str, Any]] = []

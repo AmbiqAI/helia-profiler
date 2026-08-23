@@ -137,7 +137,10 @@ against the link family's app extent, `load_image` flash bytes, and
 `unattributed` sections outside every verified window). Dashboards reading
 `memory_plan.regions[].free` must move to `memory_regions.regions[].free`;
 the block is absent for custom SoCs, non-default linker profiles, or when
-the section inventory is unavailable.
+the section inventory is unavailable. #133 Phase 3 adds a third, additive
+per-case key within schema v6: `resources.memory_reconciliation` (per-
+consumer plan-vs-measured verdicts and per-region deltas), absent whenever
+the symbol table is.
 
 Each case also carries cross-machine provenance when available: model SHA-256,
 HPX version, compiler name/version, firmware-reported `system_clock_hz`, and

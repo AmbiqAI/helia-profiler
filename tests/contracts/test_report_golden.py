@@ -49,6 +49,7 @@ from helia_profiler.engines.base import HeliaAotArtifacts
 from helia_profiler.engines import EngineType
 from helia_profiler.evaluation import LayerOps, ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
+from helia_profiler.toolchain_probe import SymbolEntry
 from helia_profiler.placement import MemoryRegion
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
 from helia_profiler.report import write_report
@@ -58,8 +59,11 @@ from helia_profiler.results import (
     FirmwareMeta,
     LayerResult,
     MemoryConsumer,
+    ConsumerReconciliation,
     MeasuredMemoryRegions,
     MeasuredRegion,
+    MemoryReconciliation,
+    RegionReconciliation,
     UnattributedSection,
     MemoryPlan,
     MemoryRegionUsage,
@@ -258,6 +262,57 @@ def _sample_memory_regions() -> MeasuredMemoryRegions:
     )
 
 
+def _sample_memory_reconciliation() -> MemoryReconciliation:
+    """Every emission path live: matched-with-delta, missing,
+    unmatchable, and a nonzero region delta (the #24 lesson — a default
+    leaves its console/summary line dead and invisible to digests)."""
+    return MemoryReconciliation(
+        consumers=(
+            ConsumerReconciliation(
+                name="tensor_arena",
+                kind="arena",
+                region="DTCM",
+                planned_size=61000,
+                status="matched",
+                matched_symbols=("_ZL15g_arena_storage",),
+                measured_size=61440,
+                delta=440,
+            ),
+            ConsumerReconciliation(
+                name="usb_buffers",
+                kind="other",
+                region="DTCM",
+                planned_size=5120,
+                status="missing",
+            ),
+            ConsumerReconciliation(
+                name="model_psram_blob",
+                kind="weights",
+                region="PSRAM",
+                planned_size=4096,
+                status="unmatchable",
+            ),
+        ),
+        regions=(
+            RegionReconciliation(
+                region="DTCM", planned_used=77664, measured_used=77664
+            ),
+            RegionReconciliation(
+                region="SRAM", planned_used=0, measured_used=98304
+            ),
+        ),
+    )
+
+
+def _sample_memory_symbols() -> tuple[SymbolEntry, ...]:
+    return (
+        SymbolEntry(name="_ZL15g_arena_storage", address=0x20012000, size=61440, type="b"),
+        SymbolEntry(name="_ZL10model_data", address=0x20004000, size=45000, type="d"),
+        SymbolEntry(name="g_pui32Stack", address=0x20000000, size=16384, type="b"),
+        SymbolEntry(name="main_loop", address=0x00411000, size=2048, type="T"),
+    )
+
+
 def _sample_memory_plan(engine: EngineType) -> MemoryPlan:
     return MemoryPlan(
         engine=engine,
@@ -269,7 +324,7 @@ def _sample_memory_plan(engine: EngineType) -> MemoryPlan:
                 capacity=2_000_000,
                 used=4096,
                 consumers=(
-                    MemoryConsumer(name="model_weights", size=4096, kind=ConsumerKind.WEIGHTS),
+                    MemoryConsumer(name="model_flatbuffer", size=4096, kind=ConsumerKind.WEIGHTS),
                 ),
             ),
             MemoryRegionUsage(
@@ -345,6 +400,8 @@ def _make_ctx(tmp_path: Path, engine: EngineType, fmt: str) -> PipelineContext:
     ctx.power_result = _sample_power()
     ctx.memory_plan = _sample_memory_plan(engine)
     ctx.memory_regions = _sample_memory_regions()
+    ctx.memory_reconciliation = _sample_memory_reconciliation()
+    ctx.memory_symbols = _sample_memory_symbols()
     # reserved is non-zero on purpose: with it at the default 0 every
     # `if bs.reserved:` emission is dead in the golden path, so the digests
     # could not see the summary.json / memory.json / console additions at all

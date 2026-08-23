@@ -389,6 +389,27 @@ same flag for program-header flash bytes). The block describes the
 custom SoC, a non-default `linker_profile`, a failed tool probe, or a
 partial section inventory — never guessed.
 
+### Plan vs measured reconciliation
+
+When the symbol table is readable, `summary.json` also carries
+`memory_reconciliation` — the two views above held against each other:
+
+- `consumers[]` — one row per plan consumer: `planned_size`, `status`
+  (`matched` with `measured_size`/`delta` = measured − planned; `missing`
+  when the planned symbol is absent from the binary; `unmatchable` when
+  no sized symbol can exist — PSRAM-placed weights bind to a runtime
+  pointer, armlink's stack is a scatter region), and the
+  `matched_symbols` it summed.
+- `regions[]` — plan `used` vs measured `used` per region. The hpx-owned
+  consumers (records, RTT, USB, stack) exist to drive these deltas
+  toward zero.
+
+`detailed/memory.json` additionally carries `memory_symbols`: the top 32
+sized symbols per region (by size, deduped across aliases, classified by
+virtual address — per-symbol load-image attribution is not recoverable on
+armlink). Both blocks are additive to schema v3 and absent whenever their
+inputs are (no symbol table, partial listing, no measured view).
+
 !!! note "Schema v3"
     `summary.json`'s `schema_version` moves from 2 to 3 with this split:
     `memory_plan` lost its `free`/`overflow`/`has_overflow` keys, so a
