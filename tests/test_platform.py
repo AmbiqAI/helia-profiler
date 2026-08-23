@@ -77,7 +77,8 @@ def test_apollo510_family_uses_ap5_rtt_scan_window():
     assert get_soc("apollo510").rtt_scan_ranges == ((0x20000000, 0x80000),)
     assert get_soc("apollo510b").rtt_scan_ranges == ((0x20000000, 0x80000),)
     assert get_soc("apollo5b").rtt_scan_ranges == ((0x20000000, 0x80000),)
-    # apollo330P's TCM is only 240 KB, so its window is tighter (see
+    # apollo330P's gcc-linked TCM region is 240 KB (hardware aperture is
+    # 256 KB — see memory_map.py), so its scan window is tighter (see
     # test_apollo330_hardware_facts_not_copied_from_apollo510).
     assert get_soc("apollo330P").rtt_scan_ranges == ((0x20000000, 0x3C000),)
 
@@ -126,13 +127,14 @@ def test_apollo330_hardware_facts_not_copied_from_apollo510():
     soc = get_soc_for_board("apollo330mP_evb")
     # Fixed 48 MHz XTAL_HS trace clock (like AP3), NOT core-clocked.
     assert soc.swo_trace_clock_mhz == 48
-    # Real memories: 240 KB unified TCM, 1792 KB SSRAM, 1984 KB usable
-    # MRAM, no separate ITCM region.
+    # Linked memories: 240 KB gcc MCU_TCM (the capacity-check ceiling;
+    # the hardware DTCM aperture is 256 KB, see memory_map.py), 1792 KB
+    # SSRAM, 1984 KB usable MRAM, no separate ITCM region.
     assert soc.memory.dtcm_kb == 240
     assert soc.memory.itcm_kb == 0
     assert soc.memory.sram_kb == 1792
     assert soc.memory.mram_kb == 1984
-    # RTT scan window bounded to the real 240 KB TCM.
+    # RTT scan window bounded to the 240 KB gcc-linked TCM region.
     assert soc.rtt_scan_ranges == ((0x20000000, 0x3C000),)
     # HAL defines SRAM_1P75M only (no SRAM_3M on this part).
     assert soc.ssram_full_power_enum == "AM_HAL_PWRCTRL_SRAM_1P75M"

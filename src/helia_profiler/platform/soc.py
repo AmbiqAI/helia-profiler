@@ -622,6 +622,11 @@ _register_soc(
             # fail at build/link time (confirmed on real hardware: a KWS
             # capture's .bss+.data overflowed the true 240 KB MCU_TCM by
             # 776 bytes while claiming to fit comfortably under 512 KB).
+            # NB: 240 KB is the gcc LINKER region, the right ceiling for
+            # these capacity checks; the hardware DTCM aperture is 256 KB
+            # (SDK DTCM_MAX_SIZE — armlink's scatter tiles to exactly
+            # that). memory_map.py records the aperture; do not cite this
+            # block as "hardware-confirmed 240" (#176 review M-1).
             mram_kb=1984,
             sram_kb=1792,
             dtcm_kb=240,
