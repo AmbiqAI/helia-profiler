@@ -517,8 +517,8 @@ _ERROR_HINTS: dict[FirmwareErrorCode, str] = {
         "deadline. This is a BOARD condition, not the debug-domain "
         "frozen-clock bug: check the X32 crystal and its jumpers/straps on "
         "the EVB, and any shield or rework touching the XT pins. The window "
-        "was aborted before opening, so no misleading power figures were "
-        "recorded."
+        "error was emitted before the window opened and the host discards "
+        "the run, so no misleading power figures are reported."
     ),
     FirmwareErrorCode.PSRAM_INIT_FAILED: (
         "PSRAM initialisation failed on the target.  Verify the board "

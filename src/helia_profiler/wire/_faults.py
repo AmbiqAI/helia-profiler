@@ -176,7 +176,7 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         engines=TFLM_ENGINES | AOT_ENGINES | ET_ENGINES,
         condition=GATE_STIMER_WINDOW,
         engine_conditions={EngineType.EXECUTORCH: GATE_BUSY_LOOP_PROBE},
-        value_shape="stimer_dead settle_us=<n>",
+        value_shape="settle_us=<n>",
         has_host_hint=True,
     ),
 )

@@ -202,3 +202,23 @@ def test_partial_nm_listing_is_refused(tmp_path: Path, monkeypatch) -> None:
     BuildFirmwareStage().run(ctx)
     assert ctx.memory_symbols is None
     assert ctx.memory_reconciliation is None
+
+
+def test_find_target_binary_is_deterministic(tmp_path: Path) -> None:
+    """PR #180: glob order is filesystem-dependent — the shallowest match
+    must win reproducibly, and the per-pattern loop keeps extension
+    precedence (a bare/axf match beats a fresh .elf in a later pattern)."""
+    from helia_profiler.firmware import _find_target_binary
+
+    deep = tmp_path / "sub" / "deeper"
+    deep.mkdir(parents=True)
+    (deep / "hpx_profiler.axf").write_bytes(b"deep")
+    (tmp_path / "sub" / "hpx_profiler.axf").write_bytes(b"shallow")
+    found = _find_target_binary(tmp_path, "hpx_profiler")
+    assert found == tmp_path / "sub" / "hpx_profiler.axf"  # shortest path
+
+    # extension precedence: .axf pattern is tried before .elf, so even a
+    # shallower .elf loses to a deeper .axf.
+    (tmp_path / "hpx_profiler.elf").write_bytes(b"elf")
+    found = _find_target_binary(tmp_path, "hpx_profiler")
+    assert found.suffix == ".axf"
