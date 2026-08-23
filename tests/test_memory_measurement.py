@@ -454,8 +454,13 @@ class TestReconciliation:
         assert by_name["model_psram_blob"].status == "unmatchable"
 
     def test_alias_pair_is_not_double_counted(self):
+        """Two MATCHING names over one object (the extern alias plus the
+        mangled static) must sum once. The #179 review proved the earlier
+        version of this test vacuous — its alias (_ssdata) never matched
+        a candidate, so the dedup branch never ran."""
         from helia_profiler.memory_measurement import reconcile_memory
         from helia_profiler.results import MemoryConsumer
+        from helia_profiler.toolchain_probe import SymbolEntry
 
         plan = self._plan(
             {
@@ -466,13 +471,16 @@ class TestReconciliation:
                 ],
             }
         )
-        rec = reconcile_memory(plan, self._measured(), self._symbols())
+        symbols = (
+            SymbolEntry("_ZL10g_profiler", 0x20080000, 0x180FC, "d"),
+            SymbolEntry("g_profiler", 0x20080000, 0x180FC, "D"),  # alias
+        )
+        rec = reconcile_memory(plan, self._measured(), symbols)
         (records,) = rec.consumers
-        # g_profiler and _ssdata share (address, size): counted ONCE.
-        assert records.measured_size == 0x180FC
         assert records.status == "matched"
-        # the profiler object is records + a few fields: small positive delta
+        assert records.measured_size == 0x180FC  # once, not twice
         assert records.delta == 0x180FC - 4096 * 24
+        assert records.measured_region == "SRAM"
 
     def test_aot_symbol_hint_wins_over_the_name_table(self):
         from helia_profiler.memory_measurement import reconcile_memory
@@ -515,3 +523,114 @@ class TestReconciliation:
         assert sram.planned_used == 4096 * 24
         assert sram.measured_used == 98_556
         assert sram.delta == 98_556 - 4096 * 24
+
+
+class TestReviewRegressionPins:
+    """#179 review round: each finding pinned so it cannot recur."""
+
+    def test_hal_symbols_do_not_false_positive_the_matcher(self):
+        """M-1: am_hal_gpio_pincfg_input ENDS WITH g_input — a bare
+        suffix test matched a 4-byte MRAM constant and flipped verdicts."""
+        from helia_profiler.memory_measurement import _match_symbols
+        from helia_profiler.toolchain_probe import SymbolEntry
+
+        symbols = (
+            SymbolEntry("am_hal_gpio_pincfg_input", 0x00420000, 4, "R"),
+            SymbolEntry("_ZL7g_input", 0x20005000, 1960, "b"),
+            SymbolEntry("g_input", 0x20006000, 1960, "b"),
+        )
+        matched = _match_symbols(("g_input",), symbols)
+        assert [m.name for m in matched] == ["_ZL7g_input", "g_input"]
+
+    def test_zero_size_symbols_never_match(self):
+        """M-5: llvm-nm reports st_size verbatim — armlink's linker
+        markers are 0 and a zero-size 'match' manufactures
+        measured_size=0, delta=-planned."""
+        from helia_profiler.memory_measurement import _match_symbols
+        from helia_profiler.toolchain_probe import SymbolEntry
+
+        symbols = (SymbolEntry("g_pui32Stack", 0x20000000, 0, "b"),)
+        assert _match_symbols(("g_pui32Stack",), symbols) == ()
+
+    def test_psram_consumers_are_unmatchable_even_when_the_pointer_matches(
+        self,
+    ):
+        """M-2: the PSRAM-weights render declares a 4-byte POINTER that
+        mangles to _ZL10model_data — matching it would report the planned
+        megabytes as shortfall."""
+        from helia_profiler.memory_measurement import reconcile_memory
+        from helia_profiler.results import MemoryConsumer
+        from helia_profiler.toolchain_probe import SymbolEntry
+
+        plan = TestReconciliation()._plan(
+            {
+                MemoryRegion.PSRAM: [
+                    MemoryConsumer(
+                        name="model_flatbuffer", size=53744, kind="weights"
+                    ),
+                ],
+            }
+        )
+        symbols = (SymbolEntry("_ZL10model_data", 0x20004000, 4, "b"),)
+        rec = reconcile_memory(
+            plan, TestReconciliation()._measured(), symbols
+        )
+        (weights,) = rec.consumers
+        assert weights.status == "unmatchable"
+        assert weights.measured_size is None
+
+    def test_measured_region_flags_a_wrong_region_match(self):
+        """M-6: a matched symbol whose address is in a DIFFERENT region
+        than the plan intended must say so — the check that catches
+        wrong-region 'clean' matches."""
+        from helia_profiler.memory_measurement import reconcile_memory
+        from helia_profiler.results import MemoryConsumer
+        from helia_profiler.toolchain_probe import SymbolEntry
+
+        plan = TestReconciliation()._plan(
+            {
+                MemoryRegion.DTCM: [
+                    MemoryConsumer(name="tensor_arena", size=0x8000, kind="arena"),
+                ],
+            }
+        )
+        # arena symbol at an SRAM address:
+        symbols = (SymbolEntry("_ZL15g_arena_storage", 0x20090000, 0x8000, "b"),)
+        rec = reconcile_memory(
+            plan, TestReconciliation()._measured(), symbols
+        )
+        (arena,) = rec.consumers
+        assert arena.status == "matched" and arena.delta == 0
+        assert arena.region == "DTCM"
+        assert arena.measured_region == "SRAM"
+
+    def test_unsized_and_undefined_nm_rows_skip_silently(self, monkeypatch):
+        """M-5: llvm-nm emits U rows and size-0-omitted shapes under
+        --size-sort; they are legitimate output, not parse failures — one
+        of them must not mark the listing partial and drop attribution."""
+        import helia_profiler.elf_inventory as ei
+        from helia_profiler.toolchain_probe import symbol_inventory
+
+        class _Result:
+            returncode = 0
+            stderr = ""
+            stdout = (
+                "         U memcpy\n"
+                "00000128 T Region$$Table$$Base\n"
+                "20000000 00004000 b g_pui32Stack\n"
+                "utter garbage row\n"
+            )
+
+        monkeypatch.setattr(ei.subprocess, "run", lambda *a, **k: _Result())
+        symbols, unparsed = symbol_inventory(Path("fw.elf"), "arm-none-eabi-gcc")
+        assert [s.name for s in symbols] == ["g_pui32Stack"]
+        assert unparsed == 1  # only the garbage row
+
+    def test_nm_command_duplicate_stays_in_sync(self):
+        """m7: elf_inventory duplicates toolchain_probe._nm_command to
+        avoid an import cycle — pin that they agree for every toolchain."""
+        import helia_profiler.elf_inventory as ei
+        import helia_profiler.toolchain_probe as tp
+
+        for toolchain in ("arm-none-eabi-gcc", "gcc", "armclang", "atfe"):
+            assert ei._nm_command(toolchain) == tp._nm_command(toolchain)

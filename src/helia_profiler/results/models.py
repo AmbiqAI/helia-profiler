@@ -503,6 +503,12 @@ class ConsumerReconciliation:
     status: str
     matched_symbols: tuple[str, ...] = ()
     measured_size: int | None = None
+    #: The measured region the DOMINANT matched symbol's address falls in
+    #: (None when nothing matched or the address is outside every
+    #: window). A matched consumer whose measured_region differs from
+    #: ``region`` landed somewhere the plan did not intend — the check
+    #: that catches wrong-region "clean" matches (#179 review M-6).
+    measured_region: str | None = None
     delta: int | None = None
 
 

@@ -83,7 +83,7 @@ class BuildFirmwareStage:
         if inventory is not None:
             symbols, unparsed = inventory
             if unparsed:
-                log.debug(
+                log.info(
                     "nm listing is partial (%d unparsed rows); refusing "
                     "symbol attribution.",
                     unparsed,

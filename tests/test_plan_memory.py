@@ -569,3 +569,79 @@ class TestHpxOwnedConsumers:
         sram = ctx.memory_plan.region("SRAM")
         records = [c for c in sram.consumers if c.name == "pmu_layer_records"]
         assert [c.size for c in records] == [4096 * 20]
+
+    def test_ap3_bss_consumers_route_to_main_sram_not_dtcm(self, tmp_path):
+        """#179 review B-1: AP3's gcc script sends .bss to RWMEM (main
+        SRAM) — TCM is only 64 KB. Booking records/USB into DTCM refused
+        VALID builds with a spurious 'shrink your arena' PlatformError."""
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {"path": str(tmp_path / "model.tflite"), "arena_size": 32768},
+                "target": {"board": "apollo3p_evb", "transport": "usb_cdc"},
+            },
+        )
+        # arena at 32 KB in 64 KB TCM + records + usb would have "overflowed"
+        # DTCM under the inverted routing; it must pass now.
+        PlanMemoryStage().run(ctx)
+        dtcm = ctx.memory_plan.region("DTCM")
+        sram = ctx.memory_plan.region("SRAM")
+        dtcm_names = {c.name for c in dtcm.consumers}
+        sram_names = {c.name for c in sram.consumers}
+        assert "pmu_layer_records" in sram_names
+        assert "usb_buffers" in sram_names
+        assert "pmu_layer_records" not in dtcm_names
+        assert "usb_buffers" not in dtcm_names
+
+    def test_usb_buffers_booked_on_usb_cdc_transport(self, tmp_path):
+        """#179 review m1: the USB branch was untested (a mutation of the
+        size constant survived)."""
+        ctx = _make_ctx(
+            tmp_path, {"target": {"transport": "usb_cdc"}}
+        )
+        PlanMemoryStage().run(ctx)
+        usb = [
+            c
+            for r in ctx.memory_plan.regions
+            for c in r.consumers
+            if c.name == "usb_buffers"
+        ]
+        assert [c.size for c in usb] == [4096 + 1024]
+        # and no rtt_buffers on a USB run:
+        names = {c.name for r in ctx.memory_plan.regions for c in r.consumers}
+        assert "rtt_buffers" not in names
+
+    def test_engine_supplied_records_entry_is_not_duplicated(self, tmp_path):
+        """#179 review m1: the idempotence-by-name guard was untested (its
+        removal survived the suite)."""
+        from helia_profiler.results import (
+            MemoryConsumer,
+            MemoryPlan,
+            MemoryRegionUsage,
+        )
+        from helia_profiler.stages.plan_memory import _add_hpx_owned_consumers
+
+        engine_plan = MemoryPlan(
+            engine="helia-aot",
+            regions=(
+                MemoryRegionUsage(
+                    region="SRAM",
+                    capacity=0,
+                    used=1234,
+                    consumers=(
+                        MemoryConsumer(
+                            name="pmu_layer_records", size=1234, kind="other"
+                        ),
+                    ),
+                ),
+            ),
+        )
+        ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-aot"}})
+        merged = _add_hpx_owned_consumers(engine_plan, ctx)
+        records = [
+            c
+            for r in merged.regions
+            for c in r.consumers
+            if c.name == "pmu_layer_records"
+        ]
+        assert [c.size for c in records] == [1234]  # engine's entry kept, once

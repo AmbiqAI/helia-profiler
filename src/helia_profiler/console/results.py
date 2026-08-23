@@ -163,6 +163,11 @@ def render_memory_reconciliation(console: HpxConsole, rec: Any) -> None:
     for c in rec.consumers:
         if c.status == "matched":
             measured_cell = _fmt_bytes(c.measured_size)
+            if c.measured_region and c.measured_region != c.region:
+                measured_cell = (
+                    f"[bold red]{measured_cell} in "
+                    f"{escape(c.measured_region)}[/bold red]"
+                )
             if c.delta:
                 sign = "+" if c.delta > 0 else "−"
                 delta_txt = f"{sign}{_fmt_bytes(abs(c.delta))}"
@@ -180,7 +185,7 @@ def render_memory_reconciliation(console: HpxConsole, rec: Any) -> None:
             status_cell = "[dim]unmatchable[/dim]"
         table.add_row(
             escape(c.name),
-            c.region,
+            escape(c.region),
             _fmt_bytes(c.planned_size),
             measured_cell,
             delta_cell,
@@ -192,7 +197,7 @@ def render_memory_reconciliation(console: HpxConsole, rec: Any) -> None:
             sign = "+" if r.delta > 0 else "−"
             style = "red" if r.delta > 0 else "dim"
             console._console.print(
-                f"  [{style}]{r.region}: measured {sign}{_fmt_bytes(abs(r.delta))}"
+                f"  [{style}]{escape(r.region)}: measured {sign}{_fmt_bytes(abs(r.delta))}"
                 f" vs plan[/{style}]"
             )
     console._console.print()

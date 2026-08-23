@@ -198,4 +198,4 @@ def test_reconciliation_table_renders_all_three_statuses():
     # consumer names are escaped like every other ELF-adjacent string:
     assert "[red]sneaky[/red]" in text
     # the nonzero region delta line renders:
-    assert "SRAM" in text and "96.0 KB" in text or "98,304" in text
+    assert "SRAM" in text and ("96.0 KB" in text or "98,304" in text)

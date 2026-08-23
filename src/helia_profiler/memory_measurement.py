@@ -194,22 +194,35 @@ _CONSUMER_SYMBOLS: dict[str, tuple[str, ...]] = {
     "pmu_layer_records": ("g_profiler", "g_layers"),
     "rtt_buffers": ("_acUpBuffer", "_acDownBuffer", "_SEGGER_RTT"),
     "usb_buffers": ("usb_tx_buf", "usb_rx_buf"),
-    #: gcc only — armlink's stack is a scatter REGION, not a symbol
-    #: (unmatchable there, by design).
+    #: GNU-family links (gcc AND ATfE) carry a sized g_pui32Stack;
+    #: armlink's stack is a scatter REGION, not a symbol -> missing
+    #: there, by design.
     "boot_stack": ("g_pui32Stack",),
 }
+
+
+def _name_matches(symbol_name: str, candidate: str) -> bool:
+    """Exact name, or GCC's file-static mangling ``_ZL<len><name>``.
+
+    NOT a bare suffix test (#179 review M-1): real HAL globals like
+    ``am_hal_gpio_pincfg_input`` END WITH ``g_input`` and would flip
+    verdicts with 4-byte MRAM constants."""
+    return symbol_name == candidate or symbol_name == f"_ZL{len(candidate)}{candidate}"
 
 
 def _match_symbols(
     candidates: tuple[str, ...], symbols: tuple[SymbolEntry, ...]
 ) -> tuple[SymbolEntry, ...]:
-    """Every symbol whose name ends with any candidate, deduped by
-    (address, size) keep-first — aliases (two names over one object) must
-    not double the sum."""
+    """Every SIZED symbol matching any candidate, deduped by
+    (address, size) keep-first — aliases (two names over one object,
+    e.g. an extern alias plus the mangled static) must not double the
+    sum. Zero-size symbols are ignored: llvm-nm reports st_size verbatim
+    and armlink's linker-defined markers carry none, so a zero-size
+    "match" would manufacture measured_size=0 (#179 review M-5)."""
     matched: list[SymbolEntry] = []
     seen: set[tuple[int, int]] = set()
     for sym in symbols:
-        if any(sym.name.endswith(c) for c in candidates):
+        if sym.size and any(_name_matches(sym.name, c) for c in candidates):
             key = (sym.address, sym.size)
             if key not in seen:
                 seen.add(key)
@@ -228,6 +241,17 @@ def reconcile_memory(
     compare plan ``used`` to measured ``used`` for every region both
     sides know. Purely additive — never mutates either input.
     """
+    measured_windows = tuple(
+        (str(r.region), r.window_start, r.window_start + r.window_length)
+        for r in measured.regions
+    )
+
+    def _classify(address: int) -> str | None:
+        for region_name, start, end in measured_windows:
+            if start <= address < end:
+                return region_name
+        return None
+
     consumers: list[ConsumerReconciliation] = []
     for region_usage in plan.regions:
         region_name = str(region_usage.region)
@@ -237,17 +261,28 @@ def reconcile_memory(
                 if consumer.symbol
                 else _CONSUMER_SYMBOLS.get(consumer.name, ())
             )
-            if not candidates:
-                # Structural: PSRAM-placed objects bind to runtime
-                # pointers (no sized symbol exists), armlink's stack is a
-                # scatter region, and AOT source-staging entries carry no
-                # hint — nothing to look for is not a failure to find.
+            if region_name == "PSRAM":
+                # PSRAM objects bind through runtime POINTERS — and the
+                # pointer itself IS a 4-byte sized symbol carrying the
+                # same name (verified: _ZL10model_data size 4 on the
+                # PSRAM-weights render). Matching it would report the
+                # planned megabytes as delta shortfall (#179 review M-2).
+                status, matched = "unmatchable", ()
+            elif not candidates:
+                # Structural: armlink's stack is a scatter region and AOT
+                # source-staging entries may carry no hint — nothing to
+                # look for is not a failure to find.
                 status, matched = "unmatchable", ()
             else:
                 matched = _match_symbols(tuple(candidates), symbols)
                 status = "matched" if matched else "missing"
             measured_size = (
                 sum(m.size for m in matched) if status == "matched" else None
+            )
+            measured_region = (
+                _classify(max(matched, key=lambda m: m.size).address)
+                if matched
+                else None
             )
             consumers.append(
                 ConsumerReconciliation(
@@ -258,6 +293,7 @@ def reconcile_memory(
                     status=status,
                     matched_symbols=tuple(m.name for m in matched),
                     measured_size=measured_size,
+                    measured_region=measured_region,
                     delta=(
                         measured_size - consumer.size
                         if measured_size is not None

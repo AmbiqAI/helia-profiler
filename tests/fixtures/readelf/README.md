@@ -16,9 +16,12 @@ arm-none-eabi-nm -S --size-sort fw.elf > symbols.txt
 rm fw.elf
 ```
 
-`symbols.txt` is the sized-symbol listing of the SAME ELF (#133 Phase 3):
-every symbol matches its section byte-for-byte (g_stack == .stack,
-g_initialized == .data, g_zero_init == .bss, __HeapBase == .heap).
+`symbols.txt` is the sized-symbol listing of the SAME ELF (#133 Phase 3).
+The real objects match their sections byte-for-byte (g_stack == .stack,
+g_initialized == .data, g_zero_init == .bss). NB `__HeapBase`'s size is
+GNU nm SYNTHESIS (gap to the next symbol — it happens to equal .heap);
+llvm-nm reports 0 for it. The pin therefore documents GNU nm behavior,
+not st_size, and matching deliberately ignores zero-size symbols.
 
 `sections_atfe.txt` / `segments_atfe.txt` are llvm-readelf (ATfE 22.1.0) on
 the SAME ELF — ATfE's toolchain spec resolves its `readelf` to llvm-readelf,

@@ -458,11 +458,19 @@ class SymbolEntry:
     type: str
 
 
-#: nm -S --size-sort row: addr, size, one-letter type, name. With
-#: --size-sort nm emits ONLY symbols that carry a size, so rows are
-#: uniformly four-column; anything else non-empty counts as unparsed.
+#: nm -S --size-sort row: addr, size, one-letter type, name. GNU nm
+#: emits only sized rows under --size-sort; llvm-nm ALSO emits size-0
+#: rows and undefined/absolute rows (verified on real output — the two
+#: tools are NOT row-identical, #179 review M-5). Sized rows parse;
+#: recognisable unsized/undefined shapes are SKIPPED silently; anything
+#: else counts as unparsed.
 _NM_SIZED_ROW_RE = re.compile(
     r"^([0-9a-fA-F]+)\s+([0-9a-fA-F]+)\s+(\S)\s+(\S+)\s*$"
+)
+#: Undefined/weak rows ("U name", "w name") and unsized address rows
+#: ("00000000 T name") — legitimate nm output, not parse failures.
+_NM_UNSIZED_ROW_RE = re.compile(
+    r"^\s*(?:[0-9a-fA-F]+\s+)?[A-Za-z?]\s+\S+\s*$"
 )
 
 
@@ -475,12 +483,17 @@ def symbol_inventory(
     """Every sized symbol of *binary_path* via the toolchain's ``nm``,
     plus an unparsed-row count, or None on tool failure.
 
-    One probe shape serves all four toolchains: GNU nm and llvm-nm emit
-    identical columns, and GNU/llvm nm read armlink ``.axf`` files with
-    full symbol sizes (the same cross-tool parity #173 proved for
-    readelf). Degrades to None per #131 — and callers must treat a
-    nonzero unparsed count like a partial section inventory: refuse,
-    never understate.
+    One probe SHAPE serves all four toolchains, with a documented
+    asymmetry (#179 review M-5): GNU nm SYNTHESIZES sizes for some
+    linker-defined symbols from the gap to the next symbol, where
+    llvm-nm reports st_size verbatim (often 0) and also prints
+    undefined/absolute rows. Real objects (arrays, buffers — everything
+    the reconciler matches) carry true st_size on both; linker markers
+    (__HeapBase, Region$$Table$$*) are NOT comparable across tools and
+    zero-size symbols are excluded from matching for the same reason.
+    Degrades to None per #131 — and callers must treat a nonzero
+    unparsed count like a partial section inventory: refuse, never
+    understate.
 
     Scope limit carried from Phase 1: symbols attribute by VIRTUAL
     address only — per-symbol load-image attribution is not recoverable
@@ -509,6 +522,11 @@ def symbol_inventory(
             continue
         match = _NM_SIZED_ROW_RE.match(line)
         if match is None:
+            if _NM_UNSIZED_ROW_RE.match(line):
+                # Undefined/unsized rows carry no occupancy — skipping
+                # them silently is correct; only a row that matches NO
+                # known nm shape marks the listing partial.
+                continue
             unparsed += 1
             log.debug("nm row not parsed by symbol inventory: %r", line)
             continue

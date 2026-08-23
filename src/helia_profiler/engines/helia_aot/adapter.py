@@ -149,11 +149,14 @@ class HeliaAOTAdapter:
         # Build a MemoryPlan from the AOT codegen context so the
         # plan_memory stage can validate placement against the SoC's
         # physical memory layout.
-        memory_plan = _extract_memory_plan(codegen_ctx, prefix)
-
-        # Extract arena binding info for external-arena mode
+        # Extract arena binding info for external-arena mode — resolved
+        # BEFORE plan extraction, which needs it to hint the symbols the
+        # templates actually emit in each mode (#179 review M-4).
         allocate_arenas = (
             config.engine.config.get("aot_args", {}).get("memory", {}).get("allocate_arenas", True)
+        )
+        memory_plan = _extract_memory_plan(
+            codegen_ctx, prefix, allocate_arenas=allocate_arenas
         )
         arena_regions = _extract_arena_regions(codegen_ctx, prefix)
 

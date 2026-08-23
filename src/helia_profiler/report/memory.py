@@ -114,6 +114,7 @@ def _serialise_memory_reconciliation(rec: MemoryReconciliation) -> dict[str, Any
                 "status": c.status,
                 "matched_symbols": list(c.matched_symbols),
                 "measured_size": c.measured_size,
+                "measured_region": c.measured_region,
                 "delta": c.delta,
             }
             for c in rec.consumers
@@ -145,22 +146,28 @@ def _serialise_memory_symbols(
     by (address, size) so aliases do not repeat."""
     per_region: dict[str, list[dict[str, Any]]] = {}
     seen: set[tuple[int, int]] = set()
+    outside_windows = 0
+    considered = 0
     ordered = sorted(symbols, key=lambda sym: sym.size, reverse=True)
     for sym in ordered:
         key = (sym.address, sym.size)
         if key in seen or sym.size == 0:
             continue
+        seen.add(key)
+        considered += 1
         region = None
         for r in measured.regions:
             if r.window_start <= sym.address < r.window_start + r.window_length:
                 region = str(r.region)
                 break
         if region is None:
+            # Outside every measured window (code below the app origin,
+            # linker markers): counted, never silently vanished.
+            outside_windows += 1
             continue
         rows = per_region.setdefault(region, [])
         if len(rows) >= _SYMBOLS_PER_REGION:
             continue
-        seen.add(key)
         rows.append(
             {
                 "name": sym.name,
@@ -170,7 +177,11 @@ def _serialise_memory_symbols(
             }
         )
     return {
-        "total_sized_symbols": len(symbols),
+        # Nonzero-size symbols after alias dedup — the population the
+        # listing draws from (#179 review m3: the raw nm row count
+        # included zero-size and alias rows and described nothing).
+        "total_sized_symbols": considered,
+        "outside_windows": outside_windows,
         "per_region_limit": _SYMBOLS_PER_REGION,
         "regions": per_region,
     }

@@ -313,6 +313,17 @@ class PlanMemoryStage:
         )
 
     def _validate(self, plan: MemoryPlan) -> None:
+        for r in plan.regions:
+            if r.capacity == 0 and r.used > 0:
+                # overflow cannot fire on a 0-capacity region (custom SoC
+                # declared without this memory); say so instead of
+                # validating clean and failing at link (#179 review m10).
+                log.warning(
+                    "%s: %d B planned into a region with no declared "
+                    "capacity — the overflow check cannot see this.",
+                    r.region,
+                    r.used,
+                )
         offenders = [r for r in plan.regions if r.overflow]
         if not offenders:
             return
@@ -390,14 +401,29 @@ _BOOT_STACK_BYTES: dict[SocFamily, int] = {
 
 
 def _default_bss_region(family: SocFamily) -> MemoryRegion:
-    """Where an unattributed static (plain ``.bss``) lands per family."""
-    return MemoryRegion.DTCM
+    """Where an unattributed static (plain ``.bss``) lands per family.
+
+    AP3 is the exception (#179 review B-1): its gcc script sends ``.bss``
+    to RWMEM — main SRAM at 0x10011000 — because TCM is only 64 KB
+    (apollo3p/gcc/linker_script.ld). AP4/AP5 default ``.bss`` into
+    MCU_TCM (DTCM)."""
+    return MemoryRegion.SRAM if family is SocFamily.AP3 else MemoryRegion.DTCM
 
 
 def _sram_bss_region(family: SocFamily) -> MemoryRegion:
-    """Where ``NSX_MEM_SRAM_BSS`` lands: SRAM where the section exists,
-    the default ``.bss`` (DTCM) on AP3-class parts (main.cc.j2:113-116)."""
-    return MemoryRegion.DTCM if family is SocFamily.AP3 else MemoryRegion.SRAM
+    """Where ``NSX_MEM_SRAM_BSS`` lands. On AP4/AP5 the macro pins
+    ``.sram_bss`` -> SRAM; on AP3 it expands to NOTHING
+    (NSX_MEM__HAS_SRAM_BSS=0) so the object falls to plain ``.bss`` —
+    which on AP3 is ALSO main SRAM (main.cc.j2's own comment: "on AP3,
+    the default .bss already targets its large main SRAM"). Every family
+    therefore resolves to SRAM; the function stays because the REASONS
+    differ and a future family must choose one deliberately."""
+    return MemoryRegion.SRAM
+
+
+def _usb_region(family: SocFamily) -> MemoryRegion:
+    """USB CDC buffers carry no NSX_MEM attribute -> plain ``.bss``."""
+    return _default_bss_region(family)
 
 
 def _rtt_region(family: SocFamily) -> MemoryRegion:
@@ -464,21 +490,27 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
     elif transport == Transport.USB_CDC:
         additions.append(
             (
-                _default_bss_region(family),
+                _usb_region(family),
                 MemoryConsumer(
                     name="usb_buffers", size=USB_CDC_BUFFER_BYTES, kind="other"
                 ),
             )
         )
 
-    stack_bytes = _BOOT_STACK_BYTES.get(family)
-    if stack_bytes is not None:
-        additions.append(
-            (
-                _stack_region(family),
-                MemoryConsumer(name="boot_stack", size=stack_bytes, kind="stack"),
-            )
+    # SWO/UART transports reserve no comparable static buffers — their
+    # absence here is deliberate scope, not an oversight.
+    additions.append(
+        (
+            _stack_region(family),
+            MemoryConsumer(
+                # Loud KeyError if a new SocFamily appears unkeyed — that
+                # is a characterization task, not a default.
+                name="boot_stack",
+                size=_BOOT_STACK_BYTES[family],
+                kind="stack",
+            ),
         )
+    )
 
     existing_names = {c.name for r in plan.regions for c in r.consumers}
     by_region: dict[MemoryRegion, MemoryRegionUsage] = {
