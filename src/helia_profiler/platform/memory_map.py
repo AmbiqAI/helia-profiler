@@ -37,10 +37,28 @@ scripts link at (e.g. 0x00410000 on AP5, where hardware MRAM begins at
 0x00400000) — an app section can only ever land in the app window, and
 "below the app origin" should classify as outside, not as MRAM.
 
+Scoping: only the RAM banks the NSX scripts actually link into are
+windowed. apollo4p/4l also have EXTRAM (0x10160000) and SSRAM1 (0x101C0000)
+apertures in the SDK, but no script places anything there and
+``soc.memory.sram_kb`` agrees with SSRAM0 alone — sections there classify
+``None``, correctly flagging an uncharacterized placement rather than
+absorbing it into "SRAM".
+
 PSRAM has no linker region on any SoC (grep-verified across every ``.ld`` and
-``.sct``); its window comes from the existing board-knowledge tables and is
-marked with that provenance. ``nvm_kb`` likewise has no linker counterpart
-and is deliberately absent here.
+``.sct``); its window comes from the existing board-knowledge tables, is
+marked with that provenance, and carries ``section_attributable=False`` —
+no ELF section can ever land there, so occupancy must come from the plan.
+``nvm_kb`` likewise has no linker counterpart and is deliberately absent
+here.
+
+Phase-2 free math (the contract these shapes exist for):
+``free = app_window[family].length − Σ(size of allocated sections whose
+address falls inside app_window[family], excluding linker_reserved ones)``.
+Sections inside ``window`` but outside ``app_window`` are the linker's own
+reservations (stacks, armlink's fixed heap) — reserved, not app usage.
+Load-image (MRAM) accounting sums ``LoadSegment.file_size`` grouped by
+``classify_address(physical_address)`` — see the ``LoadSegment`` docstring
+for why walking sections into segments is wrong on armlink.
 """
 
 from __future__ import annotations
@@ -80,15 +98,23 @@ def link_family_for_toolchain(toolchain: str) -> LinkFamily:
 
 @dataclass(frozen=True)
 class LinkedRegionWindow:
-    """One region's verified window plus its per-link-family usable size.
+    """One region's verified window plus its per-link-family app sub-window.
 
     ``window`` is the CLASSIFICATION aperture — an allocated section whose
-    address falls inside it belongs to this region. ``app_available`` is the
-    number of bytes the app's own static data can actually occupy under each
-    link family, i.e. the window minus what the script/startup reserves
-    (stack arrays, armlink's fixed heap/stack regions); it is what honest
-    ``free`` accounting subtracts from. A region absent from a SoC's map
-    simply has no window entry.
+    address falls inside it belongs to this region. ``app_window`` is the
+    address EXTENT the app's own static data occupies under each link
+    family: the window minus what the script/startup reserves (gcc's
+    stack-at-origin, armlink's fixed heap/stack regions above MCU_TCM).
+    An extent, not a count, because the reservations sit INSIDE the
+    classification window: honest Phase-2 free math is
+    ``app_window.length − Σ(sections inside app_window, excluding
+    linker_reserved ones)`` — a scalar "available" invites subtracting a
+    stack that was already carved out of it (#176 fresh-review M-1, the
+    error is exactly one stack size on every configuration either way).
+    Sections inside ``window`` but outside ``app_window`` are the linker's
+    reservations (stacks, armlink heap) — report them as reserved, never
+    as app usage or free space. A region absent from a SoC's map simply
+    has no window entry.
     """
 
     region: MemoryRegion
@@ -96,11 +122,38 @@ class LinkedRegionWindow:
     #: ``hash=False``: a MappingProxyType is unhashable, and frozen dataclass
     #: hashing would otherwise make ``hash(window)`` raise. Equality still
     #: compares it.
-    app_available: Mapping[LinkFamily, int] = field(hash=False)
-    #: Where the numbers came from — linker-script characterization or
-    #: board knowledge (PSRAM). Kept on the record so Phase 2's artifact can
-    #: state it.
-    provenance: str = "linker-script"
+    app_window: Mapping[LinkFamily, MemoryRange] = field(hash=False)
+    #: Where the WINDOW bounds came from: "hardware-aperture" (SDK regs
+    #: headers — the RAM regions), "linker-app-origin" (MRAM: app link
+    #: origin to hardware flash top), or "board-knowledge" (PSRAM). The
+    #: window and the app extents genuinely have different provenances;
+    #: one string covering both published a false claim (#176 fresh-review).
+    window_provenance: str = "hardware-aperture"
+    #: Where the app extents came from — linker-script characterization,
+    #: or board knowledge (PSRAM).
+    app_provenance: str = "linker-script"
+    #: False when no ELF section can ever land here (PSRAM: no linker
+    #: region exists on any SoC). Phase 2 must reconcile such regions from
+    #: the PLAN, never report "used 0, free capacity" from an inventory
+    #: that structurally cannot see them — that would recreate the exact
+    #: #133 pathology this module exists to close.
+    section_attributable: bool = True
+
+    def __post_init__(self) -> None:
+        for family in LinkFamily:
+            extent = self.app_window.get(family)
+            if extent is None:
+                raise ValueError(
+                    f"{self.region}: app_window missing {family!r}"
+                )
+            if extent.start < self.window.start or extent.end > self.window.end:
+                raise ValueError(
+                    f"{self.region}: app_window {family!r} exceeds the window"
+                )
+
+    def app_available(self, family: LinkFamily) -> int:
+        """Bytes of app-usable space under *family* (the extent's length)."""
+        return self.app_window[family].length
 
 
 def _window(
@@ -110,15 +163,32 @@ def _window(
     *,
     gnu: int,
     armlink: int,
-    provenance: str = "linker-script",
+    gnu_start: int | None = None,
+    armlink_start: int | None = None,
+    window_provenance: str = "hardware-aperture",
+    app_provenance: str = "linker-script",
+    section_attributable: bool = True,
 ) -> LinkedRegionWindow:
+    """``gnu``/``armlink`` are app-extent LENGTHS; ``gnu_start``/
+    ``armlink_start`` default to the window start (they differ only where
+    a script reserves the BOTTOM of the region — gcc's stack-at-origin
+    DTCM layouts)."""
     return LinkedRegionWindow(
         region=region,
         window=MemoryRange(start, length),
-        app_available=MappingProxyType(
-            {LinkFamily.GNU: gnu, LinkFamily.ARMLINK: armlink}
+        app_window=MappingProxyType(
+            {
+                LinkFamily.GNU: MemoryRange(
+                    start if gnu_start is None else gnu_start, gnu
+                ),
+                LinkFamily.ARMLINK: MemoryRange(
+                    start if armlink_start is None else armlink_start, armlink
+                ),
+            }
         ),
-        provenance=provenance,
+        window_provenance=window_provenance,
+        app_provenance=app_provenance,
+        section_attributable=section_attributable,
     )
 
 
@@ -133,9 +203,26 @@ def _window(
 # stays the 700 KB RWMEM either way; armlink's ARM_LIB_HEAP is zero-length
 # (sct:27).
 _APOLLO3P = (
-    _window(MemoryRegion.MRAM, 0x0000C000, 2_048_000, gnu=2_048_000, armlink=2_048_000),
+    _window(
+        MemoryRegion.MRAM,
+        0x0000C000,
+        2_048_000,
+        gnu=2_048_000,
+        armlink=2_048_000,
+        window_provenance="linker-app-origin",
+    ),
     _window(MemoryRegion.DTCM, 0x10000000, 0x10000, gnu=65_536, armlink=65_536),
-    _window(MemoryRegion.SRAM, 0x10010000, 0xB0000, gnu=716_800, armlink=716_800),
+    # App SRAM is RWMEM @0x10011000 under BOTH families; the 4 KB STACKMEM
+    # slot below it (gcc .stack / armlink ARM_LIB_STACK) is stack-reserved.
+    _window(
+        MemoryRegion.SRAM,
+        0x10010000,
+        0xB0000,
+        gnu=716_800,
+        armlink=716_800,
+        gnu_start=0x10011000,
+        armlink_start=0x10011000,
+    ),
 )
 
 # apollo4p / apollo4l — apollo4p/gcc/linker_script.ld:10-12 (4l's
@@ -145,8 +232,22 @@ _APOLLO3P = (
 # inside the 384 KB window and a fill-to-end .heap → 368 KB for app data.
 # armlink: MCU_TCM is 364 KB with fixed 4 KB heap + 16 KB stack above it.
 _APOLLO4 = (
-    _window(MemoryRegion.MRAM, 0x00018000, 1_998_848, gnu=1_998_848, armlink=1_998_848),
-    _window(MemoryRegion.DTCM, 0x10000000, 393_216, gnu=376_832, armlink=372_736),
+    _window(
+        MemoryRegion.MRAM,
+        0x00018000,
+        1_998_848,
+        gnu=1_998_848,
+        armlink=1_998_848,
+        window_provenance="linker-app-origin",
+    ),
+    _window(
+        MemoryRegion.DTCM,
+        0x10000000,
+        393_216,
+        gnu=376_832,
+        armlink=372_736,
+        gnu_start=0x10004000,
+    ),
     _window(MemoryRegion.SRAM, 0x10060000, 1_048_576, gnu=1_048_576, armlink=1_048_576),
 )
 
@@ -162,8 +263,25 @@ _APOLLO4 = (
 # says base 0x0, which on this family is ITCM, not MRAM.
 _APOLLO5_FULL = (
     _window(MemoryRegion.ITCM, 0x00000000, 262_144, gnu=262_144, armlink=262_144),
-    _window(MemoryRegion.MRAM, 0x00410000, 4_128_768, gnu=4_128_768, armlink=4_128_768),
-    _window(MemoryRegion.DTCM, 0x20000000, 524_288, gnu=491_520, armlink=503_808),
+    _window(
+        MemoryRegion.MRAM,
+        0x00410000,
+        4_128_768,
+        gnu=4_128_768,
+        armlink=4_128_768,
+        window_provenance="linker-app-origin",
+    ),
+    # gcc: .stack is the FIRST section into MCU_TCM (16 KB at the origin),
+    # so the app extent is [0x20004000, 0x2007C000). armlink: MCU_TCM
+    # itself is the app extent; heap+stack tile ABOVE it to the aperture.
+    _window(
+        MemoryRegion.DTCM,
+        0x20000000,
+        524_288,
+        gnu=491_520,
+        armlink=503_808,
+        gnu_start=0x20004000,
+    ),
     _window(MemoryRegion.SRAM, 0x20080000, 3_145_728, gnu=3_145_728, armlink=3_145_728),
 )
 
@@ -180,8 +298,22 @@ _APOLLO5_FULL = (
 # armlink 16 KB stack at 0x2003C000 therefore classifies as DTCM, as it
 # should.
 _APOLLO330P = (
-    _window(MemoryRegion.MRAM, 0x00410000, 2_031_616, gnu=2_031_616, armlink=2_031_616),
-    _window(MemoryRegion.DTCM, 0x20000000, 262_144, gnu=229_376, armlink=241_664),
+    _window(
+        MemoryRegion.MRAM,
+        0x00410000,
+        2_031_616,
+        gnu=2_031_616,
+        armlink=2_031_616,
+        window_provenance="linker-app-origin",
+    ),
+    _window(
+        MemoryRegion.DTCM,
+        0x20000000,
+        262_144,
+        gnu=229_376,
+        armlink=241_664,
+        gnu_start=0x20004000,
+    ),
     _window(MemoryRegion.SRAM, 0x20080000, 1_835_008, gnu=1_835_008, armlink=1_835_008),
 )
 
@@ -198,7 +330,11 @@ _MAPS: Mapping[str, tuple[LinkedRegionWindow, ...]] = MappingProxyType(
 )
 
 
-def linked_memory_map(soc: SocDef) -> tuple[LinkedRegionWindow, ...]:
+def linked_memory_map(
+    soc: SocDef,
+    *,
+    linker_profile: str = "default",
+) -> tuple[LinkedRegionWindow, ...]:
     """The verified region windows for *soc*, PSRAM appended when present.
 
     Returns an empty tuple for any non-builtin SoC — a ``target.custom_socs``
@@ -208,7 +344,17 @@ def linked_memory_map(soc: SocDef) -> tuple[LinkedRegionWindow, ...]:
     Every registered SoC is currently characterized, so builtins never hit
     the empty branch today. Callers treat empty as unavailable, never
     guessed, per #131's discipline.
+
+    ``linker_profile`` is the third axis of the real layout: these tables
+    characterize NSX's DEFAULT (sbl-based) profile ONLY. ``itcm`` is a
+    documented engine knob (``docs/guide/engines.md``) forwarded straight
+    to CMake, and its scripts declare DIFFERENT regions — on apollo330P,
+    AP510-sized ones (the upstream NSX bug in PR #176's report) — so any
+    profile other than ``default`` returns empty: the honest "unavailable"
+    instead of a confidently wrong map (#176 fresh-review M-3).
     """
+    if linker_profile != "default":
+        return ()
     if not soc.is_builtin:
         return ()
     windows = _MAPS.get(soc.name, ())
@@ -224,7 +370,9 @@ def linked_memory_map(soc: SocDef) -> tuple[LinkedRegionWindow, ...]:
                 psram_kb * 1024,
                 gnu=psram_kb * 1024,
                 armlink=psram_kb * 1024,
-                provenance="board-knowledge",
+                window_provenance="board-knowledge",
+                app_provenance="board-knowledge",
+                section_attributable=False,
             ),
         )
     return windows

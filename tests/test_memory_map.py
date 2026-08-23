@@ -18,7 +18,7 @@ from helia_profiler.platform.memory_map import (
     link_family_for_toolchain,
     linked_memory_map,
 )
-from helia_profiler.platform.soc import soc_placement_ranges
+from helia_profiler.platform.soc import MemoryRange, soc_placement_ranges
 
 CHARACTERIZED_SOCS = (
     "apollo3p",
@@ -41,15 +41,41 @@ def test_every_characterized_soc_has_nonoverlapping_windows():
             assert prev_end <= next_start, (name, spans)
 
 
-def test_app_available_never_exceeds_the_window():
+def test_app_windows_nest_inside_the_classification_window():
+    """The dataclass __post_init__ enforces this at construction; the test
+    keeps it enforced against a future __post_init__ removal."""
     for name in CHARACTERIZED_SOCS:
         for w in linked_memory_map(get_soc(name)):
             for family in LinkFamily:
-                assert 0 < w.app_available[family] <= w.window.length, (
-                    name,
-                    w.region,
-                    family,
-                )
+                extent = w.app_window[family]
+                assert 0 < extent.length <= w.window.length, (name, w.region)
+                assert w.window.start <= extent.start, (name, w.region)
+                assert extent.end <= w.window.end, (name, w.region)
+                assert w.app_available(family) == extent.length
+
+
+def test_partial_app_window_mapping_is_rejected():
+    """LinkedRegionWindow is a public export; a partial mapping must fail
+    at construction, not KeyError at a Phase-2 consumer."""
+    import pytest
+
+    from helia_profiler.platform import LinkedRegionWindow, MemoryRange
+
+    with pytest.raises(ValueError):
+        LinkedRegionWindow(
+            region=MemoryRegion.DTCM,
+            window=MemoryRange(0x20000000, 0x1000),
+            app_window={LinkFamily.GNU: MemoryRange(0x20000000, 0x1000)},
+        )
+    with pytest.raises(ValueError):
+        LinkedRegionWindow(
+            region=MemoryRegion.DTCM,
+            window=MemoryRange(0x20000000, 0x1000),
+            app_window={
+                LinkFamily.GNU: MemoryRange(0x20000000, 0x2000),  # exceeds
+                LinkFamily.ARMLINK: MemoryRange(0x20000000, 0x1000),
+            },
+        )
 
 
 def test_apollo510_windows_are_the_linker_script_values():
@@ -64,9 +90,18 @@ def test_apollo510_windows_are_the_linker_script_values():
     assert by_region[MemoryRegion.ITCM].window.length == 262_144
     dtcm = by_region[MemoryRegion.DTCM]
     assert dtcm.window.length == 524_288
-    assert dtcm.app_available[LinkFamily.GNU] == 491_520
-    assert dtcm.app_available[LinkFamily.ARMLINK] == 503_808
-    assert by_region[MemoryRegion.PSRAM].provenance == "board-knowledge"
+    # gcc's .stack is the FIRST section into MCU_TCM: the app extent
+    # starts 16 KB up and ends at the script's MCU_TCM top; armlink's app
+    # extent IS MCU_TCM (heap+stack tile above it to the aperture).
+    assert dtcm.app_window[LinkFamily.GNU] == MemoryRange(0x20004000, 491_520)
+    assert dtcm.app_window[LinkFamily.ARMLINK] == MemoryRange(0x20000000, 503_808)
+    psram = by_region[MemoryRegion.PSRAM]
+    assert psram.window_provenance == "board-knowledge"
+    assert psram.app_provenance == "board-knowledge"
+    assert not psram.section_attributable  # no linker region ever maps here
+    assert dtcm.section_attributable
+    assert dtcm.window_provenance == "hardware-aperture"
+    assert by_region[MemoryRegion.MRAM].window_provenance == "linker-app-origin"
 
 
 # Every known divergence between capabilities._FAMILY_MEMORY_BASES (via
@@ -132,9 +167,13 @@ def test_apollo330P_has_no_itcm_and_dtcm_is_the_256k_hardware_aperture():
     assert MemoryRegion.ITCM not in by_region
     assert by_region[MemoryRegion.DTCM].window.length == 262_144
     assert classify_address(0x2003C000, windows) is MemoryRegion.DTCM
-    # gcc/armlink app-available stay the linker-script facts:
-    assert by_region[MemoryRegion.DTCM].app_available[LinkFamily.GNU] == 229_376
-    assert by_region[MemoryRegion.DTCM].app_available[LinkFamily.ARMLINK] == 241_664
+    # gcc/armlink app extents stay the linker-script facts — and the
+    # armlink stack now sits inside the WINDOW but outside the app extent,
+    # which is what makes the free math consistent:
+    dtcm = by_region[MemoryRegion.DTCM]
+    assert dtcm.app_window[LinkFamily.GNU] == MemoryRange(0x20004000, 229_376)
+    assert dtcm.app_window[LinkFamily.ARMLINK] == MemoryRange(0x20000000, 241_664)
+    assert not dtcm.app_window[LinkFamily.ARMLINK].contains(0x2003C000)
 
 
 def test_apollo3p_dtcm_is_the_64k_hardware_aperture_and_stackmem_is_sram():
@@ -147,8 +186,11 @@ def test_apollo3p_dtcm_is_the_64k_hardware_aperture_and_stackmem_is_sram():
     assert by_region[MemoryRegion.DTCM].window.length == 0x10000
     assert classify_address(0x10010000, windows) is MemoryRegion.SRAM
     assert classify_address(0x1000FFFF, windows) is MemoryRegion.DTCM
-    # App-available SRAM is still only the 700 KB RWMEM either way:
-    assert by_region[MemoryRegion.SRAM].app_available[LinkFamily.GNU] == 716_800
+    # App SRAM is still only the 700 KB RWMEM either way — the 4 KB
+    # STACKMEM slot is inside the window but below the app extent:
+    sram = by_region[MemoryRegion.SRAM]
+    assert sram.app_window[LinkFamily.GNU] == MemoryRange(0x10011000, 716_800)
+    assert not sram.app_window[LinkFamily.GNU].contains(0x10010000)
 
 
 def test_non_builtin_socs_degrade_to_empty_even_on_name_collision():
@@ -211,19 +253,173 @@ def test_real_gcc_fixture_inventory_classifies_correctly():
     # process-wide for the with-block. Kept because a module-local alias
     # would churn toolchain_probe for a test-only nicety.
     with mock.patch.object(tp.subprocess, "run", lambda *a, **k: _Result()):
-        sections = _inventory_via_readelf(
+        inventory = _inventory_via_readelf(
             Path("fw.elf"), readelf_cmd="readelf", timeout_s=5
         )
+    assert inventory is not None
+    sections, unparsed = inventory
+    assert unparsed == 0
     windows = linked_memory_map(get_soc("apollo510"))
+    # Keyed on (name, address), NOT name alone — section names are not
+    # unique in general (armlink emits same-named sections per region;
+    # NSX's gcc scripts declare .text twice). The fixture happens to have
+    # unique names; the keying models the idiom Phase 2 must copy.
     classified = {
-        s.name: classify_address(s.address, windows)
+        (s.name, s.address): classify_address(s.address, windows)
         for s in sections
         if s.allocated
     }
     assert classified == {
-        ".text": MemoryRegion.MRAM,
-        ".stack": MemoryRegion.DTCM,
-        ".data": MemoryRegion.DTCM,
-        ".bss": MemoryRegion.DTCM,
-        ".heap": MemoryRegion.DTCM,
+        (".text", 0x00410000): MemoryRegion.MRAM,
+        (".stack", 0x20000000): MemoryRegion.DTCM,
+        (".data", 0x20004000): MemoryRegion.DTCM,
+        (".bss", 0x20004020): MemoryRegion.DTCM,
+        (".heap", 0x20004118): MemoryRegion.DTCM,
     }
+    # And the free-math contract composes: the stack is inside the DTCM
+    # window but OUTSIDE the gcc app extent; the fill-to-end .heap is
+    # inside the extent but linker_reserved. app_len − Σ(app sections not
+    # reserved) is then the honest free figure.
+    by_region = {w.region: w for w in windows}
+    gcc_app = by_region[MemoryRegion.DTCM].app_window[LinkFamily.GNU]
+    by_key = {(s.name, s.address): s for s in sections}
+    assert not gcc_app.contains(by_key[(".stack", 0x20000000)].address)
+    heap = by_key[(".heap", 0x20004118)]
+    assert gcc_app.contains(heap.address) and heap.linker_reserved
+    app_used = sum(
+        s.size
+        for s in sections
+        if s.allocated and not s.linker_reserved and gcc_app.contains(s.address)
+    )
+    assert app_used == 0x20 + 0xF8  # .data + .bss
+    # .heap fills to the region top, so its size IS ground-truth free —
+    # and the formula reproduces it exactly (no stack-sized error, the
+    # #176 fresh-review M-1 failure mode):
+    assert gcc_app.length - app_used == heap.size
+
+
+# Every app extent pinned exactly, per (soc, region, family): (start, length).
+# The app extents are the PR's headline deliverable — window starts/lengths
+# are pinned by _EXPECTED_LEGACY_VS_VERIFIED, but a transposed digit in an
+# extent would otherwise ship silently (#176 fresh-review M-4). gcc DTCM
+# extents start 16 KB above the window (stack-at-origin); everything else
+# starts at the window start except apollo3p SRAM (RWMEM above STACKMEM).
+_EXPECTED_APP_WINDOWS = {
+    "apollo3p": {
+        MemoryRegion.MRAM: {
+            LinkFamily.GNU: (0x0000C000, 2_048_000),
+            LinkFamily.ARMLINK: (0x0000C000, 2_048_000),
+        },
+        MemoryRegion.DTCM: {
+            LinkFamily.GNU: (0x10000000, 65_536),
+            LinkFamily.ARMLINK: (0x10000000, 65_536),
+        },
+        MemoryRegion.SRAM: {
+            LinkFamily.GNU: (0x10011000, 716_800),
+            LinkFamily.ARMLINK: (0x10011000, 716_800),
+        },
+    },
+    "apollo4p": {
+        MemoryRegion.MRAM: {
+            LinkFamily.GNU: (0x00018000, 1_998_848),
+            LinkFamily.ARMLINK: (0x00018000, 1_998_848),
+        },
+        MemoryRegion.DTCM: {
+            LinkFamily.GNU: (0x10004000, 376_832),
+            LinkFamily.ARMLINK: (0x10000000, 372_736),
+        },
+        MemoryRegion.SRAM: {
+            LinkFamily.GNU: (0x10060000, 1_048_576),
+            LinkFamily.ARMLINK: (0x10060000, 1_048_576),
+        },
+    },
+    "apollo510": {
+        MemoryRegion.ITCM: {
+            LinkFamily.GNU: (0x00000000, 262_144),
+            LinkFamily.ARMLINK: (0x00000000, 262_144),
+        },
+        MemoryRegion.MRAM: {
+            LinkFamily.GNU: (0x00410000, 4_128_768),
+            LinkFamily.ARMLINK: (0x00410000, 4_128_768),
+        },
+        MemoryRegion.DTCM: {
+            LinkFamily.GNU: (0x20004000, 491_520),
+            LinkFamily.ARMLINK: (0x20000000, 503_808),
+        },
+        MemoryRegion.SRAM: {
+            LinkFamily.GNU: (0x20080000, 3_145_728),
+            LinkFamily.ARMLINK: (0x20080000, 3_145_728),
+        },
+    },
+    "apollo330P": {
+        MemoryRegion.MRAM: {
+            LinkFamily.GNU: (0x00410000, 2_031_616),
+            LinkFamily.ARMLINK: (0x00410000, 2_031_616),
+        },
+        MemoryRegion.DTCM: {
+            LinkFamily.GNU: (0x20004000, 229_376),
+            LinkFamily.ARMLINK: (0x20000000, 241_664),
+        },
+        MemoryRegion.SRAM: {
+            LinkFamily.GNU: (0x20080000, 1_835_008),
+            LinkFamily.ARMLINK: (0x20080000, 1_835_008),
+        },
+    },
+}
+# The 4l/510b/5b variants share their sibling's linker layout exactly:
+_EXPECTED_APP_WINDOWS["apollo4l"] = _EXPECTED_APP_WINDOWS["apollo4p"]
+_EXPECTED_APP_WINDOWS["apollo510b"] = _EXPECTED_APP_WINDOWS["apollo510"]
+_EXPECTED_APP_WINDOWS["apollo5b"] = _EXPECTED_APP_WINDOWS["apollo510"]
+
+
+def test_every_app_window_extent_is_pinned_exactly():
+    for name in CHARACTERIZED_SOCS:
+        expected = _EXPECTED_APP_WINDOWS[name]
+        windows = {
+            w.region: w
+            for w in linked_memory_map(get_soc(name))
+            if w.region is not MemoryRegion.PSRAM  # board-knowledge, below
+        }
+        assert set(windows) == set(expected), name
+        for region, per_family in expected.items():
+            for family, (start, length) in per_family.items():
+                extent = windows[region].app_window[family]
+                assert (extent.start, extent.length) == (start, length), (
+                    name,
+                    region,
+                    family,
+                )
+
+
+def test_psram_window_is_board_knowledge_and_not_section_attributable():
+    """No linker region maps PSRAM on any SoC — Phase 2 must reconcile it
+    from the plan, never report used=0/free=capacity off an inventory that
+    structurally cannot see it (#176 fresh-review M-1's PSRAM corollary)."""
+    for name in CHARACTERIZED_SOCS:
+        for w in linked_memory_map(get_soc(name)):
+            if w.region is MemoryRegion.PSRAM:
+                assert not w.section_attributable, name
+                assert w.window_provenance == "board-knowledge", name
+            else:
+                assert w.section_attributable, (name, w.region)
+
+
+def test_non_default_linker_profile_returns_empty():
+    """These tables characterize NSX's DEFAULT profile only. linker_profile
+    is a documented engine knob whose itcm scripts declare DIFFERENT
+    regions (AP510-sized ones on apollo330P — the upstream NSX bug), so a
+    non-default profile must degrade to unavailable, not return a
+    confidently wrong map (#176 fresh-review M-3)."""
+    soc = get_soc("apollo330P")
+    assert linked_memory_map(soc) == linked_memory_map(soc, linker_profile="default")
+    assert linked_memory_map(soc, linker_profile="itcm") == ()
+    assert linked_memory_map(soc, linker_profile="nbl") == ()
+
+
+def test_characterized_socs_cover_the_entire_registry():
+    """The docstring's guarantee — every registered builtin is
+    characterized — enforced, so registering a new SoC without a memory map
+    fails loudly here instead of silently returning () forever."""
+    from helia_profiler.platform import list_socs
+
+    assert set(CHARACTERIZED_SOCS) == {soc.name for soc in list_socs()}
