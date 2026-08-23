@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import re
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 from .results import BinarySections
@@ -572,3 +573,264 @@ __all__ = [
     "compiler_version",
     "symbol_address",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Section inventory (#133 Phase 1)
+# ---------------------------------------------------------------------------
+#
+# The measured half of the memory model starts here: the full per-section
+# (name, address, size) inventory plus the PT_LOAD segments, captured from
+# the SAME tools the reserved/bss split already runs — readelf kept only
+# name/type/size/flags and deliberately discarded the Addr column; fromelf's
+# -v blocks carry Addr and full program headers. Everything below is
+# ADDITIVE: the BinarySections paths above are untouched, and every probe
+# degrades to None per #131's never-guess discipline. Nothing here reaches
+# an artifact yet (Phase 2 owns serialization and the region attribution).
+
+
+@dataclass(frozen=True)
+class ElfSection:
+    """One section of the linked image, address included."""
+
+    name: str
+    address: int
+    size: int
+    nobits: bool
+    allocated: bool
+
+
+@dataclass(frozen=True)
+class LoadSegment:
+    """One PT_LOAD program header: where bytes load (physical) vs run
+    (virtual) — the fact that makes initialized data's MRAM load image
+    accountable (#133 D3)."""
+
+    virtual_address: int
+    physical_address: int
+    file_size: int
+    memory_size: int
+
+
+@dataclass(frozen=True)
+class SectionInventory:
+    """The measured memory inventory of one linked binary."""
+
+    sections: tuple[ElfSection, ...]
+    segments: tuple[LoadSegment, ...] = ()
+
+
+#: readelf -S -W row, GENERAL section names (the reserved-path regex above
+#: anchors on a leading dot and cannot see armlink-style ARM_LIB_* names).
+#: The type group is constrained to an uppercase identifier so the NULL
+#: row — whose blank name column would otherwise let (\S+) swallow "NULL"
+#: and misalign every following group — fails to match and is skipped.
+_READELF_INVENTORY_RE = re.compile(
+    r"^\s*\[\s*\d+\]\s+(\S+)\s+([A-Z][A-Z0-9_]*)\s+([0-9a-fA-F]+)\s+"
+    r"[0-9a-fA-F]+\s+([0-9a-fA-F]+)\s+[0-9a-fA-F]+\s+(\S*)"
+)
+
+#: readelf -l -W LOAD row: offset, vaddr, paddr, filesz, memsz.
+_READELF_LOAD_RE = re.compile(
+    r"^\s*LOAD\s+0x[0-9a-fA-F]+\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)\s+"
+    r"0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)"
+)
+
+#: fromelf --text -v field lines consumed by the INVENTORY walk (a superset
+#: of the reserved-path's four; that regex stays untouched above).
+_FROMELF_INVENTORY_FIELD_RE = re.compile(
+    r"^\s*(Name|Type|Flags|Size|Addr|Virtual Addr|Physical Addr"
+    r"|Size in file|Size in memory)\s*:\s*(.+?)\s*$"
+)
+_FROMELF_PROGRAM_START_RE = re.compile(r"^\*\* Program header #\d+")
+_FROMELF_HEX_RE = re.compile(r"0x([0-9a-fA-F]+)")
+
+
+def _inventory_via_readelf(
+    binary_path: Path,
+    *,
+    readelf_cmd: str,
+    timeout_s: int,
+) -> tuple[ElfSection, ...] | None:
+    try:
+        result = subprocess.run(
+            [readelf_cmd, "-S", "-W", str(binary_path)],
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+        log.debug("readelf inventory probe failed: %s", exc)
+        return None
+    if result.returncode != 0:
+        log.debug("readelf -S failed: %s", (result.stderr or "").strip())
+        return None
+    sections: list[ElfSection] = []
+    for line in result.stdout.splitlines():
+        match = _READELF_INVENTORY_RE.match(line)
+        if match is None:
+            continue
+        name, sh_type, addr_hex, size_hex, flags = match.groups()
+        sections.append(
+            ElfSection(
+                name=name,
+                address=int(addr_hex, 16),
+                size=int(size_hex, 16),
+                nobits=sh_type == "NOBITS",
+                allocated="A" in flags,
+            )
+        )
+    return tuple(sections) if sections else None
+
+
+def _segments_via_readelf(
+    binary_path: Path,
+    *,
+    readelf_cmd: str,
+    timeout_s: int,
+) -> tuple[LoadSegment, ...]:
+    """PT_LOAD segments; empty on any failure — segments refine the
+    inventory (load-image accounting) but their absence must not discard
+    it."""
+    try:
+        result = subprocess.run(
+            [readelf_cmd, "-l", "-W", str(binary_path)],
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+        log.debug("readelf segment probe failed: %s", exc)
+        return ()
+    if result.returncode != 0:
+        log.debug("readelf -l failed: %s", (result.stderr or "").strip())
+        return ()
+    segments: list[LoadSegment] = []
+    for line in result.stdout.splitlines():
+        match = _READELF_LOAD_RE.match(line)
+        if match is None:
+            continue
+        vaddr, paddr, filesz, memsz = (int(g, 16) for g in match.groups())
+        segments.append(
+            LoadSegment(
+                virtual_address=vaddr,
+                physical_address=paddr,
+                file_size=filesz,
+                memory_size=memsz,
+            )
+        )
+    return tuple(segments)
+
+
+def _hex_field(value: str) -> int | None:
+    match = _FROMELF_HEX_RE.search(value)
+    return int(match.group(1), 16) if match else None
+
+
+def _inventory_from_fromelf_listing(
+    stdout: str,
+) -> tuple[tuple[ElfSection, ...], tuple[LoadSegment, ...]] | None:
+    """Sections + PT_LOAD segments from a ``fromelf --text -v`` listing."""
+    sections: list[ElfSection] = []
+    segments: list[LoadSegment] = []
+    block: dict[str, str] | None = None
+    block_kind: str | None = None
+
+    def _consume() -> None:
+        if block is None:
+            return
+        if block_kind == "section":
+            name = block.get("Name")
+            addr = _hex_field(block.get("Addr", ""))
+            size_match = _FROMELF_SIZE_BYTES_RE.match(block.get("Size", ""))
+            if name is None or addr is None or size_match is None:
+                return
+            sections.append(
+                ElfSection(
+                    name=name,
+                    address=addr,
+                    size=int(size_match.group(1)),
+                    nobits=block.get("Type", "").startswith("SHT_NOBITS"),
+                    allocated="SHF_ALLOC" in block.get("Flags", ""),
+                )
+            )
+        elif block_kind == "segment" and block.get("Type", "").startswith("PT_LOAD"):
+            vaddr = _hex_field(block.get("Virtual Addr", ""))
+            paddr = _hex_field(block.get("Physical Addr", ""))
+            filesz = _FROMELF_SIZE_BYTES_RE.match(block.get("Size in file", ""))
+            memsz = _FROMELF_SIZE_BYTES_RE.match(block.get("Size in memory", ""))
+            if None in (vaddr, paddr, filesz, memsz):
+                return
+            segments.append(
+                LoadSegment(
+                    virtual_address=vaddr,
+                    physical_address=paddr,
+                    file_size=int(filesz.group(1)),
+                    memory_size=int(memsz.group(1)),
+                )
+            )
+
+    for line in stdout.splitlines():
+        if _FROMELF_SECTION_START_RE.match(line):
+            _consume()
+            block, block_kind = {}, "section"
+            continue
+        if _FROMELF_PROGRAM_START_RE.match(line):
+            _consume()
+            block, block_kind = {}, "segment"
+            continue
+        if block is None:
+            continue
+        match = _FROMELF_INVENTORY_FIELD_RE.match(line)
+        if match is not None:
+            # First occurrence wins, same rationale as the reserved path.
+            block.setdefault(match.group(1), match.group(2))
+    _consume()
+    return (tuple(sections), tuple(segments)) if sections else None
+
+
+def section_inventory(
+    binary_path: Path,
+    toolchain: str,
+    *,
+    timeout_s: int = 30,
+) -> SectionInventory | None:
+    """The measured section/segment inventory of *binary_path*, or None.
+
+    Dispatches like :func:`binary_sections`: readelf for the size-probed
+    toolchains, ``fromelf --text -v`` for armclang. Degrades to ``None`` on
+    any tool or parse failure — the measured memory view simply does not
+    exist for that run, exactly like an absent ``reserved`` split.
+    """
+    spec = get_toolchain_spec(toolchain)
+    if spec.section_probe == "fromelf":
+        try:
+            result = subprocess.run(
+                ["fromelf", "--text", "-v", str(binary_path)],
+                capture_output=True,
+                text=True,
+                timeout=timeout_s,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+            log.debug("fromelf inventory probe failed: %s", exc)
+            return None
+        if result.returncode != 0:
+            log.debug("fromelf -v failed: %s", (result.stderr or "").strip())
+            return None
+        parsed = _inventory_from_fromelf_listing(result.stdout or "")
+        if parsed is None:
+            return None
+        sections, segments = parsed
+        return SectionInventory(sections=sections, segments=segments)
+    if spec.readelf is None:
+        return None
+    readelf_cmd = resolve_toolchain_executable(toolchain, spec.readelf)
+    sections = _inventory_via_readelf(
+        binary_path, readelf_cmd=readelf_cmd, timeout_s=timeout_s
+    )
+    if sections is None:
+        return None
+    segments = _segments_via_readelf(
+        binary_path, readelf_cmd=readelf_cmd, timeout_s=timeout_s
+    )
+    return SectionInventory(sections=sections, segments=segments)
