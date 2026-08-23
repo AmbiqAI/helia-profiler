@@ -140,7 +140,8 @@ pre-build decision record (per-region capacity, planned usage, and named
 consumers — no free/overflow), and `resources.memory_regions` carries the
 measured per-region occupancy from the linked ELF (used/reserved/free,
 load-image bytes, unattributed sections) so dashboards do not need to parse
-individual run summaries.
+individual run summaries. `resources.memory_reconciliation` (additive,
+#133 Phase 3) carries per-consumer plan-vs-measured verdicts.
 
 Schema v4 adds dashboard-ready power fields for powered cases and preserves the
 complete per-run power object as `power_metrics`. The portable artifact index

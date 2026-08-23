@@ -36,8 +36,16 @@ from .platform.memory_map import (
     linked_memory_map,
 )
 from .platform.soc import SocDef
-from .results import MeasuredMemoryRegions, MeasuredRegion, UnattributedSection
-from .toolchain_probe import section_inventory
+from .results import (
+    ConsumerReconciliation,
+    MeasuredMemoryRegions,
+    MeasuredRegion,
+    MemoryPlan,
+    MemoryReconciliation,
+    RegionReconciliation,
+    UnattributedSection,
+)
+from .toolchain_probe import SymbolEntry, section_inventory
 
 log = logging.getLogger("hpx")
 
@@ -159,3 +167,113 @@ def measure_memory_regions(
         unattributed=unattributed,
         unattributed_load_bytes=unattributed_load,
     )
+
+
+# ---------------------------------------------------------------------------
+# Plan-vs-measured reconciliation (#133 Phase 3)
+# ---------------------------------------------------------------------------
+
+#: Plan-consumer name -> candidate symbol suffixes in the linked image.
+#: Matching is by SUFFIX (the symbol_address idiom), so C++ mangling
+#: (_ZL15g_arena_storage) resolves. Multi-piece consumers list every
+#: piece and the pieces' sizes are SUMMED (rtt_buffers = up buffer +
+#: down buffer + control block). heliaAOT consumers carry their own
+#: symbol hints (MemoryConsumer.symbol) instead — their names do not
+#: resemble their symbols.
+_CONSUMER_SYMBOLS: dict[str, tuple[str, ...]] = {
+    "tensor_arena": ("g_arena_storage",),
+    "model_flatbuffer": ("model_data",),
+    "pte_program": ("model_data",),
+    "planned_arena": ("g_planned_arena",),
+    "method_arena": ("g_method_arena",),
+    "temporary_arena": ("g_temporary_arena",),
+    "input_buffer": ("g_input",),
+    "output_buffer": ("g_output",),
+    #: TFLM/heliaRT records live inside g_profiler (the whole profiler
+    #: object, records dominating); AOT/ET declare g_layers directly.
+    "pmu_layer_records": ("g_profiler", "g_layers"),
+    "rtt_buffers": ("_acUpBuffer", "_acDownBuffer", "_SEGGER_RTT"),
+    "usb_buffers": ("usb_tx_buf", "usb_rx_buf"),
+    #: gcc only — armlink's stack is a scatter REGION, not a symbol
+    #: (unmatchable there, by design).
+    "boot_stack": ("g_pui32Stack",),
+}
+
+
+def _match_symbols(
+    candidates: tuple[str, ...], symbols: tuple[SymbolEntry, ...]
+) -> tuple[SymbolEntry, ...]:
+    """Every symbol whose name ends with any candidate, deduped by
+    (address, size) keep-first — aliases (two names over one object) must
+    not double the sum."""
+    matched: list[SymbolEntry] = []
+    seen: set[tuple[int, int]] = set()
+    for sym in symbols:
+        if any(sym.name.endswith(c) for c in candidates):
+            key = (sym.address, sym.size)
+            if key not in seen:
+                seen.add(key)
+                matched.append(sym)
+    return tuple(matched)
+
+
+def reconcile_memory(
+    plan: MemoryPlan,
+    measured: MeasuredMemoryRegions,
+    symbols: tuple[SymbolEntry, ...],
+) -> MemoryReconciliation:
+    """Hold the plan against the linked binary, by name and by region.
+
+    Consumer statuses per :class:`ConsumerReconciliation`; region rows
+    compare plan ``used`` to measured ``used`` for every region both
+    sides know. Purely additive — never mutates either input.
+    """
+    consumers: list[ConsumerReconciliation] = []
+    for region_usage in plan.regions:
+        region_name = str(region_usage.region)
+        for consumer in region_usage.consumers:
+            candidates = (
+                (consumer.symbol,)
+                if consumer.symbol
+                else _CONSUMER_SYMBOLS.get(consumer.name, ())
+            )
+            if not candidates:
+                # Structural: PSRAM-placed objects bind to runtime
+                # pointers (no sized symbol exists), armlink's stack is a
+                # scatter region, and AOT source-staging entries carry no
+                # hint — nothing to look for is not a failure to find.
+                status, matched = "unmatchable", ()
+            else:
+                matched = _match_symbols(tuple(candidates), symbols)
+                status = "matched" if matched else "missing"
+            measured_size = (
+                sum(m.size for m in matched) if status == "matched" else None
+            )
+            consumers.append(
+                ConsumerReconciliation(
+                    name=consumer.name,
+                    kind=str(consumer.kind),
+                    region=region_name,
+                    planned_size=consumer.size,
+                    status=status,
+                    matched_symbols=tuple(m.name for m in matched),
+                    measured_size=measured_size,
+                    delta=(
+                        measured_size - consumer.size
+                        if measured_size is not None
+                        else None
+                    ),
+                )
+            )
+
+    measured_by_region = {str(r.region): r for r in measured.regions}
+    regions = tuple(
+        RegionReconciliation(
+            region=str(r.region),
+            planned_used=r.used,
+            measured_used=measured_by_region[str(r.region)].used,
+        )
+        for r in plan.regions
+        if str(r.region) in measured_by_region
+    )
+    return MemoryReconciliation(consumers=tuple(consumers), regions=regions)

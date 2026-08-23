@@ -479,6 +479,58 @@ class MeasuredMemoryRegions:
 
 
 # ---------------------------------------------------------------------------
+# Plan-vs-measured reconciliation (#133 Phase 3)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ConsumerReconciliation:
+    """One plan consumer held against the linked binary's symbols.
+
+    ``status``: ``matched`` (symbols found; ``measured_size``/``delta``
+    populated — delta is measured minus planned, so positive means the
+    firmware reserves MORE than the plan booked), ``missing`` (planned
+    but no symbol found — either the plan is wrong or the symbol table
+    is), or ``unmatchable`` (structural: no symbol mapping exists for
+    this consumer — PSRAM-placed weights are a runtime pointer with no
+    sized symbol, armlink's stack is a scatter region, and some staged
+    entries have no single symbol)."""
+
+    name: str
+    kind: str
+    region: str
+    planned_size: int
+    status: str
+    matched_symbols: tuple[str, ...] = ()
+    measured_size: int | None = None
+    delta: int | None = None
+
+
+@dataclass(frozen=True)
+class RegionReconciliation:
+    """Plan ``used`` vs measured ``used`` for one region — the honest
+    "the plan missed N bytes here" figure the hpx-owned consumers exist
+    to drive toward zero."""
+
+    region: str
+    planned_used: int
+    measured_used: int
+
+    @property
+    def delta(self) -> int:
+        return self.measured_used - self.planned_used
+
+
+@dataclass(frozen=True)
+class MemoryReconciliation:
+    """The #133 payoff artifact: what the plan intended vs what the
+    linker did, by name and by region."""
+
+    consumers: tuple[ConsumerReconciliation, ...] = ()
+    regions: tuple[RegionReconciliation, ...] = ()
+
+
+# ---------------------------------------------------------------------------
 # Top-level result (public API return type)
 # ---------------------------------------------------------------------------
 

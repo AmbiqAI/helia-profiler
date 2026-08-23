@@ -36,7 +36,15 @@ from .evaluation import ModelAnalysis
 from .placement import Placement
 from .power.base import PowerResult
 from .power.metadata import ObservationMode, classify_observation
-from .results import MeasuredMemoryRegions, MemoryPlan, PmuResult, RunMetadata, BinarySections
+from .results import (
+    MeasuredMemoryRegions,
+    MemoryPlan,
+    MemoryReconciliation,
+    PmuResult,
+    RunMetadata,
+    BinarySections,
+)
+from .toolchain_probe import SymbolEntry
 from .target.probe.base import FlashBackend, Probe, ResetController
 
 log = logging.getLogger("hpx")
@@ -140,6 +148,12 @@ class PipelineContext:
     #: None whenever it cannot be true (uncharacterized map, tool failure,
     #: partial inventory).
     memory_regions: MeasuredMemoryRegions | None = None
+    #: Sized symbols from the built ELF (#133 Phase 3); None when nm is
+    #: unavailable or its listing was partial.
+    memory_symbols: tuple[SymbolEntry, ...] | None = None
+    #: Plan-vs-measured reconciliation (#133 Phase 3); needs plan,
+    #: measured regions, AND symbols.
+    memory_reconciliation: MemoryReconciliation | None = None
 
     #: Resolved arena placement region.  Set by :class:`PlanMemoryStage`
     #: from split model placement controls / compatibility presets and the

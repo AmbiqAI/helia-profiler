@@ -305,3 +305,213 @@ def test_serialised_shape_is_the_contract():
     assert region["free"] == 241_664 - 1000
     assert region["window"] == {"start": 0x20000000, "length": 262_144}
     assert payload["unattributed"] == [{"name": ".x", "address": 0, "size": 1}]
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: symbol inventory + reconciliation
+# ---------------------------------------------------------------------------
+
+
+class TestSymbolInventory:
+    def _symbols(self, monkeypatch, text=None):
+        import helia_profiler.toolchain_probe as tp
+        from helia_profiler.toolchain_probe import symbol_inventory
+
+        class _Result:
+            returncode = 0
+            stderr = ""
+            stdout = (
+                text
+                if text is not None
+                else (FIXTURES / "symbols.txt").read_text()
+            )
+
+        monkeypatch.setattr(tp.subprocess, "run", lambda *a, **k: _Result())
+        return symbol_inventory(Path("fw.elf"), "arm-none-eabi-gcc")
+
+    def test_real_capture_parses_every_row(self, monkeypatch):
+        symbols, unparsed = self._symbols(monkeypatch)
+        assert unparsed == 0
+        by_name = {s.name: s for s in symbols}
+        assert by_name["g_stack"].size == 0x4000
+        assert by_name["g_stack"].address == 0x20000000
+        assert by_name["g_initialized"].size == 0x20
+        assert by_name["g_zero_init"].size == 0xF8
+        assert by_name["__HeapBase"].size == 0x77EE8  # == the .heap section
+        assert by_name["main"].type == "T"
+
+    def test_garbage_rows_count_as_unparsed(self, monkeypatch):
+        text = "20000000 00004000 b g_stack\nnot a symbol row at all\n"
+        symbols, unparsed = self._symbols(monkeypatch, text=text)
+        assert len(symbols) == 1 and unparsed == 1
+
+    def test_tool_failure_degrades_to_none(self, monkeypatch):
+        import helia_profiler.toolchain_probe as tp
+        from helia_profiler.toolchain_probe import symbol_inventory
+
+        def _boom(*a, **k):
+            raise FileNotFoundError("nm")
+
+        monkeypatch.setattr(tp.subprocess, "run", _boom)
+        assert symbol_inventory(Path("fw.elf"), "arm-none-eabi-gcc") is None
+
+
+class TestReconciliation:
+    def _symbols(self):
+        from helia_profiler.toolchain_probe import SymbolEntry
+
+        return (
+            SymbolEntry("_ZL15g_arena_storage", 0x200128E0, 0x8000, "b"),
+            SymbolEntry("_ZL10model_data", 0x20004050, 0xD1F0, "d"),
+            SymbolEntry("g_pui32Stack", 0x20000000, 0x4000, "b"),
+            SymbolEntry("_acUpBuffer", 0x2001AAF8, 0x8000, "b"),
+            SymbolEntry("_acDownBuffer", 0x2001AAE8, 0x10, "b"),
+            SymbolEntry("_SEGGER_RTT", 0x20012838, 0xA8, "d"),
+            # alias pair over one object — must not double the sum:
+            SymbolEntry("_ZL10g_profiler", 0x20080000, 0x180FC, "d"),
+            SymbolEntry("_ssdata", 0x20080000, 0x180FC, "D"),
+        )
+
+    def _plan(self, consumers_by_region):
+        from helia_profiler.results import (
+            MemoryConsumer,
+            MemoryPlan,
+            MemoryRegionUsage,
+        )
+
+        regions = tuple(
+            MemoryRegionUsage(
+                region=region,
+                capacity=0,
+                used=sum(c.size for c in consumers),
+                consumers=tuple(consumers),
+            )
+            for region, consumers in consumers_by_region.items()
+        )
+        return MemoryPlan(engine="helia-rt", regions=regions)
+
+    def _measured(self):
+        from helia_profiler.results import MeasuredRegion
+
+        return MeasuredMemoryRegions(
+            link_family="gnu",
+            linker_profile="default",
+            regions=(
+                MeasuredRegion(
+                    region=MemoryRegion.DTCM,
+                    window_start=0x20000000,
+                    window_length=524_288,
+                    app_start=0x20000000,
+                    app_length=507_904,
+                    used=142_528,
+                    reserved=365_372,
+                ),
+                MeasuredRegion(
+                    region=MemoryRegion.SRAM,
+                    window_start=0x20080000,
+                    window_length=3_145_728,
+                    app_start=0x20080000,
+                    app_length=3_145_728,
+                    used=98_556,
+                    reserved=0,
+                ),
+            ),
+        )
+
+    def test_matched_missing_unmatchable_and_deltas(self):
+        from helia_profiler.memory_measurement import reconcile_memory
+        from helia_profiler.results import MemoryConsumer
+
+        plan = self._plan(
+            {
+                MemoryRegion.DTCM: [
+                    MemoryConsumer(name="tensor_arena", size=0x8000, kind="arena"),
+                    MemoryConsumer(
+                        name="rtt_buffers", size=0x8000 + 16 + 168, kind="other"
+                    ),
+                    MemoryConsumer(name="usb_buffers", size=5120, kind="other"),
+                ],
+                MemoryRegion.PSRAM: [
+                    MemoryConsumer(
+                        name="model_psram_blob", size=1024, kind="weights"
+                    ),
+                ],
+            }
+        )
+        rec = reconcile_memory(plan, self._measured(), self._symbols())
+        by_name = {c.name: c for c in rec.consumers}
+        arena = by_name["tensor_arena"]
+        assert arena.status == "matched" and arena.delta == 0
+        assert arena.matched_symbols == ("_ZL15g_arena_storage",)
+        # rtt: three pieces summed exactly -> delta 0
+        rtt = by_name["rtt_buffers"]
+        assert rtt.status == "matched"
+        assert rtt.measured_size == 0x8000 + 0x10 + 0xA8
+        assert rtt.delta == 0
+        # usb_buffers has candidates but no symbol in this image:
+        assert by_name["usb_buffers"].status == "missing"
+        # a consumer with no mapping at all is structural:
+        assert by_name["model_psram_blob"].status == "unmatchable"
+
+    def test_alias_pair_is_not_double_counted(self):
+        from helia_profiler.memory_measurement import reconcile_memory
+        from helia_profiler.results import MemoryConsumer
+
+        plan = self._plan(
+            {
+                MemoryRegion.SRAM: [
+                    MemoryConsumer(
+                        name="pmu_layer_records", size=4096 * 24, kind="other"
+                    ),
+                ],
+            }
+        )
+        rec = reconcile_memory(plan, self._measured(), self._symbols())
+        (records,) = rec.consumers
+        # g_profiler and _ssdata share (address, size): counted ONCE.
+        assert records.measured_size == 0x180FC
+        assert records.status == "matched"
+        # the profiler object is records + a few fields: small positive delta
+        assert records.delta == 0x180FC - 4096 * 24
+
+    def test_aot_symbol_hint_wins_over_the_name_table(self):
+        from helia_profiler.memory_measurement import reconcile_memory
+        from helia_profiler.results import MemoryConsumer
+        from helia_profiler.toolchain_probe import SymbolEntry
+
+        plan = self._plan(
+            {
+                MemoryRegion.DTCM: [
+                    MemoryConsumer(
+                        name="dtcm_scratch_arena_0",
+                        size=0x1000,
+                        kind="arena",
+                        symbol="hpx_arena_dtcm_buffer",
+                    ),
+                ],
+            }
+        )
+        symbols = (SymbolEntry("hpx_arena_dtcm_buffer", 0x20001000, 0x1200, "b"),)
+        rec = reconcile_memory(plan, self._measured(), symbols)
+        (consumer,) = rec.consumers
+        assert consumer.status == "matched"
+        assert consumer.delta == 0x200
+
+    def test_region_deltas_compare_plan_to_measured_used(self):
+        from helia_profiler.memory_measurement import reconcile_memory
+        from helia_profiler.results import MemoryConsumer
+
+        plan = self._plan(
+            {
+                MemoryRegion.SRAM: [
+                    MemoryConsumer(
+                        name="pmu_layer_records", size=4096 * 24, kind="other"
+                    ),
+                ],
+            }
+        )
+        rec = reconcile_memory(plan, self._measured(), self._symbols())
+        (sram,) = [r for r in rec.regions if r.region == "SRAM"]
+        assert sram.planned_used == 4096 * 24
+        assert sram.measured_used == 98_556
+        assert sram.delta == 98_556 - 4096 * 24

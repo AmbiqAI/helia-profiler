@@ -8,7 +8,12 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .memory import _CACHE_COUNTERS, _serialise_memory_plan, _serialise_memory_regions
+from .memory import (
+    _CACHE_COUNTERS,
+    _serialise_memory_plan,
+    _serialise_memory_reconciliation,
+    _serialise_memory_regions,
+)
 from .power import _power_summary_to_dict
 from .contracts import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION
 from ..evaluation import evaluate_run
@@ -82,6 +87,12 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     # Measured memory regions — the ELF classified into the verified map
     if ctx.memory_regions is not None:
         summary["memory_regions"] = _serialise_memory_regions(ctx.memory_regions)
+
+    # Plan-vs-measured reconciliation (#133 Phase 3)
+    if ctx.memory_reconciliation is not None:
+        summary["memory_reconciliation"] = _serialise_memory_reconciliation(
+            ctx.memory_reconciliation
+        )
 
     # Binary sections
     if ctx.binary_sections is not None:

@@ -138,6 +138,66 @@ def render_memory_regions(console: HpxConsole, measured: Any) -> None:
     console._console.print()
 
 
+def render_memory_reconciliation(console: HpxConsole, rec: Any) -> None:
+    """Plan-vs-measured verdicts (#133 Phase 3): one row per plan
+    consumer. Positive delta (firmware reserves MORE than planned) and
+    missing consumers render red; unmatchable rows are dim (structural,
+    not failures). Per-symbol rows never reach the console — they live in
+    detailed/memory.json."""
+    if not rec.consumers:
+        return
+    table = Table(
+        title="[bold]Plan vs measured[/bold]",
+        box=box.SIMPLE_HEAVY,
+        show_edge=False,
+        title_justify="left",
+        padding=(0, 1),
+    )
+    table.add_column("Consumer", style="dim")
+    table.add_column("Region", style="dim", min_width=6)
+    table.add_column("Planned", justify="right", min_width=10)
+    table.add_column("Measured", justify="right", min_width=10)
+    table.add_column("Δ", justify="right", min_width=9)
+    table.add_column("Status", min_width=11)
+
+    for c in rec.consumers:
+        if c.status == "matched":
+            measured_cell = _fmt_bytes(c.measured_size)
+            if c.delta:
+                sign = "+" if c.delta > 0 else "−"
+                delta_txt = f"{sign}{_fmt_bytes(abs(c.delta))}"
+                delta_cell = (
+                    f"[red]{delta_txt}[/red]" if c.delta > 0 else delta_txt
+                )
+            else:
+                delta_cell = "0"
+            status_cell = "matched"
+        elif c.status == "missing":
+            measured_cell, delta_cell = "—", "—"
+            status_cell = "[bold red]missing[/bold red]"
+        else:
+            measured_cell, delta_cell = "—", "—"
+            status_cell = "[dim]unmatchable[/dim]"
+        table.add_row(
+            escape(c.name),
+            c.region,
+            _fmt_bytes(c.planned_size),
+            measured_cell,
+            delta_cell,
+            status_cell,
+        )
+    console._console.print(table)
+    for r in rec.regions:
+        if r.delta:
+            sign = "+" if r.delta > 0 else "−"
+            style = "red" if r.delta > 0 else "dim"
+            console._console.print(
+                f"  [{style}]{r.region}: measured {sign}{_fmt_bytes(abs(r.delta))}"
+                f" vs plan[/{style}]"
+            )
+    console._console.print()
+
+
 def render_memory_plan(console: HpxConsole, plan: Any) -> None:
     """Render the engine-agnostic MemoryPlan as a region usage table.
 
@@ -400,6 +460,8 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         # renders only as a fallback — its numbers are the pre-build
         # decision record, not measurements.
         render_memory_regions(console, ctx.memory_regions)
+        if ctx.memory_reconciliation is not None:
+            render_memory_reconciliation(console, ctx.memory_reconciliation)
     elif ctx.memory_plan is not None and ctx.memory_plan.regions:
         render_memory_plan(console, ctx.memory_plan)
 

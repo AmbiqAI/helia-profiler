@@ -12,8 +12,13 @@ arm-none-eabi-readelf -S -W fw.elf > sections.txt
 arm-none-eabi-readelf -l -W fw.elf > segments.txt
 llvm-readelf -S -W fw.elf > sections_atfe.txt
 llvm-readelf -l -W fw.elf > segments_atfe.txt
+arm-none-eabi-nm -S --size-sort fw.elf > symbols.txt
 rm fw.elf
 ```
+
+`symbols.txt` is the sized-symbol listing of the SAME ELF (#133 Phase 3):
+every symbol matches its section byte-for-byte (g_stack == .stack,
+g_initialized == .data, g_zero_init == .bss, __HeapBase == .heap).
 
 `sections_atfe.txt` / `segments_atfe.txt` are llvm-readelf (ATfE 22.1.0) on
 the SAME ELF — ATfE's toolchain spec resolves its `readelf` to llvm-readelf,
