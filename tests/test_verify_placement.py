@@ -148,10 +148,11 @@ class TestRun:
 
     def test_unmodelled_soc_is_best_effort(self, tmp_path, monkeypatch):
         ctx = _ctx(tmp_path, board="apollo3p_evb", arena_region=Placement.SRAM)
-        # Simulate a SoC family whose memory model is not yet characterised:
-        # even a wildly wrong address must not raise when ranges are unknown.
+        # Simulate a SoC whose memory model is not yet characterised (#133
+        # Phase 2: the stage now reads the verified linked-memory map):
+        # even a wildly wrong address must not raise when the map is empty.
         monkeypatch.setattr(
-            verify_placement, "soc_placement_ranges", lambda soc: {}
+            verify_placement, "linked_memory_map", lambda soc: ()
         )
         monkeypatch.setattr(
             verify_placement, "symbol_address", lambda *a, **k: (0x00001234, "b")

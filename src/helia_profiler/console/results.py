@@ -50,6 +50,72 @@ def _format_mve_cells(counters: dict[str, float], cycles: float) -> list[str]:
     return [mve_pct, mac_density, ldst_density, stall_pct]
 
 
+def render_memory_regions(console: HpxConsole, measured: Any) -> None:
+    """Render the MEASURED per-region occupancy (#133 Phase 2) — what the
+    linker actually did, from the ELF classified into the verified map.
+
+    Used/free are against the link family's app extent; ``Reserved`` is
+    the linker's own reservations (fill-to-end heap, fixed scatter
+    heap/stack). Negative free (extent disagreement) renders red, as does
+    any unattributed section."""
+    if not measured.regions:
+        return
+
+    table = Table(
+        title=(
+            f"[bold]Memory (measured)[/bold] "
+            f"[dim]({measured.link_family} link)[/dim]"
+        ),
+        box=box.SIMPLE_HEAVY,
+        show_edge=False,
+        title_justify="left",
+        padding=(0, 1),
+    )
+    table.add_column("Region", style="dim", min_width=6)
+    table.add_column("Used", justify="right", min_width=10)
+    table.add_column("Free", justify="right", min_width=10)
+    table.add_column("of", justify="right", min_width=10)
+    table.add_column("", min_width=22)  # bar
+    table.add_column("%", justify="right", width=6)
+    table.add_column("Reserved", justify="right", style="dim")
+
+    for r in measured.regions:
+        if r.used == 0 and r.load_image == 0:
+            continue
+        pct = (r.used / r.app_length * 100) if r.app_length else 0.0
+        bar = _progress_bar(min(pct, 100.0), width=20)
+        if r.free < 0:
+            used_cell = f"[bold red]{_fmt_bytes(r.used)}[/bold red]"
+            free_cell = f"[bold red]{_fmt_bytes(r.free)}[/bold red]"
+            pct_cell = f"[bold red]{pct:.0f}%[/bold red]"
+        elif pct >= 90:
+            used_cell = f"[yellow]{_fmt_bytes(r.used)}[/yellow]"
+            free_cell = _fmt_bytes(r.free)
+            pct_cell = f"[yellow]{pct:.0f}%[/yellow]"
+        else:
+            used_cell = _fmt_bytes(r.used)
+            free_cell = _fmt_bytes(r.free)
+            pct_cell = f"{pct:.0f}%"
+        table.add_row(
+            r.region,
+            used_cell,
+            free_cell,
+            _fmt_bytes(r.app_length),
+            bar,
+            pct_cell,
+            _fmt_bytes(r.reserved) if r.reserved else "—",
+        )
+
+    console._console.print(table)
+    for u in measured.unattributed:
+        console._console.print(
+            f"  [bold red]unattributed[/bold red] {u.name} "
+            f"@0x{u.address:08X} ({_fmt_bytes(u.size)}) — outside every "
+            f"verified window"
+        )
+    console._console.print()
+
+
 def render_memory_plan(console: HpxConsole, plan: Any) -> None:
     """Render the engine-agnostic MemoryPlan as a region usage table.
 
@@ -305,7 +371,12 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         console._console.print()
 
     # ── Memory plan (per-region capacity vs used) ─────────────────
-    if ctx.memory_plan is not None and ctx.memory_plan.regions:
+    if ctx.memory_regions is not None and ctx.memory_regions.regions:
+        # Measured first (#133): region truth comes from the ELF. The plan
+        # renders only as a fallback — its numbers are the pre-build
+        # decision record, not measurements.
+        render_memory_regions(console, ctx.memory_regions)
+    elif ctx.memory_plan is not None and ctx.memory_plan.regions:
         render_memory_plan(console, ctx.memory_plan)
 
     # ── Cache/memory counters ─────────────────────────────────

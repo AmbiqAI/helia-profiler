@@ -344,6 +344,7 @@ def _case_resources(summary: dict[str, Any]) -> dict[str, Any]:
             "binary_sections": _nested_dict(summary, "binary") or None,
             "runtime_memory": _nested_dict(summary, "memory") or None,
             "memory_plan": _nested_dict(summary, "memory_plan") or None,
+            "memory_regions": _nested_dict(summary, "memory_regions") or None,
         }
     )
 

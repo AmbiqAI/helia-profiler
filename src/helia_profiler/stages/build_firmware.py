@@ -8,6 +8,7 @@ from ..results import FirmwareArtifact
 from ..errors import BuildError
 from ..pipeline import PipelineContext
 from ..results import ToolchainInfo
+from ..memory_measurement import measure_memory_regions
 from ..toolchain_probe import binary_sections, cmake_version, compiler_version
 
 log = logging.getLogger("hpx")
@@ -50,6 +51,21 @@ class BuildFirmwareStage:
             toolchain,
             timeout_s=ctx.config.timeouts.binary_probe_s,
         )
+        # Measured memory regions (#133 Phase 2): the ELF classified into
+        # the verified per-SoC windows. The linker profile must be the one
+        # the binary actually linked with — the engine knob, default
+        # otherwise; non-default profiles degrade to None inside.
+        if ctx.soc is not None:  # best-effort, like binary_sections above
+            linker_profile = str(
+                ctx.config.engine.config.get("linker_profile") or "default"
+            )
+            ctx.memory_regions = measure_memory_regions(
+                binary_path,
+                toolchain,
+                ctx.soc,
+                linker_profile=linker_profile,
+                timeout_s=ctx.config.timeouts.binary_probe_s,
+            )
         ctx.publish_profile_firmware(
             FirmwareArtifact(
                 role="profile",

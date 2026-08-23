@@ -23,11 +23,20 @@ import logging
 from ..engines import EngineType
 from ..errors import BuildError
 from ..pipeline import PipelineContext
-from ..placement import Placement
-from ..platform import MemoryRange, soc_placement_ranges
+from ..placement import MemoryRegion, Placement
+from ..platform import classify_address, linked_memory_map
 from ..toolchain_probe import symbol_address
 
 log = logging.getLogger("hpx")
+
+#: Arena PLACEMENT -> verified-map region. The placement vocabulary calls
+#: the tightly-coupled bank "TCM"; the measured map calls it DTCM.
+_PLACEMENT_REGION = {
+    Placement.TCM: MemoryRegion.DTCM,
+    Placement.SRAM: MemoryRegion.SRAM,
+    Placement.MRAM: MemoryRegion.MRAM,
+    Placement.PSRAM: MemoryRegion.PSRAM,
+}
 
 #: Arena storage symbol emitted by the interpreter firmware template
 #: (``main.cc.j2``).  Mangled to ``_ZL15g_arena_storage`` by C++ compilers;
@@ -61,15 +70,29 @@ class VerifyPlacementStage:
         binary_path = ctx.built_binary_path
         arena_region = ctx.planned_arena_region
 
-        ranges = soc_placement_ranges(soc)
-        expected = ranges.get(arena_region)
-        if expected is None:
+        # #133 Phase 2 migration: verify against the characterized
+        # linked-memory map, not the legacy family placement table (whose
+        # AP5 MRAM base was entirely wrong — every divergence between the
+        # two is pinned by tests/test_memory_map.py). Interpreter builds
+        # (the only ones this stage checks) always link the DEFAULT
+        # profile — the linker_profile knob is AOT-only, and AOT skips.
+        windows = linked_memory_map(soc)
+        expected_window = next(
+            (
+                w.window
+                for w in windows
+                if w.region is _PLACEMENT_REGION.get(arena_region)
+            ),
+            None,
+        )
+        if expected_window is None:
             log.debug(
-                "No address range for %s on %s; skipping placement verify.",
+                "No verified window for %s on %s; skipping placement verify.",
                 arena_region,
                 soc.name,
             )
             return
+        expected = expected_window
 
         toolchain = ctx.config.target.toolchain
         resolved = symbol_address(
@@ -97,8 +120,8 @@ class VerifyPlacementStage:
             )
             return
 
-        actual = _classify(address, ranges)
-        actual_label = actual.upper() if actual else "an unmapped region"
+        actual = classify_address(address, windows)
+        actual_label = str(actual) if actual else "an unmapped region"
         raise BuildError(
             f"Arena landed in {actual_label} (0x{address:08X}) but the memory "
             f"plan placed it in {str(arena_region).upper()} "
@@ -112,10 +135,3 @@ class VerifyPlacementStage:
             ),
         )
 
-
-def _classify(address: int, ranges: dict[Placement, MemoryRange]) -> str | None:
-    """Return the placement name whose range contains *address*, if any."""
-    for placement, mrange in ranges.items():
-        if mrange.contains(address):
-            return str(placement)
-    return None
