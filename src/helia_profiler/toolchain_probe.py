@@ -675,8 +675,12 @@ def _inventory_via_readelf(
         if match is None:
             # A bracket row that fails the type-constrained pattern (e.g. a
             # numeric/LOOS+ sh_type readelf cannot name) would silently
-            # understate occupancy — surface it. The NULL row is expected.
-            if re.match(r"^\s*\[\s*\d+\]", line) and "NULL" not in line:
+            # understate occupancy — surface it. Index 0 is the expected
+            # NULL row (matched by position, not name, so a section whose
+            # name merely contains "NULL" still gets logged).
+            if re.match(r"^\s*\[\s*\d+\]", line) and not re.match(
+                r"^\s*\[\s*0\]", line
+            ):
                 log.debug("readelf -S row not parsed by inventory: %r", line)
             continue
         name, sh_type, addr_hex, size_hex, flags = match.groups()

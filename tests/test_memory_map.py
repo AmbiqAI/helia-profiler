@@ -70,59 +70,55 @@ def test_apollo510_windows_are_the_linker_script_values():
 
 
 # Every known divergence between capabilities._FAMILY_MEMORY_BASES (via
-# soc_placement_ranges) and the verified windows, enumerated exhaustively
-# (#176 review M-4). "disjoint": the legacy range shares NO address with the
-# real window; "overlap": shifted/resized but intersecting; "equal": same
-# span. Phase 2's migration must consciously edit this table.
-_EXPECTED_LEGACY_MRAM_RELATION = {
-    "apollo3p": "overlap",  # legacy base 0x0 vs real ROMEM 0xC000
-    "apollo4p": "overlap",  # legacy base 0x0/2000 KB vs real 0x18000/1952 KB
-    "apollo4l": "overlap",
-    "apollo510": "disjoint",  # legacy [0x0,0x400000) is ITCM territory
-    "apollo510b": "disjoint",
-    "apollo5b": "disjoint",
-    "apollo330P": "disjoint",  # same 0x0 base; real MRAM starts 0x410000
+# soc_placement_ranges) and the verified windows, pinned EXACTLY per SoC
+# (#176 review M-4, lengths added in the fresh-eyes round): real MRAM start
+# plus (legacy length, verified length) for MRAM / TCM / SRAM. Every legacy
+# MRAM base is 0x0 (asserted in the test body); a Phase-2 edit that turns
+# any known divergence into agreement — or vice versa — must consciously
+# edit this table.
+_EXPECTED_LEGACY_VS_VERIFIED = {
+    #  name         real MRAM    (legacy, verified) lengths for MRAM / TCM / SRAM
+    "apollo3p": (0x0000C000, (2_048_000, 2_048_000), (65_536, 65_536), (716_800, 720_896)),
+    "apollo4p": (0x00018000, (2_048_000, 1_998_848), (393_216, 393_216), (1_048_576, 1_048_576)),
+    "apollo4l": (0x00018000, (2_048_000, 1_998_848), (393_216, 393_216), (1_048_576, 1_048_576)),
+    "apollo510": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
+    "apollo510b": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
+    "apollo5b": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
+    "apollo330P": (0x00410000, (2_031_616, 2_031_616), (245_760, 262_144), (1_835_008, 1_835_008)),
 }
-
-
-def _relation(a, b) -> str:
-    if a.start == b.start and a.length == b.length:
-        return "equal"
-    if a.end <= b.start or b.end <= a.start:
-        return "disjoint"
-    return "overlap"
 
 
 def test_known_divergences_from_the_legacy_placement_table_are_pinned():
     """capabilities._FAMILY_MEMORY_BASES stays untouched in Phase 1 (verify-
-    placement depends on it); this test pins EVERY known divergence so the
-    Phase-2 migration is a reviewed edit, not silent drift."""
+    placement depends on it); this test pins EVERY known divergence — bases
+    AND lengths — so the Phase-2 migration is a reviewed edit, not silent
+    drift. Notable pinned facts: every legacy MRAM base is 0x0, entirely
+    disjoint from the real windows on the AP5 family (0x0 is ITCM there);
+    apollo330P's legacy 240 KB TCM is the gcc linker region while the
+    verified window is the 256 KB hardware aperture; apollo3p's verified
+    SRAM window includes the 4 KB STACKMEM slot the legacy table starts
+    above."""
     for name in CHARACTERIZED_SOCS:
         soc = get_soc(name)
         legacy = soc_placement_ranges(soc)
         verified = {w.region: w for w in linked_memory_map(soc)}
-        # MRAM: every legacy base is 0x0; the relation to the real window
-        # varies per family and is pinned exactly.
+        mram_start, mram_lens, tcm_lens, sram_lens = _EXPECTED_LEGACY_VS_VERIFIED[name]
         legacy_mram = legacy[Placement.MRAM]
+        real_mram = verified[MemoryRegion.MRAM].window
         assert legacy_mram.start == 0x0, name
-        assert (
-            _relation(legacy_mram, verified[MemoryRegion.MRAM].window)
-            == _EXPECTED_LEGACY_MRAM_RELATION[name]
-        ), name
-        # TCM bases agree everywhere; lengths agree except where the legacy
-        # table recorded a single linker script's slice of the aperture.
+        assert real_mram.start == mram_start, name
+        assert (legacy_mram.length, real_mram.length) == mram_lens, name
         legacy_tcm = legacy[Placement.TCM]
         real_dtcm = verified[MemoryRegion.DTCM].window
         assert legacy_tcm.start == real_dtcm.start, name
-        # SRAM: bases agree except apollo3p, where the verified window now
-        # starts at the hardware SRAM boundary 0x10010000 (the 4 KB STACKMEM
-        # slot) while the legacy table starts at RWMEM 0x10011000.
+        assert (legacy_tcm.length, real_dtcm.length) == tcm_lens, name
         legacy_sram = legacy[Placement.SRAM]
         real_sram = verified[MemoryRegion.SRAM].window
         if name == "apollo3p":
             assert legacy_sram.start == 0x10011000 and real_sram.start == 0x10010000
         else:
             assert legacy_sram.start == real_sram.start, name
+        assert (legacy_sram.length, real_sram.length) == sram_lens, name
 
 
 def test_apollo330P_has_no_itcm_and_dtcm_is_the_256k_hardware_aperture():

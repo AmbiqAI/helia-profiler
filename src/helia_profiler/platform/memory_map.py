@@ -24,15 +24,18 @@ ATfE links the gcc ``*.ld`` scripts (confirmed from nsx's cmake and an
 apollo330mP ATfE LLD map), so app-available lengths key on the LINK family
 (GNU ld vs armlink), not the compiler.
 
-Aperture rule (applied uniformly): every classification ``window`` is the
-HARDWARE aperture from the SDK's ``am_reg_base_addresses.h`` for that part —
-never a single linker script's opinion of it — because the two link families
-carve the same silicon differently (gcc may decline to use the top of a TCM
-that armlink tiles exactly full). What differs per link family is only
-``app_available``, which IS a linker-script fact. Where a hardware aperture
-is wider than both scripts' regions the window still ends at the hardware
-top (#176 review M-1/M-2 corrected two windows that had drifted from this
-rule).
+Aperture rule (applied uniformly): every RAM classification ``window``
+(ITCM/DTCM/SRAM) is the HARDWARE aperture from the SDK's
+``am_reg_base_addresses.h`` for that part — never a single linker script's
+opinion of it — because the two link families carve the same silicon
+differently (gcc may decline to use the top of a TCM that armlink tiles
+exactly full). What differs per link family is only ``app_available``,
+which IS a linker-script fact. (#176 review M-1/M-2 corrected two windows
+that had drifted from this rule.) MRAM windows are deliberately NOT the
+hardware flash aperture: they start at the SBL-excluded app origin both
+scripts link at (e.g. 0x00410000 on AP5, where hardware MRAM begins at
+0x00400000) — an app section can only ever land in the app window, and
+"below the app origin" should classify as outside, not as MRAM.
 
 PSRAM has no linker region on any SoC (grep-verified across every ``.ld`` and
 ``.sct``); its window comes from the existing board-knowledge tables and is
