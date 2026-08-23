@@ -51,7 +51,6 @@ def test_app_windows_nest_inside_the_classification_window():
                 assert 0 < extent.length <= w.window.length, (name, w.region)
                 assert w.window.start <= extent.start, (name, w.region)
                 assert extent.end <= w.window.end, (name, w.region)
-                assert w.app_available(family) == extent.length
 
 
 def test_partial_app_window_mapping_is_rejected():
@@ -81,8 +80,9 @@ def test_partial_app_window_mapping_is_rejected():
 def test_apollo510_windows_are_the_linker_script_values():
     """The load-bearing corrections vs the legacy tables, pinned exactly:
     MRAM at the app origin (NOT 0x0, which is ITCM on this family), DTCM's
-    hardware aperture with per-link-family app-available (gcc 480 KB /
-    armlink 492 KB), ITCM present."""
+    hardware aperture with per-link-family app extents (gcc: the full
+    496 KB MCU_TCM script region; armlink: 492 KB MCU_TCM), ITCM
+    present."""
     by_region = {w.region: w for w in linked_memory_map(get_soc("apollo510"))}
     assert by_region[MemoryRegion.MRAM].window.start == 0x00410000
     assert by_region[MemoryRegion.MRAM].window.length == 4_128_768
@@ -90,10 +90,10 @@ def test_apollo510_windows_are_the_linker_script_values():
     assert by_region[MemoryRegion.ITCM].window.length == 262_144
     dtcm = by_region[MemoryRegion.DTCM]
     assert dtcm.window.length == 524_288
-    # gcc's .stack is the FIRST section into MCU_TCM: the app extent
-    # starts 16 KB up and ends at the script's MCU_TCM top; armlink's app
-    # extent IS MCU_TCM (heap+stack tile above it to the aperture).
-    assert dtcm.app_window[LinkFamily.GNU] == MemoryRange(0x20004000, 491_520)
+    # gcc's extent is the FULL MCU_TCM script region — .stack floats
+    # inside it and counts as occupancy; armlink's extent IS MCU_TCM
+    # (its fixed heap+stack tile above it to the aperture).
+    assert dtcm.app_window[LinkFamily.GNU] == MemoryRange(0x20000000, 507_904)
     assert dtcm.app_window[LinkFamily.ARMLINK] == MemoryRange(0x20000000, 503_808)
     psram = by_region[MemoryRegion.PSRAM]
     assert psram.window_provenance == "board-knowledge"
@@ -167,11 +167,12 @@ def test_apollo330P_has_no_itcm_and_dtcm_is_the_256k_hardware_aperture():
     assert MemoryRegion.ITCM not in by_region
     assert by_region[MemoryRegion.DTCM].window.length == 262_144
     assert classify_address(0x2003C000, windows) is MemoryRegion.DTCM
-    # gcc/armlink app extents stay the linker-script facts — and the
-    # armlink stack now sits inside the WINDOW but outside the app extent,
-    # which is what makes the free math consistent:
+    # gcc's extent is the full 240 KB MCU_TCM script region — on this
+    # part .dtcm_text precedes the floating .stack, so no fixed carve-out
+    # is possible. armlink's fixed stack sits inside the WINDOW but
+    # outside the extent, which is what keeps the free math consistent:
     dtcm = by_region[MemoryRegion.DTCM]
-    assert dtcm.app_window[LinkFamily.GNU] == MemoryRange(0x20004000, 229_376)
+    assert dtcm.app_window[LinkFamily.GNU] == MemoryRange(0x20000000, 245_760)
     assert dtcm.app_window[LinkFamily.ARMLINK] == MemoryRange(0x20000000, 241_664)
     assert not dtcm.app_window[LinkFamily.ARMLINK].contains(0x2003C000)
 
@@ -276,34 +277,37 @@ def test_real_gcc_fixture_inventory_classifies_correctly():
         (".bss", 0x20004020): MemoryRegion.DTCM,
         (".heap", 0x20004118): MemoryRegion.DTCM,
     }
-    # And the free-math contract composes: the stack is inside the DTCM
-    # window but OUTSIDE the gcc app extent; the fill-to-end .heap is
-    # inside the extent but linker_reserved. app_len − Σ(app sections not
-    # reserved) is then the honest free figure.
+    # And the free-math contract composes: gcc's floating .stack is
+    # INSIDE the extent and counts as occupancy (live memory); the
+    # fill-to-end .heap is inside but linker_reserved-excluded.
+    # extent_len − Σ(non-reserved sections in extent) is the honest free.
     by_region = {w.region: w for w in windows}
     gcc_app = by_region[MemoryRegion.DTCM].app_window[LinkFamily.GNU]
     by_key = {(s.name, s.address): s for s in sections}
-    assert not gcc_app.contains(by_key[(".stack", 0x20000000)].address)
+    stack = by_key[(".stack", 0x20000000)]
+    assert gcc_app.contains(stack.address) and not stack.linker_reserved
     heap = by_key[(".heap", 0x20004118)]
     assert gcc_app.contains(heap.address) and heap.linker_reserved
-    app_used = sum(
+    occupancy = sum(
         s.size
         for s in sections
         if s.allocated and not s.linker_reserved and gcc_app.contains(s.address)
     )
-    assert app_used == 0x20 + 0xF8  # .data + .bss
+    assert occupancy == 0x4000 + 0x20 + 0xF8  # .stack + .data + .bss
     # .heap fills to the region top, so its size IS ground-truth free —
-    # and the formula reproduces it exactly (no stack-sized error, the
-    # #176 fresh-review M-1 failure mode):
-    assert gcc_app.length - app_used == heap.size
+    # and the formula reproduces it exactly (robust to WHERE the stack
+    # sits, the a50e63d fresh-eyes failure mode on apollo330P):
+    assert gcc_app.length - occupancy == heap.size
 
 
 # Every app extent pinned exactly, per (soc, region, family): (start, length).
 # The app extents are the PR's headline deliverable — window starts/lengths
 # are pinned by _EXPECTED_LEGACY_VS_VERIFIED, but a transposed digit in an
-# extent would otherwise ship silently (#176 fresh-review M-4). gcc DTCM
-# extents start 16 KB above the window (stack-at-origin); everything else
-# starts at the window start except apollo3p SRAM (RWMEM above STACKMEM).
+# extent would otherwise ship silently (#176 fresh-review M-4). GNU DTCM
+# extents are the FULL script MCU_TCM regions (the floating .stack counts
+# as occupancy — its position is script-order-dependent); armlink DTCM
+# extents are MCU_TCM with the fixed heap/stack carved out by extent;
+# apollo3p SRAM starts at RWMEM above the fixed STACKMEM slot.
 _EXPECTED_APP_WINDOWS = {
     "apollo3p": {
         MemoryRegion.MRAM: {
@@ -325,7 +329,7 @@ _EXPECTED_APP_WINDOWS = {
             LinkFamily.ARMLINK: (0x00018000, 1_998_848),
         },
         MemoryRegion.DTCM: {
-            LinkFamily.GNU: (0x10004000, 376_832),
+            LinkFamily.GNU: (0x10000000, 393_216),
             LinkFamily.ARMLINK: (0x10000000, 372_736),
         },
         MemoryRegion.SRAM: {
@@ -343,7 +347,7 @@ _EXPECTED_APP_WINDOWS = {
             LinkFamily.ARMLINK: (0x00410000, 4_128_768),
         },
         MemoryRegion.DTCM: {
-            LinkFamily.GNU: (0x20004000, 491_520),
+            LinkFamily.GNU: (0x20000000, 507_904),
             LinkFamily.ARMLINK: (0x20000000, 503_808),
         },
         MemoryRegion.SRAM: {
@@ -357,7 +361,7 @@ _EXPECTED_APP_WINDOWS = {
             LinkFamily.ARMLINK: (0x00410000, 2_031_616),
         },
         MemoryRegion.DTCM: {
-            LinkFamily.GNU: (0x20004000, 229_376),
+            LinkFamily.GNU: (0x20000000, 245_760),
             LinkFamily.ARMLINK: (0x20000000, 241_664),
         },
         MemoryRegion.SRAM: {

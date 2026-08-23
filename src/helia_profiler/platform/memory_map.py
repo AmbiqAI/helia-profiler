@@ -54,8 +54,12 @@ here.
 Phase-2 free math (the contract these shapes exist for):
 ``free = app_window[family].length − Σ(size of allocated sections whose
 address falls inside app_window[family], excluding linker_reserved ones)``.
-Sections inside ``window`` but outside ``app_window`` are the linker's own
-reservations (stacks, armlink's fixed heap) — reserved, not app usage.
+Sections inside ``window`` but outside ``app_window`` are the linker's
+FIXED reservations (armlink's scatter heap/stack, apollo3p's STACKMEM) —
+reserved, not app usage. gcc's floating ``.stack`` sits INSIDE the extent
+and counts as occupancy (live memory, the #131 stance); only the
+fill-to-end ``.heap`` is ``linker_reserved``-excluded. See the
+``LinkedRegionWindow`` docstring for why the two mechanisms exist.
 Load-image (MRAM) accounting sums ``LoadSegment.file_size`` grouped by
 ``classify_address(physical_address)`` — see the ``LoadSegment`` docstring
 for why walking sections into segments is wrong on armlink.
@@ -102,19 +106,33 @@ class LinkedRegionWindow:
 
     ``window`` is the CLASSIFICATION aperture — an allocated section whose
     address falls inside it belongs to this region. ``app_window`` is the
-    address EXTENT the app's own static data occupies under each link
-    family: the window minus what the script/startup reserves (gcc's
-    stack-at-origin, armlink's fixed heap/stack regions above MCU_TCM).
-    An extent, not a count, because the reservations sit INSIDE the
-    classification window: honest Phase-2 free math is
-    ``app_window.length − Σ(sections inside app_window, excluding
-    linker_reserved ones)`` — a scalar "available" invites subtracting a
-    stack that was already carved out of it (#176 fresh-review M-1, the
-    error is exactly one stack size on every configuration either way).
-    Sections inside ``window`` but outside ``app_window`` are the linker's
-    reservations (stacks, armlink heap) — report them as reserved, never
-    as app usage or free space. A region absent from a SoC's map simply
-    has no window entry.
+    address EXTENT of the linked region the app's image occupies under
+    each link family. Honest Phase-2 free math is
+    ``app_window.length − Σ(allocated sections inside app_window,
+    excluding linker_reserved ones)``.
+
+    Reservations are handled by TWO mechanisms, matched to how each link
+    family expresses them (#176 fresh-review rounds — both single-
+    mechanism designs were wrong):
+
+    * FIXED script regions are carved out by EXTENT: armlink's scatter
+      pins ``ARM_LIB_HEAP``/``ARM_LIB_STACK`` above ``MCU_TCM`` (so the
+      armlink extent is ``MCU_TCM`` itself), and apollo3p's gcc script
+      pins ``STACKMEM`` below ``RWMEM``. Sections inside ``window`` but
+      outside ``app_window`` are these fixed reservations — report them
+      as reserved, never as app usage or free space.
+    * FLOATING sections are handled by the INVENTORY: gcc's ``.stack`` is
+      an ordinary output section whose position depends on what else the
+      script places first (apollo330P's ``.dtcm_text`` — which hpx's own
+      AOT engine emits via ``HELIAAOT_PUT_IN_ITCM`` — precedes it; a
+      fixed carve-out was wrong there). The gcc DTCM extent is therefore
+      the FULL script region, and ``.stack`` counts as occupancy — it is
+      live memory the firmware needs, the same #131 stance
+      ``BinarySections`` takes. gcc's fill-to-end ``.heap`` is the one
+      ``linker_reserved`` exclusion (its size states what was LEFT, so
+      counting it would make free identically zero).
+
+    A region absent from a SoC's map simply has no window entry.
     """
 
     region: MemoryRegion
@@ -140,6 +158,10 @@ class LinkedRegionWindow:
     section_attributable: bool = True
 
     def __post_init__(self) -> None:
+        # Freeze the mapping so the construction-time validation below is
+        # an invariant, not a snapshot (a caller-supplied plain dict could
+        # otherwise be mutated behind the frozen dataclass).
+        object.__setattr__(self, "app_window", MappingProxyType(dict(self.app_window)))
         for family in LinkFamily:
             extent = self.app_window.get(family)
             if extent is None:
@@ -148,12 +170,8 @@ class LinkedRegionWindow:
                 )
             if extent.start < self.window.start or extent.end > self.window.end:
                 raise ValueError(
-                    f"{self.region}: app_window {family!r} exceeds the window"
+                    f"{self.region}: app_window {family!r} lies outside the window"
                 )
-
-    def app_available(self, family: LinkFamily) -> int:
-        """Bytes of app-usable space under *family* (the extent's length)."""
-        return self.app_window[family].length
 
 
 def _window(
@@ -171,8 +189,8 @@ def _window(
 ) -> LinkedRegionWindow:
     """``gnu``/``armlink`` are app-extent LENGTHS; ``gnu_start``/
     ``armlink_start`` default to the window start (they differ only where
-    a script reserves the BOTTOM of the region — gcc's stack-at-origin
-    DTCM layouts)."""
+    the script pins a FIXED region below the app one — apollo3p's
+    STACKMEM slot under RWMEM)."""
     return LinkedRegionWindow(
         region=region,
         window=MemoryRange(start, length),
@@ -240,13 +258,15 @@ _APOLLO4 = (
         armlink=1_998_848,
         window_provenance="linker-app-origin",
     ),
+    # gcc extent = the FULL 384 KB MCU_TCM script region (.stack floats
+    # inside it and counts as occupancy); armlink extent = MCU_TCM with
+    # its fixed heap/stack tiled above.
     _window(
         MemoryRegion.DTCM,
         0x10000000,
         393_216,
-        gnu=376_832,
+        gnu=393_216,
         armlink=372_736,
-        gnu_start=0x10004000,
     ),
     _window(MemoryRegion.SRAM, 0x10060000, 1_048_576, gnu=1_048_576, armlink=1_048_576),
 )
@@ -271,16 +291,17 @@ _APOLLO5_FULL = (
         armlink=4_128_768,
         window_provenance="linker-app-origin",
     ),
-    # gcc: .stack is the FIRST section into MCU_TCM (16 KB at the origin),
-    # so the app extent is [0x20004000, 0x2007C000). armlink: MCU_TCM
-    # itself is the app extent; heap+stack tile ABOVE it to the aperture.
+    # gcc extent = the FULL 496 KB MCU_TCM script region [0x20000000,
+    # 0x2007C000) — .stack is a floating section inside it (first on
+    # AP510, but position is script-order-dependent in general) and
+    # counts as occupancy. armlink extent = MCU_TCM; its fixed 4 KB heap
+    # + 16 KB stack tile ABOVE it to the hardware aperture.
     _window(
         MemoryRegion.DTCM,
         0x20000000,
         524_288,
-        gnu=491_520,
+        gnu=507_904,
         armlink=503_808,
-        gnu_start=0x20004000,
     ),
     _window(MemoryRegion.SRAM, 0x20080000, 3_145_728, gnu=3_145_728, armlink=3_145_728),
 )
@@ -306,13 +327,17 @@ _APOLLO330P = (
         armlink=2_031_616,
         window_provenance="linker-app-origin",
     ),
+    # gcc extent = the FULL 240 KB MCU_TCM script region. On THIS part
+    # .dtcm_text precedes .stack into MCU_TCM (and hpx's AOT engine emits
+    # .dtcm_text via HELIAAOT_PUT_IN_ITCM on ITCM-less parts), so the
+    # stack's position is link-dependent — a fixed carve-out was wrong
+    # (#176 fresh-eyes on a50e63d). armlink extent = MCU_TCM.
     _window(
         MemoryRegion.DTCM,
         0x20000000,
         262_144,
-        gnu=229_376,
+        gnu=245_760,
         armlink=241_664,
-        gnu_start=0x20004000,
     ),
     _window(MemoryRegion.SRAM, 0x20080000, 1_835_008, gnu=1_835_008, armlink=1_835_008),
 )

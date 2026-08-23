@@ -205,12 +205,15 @@ def _is_reserved_section_name(name: str) -> bool:
     for the same reason ``.stack`` does not: it is the live stack (armlink
     points the initial SP at its top), so it belongs in the footprint.
 
-    Reachability note (#175 review m3): the case-insensitivity only matters
-    on the fromelf path — armlink's conventional upper-case region names
-    (ARM_LIB_HEAP) never reach the readelf caller, whose section regex
-    anchors on a leading dot. Known accepted false positive: a user section
-    whose name tokenizes to a heap token (e.g. MY_HEAP_STATS) counts as
-    reserved; no shipped NSX linker script or scatter produces one.
+    Reachability (updated for #133 Phase 1): originally only the fromelf
+    path saw armlink-style names (the reserved-path readelf regex anchors
+    on a leading dot), but the INVENTORY readelf path takes general names,
+    so ARM_LIB_HEAP now reaches this predicate from both tools — the
+    case-insensitivity is load-bearing on both. Known accepted false
+    positive: a user section whose name tokenizes to a heap token (e.g.
+    MY_HEAP_STATS, .heap_manager_state) counts as reserved when it is
+    NOBITS+allocated; no shipped NSX linker script or scatter produces
+    one, and ``ElfSection.linker_reserved`` inherits this predicate.
     """
     tokens = set(name.lower().lstrip(".").replace("_", ".").split("."))
     return bool(tokens & _RESERVED_NOBITS_NAMES)
@@ -651,12 +654,14 @@ class LoadSegment:
 class SectionInventory:
     """The measured memory inventory of one linked binary.
 
-    ``unparsed_rows`` counts section rows / fromelf blocks that LOOKED like
-    inventory entries but failed to parse. When nonzero the inventory is
-    PARTIAL — occupancy computed from it is understated, and a Phase-2
-    consumer must treat the measured view as unavailable rather than
-    publish a silently-low number (#131's discipline, structural instead
-    of a debug log)."""
+    ``unparsed_rows`` counts SECTION rows/blocks that LOOKED like
+    inventory entries but failed to parse. When nonzero the section
+    inventory is PARTIAL — occupancy computed from it is understated, and
+    a Phase-2 consumer must treat the measured view as unavailable rather
+    than publish a silently-low number (#131's discipline, structural
+    instead of a debug log). Segment parse failures are NOT counted:
+    segments refine the inventory and their absence degrades
+    independently (empty tuple), on both tool paths."""
 
     sections: tuple[ElfSection, ...]
     segments: tuple[LoadSegment, ...] = ()
@@ -853,7 +858,11 @@ def _inventory_from_fromelf_listing(
             filesz = _FROMELF_SIZE_BYTES_RE.match(block.get("Size in file", ""))
             memsz = _FROMELF_SIZE_BYTES_RE.match(block.get("Size in memory", ""))
             if vaddr is None or paddr is None or filesz is None or memsz is None:
-                unparsed += 1
+                # NOT counted in unparsed_rows: that counter states SECTION
+                # completeness, and segments only refine (their absence
+                # must not discard the inventory — same rule as
+                # _segments_via_readelf, which drops a mangled LOAD row
+                # without poisoning the section signal).
                 log.debug("fromelf PT_LOAD block not parsed: %r", sorted(block))
                 return
             segments.append(
