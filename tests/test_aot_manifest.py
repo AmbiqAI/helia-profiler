@@ -402,9 +402,11 @@ class TestAotSymbolHints:
             region_id=region_id,
         )
 
-    def test_cold_constant_is_the_blob_in_both_modes(self):
+    def test_cold_constant_is_the_blob_only_with_internal_arenas(self):
         assert self._hint("constant") == "hpx_arena_const_dtcm__blob"
-        assert self._hint("constant", allocate=False) == "hpx_arena_const_dtcm__blob"
+        # External-arena mode emits NO constant symbols (sidecar files);
+        # a __blob hint there produced a false "missing" (#179 Sonnet M-1).
+        assert self._hint("constant", allocate=False) is None
 
     def test_staged_constant_is_the_gated_runtime_buffer(self):
         assert self._hint("constant", staged=True) == "hpx_arena_const_dtcm_buffer"

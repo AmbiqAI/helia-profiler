@@ -195,7 +195,42 @@ def test_reconciliation_table_renders_all_three_statuses():
     text = recorder.export_text()
     assert "Plan vs measured" in text
     assert "matched" in text and "missing" in text and "unmatchable" in text
+    # the wrong-region branch is NOT exercised here (all regions agree);
+    # test_wrong_region_match_renders_the_region below owns that pin.
     # consumer names are escaped like every other ELF-adjacent string:
     assert "[red]sneaky[/red]" in text
     # the nonzero region delta line renders:
     assert "SRAM" in text and ("96.0 KB" in text or "98,304" in text)
+
+
+def test_wrong_region_match_renders_the_region():
+    """#179 Sonnet MINOR-3: the user-facing half of M-6 — a matched
+    consumer whose dominant symbol lives in a different region than
+    planned must SAY so in the measured cell."""
+    from helia_profiler.console.results import render_memory_reconciliation
+    from helia_profiler.results import (
+        ConsumerReconciliation,
+        MemoryReconciliation,
+    )
+
+    rec = MemoryReconciliation(
+        consumers=(
+            ConsumerReconciliation(
+                name="tensor_arena",
+                kind="arena",
+                region="DTCM",
+                planned_size=32768,
+                status="matched",
+                matched_symbols=("_ZL15g_arena_storage",),
+                measured_size=32768,
+                measured_region="SRAM",
+                delta=0,
+            ),
+        ),
+    )
+    hpx_console = HpxConsole(verbosity=0)
+    recorder = Console(record=True, highlight=False, width=200)
+    hpx_console._console = recorder
+    render_memory_reconciliation(hpx_console, rec)
+    text = recorder.export_text()
+    assert "in SRAM" in text

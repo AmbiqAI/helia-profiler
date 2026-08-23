@@ -18,6 +18,29 @@ from pathlib import Path
 from .results import BinarySections
 from .toolchains import get_toolchain_spec, resolve_toolchain_executable
 
+# The #133 inventory API lives in elf_inventory (extracted at the module
+# size ceiling); re-exported here so probes keep one import surface.
+from .elf_inventory import (
+    _FROMELF_SECTION_START_RE,
+    _FROMELF_SIZE_BYTES_RE,
+    _RESERVED_NOBITS_NAMES,
+    _is_reserved_section_name,
+    ElfSection,
+    LoadSegment,
+    SectionInventory,
+    SymbolEntry,
+    _FROMELF_INVENTORY_FIELD_RE,
+    _NM_SIZED_ROW_RE,
+    _READELF_INVENTORY_RE,
+    _READELF_LOAD_RE,
+    _inventory_from_fromelf_listing,
+    _inventory_via_readelf,
+    _segments_via_readelf,
+    section_inventory,
+    symbol_inventory,
+)
+
+
 log = logging.getLogger("hpx")
 
 
@@ -537,28 +560,6 @@ def symbol_address(
         return None
     return int(match.group(1), 16), match.group(2)
 
-
-# The #133 inventory API lives in elf_inventory (extracted at the module
-# size ceiling); re-exported here so probes keep one import surface.
-from .elf_inventory import (  # noqa: E402
-    _FROMELF_SECTION_START_RE,
-    _FROMELF_SIZE_BYTES_RE,
-    _RESERVED_NOBITS_NAMES,
-    _is_reserved_section_name,
-    ElfSection,
-    LoadSegment,
-    SectionInventory,
-    SymbolEntry,
-    _FROMELF_INVENTORY_FIELD_RE,
-    _NM_SIZED_ROW_RE,
-    _READELF_INVENTORY_RE,
-    _READELF_LOAD_RE,
-    _inventory_from_fromelf_listing,
-    _inventory_via_readelf,
-    _segments_via_readelf,
-    section_inventory,
-    symbol_inventory,
-)
 
 __all__ = [
     "ElfSection",

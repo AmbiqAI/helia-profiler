@@ -634,3 +634,24 @@ class TestReviewRegressionPins:
 
         for toolchain in ("arm-none-eabi-gcc", "gcc", "armclang", "atfe"):
             assert ei._nm_command(toolchain) == tp._nm_command(toolchain)
+
+
+def test_llvm_nm_capture_parses_with_the_same_regexes():
+    """#179 Sonnet 'untested claim': real llvm-nm output
+    (symbols_atfe.txt, same fixture ELF) through the same parser. Real
+    objects carry identical sizes to the GNU capture; the linker markers
+    (__HeapBase/__HeapLimit) report st_size 0 — the documented
+    asymmetry, and exactly why zero-size symbols never match."""
+    from helia_profiler.elf_inventory import _NM_SIZED_ROW_RE
+
+    text = (FIXTURES / "symbols_atfe.txt").read_text()
+    rows = {
+        m.group(4): int(m.group(2), 16)
+        for m in map(_NM_SIZED_ROW_RE.match, text.splitlines())
+        if m
+    }
+    assert rows["g_stack"] == 0x4000
+    assert rows["g_initialized"] == 0x20
+    assert rows["g_zero_init"] == 0xF8
+    assert rows["__HeapBase"] == 0  # llvm reports st_size verbatim
+    assert rows["__HeapLimit"] == 0  # GNU omits this row entirely

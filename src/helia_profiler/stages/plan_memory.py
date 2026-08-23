@@ -390,7 +390,7 @@ USB_CDC_BUFFER_BYTES = 4096 + 1024
 
 #: Boot stack, keyed on the STARTUP DECLARATION, not STACK_SIZE: AP4/AP5
 #: startup files declare g_pui32Stack[STACK_SIZE] as uint32 (4096 words =
-#: 16 KB); AP2/3/3P hardcode g_pui32Stack[1024] = 4 KB and ignore
+#: 16 KB); the AP3 family hardcodes g_pui32Stack[1024] = 4 KB and ignores
 #: STACK_SIZE entirely (nsx-core startup_gcc.c per part; #133 Phase 3
 #: survey). armlink reserves the same amounts as fixed scatter regions.
 _BOOT_STACK_BYTES: dict[SocFamily, int] = {
@@ -410,14 +410,23 @@ def _default_bss_region(family: SocFamily) -> MemoryRegion:
     return MemoryRegion.SRAM if family is SocFamily.AP3 else MemoryRegion.DTCM
 
 
-def _sram_bss_region(family: SocFamily) -> MemoryRegion:
-    """Where ``NSX_MEM_SRAM_BSS`` lands. On AP4/AP5 the macro pins
-    ``.sram_bss`` -> SRAM; on AP3 it expands to NOTHING
-    (NSX_MEM__HAS_SRAM_BSS=0) so the object falls to plain ``.bss`` —
-    which on AP3 is ALSO main SRAM (main.cc.j2's own comment: "on AP3,
-    the default .bss already targets its large main SRAM"). Every family
-    therefore resolves to SRAM; the function stays because the REASONS
-    differ and a future family must choose one deliberately."""
+#: Parts whose nsx_mem.h sets NSX_MEM__HAS_SRAM_BSS=0 within a family
+#: that otherwise has it: AM_PART_APOLLO5A/5B (nsx_mem.h:92-99) — their
+#: linker scripts have no .sram_bss, so the macro expands to nothing and
+#: the object falls to plain .bss -> MCU_TCM (DTCM). apollo5b is the one
+#: such part hpx registers (#179 Sonnet M-2).
+_NO_SRAM_BSS_SOCS = frozenset({"apollo5b"})
+
+
+def _sram_bss_region(soc: SocDef) -> MemoryRegion:
+    """Where ``NSX_MEM_SRAM_BSS`` lands. AP4 and most AP5 parts pin
+    ``.sram_bss`` -> SRAM; on AP3 it expands to NOTHING so the object
+    falls to plain ``.bss`` — which on AP3 is ALSO main SRAM (main.cc.j2:
+    "on AP3, the default .bss already targets its large main SRAM"); on
+    apollo5b it likewise expands to nothing but plain ``.bss`` is
+    MCU_TCM there -> DTCM."""
+    if soc.name in _NO_SRAM_BSS_SOCS:
+        return MemoryRegion.DTCM
     return MemoryRegion.SRAM
 
 
@@ -428,7 +437,8 @@ def _usb_region(family: SocFamily) -> MemoryRegion:
 
 def _rtt_region(family: SocFamily) -> MemoryRegion:
     """Where the RTT statics land per the SEGGER_RTT_SECTION snippet hpx
-    writes (firmware/__init__.py): AP3/AP4 pin ``.sram_bss`` -> SRAM;
+    writes (firmware/__init__.py): AP4 pins ``.sram_bss`` -> SRAM; AP3
+    reaches SRAM through plain ``.bss`` (its default .bss IS main SRAM);
     the AP5 family (incl. apollo330P) leaves the default ``.bss`` ->
     DTCM — on exactly the parts where DTCM is scarcest."""
     return MemoryRegion.SRAM if family in (SocFamily.AP3, SocFamily.AP4) else MemoryRegion.DTCM
@@ -459,7 +469,7 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
     if record_size is not None:
         additions.append(
             (
-                _sram_bss_region(family),
+                _sram_bss_region(soc),
                 MemoryConsumer(
                     name="pmu_layer_records",
                     size=int(soc.pmu_max_ops) * record_size,

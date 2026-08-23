@@ -312,11 +312,16 @@ def _aot_buffer_symbol(
     unmatchable, never a false missing."""
     mem = region_key.lower()
     if role == ArenaRole.CONSTANT.value:
+        if not allocate_arenas:
+            # External-arena mode emits NO constant symbols at all: the
+            # cold __blob is inside {% if config.memory.allocate_arenas %}
+            # too, and constants ship as sidecar binary files instead
+            # (#179 Sonnet M-1 — the earlier unconditional __blob hint
+            # produced a false "missing" on every external-arena build).
+            return None
         if not staged:
             return f"{prefix}_arena_const_{mem}__blob"
-        if allocate_arenas:
-            return f"{prefix}_arena_const_{mem}_buffer"
-        return None
+        return f"{prefix}_arena_const_{mem}_buffer"
     if not allocate_arenas:
         return f"hpx_arena_buf_storage_{region_id}"
     if role == "persistent":
@@ -416,7 +421,7 @@ def _extract_memory_plan_from_render_plan(
                             name=f"{source_key.lower()}_{role}_source_{region_id}",
                             size=size,
                             kind="weights",
-                            # constants.c.j2:15 — the staged SOURCE blob
+                            # constants.c.j2:44 — the staged SOURCE blob
                             # is named by the RUNTIME memory, placed in
                             # source memory (#179 review M-3).
                             symbol=(
