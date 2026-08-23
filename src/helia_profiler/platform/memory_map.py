@@ -24,6 +24,16 @@ ATfE links the gcc ``*.ld`` scripts (confirmed from nsx's cmake and an
 apollo330mP ATfE LLD map), so app-available lengths key on the LINK family
 (GNU ld vs armlink), not the compiler.
 
+Aperture rule (applied uniformly): every classification ``window`` is the
+HARDWARE aperture from the SDK's ``am_reg_base_addresses.h`` for that part —
+never a single linker script's opinion of it — because the two link families
+carve the same silicon differently (gcc may decline to use the top of a TCM
+that armlink tiles exactly full). What differs per link family is only
+``app_available``, which IS a linker-script fact. Where a hardware aperture
+is wider than both scripts' regions the window still ends at the hardware
+top (#176 review M-1/M-2 corrected two windows that had drifted from this
+rule).
+
 PSRAM has no linker region on any SoC (grep-verified across every ``.ld`` and
 ``.sct``); its window comes from the existing board-knowledge tables and is
 marked with that provenance. ``nvm_kb`` likewise has no linker counterpart
@@ -32,7 +42,7 @@ and is deliberately absent here.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Mapping
@@ -51,8 +61,18 @@ class LinkFamily(StrEnum):
 
 
 def link_family_for_toolchain(toolchain: str) -> LinkFamily:
-    """The link family a toolchain name builds with."""
-    return LinkFamily.ARMLINK if toolchain == "armclang" else LinkFamily.GNU
+    """The link family a toolchain builds with.
+
+    Routed through the :class:`~helia_profiler.config.Toolchain` enum so an
+    unknown name raises (``ValueError``) instead of silently guessing GNU —
+    a future armlink-based toolchain must be classified here deliberately.
+    (Imported inside the function: config imports this package, so a
+    module-level import would be circular.)
+    """
+    from ..config import Toolchain
+
+    resolved = Toolchain(toolchain)
+    return LinkFamily.ARMLINK if resolved is Toolchain.ARMCLANG else LinkFamily.GNU
 
 
 @dataclass(frozen=True)
@@ -70,7 +90,10 @@ class LinkedRegionWindow:
 
     region: MemoryRegion
     window: MemoryRange
-    app_available: Mapping[LinkFamily, int]
+    #: ``hash=False``: a MappingProxyType is unhashable, and frozen dataclass
+    #: hashing would otherwise make ``hash(window)`` raise. Equality still
+    #: compares it.
+    app_available: Mapping[LinkFamily, int] = field(hash=False)
     #: Where the numbers came from — linker-script characterization or
     #: board knowledge (PSRAM). Kept on the record so Phase 2's artifact can
     #: state it.
@@ -97,18 +120,23 @@ def _window(
 
 
 # apollo3p — apollo3p/gcc/linker_script.ld:10-13, apollo3p/armclang/
-# linker_script.sct:6-33. The DTCM aperture spans TCM (64 KB) plus the
-# adjacent 4 KB STACKMEM window (gcc keeps the stack there; armclang's
-# 4 KB ARM_LIB_STACK sits at the same addresses), so classification covers
-# 0x10000000-0x10011000 while app static data gets the 64 KB TCM either way.
-# armlink's ARM_LIB_HEAP is zero-length (sct:27).
+# linker_script.sct:6-33, hardware apertures from the SDK's
+# am_reg_base_addresses.h / am_hal_flash.h (TCM = the FIRST 64 KB of the
+# shared 0x10000000 SRAM space; AM_HAL_FLASH_DTCM_END = 0x1000FFFF).
+# Windows follow the HARDWARE aperture rule (see the module docstring):
+# DTCM is exactly the 64 KB TCM; the SRAM window starts at 0x10010000 —
+# main SRAM proper — covering the 4 KB STACKMEM (gcc) / ARM_LIB_STACK
+# (armlink) slot, which is stack-reserved SRAM, not TCM. App-available SRAM
+# stays the 700 KB RWMEM either way; armlink's ARM_LIB_HEAP is zero-length
+# (sct:27).
 _APOLLO3P = (
     _window(MemoryRegion.MRAM, 0x0000C000, 2_048_000, gnu=2_048_000, armlink=2_048_000),
-    _window(MemoryRegion.DTCM, 0x10000000, 0x11000, gnu=65_536, armlink=65_536),
-    _window(MemoryRegion.SRAM, 0x10011000, 716_800, gnu=716_800, armlink=716_800),
+    _window(MemoryRegion.DTCM, 0x10000000, 0x10000, gnu=65_536, armlink=65_536),
+    _window(MemoryRegion.SRAM, 0x10010000, 0xB0000, gnu=716_800, armlink=716_800),
 )
 
-# apollo4p / apollo4l — apollo4p/gcc/linker_script.ld:10-12 (4l identical),
+# apollo4p / apollo4l — apollo4p/gcc/linker_script.ld:10-12 (4l's
+# ORIGIN/LENGTH values identical; only region attrs (rw)/(rwx) differ),
 # apollo4p/armclang/linker_script.sct:8-34. MRAM is 1952 KB from 0x18000
 # (NOT the 2000 KB datasheet figure in MemoryLayout). gcc: 16 KB .stack
 # inside the 384 KB window and a fill-to-end .heap → 368 KB for app data.
@@ -139,17 +167,18 @@ _APOLLO5_FULL = (
 # apollo330P — apollo330P/gcc/linker_script_sbl.ld:10-12,
 # apollo330P/armclang/linker_script_sbl.sct:6-33 (byte-identical to
 # apollo510L's). No ITCM region in the DEFAULT script (.dtcm_text goes to
-# MCU_TCM instead). The DTCM window is the hardware-confirmed 240 KB
-# (soc.py's apollo330P comment block records the confirmation); NOTE:
-# armlink's scatter puts its 16 KB ARM_LIB_STACK at 0x2003C000-0x20040000,
-# BEYOND this window — the two toolchains disagree about the aperture top
-# and the scripts cannot say which is right, so armlink sections landing
-# there will classify as outside-every-window, which is the honest flag
-# for exactly this open question (armclang has never been built on this
-# part in any cached workspace).
+# MCU_TCM instead). The DTCM window is the HARDWARE aperture, 256 KB — the
+# SDK's am_reg_base_addresses.h says DTCM_MAX_SIZE = 256 KB, and armlink's
+# scatter tiles to exactly that (MCU_TCM 0x3B000 + heap 0x1000 + stack
+# 0x4000 = 0x40000), the same pattern it uses on AP510. gcc's script
+# simply declines to use the top 16 KB (MCU_TCM stops at 240 KB), which is
+# why soc.py's earlier "hardware-confirmed 240" was circular — it was
+# confirmed against the gcc script, not the part (#176 review M-1). The
+# armlink 16 KB stack at 0x2003C000 therefore classifies as DTCM, as it
+# should.
 _APOLLO330P = (
     _window(MemoryRegion.MRAM, 0x00410000, 2_031_616, gnu=2_031_616, armlink=2_031_616),
-    _window(MemoryRegion.DTCM, 0x20000000, 245_760, gnu=229_376, armlink=241_664),
+    _window(MemoryRegion.DTCM, 0x20000000, 262_144, gnu=229_376, armlink=241_664),
     _window(MemoryRegion.SRAM, 0x20080000, 1_835_008, gnu=1_835_008, armlink=1_835_008),
 )
 
@@ -169,10 +198,16 @@ _MAPS: Mapping[str, tuple[LinkedRegionWindow, ...]] = MappingProxyType(
 def linked_memory_map(soc: SocDef) -> tuple[LinkedRegionWindow, ...]:
     """The verified region windows for *soc*, PSRAM appended when present.
 
-    Returns an empty tuple for SoCs without a characterized map (custom
-    SoCs, families NSX ships that hpx does not register) — callers treat the
-    measured view as unavailable, never guessed, per #131's discipline.
+    Returns an empty tuple for any non-builtin SoC — a ``target.custom_socs``
+    part was never checked against these scripts, EVEN IF its name collides
+    with a registered part's (same rule and rationale as
+    ``capabilities._FAMILY_APP_FLASH_LOAD_ADDR``; see ``SocDef.is_builtin``).
+    Every registered SoC is currently characterized, so builtins never hit
+    the empty branch today. Callers treat empty as unavailable, never
+    guessed, per #131's discipline.
     """
+    if not soc.is_builtin:
+        return ()
     windows = _MAPS.get(soc.name, ())
     if not windows:
         return ()

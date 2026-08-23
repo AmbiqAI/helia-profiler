@@ -8,6 +8,8 @@ Split across focused modules but re-exported here so
 * :mod:`.board` — ``BoardDef`` and the built-in board registrations.
 * :mod:`.registry` — ``PlatformRegistry`` construction and the public lookup
   helpers.
+* :mod:`.memory_map` — the verified linked-memory map (#133): per-SoC region
+  windows characterized from the NSX linker scripts.
 """
 
 from __future__ import annotations
@@ -27,6 +29,13 @@ from .capabilities import (
     TransportCapabilities,
 )
 from .custom import build_custom_platform_registry
+from .memory_map import (
+    LinkedRegionWindow,
+    LinkFamily,
+    classify_address,
+    link_family_for_toolchain,
+    linked_memory_map,
+)
 from .registry import (
     PlatformRegistry,
     build_platform_registry,
@@ -62,6 +71,8 @@ __all__ = [
     "ClockDomain",
     "ClockSpeed",
     "CoreArch",
+    "LinkFamily",
+    "LinkedRegionWindow",
     "MemoryCapabilities",
     "MemoryLayout",
     "MemoryRange",
@@ -77,12 +88,15 @@ __all__ = [
     "TransportCapabilities",
     "build_platform_registry",
     "build_custom_platform_registry",
+    "classify_address",
     "get_board",
     "get_default_go_gpio_pin",
     "get_default_state_gpio_pin",
     "get_default_sync_gpio_pin",
     "get_soc",
     "get_soc_for_board",
+    "link_family_for_toolchain",
+    "linked_memory_map",
     "list_boards",
     "list_socs",
     "soc_placement_ranges",

@@ -568,9 +568,13 @@ def symbol_address(
 
 
 __all__ = [
+    "ElfSection",
+    "LoadSegment",
+    "SectionInventory",
     "binary_sections",
     "cmake_version",
     "compiler_version",
+    "section_inventory",
     "symbol_address",
 ]
 
@@ -669,6 +673,11 @@ def _inventory_via_readelf(
     for line in result.stdout.splitlines():
         match = _READELF_INVENTORY_RE.match(line)
         if match is None:
+            # A bracket row that fails the type-constrained pattern (e.g. a
+            # numeric/LOOS+ sh_type readelf cannot name) would silently
+            # understate occupancy — surface it. The NULL row is expected.
+            if re.match(r"^\s*\[\s*\d+\]", line) and "NULL" not in line:
+                log.debug("readelf -S row not parsed by inventory: %r", line)
             continue
         name, sh_type, addr_hex, size_hex, flags = match.groups()
         sections.append(

@@ -1,7 +1,8 @@
 """Tests for toolchain_probe's section inventory (#133 Phase 1).
 
 Fixtures are UNEDITED real captures: tests/fixtures/readelf/* from
-arm-none-eabi (readelf 14.x) on an ELF built by the committed linker.ld +
+Arm GNU Toolchain 15.2.Rel1 (GNU readelf 2.45.1) on an ELF built by the
+committed linker.ld +
 main.c, and tests/fixtures/fromelf/fw_text_v.txt from Arm Compiler 6.23
 (the #132 capture). Regeneration commands live in the fixture comments.
 """
@@ -175,3 +176,30 @@ def test_unknown_readelf_toolchain_degrades(monkeypatch):
 
     monkeypatch.setattr(tp, "get_toolchain_spec", lambda name: _Spec())
     assert section_inventory(Path("fw.elf"), "whatever") is None
+
+
+def test_llvm_readelf_atfe_captures_parse_identically_to_gnu():
+    """D5's ATfE leg: llvm-readelf (what ATfE's spec resolves ``readelf``
+    to) on the same fixture ELF must yield the same inventory and segments
+    as GNU readelf — the captures differ only in header wording the parser
+    never reads."""
+    from helia_profiler.toolchain_probe import (
+        _READELF_INVENTORY_RE,
+        _READELF_LOAD_RE,
+    )
+
+    fixtures = Path(__file__).parent / "fixtures" / "readelf"
+
+    def rows(name: str, pattern) -> list:
+        text = (fixtures / name).read_text()
+        return [m.groups() for m in map(pattern.match, text.splitlines()) if m]
+
+    gnu = rows("sections.txt", _READELF_INVENTORY_RE)
+    atfe = rows("sections_atfe.txt", _READELF_INVENTORY_RE)
+    assert atfe == gnu
+    assert len(atfe) == 10  # every non-NULL section
+
+    assert rows("segments_atfe.txt", _READELF_LOAD_RE) == rows(
+        "segments.txt", _READELF_LOAD_RE
+    )
+    assert len(rows("segments_atfe.txt", _READELF_LOAD_RE)) == 4
