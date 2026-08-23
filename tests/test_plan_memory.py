@@ -497,8 +497,14 @@ class TestHpxOwnedConsumers:
         }
 
     def test_records_planned_for_every_engine_with_true_sizes(self, tmp_path):
-        # apollo510 (default board): pmu_max_ops = 4096.
-        for engine, expected in (("helia-rt", 4096 * 24), ("tflm", 4096 * 24)):
+        # apollo510 (default board): pmu_max_ops = 4096. TFLM/heliaRT book
+        # the whole g_profiler OBJECT (records + the 252-byte header
+        # characterized on ARMV8M_PMU parts) so the plan matches the
+        # linked symbol byte-for-byte.
+        for engine, expected in (
+            ("helia-rt", 4096 * 24 + 252),
+            ("tflm", 4096 * 24 + 252),
+        ):
             ctx = _make_ctx(tmp_path, {"engine": {"type": engine}})
             PlanMemoryStage().run(ctx)
             sram = ctx.memory_plan.region("SRAM")

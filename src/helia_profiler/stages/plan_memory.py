@@ -42,7 +42,7 @@ from ..engines.base import ExecutorchArtifacts
 from ..pipeline import PipelineContext
 from ..placement import MemoryRegion, Placement, resolve_fastest_fit_placement
 from ..config import Transport
-from ..platform import MemoryLayout, SocDef, SocFamily
+from ..platform import MemoryLayout, PmuTier, SocDef, SocFamily
 from ..results import MemoryConsumer, MemoryPlan, MemoryRegionUsage
 
 if TYPE_CHECKING:
@@ -377,6 +377,19 @@ PMU_RECORD_SIZE_BYTES: dict[EngineType, int] = {
     EngineType.EXECUTORCH: 32,
 }
 
+#: TFLM/heliaRT reserve the records INSIDE the HpxPmuProfiler object
+#: (g_profiler) — the linked symbol is the whole object, records plus a
+#: fixed header (vptr 4 + nsx_pmu_config_t 196 + counter-name pointers
+#: and state 52 = 252 on ARMV8M_PMU parts; verified against the AP510
+#: bench where the reconciler measured exactly records+252). Booking the
+#: object makes the plan match the symbol byte-for-byte. DWT-tier parts
+#: carry a different config struct that has not been characterized —
+#: they book the array alone and the residue stays visible in the
+#: reconciliation delta, which is the honest state (#179 review m6).
+_PROFILER_OBJECT_OVERHEAD: dict[PmuTier, int] = {
+    PmuTier.ARMV8M_PMU: 252,
+}
+
 #: SEGGER RTT statics beyond the up buffer itself: the 16-byte default
 #: down buffer (SEGGER_RTT_ConfDefaults.h BUFFER_SIZE_DOWN) plus the
 #: control block (SEGGER_RTT.h: acID[16] + 2 ints + 3 up + 3 down ring
@@ -467,12 +480,20 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
 
     record_size = PMU_RECORD_SIZE_BYTES.get(engine_type)
     if record_size is not None:
+        records_bytes = int(soc.pmu_max_ops) * record_size
+        if engine_type in (EngineType.TFLM, EngineType.HELIA_RT):
+            # The records live inside g_profiler; book the whole object
+            # where its header is characterized. NB the plan describes
+            # the PROFILE binary (the power binary's records fall to
+            # plain .bss under power_only=1) — same scope as
+            # binary_sections and memory_regions.
+            records_bytes += _PROFILER_OBJECT_OVERHEAD.get(soc.pmu_tier, 0)
         additions.append(
             (
                 _sram_bss_region(soc),
                 MemoryConsumer(
                     name="pmu_layer_records",
-                    size=int(soc.pmu_max_ops) * record_size,
+                    size=records_bytes,
                     kind="other",
                 ),
             )
