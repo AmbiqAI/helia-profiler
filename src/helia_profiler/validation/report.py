@@ -17,7 +17,11 @@ from ..errors import ReportError
 from .runner import CaseResult
 
 
-SCHEMA_VERSION = 5
+#: v6 (#133 Phase 2): per-case ``resources.memory_plan`` is the decision
+#: record only (its ``free``/``overflow``/``has_overflow`` keys are gone,
+#: mirroring run-summary schema v3) and ``resources.memory_regions`` is
+#: added — the measured per-region occupancy from the linked ELF.
+SCHEMA_VERSION = 6
 _COMMIT_SHA_RE = re.compile(r"[0-9a-f]{40}")
 
 
@@ -344,6 +348,7 @@ def _case_resources(summary: dict[str, Any]) -> dict[str, Any]:
             "binary_sections": _nested_dict(summary, "binary") or None,
             "runtime_memory": _nested_dict(summary, "memory") or None,
             "memory_plan": _nested_dict(summary, "memory_plan") or None,
+            "memory_regions": _nested_dict(summary, "memory_regions") or None,
         }
     )
 

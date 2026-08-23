@@ -49,3 +49,105 @@ def test_missing_binary_sections_does_not_fail_successful_build(
     assert ctx.binary_sections is None
     assert ctx.profile_firmware is not None
     assert progress[-1].message == "Profile firmware ready"
+
+
+def test_measured_regions_wiring_passes_soc_and_linker_profile(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """#177 review (Sonnet m2): the stage->measure_memory_regions wiring —
+    the ctx.soc gate, the engine-config linker_profile extraction, and the
+    argument order — pinned end-to-end through the stage."""
+    from helia_profiler.platform import get_soc
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-aot", "config": {"linker_profile": "itcm"}},
+            "work_dir": str(tmp_path / "work"),
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
+    ctx.soc = get_soc("apollo510")
+    ctx.firmware_dir = tmp_path / "app"
+    ctx.firmware_dir.mkdir(parents=True)
+    build_dir = tmp_path / "build"
+    binary_path = build_dir / "hpx_profiler"
+    ctx.progress_sink = lambda *_a, **_k: None
+
+    calls = []
+
+    def _measure(bp, toolchain, soc, *, linker_profile, timeout_s):
+        calls.append((bp, toolchain, soc.name, linker_profile))
+        return None  # itcm profile degrades inside the real function
+
+    monkeypatch.setattr(
+        "helia_profiler.firmware.build_app", lambda _ctx: (build_dir, binary_path)
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.binary_sections",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.measure_memory_regions", _measure
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.compiler_version",
+        lambda *_args, **_kwargs: "v",
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.cmake_version", lambda **_k: "v"
+    )
+
+    BuildFirmwareStage().run(ctx)
+
+    assert calls == [
+        (binary_path, config.target.toolchain, "apollo510", "itcm")
+    ]
+    assert ctx.memory_regions is None
+
+
+def test_measured_regions_skipped_without_resolved_soc(
+    tmp_path: Path, monkeypatch
+) -> None:
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "work_dir": str(tmp_path / "work"),
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
+    ctx.firmware_dir = tmp_path / "app"
+    ctx.firmware_dir.mkdir(parents=True)
+    ctx.progress_sink = lambda *_a, **_k: None
+
+    def _explode(*_a, **_k):
+        raise AssertionError("must not measure without a resolved SoC")
+
+    monkeypatch.setattr(
+        "helia_profiler.firmware.build_app",
+        lambda _ctx: (tmp_path / "build", tmp_path / "build" / "fw"),
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.binary_sections",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.measure_memory_regions", _explode
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.compiler_version",
+        lambda *_args, **_kwargs: "v",
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.cmake_version", lambda **_k: "v"
+    )
+
+    BuildFirmwareStage().run(ctx)
+    assert ctx.memory_regions is None

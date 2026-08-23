@@ -115,8 +115,10 @@ Schema v3 adds a per-case `resources` object to `validation_manifest.json` and
 text/data/BSS/total sizes (BSS excludes linker-reserved regions; see the
 output guide), `runtime_memory` contains firmware-reported arena and
 tensor details, and `memory_plan` contains engine-agnostic region capacities,
-used/free bytes, overflow state, and named consumers. The existing flat binary
-and arena metrics remain available for backward-compatible comparisons.
+planned usage, and named consumers (through schema v5 it also carried
+used/free bytes and overflow state; see the v6 note below). The existing flat
+binary and arena metrics remain available for backward-compatible
+comparisons.
 
 Schema v4 adds the powered-validation dashboard contract. Powered cases expose
 `avg_power_mw`, `energy_per_inference_uj`, `inferences_per_joule`, and capture
@@ -125,6 +127,17 @@ duration alongside the existing energy/current metrics. The complete
 new gate-integrity and distribution fields remain available without another
 aggregate-schema change. The manifest links the detailed CSV at
 `<case>/detailed/power_summary.csv` and records whether it is available.
+
+Schema v6 (#133) splits planned from measured memory. Per-case
+`resources.memory_plan` is now the pre-build decision record only — its
+`free`, `overflow`, and `has_overflow` keys are gone, mirroring
+`summary.json` schema v3 — and `resources.memory_regions` is added: the
+measured per-region occupancy from the linked ELF (used/reserved/free
+against the link family's app extent, `load_image` flash bytes, and
+`unattributed` sections outside every verified window). Dashboards reading
+`memory_plan.regions[].free` must move to `memory_regions.regions[].free`;
+the block is absent for custom SoCs, non-default linker profiles, or when
+the section inventory is unavailable.
 
 Each case also carries cross-machine provenance when available: model SHA-256,
 HPX version, compiler name/version, firmware-reported `system_clock_hz`, and

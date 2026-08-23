@@ -10,7 +10,19 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: need to be able to SEE it rather than read it as a memory regression.
 #: ``run_summary_schema_version`` is a comparability dimension, so bumping it
 #: is what surfaces the difference in ``hpx compare``.
-RUN_SUMMARY_SCHEMA_VERSION = 2
+#: v3 (issue #133): the ``memory_plan`` block is now a pure decision
+#: record -- ``free``/``overflow``/``has_overflow`` are GONE from it, and
+#: the new measured ``memory_regions`` block (the linked ELF classified
+#: into the verified per-SoC windows) owns region truth: per-region
+#: used/reserved/free/load_image under the app-window contract of
+#: ``platform.memory_map``. The plan's old free/overflow answered "does
+#: what hpx placed fit the datasheet capacity" -- free was overstated and
+#: overflow could not fire on real exhaustion because the plan only counts
+#: what HPX placed (the #133 pathology). A consumer comparing across the
+#: boundary must SEE the semantic change, and
+#: ``run_summary_schema_version`` is a comparability dimension, so this is
+#: a version bump per the v2 precedent above.
+RUN_SUMMARY_SCHEMA_VERSION = 3
 
 RUN_METADATA_SCHEMA = "hpx.run-metadata"
 RUN_METADATA_SCHEMA_VERSION = 1

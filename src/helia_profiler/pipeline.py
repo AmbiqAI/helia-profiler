@@ -36,7 +36,7 @@ from .evaluation import ModelAnalysis
 from .placement import Placement
 from .power.base import PowerResult
 from .power.metadata import ObservationMode, classify_observation
-from .results import MemoryPlan, PmuResult, RunMetadata, BinarySections
+from .results import MeasuredMemoryRegions, MemoryPlan, PmuResult, RunMetadata, BinarySections
 from .target.probe.base import FlashBackend, Probe, ResetController
 
 log = logging.getLogger("hpx")
@@ -136,6 +136,10 @@ class PipelineContext:
 
     # Memory plan (stage: plan_memory)
     memory_plan: MemoryPlan | None = None
+    #: Measured per-region occupancy from the built ELF (#133 Phase 2);
+    #: None whenever it cannot be true (uncharacterized map, tool failure,
+    #: partial inventory).
+    memory_regions: MeasuredMemoryRegions | None = None
 
     #: Resolved arena placement region.  Set by :class:`PlanMemoryStage`
     #: from split model placement controls / compatibility presets and the

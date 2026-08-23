@@ -18,20 +18,25 @@ all):
 hpx profile my_model.tflite --board apollo510_evb --arena-size 131072
 ```
 
-The terminal report prints a **Memory Plan** table — every consumer
-(arena, weights) by physical region, against the SoC's capacity:
+The terminal report prints a **Memory (measured)** table — per-region
+used/free read from the linked ELF against the verified per-SoC memory
+windows (the plan table renders instead only when the measured view is
+unavailable, e.g. on a custom SoC):
 
 ```
-Memory plan (helia-rt):
-  DTCM     65,536 /  512,000 B (12.8%)
-  SRAM     50,176 / 3,145,728 B ( 1.6%)
-  MRAM          0 / 4,194,304 B ( 0.0%)
+Memory (measured) (gnu link):
+  DTCM     16.3 KB   479.7 KB  of 496.0 KB   3%   Reserved 479.7 KB
+  MRAM      45.0 KB   3.9 MB   of 3.9 MB     1%   —
 ```
 
-The same data is in `summary.json` under `memory_plan` (`regions[]`, each
-with `region`, `capacity`, `used`, `free`, `overflow`), and `memory.
-allocated_arena` reports what the firmware actually used out of the arena
-you requested.
+`summary.json` carries both views: `memory_regions` (measured — `used`,
+`reserved`, `free`, `load_image` per region; see the
+[output guide](../guide/output.md#planned-vs-measured-memory)) and
+`memory_plan` (the pre-build decision record — `regions[]` with `region`,
+`capacity`, `used`, and named `consumers`; since schema v3 the plan
+carries no `free`/`overflow`, because only the measurement can answer
+those honestly). `memory.allocated_arena` reports what the firmware
+actually used out of the arena you requested.
 
 ```bash
 python -c "import json; d=json.load(open('results/summary.json')); \

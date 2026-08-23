@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
-    from ..results import MemoryPlan
+    from ..results import MeasuredMemoryRegions, MemoryPlan
 
 log = logging.getLogger("hpx")
 
@@ -39,24 +39,62 @@ _CACHE_COUNTERS = (
 
 
 def _serialise_memory_plan(plan: MemoryPlan) -> dict[str, Any]:
-    """Serialise a ``MemoryPlan`` into a JSON-friendly dict."""
+    """Serialise a ``MemoryPlan`` into a JSON-friendly dict.
+
+    Schema v3 (#133): the plan is a DECISION RECORD — what hpx intended,
+    computed before any compiler ran — so it no longer carries the
+    measurement vocabulary (``free``/``overflow``/``has_overflow``) it wore
+    in v2. The measured truth lives in ``memory_regions``, read from the
+    linked ELF. The model's ``free``/``overflow`` PROPERTIES remain (the
+    plan_memory stage still uses them as a plan-time capacity check).
+    """
     return {
         "engine": plan.engine,
         "model_weight_bytes": plan.model_weight_bytes,
-        "has_overflow": plan.has_overflow,
         "regions": [
             {
                 "region": r.region,
                 "capacity": r.capacity,
                 "used": r.used,
-                "free": r.free,
-                "overflow": r.overflow,
                 "consumers": [
                     {"name": c.name, "size": c.size, "kind": c.kind} for c in r.consumers
                 ],
             }
             for r in plan.regions
         ],
+    }
+
+
+def _serialise_memory_regions(measured: MeasuredMemoryRegions) -> dict[str, Any]:
+    """Serialise the measured per-region occupancy (#133 Phase 2).
+
+    ``free`` is emitted per region (``app.length − used``, unclamped —
+    negative means the inventory and the characterized extent disagree,
+    which the reader must SEE). ``unattributed`` lists allocated sections
+    outside every verified window: the police flag.
+    """
+    return {
+        "link_family": measured.link_family,
+        "linker_profile": measured.linker_profile,
+        "regions": [
+            {
+                "region": r.region,
+                "window": {"start": r.window_start, "length": r.window_length},
+                "app_window": {"start": r.app_start, "length": r.app_length},
+                "used": r.used,
+                "reserved": r.reserved,
+                "free": r.free,
+                "load_image": r.load_image,
+                "window_provenance": r.window_provenance,
+                "app_provenance": r.app_provenance,
+            }
+            for r in measured.regions
+        ],
+        "unattributed": [
+            {"name": u.name, "address": u.address, "size": u.size}
+            for u in measured.unattributed
+        ],
+        "unattributed_load_bytes": measured.unattributed_load_bytes,
     }
 
 
@@ -103,9 +141,13 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
     if arena:
         data["arena"] = arena
 
-    # Memory plan — engine-agnostic per-region usage
+    # Memory plan — the engine-agnostic decision record
     if ctx.memory_plan is not None:
         data["memory_plan"] = _serialise_memory_plan(ctx.memory_plan)
+
+    # Measured memory regions — the ELF classified into the verified map
+    if ctx.memory_regions is not None:
+        data["memory_regions"] = _serialise_memory_regions(ctx.memory_regions)
 
     # Per-layer cache/memory counters
     per_layer: list[dict[str, Any]] = []

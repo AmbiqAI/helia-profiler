@@ -8,7 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .memory import _CACHE_COUNTERS, _serialise_memory_plan
+from .memory import _CACHE_COUNTERS, _serialise_memory_plan, _serialise_memory_regions
 from .power import _power_summary_to_dict
 from .contracts import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION
 from ..evaluation import evaluate_run
@@ -74,9 +74,14 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
     if meta.psram is not None:
         summary["psram"] = asdict(meta.psram)
 
-    # Memory plan — engine-agnostic per-region usage
+    # Memory plan — the engine-agnostic decision record (no free/overflow
+    # since schema v3; the measured block below owns those)
     if ctx.memory_plan is not None:
         summary["memory_plan"] = _serialise_memory_plan(ctx.memory_plan)
+
+    # Measured memory regions — the ELF classified into the verified map
+    if ctx.memory_regions is not None:
+        summary["memory_regions"] = _serialise_memory_regions(ctx.memory_regions)
 
     # Binary sections
     if ctx.binary_sections is not None:

@@ -109,7 +109,7 @@ The top-level summary — start here for a quick overview.
 ```json
 {
   "schema": "hpx.run-summary",
-  "schema_version": 1,
+  "schema_version": 3,
   "engine": "helia-rt",
   "layers": 13,
   "total_cycles": 2016376,
@@ -149,6 +149,8 @@ The top-level summary — start here for a quick overview.
 | Top-level | Engine, layer count, total cycles, overflow flag |
 | `top_layers` | Top 5 layers by cycle count with percentages |
 | `memory` | Arena allocation, model size, tensor counts |
+| `memory_plan` | The pre-build DECISION RECORD: per-region capacity/used and named consumers — see [Planned vs measured memory](#planned-vs-measured-memory) |
+| `memory_regions` | The MEASURED region occupancy from the linked ELF: per-region used/reserved/free/load_image against the verified per-SoC windows |
 | `binary` | ELF section sizes (text, data, bss, total, and `reserved` when non-zero) — see [Reserved vs bss](#reserved-vs-bss) |
 | `cache` | Aggregated cache/memory PMU counters + derived L1D hit rate |
 | `power` | Power summary (when Joulescope capture is enabled) |
@@ -328,6 +330,72 @@ sum, so `text + data + bss + reserved` reconciles against it.
     is unavailable or unparseable (for example, an older `fromelf`), the run
     degrades to the unadjusted totals — `reserved` reads 0 and `bss` again
     includes any reservation — rather than failing.
+
+### Planned vs measured memory
+
+Two blocks describe memory, on purpose, because they answer different
+questions:
+
+- **`memory_plan`** is the decision record — what hpx *intended*, computed
+  before any compiler ran: per-region `capacity` (datasheet-flavored),
+  `used` (the sum of what hpx itself placed), and the named `consumers`
+  (weights, arena, scratch). It deliberately carries **no** `free` or
+  `overflow`: the plan only counts what hpx placed, so a plan-side "free"
+  was overstated and a plan-side "overflow" could not fire on real
+  exhaustion (issue #133).
+- **`memory_regions`** is the measured truth — the linked ELF's section
+  inventory classified into per-SoC memory windows characterized from the
+  NSX linker scripts and SDK hardware apertures. Per region:
+
+```json
+"memory_regions": {
+  "link_family": "gnu",
+  "linker_profile": "default",
+  "regions": [
+    {
+      "region": "DTCM",
+      "window": {"start": 536870912, "length": 524288},
+      "app_window": {"start": 536870912, "length": 507904},
+      "used": 16664,
+      "reserved": 491240,
+      "free": 491240,
+      "load_image": 0,
+      "window_provenance": "hardware-aperture",
+      "app_provenance": "linker-script"
+    }
+  ],
+  "unattributed": []
+}
+```
+
+`window` is the hardware classification aperture; `app_window` is the
+extent the link family's script gives the app image, and `free` is
+`app_window.length − used`. `used` includes the live stack (gcc links);
+`reserved` is the linker's own reservations — the fill-to-end heap plus
+armlink's fixed heap/stack regions. Note the two reservation kinds read
+differently: gcc's fill-to-end heap sits *inside* the app window, so its
+bytes appear in both `reserved` and `free` (the heap is sized to whatever
+was left — the example above shows both at 491240 for exactly that
+reason); armlink's fixed heap/stack sit *outside* the app window and are
+excluded from both. `load_image` is the flash bytes that
+initialize this region's data (summed from program headers by physical
+address, which is correct on both gcc and armlink). `unattributed` lists
+any allocated section that falls outside every verified window — either
+the binary put bytes somewhere uncharacterized, or the window table is
+wrong for that part; both deserve eyes (`unattributed_load_bytes` is the
+same flag for program-header flash bytes). The block describes the
+**profile** binary — power-only firmware is not measured, matching
+`binary`. The whole block is **absent** whenever it cannot be true: a
+custom SoC, a non-default `linker_profile`, a failed tool probe, or a
+partial section inventory — never guessed.
+
+!!! note "Schema v3"
+    `summary.json`'s `schema_version` moves from 2 to 3 with this split:
+    `memory_plan` lost its `free`/`overflow`/`has_overflow` keys, so a
+    consumer comparing across the boundary sees a
+    `run_summary_schema_version` difference in `hpx compare` rather than
+    silently reading the semantic change. Re-record baselines that
+    consumed the plan's `free`.
 
 ## Terminal summary
 

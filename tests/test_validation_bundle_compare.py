@@ -129,7 +129,7 @@ def test_loader_exposes_schema5_resource_data(tmp_path: Path) -> None:
 
     loaded = load_validation_bundle(bundle)
 
-    assert loaded.schema_version == 5
+    assert loaded.schema_version == 6  # v6: #133 planned/measured split
     assert dict(loaded.cases[0].resources) == {}
 
 
@@ -218,10 +218,10 @@ def test_loader_rejects_unsupported_future_schema(tmp_path: Path) -> None:
     _write_bundle(bundle, 100)
     manifest_path = bundle / "validation_manifest.json"
     manifest = json.loads(manifest_path.read_text())
-    manifest["schema_version"] = 6
+    manifest["schema_version"] = 7
     manifest_path.write_text(json.dumps(manifest))
 
-    with pytest.raises(ValidationBundleError, match="schema_version: 6"):
+    with pytest.raises(ValidationBundleError, match="schema_version: 7"):
         load_validation_bundle(bundle)
 
 

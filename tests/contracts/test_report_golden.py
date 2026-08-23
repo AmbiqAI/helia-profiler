@@ -58,6 +58,9 @@ from helia_profiler.results import (
     FirmwareMeta,
     LayerResult,
     MemoryConsumer,
+    MeasuredMemoryRegions,
+    MeasuredRegion,
+    UnattributedSection,
     MemoryPlan,
     MemoryRegionUsage,
     ModelInfo,
@@ -218,6 +221,43 @@ def _sample_power() -> PowerResult:
     )
 
 
+def _sample_memory_regions() -> MeasuredMemoryRegions:
+    """The measured block (#133 Phase 2), with every emission path live:
+    a reserved figure, a nonzero load_image, and one unattributed section
+    (with those at defaults the corresponding summary/console lines are
+    dead and the digests could not see them — the #24 review lesson)."""
+    return MeasuredMemoryRegions(
+        link_family="gnu",
+        linker_profile="default",
+        regions=(
+            MeasuredRegion(
+                region=MemoryRegion.MRAM,
+                window_start=0x00410000,
+                window_length=4_128_768,
+                app_start=0x00410000,
+                app_length=4_128_768,
+                used=45_000,
+                reserved=0,
+                load_image=46_200,
+                window_provenance="linker-app-origin",
+            ),
+            MeasuredRegion(
+                region=MemoryRegion.DTCM,
+                window_start=0x20000000,
+                window_length=524_288,
+                app_start=0x20000000,
+                app_length=507_904,
+                used=77_664,
+                reserved=430_240,
+                load_image=0,
+            ),
+        ),
+        unattributed=(
+            UnattributedSection(name=".mystery", address=0x30000000, size=64),
+        ),
+    )
+
+
 def _sample_memory_plan(engine: EngineType) -> MemoryPlan:
     return MemoryPlan(
         engine=engine,
@@ -304,6 +344,7 @@ def _make_ctx(tmp_path: Path, engine: EngineType, fmt: str) -> PipelineContext:
     ctx.pmu_result = _sample_pmu()
     ctx.power_result = _sample_power()
     ctx.memory_plan = _sample_memory_plan(engine)
+    ctx.memory_regions = _sample_memory_regions()
     # reserved is non-zero on purpose: with it at the default 0 every
     # `if bs.reserved:` emission is dead in the golden path, so the digests
     # could not see the summary.json / memory.json / console additions at all

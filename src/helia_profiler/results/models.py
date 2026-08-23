@@ -317,11 +317,14 @@ class MemoryConsumer:
 
 @dataclass(frozen=True)
 class MemoryRegionUsage:
-    """Usage breakdown for a single memory region (e.g. DTCM, MRAM).
+    """PLANNED usage for a single memory region (e.g. DTCM, MRAM).
 
-    ``capacity`` reflects the SoC's physical size for this region (bytes).
-    ``used`` is the sum of ``consumers[i].size`` (what the plan allocates).
-    ``free`` is a convenience property.
+    Part of the memory-plan DECISION RECORD: ``capacity`` is the SoC's
+    declared size and ``used`` sums only what hpx itself placed. Since
+    run-summary schema v3 the ``free``/``overflow`` properties are
+    plan-time capacity checks (``plan_memory`` raises on oversubscription)
+    and are NOT serialized — the measured truth is
+    :class:`MeasuredRegion`, read from the linked ELF (#133).
     """
 
     region: MemoryRegion
@@ -366,6 +369,102 @@ class MemoryPlan:
             object.__setattr__(self, "engine", EngineType(self.engine))
 
     def region(self, name: str | MemoryRegion) -> MemoryRegionUsage | None:
+        key = MemoryRegion(str(name).upper()) if not isinstance(name, MemoryRegion) else name
+        for r in self.regions:
+            if r.region is key:
+                return r
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Measured memory regions (#133 Phase 2)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MeasuredRegion:
+    """One region's MEASURED occupancy, read from the linked ELF.
+
+    The counterpart to :class:`MemoryRegionUsage`: that one is the memory
+    PLAN's decision record (what hpx intended, computed before any compiler
+    ran); this one is what the linker actually did, computed from the
+    binary's section inventory classified into the verified per-SoC windows
+    (``platform.memory_map``). ``used``/``free``/``reserved`` live HERE and
+    only here — the plan stopped wearing measurement vocabulary at
+    run-summary schema v3 (#133).
+
+    ``window_*`` is the classification aperture; ``app_*`` is the link
+    family's app extent inside it. ``used`` sums allocated, non-reserved
+    sections inside the app extent (gcc's floating ``.stack`` included —
+    live memory). ``reserved`` sums the linker's own reservations: the
+    fill-to-end/fixed heap sections inside the extent plus allocated
+    sections inside the window but outside the extent (armlink's fixed
+    heap/stack, apollo3p's STACKMEM). ``load_image`` is the PT_LOAD file
+    bytes whose PHYSICAL address lands here — initialized data's flash
+    image (summed per segment, never per section: armlink emits one
+    aggregate PT_LOAD).
+
+    Attribution is by section START address, all-or-nothing: a section
+    straddling an extent boundary is charged entirely to where it begins.
+    No NSX script produces one; if a future link does, the per-region
+    numbers will show it (negative or inflated free), not hide it.
+    """
+
+    region: MemoryRegion
+    window_start: int
+    window_length: int
+    app_start: int
+    app_length: int
+    used: int
+    reserved: int
+    load_image: int = 0
+    window_provenance: str = "hardware-aperture"
+    app_provenance: str = "linker-script"
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.region, MemoryRegion):
+            object.__setattr__(self, "region", MemoryRegion(str(self.region).upper()))
+
+    @property
+    def free(self) -> int:
+        """App extent minus measured usage. Deliberately unclamped: a
+        negative value means the inventory and the characterized extent
+        disagree — surface it, never hide it."""
+        return self.app_length - self.used
+
+
+@dataclass(frozen=True)
+class UnattributedSection:
+    """An allocated section outside every verified window — the police
+    flag: either the binary put bytes somewhere hpx has not characterized,
+    or the characterized table is wrong for this part."""
+
+    name: str
+    address: int
+    size: int
+
+
+@dataclass(frozen=True)
+class MeasuredMemoryRegions:
+    """The measured memory truth of one linked binary (#133 Phase 2).
+
+    Absent (None upstream) whenever it cannot be TRUE: unknown SoC or
+    linker profile, tool failure, or a partial section inventory
+    (``unparsed_rows`` nonzero) — never guessed, per #131. Regions that no
+    ELF section can land in (PSRAM) are excluded entirely; the plan owns
+    them.
+    """
+
+    link_family: str
+    linker_profile: str
+    regions: tuple[MeasuredRegion, ...]
+    unattributed: tuple[UnattributedSection, ...] = ()
+    #: PT_LOAD file bytes whose PHYSICAL address classifies to no
+    #: attributable window — the segment-side police flag (sections have
+    #: ``unattributed``).
+    unattributed_load_bytes: int = 0
+
+    def region(self, name: str | MemoryRegion) -> MeasuredRegion | None:
         key = MemoryRegion(str(name).upper()) if not isinstance(name, MemoryRegion) else name
         for r in self.regions:
             if r.region is key:

@@ -222,7 +222,7 @@ def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):
         "device_profiled_infer_avg_us": 8000,
     }
     assert summary["schema"] == "hpx.run-summary"
-    assert summary["schema_version"] == 2  # bumped by #24: binary.bss changed meaning
+    assert summary["schema_version"] == 3  # v2: #24 binary.bss; v3: #133 memory_regions
     assert summary["validity"] == "valid"
     assert summary["issues"] == []
 
@@ -410,7 +410,7 @@ def test_write_report_publishes_verifiable_manifest_last(tmp_path: Path):
     assert artifacts["summary.json"].role == "core"
     assert artifacts["summary.json"].name == "hpx.summary"
     assert artifacts["summary.json"].schema == "hpx.run-summary"
-    assert artifacts["summary.json"].schema_version == 2
+    assert artifacts["summary.json"].schema_version == 3
     assert artifacts["summary.json"].optional is False
     assert artifacts["profile_results.csv"].name == "hpx.profile-layers"
     assert artifacts["profile_results.csv"].schema is None
