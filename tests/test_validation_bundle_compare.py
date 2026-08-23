@@ -158,7 +158,7 @@ def test_loader_exposes_run_origin_metadata(tmp_path: Path) -> None:
     assert metadata.github_run_url.endswith("/actions/runs/31033041861")
 
 
-@pytest.mark.parametrize("schema_version", [1, 2, 3, 4, 5])
+@pytest.mark.parametrize("schema_version", [1, 2, 3, 4, 5, 6])
 def test_loader_supports_all_manifest_schemas(tmp_path: Path, schema_version: int) -> None:
     bundle = tmp_path / f"bundle-v{schema_version}"
     _write_bundle(bundle, 100)
