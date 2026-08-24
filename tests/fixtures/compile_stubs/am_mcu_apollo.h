@@ -22,8 +22,40 @@ static inline uint32_t am_hal_stimer_config(uint32_t config) {
 static inline uint32_t am_hal_stimer_counter_get(void) { return 0U; }
 
 // --- Debug power domain --------------------------------------------------
+// Apollo510-only in the real HAL (AP3/AP4 renders only ever name these in
+// comments); part-gated so a non-AP5 render arm calling them fails the gate.
+#if defined(AM_PART_APOLLO510)
 static inline uint32_t am_hal_debug_enable(void) { return 0U; }
 static inline uint32_t am_hal_debug_disable(void) { return 0U; }
+#endif  // AM_PART_APOLLO510
+
+// --- Burst mode (Apollo3 only; mirrors am_hal_burst.h) -------------------
+#if defined(AM_PART_APOLLO3P)
+typedef enum {
+    AM_HAL_BURST_AVAIL,
+    AM_HAL_BURST_NOTAVAIL,
+} am_hal_burst_avail_e;
+
+typedef enum {
+    AM_HAL_BURST_MODE,
+    AM_HAL_NORMAL_MODE,
+} am_hal_burst_mode_e;
+
+static inline uint32_t am_hal_burst_mode_initialize(am_hal_burst_avail_e *peBurstAvail) {
+    (void)peBurstAvail;
+    return 0U;
+}
+
+static inline uint32_t am_hal_burst_mode_enable(am_hal_burst_mode_e *peBurstStatus) {
+    (void)peBurstStatus;
+    return 0U;
+}
+
+static inline uint32_t am_hal_burst_mode_disable(am_hal_burst_mode_e *peBurstStatus) {
+    (void)peBurstStatus;
+    return 0U;
+}
+#endif  // AM_PART_APOLLO3P
 
 // --- VCOMP (crypto/OTP/VCOMP shutdown block) -----------------------------
 typedef struct {

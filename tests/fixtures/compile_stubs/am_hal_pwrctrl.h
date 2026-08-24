@@ -59,11 +59,6 @@ typedef enum {
     AM_HAL_PWRCTRL_CONTROL_CRYPTO_POWERDOWN = 0,
 } am_hal_pwrctrl_control_e;
 
-static inline uint32_t am_hal_pwrctrl_sram_config(am_hal_pwrctrl_sram_memcfg_t *cfg) {
-    (void)cfg;
-    return 0U;
-}
-
 static inline uint32_t am_hal_pwrctrl_periph_disable(am_hal_pwrctrl_periph_e periph) {
     (void)periph;
     return 0U;
@@ -74,8 +69,17 @@ static inline uint32_t am_hal_pwrctrl_periph_enable(am_hal_pwrctrl_periph_e peri
     return 0U;
 }
 
+// Part-gated like the real HAL: neither entry point exists on Apollo3, so a
+// render arm calling them there must fail the gate (#171 bug class).
+#if !defined(AM_PART_APOLLO3P)
+static inline uint32_t am_hal_pwrctrl_sram_config(am_hal_pwrctrl_sram_memcfg_t *cfg) {
+    (void)cfg;
+    return 0U;
+}
+
 static inline uint32_t am_hal_pwrctrl_control(am_hal_pwrctrl_control_e control, void *args) {
     (void)control;
     (void)args;
     return 0U;
 }
+#endif  // !AM_PART_APOLLO3P

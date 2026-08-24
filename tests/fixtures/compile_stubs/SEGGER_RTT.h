@@ -31,12 +31,19 @@ static inline unsigned SEGGER_RTT_Write(unsigned buffer_index, const void *buffe
     return 0U;
 }
 
+static inline unsigned SEGGER_RTT_Read(unsigned buffer_index, void *buffer, unsigned buffer_size) {
+    (void)buffer_index;
+    (void)buffer;
+    (void)buffer_size;
+    return 0U;
+}
+
 static inline unsigned SEGGER_RTT_GetAvailWriteSpace(unsigned buffer_index) {
     (void)buffer_index;
     return 0U;
 }
 
-static inline int SEGGER_RTT_HasDataUp(unsigned buffer_index) {
+static inline unsigned SEGGER_RTT_HasDataUp(unsigned buffer_index) {
     (void)buffer_index;
-    return 0;
+    return 0U;
 }

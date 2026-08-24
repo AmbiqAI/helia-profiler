@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 
-#define NSX_USB_MIN_CDC_RX_BUFSIZE 4096U
+// Real value from nsx-usb includes-api/nsx_usb.h.
+#define NSX_USB_MIN_CDC_RX_BUFSIZE 1024
 
 // Field order matters for the rendered designated initializer.
 typedef struct {
