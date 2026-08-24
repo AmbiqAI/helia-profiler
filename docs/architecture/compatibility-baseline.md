@@ -19,7 +19,7 @@ The current baseline is `hpx-neuralspotx-0.7.17-2026-08`:
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
 | `ns-cmsis-nn` | `63172642…d7f` (`v7.29.2`) |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
-| heliaRT | `1.17.0`, commit `ff6233ba…8df` (min supported `1.16.0`) |
+| heliaRT | `1.17.0`, commit `ff6233ba…8df` (min supported `1.16.0` — from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
 | heliaAOT | `min_version=0.18.0`, `max_version_exclusive=0.19.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 
@@ -28,18 +28,27 @@ perspective: the prebuilt distribution's exported-symbol surface, header
 set, and core/toolchain/variant library matrix are identical to 1.16.0
 (all 18 archives verified symbol/member/`.text`-identical in review).
 NB the CMake changes land squarely in **HPX's default build path** — the
-registry flow is a source build (`engines/helia_rt/adapter.py`), and all
-four changes hit the backend-target function it enters — but each is
-behavior-neutral for HPX, verified rather than assumed: the recording
-allocators drop out of the default source set (HPX uses
-`MicroAllocator::Create`, never the recording variants); no helia-rt
-source branches on the removed `NS_CMSIS_NN` define (ns-cmsis-nn
-self-defines it in `arm_nn_types.h`); the newly-unconditional
-`ethos_u/ethosu.cc` TU is an inert stub without the driver; and the new
-explicit `-fno-exceptions` on library targets matches what the NSX board
-flags already imposed (0 B `.text` delta on the source-axis A/B, and a
-second-bench cycle comparison measured −0.026% — real, negligible, and
-surfaced by `hpx compare`'s engine-version dimension where it matters).
+registry flow is a source build (`engines/helia_rt/adapter.py`), and the
+changes land in the backend-target function it enters — but each is
+behavior-neutral for HPX, verified rather than assumed. The six changes:
+(1) the recording allocators and (2) the test/mock/fake helpers drop out
+of the default source set (both now opt-in profiles; HPX uses
+`MicroAllocator::Create` and none of the helpers); (3) the removed
+`NS_CMSIS_NN` define branches nothing (zero preprocessor uses in the
+entire tree — ns-cmsis-nn self-defines it in `arm_nn_types.h`); (4) the
+newly-unconditional `ethos_u/ethosu.cc` TU is an inert stub without the
+driver; (5) the new explicit `-fno-exceptions` (CXX, PRIVATE) is a
+strict subset of what the NSX board flags already impose on all three
+toolchains; (6) a private ns-cmsis-nn include-dir was added on the link
+branch, upstreaming the header-prefix shim helia-rt's NSX module already
+carried. Empirically, the full 1.16→1.17 source-axis A/B showed a 0 B
+`.text` delta, and single-run cycle deltas of −41 and −531 (−0.002% /
+−0.026%; KWS DS-CNN, two independent apollo510_evb benches, gcc) — at
+or near run noise, with no claim of a real kernel effect. NB `hpx
+compare` does NOT surface an engine-version difference: the `ENGINE`
+dimension compares engine *type* only, and the version lives in
+`run_metadata.json` — a promoter A/B-ing across a runtime bump must
+diff that field by hand (tracked as a comparability-dimension gap).
 The Ethos-U kernel support is outside what HPX consumes **today**; the
 in-flight atomiq110 work (PR #98) will opt into it via
 `NSX_HELIA_RT_ENABLE_ETHOSU` and requires a helia-rt newer than 1.17.0
