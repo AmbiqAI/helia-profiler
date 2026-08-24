@@ -168,11 +168,14 @@ def _resolve_source_path(config: ProfileConfig) -> Path | None:
     if missing:
         raise EngineError(
             f"heliaRT source tree at {p} is missing required files: {', '.join(missing)}",
+            # NB release zips DO ship the source-build nsx/CMakeLists.txt
+            # (the #191 review corrected an earlier claim here that they
+            # carried the prebuilt wrapper); they are rejected because
+            # they omit the two repo-root files below.
             hint=(
-                "Source-build requires a heliaRT repo with the source-build "
-                "NSX module (>= v1.16.0). The released "
-                "release zip ships the prebuilt-style nsx/CMakeLists.txt and "
-                "is not compatible with source_path."
+                "Source-build requires a full heliaRT repo checkout "
+                "(>= v1.16.0), not a release zip: zips omit the repo-root "
+                "CMakeLists.txt and cmake/helia_rt_sources.cmake."
             ),
         )
     return p

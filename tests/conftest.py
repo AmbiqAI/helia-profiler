@@ -63,8 +63,11 @@ def fake_dist(tmp_path: Path) -> Path:
     (dist / "third_party" / "flatbuffers").mkdir()
     (dist / "signal").mkdir()
     # Copy the bundled test snapshot of heliaRT's nsx/ module into the dist
-    # so that _install_nsx_module finds the upstream-style files. This
-    # mirrors what real heliaRT >= 1.16.0 release zips ship.
+    # so that _install_nsx_module finds the upstream-style files. Only
+    # module.version tracks the qualified release; the REST of both files
+    # is a pre-1.16 prebuilt-era snapshot (summary still says "prebuilt
+    # static libraries") that _install_nsx_module never reads — it copies
+    # nsx-module.yaml and GENERATES its own wrapper (#191/#192 reviews).
     import shutil
 
     nsx_src = FIXTURES_DIR / "heliart_nsx"

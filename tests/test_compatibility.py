@@ -559,3 +559,18 @@ def test_engine_owned_module_names_match_canonical_constants() -> None:
         CMSIS_NN_MODULE,
         EXECUTORCH_MODULE,
     }
+
+
+def test_heliart_nsx_fixture_version_tracks_the_qualified_release():
+    """#192 review NIT: the heliart_nsx fixture's module.version is the one
+    field claimed to track the qualified release — enforce it so the next
+    promotion cannot silently leave it stale."""
+    import yaml
+
+    from helia_profiler.engines.helia_rt.artifacts import HELIART_VERSION
+
+    fixture = (
+        Path(__file__).parent / "fixtures" / "heliart_nsx" / "nsx-module.yaml"
+    )
+    data = yaml.safe_load(fixture.read_text(encoding="utf-8"))
+    assert data["module"]["version"] == HELIART_VERSION
