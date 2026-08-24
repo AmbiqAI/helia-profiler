@@ -19,17 +19,32 @@ The current baseline is `hpx-neuralspotx-0.7.17-2026-08`:
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
 | `ns-cmsis-nn` | `63172642…d7f` (`v7.29.2`) |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
-| heliaRT | `1.17.0`, commit `ff6233ba…8df` |
+| heliaRT | `1.17.0`, commit `ff6233ba…8df` (min supported `1.16.0`) |
 | heliaAOT | `min_version=0.18.0`, `max_version_exclusive=0.19.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 
 heliaRT 1.17.0 (issue #89) is a build-system and docs release from HPX's
 perspective: the prebuilt distribution's exported-symbol surface, header
-set, and core/toolchain/variant library matrix are identical to 1.16.0.
-The new opt-in CMake source profiles (recording/test helpers), the opt-in
-Ethos-U kernel support, and the removed `NS_CMSIS_NN` compile define all
-sit outside the features HPX consumes, so the minimum supported version
-stays 1.16.0.
+set, and core/toolchain/variant library matrix are identical to 1.16.0
+(all 18 archives verified symbol/member/`.text`-identical in review).
+NB the CMake changes land squarely in **HPX's default build path** — the
+registry flow is a source build (`engines/helia_rt/adapter.py`), and all
+four changes hit the backend-target function it enters — but each is
+behavior-neutral for HPX, verified rather than assumed: the recording
+allocators drop out of the default source set (HPX uses
+`MicroAllocator::Create`, never the recording variants); no helia-rt
+source branches on the removed `NS_CMSIS_NN` define (ns-cmsis-nn
+self-defines it in `arm_nn_types.h`); the newly-unconditional
+`ethos_u/ethosu.cc` TU is an inert stub without the driver; and the new
+explicit `-fno-exceptions` on library targets matches what the NSX board
+flags already imposed (0 B `.text` delta on the source-axis A/B, and a
+second-bench cycle comparison measured −0.026% — real, negligible, and
+surfaced by `hpx compare`'s engine-version dimension where it matters).
+The Ethos-U kernel support is outside what HPX consumes **today**; the
+in-flight atomiq110 work (PR #98) will opt into it via
+`NSX_HELIA_RT_ENABLE_ETHOSU` and requires a helia-rt newer than 1.17.0
+for the flag mapping. Minimum supported version stays 1.16.0 (HPX relies
+on nothing 1.17-only).
 
 neuralSPOT-X 0.7.17 fixes the J-Link flash-verification false negative that
 aborted idempotent re-flashes of an unchanged image, and enforces
