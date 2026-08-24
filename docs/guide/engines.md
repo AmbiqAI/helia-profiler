@@ -39,7 +39,7 @@ engine:
   type: executorch
   backend: arm  # arm or ns CMSIS-NN provider
   config:
-    source_path: /path/to/nsx-executorch
+    # source_path: /path/to/nsx-executorch  # optional development override
     method_arena_size: 65536
     temporary_arena_size: 32768
     input_size: 12288
@@ -67,16 +67,27 @@ it with a reason rather than failing.
 See `configs/executorch/resnet8_cmsis_nn.yaml` for the verified fixture — it
 targets `apollo330mP_evb` with `arena_location: sram` (that board's MCU_TCM is
 too small for the combined method/temporary/planned arenas) and accepts a
-caller-supplied PTE plus a single `nsx-executorch` checkout at `source_path`.
-The checkout must be at
-commit `62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59`, the current head of
-`nsx-executorch` `main` (the PR #4 merge adding the helia-torch CLI, on top
-of PR #2's out-of-tree `cortex_m_ns::` Tier 1 operators); HPX does not
-assume an unpublished release tag.
+caller-supplied PTE. By default HPX materializes the `nsx-executorch` checkout
+itself: it clones the repository URL pinned by the compatibility baseline into
+`~/.cache/helia-profiler/nsx-executorch/`, checks out the exact pinned commit
+(currently `62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59` — the PR #4 merge adding
+the helia-torch CLI, on top of PR #2's out-of-tree `cortex_m_ns::` Tier 1
+operators; HPX pins a commit, not a branch or release tag), and initializes
+`external/executorch` plus the
+minimal Cortex-M submodule set from that repository's README. When the
+baseline pin moves, the cache is re-synced to the new commit automatically.
+The cache worktree is force-synced on every run — local edits and untracked
+files under it are discarded, so the pinned commit fully defines what gets
+built; use `source_path` for development changes.
 
-`source_path` is the repository root containing `nsx-module.yaml`, not the
-embedded ExecuTorch submodule. Initialize the minimal Cortex-M submodules listed
-in that repository's README. HPX passes its own Python 3.11+ interpreter to
+`engine.config.source_path` overrides the auto-clone with a local development
+checkout — the repository root containing `nsx-module.yaml`, not the embedded
+ExecuTorch submodule. It must still be at the exact pinned commit with the
+minimal submodules initialized; the same verification runs either way. Note a
+`source_path` run is stamped `qualified-with-engine-override` in result
+provenance, while the auto-cloned default stays fully `qualified`.
+
+HPX passes its own Python 3.11+ interpreter to
 CMake so the pinned torchgen wrapper also sees HPX's PyYAML dependency. HPX
 declares exactly one qualified provider (`arm-cmsis-nn` or `nsx-cmsis-nn`) as
 a normal NSX module immediately before `nsx-executorch`. NSX lock/sync therefore
@@ -114,7 +125,7 @@ measured deltas.
 (schema `nsx-executorch.pte-manifest/1`), SHA-256-bound to that exact file.
 When present, HPX uses it to default `backend`, `ns_ops`, `portable_ops`,
 `planned_arena_size`, `input_size`, and `output_size`, so a minimal config
-is just `model.path`, `engine.config.source_path`, and the target board.
+is just `model.path` and the target board.
 Explicit config values always override the sidecar. A sidecar whose hash
 does not match the PTE, or an ns PTE with `ns_ops` disabled, is a
 config-time error with a hint — never a silent fallback.
