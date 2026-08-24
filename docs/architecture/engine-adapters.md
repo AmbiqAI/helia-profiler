@@ -159,7 +159,12 @@ already lowered against a chosen CMSIS-NN provider.
 
 ### What `prepare()` does
 
-1. Validates `engine.config.source_path` — a local `nsx-executorch` checkout
+1. Resolves the `nsx-executorch` checkout: by default it auto-clones the
+   repository pinned by the compatibility baseline into
+   `~/.cache/helia-profiler/nsx-executorch/` (exact pinned commit, minimal
+   Cortex-M submodule set, re-synced when the pin moves);
+   `engine.config.source_path` overrides with a local development checkout.
+   Either way it then validates the checkout — a `nsx-executorch` tree
    whose `version.txt` **and commit** match the qualified pin in the
    [compatibility baseline](compatibility-baseline.md), including its
    `external/executorch` submodule gitlink and pinned torchgen sources.

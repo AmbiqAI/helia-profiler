@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -160,6 +161,8 @@ def _config(tmp_path: Path, source: Path, *, backend: str = "arm", **engine_conf
         "portable_ops": ["aten::clamp.out"],
     }
     values.update(engine_config)
+    if values.get("source_path") is None:
+        values.pop("source_path", None)
     return load_config(
         None,
         {
@@ -417,7 +420,7 @@ def test_adapter_rejects_retired_nsx_subdirectory_layout(tmp_path: Path):
     (root / "nsx" / "nsx-module.yaml").write_text("schema_version: 1\n", encoding="utf-8")
 
     config = _config(tmp_path, root)
-    with pytest.raises(EngineError, match="Invalid nsx-executorch source_path"):
+    with pytest.raises(EngineError, match="Invalid nsx-executorch checkout"):
         ExecuTorchAdapter().prepare(config, tmp_path / "work")
 
 
@@ -609,3 +612,155 @@ def test_adapter_rejects_sidecar_with_bad_planned_size(tmp_path: Path):
 
     with pytest.raises(EngineError, match="planned_arena_size.*positive integer"):
         ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+# ---------------------------------------------------------------------------
+# Auto-clone resolution (#160) — source_path absent clones the pinned baseline
+# ---------------------------------------------------------------------------
+
+
+def test_adapter_auto_clones_pinned_checkout_when_source_path_absent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    source = _source_tree(tmp_path)
+    seen: dict[str, str] = {}
+
+    def fake_auto_clone(url: str, ref: str) -> Path:
+        seen["url"] = url
+        seen["ref"] = ref
+        return source
+
+    monkeypatch.setattr(executorch_mod, "_auto_clone_nsx_executorch", fake_auto_clone)
+    artifacts = ExecuTorchAdapter().prepare(
+        _config(tmp_path, source, source_path=None), tmp_path / "work"
+    )
+
+    # URL and ref come from the compatibility baseline's nsx-executorch project.
+    assert seen["url"] == "https://github.com/AmbiqAI/nsx-executorch.git"
+    assert seen["ref"] == "62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59"
+    # The cloned checkout then flows through the unchanged wrapper/verify path.
+    wrapper = artifacts.extra_modules[-1].path
+    assert f'"{source.as_posix()}"' in (wrapper / "CMakeLists.txt").read_text()
+
+
+def test_adapter_rejects_blank_source_path(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    with pytest.raises(EngineError, match="source_path must be a non-empty filesystem path"):
+        ExecuTorchAdapter().prepare(
+            _config(tmp_path, source, source_path="   "), tmp_path / "work"
+        )
+
+
+class _GitRecorder:
+    """Fake _run_git capturing (subcommand-args, cwd) and scripting rev-parse."""
+
+    def __init__(self, heads: list[str]):
+        self.heads = list(heads)
+        self.calls: list[tuple[tuple[str, ...], Path]] = []
+
+    def __call__(self, args, cwd, *, timeout, url, ref):
+        self.calls.append((tuple(args), Path(cwd)))
+        out = ""
+        if args[0] == "rev-parse":
+            head = self.heads.pop(0)
+            if head == "FAIL":
+                raise EngineError("corrupt cache")
+            out = head + "\n"
+
+        class _Result:
+            stdout = out
+
+        return _Result()
+
+    def subcommands(self) -> list[str]:
+        return [args[0] for args, _cwd in self.calls]
+
+
+_PINNED = "62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59"
+_URL = "https://github.com/AmbiqAI/nsx-executorch.git"
+
+
+def _patch_cache(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    cache = tmp_path / "cache" / "nsx-executorch"
+    monkeypatch.setattr(executorch_mod, "_EXECUTORCH_CACHE_DIR", cache)
+    return cache
+
+
+def test_auto_clone_fresh_cache_clones_and_inits_submodules(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    cache = _patch_cache(monkeypatch, tmp_path)
+    git = _GitRecorder(heads=[_PINNED])
+    monkeypatch.setattr(executorch_mod, "_run_git", git)
+
+    result = executorch_mod._auto_clone_nsx_executorch(_URL, _PINNED)
+
+    assert result == cache
+    assert git.subcommands() == ["clone", "rev-parse", "submodule", "submodule"]
+    clone_args, clone_cwd = git.calls[0]
+    assert clone_args == ("clone", _URL, str(cache))
+    top_args, top_cwd = git.calls[2]
+    assert top_args == ("submodule", "update", "--init", "external/executorch")
+    assert top_cwd == cache
+    nested_args, nested_cwd = git.calls[3]
+    assert nested_args[3:] == executorch_mod._EXECUTORCH_MINIMAL_SUBMODULES
+    assert nested_cwd == cache / "external" / "executorch"
+
+
+def test_auto_clone_cache_hit_skips_network(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    cache = _patch_cache(monkeypatch, tmp_path)
+    (cache / ".git").mkdir(parents=True)
+    git = _GitRecorder(heads=[_PINNED])
+    monkeypatch.setattr(executorch_mod, "_run_git", git)
+
+    executorch_mod._auto_clone_nsx_executorch(_URL, _PINNED)
+
+    # No clone/fetch/checkout — but submodule init still runs (idempotent).
+    assert git.subcommands() == ["rev-parse", "submodule", "submodule"]
+
+
+def test_auto_clone_resyncs_cache_on_baseline_ref_bump(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    cache = _patch_cache(monkeypatch, tmp_path)
+    (cache / ".git").mkdir(parents=True)
+    git = _GitRecorder(heads=["0000000000000000000000000000000000000000"])
+    monkeypatch.setattr(executorch_mod, "_run_git", git)
+
+    executorch_mod._auto_clone_nsx_executorch(_URL, _PINNED)
+
+    assert git.subcommands() == ["rev-parse", "fetch", "checkout", "submodule", "submodule"]
+    assert ("fetch", "origin", _PINNED) == git.calls[1][0][:3]
+    assert ("checkout", "--detach", _PINNED) == git.calls[2][0]
+
+
+def test_auto_clone_recovers_from_corrupt_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    cache = _patch_cache(monkeypatch, tmp_path)
+    (cache / ".git").mkdir(parents=True)
+    (cache / "junk.txt").write_text("stale", encoding="utf-8")
+    git = _GitRecorder(heads=["FAIL", _PINNED])
+    monkeypatch.setattr(executorch_mod, "_run_git", git)
+
+    executorch_mod._auto_clone_nsx_executorch(_URL, _PINNED)
+
+    # The unusable cache is removed and recloned from scratch.
+    assert git.subcommands() == ["rev-parse", "clone", "rev-parse", "submodule", "submodule"]
+    assert not (cache / "junk.txt").exists()
+
+
+def test_auto_clone_failure_hints_manual_source_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    _patch_cache(monkeypatch, tmp_path)
+
+    def failing_run(cmd, **kwargs):
+        raise subprocess.CalledProcessError(128, cmd, stderr="fatal: could not resolve host")
+
+    monkeypatch.setattr(executorch_mod.subprocess, "run", failing_run)
+
+    with pytest.raises(EngineError) as excinfo:
+        executorch_mod._auto_clone_nsx_executorch(_URL, _PINNED)
+    message = str(excinfo.value)
+    assert "could not resolve host" in message
+    assert "source_path" in message
+    assert _URL in message
+    assert _PINNED in message
