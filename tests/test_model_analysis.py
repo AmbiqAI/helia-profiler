@@ -7,13 +7,15 @@ which is where the bulk of the estimation bugs would hide.
 
 from __future__ import annotations
 
+import struct
 from pathlib import Path
 
 import pytest
 
-from helia_profiler.evaluation import analyze_model, is_available
+from helia_profiler.evaluation import analyze_model, is_available, vela_accelerator_config
 from helia_profiler.evaluation.model_analysis import (
     _conv2d_macs,
+    _decode_cop_optimizer_config,
     _depthwise_conv2d_macs,
     _elementwise_ops,
     _fully_connected_macs,
@@ -142,6 +144,60 @@ def test_quickstart_kws_model_reports_real_builtin_ops():
     assert "CONV_2D" in ops
     assert "SOFTMAX" in ops
     assert ops != {"ADD"}
+
+
+class TestVelaAcceleratorConfig:
+    """Decoding the accelerator config out of a Vela command stream (#184).
+
+    Vela stores it in the ethos-u custom op's COP1 payload, not in tflite
+    metadata: word 0 is the 'COP1' fourcc, word 1 the driver action
+    (OPTIMIZER_CONFIG == 1) and word 2 the config_r register.
+    """
+
+    @staticmethod
+    def _cop1(cfg_word: int, action: int = 1) -> bytes:
+        return (
+            b"COP1"
+            + bytes([action, 0, 0x10, 0])
+            + struct.pack("<I", cfg_word)
+            + struct.pack("<I", 0x20007000)
+        )
+
+    def test_decodes_u85_256(self):
+        # product=2 (u85) in bits 28-31, macs_per_cc=8 -> 2**8 = 256.
+        assert _decode_cop_optimizer_config(self._cop1(0x20000118)) == "ethos-u85-256"
+
+    def test_decodes_u55_128(self):
+        # product=0 (u55), macs_per_cc=7 -> 2**7 = 128.
+        assert _decode_cop_optimizer_config(self._cop1(0x00000017)) == "ethos-u55-128"
+
+    def test_rejects_non_cop1_payload(self):
+        assert _decode_cop_optimizer_config(b"NOPE" + b"\x00" * 32) is None
+
+    def test_rejects_non_optimizer_action(self):
+        # COMMAND_STREAM (2) carries no config word.
+        assert _decode_cop_optimizer_config(self._cop1(0x20000118, action=2)) is None
+
+    def test_rejects_truncated_payload(self):
+        assert _decode_cop_optimizer_config(b"COP1\x01\x00") is None
+
+    def test_rejects_unknown_product(self):
+        assert _decode_cop_optimizer_config(self._cop1(0xF0000118)) is None
+
+    @pytest.mark.skipif(not is_available(), reason="ai-edge-litert not installed")
+    def test_reads_real_vela_model(self):
+        root = Path(__file__).resolve().parents[1]
+        model = root / "examples" / "quickstart" / "kws_model_vela.tflite"
+        assert vela_accelerator_config(model) == "ethos-u85-256"
+
+    @pytest.mark.skipif(not is_available(), reason="ai-edge-litert not installed")
+    def test_non_vela_model_returns_none(self):
+        root = Path(__file__).resolve().parents[1]
+        model = root / "examples" / "quickstart" / "kws_model.tflite"
+        assert vela_accelerator_config(model) is None
+
+    def test_missing_file_returns_none(self, tmp_path: Path):
+        assert vela_accelerator_config(tmp_path / "nope.tflite") is None
 
 
 class TestEthosUDetection:

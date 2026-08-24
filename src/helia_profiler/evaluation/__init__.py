@@ -35,6 +35,7 @@ from .model_analysis import (
     analyze_for_engine,
     analyze_model,
     is_available,
+    vela_accelerator_config,
 )
 
 __all__ = [
@@ -66,5 +67,6 @@ __all__ = [
     "evaluate_run",
     "is_available",
     "render_compare",
+    "vela_accelerator_config",
     "write_compare_artifacts",
 ]

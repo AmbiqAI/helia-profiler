@@ -242,6 +242,43 @@ def _check_npu_backend(cfg) -> None:
                 f"NPU-capable boards: {', '.join(npu_boards) if npu_boards else 'none'}."
             ),
         )
+    _check_vela_accelerator_config(cfg, soc)
+
+
+def _check_vela_accelerator_config(cfg, soc) -> None:
+    """Reject a Vela model compiled for a different accelerator than the target.
+
+    Vela bakes the accelerator config (product + MACs/cycle) into the ethos-u
+    command stream, and the NPU driver compares it against the hardware's own
+    CONFIG register. A mismatch — e.g. an ethos-u55-128 model on this
+    ethos-u85-256 part — otherwise builds and flashes cleanly and then hangs at
+    the first inference, which is very hard to diagnose on a board.
+
+    Skipped silently when the config cannot be determined (model not
+    Vela-compiled yet, undecodable payload, or ai-edge-litert not installed):
+    "unknown" must never be reported as a mismatch.
+    """
+    from ..evaluation import vela_accelerator_config
+
+    target_npu = soc.npu
+    if not target_npu:
+        return
+    model_cfg = vela_accelerator_config(cfg.model.path)
+    if model_cfg is None:
+        return
+    if model_cfg.strip().lower() == str(target_npu).strip().lower():
+        return
+    raise ConfigError(
+        f"Model was compiled by Vela for '{model_cfg}', but board "
+        f"'{cfg.target.board}' ({soc.name}) has NPU '{target_npu}'.",
+        hint=(
+            "The Ethos-U driver rejects a command stream built for a different "
+            "accelerator, so this would hang at the first inference. Recompile "
+            f"the model for the target: vela model.tflite "
+            f"--accelerator-config {target_npu} --output-dir vela_out, then "
+            "profile the resulting *_vela.tflite."
+        ),
+    )
 
 
 def _check_transport_support(cfg) -> None:
