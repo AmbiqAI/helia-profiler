@@ -168,6 +168,10 @@ def test_child_override_sets_are_the_documented_ones():
         # HPX_PROFILED_INFER_* summary would publish a different measurement
         # under the keys every other engine uses for execute-only timing.
         "engine_profiled_summary",
+        # Overridden EMPTY: ET has no PSRAM support (preflight rejects it)
+        # and declares no psram_info — the base's metadata include made
+        # test-rendered psram arms uncompilable (#187 gate finding).
+        "engine_psram_metadata",
     }
 
 

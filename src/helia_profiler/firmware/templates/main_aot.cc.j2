@@ -326,7 +326,11 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
 {% for region in arena_regions %}
 {% if region.placement == "psram" %}
     static uint8_t *hpx_arena_buf_{{ region.region_id }} = nullptr;
+{% if region.blob_filename %}
+    // Retained only for the blob write-back below — a blob-less PSRAM
+    // region tripped -Wunused-but-set-variable (#187 gate).
     static uint32_t hpx_arena_psram_offset_{{ region.region_id }} = 0;
+{% endif %}
 {% elif region.placement == "tcm" %}
     NSX_MEM_FAST_BSS alignas({{ region.alignment }}) static uint8_t hpx_arena_buf_storage_{{ region.region_id }}[{{ region.size }}];
     static uint8_t *hpx_arena_buf_{{ region.region_id }} = hpx_arena_buf_storage_{{ region.region_id }};
@@ -366,7 +370,9 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
         uint32_t psram_off = 0;
 {% for region in psram_arena_regions %}
         psram_off = (psram_off + {{ region.alignment }} - 1u) & ~({{ region.alignment }}u - 1u);
+{% if region.blob_filename %}
         hpx_arena_psram_offset_{{ region.region_id }} = psram_off;
+{% endif %}
         hpx_arena_buf_{{ region.region_id }} =
             (uint8_t *)(psram_info.base_address + psram_off);
         hpx_printf("HPX_PSRAM_ARENA_REGION=%d,0x%08lx,%u\n",
