@@ -49,7 +49,7 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert baseline.project("ns-cmsis-nn").ref == "631726420b04860a5c4236956a3741ff5a96bd7f"
     assert baseline.project("nsx-executorch").ref == "62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59"
     assert baseline.engine("executorch").ref == "62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59"
-    assert baseline.engine("helia-rt").ref == "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62"
+    assert baseline.engine("helia-rt").ref == "ff6233ba3783a74de52977d155db6ed5472068df"
     assert baseline.engine("helia-aot").min_version == "0.18.0"
     assert baseline.engine("helia-aot").max_version_exclusive == "0.19.0"
     assert len(baseline.fingerprint) == 64
@@ -66,7 +66,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
         "ns-cmsis-nn": "631726420b04860a5c4236956a3741ff5a96bd7f",
         "nsx-executorch": "62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59",
-        "helia-rt": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62",
+        "helia-rt": "ff6233ba3783a74de52977d155db6ed5472068df",
         # nsx-sensors v0.3.0 — full datasheet audit of the INA228 driver.
         # Cumulative fixes that matter here: SHUNT_CAL scaling (v0.2.0),
         # ADCRANGE moved to its real register (CONFIG bit 4 — earlier code
@@ -85,10 +85,10 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
         "nsx-cmsis-nn": "631726420b04860a5c4236956a3741ff5a96bd7f",
         "nsx-executorch": "62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59",
-        "nsx-helia-rt": "c1b97f4a49ab608d226029d1bf1c9c2dac10ef62",
+        "nsx-helia-rt": "ff6233ba3783a74de52977d155db6ed5472068df",
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
     }
-    assert baseline.engine("helia-rt").version == "1.16.0"
+    assert baseline.engine("helia-rt").version == "1.17.0"
     assert baseline.engine("helia-aot").min_version == "0.18.0"
     assert baseline.engine("helia-aot").max_version_exclusive == "0.19.0"
     assert baseline.engine("tflm").governed_by_modules
