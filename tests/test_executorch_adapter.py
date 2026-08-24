@@ -764,3 +764,20 @@ def test_auto_clone_failure_hints_manual_source_path(
     assert "source_path" in message
     assert _URL in message
     assert _PINNED in message
+
+
+def test_auto_clone_failure_without_stderr_still_reports_cause(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    _patch_cache(monkeypatch, tmp_path)
+
+    def failing_run(cmd, **kwargs):
+        raise subprocess.TimeoutExpired(cmd, 600)
+
+    monkeypatch.setattr(executorch_mod.subprocess, "run", failing_run)
+
+    with pytest.raises(EngineError) as excinfo:
+        executorch_mod._auto_clone_nsx_executorch(_URL, _PINNED)
+    message = str(excinfo.value)
+    assert "timed out" in message
+    assert "source_path" in message

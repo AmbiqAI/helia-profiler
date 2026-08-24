@@ -62,8 +62,12 @@ def _run_git(
             timeout=timeout,
         )
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as exc:
-        stderr = (getattr(exc, "stderr", "") or "").strip()
-        detail = f": {stderr}" if stderr else ""
+        stderr = getattr(exc, "stderr", "") or ""
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", errors="replace")
+        # str(exc) so a missing git binary or a timeout still reports what
+        # happened, not just which subcommand died.
+        detail = f": {stderr.strip() or exc}"
         raise EngineError(
             f"git {args[0]} failed while preparing the nsx-executorch auto-clone cache{detail}",
             hint=_manual_checkout_hint(url, ref),
