@@ -179,13 +179,15 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
     }
 {% if weights_region == "psram" %}
     model_data = (const unsigned char *)psram_info.base_address;
-    // Align arena offset to 64 bytes (cacheline) past the model bytes.
-    static constexpr uint32_t kArenaPsramOffset =
-        ((uint32_t){{ model_size }} + 63u) & ~63u;
-{% else %}
-    static constexpr uint32_t kArenaPsramOffset = 0u;
 {% endif %}
 {% if arena_region == "psram" %}
+    // Arena offset past the model bytes when weights share PSRAM (64-byte
+    // cacheline aligned), 0 otherwise. Defined only where consumed: the
+    // weights-only-PSRAM arm tripped -Wunused-variable (#187 gate).
+    static constexpr uint32_t kArenaPsramOffset =
+{% if weights_region == "psram" %}        ((uint32_t){{ model_size }} + 63u) & ~63u;
+{% else %}        0u;
+{% endif %}
     g_arena = (uint8_t *)(psram_info.base_address + kArenaPsramOffset);
     hpx_printf("HPX_PSRAM_ARENA=0x%08lx,%d\n",
                (unsigned long)g_arena, kArenaSize);

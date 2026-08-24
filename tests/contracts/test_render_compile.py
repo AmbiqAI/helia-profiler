@@ -446,29 +446,11 @@ def _compile(case_dir: Path, part_define: str) -> subprocess.CompletedProcess[st
 #: template makes the case compile and this test then FAILS until the entry
 #: is removed (strict-xfail semantics), so the ledger cannot go stale.
 _EXPECTED_RENDER_BUGS: dict[str, str] = {
-    "census:ap510|rtt|tflm|psram-weights": (
-        "main.cc.j2:183-189 — kArenaPsramOffset is computed under "
-        "weights_region=='psram' but its only consumer is inside the "
-        "arena_region=='psram' guard; weights-only-in-PSRAM renders trip "
-        "-Wunused-variable"
-    ),
-    "census:ap510|swo|tflm|psram-weights": (
-        "same kArenaPsramOffset defect as ap510|rtt|tflm|psram-weights "
-        "(main.cc.j2:183-189), reached via the SWO transport arm"
-    ),
-    "census:ap510|rtt|executorch|psram-weights": (
-        "_main_base.cc.j2:331-334 includes _psram_metadata.j2 for every "
-        "psram_needed render, but main_executorch.cc.j2 renders no PSRAM "
-        "init block, so psram_info is undeclared — an uncompilable render "
-        "(production-unreachable: preflight rejects psram placement for "
-        "executorch, the exact #171 shape)"
-    ),
-    "census:ap510|rtt|helia-aot|arenas-psram-noblob": (
-        "main_aot.cc.j2:329/369 — hpx_arena_psram_offset_N is set for every "
-        "PSRAM arena region but read only under region.blob_filename "
-        "(main_aot.cc.j2:408); a PSRAM region without a sidecar blob trips "
-        "-Wunused-but-set-variable"
-    ),
+    # Empty since the three findings from the gate's first census sweep
+    # were fixed in the same PR (kArenaPsramOffset weights-only arm, the
+    # ExecuTorch psram-metadata include, the blob-less AOT psram offset).
+    # STRICT semantics: an entry whose case starts compiling fails the
+    # gate until removed, so fixes cannot leave stale expectations.
 }
 
 
