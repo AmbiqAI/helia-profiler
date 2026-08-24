@@ -28,7 +28,8 @@ NS_CMSIS_NN_PROJECT = "ns-cmsis-nn"
 _EXECUTORCH_CACHE_DIR = Path.home() / ".cache" / "helia-profiler" / "nsx-executorch"
 
 # Nested ExecuTorch submodules required by nsx-executorch's stock CMake
-# configuration — the "minimal Cortex-M checkout" set from its README.
+# configuration — the "minimal Cortex-M checkout" set from its README at the
+# baseline-pinned commit. Review against that README on every pin bump.
 _EXECUTORCH_MINIMAL_SUBMODULES = (
     "backends/xnnpack/third-party/FXdiv",
     "third-party/flatbuffers",
@@ -49,9 +50,7 @@ def _manual_checkout_hint(url: str, ref: str) -> str:
     )
 
 
-def _run_git(
-    args: list[str], cwd: Path, *, timeout: int, url: str, ref: str
-) -> subprocess.CompletedProcess[str]:
+def _run_git(args: list[str], cwd: Path, *, timeout: int) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(
             ["git", *args],
@@ -69,28 +68,39 @@ def _run_git(
         # happened, not just which subcommand died.
         detail = f": {stderr.strip() or exc}"
         raise EngineError(
-            f"git {args[0]} failed while preparing the nsx-executorch auto-clone cache{detail}",
-            hint=_manual_checkout_hint(url, ref),
+            f"git {args[0]} failed while preparing the nsx-executorch auto-clone cache{detail}"
         ) from exc
 
 
 def _auto_clone_nsx_executorch(url: str, ref: str) -> Path:
     """Materialize the baseline-pinned nsx-executorch checkout in the cache.
 
-    Mirrors the ns-cmsis-nn auto-clone (cache under ``~/.cache/helia-profiler/``)
-    but checks out the exact pinned ref and initializes the minimal Cortex-M
-    submodule set from the repository README. The caller's verification of
-    version/ref/submodule pins runs unchanged afterwards, so a stale or
-    corrupted cache can never be profiled silently.
+    Uses the same cache root as the ns-cmsis-nn auto-clone but a stricter
+    strategy: the exact pinned ref is checked out (re-synced when the pin
+    moves) and the minimal Cortex-M submodule set from the repository README
+    is initialized. The caller's verification of version/ref/submodule pins
+    runs unchanged afterwards, so a stale or corrupted cache can never be
+    profiled silently.
     """
+    try:
+        return _sync_executorch_cache(url, ref)
+    except EngineError as exc:
+        if exc.hint is None:
+            exc.hint = _manual_checkout_hint(url, ref)
+        raise
+
+
+def _sync_executorch_cache(url: str, ref: str) -> Path:
     cache = _EXECUTORCH_CACHE_DIR
     head: str | None = None
     if (cache / ".git").exists():
         try:
-            head = _run_git(
-                ["rev-parse", "HEAD"], cache, timeout=30, url=url, ref=ref
-            ).stdout.strip()
-        except EngineError:
+            head = _run_git(["rev-parse", "HEAD"], cache, timeout=30).stdout.strip()
+        except EngineError as exc:
+            # Only a git error is evidence of a corrupt cache; a missing git
+            # binary or a timeout must not discard a good clone.
+            if not isinstance(exc.__cause__, subprocess.CalledProcessError):
+                raise
             log.warning("nsx-executorch: unusable cache at %s — recloning", cache)
     if head is None:
         # Remove stale partial clone
@@ -98,30 +108,49 @@ def _auto_clone_nsx_executorch(url: str, ref: str) -> Path:
             shutil.rmtree(cache)
         cache.parent.mkdir(parents=True, exist_ok=True)
         log.info("Cloning nsx-executorch from %s ...", url)
-        _run_git(["clone", url, str(cache)], cache.parent, timeout=600, url=url, ref=ref)
-        head = _run_git(["rev-parse", "HEAD"], cache, timeout=30, url=url, ref=ref).stdout.strip()
-    if head != ref:
-        log.info("nsx-executorch: syncing cache to pinned ref %s", ref)
-        _run_git(["fetch", "origin", ref], cache, timeout=600, url=url, ref=ref)
-        _run_git(["checkout", "--detach", ref], cache, timeout=60, url=url, ref=ref)
-    else:
+        _run_git(["clone", url, str(cache)], cache.parent, timeout=600)
+    if head == ref:
         log.info("nsx-executorch: cache hit at %s", cache)
+    else:
+        log.info("nsx-executorch: syncing cache to pinned ref %s", ref)
+        try:
+            _run_git(["checkout", "--detach", ref], cache, timeout=60)
+        except EngineError:
+            # The pin is not in the clone yet (cache predates a baseline bump).
+            _run_git(["fetch", "origin", ref], cache, timeout=600)
+            _run_git(["checkout", "--detach", ref], cache, timeout=60)
     # Idempotent: fast no-ops once the pinned gitlinks are already checked out.
-    _run_git(
-        ["submodule", "update", "--init", "external/executorch"],
-        cache,
-        timeout=1800,
-        url=url,
-        ref=ref,
-    )
+    _run_git(["submodule", "update", "--init", "external/executorch"], cache, timeout=1800)
     _run_git(
         ["submodule", "update", "--init", *_EXECUTORCH_MINIMAL_SUBMODULES],
         cache / "external" / "executorch",
         timeout=1800,
-        url=url,
-        ref=ref,
     )
     return cache
+
+
+def _resolve_source_root(config: ProfileConfig) -> Path:
+    """Resolve the nsx-executorch checkout root.
+
+    Default: auto-clone the baseline-pinned revision into the cache.
+    ``engine.config.source_path`` overrides with a development checkout.
+    """
+    source_value = config.engine.config.get("source_path")
+    if source_value is None:
+        baseline = config.compatibility_baseline
+        # Clone at the same ref the checkout verification enforces; the
+        # project entry contributes the URL.
+        ref = baseline.engine("executorch").ref or baseline.project(EXECUTORCH_PROJECT).ref
+        return _auto_clone_nsx_executorch(baseline.project(EXECUTORCH_PROJECT).url, ref)
+    if not isinstance(source_value, (str, Path)) or not str(source_value).strip():
+        raise EngineError(
+            "engine.config.source_path must be a non-empty filesystem path",
+            hint=(
+                "Point it at a local nsx-executorch checkout, or omit it to "
+                "auto-clone the revision pinned by the compatibility baseline."
+            ),
+        )
+    return Path(source_value).expanduser().resolve()
 
 
 def _checkout_commit(path: Path) -> str:
@@ -346,70 +375,7 @@ class ExecuTorchAdapter:
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> ExecutorchArtifacts:
         engine_config = config.engine.config
-        source_value = engine_config.get("source_path")
-        if source_value is None:
-            # Default path: clone the baseline-pinned revision into the cache.
-            # source_path remains the override for development checkouts.
-            pinned = config.compatibility_baseline.project(EXECUTORCH_PROJECT)
-            source_root = _auto_clone_nsx_executorch(pinned.url, pinned.ref)
-        else:
-            if not isinstance(source_value, (str, Path)) or not str(source_value).strip():
-                raise EngineError(
-                    "engine.config.source_path must be a non-empty filesystem path",
-                    hint=(
-                        "Point it at a local nsx-executorch checkout, or omit it to "
-                        "auto-clone the revision pinned by the compatibility baseline."
-                    ),
-                )
-            source_root = Path(source_value).expanduser().resolve()
-        # nsx-executorch is a real NSX module at its checkout root — its own
-        # nsx-module.yaml + CMakeLists.txt (not a retired nsx/ subdirectory).
-        if (
-            not (source_root / "version.txt").is_file()
-            or not (source_root / "nsx-module.yaml").is_file()
-            or not (source_root / "CMakeLists.txt").is_file()
-        ):
-            raise EngineError(
-                f"Invalid nsx-executorch checkout: {source_root}",
-                hint="Expected version.txt, nsx-module.yaml, and CMakeLists.txt at the checkout root.",
-            )
-        expected_engine = config.compatibility_baseline.engine("executorch")
-        actual_version = (source_root / "version.txt").read_text(encoding="utf-8").strip()
-        if actual_version != expected_engine.version:
-            raise EngineError(
-                f"nsx-executorch version {actual_version!r} does not match the qualified "
-                f"version {expected_engine.version!r}",
-                hint="Check out the exact nsx-executorch commit pinned by HPX.",
-            )
-        actual_ref = _checkout_commit(source_root)
-        if actual_ref != expected_engine.ref:
-            raise EngineError(
-                f"nsx-executorch checkout is at {actual_ref}, expected {expected_engine.ref}",
-                hint="Fetch nsx-executorch main and check out the exact commit pinned by HPX.",
-            )
-        if not (source_root / "external" / "executorch" / "version.txt").is_file():
-            raise EngineError(
-                f"nsx-executorch checkout is missing its ExecuTorch submodule: {source_root}",
-                hint=(
-                    "Initialize external/executorch and the minimal Cortex-M submodules "
-                    "listed in nsx-executorch's README."
-                ),
-            )
-        expected_submodule_ref = _gitlink_commit(source_root, "external/executorch")
-        actual_submodule_ref = _checkout_commit(source_root / "external" / "executorch")
-        if actual_submodule_ref != expected_submodule_ref:
-            raise EngineError(
-                f"nsx-executorch external/executorch is at {actual_submodule_ref}, "
-                f"expected {expected_submodule_ref}",
-                hint="Run git submodule update --init external/executorch at the pinned checkout.",
-            )
-        if not (source_root / "tools" / "python" / "torchgen" / "__init__.py").is_file():
-            raise EngineError(
-                f"nsx-executorch checkout is missing its pinned torchgen sources: {source_root}"
-            )
-
         sidecar = _load_pte_sidecar(config.model.path)
-
         provider = config.engine.backend or (sidecar or {}).get("kernel_provider") or "arm"
         if provider not in {"arm", "ns"}:
             raise EngineError("ExecuTorch backend must be 'arm' or 'ns'")
@@ -479,6 +445,55 @@ class ExecuTorchAdapter:
         sidecar_portable = (
             list((sidecar.get("operators") or {}).get("portable") or []) if sidecar else None
         )
+
+        # Materialize the checkout only after the pure-config validation above:
+        # a bad YAML must fail immediately, not after a multi-minute clone.
+        source_root = _resolve_source_root(config)
+        # nsx-executorch is a real NSX module at its checkout root — its own
+        # nsx-module.yaml + CMakeLists.txt (not a retired nsx/ subdirectory).
+        if (
+            not (source_root / "version.txt").is_file()
+            or not (source_root / "nsx-module.yaml").is_file()
+            or not (source_root / "CMakeLists.txt").is_file()
+        ):
+            raise EngineError(
+                f"Invalid nsx-executorch checkout: {source_root}",
+                hint="Expected version.txt, nsx-module.yaml, and CMakeLists.txt at the checkout root.",
+            )
+        expected_engine = config.compatibility_baseline.engine("executorch")
+        actual_version = (source_root / "version.txt").read_text(encoding="utf-8").strip()
+        if actual_version != expected_engine.version:
+            raise EngineError(
+                f"nsx-executorch version {actual_version!r} does not match the qualified "
+                f"version {expected_engine.version!r}",
+                hint="Check out the exact nsx-executorch commit pinned by HPX.",
+            )
+        actual_ref = _checkout_commit(source_root)
+        if actual_ref != expected_engine.ref:
+            raise EngineError(
+                f"nsx-executorch checkout is at {actual_ref}, expected {expected_engine.ref}",
+                hint="Fetch nsx-executorch main and check out the exact commit pinned by HPX.",
+            )
+        if not (source_root / "external" / "executorch" / "version.txt").is_file():
+            raise EngineError(
+                f"nsx-executorch checkout is missing its ExecuTorch submodule: {source_root}",
+                hint=(
+                    "Initialize external/executorch and the minimal Cortex-M submodules "
+                    "listed in nsx-executorch's README."
+                ),
+            )
+        expected_submodule_ref = _gitlink_commit(source_root, "external/executorch")
+        actual_submodule_ref = _checkout_commit(source_root / "external" / "executorch")
+        if actual_submodule_ref != expected_submodule_ref:
+            raise EngineError(
+                f"nsx-executorch external/executorch is at {actual_submodule_ref}, "
+                f"expected {expected_submodule_ref}",
+                hint="Run git submodule update --init external/executorch at the pinned checkout.",
+            )
+        if not (source_root / "tools" / "python" / "torchgen" / "__init__.py").is_file():
+            raise EngineError(
+                f"nsx-executorch checkout is missing its pinned torchgen sources: {source_root}"
+            )
 
         # Generate a thin NSX module wrapper around the local checkout: mirror
         # its own nsx-module.yaml and delegate build logic to its own
