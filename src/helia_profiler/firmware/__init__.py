@@ -7,11 +7,15 @@ receives a ``PipelineContext`` and operates on the fields set by prior stages.
 
 from __future__ import annotations
 
+# ``glob`` and ``shutil`` stay imported as modules even though the code that
+# uses them moved to .build / .launcher / .segger: tests monkeypatch
+# ``helia_profiler.firmware.glob.glob`` and
+# ``helia_profiler.firmware.shutil.which``, so the package must keep these
+# module attributes (the split modules import the same module objects, so the
+# patches keep landing where the code reads them at call time).
 import glob
 import logging
-import os
 import shutil
-from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -24,10 +28,14 @@ from ..config import PowerFirmware, Transport, WindowMode
 from ..engines import EngineType
 from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError
-from ..errors import BuildError, FirmwareError
+from ..errors import FirmwareError
 from ..placement import Placement
 from ..platform import get_soc_for_board
 from .context import FirmwareRenderContext, _resolve_pmu_passes
+# NB: measured_power_fingerprint and _resolve_module_list below look unused
+# in this module but are LIVE re-export surface — report/manifest.py,
+# report/summary.py, and tests import them from the package root. Do not
+# remove in a dead-import cleanup (#194 review).
 from .fingerprint import measured_power_fingerprint
 from .project import (
     NsxModuleSpec,
@@ -50,349 +58,39 @@ from .project import (
 )
 from .render import _jinja_env, _write_text
 
+# The compiler-launcher, SEGGER RTT vendoring, generated-C-header, and NSX
+# build/flash invocation APIs live in dedicated modules (extracted at the
+# module size ceiling — the elf_inventory precedent, see toolchain_probe);
+# re-exported here so callers keep one import surface.
+from .build import (
+    _DEFAULT_RTT_BUFFER_SIZE_UP,
+    _find_target_binary,
+    _nsx_toolchain,
+    _rtt_buffer_size_up,
+    build_app,
+    flash_app,
+)
+from .headers import _blob_to_header, _model_to_header
+from .launcher import (
+    _AUTO_COMPILER_LAUNCHERS,
+    _DISABLED_LAUNCHER_VALUES,
+    _LAUNCHER_UNSUPPORTED_TOOLCHAINS,
+    _launcher_basename,
+    _launcher_supports_toolchain,
+    _resolve_compiler_launcher,
+)
+from .segger import (
+    _bundled_segger_rtt_dir,
+    _copy_segger_rtt,
+    _find_segger_rtt_dir,
+    _is_segger_rtt_root,
+)
+
 if TYPE_CHECKING:
     from ..config import ProfileConfig
     from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
-
-
-_DEFAULT_RTT_BUFFER_SIZE_UP = 32768
-
-
-def _nsx_toolchain(toolchain: str) -> str | None:
-    """Convert a config toolchain name to the ``nsx --toolchain`` value.
-
-    Returns *None* for the default (GCC) so the flag is omitted.
-    """
-    from ..toolchains import get_toolchain_spec
-
-    return get_toolchain_spec(toolchain).nsx_name
-
-
-def _rtt_buffer_size_up(toolchain: str, transport: Transport, configured_size: int | None) -> int:
-    """Return the compile-time SEGGER RTT up-buffer size for generated apps."""
-    if configured_size is not None:
-        return configured_size
-    if transport == Transport.RTT:
-        from ..toolchains import get_toolchain_spec
-
-        return get_toolchain_spec(toolchain).default_rtt_buffer_size_up
-    return _DEFAULT_RTT_BUFFER_SIZE_UP
-
-
-# Compiler launchers tried, in order, when ``build.compiler_launcher`` is
-# ``"auto"``.  sccache is preferred (better cross-platform + CI story); ccache
-# is the common local fallback.
-_AUTO_COMPILER_LAUNCHERS: tuple[str, ...] = ("sccache", "ccache")
-_DISABLED_LAUNCHER_VALUES = frozenset({"", "none", "off", "false", "disabled", "0"})
-
-# Compiler launchers that do not understand a given toolchain's compiler driver.
-# sccache rejects armclang outright ("Compiler not supported"), and because it
-# wraps the driver it also drops ``--target``, which surfaces as the misleading
-# ``armclang: fatal error: no target architecture given``.  Auto-detect must
-# therefore treat sccache as unavailable for these toolchains rather than
-# silently breaking the build.
-_LAUNCHER_UNSUPPORTED_TOOLCHAINS: dict[str, frozenset[str]] = {
-    "sccache": frozenset({"armclang"}),
-}
-
-
-def _launcher_basename(launcher: str) -> str:
-    """Return the bare tool name for a launcher path or command."""
-    return Path(launcher).name.lower()
-
-
-def _launcher_supports_toolchain(launcher: str, toolchain: str) -> bool:
-    """Whether ``launcher`` can wrap ``toolchain``'s compiler driver."""
-    unsupported = _LAUNCHER_UNSUPPORTED_TOOLCHAINS.get(_launcher_basename(launcher))
-    return not (unsupported and toolchain in unsupported)
-
-
-def _resolve_compiler_launcher(config: "ProfileConfig") -> str | None:
-    """Resolve the CMake compiler launcher executable for this build.
-
-    Precedence: the ``HPX_COMPILER_LAUNCHER`` environment variable overrides
-    ``build.compiler_launcher``.  Returns an absolute path to the launcher, or
-    ``None`` when caching is disabled or no launcher is available.
-
-    * ``"auto"`` — use the first of :data:`_AUTO_COMPILER_LAUNCHERS` found on
-      ``PATH`` that supports the active toolchain; do nothing if none are
-      installed (installing the binary is the opt-in).
-    * disabled values (``none``/``off``/``false``/empty) — ``None``.
-    * an explicit tool name or path — required: raises if it cannot be found.
-      If the named launcher cannot wrap the active toolchain (e.g. sccache with
-      armclang) it is skipped with a warning rather than breaking the build.
-    """
-    toolchain = config.target.toolchain
-    setting = os.environ.get("HPX_COMPILER_LAUNCHER")
-    source = "HPX_COMPILER_LAUNCHER"
-    if setting is None:
-        setting = config.build.compiler_launcher
-        source = "build.compiler_launcher"
-    setting = setting.strip()
-
-    if setting.lower() in _DISABLED_LAUNCHER_VALUES:
-        return None
-
-    if setting.lower() == "auto":
-        for name in _AUTO_COMPILER_LAUNCHERS:
-            found = shutil.which(name)
-            if not found:
-                continue
-            if not _launcher_supports_toolchain(name, toolchain):
-                log.debug(
-                    "Skipping compiler launcher %s: unsupported for toolchain %s",
-                    name,
-                    toolchain,
-                )
-                continue
-            log.info("Using compiler launcher: %s (auto-detected)", found)
-            return found
-        return None
-
-    found = shutil.which(setting)
-    if found is None and Path(setting).is_file() and os.access(setting, os.X_OK):
-        found = str(Path(setting).resolve())
-    if found is None:
-        raise FirmwareError(
-            f"Compiler launcher {setting!r} (from {source}) was not found on PATH.",
-            hint=(
-                "Install it, use the full path, or set the launcher to 'auto'/'none'. "
-                "For sccache: https://github.com/mozilla/sccache."
-            ),
-        )
-    if not _launcher_supports_toolchain(setting, toolchain):
-        log.warning(
-            "Compiler launcher %r (from %s) does not support the %s toolchain; "
-            "disabling it for this build.",
-            setting,
-            source,
-            toolchain,
-        )
-        return None
-    log.info("Using compiler launcher: %s (from %s)", found, source)
-    return found
-
-
-def _find_segger_rtt_dir(configured_path: Path | None = None) -> Path:
-    """Locate the SEGGER RTT source directory.
-
-    An explicit config path takes precedence, followed by ``SEGGER_RTT_PATH``
-    and the pinned sources bundled with heliaPROFILER. Override paths must point
-    to the root directory of a SEGGER RTT source checkout (the folder containing
-    ``RTT/`` and ``Config/`` subdirectories).
-
-    Returns the validated path.
-    """
-    if configured_path is not None:
-        path = Path(configured_path).expanduser().resolve()
-        if _is_segger_rtt_root(path):
-            return path
-        raise FirmwareError(
-            f"target.segger_rtt_path={configured_path} does not contain RTT/SEGGER_RTT.c",
-            hint="Point target.segger_rtt_path to the root containing RTT/ and Config/.",
-        )
-
-    env_path = os.environ.get("SEGGER_RTT_PATH")
-    if env_path:
-        p = Path(env_path).expanduser().resolve()
-        if _is_segger_rtt_root(p):
-            return p
-        raise FirmwareError(
-            f"SEGGER_RTT_PATH={env_path} does not contain RTT/SEGGER_RTT.c",
-            hint="Set SEGGER_RTT_PATH to the root dir containing RTT/ and Config/ subdirs.",
-        )
-
-    bundled = _bundled_segger_rtt_dir()
-    if _is_segger_rtt_root(bundled):
-        log.info("Using bundled SEGGER RTT target sources at %s", bundled)
-        return bundled
-
-    raise FirmwareError(
-        "Bundled SEGGER RTT target sources are missing or incomplete.",
-        hint="Reinstall helia-profiler or provide target.segger_rtt_path explicitly.",
-    )
-
-
-def _bundled_segger_rtt_dir() -> Path:
-    """Return the pinned RTT target-source root shipped with heliaPROFILER."""
-    return Path(__file__).resolve().parent.parent / "vendor" / "segger_rtt"
-
-
-def _is_segger_rtt_root(path: Path) -> bool:
-    root = path.expanduser()
-    return (
-        (root / "RTT" / "SEGGER_RTT.c").is_file()
-        and (root / "RTT" / "SEGGER_RTT.h").is_file()
-        and (root / "Config" / "SEGGER_RTT_Conf.h").is_file()
-    )
-
-
-def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> None:
-    """Copy SEGGER RTT source files into *dest_dir*/rtt/."""
-    rtt_root = _find_segger_rtt_dir(configured_path)
-    rtt_dest = dest_dir / "rtt"
-    rtt_dest.mkdir(parents=True, exist_ok=True)
-
-    # RTT source + headers. SEGGER_RTT.h includes SEGGER_RTT_ConfDefaults.h,
-    # which in turn includes Config/SEGGER_RTT_Conf.h.
-    for name in ("SEGGER_RTT.c", "SEGGER_RTT.h", "SEGGER_RTT_ConfDefaults.h"):
-        src = rtt_root / "RTT" / name
-        if src.exists():
-            shutil.copy2(src, rtt_dest / name)
-
-    # RTT buffer placement is cache-coherency sensitive on the Cortex-M55 parts.
-    #
-    # SEGGER RTT supports relocation via its SEGGER_RTT_SECTION hook: when
-    # SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0 (the default on Apollo parts) the
-    # control block and buffers are declared through SEGGER_RTT_PUT_CB_SECTION /
-    # SEGGER_RTT_PUT_BUFFER_SECTION, which emit
-    # ``__attribute__((section(SEGGER_RTT_SECTION)))`` for GCC/clang.
-    #
-    # On the cacheless Cortex-M4 parts (Apollo3/4) there is no coherency hazard,
-    # so we point that section at the NSX ``.sram_bss`` input section (collected
-    # into SHARED_SRAM by the linker scripts) to keep SEGGER's large staging
-    # buffers out of scarce MCU_TCM .bss.
-    #
-    # On the cache-coherent Cortex-M55 parts (Apollo5 / Apollo510 family) shared
-    # SRAM is *cached*, and SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0 tells RTT there is
-    # no cache to work around. That combination is incoherent with J-Link's
-    # asynchronous SWD reads/writes of the ring: the host can observe a stale
-    # ring (old bytes published before the new payload reaches SRAM) or have its
-    # up-buffer RdOff clobbered by the CPU's whole-cache clean, corrupting the
-    # stream. We therefore keep the buffers in *non-cached* TCM (the default .bss
-    # region) on these parts so SWD reads stay coherent with zero cache
-    # maintenance — the configuration SEGGER RTT actually assumes.
-    #
-    # NOTE: do *not* try to rewrite the ``#if SEGGER_RTT_CPU_CACHE_LINE_SIZE``
-    # aligned declarations — that branch is dead code here (the macro is 0), so
-    # patching it has no effect on the compiled object.
-    rtt_c = rtt_dest / "SEGGER_RTT.c"
-    if rtt_c.exists():
-        text = rtt_c.read_text(encoding="utf-8")
-        if (
-            "SEGGER_RTT_PUT_CB_SECTION(" not in text
-            or "SEGGER_RTT_PUT_BUFFER_SECTION(" not in text
-        ):
-            raise FirmwareError(
-                "Failed to patch SEGGER_RTT.c for SRAM placement",
-                hint=(
-                    "SEGGER_RTT.c does not use SEGGER_RTT_PUT_CB_SECTION / "
-                    "SEGGER_RTT_PUT_BUFFER_SECTION; cannot place the RTT control "
-                    "block and buffers in shared SRAM. Update the RTT patch "
-                    "logic for this SEGGER RTT release."
-                ),
-            )
-
-    # Config header — nested in Config/ subdir. Append the SEGGER_RTT_SECTION
-    # definition so the buffers land in shared SRAM on parts that have a
-    # dedicated .sram_bss region (NSX_MEM__HAS_SRAM_BSS); on simpler parts the
-    # macro stays undefined and SEGGER falls back to the default .bss region.
-    config_dest = rtt_dest / "Config"
-    config_dest.mkdir(parents=True, exist_ok=True)
-    conf_dest = config_dest / "SEGGER_RTT_Conf.h"
-    conf_src = rtt_root / "Config" / "SEGGER_RTT_Conf.h"
-    if conf_src.exists():
-        shutil.copy2(conf_src, conf_dest)
-
-    sram_placement = (
-        "\n"
-        "/* heliaPROFILER: RTT control block + channel buffer placement.\n"
-        " *\n"
-        " * Cache-coherent Cortex-M55 parts (Apollo5 / Apollo510 family): keep the\n"
-        " * buffers in NON-CACHED TCM (default .bss). Their shared SRAM is cached,\n"
-        " * and SEGGER_RTT_CPU_CACHE_LINE_SIZE == 0 assumes no cache, so .sram_bss\n"
-        " * placement is incoherent with J-Link's async SWD ring access (stale\n"
-        " * reads / clobbered RdOff). TCM is not cached, so SWD stays coherent with\n"
-        " * zero cache maintenance.\n"
-        " *\n"
-        " * Cacheless Cortex-M4 parts (Apollo3/4): no coherency hazard, so move the\n"
-        " * large staging buffers into shared SRAM (.sram_bss) to spare MCU_TCM. */\n"
-        '#include "nsx_mem.h"\n'
-        "#if defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510B) || \\\n"
-        "    defined(AM_PART_APOLLO5A)  || defined(AM_PART_APOLLO5B)  || \\\n"
-        "    defined(AM_PART_APOLLO510L) || defined(AM_PART_APOLLO330P)\n"
-        "  /* Non-cached TCM: leave SEGGER_RTT_SECTION undefined (default .bss). */\n"
-        "#elif NSX_MEM__HAS_SRAM_BSS\n"
-        "  #ifndef SEGGER_RTT_SECTION\n"
-        "    #define SEGGER_RTT_SECTION NSX_MEM__SEC_SRAM_BSS\n"
-        "  #endif\n"
-        "#endif\n"
-    )
-    existing_conf = conf_dest.read_text(encoding="utf-8") if conf_dest.exists() else ""
-    if "SEGGER_RTT_SECTION" not in existing_conf:
-        conf_dest.write_text(existing_conf + sram_placement, encoding="utf-8")
-
-    log.info("Copied SEGGER RTT source from %s", rtt_root)
-
-
-def _model_to_header(model_path: Path, weights_region: str = "mram") -> str:
-    """Convert a .tflite model to a C header (xxd-style byte array).
-
-    ``weights_region`` selects the section attribute applied to
-    ``model_data[]``:
-
-    * ``mram`` (default) — ``static const`` (rodata, stays in flash/MRAM).
-    * ``tcm`` — ``NSX_MEM_FAST static`` (loaded into DTCM at boot).
-    * ``sram`` — ``NSX_MEM_SRAM static`` (loaded into shared SRAM at boot).
-
-    For TCM/SRAM placement we drop ``const`` because NSX initialises these
-    sections by copying from NVM at boot, which requires writable storage.
-    """
-    data = model_path.read_bytes()
-
-    if weights_region == "tcm":
-        decl = "NSX_MEM_FAST alignas(16) static unsigned char model_data[] = {"
-        include_nsx = True
-    elif weights_region == "sram":
-        decl = "NSX_MEM_SRAM alignas(16) static unsigned char model_data[] = {"
-        include_nsx = True
-    else:  # mram / default
-        decl = "alignas(16) static const unsigned char model_data[] = {"
-        include_nsx = False
-
-    lines = [
-        "// Auto-generated by heliaPROFILER — do not edit.",
-        f"// Source: {model_path.name}",
-        f"// Placement: {weights_region}",
-    ]
-    if include_nsx:
-        lines.append('#include "nsx_mem.h"')
-    lines.append(decl)
-    for i in range(0, len(data), 12):
-        chunk = data[i : i + 12]
-        hex_vals = ", ".join(f"0x{b:02x}" for b in chunk)
-        lines.append(f"    {hex_vals},")
-    lines.append("};")
-    if weights_region in ("tcm", "sram"):
-        lines.append(f"static unsigned int model_data_len = {len(data)};")
-    else:
-        lines.append(f"static const unsigned int model_data_len = {len(data)};")
-    return "\n".join(lines) + "\n"
-
-
-def _blob_to_header(blob_path: Path, symbol_name: str) -> str:
-    """Convert a sidecar constant blob to a C header (xxd-style byte array).
-
-    The blob is placed in ``.rodata`` (const, stays in flash/MRAM) so it
-    can be memcpy'd into the runtime arena buffer at boot.
-    """
-    data = blob_path.read_bytes()
-    lines = [
-        "// Auto-generated by heliaPROFILER — do not edit.",
-        f"// Constant arena sidecar blob: {blob_path.name}",
-        "#pragma once",
-        "#include <stddef.h>",
-        f"alignas(16) static const unsigned char {symbol_name}[] = {{",
-    ]
-    for i in range(0, len(data), 12):
-        chunk = data[i : i + 12]
-        hex_vals = ", ".join(f"0x{b:02x}" for b in chunk)
-        lines.append(f"    {hex_vals},")
-    lines.append("};")
-    lines.append(f"static const size_t {symbol_name}_len = sizeof({symbol_name});")
-    return "\n".join(lines) + "\n"
 
 
 # ---------------------------------------------------------------------------
@@ -859,105 +557,3 @@ def render_power_source(ctx: PipelineContext, *, inference_count: int) -> Path:
     )
     log.info("Rendered fixed-N power source: %s (N=%d)", destination, inference_count)
     return destination
-
-
-def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
-    """Invoke ``nsx configure`` + ``nsx build`` on the generated app.
-
-    Returns (build_dir, binary_path).
-    """
-    app_dir = ctx.resolved_firmware_dir
-    board = ctx.resolved_board.name
-    timeouts = ctx.config.timeouts
-    toolchain = ctx.config.target.toolchain
-    verbose = ctx.config.verbose
-
-    # Map config toolchain names to nsx CLI values
-    nsx_tc = _nsx_toolchain(toolchain)
-    build_dir = app_dir / "build" / board
-    ninja_already_configured = (build_dir / "build.ninja").exists()
-
-    from ..dependencies import prepare_locked_dependencies, workspace_mutex
-
-    with workspace_mutex(ctx.resolved_workspace):
-        dependency_state = prepare_locked_dependencies(ctx)
-        if (
-            not ninja_already_configured
-            or dependency_state.lock.mode.value != "reused"
-        ):
-            nsx_cli.configure(
-                app_dir,
-                toolchain=nsx_tc,
-                frozen=True,
-                timeout_s=timeouts.configure_s,
-                verbose=verbose,
-            )
-        else:
-            # CMake's regeneration rule handles deterministic source/template
-            # changes; dependency verification already ran via sync --frozen.
-            log.info("Reusing configured deterministic workspace: %s", build_dir)
-        nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose)
-
-    # Locate build output. Prefer the ELF-form executable because later
-    # reporting stages run size tools against it to capture text/data/bss.
-    binary_path = _find_target_binary(build_dir, "hpx_profiler")
-    if binary_path is None:
-        raise BuildError(
-            "Build succeeded but binary not found",
-            hint=f"Searched in {build_dir}",
-        )
-    log.info("Binary: %s", binary_path)
-
-    return build_dir, binary_path
-
-
-def _find_target_binary(build_dir: Path, target_name: str) -> Path | None:
-    """Locate a built NSX target's executable/binary under ``build_dir``.
-
-    Mirrors the existing hpx_profiler artifact search so hpx_profiler_power
-    (or any future target) resolves the same way across toolchains/layouts.
-    """
-    artifact_patterns = [
-        str(build_dir / target_name),
-        str(build_dir / "**" / target_name),
-        str(build_dir / "**" / f"{target_name}.axf"),
-        str(build_dir / "**" / f"{target_name}.elf"),
-        str(build_dir / f"{target_name}.bin"),
-        str(build_dir / "**" / f"{target_name}.bin"),
-    ]
-    for pattern in artifact_patterns:
-        # sorted(): glob order is filesystem-dependent, so a build tree
-        # with two candidates (stale + fresh subdir) could resolve
-        # differently across machines/runs. Deterministic pick — shortest
-        # path first, ties lexicographic — so the shallowest match wins
-        # reproducibly.
-        matches = sorted(
-            (m for m in glob.glob(pattern, recursive=True) if Path(m).is_file()),
-            key=lambda m: (len(Path(m).parts), m),
-        )
-        if matches:
-            return Path(matches[0])
-    return None
-
-
-def flash_app(ctx: PipelineContext) -> None:
-    """Invoke ``nsx flash`` to deploy the binary to the target."""
-    firmware_dir = ctx.resolved_firmware_dir
-    toolchain = ctx.config.target.toolchain
-    nsx_tc = _nsx_toolchain(toolchain)
-    from ..dependencies import workspace_mutex
-
-    lock = (
-        workspace_mutex(ctx.dependency_workspace)
-        if ctx.dependency_workspace is not None
-        else nullcontext()
-    )
-    with lock:
-        nsx_cli.flash(
-            firmware_dir,
-            toolchain=nsx_tc,
-            jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
-            frozen=True,
-            timeout_s=ctx.config.timeouts.flash_s,
-            verbose=ctx.config.verbose,
-        )
