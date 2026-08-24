@@ -50,17 +50,31 @@
 #define HPX_STIMER_SETTLE_MAX_TICKS  410U     // ~+25%: rejects transient overshoot
 #define HPX_STIMER_SETTLE_MAX_US     1000000U // 1 s deadline, ~1.5x the measured worst case
 
-static inline void hpx_stimer_init(void) {
+// Returns 1 when two consecutive probes landed in band (crystal settled and
+// plausible), 0 when the deadline expired with the crystal still unfit.  On
+// 0 the caller ATTRIBUTES the failure BEFORE the window opens (#110's
+// remaining half): HPX_ERROR=stimer_dead on transport binaries, the power
+// terminal's failed envelope (phase "stimer_dead") on dedicated power
+// binaries, whose printf is compiled out.  Without that a dead 32.768 kHz
+// XTAL completes the window, yields elapsed_us == 0, and is
+// indistinguishable on the bench from the debug-domain frozen-clock bug
+// #106/#107 fixed.  Warm cost: two 10 ms probes per init; every failure
+// path is fault-only.
+//
+// NB the deadline is now a REJECT line, not merely give-up-and-proceed:
+// #124's bench sweep bounds the cold transient at 400-650 ms, so 1 s is
+// ~1.5x the measured worst case.  A crystal still out of band there is
+// treated as unfit by design.
+//
+// g_hpx_stimer_last_ticks: the last probe's tick count — the actually
+// diagnostic number for the failure report (0 ticks = stopped crystal,
+// out-of-band = implausible rate).
+static uint32_t g_hpx_stimer_last_ticks = 0U;
+
+static inline uint32_t hpx_stimer_init(void) {
     am_hal_stimer_config(AM_HAL_STIMER_CFG_CLEAR);
     am_hal_stimer_config(AM_HAL_STIMER_XTAL_32KHZ | AM_HAL_STIMER_CFG_RUN);
 
-    // Warm cost: two 10 ms probes per init.  On deadline expiry this returns
-    // with the crystal still unfit and the window proceeds; a crystal that
-    // never ticks then yields elapsed_us == 0 with completed work, which the
-    // host flags (frozen-clock check on power runs, the zero-elapsed clean
-    // window rule on profile runs).  ATTRIBUTING that failure to the crystal
-    // rather than the debug domain is deliberately not done here -- that is
-    // what remains open on issue #110.
     uint32_t settle_spent_us = 0U;
     uint32_t settle_in_band = 0U;
     while (settle_spent_us < HPX_STIMER_SETTLE_MAX_US) {
@@ -68,17 +82,19 @@ static inline void hpx_stimer_init(void) {
         nsx_delay_us(HPX_STIMER_SETTLE_PROBE_US);
         const uint32_t settle_ticks =
             (uint32_t)(am_hal_stimer_counter_get() - settle_t0);
+        g_hpx_stimer_last_ticks = settle_ticks;
         settle_spent_us += HPX_STIMER_SETTLE_PROBE_US;
         if (settle_ticks >= HPX_STIMER_SETTLE_MIN_TICKS &&
             settle_ticks <= HPX_STIMER_SETTLE_MAX_TICKS) {
             settle_in_band++;
             if (settle_in_band >= 2U) {
-                break;
+                return 1U;
             }
         } else {
             settle_in_band = 0U;
         }
     }
+    return 0U;
 }
 
 static inline uint32_t hpx_stimer_ticks(void) {

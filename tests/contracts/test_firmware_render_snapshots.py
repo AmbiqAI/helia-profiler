@@ -893,7 +893,14 @@ def test_stimer_init_verifies_the_crystal_against_an_independent_clock():
             checked += 1
             case = f"{soc}|{transport}|{engine}{'|power' if power_only else ''}"
 
-            init = rendered[rendered.index("static inline void hpx_stimer_init(void)") :]
+            init = rendered[rendered.index("static inline uint32_t hpx_stimer_init(void)") :]
+            # #180 review m1: the fitness CONTRACT — success returns 1, the
+            # post-loop path returns 0 — must be pinned above the sha layer
+            # (an always-1 mutation kills the attribution on every board
+            # while only churning regenerable digests).
+            init_body = init[: init.index("static inline uint32_t hpx_stimer_ticks")]
+            assert "return 1U;" in init_body, case
+            assert init_body.rstrip().endswith("return 0U;\n}"), case
             init = init[: init.index("\n}")]
 
             # Review proved the first version of these assertions vacuous

@@ -117,11 +117,32 @@ class CollectPowerTerminalStage:
                 ),
             )
         if terminal.status != "ok":
+            hint = None
+            if terminal.final_phase == "stimer_dead":
+                # #110's attribution on the dedicated power binary: the
+                # error_code carries the last settle probe's tick count
+                # PLUS ONE (the envelope forbids error_code 0 with
+                # status=error, and 0 ticks is the stopped-crystal
+                # signature — #180 review B2).
+                last_ticks = max(0, terminal.error_code - 1)
+                hint = (
+                    "The 32.768 kHz crystal (XT) that clocks the "
+                    "measurement window never produced a plausible tick "
+                    "rate within the settle deadline (last probe: "
+                    f"{last_ticks} ticks per 10 ms; nominal 328; 0 means "
+                    "the counter never moved). "
+                    "This is a BOARD condition, not the debug-domain "
+                    "frozen-clock bug: check the X32 crystal and its "
+                    "jumpers/straps, and any shield or rework touching the "
+                    "XT pins. The window never opened, so no misleading "
+                    "power figures were recorded."
+                )
             raise PowerError(
                 f"Power firmware reported error {terminal.error_code} in phase "
                 f"{terminal.final_phase} after {terminal.completed_count}/"
                 f"{terminal.requested_count} "
-                f"{count_noun(clean_window_probe, terminal.requested_count)}."
+                f"{count_noun(clean_window_probe, terminal.requested_count)}.",
+                hint=hint,
             )
         if terminal.completed_count != terminal.requested_count:
             raise PowerError(

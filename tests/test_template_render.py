@@ -855,7 +855,7 @@ class TestMainAotCcRender:
                 "busy-loop calibration reads DWT on a binary that cannot read it"
             )
             # STIMER must actually be defined in this render, not just called.
-            assert "static inline void hpx_stimer_init(void)" in out
+            assert "static inline uint32_t hpx_stimer_init(void)" in out
             shutdown = "am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_DEBUG);"
             if soc_shape["broad_peripheral_shutdown"]:
                 # The AP4 shape: pin the ordering the original comment got

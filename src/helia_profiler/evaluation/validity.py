@@ -52,8 +52,10 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         # build, and AP3/AP4 busy_loop -- had no check at all: a dead 32.768
         # kHz crystal yielded silent zeros with no issue code (found by
         # review of #128, which added the settle these windows now rely on).
-        # Attribution (dead crystal vs dead debug domain) stays open on #110;
-        # detection should not.
+        # Attribution landed with #110: STIMER-window binaries report
+        # stimer_dead before the window when the crystal is unfit, so
+        # reaching this check without that error points at a lost line on
+        # a lossy transport (a STIMER window has no debug-domain cause).
         if meta.clean_infer_count and (
             meta.clean_infer_avg_us == 0 or meta.clean_infer_total_cycles == 0
         ):

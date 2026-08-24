@@ -42,7 +42,7 @@ from ..engines.base import ExecutorchArtifacts
 from ..pipeline import PipelineContext
 from ..placement import MemoryRegion, Placement, resolve_fastest_fit_placement
 from ..config import Transport
-from ..platform import MemoryLayout, SocDef, SocFamily
+from ..platform import MemoryLayout, PmuTier, SocDef, SocFamily
 from ..results import MemoryConsumer, MemoryPlan, MemoryRegionUsage
 
 if TYPE_CHECKING:
@@ -377,6 +377,19 @@ PMU_RECORD_SIZE_BYTES: dict[EngineType, int] = {
     EngineType.EXECUTORCH: 32,
 }
 
+#: TFLM/heliaRT reserve the records INSIDE the HpxPmuProfiler object
+#: (g_profiler) — the linked symbol is the whole object, records plus a
+#: fixed header. ARMV8M_PMU parts: vptr 4 + nsx_pmu_config_t 196 +
+#: counter-name pointers and state 52 = 252 (verified byte-exact on the
+#: AP510 bench). DWT_ONLY parts render the class WITHOUT the config
+#: struct or its include (hpx_pmu_profiler.h.j2's has_armv8m_pmu gate),
+#: leaving vptr 4 + state 52 = 56 — equally derivable (#180 review M2
+#: corrected an earlier claim that this tier was uncharacterizable).
+_PROFILER_OBJECT_OVERHEAD: dict[PmuTier, int] = {
+    PmuTier.ARMV8M_PMU: 252,
+    PmuTier.DWT_ONLY: 56,
+}
+
 #: SEGGER RTT statics beyond the up buffer itself: the 16-byte default
 #: down buffer (SEGGER_RTT_ConfDefaults.h BUFFER_SIZE_DOWN) plus the
 #: control block (SEGGER_RTT.h: acID[16] + 2 ints + 3 up + 3 down ring
@@ -412,19 +425,27 @@ def _default_bss_region(family: SocFamily) -> MemoryRegion:
 
 #: Parts whose nsx_mem.h sets NSX_MEM__HAS_SRAM_BSS=0 within a family
 #: that otherwise has it: AM_PART_APOLLO5A/5B (nsx_mem.h:92-99) — their
-#: linker scripts have no .sram_bss, so the macro expands to nothing and
-#: the object falls to plain .bss -> MCU_TCM (DTCM). apollo5b is the one
-#: such part hpx registers (#179 Sonnet M-2).
+#: linker scripts have no .sram_bss, so THAT macro expands to nothing and
+#: falls to plain .bss -> MCU_TCM (DTCM). NB apollo5b still HAS
+#: NSX_MEM_SRAM (".shared" -> SRAM): the two macros diverge on exactly
+#: this part, which is why the records region is keyed on which macro the
+#: ENGINE's template uses (#180 review n4).
 _NO_SRAM_BSS_SOCS = frozenset({"apollo5b"})
 
 
-def _sram_bss_region(soc: SocDef) -> MemoryRegion:
-    """Where ``NSX_MEM_SRAM_BSS`` lands. AP4 and most AP5 parts pin
-    ``.sram_bss`` -> SRAM; on AP3 it expands to NOTHING so the object
-    falls to plain ``.bss`` — which on AP3 is ALSO main SRAM (main.cc.j2:
-    "on AP3, the default .bss already targets its large main SRAM"); on
-    apollo5b it likewise expands to nothing but plain ``.bss`` is
-    MCU_TCM there -> DTCM."""
+def _nsx_mem_sram_region(soc: SocDef) -> MemoryRegion:
+    """Where ``NSX_MEM_SRAM`` (initialized ``.shared``) lands — the macro
+    TFLM/heliaRT's g_profiler uses. SRAM on every registered part: AP4/AP5
+    (incl. apollo5b) via ``.shared``; AP3 via the documented fallback to
+    the default data region, which on AP3 IS main SRAM."""
+    return MemoryRegion.SRAM
+
+
+def _nsx_mem_sram_bss_region(soc: SocDef) -> MemoryRegion:
+    """Where ``NSX_MEM_SRAM_BSS`` lands — the macro heliaAOT/ExecuTorch's
+    g_layers uses. ``.sram_bss`` -> SRAM on AP4 and most AP5 parts; the
+    fallbacks diverge: AP3's plain ``.bss`` is main SRAM, apollo5b's is
+    MCU_TCM -> DTCM."""
     if soc.name in _NO_SRAM_BSS_SOCS:
         return MemoryRegion.DTCM
     return MemoryRegion.SRAM
@@ -467,12 +488,24 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
 
     record_size = PMU_RECORD_SIZE_BYTES.get(engine_type)
     if record_size is not None:
+        records_bytes = int(soc.pmu_max_ops) * record_size
+        if engine_type in (EngineType.TFLM, EngineType.HELIA_RT):
+            # The records live inside g_profiler (NSX_MEM_SRAM); book the
+            # whole object — both tier headers are derivable. NB the plan
+            # describes the PROFILE binary (the power binary's records
+            # fall to plain .bss under power_only=1) — same scope as
+            # binary_sections and memory_regions.
+            records_bytes += _PROFILER_OBJECT_OVERHEAD.get(soc.pmu_tier, 0)
+            records_region = _nsx_mem_sram_region(soc)
+        else:
+            # AOT/ET declare g_layers under NSX_MEM_SRAM_BSS.
+            records_region = _nsx_mem_sram_bss_region(soc)
         additions.append(
             (
-                _sram_bss_region(soc),
+                records_region,
                 MemoryConsumer(
                     name="pmu_layer_records",
-                    size=int(soc.pmu_max_ops) * record_size,
+                    size=records_bytes,
                     kind="other",
                 ),
             )

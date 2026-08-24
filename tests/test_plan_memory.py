@@ -497,13 +497,60 @@ class TestHpxOwnedConsumers:
         }
 
     def test_records_planned_for_every_engine_with_true_sizes(self, tmp_path):
-        # apollo510 (default board): pmu_max_ops = 4096.
-        for engine, expected in (("helia-rt", 4096 * 24), ("tflm", 4096 * 24)):
+        # apollo510 (default board): pmu_max_ops = 4096. TFLM/heliaRT book
+        # the whole g_profiler OBJECT (records + the 252-byte header
+        # characterized on ARMV8M_PMU parts) so the plan matches the
+        # linked symbol byte-for-byte.
+        for engine, expected in (
+            ("helia-rt", 4096 * 24 + 252),
+            ("tflm", 4096 * 24 + 252),
+        ):
             ctx = _make_ctx(tmp_path, {"engine": {"type": engine}})
             PlanMemoryStage().run(ctx)
             sram = ctx.memory_plan.region("SRAM")
             records = [c for c in sram.consumers if c.name == "pmu_layer_records"]
             assert [c.size for c in records] == [expected], engine
+
+    def test_dwt_tier_records_book_the_smaller_object_header(self, tmp_path):
+        """#180 review M2: the DWT-tier profiler object has NO config
+        struct (has_armv8m_pmu gate) — vptr 4 + state 52 = 56, as
+        derivable as the ARMV8M 252. apollo4p: 2048 records x 24 + 56."""
+        ctx = _make_ctx(tmp_path, {"target": {"board": "apollo4p_evb"}})
+        PlanMemoryStage().run(ctx)
+        records = [
+            c
+            for r in ctx.memory_plan.regions
+            for c in r.consumers
+            if c.name == "pmu_layer_records"
+        ]
+        assert [c.size for c in records] == [2048 * 24 + 56]
+
+    def test_apollo5b_records_region_is_per_engine_macro(self, tmp_path):
+        """#180 review n4: apollo5b has NSX_MEM_SRAM (.shared -> SRAM) but
+        no NSX_MEM_SRAM_BSS (falls to .bss -> DTCM). TFLM/heliaRT's
+        g_profiler uses the former; AOT's g_layers the latter — the region
+        must follow the ENGINE's macro."""
+        ctx_rt = _make_ctx(
+            tmp_path, {"target": {"board": "apollo5b_evb"}}
+        )
+        PlanMemoryStage().run(ctx_rt)
+        sram_names = {
+            c.name for c in ctx_rt.memory_plan.region("SRAM").consumers
+        }
+        assert "pmu_layer_records" in sram_names
+
+        ctx_aot = _make_ctx(
+            tmp_path,
+            {
+                "engine": {"type": "helia-aot"},
+                "target": {"board": "apollo5b_evb"},
+            },
+        )
+        PlanMemoryStage().run(ctx_aot)
+        dtcm_names = {
+            c.name for c in ctx_aot.memory_plan.region("DTCM").consumers
+        }
+        assert "pmu_layer_records" in dtcm_names
 
     def test_rtt_lands_in_dtcm_on_ap5_and_sram_on_ap4(self, tmp_path):
         ctx = _make_ctx(tmp_path)  # apollo510-family default, rtt

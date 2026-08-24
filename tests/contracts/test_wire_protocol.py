@@ -595,6 +595,9 @@ _PREDICATES = {
         and v["transport"] not in ("swo", "uart")
     ),
     "not use_stimer_window": lambda v: not v["use_stimer_window"],
+    "use_stimer_window and not power_only": (
+        lambda v: bool(v["use_stimer_window"]) and not v.get("power_only")
+    ),
     (
         "clean_window_needs_probe_attach and transport == rtt and not power_only "
         "and not use_stimer_window"
@@ -931,6 +934,7 @@ def test_error_code_catalogue():
         "executorch",
         "operator_count_exceeds_capacity",
         "pmu_init_or_selftest_failed",
+        "stimer_dead",
     }
     assert {spec.token for spec in WIRE_REGISTRY.values() if spec.kind is WireKind.ERROR} == {
         error_token(code) for code in FirmwareErrorCode

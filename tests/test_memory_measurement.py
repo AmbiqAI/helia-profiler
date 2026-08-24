@@ -482,6 +482,30 @@ class TestReconciliation:
         assert records.delta == 0x180FC - 4096 * 24
         assert records.measured_region == "SRAM"
 
+    def test_object_booked_plan_reconciles_at_zero(self):
+        """The shipped TFLM/heliaRT plan books the whole g_profiler object
+        (records + 252 header on ARMV8M_PMU parts), so against the real
+        symbol the delta is exactly zero."""
+        from helia_profiler.memory_measurement import reconcile_memory
+        from helia_profiler.results import MemoryConsumer
+        from helia_profiler.toolchain_probe import SymbolEntry
+
+        plan = self._plan(
+            {
+                MemoryRegion.SRAM: [
+                    MemoryConsumer(
+                        name="pmu_layer_records",
+                        size=4096 * 24 + 252,
+                        kind="other",
+                    ),
+                ],
+            }
+        )
+        symbols = (SymbolEntry("_ZL10g_profiler", 0x20080000, 0x180FC, "d"),)
+        rec = reconcile_memory(plan, self._measured(), symbols)
+        (records,) = rec.consumers
+        assert records.delta == 0  # 0x180FC == 4096*24+252
+
     def test_aot_symbol_hint_wins_over_the_name_table(self):
         from helia_profiler.memory_measurement import reconcile_memory
         from helia_profiler.results import MemoryConsumer

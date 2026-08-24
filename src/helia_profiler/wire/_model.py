@@ -234,6 +234,7 @@ class FirmwareErrorCode(StrEnum):
     EXECUTORCH = "executorch"
     OPERATOR_COUNT_EXCEEDS_CAPACITY = "operator_count_exceeds_capacity"
     PMU_INIT_OR_SELFTEST_FAILED = "pmu_init_or_selftest_failed"
+    STIMER_DEAD = "stimer_dead"
 
 
 class FirmwareWarnCode(StrEnum):
@@ -483,6 +484,7 @@ GATE_AOT_CONST_BLOBS_IN_PSRAM = (
     "not allocate_arenas and arena_regions with blob_filename and placement == psram"
 )
 GATE_BUSY_LOOP_PROBE = "busy_loop_probe"
+GATE_STIMER_WINDOW = "use_stimer_window and not power_only"
 GATE_CLEAN_WINDOW_TRACE = "clean_window_trace and transport not in (swo, uart)"
 GATE_NOT_STIMER_WINDOW = "not use_stimer_window"
 GATE_ATTACH_WAIT = (

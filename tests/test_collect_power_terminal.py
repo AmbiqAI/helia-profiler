@@ -860,3 +860,35 @@ def test_collect_stage_supports_all_profile_transports(tmp_path: Path, transport
     ctx = _make_ctx(tmp_path, transport=transport)
 
     assert CollectPowerTerminalStage().should_skip(ctx) is False
+
+
+class TestStimerDeadAttribution:
+    """#110/#180: the dedicated power binary's dead-crystal report."""
+
+    def test_stopped_crystal_envelope_parses_and_hints(self):
+        """#180 review B2: 0 ticks is the stopped-crystal signature, and
+        the envelope forbids error_code 0 with status=error — firmware
+        sends ticks+1 and the host subtracts. The canonical failure must
+        reach the crystal hint, not die in the parser."""
+        from helia_profiler.capture.power_terminal import (
+            parse_power_terminal_envelope,
+        )
+
+        terminal = parse_power_terminal_envelope(
+            [
+                "--- HPX_POWER_TERMINAL_START ---",
+                "HPX_POWER_TERMINAL_VERSION=1",
+                "HPX_POWER_STATUS=error",
+                "HPX_POWER_REQUESTED_COUNT=233",
+                "HPX_POWER_COMPLETED_COUNT=233",
+                "HPX_POWER_ELAPSED_US=0",
+                "HPX_POWER_FINAL_PHASE=stimer_dead",
+                "HPX_POWER_ERROR_CODE=1",  # 0 ticks + the wire bias
+                "HPX_POWER_GATE_ASSERTED=0",
+                "HPX_POWER_GATE_LOWERED=1",
+                "--- HPX_POWER_TERMINAL_END ---",
+            ]
+        )
+        assert terminal.terminal.status == "error"
+        assert terminal.terminal.final_phase == "stimer_dead"
+        assert terminal.terminal.error_code == 1  # parser invariant satisfied

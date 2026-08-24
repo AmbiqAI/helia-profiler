@@ -926,7 +926,15 @@ def _find_target_binary(build_dir: Path, target_name: str) -> Path | None:
         str(build_dir / "**" / f"{target_name}.bin"),
     ]
     for pattern in artifact_patterns:
-        matches = [m for m in glob.glob(pattern, recursive=True) if Path(m).is_file()]
+        # sorted(): glob order is filesystem-dependent, so a build tree
+        # with two candidates (stale + fresh subdir) could resolve
+        # differently across machines/runs. Deterministic pick — shortest
+        # path first, ties lexicographic — so the shallowest match wins
+        # reproducibly.
+        matches = sorted(
+            (m for m in glob.glob(pattern, recursive=True) if Path(m).is_file()),
+            key=lambda m: (len(Path(m).parts), m),
+        )
         if matches:
             return Path(matches[0])
     return None
