@@ -706,14 +706,14 @@ def test_auto_clone_fresh_cache_clones_and_inits_submodules(
     result = executorch_mod._auto_clone_nsx_executorch(_URL, _PINNED)
 
     assert result == cache
-    assert git.subcommands() == ["clone", "checkout", "submodule", "submodule"]
+    assert git.subcommands() == ["clone", "checkout", "clean", "submodule", "submodule"]
     assert git.calls[0][0] == ("clone", _URL, str(cache))
-    assert git.calls[1][0] == ("checkout", "--detach", _PINNED)
-    top_args, top_cwd = git.calls[2]
-    assert top_args == ("submodule", "update", "--init", "external/executorch")
+    assert git.calls[1][0] == ("checkout", "--force", "--detach", _PINNED)
+    top_args, top_cwd = git.calls[3]
+    assert top_args == ("submodule", "update", "--init", "--force", "external/executorch")
     assert top_cwd == cache
-    nested_args, nested_cwd = git.calls[3]
-    assert nested_args[3:] == executorch_mod._EXECUTORCH_MINIMAL_SUBMODULES
+    nested_args, nested_cwd = git.calls[4]
+    assert nested_args[4:] == executorch_mod._EXECUTORCH_MINIMAL_SUBMODULES
     assert nested_cwd == cache / "external" / "executorch"
 
 
@@ -725,8 +725,10 @@ def test_auto_clone_cache_hit_skips_network(tmp_path: Path, monkeypatch: pytest.
 
     executorch_mod._auto_clone_nsx_executorch(_URL, _PINNED)
 
-    # No clone/fetch/checkout — but submodule init still runs (idempotent).
-    assert git.subcommands() == ["rev-parse", "submodule", "submodule"]
+    # No network (clone/fetch) — but the forced checkout/clean/submodule sync
+    # still runs so local edits in the cache never survive into a build.
+    assert git.subcommands() == ["rev-parse", "checkout", "clean", "submodule", "submodule"]
+    assert git.calls[1][0] == ("checkout", "--force", "--detach", _PINNED)
 
 
 def test_auto_clone_resyncs_cache_on_baseline_ref_bump(
@@ -740,8 +742,8 @@ def test_auto_clone_resyncs_cache_on_baseline_ref_bump(
     executorch_mod._auto_clone_nsx_executorch(_URL, _PINNED)
 
     # The full clone already contains the new pin: checkout only, no fetch.
-    assert git.subcommands() == ["rev-parse", "checkout", "submodule", "submodule"]
-    assert git.calls[1][0] == ("checkout", "--detach", _PINNED)
+    assert git.subcommands() == ["rev-parse", "checkout", "clean", "submodule", "submodule"]
+    assert git.calls[1][0] == ("checkout", "--force", "--detach", _PINNED)
 
 
 def test_auto_clone_fetches_pin_missing_from_local_clone(
@@ -759,6 +761,7 @@ def test_auto_clone_fetches_pin_missing_from_local_clone(
         "checkout",
         "fetch",
         "checkout",
+        "clean",
         "submodule",
         "submodule",
     ]
@@ -775,7 +778,7 @@ def test_auto_clone_recovers_from_corrupt_cache(tmp_path: Path, monkeypatch: pyt
     executorch_mod._auto_clone_nsx_executorch(_URL, _PINNED)
 
     # The unusable cache is removed and recloned from scratch.
-    assert git.subcommands() == ["rev-parse", "clone", "checkout", "submodule", "submodule"]
+    assert git.subcommands() == ["rev-parse", "clone", "checkout", "clean", "submodule", "submodule"]
     assert not (cache / "junk.txt").exists()
 
 

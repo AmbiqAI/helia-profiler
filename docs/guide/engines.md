@@ -76,6 +76,9 @@ operators; HPX pins a commit, not a branch or release tag), and initializes
 `external/executorch` plus the
 minimal Cortex-M submodule set from that repository's README. When the
 baseline pin moves, the cache is re-synced to the new commit automatically.
+The cache worktree is force-synced on every run — local edits and untracked
+files under it are discarded, so the pinned commit fully defines what gets
+built; use `source_path` for development changes.
 
 `engine.config.source_path` overrides the auto-clone with a local development
 checkout — the repository root containing `nsx-module.yaml`, not the embedded

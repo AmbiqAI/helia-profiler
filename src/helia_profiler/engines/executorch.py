@@ -113,16 +113,23 @@ def _sync_executorch_cache(url: str, ref: str) -> Path:
         log.info("nsx-executorch: cache hit at %s", cache)
     else:
         log.info("nsx-executorch: syncing cache to pinned ref %s", ref)
-        try:
-            _run_git(["checkout", "--detach", ref], cache, timeout=60)
-        except EngineError:
-            # The pin is not in the clone yet (cache predates a baseline bump).
-            _run_git(["fetch", "origin", ref], cache, timeout=600)
-            _run_git(["checkout", "--detach", ref], cache, timeout=60)
-    # Idempotent: fast no-ops once the pinned gitlinks are already checked out.
-    _run_git(["submodule", "update", "--init", "external/executorch"], cache, timeout=1800)
+    # The cache is machine-managed and its runs are stamped fully qualified,
+    # so the pinned commit + gitlinks must define the whole tree: --force
+    # checkouts discard local edits to tracked files (even when HEAD already
+    # matches) and clean removes untracked files. Development changes belong
+    # in a source_path checkout, never in this cache.
+    try:
+        _run_git(["checkout", "--force", "--detach", ref], cache, timeout=120)
+    except EngineError:
+        # The pin is not in the clone yet (cache predates a baseline bump).
+        _run_git(["fetch", "origin", ref], cache, timeout=600)
+        _run_git(["checkout", "--force", "--detach", ref], cache, timeout=120)
+    _run_git(["clean", "-fdq"], cache, timeout=120)
     _run_git(
-        ["submodule", "update", "--init", *_EXECUTORCH_MINIMAL_SUBMODULES],
+        ["submodule", "update", "--init", "--force", "external/executorch"], cache, timeout=1800
+    )
+    _run_git(
+        ["submodule", "update", "--init", "--force", *_EXECUTORCH_MINIMAL_SUBMODULES],
         cache / "external" / "executorch",
         timeout=1800,
     )
