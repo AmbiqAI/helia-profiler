@@ -121,12 +121,16 @@ class CollectPowerTerminalStage:
             if terminal.final_phase == "stimer_dead":
                 # #110's attribution on the dedicated power binary: the
                 # error_code carries the last settle probe's tick count
-                # (0 = stopped crystal, out-of-band = implausible rate).
+                # PLUS ONE (the envelope forbids error_code 0 with
+                # status=error, and 0 ticks is the stopped-crystal
+                # signature — #180 review B2).
+                last_ticks = max(0, terminal.error_code - 1)
                 hint = (
                     "The 32.768 kHz crystal (XT) that clocks the "
                     "measurement window never produced a plausible tick "
                     "rate within the settle deadline (last probe: "
-                    f"{terminal.error_code} ticks per 10 ms; nominal 328). "
+                    f"{last_ticks} ticks per 10 ms; nominal 328; 0 means "
+                    "the counter never moved). "
                     "This is a BOARD condition, not the debug-domain "
                     "frozen-clock bug: check the X32 crystal and its "
                     "jumpers/straps, and any shield or rework touching the "

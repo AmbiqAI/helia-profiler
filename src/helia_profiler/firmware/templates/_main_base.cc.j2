@@ -693,10 +693,12 @@ int main(void) {
 {% if power_only | default(false) %}
             // Dedicated power binary: printf is compiled out, so the
             // attribution rides the power terminal's failed envelope —
-            // phase "stimer_dead", error_code = the last probe's tick
-            // count (0 = stopped crystal). terminal_fail parks; the run
-            // never opens a window on a dead clock.
-            hpx_power_terminal_fail("stimer_dead", g_hpx_stimer_last_ticks);
+            // phase "stimer_dead", error_code = last probe's tick count
+            // PLUS ONE: the envelope invariant forbids error_code 0 with
+            // status=error, and 0 ticks IS the stopped-crystal signature
+            // (#180 review B2). The host subtracts the bias in its hint.
+            // terminal_fail parks; no window opens on a dead clock.
+            hpx_power_terminal_fail("stimer_dead", g_hpx_stimer_last_ticks + 1U);
 {% else %}
             hpx_printf("HPX_ERROR=stimer_dead settle_us=%u last_ticks=%u\n",
                        (unsigned)HPX_STIMER_SETTLE_MAX_US,

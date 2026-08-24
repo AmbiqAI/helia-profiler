@@ -73,3 +73,40 @@ def test_only_first_error_is_raised():
     with pytest.raises(CaptureError) as exc_info:
         _raise_on_firmware_error(lines)
     assert "unsupported_op" in str(exc_info.value)
+
+
+class TestStimerDeadSeverity:
+    """#180 review M1 + Sonnet M-new: the severity gate, both directions."""
+
+    def test_fatal_when_power_is_enabled(self):
+        from helia_profiler.capture import _raise_on_firmware_error
+        from helia_profiler.errors import CaptureError
+
+        with pytest.raises(CaptureError, match="stimer_dead"):
+            _raise_on_firmware_error(
+                ["HPX_ERROR=stimer_dead settle_us=1000000 last_ticks=0"],
+                power_enabled=True,
+            )
+
+    def test_warns_and_continues_without_power(self, caplog):
+        from helia_profiler.capture import _raise_on_firmware_error
+
+        with caplog.at_level("WARNING", logger="hpx"):
+            _raise_on_firmware_error(
+                ["HPX_ERROR=stimer_dead settle_us=1000000 last_ticks=0"],
+                power_enabled=False,
+            )
+        assert any("stimer_dead" in r.message for r in caplog.records)
+
+    def test_downgrade_does_not_swallow_later_errors(self):
+        from helia_profiler.capture import _raise_on_firmware_error
+        from helia_profiler.errors import CaptureError
+
+        with pytest.raises(CaptureError, match="schema_mismatch"):
+            _raise_on_firmware_error(
+                [
+                    "HPX_ERROR=stimer_dead settle_us=1000000 last_ticks=0",
+                    "HPX_ERROR=schema_mismatch:1_vs_2",
+                ],
+                power_enabled=False,
+            )
