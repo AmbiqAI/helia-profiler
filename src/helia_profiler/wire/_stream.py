@@ -483,6 +483,11 @@ PSRAM_SPECS: tuple[WireSpec, ...] = tuple(
         WireConsumer.FIRMWARE_META,
         criticality,
         key=key,
+        # NOT ExecuTorch: it has no PSRAM support (preflight rejects the
+        # combination) and since the #187 gate finding its child overrides
+        # engine_psram_metadata empty — test-rendered ET psram arms emit
+        # none of these keys.
+        engines=TFLM_ENGINES | AOT_ENGINES,
         condition=GATE_PSRAM_METADATA,
         engine_conditions={EngineType.HELIA_AOT: GATE_AOT_PSRAM_METADATA},
         value_shape=value_shape,

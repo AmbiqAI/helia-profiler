@@ -285,11 +285,11 @@ static void print_layers(void) {
     hpx_printf("HPX_HEARTBEAT phase=init\n");
 {%- endblock %}
 
-{% block engine_profiler_off %}        g_profile_enabled = false;{% endblock %}{% block engine_psram_metadata %}{# ExecuTorch has no PSRAM
-   support (preflight rejects the combination) and renders no psram_info —
-   the base's metadata include referenced an undeclared identifier in
-   test-rendered psram arms, the #171 uncompilable-render class (#187
-   gate finding). Deliberately empty. #}{% endblock %}
+{% block engine_profiler_off %}        g_profile_enabled = false;{% endblock %}{% block engine_psram_metadata %}
+{# ExecuTorch has no PSRAM support (preflight rejects the combination) and
+   renders no psram_info — the base's metadata include referenced an
+   undeclared identifier in test-rendered psram arms, the #171
+   uncompilable-render class (#187 gate finding). Deliberately empty. #}{% endblock %}
 
 {# The two reset-inputs blocks are multi-line but carry NO leading or trailing
    newline of their own: the base reuses each at several sites by calling it
