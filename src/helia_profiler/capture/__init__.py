@@ -105,7 +105,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     # Scan for HPX_ERROR= lines before parsing.  A firmware-reported error
     # is more specific than any "no layer data" fallback message, so surface
     # it with the best hint we can generate.
-    _raise_on_firmware_error(lines)
+    _raise_on_firmware_error(lines, power_enabled=bool(ctx.config.power.enabled))
 
     # Pre-parse validation: check for protocol sentinels.  Scan the whole
     # capture, not just the head: the SWO transport emits a variable-length
@@ -658,12 +658,19 @@ def _verify_device_clock(ctx: PipelineContext, result: PmuResult) -> None:
         )
 
 
-def _raise_on_firmware_error(lines: list[str]) -> None:
+def _raise_on_firmware_error(lines: list[str], *, power_enabled: bool = True) -> None:
     """Raise :class:`CaptureError` if the firmware reported an HPX_ERROR.
 
     Finds the first ``HPX_ERROR=<kind> ...`` line, extracts the kind and
     the full payload, looks up a hint, and raises.  Unknown kinds still
     raise — with a generic hint — so nothing slips through silently.
+
+    One severity exception (#180 review M1): ``stimer_dead`` corrupts ONLY
+    the STIMER-timed clean window — per-layer counters come from the PMU —
+    so on a run that is not measuring power it downgrades to a warning and
+    the capture proceeds; the validity layer independently marks the
+    zero-elapsed clean window. With power enabled it stays fatal: every
+    power figure would be built on the dead clock.
     """
     for line in lines:
         s = line.strip()
@@ -679,6 +686,16 @@ def _raise_on_firmware_error(lines: list[str]) -> None:
             if sep in kind:
                 kind = kind.split(sep, 1)[0]
                 break
+
+        if kind == FirmwareErrorCode.STIMER_DEAD and not power_enabled:
+            log.warning(
+                "Firmware reported %s but this run measures no power: "
+                "per-layer PMU data is unaffected, only the clean-window "
+                "duration is untrusted (the validity layer marks it). %s",
+                kind,
+                s,
+            )
+            continue
 
         # FirmwareErrorCode is a StrEnum, so the raw ``kind`` string off the
         # wire indexes this dict directly — including a code from firmware

@@ -42,8 +42,13 @@
         // twice per run (calibration + window begin), all outside measured
         // regions.
         if (hpx_stimer_init() == 0U) {
-            hpx_printf("HPX_ERROR=stimer_dead settle_us=%u\n",
-                       (unsigned)HPX_STIMER_SETTLE_MAX_US);
+{% if power_only | default(false) %}
+            hpx_power_terminal_fail("stimer_dead", g_hpx_stimer_last_ticks);
+{% else %}
+            hpx_printf("HPX_ERROR=stimer_dead settle_us=%u last_ticks=%u\n",
+                       (unsigned)HPX_STIMER_SETTLE_MAX_US,
+                       (unsigned)g_hpx_stimer_last_ticks);
+{% endif %}
         }
         const uint32_t busy_calib_t0 = hpx_stimer_ticks();
         volatile uint32_t busy_calib_i = 0;

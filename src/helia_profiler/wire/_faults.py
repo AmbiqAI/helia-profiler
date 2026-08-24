@@ -166,7 +166,11 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         "hpx_stimer_init(): the STIMER window clock is dead or implausible. "
         "Emitted BEFORE the window opens so the failure is attributed to the "
         "crystal instead of completing a window into the frozen-clock check "
-        "(#110).",
+        "(#110). Transport binaries only — the dedicated power binary "
+        "compiles printf out and reports the same failure through the power "
+        "terminal's failed envelope (phase stimer_dead). Delivery is "
+        "guaranteed on RTT (lossless pre-window); on SWO/UART a lost line "
+        "degrades to the zero-elapsed clean-window warning.",
         WireConsumer.TRANSPORT_CONTROL,
         WireCriticality.PROTOCOL,
         # ExecuTorch's engine_clean_window override times the window
@@ -176,7 +180,7 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         engines=TFLM_ENGINES | AOT_ENGINES | ET_ENGINES,
         condition=GATE_STIMER_WINDOW,
         engine_conditions={EngineType.EXECUTORCH: GATE_BUSY_LOOP_PROBE},
-        value_shape="settle_us=<n>",
+        value_shape="settle_us=<n> last_ticks=<n>",
         has_host_hint=True,
     ),
 )

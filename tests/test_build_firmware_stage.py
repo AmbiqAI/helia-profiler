@@ -222,3 +222,30 @@ def test_find_target_binary_is_deterministic(tmp_path: Path) -> None:
     (tmp_path / "hpx_profiler.elf").write_bytes(b"elf")
     found = _find_target_binary(tmp_path, "hpx_profiler")
     assert found.suffix == ".axf"
+
+
+def test_find_target_binary_tiebreak_is_filesystem_order_independent(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """#180 review M3: glob already walks top-down, so shallow-vs-deep never
+    depended on FS order — SAME-DEPTH siblings did. Feed the raw glob in
+    reversed order and require the lexicographic winner."""
+    import glob as glob_module
+
+    from helia_profiler.firmware import _find_target_binary
+
+    for name in ("zzz", "aaa"):
+        d = tmp_path / name
+        d.mkdir()
+        (d / "hpx_profiler.axf").write_bytes(name.encode())
+
+    real_glob = glob_module.glob
+
+    def reversed_glob(pattern, **kwargs):
+        return list(reversed(real_glob(pattern, **kwargs)))
+
+    monkeypatch.setattr(
+        "helia_profiler.firmware.glob.glob", reversed_glob
+    )
+    found = _find_target_binary(tmp_path, "hpx_profiler")
+    assert found == tmp_path / "aaa" / "hpx_profiler.axf"
