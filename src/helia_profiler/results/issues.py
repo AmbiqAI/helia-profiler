@@ -72,6 +72,8 @@ class IssueCode(StrEnum):
     POWER_GATE_NOT_LOWERED = "power.gate_not_lowered"
     POWER_GATE_DURATION_MISMATCH = "power.gate_duration_mismatch"
     POWER_GATE_DURATION_UNVERIFIABLE = "power.gate_duration_unverifiable"
+    POWER_GATE_BELOW_MINIMUM = "power.gate_below_minimum"
+    POWER_WINDOW_OBSERVER_MISMATCH = "power.window_observer_mismatch"
     POWER_TERMINAL_MISSING = "power.terminal_missing"
     POWER_TERMINAL_ERROR = "power.terminal_error"
     POWER_TERMINAL_INCOMPLETE = "power.terminal_incomplete"
@@ -192,6 +194,17 @@ _ISSUE_SPECS: tuple[IssueSpec, ...] = (
         "Power-gate duration cannot be verified because clean inference "
         "timing is invalid.",
         severity=Severity.WARNING,
+    ),
+    IssueSpec(
+        IssueCode.POWER_GATE_BELOW_MINIMUM,
+        "Measured power gate is shorter than the minimum accepted window.",
+        severity=Severity.ERROR,
+    ),
+    IssueSpec(
+        IssueCode.POWER_WINDOW_OBSERVER_MISMATCH,
+        "The instrument-timed gate and the firmware's own window clock "
+        "disagree about the same physical window.",
+        severity=Severity.ERROR,
     ),
     IssueSpec(
         IssueCode.POWER_TERMINAL_MISSING,

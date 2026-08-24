@@ -258,6 +258,7 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                     from ..power.diagnostics import (
                         GateDurationIntegrity,
                         assess_gate_duration,
+                        assess_gate_observer,
                     )
 
                     integrity_meta = power_meta.get("gate_duration_integrity")
@@ -294,20 +295,79 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                     summary["power"]["gated_window_duration_ratio"] = round(
                         integrity.ratio, 4
                     )
-                    if not integrity.valid:
+                    # Suppression keys on the OBSERVER verdict, not the
+                    # est*count band (#142/#181): the band straddles boots and
+                    # thermal states, so a cold-boot HFRC-fast window misses
+                    # it while being perfectly healthy -- and N (the actual
+                    # denominator) is a firmware loop count that drift cannot
+                    # change. The firmware's STIMER window time (same boot,
+                    # same physical window as the gate) arbitrates; est*count
+                    # keeps its suppression authority only where no envelope
+                    # exists to arbitrate (shared firmware, lost or frozen
+                    # terminal, replayed artifact).
+                    terminal = (
+                        ctx.power_run.terminal
+                        if ctx.power_run is not None
+                        else None
+                    )
+                    observer = (
+                        assess_gate_observer(
+                            elapsed_us=terminal.elapsed_us,
+                            gated_result=ctx.power_result,
+                        )
+                        if terminal is not None
+                        else None
+                    )
+                    observer_failed = observer is not None and not observer.agrees
+                    if integrity.below_minimum or observer_failed or (
+                        not integrity.valid and observer is None
+                    ):
                         summary["power"]["gated_window_duration_suspect"] = True
                         log.warning(
-                            "Joulescope gated window duration (%.4fs) does not match "
-                            "clean_infer_count=%d x clean_infer_avg_us=%dus (expected "
-                            "%.4fs, ratio=%.3f). Per-inference power metrics are "
-                            "suppressed because the denominator is not trustworthy.",
+                            "Joulescope gated window duration (%.4fs) is not "
+                            "trustworthy (%s; expected %.4fs from "
+                            "clean_infer_count=%d x clean_infer_avg_us=%dus, "
+                            "ratio=%.3f). Per-inference power metrics are "
+                            "suppressed because the denominator is not "
+                            "trustworthy.",
                             ps.duration_s,
+                            (
+                                "below the minimum accepted gate"
+                                if integrity.below_minimum
+                                else "firmware window clock disagrees with the gate"
+                                if observer_failed
+                                else "duration mismatch with no firmware envelope to arbitrate"
+                            ),
+                            integrity.expected_s,
                             effective_count,
                             effective_avg_us,
-                            integrity.expected_s,
                             integrity.ratio,
                         )
                     else:
+                        if not integrity.valid:
+                            # Observer agreed: the window is real and
+                            # self-consistent; the profile-boot reference is
+                            # stale. Publish the story next to the ratio.
+                            drift_pct = (integrity.ratio - 1.0) * 100.0
+                            summary["power"]["gated_window_reference_drift"] = (
+                                f"window ran {abs(drift_pct):.1f}% "
+                                f"{'short of' if drift_pct < 0 else 'past'} the "
+                                "profile-phase expectation but agrees with the "
+                                "firmware's own STIMER window time; consistent "
+                                "with cold-start HFRC core-clock drift (#181), "
+                                "not a capture defect"
+                            )
+                            log.info(
+                                "Gated window %.4fs vs est*count %.4fs "
+                                "(ratio=%.3f) -- firmware STIMER window agrees "
+                                "with the gate, so the profile-phase reference "
+                                "is stale (cold-start HFRC drift), not the "
+                                "capture. Per-inference metrics remain valid: "
+                                "the denominator is the inference count.",
+                                ps.duration_s,
+                                integrity.expected_s,
+                                integrity.ratio,
+                            )
                         energy_per_infer = ps.energy_j / effective_count
                         summary["power"]["energy_per_inference_j"] = round(
                             energy_per_infer, 9

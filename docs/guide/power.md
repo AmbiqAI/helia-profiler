@@ -398,21 +398,36 @@ the *effective* target to at least 5000 ms (`max(profiling.window_target_ms,
 more time to settle than a plain PMU capture does. `window_mode: fixed` is
 left alone — it means "use my number" — so a fixed sub-5 s power window is
 built as written. Note the separate floor below it: an external capture
-rejects any measured gate shorter than 1 s, so a `fixed` target at or below
-about 1000 ms will fail the window contract even when the firmware runs
-exactly what it was told to.
+treats any measured gate shorter than 1 s as an error
+(`power.gate_below_minimum` — the run still completes and writes its
+artifact, but it evaluates invalid and per-inference metrics are
+suppressed), so a `fixed` target at or below about 1000 ms cannot produce a
+valid power run even when the firmware runs exactly what it was told to.
 
-External captures enforce the window contract before reporting
-energy-per-inference. The measured gate must be at least one second and agree
-with `clean_infer_count * clean_infer_avg_us` within the larger of two stats
-packets, half an inference (only when more than one inference was counted —
-with a single unit that allowance would be half the whole measurement), or a
-cross-boot timing allowance: 10% for a counted window, 25% for a `busy_loop`
-window, whose length is predicted from a calibration pass rather than counted.
-That allowance follows the probe in both `power.firmware` modes. Short GPIO pulses
-are ignored as glitches; a capture with no qualifying window fails rather than
-publishing a plausible but invalid power number. The accepted ratio and any
-ignored pulse count are recorded in `summary.json`.
+External captures verify the window in two layers before reporting
+energy-per-inference. The **authoritative** check compares the firmware's own
+STIMER-timed window (`power.terminal.elapsed_us`) against the instrument-timed
+gate: two independent clocks watching the same physical window in the same
+boot, so they must agree within 1% — disagreement is an error
+(`power.window_observer_mismatch`) and per-inference metrics are suppressed.
+The `clean_infer_count * clean_infer_avg_us` expectation is a **reference
+diagnostic**: the profile boot timed it in a different thermal state, and the
+LP core clock is HFRC-derived, so a cold power boot can legitimately run the
+window ~10% short of it while every published number stays correct — the
+energy-per-inference denominator is the inference count, which drift cannot
+change. When the firmware envelope confirms the gate, an `est*count` miss is
+published as `gated_window_reference_drift` next to the ratio instead of
+degrading the run; when no envelope exists to arbitrate (shared firmware
+mode, a lost terminal), the `est*count` band keeps its original authority as
+a warning (`power.gate_duration_mismatch`): agreement within the larger of
+two stats packets, half an inference (only when more than one inference was
+counted), or a cross-boot allowance — 10% for a counted window, 25% for a
+`busy_loop` window, whose length is predicted from a calibration pass rather
+than counted. That allowance follows the probe in both `power.firmware`
+modes. Short GPIO pulses are ignored as glitches; a capture with no
+qualifying window is recorded as degraded rather than publishing a plausible
+but invalid power number. The accepted ratio and any ignored pulse count are
+recorded in `summary.json`.
 
 ### Very short inferences
 
@@ -848,9 +863,12 @@ health signals you should check before trusting a result:
 on your board, model, and clock configuration.)
 
 - **`gated_window_duration_ratio`** — measured gate duration ÷ expected
-  duration (`clean_infer_count × clean_infer_avg_us`). Healthy captures land
-  around 0.99–1.01. Far from 1.0 means the gate/handshake didn't line up
-  with the actual inference loop.
+  duration (`clean_infer_count × clean_infer_avg_us`). Warm back-to-back
+  captures land around 0.99–1.01. Far from 1.0 **with**
+  `gated_window_reference_drift` present means the firmware's own window
+  clock confirmed the gate and only the profile-phase reference is stale
+  (cold-start HFRC drift — harmless). Far from 1.0 **without** it means the
+  gate/handshake didn't line up with the actual inference loop.
 - **`gated_vs_whole_current_ok`** — `false` means the gated (inference)
   average current was **not** higher than the whole-capture average, which
   usually signals a gate/timing problem — but can be a legitimate reading
@@ -859,15 +877,17 @@ on your board, model, and clock configuration.)
 - **`power.sync.ready_observed`** — `true` once the host observed the
   firmware's lock-step `READY` handshake. `false`/absent with lock-step
   enabled points at a wiring or GO-line problem.
-- **`gated_window_duration_suspect`** — set when the duration check above
-  fails tolerance, or when the device-reported clean-window timing itself
-  looks corrupted (an inference reporting zero time). Per-inference metrics
-  are suppressed when it is set.
+- **`gated_window_duration_suspect`** — set when the gate is below the 1 s
+  floor, when the firmware's window clock disagrees with the gate
+  (`power.window_observer_mismatch`), when the duration check above fails
+  tolerance with no firmware envelope to arbitrate it, or when the
+  device-reported clean-window timing itself looks corrupted (an inference
+  reporting zero time). Per-inference metrics are suppressed when it is set.
 
 The dedicated power firmware also times its own measured window and reports it
 as `power.terminal.elapsed_us`. Because nothing else on the host depends on
 that clock, it is the one number that can be wrong while every other check
-passes, so it is cross-checked directly. Three issue codes come out of that:
+passes, so it is cross-checked directly. Four issue codes come out of that:
 
 - **`power.window_clock_frozen`** — the firmware completed its inferences but
   reported zero elapsed time, so its window clock never advanced. In
@@ -878,11 +898,16 @@ passes, so it is cross-checked directly. Three issue codes come out of that:
   `elapsed_us` is meaningless. Two causes produce it: a window timed with
   `DWT->CYCCNT` on a Cortex-M4F part whose debug power domain is down, or a
   STIMER-timed window whose 32.768 kHz XTAL is stopped or unpopulated.
-- **`power.window_clock_mismatch`** — the firmware's window disagrees with an
-  independent measurement of the same work: the host-timed gate in external
-  mode (5% tolerance — the two time the same physical window), or
-  `inference_count × reference_inference_us` in internal mode (25%, looser
-  because that reference comes from a different binary). A warning in both.
+- **`power.window_observer_mismatch`** — external mode: the firmware's
+  window disagrees with the host-timed gate beyond 1%. The two are
+  independent clocks timing the same physical window in the same boot, so
+  drift cannot explain a miss — the gate did not bracket what the firmware
+  timed. An **error**: it is the authoritative window-integrity verdict, and
+  per-inference metrics are suppressed when it fires.
+- **`power.window_clock_mismatch`** — internal mode: the firmware's window
+  disagrees with `inference_count × reference_inference_us` (25% tolerance —
+  loose because that reference comes from a different binary, in a different
+  boot and thermal state). A warning.
 - **`power.window_clock_exceeds_host_time`** — internal mode only: the
   reported window is longer than the host wall time between starting the
   power binary and collecting its record, which is physically impossible.
@@ -1094,8 +1119,11 @@ the JS320 bench.
     `power.capture_duration_s` in `summary.json` (they should agree to well
     under 1%). If `elapsed_us` is `0`, or several times the gate, the wiring
     is fine and the firmware timed its window with a clock it could not read —
-    see `power.window_clock_frozen` and `power.window_clock_mismatch` above.
-    The remedy is a firmware rebuild, not a rewire.
+    see `power.window_clock_frozen` and `power.window_observer_mismatch`
+    above. The remedy is a firmware rebuild, not a rewire. If instead
+    `elapsed_us` *agrees* with the gate and only the est×count ratio is off,
+    that is cold-start clock drift, reported as
+    `gated_window_reference_drift` — nothing is wrong.
 
 ??? failure "\"gated avg current <= whole-capture avg\" warning"
     Usually a gate/timing problem, but can be a legitimate reading for a

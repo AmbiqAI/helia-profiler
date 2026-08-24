@@ -85,8 +85,10 @@ def test_degraded_observation_and_duration_mismatch_are_structured(tmp_path: Pat
     ctx = _context(tmp_path)
     assert ctx.power_run is not None and ctx.power_run.observation is not None
     observation = ctx.power_run.observation
+    # Above the floor but outside the band, with no gated window for the
+    # observer check to arbitrate -- the est*count fallback keeps authority.
     observation.result.metadata.gate_duration_integrity = GateDurationIntegrity(
-        measured_s=0.1,
+        measured_s=0.85,
         expected_s=1.0,
         tolerance_s=0.01,
         minimum_s=0.5,
@@ -111,6 +113,30 @@ def test_degraded_observation_and_duration_mismatch_are_structured(tmp_path: Pat
         IssueCode.POWER_OBSERVATION_DEGRADED,
         IssueCode.POWER_GATE_DURATION_MISMATCH,
     }
+
+
+def test_below_minimum_gate_is_an_error(tmp_path: Path):
+    """The 1 s floor never needed arbitration: a below-floor gate is too
+    short for the stats integral to be trusted regardless of what the
+    firmware clock says (#142/#181 D1 -- previously this aborted the run at
+    capture time with no artifact at all)."""
+    ctx = _context(tmp_path)
+    assert ctx.power_run is not None and ctx.power_run.observation is not None
+    observation = ctx.power_run.observation
+    observation.result.metadata.gate_duration_integrity = GateDurationIntegrity(
+        measured_s=0.1,
+        expected_s=1.0,
+        tolerance_s=0.01,
+        minimum_s=0.5,
+    )
+
+    evaluation = evaluate_run(ctx)
+
+    assert evaluation.validity is ResultValidity.INVALID
+    codes = [issue.code for issue in evaluation.issues]
+    assert codes.count(IssueCode.POWER_GATE_BELOW_MINIMUM) == 1
+    # One defect, one issue: the floor breach subsumes the band miss.
+    assert IssueCode.POWER_GATE_DURATION_MISMATCH not in codes
 
 
 def test_terminal_plan_and_on_device_mismatches_are_invalid(tmp_path: Path):
@@ -322,21 +348,30 @@ class TestWindowClockValidity:
 
         assert codes.count(IssueCode.POWER_WINDOW_CLOCK_MISMATCH) == 0
 
-    def test_external_disagreement_is_a_warning_not_an_error(self, tmp_path: Path):
-        """Apollo4's ~7x inflation: degraded, not invalid -- two boards is not
-        a wide enough envelope to fail a run on."""
+    def test_external_disagreement_is_the_observer_error(self, tmp_path: Path):
+        """Apollo4's ~7x inflation: two independent clocks watched the SAME
+        physical window in the same boot, so drift cannot explain a miss --
+        the gate did not bracket what the firmware timed, and every
+        per-inference figure divided out of it inherits the error. Promoted
+        from warning to the authoritative ERROR by the #142/#181 redesign
+        (cross-family evidence at diagnostics.py's tolerance comment)."""
         ctx = _context(tmp_path)
         self._bench_run(ctx, elapsed_us=int(self.BENCH_ELAPSED_US * 6027 / 866.6))
 
         evaluation = evaluate_run(ctx)
 
-        assert evaluation.validity is ResultValidity.DEGRADED
+        assert evaluation.validity is ResultValidity.INVALID
         mismatch = [
-            issue for issue in evaluation.issues if issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH
+            issue
+            for issue in evaluation.issues
+            if issue.code == IssueCode.POWER_WINDOW_OBSERVER_MISMATCH
         ]
         assert len(mismatch) == 1
-        assert mismatch[0].severity == "warning"
+        assert mismatch[0].severity == "error"
         assert mismatch[0].context["reference_source"] == "gated_windows"
+        # The old external warning code must not double up on the same defect.
+        codes = [issue.code for issue in evaluation.issues]
+        assert IssueCode.POWER_WINDOW_CLOCK_MISMATCH not in codes
 
     def test_degraded_capture_gains_no_window_clock_issue(self, tmp_path: Path):
         """A degraded capture has no gated window, only a whole-capture
@@ -383,11 +418,13 @@ class TestWindowClockValidity:
 
     def test_the_two_modes_apply_different_tolerances(self, tmp_path: Path):
         """One 14% deviation, two verdicts: a real fault against a host-timed
-        gate, expected cross-binary noise against the plan."""
+        gate (same window, two observers -- the error code), expected
+        cross-binary noise against the plan (warning code, and only past
+        25%)."""
         external = _context(tmp_path)
         self._bench_run(external, elapsed_us=int(self.BENCH_GATE_S * 1e6 * 1.14))
         assert any(
-            issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH
+            issue.code == IssueCode.POWER_WINDOW_OBSERVER_MISMATCH
             for issue in evaluate_run(external).issues
         )
 
@@ -478,6 +515,144 @@ class TestWindowClockValidity:
         assert not any(
             issue.code == IssueCode.POWER_WINDOW_CLOCK_EXCEEDS_HOST_TIME
             for issue in evaluate_run(ctx).issues
+        )
+
+
+class TestGateArbitration:
+    """#142/#181 redesign: the est*count band is a reference diagnostic and
+    the firmware's STIMER window time arbitrates. Values are the AP510 EVB
+    first-run-after-idle rejection from #181: gate 4.427 s against an
+    est*count expectation of 5.017 s (-11.8%, outside the 10% band) while the
+    window itself was healthy -- cold silicon clocks fast because the LP core
+    clock is HFRC-derived, and total_cycles was constant to 2.5 ppm across
+    the whole drift sweep."""
+
+    DRIFT_COUNT = 233
+    DRIFT_REFERENCE_US = 21_532  # profile boot: est*count = 5.017 s
+    DRIFT_GATE_S = 4.427  # first run after long idle (#181)
+    DRIFT_ELAPSED_US = 4_427_500  # firmware STIMER: agrees with the gate
+
+    def _drift_run(
+        self,
+        ctx: PipelineContext,
+        *,
+        elapsed_us: int | None,
+        minimum_s: float = 1.0,
+    ) -> None:
+        assert ctx.power_run is not None and ctx.power_run.observation is not None
+        observation = ctx.power_run.observation
+        result = PowerResult(
+            summary=replace(observation.result.summary, duration_s=self.DRIFT_GATE_S),
+            gated_windows=[
+                GatedPowerWindow(
+                    0.0, self.DRIFT_GATE_S, self.DRIFT_GATE_S, 0.0, 0.0, 0.0, 0.0, 0.0, 0
+                )
+            ],
+            metadata=replace(observation.result.metadata),
+        )
+        expected_s = self.DRIFT_COUNT * self.DRIFT_REFERENCE_US / 1_000_000.0
+        result.metadata.gate_duration_integrity = GateDurationIntegrity(
+            measured_s=self.DRIFT_GATE_S,
+            expected_s=expected_s,
+            tolerance_s=expected_s * 0.10,
+            minimum_s=minimum_s,
+            relative_tolerance=0.10,
+        )
+        ctx.power_run = PowerRun(
+            plan=PowerRunPlan(
+                # No terminal envelope exists in shared mode -- the exact case
+                # where the est*count fallback must keep its authority.
+                firmware_mode="dedicated" if elapsed_us is not None else "shared",
+                inference_count=self.DRIFT_COUNT,
+                reference_inference_us=self.DRIFT_REFERENCE_US,
+            ),
+            observation=replace(observation, result=result),
+            terminal=(
+                replace(
+                    ctx.power_run.terminal,
+                    requested_count=self.DRIFT_COUNT,
+                    completed_count=self.DRIFT_COUNT,
+                    elapsed_us=elapsed_us,
+                )
+                if elapsed_us is not None
+                else None
+            ),
+        )
+
+    def test_cold_boot_drift_with_observer_agreement_is_valid(self, tmp_path: Path):
+        """THE #181 scenario: est*count missed by 11.8%, but the firmware's
+        own window clock confirms the gate bracketed exactly what it timed.
+        The reference is stale, the capture is sound, and the per-inference
+        denominator (the count) is untouched by drift -- a fully valid run.
+        Before the redesign this aborted at capture time with no artifact."""
+        ctx = _context(tmp_path)
+        self._drift_run(ctx, elapsed_us=self.DRIFT_ELAPSED_US)
+
+        evaluation = evaluate_run(ctx)
+
+        assert evaluation.validity is ResultValidity.VALID
+        assert evaluation.issues == ()
+
+    def test_band_miss_without_envelope_keeps_its_warning(self, tmp_path: Path):
+        """Shared firmware publishes no terminal envelope, so nothing can
+        arbitrate: est*count keeps its original WARNING authority."""
+        ctx = _context(tmp_path)
+        self._drift_run(ctx, elapsed_us=None)
+
+        evaluation = evaluate_run(ctx)
+
+        assert evaluation.validity is ResultValidity.DEGRADED
+        mismatch = [
+            issue
+            for issue in evaluation.issues
+            if issue.code == IssueCode.POWER_GATE_DURATION_MISMATCH
+        ]
+        assert len(mismatch) == 1
+        assert mismatch[0].severity == "warning"
+
+    def test_observer_mismatch_is_reported_once(self, tmp_path: Path):
+        """When the two observers disagree, the ERROR carries the whole
+        story; the est*count warning must not pile on a restatement."""
+        ctx = _context(tmp_path)
+        self._drift_run(ctx, elapsed_us=int(self.DRIFT_GATE_S * 1e6 * 1.14))
+
+        evaluation = evaluate_run(ctx)
+
+        assert evaluation.validity is ResultValidity.INVALID
+        codes = [issue.code for issue in evaluation.issues]
+        assert codes.count(IssueCode.POWER_WINDOW_OBSERVER_MISMATCH) == 1
+        assert IssueCode.POWER_GATE_DURATION_MISMATCH not in codes
+
+    def test_frozen_envelope_returns_authority_to_the_band(self, tmp_path: Path):
+        """A frozen firmware clock cannot arbitrate anything: the frozen
+        warning fires (external mode) AND the est*count band keeps its
+        fallback authority over the duration question."""
+        ctx = _context(tmp_path)
+        self._drift_run(ctx, elapsed_us=0)
+
+        evaluation = evaluate_run(ctx)
+
+        codes = [issue.code for issue in evaluation.issues]
+        assert codes.count(IssueCode.POWER_WINDOW_CLOCK_FROZEN) == 1
+        assert codes.count(IssueCode.POWER_GATE_DURATION_MISMATCH) == 1
+        assert IssueCode.POWER_WINDOW_OBSERVER_MISMATCH not in codes
+
+    def test_below_minimum_is_an_error_even_when_the_observer_agrees(
+        self, tmp_path: Path
+    ):
+        """The floor is independent of arbitration: a sub-minimum gate is too
+        short for the stats integral whatever the firmware clock says."""
+        ctx = _context(tmp_path)
+        self._drift_run(
+            ctx, elapsed_us=self.DRIFT_ELAPSED_US, minimum_s=self.DRIFT_GATE_S + 1.0
+        )
+
+        evaluation = evaluate_run(ctx)
+
+        assert evaluation.validity is ResultValidity.INVALID
+        assert any(
+            issue.code == IssueCode.POWER_GATE_BELOW_MINIMUM
+            for issue in evaluation.issues
         )
 
 
