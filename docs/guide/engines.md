@@ -169,7 +169,7 @@ graph contains `VAR_HANDLE`-style ops. That means models using
 manual firmware edits just to stand up the interpreter.
 
 The profiler ships pinned to a specific heliaRT release
-(currently **v1.16.0**) and enforces a minimum supported version
+(currently **v1.17.0**) and enforces a minimum supported version
 (**v1.16.0**). In the default flow NSX resolves the pinned
 `nsx-helia-rt` registry module and builds it with the selected toolchain.
 
@@ -213,7 +213,7 @@ engine:
   config:
     source:
       repo: AmbiqAI/helia-rt
-      ref: helia-rt-v1.16.0
+      ref: helia-rt-v1.17.0
 ```
 
 ```yaml title="hpx.yml"
