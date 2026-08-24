@@ -775,14 +775,35 @@ class TestEthosURender:
     def test_npu_pmu_partial_included(self):
         out = _render_tflm(has_ethos_u=True)
         assert '#include "pmu_ethosu.h"' in out
-        assert "ethosu_inference_begin" in out
-        assert "ethosu_inference_end" in out
+        assert '#include "nsx_ethos_u.h"' in out
+        assert "hpx_npu_probe(" in out
         assert "hpx_npu_print_csv" in out
+
+    def test_npu_pmu_uses_driver_probe_not_strong_hooks(self):
+        """The driver owns ethosu_inference_begin/end; redefining them collides
+        at link (nsx-ethos-u-driver v0.1.2 ships strong overrides via
+        INTERFACE_SOURCES). We must register a probe instead."""
+        out = _render_tflm(has_ethos_u=True)
+        # No *definition* of the driver-owned symbols (prose mentioning them in
+        # the explanatory comment is fine).
+        assert "void ethosu_inference_begin(" not in out
+        assert "void ethosu_inference_end(" not in out
+        # The dead auto-config hook does not exist in driver v0.1.2.
+        assert "ethosu_pmu_auto_config_enabled" not in out
+        # Probe dispatches on the driver's phase constants.
+        assert "NSX_ETHOS_U_PROBE_BEGIN" in out
+        assert "NSX_ETHOS_U_PROBE_END" in out
+        # Registered on the init path, before the first inference.
+        assert "nsx_ethos_u_set_probe(hpx_npu_probe);" in out
+        assert out.index("nsx_ethos_u_set_probe(hpx_npu_probe);") < out.index(
+            "interpreter.Invoke();"
+        )
 
     def test_npu_pmu_partial_absent_without_ethos_u(self):
         out = _render_tflm()
         assert "pmu_ethosu.h" not in out
-        assert "ethosu_inference_begin" not in out
+        assert "nsx_ethos_u_set_probe" not in out
+        assert "hpx_npu_probe" not in out
 
     def test_ethos_npu_pass_uses_npu_csv(self):
         out = _render_tflm(has_ethos_u=True, pmu_passes=[_npu_pmu_pass()])
@@ -824,7 +845,8 @@ class TestEthosUAotRender:
         assert "nsx_npu" not in out
         assert "HPX_NPU" not in out
         assert "pmu_ethosu.h" not in out
-        assert "ethosu_inference_begin" not in out
+        assert "nsx_ethos_u_set_probe" not in out
+        assert "hpx_npu_probe" not in out
 
     def test_power_only_uses_terminal_fail(self):
         out = _render_aot(has_ethos_u=True, power_only=True)
@@ -833,8 +855,13 @@ class TestEthosUAotRender:
     def test_npu_pmu_partial_included_with_aot_seams(self):
         out = _render_aot(has_ethos_u=True)
         assert '#include "pmu_ethosu.h"' in out
-        assert "ethosu_inference_begin" in out
-        assert "ethosu_inference_end" in out
+        assert '#include "nsx_ethos_u.h"' in out
+        # Driver owns the strong hooks; we register a probe (see #183).
+        assert "void ethosu_inference_begin(" not in out
+        assert "void ethosu_inference_end(" not in out
+        assert "ethosu_pmu_auto_config_enabled" not in out
+        assert "hpx_npu_probe(" in out
+        assert "nsx_ethos_u_set_probe(hpx_npu_probe);" in out
         # AOT engine seams — layer ordinal from the operator callback.
         assert "#define HPX_NPU_MAX_LAYERS kMaxLayers" in out
         assert "return g_num_layers;" in out
