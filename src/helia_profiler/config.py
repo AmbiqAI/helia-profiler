@@ -759,7 +759,7 @@ def load_config(yaml_path: Path | None, cli_overrides: dict[str, Any]) -> Profil
     base: dict[str, Any] = {}
     if yaml_path is not None:
         try:
-            with open(yaml_path) as f:
+            with open(yaml_path, encoding="utf-8") as f:
                 base = yaml.safe_load(f) or {}
         except FileNotFoundError as exc:
             raise ConfigError(

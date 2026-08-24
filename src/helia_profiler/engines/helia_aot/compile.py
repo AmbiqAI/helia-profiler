@@ -260,7 +260,7 @@ def _run_aot_compiler(
                 f"heliaAOT config file not found: {cfg_path}",
                 hint="Check engine.config_path in your profiler YAML.",
             )
-        with open(cfg_path) as f:
+        with open(cfg_path, encoding="utf-8") as f:
             loaded = yaml.safe_load(f) or {}
         if not isinstance(loaded, dict):
             raise EngineError(
@@ -444,7 +444,7 @@ def _validate_pragmas(aot_module_dir: Path, prefix: str) -> None:
         )
         return
 
-    content = platform_h.read_text()
+    content = platform_h.read_text(encoding="utf-8")
 
     # Collect all PUT_IN_* macros that the generated code expects
     found_macros = set(_PRAGMA_RE.findall(content))
@@ -488,7 +488,11 @@ def _write_attributes_header(aot_module_dir: Path, prefix: str) -> Path:
     header_path.write_text(
         _jinja_env.get_template("heliaaot_attributes.h.j2").render(
             prefix=prefix,
-        )
+        ),
+        # The template carries non-ASCII (arrows/em-dashes in comments);
+        # Windows' default cp1252 raised UnicodeEncodeError the first time
+        # a test exercised this write (surfaced by PR #98's branch).
+        encoding="utf-8",
     )
     return header_path
 

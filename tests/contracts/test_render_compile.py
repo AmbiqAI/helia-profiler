@@ -378,14 +378,35 @@ def _const_blob_stub(region_id: str) -> str:
 
 
 def _part_define(vars: dict) -> str:
-    """AM_PART_* define for this render's SoC, from its CMSIS device header.
+    """The part macro for this render's SoC — from the REGISTRY's c_define.
 
     Production gets the part macro from the toolchain command line (CMake),
-    not from an include, so the stub tree's part gates (burst, debug domain,
-    SRAM config, cache capabilities) key on the same mechanism here.
+    sourced from SocDef.c_define — NOT reconstructed from the header name.
+    The PR #98 review caught the earlier reconstruction
+    (AM_PART_{STEM.upper()}) defining a macro production never defines:
+    atomiq110 deliberately declares c_define="PART_atomiq110" because that
+    part has no AM_PART_* macro. Keying on the registry keeps the gate's
+    part gates (burst, debug domain, SRAM config, cache capabilities)
+    aligned with the real build for every current and future part.
     """
-    stem = Path(str(vars["cmsis_device_header"])).stem
-    return f"AM_PART_{stem.upper()}"
+    header_stem = Path(str(vars["cmsis_device_header"])).stem
+    for soc in _socs_by_header.get(header_stem, ()):
+        return soc.c_define
+    # Unregistered header (future part in a render override): fall back to
+    # the old reconstruction rather than failing the whole gate.
+    return f"AM_PART_{header_stem.upper()}"
+
+
+def _build_socs_by_header() -> dict:
+    from helia_profiler.platform import list_socs
+
+    by_header: dict[str, list] = {}
+    for soc in list_socs():
+        by_header.setdefault(Path(soc.cmsis_header).stem, []).append(soc)
+    return by_header
+
+
+_socs_by_header = _build_socs_by_header()
 
 
 def _prepare_case_dir(case: _CompileCase, base: Path) -> Path:

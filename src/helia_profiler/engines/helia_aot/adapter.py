@@ -105,7 +105,7 @@ class HeliaAOTAdapter:
         op_manifest = _extract_operator_manifest(codegen_ctx)
         if op_manifest:
             manifest_path = work_dir / "aot_operator_manifest.json"
-            manifest_path.write_text(json.dumps(op_manifest, indent=2))
+            manifest_path.write_text(json.dumps(op_manifest, indent=2), encoding="utf-8")
             log.info(
                 "Extracted %d AOT operators from CodeGenContext",
                 len(op_manifest),
