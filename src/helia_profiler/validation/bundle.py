@@ -139,9 +139,13 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
         identities.add(case.identity)
         cases.append(case)
 
-    repo = manifest.get("repo") if isinstance(manifest.get("repo"), dict) else {}
-    run = manifest.get("run") if isinstance(manifest.get("run"), dict) else {}
-    github = run.get("github") if isinstance(run.get("github"), dict) else {}
+    repo_raw = manifest.get("repo")
+    repo: dict[str, object] = repo_raw if isinstance(repo_raw, dict) else {}
+    run_raw = manifest.get("run")
+    run: dict[str, object] = run_raw if isinstance(run_raw, dict) else {}
+    github_raw = run.get("github")
+    github: dict[str, object] = github_raw if isinstance(github_raw, dict) else {}
+    dirty_raw = repo.get("dirty")
     if version in (4, 5, 6) and not isinstance(manifest.get("validation"), dict):
         raise ValidationBundleError(
             f"Validation manifest schema v{version} field 'validation' must be an object"
@@ -156,7 +160,7 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
             hpx_version=_optional_string(manifest.get("hpx_version")),
             repo_sha=_optional_string(repo.get("sha")),
             repo_branch=_optional_string(repo.get("branch")),
-            repo_dirty=repo.get("dirty") if isinstance(repo.get("dirty"), bool) else None,
+            repo_dirty=dirty_raw if isinstance(dirty_raw, bool) else None,
             run_origin=_optional_string(run.get("origin")),
             github_event_name=_optional_string(github.get("event_name")),
             github_run_id=_optional_positive_int(github.get("run_id")),

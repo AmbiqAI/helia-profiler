@@ -243,6 +243,7 @@ def _provider_module_ref(
         path=Path(),
         local=False,
         project=ARM_CMSIS_NN_PROJECT,
+        # None must reach the dependency-lock digest as null; "" is a different key.
         ref=requested_ref,
     )
 
@@ -413,12 +414,12 @@ class ExecuTorchAdapter:
         # ExecuTorch runtime buffers are RAM-resident; the coarse
         # model.arena_location knob and the per-buffer overrides below may
         # only name RAM regions.
-        if config.model.arena_location is not None and config.model.arena_location.value not in (
+        if config.model.arena_location is not None and config.model.arena_location not in (
             "tcm",
             "sram",
         ):
             raise EngineError(
-                f"model.arena_location '{config.model.arena_location.value}' is not "
+                f"model.arena_location '{config.model.arena_location}' is not "
                 "valid for ExecuTorch runtime buffers",
                 hint="Use tcm or sram; weights_location controls the PTE placement.",
             )

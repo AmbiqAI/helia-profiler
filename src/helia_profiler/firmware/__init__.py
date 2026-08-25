@@ -291,7 +291,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 entry["ref"] = compatibility.baseline.module(extra_mod.name).ref
             modules.append(entry)
 
-    log.info("NSX modules: %s", ", ".join(m["name"] for m in modules))  # type: ignore[arg-type]
+    log.info("NSX modules: %s", ", ".join(str(m["name"]) for m in modules))
 
     # Engine identity flows through the typed EngineArtifacts field.
     # Templates receive the canonical hyphen-form string (StrEnum value).

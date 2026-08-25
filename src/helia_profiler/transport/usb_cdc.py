@@ -431,7 +431,7 @@ class UsbCdcTransport(BaseCaptureTransport):
     def collect(self, ctx) -> list[str]:
         from ..usb_identity import usb_marker_serial
 
-        args = self._args
+        args = self.prepared_args
         return capture_usb_output(
             jlink_serial=args.jlink_serial,
             jlink_device=args.jlink_device,

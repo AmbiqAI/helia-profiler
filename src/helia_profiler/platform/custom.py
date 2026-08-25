@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import difflib
 from enum import Enum
-from typing import Any, Mapping
+from typing import Any, Mapping, TypeVar
 
 from ..errors import ConfigError
 from .board import DEFAULT_GO_GPIO_PIN, DEFAULT_STATE_GPIO_PIN, DEFAULT_SYNC_GPIO_PIN, BoardDef
@@ -497,7 +497,10 @@ def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, Boar
     return custom
 
 
-def _enum_value(enum_cls: type, raw: Any, *, field_name: str):
+_EnumT = TypeVar("_EnumT", bound=Enum)
+
+
+def _enum_value(enum_cls: type[_EnumT], raw: Any, *, field_name: str) -> _EnumT:
     if isinstance(raw, enum_cls):
         return raw
     if raw is None:

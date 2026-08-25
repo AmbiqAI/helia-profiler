@@ -27,7 +27,11 @@ import logging
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from helia_aot.air.enums import AirOpType  # type: ignore[import-untyped]
+    from helia_aot.air.model import AirModel  # type: ignore[import-untyped]
 
 log = logging.getLogger("hpx")
 
@@ -54,14 +58,18 @@ def is_available() -> bool:
 # ---------------------------------------------------------------------------
 
 _HAS_AOT = False
+_AirModel: type[AirModel] | None
+_AirOpType: type[AirOpType] | None
 try:
-    from helia_aot.air.model import AirModel as _AirModel  # type: ignore[import-untyped]
-    from helia_aot.air.enums import AirOpType as _AirOpType  # type: ignore[import-untyped]
+    from helia_aot.air.model import AirModel as _imported_air_model  # type: ignore[import-untyped]
+    from helia_aot.air.enums import AirOpType as _imported_air_op_type  # type: ignore[import-untyped]
 
+    _AirModel = _imported_air_model
+    _AirOpType = _imported_air_op_type
     _HAS_AOT = True
 except ImportError:
-    _AirModel = None  # type: ignore[assignment,misc]
-    _AirOpType = None  # type: ignore[assignment,misc]
+    _AirModel = None
+    _AirOpType = None
 
 
 def is_aot_available() -> bool:
@@ -326,7 +334,7 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
 
     Returns ``None`` if ``ai-edge-litert`` is not installed.
     """
-    if not _HAS_LITERT:
+    if _schema is None:
         log.debug("ai-edge-litert not installed — skipping model analysis")
         return None
 
@@ -600,7 +608,7 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
 
     Returns ``None`` if ``helia-aot`` is not installed.
     """
-    if not _HAS_AOT:
+    if _AirOpType is None:
         log.debug("helia-aot not installed — skipping AirModel analysis")
         return None
 

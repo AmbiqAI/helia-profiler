@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
 from ..results import PowerTerminalEnvelope
@@ -67,8 +68,14 @@ class RttPowerTerminalTransport:
         )
 
 
+class _ByteLineStream(Protocol):
+    """The one method both serial-port collectors need from ``serial.Serial``."""
+
+    def readline(self) -> bytes: ...
+
+
 def _collect_serial_terminal(
-    serial_port: object,
+    serial_port: _ByteLineStream,
     *,
     timeout_s: float,
 ) -> PowerTerminalEnvelope:
@@ -132,7 +139,9 @@ class UartPowerTerminalTransport:
             ) from exc
 
 
-def _collect_chunked_terminal(read_fn: object, *, timeout_s: float) -> PowerTerminalEnvelope:
+def _collect_chunked_terminal(
+    read_fn: Callable[[], bytes], *, timeout_s: float
+) -> PowerTerminalEnvelope:
     from ..capture.power_terminal import (
         POWER_TERMINAL_END,
         POWER_TERMINAL_START,

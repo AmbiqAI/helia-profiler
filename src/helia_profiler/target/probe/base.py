@@ -9,11 +9,19 @@ from typing import Any, Protocol, Self
 
 
 class Probe(Protocol):
-    """Identity exposed by a discovered hardware debug probe."""
+    """Identity exposed by a discovered hardware debug probe.
 
-    serial: str
-    product: str
-    connection: str
+    Read-only properties so frozen-dataclass implementations conform.
+    """
+
+    @property
+    def serial(self) -> str: ...
+
+    @property
+    def product(self) -> str: ...
+
+    @property
+    def connection(self) -> str: ...
 
 
 class ProbeSession(Protocol):
@@ -21,7 +29,7 @@ class ProbeSession(Protocol):
 
     def __enter__(self) -> Self: ...
 
-    def __exit__(self, exc_type: object, exc: object, tb: object) -> object: ...
+    def __exit__(self, exc_type: object, exc: object, tb: object, /) -> object: ...
 
     def close(self) -> None: ...
 
@@ -33,10 +41,11 @@ class FlashBackend(Protocol):
         self,
         firmware_path: Path,
         *,
-        toolchain: str,
+        toolchain: str | None,
         jlink_serial: str | None = None,
+        frozen: bool = False,
         timeout_s: float,
-        verbose: bool = False,
+        verbose: int = 0,
     ) -> None: ...
 
 
@@ -58,7 +67,7 @@ class ResetController(Protocol):
 
 
 class DebugMemorySession(ProbeSession, Protocol):
-    """Minimal debug-memory surface needed by RTT capture."""
+    """Minimal debug-memory surface needed by RTT and SWO capture."""
 
     def open(self, serial_no: int | None = None) -> None: ...
 
@@ -95,3 +104,11 @@ class DebugMemorySession(ProbeSession, Protocol):
     def rtt_read(self, buffer_index: int, num_bytes: int) -> Sequence[int]: ...
 
     def rtt_write(self, buffer_index: int, data: Sequence[int]) -> int | None: ...
+
+    def swo_enable(
+        self, cpu_speed: int, swo_speed: int = 9600, port_mask: int = 0x01
+    ) -> None: ...
+
+    def swo_read_stimulus(self, port: int, num_bytes: int) -> Sequence[int]: ...
+
+    def swo_stop(self) -> None: ...

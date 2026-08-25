@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Mapping, Sequence
 
 from ..config import Toolchain, Transport
 from ..engines import EngineType
@@ -43,7 +44,7 @@ def _cmd_doctor(args: argparse.Namespace | None = None) -> None:
     json_ = bool(getattr(args, "json", False))
     bundle = getattr(args, "bundle", None)
 
-    if bundle is not None:
+    if args is not None and bundle is not None:
         _cmd_doctor_bundle(args)
         return
 
@@ -311,7 +312,7 @@ def _cmd_target_reset(args: argparse.Namespace) -> None:
     print(f"Reset {args.board} via {args.kind} reset (serial={serial}).")
 
 
-def _print_rows(rows: list[dict[str, object]], columns: tuple[str, ...]) -> None:
+def _print_rows(rows: Sequence[Mapping[str, object]], columns: tuple[str, ...]) -> None:
     widths = {
         col: max(len(col), *(len(_cell_text(row.get(col))) for row in rows)) for col in columns
     }

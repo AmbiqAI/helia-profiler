@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from ..config import DEFAULT_POWER_DURATION_S, Transport
 from ..errors import CaptureError, PowerError
@@ -37,7 +37,8 @@ from ..wire import HPX_ERROR_PREFIX, FirmwareErrorCode
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
-    from ..power.base import PowerResult
+    from ..power.base import PowerDriver, PowerResult
+    from ..power.sync import SyncController, SyncWiring
     from ..results import PmuResult
     from ..target.lifecycle import TargetLifecyclePlan
 
@@ -211,7 +212,18 @@ class _UsbDtrHolder:
                 self._ser = None
 
 
-def _make_sync_controller(ctx: PipelineContext, driver: object):
+@runtime_checkable
+class _SyncControllerFactory(Protocol):
+    """Optional driver surface for building a 3-wire lock-step controller.
+
+    Not part of :class:`~helia_profiler.power.base.PowerDriver`: only drivers
+    with a host-drivable GO output (Joulescope) provide it.
+    """
+
+    def make_sync_controller(self, wiring: SyncWiring) -> SyncController: ...
+
+
+def _make_sync_controller(ctx: PipelineContext, driver: PowerDriver):
     """Build a host sync controller from config, or a gate-only fallback.
 
     Lock-step is resolved via ``target.lifecycle.resolve_power_lockstep``
@@ -226,14 +238,15 @@ def _make_sync_controller(ctx: PipelineContext, driver: object):
     from ..target.lifecycle import resolve_power_lockstep
 
     resolved_lockstep = resolve_power_lockstep(ctx)
+    factory = driver if isinstance(driver, _SyncControllerFactory) else None
     log.debug(
         "gate-race timeline: resolve_power_lockstep=%s (configured=%s, "
         "has_make_sync_controller=%s)",
         resolved_lockstep,
         ctx.config.power.lockstep,
-        hasattr(driver, "make_sync_controller"),
+        factory is not None,
     )
-    if not resolved_lockstep or not hasattr(driver, "make_sync_controller"):
+    if not resolved_lockstep or factory is None:
         return NullSyncController()
     wiring = SyncWiring(
         lockstep=True,
@@ -241,14 +254,14 @@ def _make_sync_controller(ctx: PipelineContext, driver: object):
         state_input_index=ctx.config.power.state_input_index,
         go_output_index=ctx.config.power.go_output_index,
     )
-    return driver.make_sync_controller(wiring)
+    return factory.make_sync_controller(wiring)
 
 
 def capture_power(
     ctx: PipelineContext,
     *,
     duration_override_s: float | None = None,
-    prepare_target: Callable[[object, str], "TargetLifecyclePlan"] | None = None,
+    prepare_target: Callable[["PowerDriver", str], "TargetLifecyclePlan"] | None = None,
 ) -> PowerResult:
     """Record a power trace using the configured power driver.
 

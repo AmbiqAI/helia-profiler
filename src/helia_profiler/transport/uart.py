@@ -225,7 +225,7 @@ class UartTransport(BaseCaptureTransport):
     honors_keep_attached = True
 
     def collect(self, ctx) -> list[str]:
-        args = self._args
+        args = self.prepared_args
         return capture_uart_output(
             jlink_serial=args.jlink_serial,
             jlink_device=args.jlink_device,

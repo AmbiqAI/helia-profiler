@@ -112,7 +112,9 @@ def get_driver(name: str, *, serial: str | None = None) -> PowerDriver:
     """
     cls = resolve_driver_class(name)
     try:
-        return cls(serial=serial)  # type: ignore[call-arg]
+        # PowerDriver deliberately declares no __init__ — constructor kwargs
+        # vary per driver, and the TypeError fallback below is the contract.
+        return cls(serial=serial)  # ty: ignore[unknown-argument]
     except TypeError:
         # Driver doesn't accept a serial kwarg (e.g. ondevice).
         return cls()

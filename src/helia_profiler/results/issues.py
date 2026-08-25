@@ -119,7 +119,10 @@ class IssueSpec:
     def allowed_severities(self) -> frozenset[Severity]:
         if self.severity is not None:
             return frozenset((self.severity,))
-        return frozenset((self.internal_severity, self.external_severity))
+        internal = self.internal_severity
+        external = self.external_severity
+        assert internal is not None and external is not None  # __post_init__
+        return frozenset((internal, external))
 
 
 _ISSUE_SPECS: tuple[IssueSpec, ...] = (

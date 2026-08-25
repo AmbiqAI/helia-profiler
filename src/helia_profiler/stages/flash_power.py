@@ -42,6 +42,7 @@ class FlashPowerFirmwareStage:
         binary_path = artifact.binary_path
         if ctx.soc is None:
             raise BuildError("Cannot flash power firmware before platform resolution.")
+        soc = ctx.soc
 
         ctx.report_progress(f"Deploying power firmware to {ctx.config.target.board}")
 
@@ -49,8 +50,8 @@ class FlashPowerFirmwareStage:
         def deploy() -> None:
             flash_binary(
                 binary_path,
-                device=ctx.soc.jlink_device,
-                load_addr=ctx.soc.capabilities.memory.app_flash_load_addr,
+                device=soc.jlink_device,
+                load_addr=soc.capabilities.memory.app_flash_load_addr,
                 jlink_serial=jlink_serial,
                 timeout_s=ctx.config.timeouts.flash_s,
             )

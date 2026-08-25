@@ -30,6 +30,7 @@ class FlashFirmwareStage:
 
         if ctx.firmware_dir is None:
             raise BuildError("No firmware directory to flash — firmware generation did not run.")
+        firmware_dir = ctx.firmware_dir
         ctx.report_progress(f"Deploying profile firmware to {ctx.config.target.board}")
         backend = ctx.flash_backend or JLinkFlashBackend()
         toolchain = _nsx_toolchain(ctx.config.target.toolchain)
@@ -37,7 +38,7 @@ class FlashFirmwareStage:
 
         def flash_firmware() -> None:
             backend.flash(
-                ctx.firmware_dir,
+                firmware_dir,
                 toolchain=toolchain,
                 jlink_serial=jlink_serial,
                 frozen=ctx.config.frozen,
