@@ -346,9 +346,12 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         # thermal state, and the LP core clock is HFRC-derived: a cold power
         # boot runs fast enough to undershoot the band while being perfectly
         # healthy. The observer check above arbitrates:
-        #   * observer agreed -> the window is real and self-consistent; the
-        #     reference is stale (cold-boot HFRC drift, #181). That is data,
-        #     not a defect -- the summary publishes the ratio and drift note.
+        #   * observer agreed AND the miss is drift-scale (within
+        #     DRIFT_PLAUSIBLE_RATIO_DEVIATION) -> the window is real and
+        #     self-consistent; the reference is stale (cold-boot HFRC drift,
+        #     #181). That is data, not a defect -- the summary publishes the
+        #     ratio and drift note. Beyond drift scale the warning stands:
+        #     see the inline comment on that branch.
         #   * observer disagreed -> POWER_WINDOW_OBSERVER_MISMATCH (ERROR)
         #     already carries the story; a second issue would restate it.
         #   * observer could not run (shared firmware, lost or frozen
