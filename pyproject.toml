@@ -59,7 +59,12 @@ Issues = "https://github.com/AmbiqAI/helia-profiler/issues"
 Repository = "https://github.com/AmbiqAI/helia-profiler"
 
 [dependency-groups]
-lint = ["ruff>=0.11.0,<0.12"]
+lint = [
+    "ruff>=0.11.0,<0.12",
+    # Pinned exactly: ty is pre-1.0 and its rule behavior moves between
+    # releases -- upgrades are deliberate, with a re-triage of diagnostics.
+    "ty==0.0.74",
+]
 test = ["pytest>=8.0", "pytest-timeout>=2.3"]
 notebook = ["ipykernel>=6,<8"]
 docs = [
