@@ -29,6 +29,7 @@ from .contracts import (
 )
 
 if TYPE_CHECKING:
+    from ..evaluation import RunEvaluation
     from ..pipeline import PipelineContext
 
 
@@ -43,9 +44,16 @@ def _write_result_manifest(
     ctx: PipelineContext,
     paths: list[Path],
     output_dir: Path,
+    evaluation: RunEvaluation | None = None,
 ) -> Path:
-    """Write the publication marker after every other result artifact."""
-    evaluation = evaluate_run(ctx)
+    """Write the publication marker after every other result artifact.
+
+    ``write_report`` passes the run's single :class:`RunEvaluation` -- the
+    same one the summary rendered, so the two artifacts cannot disagree.
+    The ``None`` default evaluates on demand for direct callers (tests).
+    """
+    if evaluation is None:
+        evaluation = evaluate_run(ctx)
     artifacts = tuple(
         _result_artifact(path, output_dir)
         for path in paths

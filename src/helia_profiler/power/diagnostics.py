@@ -719,6 +719,113 @@ def assess_gate_observer(
     )
 
 
+@dataclass(frozen=True)
+class GateArbitration:
+    """The single composition of the #142/#181 gate verdict.
+
+    Before this existed, ``evaluation.validity`` and ``report.summary`` each
+    composed the same three facts (est*count integrity, observer agreement,
+    terminal health) into their own verdicts -- the shared helpers aligned
+    the inputs but nothing aligned the composition, and the two drifted
+    (found by #195's review round, fixed by hand there, made structural
+    here). ``evaluation.validity`` builds one of these per run; the summary
+    renders it; every verdict below is DERIVED from the stored facts, never
+    cached (same rule as :class:`GateDurationIntegrity`).
+    """
+
+    #: The est*count band verdict, or ``None`` when neither a recorded
+    #: verdict nor the inputs to re-derive one exist -- the observer check
+    #: below stands on its own (it compares two clocks, not the plan).
+    #: ``integrity_recorded`` says whether it came from the capture's own
+    #: record (probe-keyed band, 1s floor) or was re-derived for an
+    #: artifact that lacked one (advisory 1% band, no floor) -- validity
+    #: emits issues only from a recorded verdict, while the summary
+    #: renders either.
+    integrity: GateDurationIntegrity | None
+    integrity_recorded: bool
+    #: Gate vs the firmware's own window clock -- two observers of one
+    #: physical window. ``None`` when no healthy terminal envelope exists
+    #: to arbitrate (shared firmware, lost/frozen terminal, failed or
+    #: incomplete work), which callers treat as "could not run", never as
+    #: a pass.
+    observer: WindowClockAgreement | None
+    #: The terminal reported failed or incomplete work: the planned count
+    #: is wrong on its face, and elapsed_us times whatever short window did
+    #: run, so it cannot arbitrate either (an early-exit firmware agrees
+    #: with its own gate BY CONSTRUCTION).
+    terminal_unhealthy: bool
+
+    @property
+    def observer_agrees(self) -> bool | None:
+        return self.observer.agrees if self.observer is not None else None
+
+    @property
+    def reference_deviation(self) -> float | None:
+        """``|1 - ratio|`` of the est*count comparison, if one exists."""
+        if self.integrity is None:
+            return None
+        return abs(1.0 - self.integrity.ratio)
+
+    @property
+    def suppress_per_inference(self) -> bool:
+        """Per-inference metrics are untrustworthy and must not publish."""
+        if self.integrity is not None and self.integrity.below_minimum:
+            return True
+        if self.observer_agrees is False or self.terminal_unhealthy:
+            return True
+        return (
+            self.integrity is not None
+            and not self.integrity.valid
+            and self.observer is None
+        )
+
+    @property
+    def suppression_reason(self) -> str | None:
+        """Human-readable cause, ``None`` when nothing is suppressed."""
+        if self.integrity is not None and self.integrity.below_minimum:
+            return "below the minimum accepted gate"
+        if self.observer_agrees is False:
+            return "firmware window clock disagrees with the gate"
+        if self.terminal_unhealthy:
+            return "power terminal reported failed or incomplete work"
+        if self.integrity is not None and not self.integrity.valid and self.observer is None:
+            return "duration mismatch with no firmware envelope to arbitrate"
+        return None
+
+    @property
+    def drift_note(self) -> str | None:
+        """The published reclassification for a drift-scale band miss.
+
+        Written only when the observer confirmed the gate AND the miss is
+        inside the drift-plausible envelope -- beyond it drift cannot
+        explain the deviation and ``evaluation.validity`` keeps the
+        est*count warning instead.
+        """
+        if self.integrity is None or self.integrity.valid:
+            return None
+        if self.suppress_per_inference:
+            return None
+        if self.observer_agrees is not True:
+            return None
+        deviation = abs(1.0 - self.integrity.ratio)
+        if not (
+            DRIFT_NOTE_MIN_RATIO_DEVIATION
+            < deviation
+            <= DRIFT_PLAUSIBLE_RATIO_DEVIATION
+        ):
+            return None
+        drift_pct = (self.integrity.ratio - 1.0) * 100.0
+        return (
+            f"window ran {abs(drift_pct):.1f}% "
+            f"{'short of' if drift_pct < 0 else 'past'} the "
+            "profile-phase expectation but agrees with the "
+            "firmware's own STIMER window time; consistent "
+            "with HFRC core-clock thermal drift between "
+            "the profile and power boots (#181), not a "
+            "capture defect"
+        )
+
+
 #: ``no_gate_rise`` hint for a run that had lock-step OFF on a board wired for
 #: it. This exact combination has a specific, non-wiring cause that presents as
 #: a wiring fault and has cost real bench time (issue #114: headers re-seated
@@ -819,6 +926,7 @@ __all__ = [
     "CleanWindowClockRate",
     "CleanWindowStall",
     "DWT_RATE_MIN_RATIO",
+    "GateArbitration",
     "GateDurationIntegrity",
     "GateFailure",
     "GateFailureKind",

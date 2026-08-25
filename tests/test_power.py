@@ -3207,3 +3207,111 @@ class TestObserverAbsoluteSlack:
             absolute_slack_s=0.010,
         )
         assert agreement is not None and not agreement.agrees
+
+
+class TestGateArbitrationComposition:
+    """#202: the single composition of integrity + observer + terminal
+    health. Every verdict is a derived property; this matrix pins the
+    corners the two former hand-written compositions covered separately."""
+
+    @staticmethod
+    def _integrity(*, measured=4.427, expected=5.017, minimum=1.0, tolerance=0.502):
+        from helia_profiler.power.diagnostics import GateDurationIntegrity
+
+        return GateDurationIntegrity(
+            measured_s=measured,
+            expected_s=expected,
+            tolerance_s=tolerance,
+            minimum_s=minimum,
+        )
+
+    @staticmethod
+    def _observer(*, agrees: bool):
+        from helia_profiler.power.diagnostics import WindowClockAgreement
+
+        return WindowClockAgreement(
+            elapsed_us=4_427_000 if agrees else 5_017_000,
+            reference_s=4.427,
+            reference_source="gated_windows",
+            relative_tolerance=0.01,
+        )
+
+    def _arb(self, *, integrity="drift", observer=None, terminal_unhealthy=False):
+        from helia_profiler.power.diagnostics import GateArbitration
+
+        integrity_obj = {
+            "drift": self._integrity(),  # 11.8% short of expected, above floor
+            "valid": self._integrity(measured=5.016),
+            "floor": self._integrity(measured=0.8, minimum=1.0),
+            "beyond": self._integrity(measured=2.5),  # 50% short
+            "small": self._integrity(measured=4.97, tolerance=0.01),  # 0.9% short
+            None: None,
+        }[integrity]
+        return GateArbitration(
+            integrity=integrity_obj,
+            integrity_recorded=integrity_obj is not None,
+            observer=observer,
+            terminal_unhealthy=terminal_unhealthy,
+        )
+
+    def test_drift_scale_agreement_publishes_a_note(self):
+        arb = self._arb(observer=self._observer(agrees=True))
+        assert arb.suppress_per_inference is False
+        assert arb.suppression_reason is None
+        assert arb.drift_note is not None
+        assert "11.7% short" in arb.drift_note or "11.8% short" in arb.drift_note
+
+    def test_valid_band_needs_no_note(self):
+        arb = self._arb(integrity="valid", observer=self._observer(agrees=True))
+        assert arb.suppress_per_inference is False
+        assert arb.drift_note is None
+
+    def test_observer_disagreement_suppresses(self):
+        arb = self._arb(observer=self._observer(agrees=False))
+        assert arb.suppress_per_inference is True
+        assert arb.suppression_reason == "firmware window clock disagrees with the gate"
+        assert arb.drift_note is None
+
+    def test_no_envelope_returns_authority_to_the_band(self):
+        arb = self._arb(observer=None)
+        assert arb.suppress_per_inference is True
+        assert (
+            arb.suppression_reason
+            == "duration mismatch with no firmware envelope to arbitrate"
+        )
+
+    def test_floor_beats_every_other_reason(self):
+        arb = self._arb(integrity="floor", observer=self._observer(agrees=False))
+        assert arb.suppress_per_inference is True
+        assert arb.suppression_reason == "below the minimum accepted gate"
+
+    def test_unhealthy_terminal_suppresses_without_an_observer(self):
+        arb = self._arb(terminal_unhealthy=True)
+        assert arb.observer_agrees is None
+        assert arb.suppress_per_inference is True
+        assert (
+            arb.suppression_reason == "power terminal reported failed or incomplete work"
+        )
+
+    def test_beyond_drift_band_gets_no_note(self):
+        """Metrics stay published (the observer vouches for the bracket) but
+        no note claims a cause drift cannot produce -- validity carries the
+        est*count warning instead."""
+        arb = self._arb(integrity="beyond", observer=self._observer(agrees=True))
+        assert arb.suppress_per_inference is False
+        assert arb.drift_note is None
+
+    def test_sub_note_threshold_miss_gets_no_note(self):
+        arb = self._arb(integrity="small", observer=self._observer(agrees=True))
+        assert arb.suppress_per_inference is False
+        assert arb.drift_note is None
+
+    def test_missing_integrity_leaves_the_observer_standing(self):
+        """The observer compares two clocks, not the plan -- it must work
+        with no est*count term at all (the bench fixtures record none)."""
+        arb = self._arb(integrity=None, observer=self._observer(agrees=False))
+        assert arb.observer_agrees is False
+        assert arb.suppress_per_inference is True
+        arb_ok = self._arb(integrity=None, observer=self._observer(agrees=True))
+        assert arb_ok.suppress_per_inference is False
+        assert arb_ok.drift_note is None

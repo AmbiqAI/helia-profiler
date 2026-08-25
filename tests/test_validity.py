@@ -539,6 +539,7 @@ class TestGateArbitration:
         elapsed_us: int | None,
         minimum_s: float = 1.0,
         gate_s: float = DRIFT_GATE_S,
+        completed_count: int | None = None,
     ) -> None:
         assert ctx.power_run is not None and ctx.power_run.observation is not None
         observation = ctx.power_run.observation
@@ -572,7 +573,11 @@ class TestGateArbitration:
                 replace(
                     ctx.power_run.terminal,
                     requested_count=self.DRIFT_COUNT,
-                    completed_count=self.DRIFT_COUNT,
+                    completed_count=(
+                        self.DRIFT_COUNT
+                        if completed_count is None
+                        else completed_count
+                    ),
                     elapsed_us=elapsed_us,
                 )
                 if elapsed_us is not None
@@ -660,6 +665,49 @@ class TestGateArbitration:
             if issue.code == IssueCode.POWER_GATE_DURATION_MISMATCH
         )
         assert "thermal" in mismatch.message
+
+    def test_unhealthy_terminal_cannot_arbitrate(self, tmp_path: Path):
+        """An early-exit firmware agrees with its own gate BY CONSTRUCTION
+        (it times the span it gated), so a terminal reporting incomplete work
+        must not silence the est*count warning or earn the observer's
+        authority (#202 harmonization: validity now applies the same
+        terminal-health gate the summary got in the #195 review round)."""
+        ctx = _context(tmp_path)
+        # Gate and elapsed agree (both 4.427 s) but only 116/233 completed.
+        self._drift_run(
+            ctx, elapsed_us=self.DRIFT_ELAPSED_US, completed_count=116
+        )
+
+        evaluation = evaluate_run(ctx)
+
+        assert evaluation.validity is ResultValidity.INVALID
+        codes = [issue.code for issue in evaluation.issues]
+        assert IssueCode.POWER_TERMINAL_INCOMPLETE in codes
+        # The observer never ran: no agreement-based silence, no observer
+        # error -- the incomplete-work ERROR carries the story and the
+        # est*count fallback warning keeps its authority.
+        assert IssueCode.POWER_WINDOW_OBSERVER_MISMATCH not in codes
+        assert IssueCode.POWER_GATE_DURATION_MISMATCH in codes
+        arb = evaluation.gate_arbitration
+        assert arb is not None
+        assert arb.terminal_unhealthy is True
+        assert arb.observer is None
+        assert arb.suppress_per_inference is True
+
+    def test_arbitration_rides_the_evaluation(self, tmp_path: Path):
+        """The composed verdict is carried on RunEvaluation for the summary
+        to render -- the drift note the artifact publishes IS this string."""
+        ctx = _context(tmp_path)
+        self._drift_run(ctx, elapsed_us=self.DRIFT_ELAPSED_US)
+
+        arb = evaluate_run(ctx).gate_arbitration
+
+        assert arb is not None
+        assert arb.integrity_recorded is True
+        assert arb.observer_agrees is True
+        assert arb.suppress_per_inference is False
+        assert arb.suppression_reason is None
+        assert arb.drift_note is not None and "HFRC" in arb.drift_note
 
     def test_below_minimum_is_an_error_even_when_the_observer_agrees(
         self, tmp_path: Path
