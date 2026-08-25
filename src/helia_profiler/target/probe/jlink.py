@@ -414,9 +414,16 @@ def run_jlink_script(
         raise CaptureError("JLinkExe not found", hint=_JLINK_NOT_FOUND_HINT) from exc
 
     if result.returncode != 0:
+        # J-Link Commander reports most failures (cannot connect, LoadFile
+        # errors, script refusals) on stdout and exits with an empty stderr,
+        # so a stderr-only hint renders as a blank — fall back to the stdout
+        # tail so a bare rc=1 is diagnosable from the error alone (the CI
+        # dark-board flash failures in #203 were opaque for exactly this).
+        stderr = (result.stderr or "").strip()
+        detail = stderr if stderr else (result.stdout or "").strip()[-600:]
         raise CaptureError(
             f"{op_label} failed (rc={result.returncode})",
-            hint=f"stderr: {(result.stderr or '').strip()[:300]}",
+            hint=f"{'stderr' if stderr else 'stdout tail'}: {detail[:600]}",
         )
     return result
 
