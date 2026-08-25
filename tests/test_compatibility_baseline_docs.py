@@ -3,8 +3,8 @@
 The page's qualified-reference table is hand-maintained prose mirroring
 ``src/helia_profiler/data/compatibility-baseline-v1.json`` plus two code
 constants — and until #193 it had no guard (unlike pipeline.md, pinned by
-test_pipeline.py): its first run caught two rows that had silently drifted
-out of the doc (``nsx-executorch`` as both a project and an engine entry).
+test_pipeline.py): its first run caught two rows that were never added
+to the doc (``nsx-executorch`` as both a project and an engine entry).
 
 Mechanics follow the pipeline.md precedent: the doc stays hand-written, the
 test extracts the table region and cross-checks it against the data. Refs in
@@ -68,19 +68,32 @@ def test_every_baseline_entry_has_a_doc_row_with_its_ref():
         )
 
     for name, engine in data["engines"].items():
+        assert name in _ENGINE_DOC_NAMES, (
+            f"engine '{name}' is new to the baseline JSON -- add it to "
+            "_ENGINE_DOC_NAMES here and give it a doc row"
+        )
         doc_name = _ENGINE_DOC_NAMES[name]
         assert doc_name in table, f"engine '{name}' has no doc row"
-        for key in ("version", "min_version", "max_version_exclusive"):
+        if "version" in engine:
+            assert str(engine["version"]) in table, (
+                f"engine '{name}' version={engine['version']} missing from the doc table"
+            )
+        for key in ("min_version", "max_version_exclusive"):
+            # Key-scoped, not table-wide: a one-sided range bump can alias an
+            # unrelated value elsewhere in the table (#207 review, mutation r
+            # -- raising min to the old max passed a bare substring check).
             if key in engine:
-                assert str(engine[key]) in table, (
-                    f"engine '{name}' {key}={engine[key]} missing from the doc table"
+                assert f"{key}={engine[key]}" in table, (
+                    f"engine '{name}' {key}={engine[key]} missing from the doc "
+                    "table (expected as 'key=value')"
                 )
         if "ref" in engine:
             assert engine["ref"][:8] in table, (
                 f"engine '{name}' ref missing from the doc table"
             )
         if engine.get("governed_by_modules"):
-            assert "governed" in table
+            row = next(line for line in table.splitlines() if f"| {doc_name} |" in line)
+            assert "governed" in row, f"'{doc_name}' row no longer states module governance"
 
     package = data["neuralspotx"]
     assert package["version"] in table
@@ -97,6 +110,14 @@ def test_every_doc_ref_exists_in_the_baseline():
     known_hex |= {e["ref"] for e in data["engines"].values() if "ref" in e}
     known_hex.add(data["neuralspotx"]["sha256"])
 
+    # Hygiene first: a stale ref typed with an ASCII "..." or truncated below
+    # 8 hex would be INVISIBLE to the reverse check below -- refuse the format
+    # outright (#207 review, mutations j/c2).
+    malformed = re.findall(r"`[0-9a-f]{4,7}…|`[0-9a-f]{4,}\.{2,}", table)
+    assert not malformed, (
+        f"doc table refs must be >=8 hex chars followed by a real ellipsis "
+        f"(U+2026); malformed: {malformed}"
+    )
     for prefix in re.findall(r"`([0-9a-f]{8})[0-9a-f]*…", table):
         assert any(ref.startswith(prefix) for ref in known_hex), (
             f"doc table ref prefix '{prefix}…' matches nothing in "
@@ -108,8 +129,13 @@ def test_doc_identity_and_code_constants_are_current():
     doc = _DOC.read_text(encoding="utf-8")
     data = json.loads(_JSON.read_text(encoding="utf-8"))
 
-    # The headline identity line carries the packaged neuralspotx version.
-    assert f"hpx-neuralspotx-{data['neuralspotx']['version']}" in doc
+    # The headline identity line carries the FULL baseline id, not just the
+    # version: a re-pin within the same nsx version changes only the id date,
+    # and that is exactly the bump-forgets-doc case (#207 review, mutation l).
+    assert data["baseline_id"] in doc, (
+        f"the doc headline no longer names the current baseline id "
+        f"'{data['baseline_id']}' -- update compatibility-baseline.md"
+    )
 
     # The heliaRT row mirrors the canonical code constants (the JSON side of
     # this pairing is pinned by test_compatibility.py).

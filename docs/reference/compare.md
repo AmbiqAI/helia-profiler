@@ -35,6 +35,12 @@ Comparison applies typed compatibility policy before calculating deltas:
   transport, and placement differences remain visible as informative
   dimensions.
 
+A comparison profile's `required_dimensions` judges the Config-table row, not
+the informative issue: a value present on one side and absent on the other is
+a `diff` row (profile FAIL) even though the comparability check skips
+absent-vs-present pairs. Requiring a dimension means requiring both runs to
+prove the same value — absence on one side fails conservatively.
+
 `compare_summary.json` includes the structured compatibility issues and the
 run, layer, and power comparability decisions, so automation does not need to
 parse warning text.
