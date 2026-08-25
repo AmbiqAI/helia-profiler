@@ -89,8 +89,9 @@ The same pure policy functions drive manifests, summary output, comparisons,
 and programmatic consumers. Invalid runs and model mismatches block run-level
 deltas. Topology differences suppress only per-layer deltas. Power scope,
 mode, firmware, or integrity differences suppress only power metrics, while
-intentional engine, toolchain, clock, board, transport, and placement changes
-remain informative comparison dimensions.
+intentional engine (type and measured runtime version), toolchain, clock,
+board, transport, and placement changes remain informative comparison
+dimensions.
 
 ::: helia_profiler.evaluate_run
 

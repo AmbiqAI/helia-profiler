@@ -31,8 +31,9 @@ Comparison applies typed compatibility policy before calculating deltas:
   integrity, clean-window probe, or (same platform only) the measured
   firmware code fingerprint suppresses only power metrics (see
   [Analysis & Comparison](../guide/analysis-comparison.md) for details);
-- engine, toolchain, board, clock, transport, and placement differences remain
-  visible as informative dimensions.
+- engine (type and measured runtime version), toolchain, board, clock,
+  transport, and placement differences remain visible as informative
+  dimensions.
 
 `compare_summary.json` includes the structured compatibility issues and the
 run, layer, and power comparability decisions, so automation does not need to
