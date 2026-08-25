@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import sys
 
+from ..results import ResultValidity
+
 
 def _cmd_profile(args: argparse.Namespace) -> None:
     """Run the profiling pipeline."""
@@ -37,13 +39,29 @@ def _cmd_profile(args: argparse.Namespace) -> None:
     from ..profiler import run_profile
 
     try:
-        run_profile(config, console=console)
+        ctx = run_profile(config, console=console)
     except KeyboardInterrupt:
         console.print_interrupted()
         sys.exit(130)
     except HpxError as exc:
         console.print_error(exc)
         sys.exit(1)
+
+    # #197: opt-in exit policy for automation. Deliberately AFTER the run
+    # completes -- artifacts are written, the console footer rendered the
+    # verdict, and comparability already blocks invalid runs; 3 is distinct
+    # from 1 (error) / 2 (usage) / 130 (interrupt). Reads the STORED
+    # evaluation only: every run that returns from run_profile has passed
+    # write_report (the report stage never skips), so if a skip path is
+    # ever introduced this policy must gain the footer's fresh-evaluate
+    # fallback with it.
+    if (
+        ctx is not None
+        and ctx.run_evaluation is not None
+        and ctx.run_evaluation.validity is ResultValidity.INVALID
+        and ctx.config.output.fail_on_invalid
+    ):
+        sys.exit(3)
 
 
 def _apply_model_engine_overrides(args: argparse.Namespace, cli: dict) -> None:
@@ -155,6 +173,8 @@ def _apply_output_overrides(args: argparse.Namespace, cli: dict) -> None:
         cli.setdefault("output", {})["model_explorer"] = False
     if args.detailed:
         cli.setdefault("output", {})["detailed"] = True
+    if getattr(args, "fail_on_invalid", False):
+        cli.setdefault("output", {})["fail_on_invalid"] = True
 
 
 def _apply_workdir_overrides(args: argparse.Namespace, cli: dict) -> None:

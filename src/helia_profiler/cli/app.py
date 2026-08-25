@@ -501,6 +501,14 @@ def profile_command(
             rich_help_panel=G_OUTPUT,
         ),
     ] = False,
+    fail_on_invalid: Annotated[
+        bool,
+        typer.Option(
+            "--fail-on-invalid",
+            help="Exit 3 when the run evaluates INVALID (artifacts still written)",
+            rich_help_panel=G_OUTPUT,
+        ),
+    ] = False,
     # -- advanced --
     work_dir: Annotated[
         Optional[Path],
@@ -564,6 +572,7 @@ def profile_command(
         output_dir=output_dir,
         output_format=output_format,
         no_model_explorer=no_model_explorer,
+        fail_on_invalid=fail_on_invalid,
         detailed=detailed,
         work_dir=work_dir,
         clean=clean,

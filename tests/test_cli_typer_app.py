@@ -56,6 +56,28 @@ def test_pmu_counters_repeatable_option_builds_list(monkeypatch) -> None:
     assert seen["args"].pmu_counters == ["cpu:default", "mve:all"]
 
 
+def test_profile_forwards_fail_on_invalid(monkeypatch) -> None:
+    """#197/#208 review: the typer->Namespace keyword is a stringly link a
+    rename would silently break (the applier getattr-defaults to False)."""
+    import helia_profiler.cli.profile_cmd as profile_cmd
+
+    seen: dict[str, object] = {}
+
+    def fake_cmd_profile(args: SimpleNamespace) -> None:
+        seen["args"] = args
+
+    monkeypatch.setattr(profile_cmd, "_cmd_profile", fake_cmd_profile)
+
+    result = runner.invoke(app, ["profile", "model.tflite", "--fail-on-invalid"])
+
+    assert result.exit_code == 0, result.output
+    assert seen["args"].fail_on_invalid is True
+
+    result = runner.invoke(app, ["profile", "model.tflite"])
+    assert result.exit_code == 0, result.output
+    assert seen["args"].fail_on_invalid is False
+
+
 def test_profile_accepts_tflm_engine(monkeypatch) -> None:
     import helia_profiler.cli.profile_cmd as profile_cmd
 

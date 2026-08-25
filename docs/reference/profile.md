@@ -121,13 +121,20 @@ modes; JSON/CSV profile data is currently written to files in `--output-dir`.
 
 | Code | Meaning |
 |---|---|
-| 0 | Success |
+| 0 | Success (including runs that evaluate DEGRADED or INVALID — see below) |
 | 1 | HPX configuration, platform, engine, build, capture, power, or report failure |
 | 2 | Typer/Click command-line usage error |
+| 3 | Run evaluated INVALID and `--fail-on-invalid` (or `output.fail_on_invalid`) was set — artifacts are still written |
 | 130 | Interrupted with Ctrl-C |
 
-Typed category-specific exit codes are not yet part of the CLI contract. Error
-types remain available to programmatic callers through the `HpxError` hierarchy.
+A run whose *measurements* are untrustworthy (`validity: invalid` in
+`summary.json`) still exits 0 by default: the degrade-don't-abort design
+writes the artifact and lets comparability block it downstream, and the
+console footer prints the verdict with its issue codes. Automation that
+wants a nonzero signal opts in with `--fail-on-invalid` → exit 3. Other
+typed category-specific exit codes are not part of the CLI contract; error
+types remain available to programmatic callers through the `HpxError`
+hierarchy.
 
 ## Examples
 

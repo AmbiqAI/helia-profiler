@@ -188,6 +188,7 @@ Report output settings.
 | `dir` | Path | `results` |  |
 | `model_explorer` | bool | `true` |  |
 | `detailed` | bool | `false` |  |
+| `fail_on_invalid` | bool | `false` |  |
 
 ## `timeouts`
 

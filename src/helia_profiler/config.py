@@ -490,6 +490,11 @@ class OutputConfig:
     dir: Path = Path("./results")
     model_explorer: bool = True  # always emit ME overlay alongside primary format
     detailed: bool = False  # emit per-preset/group CSVs and memory breakdown
+    #: Exit with status 3 when the run evaluates INVALID (#197). Off by
+    #: default: artifacts are still written and comparability already blocks
+    #: invalid runs, and automation that treats nonzero as abort (the
+    #: validation runner's subprocess path) must opt in knowingly.
+    fail_on_invalid: bool = False
 
     @model_validator(mode="after")
     def _validate(self) -> OutputConfig:
