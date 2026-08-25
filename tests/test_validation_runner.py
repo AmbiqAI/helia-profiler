@@ -311,8 +311,8 @@ def test_build_config_executorch_uses_pte_contract(
         "planned_arena_size": 16000,
         "method_arena_size": 65536,
         "temporary_arena_size": 32768,
-        "input_size": 1960,
-        "output_size": 48,
+        "input_size": 490,
+        "output_size": 12,
         "portable_ops": ["dim_order_ops::_clone_dim_order.out"],
         "cmsis_nn_ref": cmsis_nn_ref,
     }

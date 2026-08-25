@@ -1,77 +1,57 @@
 #!/usr/bin/env python3
-"""Re-export the MLPerf Tiny fixture models through nsx_cortex_m.export().
+"""Lower the INT8 MLPerf Tiny .pt2 fixtures once per nsx kernel provider.
 
-The per-model scripts in this directory (ad/ic/kws/vww.py) inline the stock
-Cortex-M pipeline, so their PTEs contain only cortex_m:: ops. This wrapper
-reuses their deterministic model builders but lowers through the
-nsx-executorch AOT package instead, once per kernel provider:
+export_pte.py lowers the .pt2 fixtures with the stock Cortex-M pipeline, so
+its PTEs contain only cortex_m:: ops. This wrapper loads the same INT8
+.pt2 ExportedProgram fixtures (see make_pt2.py) and lowers with the
+nsx-executorch AOT (helia-torch) pass managers instead, once per provider:
 
 - kernel_provider=arm reproduces the stock flow (byte-compatible operator
   contract with the existing fixtures);
 - kernel_provider=ns additionally lowers Tier-1 ops (sub, hardswish, mean,
   standalone relu/relu6/hardtanh/clamp, leaky_relu) to cortex_m_ns::.
 
-Run with the export venv:
+The .pt2 fixtures are already quantized, so ``nsx_cortex_m.export()`` takes
+its pre-quantized path: no re-quantization, straight to kernel matching.
+Note the ns quantizer annotations are NOT present in a .pt2 quantized by
+make_pt2.py's stock CortexMQuantizer, so provider=ns Tier-1 coverage is
+limited to what the stock annotations allow; none of the four MLPerf Tiny
+fixtures currently exercises a Tier-1 op either way.
 
-  PYTHONPATH=<nsx-executorch>/external/executorch/src:<nsx-executorch>/aot \
-    python export_nsx_aot.py --output-dir <dir> [--models ic,vww,...]
+Run inside the pinned export environment (same import resolution as the
+sibling scripts — set NSX_EXECUTORCH_ROOT/EXECUTORCH_ROOT or pass
+--executorch-root):
+
+  ~/.cache/nsx-executorch-export-venv/bin/python export_nsx_aot.py \
+      --output-dir <dir> [--models ic,vww,...] \
+      --executorch-root ~/nsx-executorch-package/external/executorch
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib
 import json
-import sys
+import os
 from pathlib import Path
 
-import torch
+from common import (
+    FIXTURE_ROOT,
+    MODELS,
+    check_pins,
+    configure_import_path,
+    configure_nsx_import_path,
+    load_quantized_pt2,
+    parse_model_keys,
+    use_checkout_schema_resources,
+)
 
-
-def _load(module_name: str):
-    sys.path.insert(0, str(Path(__file__).parent))
-    return importlib.import_module(module_name)
-
-
-def _build(module_name: str):
-    """Return (model, example_inputs, calibration, channels_last)."""
-    module = _load(module_name)
-    torch.manual_seed(module.SEED)
-    if module_name == "ad":
-        model = module._make_model().eval()
-        calibration = list(module._calibration_samples())
-        return model, calibration[0], calibration, False
-    if module_name == "ic":
-        module._seed_everything(torch)
-        model = module._make_model(torch).eval().to(memory_format=torch.channels_last)
-        generator = torch.Generator().manual_seed(module.SEED)
-        calibration = [
-            (
-                torch.rand(module.INPUT_SHAPE, generator=generator).to(
-                    memory_format=torch.channels_last
-                ),
-            )
-            for _ in range(module.CALIBRATION_SAMPLES)
-        ]
-        return model, calibration[0], calibration, True
-    if module_name == "kws":
-        model = module._make_model(torch).eval().to(memory_format=torch.channels_last)
-        calibration = [(sample,) for sample in module._calibration_data(torch)]
-        return model, calibration[0], calibration, True
-    if module_name == "vww":
-        model = module._build_model().eval().to(memory_format=torch.channels_last)
-        generator = torch.Generator().manual_seed(module.SEED)
-        calibration = [
-            (
-                torch.rand(module.INPUT_SHAPE, generator=generator).to(
-                    memory_format=torch.channels_last
-                ),
-            )
-            for _ in range(8)
-        ]
-        return model, calibration[0], calibration, True
-    raise SystemExit(f"unknown model {module_name}")
+DEFAULT_EXECUTORCH_ROOT = Path(
+    os.environ.get(
+        "EXECUTORCH_ROOT",
+        Path(os.environ.get("NSX_EXECUTORCH_ROOT", ".")) / "external" / "executorch",
+    )
+)
 
 
 def _plan_facts(result) -> dict:
@@ -96,20 +76,37 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--models", default="ad,ic,kws,vww")
+    parser.add_argument(
+        "--executorch-root",
+        type=Path,
+        default=DEFAULT_EXECUTORCH_ROOT,
+    )
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    from nsx_cortex_m import export
+    executorch_root = args.executorch_root.resolve()
+    configure_import_path(executorch_root)
+    configure_nsx_import_path(executorch_root)
+    import torch
+
+    check_pins(torch, executorch_root)
+    use_checkout_schema_resources(executorch_root)
+    from nsx_cortex_m import export as nsx_export
 
     manifest: dict = {"torch_version": torch.__version__, "models": {}}
-    for module_name in args.models.split(","):
-        entry: dict = {"providers": {}}
+    for key in parse_model_keys(args.models):
+        spec = MODELS[key]
+        entry: dict = {"pt2": spec.pt2_path, "providers": {}}
+        quantized_exported = load_quantized_pt2(torch, FIXTURE_ROOT / spec.pt2_path)
+        example_inputs = (quantized_exported.example_inputs[0][0],)
         for provider in ("arm", "ns"):
-            model, example, calibration, _ = _build(module_name)
-            result = export(
-                model, example, kernel_provider=provider, calibration_samples=calibration
+            result = nsx_export(
+                quantized_exported,
+                example_inputs,
+                kernel_provider=provider,
+                int8_io=True,
             )
-            pte_path = args.output_dir / f"{module_name}_{provider}.pte"
+            pte_path = args.output_dir / f"{key}_{provider}.pte"
             result.write_pte(pte_path)
             facts = _plan_facts(result)
             portable_ops = sorted(
@@ -128,9 +125,9 @@ def main() -> None:
                 "cortex_m_ns_ops": ns_ops,
                 **facts,
             }
-            print(f"[{module_name}/{provider}] {pte_path.name}: "
+            print(f"[{key}/{provider}] {pte_path.name}: "
                   f"planned={facts['planned_arena_size']} portable={portable_ops} ns={ns_ops}")
-        manifest["models"][module_name] = entry
+        manifest["models"][key] = entry
 
     manifest_path = args.output_dir / "nsx_aot_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
