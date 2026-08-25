@@ -53,7 +53,9 @@ result-*
 **/sweep_*/
 **/validation_results_*/
 
-# Personal scratch runners (hardcoded paths)
-run_*.py
+# Personal scratch runners (hardcoded paths). Root-only: an unanchored
+# run_*.py silently swallowed src/helia_profiler/results/run_summary.py
+# (#205 -- the module shipped in a commit that didn't contain it).
+/run_*.py
 
 # Legacy local scratch directories were consolidated under experiments/.

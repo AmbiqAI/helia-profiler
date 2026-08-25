@@ -34,6 +34,7 @@ from typing import Any
 import yaml
 
 from ..engines import EngineType
+from ..results.run_summary import load_run_summary
 from .matrix import CaseSpec, MemoryProfile
 
 _TRANSIENT_POWER_LOCK_RETRY_DELAY_S = 5.0
@@ -96,6 +97,12 @@ class CaseResult:
     #: window clock confirmed the gate (#142/#181): a stale profile-phase
     #: reference, not a capture defect. Health checks must not fail it.
     gated_window_reference_drift: str | None = None
+    #: The model's arbitration verdict (#202): captured at parse time from
+    #: PowerSection.gate_duration_unarbitrated_failure so the health check
+    #: consults ONE interpretation. ``None`` = parsed by an older hpx that
+    #: did not record it; the health check falls back to the two-field
+    #: predicate for those legacy records only.
+    gate_duration_unarbitrated_failure: bool | None = None
     power_observation_mode: str | None = None
     power_observation_integrity: str | None = None
     power_gate_failure_kind: str | None = None
@@ -583,78 +590,66 @@ def run_case(
     summary_path = case_dir / "summary.json"
     if summary_path.exists():
         try:
-            summary = json.loads(summary_path.read_text())
-            result.layers = (
-                int(summary.get("layers")) if summary.get("layers") is not None else None
-            )
-            latency_blob = summary.get("latency") or {}
-            clean_cycles = latency_blob.get("device_clean_infer_avg_cycles")
-            result.total_cycles = (
-                int(clean_cycles)
-                if clean_cycles is not None
-                else _optional_int(summary.get("total_cycles"))
-            )
-            if latency_blob.get("device_clean_infer_avg_us") is not None:
-                result.latency_avg_us = float(latency_blob["device_clean_infer_avg_us"])
-            elif latency_blob.get("device_profiled_infer_avg_us") is not None:
-                result.latency_avg_us = float(latency_blob["device_profiled_infer_avg_us"])
-            binary_blob = summary.get("binary") or {}
-            if binary_blob:
-                result.binary_text_bytes = _optional_int(binary_blob.get("text"))
-                result.binary_data_bytes = _optional_int(binary_blob.get("data"))
-                result.binary_bss_bytes = _optional_int(binary_blob.get("bss"))
-                result.binary_total_bytes = _optional_int(binary_blob.get("total"))
-            memory_blob = summary.get("memory") or {}
-            if memory_blob:
-                result.arena_size_bytes = _optional_int(memory_blob.get("arena_size"))
-                result.allocated_arena_bytes = _optional_int(memory_blob.get("allocated_arena"))
-                result.model_size_bytes = _optional_int(memory_blob.get("model_size"))
-            power_blob = summary.get("power") or {}
-            if power_blob:
-                if "total_energy_uj" in power_blob:
-                    result.energy_uj = float(power_blob["total_energy_uj"])
-                elif "energy_uJ" in power_blob:
-                    result.energy_uj = float(power_blob["energy_uJ"])
-                elif "energy_j" in power_blob:
-                    result.energy_uj = float(power_blob["energy_j"]) * 1e6
-                if "avg_current_ma" in power_blob:
-                    result.avg_current_ma = float(power_blob["avg_current_ma"])
-                elif "avg_current_a" in power_blob:
-                    result.avg_current_ma = float(power_blob["avg_current_a"]) * 1e3
-                if "avg_power_mw" in power_blob:
-                    result.avg_power_mw = float(power_blob["avg_power_mw"])
-                elif "avg_power_w" in power_blob:
-                    result.avg_power_mw = float(power_blob["avg_power_w"]) * 1e3
-                if "peak_current_ma" in power_blob:
-                    result.peak_current_ma = float(power_blob["peak_current_ma"])
-                elif "peak_current_a" in power_blob:
-                    result.peak_current_ma = float(power_blob["peak_current_a"]) * 1e3
-                if power_blob.get("capture_duration_s") is not None:
-                    result.power_capture_duration_s = float(power_blob["capture_duration_s"])
-                if power_blob.get("energy_per_inference_j") is not None:
-                    result.energy_per_inference_uj = (
-                        float(power_blob["energy_per_inference_j"]) * 1e6
-                    )
-                if power_blob.get("inferences_per_joule") is not None:
-                    result.inferences_per_joule = float(power_blob["inferences_per_joule"])
+            # The typed, cross-version reader (#202): legacy key spellings
+            # and the drift-arbitration interpretation live on the model's
+            # properties, not re-derived here.
+            summary = load_run_summary(summary_path)
+            result.layers = summary.layers or None
+            latency = summary.latency
+            if latency is not None and latency.device_clean_infer_avg_cycles is not None:
+                result.total_cycles = int(latency.device_clean_infer_avg_cycles)
+            else:
+                result.total_cycles = summary.total_cycles_int
+            if latency is not None:
+                result.latency_avg_us = latency.best_latency_avg_us
+            binary = summary.binary
+            if binary is not None:
+                result.binary_text_bytes = binary.text
+                result.binary_data_bytes = binary.data
+                result.binary_bss_bytes = binary.bss
+                result.binary_total_bytes = binary.total
+            memory = summary.memory
+            if memory is not None:
+                result.arena_size_bytes = memory.arena_size
+                result.allocated_arena_bytes = memory.allocated_arena
+                result.model_size_bytes = memory.model_size
+            power = summary.power
+            if power is not None:
+                result.energy_uj = power.energy_uj
+                result.avg_current_ma = power.avg_current_ma
+                result.avg_power_mw = power.avg_power_mw
+                result.peak_current_ma = power.peak_current_ma
+                if power.capture_duration_s is not None:
+                    result.power_capture_duration_s = float(power.capture_duration_s)
+                result.energy_per_inference_uj = power.energy_per_inference_uj
+                if power.inferences_per_joule is not None:
+                    result.inferences_per_joule = float(power.inferences_per_joule)
                 result.gated_window_duration_suspect = bool(
-                    power_blob.get("gated_window_duration_suspect", False)
+                    power.gated_window_duration_suspect
                 )
-                integrity = power_blob.get("gate_duration_integrity")
-                if isinstance(integrity, dict) and "valid" in integrity:
-                    result.gate_duration_integrity_valid = bool(integrity["valid"])
-                if power_blob.get("gated_window_reference_drift") is not None:
-                    result.gated_window_reference_drift = str(
-                        power_blob["gated_window_reference_drift"]
-                    )
-                if power_blob.get("observation_mode") is not None:
-                    result.power_observation_mode = str(power_blob["observation_mode"])
-                if power_blob.get("integrity") is not None:
-                    result.power_observation_integrity = str(power_blob["integrity"])
-                gate_failure = power_blob.get("gate_failure")
-                if isinstance(gate_failure, dict) and gate_failure.get("kind") is not None:
-                    result.power_gate_failure_kind = str(gate_failure["kind"])
-        except (ValueError, OSError) as exc:
+                result.gate_duration_integrity_valid = (
+                    power.gate_duration_integrity_valid
+                )
+                result.gated_window_reference_drift = (
+                    str(power.gated_window_reference_drift)
+                    if power.gated_window_reference_drift is not None
+                    else None
+                )
+                result.power_observation_mode = (
+                    str(power.observation_mode)
+                    if power.observation_mode is not None
+                    else None
+                )
+                result.power_observation_integrity = (
+                    str(power.integrity) if power.integrity is not None else None
+                )
+                result.power_gate_failure_kind = power.gate_failure_kind
+                result.gate_duration_unarbitrated_failure = (
+                    power.gate_duration_unarbitrated_failure
+                )
+        except (ValueError, TypeError, OSError) as exc:
+            # TypeError included (#205 review): a hostile artifact shape must
+            # fail THIS case, not crash the whole validation sweep.
             result.error = f"could not parse summary.json: {exc}"
             result.status = "fail"
             return result
@@ -675,15 +670,6 @@ def run_case(
 
     result.health_issues = validation_health_issues(result)
     return result
-
-
-def _optional_int(value: Any) -> int | None:
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
 
 
 # ---------------------------------------------------------------------------
@@ -717,15 +703,17 @@ def validation_health_issues(result: CaseResult) -> tuple[str, ...]:
         issues.append("power enabled but zero energy captured")
     if result.power and result.gated_window_duration_suspect:
         issues.append("GPIO-gated power window duration is suspect")
-    if (
-        result.power
-        and result.gate_duration_integrity_valid is False
-        and result.gated_window_reference_drift is None
-    ):
-        # valid:false alone no longer means the capture is bad (#142/#181):
-        # when the firmware's window clock confirmed the gate, the summary
-        # carries a drift note and the miss is a stale reference. Only a
-        # band miss WITHOUT that arbitration is a health problem.
+    unarbitrated = result.gate_duration_unarbitrated_failure
+    if unarbitrated is None:
+        # Legacy record (parsed before the verdict field existed): fall back
+        # to the two-field predicate. New records carry the model's own
+        # PowerSection.gate_duration_unarbitrated_failure, so the #142/#181
+        # interpretation lives in exactly one place (#205 review).
+        unarbitrated = (
+            result.gate_duration_integrity_valid is False
+            and result.gated_window_reference_drift is None
+        )
+    if result.power and unarbitrated:
         issues.append("GPIO-gated power window failed duration integrity")
     if result.power and result.power_observation_integrity not in {None, "valid"}:
         detail = result.power_gate_failure_kind or result.power_observation_mode or "unknown"
