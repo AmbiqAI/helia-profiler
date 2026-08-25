@@ -45,6 +45,7 @@ from common import (
     configure_import_path,
     configure_nsx_import_path,
     deterministic_example,
+    parse_model_keys,
     quantization_ops,
 )
 
@@ -107,7 +108,7 @@ def main() -> None:
         ),
         "models": previous_models,
     }
-    for key in args.models.split(","):
+    for key in parse_model_keys(args.models):
         spec = MODELS[key]
         torch.manual_seed(SEED)
         wrapper = getattr(mlperf_tiny, spec.model_class)()

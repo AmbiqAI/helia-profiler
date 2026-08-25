@@ -88,6 +88,20 @@ MODELS: dict[str, ModelSpec] = {
 }
 
 
+def parse_model_keys(models_arg: str | None) -> list[str]:
+    """Parse a --models value ('ad, ic') into validated MODELS keys."""
+    if models_arg is None:
+        return list(MODELS)
+    keys = [key.strip() for key in models_arg.split(",") if key.strip()]
+    unknown = [key for key in keys if key not in MODELS]
+    if not keys or unknown:
+        raise SystemExit(
+            f"--models must be a comma-separated subset of {', '.join(MODELS)}; "
+            f"got {models_arg!r}"
+        )
+    return keys
+
+
 def configure_import_path(executorch_root: Path) -> None:
     if not (executorch_root / "src" / "executorch" / "exir").exists():
         raise SystemExit(f"Not an ExecuTorch source checkout: {executorch_root}")

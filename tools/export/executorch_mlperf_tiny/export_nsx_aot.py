@@ -33,7 +33,7 @@ from pathlib import Path
 
 import torch
 
-from common import FIXTURE_ROOT, MODELS, load_quantized_pt2
+from common import FIXTURE_ROOT, MODELS, load_quantized_pt2, parse_model_keys
 
 
 def _plan_facts(result) -> dict:
@@ -64,12 +64,12 @@ def main() -> None:
     from nsx_cortex_m import export as nsx_export
 
     manifest: dict = {"torch_version": torch.__version__, "models": {}}
-    for key in args.models.split(","):
+    for key in parse_model_keys(args.models):
         spec = MODELS[key]
         entry: dict = {"pt2": spec.pt2_path, "providers": {}}
+        quantized_exported = load_quantized_pt2(torch, FIXTURE_ROOT / spec.pt2_path)
+        example_inputs = (quantized_exported.example_inputs[0][0],)
         for provider in ("arm", "ns"):
-            quantized_exported = load_quantized_pt2(torch, FIXTURE_ROOT / spec.pt2_path)
-            example_inputs = (quantized_exported.example_inputs[0][0],)
             result = nsx_export(
                 quantized_exported,
                 example_inputs,

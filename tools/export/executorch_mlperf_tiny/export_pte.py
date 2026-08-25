@@ -41,6 +41,7 @@ from common import (
     configure_nsx_import_path,
     git_commit,
     load_quantized_pt2,
+    parse_model_keys,
     quantization_ops,
     use_checkout_schema_resources,
 )
@@ -88,6 +89,11 @@ def inspect_pte(pte_path: Path) -> dict:
             if isinstance(instruction.instr_args, KernelCall):
                 counts[operators[instruction.instr_args.op_index]] += 1
     buffers = list(plan.non_const_buffer_sizes)
+    if len(buffers) != 2:
+        raise SystemExit(
+            "nsx-executorch requires exactly one planned buffer; "
+            f"PTE contains {len(buffers) - 1}: {buffers}"
+        )
     input_tensor = plan.values[plan.inputs[0]].val
     output_tensor = plan.values[plan.outputs[0]].val
 
@@ -96,6 +102,11 @@ def inspect_pte(pte_path: Path) -> dict:
 
     def _tensor_facts(tensor):
         dtype = tensor.scalar_type.name
+        if dtype not in element_bytes:
+            raise SystemExit(
+                f"unsupported method I/O ScalarType {dtype}; expected one of "
+                f"{sorted(element_bytes)}"
+            )
         numel = 1
         for dim in tensor.sizes:
             numel *= dim
@@ -288,7 +299,7 @@ def main() -> None:
         default=DEFAULT_EXECUTORCH_ROOT,
     )
     args = parser.parse_args()
-    keys = list(MODELS) if args.all or args.models is None else args.models.split(",")
+    keys = list(MODELS) if args.all else parse_model_keys(args.models)
 
     executorch_root = args.executorch_root.resolve()
     configure_import_path(executorch_root)
