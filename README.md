@@ -89,7 +89,7 @@ for a real walkthrough.)*
 ```bash
 uv sync --locked --all-groups --extra aot --extra analysis
 uv run ruff check .
-uv run ty check src/helia_profiler
+uv run ty check src/helia_profiler tests
 uv run pytest -q
 uv run --group docs zensical build
 ```

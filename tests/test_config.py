@@ -9,6 +9,7 @@ import pytest
 from helia_profiler.config import (
     Aggregation,
     CleanWindowProbe,
+    ClockSelection,
     EngineConfig,
     EngineType,
     ModelConfig,
@@ -272,7 +273,8 @@ def test_config_is_frozen():
     config = load_config(None, cli)
 
     try:
-        config.verbose = 5  # type: ignore[misc]
+        # Deliberate invalid assignment: proves the dataclass is frozen.
+        config.verbose = 5  # ty: ignore[invalid-assignment]
         assert False, "Should have raised FrozenInstanceError"
     except AttributeError:
         pass
@@ -831,11 +833,18 @@ def test_non_dict_heartbeat_is_rejected():
 
 
 def test_direct_construction_still_coerces_strings():
+    # Deliberate plain strings: this test proves direct construction coerces
+    # them to the enum members asserted below.
     profiling = ProfilingConfig(
-        aggregation="median", window_mode="fixed", clean_window_probe="busy_loop"
+        aggregation="median",  # ty: ignore[invalid-argument-type]
+        window_mode="fixed",  # ty: ignore[invalid-argument-type]
+        clean_window_probe="busy_loop",  # ty: ignore[invalid-argument-type]
     )
-    target = TargetConfig(toolchain="gcc")
-    power = PowerConfig(mode="external", firmware="shared")
+    target = TargetConfig(toolchain="gcc")  # ty: ignore[invalid-argument-type]
+    power = PowerConfig(
+        mode="external",  # ty: ignore[invalid-argument-type]
+        firmware="shared",  # ty: ignore[invalid-argument-type]
+    )
 
     assert profiling.aggregation is Aggregation.MEDIAN
     assert profiling.window_mode is WindowMode.FIXED
@@ -850,7 +859,7 @@ def test_config_snapshot_serialization_is_json_safe():
     config = ProfileConfig(
         model=ModelConfig(path=Path("m.tflite")),
         engine=EngineConfig(type=EngineType.HELIA_RT, config={"backend_mode": "fast"}),
-        target=TargetConfig(clock={"cpu": "hp"}),
+        target=TargetConfig(clock=ClockSelection(cpu="hp")),
     )
 
     snapshot = _serialize_config(config)

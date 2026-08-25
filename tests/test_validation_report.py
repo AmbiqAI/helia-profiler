@@ -51,6 +51,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
         ),
     )
     result = _case(tmp_path)
+    assert result.output_dir is not None
     case_dir = Path(result.output_dir)
     case_dir.mkdir(parents=True)
     (case_dir / "summary.json").write_text(

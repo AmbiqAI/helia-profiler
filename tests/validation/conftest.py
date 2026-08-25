@@ -179,7 +179,8 @@ def _split_power_gpio_map(raw: str) -> dict[str, tuple[int, int, int]] | None:
                 f"got {item!r}."
             )
         try:
-            mapping[board.strip()] = tuple(int(value, 0) for value in pins)  # type: ignore[assignment]
+            gate, state, go = (int(value, 0) for value in pins)
+            mapping[board.strip()] = (gate, state, go)
         except ValueError as exc:
             raise ValueError(f"--mlperf-power-gpios GPIO pins must be integers, got {item!r}.") from exc
     return mapping

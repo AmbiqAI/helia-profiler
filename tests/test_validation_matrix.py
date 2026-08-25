@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from helia_profiler.config import Toolchain, Transport
@@ -105,15 +107,16 @@ models:
 
 
 class TestCaseValidity:
-    def _case(self, **overrides) -> CaseSpec:
-        kwargs = dict(
+    def _case(self, **overrides: object) -> CaseSpec:
+        # replace() on the frozen, __post_init__-free CaseSpec is exactly
+        # CaseSpec(**{**defaults, **overrides}) — but each field is typed.
+        base = CaseSpec(
             model=MODELS["kws"],
             engine=EngineType.HELIA_RT,
             power=False,
             board=BOARDS["apollo510_evb"],
         )
-        kwargs.update(overrides)
-        return CaseSpec(**kwargs)
+        return dataclasses.replace(base, **overrides)
 
     def test_psram_with_swo_gives_reason(self):
         case = self._case(memory=MemoryProfile.PSRAM, transport=Transport.SWO)
@@ -193,7 +196,10 @@ class TestBuildMatrix:
             ExecuTorchBackend.ARM,
             ExecuTorchBackend.NS,
         }
-        assert all(f"executorch-{case.cmsis_nn_backend.value}" in case.case_id for case in cases)
+        for case in cases:
+            backend = case.cmsis_nn_backend
+            assert backend is not None
+            assert f"executorch-{backend.value}" in case.case_id
 
     @pytest.mark.parametrize(
         ("selected", "expected"),
@@ -433,11 +439,13 @@ class TestBuildMatrix:
 
 
 class TestCaseValidityGuards:
-    def _case(self, **overrides):
+    def _case(self, **overrides: object) -> CaseSpec:
         from helia_profiler.validation.matrix import BOARDS, MODELS, CaseSpec
         from helia_profiler.engines import EngineType
 
-        defaults = dict(
+        # replace() on the frozen, __post_init__-free CaseSpec is exactly
+        # CaseSpec(**{**defaults, **overrides}) — but each field is typed.
+        base = CaseSpec(
             model=MODELS["kws"],
             engine=EngineType.HELIA_RT,
             power=False,
@@ -445,8 +453,7 @@ class TestCaseValidityGuards:
             transport=Transport.RTT,
             memory=MemoryProfile.AUTO,
         )
-        defaults.update(overrides)
-        return CaseSpec(**defaults)
+        return dataclasses.replace(base, **overrides)
 
     def test_tcm_arena_plus_weights_too_large_for_dtcm_is_skipped(self, tmp_path):
         # Hermetic: a synthetic 53 KB "model" whose weights + KWS's 32 KB

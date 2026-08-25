@@ -184,6 +184,7 @@ def test_check_versions_flags_cmake_below_minimum(monkeypatch) -> None:
     cmake_check = next(v for v in versions if v.name == "cmake")
     assert cmake_check.installed == "3.10.0"
     assert cmake_check.ok is False
+    assert cmake_check.hint is not None
     assert "Upgrade CMake" in cmake_check.hint
 
 

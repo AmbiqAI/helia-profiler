@@ -183,7 +183,7 @@ class _UsbDtrHolder:
     def __init__(self, *, usb_port: str | None, usb_marker: str | None) -> None:
         self._usb_port = usb_port
         self._usb_marker = usb_marker
-        self._ser = None  # type: ignore[var-annotated]
+        self._ser = None
 
     def open(self) -> None:
         import serial

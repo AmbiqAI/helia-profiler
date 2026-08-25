@@ -367,7 +367,8 @@ def _stub_locked_dependencies(
     monkeypatch: pytest.MonkeyPatch,
 ) -> list[Path]:
     prepared: list[Path] = []
-    ctx.dependency_workspace = SimpleNamespace(root=app_dir.parent)  # type: ignore[assignment]
+    # Duck-typed fake: only .root is read from the workspace here.
+    ctx.dependency_workspace = SimpleNamespace(root=app_dir.parent)  # ty: ignore[invalid-assignment]
     monkeypatch.setattr(
         "helia_profiler.dependencies.workspace_mutex",
         lambda _workspace: nullcontext(),

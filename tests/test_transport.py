@@ -199,6 +199,7 @@ def test_window_budget_is_capped():
     sane = window_budget_s(
         "HPX_HEARTBEAT phase=clean_window_begin iters=6000 est_ms=130000"
     )
+    assert sane is not None
     assert sane == 130.0 * WINDOW_BUDGET_SAFETY + WINDOW_BUDGET_MARGIN_S
     assert sane < WINDOW_BUDGET_CAP_S
 
@@ -260,7 +261,7 @@ def test_hang_warning_reports_real_silence_not_configured_timeout(
 
     def read() -> bytes:
         if not getattr(read, "sent", False):
-            read.sent = True
+            read.sent = True  # ty: ignore[unresolved-attribute]  # one-shot flag stashed on the function object by design
             return (
                 b"--- HPX_START ---\n"
                 b"HPX_HEARTBEAT phase=clean_window_begin iters=1 est_ms=1000\n"
@@ -281,7 +282,9 @@ def test_hang_warning_reports_real_silence_not_configured_timeout(
     assert waited > 1.0
     hang = [r for r in caplog.records if "no data for" in r.getMessage()]
     assert hang, "expected the hang warning"
-    reported = float(re.search(r"no data for (\d+)s", hang[-1].getMessage()).group(1))
+    silence_match = re.search(r"no data for (\d+)s", hang[-1].getMessage())
+    assert silence_match is not None
+    reported = float(silence_match.group(1))
     # Reports the real ~2s silence, not the configured 0.2s.
     assert reported >= 1.0
 

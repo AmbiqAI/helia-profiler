@@ -50,13 +50,13 @@ jobs:
       - name: Run ruff lint
         run: uv run --no-sync ruff check .
 
-      # Type checking gates src only for now; the tests tree is follow-up
-      # work tracked on #199. ty is pinned exactly in the lint group -- it is
-      # pre-1.0 and upgrades are deliberate, with a diagnostic re-triage.
+      # Type checking gates src AND tests (#199/#201). ty is pinned exactly
+      # in the lint group -- it is pre-1.0 and upgrades are deliberate, with
+      # a diagnostic re-triage.
       # --no-sync: the environment was fully built by the sync step above;
       # skipping the implicit re-resolve keeps this step honest about that.
       - name: Run ty type check
-        run: uv run --no-sync ty check src/helia_profiler
+        run: uv run --no-sync ty check src/helia_profiler tests
 
   # ---------------------------------------------------------------
   # Unit tests — run on all three platforms

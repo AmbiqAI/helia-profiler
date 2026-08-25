@@ -193,7 +193,9 @@ class TestLockstepArmBeforeReset:
         )
         ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=5))
         _mark_deployed(ctx, tmp_path)
-        capture_power(ctx, prepare_target=lambda *_: events.append("lifecycle_reset"))
+        # Recorder stub in place of a real lifecycle plan; its None return is
+        # tolerated by this path and irrelevant to the ordering under test.
+        capture_power(ctx, prepare_target=lambda *_: events.append("lifecycle_reset"))  # ty: ignore[invalid-argument-type]
         assert events.index("wait_ready") < events.index("signal_go")
 
 
@@ -426,7 +428,7 @@ class TestAutoStrategyNeverCyclesRail:
             tmp_path, board="apollo510_evb", power_enabled=True, reset_strategy=strategy
         )
         plan = prepare_target_for_phase(
-            ctx, phase=CapturePhase.POWER, power_driver=driver, power_driver_name="joulescope"
+            ctx, phase=CapturePhase.POWER, power_driver=driver, power_driver_name="joulescope"  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the rail surface
         )
         assert driver.power_cycle_calls == 0
         assert plan.power_cycle_attempted is False
@@ -441,7 +443,7 @@ class TestAutoStrategyNeverCyclesRail:
             tmp_path, board="apollo510_evb", power_enabled=True, reset_strategy="power_cycle"
         )
         plan = prepare_target_for_phase(
-            ctx, phase=CapturePhase.POWER, power_driver=driver, power_driver_name="joulescope"
+            ctx, phase=CapturePhase.POWER, power_driver=driver, power_driver_name="joulescope"  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the rail surface
         )
         assert driver.power_cycle_calls == 1
         assert plan.power_cycle_attempted is True

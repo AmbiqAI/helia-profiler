@@ -33,7 +33,7 @@ def test_pmu_counters_repeatable_option_builds_list(monkeypatch) -> None:
     """Multiple --pmu-counters occurrences replace argparse's old nargs='+' form."""
     import helia_profiler.cli.profile_cmd as profile_cmd
 
-    seen: dict[str, object] = {}
+    seen: dict[str, SimpleNamespace] = {}
 
     def fake_cmd_profile(args: SimpleNamespace) -> None:
         seen["args"] = args
@@ -61,7 +61,7 @@ def test_profile_forwards_fail_on_invalid(monkeypatch) -> None:
     rename would silently break (the applier getattr-defaults to False)."""
     import helia_profiler.cli.profile_cmd as profile_cmd
 
-    seen: dict[str, object] = {}
+    seen: dict[str, SimpleNamespace] = {}
 
     def fake_cmd_profile(args: SimpleNamespace) -> None:
         seen["args"] = args
@@ -81,7 +81,7 @@ def test_profile_forwards_fail_on_invalid(monkeypatch) -> None:
 def test_profile_accepts_tflm_engine(monkeypatch) -> None:
     import helia_profiler.cli.profile_cmd as profile_cmd
 
-    seen: dict[str, object] = {}
+    seen: dict[str, SimpleNamespace] = {}
 
     def fake_cmd_profile(args: SimpleNamespace) -> None:
         seen["args"] = args
@@ -97,7 +97,7 @@ def test_profile_accepts_tflm_engine(monkeypatch) -> None:
 def test_profile_uses_canonical_placement_options(monkeypatch) -> None:
     import helia_profiler.cli.profile_cmd as profile_cmd
 
-    seen: dict[str, object] = {}
+    seen: dict[str, SimpleNamespace] = {}
     monkeypatch.setattr(profile_cmd, "_cmd_profile", lambda args: seen.setdefault("args", args))
 
     result = runner.invoke(
@@ -118,7 +118,7 @@ def test_profile_uses_canonical_placement_options(monkeypatch) -> None:
 def test_compare_validation_option_reaches_command_adapter(monkeypatch) -> None:
     import helia_profiler.cli.compare_cmd as compare_cmd
 
-    seen: dict[str, object] = {}
+    seen: dict[str, SimpleNamespace] = {}
 
     def fake_cmd_compare(args: SimpleNamespace) -> None:
         seen["args"] = args
@@ -145,7 +145,7 @@ def test_compare_validation_option_reaches_command_adapter(monkeypatch) -> None:
 def test_per_layer_tri_state_true_false_and_absent(monkeypatch) -> None:
     import helia_profiler.cli.profile_cmd as profile_cmd
 
-    seen: dict[str, object] = {}
+    seen: dict[str, SimpleNamespace] = {}
 
     def fake_cmd_profile(args: SimpleNamespace) -> None:
         seen["args"] = args

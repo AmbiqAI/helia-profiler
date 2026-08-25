@@ -74,7 +74,9 @@ def _required_kwargs(engine_type: EngineType) -> dict[str, object]:
 def _build(engine_type: EngineType, **overrides: object) -> EngineArtifacts:
     """Construct the artifact type for *engine_type* with sentinel values."""
     kwargs = {**_required_kwargs(engine_type), **overrides}
-    return ARTIFACT_TYPE_FOR_ENGINE[engine_type](**kwargs)  # type: ignore[arg-type]
+    # Heterogeneous per-engine kwargs dispatched through one registry lookup;
+    # the constructors themselves validate the sentinel values at runtime.
+    return ARTIFACT_TYPE_FOR_ENGINE[engine_type](**kwargs)  # ty: ignore[invalid-argument-type]
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +101,8 @@ def test_mismatched_engine_type_raises(engine_type: EngineType):
     wrong = next(other for other in EngineType if other is not engine_type)
     kwargs = {**_required_kwargs(engine_type), "engine_type": wrong}
     with pytest.raises(ValueError, match="pinned to engine_type"):
-        ARTIFACT_TYPE_FOR_ENGINE[engine_type](**kwargs)  # type: ignore[arg-type]
+        # Same heterogeneous kwargs dispatch as _build; the mismatch is the test.
+        ARTIFACT_TYPE_FOR_ENGINE[engine_type](**kwargs)  # ty: ignore[invalid-argument-type]
 
 
 @pytest.mark.parametrize("engine_type", list(EngineType))
@@ -125,7 +128,7 @@ def test_engine_header_has_no_cross_engine_default(engine_type: EngineType):
         if key != "engine_header" and not key.startswith("_")
     }
     with pytest.raises(TypeError, match="engine_header"):
-        ARTIFACT_TYPE_FOR_ENGINE[engine_type](**kwargs)  # type: ignore[arg-type]
+        ARTIFACT_TYPE_FOR_ENGINE[engine_type](**kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -338,7 +341,8 @@ def test_the_pin_rejects_a_raw_string_engine_type():
     # then fail every downstream `engine_type is EngineType.X` dispatch.
     kwargs = _required_kwargs(EngineType.HELIA_AOT)
     with pytest.raises(ValueError, match="pinned to engine_type"):
-        HeliaAotArtifacts(engine_type="helia-aot", **kwargs)  # type: ignore[arg-type]
+        # The raw string engine_type IS the test (StrEnum equality-pin trap).
+        HeliaAotArtifacts(engine_type="helia-aot", **kwargs)  # ty: ignore[invalid-argument-type]
 
 
 def test_the_base_class_is_not_constructible():

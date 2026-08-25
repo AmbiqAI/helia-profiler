@@ -58,6 +58,8 @@ def test_poll_until_times_out(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
+# _FakeJLink/_RetryJLink implement only the slice of DebugMemorySession the
+# functions under test touch; call sites carry ty ignores for the protocol gap.
 class _FakeJLink:
     def __init__(self, *, halted: bool):
         self._halted = halted
@@ -75,7 +77,7 @@ def test_resume_if_halted_restarts_when_halted(monkeypatch):
     monkeypatch.setattr(target_jlink.time, "sleep", lambda _s: None)
     jlink = _FakeJLink(halted=True)
 
-    assert resume_if_halted(jlink) is True
+    assert resume_if_halted(jlink) is True  # ty: ignore[invalid-argument-type]
     assert jlink.restart_calls == 1
 
 
@@ -83,7 +85,7 @@ def test_resume_if_halted_noop_when_running(monkeypatch):
     monkeypatch.setattr(target_jlink.time, "sleep", lambda _s: None)
     jlink = _FakeJLink(halted=False)
 
-    assert resume_if_halted(jlink) is False
+    assert resume_if_halted(jlink) is False  # ty: ignore[invalid-argument-type]
     assert jlink.restart_calls == 0
 
 
@@ -136,7 +138,11 @@ def test_open_jlink_with_retry_succeeds_first_try(monkeypatch):
     monkeypatch.setattr(target_jlink.time, "sleep", lambda _s: None)
     jlink = _RetryJLink(fail_first=0)
 
-    open_jlink_with_retry(jlink, device="AP510NFA-CBR", timeout_s=5.0)
+    open_jlink_with_retry(
+        jlink,  # ty: ignore[invalid-argument-type]
+        device="AP510NFA-CBR",
+        timeout_s=5.0,
+    )
 
     assert jlink.connect_calls == 1
     assert jlink.close_calls == 0
@@ -147,7 +153,12 @@ def test_open_jlink_with_retry_retries_until_ready(monkeypatch):
     monkeypatch.setattr(target_jlink.time, "sleep", lambda _s: None)
     jlink = _RetryJLink(fail_first=2)
 
-    open_jlink_with_retry(jlink, device="AP510NFA-CBR", timeout_s=10.0, interval_s=0.01)
+    open_jlink_with_retry(
+        jlink,  # ty: ignore[invalid-argument-type]
+        device="AP510NFA-CBR",
+        timeout_s=10.0,
+        interval_s=0.01,
+    )
 
     assert jlink.connect_calls == 3
     assert jlink.close_calls == 2  # closed after each failed attempt
@@ -165,4 +176,9 @@ def test_open_jlink_with_retry_raises_capture_error_on_timeout(monkeypatch):
     jlink = _RetryJLink(fail_first=10_000)  # never succeeds
 
     with pytest.raises(CaptureError, match="Timed out attaching"):
-        open_jlink_with_retry(jlink, device="AP510NFA-CBR", timeout_s=0.3, interval_s=0.1)
+        open_jlink_with_retry(
+            jlink,  # ty: ignore[invalid-argument-type]
+            device="AP510NFA-CBR",
+            timeout_s=0.3,
+            interval_s=0.1,
+        )

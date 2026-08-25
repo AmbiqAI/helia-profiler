@@ -34,7 +34,9 @@ def _source(name: str) -> str:
     consequence (a line silently commented out) on the one variable
     combination that happens to reach it.
     """
-    source, _, _ = _jinja_env.loader.get_source(_jinja_env, name)  # type: ignore[union-attr]
+    loader = _jinja_env.loader
+    assert loader is not None
+    source, _, _ = loader.get_source(_jinja_env, name)
     # Windows checkouts materialize the templates with CRLF endings
     # (core.autocrlf), which would make every "opens with its own newline"
     # check below see "\r" instead of "\n". The rules are about logical line

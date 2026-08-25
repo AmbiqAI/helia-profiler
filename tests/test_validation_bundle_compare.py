@@ -88,9 +88,9 @@ def test_compare_validation_bundles_writes_portable_artifacts(tmp_path: Path) ->
 
     assert result.summary["compared"] == 1
     assert result.cases[0].outcome is CaseOutcome.COMPARED
-    total = next(
-        metric for metric in result.cases[0].compare_result.metrics if metric.name == "total_cycles"
-    )
+    compare_result = result.cases[0].compare_result
+    assert compare_result is not None
+    total = next(metric for metric in compare_result.metrics if metric.name == "total_cycles")
     assert total.delta == -20
 
     output = tmp_path / "output"
@@ -155,6 +155,7 @@ def test_loader_exposes_run_origin_metadata(tmp_path: Path) -> None:
     assert metadata.github_event_name == "schedule"
     assert metadata.github_run_id == 31033041861
     assert metadata.github_run_attempt == 2
+    assert metadata.github_run_url is not None
     assert metadata.github_run_url.endswith("/actions/runs/31033041861")
 
 
@@ -414,7 +415,9 @@ def test_loader_accepts_v1_and_infers_terminal_repeat_suffix(tmp_path: Path) -> 
     loaded = load_validation_bundle(bundle)
 
     assert loaded.cases[0].identity.attempt == 2
-    assert loaded.cases[0].artifact("case_dir").available is True
+    case_dir_artifact = loaded.cases[0].artifact("case_dir")
+    assert case_dir_artifact is not None
+    assert case_dir_artifact.available is True
     assert "schema v1" in loaded.warnings[0]
 
 

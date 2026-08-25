@@ -6,6 +6,8 @@ which hid a rich-markup injection through ELF section names (M3).
 
 from __future__ import annotations
 
+import dataclasses
+
 from rich.console import Console
 
 from helia_profiler.console import HpxConsole
@@ -30,7 +32,7 @@ def _render(measured: MeasuredMemoryRegions) -> str:
 
 
 def _region(**overrides) -> MeasuredRegion:
-    base = dict(
+    base = MeasuredRegion(
         region=MemoryRegion.DTCM,
         window_start=0x20000000,
         window_length=524_288,
@@ -40,8 +42,7 @@ def _region(**overrides) -> MeasuredRegion:
         reserved=491_240,
         load_image=0,
     )
-    base.update(overrides)
-    return MeasuredRegion(**base)
+    return dataclasses.replace(base, **overrides)
 
 
 def test_measured_table_renders_used_free_and_reserved():

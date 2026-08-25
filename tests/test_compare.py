@@ -38,7 +38,7 @@ def _write_run(
     total_cycles: float,
     avg_us: int,
     layer_cycles: list[float],
-    power: dict[str, float] | None = None,
+    power: dict[str, float | str] | None = None,
 ) -> None:
     path.mkdir(parents=True)
     (path / "summary.json").write_text(
@@ -465,6 +465,9 @@ def test_compare_includes_aot_memory_placement_diffs(tmp_path: Path):
 
     row = result.layer_rows[0]
     assert row.memory_changed is True
+    assert row.baseline_memory is not None
+    assert row.candidate_memory is not None
+    assert row.memory_diff is not None
     assert "constants: 1 buffer in DTCM" in row.baseline_memory
     assert "constants: 1 buffer staged MRAM to SRAM" in row.candidate_memory
     assert "->" in row.memory_diff
@@ -489,7 +492,7 @@ def test_layer_diff_row_is_frozen_and_flattens_for_csv(tmp_path: Path):
     row = result.layer_rows[0]
 
     with pytest.raises(FrozenInstanceError):
-        row.delta_cycles = 0  # type: ignore[misc]
+        row.delta_cycles = 0  # ty: ignore[invalid-assignment]  # the illegal write IS the test
 
     flat = row.to_flat_dict()
     assert flat["delta_cycles"] == row.delta_cycles

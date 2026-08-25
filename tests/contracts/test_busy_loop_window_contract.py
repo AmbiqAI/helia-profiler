@@ -133,6 +133,8 @@ def test_the_external_gate_check_accepts_the_window_the_firmware_runs(
     plan = plan_power_run(ctx)
     firmware_ms = _firmware_spin_target_ms(ctx)
 
+    assert plan.inference_count is not None
+    assert plan.reference_inference_us is not None
     integrity = assess_gate_duration(
         measured_s=firmware_ms / 1000,
         clean_infer_count=plan.inference_count,

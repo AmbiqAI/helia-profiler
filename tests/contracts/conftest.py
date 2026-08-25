@@ -17,6 +17,7 @@ import pytest
 
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
+from helia_profiler.placement import Placement
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
 # A minimal, fully parseable firmware capture: one preset, one iteration,
@@ -60,7 +61,7 @@ def make_pmu_ctx(
     model = tmp_path / "model.tflite"
     if not model.exists():
         model.write_bytes(b"\x00")
-    overrides: dict = {
+    overrides: dict[str, dict[str, object]] = {
         "model": {"path": str(model)},
         "engine": {"type": engine},
         "target": {"board": board, "transport": transport},
@@ -83,7 +84,7 @@ def make_pmu_ctx(
     ctx.build_dir = tmp_path / "build"
     ctx.build_dir.mkdir(exist_ok=True)
     ctx.resolved_jlink_serial = "1160002204"
-    ctx.weights_region = "mram"
+    ctx.weights_region = Placement.MRAM
     return ctx
 
 

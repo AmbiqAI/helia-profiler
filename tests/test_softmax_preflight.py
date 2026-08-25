@@ -322,6 +322,7 @@ class TestPreflightGate:
             Path(__file__).parent.parent / "tools" / "gen_softmax_preflight_fixture.py"
         )
         spec = importlib.util.spec_from_file_location("gen_fixture_nobeta", tool)
+        assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         model = tmp_path / "no_beta.tflite"
@@ -402,6 +403,7 @@ def test_fixture_matches_its_committed_generator():
 
     tool = Path(__file__).parent.parent / "tools" / "gen_softmax_preflight_fixture.py"
     spec = importlib.util.spec_from_file_location("gen_softmax_preflight_fixture", tool)
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 

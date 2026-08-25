@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
@@ -69,7 +70,8 @@ class TestPowerTypes:
             sample_count=1000,
         )
         with pytest.raises(AttributeError):
-            summary.avg_current_a = 0.02  # type: ignore[misc]
+            # Writing to the frozen dataclass IS the test.
+            summary.avg_current_a = 0.02  # ty: ignore[invalid-assignment]
 
     def test_power_result_no_per_layer_by_default(self):
         summary = PowerSummary(
@@ -606,6 +608,7 @@ class TestGatedStatsProcessing:
         assert result.metadata.measurement_scope == "free_form_capture"
         assert result.metadata.observation_mode == "free_form"
         assert result.metadata.integrity == "degraded"
+        assert result.metadata.gate_failure is not None
         assert result.metadata.gate_failure.kind == failure_kind
         assert result.metadata.gate_rise_observed is saw_rise
         assert result.metadata.gate_fall_observed is saw_fall
@@ -646,6 +649,7 @@ class TestGatedStatsProcessing:
         )
 
         gate_failure = result.metadata.gate_failure
+        assert gate_failure is not None
         assert gate_failure.kind == "no_gate_rise"
         assert "power.lockstep: true" in gate_failure.message
         assert "power.lockstep: true" in gate_failure.hint
@@ -677,6 +681,7 @@ class TestMissedGateWarningNamesTheFix:
             pass
 
         def emit_packets(self, count: int) -> None:
+            assert self._stats_cb is not None, "subscribe() was never called"
             ms = _SECOND // 1000
             for i in range(count):
                 self._stats_cb(
@@ -1093,6 +1098,7 @@ class TestCapturePowerStage:
         assert reset_calls["jlink_serial"] == "1160002204"
         assert reset_calls["device"] == ctx.soc.jlink_device
         assert ctx.power_result is not None
+        assert ctx.power_result.metadata.target_lifecycle is not None
         lifecycle = ctx.power_result.metadata.target_lifecycle.to_metadata()
         assert {k: v for k, v in lifecycle.items() if k != "timings_s"} == {
             "phase": "power",
@@ -1102,7 +1108,9 @@ class TestCapturePowerStage:
             "reset_action": "debug_reset+swpoi_reset",
             "actions": ["debug_reset+swpoi_reset"],
         }
-        assert set(lifecycle["timings_s"]) == {"reset"}
+        timings_s = lifecycle["timings_s"]
+        assert isinstance(timings_s, dict)
+        assert set(timings_s) == {"reset"}
 
     def test_degraded_driver_result_publishes_free_form_observation(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1301,7 +1309,7 @@ class TestTargetLifecycle:
         plan = prepare_target_for_phase(
             ctx,
             phase=CapturePhase.POWER,
-            power_driver=FakeDriver(),
+            power_driver=FakeDriver(),  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
             power_driver_name="joulescope",
         )
 
@@ -1340,7 +1348,7 @@ class TestTargetLifecycle:
         plan = prepare_target_for_phase(
             ctx,
             phase=CapturePhase.POWER,
-            power_driver=FakeDriver(),
+            power_driver=FakeDriver(),  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
             power_driver_name="joulescope",
         )
 
@@ -1377,7 +1385,7 @@ class TestTargetLifecycle:
         plan = prepare_target_for_phase(
             ctx,
             phase=CapturePhase.POWER,
-            power_driver=FakeDriver(),
+            power_driver=FakeDriver(),  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
             power_driver_name="joulescope",
         )
 
@@ -1410,7 +1418,7 @@ class TestTargetLifecycle:
         plan = prepare_target_for_phase(
             ctx,
             phase=CapturePhase.POWER,
-            power_driver=FakeDriver(),
+            power_driver=FakeDriver(),  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
             power_driver_name="joulescope",
         )
 
@@ -1443,7 +1451,7 @@ class TestTargetLifecycle:
         plan = prepare_target_for_phase(
             ctx,
             phase=CapturePhase.POWER,
-            power_driver=FakeDriver(),
+            power_driver=FakeDriver(),  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
             power_driver_name="joulescope",
         )
 
@@ -1473,7 +1481,7 @@ class TestTargetLifecycle:
             prepare_target_for_phase(
                 ctx,
                 phase=CapturePhase.POWER,
-                power_driver=FakeDriver(),
+                power_driver=FakeDriver(),  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
                 power_driver_name="joulescope",
             )
 
@@ -1498,7 +1506,7 @@ class TestTargetLifecycle:
         plan = prepare_target_for_phase(
             ctx,
             phase=CapturePhase.PMU,
-            power_driver=FakeDriver(),
+            power_driver=FakeDriver(),  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
             power_driver_name="joulescope",
         )
 
@@ -1752,7 +1760,9 @@ class TestCapturePowerWrapper:
         assert called["serial"] == "004204"
         assert called["checked"] is True
         assert "capture" not in called
-        gated = dict(called["capture_gated"])
+        captured_kwargs = called["capture_gated"]
+        assert isinstance(captured_kwargs, dict)
+        gated = dict(captured_kwargs)
         on_started = gated.pop("on_started")
         assert callable(on_started)
         # GO backfeed fix: the gate-rise hook must be wired so the GO line is
@@ -1809,7 +1819,7 @@ class TestCapturePowerWrapper:
         _mark_power_firmware_deployed(ctx, tmp_path)
 
         calls: list[str] = []
-        hooks: dict[str, object] = {}
+        hooks: dict[str, Callable[[], object]] = {}
         summary = PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6)
 
         class FakeSync:
@@ -1877,9 +1887,13 @@ class TestCapturePowerWrapper:
             "go",
             "release",
         ]
-        assert result.metadata.sync.lockstep is True
-        assert result.metadata.sync.ready_wait_s >= 0.0
-        assert result.metadata.sync.ready_observed is True
+        sync = result.metadata.sync
+        assert sync is not None
+        assert sync.lockstep is True
+        assert sync.ready_wait_s is not None
+        assert sync.ready_wait_s >= 0.0
+        assert sync.ready_observed is True
+        assert result.metadata.target_lifecycle is not None
         assert result.metadata.target_lifecycle.to_metadata() == {"reset_action": "debug_reset"}
 
     def test_capture_power_releases_sync_when_prepare_raises_after_arm(
@@ -2797,7 +2811,7 @@ class TestPowerFirmwareSelection:
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         ctx.firmware_dir = tmp_path / "app"
-        ctx.dependency_workspace = object()  # type: ignore[assignment]
+        ctx.dependency_workspace = object()
         ctx.build_dir = ctx.firmware_dir / "build" / "apollo510_evb"
         ctx.build_dir.mkdir(parents=True)
         stale_binary = ctx.build_dir / "hpx_profiler_power"
@@ -2861,7 +2875,7 @@ class TestPowerFirmwareSelection:
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         ctx.firmware_dir = tmp_path / "app"
-        ctx.dependency_workspace = object()  # type: ignore[assignment]
+        ctx.dependency_workspace = object()
         ctx.build_dir = ctx.firmware_dir / "build" / "apollo510_evb"
         ctx.build_dir.mkdir(parents=True)
         binary = ctx.build_dir / "hpx_profiler_power"
@@ -3034,7 +3048,7 @@ class TestGatedCaptureCapabilityDetection:
                     summary=summary, metadata=PowerMetadata(measurement_scope="custom_gated")
                 )
 
-        register_driver("custom-gated-test-driver", CustomGatedDriver)
+        register_driver("custom-gated-test-driver", CustomGatedDriver)  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the gated-capture surface
 
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")

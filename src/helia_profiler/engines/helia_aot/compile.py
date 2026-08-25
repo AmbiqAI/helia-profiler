@@ -240,9 +240,9 @@ def _run_aot_compiler(
       (applied last).
     """
     try:
-        from helia_aot.cli.defines import ConvertArgs  # type: ignore[import-untyped]
-        from helia_aot.converter import AotConverter  # type: ignore[import-untyped]
-        from helia_aot.defines import ModuleType  # type: ignore[import-untyped]
+        from helia_aot.cli.defines import ConvertArgs
+        from helia_aot.converter import AotConverter
+        from helia_aot.defines import ModuleType
     except ImportError:
         raise EngineError(
             "heliaAOT package not installed",

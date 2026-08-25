@@ -22,6 +22,7 @@ from helia_profiler.config import Transport, load_config
 from helia_profiler.errors import PowerError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import PowerResult, PowerSummary
+from helia_profiler.power.metadata import ObservationMode, PowerIntegrity
 from helia_profiler.power.terminal_transport import (
     UsbCdcPowerTerminalTransport,
     _TERMINAL_TRANSPORTS,
@@ -249,12 +250,12 @@ def test_publish_terminal_into_grouped_power_run(tmp_path: Path) -> None:
     result = PowerResult(summary=PowerSummary(0.01, 0.018, 0.02, 0.09, 5.0, 5000))
     ctx.publish_power_observation(
         PowerObservation(
-            mode="gpio_gated",
+            mode=ObservationMode.GPIO_GATED,
             result=result,
             gate_rise_observed=True,
             gate_fall_observed=True,
             deadline_s=20.0,
-            integrity="valid",
+            integrity=PowerIntegrity.VALID,
         )
     )
     record = parse_power_terminal(_lines())
