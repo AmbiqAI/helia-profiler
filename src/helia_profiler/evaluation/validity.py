@@ -56,7 +56,7 @@ def _rederive_integrity(
     if not probe_runs_inferences(ctx.config.profiling.clean_window_probe):
         return None
     meta = ctx.pmu_result.meta if ctx.pmu_result is not None else None
-    if meta is None or not meta.clean_infer_count:
+    if meta is None or not meta.clean_infer_count or meta.clean_infer_count <= 0:
         return None
     effective_count = meta.clean_infer_count
     effective_avg_us = meta.clean_infer_avg_us
@@ -468,7 +468,16 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         # too short for the stats integral to be trusted regardless of what
         # the firmware clock says.
         if observation is not None:
-            duration = observation.result.metadata.gate_duration_integrity
+            # Consume the arbitration's integrity term, not the metadata
+            # directly: ``integrity_recorded`` is the chokepoint that keeps
+            # validity issues off the advisory re-derived band (review of
+            # #204: reading the metadata in parallel left the flag
+            # write-only and the distinction enforced by duplicate code).
+            duration = (
+                arbitration.integrity
+                if arbitration is not None and arbitration.integrity_recorded
+                else None
+            )
             if duration is not None:
                 if duration.below_minimum:
                     issues.append(

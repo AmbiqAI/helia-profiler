@@ -694,6 +694,25 @@ class TestGateArbitration:
         assert arb.observer is None
         assert arb.suppress_per_inference is True
 
+    def test_unhealthy_terminal_downgrades_the_observer_error(self, tmp_path: Path):
+        """The other half of the harmonization (#204 review, cell 03b): with
+        an unhealthy terminal whose elapsed_us ALSO disagrees with the gate,
+        validity previously emitted the observer ERROR from an envelope that
+        had no standing to arbitrate. Now the observer is withheld, the
+        est*count fallback WARNING carries the duration story, and the
+        terminal ERRORs carry the failure -- the run stays INVALID."""
+        ctx = _context(tmp_path)
+        # elapsed 5.017s vs gate 4.427s (would disagree), only 116/233 done.
+        self._drift_run(ctx, elapsed_us=5_017_000, completed_count=116)
+
+        evaluation = evaluate_run(ctx)
+
+        assert evaluation.validity is ResultValidity.INVALID
+        codes = [issue.code for issue in evaluation.issues]
+        assert IssueCode.POWER_TERMINAL_INCOMPLETE in codes
+        assert IssueCode.POWER_WINDOW_OBSERVER_MISMATCH not in codes
+        assert codes.count(IssueCode.POWER_GATE_DURATION_MISMATCH) == 1
+
     def test_arbitration_rides_the_evaluation(self, tmp_path: Path):
         """The composed verdict is carried on RunEvaluation for the summary
         to render -- the drift note the artifact publishes IS this string."""
