@@ -34,7 +34,7 @@
     },
     "nsx-executorch": {
       "url": "https://github.com/AmbiqAI/nsx-executorch.git",
-      "ref": "36b3a3d1d1a98c408b5f2303706731b9604b4dd4"
+      "ref": "8fa54faf75ff41c3b7bbeddff4a07a84e7b78847"
     },
     "helia-rt": {
       "url": "https://github.com/AmbiqAI/helia-rt.git",
@@ -68,7 +68,7 @@
     },
     "nsx-executorch": {
       "project": "nsx-executorch",
-      "ref": "36b3a3d1d1a98c408b5f2303706731b9604b4dd4"
+      "ref": "8fa54faf75ff41c3b7bbeddff4a07a84e7b78847"
     },
     "nsx-helia-rt": {
       "project": "helia-rt",
@@ -93,7 +93,7 @@
     },
     "executorch": {
       "version": "0.1.0",
-      "ref": "36b3a3d1d1a98c408b5f2303706731b9604b4dd4"
+      "ref": "8fa54faf75ff41c3b7bbeddff4a07a84e7b78847"
     }
   }
 }

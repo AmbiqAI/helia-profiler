@@ -136,7 +136,7 @@ def _fake_source_refs(monkeypatch: pytest.MonkeyPatch):
                 else (
                     "631726420b04860a5c4236956a3741ff5a96bd7f"
                     if path.name.startswith("ns-cmsis-nn-")
-                    else "36b3a3d1d1a98c408b5f2303706731b9604b4dd4"
+                    else "8fa54faf75ff41c3b7bbeddff4a07a84e7b78847"
                 )
             )
         ),
@@ -391,7 +391,7 @@ def test_adapter_rejects_wrong_nsx_executorch_commit(
     source = _source_tree(tmp_path)
     monkeypatch.setattr(executorch_mod, "_checkout_commit", lambda _path: "f" * 40)
 
-    with pytest.raises(EngineError, match="expected 36b3a3"):
+    with pytest.raises(EngineError, match="expected 8fa54f"):
         ExecuTorchAdapter().prepare(_config(tmp_path, source), tmp_path / "work")
 
 
@@ -403,7 +403,7 @@ def test_adapter_rejects_wrong_executorch_submodule_commit(
     def _commit(path: Path) -> str:
         if path.parent.name == "external":
             return "f" * 40
-        return "36b3a3d1d1a98c408b5f2303706731b9604b4dd4"
+        return "8fa54faf75ff41c3b7bbeddff4a07a84e7b78847"
 
     monkeypatch.setattr(executorch_mod, "_checkout_commit", _commit)
 
@@ -637,7 +637,7 @@ def test_adapter_auto_clones_pinned_checkout_when_source_path_absent(
     # URL from the baseline's nsx-executorch project; ref is the engine pin —
     # the same commit the checkout verification enforces.
     assert seen["url"] == "https://github.com/AmbiqAI/nsx-executorch.git"
-    assert seen["ref"] == "36b3a3d1d1a98c408b5f2303706731b9604b4dd4"
+    assert seen["ref"] == "8fa54faf75ff41c3b7bbeddff4a07a84e7b78847"
     # The cloned checkout then flows through the unchanged wrapper/verify path.
     wrapper = artifacts.extra_modules[-1].path
     assert f'"{source.as_posix()}"' in (wrapper / "CMakeLists.txt").read_text()
