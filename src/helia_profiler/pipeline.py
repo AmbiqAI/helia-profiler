@@ -45,7 +45,7 @@ from .results import (
     BinarySections,
 )
 from .toolchain_probe import SymbolEntry
-from .target.probe.base import FlashBackend, Probe, ResetController
+from .target.probe.base import Probe, ResetController
 
 log = logging.getLogger("hpx")
 
@@ -106,7 +106,6 @@ class PipelineContext:
     board: BoardDef | None = None
     resolved_jlink_serial: str | None = None
     probe: Probe | None = None
-    flash_backend: FlashBackend | None = None
     reset_controller: ResetController | None = None
 
     # Engine preparation (stage: prepare_engine)

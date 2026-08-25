@@ -5,8 +5,11 @@ mapping, the compile-time RTT up-buffer sizing, the build itself, the
 deterministic target-binary search, and flashing.  Extracted from
 ``firmware/__init__`` at the module size ceiling (see the elf_inventory
 precedent in toolchain_probe); the package re-exports every name so callers
-(stages/build_firmware, stages/build_power_firmware, stages/flash,
-stages/plan_memory) keep one import surface.
+(stages/build_firmware, stages/build_power_firmware, stages/plan_memory)
+keep one import surface.  Flashing is NOT invoked through here by the
+pipeline anymore — both firmware deployments run the NSX-generated J-Link
+recipe directly (target/probe/flash.flash_binary); ``flash_app`` remains as
+the ``nsx flash`` convenience wrapper for callers outside the pipeline.
 
 NOTE: ``nsx_cli`` and ``glob`` are imported as modules (never ``from ... import
 build`` / ``from glob import glob``) so tests that monkeypatch

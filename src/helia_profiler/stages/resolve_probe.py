@@ -8,7 +8,6 @@ import time
 from ..errors import ConfigError
 from ..pipeline import PipelineContext
 from ..target.probe.jlink import (
-    JLinkFlashBackend,
     JLinkProbe,
     JLinkResetController,
     resolve_probe_serial,
@@ -50,6 +49,5 @@ class ResolveJLinkProbeStage:
                 time.sleep(_POST_POWER_PROBE_RETRY_S)
         ctx.resolved_jlink_serial = serial
         ctx.probe = JLinkProbe(serial=serial)
-        ctx.flash_backend = JLinkFlashBackend()
         ctx.reset_controller = JLinkResetController()
         log.info("Using J-Link serial: %s", serial)

@@ -546,32 +546,6 @@ class JLinkResetController:
         )
 
 
-@dataclass(frozen=True)
-class JLinkFlashBackend:
-    """Flash firmware through the NSX J-Link backend."""
-
-    def flash(
-        self,
-        firmware_path: Path,
-        *,
-        toolchain: str,
-        jlink_serial: str | None = None,
-        frozen: bool = False,
-        timeout_s: float,
-        verbose: bool = False,
-    ) -> None:
-        from ... import nsx as nsx_cli
-
-        nsx_cli.flash(
-            firmware_path,
-            toolchain=toolchain,
-            jlink_serial=jlink_serial,
-            frozen=frozen,
-            timeout_s=timeout_s,
-            verbose=verbose,
-        )
-
-
 def create_debug_memory_session() -> DebugMemorySession:
     """Create a pylink-backed debug-memory session."""
     try:
@@ -881,7 +855,6 @@ def attached_reset_session(
 
 
 __all__ = [
-    "JLinkFlashBackend",
     "JLINK_COMMANDER",
     "JLinkProbe",
     "JLinkProbeMatch",

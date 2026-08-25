@@ -26,20 +26,6 @@ class ProbeSession(Protocol):
     def close(self) -> None: ...
 
 
-class FlashBackend(Protocol):
-    """Firmware flashing backend."""
-
-    def flash(
-        self,
-        firmware_path: Path,
-        *,
-        toolchain: str,
-        jlink_serial: str | None = None,
-        timeout_s: float,
-        verbose: bool = False,
-    ) -> None: ...
-
-
 class ResetController(Protocol):
     """Named target reset primitives selected by lifecycle policy."""
 
