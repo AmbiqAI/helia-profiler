@@ -25,8 +25,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ...placement import ArenaRole, Placement
-from ...results import MemoryConsumer, MemoryPlan, MemoryRegionUsage
+from ...placement import ArenaRole, MemoryRegion, Placement
+from ...results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
 from .. import EngineType
 from ..base import ArenaRegion
 from .compile import _AOT_MEMORY_ALIASES, _PLACEMENT_TO_AOT_MEMTYPE
@@ -390,7 +390,9 @@ def _extract_memory_plan_from_render_plan(
 
             role = str(getattr(arena, "role", arena_list_name.removesuffix("_arenas"))).lower()
             region_id = int(getattr(arena, "region_id", len(buckets)))
-            kind = "weights" if role == ArenaRole.CONSTANT.value else "arena"
+            kind = (
+                ConsumerKind.WEIGHTS if role == ArenaRole.CONSTANT.value else ConsumerKind.ARENA
+            )
             source_key_early = _aot_memory_region_key(
                 getattr(arena, "source_memory", None)
             )
@@ -420,7 +422,7 @@ def _extract_memory_plan_from_render_plan(
                         MemoryConsumer(
                             name=f"{source_key.lower()}_{role}_source_{region_id}",
                             size=size,
-                            kind="weights",
+                            kind=ConsumerKind.WEIGHTS,
                             # constants.c.j2:44 — the staged SOURCE blob
                             # is named by the RUNTIME memory, placed in
                             # source memory (#179 review M-3).
@@ -444,7 +446,7 @@ def _extract_memory_plan_from_render_plan(
 
     regions = tuple(
         MemoryRegionUsage(
-            region=key,
+            region=MemoryRegion(key),
             capacity=capacities.get(key, 0),
             used=sum(c.size for c in buckets.get(key, ())),
             consumers=tuple(buckets.get(key, ())),

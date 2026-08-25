@@ -42,6 +42,8 @@ class Ina228Driver(OnDeviceDriver):
     #: (energy/charge/bus-voltage) for this driver — this is what allows
     #: ``power.mode: internal`` to pass planning.
     supports_firmware_measurement = True
+    #: No instrument-side stats stream to integrate over a GPIO gate.
+    supports_gated_capture = False
 
     @property
     def name(self) -> str:

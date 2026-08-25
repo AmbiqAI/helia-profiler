@@ -87,8 +87,9 @@ for a real walkthrough.)*
 ## Development
 
 ```bash
-uv sync --locked --all-groups
+uv sync --locked --all-groups --extra aot --extra analysis
 uv run ruff check .
+uv run ty check src/helia_profiler
 uv run pytest -q
 uv run --group docs zensical build
 ```

@@ -164,7 +164,7 @@ def flash(
     toolchain: str | None = None,
     jlink_serial: str | None = None,
     frozen: bool = False,
-    timeout_s: int = _DEFAULT_FLASH_TIMEOUT_S,
+    timeout_s: float = _DEFAULT_FLASH_TIMEOUT_S,
     verbose: int = 0,
 ) -> None:
     """Run ``nsx flash`` on the given app directory.
@@ -247,7 +247,6 @@ def sync(
     """
     log.info("nsx sync: %s (frozen=%s, force=%s)", app_dir, frozen, force)
     emit = emitter_for_verbosity(verbose)
-    last_exc: NetworkError | None = None
     for attempt in range(1, retries + 1):
         try:
             _translate(
@@ -257,19 +256,19 @@ def sync(
                 ),
             )
             return
-        except NetworkError as exc:
-            last_exc = exc
-            if attempt < retries:
-                delay = 2**attempt
-                log.warning(
-                    "nsx sync: transient network error (attempt %d/%d), retrying in %ds…",
-                    attempt,
-                    retries,
-                    delay,
-                )
-                time.sleep(delay)
-    # All retries exhausted — re-raise the last NetworkError.
-    raise last_exc  # type: ignore[misc]
+        except NetworkError:
+            if attempt >= retries:
+                # All retries exhausted — propagate the last NetworkError.
+                raise
+            delay = 2**attempt
+            log.warning(
+                "nsx sync: transient network error (attempt %d/%d), retrying in %ds…",
+                attempt,
+                retries,
+                delay,
+            )
+            time.sleep(delay)
+    raise ValueError(f"retries must be >= 1, got {retries}")
 
 
 # ---------------------------------------------------------------------------

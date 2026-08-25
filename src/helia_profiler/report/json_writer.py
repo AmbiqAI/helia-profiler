@@ -53,7 +53,7 @@ def _write_json(
     }
 
     if power is not None:
-        data["power"] = {
+        power_data: dict[str, Any] = {
             "avg_current_a": power.summary.avg_current_a,
             "avg_power_w": power.summary.avg_power_w,
             "peak_current_a": power.summary.peak_current_a,
@@ -61,6 +61,7 @@ def _write_json(
             "duration_s": power.summary.duration_s,
             "sample_count": power.summary.sample_count,
         }
+        data["power"] = power_data
         flat_meta = power.metadata.to_metadata_dict()
         observation = {
             key: flat_meta[key]
@@ -77,11 +78,11 @@ def _write_json(
         if "gate_failure" in flat_meta:
             observation["gate_failure"] = flat_meta["gate_failure"]
         if observation:
-            data["power"]["observation"] = observation
+            power_data["observation"] = observation
         if power_terminal is not None:
-            data["power"]["terminal"] = power_terminal
+            power_data["terminal"] = power_terminal
         if on_device_summary is not None:
-            data["power"]["on_device_summary"] = on_device_summary
+            power_data["on_device_summary"] = on_device_summary
 
     out_path.write_text(
         json.dumps(data, indent=2, default=str),

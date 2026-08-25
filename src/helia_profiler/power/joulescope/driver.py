@@ -41,6 +41,11 @@ class JoulescopeDriver:
     #: polling + on-instrument stats integration) — see ``supports_gated_
     #: capture`` on :class:`~helia_profiler.power.base.PowerDriver`.
     supports_gated_capture = True
+    supports_firmware_measurement = False
+
+    #: Implemented in ``capture_gated.py`` (rather than inline) to keep this
+    #: module under the repo's per-file line budget; see its docstring there.
+    capture_gated = capture_gated
 
     @property
     def name(self) -> str:
@@ -346,9 +351,3 @@ class JoulescopeDriver:
 
         log.info("Joulescope passthrough enabled (relay latched).")
         return True
-
-
-# Attached here (rather than defined inline) to keep this module under the
-# repo's per-file line budget; see ``capture_gated.py`` for the docstring
-# and implementation.
-JoulescopeDriver.capture_gated = capture_gated

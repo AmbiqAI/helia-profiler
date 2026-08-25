@@ -464,7 +464,7 @@ def _read_json(path: Path) -> dict[str, Any]:
     try:
         data = json.loads(path.read_text())
     except json.JSONDecodeError as exc:
-        raise ReportError(f"Could not parse JSON artifact: {path}", details=str(exc)) from exc
+        raise ReportError(f"Could not parse JSON artifact: {path}", hint=str(exc)) from exc
     if not isinstance(data, dict):
         raise ReportError(f"Expected JSON object in {path}")
     return data

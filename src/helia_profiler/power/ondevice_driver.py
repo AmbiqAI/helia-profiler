@@ -27,6 +27,7 @@ class OnDeviceDriver:
     per inference (or per layer).
     """
 
+    supports_gated_capture = False
     supports_firmware_measurement = False
 
     @property

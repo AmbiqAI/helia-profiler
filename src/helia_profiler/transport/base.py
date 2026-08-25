@@ -37,9 +37,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from ..config import Transport
+from ..errors import CaptureError
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from ..pipeline import PipelineContext
+    from ..target.probe.base import ResetController
 
 log = logging.getLogger("hpx")
 
@@ -55,11 +59,12 @@ class CaptureArgs:
     jlink_serial: str | None
     jlink_device: str
     keep_debugger_attached: bool
-    overall_timeout_s: float
+    #: ``None`` = unbounded (rely on heartbeats), matching ``HeartbeatConfig``.
+    overall_timeout_s: float | None
     heartbeat_timeout_s: float
-    build_dir: object
+    build_dir: Path | None
     timing_raw: dict[str, float] = field(default_factory=dict)
-    reset_controller: object | None = None
+    reset_controller: ResetController | None = None
 
 
 @runtime_checkable
@@ -105,6 +110,15 @@ class BaseCaptureTransport:
 
     def prepare(self, ctx: PipelineContext, args: CaptureArgs) -> None:
         self._args = args
+
+    @property
+    def prepared_args(self) -> CaptureArgs:
+        """The shared capture args (present once :meth:`prepare` has run)."""
+        if self._args is None:
+            raise CaptureError(
+                f"{type(self).__name__}.collect() requires prepare() to run first."
+            )
+        return self._args
 
     def start(self, ctx: PipelineContext) -> None:
         return None

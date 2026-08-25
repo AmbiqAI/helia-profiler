@@ -291,7 +291,12 @@ class NsxModuleRef:
     version: str = ""
     local: bool = True
     project: str = ""
-    ref: str = ""
+    #: ``None`` and ``""`` are distinct on purpose: both engine adapters pass
+    #: an unset ``cmsis_nn_ref`` through as ``None``, and that None reaches
+    #: the dependency-lock digest as ``null`` -- coercing to ``""`` would
+    #: silently re-key every existing workspace digest. The default stays
+    #: ``""`` for the same reason.
+    ref: str | None = ""
 
 
 # ---------------------------------------------------------------------------

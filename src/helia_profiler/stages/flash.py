@@ -39,6 +39,7 @@ class FlashFirmwareStage:
         artifact = ctx.profile_run.firmware
         if ctx.soc is None:
             raise BuildError("Cannot flash firmware before platform resolution.")
+        soc = ctx.soc
 
         ctx.report_progress(f"Deploying profile firmware to {ctx.config.target.board}")
         jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
@@ -46,8 +47,8 @@ class FlashFirmwareStage:
         def flash_firmware() -> None:
             flash_binary(
                 artifact.binary_path,
-                device=ctx.soc.jlink_device,
-                load_addr=ctx.soc.capabilities.memory.app_flash_load_addr,
+                device=soc.jlink_device,
+                load_addr=soc.capabilities.memory.app_flash_load_addr,
                 jlink_serial=jlink_serial,
                 timeout_s=ctx.config.timeouts.flash_s,
             )

@@ -744,7 +744,7 @@ class RttTransport(BaseCaptureTransport):
     def collect(self, ctx) -> list[str]:
         from ..placement import Placement
 
-        args = self._args
+        args = self.prepared_args
         return capture_rtt_output(
             jlink_serial=args.jlink_serial,
             jlink_device=args.jlink_device,

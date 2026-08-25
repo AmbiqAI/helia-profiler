@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from .counters import PmuCounter
     from .doctor import DoctorResult
     from .engines import EngineType
-    from .model_analysis import ModelAnalysis
+    from .evaluation.model_analysis import ModelAnalysis
     from .pipeline import ProgressUpdate
     from .platform import BoardDef
     from .target.probe.jlink import JLinkProbe, JLinkProbeMatch
@@ -289,11 +289,13 @@ class Session:
         """Compare two completed profiles and optionally write diff artifacts."""
         from .evaluation import compare_runs, write_compare_artifacts
 
-        resolved_profile = profile
+        resolved_profile: ComparisonProfile | None
         if isinstance(profile, (str, Path)):
             from .evaluation import ComparisonProfile
 
             resolved_profile = ComparisonProfile.load(profile)
+        else:
+            resolved_profile = profile
         baseline_dir = _result_directory(baseline)
         candidate_dir = _result_directory(candidate)
         if resolved_profile is None:

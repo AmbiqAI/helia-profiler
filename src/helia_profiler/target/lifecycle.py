@@ -17,6 +17,7 @@ from ..errors import PowerError
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
+    from ..power.base import PowerDriver
 
 log = logging.getLogger("hpx")
 
@@ -80,7 +81,7 @@ def prepare_target_for_phase(
     ctx: PipelineContext,
     *,
     phase: CapturePhase,
-    power_driver: object,
+    power_driver: PowerDriver,
     power_driver_name: str,
 ) -> TargetLifecyclePlan:
     """Prepare the target for *phase* and return the lifecycle plan used."""
@@ -141,7 +142,7 @@ def _time_action(timings_s: dict[str, float], key: str, action):
 
 
 def try_power_cycle(
-    power_driver: object,
+    power_driver: PowerDriver,
     power_driver_name: str,
     *,
     strict: bool,
@@ -150,7 +151,7 @@ def try_power_cycle(
 ) -> bool:
     """Attempt a driver-owned rail cycle with shared strict/best-effort policy."""
     try:
-        power_driver.power_cycle(  # type: ignore[attr-defined]
+        power_driver.power_cycle(
             off_time_s=off_time_s,
             settle_time_s=settle_time_s,
         )
@@ -210,7 +211,7 @@ def _default_power_reset_strategy(ctx: PipelineContext) -> ResetStrategy:
     # state that was measured to inflate AP510 steady-state power. Keep AP3/AP4
     # on debug reset until their SWPOI behavior is validated as a replacement.
     # The per-family policy is resolved in the platform capability records.
-    return ResetStrategy(ctx.soc.capabilities.reset.default_power_reset_strategy)
+    return ResetStrategy(ctx.resolved_soc.capabilities.reset.default_power_reset_strategy)
 
 
 def resolve_power_lockstep(ctx: PipelineContext) -> bool:
@@ -235,18 +236,19 @@ def _execute_reset_strategy(ctx: PipelineContext, strategy: ResetStrategy) -> Re
 
     jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
     reset_controller = ctx.reset_controller or JLinkResetController()
+    device = ctx.resolved_soc.jlink_device
 
     if strategy is ResetStrategy.DEBUG_RESET:
-        reset_controller.debug_reset(device=ctx.soc.jlink_device, jlink_serial=jlink_serial)
+        reset_controller.debug_reset(device=device, jlink_serial=jlink_serial)
         return ResetAction.DEBUG_RESET
     if strategy is ResetStrategy.SWPOI_RESET:
-        reset_controller.swpoi_reset(device=ctx.soc.jlink_device, jlink_serial=jlink_serial)
+        reset_controller.swpoi_reset(device=device, jlink_serial=jlink_serial)
         return ResetAction.SWPOI_RESET
     if strategy is ResetStrategy.DEBUG_RESET_THEN_SWPOI:
         log.debug("gate-race timeline: debug_reset() start t=%.3f", time.time())
-        reset_controller.debug_reset(device=ctx.soc.jlink_device, jlink_serial=jlink_serial)
+        reset_controller.debug_reset(device=device, jlink_serial=jlink_serial)
         log.debug("gate-race timeline: debug_reset() done t=%.3f", time.time())
-        reset_controller.swpoi_reset(device=ctx.soc.jlink_device, jlink_serial=jlink_serial)
+        reset_controller.swpoi_reset(device=device, jlink_serial=jlink_serial)
         log.debug("gate-race timeline: swpoi_reset() done t=%.3f", time.time())
         return ResetAction.DEBUG_RESET_THEN_SWPOI
 
