@@ -92,6 +92,10 @@ class CaseResult:
     inferences_per_joule: float | None = None
     gated_window_duration_suspect: bool = False
     gate_duration_integrity_valid: bool | None = None
+    #: Present when the run's est*count band missed but the firmware's own
+    #: window clock confirmed the gate (#142/#181): a stale profile-phase
+    #: reference, not a capture defect. Health checks must not fail it.
+    gated_window_reference_drift: str | None = None
     power_observation_mode: str | None = None
     power_observation_integrity: str | None = None
     power_gate_failure_kind: str | None = None
@@ -624,6 +628,10 @@ def run_case(
                 integrity = power_blob.get("gate_duration_integrity")
                 if isinstance(integrity, dict) and "valid" in integrity:
                     result.gate_duration_integrity_valid = bool(integrity["valid"])
+                if power_blob.get("gated_window_reference_drift") is not None:
+                    result.gated_window_reference_drift = str(
+                        power_blob["gated_window_reference_drift"]
+                    )
                 if power_blob.get("observation_mode") is not None:
                     result.power_observation_mode = str(power_blob["observation_mode"])
                 if power_blob.get("integrity") is not None:
@@ -694,7 +702,15 @@ def validation_health_issues(result: CaseResult) -> tuple[str, ...]:
         issues.append("power enabled but zero energy captured")
     if result.power and result.gated_window_duration_suspect:
         issues.append("GPIO-gated power window duration is suspect")
-    if result.power and result.gate_duration_integrity_valid is False:
+    if (
+        result.power
+        and result.gate_duration_integrity_valid is False
+        and result.gated_window_reference_drift is None
+    ):
+        # valid:false alone no longer means the capture is bad (#142/#181):
+        # when the firmware's window clock confirmed the gate, the summary
+        # carries a drift note and the miss is a stale reference. Only a
+        # band miss WITHOUT that arbitration is a health problem.
         issues.append("GPIO-gated power window failed duration integrity")
     if result.power and result.power_observation_integrity not in {None, "valid"}:
         detail = result.power_gate_failure_kind or result.power_observation_mode or "unknown"

@@ -222,7 +222,7 @@ def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):
         "device_profiled_infer_avg_us": 8000,
     }
     assert summary["schema"] == "hpx.run-summary"
-    assert summary["schema_version"] == 3  # v2: #24 binary.bss; v3: #133 memory_regions
+    assert summary["schema_version"] == 4  # v2: #24 binary.bss; v3: #133 memory_regions; v4: #142/#181 gate verdict
     assert summary["validity"] == "valid"
     assert summary["issues"] == []
 
@@ -410,7 +410,7 @@ def test_write_report_publishes_verifiable_manifest_last(tmp_path: Path):
     assert artifacts["summary.json"].role == "core"
     assert artifacts["summary.json"].name == "hpx.summary"
     assert artifacts["summary.json"].schema == "hpx.run-summary"
-    assert artifacts["summary.json"].schema_version == 3
+    assert artifacts["summary.json"].schema_version == 4
     assert artifacts["summary.json"].optional is False
     assert artifacts["profile_results.csv"].name == "hpx.profile-layers"
     assert artifacts["profile_results.csv"].schema is None
@@ -644,7 +644,13 @@ def test_write_summary_does_not_flag_normal_gated_window(tmp_path: Path):
     assert summary["power"]["gated_window_duration_ratio"] > 0.95
 
 
-def _attach_power_terminal(ctx: PipelineContext, *, elapsed_us: int, count: int) -> None:
+def _attach_power_terminal(
+    ctx: PipelineContext,
+    *,
+    elapsed_us: int,
+    count: int,
+    completed_count: int | None = None,
+) -> None:
     """Dedicated-mode terminal envelope, the observer that arbitrates the
     est*count band (#142/#181)."""
     ctx.power_run = PowerRun(
@@ -657,7 +663,7 @@ def _attach_power_terminal(ctx: PipelineContext, *, elapsed_us: int, count: int)
             version=1,
             status="ok",
             requested_count=count,
-            completed_count=count,
+            completed_count=count if completed_count is None else completed_count,
             elapsed_us=elapsed_us,
             final_phase="done",
             error_code=0,
@@ -704,6 +710,44 @@ def test_write_summary_suppresses_when_observer_disagrees(tmp_path: Path):
 
     assert summary["power"]["gated_window_duration_suspect"] is True
     assert "energy_per_inference_j" not in summary["power"]
+    assert "gated_window_reference_drift" not in summary["power"]
+
+
+def test_write_summary_suppresses_when_terminal_reports_incomplete_work(
+    tmp_path: Path,
+):
+    """An early-exit firmware agrees with its own gate BY CONSTRUCTION (it
+    times the same short window it gated), so terminal health must gate the
+    arbitration: energy / planned_count would be wrong by the shortfall, with
+    a drift note vouching for it (found by review)."""
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=233, clean_infer_avg_us=21532, duration_s=2.5
+    )
+    _attach_power_terminal(ctx, elapsed_us=2_500_500, count=233, completed_count=116)
+
+    out_path = _write_summary(ctx, tmp_path)
+    summary = json.loads(out_path.read_text())
+
+    assert summary["power"]["gated_window_duration_suspect"] is True
+    assert "energy_per_inference_j" not in summary["power"]
+    assert "gated_window_reference_drift" not in summary["power"]
+
+
+def test_write_summary_no_drift_note_beyond_the_plausible_envelope(tmp_path: Path):
+    """A self-consistent window at half the expected length is not thermal
+    drift: metrics stay published (the observer vouches for the bracket and
+    the count is exact) but no note claims a cause -- evaluation.validity
+    carries the est*count warning instead."""
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=233, clean_infer_avg_us=21532, duration_s=2.5
+    )
+    _attach_power_terminal(ctx, elapsed_us=2_500_500, count=233)
+
+    out_path = _write_summary(ctx, tmp_path)
+    summary = json.loads(out_path.read_text())
+
+    assert "gated_window_duration_suspect" not in summary["power"]
+    assert "energy_per_inference_j" in summary["power"]
     assert "gated_window_reference_drift" not in summary["power"]
 
 

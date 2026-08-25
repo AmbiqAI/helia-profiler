@@ -538,21 +538,22 @@ class TestGateArbitration:
         *,
         elapsed_us: int | None,
         minimum_s: float = 1.0,
+        gate_s: float = DRIFT_GATE_S,
     ) -> None:
         assert ctx.power_run is not None and ctx.power_run.observation is not None
         observation = ctx.power_run.observation
         result = PowerResult(
-            summary=replace(observation.result.summary, duration_s=self.DRIFT_GATE_S),
+            summary=replace(observation.result.summary, duration_s=gate_s),
             gated_windows=[
                 GatedPowerWindow(
-                    0.0, self.DRIFT_GATE_S, self.DRIFT_GATE_S, 0.0, 0.0, 0.0, 0.0, 0.0, 0
+                    0.0, gate_s, gate_s, 0.0, 0.0, 0.0, 0.0, 0.0, 0
                 )
             ],
             metadata=replace(observation.result.metadata),
         )
         expected_s = self.DRIFT_COUNT * self.DRIFT_REFERENCE_US / 1_000_000.0
         result.metadata.gate_duration_integrity = GateDurationIntegrity(
-            measured_s=self.DRIFT_GATE_S,
+            measured_s=gate_s,
             expected_s=expected_s,
             tolerance_s=expected_s * 0.10,
             minimum_s=minimum_s,
@@ -636,6 +637,29 @@ class TestGateArbitration:
         assert codes.count(IssueCode.POWER_WINDOW_CLOCK_FROZEN) == 1
         assert codes.count(IssueCode.POWER_GATE_DURATION_MISMATCH) == 1
         assert IssueCode.POWER_WINDOW_OBSERVER_MISMATCH not in codes
+
+    def test_beyond_drift_band_agreement_keeps_the_warning(self, tmp_path: Path):
+        """Observer agreement is bounded absolution: it proves the gate
+        brackets what the firmware timed, but cannot see a window whose
+        CONTENT changed (init inside the gate, wrong clock config) -- both
+        clocks watch the same span regardless of what ran in it. A
+        self-consistent window at half the expected length is NOT thermal
+        drift, so est*count keeps its warning even with agreement."""
+        ctx = _context(tmp_path)
+        self._drift_run(ctx, elapsed_us=2_500_500, gate_s=2.5)
+
+        evaluation = evaluate_run(ctx)
+
+        assert evaluation.validity is ResultValidity.DEGRADED
+        codes = [issue.code for issue in evaluation.issues]
+        assert codes.count(IssueCode.POWER_GATE_DURATION_MISMATCH) == 1
+        assert IssueCode.POWER_WINDOW_OBSERVER_MISMATCH not in codes
+        mismatch = next(
+            issue
+            for issue in evaluation.issues
+            if issue.code == IssueCode.POWER_GATE_DURATION_MISMATCH
+        )
+        assert "thermal" in mismatch.message
 
     def test_below_minimum_is_an_error_even_when_the_observer_agrees(
         self, tmp_path: Path

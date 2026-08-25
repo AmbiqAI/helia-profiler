@@ -18,7 +18,11 @@ from typing import TYPE_CHECKING, Any
 
 from ...errors import PowerError
 from ..base import PowerResult
-from ..diagnostics import GateTransitionTiming, classify_gate_failure
+from ..diagnostics import (
+    GATE_EDGE_POLL_INTERVAL_S,
+    GateTransitionTiming,
+    classify_gate_failure,
+)
 from ..metadata import MeasurementScope, ObservationMode, PowerIntegrity, PowerMetadata
 from .device import (
     _HOST_STATS,
@@ -121,7 +125,9 @@ def capture_gated(
     # for artifact-only callers (#172 review: the hint said "1 inferences"
     # for a busy-loop window that ran none).
     work_noun: str = "inferences",
-    poll_interval_s: float = 0.004,
+    # Shared with diagnostics.external_observer_slack_s: the observer check's
+    # absolute slack assumes edges are resolved no finer than this cadence.
+    poll_interval_s: float = GATE_EDGE_POLL_INTERVAL_S,
     min_high_windows: int = 1,
     guard_s: float = 0.15,
     on_started: Callable[..., None] | None = None,

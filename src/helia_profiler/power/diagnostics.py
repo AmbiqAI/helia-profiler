@@ -129,8 +129,10 @@ class GateDurationIntegrity:
         """Artifact form — byte-compatible with the dict previously built by
         hand in ``capture_gated.py``: seconds rounded to 6 places, and
         ``valid`` DERIVED from the stored measurements rather than cached
-        (the old dict stored a constant ``True``, which held only because
-        that writer raises on mismatch; deriving keeps it honest everywhere)."""
+        (the old hand-built dict stored a constant ``True``, which held only
+        while that writer still raised on mismatch — it no longer does
+        (#142/#181), so an artifact can now honestly carry ``valid: false``;
+        deriving keeps it honest everywhere)."""
         metadata: dict[str, object] = {
             "measured_s": round(self.measured_s, 6),
             "expected_s": round(self.expected_s, 6),
@@ -268,7 +270,48 @@ def assess_gate_duration(
 #: Disagreement therefore means the gate did not bracket what the firmware
 #: timed, which is exactly the condition that makes the per-inference energy
 #: denominator untrustworthy -- ERROR, not warning, at the emit sites.
+#:
+#: The 12x margin claim holds for bench-length (4-5 s) windows. On short
+#: windows the reference's mechanical error is ABSOLUTE (packet integral +
+#: GPI-poll edges), so the comparison carries an absolute slack floor too --
+#: see :func:`external_observer_slack_s`; without it, the 1 s minimum window
+#: at low ``stats_rate_hz`` fails on quantization alone.
 EXTERNAL_WINDOW_CLOCK_TOLERANCE = 0.01
+
+#: GPI poll cadence of the gated capture loop (capture_gated.py uses this as
+#: its ``poll_interval_s`` default). Each gate edge is resolved no finer than
+#: one poll, so the observer comparison must absorb up to two of these.
+GATE_EDGE_POLL_INTERVAL_S = 0.004
+
+#: Largest ``|1 - ratio|`` of gate vs est*count that HFRC thermal drift
+#: between the profile boot and the power boot can plausibly explain. #181
+#: observed up to ~12% on a cold AP510 first-run-after-idle; 0.15 covers that
+#: with margin. INSIDE this envelope, observer agreement silences the
+#: est*count warning (stale reference, healthy capture). BEYOND it, the
+#: warning stands even when the observer agrees: the observer only proves the
+#: gate brackets what the firmware timed -- it structurally cannot see a
+#: window whose CONTENT changed (init left inside the gate, wrong clock
+#: config, a different binary variant with matching counts), and est*count is
+#: the only check tying the window to the profile phase's timing.
+DRIFT_PLAUSIBLE_RATIO_DEVIATION = 0.15
+
+#: Smallest est*count deviation worth an explanatory drift note in the
+#: summary. Below this the miss is within ordinary cross-boot jitter of the
+#: tight advisory band and a "thermal drift" story would overclaim; the ratio
+#: field carries the number either way.
+DRIFT_NOTE_MIN_RATIO_DEVIATION = 0.05
+
+
+def external_observer_slack_s(stats_rate_hz: int | None) -> float:
+    """Absolute mechanical error bound on the gate-vs-firmware comparison.
+
+    The gate side is a stats-packet integral (up to one packet of edge
+    quantization per side) bounded by GPI polls (up to one poll interval per
+    edge). Mirrors ``packet_slack_s`` in :func:`assess_gate_duration`, which
+    has always modelled the packet term for the est*count band.
+    """
+    packet_s = 2.0 / max(1, stats_rate_hz) if stats_rate_hz else 0.0
+    return packet_s + 2.0 * GATE_EDGE_POLL_INTERVAL_S
 
 #: Internally-referenced tolerance, TWO-SIDED. Internal mode has no host-timed
 #: gate, so the only plan-based reference is N x the reference inference time
@@ -421,6 +464,13 @@ class WindowClockAgreement:
     #: can name it and a reader knows how much to trust the comparison.
     reference_source: str
     relative_tolerance: float
+    #: Absolute floor under the relative band. The external gate reference is
+    #: a packet-integral bounded by GPI-poll edges, so its mechanical error is
+    #: absolute (packets + poll skew), not proportional -- on a short window a
+    #: purely relative band shrinks below what the instrument can resolve and
+    #: a healthy run fails on quantization alone (found by review of the 1%
+    #: promotion; the est*count check always modelled this via packet_slack_s).
+    absolute_slack_s: float = 0.0
 
     @property
     def elapsed_s(self) -> float:
@@ -437,11 +487,15 @@ class WindowClockAgreement:
         return abs(self.elapsed_s - self.reference_s) / self.reference_s
 
     @property
+    def tolerance_s(self) -> float:
+        return max(self.reference_s * self.relative_tolerance, self.absolute_slack_s)
+
+    @property
     def agrees(self) -> bool:
-        return self.relative_error <= self.relative_tolerance
+        return abs(self.elapsed_s - self.reference_s) <= self.tolerance_s
 
     def to_metadata(self) -> dict[str, float | int | str]:
-        return {
+        metadata: dict[str, float | int | str] = {
             "elapsed_us": self.elapsed_us,
             "elapsed_s": round(self.elapsed_s, 6),
             "reference_s": round(self.reference_s, 6),
@@ -450,10 +504,18 @@ class WindowClockAgreement:
             "relative_tolerance": self.relative_tolerance,
             "ratio": round(self.ratio, 6),
         }
+        if self.absolute_slack_s > 0:
+            metadata["absolute_slack_s"] = round(self.absolute_slack_s, 6)
+        return metadata
 
 
 def assess_window_clock(
-    *, elapsed_us: int, reference_s: float, reference_source: str, relative_tolerance: float
+    *,
+    elapsed_us: int,
+    reference_s: float,
+    reference_source: str,
+    relative_tolerance: float,
+    absolute_slack_s: float = 0.0,
 ) -> WindowClockAgreement | None:
     """Compare the firmware window clock against an independent reference.
 
@@ -467,6 +529,7 @@ def assess_window_clock(
         reference_s=reference_s,
         reference_source=reference_source,
         relative_tolerance=relative_tolerance,
+        absolute_slack_s=absolute_slack_s,
     )
 
 
@@ -587,6 +650,7 @@ def assess_run_window_clock(
     gated_result: "PowerResult | None",
     planned_inference_count: int | None,
     planned_inference_us: int | None,
+    stats_rate_hz: int | None = None,
 ) -> WindowClockAgreement | None:
     """Resolve reference + tolerance for one run and compare the window clock.
 
@@ -610,17 +674,22 @@ def assess_run_window_clock(
             return None
         reference_s, reference_source = reference
         tolerance = EXTERNAL_WINDOW_CLOCK_TOLERANCE
+        absolute_slack_s = external_observer_slack_s(stats_rate_hz)
     else:
         if not planned_inference_count or not planned_inference_us:
             return None
         reference_s = planned_inference_count * planned_inference_us / 1_000_000.0
         reference_source = "planned_window"
         tolerance = INTERNAL_WINDOW_CLOCK_TOLERANCE
+        # The 25% cross-binary band dwarfs any instrument quantization; an
+        # absolute floor would only ever be the smaller term here.
+        absolute_slack_s = 0.0
     return assess_window_clock(
         elapsed_us=elapsed_us,
         reference_s=reference_s,
         reference_source=reference_source,
         relative_tolerance=tolerance,
+        absolute_slack_s=absolute_slack_s,
     )
 
 
@@ -628,6 +697,7 @@ def assess_gate_observer(
     *,
     elapsed_us: int | None,
     gated_result: "PowerResult | None",
+    stats_rate_hz: int | None = None,
 ) -> WindowClockAgreement | None:
     """Two-observer verdict on one gated window: instrument gate vs firmware STIMER.
 
@@ -645,6 +715,7 @@ def assess_gate_observer(
         gated_result=gated_result,
         planned_inference_count=None,
         planned_inference_us=None,
+        stats_rate_hz=stats_rate_hz,
     )
 
 
@@ -736,8 +807,11 @@ def classify_gate_failure(
 
 
 __all__ = [
+    "DRIFT_NOTE_MIN_RATIO_DEVIATION",
+    "DRIFT_PLAUSIBLE_RATIO_DEVIATION",
     "EXTERNAL_WINDOW_CLOCK_TOLERANCE",
     "FROZEN_WINDOW_CLOCK_HINT",
+    "GATE_EDGE_POLL_INTERVAL_S",
     "INTERNAL_WINDOW_CLOCK_TOLERANCE",
     "NO_GATE_RISE_LOCKSTEP_HINT",
     "NO_GATE_RISE_WIRING_HINT",
@@ -755,10 +829,12 @@ __all__ = [
     "assess_clean_window_clock_rate",
     "assess_clean_window_stall",
     "assess_gate_duration",
+    "assess_gate_observer",
     "assess_run_window_clock",
     "assess_window_clock",
     "assess_window_clock_ceiling",
     "classify_gate_failure",
+    "external_observer_slack_s",
     "firmware_window_clock_is_frozen",
     "gated_window_reference_s",
 ]

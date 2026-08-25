@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from ..power.diagnostics import (
+    DRIFT_PLAUSIBLE_RATIO_DEVIATION,
     assess_clean_window_clock_rate,
     count_noun,
     assess_clean_window_stall,
@@ -283,6 +284,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                     # check at all while the stage has one.
                     planned_inference_count=plan.inference_count,
                     planned_inference_us=plan.reference_inference_us,
+                    stats_rate_hz=ctx.config.power.stats_rate_hz,
                 )
                 if agreement is not None and not internal_mode:
                     observer_agrees = agreement.agrees
@@ -365,14 +367,44 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                             **duration.to_metadata(),
                         )
                     )
-                elif not duration.valid and observer_agrees is None:
-                    issues.append(
-                        _warning(
-                            IssueCode.POWER_GATE_DURATION_MISMATCH,
-                            "Measured power-gate duration does not agree with the expected fixed-N window.",
-                            **duration.to_metadata(),
+                elif not duration.valid:
+                    if observer_agrees is None:
+                        issues.append(
+                            _warning(
+                                IssueCode.POWER_GATE_DURATION_MISMATCH,
+                                "Measured power-gate duration does not agree with the expected fixed-N window.",
+                                **duration.to_metadata(),
+                            )
                         )
-                    )
+                    elif (
+                        observer_agrees
+                        and abs(1.0 - duration.ratio) > DRIFT_PLAUSIBLE_RATIO_DEVIATION
+                    ):
+                        # Observer agreement only proves the gate brackets what
+                        # the firmware timed -- it cannot see a window whose
+                        # CONTENT changed (init left inside the gate, wrong
+                        # clock config), because both clocks watch the same
+                        # span regardless of what ran in it. Beyond the
+                        # drift-plausible envelope the est*count check is the
+                        # only tie to the profile phase's timing, so its
+                        # warning stands (found by review of the redesign:
+                        # unbounded absolution let a ratio-0.5 window evaluate
+                        # VALID with a friendly drift note).
+                        issues.append(
+                            _warning(
+                                IssueCode.POWER_GATE_DURATION_MISMATCH,
+                                "Measured power-gate duration deviates from the "
+                                "profile-phase reference beyond what thermal "
+                                "drift can explain, although the firmware's own "
+                                "window clock confirms the gate is "
+                                "self-consistent.",
+                                **duration.to_metadata(),
+                            )
+                        )
+                    # Inside the envelope with observer agreement: a stale
+                    # reference, not a defect -- the summary publishes the
+                    # ratio and drift note. Observer disagreement: the ERROR
+                    # above already carries the story.
             elif observation.mode == "gpio_gated" and observer_agrees is None:
                 duration_issue = _assess_unrecorded_duration(ctx, observation.result.summary.duration_s)
                 if duration_issue is not None:
