@@ -296,6 +296,15 @@ def render_validity(console: HpxConsole, ctx: PipelineContext) -> None:
         console._console.print(
             f"    [yellow]{escape(issue.code)}[/yellow] — {escape(issue.message)}"
         )
+    # Issues carrying a severity this renderer predates (severity is a plain
+    # str on ResultIssue) must still show -- a verdict header with invisible
+    # causes is worse than an unstyled line (#208 review).
+    for issue in evaluation.issues:
+        if issue.severity not in ("error", "warning"):
+            console._console.print(
+                f"    {escape(issue.severity)}: {escape(issue.code)} — "
+                f"{escape(issue.message)}"
+            )
     if verdict == "invalid" and not ctx.config.output.fail_on_invalid:
         console._console.print(
             "    [dim]hint: automation can catch this via output.fail_on_invalid "

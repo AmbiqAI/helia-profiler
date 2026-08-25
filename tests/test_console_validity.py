@@ -191,3 +191,95 @@ def test_invalid_without_the_policy_exits_normally(
 
     args = argparse.Namespace(config=None, verbose=0, fail_on_invalid=False)
     profile_cmd._cmd_profile(args)  # must not raise SystemExit
+
+
+def test_degraded_with_policy_exits_normally(tmp_path: Path, monkeypatch) -> None:
+    """Exit 3 is INVALID-only: a degraded run with the policy on still
+    exits 0 -- warnings are advisory."""
+    import argparse
+
+    import helia_profiler.cli.profile_cmd as profile_cmd
+
+    ctx = _ctx(tmp_path, fail_on_invalid=True)
+    ctx.run_evaluation = RunEvaluation(
+        validity=ResultValidity.DEGRADED,
+        issues=(_issue("power.gate_duration_mismatch", "warning", "Band."),),
+    )
+    monkeypatch.setattr(
+        "helia_profiler.profiler.run_profile", lambda config, console: ctx
+    )
+    monkeypatch.setattr(
+        "helia_profiler.config.load_config", lambda path, cli: ctx.config
+    )
+    for name in (
+        "_apply_model_engine_overrides",
+        "_apply_target_overrides",
+        "_apply_pmu_overrides",
+        "_apply_power_overrides",
+        "_apply_output_overrides",
+        "_apply_workdir_overrides",
+        "_apply_build_overrides",
+    ):
+        monkeypatch.setattr(profile_cmd, name, lambda a, c: None)
+
+    profile_cmd._cmd_profile(
+        argparse.Namespace(config=None, verbose=0)
+    )  # must not raise SystemExit
+
+
+def test_output_applier_forwards_the_flag() -> None:
+    """The REAL applier, un-mocked (#208 review: both exit tests bypass it):
+    the flag lands in the overrides dict, and its absence -- older Namespaces
+    lack the attribute -- leaves the dict untouched."""
+    import argparse
+
+    from helia_profiler.cli.profile_cmd import _apply_output_overrides
+
+    base = argparse.Namespace(
+        output_dir=None, output_format=None, no_model_explorer=False, detailed=False
+    )
+
+    cli: dict = {}
+    _apply_output_overrides(
+        argparse.Namespace(**vars(base), fail_on_invalid=True), cli
+    )
+    assert cli["output"]["fail_on_invalid"] is True
+
+    cli = {}
+    _apply_output_overrides(
+        argparse.Namespace(**vars(base), fail_on_invalid=False), cli
+    )
+    assert "output" not in cli
+
+    cli = {}
+    _apply_output_overrides(base, cli)  # attribute absent entirely
+    assert "output" not in cli
+
+
+def test_yaml_route_sets_the_policy(tmp_path: Path) -> None:
+    """The doc promises output.fail_on_invalid works from a config file."""
+    yaml_path = tmp_path / "cfg.yaml"
+    yaml_path.write_text(
+        "model:\n  path: test.tflite\n"
+        "engine:\n  type: helia-rt\n"
+        "output:\n  fail_on_invalid: true\n"
+    )
+
+    config = load_config(yaml_path, {})
+
+    assert config.output.fail_on_invalid is True
+
+
+def test_unknown_severity_renders_instead_of_vanishing(tmp_path: Path) -> None:
+    """#208 review: a future severity tier must not yield a verdict header
+    with invisible causes."""
+    ctx = _ctx(tmp_path)
+    ctx.run_evaluation = RunEvaluation(
+        validity=ResultValidity.DEGRADED,
+        issues=(_issue("future.code", "info", "A future-tier note."),),
+    )
+
+    text = _render(ctx)
+
+    assert "future.code" in text
+    assert "A future-tier note." in text

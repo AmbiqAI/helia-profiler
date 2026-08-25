@@ -50,7 +50,11 @@ def _cmd_profile(args: argparse.Namespace) -> None:
     # #197: opt-in exit policy for automation. Deliberately AFTER the run
     # completes -- artifacts are written, the console footer rendered the
     # verdict, and comparability already blocks invalid runs; 3 is distinct
-    # from 1 (error) / 2 (usage) / 130 (interrupt).
+    # from 1 (error) / 2 (usage) / 130 (interrupt). Reads the STORED
+    # evaluation only: every run that returns from run_profile has passed
+    # write_report (the report stage never skips), so if a skip path is
+    # ever introduced this policy must gain the footer's fresh-evaluate
+    # fallback with it.
     if (
         ctx is not None
         and ctx.run_evaluation is not None
