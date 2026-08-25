@@ -18,6 +18,7 @@ number is the measurement of record decides fatal-vs-warn.
 | --- | --- | --- |
 | `pmu.counter_overflow` | `error` | One or more PMU counters overflowed during capture. |
 | `pmu.missing` | `error` | The run has no PMU result. |
+| `power.gate_below_minimum` | `error` | Measured power gate is shorter than the minimum accepted window. |
 | `power.gate_duration_mismatch` | `warning` | Measured power-gate duration does not agree with the expected window. |
 | `power.gate_duration_unverifiable` | `warning` | Power-gate duration cannot be verified because clean inference timing is invalid. |
 | `power.gate_edges_missing` | `error` | GPIO-gated power capture is missing a gate edge. |
@@ -35,6 +36,7 @@ number is the measurement of record decides fatal-vs-warn.
 | `power.window_clock_exceeds_host_time` | `warning` | Firmware-reported window is longer than the host wall time that contained it. |
 | `power.window_clock_frozen` | `error` (internal) / `warning` (external) | Power firmware reported zero elapsed time for completed inferences. |
 | `power.window_clock_mismatch` | `warning` | Firmware-reported window duration does not agree with the independently measured window. |
+| `power.window_observer_mismatch` | `error` | The instrument-timed gate and the firmware's own window clock disagree about the same physical window. |
 | `profile.clean_window_check_inoperative` | `warning` | The clean window's partial-stall check could not run; absence of stalls is not evidence of a healthy window. |
 | `profile.clean_window_clock_rate_low` | `warning` | The clean window's cycle counter ran far below its expected rate, measured against an independent clock. |
 | `profile.clean_window_frozen` | `warning` | The clean window completed inferences in zero elapsed time; the clock timing it never advanced. |

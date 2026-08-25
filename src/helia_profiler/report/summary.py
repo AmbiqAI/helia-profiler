@@ -256,8 +256,11 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                         effective_avg_us = int(plan_meta["reference_inference_us"])
                 if effective_avg_us and effective_avg_us > 0 and ps.duration_s > 0:
                     from ..power.diagnostics import (
+                        DRIFT_NOTE_MIN_RATIO_DEVIATION,
+                        DRIFT_PLAUSIBLE_RATIO_DEVIATION,
                         GateDurationIntegrity,
                         assess_gate_duration,
+                        assess_gate_observer,
                     )
 
                     integrity_meta = power_meta.get("gate_duration_integrity")
@@ -294,20 +297,108 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
                     summary["power"]["gated_window_duration_ratio"] = round(
                         integrity.ratio, 4
                     )
-                    if not integrity.valid:
+                    # Suppression keys on the OBSERVER verdict, not the
+                    # est*count band (#142/#181): the band straddles boots and
+                    # thermal states, so a cold-boot HFRC-fast window misses
+                    # it while being perfectly healthy -- and N (the actual
+                    # denominator) is a firmware loop count that drift cannot
+                    # change. The firmware's STIMER window time (same boot,
+                    # same physical window as the gate) arbitrates; est*count
+                    # keeps its suppression authority only where no envelope
+                    # exists to arbitrate (shared firmware, lost or frozen
+                    # terminal, replayed artifact).
+                    terminal = (
+                        ctx.power_run.terminal
+                        if ctx.power_run is not None
+                        else None
+                    )
+                    # A terminal that reports failed or incomplete work makes
+                    # the PLANNED count -- the denominator below -- wrong on
+                    # its face, and its elapsed_us times whatever short window
+                    # it did run, so it cannot arbitrate either (found by
+                    # review: an early-exit firmware agrees with its own gate
+                    # by construction and would have earned a drift note plus
+                    # a 2x-wrong energy figure).
+                    terminal_unhealthy = terminal is not None and (
+                        terminal.status != "ok"
+                        or terminal.error_code != 0
+                        or terminal.completed_count != terminal.requested_count
+                    )
+                    observer = (
+                        assess_gate_observer(
+                            elapsed_us=terminal.elapsed_us,
+                            gated_result=ctx.power_result,
+                            stats_rate_hz=ctx.config.power.stats_rate_hz,
+                        )
+                        if terminal is not None and not terminal_unhealthy
+                        else None
+                    )
+                    observer_failed = observer is not None and not observer.agrees
+                    if (
+                        integrity.below_minimum
+                        or observer_failed
+                        or terminal_unhealthy
+                        or (not integrity.valid and observer is None)
+                    ):
                         summary["power"]["gated_window_duration_suspect"] = True
                         log.warning(
-                            "Joulescope gated window duration (%.4fs) does not match "
-                            "clean_infer_count=%d x clean_infer_avg_us=%dus (expected "
-                            "%.4fs, ratio=%.3f). Per-inference power metrics are "
-                            "suppressed because the denominator is not trustworthy.",
+                            "Joulescope gated window duration (%.4fs) is not "
+                            "trustworthy (%s; expected %.4fs from "
+                            "clean_infer_count=%d x clean_infer_avg_us=%dus, "
+                            "ratio=%.3f). Per-inference power metrics are "
+                            "suppressed because the denominator is not "
+                            "trustworthy.",
                             ps.duration_s,
+                            (
+                                "below the minimum accepted gate"
+                                if integrity.below_minimum
+                                else "firmware window clock disagrees with the gate"
+                                if observer_failed
+                                else "power terminal reported failed or incomplete work"
+                                if terminal_unhealthy
+                                else "duration mismatch with no firmware envelope to arbitrate"
+                            ),
+                            integrity.expected_s,
                             effective_count,
                             effective_avg_us,
-                            integrity.expected_s,
                             integrity.ratio,
                         )
                     else:
+                        deviation = abs(1.0 - integrity.ratio)
+                        if (
+                            not integrity.valid
+                            and DRIFT_NOTE_MIN_RATIO_DEVIATION
+                            < deviation
+                            <= DRIFT_PLAUSIBLE_RATIO_DEVIATION
+                        ):
+                            # Observer agreed and the miss is drift-scale: the
+                            # window is real and self-consistent; the
+                            # profile-boot reference is stale. Publish the
+                            # story next to the ratio. Beyond the envelope no
+                            # note is written -- drift cannot explain it, and
+                            # evaluation.validity keeps the est*count warning
+                            # there.
+                            drift_pct = (integrity.ratio - 1.0) * 100.0
+                            summary["power"]["gated_window_reference_drift"] = (
+                                f"window ran {abs(drift_pct):.1f}% "
+                                f"{'short of' if drift_pct < 0 else 'past'} the "
+                                "profile-phase expectation but agrees with the "
+                                "firmware's own STIMER window time; consistent "
+                                "with HFRC core-clock thermal drift between "
+                                "the profile and power boots (#181), not a "
+                                "capture defect"
+                            )
+                            log.info(
+                                "Gated window %.4fs vs est*count %.4fs "
+                                "(ratio=%.3f) -- firmware STIMER window agrees "
+                                "with the gate, so the profile-phase reference "
+                                "is stale (thermal clock drift), not the "
+                                "capture. Per-inference metrics remain valid: "
+                                "the denominator is the inference count.",
+                                ps.duration_s,
+                                integrity.expected_s,
+                                integrity.ratio,
+                            )
                         energy_per_infer = ps.energy_j / effective_count
                         summary["power"]["energy_per_inference_j"] = round(
                             energy_per_infer, 9

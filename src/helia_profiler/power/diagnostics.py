@@ -11,6 +11,17 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
+# Profile clean-window clock integrity, extracted to its own module at this
+# file's size ceiling. Re-exported here (``_as_count`` included) so existing
+# import sites keep working.
+from .clean_window import (  # noqa: F401
+    DWT_RATE_MIN_RATIO,
+    CleanWindowClockRate,
+    CleanWindowStall,
+    _as_count,
+    assess_clean_window_clock_rate,
+    assess_clean_window_stall,
+)
 from .sync import DeviceState
 
 if TYPE_CHECKING:
@@ -103,6 +114,14 @@ class GateDurationIntegrity:
         )
 
     @property
+    def below_minimum(self) -> bool:
+        """The floor and the band fail for different reasons and carry
+        different severities downstream: a below-floor gate is too short for
+        the instrument's stats integral to be trusted at all, while a band
+        miss may just mean the cross-boot reference is stale (#181)."""
+        return self.measured_s < self.minimum_s
+
+    @property
     def ratio(self) -> float:
         return self.measured_s / self.expected_s if self.expected_s > 0 else 0.0
 
@@ -110,8 +129,10 @@ class GateDurationIntegrity:
         """Artifact form — byte-compatible with the dict previously built by
         hand in ``capture_gated.py``: seconds rounded to 6 places, and
         ``valid`` DERIVED from the stored measurements rather than cached
-        (the old dict stored a constant ``True``, which held only because
-        that writer raises on mismatch; deriving keeps it honest everywhere)."""
+        (the old hand-built dict stored a constant ``True``, which held only
+        while that writer still raised on mismatch — it no longer does
+        (#142/#181), so an artifact can now honestly carry ``valid: false``;
+        deriving keeps it honest everywhere)."""
         metadata: dict[str, object] = {
             "measured_s": round(self.measured_s, 6),
             "expected_s": round(self.expected_s, 6),
@@ -234,11 +255,63 @@ def assess_gate_duration(
 #:   - Apollo510B: 13 gated runs, all within 0.08% -- the bulk of the sample,
 #:   - Apollo3 Blue Plus: ONE valid gated run, 0.064%,
 #:   - Apollo4 Blue Plus: ONE valid gated run, 0.065%.
-#: 5% is ~60x the worst of those -- generous enough that instrument jitter,
+#: 1% is ~12x the worst of those -- generous enough that instrument jitter,
 #: packet quantization and gate-edge poll resolution can never trip it, while
-#: still catching the 0x and 7x failures. Warning-only: three boards, and only
-#: one run on two of them, is not a wide enough envelope to make this fatal.
-EXTERNAL_WINDOW_CLOCK_TOLERANCE = 0.05
+#: still catching every failure mode on record (the 0x and 7x clock faults,
+#: and any gate that bracketed the wrong stretch of firmware execution).
+#:
+#: This is the AUTHORITATIVE external window check (#142/#181 redesign): the
+#: two sides are independent oscillators (instrument sample clock vs the
+#: 32.768 kHz STIMER XTAL) observing the SAME physical window in the SAME
+#: boot, so HFRC thermal drift -- which moves the est*count expectation by
+#: up to ~12% on a cold AP5 boot -- cancels here by construction. #110's
+#: settle-verify guarantees the STIMER side was alive when the window opened
+#: (an envelope without stimer_dead is a positive liveness statement).
+#: Disagreement therefore means the gate did not bracket what the firmware
+#: timed, which is exactly the condition that makes the per-inference energy
+#: denominator untrustworthy -- ERROR, not warning, at the emit sites.
+#:
+#: The 12x margin claim holds for bench-length (4-5 s) windows. On short
+#: windows the reference's mechanical error is ABSOLUTE (packet integral +
+#: GPI-poll edges), so the comparison carries an absolute slack floor too --
+#: see :func:`external_observer_slack_s`; without it, the 1 s minimum window
+#: at low ``stats_rate_hz`` fails on quantization alone.
+EXTERNAL_WINDOW_CLOCK_TOLERANCE = 0.01
+
+#: GPI poll cadence of the gated capture loop (capture_gated.py uses this as
+#: its ``poll_interval_s`` default). Each gate edge is resolved no finer than
+#: one poll, so the observer comparison must absorb up to two of these.
+GATE_EDGE_POLL_INTERVAL_S = 0.004
+
+#: Largest ``|1 - ratio|`` of gate vs est*count that HFRC thermal drift
+#: between the profile boot and the power boot can plausibly explain. #181
+#: observed up to ~12% on a cold AP510 first-run-after-idle; 0.15 covers that
+#: with margin. INSIDE this envelope, observer agreement silences the
+#: est*count warning (stale reference, healthy capture). BEYOND it, the
+#: warning stands even when the observer agrees: the observer only proves the
+#: gate brackets what the firmware timed -- it structurally cannot see a
+#: window whose CONTENT changed (init left inside the gate, wrong clock
+#: config, a different binary variant with matching counts), and est*count is
+#: the only check tying the window to the profile phase's timing.
+DRIFT_PLAUSIBLE_RATIO_DEVIATION = 0.15
+
+#: Smallest est*count deviation worth an explanatory drift note in the
+#: summary. Below this the miss is within ordinary cross-boot jitter of the
+#: tight advisory band and a "thermal drift" story would overclaim; the ratio
+#: field carries the number either way.
+DRIFT_NOTE_MIN_RATIO_DEVIATION = 0.05
+
+
+def external_observer_slack_s(stats_rate_hz: int | None) -> float:
+    """Absolute mechanical error bound on the gate-vs-firmware comparison.
+
+    The gate side is a stats-packet integral (up to one packet of edge
+    quantization per side) bounded by GPI polls (up to one poll interval per
+    edge). Mirrors ``packet_slack_s`` in :func:`assess_gate_duration`, which
+    has always modelled the packet term for the est*count band.
+    """
+    packet_s = 2.0 / max(1, stats_rate_hz) if stats_rate_hz else 0.0
+    return packet_s + 2.0 * GATE_EDGE_POLL_INTERVAL_S
 
 #: Internally-referenced tolerance, TWO-SIDED. Internal mode has no host-timed
 #: gate, so the only plan-based reference is N x the reference inference time
@@ -381,268 +454,6 @@ def expected_terminal_requested_count(
     return inference_count
 
 
-# ---------------------------------------------------------------------------
-# Profile clean-window clock integrity
-# ---------------------------------------------------------------------------
-#
-# The two checks above police the *power* binary's window clock. This one
-# polices the clock that measures the PROFILE binary's clean window -- the
-# number published as clean_infer_avg_us, which is also the reference the power
-# plan sizes its window from (stages/plan_power.py). It is a different failure
-# with a different signature, which is why it is a different check:
-#
-#   * frozen power clock: elapsed_us == 0, or off by a large factor. Loud.
-#   * stalled profile clock: the window loses a *sub-interval*, so the average
-#     comes back some percentage low. It is never zero, never inverted, and
-#     lands squarely inside every plausible range -- 21% low on the Apollo4
-#     runs in #121, against a 3.9% legitimate build-to-build spread. Nothing
-#     downstream could tell.
-#
-# Detection does not need a reference measurement, because the firmware reports
-# the fault directly. It reports TWO counts, because a dropped debug domain has
-# been seen doing two different things to the counter:
-#
-#   * FROZEN (the usual case, and what #121 measured): CYCCNT stops, so every
-#     iteration wholly inside the stall reads a delta of exactly zero. An
-#     inference cannot take zero core cycles, so this needs no threshold and
-#     cannot false-positive.
-#   * PARTIAL: the counter keeps advancing, but far too slowly. Observed at
-#     least once on Apollo4, with DWT running at ~0.6% of the expected rate
-#     through an early-boot window. Such a delta is small but non-zero, so it
-#     passes the zero test and accumulates uncounted -- which would be worse
-#     than silence, because the run would then assert "checked, clean" while
-#     still being wrong. The firmware counts these separately, against a floor
-#     derived from its own warm reference (an eighth of it; see the
-#     clean_stalled_iters declaration in main.cc.j2).
-#
-# Note the evidence for the frozen shape is an aggregate: #121's table records
-# per-run average cycles, which cannot by itself distinguish "N iterations read
-# exactly 0" from "a broader set read partially low" -- both fit the same
-# deficit total. The bimodal shape is the most likely reading of it, not a
-# demonstrated one, which is the other reason both counts exist.
-#
-# The host judges; the firmware only reports. Same split as
-# firmware_window_clock_is_frozen().
-
-
-def _as_count(value: object) -> int | None:
-    """Parse a firmware-reported count, or ``None`` if it is not a number.
-
-    The parser leaves any ``HPX_KEY=value`` it cannot int() as a *string*, so a
-    torn transport line (``HPX_CLEAN_PARTIAL_ITERS=1 7``) arrives here as text.
-    int() on that raises, and this function is reached from ``evaluate_run()``,
-    which would take the whole evaluation down over a corrupt diagnostic field.
-    Unparseable is treated as unreported, which the callers already model.
-    """
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value
-    try:
-        return int(str(value).strip())
-    except (TypeError, ValueError):
-        return None
-
-
-@dataclass(frozen=True)
-class CleanWindowStall:
-    """Clean-window iterations whose DWT delta was zero or implausibly low."""
-
-    #: Deltas of exactly zero -- a frozen counter. Cannot be legitimate.
-    stalled_iters: int
-    #: Deltas below the firmware's warm-derived floor but non-zero -- a counter
-    #: that kept advancing, far too slowly.
-    partial_iters: int
-    #: ``None`` when the firmware reported no usable iteration count, in which
-    #: case the counts are known but their scale is not.
-    total_iters: int | None
-    #: The warm reference the partial floor was derived from. ``0`` means the
-    #: floor was zero and the partial check could not fire at all.
-    ref_cycles: int | None = None
-
-    @property
-    def affected_iters(self) -> int:
-        return self.stalled_iters + self.partial_iters
-
-    @property
-    def partial_check_inoperative(self) -> bool:
-        """The partial check was compiled in but could not fire.
-
-        The floor is ``ref_cycles >> 3``, so a zero reference makes it zero and
-        no unsigned delta is below it. That happens when every warm sample was
-        itself frozen -- the documented "usual case" of the very fault this is
-        meant to catch -- so it must not read as "checked, clean".
-        """
-        return self.ref_cycles is not None and self.ref_cycles <= 0
-
-    @property
-    def total_is_unknown(self) -> bool:
-        return not self.total_iters or self.total_iters <= 0
-
-    @property
-    def counts_are_inconsistent(self) -> bool:
-        """More affected iterations than the window ran.
-
-        Structurally impossible, so the report itself is corrupt -- a torn
-        transport line can inflate one field while the other parses cleanly.
-        Still a fault worth raising; just not one whose fractions mean
-        anything, so they are clamped rather than published as the >100%
-        nonsense a raw division gives.
-        """
-        if self.total_is_unknown:
-            return False
-        return self.affected_iters > (self.total_iters or 0)
-
-    @property
-    def affected_fraction(self) -> float:
-        if self.total_is_unknown:
-            return 0.0
-        return min(1.0, self.affected_iters / (self.total_iters or 1))
-
-    @property
-    def understatement_lower_bound(self) -> float:
-        """Minimum fraction by which ``clean_infer_avg_us`` reads low.
-
-        Both shapes contribute, and both bounds are sound:
-
-        * a frozen iteration contributed exactly 0 to a sum that should have
-          carried a full inference, so it costs the full ``1/total`` each;
-        * a partial iteration contributed *something*, but by construction less
-          than an eighth of the warm reference, so it costs at least
-          ``0.875/total``.
-
-        Using the frozen count alone made a pure-partial stall report "~0.0%
-        low" while every iteration in the window was affected, which is worse
-        than saying nothing. Still a lower bound: partials are bounded above by
-        the floor, not pinned to it.
-        """
-        if self.total_is_unknown:
-            return 0.0
-        lost = self.stalled_iters + 0.875 * self.partial_iters
-        return min(1.0, lost / (self.total_iters or 1))
-
-    def to_metadata(self) -> dict[str, float | int | bool | None]:
-        metadata: dict[str, float | int | bool | None] = {
-            "stalled_iters": self.stalled_iters,
-            "partial_iters": self.partial_iters,
-            "total_iters": self.total_iters,
-            "affected_fraction": round(self.affected_fraction, 6),
-            "understatement_lower_bound": round(self.understatement_lower_bound, 6),
-        }
-        if self.ref_cycles is not None:
-            metadata["ref_cycles"] = self.ref_cycles
-        if self.counts_are_inconsistent:
-            metadata["counts_are_inconsistent"] = True
-        if self.total_is_unknown:
-            metadata["total_is_unknown"] = True
-        if self.partial_check_inoperative:
-            metadata["partial_check_inoperative"] = True
-        return metadata
-
-
-def assess_clean_window_stall(
-    *,
-    stalled_iters: object,
-    partial_iters: object,
-    clean_infer_count: object,
-    ref_cycles: object = None,
-) -> CleanWindowStall | None:
-    """Report a stalled profile clean window, or ``None`` when there is none.
-
-    ``None`` means "nothing to say": the firmware reported no counts (a window
-    that is not DWT-timed per iteration, or firmware predating the check), or
-    it reported zero for both AND its partial check was operative. A zero pair
-    with a dead floor is NOT healthy -- the check could not have fired -- so
-    that case returns a record rather than None.
-
-    Counts are accepted as ``object`` and parsed defensively: the parser hands
-    through unparseable ``HPX_*`` values as strings.
-    """
-    stalled = _as_count(stalled_iters)
-    partial = _as_count(partial_iters)
-    total = _as_count(clean_infer_count)
-    ref = _as_count(ref_cycles)
-    if stalled is None and partial is None:
-        return None
-    stalled = max(0, stalled or 0)
-    partial = max(0, partial or 0)
-    floor_dead = ref is not None and ref <= 0
-    if stalled <= 0 and partial <= 0 and not floor_dead:
-        return None
-    return CleanWindowStall(
-        stalled_iters=stalled,
-        partial_iters=partial,
-        total_iters=total,
-        ref_cycles=ref,
-    )
-
-
-#: Fraction of the expected DWT rate below which the counter is judged broken.
-#: The probe times a known nsx_delay_us() interval, so the expected reading is
-#: SystemCoreClock * probe_us / 1e6 exactly -- no model behaviour enters it.
-#: Half is far below anything nsx_delay_us's own calibration error could
-#: produce and far above the observed fault (a frozen counter reads 0; the
-#: partial-counting case measured ~0.6% of rate), so the band between "healthy"
-#: and "flagged" is roughly two orders of magnitude wide.
-DWT_RATE_MIN_RATIO = 0.5
-
-
-@dataclass(frozen=True)
-class CleanWindowClockRate:
-    """DWT's measured rate against an independent clock, before the window."""
-
-    measured_cycles: int
-    probe_us: int
-    system_clock_hz: int
-
-    @property
-    def expected_cycles(self) -> float:
-        return self.system_clock_hz * self.probe_us / 1_000_000.0
-
-    @property
-    def ratio(self) -> float:
-        expected = self.expected_cycles
-        return self.measured_cycles / expected if expected > 0 else 0.0
-
-    @property
-    def is_broken(self) -> bool:
-        return self.ratio < DWT_RATE_MIN_RATIO
-
-    def to_metadata(self) -> dict[str, float | int]:
-        return {
-            "measured_cycles": self.measured_cycles,
-            "expected_cycles": round(self.expected_cycles, 1),
-            "probe_us": self.probe_us,
-            "ratio": round(self.ratio, 6),
-            "min_ratio": DWT_RATE_MIN_RATIO,
-        }
-
-
-def assess_clean_window_clock_rate(
-    *, rate_cycles: object, probe_us: object, system_clock_hz: object
-) -> CleanWindowClockRate | None:
-    """Compare the firmware's DWT rate probe against its closed-form expectation.
-
-    This is the only clean-window check whose reference does not come from DWT.
-    The in-window counters are DWT-relative and therefore scale-invariant: a
-    uniform slowdown moves the warm reference and the counted iterations by the
-    same factor and cancels exactly. Returns ``None`` when the firmware did not
-    report a probe, or reported one with no usable clock to expect against.
-    """
-    measured = _as_count(rate_cycles)
-    probe = _as_count(probe_us)
-    clock = _as_count(system_clock_hz)
-    if measured is None or not probe or not clock or probe <= 0 or clock <= 0:
-        return None
-    return CleanWindowClockRate(
-        measured_cycles=max(0, measured),
-        probe_us=probe,
-        system_clock_hz=clock,
-    )
-
-
 @dataclass(frozen=True)
 class WindowClockAgreement:
     """Agreement between the firmware's own window clock and a reference."""
@@ -653,6 +464,13 @@ class WindowClockAgreement:
     #: can name it and a reader knows how much to trust the comparison.
     reference_source: str
     relative_tolerance: float
+    #: Absolute floor under the relative band. The external gate reference is
+    #: a packet-integral bounded by GPI-poll edges, so its mechanical error is
+    #: absolute (packets + poll skew), not proportional -- on a short window a
+    #: purely relative band shrinks below what the instrument can resolve and
+    #: a healthy run fails on quantization alone (found by review of the 1%
+    #: promotion; the est*count check always modelled this via packet_slack_s).
+    absolute_slack_s: float = 0.0
 
     @property
     def elapsed_s(self) -> float:
@@ -669,11 +487,15 @@ class WindowClockAgreement:
         return abs(self.elapsed_s - self.reference_s) / self.reference_s
 
     @property
+    def tolerance_s(self) -> float:
+        return max(self.reference_s * self.relative_tolerance, self.absolute_slack_s)
+
+    @property
     def agrees(self) -> bool:
-        return self.relative_error <= self.relative_tolerance
+        return abs(self.elapsed_s - self.reference_s) <= self.tolerance_s
 
     def to_metadata(self) -> dict[str, float | int | str]:
-        return {
+        metadata: dict[str, float | int | str] = {
             "elapsed_us": self.elapsed_us,
             "elapsed_s": round(self.elapsed_s, 6),
             "reference_s": round(self.reference_s, 6),
@@ -682,10 +504,18 @@ class WindowClockAgreement:
             "relative_tolerance": self.relative_tolerance,
             "ratio": round(self.ratio, 6),
         }
+        if self.absolute_slack_s > 0:
+            metadata["absolute_slack_s"] = round(self.absolute_slack_s, 6)
+        return metadata
 
 
 def assess_window_clock(
-    *, elapsed_us: int, reference_s: float, reference_source: str, relative_tolerance: float
+    *,
+    elapsed_us: int,
+    reference_s: float,
+    reference_source: str,
+    relative_tolerance: float,
+    absolute_slack_s: float = 0.0,
 ) -> WindowClockAgreement | None:
     """Compare the firmware window clock against an independent reference.
 
@@ -699,6 +529,7 @@ def assess_window_clock(
         reference_s=reference_s,
         reference_source=reference_source,
         relative_tolerance=relative_tolerance,
+        absolute_slack_s=absolute_slack_s,
     )
 
 
@@ -819,6 +650,7 @@ def assess_run_window_clock(
     gated_result: "PowerResult | None",
     planned_inference_count: int | None,
     planned_inference_us: int | None,
+    stats_rate_hz: int | None = None,
 ) -> WindowClockAgreement | None:
     """Resolve reference + tolerance for one run and compare the window clock.
 
@@ -842,17 +674,48 @@ def assess_run_window_clock(
             return None
         reference_s, reference_source = reference
         tolerance = EXTERNAL_WINDOW_CLOCK_TOLERANCE
+        absolute_slack_s = external_observer_slack_s(stats_rate_hz)
     else:
         if not planned_inference_count or not planned_inference_us:
             return None
         reference_s = planned_inference_count * planned_inference_us / 1_000_000.0
         reference_source = "planned_window"
         tolerance = INTERNAL_WINDOW_CLOCK_TOLERANCE
+        # The 25% cross-binary band dwarfs any instrument quantization; an
+        # absolute floor would only ever be the smaller term here.
+        absolute_slack_s = 0.0
     return assess_window_clock(
         elapsed_us=elapsed_us,
         reference_s=reference_s,
         reference_source=reference_source,
         relative_tolerance=tolerance,
+        absolute_slack_s=absolute_slack_s,
+    )
+
+
+def assess_gate_observer(
+    *,
+    elapsed_us: int | None,
+    gated_result: "PowerResult | None",
+    stats_rate_hz: int | None = None,
+) -> WindowClockAgreement | None:
+    """Two-observer verdict on one gated window: instrument gate vs firmware STIMER.
+
+    Thin fixed-mode entry to :func:`assess_run_window_clock`, so every consumer
+    (evaluation.validity, report.summary) resolves the same reference and the
+    same tolerance -- the divergence class this module exists to prevent.
+    Returns ``None`` when either observer is missing (no envelope: shared-mode
+    firmware or a lost terminal; no gate: internal mode or a degraded capture),
+    which callers must treat as "the check could not run", never as a pass --
+    the est*count fallback keeps its authority exactly there.
+    """
+    return assess_run_window_clock(
+        elapsed_us=elapsed_us,
+        internal_mode=False,
+        gated_result=gated_result,
+        planned_inference_count=None,
+        planned_inference_us=None,
+        stats_rate_hz=stats_rate_hz,
     )
 
 
@@ -944,8 +807,11 @@ def classify_gate_failure(
 
 
 __all__ = [
+    "DRIFT_NOTE_MIN_RATIO_DEVIATION",
+    "DRIFT_PLAUSIBLE_RATIO_DEVIATION",
     "EXTERNAL_WINDOW_CLOCK_TOLERANCE",
     "FROZEN_WINDOW_CLOCK_HINT",
+    "GATE_EDGE_POLL_INTERVAL_S",
     "INTERNAL_WINDOW_CLOCK_TOLERANCE",
     "NO_GATE_RISE_LOCKSTEP_HINT",
     "NO_GATE_RISE_WIRING_HINT",
@@ -963,10 +829,12 @@ __all__ = [
     "assess_clean_window_clock_rate",
     "assess_clean_window_stall",
     "assess_gate_duration",
+    "assess_gate_observer",
     "assess_run_window_clock",
     "assess_window_clock",
     "assess_window_clock_ceiling",
     "classify_gate_failure",
+    "external_observer_slack_s",
     "firmware_window_clock_is_frozen",
     "gated_window_reference_s",
 ]

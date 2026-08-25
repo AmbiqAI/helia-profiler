@@ -222,7 +222,7 @@ def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):
         "device_profiled_infer_avg_us": 8000,
     }
     assert summary["schema"] == "hpx.run-summary"
-    assert summary["schema_version"] == 3  # v2: #24 binary.bss; v3: #133 memory_regions
+    assert summary["schema_version"] == 4  # v2: #24 binary.bss; v3: #133 memory_regions; v4: #142/#181 gate verdict
     assert summary["validity"] == "valid"
     assert summary["issues"] == []
 
@@ -410,7 +410,7 @@ def test_write_report_publishes_verifiable_manifest_last(tmp_path: Path):
     assert artifacts["summary.json"].role == "core"
     assert artifacts["summary.json"].name == "hpx.summary"
     assert artifacts["summary.json"].schema == "hpx.run-summary"
-    assert artifacts["summary.json"].schema_version == 3
+    assert artifacts["summary.json"].schema_version == 4
     assert artifacts["summary.json"].optional is False
     assert artifacts["profile_results.csv"].name == "hpx.profile-layers"
     assert artifacts["profile_results.csv"].schema is None
@@ -642,6 +642,134 @@ def test_write_summary_does_not_flag_normal_gated_window(tmp_path: Path):
 
     assert "gated_window_duration_suspect" not in summary["power"]
     assert summary["power"]["gated_window_duration_ratio"] > 0.95
+
+
+def _attach_power_terminal(
+    ctx: PipelineContext,
+    *,
+    elapsed_us: int,
+    count: int,
+    completed_count: int | None = None,
+) -> None:
+    """Dedicated-mode terminal envelope, the observer that arbitrates the
+    est*count band (#142/#181)."""
+    ctx.power_run = PowerRun(
+        plan=PowerRunPlan(
+            firmware_mode="dedicated",
+            inference_count=count,
+        ),
+        observation=None,
+        terminal=PowerTerminalRecord(
+            version=1,
+            status="ok",
+            requested_count=count,
+            completed_count=count if completed_count is None else completed_count,
+            elapsed_us=elapsed_us,
+            final_phase="done",
+            error_code=0,
+            gate_asserted=True,
+            gate_lowered=True,
+        ),
+    )
+
+
+def test_write_summary_publishes_drift_note_when_firmware_confirms_gate(
+    tmp_path: Path,
+):
+    """THE #181 scenario at summary level: est*count misses by 11.8% but the
+    firmware's STIMER window agrees with the gate, so the reference is stale
+    and the capture is sound. Per-inference metrics stay published (the
+    denominator is the count, which drift cannot change) and the story is
+    told next to the ratio instead of via suppression."""
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=233, clean_infer_avg_us=21532, duration_s=4.427
+    )
+    _attach_power_terminal(ctx, elapsed_us=4_427_500, count=233)
+
+    out_path = _write_summary(ctx, tmp_path)
+    summary = json.loads(out_path.read_text())
+
+    assert "gated_window_duration_suspect" not in summary["power"]
+    assert "energy_per_inference_j" in summary["power"]
+    assert "inferences_per_joule" in summary["power"]
+    assert "HFRC" in summary["power"]["gated_window_reference_drift"]
+    assert summary["power"]["gated_window_duration_ratio"] < 0.95
+
+
+def test_write_summary_suppresses_when_observer_disagrees(tmp_path: Path):
+    """When the firmware's own window clock disagrees with the gate, the gate
+    did not bracket what the firmware timed -- suppression, with no drift
+    note pretending otherwise."""
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=233, clean_infer_avg_us=21532, duration_s=4.427
+    )
+    _attach_power_terminal(ctx, elapsed_us=5_017_000, count=233)
+
+    out_path = _write_summary(ctx, tmp_path)
+    summary = json.loads(out_path.read_text())
+
+    assert summary["power"]["gated_window_duration_suspect"] is True
+    assert "energy_per_inference_j" not in summary["power"]
+    assert "gated_window_reference_drift" not in summary["power"]
+
+
+def test_write_summary_suppresses_when_terminal_reports_incomplete_work(
+    tmp_path: Path,
+):
+    """An early-exit firmware agrees with its own gate BY CONSTRUCTION (it
+    times the same short window it gated), so terminal health must gate the
+    arbitration: energy / planned_count would be wrong by the shortfall, with
+    a drift note vouching for it (found by review)."""
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=233, clean_infer_avg_us=21532, duration_s=2.5
+    )
+    _attach_power_terminal(ctx, elapsed_us=2_500_500, count=233, completed_count=116)
+
+    out_path = _write_summary(ctx, tmp_path)
+    summary = json.loads(out_path.read_text())
+
+    assert summary["power"]["gated_window_duration_suspect"] is True
+    assert "energy_per_inference_j" not in summary["power"]
+    assert "gated_window_reference_drift" not in summary["power"]
+
+
+def test_write_summary_no_drift_note_beyond_the_plausible_envelope(tmp_path: Path):
+    """A self-consistent window at half the expected length is not thermal
+    drift: metrics stay published (the observer vouches for the bracket and
+    the count is exact) but no note claims a cause -- evaluation.validity
+    carries the est*count warning instead."""
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=233, clean_infer_avg_us=21532, duration_s=2.5
+    )
+    _attach_power_terminal(ctx, elapsed_us=2_500_500, count=233)
+
+    out_path = _write_summary(ctx, tmp_path)
+    summary = json.loads(out_path.read_text())
+
+    assert "gated_window_duration_suspect" not in summary["power"]
+    assert "energy_per_inference_j" in summary["power"]
+    assert "gated_window_reference_drift" not in summary["power"]
+
+
+def test_write_summary_observer_agreement_does_not_mask_the_floor(tmp_path: Path):
+    """A sub-minimum gate suppresses even when the firmware clock agrees:
+    the floor guards the stats integral, not the reference."""
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=11, clean_infer_avg_us=21000, duration_s=0.210
+    )
+    ctx.power_result.metadata.gate_duration_integrity = GateDurationIntegrity(
+        measured_s=0.210,
+        expected_s=0.231,
+        tolerance_s=0.0231,
+        minimum_s=1.0,
+    )
+    _attach_power_terminal(ctx, elapsed_us=210_000, count=11)
+
+    out_path = _write_summary(ctx, tmp_path)
+    summary = json.loads(out_path.read_text())
+
+    assert summary["power"]["gated_window_duration_suspect"] is True
+    assert "energy_per_inference_j" not in summary["power"]
 
 
 def test_write_summary_uses_fixed_power_plan_count(tmp_path: Path):

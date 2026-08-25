@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from ..power.diagnostics import (
+    DRIFT_PLAUSIBLE_RATIO_DEVIATION,
     assess_clean_window_clock_rate,
     count_noun,
     assess_clean_window_stall,
@@ -164,19 +165,13 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                         gate_fall_observed=observation.gate_fall_observed,
                     )
                 )
-            duration = observation.result.metadata.gate_duration_integrity
-            if duration is not None and not duration.valid:
-                issues.append(
-                    _warning(
-                        IssueCode.POWER_GATE_DURATION_MISMATCH,
-                        "Measured power-gate duration does not agree with the expected fixed-N window.",
-                        **duration.to_metadata(),
-                    )
-                )
-            elif duration is None and observation.mode == "gpio_gated":
-                duration_issue = _assess_unrecorded_duration(ctx, observation.result.summary.duration_s)
-                if duration_issue is not None:
-                    issues.append(duration_issue)
+        # The est*count duration verdict is DEFERRED until after the terminal
+        # block below (#142/#181): whether a band miss is an error depends on
+        # what the firmware's own window clock says, and that arbitration is
+        # computed there. Tracked as a tri-state -- None means the observer
+        # check could not run, which hands the est*count fallback its
+        # authority back; it is never treated as a pass.
+        observer_agrees: bool | None = None
 
         if plan.firmware_mode == "dedicated" and terminal is None:
             issues.append(
@@ -289,16 +284,43 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                     # check at all while the stage has one.
                     planned_inference_count=plan.inference_count,
                     planned_inference_us=plan.reference_inference_us,
+                    stats_rate_hz=ctx.config.power.stats_rate_hz,
                 )
+                if agreement is not None and not internal_mode:
+                    observer_agrees = agreement.agrees
                 if agreement is not None and not agreement.agrees:
-                    issues.append(
-                        _warning(
-                            IssueCode.POWER_WINDOW_CLOCK_MISMATCH,
-                            "Firmware-reported window duration does not agree with "
-                            "the independently measured window.",
-                            **agreement.to_metadata(),
+                    if internal_mode:
+                        # Plan-referenced (count x a different boot's timing,
+                        # 25% band): a genuine cross-boot reference check, so
+                        # it stays advisory.
+                        issues.append(
+                            _warning(
+                                IssueCode.POWER_WINDOW_CLOCK_MISMATCH,
+                                "Firmware-reported window duration does not agree with "
+                                "the independently measured window.",
+                                **agreement.to_metadata(),
+                            )
                         )
-                    )
+                    else:
+                        # Two independent oscillators watched the SAME window
+                        # in the SAME boot (instrument sample clock vs the
+                        # STIMER XTAL, liveness-verified by #110's settle
+                        # probe), so drift cannot explain a miss: the gate did
+                        # not bracket what the firmware timed, and every
+                        # per-inference figure divided out of it inherits the
+                        # error. This is the authoritative window-integrity
+                        # verdict (#142/#181) -- the est*count band below is
+                        # only a reference diagnostic once this check has run.
+                        issues.append(
+                            _error(
+                                IssueCode.POWER_WINDOW_OBSERVER_MISMATCH,
+                                "The instrument-timed gate and the firmware's own "
+                                "window clock disagree about the same physical "
+                                "window; per-inference power metrics are not "
+                                "trustworthy.",
+                                **agreement.to_metadata(),
+                            )
+                        )
                 # Host wall-clock ceiling, recorded by the collect stage (which
                 # is the only place that knows "now"). The verdict is a
                 # property derived from the stored measurements, never a
@@ -318,6 +340,78 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                                 **ceiling.to_metadata(),
                             )
                         )
+
+        # Deferred est*count verdict (#142/#181). The expectation multiplies a
+        # count by a per-inference time measured in a DIFFERENT boot and
+        # thermal state, and the LP core clock is HFRC-derived: a cold power
+        # boot runs fast enough to undershoot the band while being perfectly
+        # healthy. The observer check above arbitrates:
+        #   * observer agreed AND the miss is drift-scale (within
+        #     DRIFT_PLAUSIBLE_RATIO_DEVIATION) -> the window is real and
+        #     self-consistent; the reference is stale (cold-boot HFRC drift,
+        #     #181). That is data, not a defect -- the summary publishes the
+        #     ratio and drift note. Beyond drift scale the warning stands:
+        #     see the inline comment on that branch.
+        #   * observer disagreed -> POWER_WINDOW_OBSERVER_MISMATCH (ERROR)
+        #     already carries the story; a second issue would restate it.
+        #   * observer could not run (shared firmware, lost or frozen
+        #     terminal) -> est*count keeps its original WARNING authority.
+        # The 1s floor is independent of arbitration: a below-floor gate is
+        # too short for the stats integral to be trusted regardless of what
+        # the firmware clock says.
+        if observation is not None:
+            duration = observation.result.metadata.gate_duration_integrity
+            if duration is not None:
+                if duration.below_minimum:
+                    issues.append(
+                        _error(
+                            IssueCode.POWER_GATE_BELOW_MINIMUM,
+                            "Measured power gate is shorter than the minimum accepted window.",
+                            **duration.to_metadata(),
+                        )
+                    )
+                elif not duration.valid:
+                    if observer_agrees is None:
+                        issues.append(
+                            _warning(
+                                IssueCode.POWER_GATE_DURATION_MISMATCH,
+                                "Measured power-gate duration does not agree with the expected fixed-N window.",
+                                **duration.to_metadata(),
+                            )
+                        )
+                    elif (
+                        observer_agrees
+                        and abs(1.0 - duration.ratio) > DRIFT_PLAUSIBLE_RATIO_DEVIATION
+                    ):
+                        # Observer agreement only proves the gate brackets what
+                        # the firmware timed -- it cannot see a window whose
+                        # CONTENT changed (init left inside the gate, wrong
+                        # clock config), because both clocks watch the same
+                        # span regardless of what ran in it. Beyond the
+                        # drift-plausible envelope the est*count check is the
+                        # only tie to the profile phase's timing, so its
+                        # warning stands (found by review of the redesign:
+                        # unbounded absolution let a ratio-0.5 window evaluate
+                        # VALID with a friendly drift note).
+                        issues.append(
+                            _warning(
+                                IssueCode.POWER_GATE_DURATION_MISMATCH,
+                                "Measured power-gate duration deviates from the "
+                                "profile-phase reference beyond what thermal "
+                                "drift can explain, although the firmware's own "
+                                "window clock confirms the gate is "
+                                "self-consistent.",
+                                **duration.to_metadata(),
+                            )
+                        )
+                    # Inside the envelope with observer agreement: a stale
+                    # reference, not a defect -- the summary publishes the
+                    # ratio and drift note. Observer disagreement: the ERROR
+                    # above already carries the story.
+            elif observation.mode == "gpio_gated" and observer_agrees is None:
+                duration_issue = _assess_unrecorded_duration(ctx, observation.result.summary.duration_s)
+                if duration_issue is not None:
+                    issues.append(duration_issue)
 
         if on_device is not None:
             if on_device.overflow:
@@ -371,7 +465,17 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 )
             )
         duration = ctx.power_result.metadata.gate_duration_integrity
-        if duration is not None and not duration.valid:
+        if duration is not None and duration.below_minimum:
+            # No power_run means no terminal to arbitrate, but the floor
+            # never needed arbitration -- same severity as the run path.
+            issues.append(
+                _error(
+                    IssueCode.POWER_GATE_BELOW_MINIMUM,
+                    "Measured power gate is shorter than the minimum accepted window.",
+                    **duration.to_metadata(),
+                )
+            )
+        elif duration is not None and not duration.valid:
             issues.append(
                 _warning(
                     IssueCode.POWER_GATE_DURATION_MISMATCH,

@@ -302,12 +302,14 @@ class CollectPowerTerminalStage:
                 ctx.config.power.driver,
                 FROZEN_WINDOW_CLOCK_HINT,
             )
-        # Non-fatal cross-check of the firmware's own window clock against an
-        # independent measurement of the same work. Warning-only: the tolerances
-        # here are set from a narrow bench envelope -- wide enough that only a
-        # real timing fault trips them, not wide enough to promise no false
-        # positives on hardware nobody has run yet. See
-        # power.diagnostics.EXTERNAL_/INTERNAL_WINDOW_CLOCK_TOLERANCE.
+        # Cross-check of the firmware's own window clock against an
+        # independent measurement of the same work. This stage only LOGS the
+        # verdict at capture time; the authoritative consequence lives in
+        # evaluation.validity, where the external arm is an ERROR
+        # (power.window_observer_mismatch, #142/#181 -- two clocks watched
+        # the same physical window, so disagreement is a real fault) and the
+        # internal arm stays a warning (cross-binary 25% band). Same helper,
+        # same inputs, so the log here and the verdict there cannot diverge.
         agreement = assess_run_window_clock(
             elapsed_us=terminal.elapsed_us,
             internal_mode=internal_mode,
@@ -335,6 +337,7 @@ class CollectPowerTerminalStage:
             # whatever ran inside it.
             planned_inference_count=plan.inference_count,
             planned_inference_us=plan.reference_inference_us,
+            stats_rate_hz=ctx.config.power.stats_rate_hz,
         )
         if agreement is not None and not agreement.agrees:
             log.warning(

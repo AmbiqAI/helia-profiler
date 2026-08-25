@@ -70,6 +70,36 @@ def test_power_health_rejects_invalid_gate_integrity():
     )
 
 
+def test_power_health_accepts_arbitrated_drift():
+    """#142/#181: `gate_duration_integrity.valid: false` alone no longer
+    means the capture is bad. When the summary carries a drift note, the
+    firmware's own window clock confirmed the gate and the miss is a stale
+    profile-phase reference -- the run is healthy and MUST pass validation
+    (the cold-boot bench case the redesign exists to accept)."""
+    result = CaseResult(
+        case_id="apollo510-power",
+        status="pass",
+        duration_s=1.0,
+        engine="helia-rt",
+        model_id="kws",
+        board="apollo510_evb",
+        power=True,
+        toolchain="arm-none-eabi-gcc",
+        transport="rtt",
+        memory="auto",
+        layers=13,
+        total_cycles=123456,
+        energy_uj=100.0,
+        gate_duration_integrity_valid=False,
+        gated_window_reference_drift=(
+            "window ran 11.8% short of the profile-phase expectation but "
+            "agrees with the firmware's own STIMER window time"
+        ),
+    )
+
+    assert validation_health_issues(result) == ()
+
+
 def test_power_health_rejects_degraded_observation():
     result = CaseResult(
         case_id="apollo510-power",

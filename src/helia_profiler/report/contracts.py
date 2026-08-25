@@ -22,7 +22,18 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: boundary must SEE the semantic change, and
 #: ``run_summary_schema_version`` is a comparability dimension, so this is
 #: a version bump per the v2 precedent above.
-RUN_SUMMARY_SCHEMA_VERSION = 3
+#:
+#: v4 (#142/#181): the gate-duration verdict was re-sourced. A v4 artifact
+#: can carry ``power.energy_per_inference_j`` alongside
+#: ``gate_duration_integrity.valid: false`` (impossible at v3, where the
+#: capture raised before such an artifact existed) -- the firmware's own
+#: window clock arbitrates, and ``power.gated_window_reference_drift``
+#: records the reclassification. ``gated_window_duration_suspect`` now keys
+#: on that arbitration (observer/terminal-health/floor), not the est*count
+#: band alone. A consumer applying v3 semantics to a v4 artifact fails
+#: healthy drift runs (the validation runner did exactly that until taught
+#: the drift field), so the boundary must be visible.
+RUN_SUMMARY_SCHEMA_VERSION = 4
 
 RUN_METADATA_SCHEMA = "hpx.run-metadata"
 RUN_METADATA_SCHEMA_VERSION = 1

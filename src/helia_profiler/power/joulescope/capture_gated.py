@@ -18,7 +18,11 @@ from typing import TYPE_CHECKING, Any
 
 from ...errors import PowerError
 from ..base import PowerResult
-from ..diagnostics import GateTransitionTiming, classify_gate_failure
+from ..diagnostics import (
+    GATE_EDGE_POLL_INTERVAL_S,
+    GateTransitionTiming,
+    classify_gate_failure,
+)
 from ..metadata import MeasurementScope, ObservationMode, PowerIntegrity, PowerMetadata
 from .device import (
     _HOST_STATS,
@@ -121,7 +125,9 @@ def capture_gated(
     # for artifact-only callers (#172 review: the hint said "1 inferences"
     # for a busy-loop window that ran none).
     work_noun: str = "inferences",
-    poll_interval_s: float = 0.004,
+    # Shared with diagnostics.external_observer_slack_s: the observer check's
+    # absolute slack assumes edges are resolved no finer than this cadence.
+    poll_interval_s: float = GATE_EDGE_POLL_INTERVAL_S,
     min_high_windows: int = 1,
     guard_s: float = 0.15,
     on_started: Callable[..., None] | None = None,
@@ -492,18 +498,31 @@ def capture_gated(
                 relative_tolerance=gate_relative_tolerance,
             )
             if not gate_integrity.valid:
-                raise PowerError(
-                    "GPIO-gated power window duration does not match the "
-                    f"requested {work_noun} count",
-                    hint=(
-                        f"Measured {gate_integrity.measured_s:.6f}s, expected "
-                        f"{gate_integrity.expected_s:.6f}s for {clean_infer_count} "
-                        f"{work_noun} at {clean_infer_avg_us}us each "
-                        f"(allowed jitter {gate_integrity.tolerance_s:.6f}s). "
-                        f"The minimum accepted power gate is {minimum_gate_s:.3f}s. "
-                        "Rejecting the capture because its energy-per-inference "
-                        "denominator is not trustworthy."
-                    ),
+                # Deliberately NOT a raise (#142/#181). The est*count
+                # expectation straddles boots and thermal states: the
+                # reference was timed by the profile boot while the LP core
+                # clock is HFRC-derived, so a cold power boot runs fast and
+                # undershoots it by up to ~12% while being perfectly healthy.
+                # The verdict belongs to evaluation.validity, which runs
+                # after CollectPowerTerminalStage and lets the firmware's own
+                # STIMER window time (same boot, same physical window)
+                # arbitrate: gate-vs-ELAPSED_US agreement means a stale
+                # reference, not a broken gate. Raising here would discard
+                # the capture one stage before its own best evidence arrives
+                # -- and produce no artifact at all.
+                log.warning(
+                    "Gated window duration %.6fs differs from the planned "
+                    "%d %s at %dus each (expected %.6fs, band %.6fs, "
+                    "minimum %.3fs). Recording for validity evaluation; the "
+                    "power-terminal envelope arbitrates whether this is "
+                    "clock drift or a broken gate.",
+                    gate_integrity.measured_s,
+                    clean_infer_count,
+                    work_noun,
+                    clean_infer_avg_us,
+                    gate_integrity.expected_s,
+                    gate_integrity.tolerance_s,
+                    minimum_gate_s,
                 )
 
         captured_s = time.monotonic() - capture_start

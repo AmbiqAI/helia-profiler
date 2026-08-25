@@ -3153,3 +3153,57 @@ def test_plan_power_progress_message_is_probe_aware(tmp_path, monkeypatch):
     planned = next(m for m in messages if m.startswith("Power run planned"))
     assert "1 busy-loop pass" in planned
     assert "inference" not in planned
+
+
+class TestObserverAbsoluteSlack:
+    """The observer comparison's reference is a packet integral bounded by
+    GPI polls, so its mechanical error is ABSOLUTE. A purely relative 1% band
+    shrinks below instrument resolution on short windows (found by review of
+    the #142/#181 promotion; assess_gate_duration always modelled the packet
+    term via packet_slack_s)."""
+
+    def test_slack_arithmetic_mirrors_the_gate_duration_packet_term(self):
+        from helia_profiler.power.diagnostics import external_observer_slack_s
+
+        assert external_observer_slack_s(1000) == pytest.approx(0.002 + 0.008)
+        assert external_observer_slack_s(100) == pytest.approx(0.020 + 0.008)
+        assert external_observer_slack_s(None) == pytest.approx(0.008)
+
+    def test_absolute_slack_floors_the_relative_band(self):
+        from helia_profiler.power.diagnostics import assess_window_clock
+
+        # 1 s reference, 12 ms disagreement: outside the pure 1% band, inside
+        # the quantization floor a 100 Hz stats stream implies.
+        floored = assess_window_clock(
+            elapsed_us=1_012_000,
+            reference_s=1.0,
+            reference_source="gated_windows",
+            relative_tolerance=0.01,
+            absolute_slack_s=0.028,
+        )
+        assert floored is not None and floored.agrees
+        assert floored.to_metadata()["absolute_slack_s"] == pytest.approx(0.028)
+
+        bare = assess_window_clock(
+            elapsed_us=1_012_000,
+            reference_s=1.0,
+            reference_source="gated_windows",
+            relative_tolerance=0.01,
+        )
+        assert bare is not None and not bare.agrees
+        assert "absolute_slack_s" not in bare.to_metadata()
+
+    def test_long_windows_still_use_the_relative_band(self):
+        from helia_profiler.power.diagnostics import assess_window_clock
+
+        # 5 s reference: the 1% relative term (50 ms) dwarfs the slack, so a
+        # 60 ms disagreement still fails -- the floor must never widen the
+        # band where the relative term already covers quantization.
+        agreement = assess_window_clock(
+            elapsed_us=5_060_000,
+            reference_s=5.0,
+            reference_source="gated_windows",
+            relative_tolerance=0.01,
+            absolute_slack_s=0.010,
+        )
+        assert agreement is not None and not agreement.agrees
