@@ -511,7 +511,8 @@ def _write_attributes_header(aot_module_dir: Path, prefix: str) -> Path:
     header_path.write_text(
         _jinja_env.get_template("heliaaot_attributes.h.j2").render(
             prefix=prefix,
-        )
+        ),
+        encoding="utf-8",
     )
     return header_path
 

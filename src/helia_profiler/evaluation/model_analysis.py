@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 import math
+import struct
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -136,6 +137,79 @@ def analyze_for_engine(
 
 #: Display name of the Vela-generated Ethos-U custom op (see _display_name).
 ETHOS_U_OP_NAME = "CUSTOM(ethos-u)"
+
+# --- Vela accelerator-config extraction ------------------------------------
+#
+# Vela stores the accelerator it compiled for inside the ethos-u custom op's
+# payload ("Custom Operator Payload 1"), not in tflite metadata.  Layout, per
+# ethos-u-core-driver ethosu_driver.c:
+#
+#   word 0            : 'COP1' fourcc
+#   word 1            : struct cop_data_s — byte 0 is the driver action;
+#                       OPTIMIZER_CONFIG == 1
+#   word 2 (cfg)      : struct config_r
+#   word 3 (id)       : struct id_r
+#
+# config_r bit layout is identical across the u55/u65/u85 interface headers
+# for the two fields we need:
+#   bits [3:0]   macs_per_cc — log2(MACs per clock cycle)
+#   bits [31:28] product     — 0=U55, 1=U65, 2=U85
+#
+# The driver compares this whole word against the NPU's own CONFIG register at
+# inference time; a mismatch is exactly the u55-model-on-u85-hardware case.
+_ETHOS_U_COP_FOURCC = b"COP1"
+_ETHOS_U_DRIVER_ACTION_OPTIMIZER_CONFIG = 1
+_ETHOS_U_PRODUCTS: dict[int, str] = {0: "u55", 1: "u65", 2: "u85"}
+
+
+def vela_accelerator_config(model_path: str | Path) -> str | None:
+    """Return a Vela-compiled model's accelerator config, e.g. ``ethos-u85-256``.
+
+    Returns ``None`` when the model is not Vela-compiled, when the payload
+    cannot be decoded, or when ``ai-edge-litert`` is not installed — callers
+    treat "unknown" as "cannot check", never as a mismatch.
+    """
+    if _schema is None:
+        return None
+    try:
+        buf = Path(model_path).read_bytes()
+        model = _schema.Model.GetRootAs(buf, 0)
+        for sg_idx in range(model.SubgraphsLength()):
+            graph = model.Subgraphs(sg_idx)
+            for op_idx in range(graph.OperatorsLength()):
+                op = graph.Operators(op_idx)
+                custom = model.OperatorCodes(op.OpcodeIndex()).CustomCode()
+                if not custom or b"ethos-u" not in custom:
+                    continue
+                for i in range(op.InputsLength()):
+                    tensor_idx = op.Inputs(i)
+                    if tensor_idx < 0:
+                        continue
+                    buffer = model.Buffers(graph.Tensors(tensor_idx).Buffer())
+                    if buffer.DataLength() < 16:
+                        continue
+                    payload = bytes(buffer.DataAsNumpy())
+                    cfg = _decode_cop_optimizer_config(payload)
+                    if cfg is not None:
+                        return cfg
+    except Exception as exc:  # pragma: no cover - defensive
+        log.debug("Vela accelerator-config extraction failed: %s", exc)
+    return None
+
+
+def _decode_cop_optimizer_config(payload: bytes) -> str | None:
+    """Decode ``ethos-u<product>-<macs>`` from a COP1 payload, or None."""
+    if len(payload) < 16 or payload[:4] != _ETHOS_U_COP_FOURCC:
+        return None
+    driver_action = payload[4]
+    if driver_action != _ETHOS_U_DRIVER_ACTION_OPTIMIZER_CONFIG:
+        return None
+    (cfg_word,) = struct.unpack_from("<I", payload, 8)
+    product = _ETHOS_U_PRODUCTS.get((cfg_word >> 28) & 0xF)
+    macs_per_cc = cfg_word & 0xF
+    if product is None or not 0 < macs_per_cc < 24:
+        return None
+    return f"ethos-{product}-{1 << macs_per_cc}"
 
 
 @dataclass(frozen=True)
