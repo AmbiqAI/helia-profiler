@@ -99,7 +99,10 @@ def write_report(ctx: PipelineContext) -> list[Path]:
     # --- Always: summary.json ---
     # One evaluation per publication (#202 D5): the summary renders it and
     # the manifest records it -- the same object, so they cannot disagree.
+    # Stored on the context (#197) so the console footer and the
+    # fail-on-invalid exit policy consume it too.
     evaluation = evaluate_run(ctx)
+    ctx.run_evaluation = evaluation
     p = _write_summary(ctx, output_dir, evaluation)
     paths.append(p)
 

@@ -32,7 +32,7 @@ from .config import ProfileConfig
 from .engines.base import EngineAdapter, EngineArtifacts
 from .errors import HpxError, PipelineError
 from .platform import BoardDef, SocDef
-from .evaluation import ModelAnalysis
+from .evaluation import ModelAnalysis, RunEvaluation
 from .placement import Placement
 from .power.base import PowerResult
 from .power.metadata import ObservationMode, classify_observation
@@ -168,6 +168,12 @@ class PipelineContext:
     # Capture (stage: capture_pmu / capture_power)
     pmu_result: PmuResult | None = None
     power_result: PowerResult | None = None
+
+    #: The run's single authoritative evaluation (#197): computed once in
+    #: ``write_report`` (#204 D5) and stored here so the console footer and
+    #: the ``--fail-on-invalid`` exit policy consume the same object the
+    #: summary rendered and the manifest recorded.
+    run_evaluation: RunEvaluation | None = None
 
     # Run metadata — enriched by stages, written to report
     run_metadata: RunMetadata = field(default_factory=RunMetadata)

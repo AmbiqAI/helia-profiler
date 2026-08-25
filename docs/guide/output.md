@@ -458,8 +458,17 @@ heliaPROFILER Results
     L1D_CACHE_RD                       230,203
     DTCM_ACCESS                      1,338,037
     MEM_ACCESS                       1,568,463
+
+  Validity: VALID
 ============================================================
 ```
+
+The validity footer is the run's verdict from the same evaluation that
+`summary.json` and the result manifest record: `VALID` (quiet), `DEGRADED`
+with one `code — message` line per warning, or `INVALID` with errors first.
+An INVALID run still exits 0 and writes its artifacts unless
+`output.fail_on_invalid` / `--fail-on-invalid` is set (exit 3) — the footer
+prints a hint recommending it when relevant.
 
 ## Controlling output
 

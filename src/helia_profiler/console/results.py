@@ -258,6 +258,53 @@ def render_memory_plan(console: HpxConsole, plan: Any) -> None:
     console._console.print()
 
 
+def render_validity(console: HpxConsole, ctx: PipelineContext) -> None:
+    """The run's verdict, in the #178 police-line spirit: lines, not a table.
+
+    Since #142/#181 a broken gate no longer aborts the run -- the artifact is
+    written and validity carries the verdict. Without this footer an INVALID
+    run showed a normal-looking table and exited 0 (#197). Consumes the
+    single evaluation ``write_report`` stored on the context (#204 D5);
+    computes one only for direct callers that never wrote a report.
+    """
+    evaluation = ctx.run_evaluation
+    if evaluation is None:
+        from ..evaluation import evaluate_run
+
+        evaluation = evaluate_run(ctx)
+
+    verdict = evaluation.validity.value
+    if verdict == "valid":
+        console._console.print("  [green]Validity: VALID[/green]")
+        console._console.print()
+        return
+
+    errors = [issue for issue in evaluation.issues if issue.severity == "error"]
+    warnings = [issue for issue in evaluation.issues if issue.severity == "warning"]
+    if verdict == "invalid":
+        console._console.print("  [bold red]Validity: INVALID[/bold red]")
+    else:
+        console._console.print(
+            f"  [yellow]Validity: DEGRADED ({len(warnings)} warning"
+            f"{'s' if len(warnings) != 1 else ''})[/yellow]"
+        )
+    for issue in errors:
+        console._console.print(
+            f"    [bold red]{escape(issue.code)}[/bold red] — {escape(issue.message)}"
+        )
+    for issue in warnings:
+        console._console.print(
+            f"    [yellow]{escape(issue.code)}[/yellow] — {escape(issue.message)}"
+        )
+    if verdict == "invalid" and not ctx.config.output.fail_on_invalid:
+        console._console.print(
+            "    [dim]hint: automation can catch this via output.fail_on_invalid "
+            "(hpx profile --fail-on-invalid → exit 3); artifacts are still "
+            "written either way.[/dim]"
+        )
+    console._console.print()
+
+
 def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     """Render the rich results panel after a successful run."""
     pmu = ctx.captured_pmu
@@ -562,6 +609,9 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
 
         console._console.print(power_table)
         console._console.print()
+
+    # ── Validity ──────────────────────────────────────────────
+    render_validity(console, ctx)
 
     # ── Output files ──────────────────────────────────────────
     output_dir = ctx.config.output.dir.resolve()
