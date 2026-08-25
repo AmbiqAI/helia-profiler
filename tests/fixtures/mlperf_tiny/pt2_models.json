@@ -1,0 +1,96 @@
+{
+  "schema": "hpx.mlperf-tiny-pt2-fixtures",
+  "schema_version": 2,
+  "seed": 20260817,
+  "weights": "deterministic random initialization; not trained",
+  "source": "executorch.examples.models.mlperf_tiny (pinned checkout)",
+  "quantization": {
+    "pipeline": "helia-torch nsx_cortex_m.quantize(kernel_provider='arm')",
+    "scheme": "PT2E static INT8 (CortexMQuantizer); float32 method I/O",
+    "calibration": "deterministic synthetic uniform [-1,1] plus full-range fills",
+    "calibration_seed": 20260818
+  },
+  "executorch_commit": "3a97429b0ce0c192861fc3e3729fb81432fd22cf",
+  "torch_version": "2.12.0+cpu",
+  "torchao_version": "0.17.0+git02105d46c",
+  "pt2_reproducibility": "graph and weights are deterministic (the derived .pte is byte-identical across runs), but .pt2 archive bytes are not: torch.export.save embeds a per-save serialization id and process-global graph counters in debug metadata",
+  "models": {
+    "kws": {
+      "path": "kws/kws_dscnn_random_int8.pt2",
+      "model_class": "executorch.examples.models.mlperf_tiny.DSCNNKWSModel",
+      "input_shape": [
+        1,
+        1,
+        49,
+        10
+      ],
+      "memory_format": "channels_last",
+      "parameters": 23180,
+      "calibration_samples": 32,
+      "quantize_dequantize_ops": {
+        "quantized_decomposed::quantize_per_tensor": 15,
+        "quantized_decomposed::dequantize_per_tensor": 17,
+        "quantized_decomposed::dequantize_per_channel": 18
+      },
+      "sha256": "3243270494044875bfb2f0924369d5ec199a3a3dd45738273e128e5b05c68123",
+      "byte_size": 321961
+    },
+    "ad": {
+      "path": "ad/deep_autoencoder_random_int8.pt2",
+      "model_class": "executorch.examples.models.mlperf_tiny.DeepAutoEncoderModel",
+      "input_shape": [
+        1,
+        640
+      ],
+      "memory_format": "contiguous",
+      "parameters": 267928,
+      "calibration_samples": 8,
+      "quantize_dequantize_ops": {
+        "quantized_decomposed::quantize_per_tensor": 11,
+        "quantized_decomposed::dequantize_per_tensor": 31
+      },
+      "sha256": "68c070e3c4b8886c43d0568c6836a2200cbc4adf52863c90eb91124c8e6a3eb5",
+      "byte_size": 471820
+    },
+    "ic": {
+      "path": "ic/ic_resnet8_random_int8.pt2",
+      "model_class": "executorch.examples.models.mlperf_tiny.ResNet8Model",
+      "input_shape": [
+        1,
+        3,
+        32,
+        32
+      ],
+      "memory_format": "channels_last",
+      "parameters": 77850,
+      "calibration_samples": 32,
+      "quantize_dequantize_ops": {
+        "quantized_decomposed::quantize_per_tensor": 16,
+        "quantized_decomposed::dequantize_per_tensor": 21,
+        "quantized_decomposed::dequantize_per_channel": 16
+      },
+      "sha256": "7c8e73750e5f0ae3818c85d18b9c1a8742b8c932f66792a1a3349c932975e0da",
+      "byte_size": 388296
+    },
+    "vww": {
+      "path": "vww/vww_mobilenetv1_025_random_int8.pt2",
+      "model_class": "executorch.examples.models.mlperf_tiny.MobileNetV1025Model",
+      "input_shape": [
+        1,
+        3,
+        96,
+        96
+      ],
+      "memory_format": "channels_last",
+      "parameters": 213586,
+      "calibration_samples": 16,
+      "quantize_dequantize_ops": {
+        "quantized_decomposed::quantize_per_tensor": 31,
+        "quantized_decomposed::dequantize_per_tensor": 33,
+        "quantized_decomposed::dequantize_per_channel": 54
+      },
+      "sha256": "f96c109fedc77946568994e5125d06d7f206987cf01cc474368bd32e8f1b662e",
+      "byte_size": 1093283
+    }
+  }
+}

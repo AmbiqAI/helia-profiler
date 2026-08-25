@@ -1,16 +1,22 @@
 {
   "schema": "hpx.executorch-fixtures",
-  "schema_version": 1,
+  "schema_version": 2,
   "seed": 20260817,
   "weights": "deterministic random initialization; not trained",
+  "source": "each PTE is lowered from the INT8 .pt2 ExportedProgram fixture beside it (see pt2_models.json); quantization happens at .pt2 creation and tools/export/executorch_mlperf_tiny defines no model architectures",
   "target": "Cortex-M55",
   "generation": {
+    "pt2_exporter": "tools/export/executorch_mlperf_tiny/make_pt2.py",
+    "pte_exporter": "tools/export/executorch_mlperf_tiny/export_pte.py",
+    "model_source": "executorch.examples.models.mlperf_tiny (pinned checkout)",
     "executorch": "3a97429b0ce0c192861fc3e3729fb81432fd22cf",
     "executorch_version": "1.3.0",
     "torch_version": "2.12.0",
+    "torchao_version": "0.17.0",
     "cmsis_nn_source": "d933672e7ca97eec70ef43230baee7b20c2a28ae",
-    "kws_nsx_executorch": "67955a77e4cd6b3aaf29e0895106a94430ec29e5",
-    "note": "The other exporters do not embed an nsx-executorch generation revision."
+    "quantization": "PT2E static INT8 (CortexMQuantizer) baked into the .pt2; float32 method I/O",
+    "pte_pipeline": "helia-torch nsx_cortex_m.export(kernel_provider='arm', int8_io=True), pre-quantized path; stock Cortex-M lowering with the float boundary q/dq removed",
+    "nsx_executorch": "757aa9ca6f66bca1c1f4d6338c42f3505b60be97 (AmbiqAI/nsx-executorch#10)"
   },
   "qualified_runtime": {
     "nsx_executorch": "62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59",
@@ -22,49 +28,118 @@
   "models": {
     "kws": {
       "path": "kws/kws_dscnn_random_cortex_m55.pte",
-      "sha256": "7416b4f1fbfdd5547a3af2370280577e8ae7db560af413d62a04a436e5fb754d",
-      "byte_size": 50400,
+      "pt2": "kws/kws_dscnn_random_int8.pt2",
+      "sha256": "840aaa1895e5c0964281cfb76448bbf5963a4dca431a427e77b20584ec59d026",
+      "byte_size": 49760,
       "planned_arena_size": 16000,
       "method_arena_size": 65536,
       "temporary_arena_size": 32768,
-      "input_size": 1960,
-      "output_size": 48,
+      "input_size": 490,
+      "output_size": 12,
       "portable_ops": [
         "dim_order_ops::_clone_dim_order.out"
-      ]
+      ],
+      "io_quantization": {
+        "input": {
+          "scale": 0.007839307188987732,
+          "zero_point": 0,
+          "quant_min": -128,
+          "quant_max": 127,
+          "dtype": "int8"
+        },
+        "output": {
+          "scale": 0.0008170212968252599,
+          "zero_point": 11,
+          "quant_min": -128,
+          "quant_max": 127,
+          "dtype": "int8"
+        }
+      }
     },
     "vww": {
       "path": "vww/vww_mobilenetv1_random_int8.pte",
-      "sha256": "72adcd9d66fb5ae2f63c7d575aeef4ed9bdc1d04c836eb0dc9a54a95bbef74b5",
-      "byte_size": 309592,
-      "planned_arena_size": 138240,
+      "pt2": "vww/vww_mobilenetv1_025_random_int8.pt2",
+      "sha256": "d953b333dbb1d376e564c003d7ba5972082febc2aa6d8d78e22e597491d9d739",
+      "byte_size": 297240,
+      "planned_arena_size": 73728,
       "method_arena_size": 65536,
       "temporary_arena_size": 32768,
-      "input_size": 110592,
-      "output_size": 8,
-      "portable_ops": []
+      "input_size": 27648,
+      "output_size": 2,
+      "portable_ops": [],
+      "io_quantization": {
+        "input": {
+          "scale": 0.007839307188987732,
+          "zero_point": 0,
+          "quant_min": -128,
+          "quant_max": 127,
+          "dtype": "int8"
+        },
+        "output": {
+          "scale": 0.00031848190701566637,
+          "zero_point": 35,
+          "quant_min": -128,
+          "quant_max": 127,
+          "dtype": "int8"
+        }
+      }
     },
     "ic": {
       "path": "ic/ic_resnet8_random_int8.pte",
-      "sha256": "e15f913a56fa8eb77230fb00483ac75ec838c1cadce7f31e3cc04fa247808fd4",
-      "byte_size": 99528,
+      "pt2": "ic/ic_resnet8_random_int8.pt2",
+      "sha256": "4668a1ffdf147c1580fce9ee090a15c464fb7d5041c208a328927fa42a586128",
+      "byte_size": 96392,
       "planned_arena_size": 49152,
       "method_arena_size": 65536,
       "temporary_arena_size": 32768,
-      "input_size": 12288,
-      "output_size": 40,
-      "portable_ops": []
+      "input_size": 3072,
+      "output_size": 10,
+      "portable_ops": [],
+      "io_quantization": {
+        "input": {
+          "scale": 0.007839307188987732,
+          "zero_point": 0,
+          "quant_min": -128,
+          "quant_max": 127,
+          "dtype": "int8"
+        },
+        "output": {
+          "scale": 0.0007818154408596456,
+          "zero_point": 10,
+          "quant_min": -128,
+          "quant_max": 127,
+          "dtype": "int8"
+        }
+      }
     },
     "ad": {
       "path": "ad/deep_autoencoder_int8_random.pte",
-      "sha256": "a2f4dd48f025c74de11fba1a8d6af2e379dc11370a3fb6be3fbf013d5e64514c",
-      "byte_size": 284864,
-      "planned_arena_size": 3200,
+      "pt2": "ad/deep_autoencoder_random_int8.pt2",
+      "sha256": "d5fb1ee9c5d7c85558abe2a2a0f0b38b8ce200736496257c0e1a13e4b9ae255b",
+      "byte_size": 284096,
+      "planned_arena_size": 768,
       "method_arena_size": 65536,
       "temporary_arena_size": 32768,
-      "input_size": 2560,
-      "output_size": 2560,
-      "portable_ops": []
+      "input_size": 640,
+      "output_size": 640,
+      "portable_ops": [],
+      "io_quantization": {
+        "input": {
+          "scale": 0.007839307188987732,
+          "zero_point": 0,
+          "quant_min": -128,
+          "quant_max": 127,
+          "dtype": "int8"
+        },
+        "output": {
+          "scale": 0.001129544572904706,
+          "zero_point": 5,
+          "quant_min": -128,
+          "quant_max": 127,
+          "dtype": "int8"
+        }
+      }
     }
-  }
+  },
+  "io": "int8 method I/O (matching the int8 .tflite references); host quantizes inputs / dequantizes outputs using each model's io_quantization parameters"
 }
