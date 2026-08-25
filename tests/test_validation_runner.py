@@ -149,7 +149,9 @@ def test_build_config_includes_reliability_axes(tmp_path: Path):
     assert cfg["model"]["weights_location"] == "sram"
     assert cfg["power"]["enabled"] is False
     assert cfg["output"]["dir"] == str(output_dir)
-    assert cfg["work_dir"] == str(output_dir / "work")
+    # No per-case work_dir: builds land in the shared incremental cache so
+    # repeat runs reuse the configured build tree (see _build_config).
+    assert "work_dir" not in cfg
 
 
 def test_build_config_pins_power_serial_for_multi_instrument_bench(tmp_path: Path):

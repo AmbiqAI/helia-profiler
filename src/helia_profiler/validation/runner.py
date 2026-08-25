@@ -202,7 +202,12 @@ def _build_config(
             # part of the portable dashboard artifact contract.
             "detailed": bool(case.power),
         },
-        "work_dir": str(output_dir / "work"),
+        # No explicit work_dir: cases build in the shared incremental cache
+        # under ~/.cache/helia-profiler/workspaces/ (same as ad-hoc `hpx
+        # profile`). Dependency-workspace fingerprints already isolate
+        # incompatible cases from each other, and repeat runs of the same
+        # case reuse the configured build tree instead of paying a clean
+        # CMake configure + full compile every time.
     }
 
     if case.power:
