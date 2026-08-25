@@ -63,7 +63,17 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
     pmu = ctx.pmu_result
     soc = ctx.soc
     platform = ctx.run_metadata.platform
-    if pmu is None or soc is None or platform is None:
+    if pmu is None or soc is None:
+        return None
+    if platform is None:
+        # ResolvePlatformStage sets platform whenever it sets soc, so this
+        # arm is unreachable in the shipped pipeline -- but a silent None
+        # would quietly size the capture from the default duration, so the
+        # fallback announces itself.
+        log.warning(
+            "Cannot estimate the capture duration (run_metadata.platform is "
+            "not set); falling back to the configured window duration."
+        )
         return None
 
     total_cycles = sum(layer.cycles or 0 for layer in pmu.layers)

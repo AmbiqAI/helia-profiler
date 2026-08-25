@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -147,7 +147,7 @@ name = "cffi"
 version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
+    { name = "pycparser" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/57/5f/ff100cae70ebe9d8df1c01a00e510e45d9adb5c1fdda84791b199141de97/cffi-2.1.0.tar.gz", hash = "sha256:efc1cdd798b1aaf39b4610bba7aad28c9bea9b910f25c784ccf9ec1fa719d1f9", size = 531036, upload-time = "2026-07-06T21:34:30.382Z" }
 wheels = [
@@ -465,7 +465,7 @@ wheels = [
 
 [[package]]
 name = "helia-profiler"
-version = "0.1.6"
+version = "0.1.6" # x-release-please-version
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -532,7 +532,7 @@ requires-dist = [
     { name = "pyserial", specifier = ">=3.5" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.0" },
-    { name = "typer", specifier = ">=0.16" },
+    { name = "typer", specifier = ">=0.16,<0.28" },
 ]
 provides-extras = ["aot", "analysis"]
 
@@ -1393,10 +1393,10 @@ resolution-markers = [
     "python_full_version < '3.12'",
 ]
 dependencies = [
-    { name = "numpy", marker = "python_full_version < '3.12'" },
-    { name = "psutil", marker = "python_full_version < '3.12'" },
-    { name = "pywin32", marker = "python_full_version < '3.12' and sys_platform == 'win32'" },
-    { name = "requests", marker = "python_full_version < '3.12'" },
+    { name = "numpy" },
+    { name = "psutil" },
+    { name = "pywin32", marker = "sys_platform == 'win32'" },
+    { name = "requests" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/24/7e/91caccec38f00a0b680aa5e9b296c4b25797d4f30ba5245ecd549e77610c/pyjoulescope_driver-2.2.12.tar.gz", hash = "sha256:b4974c04d15d49f6593e9c0fd624aa0abce6fa45b27534e2789d64b3e497ce03", size = 4575650, upload-time = "2026-06-18T16:52:51.06Z" }
 wheels = [
@@ -1430,10 +1430,10 @@ resolution-markers = [
     "python_full_version >= '3.12'",
 ]
 dependencies = [
-    { name = "numpy", marker = "python_full_version >= '3.12'" },
-    { name = "psutil", marker = "python_full_version >= '3.12'" },
-    { name = "pywin32", marker = "python_full_version >= '3.12' and sys_platform == 'win32'" },
-    { name = "requests", marker = "python_full_version >= '3.12'" },
+    { name = "numpy" },
+    { name = "psutil" },
+    { name = "pywin32", marker = "sys_platform == 'win32'" },
+    { name = "requests" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ee/8c/778b3ecf6df8b2354913cc5000e2e4ae85b0a598a6df755fe303b05eec4d/pyjoulescope_driver-2.3.4.tar.gz", hash = "sha256:cb1fa819f31620cf72ed96789ac6b8794892ad2b116e32a387c72e393f6163d8", size = 4605635, upload-time = "2026-07-17T14:39:56.751Z" }
 wheels = [

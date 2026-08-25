@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol
 
 from ..config import DEFAULT_POWER_DURATION_S, Transport
 from ..errors import CaptureError, PowerError
@@ -212,7 +212,6 @@ class _UsbDtrHolder:
                 self._ser = None
 
 
-@runtime_checkable
 class _SyncControllerFactory(Protocol):
     """Optional driver surface for building a 3-wire lock-step controller.
 
@@ -238,15 +237,20 @@ def _make_sync_controller(ctx: PipelineContext, driver: PowerDriver):
     from ..target.lifecycle import resolve_power_lockstep
 
     resolved_lockstep = resolve_power_lockstep(ctx)
-    factory = driver if isinstance(driver, _SyncControllerFactory) else None
+    # getattr, not a Protocol isinstance: runtime_checkable isinstance uses
+    # getattr_static, which misses a driver exposing the method dynamically
+    # (__getattr__) -- such a driver would silently degrade to gate-only
+    # capture. Duck typing is the contract here; _SyncControllerFactory
+    # documents the shape for readers and type checkers.
+    make_controller = getattr(driver, "make_sync_controller", None)
     log.debug(
         "gate-race timeline: resolve_power_lockstep=%s (configured=%s, "
         "has_make_sync_controller=%s)",
         resolved_lockstep,
         ctx.config.power.lockstep,
-        factory is not None,
+        callable(make_controller),
     )
-    if not resolved_lockstep or factory is None:
+    if not resolved_lockstep or not callable(make_controller):
         return NullSyncController()
     wiring = SyncWiring(
         lockstep=True,
@@ -254,7 +258,7 @@ def _make_sync_controller(ctx: PipelineContext, driver: PowerDriver):
         state_input_index=ctx.config.power.state_input_index,
         go_output_index=ctx.config.power.go_output_index,
     )
-    return factory.make_sync_controller(wiring)
+    return make_controller(wiring)
 
 
 def capture_power(

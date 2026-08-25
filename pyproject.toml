@@ -34,7 +34,11 @@ dependencies = [
     "pyjoulescope-driver>=2.2.12,<2.3.0; python_version < '3.12'",
     "pyjoulescope-driver>=2.3.4,<3; python_version >= '3.12'",
     "pydantic>=2.7,<3",
-    "typer>=0.16",
+    # Upper cap because the CLI imports typer._types.TyperChoice (private;
+    # typer 0.26+ vendors click, so an external click.Choice no longer
+    # renders choice lists). Verified present on every release 0.16-0.27;
+    # re-verify the import before raising the cap.
+    "typer>=0.16,<0.28",
     "click>=8.2",
 ]
 
