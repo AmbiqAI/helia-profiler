@@ -2,10 +2,12 @@
 
 One class owns the artifact's shape for BOTH sides of the boundary:
 
-* the **producer** (``report/summary.py``) builds a :class:`RunSummary` and
-  serializes it via :meth:`RunSummary.to_dict`, whose emission order and
+* the **producer** (``report/summary.py``) routes its assembled content
+  through this model -- ``from_dict`` -> a write-time round-trip equality
+  check -> :meth:`RunSummary.to_dict` -- whose emission order and
   omit-when-``None`` conditionality reproduce the historical hand-built dict
-  byte-for-byte (``tests/contracts/test_report_golden.py`` is the proof);
+  byte-for-byte (``tests/contracts/test_report_golden.py`` is the proof, and
+  the equality check makes any divergence a loud producer-time failure);
 * **consumers** (``validation/runner.py`` today; more as they migrate) load
   artifacts through :func:`load_run_summary` / :meth:`RunSummary.from_dict`,
   a *tolerant* reader: missing fields become ``None``, unknown keys are
@@ -111,21 +113,23 @@ class MemorySection:
 class BinarySection:
     """``summary["binary"]`` — ELF section byte totals."""
 
-    text: int
-    data: int
-    bss: int
-    total: int
+    #: Optional so a partial or unparseable foreign block reads as absent
+    #: fields, never as fabricated zero-byte sections (#205 review). The
+    #: producer always supplies all four.
+    text: int | None = None
+    data: int | None = None
+    bss: int | None = None
+    total: int | None = None
     #: Emitted only when truthy, matching the historical writer.
     reserved: int | None = None
     extras: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        out: dict[str, Any] = {
-            "text": self.text,
-            "data": self.data,
-            "bss": self.bss,
-            "total": self.total,
-        }
+        out: dict[str, Any] = {}
+        _put(out, "text", self.text)
+        _put(out, "data", self.data)
+        _put(out, "bss", self.bss)
+        _put(out, "total", self.total)
         if self.reserved:
             out["reserved"] = self.reserved
         return out
@@ -134,10 +138,10 @@ class BinarySection:
     def from_dict(cls, data: Mapping[str, Any]) -> BinarySection:
         known = {"text", "data", "bss", "total", "reserved"}
         return cls(
-            text=_opt_int(data.get("text")) or 0,
-            data=_opt_int(data.get("data")) or 0,
-            bss=_opt_int(data.get("bss")) or 0,
-            total=_opt_int(data.get("total")) or 0,
+            text=_opt_int(data.get("text")),
+            data=_opt_int(data.get("data")),
+            bss=_opt_int(data.get("bss")),
+            total=_opt_int(data.get("total")),
             reserved=_opt_int(data.get("reserved")),
             extras={k: v for k, v in data.items() if k not in known},
         )
@@ -155,9 +159,9 @@ class LatencySection:
     #: JSON numbers carried VERBATIM: the producer writes ints for the
     #: device fields, but a tolerant reader must not round what an older or
     #: foreign artifact wrote -- coercion belongs at the consumer.
-    capture_duration_s: float | None = None
-    hpx_start_latency_s: float | None = None
-    protocol_duration_s: float | None = None
+    capture_duration_s: float | int | None = None
+    hpx_start_latency_s: float | int | None = None
+    protocol_duration_s: float | int | None = None
     boot_phases_s: Mapping[str, float] | None = None
     device_profiled_infer_count: float | int | None = None
     device_profiled_infer_total_us: float | int | None = None
@@ -217,9 +221,9 @@ class LatencySection:
             "device_clean_attach_wait_us",
         }
         return cls(
-            capture_duration_s=_opt_float(data.get("capture_duration_s")),
-            hpx_start_latency_s=_opt_float(data.get("hpx_start_latency_s")),
-            protocol_duration_s=_opt_float(data.get("protocol_duration_s")),
+            capture_duration_s=data.get("capture_duration_s"),
+            hpx_start_latency_s=data.get("hpx_start_latency_s"),
+            protocol_duration_s=data.get("protocol_duration_s"),
             boot_phases_s=data.get("boot_phases_s"),
             device_profiled_infer_count=data.get("device_profiled_infer_count"),
             device_profiled_infer_total_us=data.get("device_profiled_infer_total_us"),
@@ -245,11 +249,10 @@ class LatencySection:
         the fallback — the precedence the validation runner has always
         applied, now stated once.
         """
-        if self.device_clean_infer_avg_us is not None:
-            return float(self.device_clean_infer_avg_us)
-        if self.device_profiled_infer_avg_us is not None:
-            return float(self.device_profiled_infer_avg_us)
-        return None
+        clean = _opt_float(self.device_clean_infer_avg_us)
+        if clean is not None:
+            return clean
+        return _opt_float(self.device_profiled_infer_avg_us)
 
 
 @dataclass(frozen=True)
@@ -386,43 +389,49 @@ class PowerSection:
 
     @property
     def energy_uj(self) -> float | None:
-        """Total gated energy in µJ, across three schema generations."""
+        """Total gated energy in µJ, across three schema generations.
+
+        Precedence: explicit-unit legacy keys, then the canonical SI field
+        scaled. A null or garbage legacy value falls through to the next
+        source instead of crashing -- the old read sites raised TypeError
+        there, and these properties are the reader every future consumer
+        inherits (#205 review).
+        """
         for legacy in ("total_energy_uj", "energy_uJ"):
-            if legacy in self.extras:
-                return float(self.extras[legacy])
-        if self.energy_j is not None:
-            return float(self.energy_j) * 1e6
-        return None
+            value = _opt_float(self.extras.get(legacy))
+            if value is not None:
+                return value
+        value = _opt_float(self.energy_j)
+        return value * 1e6 if value is not None else None
 
     @property
     def avg_current_ma(self) -> float | None:
-        if "avg_current_ma" in self.extras:
-            return float(self.extras["avg_current_ma"])
-        if self.avg_current_a is not None:
-            return float(self.avg_current_a) * 1e3
-        return None
+        value = _opt_float(self.extras.get("avg_current_ma"))
+        if value is not None:
+            return value
+        value = _opt_float(self.avg_current_a)
+        return value * 1e3 if value is not None else None
 
     @property
     def avg_power_mw(self) -> float | None:
-        if "avg_power_mw" in self.extras:
-            return float(self.extras["avg_power_mw"])
-        if self.avg_power_w is not None:
-            return float(self.avg_power_w) * 1e3
-        return None
+        value = _opt_float(self.extras.get("avg_power_mw"))
+        if value is not None:
+            return value
+        value = _opt_float(self.avg_power_w)
+        return value * 1e3 if value is not None else None
 
     @property
     def peak_current_ma(self) -> float | None:
-        if "peak_current_ma" in self.extras:
-            return float(self.extras["peak_current_ma"])
-        if self.peak_current_a is not None:
-            return float(self.peak_current_a) * 1e3
-        return None
+        value = _opt_float(self.extras.get("peak_current_ma"))
+        if value is not None:
+            return value
+        value = _opt_float(self.peak_current_a)
+        return value * 1e3 if value is not None else None
 
     @property
     def energy_per_inference_uj(self) -> float | None:
-        if self.energy_per_inference_j is None:
-            return None
-        return float(self.energy_per_inference_j) * 1e6
+        value = _opt_float(self.energy_per_inference_j)
+        return value * 1e6 if value is not None else None
 
     @property
     def gate_duration_integrity_valid(self) -> bool | None:
@@ -488,7 +497,7 @@ class RunSummary:
     def total_cycles_int(self) -> int | None:
         if not self.total_cycles:
             return None
-        return int(self.total_cycles)
+        return _opt_int(self.total_cycles)
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -556,15 +565,15 @@ class RunSummary:
         return cls(
             engine=str(data.get("engine", "")),
             layers=_opt_int(data.get("layers")) or 0,
-            total_cycles=_opt_float(data.get("total_cycles")) or 0,
+            total_cycles=data.get("total_cycles") or 0,
             overflow_detected=bool(data.get("overflow_detected", False)),
             validity=(str(data["validity"]) if data.get("validity") is not None else None),
-            issues=tuple(data.get("issues") or ()),
+            issues=_tuple_of_mappings(data.get("issues")),
             schema=str(data.get("schema", RUN_SUMMARY_SCHEMA)),
             schema_version=_opt_int(data.get("schema_version")) or 1,
             compatibility=data.get("compatibility"),
             dependencies=data.get("dependencies"),
-            top_layers=tuple(data.get("top_layers") or ()),
+            top_layers=_tuple_of_mappings(data.get("top_layers")),
             memory=(MemorySection.from_dict(memory) if isinstance(memory, Mapping) else None),
             psram=data.get("psram"),
             memory_plan=data.get("memory_plan"),
@@ -595,19 +604,28 @@ def load_run_summary(path: str | Path) -> RunSummary:
     return RunSummary.from_dict(data)
 
 
+def _tuple_of_mappings(value: Any) -> tuple[Mapping[str, Any], ...]:
+    """Tolerant list-of-objects read: anything else is an empty tuple."""
+    if isinstance(value, list):
+        return tuple(item for item in value if isinstance(item, Mapping))
+    return ()
+
+
 def _opt_int(value: Any) -> int | None:
-    if value is None:
+    # bool is an int subclass; a boolean where a count belongs is garbage,
+    # not a 0/1 measurement (matches the runner's historical parser).
+    if value is None or isinstance(value, bool):
         return None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
 def _opt_float(value: Any) -> float | None:
-    if value is None:
+    if value is None or isinstance(value, bool):
         return None
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None

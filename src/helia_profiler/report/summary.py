@@ -499,10 +499,11 @@ def _write_summary(
     # here instead of shipping as an untyped, unversioned field no reader
     # can rely on.
     model = RunSummary.from_dict(summary)
-    _assert_no_unmodelled_keys(model)
+    rendered = json.dumps(model.to_dict(), indent=2, default=str)
+    _assert_model_owns_the_shape(model, rendered, summary)
     out_path = output_dir / "summary.json"
     out_path.write_text(
-        json.dumps(model.to_dict(), indent=2, default=str),
+        rendered,
         encoding="utf-8",
         newline="\n",
     )
@@ -510,7 +511,20 @@ def _write_summary(
     return out_path
 
 
-def _assert_no_unmodelled_keys(model: RunSummary) -> None:
+def _assert_model_owns_the_shape(
+    model: RunSummary, rendered: str, summary: dict[str, Any]
+) -> None:
+    """The written bytes must equal what this function assembled.
+
+    Full round-trip equality, not just a keyset check (#205 review): a
+    wrong-typed section silently becomes ``None`` in ``from_dict`` and
+    would VANISH from the artifact without tripping an unknown-keys scan,
+    and a value the reader coerces would ship altered. Any divergence --
+    unregistered key, dropped section, changed value -- fails loudly here
+    instead of publishing a schema the model does not describe.
+    """
+    if rendered == json.dumps(summary, indent=2, default=str):
+        return
     unmodelled: dict[str, list[str]] = {}
     if model.extras:
         unmodelled["summary"] = sorted(model.extras)
@@ -518,9 +532,12 @@ def _assert_no_unmodelled_keys(model: RunSummary) -> None:
         section = getattr(model, name)
         if section is not None and section.extras:
             unmodelled[name] = sorted(section.extras)
-    if unmodelled:
-        raise ReportError(
-            "summary.json writer produced keys the RunSummary model does not "
-            f"declare: {unmodelled}",
-            hint="Add the field to results/run_summary.py -- the model IS the schema.",
-        )
+    detail = (
+        f"unregistered keys: {unmodelled}"
+        if unmodelled
+        else "a section or value changed through the model round-trip"
+    )
+    raise ReportError(
+        f"summary.json diverged from the RunSummary model ({detail}).",
+        hint="Register the field in results/run_summary.py -- the model IS the schema.",
+    )

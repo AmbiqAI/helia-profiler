@@ -94,7 +94,7 @@ consumers can evolve parsers without coupling every file to the bundle schema:
 
 | Artifact | Schema | Packaged JSON Schema |
 | --- | --- | --- |
-| `summary.json` | `hpx.run-summary` v1 | `run_summary.schema.v1.json` |
+| `summary.json` | `hpx.run-summary` v4 | `run_summary.schema.v1.json` (root fields; the authoritative shape is the typed model `helia_profiler.results.run_summary.RunSummary`) |
 | `run_metadata.json` | `hpx.run-metadata` v1 | `run_metadata.schema.v1.json` |
 | `profile_results.json` | `hpx.profile-results` v1 | `profile_results.schema.v1.json` |
 
@@ -109,7 +109,7 @@ The top-level summary — start here for a quick overview.
 ```json
 {
   "schema": "hpx.run-summary",
-  "schema_version": 3,
+  "schema_version": 4,
   "engine": "helia-rt",
   "layers": 13,
   "total_cycles": 2016376,
@@ -417,6 +417,18 @@ inputs are (no symbol table, partial listing, no measured view).
     `run_summary_schema_version` difference in `hpx compare` rather than
     silently reading the semantic change. Re-record baselines that
     consumed the plan's `free`.
+
+!!! note "Schema v4"
+    The gate-duration verdict was re-sourced (#142/#181): a v4 artifact can
+    carry `power.energy_per_inference_j` alongside
+    `power.gate_duration_integrity.valid: false` — the firmware's own
+    window clock arbitrates, `power.gated_window_reference_drift` records
+    the reclassification, and `gated_window_duration_suspect` keys on that
+    arbitration rather than the est×count band alone. Do not treat
+    `valid: false` alone as a bad capture; read artifacts through
+    `helia_profiler.results.run_summary.load_run_summary`, whose
+    `gate_duration_unarbitrated_failure` property applies the arbitration
+    for you.
 
 ## Terminal summary
 

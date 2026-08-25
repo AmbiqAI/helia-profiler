@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.errors import ReportError
-from helia_profiler.report.summary import _assert_no_unmodelled_keys, _write_summary
+from helia_profiler.report.summary import _write_summary
 from helia_profiler.results.run_summary import (
     RUN_SUMMARY_SCHEMA_VERSION,
     LatencySection,
@@ -131,20 +131,69 @@ def test_latency_numbers_carried_verbatim_and_headline_precedence() -> None:
     assert profiled_only.best_latency_avg_us == 99.0
 
 
-def test_unmodelled_producer_key_fails_loudly() -> None:
+def _shape_check(summary: dict) -> None:
+    from helia_profiler.report.summary import _assert_model_owns_the_shape
+
+    model = RunSummary.from_dict(summary)
+    rendered = json.dumps(model.to_dict(), indent=2, default=str)
+    _assert_model_owns_the_shape(model, rendered, summary)
+
+
+def _base_summary(**overrides: object) -> dict:
+    """A producer-shaped dict: sections inserted in canonical emission order
+    (the equality chokepoint checks bytes, so order matters — as it should)."""
+    out: dict = {
+        "schema": "hpx.run-summary",
+        "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
+        "engine": "helia-rt",
+        "layers": 1,
+        "total_cycles": 100.0,
+        "overflow_detected": False,
+        "top_layers": [],
+    }
+    for key in ("memory", "binary", "power", "latency"):
+        if key in overrides:
+            out[key] = overrides.pop(key)
+    out["validity"] = "valid"
+    out["issues"] = []
+    out.update(overrides)
+    return out
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"a_rogue_top_level_key": 1},
+        {"power": {"energy_j": 0.1, "rogue_key": 1}},
+        {"latency": {"capture_duration_s": 1.0, "rogue_key": 1}},
+        {"memory": {"arena_size": 4, "rogue_key": 1}},
+        {"binary": {"text": 1, "data": 2, "bss": 3, "total": 6, "rogue_key": 1}},
+    ],
+)
+def test_unmodelled_producer_key_fails_loudly(overrides: dict) -> None:
     """The model IS the schema: a writer key the model does not declare must
-    raise at write time, not ship as an untyped, unversioned field."""
-    model = RunSummary.from_dict(
-        {
-            "engine": "helia-rt",
-            "layers": 1,
-            "total_cycles": 100,
-            "overflow_detected": False,
-            "power": {"energy_j": 0.1, "rogue_key": 1},
-        }
+    raise at write time in EVERY section, not ship as an untyped field."""
+    with pytest.raises(ReportError, match="rogue"):
+        _shape_check(_base_summary(**overrides))
+
+
+def test_wrong_typed_section_fails_loudly_instead_of_vanishing() -> None:
+    """#205 review: a wrong-typed section becomes None in from_dict and
+    would silently VANISH from the artifact under a keyset-only check --
+    the round-trip equality assert makes it a producer-time failure."""
+    with pytest.raises(ReportError, match="diverged"):
+        _shape_check(_base_summary(binary="oops"))
+    with pytest.raises(ReportError, match="diverged"):
+        _shape_check(_base_summary(memory={"arena_size": "N/A"}))
+
+
+def test_healthy_producer_shape_passes_the_check() -> None:
+    _shape_check(
+        _base_summary(
+            power={"energy_j": 0.1, "measurement_scope": "gpio_gated_clean_window"},
+            binary={"text": 1, "data": 2, "bss": 3, "total": 6},
+        )
     )
-    with pytest.raises(ReportError, match="rogue_key"):
-        _assert_no_unmodelled_keys(model)
 
 
 def test_minimal_old_artifact_loads(tmp_path: Path) -> None:
@@ -159,3 +208,53 @@ def test_minimal_old_artifact_loads(tmp_path: Path) -> None:
     assert summary.schema_version == 1
     assert summary.power is None
     assert summary.validity is None
+
+
+def test_legacy_pair_precedence() -> None:
+    """Both spellings present: the older explicit-unit key wins, in the
+    documented order (kills the lens-2 surviving precedence mutants)."""
+    both_energy = PowerSection.from_dict({"total_energy_uj": 1.0, "energy_uJ": 2.0})
+    assert both_energy.energy_uj == 1.0
+    both_current = PowerSection.from_dict(
+        {"avg_current_ma": 3.0, "avg_current_a": 0.004}
+    )
+    assert both_current.avg_current_ma == 3.0
+    both_power = PowerSection.from_dict({"avg_power_mw": 5.0, "avg_power_w": 0.008})
+    assert both_power.avg_power_mw == 5.0
+
+
+def test_non_dict_root_raises_value_error(tmp_path: Path) -> None:
+    path = tmp_path / "summary.json"
+    path.write_text("[1, 2, 3]")
+    with pytest.raises(ValueError, match="not a JSON object"):
+        load_run_summary(path)
+
+
+def test_hostile_shapes_read_as_absent_not_crash() -> None:
+    """#205 review F1/F4: non-iterable list fields and non-finite numbers
+    must degrade to absence -- a hostile artifact fails ONE case downstream,
+    never the reader itself."""
+    hostile = RunSummary.from_dict(
+        {
+            "engine": "x",
+            "layers": 1,
+            "total_cycles": float("nan"),
+            "overflow_detected": False,
+            "issues": 7,
+            "top_layers": 5,
+        }
+    )
+    assert hostile.issues == ()
+    assert hostile.top_layers == ()
+    assert hostile.total_cycles_int is None
+
+    infinite = RunSummary.from_dict({"engine": "x", "total_cycles": float("inf")})
+    assert infinite.total_cycles_int is None
+
+
+def test_null_legacy_keys_fall_through_to_canonical() -> None:
+    """A null-valued legacy key is garbage, not a value: the property falls
+    through to the next source (the old read sites crashed with TypeError)."""
+    section = PowerSection.from_dict({"total_energy_uj": None, "energy_j": 2e-6})
+    assert section.energy_uj == pytest.approx(2.0)
+    assert PowerSection.from_dict({"avg_current_ma": None}).avg_current_ma is None

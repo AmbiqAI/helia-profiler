@@ -97,6 +97,12 @@ class CaseResult:
     #: window clock confirmed the gate (#142/#181): a stale profile-phase
     #: reference, not a capture defect. Health checks must not fail it.
     gated_window_reference_drift: str | None = None
+    #: The model's arbitration verdict (#202): captured at parse time from
+    #: PowerSection.gate_duration_unarbitrated_failure so the health check
+    #: consults ONE interpretation. ``None`` = parsed by an older hpx that
+    #: did not record it; the health check falls back to the two-field
+    #: predicate for those legacy records only.
+    gate_duration_unarbitrated_failure: bool | None = None
     power_observation_mode: str | None = None
     power_observation_integrity: str | None = None
     power_gate_failure_kind: str | None = None
@@ -624,11 +630,26 @@ def run_case(
                 result.gate_duration_integrity_valid = (
                     power.gate_duration_integrity_valid
                 )
-                result.gated_window_reference_drift = power.gated_window_reference_drift
-                result.power_observation_mode = power.observation_mode
-                result.power_observation_integrity = power.integrity
+                result.gated_window_reference_drift = (
+                    str(power.gated_window_reference_drift)
+                    if power.gated_window_reference_drift is not None
+                    else None
+                )
+                result.power_observation_mode = (
+                    str(power.observation_mode)
+                    if power.observation_mode is not None
+                    else None
+                )
+                result.power_observation_integrity = (
+                    str(power.integrity) if power.integrity is not None else None
+                )
                 result.power_gate_failure_kind = power.gate_failure_kind
-        except (ValueError, OSError) as exc:
+                result.gate_duration_unarbitrated_failure = (
+                    power.gate_duration_unarbitrated_failure
+                )
+        except (ValueError, TypeError, OSError) as exc:
+            # TypeError included (#205 review): a hostile artifact shape must
+            # fail THIS case, not crash the whole validation sweep.
             result.error = f"could not parse summary.json: {exc}"
             result.status = "fail"
             return result
@@ -682,15 +703,17 @@ def validation_health_issues(result: CaseResult) -> tuple[str, ...]:
         issues.append("power enabled but zero energy captured")
     if result.power and result.gated_window_duration_suspect:
         issues.append("GPIO-gated power window duration is suspect")
-    if (
-        result.power
-        and result.gate_duration_integrity_valid is False
-        and result.gated_window_reference_drift is None
-    ):
-        # valid:false alone no longer means the capture is bad (#142/#181):
-        # when the firmware's window clock confirmed the gate, the summary
-        # carries a drift note and the miss is a stale reference. Only a
-        # band miss WITHOUT that arbitration is a health problem.
+    unarbitrated = result.gate_duration_unarbitrated_failure
+    if unarbitrated is None:
+        # Legacy record (parsed before the verdict field existed): fall back
+        # to the two-field predicate. New records carry the model's own
+        # PowerSection.gate_duration_unarbitrated_failure, so the #142/#181
+        # interpretation lives in exactly one place (#205 review).
+        unarbitrated = (
+            result.gate_duration_integrity_valid is False
+            and result.gated_window_reference_drift is None
+        )
+    if result.power and unarbitrated:
         issues.append("GPIO-gated power window failed duration integrity")
     if result.power and result.power_observation_integrity not in {None, "valid"}:
         detail = result.power_gate_failure_kind or result.power_observation_mode or "unknown"
