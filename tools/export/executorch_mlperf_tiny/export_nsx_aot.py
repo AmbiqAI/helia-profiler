@@ -18,10 +18,13 @@ make_pt2.py's stock CortexMQuantizer, so provider=ns Tier-1 coverage is
 limited to what the stock annotations allow; none of the four MLPerf Tiny
 fixtures currently exercises a Tier-1 op either way.
 
-Run with the export venv:
+Run inside the pinned export environment (same import resolution as the
+sibling scripts — set NSX_EXECUTORCH_ROOT/EXECUTORCH_ROOT or pass
+--executorch-root):
 
-  PYTHONPATH=<nsx-executorch>/external/executorch/src:<nsx-executorch>/aot \
-    python export_nsx_aot.py --output-dir <dir> [--models ic,vww,...]
+  ~/.cache/nsx-executorch-export-venv/bin/python export_nsx_aot.py \
+      --output-dir <dir> [--models ic,vww,...] \
+      --executorch-root ~/nsx-executorch-package/external/executorch
 """
 
 from __future__ import annotations
@@ -29,11 +32,26 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 
-import torch
+from common import (
+    FIXTURE_ROOT,
+    MODELS,
+    check_pins,
+    configure_import_path,
+    configure_nsx_import_path,
+    load_quantized_pt2,
+    parse_model_keys,
+    use_checkout_schema_resources,
+)
 
-from common import FIXTURE_ROOT, MODELS, load_quantized_pt2, parse_model_keys
+DEFAULT_EXECUTORCH_ROOT = Path(
+    os.environ.get(
+        "EXECUTORCH_ROOT",
+        Path(os.environ.get("NSX_EXECUTORCH_ROOT", ".")) / "external" / "executorch",
+    )
+)
 
 
 def _plan_facts(result) -> dict:
@@ -58,9 +76,21 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--models", default="ad,ic,kws,vww")
+    parser.add_argument(
+        "--executorch-root",
+        type=Path,
+        default=DEFAULT_EXECUTORCH_ROOT,
+    )
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
+    executorch_root = args.executorch_root.resolve()
+    configure_import_path(executorch_root)
+    configure_nsx_import_path(executorch_root)
+    import torch
+
+    check_pins(torch, executorch_root)
+    use_checkout_schema_resources(executorch_root)
     from nsx_cortex_m import export as nsx_export
 
     manifest: dict = {"torch_version": torch.__version__, "models": {}}
