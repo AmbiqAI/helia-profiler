@@ -114,7 +114,7 @@ env:
   # configured build trees instead of cold-building every case.
   HPX_CACHE_DIR: ${{ github.workspace }}/../hpx-cache
   SEGGER_RTT_PATH: ${{ github.workspace }}/segger-rtt
-  HPX_NSX_EXECUTORCH_REF: 62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59
+  HPX_NSX_EXECUTORCH_REF: 18e7ca1a52f81f4038b9cd9952bc1531f67e147c
   HPX_QUALIFIED_NS_CMSIS_NN_REF: 631726420b04860a5c4236956a3741ff5a96bd7f
   # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
   # with the manual defaults, except that nightly validation covers the full suite.
@@ -254,7 +254,7 @@ jobs:
             echo "Resolved nsx-executorch commit does not match the qualified commit." >&2
             exit 2
           fi
-          if [[ "${executorch_commit}" != "3a97429b0ce0c192861fc3e3729fb81432fd22cf" ]]; then
+          if [[ "${executorch_commit}" != "4eba847c37355cd65f1f71bff44c0a59348c248e" ]]; then
             echo "Resolved ExecuTorch submodule does not match the qualified commit." >&2
             exit 2
           fi
