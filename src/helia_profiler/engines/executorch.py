@@ -25,7 +25,6 @@ ARM_CMSIS_NN_PROJECT = "arm-cmsis-nn"
 NS_CMSIS_NN_MODULE = "nsx-cmsis-nn"
 NS_CMSIS_NN_PROJECT = "ns-cmsis-nn"
 
-_EXECUTORCH_CACHE_DIR = Path.home() / ".cache" / "helia-profiler" / "nsx-executorch"
 
 # Nested ExecuTorch submodules required by nsx-executorch's stock CMake
 # configuration — the "minimal Cortex-M checkout" set from its README at the
@@ -91,7 +90,9 @@ def _auto_clone_nsx_executorch(url: str, ref: str) -> Path:
 
 
 def _sync_executorch_cache(url: str, ref: str) -> Path:
-    cache = _EXECUTORCH_CACHE_DIR
+    from ..cache_dirs import hpx_cache_root
+
+    cache = hpx_cache_root() / "nsx-executorch"
     head: str | None = None
     if (cache / ".git").exists():
         try:

@@ -691,9 +691,8 @@ _PINNED = "a" * 40
 
 
 def _patch_cache(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    cache = tmp_path / "cache" / "nsx-executorch"
-    monkeypatch.setattr(executorch_mod, "_EXECUTORCH_CACHE_DIR", cache)
-    return cache
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
+    return tmp_path / "cache" / "nsx-executorch"
 
 
 def test_auto_clone_fresh_cache_clones_and_inits_submodules(

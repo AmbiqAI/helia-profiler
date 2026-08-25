@@ -24,7 +24,6 @@ from ..results import NsxModuleRef
 log = logging.getLogger("hpx")
 
 _CMSIS_NN_GH_REPO = "AmbiqAI/ns-cmsis-nn"
-_CMSIS_NN_CACHE_DIR = Path.home() / ".cache" / "helia-profiler" / "ns-cmsis-nn"
 
 # NSX registry identity for ns-cmsis-nn. By default hpx declares this module
 # and lets NSX clone it from the registered GitHub upstream; a user-provided
@@ -148,7 +147,9 @@ def _validate_cmsis_nn(path: Path) -> None:
 
 def _auto_clone_cmsis_nn() -> Path:
     """Clone ns-cmsis-nn from GitHub into a local cache directory."""
-    cache = _CMSIS_NN_CACHE_DIR
+    from ..cache_dirs import hpx_cache_root
+
+    cache = hpx_cache_root() / "ns-cmsis-nn"
     if cache.is_dir() and (cache / "Include").is_dir() and (cache / "Source").is_dir():
         log.info("ns-cmsis-nn: cache hit at %s", cache)
         _validate_cmsis_nn(cache)

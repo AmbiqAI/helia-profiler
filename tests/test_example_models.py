@@ -14,12 +14,12 @@ from helia_profiler import examples
 
 
 def test_example_model_materializes_valid_tflite(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(examples, "_CACHE_ROOT", tmp_path)
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path))
 
     path = hpx.examples.tiny_cnn()
     data = path.read_bytes()
 
-    assert path == tmp_path / "tiny-cnn" / "4419dfff1e15" / "tiny_cnn.tflite"
+    assert path == tmp_path / "models" / "tiny-cnn" / "4419dfff1e15" / "tiny_cnn.tflite"
     assert data[4:8] == b"TFL3"
     assert len(data) == 2480
     assert hashlib.sha256(data).hexdigest() == (

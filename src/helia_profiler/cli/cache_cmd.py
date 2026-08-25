@@ -7,7 +7,9 @@ from pathlib import Path
 
 
 def _workspace_cache_root() -> Path:
-    return Path.home() / ".cache" / "helia-profiler" / "workspaces"
+    from ..cache_dirs import hpx_cache_root
+
+    return hpx_cache_root() / "workspaces"
 
 
 def _cmd_cache_purge() -> None:

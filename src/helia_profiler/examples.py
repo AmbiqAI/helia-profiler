@@ -12,7 +12,10 @@ from .errors import ConfigError
 _MODELS = {
     "tiny-cnn": ("tiny_cnn.tflite", "tiny_cnn.json"),
 }
-_CACHE_ROOT = Path.home() / ".cache" / "helia-profiler" / "models"
+def _cache_root() -> Path:
+    from .cache_dirs import hpx_cache_root
+
+    return hpx_cache_root() / "models"
 
 
 def tiny_cnn() -> Path:
@@ -33,7 +36,7 @@ def _materialize_model(name: str) -> Path:
             hint="Reinstall helia-profiler.",
         )
 
-    destination = _CACHE_ROOT / name / expected_digest[:12] / filename
+    destination = _cache_root() / name / expected_digest[:12] / filename
     if destination.is_file() and hashlib.sha256(destination.read_bytes()).hexdigest() == expected_digest:
         return destination
 
