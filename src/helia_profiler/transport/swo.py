@@ -201,7 +201,7 @@ class SwoTransport(BaseCaptureTransport):
     honors_keep_attached = False
 
     def collect(self, ctx) -> list[str]:
-        args = self._args
+        args = self.prepared_args
 
         # SWO baud is derived from the trace clock, so it MUST come from the
         # resolved platform — never a hardcoded guess.  A wrong assumption here

@@ -171,29 +171,32 @@ def _build_config(
         # 240 KB TCM; the immutable PTE executes directly from MRAM.
         placement = {"arena_location": "sram", "weights_location": "mram"}
 
+    engine_cfg: dict[str, object] = {
+        "type": case.engine.value,
+    }
+    target_cfg: dict[str, object] = {
+        "board": case.board.id,
+        "toolchain": case.toolchain.value,
+        "transport": case.transport.value,
+    }
+    power_cfg: dict[str, object] = {
+        "enabled": bool(case.power),
+    }
     cfg: dict[str, Any] = {
         "model": {
             "path": str((repo_root / case.model.fixture_for(case.engine)).resolve()),
             "arena_size": case.model.arena_size_for(case.engine),
             **placement,
         },
-        "engine": {
-            "type": case.engine.value,
-        },
-        "target": {
-            "board": case.board.id,
-            "toolchain": case.toolchain.value,
-            "transport": case.transport.value,
-        },
+        "engine": engine_cfg,
+        "target": target_cfg,
         "profiling": {
             "pmu_counters": {"cpu": "default"},
             "per_layer": True,
             "iterations": 3,
             "warmup": 1,
         },
-        "power": {
-            "enabled": bool(case.power),
-        },
+        "power": power_cfg,
         "output": {
             "format": "csv",
             "dir": str(output_dir),
@@ -206,7 +209,7 @@ def _build_config(
     }
 
     if case.power:
-        cfg["power"].update(
+        power_cfg.update(
             {
                 "driver": "joulescope",
                 "mode": "external",
@@ -215,10 +218,10 @@ def _build_config(
             }
         )
         if case.power_serial:
-            cfg["power"]["serial"] = case.power_serial
+            power_cfg["serial"] = case.power_serial
         if case.power_gpio_pins:
             sync, state, go = case.power_gpio_pins
-            cfg["power"].update(
+            power_cfg.update(
                 {
                     "sync_gpio_pin": sync,
                     "state_gpio_pin": state,
@@ -227,7 +230,7 @@ def _build_config(
             )
 
     if case.jlink_serial:
-        cfg["target"]["jlink_serial"] = case.jlink_serial
+        target_cfg["jlink_serial"] = case.jlink_serial
 
     if case.engine is EngineType.EXECUTORCH:
         contract = case.model.executorch
@@ -249,7 +252,7 @@ def _build_config(
             "portable_ops": list(contract.portable_ops),
             "cmsis_nn_ref": cmsis_nn_ref,
         }
-        cfg["engine"].update(
+        engine_cfg.update(
             {
                 "backend": case.cmsis_nn_backend.value,
                 "config": engine_config,
@@ -259,13 +262,13 @@ def _build_config(
         # Hardware CI resolves branches to an exact commit before creating
         # cases. Put that commit in the profile config so it reaches the NSX
         # manifest and lock instead of relying on a process environment path.
-        cfg["engine"]["config"] = {"cmsis_nn_ref": ns_cmsis_nn_ref}
+        engine_cfg["config"] = {"cmsis_nn_ref": ns_cmsis_nn_ref}
     elif case.engine is EngineType.HELIA_AOT:
         # Point heliaAOT at an explicit or nearby ns-cmsis-nn checkout when one
         # is available, instead of assuming a single sibling-repo layout.
         cmsis_nn_candidate = _find_local_cmsis_nn_checkout(repo_root)
         if cmsis_nn_candidate is not None:
-            cfg["engine"]["config"] = {
+            engine_cfg["config"] = {
                 "prefix": "hpx",
                 "module_name": "hpx_model",
                 "cmsis_nn_path": str(cmsis_nn_candidate),
@@ -273,7 +276,7 @@ def _build_config(
     elif case.engine is EngineType.TFLM:
         # Validation exercises the optimized upstream CMSIS-NN baseline. The
         # reference-kernel backend remains available to ad-hoc profile runs.
-        cfg["engine"]["backend"] = "cmsis_nn"
+        engine_cfg["backend"] = "cmsis_nn"
 
     return cfg
 
@@ -285,6 +288,18 @@ def _engine_backend(case: CaseSpec) -> str | None:
     if case.engine is EngineType.EXECUTORCH:
         return case.cmsis_nn_provider.value
     return None
+
+
+def _tail_text(stream: str | bytes | None, limit: int = 2000) -> str | None:
+    """Return the last *limit* characters of captured process output.
+
+    ``subprocess.TimeoutExpired`` carries ``bytes`` when the command was not
+    run in text mode; decode defensively so the tail stays JSON-serialisable.
+    """
+    if not stream:
+        return None
+    text = stream.decode("utf-8", errors="replace") if isinstance(stream, bytes) else stream
+    return text[-limit:]
 
 
 # ---------------------------------------------------------------------------
@@ -475,8 +490,8 @@ def run_case(
                 repeat_total=case.repeat_total,
                 output_dir=str(case_dir),
                 error=f"timeout after {timeout_s:.0f}s",
-                stdout_tail=(exc.stdout or "")[-2000:] if exc.stdout else None,
-                stderr_tail=(exc.stderr or "")[-2000:] if exc.stderr else None,
+                stdout_tail=_tail_text(exc.stdout),
+                stderr_tail=_tail_text(exc.stderr),
             )
 
         if (

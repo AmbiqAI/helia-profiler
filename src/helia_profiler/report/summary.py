@@ -206,7 +206,6 @@ def _write_summary(ctx: PipelineContext, output_dir: Path) -> Path:
             ]
         if ctx.power_result.gated_windows:
             summary["power"]["gated_window_count"] = len(ctx.power_result.gated_windows)
-        meta = ctx.pmu_result.meta if ctx.pmu_result is not None else None
         # Per-inference and inference-scaled figures need a window that ran
         # inferences. The busy_loop probe runs a calibrated CPU spin instead,
         # so BOTH derivation families below fabricate: the gated branch would

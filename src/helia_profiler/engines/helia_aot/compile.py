@@ -161,7 +161,7 @@ _AOT_MEMORY_ALIASES: dict[str, Placement] = {
 
 def _resolve_aot_placement_intent(
     config: ProfileConfig, soc: SocDef | None
-) -> tuple[Placement, Placement] | None:
+) -> tuple[Placement, Placement]:
     """Resolve ``(arena, weights)`` placement for AOT from the profiler config.
 
     ``arena`` covers the read-write scratch + persistent tensors; ``weights``
@@ -177,8 +177,11 @@ def _resolve_aot_placement_intent(
         tcm_cap=soc.memory.dtcm_kb * 1024 if soc else 1 << 31,
         sram_cap=soc.memory.sram_kb * 1024 if soc else 1 << 31,
     )
-    arena = config.model.arena_location or arena
-    weights = config.model.weights_location or weights
+    # Explicit locations are preflight-validated; Placement() is identity for members.
+    if config.model.arena_location:
+        arena = Placement(config.model.arena_location)
+    if config.model.weights_location:
+        weights = Placement(config.model.weights_location)
     return arena, weights
 
 
@@ -187,8 +190,7 @@ def _resolve_aot_tensor_rulesets(
 ) -> list[dict[str, Any]]:
     """Build heliaAOT per-kind attribute rulesets (constant/persistent/scratch).
     """
-    intent = _resolve_aot_placement_intent(config, soc)
-    arena, weights = intent
+    arena, weights = _resolve_aot_placement_intent(config, soc)
     arena_mem = _PLACEMENT_TO_AOT_MEMTYPE[arena]
 
     # scratch + persistent are read-write: their runtime memory is the arena.
@@ -238,9 +240,9 @@ def _run_aot_compiler(
       (applied last).
     """
     try:
-        from helia_aot.cli.defines import ConvertArgs
-        from helia_aot.converter import AotConverter
-        from helia_aot.defines import ModuleType
+        from helia_aot.cli.defines import ConvertArgs  # type: ignore[import-untyped]
+        from helia_aot.converter import AotConverter  # type: ignore[import-untyped]
+        from helia_aot.defines import ModuleType  # type: ignore[import-untyped]
     except ImportError:
         raise EngineError(
             "heliaAOT package not installed",

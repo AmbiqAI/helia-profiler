@@ -86,7 +86,8 @@ def _parse_power_gpio_pins(raw: str) -> dict[str, tuple[int, int, int]] | None:
             )
             sys.exit(2)
         try:
-            mapping[board.strip()] = tuple(int(value, 0) for value in values)  # type: ignore[assignment]
+            gate, state, go = (int(value, 0) for value in values)
+            mapping[board.strip()] = (gate, state, go)
         except ValueError:
             print(
                 f"Error: invalid --power-gpios entry {item!r}; GPIO pins must be integers.",
@@ -307,7 +308,7 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         sys.exit(2)
 
     try:
-        import pytest  # noqa: F401  (imported to fail fast with a clear msg)
+        import pytest  # noqa: F401
     except ImportError:
         print(
             "Error: pytest is required for `hpx validate`. Install it with `pip install pytest`.",

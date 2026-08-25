@@ -43,7 +43,7 @@ from ..pipeline import PipelineContext
 from ..placement import MemoryRegion, Placement, resolve_fastest_fit_placement
 from ..config import Transport
 from ..platform import MemoryLayout, PmuTier, SocDef, SocFamily
-from ..results import MemoryConsumer, MemoryPlan, MemoryRegionUsage
+from ..results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
 
 if TYPE_CHECKING:
     from ..config import ProfileConfig
@@ -137,7 +137,7 @@ class PlanMemoryStage:
                 "or fields were missing); the plan records capacities and "
                 "hpx-owned consumers only — no arena/weights figures."
             )
-            return MemoryPlan(engine=ctx.config.engine.type.value)
+            return MemoryPlan(engine=ctx.config.engine.type)
         return self._synthesise_plan(ctx)
 
     def _synthesise_plan(self, ctx: PipelineContext) -> MemoryPlan:
@@ -149,7 +149,6 @@ class PlanMemoryStage:
         will actually emit.
         """
         engine_type = ctx.config.engine.type
-        engine = engine_type.value
         artifacts = ctx.engine_artifacts
         arena = int(ctx.config.model.arena_size or DEFAULT_ARENA_SIZE_BYTES)
 
@@ -172,7 +171,7 @@ class PlanMemoryStage:
         def add(region: MemoryRegion, name: str, size: int, kind: str) -> None:
             if size > 0:
                 region_map.setdefault(region, []).append(
-                    MemoryConsumer(name=name, size=size, kind=kind)
+                    MemoryConsumer(name=name, size=size, kind=ConsumerKind(kind))
                 )
 
         if model_bytes > 0:
@@ -245,7 +244,7 @@ class PlanMemoryStage:
         )
 
         return MemoryPlan(
-            engine=engine,
+            engine=engine_type,
             regions=regions,
             model_weight_bytes=model_bytes,
         )
@@ -506,7 +505,7 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
                 MemoryConsumer(
                     name="pmu_layer_records",
                     size=records_bytes,
-                    kind="other",
+                    kind=ConsumerKind.OTHER,
                 ),
             )
         )
@@ -526,7 +525,7 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
                 MemoryConsumer(
                     name="rtt_buffers",
                     size=up + RTT_FIXED_OVERHEAD_BYTES,
-                    kind="other",
+                    kind=ConsumerKind.OTHER,
                 ),
             )
         )
@@ -535,7 +534,7 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
             (
                 _usb_region(family),
                 MemoryConsumer(
-                    name="usb_buffers", size=USB_CDC_BUFFER_BYTES, kind="other"
+                    name="usb_buffers", size=USB_CDC_BUFFER_BYTES, kind=ConsumerKind.OTHER
                 ),
             )
         )
@@ -550,7 +549,7 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
                 # is a characterization task, not a default.
                 name="boot_stack",
                 size=_BOOT_STACK_BYTES[family],
-                kind="stack",
+                kind=ConsumerKind.STACK,
             ),
         )
     )

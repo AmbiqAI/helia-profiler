@@ -50,25 +50,25 @@ def _eligible(case: CaseResult) -> bool:
 
 
 def _pareto_cases(cases: list[CaseResult]) -> set[str]:
-    candidates = [
-        case
-        for case in cases
-        if _eligible(case) and case.binary_total_bytes is not None and case.binary_total_bytes > 0
-    ]
+    # (case_id, total_cycles, binary_total_bytes); _eligible guarantees
+    # total_cycles is present, the size filter guarantees binary_total_bytes.
+    candidates: list[tuple[str, int, int]] = []
+    for case in cases:
+        cycles = case.total_cycles
+        size = case.binary_total_bytes
+        if _eligible(case) and cycles is not None and size is not None and size > 0:
+            candidates.append((case.case_id, cycles, size))
     frontier: set[str] = set()
-    for candidate in candidates:
+    for index, (case_id, cycles, size) in enumerate(candidates):
         dominated = any(
-            other.total_cycles <= candidate.total_cycles
-            and other.binary_total_bytes <= candidate.binary_total_bytes
-            and (
-                other.total_cycles < candidate.total_cycles
-                or other.binary_total_bytes < candidate.binary_total_bytes
-            )
-            for other in candidates
-            if other is not candidate
+            other_cycles <= cycles
+            and other_size <= size
+            and (other_cycles < cycles or other_size < size)
+            for other_index, (_, other_cycles, other_size) in enumerate(candidates)
+            if other_index != index
         )
         if not dominated:
-            frontier.add(candidate.case_id)
+            frontier.add(case_id)
     return frontier
 
 
@@ -264,11 +264,8 @@ def print_validation(
                     else "—"
                 )
             if show_arena:
-                row.append(
-                    _fmt_bytes(case.allocated_arena_bytes or case.arena_size_bytes)
-                    if case.allocated_arena_bytes is not None or case.arena_size_bytes is not None
-                    else "—"
-                )
+                arena_bytes = case.allocated_arena_bytes or case.arena_size_bytes
+                row.append(_fmt_bytes(arena_bytes) if arena_bytes is not None else "—")
             if show_energy:
                 row.append(
                     f"{_format_optional(case.energy_uj, digits=1)} µJ"

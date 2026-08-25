@@ -18,6 +18,7 @@ from ..results import PowerObservation
 from ..config import DEFAULT_POWER_DURATION_S, WindowMode
 from ..errors import PowerError
 from ..pipeline import PipelineContext
+from ..power.base import PowerDriver
 from ..power.diagnostics import count_noun, probe_runs_inferences
 from ..power.metadata import classify_observation
 from ..target.lifecycle import CapturePhase, prepare_target_for_phase
@@ -61,7 +62,18 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
     """
     pmu = ctx.pmu_result
     soc = ctx.soc
+    platform = ctx.run_metadata.platform
     if pmu is None or soc is None:
+        return None
+    if platform is None:
+        # ResolvePlatformStage sets platform whenever it sets soc, so this
+        # arm is unreachable in the shipped pipeline -- but a silent None
+        # would quietly size the capture from the default duration, so the
+        # fallback announces itself.
+        log.warning(
+            "Cannot estimate the capture duration (run_metadata.platform is "
+            "not set); falling back to the configured window duration."
+        )
         return None
 
     total_cycles = sum(layer.cycles or 0 for layer in pmu.layers)
@@ -70,7 +82,7 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
 
     # Use the CPU clock actually selected for this run (resolved in stage 1),
     # not the SoC's top frequency.
-    clock_hz = ctx.run_metadata.platform.cpu_clock_mhz * 1_000_000
+    clock_hz = platform.cpu_clock_mhz * 1_000_000
     if clock_hz <= 0:
         return None
 
@@ -151,7 +163,7 @@ class CapturePowerStage:
         mode = ctx.config.power.mode
         log.info("Power driver: %s (mode: %s)", driver_name, mode)
 
-        def _prepare_target(driver: object, resolved_driver_name: str):
+        def _prepare_target(driver: PowerDriver, resolved_driver_name: str):
             lifecycle_plan = prepare_target_for_phase(
                 ctx,
                 phase=CapturePhase.POWER,

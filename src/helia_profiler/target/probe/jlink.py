@@ -554,11 +554,11 @@ class JLinkFlashBackend:
         self,
         firmware_path: Path,
         *,
-        toolchain: str,
+        toolchain: str | None,
         jlink_serial: str | None = None,
         frozen: bool = False,
         timeout_s: float,
-        verbose: bool = False,
+        verbose: int = 0,
     ) -> None:
         from ... import nsx as nsx_cli
 

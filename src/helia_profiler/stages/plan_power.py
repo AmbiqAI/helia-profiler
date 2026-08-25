@@ -92,7 +92,9 @@ def _check_ina228_cadence(ctx: PipelineContext, plan: PowerRunPlan) -> None:
         window_us = plan.inference_count * plan.reference_inference_us
         window_source = "planned window"
     else:
-        window_us = plan.target_duration_ms * 1000
+        target_ms = plan.target_duration_ms
+        assert target_ms is not None  # plan_power_run always sets it
+        window_us = target_ms * 1000
         window_source = "target duration"
     updates = window_us // update_period_us
     if updates < MIN_INA228_ACCUMULATOR_UPDATES:
@@ -275,17 +277,16 @@ class PlanPowerRunStage:
                     "PowerTerminalEnvelope emission before enabling internal mode."
                 ),
             )
-        ctx.publish_power_plan(
-            plan_power_run(ctx, inference_count=self._inference_count)
-        )
+        plan = plan_power_run(ctx, inference_count=self._inference_count)
+        ctx.publish_power_plan(plan)
         log.info(
             "Power plan: firmware=%s count=%s source=%s",
-            ctx.power_plan.firmware_mode,
-            ctx.power_plan.inference_count or "auto",
-            ctx.power_plan.count_source,
+            plan.firmware_mode,
+            plan.inference_count or "auto",
+            plan.count_source,
         )
-        count = ctx.power_plan.inference_count
-        reference_us = ctx.power_plan.reference_inference_us
+        count = plan.inference_count
+        reference_us = plan.reference_inference_us
         if count is not None and reference_us is not None:
             runtime_s = count * reference_us / 1_000_000
             noun = count_noun(ctx.config.profiling.clean_window_probe, count)

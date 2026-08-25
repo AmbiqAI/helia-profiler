@@ -82,6 +82,7 @@ def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
         path=Path(),
         local=False,
         project=CMSIS_NN_PROJECT,
+        # None must reach the dependency-lock digest as null; "" is a different key.
         ref=requested_ref,
     )
 

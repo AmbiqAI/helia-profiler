@@ -706,9 +706,12 @@ def _build_valid_field_names() -> dict[tuple[str, ...], tuple[str, ...]]:
     import dataclasses as _dc
     import typing as _t
 
+    if _t.TYPE_CHECKING:
+        from _typeshed import DataclassInstance
+
     result: dict[tuple[str, ...], tuple[str, ...]] = {}
 
-    def visit(cls: type, path: tuple[str, ...]) -> None:
+    def visit(cls: type[DataclassInstance], path: tuple[str, ...]) -> None:
         names = tuple(f.name for f in _dc.fields(cls))
         if path == ():
             names = tuple(
