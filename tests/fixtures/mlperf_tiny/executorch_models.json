@@ -14,7 +14,7 @@
     "torch_version": "2.12.0",
     "torchao_version": "0.17.0",
     "cmsis_nn_source": "d933672e7ca97eec70ef43230baee7b20c2a28ae",
-    "quantization": "PT2E static INT8 (CortexMQuantizer) baked into the .pt2; float32 method I/O",
+    "quantization": "PT2E static INT8 (CortexMQuantizer) baked into the .pt2, which keeps quantize/dequantize at a float32 method boundary; the lowered .pte strips that boundary (int8_io=True) so its method I/O is int8",
     "pte_pipeline": "helia-torch nsx_cortex_m.export(kernel_provider='arm', int8_io=True), pre-quantized path; stock Cortex-M lowering with the float boundary q/dq removed",
     "nsx_executorch": "757aa9ca6f66bca1c1f4d6338c42f3505b60be97 (AmbiqAI/nsx-executorch#10)"
   },

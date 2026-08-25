@@ -8,9 +8,10 @@ stages, with an INT8 `.pt2` ExportedProgram as the interface between them:
    (`executorch.examples.models.mlperf_tiny`) with a deterministic seed,
    applies PT2E static INT8 quantization (`CortexMQuantizer` with
    deterministic synthetic calibration), and saves each quantized program as
-   a `.pt2` fixture (Git LFS) beside its TFLite counterpart. The `.pt2` is
-   therefore datatype-equivalent to the INT8 `.tflite` reference model next
-   to it: int8 weights/activations with a float32 method boundary. No
+   a `.pt2` fixture (Git LFS) beside its TFLite counterpart. Like the INT8
+   `.tflite` reference next to it, the `.pt2` carries int8 weights and
+   activations — but as a PT2E artifact it keeps quantize/dequantize at a
+   float32 method boundary; the boundary goes int8 at the `.pte` stage. No
    architecture is re-authored in this repository. Upstream ships no trained
    checkpoints, so weights are deterministic random initialization — hence
    the `_random` file names. A `.pt2` with the same contract but trained

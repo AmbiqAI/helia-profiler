@@ -299,6 +299,8 @@ def main() -> None:
         default=DEFAULT_EXECUTORCH_ROOT,
     )
     args = parser.parse_args()
+    if args.all and args.models is not None:
+        parser.error("--all and --models are mutually exclusive")
     keys = list(MODELS) if args.all else parse_model_keys(args.models)
 
     executorch_root = args.executorch_root.resolve()
