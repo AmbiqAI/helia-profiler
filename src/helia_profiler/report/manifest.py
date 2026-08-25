@@ -216,6 +216,9 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
         ComparisonDimension.TRANSPORT: _nested(config, "target", "transport"),
         ComparisonDimension.ARENA_LOCATION: _nested(config, "model", "arena_location"),
         ComparisonDimension.WEIGHTS_LOCATION: _nested(config, "model", "weights_location"),
+        ComparisonDimension.ENGINE_VERSION: (
+            ctx.run_metadata.engine.version if ctx.run_metadata.engine is not None else None
+        ),
     }
     if ctx.power_result is not None:
         # A run that measured no power has nothing to say about how it

@@ -18,10 +18,12 @@ The current baseline is `hpx-neuralspotx-0.7.17-2026-08`:
 | `nsx-tflite-micro` | `7afcf2b4…333` |
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
 | `ns-cmsis-nn` | `63172642…d7f` (`v7.29.2`) |
+| `nsx-executorch` | `62b22f96…1d59` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
 | heliaRT | `1.17.0`, commit `ff6233ba…8df` (min supported `1.16.0` — from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
 | heliaAOT | `min_version=0.18.0`, `max_version_exclusive=0.19.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
+| executorch | `0.1.0`, module ref `62b22f96…1d59` (a checkout's `version.txt` is verified against the baseline) |
 
 heliaRT 1.17.0 (issue #89) is a build-system and docs release from HPX's
 perspective: the prebuilt distribution's exported-symbol surface, header
@@ -44,11 +46,13 @@ branch, upstreaming the header-prefix shim helia-rt's NSX module already
 carried. Empirically, the full 1.16→1.17 source-axis A/B showed a 0 B
 `.text` delta, and single-run cycle deltas of −41 and −531 (−0.002% /
 −0.026%; KWS DS-CNN, two independent apollo510_evb benches, gcc) — at
-or near run noise, with no claim of a real kernel effect. NB `hpx
-compare` does NOT surface an engine-version difference: the `ENGINE`
-dimension compares engine *type* only, and the version lives in
-`run_metadata.json` — a promoter A/B-ing across a runtime bump must
-diff that field by hand (tracked as a comparability-dimension gap).
+or near run noise, with no claim of a real kernel effect. `hpx
+compare` surfaces such a promotion via the `engine_version` comparability
+dimension (#193): the measured `run_metadata.engine.version` renders as an
+`Engine version` row in the compare Config table and an informative
+`dimension.engine_version_differs` warning when the two sides differ
+(absent for artifacts predating the dimension, and for tflm/executorch
+runs, which record no resolved version).
 The Ethos-U kernel support is outside what HPX consumes **today**; the
 in-flight atomiq110 work (PR #98) will opt into it via
 `NSX_HELIA_RT_ENABLE_ETHOSU` and requires a helia-rt newer than 1.17.0

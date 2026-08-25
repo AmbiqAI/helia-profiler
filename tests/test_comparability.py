@@ -12,6 +12,7 @@ def _run(
     *,
     model: str = "abc",
     engine: str = "helia-rt",
+    engine_version: str | None = "1.17.0",
     compiler_version: str = "12.2.1",
     system_clock_hz: int = 250_000_000,
     ops=("CONV_2D",),
@@ -20,12 +21,19 @@ def _run(
     summary: dict = {"schema_version": 1, "total_cycles": 100}
     if power is not None:
         summary["power"] = power
+    # Matches report/metadata.py: a None version is FILTERED OUT of the JSON
+    # (tflm/executorch record no resolved version), so absence is the real
+    # legacy/no-version shape, not a null.
+    engine_block: dict = {"type": engine}
+    if engine_version is not None:
+        engine_block["version"] = engine_version
     return RunArtifacts(
         path=Path("results"),
         summary=summary,
         metadata={
             "schema_version": 1,
             "hpx_version": "0.1.0",
+            "engine": engine_block,
             "model": {"sha256": model},
             "toolchain": {"compiler_version": compiler_version},
             "firmware": {"system_clock_hz": system_clock_hz},
@@ -51,6 +59,39 @@ def test_engine_difference_is_informative():
     assert assessment.layers_comparable
     issue = next(issue for issue in assessment.issues if issue.code == DIMENSION_DIFFERS.code_for(ComparisonDimension.ENGINE))
     assert issue.severity is ComparabilitySeverity.INFORMATIVE
+
+
+def test_engine_version_difference_is_informative():
+    """#193: a runtime promotion (heliaRT 1.16 -> 1.17, the #191 A/B) must
+    surface -- previously the one axis that changed was invisible."""
+    assessment = assess_comparability(
+        _run(engine_version="1.16.0"), _run(engine_version="1.17.0")
+    )
+
+    assert assessment.run_metrics_comparable
+    assert assessment.layers_comparable
+    issue = next(
+        issue
+        for issue in assessment.issues
+        if issue.code == DIMENSION_DIFFERS.code_for(ComparisonDimension.ENGINE_VERSION)
+    )
+    assert issue.severity is ComparabilitySeverity.INFORMATIVE
+    assert issue.context["baseline"] == "1.16.0"
+    assert issue.context["candidate"] == "1.17.0"
+
+
+def test_a_baseline_predating_engine_version_is_skipped_not_flagged():
+    """Old artifacts (and tflm/executorch runs, which record no resolved
+    version) omit the key entirely -- missing is unknown, not different."""
+    assessment = assess_comparability(
+        _run(engine_version=None), _run(engine_version="1.17.0")
+    )
+
+    assert assessment.run_metrics_comparable
+    assert not any(
+        issue.code == DIMENSION_DIFFERS.code_for(ComparisonDimension.ENGINE_VERSION)
+        for issue in assessment.issues
+    )
 
 
 def test_model_mismatch_blocks_all_deltas():

@@ -98,6 +98,9 @@ def test_family_membership_and_order_are_the_documented_sets():
         "transport",
         "arena_location",
         "weights_location",
+        # #193: appended, never inserted -- family order is emitted-issue
+        # order and existing positions are frozen shipped behavior.
+        "engine_version",
     ]
     # The remaining enum members are exactly the two non-family classes.
     non_family = set(ComparisonDimension) - set(

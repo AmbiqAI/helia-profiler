@@ -158,6 +158,7 @@ _CONFIG_FIELDS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("model_path", "Model path", ("config", "model", "path")),
     _dimension_row(ComparisonDimension.MODEL_SHA256),
     _dimension_row(ComparisonDimension.ENGINE),
+    _dimension_row(ComparisonDimension.ENGINE_VERSION),
     ("backend", "Backend", ("config", "engine", "backend")),
     _dimension_row(ComparisonDimension.BOARD),
     _dimension_row(ComparisonDimension.SOC),

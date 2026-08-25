@@ -57,8 +57,12 @@ reading a bundle. It then applies typed comparability rules:
 - incompatible power scope, mode, firmware, monitor presence, lock-step,
   integrity, **clean-window probe**, or (same platform only) the measured
   **firmware code fingerprint** suppresses only power deltas;
-- engine, toolchain, board, clock, transport, and placement differences remain
-  visible as experimental dimensions.
+- engine (type and measured runtime version), toolchain, board, clock,
+  transport, and placement differences remain visible as informative
+  dimensions. The engine version is the *measured* identity
+  (`run_metadata.engine.version`, e.g. a heliaRT promotion) — runs recorded
+  before the dimension existed, and tflm/executorch runs (no resolved
+  version), are skipped like any other absent dimension.
 
 The clean-window probe is what ran *inside* the measured window. A
 `busy_loop` window measures a calibrated CPU spin rather than a model
