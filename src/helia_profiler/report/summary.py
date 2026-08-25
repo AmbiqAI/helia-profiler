@@ -16,6 +16,8 @@ from .memory import (
 )
 from .power import _power_summary_to_dict
 from .contracts import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION
+from ..errors import ReportError
+from ..results.run_summary import RunSummary
 from ..evaluation import evaluate_run
 from ..firmware import measured_power_fingerprint
 from ..power.diagnostics import probe_runs_inferences
@@ -490,11 +492,35 @@ def _write_summary(
     summary["validity"] = evaluation.validity.value
     summary["issues"] = [issue.to_dict() for issue in evaluation.issues]
 
+    # The artifact goes THROUGH the typed model (#202): RunSummary owns the
+    # schema, its to_dict() owns emission order and omit-when-None
+    # conditionality, and the strict check below makes it a chokepoint -- a
+    # key this function writes that the model does not declare fails loudly
+    # here instead of shipping as an untyped, unversioned field no reader
+    # can rely on.
+    model = RunSummary.from_dict(summary)
+    _assert_no_unmodelled_keys(model)
     out_path = output_dir / "summary.json"
     out_path.write_text(
-        json.dumps(summary, indent=2, default=str),
+        json.dumps(model.to_dict(), indent=2, default=str),
         encoding="utf-8",
         newline="\n",
     )
     log.info("Wrote summary: %s", out_path)
     return out_path
+
+
+def _assert_no_unmodelled_keys(model: RunSummary) -> None:
+    unmodelled: dict[str, list[str]] = {}
+    if model.extras:
+        unmodelled["summary"] = sorted(model.extras)
+    for name in ("memory", "binary", "power", "latency"):
+        section = getattr(model, name)
+        if section is not None and section.extras:
+            unmodelled[name] = sorted(section.extras)
+    if unmodelled:
+        raise ReportError(
+            "summary.json writer produced keys the RunSummary model does not "
+            f"declare: {unmodelled}",
+            hint="Add the field to results/run_summary.py -- the model IS the schema.",
+        )
