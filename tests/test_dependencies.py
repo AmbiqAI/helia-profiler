@@ -350,7 +350,10 @@ def test_incompatible_inputs_select_isolated_workspaces(tmp_path: Path) -> None:
     assert first.dependency_workspace.root != second.dependency_workspace.root
 
 
-def test_model_and_firmware_config_changes_isolate_workspaces(tmp_path: Path) -> None:
+def test_render_only_changes_share_the_workspace(tmp_path: Path) -> None:
+    """Model bytes, profiling settings, and probe serial are render/runtime
+    inputs: they re-render files inside the workspace, so they must reuse
+    the dependency fingerprint rather than fork a full module tree."""
     first = _context(tmp_path / "one")
     assert first.dependency_workspace is not None
     second = _context(tmp_path / "two", model_bytes=b"different-model")
@@ -370,11 +373,30 @@ def test_model_and_firmware_config_changes_isolate_workspaces(tmp_path: Path) ->
     )
     third = PipelineContext(config=config, work_dir=tmp_path / "three" / "work")
     ResolvePlatformStage().run(third)
+    third.resolved_jlink_serial = "1160009999"
     third.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
     third.dependency_workspace = create_workspace(third)
 
-    assert first.dependency_workspace.fingerprint != second.dependency_workspace.fingerprint
-    assert first.dependency_workspace.fingerprint != third.dependency_workspace.fingerprint
+    assert first.dependency_workspace.fingerprint == second.dependency_workspace.fingerprint
+    assert first.dependency_workspace.fingerprint == third.dependency_workspace.fingerprint
+
+
+def test_model_change_reuses_workspace_root_without_identity_collision(
+    tmp_path: Path,
+) -> None:
+    """Two runs in one work dir with different models select the same root;
+    the persisted hpx-workspace.json identity must accept the second run
+    (a mismatch raises DependencyError from _persist_workspace_identity)."""
+    shared = tmp_path / "shared"
+    first = _context(shared, model_bytes=b"TFL3-model-a")
+    second = _context(shared, model_name="model_b.tflite", model_bytes=b"TFL3-model-b")
+
+    assert first.dependency_workspace is not None
+    assert second.dependency_workspace is not None
+    assert first.dependency_workspace.root == second.dependency_workspace.root
+    assert (
+        first.dependency_workspace.fingerprint == second.dependency_workspace.fingerprint
+    )
 
 
 def test_offline_requires_compatible_lock(tmp_path: Path) -> None:
