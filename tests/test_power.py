@@ -3315,3 +3315,59 @@ class TestGateArbitrationComposition:
         arb_ok = self._arb(integrity=None, observer=self._observer(agrees=True))
         assert arb_ok.suppress_per_inference is False
         assert arb_ok.drift_note is None
+
+    def test_unhealthy_terminal_suppresses_even_with_a_valid_band(self):
+        """#204 lens-2 M2 kill: the terminal-health term must suppress on its
+        own -- an early-exit firmware whose short gate happens to match the
+        shortened work passes the est*count band while the planned-count
+        denominator is still wrong."""
+        arb = self._arb(integrity="valid", terminal_unhealthy=True)
+        assert arb.suppress_per_inference is True
+        assert (
+            arb.suppression_reason
+            == "power terminal reported failed or incomplete work"
+        )
+
+    def test_floor_suppression_starves_the_drift_note(self):
+        """#204 lens-2 M6 kill: the note's own no-note-while-suppressed
+        guarantee, not just the render's ordering -- a below-floor gate at
+        drift-scale deviation with an agreeing observer must not narrate."""
+        from helia_profiler.power.diagnostics import GateArbitration
+
+        arb = GateArbitration(
+            integrity=self._integrity(
+                measured=0.9, expected=1.0, minimum=1.0, tolerance=0.01
+            ),
+            integrity_recorded=True,
+            observer=self._observer(agrees=True),
+            terminal_unhealthy=False,
+        )
+        assert arb.suppress_per_inference is True
+        assert arb.drift_note is None
+
+    def test_reason_precedence_is_the_suppress_order(self):
+        """#204 lens-2 M3 kill: the builder never produces observer+unhealthy
+        together (it withholds the observer), so precedence is pinned by
+        direct construction -- observer disagreement outranks terminal
+        health, mirroring the suppress disjunction."""
+        from helia_profiler.power.diagnostics import GateArbitration
+
+        arb = GateArbitration(
+            integrity=None,
+            integrity_recorded=False,
+            observer=self._observer(agrees=False),
+            terminal_unhealthy=True,
+        )
+        assert arb.suppression_reason == "firmware window clock disagrees with the gate"
+
+    def test_incoherent_recorded_flag_is_refused(self):
+        """integrity_recorded without an integrity term is unconstructible."""
+        from helia_profiler.power.diagnostics import GateArbitration
+
+        with pytest.raises(ValueError, match="incoherent"):
+            GateArbitration(
+                integrity=None,
+                integrity_recorded=True,
+                observer=None,
+                terminal_unhealthy=False,
+            )

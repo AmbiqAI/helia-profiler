@@ -719,6 +719,20 @@ def assess_gate_observer(
     )
 
 
+class GateSuppressionReason(StrEnum):
+    """Why per-inference metrics were suppressed, in precedence order.
+
+    A StrEnum so the summary's log line and any serialized form render the
+    same prose they always did, while typed consumers (#202 Part A) get a
+    structured value instead of parsing a sentence.
+    """
+
+    BELOW_MINIMUM = "below the minimum accepted gate"
+    OBSERVER_DISAGREES = "firmware window clock disagrees with the gate"
+    TERMINAL_UNHEALTHY = "power terminal reported failed or incomplete work"
+    NO_ARBITER = "duration mismatch with no firmware envelope to arbitrate"
+
+
 @dataclass(frozen=True)
 class GateArbitration:
     """The single composition of the #142/#181 gate verdict.
@@ -755,6 +769,12 @@ class GateArbitration:
     #: with its own gate BY CONSTRUCTION).
     terminal_unhealthy: bool
 
+    def __post_init__(self) -> None:
+        if self.integrity is None and self.integrity_recorded:
+            raise ValueError(
+                "integrity_recorded without an integrity term is incoherent"
+            )
+
     @property
     def observer_agrees(self) -> bool | None:
         return self.observer.agrees if self.observer is not None else None
@@ -780,16 +800,20 @@ class GateArbitration:
         )
 
     @property
-    def suppression_reason(self) -> str | None:
-        """Human-readable cause, ``None`` when nothing is suppressed."""
+    def suppression_reason(self) -> GateSuppressionReason | None:
+        """The cause, ``None`` when nothing is suppressed.
+
+        Precedence mirrors :attr:`suppress_per_inference`'s disjunction
+        order exactly -- the two properties must answer as one.
+        """
         if self.integrity is not None and self.integrity.below_minimum:
-            return "below the minimum accepted gate"
+            return GateSuppressionReason.BELOW_MINIMUM
         if self.observer_agrees is False:
-            return "firmware window clock disagrees with the gate"
+            return GateSuppressionReason.OBSERVER_DISAGREES
         if self.terminal_unhealthy:
-            return "power terminal reported failed or incomplete work"
+            return GateSuppressionReason.TERMINAL_UNHEALTHY
         if self.integrity is not None and not self.integrity.valid and self.observer is None:
-            return "duration mismatch with no firmware envelope to arbitrate"
+            return GateSuppressionReason.NO_ARBITER
         return None
 
     @property
@@ -807,8 +831,8 @@ class GateArbitration:
             return None
         if self.observer_agrees is not True:
             return None
-        deviation = abs(1.0 - self.integrity.ratio)
-        if not (
+        deviation = self.reference_deviation
+        if deviation is None or not (
             DRIFT_NOTE_MIN_RATIO_DEVIATION
             < deviation
             <= DRIFT_PLAUSIBLE_RATIO_DEVIATION
@@ -928,6 +952,7 @@ __all__ = [
     "DWT_RATE_MIN_RATIO",
     "GateArbitration",
     "GateDurationIntegrity",
+    "GateSuppressionReason",
     "GateFailure",
     "GateFailureKind",
     "GateTransitionTiming",

@@ -56,7 +56,7 @@ def _rederive_integrity(
     if not probe_runs_inferences(ctx.config.profiling.clean_window_probe):
         return None
     meta = ctx.pmu_result.meta if ctx.pmu_result is not None else None
-    if meta is None or not meta.clean_infer_count or meta.clean_infer_count <= 0:
+    if meta is None or meta.clean_infer_count is None or meta.clean_infer_count <= 0:
         return None
     effective_count = meta.clean_infer_count
     effective_avg_us = meta.clean_infer_avg_us
@@ -102,6 +102,16 @@ def _build_gate_arbitration(ctx: PipelineContext) -> GateArbitration | None:
     if integrity is None:
         integrity = _rederive_integrity(ctx, result)
 
+    # The pipeline stores the observation's result AS ctx.power_result; a
+    # context carrying two different objects would render summary fields
+    # from mixed sources (#204 review) -- broken-invariant tripwire.
+    assert (
+        ctx.power_run is None
+        or ctx.power_run.observation is None
+        or ctx.power_result is None
+        or ctx.power_run.observation.result is ctx.power_result
+    ), "observation.result and ctx.power_result diverge"
+
     terminal = ctx.power_run.terminal if ctx.power_run is not None else None
     terminal_unhealthy = terminal is not None and (
         terminal.status != "ok"
@@ -117,6 +127,14 @@ def _build_gate_arbitration(ctx: PipelineContext) -> GateArbitration | None:
         if terminal is not None and not terminal_unhealthy
         else None
     )
+    if integrity is None and observer is None:
+        # Neither an est*count term nor a two-clock comparison exists --
+        # there is nothing gated to arbitrate (an internal-mode run with a
+        # terminal hiccup lands here), and RunEvaluation.gate_arbitration
+        # promises None for exactly that (#204 review: a non-None,
+        # suppressing arbitration for a non-gated run would poison any
+        # consumer keying "gated" on its presence).
+        return None
     return GateArbitration(
         integrity=integrity,
         integrity_recorded=integrity_recorded,
@@ -498,7 +516,10 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                         )
                     elif (
                         observer_agrees
-                        and abs(1.0 - duration.ratio) > DRIFT_PLAUSIBLE_RATIO_DEVIATION
+                        and arbitration is not None
+                        and arbitration.reference_deviation is not None
+                        and arbitration.reference_deviation
+                        > DRIFT_PLAUSIBLE_RATIO_DEVIATION
                     ):
                         # Observer agreement only proves the gate brackets what
                         # the firmware timed -- it cannot see a window whose
