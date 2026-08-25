@@ -37,6 +37,7 @@ from ..errors import ReportError
 from .aot import _write_aot_manifest, _write_aot_memory_layers
 from .csv_writer import _layer_to_flat_dict, _write_csv, _write_preset_csv
 from .json_writer import _write_json
+from ..evaluation import evaluate_run
 from .manifest import _write_result_manifest
 from .memory import _serialise_memory_plan, _write_memory_breakdown
 from .metadata import _firmware_meta_to_dict, _metadata_to_dict, _write_run_metadata
@@ -96,7 +97,10 @@ def write_report(ctx: PipelineContext) -> list[Path]:
         raise ReportError(f"Unknown output format: '{fmt}'")
 
     # --- Always: summary.json ---
-    p = _write_summary(ctx, output_dir)
+    # One evaluation per publication (#202 D5): the summary renders it and
+    # the manifest records it -- the same object, so they cannot disagree.
+    evaluation = evaluate_run(ctx)
+    p = _write_summary(ctx, output_dir, evaluation)
     paths.append(p)
 
     # --- Always: run metadata ---
@@ -158,6 +162,6 @@ def write_report(ctx: PipelineContext) -> list[Path]:
             paths.append(p)
 
     # Publication marker: written last so an interrupted report cannot appear complete.
-    paths.append(_write_result_manifest(ctx, paths, output_dir))
+    paths.append(_write_result_manifest(ctx, paths, output_dir, evaluation))
 
     return paths

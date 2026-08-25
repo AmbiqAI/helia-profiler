@@ -7,20 +7,26 @@ from typing import TYPE_CHECKING, Any
 
 from ..power.diagnostics import (
     DRIFT_PLAUSIBLE_RATIO_DEVIATION,
+    GateArbitration,
     assess_clean_window_clock_rate,
     count_noun,
     assess_clean_window_stall,
     assess_gate_duration,
+    assess_gate_observer,
     assess_run_window_clock,
     expected_terminal_requested_count,
     firmware_window_clock_is_frozen,
     gate_relative_tolerance_for,
+    probe_runs_inferences,
 )
+from ..power.metadata import MeasurementScope
 from ..errors import ReportError
 from ..results import ISSUE_REGISTRY, IssueCode, ResultIssue, ResultValidity, Severity
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
+    from ..power.base import PowerResult
+    from ..power.diagnostics import GateDurationIntegrity
 
 
 @dataclass(frozen=True)
@@ -29,11 +35,118 @@ class RunEvaluation:
 
     validity: ResultValidity
     issues: tuple[ResultIssue, ...] = ()
+    #: The composed #142/#181 gate verdict (None when the run has no gated
+    #: power capture to arbitrate). Issues above are emitted FROM it; the
+    #: summary renders it -- one composition, two consumers (#202).
+    gate_arbitration: GateArbitration | None = None
+
+
+def _rederive_integrity(
+    ctx: PipelineContext, result: "PowerResult"
+) -> "GateDurationIntegrity | None":
+    """Advisory est*count verdict for a result that recorded none.
+
+    Mirrors the report's historical inputs exactly: gated scope, an
+    inference-running probe, the plan-preferred count/reference, and the
+    ``assess_gate_duration`` advisory default band. ``None`` when the inputs
+    do not exist -- the observer check does not need this term.
+    """
+    if result.metadata.measurement_scope != MeasurementScope.GPIO_GATED_CLEAN_WINDOW:
+        return None
+    if not probe_runs_inferences(ctx.config.profiling.clean_window_probe):
+        return None
+    meta = ctx.pmu_result.meta if ctx.pmu_result is not None else None
+    if meta is None or meta.clean_infer_count is None or meta.clean_infer_count <= 0:
+        return None
+    effective_count = meta.clean_infer_count
+    effective_avg_us = meta.clean_infer_avg_us
+    plan_meta = result.metadata.power_plan
+    if isinstance(plan_meta, dict) and plan_meta.get("inference_count"):
+        effective_count = int(plan_meta["inference_count"])
+        if plan_meta.get("reference_inference_us"):
+            effective_avg_us = int(plan_meta["reference_inference_us"])
+    if not effective_avg_us or effective_avg_us <= 0 or result.summary.duration_s <= 0:
+        return None
+    return assess_gate_duration(
+        measured_s=result.summary.duration_s,
+        clean_infer_count=effective_count,
+        clean_infer_avg_us=effective_avg_us,
+        stats_rate_hz=ctx.config.power.stats_rate_hz,
+    )
+
+
+def _build_gate_arbitration(ctx: PipelineContext) -> GateArbitration | None:
+    """Compose the gate facts exactly once per run.
+
+    Sources the gated result from the observation when one exists (the
+    pipeline stores the same object in ``ctx.power_result``, but replayed or
+    hand-built contexts may carry only one of the two).
+
+    The integrity term prefers the capture's own record (probe-keyed band,
+    1 s floor). For an artifact that recorded none, it re-derives at the
+    advisory band ``assess_gate_duration`` defaults to -- deliberately
+    tighter, because that verdict only ever feeds the summary's advisory
+    ``suspect`` flag, never a validity issue (``integrity_recorded`` is how
+    validity tells the difference).
+    """
+    result = None
+    if ctx.power_run is not None and ctx.power_run.observation is not None:
+        result = ctx.power_run.observation.result
+    if result is None:
+        result = ctx.power_result
+    if result is None:
+        return None
+
+    integrity = result.metadata.gate_duration_integrity
+    integrity_recorded = integrity is not None
+    if integrity is None:
+        integrity = _rederive_integrity(ctx, result)
+
+    # The pipeline stores the observation's result AS ctx.power_result; a
+    # context carrying two different objects would render summary fields
+    # from mixed sources (#204 review) -- broken-invariant tripwire.
+    assert (
+        ctx.power_run is None
+        or ctx.power_run.observation is None
+        or ctx.power_result is None
+        or ctx.power_run.observation.result is ctx.power_result
+    ), "observation.result and ctx.power_result diverge"
+
+    terminal = ctx.power_run.terminal if ctx.power_run is not None else None
+    terminal_unhealthy = terminal is not None and (
+        terminal.status != "ok"
+        or terminal.error_code != 0
+        or terminal.completed_count != terminal.requested_count
+    )
+    observer = (
+        assess_gate_observer(
+            elapsed_us=terminal.elapsed_us,
+            gated_result=result,
+            stats_rate_hz=ctx.config.power.stats_rate_hz,
+        )
+        if terminal is not None and not terminal_unhealthy
+        else None
+    )
+    if integrity is None and observer is None:
+        # Neither an est*count term nor a two-clock comparison exists --
+        # there is nothing gated to arbitrate (an internal-mode run with a
+        # terminal hiccup lands here), and RunEvaluation.gate_arbitration
+        # promises None for exactly that (#204 review: a non-None,
+        # suppressing arbitration for a non-gated run would poison any
+        # consumer keying "gated" on its presence).
+        return None
+    return GateArbitration(
+        integrity=integrity,
+        integrity_recorded=integrity_recorded,
+        observer=observer,
+        terminal_unhealthy=terminal_unhealthy,
+    )
 
 
 def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
     """Evaluate captured results without mutating pipeline state."""
     issues: list[ResultIssue] = []
+    arbitration = _build_gate_arbitration(ctx)
     if ctx.pmu_result is None:
         issues.append(_error(IssueCode.PMU_MISSING, "The run has no PMU result."))
     elif ctx.pmu_result.overflow_detected:
@@ -268,10 +381,10 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                             elapsed_us=terminal.elapsed_us,
                         )
                     )
-            else:
+            elif internal_mode:
                 agreement = assess_run_window_clock(
                     elapsed_us=terminal.elapsed_us,
-                    internal_mode=internal_mode,
+                    internal_mode=True,
                     gated_result=observation.result if observation is not None else None,
                     # Same reference the collect stage uses, unconditionally:
                     # `count x reference_us`. #112 withheld it for probes that
@@ -286,45 +399,58 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                     planned_inference_us=plan.reference_inference_us,
                     stats_rate_hz=ctx.config.power.stats_rate_hz,
                 )
-                if agreement is not None and not internal_mode:
-                    observer_agrees = agreement.agrees
                 if agreement is not None and not agreement.agrees:
-                    if internal_mode:
-                        # Plan-referenced (count x a different boot's timing,
-                        # 25% band): a genuine cross-boot reference check, so
-                        # it stays advisory.
-                        issues.append(
-                            _warning(
-                                IssueCode.POWER_WINDOW_CLOCK_MISMATCH,
-                                "Firmware-reported window duration does not agree with "
-                                "the independently measured window.",
-                                **agreement.to_metadata(),
-                            )
+                    # Plan-referenced (count x a different boot's timing,
+                    # 25% band): a genuine cross-boot reference check, so
+                    # it stays advisory.
+                    issues.append(
+                        _warning(
+                            IssueCode.POWER_WINDOW_CLOCK_MISMATCH,
+                            "Firmware-reported window duration does not agree with "
+                            "the independently measured window.",
+                            **agreement.to_metadata(),
                         )
-                    else:
-                        # Two independent oscillators watched the SAME window
-                        # in the SAME boot (instrument sample clock vs the
-                        # STIMER XTAL, liveness-verified by #110's settle
-                        # probe), so drift cannot explain a miss: the gate did
-                        # not bracket what the firmware timed, and every
-                        # per-inference figure divided out of it inherits the
-                        # error. This is the authoritative window-integrity
-                        # verdict (#142/#181) -- the est*count band below is
-                        # only a reference diagnostic once this check has run.
-                        issues.append(
-                            _error(
-                                IssueCode.POWER_WINDOW_OBSERVER_MISMATCH,
-                                "The instrument-timed gate and the firmware's own "
-                                "window clock disagree about the same physical "
-                                "window; per-inference power metrics are not "
-                                "trustworthy.",
-                                **agreement.to_metadata(),
-                            )
+                    )
+            else:
+                # External mode reads the observer off the shared arbitration
+                # (same helper chain as before -- assess_gate_observer -- but
+                # composed once, and now gated on terminal health: an envelope
+                # reporting failed or incomplete work cannot arbitrate, it
+                # times whatever short window it did run).
+                observer = arbitration.observer if arbitration is not None else None
+                if observer is not None:
+                    observer_agrees = observer.agrees
+                if observer is not None and not observer.agrees:
+                    # Two independent oscillators watched the SAME window
+                    # in the SAME boot (instrument sample clock vs the
+                    # STIMER XTAL, liveness-verified by #110's settle
+                    # probe), so drift cannot explain a miss: the gate did
+                    # not bracket what the firmware timed, and every
+                    # per-inference figure divided out of it inherits the
+                    # error. This is the authoritative window-integrity
+                    # verdict (#142/#181) -- the est*count band below is
+                    # only a reference diagnostic once this check has run.
+                    issues.append(
+                        _error(
+                            IssueCode.POWER_WINDOW_OBSERVER_MISMATCH,
+                            "The instrument-timed gate and the firmware's own "
+                            "window clock disagree about the same physical "
+                            "window; per-inference power metrics are not "
+                            "trustworthy.",
+                            **observer.to_metadata(),
                         )
+                    )
+            if not firmware_window_clock_is_frozen(
+                elapsed_us=terminal.elapsed_us,
+                completed_count=terminal.completed_count,
+            ):
                 # Host wall-clock ceiling, recorded by the collect stage (which
                 # is the only place that knows "now"). The verdict is a
                 # property derived from the stored measurements, never a
                 # cached boolean — same rule as GateDurationIntegrity.valid.
+                # Runs for both modes (ceiling is only ever recorded on
+                # internal runs today, but that is the recorder's knowledge,
+                # not this check's).
                 ceiling = (
                     ctx.power_result.metadata.window_clock_ceiling
                     if ctx.power_result is not None
@@ -360,7 +486,16 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         # too short for the stats integral to be trusted regardless of what
         # the firmware clock says.
         if observation is not None:
-            duration = observation.result.metadata.gate_duration_integrity
+            # Consume the arbitration's integrity term, not the metadata
+            # directly: ``integrity_recorded`` is the chokepoint that keeps
+            # validity issues off the advisory re-derived band (review of
+            # #204: reading the metadata in parallel left the flag
+            # write-only and the distinction enforced by duplicate code).
+            duration = (
+                arbitration.integrity
+                if arbitration is not None and arbitration.integrity_recorded
+                else None
+            )
             if duration is not None:
                 if duration.below_minimum:
                     issues.append(
@@ -381,7 +516,10 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                         )
                     elif (
                         observer_agrees
-                        and abs(1.0 - duration.ratio) > DRIFT_PLAUSIBLE_RATIO_DEVIATION
+                        and arbitration is not None
+                        and arbitration.reference_deviation is not None
+                        and arbitration.reference_deviation
+                        > DRIFT_PLAUSIBLE_RATIO_DEVIATION
                     ):
                         # Observer agreement only proves the gate brackets what
                         # the firmware timed -- it cannot see a window whose
@@ -484,7 +622,11 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 )
             )
 
-    return RunEvaluation(validity=_validity_for(issues), issues=tuple(issues))
+    return RunEvaluation(
+        validity=_validity_for(issues),
+        issues=tuple(issues),
+        gate_arbitration=arbitration,
+    )
 
 
 def _assess_unrecorded_duration(ctx: PipelineContext, measured_s: float) -> ResultIssue | None:

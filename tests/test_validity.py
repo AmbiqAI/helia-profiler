@@ -539,6 +539,7 @@ class TestGateArbitration:
         elapsed_us: int | None,
         minimum_s: float = 1.0,
         gate_s: float = DRIFT_GATE_S,
+        completed_count: int | None = None,
     ) -> None:
         assert ctx.power_run is not None and ctx.power_run.observation is not None
         observation = ctx.power_run.observation
@@ -572,7 +573,11 @@ class TestGateArbitration:
                 replace(
                     ctx.power_run.terminal,
                     requested_count=self.DRIFT_COUNT,
-                    completed_count=self.DRIFT_COUNT,
+                    completed_count=(
+                        self.DRIFT_COUNT
+                        if completed_count is None
+                        else completed_count
+                    ),
                     elapsed_us=elapsed_us,
                 )
                 if elapsed_us is not None
@@ -660,6 +665,136 @@ class TestGateArbitration:
             if issue.code == IssueCode.POWER_GATE_DURATION_MISMATCH
         )
         assert "thermal" in mismatch.message
+
+    def test_unhealthy_terminal_cannot_arbitrate(self, tmp_path: Path):
+        """An early-exit firmware agrees with its own gate BY CONSTRUCTION
+        (it times the span it gated), so a terminal reporting incomplete work
+        must not silence the est*count warning or earn the observer's
+        authority (#202 harmonization: validity now applies the same
+        terminal-health gate the summary got in the #195 review round)."""
+        ctx = _context(tmp_path)
+        # Gate and elapsed agree (both 4.427 s) but only 116/233 completed.
+        self._drift_run(
+            ctx, elapsed_us=self.DRIFT_ELAPSED_US, completed_count=116
+        )
+
+        evaluation = evaluate_run(ctx)
+
+        assert evaluation.validity is ResultValidity.INVALID
+        codes = [issue.code for issue in evaluation.issues]
+        assert IssueCode.POWER_TERMINAL_INCOMPLETE in codes
+        # The observer never ran: no agreement-based silence, no observer
+        # error -- the incomplete-work ERROR carries the story and the
+        # est*count fallback warning keeps its authority.
+        assert IssueCode.POWER_WINDOW_OBSERVER_MISMATCH not in codes
+        assert IssueCode.POWER_GATE_DURATION_MISMATCH in codes
+        arb = evaluation.gate_arbitration
+        assert arb is not None
+        assert arb.terminal_unhealthy is True
+        assert arb.observer is None
+        assert arb.suppress_per_inference is True
+
+    def test_unhealthy_terminal_downgrades_the_observer_error(self, tmp_path: Path):
+        """The other half of the harmonization (#204 review, cell 03b): with
+        an unhealthy terminal whose elapsed_us ALSO disagrees with the gate,
+        validity previously emitted the observer ERROR from an envelope that
+        had no standing to arbitrate. Now the observer is withheld, the
+        est*count fallback WARNING carries the duration story, and the
+        terminal ERRORs carry the failure -- the run stays INVALID."""
+        ctx = _context(tmp_path)
+        # elapsed 5.017s vs gate 4.427s (would disagree), only 116/233 done.
+        self._drift_run(ctx, elapsed_us=5_017_000, completed_count=116)
+
+        evaluation = evaluate_run(ctx)
+
+        assert evaluation.validity is ResultValidity.INVALID
+        codes = [issue.code for issue in evaluation.issues]
+        assert IssueCode.POWER_TERMINAL_INCOMPLETE in codes
+        assert IssueCode.POWER_WINDOW_OBSERVER_MISMATCH not in codes
+        assert codes.count(IssueCode.POWER_GATE_DURATION_MISMATCH) == 1
+
+    def test_advisory_rederived_band_never_reaches_validity(self, tmp_path: Path):
+        """#204 lens-2 M9 kill: an artifact with NO recorded integrity gets
+        the advisory 1% re-derived band for the summary's suspect flag ONLY.
+        A gate inside the probe-keyed 10% band but outside 1% (2.3% short
+        here) must produce zero duration issues -- feeding the advisory band
+        into validity is exactly the recorded/advisory confusion the
+        integrity_recorded chokepoint exists to kill."""
+        ctx = _context(tmp_path)
+        assert ctx.power_run is not None and ctx.power_run.observation is not None
+        observation = ctx.power_run.observation
+        gate_s = 4.90  # vs 233 x 21532us = 5.017s expected: 2.3% short
+        result = PowerResult(
+            summary=replace(observation.result.summary, duration_s=gate_s),
+            gated_windows=[
+                GatedPowerWindow(0.0, gate_s, gate_s, 0.0, 0.0, 0.0, 0.0, 0.0, 0)
+            ],
+            # No recorded gate_duration_integrity.
+            metadata=replace(observation.result.metadata),
+        )
+        ctx.pmu_result = PmuResult(
+            meta=FirmwareMeta(
+                clean_infer_count=self.DRIFT_COUNT,
+                clean_infer_avg_us=self.DRIFT_REFERENCE_US,
+            ),
+            layers=[],
+        )
+        ctx.power_run = PowerRun(
+            plan=PowerRunPlan(
+                firmware_mode="shared",
+                inference_count=self.DRIFT_COUNT,
+                reference_inference_us=self.DRIFT_REFERENCE_US,
+            ),
+            observation=replace(observation, result=result),
+            terminal=None,
+        )
+
+        evaluation = evaluate_run(ctx)
+
+        codes = [issue.code for issue in evaluation.issues]
+        assert IssueCode.POWER_GATE_DURATION_MISMATCH not in codes
+        assert evaluation.validity is ResultValidity.VALID
+        arb = evaluation.gate_arbitration
+        assert arb is not None
+        assert arb.integrity_recorded is False
+        # The advisory term itself missed its 1% band -- proving the verdict
+        # existed and was correctly withheld from validity.
+        assert arb.integrity is not None and not arb.integrity.valid
+
+    def test_non_gated_runs_carry_no_arbitration(self, tmp_path: Path):
+        """#204 lens-2 F3: RunEvaluation.gate_arbitration promises None when
+        there is nothing gated to arbitrate. An internal-mode run with a
+        terminal hiccup must not manufacture a suppressing arbitration."""
+        ctx = _context(tmp_path, mode="internal")
+        assert ctx.power_run is not None
+        ctx.power_result = PowerResult(
+            summary=PowerSummary(0.01, 0.02, 0.03, 0.1, 1.0, 10),
+            metadata=PowerMetadata(
+                measurement_scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE
+            ),
+        )
+        ctx.power_run = PowerRun(
+            plan=PowerRunPlan(firmware_mode="dedicated", inference_count=10),
+            observation=None,
+            terminal=replace(ctx.power_run.terminal, completed_count=5),
+        )
+
+        assert evaluate_run(ctx).gate_arbitration is None
+
+    def test_arbitration_rides_the_evaluation(self, tmp_path: Path):
+        """The composed verdict is carried on RunEvaluation for the summary
+        to render -- the drift note the artifact publishes IS this string."""
+        ctx = _context(tmp_path)
+        self._drift_run(ctx, elapsed_us=self.DRIFT_ELAPSED_US)
+
+        arb = evaluate_run(ctx).gate_arbitration
+
+        assert arb is not None
+        assert arb.integrity_recorded is True
+        assert arb.observer_agrees is True
+        assert arb.suppress_per_inference is False
+        assert arb.suppression_reason is None
+        assert arb.drift_note is not None and "HFRC" in arb.drift_note
 
     def test_below_minimum_is_an_error_even_when_the_observer_agrees(
         self, tmp_path: Path

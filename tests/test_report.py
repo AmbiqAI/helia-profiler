@@ -751,6 +751,77 @@ def test_write_summary_no_drift_note_beyond_the_plausible_envelope(tmp_path: Pat
     assert "gated_window_reference_drift" not in summary["power"]
 
 
+def test_write_summary_renders_the_evaluation_verdict(tmp_path: Path):
+    """#202 Part B: the summary no longer composes the gate verdict -- it
+    renders the one RunEvaluation carries. The published drift note IS the
+    arbitration's string, by identity of source."""
+    from helia_profiler.evaluation import evaluate_run
+
+    ctx = _gated_power_ctx(
+        tmp_path, clean_infer_count=233, clean_infer_avg_us=21532, duration_s=4.427
+    )
+    _attach_power_terminal(ctx, elapsed_us=4_427_500, count=233)
+    evaluation = evaluate_run(ctx)
+    assert evaluation.gate_arbitration is not None
+
+    out_path = _write_summary(ctx, tmp_path, evaluation)
+    summary = json.loads(out_path.read_text())
+
+    assert (
+        summary["power"]["gated_window_reference_drift"]
+        == evaluation.gate_arbitration.drift_note
+    )
+    assert evaluation.gate_arbitration.suppress_per_inference is False
+    assert "gated_window_duration_suspect" not in summary["power"]
+
+
+def test_write_report_evaluates_the_run_exactly_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """#202 D5: one RunEvaluation per publication -- the summary renders the
+    same object the manifest records, so the two artifacts cannot disagree
+    (and the evaluation is not silently computed twice)."""
+    import helia_profiler.report as report_pkg
+    import helia_profiler.report.manifest as manifest_mod
+    import helia_profiler.report.summary as summary_mod
+    from helia_profiler.evaluation.validity import evaluate_run as real_evaluate
+
+    config = load_config(
+        None,
+        {
+            "model": {"path": "test.tflite"},
+            "engine": {"type": "helia-rt"},
+            "output": {"dir": tmp_path, "model_explorer": False},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.run_metadata = RunMetadata(
+        hpx_version="0.1.0",
+        run_id="run-1",
+        timestamp="2026-07-18T00:00:00+00:00",
+        config_snapshot={"engine": {"type": "helia-rt"}},
+    )
+    ctx.pmu_result = PmuResult(
+        meta=FirmwareMeta(),
+        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+    )
+    _attach_dependency_lock(ctx, tmp_path)
+
+    calls: list[int] = []
+
+    def counting(inner_ctx):
+        calls.append(1)
+        return real_evaluate(inner_ctx)
+
+    monkeypatch.setattr(report_pkg, "evaluate_run", counting)
+    monkeypatch.setattr(summary_mod, "evaluate_run", counting)
+    monkeypatch.setattr(manifest_mod, "evaluate_run", counting)
+
+    write_report(ctx)
+
+    assert len(calls) == 1
+
+
 def test_write_summary_observer_agreement_does_not_mask_the_floor(tmp_path: Path):
     """A sub-minimum gate suppresses even when the firmware clock agrees:
     the floor guards the stats integral, not the reference."""
