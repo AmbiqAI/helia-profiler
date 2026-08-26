@@ -114,7 +114,7 @@ env:
   # configured build trees instead of cold-building every case.
   HPX_CACHE_DIR: ${{ github.workspace }}/../hpx-cache
   SEGGER_RTT_PATH: ${{ github.workspace }}/segger-rtt
-  HPX_NSX_EXECUTORCH_REF: 8fa54faf75ff41c3b7bbeddff4a07a84e7b78847
+  HPX_NSX_EXECUTORCH_REF: 27eee513636821398f0bb5e92055526cac29b1ed
   HPX_QUALIFIED_NS_CMSIS_NN_REF: 631726420b04860a5c4236956a3741ff5a96bd7f
   # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
   # with the manual defaults, except that nightly validation covers the full suite.
