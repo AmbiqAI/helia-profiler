@@ -17,6 +17,7 @@ import shutil
 from pathlib import Path
 
 from ..errors import FirmwareError
+from .render import _write_text
 
 log = logging.getLogger("hpx")
 
@@ -139,8 +140,7 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
     config_dest.mkdir(parents=True, exist_ok=True)
     conf_dest = config_dest / "SEGGER_RTT_Conf.h"
     conf_src = rtt_root / "Config" / "SEGGER_RTT_Conf.h"
-    if conf_src.exists():
-        shutil.copy2(conf_src, conf_dest)
+    conf_text = conf_src.read_text(encoding="utf-8") if conf_src.exists() else ""
 
     sram_placement = (
         "\n"
@@ -166,8 +166,11 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
         "  #endif\n"
         "#endif\n"
     )
-    existing_conf = conf_dest.read_text(encoding="utf-8") if conf_dest.exists() else ""
-    if "SEGGER_RTT_SECTION" not in existing_conf:
-        conf_dest.write_text(existing_conf + sram_placement, encoding="utf-8")
+    if "SEGGER_RTT_SECTION" not in conf_text:
+        conf_text += sram_placement
+    # Content-compare before writing (see render._write_text): regeneration
+    # into a cached workspace must not bump this header's mtime, or every
+    # translation unit that includes it recompiles on every run.
+    _write_text(conf_dest, conf_text)
 
     log.info("Copied SEGGER RTT source from %s", rtt_root)
