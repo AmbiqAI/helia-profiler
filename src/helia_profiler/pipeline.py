@@ -45,7 +45,7 @@ from .results import (
     BinarySections,
 )
 from .toolchain_probe import SymbolEntry
-from .target.probe.base import FlashBackend, Probe, ResetController
+from .target.probe.base import Probe, ResetController
 
 log = logging.getLogger("hpx")
 
@@ -106,7 +106,6 @@ class PipelineContext:
     board: BoardDef | None = None
     resolved_jlink_serial: str | None = None
     probe: Probe | None = None
-    flash_backend: FlashBackend | None = None
     reset_controller: ResetController | None = None
 
     # Engine preparation (stage: prepare_engine)
@@ -513,10 +512,15 @@ class PipelineRunner:
 # ---------------------------------------------------------------------------
 
 
+def _cache_work_key(config: ProfileConfig) -> str:
+    return f"{config.target.board}-{config.target.toolchain.value}-{config.engine.type.value}"
+
+
 def _default_cache_work_dir(config: ProfileConfig) -> Path:
     """Stable cache root; dependency fingerprints isolate incompatible apps."""
-    key = f"{config.target.board}-{config.target.toolchain.value}-{config.engine.type.value}"
-    return Path.home() / ".cache" / "helia-profiler" / "workspaces" / key
+    from .cache_dirs import hpx_cache_root
+
+    return hpx_cache_root() / "workspaces" / _cache_work_key(config)
 
 
 def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
@@ -524,9 +528,15 @@ def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
 
     Resolution order:
     1. Explicit ``--work-dir`` — used as-is, never cleaned up.
-    2. Default cache directory under ``~/.cache/helia-profiler/workspaces/``
-       keyed on ``{board}-{toolchain}-{engine}``.  Enables incremental
-       cmake builds across runs.  Never cleaned up automatically.
+    2. Default cache directory under ``<cache root>/workspaces/`` (see
+       :func:`helia_profiler.cache_dirs.hpx_cache_root`) keyed on
+       ``{board}-{toolchain}-{engine}``.  Enables incremental cmake builds
+       across runs.  Never cleaned up automatically.
+    3. If that cache directory cannot be created (read-only service homes —
+       the hardware-validation runner crashed here before ``HPX_CACHE_DIR``
+       existed), fall back to ``.hpx-cache/`` under the working directory
+       with a warning.  Builds still work; incrementality only lasts as
+       long as the directory does.
     """
     if config.work_dir is not None:
         wd = config.work_dir.resolve()
@@ -539,7 +549,20 @@ def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
         if wd.exists():
             shutil.rmtree(wd, ignore_errors=True)
             log.info("Cleaned cached work directory: %s", wd)
-    wd.mkdir(parents=True, exist_ok=True)
+    try:
+        wd.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        fallback = Path.cwd() / ".hpx-cache" / "workspaces" / _cache_work_key(config)
+        log.warning(
+            "Cache work directory %s is not writable (%s); falling back to %s. "
+            "Set HPX_CACHE_DIR to a writable persistent path to keep "
+            "incremental builds across runs.",
+            wd,
+            exc,
+            fallback,
+        )
+        fallback.mkdir(parents=True, exist_ok=True)
+        wd = fallback
     return wd, False
 
 

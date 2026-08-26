@@ -383,12 +383,14 @@ def flash_binary(
     interface: str = "SWD",
     timeout_s: int = _DEFAULT_TIMEOUT_S,
 ) -> None:
-    """Flash a second NSX target's image via its NSX-generated JLink script.
+    """Flash an NSX target's image via its NSX-generated JLink script.
 
-    This exists for the dedicated power binary (``hpx_profiler_power``): a
-    *second* executable in the same NSX/CMake project as the transport binary,
-    with no ``nsx flash`` entry point of its own (``nsx flash`` /
-    :class:`JLinkFlashBackend` always target the project's primary executable).
+    Both pipeline firmware deployments run through here: the profile binary
+    (``hpx_profiler``, ``stages/flash``) and the dedicated power binary
+    (``hpx_profiler_power``, ``stages/flash_power``).  ``nsx flash`` is not
+    used for either — it only targets the project's primary executable, and
+    passing a probe serial forces it to re-run CMake configure on a tree the
+    build stage configured moments earlier (see ``helia_profiler.nsx.flash``).
 
     The NSX build generates a ready-made commander script per target at
     ``<build_dir>/jlink/<target>/flash_cmds.jlink`` containing the exact proven

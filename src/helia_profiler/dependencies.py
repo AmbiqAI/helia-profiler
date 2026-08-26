@@ -250,6 +250,30 @@ def create_workspace(ctx: PipelineContext) -> DependencyWorkspace:
             entry["content_hash"] = _digest_path(module.path).to_dict()
         extra_modules.append(entry)
 
+    # The fingerprint captures DEPENDENCY identity only: everything that
+    # decides what lands in modules/ and how CMake is configured.  Render-only
+    # inputs (the model bytes, arena size/placement, iterations/warmup, PMU
+    # counters, heartbeat, RTT buffer sizing, power wiring) are deliberately
+    # excluded so cases that differ only in what the generate stage renders
+    # share one synced, configured, compiled workspace instead of forking a
+    # full module tree per model.  This is a cache key, not the correctness
+    # boundary — three layers gate reuse regardless of what is hashed here:
+    # the rendered nsx.yml manifest hash decides lock reuse
+    # (_lock_incompatibility), ``nsx sync --frozen`` verifies module content
+    # on every build, and CMake's regeneration rule reconfigures whenever a
+    # rendered CMakeLists/template input changes.  A misclassified input
+    # therefore costs a re-lock/reconfigure, never a wrong binary.
+    #
+    # The probe serial also left the identity: it was only here because
+    # ``nsx flash`` baked it into the CMake cache, and the pipeline now
+    # deploys via the direct J-Link recipe (stages/flash), so a workspace is
+    # valid for any probe.
+    #
+    # ``engine.config`` stays whole even though some engines put render-ish
+    # values in it (e.g. ExecuTorch arena sizes): it also pins dependency
+    # refs like ``cmsis_nn_ref``, and splitting it per-engine buys little
+    # for the risk — engines whose config embeds per-model values simply
+    # keep forking per model, conservatively.
     inputs = _canonical(
         {
             "hpx_version": __version__,
@@ -262,25 +286,16 @@ def create_workspace(ctx: PipelineContext) -> DependencyWorkspace:
             "soc": asdict(ctx.soc) if ctx.soc is not None else None,
             "target": {
                 "toolchain": ctx.config.target.toolchain,
+                # Transport selects provider modules (USB CDC pulls in the
+                # USB stack), so it is dependency identity, not render.
                 "transport": ctx.config.target.transport,
                 "psram": ctx.config.target.psram,
                 "clock": ctx.config.target.clock,
-                "heartbeat": ctx.config.target.heartbeat,
-                "rtt_buffer_size_up": ctx.config.target.rtt_buffer_size_up,
                 "segger_rtt_source_hash": (
                     _digest_path(ctx.config.target.segger_rtt_path).to_dict()
                     if ctx.config.target.segger_rtt_path is not None
                     else None
                 ),
-                "probe_serial": (
-                    ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
-                ),
-            },
-            "model": {
-                "sha256": _digest_path(ctx.config.model.path).value,
-                "arena_size": ctx.config.model.arena_size,
-                "arena_location": ctx.config.model.arena_location,
-                "weights_location": ctx.config.model.weights_location,
             },
             "engine": {
                 "type": ctx.config.engine.type,
@@ -306,10 +321,6 @@ def create_workspace(ctx: PipelineContext) -> DependencyWorkspace:
                 "compiler_launcher": ctx.config.build.compiler_launcher,
                 "module_overrides": module_overrides,
                 "explicit_overrides": explicit_overrides,
-            },
-            "module_selection": {
-                "profiling": ctx.config.profiling,
-                "power": ctx.config.power,
             },
         }
     )

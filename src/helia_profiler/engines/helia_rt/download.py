@@ -17,7 +17,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from ...errors import EngineError
-from .artifacts import _ASSET_FMT, _CACHE_DIR, _detect_version, _is_valid_dist, _validate_dist
+from .artifacts import _ASSET_FMT, _cache_dir, _detect_version, _is_valid_dist, _validate_dist
 
 log = logging.getLogger("hpx")
 
@@ -38,7 +38,7 @@ def _fetch_github_release(
     Returns ``(dist_path, detected_version)``.
     """
     cache_key = f"{repo.replace('/', '_')}_{ref}"
-    cache_dir = _CACHE_DIR / cache_key
+    cache_dir = _cache_dir() / cache_key
 
     # Cache hit — validate and return
     if cache_dir.is_dir() and _is_valid_dist(cache_dir):

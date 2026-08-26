@@ -414,9 +414,16 @@ def run_jlink_script(
         raise CaptureError("JLinkExe not found", hint=_JLINK_NOT_FOUND_HINT) from exc
 
     if result.returncode != 0:
+        # J-Link Commander reports most failures (cannot connect, LoadFile
+        # errors, script refusals) on stdout and exits with an empty stderr,
+        # so a stderr-only hint renders as a blank — fall back to the stdout
+        # tail so a bare rc=1 is diagnosable from the error alone (the CI
+        # dark-board flash failures in #203 were opaque for exactly this).
+        stderr = (result.stderr or "").strip()
+        detail = stderr if stderr else (result.stdout or "").strip()[-600:]
         raise CaptureError(
             f"{op_label} failed (rc={result.returncode})",
-            hint=f"stderr: {(result.stderr or '').strip()[:300]}",
+            hint=f"{'stderr' if stderr else 'stdout tail'}: {detail[:600]}",
         )
     return result
 
@@ -543,32 +550,6 @@ class JLinkResetController:
             jlink_serial=jlink_serial,
             attach_timeout_s=attach_timeout_s,
             settle_s=settle_s,
-        )
-
-
-@dataclass(frozen=True)
-class JLinkFlashBackend:
-    """Flash firmware through the NSX J-Link backend."""
-
-    def flash(
-        self,
-        firmware_path: Path,
-        *,
-        toolchain: str | None,
-        jlink_serial: str | None = None,
-        frozen: bool = False,
-        timeout_s: float,
-        verbose: int = 0,
-    ) -> None:
-        from ... import nsx as nsx_cli
-
-        nsx_cli.flash(
-            firmware_path,
-            toolchain=toolchain,
-            jlink_serial=jlink_serial,
-            frozen=frozen,
-            timeout_s=timeout_s,
-            verbose=verbose,
         )
 
 
@@ -881,7 +862,6 @@ def attached_reset_session(
 
 
 __all__ = [
-    "JLinkFlashBackend",
     "JLINK_COMMANDER",
     "JLinkProbe",
     "JLinkProbeMatch",

@@ -54,8 +54,12 @@ HELIART_SOURCE_COMMIT = "ff6233ba3783a74de52977d155db6ed5472068df"
 HELIART_PROJECT = "helia-rt"  # registry project (path: modules/helia-rt)
 HELIART_MODULE = "nsx-helia-rt"  # registry module name
 
-# Cache directory for downloaded distributions
-_CACHE_DIR = Path.home() / ".cache" / "helia-profiler" / "heliart"
+def _cache_dir() -> Path:
+    """Cache directory for downloaded heliaRT distributions."""
+    from ...cache_dirs import hpx_cache_root
+
+    return hpx_cache_root() / "heliart"
+
 
 # Directories required in a valid heliaRT distribution.
 _DIST_DIRS = ("lib", "tensorflow", "third_party", "signal")
