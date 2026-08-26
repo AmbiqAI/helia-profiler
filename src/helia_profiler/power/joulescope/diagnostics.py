@@ -20,16 +20,24 @@ def _gated_stats_diagnostics(
     packets: list[dict[str, Any]],
     poll_samples: list[tuple[int, int]],
     prefer_device_time: bool = False,
+    windows_override: list[tuple[float, float]] | None = None,
+    gate_edge_source: str = "gpi_snapshot_poll",
+    stream_segment_count: int | None = None,
 ) -> dict[str, Any]:
     """Summarise how the GPIO windows intersect the stats packets."""
     import numpy as np
 
     a = _stats_arrays(packets)
-    windows = _segment_gpi_windows(poll_samples)
+    windows = (
+        windows_override
+        if windows_override is not None
+        else _segment_gpi_windows(poll_samples)
+    )
     mask_axis, axis_name = _gated_mask_axis(a, prefer_device_time=prefer_device_time)
 
     diagnostics: dict[str, Any] = {
         "mask_time_axis": axis_name,
+        "gate_edge_source": gate_edge_source,
         "window_count": len(windows),
         "gpi_poll_count": len(poll_samples),
         "stat_packet_count": int(mask_axis.size),
@@ -51,6 +59,12 @@ def _gated_stats_diagnostics(
             {"rise_tick": int(rise), "fall_tick": int(fall)} for rise, fall in windows
         ],
     }
+    if stream_segment_count is not None:
+        # How many raw high segments the GPI stream resolved — an undriven
+        # gate line coupling to device activity shows up here as hundreds of
+        # micro-pulses, which is the tell that separates a noisy line from a
+        # clean strobe when reading artifacts after the fact.
+        diagnostics["stream_segment_count"] = stream_segment_count
     if poll_samples:
         diagnostics["gpi_first_tick"] = int(poll_samples[0][0])
         diagnostics["gpi_last_tick"] = int(poll_samples[-1][0])
