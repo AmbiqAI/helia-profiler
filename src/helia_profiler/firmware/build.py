@@ -75,35 +75,50 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     build_dir = app_dir / "build" / board
     ninja_already_configured = (build_dir / "build.ninja").exists()
 
-    from ..dependencies import prepare_locked_dependencies, workspace_mutex
+    from ..dependencies import (
+        invalidate_sync_stamp,
+        prepare_locked_dependencies,
+        workspace_mutex,
+    )
 
     with workspace_mutex(ctx.resolved_workspace):
         dependency_state = prepare_locked_dependencies(ctx)
-        if (
-            not ninja_already_configured
-            or dependency_state.lock.mode.value != "reused"
-        ):
-            nsx_cli.configure(
-                app_dir,
-                toolchain=nsx_tc,
-                frozen=True,
-                timeout_s=timeouts.configure_s,
-                verbose=verbose,
-            )
-        else:
-            # CMake's regeneration rule handles deterministic source/template
-            # changes; dependency verification already ran via sync --frozen.
-            log.info("Reusing configured deterministic workspace: %s", build_dir)
-        nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose)
+        try:
+            if (
+                not ninja_already_configured
+                or dependency_state.lock.mode.value != "reused"
+            ):
+                nsx_cli.configure(
+                    app_dir,
+                    toolchain=nsx_tc,
+                    frozen=True,
+                    timeout_s=timeouts.configure_s,
+                    verbose=verbose,
+                )
+            else:
+                # CMake's regeneration rule handles deterministic source/template
+                # changes; dependency verification already ran via sync --frozen.
+                log.info("Reusing configured deterministic workspace: %s", build_dir)
+            nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose)
 
-    # Locate build output. Prefer the ELF-form executable because later
-    # reporting stages run size tools against it to capture text/data/bss.
-    binary_path = _find_target_binary(build_dir, "hpx_profiler")
-    if binary_path is None:
-        raise BuildError(
-            "Build succeeded but binary not found",
-            hint=f"Searched in {build_dir}",
-        )
+            # Locate build output. Prefer the ELF-form executable because
+            # later reporting stages run size tools against it to capture
+            # text/data/bss.
+            binary_path = _find_target_binary(build_dir, "hpx_profiler")
+            if binary_path is None:
+                raise BuildError(
+                    "Build succeeded but binary not found",
+                    hint=f"Searched in {build_dir}",
+                )
+        except BuildError:
+            # Any build-stage failure — configure, compile, or the artifact
+            # lookup — may mean the workspace is corrupted in a way the
+            # stamped skip above no longer checks for; drop the stamp so the
+            # next run pays full frozen verification (and repair) again
+            # instead of skipping straight back into the same failure.
+            invalidate_sync_stamp(app_dir)
+            raise
+
     log.info("Binary: %s", binary_path)
 
     return build_dir, binary_path

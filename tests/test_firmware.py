@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import hashlib
+import json
 from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,7 +15,7 @@ import pytest
 import yaml
 
 from helia_profiler.config import load_config
-from helia_profiler.errors import FirmwareError
+from helia_profiler.errors import BuildError, FirmwareError
 from helia_profiler.firmware import (
     _board_module_name,
     _find_segger_rtt_dir,
@@ -1345,6 +1346,97 @@ class TestBuildApp:
         assert sync_calls == []
         assert out_build_dir == build_dir
         assert out_binary == binary
+
+    def test_build_failure_invalidates_frozen_sync_stamp(
+        self, tmp_path: Path, fake_dist: Path, monkeypatch
+    ):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        app_dir = tmp_path / "app"
+        build_dir = app_dir / "build" / "apollo510_evb"
+        build_dir.mkdir(parents=True, exist_ok=True)
+        object.__setattr__(ctx, "firmware_dir", app_dir)
+        _stub_locked_dependencies(ctx, app_dir, monkeypatch)
+
+        stamp = app_dir / "hpx-frozen-sync.json"
+        stamp.write_text(json.dumps({"lock_sha256": "0" * 64}), encoding="utf-8")
+
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.lock", lambda *a, **kw: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.sync", lambda *a, **kw: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.configure", lambda *a, **kw: None)
+
+        def failing_build(*_args, **_kwargs) -> None:
+            raise BuildError("ninja failed")
+
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.build", failing_build)
+
+        with pytest.raises(BuildError):
+            build_app(ctx)
+
+        assert not stamp.exists()  # next run must fully re-verify the workspace
+
+    def test_missing_binary_invalidates_frozen_sync_stamp(
+        self, tmp_path: Path, fake_dist: Path, monkeypatch
+    ):
+        """A build that 'succeeds' without producing the expected artifact is
+        still a build-stage failure — the stamp must not keep suppressing the
+        frozen re-verification/repair on the next run."""
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        app_dir = tmp_path / "app"
+        # Build dir exists but no hpx_profiler artifact is ever produced.
+        build_dir = app_dir / "build" / "apollo510_evb"
+        build_dir.mkdir(parents=True, exist_ok=True)
+        object.__setattr__(ctx, "firmware_dir", app_dir)
+        _stub_locked_dependencies(ctx, app_dir, monkeypatch)
+
+        stamp = app_dir / "hpx-frozen-sync.json"
+        stamp.write_text(json.dumps({"lock_sha256": "0" * 64}), encoding="utf-8")
+
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.lock", lambda *a, **kw: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.sync", lambda *a, **kw: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.configure", lambda *a, **kw: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.build", lambda *a, **kw: None)
+
+        with pytest.raises(BuildError, match="binary not found"):
+            build_app(ctx)
+
+        assert not stamp.exists()
+
+    def test_configure_failure_invalidates_frozen_sync_stamp(
+        self, tmp_path: Path, fake_dist: Path, monkeypatch
+    ):
+        """A failed configure must also drop the stamp — otherwise a stamped
+        skip keeps suppressing the frozen re-verification/repair that could
+        fix the workspace, repeating the same failure every run."""
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        app_dir = tmp_path / "app"
+        # No build.ninja in the build dir, so build_app takes the configure path.
+        build_dir = app_dir / "build" / "apollo510_evb"
+        build_dir.mkdir(parents=True, exist_ok=True)
+        object.__setattr__(ctx, "firmware_dir", app_dir)
+        _stub_locked_dependencies(ctx, app_dir, monkeypatch)
+
+        stamp = app_dir / "hpx-frozen-sync.json"
+        stamp.write_text(json.dumps({"lock_sha256": "0" * 64}), encoding="utf-8")
+
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.lock", lambda *a, **kw: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.sync", lambda *a, **kw: None)
+
+        def failing_configure(*_args, **_kwargs) -> None:
+            raise BuildError("cmake configure failed")
+
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.configure", failing_configure)
+        monkeypatch.setattr(
+            "helia_profiler.firmware.nsx_cli.build",
+            lambda *a, **kw: pytest.fail("build must not run after configure fails"),
+        )
+
+        with pytest.raises(BuildError):
+            build_app(ctx)
+
+        assert not stamp.exists()
 
     def test_power_enabled_defers_power_target_until_after_profile(
         self, tmp_path: Path, fake_dist: Path, monkeypatch

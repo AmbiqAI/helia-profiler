@@ -113,6 +113,12 @@ env:
   # checkout action's git clean and runs, so warm nightlies reuse the
   # configured build trees instead of cold-building every case.
   HPX_CACHE_DIR: ${{ github.workspace }}/../hpx-cache
+  # ccache (when installed on the runner): the service home is read-only, so
+  # its default ~/.cache/ccache would make every launched compile fail
+  # outright — keep the compilation cache next to the hpx caches instead.
+  # hpx's build.compiler_launcher auto-detect picks ccache up from PATH.
+  CCACHE_DIR: ${{ github.workspace }}/../ccache
+  CCACHE_MAXSIZE: 10G
   SEGGER_RTT_PATH: ${{ github.workspace }}/segger-rtt
   HPX_NSX_EXECUTORCH_REF: 27eee513636821398f0bb5e92055526cac29b1ed
   HPX_QUALIFIED_NS_CMSIS_NN_REF: 631726420b04860a5c4236956a3741ff5a96bd7f

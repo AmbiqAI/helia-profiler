@@ -33,6 +33,13 @@ from .results.dependencies import (
     DependencyWorkspace,
 )
 from .compatibility import QualificationState
+from .dependency_sync import (
+    _offline_materialization_error,
+    _run_frozen_sync_with_repair,
+    _sync_stamp_matches,
+    _write_sync_stamp,
+    invalidate_sync_stamp,
+)
 
 if TYPE_CHECKING:
     from .pipeline import PipelineContext
@@ -411,22 +418,6 @@ def _lock_incompatibility(app_dir: Path, board: str) -> tuple[str, type[Dependen
     return None
 
 
-def _offline_materialization_error(app_dir: Path, board: str) -> str | None:
-    lock = read_lock(app_dir, board)
-    if lock is None:
-        return f"nsx.lock has no target section for board '{board}'"
-    missing = sorted(
-        {
-            module.vendored_at
-            for module in lock.modules.values()
-            if module.vendored_at and not (app_dir / module.vendored_at).exists()
-        }
-    )
-    if missing:
-        return "locked module trees are missing: " + ", ".join(missing)
-    return None
-
-
 def prepare_locked_dependencies(ctx: PipelineContext) -> DependencyProvenance:
     """Reuse or explicitly resolve a lock, then materialize it frozen."""
 
@@ -481,53 +472,14 @@ def prepare_locked_dependencies(ctx: PipelineContext) -> DependencyProvenance:
                 f"Offline/frozen dependency sync cannot continue because {missing}.",
                 hint="Run once online without --offline/--frozen to materialize the exact lock.",
             )
-    try:
-        nsx_cli.sync(
-            app_dir,
-            frozen=True,
-            timeout_s=config.timeouts.configure_s,
-            verbose=config.verbose,
+    if _sync_stamp_matches(app_dir, board, mode):
+        log.info(
+            "Skipping frozen dependency sync — workspace already verified "
+            "against this exact nsx.lock."
         )
-    except BuildError as exc:
-        if offline:
-            raise LockError(
-                "Frozen dependency sync rejected the locked workspace.",
-                details=exc.details,
-                hint=(
-                    "Offline mode cannot repair missing or modified module trees. Run once "
-                    "online, or remove the fingerprinted workspace and retry online."
-                ),
-            ) from exc
-        log.warning(
-            "Repairing module materialization from the existing exact nsx.lock after "
-            "frozen verification failed."
-        )
-        try:
-            # Non-frozen sync repairs only module materialization at the exact
-            # commits/content hashes already in nsx.lock; it never resolves refs
-            # or rewrites the lock. Verify frozen again before proceeding.
-            nsx_cli.sync(
-                app_dir,
-                frozen=False,
-                force=True,
-                timeout_s=config.timeouts.configure_s,
-                verbose=config.verbose,
-            )
-            nsx_cli.sync(
-                app_dir,
-                frozen=True,
-                timeout_s=config.timeouts.configure_s,
-                verbose=config.verbose,
-            )
-        except BuildError as repair_exc:
-            raise LockError(
-                "Dependency module repair from the exact lock failed.",
-                details=repair_exc.details,
-                hint=(
-                    f"Remove the isolated workspace at {workspace.root} "
-                    "and retry. Use explicit path overrides for intentional local edits."
-                ),
-            ) from repair_exc
+    else:
+        _run_frozen_sync_with_repair(app_dir, workspace, config, offline)
+        _write_sync_stamp(app_dir)
 
     provenance = _collect_provenance(ctx, mode=mode, offline=offline)
     _verify_baseline_resolution(ctx, provenance)

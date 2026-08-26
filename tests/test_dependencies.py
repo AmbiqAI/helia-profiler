@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 from threading import Thread
 
@@ -18,6 +19,7 @@ from neuralspotx.nsx_lock import (
 from helia_profiler.config import load_config
 from helia_profiler.dependencies import (
     create_workspace,
+    invalidate_sync_stamp,
     normalize_path,
     prepare_locked_dependencies,
     read_dependency_lock_provenance,
@@ -174,6 +176,90 @@ def test_online_reuse_repairs_partial_materialization_without_relocking(
     assert ctx.firmware_dir is not None
     assert (ctx.firmware_dir / "nsx.lock").read_bytes() == before
     assert provenance.lock.mode is DependencyLockMode.REUSED
+
+
+def test_reuse_skips_frozen_sync_when_stamp_matches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(tmp_path)
+    _write_valid_lock(ctx)
+    sync_calls: list[bool] = []
+    monkeypatch.setattr(
+        "helia_profiler.dependencies.nsx_cli.lock",
+        lambda *_args, **_kwargs: pytest.fail("ordinary reuse must not call nsx lock"),
+    )
+    monkeypatch.setattr(
+        "helia_profiler.dependencies.nsx_cli.sync",
+        lambda _path, *, frozen, **_kwargs: sync_calls.append(frozen),
+    )
+
+    prepare_locked_dependencies(ctx)
+    assert sync_calls == [True]  # first reuse verifies and stamps
+
+    provenance = prepare_locked_dependencies(ctx)
+    assert sync_calls == [True]  # stamped reuse skips re-verification
+    assert provenance.lock.mode is DependencyLockMode.REUSED
+    assert provenance.lock.frozen_sync is True
+
+
+def test_lock_change_invalidates_sync_stamp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(tmp_path)
+    _write_valid_lock(ctx)
+    sync_calls: list[bool] = []
+    monkeypatch.setattr(
+        "helia_profiler.dependencies.nsx_cli.sync",
+        lambda _path, *, frozen, **_kwargs: sync_calls.append(frozen),
+    )
+
+    prepare_locked_dependencies(ctx)
+    assert sync_calls == [True]
+
+    # A different (still byte-exact-compatible) lock must re-verify.
+    _write_valid_lock(ctx, commit="c" * 40)
+    prepare_locked_dependencies(ctx)
+    assert sync_calls == [True, True]
+
+
+def test_missing_module_tree_prevents_sync_skip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(tmp_path)
+    _write_valid_lock(ctx)
+    sync_calls: list[bool] = []
+    monkeypatch.setattr(
+        "helia_profiler.dependencies.nsx_cli.sync",
+        lambda _path, *, frozen, **_kwargs: sync_calls.append(frozen),
+    )
+
+    prepare_locked_dependencies(ctx)
+    assert sync_calls == [True]
+
+    assert ctx.firmware_dir is not None
+    shutil.rmtree(ctx.firmware_dir / "modules" / "demo")
+    prepare_locked_dependencies(ctx)
+    assert sync_calls == [True, True]  # half-deleted workspace re-verifies
+
+
+def test_invalidate_sync_stamp_forces_reverification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(tmp_path)
+    _write_valid_lock(ctx)
+    sync_calls: list[bool] = []
+    monkeypatch.setattr(
+        "helia_profiler.dependencies.nsx_cli.sync",
+        lambda _path, *, frozen, **_kwargs: sync_calls.append(frozen),
+    )
+
+    prepare_locked_dependencies(ctx)
+    assert sync_calls == [True]
+
+    assert ctx.firmware_dir is not None
+    invalidate_sync_stamp(ctx.firmware_dir)
+    prepare_locked_dependencies(ctx)
+    assert sync_calls == [True, True]
 
 
 def test_engine_release_source_mapping_is_fingerprinted_and_serialized(
