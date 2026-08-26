@@ -72,7 +72,7 @@ def test_degraded_run_lists_warning_codes_and_messages(tmp_path: Path) -> None:
 
     text = _render(ctx)
 
-    assert "Validity: DEGRADED (1 warning)" in text
+    assert "Validity: DEGRADED (1 issue)" in text
     assert "power.gate_duration_mismatch" in text
     assert "Band missed." in text
 
@@ -283,3 +283,82 @@ def test_unknown_severity_renders_instead_of_vanishing(tmp_path: Path) -> None:
 
     assert "future.code" in text
     assert "A future-tier note." in text
+
+
+def test_write_report_stores_the_evaluation_it_rendered(tmp_path: Path) -> None:
+    """#208 retro review: the write_report -> ctx.run_evaluation store is the
+    one link in the fail-on-invalid chain nothing pinned. Dropping it fails
+    OPEN — the footer falls back to a fresh evaluation but exit 3 silently
+    never fires — so the store gets its own test."""
+    import json
+
+    from helia_profiler.report import write_report
+
+    from helia_profiler.results import LayerResult, RunMetadata
+
+    ctx = _ctx(tmp_path)
+    ctx.run_metadata = RunMetadata(
+        hpx_version="0.1.0",
+        run_id="run-1",
+        timestamp="2026-08-25T00:00:00+00:00",
+        config_snapshot={"engine": {"type": "helia-rt"}},
+    )
+    ctx.pmu_result = PmuResult(
+        meta=FirmwareMeta(),
+        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+    )
+    lock = tmp_path / "workspace" / "nsx.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text("schema_version: 4\ntargets: {}\n")
+    ctx.dependency_lock_path = lock
+    ctx.config.output.dir.mkdir(parents=True, exist_ok=True)
+
+    paths = write_report(ctx)
+
+    assert ctx.run_evaluation is not None
+    summary_path = next(p for p in paths if p.name == "summary.json")
+    summary = json.loads(summary_path.read_text())
+    # The stored object IS the one the summary rendered.
+    assert summary["validity"] == ctx.run_evaluation.validity.value
+
+
+def test_fail_on_invalid_defaults_off_behaviorally(tmp_path: Path) -> None:
+    """#208 retro review: the False default was pinned only by the config
+    docs-drift test, which a coordinated doc+code flip would satisfy. The
+    opt-in design is behavior; pin it as behavior."""
+    config = load_config(
+        None,
+        {"model": {"path": "test.tflite"}, "engine": {"type": "helia-rt"}},
+    )
+
+    assert config.output.fail_on_invalid is False
+
+
+def test_valid_with_issues_still_renders_the_causes(tmp_path: Path) -> None:
+    """Hand-built/rehydrated evaluations must not have causes swallowed by
+    the quiet-VALID early return."""
+    ctx = _ctx(tmp_path)
+    ctx.run_evaluation = RunEvaluation(
+        validity=ResultValidity.VALID,
+        issues=(_issue("future.code", "info", "Note."),),
+    )
+
+    text = _render(ctx)
+
+    assert "Validity: VALID" in text
+    assert "future.code" in text
+
+
+def test_degraded_header_counts_unknown_severities(tmp_path: Path) -> None:
+    """The '(0 warnings)' artifact, fully dead: an info-only evaluation
+    reports one issue, not zero warnings."""
+    ctx = _ctx(tmp_path)
+    ctx.run_evaluation = RunEvaluation(
+        validity=ResultValidity.DEGRADED,
+        issues=(_issue("future.code", "info", "Note."),),
+    )
+
+    text = _render(ctx)
+
+    assert "Validity: DEGRADED (1 issue)" in text
+    assert "future.code" in text
