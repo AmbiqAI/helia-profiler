@@ -46,17 +46,23 @@ def _region(**overrides) -> MeasuredRegion:
 
 
 def test_measured_table_renders_used_free_and_reserved():
+    # reserved deliberately != free (#209 review: the base fixture's reserved
+    # of 491,240 numerically equals app_length - used, so blanking the
+    # reserved COLUMN was invisible -- the assertion matched the free cell).
     text = _render(
         MeasuredMemoryRegions(
             link_family="gnu",
             linker_profile="default",
-            regions=(_region(),),
+            regions=(_region(reserved=123_456),),
         )
     )
     assert "Memory (measured)" in text
     assert "gnu link" in text
     assert "DTCM" in text
+    # free = app_length - used = 491,240
     assert "491,240" in text or "491.2" in text or "479.7 KB" in text.replace("\n", "")
+    # reserved renders as its own distinct value
+    assert "123,456" in text or "123.5" in text or "120.6 KB" in text.replace("\n", "")
 
 
 def test_hostile_section_names_render_escaped_and_do_not_crash():
