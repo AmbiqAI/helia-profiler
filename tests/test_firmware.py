@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import hashlib
+import json
 from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
@@ -1358,7 +1359,7 @@ class TestBuildApp:
         _stub_locked_dependencies(ctx, app_dir, monkeypatch)
 
         stamp = app_dir / "hpx-frozen-sync.json"
-        stamp.write_text('{"lock_sha256": "0" * 64}', encoding="utf-8")
+        stamp.write_text(json.dumps({"lock_sha256": "0" * 64}), encoding="utf-8")
 
         monkeypatch.setattr("helia_profiler.firmware.nsx_cli.lock", lambda *a, **kw: None)
         monkeypatch.setattr("helia_profiler.firmware.nsx_cli.sync", lambda *a, **kw: None)

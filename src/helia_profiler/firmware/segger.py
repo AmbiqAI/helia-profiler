@@ -140,7 +140,14 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
     config_dest.mkdir(parents=True, exist_ok=True)
     conf_dest = config_dest / "SEGGER_RTT_Conf.h"
     conf_src = rtt_root / "Config" / "SEGGER_RTT_Conf.h"
-    conf_text = conf_src.read_text(encoding="utf-8") if conf_src.exists() else ""
+    if conf_src.exists():
+        conf_text = conf_src.read_text(encoding="utf-8")
+    elif conf_dest.exists():
+        # No vendor conf to copy from — keep whatever a previous generation
+        # left in place rather than reducing it to the placement block alone.
+        conf_text = conf_dest.read_text(encoding="utf-8")
+    else:
+        conf_text = ""
 
     sram_placement = (
         "\n"
