@@ -71,6 +71,7 @@ class TestFlashFirmwareStageDirect:
         assert len(calls) == 1
         assert calls[0]["binary_path"] == ctx.binary_path
         assert calls[0]["jlink_serial"] == "1160001481"
+        assert ctx.soc is not None
         assert calls[0]["device"] == ctx.soc.jlink_device
         # AP5 app flash base — resolved from SoC capabilities, not hardcoded.
         assert calls[0]["load_addr"] == 0x00410000
@@ -91,6 +92,7 @@ class TestFlashFirmwareStageDirect:
 
         FlashFirmwareStage().run(ctx)
 
+        assert ctx.soc is not None
         expected = ctx.soc.capabilities.memory.app_flash_load_addr
         assert expected is not None
         assert calls[0]["load_addr"] == expected
