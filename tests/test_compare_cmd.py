@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -9,17 +10,17 @@ from helia_profiler.cli.compare_cmd import _cmd_compare
 from helia_profiler.evaluation import VerdictStatus
 
 
-def _args(**overrides):
+def _kwargs(**overrides):
     values = {
-        "baseline": "baseline",
-        "candidate": "candidate",
+        "baseline": Path("baseline"),
+        "candidate": Path("candidate"),
         "output_dir": None,
         "profile": None,
         "top_layers": 10,
         "validation": False,
     }
     values.update(overrides)
-    return SimpleNamespace(**values)
+    return values
 
 
 def test_compare_command_loads_and_forwards_profile():
@@ -30,9 +31,9 @@ def test_compare_command_loads_and_forwards_profile():
         patch("helia_profiler.evaluation.compare_runs", return_value=result) as compare,
         patch("helia_profiler.console.HpxConsole.print_compare") as render,
     ):
-        _cmd_compare(_args(profile="policy.json"))
+        _cmd_compare(**_kwargs(profile=Path("policy.json")))
 
-    compare.assert_called_once_with("baseline", "candidate", profile=profile)
+    compare.assert_called_once_with(Path("baseline"), Path("candidate"), profile=profile)
     render.assert_called_once()
 
 
@@ -43,7 +44,7 @@ def test_compare_command_exits_one_for_failed_verdict():
         patch("helia_profiler.console.HpxConsole.print_compare"),
         pytest.raises(SystemExit) as exc,
     ):
-        _cmd_compare(_args())
+        _cmd_compare(**_kwargs())
 
     assert exc.value.code == 1
 
@@ -54,6 +55,6 @@ def test_compare_command_keeps_warn_verdict_successful():
         patch("helia_profiler.evaluation.compare_runs", return_value=result),
         patch("helia_profiler.console.HpxConsole.print_compare") as render,
     ):
-        _cmd_compare(_args())
+        _cmd_compare(**_kwargs())
 
     render.assert_called_once()

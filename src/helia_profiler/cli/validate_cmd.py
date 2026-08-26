@@ -7,7 +7,6 @@ of :class:`~helia_profiler.validation.matrix.CaseSpec` cases.
 
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 import sys
 
@@ -170,7 +169,34 @@ def _normalise_csv_aliases(
     return ",".join(out)
 
 
-def _cmd_validate(args: argparse.Namespace) -> None:
+def _cmd_validate(
+    *,
+    models: str = "",
+    models_file: Path | None = None,
+    model_paths: str = "",
+    comparison_group: str = "custom",
+    model_arena_size: int = 524288,
+    engines: str = "",
+    executorch_backends: str = "both",
+    ns_cmsis_nn_ref: str = "",
+    power: str = "off",
+    power_boards: str = "",
+    boards: str = "",
+    toolchains: str = "",
+    transports: str = "",
+    memories: str = "",
+    suite: str | None = None,
+    jlink_serials: str = "",
+    power_serials: str = "",
+    power_gpios: str = "",
+    repeat: int = 1,
+    output_dir: Path = Path("results/validation"),
+    timeout: float = 900.0,
+    keyword: str = "",
+    junit_xml: Path | None = None,
+    list_: bool = False,
+    verbose: int = 0,
+) -> None:
     """Drive the hardware validation suite via pytest."""
     from ..validation import (
         BOARDS,
@@ -183,18 +209,16 @@ def _cmd_validate(args: argparse.Namespace) -> None:
     model_registry = dict(MODELS)
     custom_model_ids: list[str] = []
     try:
-        models_file = getattr(args, "models_file", None)
         if models_file is not None:
             file_models = load_model_file(Path(models_file))
             model_registry.update(file_models)
             custom_model_ids.extend(file_models)
 
-        raw_model_paths = getattr(args, "model_paths", "")
-        if raw_model_paths.strip():
+        if model_paths.strip():
             path_models = models_from_paths(
-                [Path(item.strip()) for item in raw_model_paths.split(",") if item.strip()],
-                arena_size=getattr(args, "model_arena_size", 524288),
-                comparison_group=getattr(args, "comparison_group", "custom"),
+                [Path(item.strip()) for item in model_paths.split(",") if item.strip()],
+                arena_size=model_arena_size,
+                comparison_group=comparison_group,
             )
             duplicates = sorted(set(path_models) & set(model_registry))
             if duplicates:
@@ -205,59 +229,56 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(2)
 
-    if custom_model_ids and not args.models.strip():
-        args.models = ",".join(custom_model_ids)
+    if custom_model_ids and not models.strip():
+        models = ",".join(custom_model_ids)
 
     # Preset suites fill in defaults for any axis the user did not set.
-    suite = getattr(args, "suite", None)
     if suite == "smoke":
-        if not args.models.strip():
-            args.models = "kws"
-        if not args.engines.strip():
-            args.engines = "helia-rt"
-        if not args.toolchains.strip():
-            args.toolchains = "arm-none-eabi-gcc"
-        if not args.transports.strip():
-            args.transports = "rtt"
-        if not args.memories.strip():
-            args.memories = "auto"
+        if not models.strip():
+            models = "kws"
+        if not engines.strip():
+            engines = "helia-rt"
+        if not toolchains.strip():
+            toolchains = "arm-none-eabi-gcc"
+        if not transports.strip():
+            transports = "rtt"
+        if not memories.strip():
+            memories = "auto"
     elif suite in {"models-rt", "models-aot", "complete"}:
-        if not args.models.strip():
-            args.models = "kws,vww,ic,ad"
-        if not args.engines.strip():
-            args.engines = {
+        if not models.strip():
+            models = "kws,vww,ic,ad"
+        if not engines.strip():
+            engines = {
                 "models-rt": "helia-rt",
                 "models-aot": "helia-aot",
                 "complete": "helia-rt,helia-aot,tflm,executorch",
             }[suite]
-        if not args.boards.strip():
-            args.boards = "apollo510_evb,apollo330mP_evb"
-        if not args.toolchains.strip():
-            args.toolchains = "arm-none-eabi-gcc,atfe"
-        if not args.transports.strip():
-            args.transports = "rtt"
-        if not args.memories.strip():
-            args.memories = "auto"
+        if not boards.strip():
+            boards = "apollo510_evb,apollo330mP_evb"
+        if not toolchains.strip():
+            toolchains = "arm-none-eabi-gcc,atfe"
+        if not transports.strip():
+            transports = "rtt"
+        if not memories.strip():
+            memories = "auto"
 
-    if not args.boards.strip():
-        args.boards = "apollo510_evb"
+    if not boards.strip():
+        boards = "apollo510_evb"
 
-    engines_csv = _normalise_engines(args.engines)
-    executorch_backends_csv = _normalise_executorch_backends(
-        getattr(args, "executorch_backends", "both")
-    )
-    toolchains_csv = _normalise_toolchains(args.toolchains)
-    transports_csv = _normalise_transports(args.transports)
-    memories_csv = _normalise_memories(args.memories)
-    jlink_serials = _parse_board_serials(args.jlink_serials, option="--jlink-serials")
-    power_serials = _parse_board_serials(args.power_serials, option="--power-serials")
-    power_gpio_pins = _parse_power_gpio_pins(args.power_gpios)
+    engines_csv = _normalise_engines(engines)
+    executorch_backends_csv = _normalise_executorch_backends(executorch_backends)
+    toolchains_csv = _normalise_toolchains(toolchains)
+    transports_csv = _normalise_transports(transports)
+    memories_csv = _normalise_memories(memories)
+    jlink_serial_map = _parse_board_serials(jlink_serials, option="--jlink-serials")
+    power_serial_map = _parse_board_serials(power_serials, option="--power-serials")
+    power_gpio_pins = _parse_power_gpio_pins(power_gpios)
 
     # --list mode — preview the matrix, don't touch hardware.
-    if args.list:
+    if list_:
         try:
             cases = build_matrix(
-                models=[m.strip() for m in args.models.split(",") if m.strip()] or None,
+                models=[m.strip() for m in models.split(",") if m.strip()] or None,
                 model_registry=model_registry,
                 engines=[e.strip() for e in engines_csv.split(",") if e.strip()] or None,
                 executorch_backends=[
@@ -266,16 +287,16 @@ def _cmd_validate(args: argparse.Namespace) -> None:
                     if backend.strip()
                 ]
                 or None,
-                power=args.power,
-                power_boards=[b.strip() for b in args.power_boards.split(",") if b.strip()] or None,
-                boards=[b.strip() for b in args.boards.split(",") if b.strip()] or None,
+                power=power,
+                power_boards=[b.strip() for b in power_boards.split(",") if b.strip()] or None,
+                boards=[b.strip() for b in boards.split(",") if b.strip()] or None,
                 toolchains=[t.strip() for t in toolchains_csv.split(",") if t.strip()] or None,
                 transports=[t.strip() for t in transports_csv.split(",") if t.strip()] or None,
                 memories=[m.strip() for m in memories_csv.split(",") if m.strip()] or None,
-                jlink_serials=jlink_serials,
-                power_serials=power_serials,
+                jlink_serials=jlink_serial_map,
+                power_serials=power_serial_map,
                 power_gpio_pins=power_gpio_pins,
-                repeat=args.repeat,
+                repeat=repeat,
             )
         except ValueError as exc:
             print(f"Error: {exc}", file=sys.stderr)
@@ -285,12 +306,13 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         print(f"Registered boards: {', '.join(sorted(BOARDS))}")
         print(f"\n{len(cases)} case(s) would run:\n")
         for c in cases:
-            power = "power" if c.power else "     "
+            power_flag = "power" if c.power else "     "
             engine = c.engine.value
             engine = f"{engine}/{c.cmsis_nn_provider.value}"
             print(
                 f"  {c.case_id:<82}  {engine:<14}  "
-                f"{c.toolchain.value:<18}  {c.transport.value:<7}  {c.memory.value:<5}  {power}"
+                f"{c.toolchain.value:<18}  {c.transport.value:<7}  {c.memory.value:<5}  "
+                f"{power_flag}"
             )
         return
 
@@ -321,59 +343,59 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         "-m",
         "hardware",
         "--mlperf-power",
-        args.power,
+        power,
         "--mlperf-output",
-        str(args.output_dir.resolve()),
+        str(output_dir.resolve()),
         "--mlperf-timeout",
-        str(args.timeout),
+        str(timeout),
     ]
-    if args.power_boards.strip():
-        pytest_args += ["--mlperf-power-boards", args.power_boards.strip()]
+    if power_boards.strip():
+        pytest_args += ["--mlperf-power-boards", power_boards.strip()]
     if suite:
         pytest_args += ["--mlperf-suite", suite]
-    if args.models.strip():
-        pytest_args += ["--mlperf-models", args.models.strip()]
+    if models.strip():
+        pytest_args += ["--mlperf-models", models.strip()]
     if models_file is not None:
         pytest_args += ["--mlperf-models-file", str(Path(models_file).expanduser().resolve())]
-    if raw_model_paths.strip():
-        pytest_args += ["--mlperf-model-paths", raw_model_paths.strip()]
+    if model_paths.strip():
+        pytest_args += ["--mlperf-model-paths", model_paths.strip()]
         pytest_args += [
             "--mlperf-comparison-group",
-            getattr(args, "comparison_group", "custom"),
+            comparison_group,
             "--mlperf-model-arena-size",
-            str(getattr(args, "model_arena_size", 524288)),
+            str(model_arena_size),
         ]
     if engines_csv:
         pytest_args += ["--mlperf-engines", engines_csv]
     if executorch_backends_csv:
         pytest_args += ["--mlperf-executorch-backends", executorch_backends_csv]
-    if args.ns_cmsis_nn_ref.strip():
-        pytest_args += ["--mlperf-ns-cmsis-nn-ref", args.ns_cmsis_nn_ref.strip()]
-    if args.boards.strip():
-        pytest_args += ["--mlperf-boards", args.boards.strip()]
+    if ns_cmsis_nn_ref.strip():
+        pytest_args += ["--mlperf-ns-cmsis-nn-ref", ns_cmsis_nn_ref.strip()]
+    if boards.strip():
+        pytest_args += ["--mlperf-boards", boards.strip()]
     if toolchains_csv:
         pytest_args += ["--mlperf-toolchains", toolchains_csv]
     if transports_csv:
         pytest_args += ["--mlperf-transports", transports_csv]
     if memories_csv:
         pytest_args += ["--mlperf-memories", memories_csv]
-    if args.jlink_serials.strip():
-        pytest_args += ["--mlperf-jlink-serials", args.jlink_serials.strip()]
-    if args.power_serials.strip():
-        pytest_args += ["--mlperf-power-serials", args.power_serials.strip()]
-    if args.power_gpios.strip():
-        pytest_args += ["--mlperf-power-gpios", args.power_gpios.strip()]
-    pytest_args += ["--mlperf-repeat", str(args.repeat)]
-    if args.keyword:
-        pytest_args += ["-k", args.keyword]
-    if args.junit_xml:
-        pytest_args += [f"--junitxml={args.junit_xml.resolve()}"]
-    if args.verbose:
-        pytest_args.append("-" + "v" * args.verbose)
+    if jlink_serials.strip():
+        pytest_args += ["--mlperf-jlink-serials", jlink_serials.strip()]
+    if power_serials.strip():
+        pytest_args += ["--mlperf-power-serials", power_serials.strip()]
+    if power_gpios.strip():
+        pytest_args += ["--mlperf-power-gpios", power_gpios.strip()]
+    pytest_args += ["--mlperf-repeat", str(repeat)]
+    if keyword:
+        pytest_args += ["-k", keyword]
+    if junit_xml:
+        pytest_args += [f"--junitxml={junit_xml.resolve()}"]
+    if verbose:
+        pytest_args.append("-" + "v" * verbose)
     else:
         pytest_args.append("-v")
 
-    report_dir = args.output_dir.resolve()
+    report_dir = output_dir.resolve()
     report_json = report_dir / "validation_report.json"
     report_before = report_json.stat().st_mtime_ns if report_json.exists() else None
 
@@ -391,7 +413,7 @@ def _cmd_validate(args: argparse.Namespace) -> None:
         from ..errors import ReportError
         from ..validation.report import load_validation_report
 
-        console = HpxConsole(verbosity=args.verbose)
+        console = HpxConsole(verbosity=verbose)
         try:
             report = load_validation_report(report_json)
         except ReportError as exc:

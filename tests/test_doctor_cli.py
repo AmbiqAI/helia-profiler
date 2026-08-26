@@ -2,7 +2,7 @@
 
 Mirrors the existing Typer adapter test pattern in
 ``tests/test_cli_typer_app.py`` (monkeypatch the ``_cmd_*`` implementation
-and assert the ``SimpleNamespace`` it receives) plus true end-to-end
+and assert the keyword arguments it receives) plus true end-to-end
 ``CliRunner`` invocations for the JSON and bundle paths.
 """
 
@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import zipfile
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
@@ -40,32 +39,32 @@ def test_doctor_json_flag_emits_valid_json_to_stdout() -> None:
     assert any(check["name"] == "hpx" for check in payload["versions"])
 
 
-def test_doctor_command_builds_expected_namespace_for_json(monkeypatch) -> None:
-    seen: dict[str, SimpleNamespace] = {}
+def test_doctor_command_builds_expected_kwargs_for_json(monkeypatch) -> None:
+    seen: dict[str, dict] = {}
 
-    def fake_cmd_doctor(args: SimpleNamespace) -> None:
-        seen["args"] = args
+    def fake_cmd_doctor(**kwargs) -> None:
+        seen["kwargs"] = kwargs
 
     monkeypatch.setattr("helia_profiler.cli.inspect_cmds._cmd_doctor", fake_cmd_doctor)
 
     result = runner.invoke(app, ["doctor", "--json"])
 
     assert result.exit_code == 0, result.output
-    args = seen["args"]
-    assert args.json is True
-    assert args.bundle is None
-    assert args.workspace is None
-    assert args.config is None
-    assert args.no_probes is False
-    assert args.no_ports is False
-    assert args.raw_probe_ids is False
+    kwargs = seen["kwargs"]
+    assert kwargs["json_"] is True
+    assert kwargs["bundle"] is None
+    assert kwargs["workspace"] is None
+    assert kwargs["config"] is None
+    assert kwargs["no_probes"] is False
+    assert kwargs["no_ports"] is False
+    assert kwargs["raw_probe_ids"] is False
 
 
-def test_doctor_command_builds_expected_namespace_for_bundle(monkeypatch, tmp_path: Path) -> None:
-    seen: dict[str, SimpleNamespace] = {}
+def test_doctor_command_builds_expected_kwargs_for_bundle(monkeypatch, tmp_path: Path) -> None:
+    seen: dict[str, dict] = {}
 
-    def fake_cmd_doctor(args: SimpleNamespace) -> None:
-        seen["args"] = args
+    def fake_cmd_doctor(**kwargs) -> None:
+        seen["kwargs"] = kwargs
 
     monkeypatch.setattr("helia_profiler.cli.inspect_cmds._cmd_doctor", fake_cmd_doctor)
     workspace = tmp_path / "profiler_app"
@@ -94,16 +93,16 @@ def test_doctor_command_builds_expected_namespace_for_bundle(monkeypatch, tmp_pa
     )
 
     assert result.exit_code == 0, result.output
-    args = seen["args"]
-    assert args.bundle == str(tmp_path / "out")
-    assert args.workspace == str(workspace)
-    assert args.config == str(config)
-    assert args.toolchain == "armclang"
-    assert args.transport == "usb_cdc"
-    assert args.engine == "helia-aot"
-    assert args.no_probes is True
-    assert args.no_ports is True
-    assert args.raw_probe_ids is True
+    kwargs = seen["kwargs"]
+    assert kwargs["bundle"] == str(tmp_path / "out")
+    assert kwargs["workspace"] == str(workspace)
+    assert kwargs["config"] == str(config)
+    assert kwargs["toolchain"] == "armclang"
+    assert kwargs["transport"] == "usb_cdc"
+    assert kwargs["engine"] == "helia-aot"
+    assert kwargs["no_probes"] is True
+    assert kwargs["no_ports"] is True
+    assert kwargs["raw_probe_ids"] is True
 
 
 def test_doctor_bundle_end_to_end_writes_archive(tmp_path: Path) -> None:
@@ -176,13 +175,12 @@ def test_doctor_bundle_explicit_zip_path_used_verbatim(tmp_path: Path) -> None:
 
 def test_doctor_invalid_toolchain_exits_with_usage_error() -> None:
     with pytest.raises(SystemExit) as exc:
-        # SimpleNamespace stands in for the argparse.Namespace contract here.
-        cli._cmd_doctor(SimpleNamespace(toolchain="not-a-real-toolchain"))  # ty: ignore[invalid-argument-type]
+        cli._cmd_doctor(toolchain="not-a-real-toolchain")
 
     assert exc.value.code == 2
 
 
-def test_cmd_doctor_default_namespace_prints_table(capsys) -> None:
+def test_cmd_doctor_defaults_print_table(capsys) -> None:
     cli._cmd_doctor()
 
     out = capsys.readouterr().out

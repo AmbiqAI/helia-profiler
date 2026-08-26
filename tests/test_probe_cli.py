@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from argparse import Namespace
 from types import SimpleNamespace
 import sys
 
@@ -32,7 +31,7 @@ def test_probes_list_prints_connected_probes(monkeypatch, capsys) -> None:
         lambda: [JLinkProbe(serial="1160002204", product="J-Link OB", connection="USB")],
     )
 
-    cli._cmd_probes_list(Namespace(board=None, inspect=False, json=False))
+    cli._cmd_probes_list()
 
     out = capsys.readouterr().out
     assert "1160002204" in out
@@ -47,7 +46,7 @@ def test_probes_list_inspects_against_board(monkeypatch, capsys) -> None:
         lambda probe, *, device: JLinkProbeMatch(probe=probe, detected_core=CoreArch.CORTEX_M55),
     )
 
-    cli._cmd_probes_list(Namespace(board="apollo510_evb", inspect=True, json=False))
+    cli._cmd_probes_list(board="apollo510_evb", inspect=True)
 
     out = capsys.readouterr().out
     assert "cortex-m55" in out
@@ -57,9 +56,7 @@ def test_probes_list_inspects_against_board(monkeypatch, capsys) -> None:
 def test_probes_match_prints_resolved_serial(monkeypatch, capsys) -> None:
     monkeypatch.setattr("helia_profiler.target.probe.jlink.resolve_probe_serial", lambda **kwargs: "1160002204")
 
-    cli._cmd_probes_match(
-        Namespace(board="apollo510_evb", jlink_serial=None, json=False)
-    )
+    cli._cmd_probes_match(board="apollo510_evb")
 
     assert "apollo510_evb: 1160002204" in capsys.readouterr().out
 
@@ -73,7 +70,7 @@ def test_target_reset_uses_noninteractive_wrapper(monkeypatch, capsys) -> None:
     monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", fake_reset_target)
 
     cli._cmd_target_reset(
-        Namespace(board="apollo4p_blue_kxr_evb", jlink_serial="1160001481", kind="debug")
+        board="apollo4p_blue_kxr_evb", jlink_serial="1160001481", kind="debug"
     )
 
     assert calls == [{"device": "AMAP42KP-KBR", "jlink_serial": "1160001481"}]
@@ -103,7 +100,7 @@ def test_ports_list_classifies_jlink_and_hpx_cdc(monkeypatch, capsys) -> None:
     ]
     monkeypatch.setattr("serial.tools.list_ports.comports", lambda: ports)
 
-    cli._cmd_ports_list(Namespace(json=False, show_all=False))
+    cli._cmd_ports_list()
 
     out = capsys.readouterr().out
     assert "jlink-vcom" in out
@@ -133,12 +130,12 @@ def test_ports_list_hides_builtin_ttys_unless_all(monkeypatch, capsys) -> None:
     ]
     monkeypatch.setattr("serial.tools.list_ports.comports", lambda: ports)
 
-    cli._cmd_ports_list(Namespace(json=False, show_all=False))
+    cli._cmd_ports_list()
     out = capsys.readouterr().out
     assert "/dev/ttyACM0" in out
     assert "/dev/ttyS0" not in out
 
-    cli._cmd_ports_list(Namespace(json=False, show_all=True))
+    cli._cmd_ports_list(show_all=True)
     out = capsys.readouterr().out
     assert "/dev/ttyS0" in out
 
@@ -150,7 +147,7 @@ def test_probe_cli_reports_hpx_errors(monkeypatch, capsys) -> None:
     monkeypatch.setattr("helia_profiler.target.probe.jlink.list_connected_probes", fail)
 
     with pytest.raises(SystemExit) as exc_info:
-        cli._cmd_probes_list(Namespace(board=None, inspect=False, json=False))
+        cli._cmd_probes_list()
 
     assert exc_info.value.code == 1
     assert "JLinkExe not found" in capsys.readouterr().err

@@ -118,8 +118,6 @@ def test_footer_falls_back_to_a_fresh_evaluation(tmp_path: Path) -> None:
 
 
 def test_fail_on_invalid_exits_3_after_the_run(tmp_path: Path, monkeypatch) -> None:
-    import argparse
-
     import helia_profiler.cli.profile_cmd as profile_cmd
 
     ctx = _ctx(tmp_path, fail_on_invalid=True)
@@ -136,24 +134,8 @@ def test_fail_on_invalid_exits_3_after_the_run(tmp_path: Path, monkeypatch) -> N
         "helia_profiler.config.load_config", lambda path, cli: ctx.config
     )
 
-    args = argparse.Namespace(
-        config=None, verbose=0, fail_on_invalid=True
-    )
-    monkeypatch.setattr(
-        profile_cmd, "_apply_model_engine_overrides", lambda a, c: None
-    )
-    for name in (
-        "_apply_target_overrides",
-        "_apply_pmu_overrides",
-        "_apply_power_overrides",
-        "_apply_output_overrides",
-        "_apply_workdir_overrides",
-        "_apply_build_overrides",
-    ):
-        monkeypatch.setattr(profile_cmd, name, lambda a, c: None)
-
     with pytest.raises(SystemExit) as excinfo:
-        profile_cmd._cmd_profile(args)
+        profile_cmd._cmd_profile(config=None, verbose=0, fail_on_invalid=True)
 
     assert excinfo.value.code == 3
 
@@ -161,8 +143,6 @@ def test_fail_on_invalid_exits_3_after_the_run(tmp_path: Path, monkeypatch) -> N
 def test_invalid_without_the_policy_exits_normally(
     tmp_path: Path, monkeypatch
 ) -> None:
-    import argparse
-
     import helia_profiler.cli.profile_cmd as profile_cmd
 
     ctx = _ctx(tmp_path, fail_on_invalid=False)
@@ -178,26 +158,14 @@ def test_invalid_without_the_policy_exits_normally(
     monkeypatch.setattr(
         "helia_profiler.config.load_config", lambda path, cli: ctx.config
     )
-    for name in (
-        "_apply_model_engine_overrides",
-        "_apply_target_overrides",
-        "_apply_pmu_overrides",
-        "_apply_power_overrides",
-        "_apply_output_overrides",
-        "_apply_workdir_overrides",
-        "_apply_build_overrides",
-    ):
-        monkeypatch.setattr(profile_cmd, name, lambda a, c: None)
 
-    args = argparse.Namespace(config=None, verbose=0, fail_on_invalid=False)
-    profile_cmd._cmd_profile(args)  # must not raise SystemExit
+    # must not raise SystemExit
+    profile_cmd._cmd_profile(config=None, verbose=0, fail_on_invalid=False)
 
 
 def test_degraded_with_policy_exits_normally(tmp_path: Path, monkeypatch) -> None:
     """Exit 3 is INVALID-only: a degraded run with the policy on still
     exits 0 -- warnings are advisory."""
-    import argparse
-
     import helia_profiler.cli.profile_cmd as profile_cmd
 
     ctx = _ctx(tmp_path, fail_on_invalid=True)
@@ -211,48 +179,27 @@ def test_degraded_with_policy_exits_normally(tmp_path: Path, monkeypatch) -> Non
     monkeypatch.setattr(
         "helia_profiler.config.load_config", lambda path, cli: ctx.config
     )
-    for name in (
-        "_apply_model_engine_overrides",
-        "_apply_target_overrides",
-        "_apply_pmu_overrides",
-        "_apply_power_overrides",
-        "_apply_output_overrides",
-        "_apply_workdir_overrides",
-        "_apply_build_overrides",
-    ):
-        monkeypatch.setattr(profile_cmd, name, lambda a, c: None)
 
-    profile_cmd._cmd_profile(
-        argparse.Namespace(config=None, verbose=0)
-    )  # must not raise SystemExit
+    # must not raise SystemExit
+    profile_cmd._cmd_profile(config=None, verbose=0)
 
 
 def test_output_applier_forwards_the_flag() -> None:
     """The REAL applier, un-mocked (#208 review: both exit tests bypass it):
-    the flag lands in the overrides dict, and its absence -- older Namespaces
-    lack the attribute -- leaves the dict untouched."""
-    import argparse
-
+    the flag lands in the overrides dict, and a False value leaves the dict
+    untouched."""
     from helia_profiler.cli.profile_cmd import _apply_output_overrides
 
-    base = argparse.Namespace(
+    base = dict(
         output_dir=None, output_format=None, no_model_explorer=False, detailed=False
     )
 
     cli: dict = {}
-    _apply_output_overrides(
-        argparse.Namespace(**vars(base), fail_on_invalid=True), cli
-    )
+    _apply_output_overrides(cli, **base, fail_on_invalid=True)
     assert cli["output"]["fail_on_invalid"] is True
 
     cli = {}
-    _apply_output_overrides(
-        argparse.Namespace(**vars(base), fail_on_invalid=False), cli
-    )
-    assert "output" not in cli
-
-    cli = {}
-    _apply_output_overrides(base, cli)  # attribute absent entirely
+    _apply_output_overrides(cli, **base, fail_on_invalid=False)
     assert "output" not in cli
 
 

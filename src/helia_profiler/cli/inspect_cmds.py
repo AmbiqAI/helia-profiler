@@ -7,7 +7,6 @@ full profiling pipeline.
 
 from __future__ import annotations
 
-import argparse
 import json
 import sys
 from collections.abc import Mapping, Sequence
@@ -21,11 +20,10 @@ _DOCTOR_DEFAULT_TRANSPORT = Transport.RTT
 _DOCTOR_DEFAULT_ENGINE = EngineType.HELIA_RT
 
 
-def _resolve_doctor_env(args: argparse.Namespace | None) -> tuple[Toolchain, Transport, EngineType]:
+def _resolve_doctor_env(
+    toolchain_raw: str | None, transport_raw: str | None, engine_raw: str | None
+) -> tuple[Toolchain, Transport, EngineType]:
     """Resolve the CLI's plain --toolchain/--transport/--engine strings to enums."""
-    toolchain_raw = getattr(args, "toolchain", None)
-    transport_raw = getattr(args, "transport", None)
-    engine_raw = getattr(args, "engine", None)
     try:
         toolchain = Toolchain(toolchain_raw) if toolchain_raw else _DOCTOR_DEFAULT_TOOLCHAIN
         transport = Transport(transport_raw) if transport_raw else _DOCTOR_DEFAULT_TRANSPORT
@@ -36,23 +34,45 @@ def _resolve_doctor_env(args: argparse.Namespace | None) -> tuple[Toolchain, Tra
     return toolchain, transport, engine
 
 
-def _cmd_doctor(args: argparse.Namespace | None = None) -> None:
+def _cmd_doctor(
+    *,
+    json_: bool = False,
+    bundle: str | None = None,
+    workspace: str | None = None,
+    config: str | None = None,
+    toolchain: str | None = None,
+    transport: str | None = None,
+    engine: str | None = None,
+    no_probes: bool = False,
+    no_ports: bool = False,
+    raw_probe_ids: bool = False,
+) -> None:
     """Check toolchain and dependencies; optionally emit JSON or a support bundle."""
     from ..doctor import inspect_environment
     from ..console import HpxConsole
 
-    json_ = bool(getattr(args, "json", False))
-    bundle = getattr(args, "bundle", None)
-
-    if args is not None and bundle is not None:
-        _cmd_doctor_bundle(args)
+    if bundle is not None:
+        _cmd_doctor_bundle(
+            bundle=bundle,
+            json_=json_,
+            workspace=workspace,
+            config=config,
+            toolchain=toolchain,
+            transport=transport,
+            engine=engine,
+            no_probes=no_probes,
+            no_ports=no_ports,
+            raw_probe_ids=raw_probe_ids,
+        )
         return
 
-    toolchain, transport, engine = _resolve_doctor_env(args)
+    resolved_toolchain, resolved_transport, resolved_engine = _resolve_doctor_env(
+        toolchain, transport, engine
+    )
     result = inspect_environment(
-        toolchain=toolchain,
-        transport=transport,
-        engine=engine,
+        toolchain=resolved_toolchain,
+        transport=resolved_transport,
+        engine=resolved_engine,
         include_versions=json_,
     )
     if json_:
@@ -62,7 +82,19 @@ def _cmd_doctor(args: argparse.Namespace | None = None) -> None:
     console.print_doctor(result)
 
 
-def _cmd_doctor_bundle(args: argparse.Namespace) -> None:
+def _cmd_doctor_bundle(
+    *,
+    bundle: str,
+    json_: bool,
+    workspace: str | None,
+    config: str | None,
+    toolchain: str | None,
+    transport: str | None,
+    engine: str | None,
+    no_probes: bool,
+    no_ports: bool,
+    raw_probe_ids: bool,
+) -> None:
     """Collect and write an ``hpx doctor --bundle`` support archive."""
     from pathlib import Path
 
@@ -73,7 +105,6 @@ def _cmd_doctor_bundle(args: argparse.Namespace) -> None:
         write_support_bundle,
     )
 
-    raw_probe_ids = bool(getattr(args, "raw_probe_ids", False))
     if raw_probe_ids:
         print(
             "Warning: --raw-probe-ids includes unredacted device serial numbers "
@@ -81,28 +112,28 @@ def _cmd_doctor_bundle(args: argparse.Namespace) -> None:
             file=sys.stderr,
         )
 
-    toolchain, transport, engine = _resolve_doctor_env(args)
-    workspace = getattr(args, "workspace", None)
-    config_path = getattr(args, "config", None)
+    resolved_toolchain, resolved_transport, resolved_engine = _resolve_doctor_env(
+        toolchain, transport, engine
+    )
     options = SupportBundleOptions(
         workspace=Path(workspace).expanduser() if workspace else None,
-        config_path=Path(config_path).expanduser() if config_path else None,
-        toolchain=toolchain,
-        transport=transport,
-        engine=engine,
-        include_probes=not bool(getattr(args, "no_probes", False)),
-        include_ports=not bool(getattr(args, "no_ports", False)),
+        config_path=Path(config).expanduser() if config else None,
+        toolchain=resolved_toolchain,
+        transport=resolved_transport,
+        engine=resolved_engine,
+        include_probes=not no_probes,
+        include_ports=not no_ports,
         raw_probe_ids=raw_probe_ids,
     )
 
     try:
         collection = collect_support_bundle(options)
-        path = write_support_bundle(collection, Path(args.bundle).expanduser())
+        path = write_support_bundle(collection, Path(bundle).expanduser())
     except HpxError as exc:
         _print_hpx_error(exc)
         sys.exit(1)
 
-    if bool(getattr(args, "json", False)):
+    if json_:
         print(
             json.dumps(
                 {"path": str(path), "manifest": collection.manifest.to_dict()}, indent=2
@@ -147,22 +178,24 @@ def _cmd_boards() -> None:
     console.print_boards(rows)
 
 
-def _cmd_probes_list(args: argparse.Namespace) -> None:
+def _cmd_probes_list(
+    *, board: str | None = None, inspect: bool = False, json_: bool = False
+) -> None:
     from ..errors import HpxError
     from ..target.probe.jlink import inspect_probe_target, list_connected_probes
 
-    board_name = getattr(args, "board", None)
-    inspect = bool(getattr(args, "inspect", False) or board_name)
+    board_name = board
+    inspect = bool(inspect or board_name)
     if inspect and not board_name:
         print("Error: hpx probes list --inspect requires --board.", file=sys.stderr)
         sys.exit(2)
 
-    board = soc = None
+    board_def = soc = None
     if board_name:
         try:
             from ..platform import get_board, get_soc_for_board
 
-            board = get_board(board_name)
+            board_def = get_board(board_name)
             soc = get_soc_for_board(board_name)
         except ValueError as exc:
             print(f"Error: {exc}", file=sys.stderr)
@@ -181,14 +214,14 @@ def _cmd_probes_list(args: argparse.Namespace) -> None:
                 match = inspect_probe_target(probe, device=soc.jlink_device)
                 row["detected_core"] = match.detected_core.value if match.detected_core else None
                 row["matches_board"] = match.detected_core is soc.core
-                row["board"] = board.name if board is not None else board_name
+                row["board"] = board_def.name if board_def is not None else board_name
                 row["jlink_device"] = soc.jlink_device
             rows.append(row)
     except HpxError as exc:
         _print_hpx_error(exc)
         sys.exit(1)
 
-    if args.json:
+    if json_:
         print(json.dumps({"probes": rows}, indent=2))
         return
     if not rows:
@@ -200,14 +233,16 @@ def _cmd_probes_list(args: argparse.Namespace) -> None:
         _print_rows(rows, ("serial", "product", "connection"))
 
 
-def _cmd_probes_match(args: argparse.Namespace) -> None:
+def _cmd_probes_match(
+    *, board: str, jlink_serial: str | None = None, json_: bool = False
+) -> None:
     from ..errors import HpxError
     from ..target.probe.jlink import resolve_probe_serial
 
     try:
         from ..platform import get_soc_for_board
 
-        soc = get_soc_for_board(args.board)
+        soc = get_soc_for_board(board)
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(2)
@@ -216,26 +251,26 @@ def _cmd_probes_match(args: argparse.Namespace) -> None:
         serial = resolve_probe_serial(
             device=soc.jlink_device,
             expected_core=soc.core,
-            requested_serial=args.jlink_serial,
+            requested_serial=jlink_serial,
         )
     except HpxError as exc:
         _print_hpx_error(exc)
         sys.exit(1)
 
-    if args.json:
-        print(json.dumps({"board": args.board, "serial": serial}, indent=2))
+    if json_:
+        print(json.dumps({"board": board, "serial": serial}, indent=2))
     else:
-        print(f"{args.board}: {serial}")
+        print(f"{board}: {serial}")
 
 
-def _cmd_ports_list(args: argparse.Namespace) -> None:
+def _cmd_ports_list(*, show_all: bool = False, json_: bool = False) -> None:
     try:
         from ..transport.ports import list_serial_ports
     except ImportError:
         print("Error: pyserial is required for hpx ports list.", file=sys.stderr)
         sys.exit(1)
 
-    ports = list_serial_ports(include_all=args.show_all)
+    ports = list_serial_ports(include_all=show_all)
     rows = [
         {
             "device": port.device,
@@ -249,7 +284,7 @@ def _cmd_ports_list(args: argparse.Namespace) -> None:
         }
         for port in ports
     ]
-    if args.json:
+    if json_:
         print(json.dumps({"ports": rows}, indent=2))
         return
     if not rows:
@@ -258,29 +293,31 @@ def _cmd_ports_list(args: argparse.Namespace) -> None:
     _print_rows(rows, ("device", "kind", "serial_number", "description", "product"))
 
 
-def _cmd_target_reset(args: argparse.Namespace) -> None:
+def _cmd_target_reset(
+    *, board: str, jlink_serial: str | None = None, kind: str = "debug"
+) -> None:
     from ..errors import HpxError
     from ..target.probe.jlink import reset_target, reset_target_poi
 
     try:
         from ..platform import get_soc_for_board
 
-        soc = get_soc_for_board(args.board)
+        soc = get_soc_for_board(board)
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(2)
 
     try:
-        if args.kind == "swpoi":
-            reset_target_poi(device=soc.jlink_device, jlink_serial=args.jlink_serial)
+        if kind == "swpoi":
+            reset_target_poi(device=soc.jlink_device, jlink_serial=jlink_serial)
         else:
-            reset_target(device=soc.jlink_device, jlink_serial=args.jlink_serial)
+            reset_target(device=soc.jlink_device, jlink_serial=jlink_serial)
     except HpxError as exc:
         _print_hpx_error(exc)
         sys.exit(1)
 
-    serial = args.jlink_serial or "auto"
-    print(f"Reset {args.board} via {args.kind} reset (serial={serial}).")
+    serial = jlink_serial or "auto"
+    print(f"Reset {board} via {kind} reset (serial={serial}).")
 
 
 def _print_rows(rows: Sequence[Mapping[str, object]], columns: tuple[str, ...]) -> None:
