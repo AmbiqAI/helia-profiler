@@ -147,17 +147,6 @@ def _cmd_boards() -> None:
     console.print_boards(rows)
 
 
-def _cmd_probes(args: argparse.Namespace) -> None:
-    action = getattr(args, "probes_action", None)
-    if action == "list":
-        _cmd_probes_list(args)
-    elif action == "match":
-        _cmd_probes_match(args)
-    else:
-        print("Usage: hpx probes {list|match}", file=sys.stderr)
-        sys.exit(1)
-
-
 def _cmd_probes_list(args: argparse.Namespace) -> None:
     from ..errors import HpxError
     from ..target.probe.jlink import inspect_probe_target, list_connected_probes
@@ -239,15 +228,6 @@ def _cmd_probes_match(args: argparse.Namespace) -> None:
         print(f"{args.board}: {serial}")
 
 
-def _cmd_ports(args: argparse.Namespace) -> None:
-    action = getattr(args, "ports_action", None)
-    if action == "list":
-        _cmd_ports_list(args)
-    else:
-        print("Usage: hpx ports {list}", file=sys.stderr)
-        sys.exit(1)
-
-
 def _cmd_ports_list(args: argparse.Namespace) -> None:
     try:
         from ..transport.ports import list_serial_ports
@@ -276,15 +256,6 @@ def _cmd_ports_list(args: argparse.Namespace) -> None:
         print("No serial ports detected.")
         return
     _print_rows(rows, ("device", "kind", "serial_number", "description", "product"))
-
-
-def _cmd_target(args: argparse.Namespace) -> None:
-    action = getattr(args, "target_action", None)
-    if action == "reset":
-        _cmd_target_reset(args)
-    else:
-        print("Usage: hpx target {reset}", file=sys.stderr)
-        sys.exit(1)
 
 
 def _cmd_target_reset(args: argparse.Namespace) -> None:

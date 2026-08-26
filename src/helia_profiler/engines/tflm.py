@@ -6,10 +6,9 @@ from pathlib import Path
 
 from ..config import ProfileConfig
 from ..errors import EngineError
-from ..placement import Placement
 from ..results import NsxModuleRef
 from . import EngineType, TFLM_ENGINE_HEADER
-from .base import ArenaRegion, TflmArtifacts
+from .base import SingleArenaPlacementMixin, TflmArtifacts
 
 
 TFLITE_MICRO_MODULE = "nsx-tflite-micro"
@@ -19,7 +18,7 @@ ARM_CMSIS_NN_PROJECT = "arm-cmsis-nn"
 _SUPPORTED_BACKENDS = frozenset(("reference", "cmsis_nn"))
 
 
-class TFLMAdapter:
+class TFLMAdapter(SingleArenaPlacementMixin):
     """Adapter for stock TensorFlow Lite for Microcontrollers."""
 
     @property
@@ -29,21 +28,6 @@ class TFLMAdapter:
     @property
     def engine_type(self) -> EngineType:
         return EngineType.TFLM
-
-    def default_auto_placement(
-        self, *, tcm_cap: int, sram_cap: int
-    ) -> tuple[Placement, Placement] | None:
-        # Fall through to the shared greedy fastest-fit policy.
-        del tcm_cap, sram_cap
-        return None
-
-    def apply_arena_placement_override(
-        self, regions: list[ArenaRegion], target: Placement
-    ) -> list[ArenaRegion]:
-        # TFLM owns a single arena managed by the firmware template;
-        # no engine-side override needed.
-        del target
-        return regions
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> TflmArtifacts:
         """Resolve the reference or upstream-CMSIS-NN TFLM NSX modules."""

@@ -10,7 +10,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, Self
 
-from .config import ProfileConfig, load_config
+from .config import ProfileConfig, deep_merge, load_config
 from .errors import ConfigError
 from .results import ProfileResult
 
@@ -31,15 +31,13 @@ if TYPE_CHECKING:
 
 
 def _merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
-    """Recursively merge mappings; scalar and sequence values replace."""
-    merged = {key: _thaw(value) for key, value in base.items()}
-    for key, value in override.items():
-        current = merged.get(key)
-        if isinstance(current, Mapping) and isinstance(value, Mapping):
-            merged[key] = _merge(current, value)
-        else:
-            merged[key] = _thaw(value)
-    return merged
+    """Recursively merge mappings; scalar and sequence values replace.
+
+    Thaws both sides to plain dicts/lists, then delegates to the canonical
+    :func:`helia_profiler.config.deep_merge` so session and CLI override
+    semantics stay identical.
+    """
+    return deep_merge(_thaw(base), _thaw(override))
 
 
 def _copy_value(value: Any) -> Any:

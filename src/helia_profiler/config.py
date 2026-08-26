@@ -787,7 +787,7 @@ def load_config(yaml_path: Path | None, cli_overrides: dict[str, Any]) -> Profil
                 hint="Top-level YAML must be a mapping with keys like model, engine, target.",
             )
 
-    merged = _deep_merge(base, cli_overrides)
+    merged = deep_merge(base, cli_overrides)
     _check_reserved_user_keys(merged)
     _check_required_model_path(merged)
     prepared, platform_registry = _prepare_merged_config(merged)
@@ -809,12 +809,17 @@ def load_config(yaml_path: Path | None, cli_overrides: dict[str, Any]) -> Profil
         raise ConfigError(str(exc)) from exc
 
 
-def _deep_merge(base: dict, override: dict) -> dict:
-    """Recursively merge *override* into *base*, returning a new dict."""
+def deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge *override* into *base*, returning a new dict.
+
+    Canonical override-merge for config mappings — nested dicts merge,
+    every other value (including lists) replaces. ``Session`` reuses this
+    so CLI and notebook override semantics cannot drift.
+    """
     result = dict(base)
     for key, val in override.items():
         if key in result and isinstance(result[key], dict) and isinstance(val, dict):
-            result[key] = _deep_merge(result[key], val)
+            result[key] = deep_merge(result[key], val)
         else:
             result[key] = val
     return result
