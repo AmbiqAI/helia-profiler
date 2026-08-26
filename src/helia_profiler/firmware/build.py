@@ -100,22 +100,25 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
                 # changes; dependency verification already ran via sync --frozen.
                 log.info("Reusing configured deterministic workspace: %s", build_dir)
             nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose)
+
+            # Locate build output. Prefer the ELF-form executable because
+            # later reporting stages run size tools against it to capture
+            # text/data/bss.
+            binary_path = _find_target_binary(build_dir, "hpx_profiler")
+            if binary_path is None:
+                raise BuildError(
+                    "Build succeeded but binary not found",
+                    hint=f"Searched in {build_dir}",
+                )
         except BuildError:
-            # A failed configure or build may mean the workspace is corrupted
-            # in a way the stamped skip above no longer checks for; drop the
-            # stamp so the next run pays full frozen verification (and repair)
-            # again instead of skipping straight back into the same failure.
+            # Any build-stage failure — configure, compile, or the artifact
+            # lookup — may mean the workspace is corrupted in a way the
+            # stamped skip above no longer checks for; drop the stamp so the
+            # next run pays full frozen verification (and repair) again
+            # instead of skipping straight back into the same failure.
             invalidate_sync_stamp(app_dir)
             raise
 
-    # Locate build output. Prefer the ELF-form executable because later
-    # reporting stages run size tools against it to capture text/data/bss.
-    binary_path = _find_target_binary(build_dir, "hpx_profiler")
-    if binary_path is None:
-        raise BuildError(
-            "Build succeeded but binary not found",
-            hint=f"Searched in {build_dir}",
-        )
     log.info("Binary: %s", binary_path)
 
     return build_dir, binary_path
