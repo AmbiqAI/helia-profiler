@@ -14,7 +14,7 @@ import pytest
 import yaml
 
 from helia_profiler.config import load_config
-from helia_profiler.errors import FirmwareError
+from helia_profiler.errors import BuildError, FirmwareError
 from helia_profiler.firmware import (
     _board_module_name,
     _find_segger_rtt_dir,
@@ -1345,6 +1345,34 @@ class TestBuildApp:
         assert sync_calls == []
         assert out_build_dir == build_dir
         assert out_binary == binary
+
+    def test_build_failure_invalidates_frozen_sync_stamp(
+        self, tmp_path: Path, fake_dist: Path, monkeypatch
+    ):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        app_dir = tmp_path / "app"
+        build_dir = app_dir / "build" / "apollo510_evb"
+        build_dir.mkdir(parents=True, exist_ok=True)
+        object.__setattr__(ctx, "firmware_dir", app_dir)
+        _stub_locked_dependencies(ctx, app_dir, monkeypatch)
+
+        stamp = app_dir / "hpx-frozen-sync.json"
+        stamp.write_text('{"lock_sha256": "0" * 64}', encoding="utf-8")
+
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.lock", lambda *a, **kw: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.sync", lambda *a, **kw: None)
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.configure", lambda *a, **kw: None)
+
+        def failing_build(*_args, **_kwargs) -> None:
+            raise BuildError("ninja failed")
+
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.build", failing_build)
+
+        with pytest.raises(BuildError):
+            build_app(ctx)
+
+        assert not stamp.exists()  # next run must fully re-verify the workspace
 
     def test_power_enabled_defers_power_target_until_after_profile(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
