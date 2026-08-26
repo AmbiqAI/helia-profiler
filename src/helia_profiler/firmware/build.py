@@ -83,27 +83,28 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
 
     with workspace_mutex(ctx.resolved_workspace):
         dependency_state = prepare_locked_dependencies(ctx)
-        if (
-            not ninja_already_configured
-            or dependency_state.lock.mode.value != "reused"
-        ):
-            nsx_cli.configure(
-                app_dir,
-                toolchain=nsx_tc,
-                frozen=True,
-                timeout_s=timeouts.configure_s,
-                verbose=verbose,
-            )
-        else:
-            # CMake's regeneration rule handles deterministic source/template
-            # changes; dependency verification already ran via sync --frozen.
-            log.info("Reusing configured deterministic workspace: %s", build_dir)
         try:
+            if (
+                not ninja_already_configured
+                or dependency_state.lock.mode.value != "reused"
+            ):
+                nsx_cli.configure(
+                    app_dir,
+                    toolchain=nsx_tc,
+                    frozen=True,
+                    timeout_s=timeouts.configure_s,
+                    verbose=verbose,
+                )
+            else:
+                # CMake's regeneration rule handles deterministic source/template
+                # changes; dependency verification already ran via sync --frozen.
+                log.info("Reusing configured deterministic workspace: %s", build_dir)
             nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose)
         except BuildError:
-            # A failed build may mean the workspace is corrupted in a way the
-            # stamped skip above no longer checks for; drop the stamp so the
-            # next run pays full frozen verification (and repair) again.
+            # A failed configure or build may mean the workspace is corrupted
+            # in a way the stamped skip above no longer checks for; drop the
+            # stamp so the next run pays full frozen verification (and repair)
+            # again instead of skipping straight back into the same failure.
             invalidate_sync_stamp(app_dir)
             raise
 
