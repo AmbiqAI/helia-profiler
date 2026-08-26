@@ -37,6 +37,7 @@ from .stats import (
     _fullrate_energy_over_windows,
     _map_poll_samples_to_packet_time,
     _process_gated_stats,
+    _segment_streamed_gpi,
     _summary_to_dict,
     _whole_summary_from_stats,
 )
@@ -217,6 +218,41 @@ def capture_gated(
             packet["_host_time64"] = _host_monotonic_time64(time64)
             packets.append(packet)
 
+    # Device-timestamped gate edges: stream the sync GPI as a signal so
+    # window edges live on the instrument clock — the same axis as the stat
+    # packets — at sample-period resolution.  The snapshot poller below stays
+    # as the *control* plane (early-stop, GO release, READY qualification) and
+    # as the edge fallback, but its ~5-10 ms cadence plus callback latency can
+    # merge a pre-window coupling pulse into the true rise (or hold a fall)
+    # under host load, inflating the measured window by ~100 ms — the CI
+    # "gated window duration is suspect" failures.  A streamed edge cannot be
+    # merged: the real quiesce/idle gaps around the window are tens of ms,
+    # orders of magnitude above stream resolution.
+    gpi_stream_frames: list[dict[str, Any]] = []
+
+    def _on_gpi_data(_topic: str, value: Any) -> None:
+        try:
+            import numpy as np
+
+            data = np.asarray(value["data"])
+            if data.size == 0:
+                return
+            decimate = max(1, int(value.get("decimate_factor", 1) or 1))
+            rate = float(value["sample_rate"]) / decimate
+            sample_id = value.get("sample_id")
+            gpi_stream_frames.append(
+                {
+                    "utc": int(value["utc"]),
+                    "rate": rate,
+                    "sample_id": (
+                        int(sample_id) // decimate if sample_id is not None else None
+                    ),
+                    "data": data.copy(),
+                }
+            )
+        except Exception:  # never let a malformed frame kill the capture
+            log.debug("Discarding malformed GPI stream frame", exc_info=True)
+
     # Opt-in full-rate cross-check (AutoDeploy-equivalent reference method).
     # Set HPX_POWER_FULLRATE_XCHECK=1 to also stream raw s/i + s/v at the
     # instrument's native rate and integrate energy over the GPI windows,
@@ -360,6 +396,21 @@ def capture_gated(
         driver.publish(f"{device_path}/{scnt_topic}", scnt)
         driver.publish(f"{device_path}/{sctrl_topic}", 1)
         driver.subscribe(f"{device_path}/{sval_topic}", "pub", _on_stats)
+        gpi_stream_enabled = False
+        gpi_data_topic = f"{device_path}/s/gpi/{sync_input_index}/!data"
+        gpi_ctrl_topic = f"{device_path}/s/gpi/{sync_input_index}/ctrl"
+        if family in ("js220", "js320"):
+            try:
+                driver.subscribe(gpi_data_topic, "pub", _on_gpi_data)
+                driver.publish(gpi_ctrl_topic, 1)
+                gpi_stream_enabled = True
+            except Exception:
+                log.warning(
+                    "GPI edge streaming unavailable on %s; gate edges fall "
+                    "back to snapshot polling",
+                    device_path,
+                    exc_info=True,
+                )
         if fr_xcheck:
             try:
                 driver.subscribe(f"{device_path}/s/i/!data", ["pub"], _on_fr_current)
@@ -400,6 +451,15 @@ def capture_gated(
                 driver.unsubscribe(f"{device_path}/{sval_topic}", _on_stats)
             except Exception:
                 pass
+            if gpi_stream_enabled:
+                try:
+                    driver.publish(gpi_ctrl_topic, 0)
+                except Exception:
+                    pass
+                try:
+                    driver.unsubscribe(gpi_data_topic, _on_gpi_data)
+                except Exception:
+                    pass
             if fr_xcheck:
                 try:
                     driver.publish(f"{device_path}/s/i/ctrl", 0, timeout=0)
@@ -417,10 +477,109 @@ def capture_gated(
                 poll_samples=poll_samples,
             )
 
+        # Prefer instrument-clock gate edges from the GPI stream whenever it
+        # produced at least one window that clears the minimum gate.  The
+        # snapshot-poll segmentation stays authoritative otherwise — including
+        # the degraded no-usable-window path, whose classification must keep
+        # seeing exactly what the poller saw.
+        streamed_gate_windows: list[tuple[float, float]] | None = None
+        raw_streamed: list[tuple[float, float]] = []
+        gate_edge_source = "gpi_snapshot_poll"
+        if gpi_stream_enabled and gpi_stream_frames:
+            raw_streamed = _segment_streamed_gpi(gpi_stream_frames)
+            qualifying = [
+                (rise, fall)
+                for rise, fall in raw_streamed
+                if (fall - rise) / time64.SECOND >= minimum_gate_s
+            ]
+            if qualifying:
+                # The firmware asserts the gate exactly once per run, as the
+                # LAST thing the sync line does before the device parks and
+                # the capture early-stops.  Any earlier qualifying stretch is
+                # the undriven line coupling to pre-window device activity —
+                # observed on an AP510 EVB as a >1 s continuous high through
+                # the busy setup phase, which a duration floor alone cannot
+                # reject.  Sub-minimum segments before OR after are noise
+                # pulses; the raw list goes to diagnostics unfiltered.
+                streamed_gate_windows = [qualifying[-1]]
+                gate_edge_source = "gpi_stream"
+                if len(qualifying) > 1:
+                    log.info(
+                        "GPI stream saw %d qualifying gate segments; using the "
+                        "final one (the firmware window) and attributing the "
+                        "earlier %d to pre-window line coupling",
+                        len(qualifying),
+                        len(qualifying) - 1,
+                    )
+            elif raw_streamed:
+                log.warning(
+                    "GPI stream saw %d gate segment(s) but none reached the "
+                    "%.3fs minimum; gate edges fall back to snapshot polling",
+                    len(raw_streamed),
+                    minimum_gate_s,
+                )
+
+        dump_dir = os.environ.get("HPX_GATE_DEBUG_DUMP")
+        if dump_dir:
+            try:
+                import json as _json
+                from pathlib import Path as _Path
+
+                _pkt_rows = []
+                for _p in packets:
+                    _t = _p.get("time", {}) if isinstance(_p, dict) else {}
+                    _utc = (_t.get("utc", {}) or {}).get("value")
+                    if not _utc or len(_utc) < 2:
+                        continue
+                    _sig = _p.get("signals", {})
+                    _pkt_rows.append(
+                        [
+                            _p.get("_host_time64"),
+                            float(_utc[0]),
+                            float(_utc[1]),
+                            float((_sig.get("current", {}).get("avg", {}) or {}).get("value", 0.0)),
+                        ]
+                    )
+                _out = _Path(dump_dir)
+                _out.mkdir(parents=True, exist_ok=True)
+                _fn = _out / f"gate_dump_{int(time.time())}.json"
+                _fn.write_text(
+                    _json.dumps(
+                        {
+                            "capture_start_monotonic": capture_start,
+                            "go_release_monotonic": go_release_at,
+                            "first_high_monotonic": first_high_at,
+                            "first_low_after_high_monotonic": first_low_after_high_at,
+                            "poll_samples_host_time64": poll_samples,
+                            "aligned_poll_samples": aligned_poll_samples,
+                            "packets_host_u0_u1_curavg": _pkt_rows,
+                            "gate_edge_source": gate_edge_source,
+                            "gpi_stream_frame_count": len(gpi_stream_frames),
+                            "gpi_stream_frames_meta": [
+                                {
+                                    "utc": f["utc"],
+                                    "rate": f["rate"],
+                                    "sample_id": f.get("sample_id"),
+                                    "n": int(len(f["data"])),
+                                }
+                                for f in gpi_stream_frames
+                            ],
+                            "gpi_stream_windows_raw": raw_streamed,
+                            "gpi_stream_windows": streamed_gate_windows,
+                        }
+                    )
+                )
+                log.info("Gate debug dump written: %s", _fn)
+            except Exception:
+                log.warning("Gate debug dump failed", exc_info=True)
+
         gating_diagnostics = _gated_stats_diagnostics(
             packets=packets,
             poll_samples=aligned_poll_samples,
             prefer_device_time=use_device_time_axis,
+            windows_override=streamed_gate_windows,
+            gate_edge_source=gate_edge_source,
+            stream_segment_count=len(raw_streamed) if gpi_stream_enabled else None,
         )
 
         windows, gated_summary = _process_gated_stats(
@@ -429,6 +588,7 @@ def capture_gated(
             io_voltage=io_voltage,
             prefer_device_time=use_device_time_axis,
             minimum_window_s=minimum_gate_s,
+            windows_override=streamed_gate_windows,
         )
         if not windows:
             failure = classify_gate_failure(
@@ -531,7 +691,7 @@ def capture_gated(
             device=device_path,
             io_voltage=io_voltage,
             measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
-            gating_method="gpi_snapshot_poll+host_stats_integral",
+            gating_method=f"{gate_edge_source}+host_stats_integral",
             sync_input_index=sync_input_index,
             stats_rate_hz=stats_rate_hz,
             stats_scnt=scnt,
@@ -615,6 +775,9 @@ def capture_gated(
                 packets=packets,
                 poll_samples=aligned_poll_samples,
                 prefer_device_time=use_device_time_axis,
+                windows_override=streamed_gate_windows,
+                gate_edge_source=gate_edge_source,
+                stream_segment_count=len(raw_streamed) if gpi_stream_enabled else None,
             )
             metadata.gating_diagnostics = diagnostics
             sane_window = gated_summary.avg_current_a > whole_summary.avg_current_a

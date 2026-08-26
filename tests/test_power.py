@@ -655,6 +655,244 @@ class TestGatedStatsProcessing:
         assert "power.lockstep: true" in gate_failure.hint
 
 
+class TestStreamedGpiSegmentation:
+    """Instrument-clock gate edges from ``s/gpi/N/!data`` stream frames.
+
+    These edges live on the same time64 axis as the stat-packet midpoints, so
+    they need no host-time mapping and cannot be distorted by GPI snapshot
+    poll cadence or callback latency — the mechanism behind the CI
+    "gated window duration is suspect" failures, where a pre-window coupling
+    pulse merged into the true rise across a stalled poll gap and inflated
+    the measured window by ~100 ms.
+    """
+
+    @staticmethod
+    def _frame(utc: int, rate: float, levels: list[int]):
+        import numpy as np
+
+        return {"utc": utc, "rate": rate, "data": np.asarray(levels, dtype=np.uint8)}
+
+    def test_segments_window_across_frame_boundary(self):
+        from helia_profiler.power.joulescope.stats import _segment_streamed_gpi
+
+        ms = _SECOND // 1000
+        # 1 kHz stream: frame 1 rises at sample 2; frame 2 falls at sample 3.
+        frames = [
+            self._frame(0, 1000.0, [0, 0, 1, 1, 1]),
+            self._frame(5 * ms, 1000.0, [1, 1, 1, 0, 0]),
+        ]
+
+        windows = _segment_streamed_gpi(frames)
+
+        assert len(windows) == 1
+        rise, fall = windows[0]
+        assert rise == pytest.approx(2 * ms)
+        assert fall == pytest.approx(8 * ms)
+
+    def test_capture_starting_high_yields_no_leading_window(self):
+        from helia_profiler.power.joulescope.stats import _segment_streamed_gpi
+
+        ms = _SECOND // 1000
+        # High at stream start: that rise was never observed, so no window may
+        # be timed from it — mirrors _segment_gpi_windows' rejection.
+        frames = [self._frame(0, 1000.0, [1, 1, 0, 0, 1, 1, 0])]
+
+        windows = _segment_streamed_gpi(frames)
+
+        assert len(windows) == 1
+        rise, fall = windows[0]
+        assert rise == pytest.approx(4 * ms)
+        assert fall == pytest.approx(6 * ms)
+
+    def test_trailing_high_without_fall_is_dropped(self):
+        from helia_profiler.power.joulescope.stats import _segment_streamed_gpi
+
+        frames = [self._frame(0, 1000.0, [0, 0, 1, 1, 1])]
+
+        assert _segment_streamed_gpi(frames) == []
+
+    def test_coupling_pulse_stays_separate_from_window(self):
+        from helia_profiler.power.joulescope.stats import _segment_streamed_gpi
+
+        ms = _SECOND // 1000
+        # A short pre-window pulse, a real low gap, then the window: the gap
+        # is resolved at sample resolution, so the pulse can never merge into
+        # the window the way a slow snapshot poll can merge them.
+        levels = [0] + [1] * 6 + [0] * 27 + [1] * 60 + [0]
+        frames = [self._frame(0, 1000.0, levels)]
+
+        windows = _segment_streamed_gpi(frames)
+
+        assert len(windows) == 2
+        pulse, window = windows
+        assert (pulse[1] - pulse[0]) == pytest.approx(6 * ms)
+        assert (window[1] - window[0]) == pytest.approx(60 * ms)
+
+    def test_process_gated_stats_prefers_streamed_windows(self):
+        from helia_profiler.power.joulescope.stats import _process_gated_stats
+
+        ms = _SECOND // 1000
+        packets = [
+            TestGatedStatsProcessing._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12)
+            for i in range(30)
+        ]
+        # The poll segmentation observed a merged rise 10 ms early (coupling
+        # pulse + stalled poll); the streamed edges carry the true window.
+        poll_samples = [(0, 0), (5 * ms, 1), (25 * ms, 0)]
+        streamed = [(float(15 * ms), float(25 * ms))]
+
+        windows, _summary = _process_gated_stats(
+            packets=packets,
+            poll_samples=poll_samples,
+            io_voltage=1.8,
+            prefer_device_time=True,
+            windows_override=streamed,
+        )
+
+        assert len(windows) == 1
+        assert windows[0].sample_count == 10
+        assert windows[0].duration_s == pytest.approx(0.01, rel=1e-6)
+
+    def test_diagnostics_record_gate_edge_source(self):
+        from helia_profiler.power.joulescope.diagnostics import (
+            _gated_stats_diagnostics,
+        )
+
+        ms = _SECOND // 1000
+        packets = [
+            TestGatedStatsProcessing._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12)
+            for i in range(10)
+        ]
+
+        poll_diag = _gated_stats_diagnostics(
+            packets=packets,
+            poll_samples=[(0, 0), (2 * ms, 1), (8 * ms, 0)],
+            prefer_device_time=True,
+        )
+        stream_diag = _gated_stats_diagnostics(
+            packets=packets,
+            poll_samples=[(0, 0), (2 * ms, 1), (8 * ms, 0)],
+            prefer_device_time=True,
+            windows_override=[(3 * ms, 7 * ms)],
+            gate_edge_source="gpi_stream",
+        )
+
+        assert poll_diag["gate_edge_source"] == "gpi_snapshot_poll"
+        assert stream_diag["gate_edge_source"] == "gpi_stream"
+        assert stream_diag["windows"] == [
+            {"rise_tick": 3 * ms, "fall_tick": 7 * ms}
+        ]
+
+
+class TestStreamedGateSelection:
+    """End-to-end capture: the LAST qualifying streamed window is the gate.
+
+    The firmware asserts the gate exactly once, at the end of the capture —
+    an undriven line coupling to pre-window activity can hold a qualifying
+    high for over a second (observed live on an AP510 EVB), so a duration
+    floor alone would sum it into the measured window.  Drives the real
+    :func:`capture_gated` against a fake instrument that emits both a long
+    coupling stretch and the real window on the GPI stream.
+    """
+
+    class _FakeStreamingDriver:
+        def __init__(self) -> None:
+            self._subs: dict[str, object] = {}
+
+        def publish(self, _topic, _value, **_kwargs) -> None:
+            pass
+
+        def subscribe(self, topic, _flags, callback) -> None:
+            self._subs[topic] = callback
+
+        def unsubscribe(self, _topic, _callback) -> None:
+            pass
+
+        def _cb(self, fragment: str):
+            for topic, callback in self._subs.items():
+                if fragment in topic:
+                    return callback
+            return None
+
+        def emit_timeline(self) -> None:
+            import numpy as np
+
+            ms = _SECOND // 1000
+            stats_cb = self._cb("/s/stats/")
+            gpi_cb = self._cb("/s/gpi/0/!data")
+            assert stats_cb is not None and gpi_cb is not None
+            # 40 packets of 1 ms each; device timeline 0..40 ms.
+            for i in range(40):
+                stats_cb(
+                    "u/js320/test/s/stats/value",
+                    TestGatedStatsProcessing._packet(
+                        i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12
+                    ),
+                )
+            # GPI stream at 1 kHz: a 12 ms coupling stretch (qualifying!),
+            # a 5 ms low gap, then the 10 ms real window, then low.
+            levels = [0] * 2 + [1] * 12 + [0] * 5 + [1] * 10 + [0] * 5
+            gpi_cb(
+                "u/js320/test/s/gpi/0/!data",
+                {
+                    "data": np.asarray(levels, dtype=np.uint8),
+                    "sample_rate": 1000,
+                    "decimate_factor": 1,
+                    "sample_id": 0,
+                    "utc": 0,
+                },
+            )
+
+    def test_last_qualifying_stream_window_wins(self, monkeypatch):
+        from helia_profiler.power.joulescope import capture_gated as module
+        from helia_profiler.power.joulescope.driver import JoulescopeDriver
+
+        fake = self._FakeStreamingDriver()
+        monkeypatch.setattr(
+            module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320")
+        )
+        monkeypatch.setattr(module, "_close_device", lambda *_a, **_k: None)
+
+        # Snapshot poller sees one plain rise/fall so the capture completes;
+        # its edge timing is deliberately NOT what the assertion checks.
+        calls = {"n": 0}
+
+        def _scripted_gpi(_driver, _path):
+            calls["n"] += 1
+            return 1 if 3 <= calls["n"] <= 8 else 0
+
+        monkeypatch.setattr(module, "_read_gpi_snapshot", _scripted_gpi)
+
+        def _on_started(_wait=None):
+            fake.emit_timeline()
+
+        result = module.capture_gated(
+            JoulescopeDriver(),
+            duration_s=1.0,
+            io_voltage=1.8,
+            sync_input_index=0,
+            stats_rate_hz=1000,
+            minimum_gate_s=0.008,  # both the coupling stretch and the window qualify
+            poll_interval_s=0.001,
+            on_started=_on_started,
+        )
+
+        ms = _SECOND // 1000
+        assert result.metadata.gating_method == "gpi_stream+host_stats_integral"
+        assert len(result.gated_windows) == 1
+        window = result.gated_windows[0]
+        # The 10 ms real window (19..29 ms), NOT the 12 ms coupling stretch
+        # (2..14 ms) and NOT their sum.
+        assert window.duration_s == pytest.approx(0.010, rel=1e-6)
+        diagnostics = result.metadata.gating_diagnostics
+        assert diagnostics is not None
+        assert diagnostics["gate_edge_source"] == "gpi_stream"
+        assert diagnostics["stream_segment_count"] == 2
+        (recorded,) = diagnostics["windows"]
+        assert recorded["rise_tick"] == pytest.approx(19 * ms, abs=ms // 100)
+        assert recorded["fall_tick"] == pytest.approx(29 * ms, abs=ms // 100)
+
+
 class TestMissedGateWarningNamesTheFix:
     """End-to-end: the degraded-path ``log.warning`` must name the fix.
 
@@ -669,16 +907,23 @@ class TestMissedGateWarningNamesTheFix:
         """Minimal pyjoulescope_driver.Driver stand-in for the gated path."""
 
         def __init__(self) -> None:
-            self._stats_cb = None
+            self._subs: dict[str, object] = {}
 
         def publish(self, _topic, _value, **_kwargs) -> None:
             pass
 
-        def subscribe(self, _topic, _flags, callback) -> None:
-            self._stats_cb = callback
+        def subscribe(self, topic, _flags, callback) -> None:
+            self._subs[topic] = callback
 
         def unsubscribe(self, _topic, _callback) -> None:
             pass
+
+        @property
+        def _stats_cb(self):
+            for topic, callback in self._subs.items():
+                if "/s/stats/" in topic:
+                    return callback
+            return None
 
         def emit_packets(self, count: int) -> None:
             assert self._stats_cb is not None, "subscribe() was never called"

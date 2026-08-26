@@ -243,6 +243,83 @@ def _segment_gpi_windows(poll_samples: list[tuple[int, int]]) -> list[tuple[floa
     return windows
 
 
+def _segment_streamed_gpi(
+    frames: list[dict[str, Any]],
+) -> list[tuple[float, float]]:
+    """Segment gate-high windows from device-timestamped GPI stream frames.
+
+    Each frame is ``{"utc": <time64 of first sample>, "rate": <samples/s>,
+    "data": <per-sample levels>}`` as captured from ``s/gpi/N/!data``.  The
+    returned ``(rise, fall)`` pairs are in instrument time64 — the same clock
+    as the stat-packet midpoints — so no host-time mapping is involved and the
+    edges carry sample-period resolution instead of host poll cadence.
+
+    Only complete windows are returned (a trailing high with no observed fall
+    is dropped), mirroring :func:`_segment_gpi_windows`.  A capture that
+    starts high yields no leading window for the same reason that function
+    rejects one: a rise that was never observed cannot be timed.
+    """
+    import numpy as np
+    from pyjoulescope_driver import time64
+
+    usable = [
+        frame
+        for frame in frames
+        if np.asarray(frame["data"]).size and float(frame["rate"]) > 0
+    ]
+    if not usable:
+        return []
+
+    # Per-sample spacing measured from the frames themselves, NOT from the
+    # reported rate: JS320 GPI ``!data`` frames report ``sample_rate`` at the
+    # raw instrument rate with ``decimate_factor`` 1 while actually carrying
+    # 8:1-decimated samples (observed live: ``sample_id`` counts raw samples
+    # and both sid and utc advance exactly 8 per delivered sample).  Trusting
+    # the reported rate compressed every frame's intra-frame time 8x and put
+    # streamed edges tens of ms off — flagged by the firmware window clock,
+    # whose STIMER bracket a correctly measured gate can never exceed.  The
+    # per-frame ``utc`` values are device-exact, so consecutive frames give
+    # the true spacing directly and a median over the capture rejects any
+    # frame-drop outliers.
+    spacings = [
+        (float(nxt["utc"]) - float(cur["utc"])) / int(np.asarray(cur["data"]).size)
+        for cur, nxt in zip(usable, usable[1:])
+        if float(nxt["utc"]) > float(cur["utc"])
+    ]
+    if spacings:
+        tick_per_sample = float(np.median(spacings))
+    else:
+        tick_per_sample = time64.SECOND / float(usable[0]["rate"])
+
+    edges: list[tuple[float, int]] = []  # (tick, new_level)
+    prev_level: int | None = None
+    for frame in usable:
+        data = np.asarray(frame["data"])
+        frame_t0 = float(frame["utc"])
+        levels = (data > 0).astype(np.int8)
+        if prev_level is None:
+            prev_level = int(levels[0])
+        # Boundary edge between frames, then intra-frame edges.
+        if int(levels[0]) != prev_level:
+            edges.append((frame_t0, int(levels[0])))
+        idx = np.nonzero(np.diff(levels))[0]
+        for i in idx:
+            edges.append(
+                (frame_t0 + (int(i) + 1) * tick_per_sample, int(levels[i + 1]))
+            )
+        prev_level = int(levels[-1])
+
+    windows: list[tuple[float, float]] = []
+    rise: float | None = None
+    for tick, level in edges:
+        if level and rise is None:
+            rise = tick
+        elif not level and rise is not None:
+            windows.append((rise, tick))
+            rise = None
+    return windows
+
+
 def _fullrate_energy_over_windows(
     *,
     cur_chunks: list[Any],
@@ -340,6 +417,7 @@ def _process_gated_stats(
     io_voltage: float,
     prefer_device_time: bool = False,
     minimum_window_s: float = 0.0,
+    windows_override: list[tuple[float, float]] | None = None,
 ) -> tuple[list[GatedPowerWindow], PowerSummary]:
     """Integrate the gated window(s) from on-device stat-packet integrals.
 
@@ -356,9 +434,14 @@ def _process_gated_stats(
     del io_voltage  # voltage is folded into the on-device power integral
 
     a = _stats_arrays(packets)
+    raw_windows = (
+        windows_override
+        if windows_override is not None
+        else _segment_gpi_windows(poll_samples)
+    )
     windows = [
         (rise, fall)
-        for rise, fall in _segment_gpi_windows(poll_samples)
+        for rise, fall in raw_windows
         if (fall - rise) / time64.SECOND >= minimum_window_s
     ]
     if a["mid"].size == 0 or not windows:
