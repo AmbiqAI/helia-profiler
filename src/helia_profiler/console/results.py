@@ -274,7 +274,7 @@ def render_validity(console: HpxConsole, ctx: PipelineContext) -> None:
         evaluation = evaluate_run(ctx)
 
     verdict = evaluation.validity.value
-    if verdict == "valid":
+    if verdict == "valid" and not evaluation.issues:
         console._console.print("  [green]Validity: VALID[/green]")
         console._console.print()
         return
@@ -283,10 +283,20 @@ def render_validity(console: HpxConsole, ctx: PipelineContext) -> None:
     warnings = [issue for issue in evaluation.issues if issue.severity == "warning"]
     if verdict == "invalid":
         console._console.print("  [bold red]Validity: INVALID[/bold red]")
+    elif verdict == "valid":
+        # Unreachable from evaluate_run (_validity_for: any issue => at
+        # least DEGRADED) -- but a hand-built or rehydrated evaluation must
+        # not have its causes swallowed by the quiet-VALID early return
+        # (#208 retro review).
+        console._console.print("  [green]Validity: VALID[/green]")
     else:
+        # Count every issue, not just warnings: an evaluation carrying only
+        # a severity this renderer predates used to read "DEGRADED
+        # (0 warnings)" over visible causes (#208 retro review).
+        count = len(evaluation.issues)
         console._console.print(
-            f"  [yellow]Validity: DEGRADED ({len(warnings)} warning"
-            f"{'s' if len(warnings) != 1 else ''})[/yellow]"
+            f"  [yellow]Validity: DEGRADED ({count} issue"
+            f"{'s' if count != 1 else ''})[/yellow]"
         )
     for issue in errors:
         console._console.print(
