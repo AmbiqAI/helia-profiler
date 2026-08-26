@@ -199,7 +199,7 @@ def test_the_plan_describes_the_window_the_firmware_runs(
     if plan.inference_count and plan.reference_inference_us:
         # Stated in microseconds -- must agree exactly.
         planned_s = plan.inference_count * plan.reference_inference_us / 1e6
-        tolerance = {"rel": 1e-6}
+        expected = pytest.approx(expected_s, rel=1e-6)
     elif firmware == "shared" and window_mode == "auto":
         # The one cell the host cannot predict exactly, in principle: the
         # firmware sizes this window itself, as
@@ -210,14 +210,14 @@ def test_the_plan_describes_the_window_the_firmware_runs(
         # that is actually true. Still far tighter than the 5x and 90x
         # disagreements this file exists to catch.
         planned_s = plan.target_duration_ms / 1000.0
-        tolerance = {"abs": PER_INFER_US / 1e6}
+        expected = pytest.approx(expected_s, abs=PER_INFER_US / 1e6)
     else:
         # Stated only as target_duration_ms, an integer-millisecond field, so
         # its resolution is the bound.
         planned_s = plan.target_duration_ms / 1000.0
-        tolerance = {"abs": 1e-3}
+        expected = pytest.approx(expected_s, abs=1e-3)
 
-    assert planned_s == pytest.approx(expected_s, **tolerance), (
+    assert planned_s == expected, (
         f"plan describes {planned_s:.3f}s against firmware built to run "
         f"{expected_s:.3f}s ({planned_s / expected_s:.2f}x)"
     )

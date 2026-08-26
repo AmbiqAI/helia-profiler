@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from helia_profiler.cli import profile_cmd as cli
+from helia_profiler.console import HpxConsole
 
 
 def _profile_args(**overrides):
@@ -143,7 +144,9 @@ def test_profile_cli_owns_console_presentation(monkeypatch) -> None:
     cli._cmd_profile(_profile_args(verbose=1))
 
     assert seen["config"] is config
-    assert seen["console"].verbosity == 1
+    console = seen["console"]
+    assert isinstance(console, HpxConsole)
+    assert console.verbosity == 1
 
 
 def test_cli_choice_lists_mirror_the_config_enums():

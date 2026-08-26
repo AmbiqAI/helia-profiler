@@ -66,7 +66,7 @@ from ._tflite_reader import TENSOR_TYPE_UINT8, read_quantized_softmax_ops
 # the package IS present, constants that mirror its internals are read live
 # so a version bump moves them here instead of silently diverging (#147).
 try:
-    from helia_aot.air.options import (  # type: ignore[import-untyped]
+    from helia_aot.air.options import (
         AirSoftmaxOptions as _AirSoftmaxOptions,
     )
 except ImportError:

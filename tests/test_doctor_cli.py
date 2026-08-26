@@ -41,7 +41,7 @@ def test_doctor_json_flag_emits_valid_json_to_stdout() -> None:
 
 
 def test_doctor_command_builds_expected_namespace_for_json(monkeypatch) -> None:
-    seen: dict[str, object] = {}
+    seen: dict[str, SimpleNamespace] = {}
 
     def fake_cmd_doctor(args: SimpleNamespace) -> None:
         seen["args"] = args
@@ -62,7 +62,7 @@ def test_doctor_command_builds_expected_namespace_for_json(monkeypatch) -> None:
 
 
 def test_doctor_command_builds_expected_namespace_for_bundle(monkeypatch, tmp_path: Path) -> None:
-    seen: dict[str, object] = {}
+    seen: dict[str, SimpleNamespace] = {}
 
     def fake_cmd_doctor(args: SimpleNamespace) -> None:
         seen["args"] = args
@@ -176,7 +176,8 @@ def test_doctor_bundle_explicit_zip_path_used_verbatim(tmp_path: Path) -> None:
 
 def test_doctor_invalid_toolchain_exits_with_usage_error() -> None:
     with pytest.raises(SystemExit) as exc:
-        cli._cmd_doctor(SimpleNamespace(toolchain="not-a-real-toolchain"))
+        # SimpleNamespace stands in for the argparse.Namespace contract here.
+        cli._cmd_doctor(SimpleNamespace(toolchain="not-a-real-toolchain"))  # ty: ignore[invalid-argument-type]
 
     assert exc.value.code == 2
 

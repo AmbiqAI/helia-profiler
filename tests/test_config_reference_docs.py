@@ -18,8 +18,8 @@ DOCS_PATH = ROOT / "docs" / "reference" / "configuration.md"
 
 def _load_generator():
     spec = importlib.util.spec_from_file_location("gen_config_reference", GENERATOR_PATH)
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     # Register before exec so dataclasses/typing.get_type_hints can resolve
     # postponed (`from __future__ import annotations`) type hints against
     # this module's namespace while it runs.

@@ -828,6 +828,7 @@ def test_write_summary_observer_agreement_does_not_mask_the_floor(tmp_path: Path
     ctx = _gated_power_ctx(
         tmp_path, clean_infer_count=11, clean_infer_avg_us=21000, duration_s=0.210
     )
+    assert ctx.power_result is not None
     ctx.power_result.metadata.gate_duration_integrity = GateDurationIntegrity(
         measured_s=0.210,
         expected_s=0.231,
@@ -847,6 +848,7 @@ def test_write_summary_uses_fixed_power_plan_count(tmp_path: Path):
     ctx = _gated_power_ctx(
         tmp_path, clean_infer_count=10, clean_infer_avg_us=10000, duration_s=0.08
     )
+    assert ctx.power_result is not None
     ctx.power_result.metadata.power_plan = {
         "inference_count": 8,
         "reference_inference_us": 10000,
@@ -881,6 +883,7 @@ def test_write_summary_surfaces_window_clock_ceiling(tmp_path: Path):
     ctx = _gated_power_ctx(
         tmp_path, clean_infer_count=10, clean_infer_avg_us=10000, duration_s=0.1
     )
+    assert ctx.power_result is not None
     ctx.power_result.metadata.window_clock_ceiling = ceiling
 
     out_path = _write_summary(ctx, tmp_path)
@@ -1024,6 +1027,7 @@ def test_busy_loop_probe_publishes_no_active_window_estimates_either(tmp_path: P
     object.__setattr__(
         ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
     )
+    assert ctx.power_result is not None and ctx.pmu_result is not None
     ctx.power_result.metadata.measurement_scope = MeasurementScope.ON_DEVICE_GATED_INFERENCE
     object.__setattr__(ctx.pmu_result.meta, "profiled_infer_count", 200)
     object.__setattr__(ctx.pmu_result.meta, "profiled_infer_total_us", 18_000_000)
@@ -1180,6 +1184,7 @@ def test_write_summary_handles_sub_inference_dedicated_gate(tmp_path: Path):
     ctx = _gated_power_ctx(
         tmp_path, clean_infer_count=235, clean_infer_avg_us=21159, duration_s=0.008
     )
+    assert ctx.power_result is not None
     ctx.power_result.metadata.power_firmware = "dedicated"
 
     out_path = _write_summary(ctx, tmp_path)

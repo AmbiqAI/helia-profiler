@@ -15,8 +15,11 @@ def test_cache_purge_removes_workspace_cache(tmp_path: Path, monkeypatch, capsys
     (workspaces_root / "apollo510_evb-arm-none-eabi-gcc-helia-aot").mkdir(parents=True)
     (workspaces_root / "apollo510_evb-arm-none-eabi-gcc-helia-aot" / "nsx.lock").write_text("lock")
 
+    # Fake module surface: attributes are attached ad hoc (ty ignores below).
     fake_neuralspotx = ModuleType("neuralspotx")
-    fake_neuralspotx.clean_cache = lambda **_kwargs: SimpleNamespace(removed_count=3)
+    fake_neuralspotx.clean_cache = (  # ty: ignore[unresolved-attribute]
+        lambda **_kwargs: SimpleNamespace(removed_count=3)
+    )
 
     monkeypatch.setitem(sys.modules, "neuralspotx", fake_neuralspotx)
     monkeypatch.setattr(cli.Path, "home", staticmethod(lambda: tmp_path))
@@ -35,8 +38,9 @@ def test_cache_info_reports_workspace_cache(tmp_path: Path, monkeypatch, capsys)
     workspace.mkdir(parents=True)
     (workspace / "nsx.lock").write_text("lock")
 
+    # Fake module surface: attributes are attached ad hoc (ty ignores below).
     fake_neuralspotx = ModuleType("neuralspotx")
-    fake_neuralspotx.cache_info = lambda: SimpleNamespace(
+    fake_neuralspotx.cache_info = lambda: SimpleNamespace(  # ty: ignore[unresolved-attribute]
         entry_count=1,
         total_size_bytes=4,
     )
@@ -46,7 +50,7 @@ def test_cache_info_reports_workspace_cache(tmp_path: Path, monkeypatch, capsys)
         clean_calls.append(dry_run)
         return SimpleNamespace(root=str(tmp_path / "nsx"), removed_count=4)
 
-    fake_neuralspotx.clean_cache = clean_cache
+    fake_neuralspotx.clean_cache = clean_cache  # ty: ignore[unresolved-attribute]
 
     monkeypatch.setitem(sys.modules, "neuralspotx", fake_neuralspotx)
     monkeypatch.setattr(cli.Path, "home", staticmethod(lambda: tmp_path))

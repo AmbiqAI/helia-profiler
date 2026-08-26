@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from helia_profiler.capture.parser import parse_firmware_output, _infer_group
+from helia_profiler.config import Aggregation
 
 
 # ---------------------------------------------------------------------------
@@ -365,14 +366,14 @@ def test_median_is_default_and_rejects_wrap_and_frozen():
 
 def test_mean_aggregation_after_rejection():
     lines = _single_layer_iters(["0", "3221837689", "1000", "3000"])
-    result = parse_firmware_output(lines, aggregation="mean")
+    result = parse_firmware_output(lines, aggregation=Aggregation.MEAN)
     # Wrap + frozen-zero rejected; mean(1000, 3000) = 2000.
     assert result.layers[0].cycles == 2000
 
 
 def test_trimmed_aggregation_drops_extremes():
     lines = _single_layer_iters(["1", "5", "6", "7", "100"])
-    result = parse_firmware_output(lines, aggregation="trimmed")
+    result = parse_firmware_output(lines, aggregation=Aggregation.TRIMMED)
     # Drop low (1) and high (100), mean(5, 6, 7) = 6.
     assert result.layers[0].cycles == 6
 

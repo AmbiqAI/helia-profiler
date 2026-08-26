@@ -174,7 +174,7 @@ class TestPipelineRunner:
     def test_stages_run_in_order(self, tmp_path: Path):
         config = _make_config(tmp_path)
         log: list[str] = []
-        stages = [
+        stages: list[Stage] = [
             RecordingStage("first", log),
             RecordingStage("second", log),
             RecordingStage("third", log),
@@ -204,7 +204,7 @@ class TestPipelineRunner:
     def test_skip_stage_not_executed(self, tmp_path: Path):
         config = _make_config(tmp_path)
         log: list[str] = []
-        stages = [
+        stages: list[Stage] = [
             RecordingStage("before", log),
             SkipStage(),
             RecordingStage("after", log),
@@ -216,14 +216,14 @@ class TestPipelineRunner:
     def test_hpx_error_propagates(self, tmp_path: Path):
         config = _make_config(tmp_path)
         error = CaptureError("serial timeout", hint="check cable")
-        stages = [PassStage(), FailStage(error)]
+        stages: list[Stage] = [PassStage(), FailStage(error)]
         runner = PipelineRunner(stages)
         with pytest.raises(CaptureError, match="serial timeout"):
             runner.run(config)
 
     def test_unexpected_error_wrapped(self, tmp_path: Path):
         config = _make_config(tmp_path)
-        stages = [PassStage(), UnexpectedFailStage()]
+        stages: list[Stage] = [PassStage(), UnexpectedFailStage()]
         runner = PipelineRunner(stages)
         with pytest.raises(HpxError, match="Unexpected error.*unexpected_fail"):
             runner.run(config)
@@ -237,7 +237,7 @@ class TestPipelineRunner:
     def test_stages_after_failure_not_run(self, tmp_path: Path):
         config = _make_config(tmp_path)
         log: list[str] = []
-        stages = [
+        stages: list[Stage] = [
             RecordingStage("before", log),
             FailStage(),
             RecordingStage("after", log),
@@ -291,7 +291,8 @@ class TestPipelineContext:
         assert built_run is not None
         assert ctx.profile_firmware is firmware
         with pytest.raises(FrozenInstanceError):
-            built_run.result = PmuResult(meta=FirmwareMeta())
+            # Deliberate invalid assignment: proves the record is frozen.
+            built_run.result = PmuResult(meta=FirmwareMeta())  # ty: ignore[invalid-assignment]
 
         deployment = DeploymentRecord(
             firmware=firmware,
@@ -559,7 +560,9 @@ class TestNarrowingAccessors:
         cls = getattr(stages, stage, None)
         assert cls is not None, f"{stage} is not a stage class in helia_profiler.stages"
         assert isinstance(cls(), Stage)
-        module_src = inspect.getsource(inspect.getmodule(cls))
+        module = inspect.getmodule(cls)
+        assert module is not None
+        module_src = inspect.getsource(module)
         # (?!=) so a comparison (`ctx.field == x`) cannot count as producing
         # the field, and the publish hatch is per-field, not module-wide —
         # both holes let a wrong-but-real producer pass until the second

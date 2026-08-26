@@ -221,6 +221,7 @@ def test_find_target_binary_is_deterministic(tmp_path: Path) -> None:
     # shallower .elf loses to a deeper .axf.
     (tmp_path / "hpx_profiler.elf").write_bytes(b"elf")
     found = _find_target_binary(tmp_path, "hpx_profiler")
+    assert found is not None
     assert found.suffix == ".axf"
 
 

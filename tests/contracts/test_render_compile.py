@@ -438,6 +438,7 @@ def _prepare_case_dir(case: _CompileCase, base: Path) -> Path:
 
 
 def _compile(case_dir: Path, part_define: str) -> subprocess.CompletedProcess[str]:
+    assert _GXX is not None  # module-level skip guarantees this
     return subprocess.run(
         [
             _GXX,

@@ -1252,7 +1252,8 @@ def _placeholder_free_fstring(text: str) -> str | None:
         isinstance(value, ast.Constant) and isinstance(value.value, str)
         for value in node.values
     ):
-        return "".join(value.value for value in node.values)
+        # The all() guard above proves every value is a str Constant.
+        return "".join(value.value for value in node.values)  # ty: ignore[unresolved-attribute]
     return None
 
 

@@ -120,11 +120,14 @@ def test_usb_marker_serial_derivation():
     assert usb_marker_serial("") is None
     assert usb_marker_serial("1160001350") == f"{USB_MARKER_PREFIX}1160001350"
     # Truncated to the 31-char USB string-descriptor limit.
-    assert len(usb_marker_serial("9" * 40)) == 31
+    truncated = usb_marker_serial("9" * 40)
+    assert truncated is not None
+    assert len(truncated) == 31
 
 
 def test_find_port_by_marker_matches_serial_number():
     marker = usb_marker_serial("1160001350")
+    assert marker is not None
     monkeypatch_ports = [
         _port("/dev/ttyACM0", manufacturer="SEGGER", product="J-Link", serial_number="1160001350"),
         _port("/dev/ttyACM1", manufacturer="Ambiq", product="NSX HPX Profiler", serial_number=marker),
@@ -133,7 +136,7 @@ def test_find_port_by_marker_matches_serial_number():
     import helia_profiler.transport.usb_cdc as mod
 
     orig = mod.list_ports.comports
-    mod.list_ports.comports = lambda: monkeypatch_ports
+    mod.list_ports.comports = lambda: monkeypatch_ports  # ty: ignore[invalid-assignment]  # manual monkeypatch of the pyserial module attr
     try:
         assert mod._find_port_by_marker(marker) == "/dev/ttyACM1"
         assert mod._find_port_by_marker("HPX-nope") is None

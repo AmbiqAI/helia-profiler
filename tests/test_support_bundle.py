@@ -157,6 +157,7 @@ def test_collect_support_bundle_marks_missing_workspace_unavailable() -> None:
     dependencies = collection.manifest.section("dependencies")
     lock_section = collection.manifest.section("nsx.lock")
     assert dependencies is not None and not dependencies.available
+    assert dependencies.reason is not None
     assert "no --workspace given" in dependencies.reason
     assert lock_section is not None and not lock_section.available
     assert "dependencies.json" not in collection.members
@@ -183,6 +184,7 @@ def test_collect_support_bundle_marks_missing_config_unavailable() -> None:
     section = _section(options, "config")
 
     assert not section.available
+    assert section.reason is not None
     assert "no --config given" in section.reason
 
 
@@ -196,6 +198,7 @@ def test_collect_support_bundle_marks_unresolvable_config_unavailable(tmp_path: 
     section = _section(options, "config")
 
     assert not section.available
+    assert section.reason is not None
     assert "model.path" in section.reason
 
 

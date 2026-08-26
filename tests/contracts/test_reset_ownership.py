@@ -146,7 +146,7 @@ class TestPowerLifecycleResetSequences:
             tmp_path, board=BOARD_FOR_FAMILY[family], power_enabled=True, reset_strategy="auto"
         )
         plan = prepare_target_for_phase(
-            ctx, phase=CapturePhase.POWER, power_driver=_FakeDriver(), power_driver_name="joulescope"
+            ctx, phase=CapturePhase.POWER, power_driver=_FakeDriver(), power_driver_name="joulescope"  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
         )
         assert events == expected
         # Plan metadata mirrors the executed sequence.
@@ -176,7 +176,7 @@ class TestPowerLifecycleResetSequences:
             tmp_path, board="apollo510_evb", power_enabled=True, reset_strategy=strategy
         )
         plan = prepare_target_for_phase(
-            ctx, phase=CapturePhase.POWER, power_driver=_FakeDriver(), power_driver_name="joulescope"
+            ctx, phase=CapturePhase.POWER, power_driver=_FakeDriver(), power_driver_name="joulescope"  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
         )
         assert events == expected_events
         assert plan.reset_action is expected_action
@@ -190,7 +190,7 @@ class TestPowerLifecycleResetSequences:
                 tmp_path, board=BOARD_FOR_FAMILY[family], power_enabled=True, reset_strategy="auto"
             )
             prepare_target_for_phase(
-                ctx, phase=CapturePhase.POWER, power_driver=_FakeDriver(), power_driver_name="js"
+                ctx, phase=CapturePhase.POWER, power_driver=_FakeDriver(), power_driver_name="js"  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
             )
             assert "swpoi_reset" not in events, family
 
@@ -205,7 +205,7 @@ class TestPmuPhaseHasNoLifecycleReset:
         events = _install_lifecycle_recorder(monkeypatch)
         ctx = make_pmu_ctx(tmp_path, board=BOARD_FOR_FAMILY[family], power_enabled=True)
         plan = prepare_target_for_phase(
-            ctx, phase=CapturePhase.PMU, power_driver=_FakeDriver(), power_driver_name="js"
+            ctx, phase=CapturePhase.PMU, power_driver=_FakeDriver(), power_driver_name="js"  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
         )
         assert events == []
         assert plan.reset_action is ResetAction.NONE
@@ -330,6 +330,7 @@ def _drive_reader_reset(monkeypatch, tmp_path, family: str, transport: str) -> l
     events = _install_reader_reset_recorder(monkeypatch, module)
 
     ctx = make_pmu_ctx(tmp_path, board=BOARD_FOR_FAMILY[family], transport=transport)
+    assert ctx.soc is not None
     keep = ctx.soc.requires_attached_probe_for_cycles
 
     if transport == "uart":
@@ -397,7 +398,7 @@ def test_reset_owner_matrix(monkeypatch, tmp_path, family, transport, power_on):
             power_enabled=True, reset_strategy="auto",
         )
         prepare_target_for_phase(
-            ctx, phase=CapturePhase.POWER, power_driver=_FakeDriver(), power_driver_name="js"
+            ctx, phase=CapturePhase.POWER, power_driver=_FakeDriver(), power_driver_name="js"  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
         )
         expected = (
             ["debug_reset", "swpoi_reset"] if family == "ap5" else ["debug_reset"]

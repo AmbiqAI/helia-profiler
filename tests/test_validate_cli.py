@@ -18,6 +18,7 @@ requires_hpx = pytest.mark.skipif(
 
 
 def _run_hpx(*args: str) -> subprocess.CompletedProcess:
+    assert HPX is not None  # requires_hpx skips these tests otherwise
     return subprocess.run(
         [HPX, *args],
         capture_output=True,

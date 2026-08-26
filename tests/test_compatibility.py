@@ -445,7 +445,9 @@ def test_helia_aot_single_sided_baseline_range_is_not_backfilled_from_constants(
     import logging
     from dataclasses import replace
     from types import SimpleNamespace
+    from typing import cast
 
+    from helia_profiler.config import ProfileConfig
     from helia_profiler.engines.helia_aot import compile as aot_compile
     from helia_profiler.errors import EngineError
 
@@ -457,8 +459,12 @@ def test_helia_aot_single_sided_baseline_range_is_not_backfilled_from_constants(
     # _check_helia_aot_version() only reads config.compatibility.baseline, so
     # a lightweight stand-in avoids ProfileConfig's init=False `compatibility`
     # field (which dataclasses.replace() cannot target directly).
-    def _config_with_baseline(new_baseline: object) -> object:
-        return SimpleNamespace(compatibility=SimpleNamespace(baseline=new_baseline))
+    def _config_with_baseline(new_baseline: object) -> ProfileConfig:
+        # Duck-typed fake: only config.compatibility.baseline is read.
+        return cast(
+            "ProfileConfig",
+            SimpleNamespace(compatibility=SimpleNamespace(baseline=new_baseline)),
+        )
 
     # min_version only, well above HELIAAOT_MAX_VERSION_EXCLUSIVE (0.19.0) —
     # an installed version above that local constant must still pass, since

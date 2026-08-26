@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from typing import Literal
 
 from helia_profiler.results import (
     OnDevicePowerSummary,
@@ -13,7 +14,12 @@ from helia_profiler.results import (
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
-from helia_profiler.power.metadata import MeasurementScope, PowerMetadata
+from helia_profiler.power.metadata import (
+    MeasurementScope,
+    ObservationMode,
+    PowerIntegrity,
+    PowerMetadata,
+)
 from helia_profiler.power.diagnostics import (
     WINDOW_CLOCK_CEILING_SLACK_S,
     GateDurationIntegrity,
@@ -48,12 +54,12 @@ def _context(
         metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
     )
     observation = PowerObservation(
-        mode="gpio_gated",
+        mode=ObservationMode.GPIO_GATED,
         result=result,
         gate_rise_observed=True,
         gate_fall_observed=True,
         deadline_s=2.0,
-        integrity="valid",
+        integrity=PowerIntegrity.VALID,
     )
     terminal = PowerTerminalRecord(
         version=1,
@@ -96,12 +102,12 @@ def test_degraded_observation_and_duration_mismatch_are_structured(tmp_path: Pat
     ctx.power_run = PowerRun(
         plan=ctx.power_run.plan,
         observation=PowerObservation(
-            mode="free_form",
+            mode=ObservationMode.FREE_FORM,
             result=observation.result,
             gate_rise_observed=False,
             gate_fall_observed=False,
             deadline_s=2.0,
-            integrity="degraded",
+            integrity=PowerIntegrity.DEGRADED,
         ),
         terminal=ctx.power_run.terminal,
     )
@@ -227,6 +233,7 @@ class TestWindowClockValidity:
             ],
             metadata=replace(observation.result.metadata),
         )
+        assert ctx.power_run.terminal is not None
         terminal = replace(
             ctx.power_run.terminal,
             requested_count=self.BENCH_COUNT,
@@ -390,6 +397,7 @@ class TestWindowClockValidity:
             gated_windows=[],
             metadata=PowerMetadata(measurement_scope=MeasurementScope.FREE_FORM_CAPTURE),
         )
+        assert ctx.power_run.terminal is not None
         ctx.power_run = PowerRun(
             plan=PowerRunPlan(
                 firmware_mode="dedicated",
@@ -397,12 +405,12 @@ class TestWindowClockValidity:
                 reference_inference_us=self.BENCH_REFERENCE_US,
             ),
             observation=PowerObservation(
-                mode="free_form",
+                mode=ObservationMode.FREE_FORM,
                 result=degraded,
                 gate_rise_observed=True,
                 gate_fall_observed=False,
                 deadline_s=45.0,
-                integrity="degraded",
+                integrity=PowerIntegrity.DEGRADED,
             ),
             terminal=replace(
                 ctx.power_run.terminal,
@@ -560,6 +568,7 @@ class TestGateArbitration:
             minimum_s=minimum_s,
             relative_tolerance=0.10,
         )
+        assert ctx.power_run.terminal is not None
         ctx.power_run = PowerRun(
             plan=PowerRunPlan(
                 # No terminal envelope exists in shared mode -- the exact case
@@ -773,6 +782,7 @@ class TestGateArbitration:
                 measurement_scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE
             ),
         )
+        assert ctx.power_run.terminal is not None
         ctx.power_run = PowerRun(
             plan=PowerRunPlan(firmware_mode="dedicated", inference_count=10),
             observation=None,
@@ -1125,6 +1135,7 @@ class TestCleanWindowStall:
         motivation.
         """
         ctx = self._profile_only(tmp_path, stalled=233, partial=0)
+        assert ctx.pmu_result is not None
         ctx.pmu_result = PmuResult(
             meta=replace(ctx.pmu_result.meta, clean_partial_iters="1 7"),
             layers=[],
@@ -1162,6 +1173,7 @@ class TestNoInferenceProbeWindowDuration:
 
     def _run(self, ctx: PipelineContext, *, elapsed_us: int) -> None:
         assert ctx.power_run is not None
+        assert ctx.power_run.terminal is not None
         # Firmware reports 1 requested / 1 completed under this probe (#112).
         terminal = replace(
             ctx.power_run.terminal,
@@ -1231,7 +1243,13 @@ class TestGateToleranceAgreesAcrossCaptureAndEvaluate:
     of #136).
     """
 
-    def _ctx_with_plan(self, tmp_path: Path, count_source: str) -> PipelineContext:
+    def _ctx_with_plan(
+        self,
+        tmp_path: Path,
+        count_source: Literal[
+            "firmware_auto", "configured", "profile_guided", "probe_window"
+        ],
+    ) -> PipelineContext:
         ctx = _context(tmp_path, probe="busy_loop")
         assert ctx.power_run is not None
         ctx.power_run = PowerRun(
@@ -1293,6 +1311,7 @@ class TestReplayedBusyLoopPlanCount:
     ):
         ctx = _context(tmp_path, probe="busy_loop")
         assert ctx.power_run is not None
+        assert ctx.power_run.terminal is not None
         ctx.power_run = PowerRun(
             plan=PowerRunPlan(
                 firmware_mode="dedicated",
@@ -1321,6 +1340,7 @@ class TestReplayedBusyLoopPlanCount:
         """
         ctx = _context(tmp_path)
         assert ctx.power_run is not None
+        assert ctx.power_run.terminal is not None
         ctx.power_run = PowerRun(
             plan=PowerRunPlan(firmware_mode="dedicated", inference_count=10),
             observation=ctx.power_run.observation,

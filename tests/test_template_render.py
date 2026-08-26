@@ -1137,8 +1137,10 @@ def test_pmu_storage_seam_rejects_unknown_vocabulary(monkeypatch):
             '{% extends "' + base_template + '" %}'
             "{% block engine_pmu_storage_sram_resident %}" + value + "{% endblock %}"
         )
+        base_loader = _env.loader
+        assert base_loader is not None
         overlay = _env.overlay(
-            loader=ChoiceLoader([DictLoader({"seam_child.cc.j2": child}), _env.loader])
+            loader=ChoiceLoader([DictLoader({"seam_child.cc.j2": child}), base_loader])
         )
         import sys
         this_module = sys.modules[__name__]

@@ -19,6 +19,7 @@ from helia_profiler.errors import CaptureError
 from helia_profiler.transport.swo import capture_swo_output
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
+from helia_profiler.placement import Placement
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
 
@@ -84,15 +85,15 @@ def test_scan_for_rtt_control_block_uses_provided_ranges():
     chunk = magic + b"\x00" * (0x4000 - len(magic))
     jlink = _FakeJLink({0x30000000: chunk})
 
-    result = _scan_for_rtt_control_block(jlink, ((0x30000000, 0x4000),))
+    result = _scan_for_rtt_control_block(jlink, ((0x30000000, 0x4000),))  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
     assert result is not None and result[0] == 0x30000000
-    assert _scan_for_rtt_control_block(jlink, ((0x20000000, 0x4000),)) is None
+    assert _scan_for_rtt_control_block(jlink, ((0x20000000, 0x4000),)) is None  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
 
 
 def test_direct_rtt_read_advances_rd_off():
     jlink = _FakeDirectRttJLink()
 
-    data = _direct_rtt_read(jlink, block_address=0x20000000, max_bytes=16)
+    data = _direct_rtt_read(jlink, block_address=0x20000000, max_bytes=16)  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
 
     assert data == b"HPX_LINE"
     assert jlink.rd_off_writes == [(0x20000028, [10])]
@@ -101,7 +102,7 @@ def test_direct_rtt_read_advances_rd_off():
 def test_direct_rtt_write_advances_wr_off():
     jlink = _FakeDirectRttWriteJLink()
 
-    written = _direct_rtt_write(jlink, block_address=0x20000000, data=b"READY")
+    written = _direct_rtt_write(jlink, block_address=0x20000000, data=b"READY")  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
 
     assert written == 5
     assert jlink.byte_writes == [(0x20002002, [82, 69, 65, 68, 89])]
@@ -122,7 +123,7 @@ def test_api_rtt_write_retries_until_full_command_sent(monkeypatch):
     monkeypatch.setattr("helia_profiler.transport.rtt.time.sleep", lambda _s: None)
     jlink = _FakeApiRttWriteJLink()
 
-    _write_rtt_command_api(jlink, command=b"READY", timeout_s=0.1)
+    _write_rtt_command_api(jlink, command=b"READY", timeout_s=0.1)  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
 
     assert jlink.calls == [
         [82, 69, 65, 68, 89],
@@ -147,7 +148,7 @@ def test_api_rtt_write_times_out_when_down_buffer_never_accepts_bytes(monkeypatc
     monkeypatch.setattr("helia_profiler.transport.rtt.time.monotonic", lambda: next(times))
 
     with pytest.raises(CaptureError, match="Timed out sending RTT host-ready command"):
-        _write_rtt_command_api(_FakeApiRttWriteJLink(), command=b"READY", timeout_s=0.05)
+        _write_rtt_command_api(_FakeApiRttWriteJLink(), command=b"READY", timeout_s=0.05)  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
 
     assert sleeps["count"] >= 1
 
@@ -184,7 +185,7 @@ def test_wipe_rtt_control_blocks_validates_candidates_and_honors_range_end():
 
     jlink = _FakeWipeJLink()
 
-    wiped = _wipe_rtt_control_blocks(jlink, ((0x30000000, 42),))
+    wiped = _wipe_rtt_control_blocks(jlink, ((0x30000000, 42),))  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
 
     assert wiped == 1
     assert jlink.read_lengths[0] == 42
@@ -206,7 +207,7 @@ def test_capture_pmu_passes_soc_rtt_scan_ranges(tmp_path: Path, monkeypatch):
     ctx.build_dir = tmp_path / "build"
     ctx.build_dir.mkdir()
     ctx.resolved_jlink_serial = "1160002204"
-    ctx.weights_region = "mram"
+    ctx.weights_region = Placement.MRAM
 
     captured: dict[str, object] = {}
 
@@ -227,6 +228,7 @@ def test_capture_pmu_passes_soc_rtt_scan_ranges(tmp_path: Path, monkeypatch):
     result = capture_pmu(ctx)
 
     assert result.layers[0].cycles == 1
+    assert ctx.soc is not None
     assert captured["jlink_device"] == ctx.soc.jlink_device
     assert captured["rtt_scan_ranges"] == ctx.soc.rtt_scan_ranges
     assert ctx.run_metadata.timing is not None
@@ -258,7 +260,7 @@ def test_capture_pmu_passes_known_block_address_from_map(tmp_path: Path, monkeyp
         "                0x20088010                _SEGGER_RTT\n"
     )
     ctx.resolved_jlink_serial = "1160002204"
-    ctx.weights_region = "mram"
+    ctx.weights_region = Placement.MRAM
 
     captured: dict[str, object] = {}
 
@@ -309,6 +311,7 @@ def test_capture_pmu_passes_resolved_cpu_clock_to_swo(tmp_path: Path, monkeypatc
     result = capture_pmu(ctx)
 
     assert result.layers[0].cycles == 1
+    assert ctx.soc is not None
     assert captured["jlink_device"] == ctx.soc.jlink_device
     assert captured["cpu_freq"] == 250_000_000
 
@@ -331,6 +334,7 @@ def test_capture_pmu_swo_requires_resolved_cpu_clock(tmp_path: Path, monkeypatch
     ctx.resolved_jlink_serial = "1160002204"
     # Simulate a platform whose clock failed to resolve — the host must refuse
     # to guess a SWO baud rather than silently assume a default frequency.
+    assert ctx.run_metadata.platform is not None
     ctx.run_metadata.platform.cpu_clock_mhz = 0
 
     with pytest.raises(CaptureError, match="resolved trace clock"):
@@ -360,7 +364,9 @@ def test_capture_pmu_swo_uses_fixed_trace_clock_on_apollo3(tmp_path: Path, monke
     ctx.resolved_jlink_serial = "1160000174"
 
     # CPU runs at 96 MHz under burst, but the TPIU trace clock stays at 48 MHz.
+    assert ctx.run_metadata.platform is not None
     assert ctx.run_metadata.platform.cpu_clock_mhz == 96
+    assert ctx.soc is not None
     assert ctx.soc.swo_trace_clock_mhz == 48
 
     captured: dict[str, object] = {}
@@ -505,6 +511,7 @@ def test_capture_pmu_passes_resolved_jlink_device_to_usb(tmp_path: Path, monkeyp
     result = capture_pmu(ctx)
 
     assert result.layers[0].cycles == 1
+    assert ctx.soc is not None
     assert captured["jlink_device"] == ctx.soc.jlink_device
 
 
@@ -523,7 +530,7 @@ def test_capture_pmu_rejects_rtt_protocol_without_hpx_start(tmp_path: Path, monk
     ctx.build_dir = tmp_path / "build"
     ctx.build_dir.mkdir()
     ctx.resolved_jlink_serial = "1160002204"
-    ctx.weights_region = "mram"
+    ctx.weights_region = Placement.MRAM
 
     def fake_capture_rtt_output(**kwargs):
         return [
@@ -1373,7 +1380,7 @@ def test_psram_upload_ready_line_already_in_initial_buf(tmp_path):
 
     session = _FakePsramSession()  # rtt_read always returns nothing
     _upload_model_to_psram(
-        session,
+        session,  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
         model,
         timeout_s=0.5,
         initial_buf=b"HPX_READY\nHPX_PSRAM_READY=0x60000000,100\n",
@@ -1396,7 +1403,7 @@ def test_psram_upload_ready_line_arrives_in_later_chunk(tmp_path):
         rtt_chunks=[list(b"READY=0x60000000,10\n")],
     )
     _upload_model_to_psram(
-        session,
+        session,  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
         model,
         timeout_s=0.5,
         initial_buf=b"HPX_PSRAM_",
@@ -1415,4 +1422,4 @@ def test_psram_upload_times_out_without_ready_line(tmp_path):
 
     session = _FakePsramSession()
     with pytest.raises(CaptureError, match="HPX_PSRAM_READY"):
-        _upload_model_to_psram(session, model, timeout_s=0.05, initial_buf=b"")
+        _upload_model_to_psram(session, model, timeout_s=0.05, initial_buf=b"")  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test

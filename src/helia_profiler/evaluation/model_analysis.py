@@ -30,8 +30,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from helia_aot.air.enums import AirOpType  # type: ignore[import-untyped]
-    from helia_aot.air.model import AirModel  # type: ignore[import-untyped]
+    from helia_aot.air.enums import AirOpType
+    from helia_aot.air.model import AirModel
 
 log = logging.getLogger("hpx")
 
@@ -41,11 +41,11 @@ log = logging.getLogger("hpx")
 
 _HAS_LITERT = False
 try:
-    from ai_edge_litert import schema_py_generated as _schema  # type: ignore[import-untyped]
+    from ai_edge_litert import schema_py_generated as _schema
 
     _HAS_LITERT = True
 except ImportError:
-    _schema = None  # type: ignore[assignment]
+    _schema = None
 
 
 def is_available() -> bool:
@@ -61,8 +61,8 @@ _HAS_AOT = False
 _AirModel: type[AirModel] | None
 _AirOpType: type[AirOpType] | None
 try:
-    from helia_aot.air.model import AirModel as _imported_air_model  # type: ignore[import-untyped]
-    from helia_aot.air.enums import AirOpType as _imported_air_op_type  # type: ignore[import-untyped]
+    from helia_aot.air.model import AirModel as _imported_air_model
+    from helia_aot.air.enums import AirOpType as _imported_air_op_type
 
     _AirModel = _imported_air_model
     _AirOpType = _imported_air_op_type
@@ -112,9 +112,9 @@ def analyze_for_engine(
     import tempfile
 
     try:
-        from helia_aot.cli.defines import ConvertArgs  # type: ignore[import-untyped]
-        from helia_aot.converter import AotConverter  # type: ignore[import-untyped]
-        from helia_aot.defines import ModuleType  # type: ignore[import-untyped]
+        from helia_aot.cli.defines import ConvertArgs
+        from helia_aot.converter import AotConverter
+        from helia_aot.defines import ModuleType
     except ImportError as exc:
         raise ConfigError(
             "helia-aot import failed.",

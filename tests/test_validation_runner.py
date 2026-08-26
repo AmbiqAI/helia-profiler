@@ -491,7 +491,7 @@ def test_run_case_verbose_appends_v_flag(tmp_path: Path, monkeypatch):
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     output_root = tmp_path / "out"
-    seen: dict[str, object] = {}
+    seen: dict[str, list[str]] = {}
 
     case = CaseSpec(
         model=MODELS["kws"],

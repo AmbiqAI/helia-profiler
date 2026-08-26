@@ -14,6 +14,12 @@ from helia_profiler.results import PowerRun, PowerRunPlan
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import PowerResult, PowerSummary
+from helia_profiler.power.metadata import (
+    MeasurementScope,
+    ObservationMode,
+    PowerIntegrity,
+    PowerMetadata,
+)
 from helia_profiler.results import FirmwareMeta, PmuResult
 
 
@@ -33,15 +39,15 @@ def test_profile_result_exposes_grouped_power_contract(
     ctx.pmu_result = PmuResult(meta=FirmwareMeta(), layers=[])
     power = PowerResult(
         summary=PowerSummary(0.01, 0.018, 0.02, 0.09, 5.0, 5000),
-        metadata={"measurement_scope": "gpio_gated_clean_window"},
+        metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
     )
     observation = PowerObservation(
-        mode="gpio_gated",
+        mode=ObservationMode.GPIO_GATED,
         result=power,
         gate_rise_observed=True,
         gate_fall_observed=True,
         deadline_s=20.0,
-        integrity="valid",
+        integrity=PowerIntegrity.VALID,
     )
     terminal = PowerTerminalRecord(
         version=1,

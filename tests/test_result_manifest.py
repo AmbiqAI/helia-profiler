@@ -142,7 +142,7 @@ def test_manifest_direct_construction_requires_enum_values():
             run_id="run-1",
             timestamp="2026-07-18T00:00:00+00:00",
             hpx_version="0.1.0",
-            status="complete",  # type: ignore[arg-type]
+            status="complete",  # ty: ignore[invalid-argument-type]  # deliberate: must raise ReportError
             validity=ResultValidity.VALID,
             issues=(),
             provenance={},
@@ -158,7 +158,7 @@ def test_manifest_direct_construction_requires_enum_values():
             timestamp="2026-07-18T00:00:00+00:00",
             hpx_version="0.1.0",
             status=RunStatus.COMPLETE,
-            validity="valid",  # type: ignore[arg-type]
+            validity="valid",  # ty: ignore[invalid-argument-type]  # deliberate: must raise ReportError
             issues=(),
             provenance={},
             comparability={},

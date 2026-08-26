@@ -418,7 +418,7 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     # Build a lookup from layer id -> LayerOps
     macs_lookup: dict[int, int] = {}
     if has_macs:
-        for la in ctx.model_analysis.layers:  # type: ignore[union-attr]
+        for la in ctx.model_analysis.layers:
             macs_lookup[la.id] = la.macs
 
     for i, layer in enumerate(top_n, 1):
@@ -509,7 +509,7 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
 
         # Binary table below the panel if present
         if ctx.binary_sections is not None:
-            console._console.print(bin_table)  # type: ignore[possibly-undefined]
+            console._console.print(bin_table)
 
         console._console.print()
 

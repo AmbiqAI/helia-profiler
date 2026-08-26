@@ -144,6 +144,7 @@ def test_ordinary_reuse_is_byte_stable_and_never_locks(
 
     provenance = prepare_locked_dependencies(ctx)
 
+    assert ctx.firmware_dir is not None
     assert (ctx.firmware_dir / "nsx.lock").read_bytes() == before
     assert provenance.lock.mode is DependencyLockMode.REUSED
     assert provenance.lock.frozen_sync is True
@@ -170,6 +171,7 @@ def test_online_reuse_repairs_partial_materialization_without_relocking(
     provenance = prepare_locked_dependencies(ctx)
 
     assert calls == [(True, False), (False, True), (True, False)]
+    assert ctx.firmware_dir is not None
     assert (ctx.firmware_dir / "nsx.lock").read_bytes() == before
     assert provenance.lock.mode is DependencyLockMode.REUSED
 
@@ -244,6 +246,7 @@ def test_exact_dependency_provenance_serialization(
     provenance = prepare_locked_dependencies(ctx)
     assert ctx.dependency_lock_path is not None
     snapshot_bytes = ctx.dependency_lock_path.read_bytes()
+    assert ctx.firmware_dir is not None
     (ctx.firmware_dir / "nsx.lock").write_text("concurrent update\n")
     serialized = json.loads(json.dumps(provenance.to_dict(), sort_keys=True))
 

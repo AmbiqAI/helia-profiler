@@ -12,10 +12,11 @@ from pathlib import Path
 
 import pytest
 
+from helia_profiler.engines import EngineType
 from helia_profiler.memory_measurement import measure_memory_regions
 from helia_profiler.placement import MemoryRegion
 from helia_profiler.platform import get_soc
-from helia_profiler.results import MeasuredMemoryRegions
+from helia_profiler.results import ConsumerKind, MeasuredMemoryRegions
 from helia_profiler.toolchain_probe import SectionInventory
 
 FIXTURES = Path(__file__).parent / "fixtures" / "readelf"
@@ -53,6 +54,7 @@ class TestFixtureMeasurement:
         measured = _measure()
         assert measured is not None
         dtcm = measured.region(MemoryRegion.DTCM)
+        assert dtcm is not None
         # used = .stack (live) + .data + .bss; reserved = the fill-to-end
         # .heap, whose size IS what was left in the region:
         assert dtcm.used == 0x4000 + 0x20 + 0xF8
@@ -66,20 +68,27 @@ class TestFixtureMeasurement:
         image loads at paddr 0x0041003C (0x20 bytes) — both land in MRAM
         by PHYSICAL address; the NOBITS segments contribute file_size 0."""
         measured = _measure()
+        assert measured is not None
         mram = measured.region(MemoryRegion.MRAM)
+        assert mram is not None
         assert mram.used == 0x3C  # .text runs in place
         assert mram.load_image == 0x3C + 0x20
-        assert measured.region(MemoryRegion.DTCM).load_image == 0
+        dtcm = measured.region(MemoryRegion.DTCM)
+        assert dtcm is not None
+        assert dtcm.load_image == 0
 
     def test_idle_regions_report_zero_and_psram_is_absent(self, gcc_inventory):
         measured = _measure()
+        assert measured is not None
         regions = {r.region for r in measured.regions}
         assert MemoryRegion.PSRAM not in regions  # plan-owned, not measured
         itcm = measured.region(MemoryRegion.ITCM)
+        assert itcm is not None
         assert itcm.used == 0 and itcm.reserved == 0 and itcm.load_image == 0
 
     def test_link_family_and_profile_are_recorded(self, gcc_inventory):
         measured = _measure()
+        assert measured is not None
         assert measured.link_family == "gnu"
         assert measured.linker_profile == "default"
         assert measured.unattributed == ()
@@ -140,6 +149,7 @@ def test_unattributed_sections_are_flagged(monkeypatch):
     measured = measure_memory_regions(
         Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510")
     )
+    assert measured is not None
     assert len(measured.unattributed) == 1
     flag = measured.unattributed[0]
     assert (flag.name, flag.address, flag.size) == (".mystery", 0x30000000, 64)
@@ -180,8 +190,10 @@ def test_armlink_join_uses_the_extent_not_the_window(monkeypatch):
     measured = measure_memory_regions(
         Path("fw.axf"), "armclang", get_soc("apollo510")
     )
+    assert measured is not None
     assert measured.link_family == "armlink"
     dtcm = measured.region(MemoryRegion.DTCM)
+    assert dtcm is not None
     # used: BOTH same-named MCU_TCM sections, nothing else.
     assert dtcm.used == 16384 + 8192
     # reserved: in-extent linker_reserved (none here — the heap sits at
@@ -192,6 +204,7 @@ def test_armlink_join_uses_the_extent_not_the_window(monkeypatch):
     assert dtcm.free == 503_808 - (16384 + 8192)  # 479232, the real figure
     # armlink's single aggregate PT_LOAD: all file bytes to MRAM by paddr.
     mram = measured.region(MemoryRegion.MRAM)
+    assert mram is not None
     assert mram.load_image == 16424
     assert measured.unattributed == ()
 
@@ -214,6 +227,7 @@ def test_psram_landing_bytes_are_flagged_not_swallowed(monkeypatch):
     measured = measure_memory_regions(
         Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510")
     )
+    assert measured is not None
     assert [u.name for u in measured.unattributed] == [".psram_data"]
 
 
@@ -235,7 +249,10 @@ def test_unattributed_load_bytes_are_counted(monkeypatch):
     measured = measure_memory_regions(
         Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510")
     )
-    assert measured.region(MemoryRegion.MRAM).load_image == 60
+    assert measured is not None
+    mram = measured.region(MemoryRegion.MRAM)
+    assert mram is not None
+    assert mram.load_image == 60
     assert measured.unattributed_load_bytes == 0x2000
 
 
@@ -253,6 +270,7 @@ def test_zero_length_orphan_sections_are_not_flagged(monkeypatch):
     measured = measure_memory_regions(
         Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510")
     )
+    assert measured is not None
     assert measured.unattributed == ()
 
 
@@ -388,7 +406,7 @@ class TestReconciliation:
             )
             for region, consumers in consumers_by_region.items()
         )
-        return MemoryPlan(engine="helia-rt", regions=regions)
+        return MemoryPlan(engine=EngineType.HELIA_RT, regions=regions)
 
     def _measured(self):
         from helia_profiler.results import MeasuredRegion
@@ -425,15 +443,21 @@ class TestReconciliation:
         plan = self._plan(
             {
                 MemoryRegion.DTCM: [
-                    MemoryConsumer(name="tensor_arena", size=0x8000, kind="arena"),
                     MemoryConsumer(
-                        name="rtt_buffers", size=0x8000 + 16 + 168, kind="other"
+                        name="tensor_arena", size=0x8000, kind=ConsumerKind.ARENA
                     ),
-                    MemoryConsumer(name="usb_buffers", size=5120, kind="other"),
+                    MemoryConsumer(
+                        name="rtt_buffers",
+                        size=0x8000 + 16 + 168,
+                        kind=ConsumerKind.OTHER,
+                    ),
+                    MemoryConsumer(
+                        name="usb_buffers", size=5120, kind=ConsumerKind.OTHER
+                    ),
                 ],
                 MemoryRegion.PSRAM: [
                     MemoryConsumer(
-                        name="model_psram_blob", size=1024, kind="weights"
+                        name="model_psram_blob", size=1024, kind=ConsumerKind.WEIGHTS
                     ),
                 ],
             }
@@ -466,7 +490,7 @@ class TestReconciliation:
             {
                 MemoryRegion.SRAM: [
                     MemoryConsumer(
-                        name="pmu_layer_records", size=4096 * 24, kind="other"
+                        name="pmu_layer_records", size=4096 * 24, kind=ConsumerKind.OTHER
                     ),
                 ],
             }
@@ -496,7 +520,7 @@ class TestReconciliation:
                     MemoryConsumer(
                         name="pmu_layer_records",
                         size=4096 * 24 + 252,
-                        kind="other",
+                        kind=ConsumerKind.OTHER,
                     ),
                 ],
             }
@@ -517,7 +541,7 @@ class TestReconciliation:
                     MemoryConsumer(
                         name="dtcm_scratch_arena_0",
                         size=0x1000,
-                        kind="arena",
+                        kind=ConsumerKind.ARENA,
                         symbol="hpx_arena_dtcm_buffer",
                     ),
                 ],
@@ -537,7 +561,7 @@ class TestReconciliation:
             {
                 MemoryRegion.SRAM: [
                     MemoryConsumer(
-                        name="pmu_layer_records", size=4096 * 24, kind="other"
+                        name="pmu_layer_records", size=4096 * 24, kind=ConsumerKind.OTHER
                     ),
                 ],
             }
@@ -590,7 +614,7 @@ class TestReviewRegressionPins:
             {
                 MemoryRegion.PSRAM: [
                     MemoryConsumer(
-                        name="model_flatbuffer", size=53744, kind="weights"
+                        name="model_flatbuffer", size=53744, kind=ConsumerKind.WEIGHTS
                     ),
                 ],
             }
@@ -614,7 +638,9 @@ class TestReviewRegressionPins:
         plan = TestReconciliation()._plan(
             {
                 MemoryRegion.DTCM: [
-                    MemoryConsumer(name="tensor_arena", size=0x8000, kind="arena"),
+                    MemoryConsumer(
+                        name="tensor_arena", size=0x8000, kind=ConsumerKind.ARENA
+                    ),
                 ],
             }
         )
@@ -646,7 +672,9 @@ class TestReviewRegressionPins:
             )
 
         monkeypatch.setattr(ei.subprocess, "run", lambda *a, **k: _Result())
-        symbols, unparsed = symbol_inventory(Path("fw.elf"), "arm-none-eabi-gcc")
+        result = symbol_inventory(Path("fw.elf"), "arm-none-eabi-gcc")
+        assert result is not None
+        symbols, unparsed = result
         assert [s.name for s in symbols] == ["g_pui32Stack"]
         assert unparsed == 1  # only the garbage row
 

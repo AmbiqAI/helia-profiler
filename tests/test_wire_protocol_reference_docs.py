@@ -18,8 +18,8 @@ DOCS_PATH = ROOT / "docs" / "reference" / "wire-protocol.md"
 
 def _load_generator():
     spec = importlib.util.spec_from_file_location("gen_wire_protocol_reference", GENERATOR_PATH)
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module

@@ -16,6 +16,7 @@ from helia_profiler.config import (
     INA228_BOARD_PRESETS,
     Ina228Config,
     PowerConfig,
+    PowerFirmware,
     PowerMode,
     load_config,
 )
@@ -131,7 +132,7 @@ class TestPowerConfigIna228Coupling:
                 enabled=True,
                 driver="ina228",
                 mode=PowerMode.INTERNAL,
-                firmware="shared",
+                firmware=PowerFirmware.SHARED,
                 ina228=Ina228Config(shunt_ohms=2.0),
             )
 

@@ -8,19 +8,25 @@ override, and the not-found error path).
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
-from helia_profiler.config import BuildConfig
+from helia_profiler.config import BuildConfig, ProfileConfig
 from helia_profiler.errors import ConfigError, FirmwareError
 from helia_profiler.firmware import _resolve_compiler_launcher
 
 
-def _config_with_launcher(value: str, toolchain: str = "arm-none-eabi-gcc") -> SimpleNamespace:
+def _config_with_launcher(value: str, toolchain: str = "arm-none-eabi-gcc") -> ProfileConfig:
     """Minimal stand-in exposing ``config.build.compiler_launcher`` and toolchain."""
-    return SimpleNamespace(
-        build=SimpleNamespace(compiler_launcher=value),
-        target=SimpleNamespace(toolchain=toolchain),
+    # Duck-typed fake: the resolver only reads build.compiler_launcher and
+    # target.toolchain, so a SimpleNamespace stands in for ProfileConfig.
+    return cast(
+        "ProfileConfig",
+        SimpleNamespace(
+            build=SimpleNamespace(compiler_launcher=value),
+            target=SimpleNamespace(toolchain=toolchain),
+        ),
     )
 
 
@@ -33,16 +39,19 @@ class TestBuildConfigParsing:
         assert cfg.compiler_launcher == "sccache"
 
     def test_false_maps_to_none(self):
-        cfg = BuildConfig(compiler_launcher=False)
+        # Deliberate wrong type: the before-validator coerces False to "none".
+        cfg = BuildConfig(compiler_launcher=False)  # ty: ignore[invalid-argument-type]
         assert cfg.compiler_launcher == "none"
 
     def test_null_maps_to_none(self):
-        cfg = BuildConfig(compiler_launcher=None)
+        # Deliberate wrong type: the before-validator coerces None to "none".
+        cfg = BuildConfig(compiler_launcher=None)  # ty: ignore[invalid-argument-type]
         assert cfg.compiler_launcher == "none"
 
     def test_non_string_rejected(self):
         with pytest.raises(ConfigError):
-            BuildConfig(compiler_launcher=123)
+            # Deliberate wrong type: non-strings must raise ConfigError.
+            BuildConfig(compiler_launcher=123)  # ty: ignore[invalid-argument-type]
 
 
 class TestResolveCompilerLauncher:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Literal
 
 from helia_profiler.firmware.fingerprint import (
     canonical_code,
@@ -110,7 +111,7 @@ class TestFingerprintStability:
 
 
 class TestMeasuredPowerFingerprint:
-    def _ctx(self, tmp_path, firmware_mode: str):
+    def _ctx(self, tmp_path, firmware_mode: Literal["dedicated", "shared"]):
         from helia_profiler.config import load_config
 
         tmp_path.mkdir(parents=True, exist_ok=True)

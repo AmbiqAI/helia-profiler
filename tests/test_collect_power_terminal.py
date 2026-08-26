@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -20,7 +21,12 @@ from helia_profiler.config import load_config
 from helia_profiler.errors import PowerError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
-from helia_profiler.power.metadata import MeasurementScope, PowerMetadata
+from helia_profiler.power.metadata import (
+    MeasurementScope,
+    ObservationMode,
+    PowerIntegrity,
+    PowerMetadata,
+)
 from helia_profiler.stages.collect_power_terminal import CollectPowerTerminalStage
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
@@ -47,7 +53,9 @@ def _make_ctx(
     internal: bool = False,
     inference_count: int = 5,
     reference_inference_us: int = 1000,
-    count_source: str = "configured",
+    count_source: Literal[
+        "firmware_auto", "configured", "profile_guided", "probe_window"
+    ] = "configured",
     gate_duration_s: float = 0.005,
     capture_duration_s: float | None = None,
     deployed_at: str = "2026-07-18T00:00:00+00:00",
@@ -117,12 +125,12 @@ def _make_ctx(
         )
         ctx.publish_power_observation(
             PowerObservation(
-                mode="gpio_gated",
+                mode=ObservationMode.GPIO_GATED,
                 result=result,
                 gate_rise_observed=True,
                 gate_fall_observed=True,
                 deadline_s=20.0,
-                integrity="valid",
+                integrity=PowerIntegrity.VALID,
             )
         )
     return ctx
@@ -503,7 +511,7 @@ class TestFirmwareWindowClockIntegrity:
         assert ctx.power_run is not None and ctx.power_run.observation is not None
         ctx.publish_power_observation(
             PowerObservation(
-                mode="free_form",
+                mode=ObservationMode.FREE_FORM,
                 result=PowerResult(
                     summary=PowerSummary(0.001, 0.002, 0.02, 0.04, 19.2, 19200),
                     gated_windows=[],
@@ -512,7 +520,7 @@ class TestFirmwareWindowClockIntegrity:
                 gate_rise_observed=True,
                 gate_fall_observed=False,
                 deadline_s=45.0,
-                integrity="degraded",
+                integrity=PowerIntegrity.DEGRADED,
             )
         )
         with caplog.at_level("WARNING", logger="hpx"):
@@ -599,6 +607,7 @@ class TestFirmwareWindowClockIntegrity:
             )
         assert "cannot outlast the interval that contains it" in caplog.text
         assert ctx.power_result is not None
+        assert ctx.power_result.metadata.window_clock_ceiling is not None
         assert ctx.power_result.metadata.window_clock_ceiling.elapsed_us == inflated
 
     def test_internal_window_inside_host_wall_time_does_not_warn(

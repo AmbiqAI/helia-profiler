@@ -64,7 +64,7 @@ def test_progress_update_shows_phase_count_and_eta() -> None:
     console = _FakeHpxConsole(verbosity=0)
 
     progress_update(
-        console,
+        console,  # ty: ignore[invalid-argument-type]  # duck-typed HpxConsole fake
         ProgressUpdate(
             message="Running fixed inference window",
             completed=50,
@@ -86,7 +86,7 @@ def test_minimum_verbosity_filters_detail() -> None:
     console = _FakeHpxConsole(verbosity=0)
 
     progress_update(
-        console,
+        console,  # ty: ignore[invalid-argument-type]  # duck-typed HpxConsole fake
         ProgressUpdate(message="Compiler detail", min_verbosity=1),
     )
 
@@ -97,7 +97,7 @@ def test_verbose_checkpoint_is_durable_line() -> None:
     console = _FakeHpxConsole(verbosity=1)
 
     progress_update(
-        console,
+        console,  # ty: ignore[invalid-argument-type]  # duck-typed HpxConsole fake
         ProgressUpdate(message="Profile captured", kind="checkpoint"),
     )
 
