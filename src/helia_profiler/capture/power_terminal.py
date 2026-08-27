@@ -236,7 +236,15 @@ def collect_power_terminal_envelope_from_chunks(
     Shared scan loop for every chunk-oriented terminal transport (RTT, SWO):
     buffer chunks, look for the start/end markers, log any pre-record
     diagnostics, and retry past malformed records until the deadline.
+
+    Markers are located in the raw byte buffer (they are ASCII), so trimming
+    is byte-accurate and independent of UTF-8 replacement decoding.  Each END
+    is paired with the *last* START before it: a truncated frame prefix
+    (START without its END) cannot span into — and discard — a subsequent
+    valid frame.
     """
+    start_marker = POWER_TERMINAL_START.encode("ascii")
+    end_marker = POWER_TERMINAL_END.encode("ascii")
     deadline = time.monotonic() + timeout_s
     buffer = bytearray()
     last_error: PowerError | None = None
@@ -247,20 +255,24 @@ def collect_power_terminal_envelope_from_chunks(
             continue
         buffer.extend(chunk)
         while True:
-            text = buffer.decode("utf-8", errors="replace")
-            start = text.find(POWER_TERMINAL_START)
-            if start < 0:
-                break
-            end = text.find(POWER_TERMINAL_END, start)
+            end = buffer.find(end_marker)
             if end < 0:
                 break
-            end += len(POWER_TERMINAL_END)
-            _log_pre_record_diagnostics(text[:start])
+            start = buffer.rfind(start_marker, 0, end)
+            if start < 0:
+                # END without any preceding START — unparseable remnant.
+                del buffer[: end + len(end_marker)]
+                continue
+            end += len(end_marker)
+            _log_pre_record_diagnostics(
+                buffer[:start].decode("utf-8", errors="replace")
+            )
+            frame = buffer[start:end].decode("utf-8", errors="replace")
             try:
-                return parse_power_terminal_envelope(text[start:end].splitlines())
+                return parse_power_terminal_envelope(frame.splitlines())
             except PowerError as exc:
                 last_error = exc
-                del buffer[: len(text[:end].encode("utf-8"))]
+                del buffer[:end]
     text = buffer.decode("utf-8", errors="replace")
     if text:
         try:

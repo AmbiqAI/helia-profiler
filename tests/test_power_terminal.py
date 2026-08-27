@@ -352,6 +352,45 @@ def test_collect_power_terminal_rtt_skips_stale_malformed_frame(
     assert record.completed_count == 237
 
 
+def test_collect_from_chunks_survives_truncated_frame_prefix() -> None:
+    """A stale START without its END must not swallow the next valid frame."""
+    from helia_profiler.capture.power_terminal import (
+        collect_power_terminal_envelope_from_chunks,
+    )
+
+    truncated = "\n".join(_lines()[:4]) + "\n"  # START + a few fields, no END
+    valid = "\n".join(_lines()) + "\n"
+    chunks = [(truncated + valid).encode()]
+
+    envelope = collect_power_terminal_envelope_from_chunks(
+        lambda: chunks.pop(0) if chunks else b"",
+        timeout_s=1.0,
+        poll_interval_s=0.0,
+    )
+
+    assert envelope.terminal.status == "ok"
+    assert envelope.terminal.completed_count == 237
+
+
+def test_collect_from_chunks_discards_end_without_start() -> None:
+    """An orphan END remnant is dropped so a later full frame still parses."""
+    from helia_profiler.capture.power_terminal import (
+        POWER_TERMINAL_END,
+        collect_power_terminal_envelope_from_chunks,
+    )
+
+    valid = "\n".join(_lines()) + "\n"
+    chunks = [f"{POWER_TERMINAL_END}\n{valid}".encode()]
+
+    envelope = collect_power_terminal_envelope_from_chunks(
+        lambda: chunks.pop(0) if chunks else b"",
+        timeout_s=1.0,
+        poll_interval_s=0.0,
+    )
+
+    assert envelope.terminal.status == "ok"
+
+
 def test_collect_power_terminal_rtt_times_out_without_data(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
