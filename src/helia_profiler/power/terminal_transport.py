@@ -142,40 +142,10 @@ class UartPowerTerminalTransport:
 def _collect_chunked_terminal(
     read_fn: Callable[[], bytes], *, timeout_s: float
 ) -> PowerTerminalEnvelope:
-    from ..capture.power_terminal import (
-        POWER_TERMINAL_END,
-        POWER_TERMINAL_START,
-        parse_power_terminal_envelope,
-    )
+    from ..capture.power_terminal import collect_power_terminal_envelope_from_chunks
 
-    deadline = time.monotonic() + timeout_s
-    buffer = bytearray()
-    last_error: PowerError | None = None
-    while time.monotonic() < deadline:
-        chunk = read_fn()
-        if not chunk:
-            time.sleep(0.001)
-            continue
-        buffer.extend(chunk)
-        text = buffer.decode("utf-8", errors="replace")
-        start = text.rfind(POWER_TERMINAL_START)
-        if start < 0:
-            continue
-        end = text.find(POWER_TERMINAL_END, start)
-        if end < 0:
-            continue
-        end += len(POWER_TERMINAL_END)
-        try:
-            return parse_power_terminal_envelope(text[start:end].splitlines())
-        except PowerError as exc:
-            last_error = exc
-            del buffer[:end]
-    if last_error is not None:
-        raise PowerError(
-            f"No valid power terminal record received within {timeout_s:.1f}s: {last_error}"
-        ) from last_error
-    raise PowerError(
-        f"No complete power terminal record received within {timeout_s:.1f}s."
+    return collect_power_terminal_envelope_from_chunks(
+        read_fn, timeout_s=timeout_s, poll_interval_s=0.001
     )
 
 

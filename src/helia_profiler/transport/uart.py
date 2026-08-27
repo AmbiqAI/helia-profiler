@@ -42,6 +42,7 @@ from .protocol import (
     HPX_START,
     collect_lines,
 )
+from .timing import CaptureTimingTracker
 
 log = logging.getLogger("hpx")
 
@@ -141,16 +142,8 @@ def capture_uart_output(
     Returns:
         List of captured text lines.
     """
-    capture_started_s = time.monotonic()
-    hpx_start_s: float | None = None
-    hpx_end_s: float | None = None
-
-    def on_line(line: str, line_ts: float) -> None:
-        nonlocal hpx_start_s, hpx_end_s
-        if line == HPX_START and hpx_start_s is None:
-            hpx_start_s = line_ts
-        elif line == HPX_END:
-            hpx_end_s = line_ts
+    timing = CaptureTimingTracker(start_marker=HPX_START, end_marker=HPX_END)
+    on_line = timing.observe_line
 
     port = _find_jlink_vcom_port(jlink_serial)
     controller = reset_controller or JLinkResetController()
@@ -202,11 +195,7 @@ def capture_uart_output(
             ser.close()
 
     if timing_out is not None:
-        timing_out["capture_duration_s"] = time.monotonic() - capture_started_s
-        if hpx_start_s is not None:
-            timing_out["hpx_start_latency_s"] = hpx_start_s - capture_started_s
-        if hpx_start_s is not None and hpx_end_s is not None:
-            timing_out["protocol_duration_s"] = hpx_end_s - hpx_start_s
+        timing.finalize(timing_out)
 
     return lines
 

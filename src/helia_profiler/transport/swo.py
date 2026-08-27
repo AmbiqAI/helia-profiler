@@ -34,7 +34,7 @@ from ..target.probe.jlink import (
     open_jlink_with_retry,
     resume_if_halted,
 )
-from .timing import SBL_SETTLE_S
+from .timing import SBL_SETTLE_S, CaptureTimingTracker
 from .protocol import DEFAULT_TIMEOUT_S, collect_lines
 from ..wire import HPX_END_SENTINEL, HPX_START_SENTINEL
 
@@ -81,25 +81,13 @@ def capture_swo_output(
     Returns:
         List of captured text lines.
     """
-    capture_started_s = time.monotonic()
-    hpx_start_s: float | None = None
-    hpx_end_s: float | None = None
-
-    def on_line(line: str, line_ts: float) -> None:
-        nonlocal hpx_start_s, hpx_end_s
-        if line == _HPX_START_SENTINEL and hpx_start_s is None:
-            hpx_start_s = line_ts
-        elif line == HPX_END_SENTINEL:
-            hpx_end_s = line_ts
+    timing = CaptureTimingTracker(
+        start_marker=_HPX_START_SENTINEL, end_marker=HPX_END_SENTINEL
+    )
+    on_line = timing.observe_line
 
     def finalize_timing() -> None:
-        if timing_out is None:
-            return
-        timing_out["capture_duration_s"] = time.monotonic() - capture_started_s
-        if hpx_start_s is not None:
-            timing_out["hpx_start_latency_s"] = hpx_start_s - capture_started_s
-        if hpx_start_s is not None and hpx_end_s is not None:
-            timing_out["protocol_duration_s"] = hpx_end_s - hpx_start_s
+        timing.finalize(timing_out)
 
     controller = reset_controller or JLinkResetController()
 

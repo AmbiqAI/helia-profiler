@@ -596,8 +596,6 @@ def _serialize_config(config: ProfileConfig) -> dict[str, Any]:
             return {field.name: _coerce(getattr(value, field.name)) for field in fields(value)}
         if isinstance(value, (dict, MappingProxyType)):
             return {k: _coerce(v) for k, v in value.items()}
-        if isinstance(value, dict):
-            return {k: _coerce(v) for k, v in value.items()}
         if isinstance(value, (list, tuple, set)):
             return [_coerce(v) for v in value]
         if isinstance(value, Enum):
