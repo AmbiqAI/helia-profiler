@@ -10,7 +10,6 @@ import pytest
 
 from helia_profiler.capture import capture_pmu
 from helia_profiler.transport.rtt import (
-    _direct_rtt_write,
     _direct_rtt_read,
     _scan_for_rtt_control_block,
     _write_rtt_command_api,
@@ -18,6 +17,7 @@ from helia_profiler.transport.rtt import (
     capture_rtt_output,
 )
 from helia_profiler.errors import CaptureError
+from helia_profiler.transport.rtt_control import direct_rtt_write as _direct_rtt_write
 from helia_profiler.transport.swo import capture_swo_output
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
@@ -1096,10 +1096,6 @@ def test_capture_rtt_output_direct_fallback_rescans_only_after_idle_backoff(monk
     )
     monkeypatch.setattr("helia_profiler.transport.rtt._RTT_CB_TIMEOUT_S", 0.1)
     monkeypatch.setattr("helia_profiler.transport.rtt._RTT_DISCOVERY_SETTLE_S", 0.0)
-    monkeypatch.setattr(
-        "helia_profiler.transport.rtt._write_rtt_command_direct",
-        lambda *args, **kwargs: None,
-    )
     monkeypatch.setattr("helia_profiler.transport.rtt.collect_lines", fake_collect_lines)
 
     capture_rtt_output(

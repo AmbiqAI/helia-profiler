@@ -58,12 +58,11 @@ from .protocol import (
     collect_lines,
 )
 from ..wire import HPX_ERROR_PREFIX, HPX_GO_COMMAND, HPX_READY_LINE, WireKey
-from .timing import SBL_SETTLE_S
+from .timing import SBL_SETTLE_S, CaptureTimingTracker
 from .rtt_control import (
     RTT_LIVE_NAMED_SCORE,
     direct_rtt_read as _direct_rtt_read,
     direct_rtt_read_any as _direct_rtt_read_any,
-    direct_rtt_write as _direct_rtt_write,
     read_rtt_up_channel0_name as _read_rtt_up_channel0_name,
     scan_for_rtt_control_block as _scan_for_rtt_control_block,
     scan_rtt_control_blocks as _scan_rtt_control_blocks,
@@ -132,34 +131,6 @@ def _wait_for_rtt_line(
         f"Timed out waiting for {expected_line} from firmware",
         hint="The target did not complete the RTT startup handshake.",
     )
-
-
-def _write_rtt_command_direct(
-    jlink: DebugMemorySession,
-    *,
-    block_address: int,
-    command: bytes,
-    timeout_s: float = _RTT_READY_TIMEOUT_S,
-) -> None:
-    written = 0
-    deadline = time.monotonic() + timeout_s
-
-    while written < len(command) and time.monotonic() < deadline:
-        advanced = _direct_rtt_write(
-            jlink,
-            block_address=block_address,
-            data=command[written:],
-        )
-        if advanced > 0:
-            written += advanced
-            continue
-        time.sleep(0.005)
-
-    if written < len(command):
-        raise CaptureError(
-            "Timed out sending RTT host-ready command",
-            hint="The firmware did not expose a writable RTT down-buffer in time.",
-        )
 
 
 def _write_rtt_command_api(
@@ -336,9 +307,7 @@ def capture_rtt_output(
     Returns:
         List of captured text lines.
     """
-    capture_started_s = time.monotonic()
-    hpx_start_s: float | None = None
-    hpx_end_s: float | None = None
+    timing = CaptureTimingTracker(start_marker=HPX_START, end_marker=HPX_END)
 
     def record_phase_duration(name: str, started_s: float, *, detail: str = "") -> float:
         elapsed_s = time.monotonic() - started_s
@@ -349,29 +318,21 @@ def capture_rtt_output(
         return elapsed_s
 
     def on_line(line: str, line_ts: float) -> None:
-        nonlocal hpx_start_s, hpx_end_s
-        if line == HPX_START and hpx_start_s is None:
-            hpx_start_s = line_ts
+        first_start = timing.hpx_start_s is None
+        timing.observe_line(line, line_ts)
+        if line == HPX_START and first_start:
             log.info(
                 "RTT observed HPX_START %.3fs after capture start",
-                hpx_start_s - capture_started_s,
+                line_ts - timing.capture_started_s,
             )
-        elif line == HPX_END:
-            hpx_end_s = line_ts
-            if hpx_start_s is not None:
-                log.info(
-                    "RTT observed HPX_END %.3fs after HPX_START",
-                    hpx_end_s - hpx_start_s,
-                )
+        elif line == HPX_END and timing.hpx_start_s is not None:
+            log.info(
+                "RTT observed HPX_END %.3fs after HPX_START",
+                line_ts - timing.hpx_start_s,
+            )
 
     def finalize_timing() -> None:
-        if timing_out is None:
-            return
-        timing_out["capture_duration_s"] = time.monotonic() - capture_started_s
-        if hpx_start_s is not None:
-            timing_out["hpx_start_latency_s"] = hpx_start_s - capture_started_s
-        if hpx_start_s is not None and hpx_end_s is not None:
-            timing_out["protocol_duration_s"] = hpx_end_s - hpx_start_s
+        timing.finalize(timing_out)
 
     controller = reset_controller or JLinkResetController()
     jlink = create_debug_memory_session()

@@ -14,8 +14,7 @@ from helia_profiler.results import (
     PowerRunPlan,
 )
 from helia_profiler.capture.power_terminal import (
-    collect_power_terminal_rtt,
-    parse_power_terminal,
+    collect_power_terminal_envelope_rtt,
     parse_power_terminal_envelope,
 )
 from helia_profiler.config import Transport, load_config
@@ -55,7 +54,7 @@ def _lines(**overrides: str) -> list[str]:
 
 
 def test_parse_success_record() -> None:
-    record = parse_power_terminal(_lines())
+    record = parse_power_terminal_envelope(_lines()).terminal
 
     assert record.version == 1
     assert record.status == "ok"
@@ -95,14 +94,14 @@ def test_public_power_types_validate_direct_construction() -> None:
 
 
 def test_parse_error_record() -> None:
-    record = parse_power_terminal(
+    record = parse_power_terminal_envelope(
         _lines(
             HPX_POWER_STATUS="error",
             HPX_POWER_COMPLETED_COUNT="19",
             HPX_POWER_FINAL_PHASE="inference",
             HPX_POWER_ERROR_CODE="4",
         )
-    )
+    ).terminal
 
     assert record.status == "error"
     assert record.completed_count == 19
@@ -197,7 +196,7 @@ def test_parse_rejects_partial_or_invalid_measurement(overrides: dict[str, str])
 )
 def test_parse_rejects_invalid_records(lines: list[str], message: str) -> None:
     with pytest.raises(PowerError, match=message):
-        parse_power_terminal(lines)
+        parse_power_terminal_envelope(lines).terminal
 
 
 def test_parse_requires_elapsed_time_for_v1() -> None:
@@ -208,7 +207,7 @@ def test_parse_requires_elapsed_time_for_v1() -> None:
     ]
 
     with pytest.raises(PowerError, match="missing fields: HPX_POWER_ELAPSED_US"):
-        parse_power_terminal(lines)
+        parse_power_terminal_envelope(lines).terminal
 
 
 def test_publish_terminal_into_grouped_power_run(tmp_path: Path) -> None:
@@ -258,7 +257,7 @@ def test_publish_terminal_into_grouped_power_run(tmp_path: Path) -> None:
             integrity=PowerIntegrity.VALID,
         )
     )
-    record = parse_power_terminal(_lines())
+    record = parse_power_terminal_envelope(_lines()).terminal
 
     ctx.publish_power_terminal(record)
 
@@ -307,13 +306,13 @@ def test_collect_power_terminal_rtt_without_reset(
         fake_attached_session,
     )
 
-    record = collect_power_terminal_rtt(
+    record = collect_power_terminal_envelope_rtt(
         build_dir=tmp_path,
         toolchain="arm-none-eabi-gcc",
         device="AP510NFA-CBR",
         jlink_serial="1160002255",
         timeout_s=1.0,
-    )
+    ).terminal
 
     assert record.status == "ok"
     assert session.started_at == 0x20008000
@@ -341,13 +340,13 @@ def test_collect_power_terminal_rtt_skips_stale_malformed_frame(
         fake_attached_session,
     )
 
-    record = collect_power_terminal_rtt(
+    record = collect_power_terminal_envelope_rtt(
         build_dir=tmp_path,
         toolchain="arm-none-eabi-gcc",
         device="AP510NFA-CBR",
         jlink_serial=None,
         timeout_s=1.0,
-    )
+    ).terminal
 
     assert record.status == "ok"
     assert record.completed_count == 237
@@ -373,13 +372,13 @@ def test_collect_power_terminal_rtt_times_out_without_data(
     )
 
     with pytest.raises(PowerError, match="No power terminal record"):
-        collect_power_terminal_rtt(
+        collect_power_terminal_envelope_rtt(
             build_dir=tmp_path,
             toolchain="arm-none-eabi-gcc",
             device="AP510NFA-CBR",
             jlink_serial=None,
             timeout_s=0.01,
-        )
+        ).terminal
 
 
 class _FakeSerial:

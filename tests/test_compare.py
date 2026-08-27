@@ -14,7 +14,6 @@ from helia_profiler.evaluation import (
     CounterDiff,
     LayerDiffRow,
     compare_runs,
-    render_compare,
     write_compare_artifacts,
 )
 from helia_profiler.evaluation import (
@@ -379,22 +378,6 @@ def test_compare_layer_rows_type_dynamic_pmu_counters_as_counter_diffs(tmp_path:
     # Rows with no memory placement data leave the memory fields unset.
     assert row.baseline_memory is None
     assert row.memory_changed is None
-
-
-def test_render_compare_starts_with_config_then_run_then_layers(tmp_path: Path):
-    baseline = tmp_path / "gcc"
-    candidate = tmp_path / "atfe"
-    _write_run(
-        baseline, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
-    )
-    _write_run(candidate, toolchain="atfe", total_cycles=900, avg_us=9, layer_cycles=[700])
-
-    text = render_compare(compare_runs(baseline, candidate), top_layers=1)
-
-    assert text.index("Config") < text.index("Run") < text.index("Layers")
-    assert "Toolchain" in text
-    assert "total_cycles" in text
-    assert "CONV_2D" in text
 
 
 def test_write_compare_artifacts(tmp_path: Path):

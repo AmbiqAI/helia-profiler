@@ -5,12 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
 
 from ..errors import ReportError
+from ..results.serde import dataclass_from_dict as _from_dict
 
 if TYPE_CHECKING:
     from .compare import CompareResult, MetricDiff
@@ -315,20 +316,3 @@ def _dimension_tuple(value: Any) -> tuple[str, ...]:
     return tuple(value)
 
 
-def _from_dict(cls, data: dict[str, Any], transforms: dict[str, Any] | None = None):
-    if not isinstance(data, dict):
-        raise ReportError(f"Expected JSON object for {cls.__name__}.")
-    transforms = transforms or {}
-    known = {item.name for item in fields(cls) if item.name != "extra"}
-    try:
-        values = {
-            key: transforms.get(key, lambda value: value)(value)
-            for key, value in data.items()
-            if key in known
-        }
-        values["extra"] = {key: value for key, value in data.items() if key not in known}
-        return cls(**values)
-    except ReportError:
-        raise
-    except (TypeError, ValueError) as exc:
-        raise ReportError(f"Invalid {cls.__name__}: {exc}") from exc

@@ -14,7 +14,6 @@ from .compare import (
     MetricDiff,
     RunArtifacts,
     compare_runs,
-    render_compare,
     write_compare_artifacts,
 )
 from .comparison_profile import (
@@ -63,6 +62,5 @@ __all__ = [
     "evaluate_comparison_profile",
     "evaluate_run",
     "is_available",
-    "render_compare",
     "write_compare_artifacts",
 ]

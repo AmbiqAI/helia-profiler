@@ -32,7 +32,7 @@ from .base import BaseCaptureTransport, CaptureArgs
 from ..target.probe.base import ResetController
 from ..target.probe.jlink import JLinkResetController
 from ..usb_identity import USB_MARKER_PREFIX
-from .timing import READINESS_POLL_INTERVAL_S, USB_REENUM_FLOOR_S
+from .timing import READINESS_POLL_INTERVAL_S, USB_REENUM_FLOOR_S, CaptureTimingTracker
 from .protocol import (
     DEFAULT_TIMEOUT_S,
     HPX_END,
@@ -277,18 +277,10 @@ def capture_usb_output(
     Returns:
         List of captured text lines.
     """
-    capture_started_s = time.monotonic()
-    hpx_start_s: float | None = None
-    hpx_end_s: float | None = None
+    timing = CaptureTimingTracker(start_marker=HPX_START, end_marker=HPX_END)
 
     def finalize_timing() -> None:
-        if timing_out is None:
-            return
-        timing_out["capture_duration_s"] = time.monotonic() - capture_started_s
-        if hpx_start_s is not None:
-            timing_out["hpx_start_latency_s"] = hpx_start_s - capture_started_s
-        if hpx_start_s is not None and hpx_end_s is not None:
-            timing_out["protocol_duration_s"] = hpx_end_s - hpx_start_s
+        timing.finalize(timing_out)
 
     # --- Step 0: snapshot existing CDC ports before reset ---
     pre_existing = _snapshot_cdc_ports()
@@ -366,8 +358,7 @@ def capture_usb_output(
             line_ts = time.monotonic()
             lines.append(line)
             log.debug("USB: %s", line)
-            if line == HPX_START and hpx_start_s is None:
-                hpx_start_s = line_ts
+            timing.observe_line(line, line_ts)
 
             # Clean (power) window announce: widen the capture deadline to cover
             # the firmware's estimate of the upcoming silent window so a long
@@ -384,7 +375,6 @@ def capture_usb_output(
                     )
 
             if line == HPX_END:
-                hpx_end_s = line_ts
                 log.info("Captured %d lines (HPX_END received)", len(lines))
                 finalize_timing()
                 return lines

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from ..results import (
@@ -201,11 +201,6 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
     return PowerTerminalEnvelope(terminal=terminal, measurement=measurement)
 
 
-def parse_power_terminal(lines: Iterable[str]) -> PowerTerminalRecord:
-    """Compatibility parser returning only execution status."""
-    return parse_power_terminal_envelope(lines).terminal
-
-
 def _log_pre_record_diagnostics(text: str) -> None:
     """Surface firmware diagnostic lines emitted before the envelope.
 
@@ -228,6 +223,58 @@ def _log_pre_record_diagnostics(text: str) -> None:
             )
         elif line.startswith(HPX_POWER_PREFIX):
             log.info("Power firmware diagnostic: %s", line)
+
+
+def collect_power_terminal_envelope_from_chunks(
+    read_chunk: Callable[[], bytes],
+    *,
+    timeout_s: float,
+    poll_interval_s: float = 0.01,
+) -> PowerTerminalEnvelope:
+    """Collect one terminal envelope from a chunked byte stream.
+
+    Shared scan loop for every chunk-oriented terminal transport (RTT, SWO):
+    buffer chunks, look for the start/end markers, log any pre-record
+    diagnostics, and retry past malformed records until the deadline.
+    """
+    deadline = time.monotonic() + timeout_s
+    buffer = bytearray()
+    last_error: PowerError | None = None
+    while time.monotonic() < deadline:
+        chunk = read_chunk()
+        if not chunk:
+            time.sleep(poll_interval_s)
+            continue
+        buffer.extend(chunk)
+        while True:
+            text = buffer.decode("utf-8", errors="replace")
+            start = text.find(POWER_TERMINAL_START)
+            if start < 0:
+                break
+            end = text.find(POWER_TERMINAL_END, start)
+            if end < 0:
+                break
+            end += len(POWER_TERMINAL_END)
+            _log_pre_record_diagnostics(text[:start])
+            try:
+                return parse_power_terminal_envelope(text[start:end].splitlines())
+            except PowerError as exc:
+                last_error = exc
+                del buffer[: len(text[:end].encode("utf-8"))]
+    text = buffer.decode("utf-8", errors="replace")
+    if text:
+        try:
+            return parse_power_terminal_envelope(text.splitlines())
+        except PowerError as exc:
+            last_error = exc
+    if last_error is not None:
+        raise PowerError(
+            f"No valid power terminal record received within {timeout_s:.1f}s: {last_error}"
+        ) from last_error
+    raise PowerError(
+        f"No power terminal record received within {timeout_s:.1f}s.",
+        hint="Confirm the power firmware reached post-GATE diagnostics and the transport is linked.",
+    )
 
 
 def collect_power_terminal_envelope_rtt(
@@ -253,9 +300,6 @@ def collect_power_terminal_envelope_rtt(
             hint="Inspect the hpx_profiler_power ELF/map and toolchain symbol utilities.",
         )
 
-    deadline = time.monotonic() + timeout_s
-    buffer = bytearray()
-    last_error: PowerError | None = None
     with attached_session(
         device=device,
         jlink_serial=jlink_serial,
@@ -263,75 +307,22 @@ def collect_power_terminal_envelope_rtt(
     ) as jlink:
         try:
             jlink.rtt_start(block_address=address)
-            while time.monotonic() < deadline:
-                chunk = bytes(jlink.rtt_read(0, 4096))
-                if chunk:
-                    buffer.extend(chunk)
-                    while True:
-                        text = buffer.decode("utf-8", errors="replace")
-                        start = text.find(POWER_TERMINAL_START)
-                        if start < 0:
-                            break
-                        end = text.find(POWER_TERMINAL_END, start)
-                        if end < 0:
-                            break
-                        end += len(POWER_TERMINAL_END)
-                        _log_pre_record_diagnostics(text[:start])
-                        try:
-                            return parse_power_terminal_envelope(
-                                text[start:end].splitlines()
-                            )
-                        except PowerError as exc:
-                            last_error = exc
-                            del buffer[: len(text[:end].encode("utf-8"))]
-                else:
-                    time.sleep(0.01)
+            return collect_power_terminal_envelope_from_chunks(
+                lambda: bytes(jlink.rtt_read(0, 4096)),
+                timeout_s=timeout_s,
+            )
         finally:
             try:
                 jlink.rtt_stop()
             except Exception:
                 pass
 
-    text = buffer.decode("utf-8", errors="replace")
-    if text:
-        try:
-            return parse_power_terminal_envelope(text.splitlines())
-        except PowerError as exc:
-            last_error = exc
-    if last_error is not None:
-        raise PowerError(
-            f"No valid power terminal record received within {timeout_s:.1f}s: {last_error}"
-        ) from last_error
-    raise PowerError(
-        f"No power terminal record received within {timeout_s:.1f}s.",
-        hint="Confirm the power firmware reached post-GATE diagnostics and RTT is linked.",
-    )
-
-
-def collect_power_terminal_rtt(
-    *,
-    build_dir: Path,
-    toolchain: str,
-    device: str,
-    jlink_serial: str | None,
-    timeout_s: float,
-) -> PowerTerminalRecord:
-    """Compatibility collector returning only execution status."""
-    return collect_power_terminal_envelope_rtt(
-        build_dir=build_dir,
-        toolchain=toolchain,
-        device=device,
-        jlink_serial=jlink_serial,
-        timeout_s=timeout_s,
-    ).terminal
-
 
 __all__ = [
     "POWER_TERMINAL_END",
     "POWER_TERMINAL_START",
     "POWER_TERMINAL_VERSION",
+    "collect_power_terminal_envelope_from_chunks",
     "collect_power_terminal_envelope_rtt",
-    "collect_power_terminal_rtt",
-    "parse_power_terminal",
     "parse_power_terminal_envelope",
 ]

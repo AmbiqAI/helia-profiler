@@ -505,10 +505,6 @@ def _git_dirty(repo_root: Path) -> bool | None:
     return bool(proc.stdout.strip())
 
 
-def _rel(path: Path, root: Path) -> str:
-    return _bundle_relative(path, root)
-
-
 def _bundle_relative(path: Path, root: Path) -> str:
     """Return a portable bundle-relative path, rejecting writer escapes."""
 
