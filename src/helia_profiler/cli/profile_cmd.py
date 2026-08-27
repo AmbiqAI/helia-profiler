@@ -121,21 +121,6 @@ _OVERRIDE_SPECS: tuple[_OverrideSpec, ...] = (
         apply="truthy",
         const=True,
     ),
-    # -- build / NSX overrides --
-    _OverrideSpec("nsx_channel", ("build", "channel"), apply="truthy"),
-    _OverrideSpec(
-        "no_compiler_launcher",
-        ("build", "compiler_launcher"),
-        default=False,
-        apply="truthy",
-        const="none",
-    ),
-    _OverrideSpec(
-        "compiler_launcher", ("build", "compiler_launcher"), apply="truthy", overwrite=False
-    ),
-    _OverrideSpec(
-        "nsx_module", ("build", "nsx_modules"), apply="truthy", coerce=_parse_nsx_modules
-    ),
     # -- PMU profiling --
     _OverrideSpec("pmu_counters", ("profiling", "pmu_counters"), coerce=_parse_pmu_counters),
     _OverrideSpec("per_layer", ("profiling", "per_layer")),
@@ -183,6 +168,22 @@ _OVERRIDE_SPECS: tuple[_OverrideSpec, ...] = (
     _OverrideSpec("work_dir", ("work_dir",), coerce=str),
     _OverrideSpec("clean", ("clean",), default=False, apply="truthy", const=True),
     _OverrideSpec("verbose", ("verbose",), default=0, apply="always"),
+    # -- build / NSX overrides -- (last, matching the historical apply order:
+    # with several malformed flags the --pmu-counters parse error wins)
+    _OverrideSpec("nsx_channel", ("build", "channel"), apply="truthy"),
+    _OverrideSpec(
+        "no_compiler_launcher",
+        ("build", "compiler_launcher"),
+        default=False,
+        apply="truthy",
+        const="none",
+    ),
+    _OverrideSpec(
+        "compiler_launcher", ("build", "compiler_launcher"), apply="truthy", overwrite=False
+    ),
+    _OverrideSpec(
+        "nsx_module", ("build", "nsx_modules"), apply="truthy", coerce=_parse_nsx_modules
+    ),
 )
 
 _KNOWN_PARAMS = frozenset(spec.param for spec in _OVERRIDE_SPECS)
