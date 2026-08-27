@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from datetime import datetime, timezone
 
 from ..errors import PowerError
@@ -286,16 +285,18 @@ class CollectPowerTerminalStage:
                     power_firmware=plan.firmware_mode,
                 ),
             )
-            ctx.power_run = replace(
-                ctx.power_run,
-                observation=PowerObservation(
+            # Route through the publisher so result.metadata is enriched with
+            # the observation fields (set_observation), keeping the record and
+            # the serialized metadata in agreement.
+            ctx.publish_power_observation(
+                PowerObservation(
                     mode=ObservationMode.ON_DEVICE,
                     result=result,
                     gate_rise_observed=True,
                     gate_fall_observed=True,
                     deadline_s=duration_s,
                     integrity=PowerIntegrity.VALID,
-                ),
+                )
             )
         if frozen_window_clock:
             # External mode: warn, do not raise. The instrument owns every
