@@ -105,6 +105,19 @@ class ArtifactSource(StrEnum):
 
 
 @dataclass(frozen=True)
+class ArtifactPath:
+    """A plain path into one artifact -- the shape of a spec's ``fallback``.
+
+    Only the two path-addressable sources make sense here: ``SUMMARY_POWER``
+    is gated on the block existing and ``MANIFEST_ONLY`` has no path. The
+    dimension-model contract test pins that.
+    """
+
+    source: ArtifactSource
+    path: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class DimensionSpec:
     """Declaration of one comparison dimension.
 
@@ -119,6 +132,13 @@ class DimensionSpec:
 
     ``derive`` computes the value from the source dict when a plain path
     cannot express it (``power_monitor``'s manifest-less fallback).
+
+    ``fallback`` is a second artifact location the reader consults only when
+    the primary read is ``None`` -- for a dimension whose record moved
+    (``link_family``: measured into ``summary.memory_regions`` since #133,
+    promoted to ``run_metadata.platform`` in #206). The manifest still
+    merges last. Declared here so the compare Config row and the gate read
+    the same value from the same declaration.
     """
 
     dimension: ComparisonDimension
@@ -143,6 +163,7 @@ class DimensionSpec:
     #: platform match cannot be established and the dimension is skipped —
     #: the same conservative non-blocking rule as an absent value itself.
     scoped_to: tuple[ComparisonDimension, ...] = ()
+    fallback: ArtifactPath | None = None
 
 
 def _derive_power_monitor(power: dict[str, Any]) -> str:
@@ -344,8 +365,10 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
     # same classifier the memory measurer uses (#206). RUN_METADATA-sourced
     # with a label so it can also be a compare Config row -- the first
     # blocking-class dimension with one, so required_dimensions can insist
-    # on it. Absent on pre-#206 artifacts: the comparator's None-skip rule
-    # applies, zero migration.
+    # on it. Pre-#206 artifacts have no platform record but every #133+
+    # summary carries the measured family in memory_regions -- the fallback
+    # keeps the gate honest on existing bundles; only pre-#133 artifacts
+    # (no family anywhere) hit the comparator's None-skip rule.
     DimensionSpec(
         ComparisonDimension.LINK_FAMILY,
         DimensionEffect.MEMORY_METRIC_BLOCKING,
@@ -353,6 +376,7 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
         ("platform", "link_family"),
         label="Link family",
         metric_group="memory",
+        fallback=ArtifactPath(ArtifactSource.SUMMARY, ("memory_regions", "link_family")),
         mismatch_hint=(
             "Per-region memory metrics omitted because the runs were linked "
             "by different linker families — GNU ld counts the floating stack "

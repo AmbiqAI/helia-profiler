@@ -172,6 +172,40 @@ def test_manifest_only_dimensions_declare_no_artifact_path():
             assert spec.path, f"{spec.dimension} needs a path or derive"
 
 
+def test_fallbacks_point_at_path_addressable_artifacts():
+    # A fallback is a plain second path: SUMMARY_POWER is gated on the block
+    # existing and MANIFEST_ONLY has no path, so neither can be one.
+    for spec in DIMENSION_REGISTRY.values():
+        if spec.fallback is not None:
+            assert spec.fallback.source in (
+                ArtifactSource.RUN_METADATA,
+                ArtifactSource.SUMMARY,
+            ), spec.dimension
+            assert spec.fallback.path, spec.dimension
+
+
+def test_reader_consults_the_fallback_only_when_the_primary_is_absent(tmp_path: Path):
+    from helia_profiler.evaluation.comparability import _dimensions
+    from helia_profiler.evaluation.compare import RunArtifacts
+
+    def run(platform: dict | None, measured: str | None) -> RunArtifacts:
+        summary: dict = {"schema_version": 3}
+        if measured is not None:
+            summary["memory_regions"] = {"link_family": measured, "regions": []}
+        metadata: dict = {"hpx_version": "0.0.0", "schema_version": 1}
+        if platform is not None:
+            metadata["platform"] = platform
+        return RunArtifacts(path=tmp_path, summary=summary, metadata=metadata, layers=[])
+
+    key = ComparisonDimension.LINK_FAMILY
+    # Pre-#206 artifact: only the measured family exists.
+    assert _dimensions(run(None, "armlink"))[key] == "armlink"
+    # Pre-#133 artifact: nothing anywhere.
+    assert _dimensions(run(None, None))[key] is None
+    # Post-#206: the platform record is primary even if the summary disagrees.
+    assert _dimensions(run({"link_family": "gnu"}, "armlink"))[key] == "gnu"
+
+
 def test_manifest_writer_records_the_link_family(tmp_path: Path):
     """#206: the platform's link family reaches the manifest from
     run_metadata.platform -- the same value the memory measurer records in

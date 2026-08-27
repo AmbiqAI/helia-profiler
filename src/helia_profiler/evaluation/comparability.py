@@ -292,10 +292,11 @@ def _dimensions(run: RunArtifacts) -> dict[str, Any]:
     power = run.summary.get("power")
     power_dict = power if isinstance(power, dict) else None
     for spec in DIMENSION_REGISTRY.values():
-        if spec.source is ArtifactSource.RUN_METADATA:
-            dimensions[spec.dimension] = _nested(run.metadata, *spec.path)
-        elif spec.source is ArtifactSource.SUMMARY:
-            dimensions[spec.dimension] = _nested(run.summary, *spec.path)
+        if spec.source in (ArtifactSource.RUN_METADATA, ArtifactSource.SUMMARY):
+            value = read_artifact_value(run, spec.source, spec.path)
+            if value is None and spec.fallback is not None:
+                value = read_artifact_value(run, spec.fallback.source, spec.fallback.path)
+            dimensions[spec.dimension] = value
         elif spec.source is ArtifactSource.SUMMARY_POWER:
             if power_dict is not None:
                 dimensions[spec.dimension] = (
@@ -322,6 +323,19 @@ def _dimensions(run: RunArtifacts) -> dict[str, Any]:
             }
         )
     return dimensions
+
+
+def read_artifact_value(run: RunArtifacts, source: ArtifactSource, path: tuple[str, ...]) -> Any:
+    """Path read from one path-addressable artifact (``None`` when absent).
+
+    Shared by the dimension reader and the compare Config rows so a
+    dimension's ``fallback`` means the same thing in both.
+    """
+    if source is ArtifactSource.RUN_METADATA:
+        return _nested(run.metadata, *path)
+    if source is ArtifactSource.SUMMARY:
+        return _nested(run.summary, *path)
+    raise ValueError(f"{source} is not a path-addressable artifact source.")
 
 
 def _nested(value: Any, *keys: str) -> Any:

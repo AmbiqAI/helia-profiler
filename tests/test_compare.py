@@ -512,6 +512,48 @@ def _memory_regions_block(link_family: str, **regions: tuple[int, int]) -> dict:
 class TestMemoryRegionRows:
     """#206: per-region used/free become compare rows, gated on link family."""
 
+    def test_config_row_shows_the_family_the_gate_judged(self, tmp_path):
+        """#213 lens: a pre-#206 pair must not render 'Link family — — same'
+        while the gate (reading the summary fallback) withholds the rows."""
+        from helia_profiler.evaluation.compare import RunArtifacts, _compare_config
+
+        def run(measured: str) -> RunArtifacts:
+            return RunArtifacts(
+                path=tmp_path,
+                summary={"memory_regions": _memory_regions_block(measured, DTCM=(1, 1))},
+                metadata={"platform": {"board": "apollo510_evb"}},
+                layers=[],
+            )
+
+        row = next(r for r in _compare_config(run("gnu"), run("armlink")) if r.key == "link_family")
+
+        assert (row.baseline, row.candidate, row.status) == ("gnu", "armlink", "diff")
+
+    def test_percent_is_relative_to_the_baseline_magnitude(self):
+        """#213 lens: ``free`` is unclamped, so a negative baseline must not
+        flip the sign of the percentage against the delta."""
+        from helia_profiler.evaluation.compare import _compare_metrics
+
+        base = {"memory_regions": _memory_regions_block("gnu", DTCM=(1000, -100))}
+        cand = {"memory_regions": _memory_regions_block("gnu", DTCM=(1000, -50))}
+
+        row = next(m for m in _compare_metrics(base, cand) if m.name == "memory_regions.DTCM.free")
+
+        assert row.delta == 50
+        assert row.delta_pct == 50.0
+
+    def test_a_repeated_region_name_keeps_the_first_row(self):
+        from helia_profiler.evaluation.compare import _compare_metrics
+
+        block = _memory_regions_block("gnu", DTCM=(1000, 9000))
+        block["regions"].append(dict(block["regions"][0], used=2000, free=8000))
+        base = {"memory_regions": block}
+        cand = {"memory_regions": _memory_regions_block("gnu", DTCM=(1000, 9000))}
+
+        row = next(m for m in _compare_metrics(base, cand) if m.name == "memory_regions.DTCM.used")
+
+        assert row.baseline == 1000
+
     def test_rows_emit_in_canonical_order_with_declared_direction(self):
         from helia_profiler.evaluation.compare import _compare_metrics
 
@@ -565,7 +607,7 @@ class TestMemoryRegionRows:
     def test_declared_direction_replaces_the_name_hacks(self):
         """The static rows carry their direction too: layers and
         inferences_per_joule are higher-is-better, everything else lower."""
-        from helia_profiler.evaluation.compare import _METRIC_FIELDS
+        from helia_profiler.evaluation.run_metrics import _METRIC_FIELDS
 
         directions = {f.name: f.lower_is_better for f in _METRIC_FIELDS}
         assert directions["layers"] is False

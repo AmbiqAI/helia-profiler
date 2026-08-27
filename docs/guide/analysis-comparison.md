@@ -107,12 +107,16 @@ family: GNU ld counts the floating stack inside the app extent while
 armlink's fixed reservations sit outside it, so a cross-family compare would
 show a large, meaningless delta. When the families differ, the per-region
 rows are omitted and the comparison says why; binary section sizes (`text`,
-`data`, `bss`) remain comparable across toolchains. A region present on one
-side only (ITCM exists on the Apollo5 family alone) renders with a dash rather
-than being hidden — that is an SoC-axis change worth seeing. Runs recorded
-before the link family existed are skipped like any other absent dimension,
-and `Link family` appears in the Config table so a comparison profile can
-require it to match.
+`data`, `bss`) remain comparable across toolchains. Canonical regions render
+first (ITCM, MRAM, DTCM, SRAM), any other region the summary lists after
+them. A region present on one side only (ITCM exists on the Apollo510
+family alone) renders with a dash rather than being hidden — that is an
+SoC-axis change worth seeing. Runs that predate the platform record fall
+back to the family the memory measurer wrote into
+`summary.memory_regions.link_family`, so the gate holds on existing bundles;
+only runs with no family anywhere are skipped like any other absent
+dimension. `Link family` appears in the Config table so a comparison profile
+can require it to match.
 
 The terminal highlights totals and the largest layer deltas.
 `--output-dir` also writes `compare_summary.json` and `layer_diff.csv`.

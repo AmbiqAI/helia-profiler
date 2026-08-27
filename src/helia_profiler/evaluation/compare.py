@@ -8,7 +8,8 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-from .comparability import ComparabilityAssessment, assess_comparability
+from .comparability import ComparabilityAssessment, assess_comparability, read_artifact_value
+from .run_metrics import MetricDiff, _compare_metrics, _get_nested, _to_float
 from .comparison_profile import (
     ComparisonProfile,
     ComparisonVerdict,
@@ -16,7 +17,7 @@ from .comparison_profile import (
 )
 from ..errors import ReportError
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
-from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
+from ..results.dimensions import DIMENSION_REGISTRY, ArtifactPath, ArtifactSource
 
 
 @dataclass(frozen=True)
@@ -29,42 +30,6 @@ class RunArtifacts:
     layers: list[dict[str, Any]]
     layer_memory: dict[Any, list[dict[str, Any]]] = field(default_factory=dict)
     manifest: ResultManifest | None = None
-
-
-@dataclass(frozen=True)
-class MetricDiff:
-    """Run-level metric comparison."""
-
-    name: str
-    baseline: Any
-    candidate: Any
-    delta: float | None = None
-    delta_pct: float | None = None
-    unit: str = ""
-    #: Declared row metadata (#206) -- replaces the name-string hacks that
-    #: used to decide gating (``startswith("power.")``) and direction
-    #: (``name != "layers"``). Not serialized: compare_summary.json's
-    #: metrics[] shape is unchanged.
-    group: str | None = None
-    lower_is_better: bool = True
-
-
-@dataclass(frozen=True)
-class _MetricField:
-    """One declared run-level metric row.
-
-    ``group`` names the metric group whose comparability gate governs the
-    row (``"power"``, ``"memory"``) -- ``None`` rows are always emitted.
-    Group rows absent on BOTH sides are skipped (a run that measured no
-    power has nothing to say about power); one-sided absence still emits,
-    so an axis change (a region present on one SoC only) stays visible.
-    """
-
-    name: str
-    path: tuple[str, ...]
-    unit: str
-    group: str | None = None
-    lower_is_better: bool = True
 
 
 @dataclass(frozen=True)
@@ -163,7 +128,20 @@ class CompareResult:
     verdict: ComparisonVerdict | None = None
 
 
-def _dimension_row(dimension: ComparisonDimension) -> tuple[str, str, tuple[str, ...]]:
+@dataclass(frozen=True)
+class _ConfigField:
+    """One Config-table row: a run_metadata path plus, for dimension rows,
+    the registry's ``fallback`` location so the row shows the same value
+    the comparability gate judged (#206: the link family of a pre-#206
+    artifact lives in ``summary.memory_regions``)."""
+
+    key: str
+    label: str
+    path: tuple[str, ...]
+    fallback: ArtifactPath | None = None
+
+
+def _dimension_row(dimension: ComparisonDimension) -> _ConfigField:
     """Config-diff row for a comparison dimension: label and artifact path
     come from the dimension registry, so the table cannot drift from it.
     Row ORDER stays hand-controlled below — it is rendered artifact content."""
@@ -172,28 +150,28 @@ def _dimension_row(dimension: ComparisonDimension) -> tuple[str, str, tuple[str,
         raise ValueError(
             f"{dimension} is not a run-metadata dimension with a display label."
         )
-    return (dimension.value, spec.label, spec.path)
+    return _ConfigField(dimension.value, spec.label, spec.path, spec.fallback)
 
 
 #: Rows are either dimension-derived (data from DIMENSION_REGISTRY) or
 #: explicit config-diff-only entries that are deliberately NOT comparability
 #: dimensions (they change results without gating comparison).
-_CONFIG_FIELDS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
-    ("model_path", "Model path", ("config", "model", "path")),
+_CONFIG_FIELDS: tuple[_ConfigField, ...] = (
+    _ConfigField("model_path", "Model path", ("config", "model", "path")),
     _dimension_row(ComparisonDimension.MODEL_SHA256),
     _dimension_row(ComparisonDimension.ENGINE),
     _dimension_row(ComparisonDimension.ENGINE_VERSION),
-    ("backend", "Backend", ("config", "engine", "backend")),
+    _ConfigField("backend", "Backend", ("config", "engine", "backend")),
     _dimension_row(ComparisonDimension.BOARD),
     _dimension_row(ComparisonDimension.SOC),
     _dimension_row(ComparisonDimension.TOOLCHAIN),
     _dimension_row(ComparisonDimension.LINK_FAMILY),
     _dimension_row(ComparisonDimension.TRANSPORT),
     _dimension_row(ComparisonDimension.CPU_CLOCK),
-    ("iterations", "Iterations", ("config", "profiling", "iterations")),
-    ("warmup", "Warmup", ("config", "profiling", "warmup")),
-    ("pmu_counters", "PMU counters", ("config", "profiling", "pmu_counters")),
-    ("arena_size", "Arena size", ("config", "model", "arena_size")),
+    _ConfigField("iterations", "Iterations", ("config", "profiling", "iterations")),
+    _ConfigField("warmup", "Warmup", ("config", "profiling", "warmup")),
+    _ConfigField("pmu_counters", "PMU counters", ("config", "profiling", "pmu_counters")),
+    _ConfigField("arena_size", "Arena size", ("config", "model", "arena_size")),
     _dimension_row(ComparisonDimension.ARENA_LOCATION),
     _dimension_row(ComparisonDimension.WEIGHTS_LOCATION),
     _dimension_row(ComparisonDimension.HPX_VERSION),
@@ -201,54 +179,6 @@ _CONFIG_FIELDS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     _dimension_row(ComparisonDimension.SYSTEM_CLOCK_HZ),
     _dimension_row(ComparisonDimension.RUN_METADATA_SCHEMA_VERSION),
 )
-
-_METRIC_FIELDS: tuple[_MetricField, ...] = (
-    _MetricField("total_cycles", ("total_cycles",), "cycles"),
-    _MetricField(
-        "device_profiled_infer_avg_us", ("latency", "device_profiled_infer_avg_us"), "us"
-    ),
-    _MetricField(
-        "device_profiled_infer_total_us", ("latency", "device_profiled_infer_total_us"), "us"
-    ),
-    _MetricField("layers", ("layers",), "", lower_is_better=False),
-    _MetricField("binary.text", ("binary", "text"), "bytes"),
-    _MetricField("binary.data", ("binary", "data"), "bytes"),
-    _MetricField("binary.bss", ("binary", "bss"), "bytes"),
-    # Reported alongside bss so a comparison across the #24 boundary shows
-    # where the bytes went, instead of a bss row and a total row that
-    # contradict each other with nothing to reconcile them.
-    _MetricField("binary.reserved", ("binary", "reserved"), "bytes"),
-    _MetricField("binary.total", ("binary", "total"), "bytes"),
-    _MetricField("memory.arena_size", ("memory", "arena_size"), "bytes"),
-    _MetricField("memory.allocated_arena", ("memory", "allocated_arena"), "bytes"),
-    _MetricField("memory.model_size", ("memory", "model_size"), "bytes"),
-    _MetricField("power.avg_current_a", ("power", "avg_current_a"), "A", group="power"),
-    _MetricField("power.avg_power_w", ("power", "avg_power_w"), "W", group="power"),
-    _MetricField("power.peak_current_a", ("power", "peak_current_a"), "A", group="power"),
-    _MetricField("power.energy_j", ("power", "energy_j"), "J", group="power"),
-    _MetricField("power.duration_s", ("power", "duration_s"), "s", group="power"),
-    _MetricField(
-        "power.energy_per_inference_j", ("power", "energy_per_inference_j"), "J", group="power"
-    ),
-    _MetricField(
-        "power.inferences_per_joule",
-        ("power", "inferences_per_joule"),
-        "inferences/J",
-        group="power",
-        lower_is_better=False,
-    ),
-)
-
-#: Measured per-region rows (#206): the region SET varies by SoC (AP5-family
-#: adds ITCM), so these are expanded from each summary's memory_regions
-#: block rather than declared statically. Canonical order matches the
-#: per-SoC tables in platform/memory_map.py.
-_MEMORY_REGION_ORDER: tuple[str, ...] = ("ITCM", "MRAM", "DTCM", "SRAM")
-_MEMORY_REGION_FIELDS: tuple[tuple[str, bool], ...] = (
-    ("used", True),
-    ("free", False),
-)
-
 
 def compare_runs(
     baseline_dir: Path,
@@ -269,7 +199,7 @@ def compare_runs(
         )
         raise ReportError(f"Results are not comparable: {reasons}")
 
-    config_rows = _compare_config(baseline.metadata, candidate.metadata)
+    config_rows = _compare_config(baseline, candidate)
     include_groups = frozenset(
         group
         for group in ("power", "memory")
@@ -491,115 +421,28 @@ def _coerce_csv_value(value: str | None) -> Any:
         return value
 
 
-def _compare_config(base: dict[str, Any], cand: dict[str, Any]) -> list[ConfigDiffRow]:
+def _config_value(run: RunArtifacts, spec: _ConfigField) -> Any:
+    value = _get_nested(run.metadata, spec.path)
+    if value is None and spec.fallback is not None:
+        value = read_artifact_value(run, spec.fallback.source, spec.fallback.path)
+    return value
+
+
+def _compare_config(base: RunArtifacts, cand: RunArtifacts) -> list[ConfigDiffRow]:
     rows: list[ConfigDiffRow] = []
-    for key, label, path in _CONFIG_FIELDS:
-        b = _get_nested(base, path)
-        c = _get_nested(cand, path)
-        stable_b = _stable_value(b)
-        stable_c = _stable_value(c)
+    for spec in _CONFIG_FIELDS:
+        stable_b = _stable_value(_config_value(base, spec))
+        stable_c = _stable_value(_config_value(cand, spec))
         rows.append(
             ConfigDiffRow(
-                field=label,
+                field=spec.label,
                 baseline=stable_b,
                 candidate=stable_c,
                 status="same" if stable_b == stable_c else "diff",
-                key=key,
+                key=spec.key,
             )
         )
     return rows
-
-
-def _compare_metrics(
-    base: dict[str, Any],
-    cand: dict[str, Any],
-    *,
-    include_groups: frozenset[str] = frozenset({"power", "memory"}),
-) -> list[MetricDiff]:
-    metrics: list[MetricDiff] = []
-    for spec in _METRIC_FIELDS:
-        b = _get_nested(base, spec.path)
-        c = _get_nested(cand, spec.path)
-        diff = _metric_diff(spec, b, c, include_groups)
-        if diff is not None:
-            metrics.append(diff)
-    metrics.extend(_memory_region_metrics(base, cand, include_groups))
-    return metrics
-
-
-def _metric_diff(
-    spec: _MetricField, b: Any, c: Any, include_groups: frozenset[str]
-) -> MetricDiff | None:
-    if spec.group is not None:
-        if spec.group not in include_groups:
-            return None
-        if b is None and c is None:
-            return None
-    bf = _to_float(b)
-    cf = _to_float(c)
-    delta = None
-    delta_pct = None
-    if bf is not None and cf is not None:
-        delta = cf - bf
-        if bf != 0:
-            delta_pct = delta / bf * 100
-    return MetricDiff(
-        name=spec.name,
-        baseline=b,
-        candidate=c,
-        delta=delta,
-        delta_pct=delta_pct,
-        unit=spec.unit,
-        group=spec.group,
-        lower_is_better=spec.lower_is_better,
-    )
-
-
-def _memory_regions_by_name(summary: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    block = summary.get("memory_regions")
-    if not isinstance(block, dict):
-        return {}
-    regions = block.get("regions")
-    if not isinstance(regions, list):
-        return {}
-    return {
-        str(row["region"]): row
-        for row in regions
-        if isinstance(row, dict) and row.get("region") is not None
-    }
-
-
-def _memory_region_metrics(
-    base: dict[str, Any], cand: dict[str, Any], include_groups: frozenset[str]
-) -> list[MetricDiff]:
-    """Per-region used/free rows, gated as the ``memory`` group (#206).
-
-    Regions present on either side render (canonical order first, any
-    unknown names after); a region on one side only shows the asymmetry,
-    which is an SoC-axis change worth seeing rather than hiding.
-    """
-    base_regions = _memory_regions_by_name(base)
-    cand_regions = _memory_regions_by_name(cand)
-    names = [name for name in _MEMORY_REGION_ORDER if name in base_regions or name in cand_regions]
-    names += sorted(
-        (set(base_regions) | set(cand_regions)) - set(_MEMORY_REGION_ORDER)
-    )
-    metrics: list[MetricDiff] = []
-    for name in names:
-        for field_name, lower_is_better in _MEMORY_REGION_FIELDS:
-            spec = _MetricField(
-                f"memory_regions.{name}.{field_name}",
-                ("memory_regions", name, field_name),
-                "bytes",
-                group="memory",
-                lower_is_better=lower_is_better,
-            )
-            b = base_regions.get(name, {}).get(field_name)
-            c = cand_regions.get(name, {}).get(field_name)
-            diff = _metric_diff(spec, b, c, include_groups)
-            if diff is not None:
-                metrics.append(diff)
-    return metrics
 
 
 def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[LayerDiffRow]:
@@ -809,30 +652,10 @@ def _friendly_memory_role(kind: str) -> str:
     return labels.get(kind.lower(), kind.lower())
 
 
-def _get_nested(data: dict[str, Any], path: tuple[str, ...]) -> Any:
-    cur: Any = data
-    for part in path:
-        if not isinstance(cur, dict) or part not in cur:
-            return None
-        cur = cur[part]
-    return cur
-
-
 def _stable_value(value: Any) -> Any:
     if isinstance(value, (dict, list)):
         return json.dumps(value, sort_keys=True)
     return value
-
-
-def _to_float(value: Any) -> float | None:
-    if isinstance(value, bool) or value is None:
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _layer_fieldnames(rows: list[dict[str, Any]]) -> list[str]:

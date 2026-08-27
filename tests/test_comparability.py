@@ -630,8 +630,36 @@ class TestLinkFamily:
         )
 
     def test_a_baseline_predating_the_dimension_is_skipped(self):
-        """Pre-#206 artifacts carry no link family: unknown, not different."""
+        """Pre-#133 artifacts carry no link family anywhere: unknown, not
+        different."""
         assessment = assess_comparability(self._run_with(None), self._run_with("armlink"))
+
+        assert assessment.memory_metrics_comparable
+
+    def test_pre_206_artifacts_fall_back_to_the_measured_family(self):
+        """#213 lens: every #133+ summary records the family the measurer
+        saw in memory_regions -- a pre-#206 gnu-vs-armlink pair must gate
+        exactly like a post-#206 one, not slip through the None-skip rule."""
+        base = self._run_with(None)
+        cand = self._run_with(None)
+        base.summary["memory_regions"] = {"link_family": "gnu", "regions": []}
+        cand.summary["memory_regions"] = {"link_family": "armlink", "regions": []}
+
+        assessment = assess_comparability(base, cand)
+
+        assert not assessment.memory_metrics_comparable
+        issue = next(
+            issue
+            for issue in assessment.issues
+            if issue.code == MEMORY_DIMENSION_MISMATCH.code_for(ComparisonDimension.LINK_FAMILY)
+        )
+        assert (issue.context["baseline"], issue.context["candidate"]) == ("gnu", "armlink")
+
+    def test_the_platform_record_wins_over_the_summary_fallback(self):
+        base = self._run_with("gnu")
+        base.summary["memory_regions"] = {"link_family": "armlink", "regions": []}
+
+        assessment = assess_comparability(base, self._run_with("gnu"))
 
         assert assessment.memory_metrics_comparable
 
