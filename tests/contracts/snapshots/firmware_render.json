@@ -1201,7 +1201,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "ad9699f216fb930daff56c85bd6ac16d798332fb881f0af96178493b8187fd5d"
+    "sha256": "2acb7c65ece015a3261c486a9492be1e746f46f4ce9ed6e6982af7ed88a8ad5f"
   },
   "apollo510|rtt|helia-aot": {
     "markers": {
@@ -1565,7 +1565,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "273e19c1d71867fc9a822f622c8408cf97017b6a346ae51688a1e549f31b36af"
+    "sha256": "0a5b979fa98caffd4a4f3149ffbbf3debcea07e66d0a8778b7cc3c1ed5641744"
   },
   "apollo510|swo|helia-aot": {
     "markers": {
@@ -1677,7 +1677,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "227e717031d3205cf173dff9730c417aea56ad526128eae892e304ab784121f1"
+    "sha256": "b7271c3ef57a7da304765b60356cd1be2686a8a7b7c3574f69b390681472c1e7"
   },
   "apollo510|uart|helia-aot": {
     "markers": {
@@ -1789,7 +1789,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "6421123775e60ecb90ff1a0865769d60755f3dc9c1d2f9a86c7aebaf56b31b3c"
+    "sha256": "e6c9ba720d46ff06d7dc13387012ce21ab222c18ec656ec3727457f4ca443815"
   },
   "apollo510|usb_cdc|helia-aot": {
     "markers": {

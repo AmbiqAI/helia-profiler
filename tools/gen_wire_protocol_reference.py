@@ -283,9 +283,6 @@ def render() -> str:
 
 
 _GAPS = (
-    "ExecuTorch's `HPX_ARENA_SIZE` counts only the planned arena — its method "
-    "and temporary arenas are excluded, so the figure is not comparable with "
-    "TFLM's single-arena number.",
     EST_MS_GAP,
     "`HPX_VERSION` is checked against the expected protocol version and then "
     "discarded: it never reaches `FirmwareMeta` or `summary.json`.",

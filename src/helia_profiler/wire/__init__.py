@@ -64,15 +64,14 @@ Registry-documented gaps
 ------------------------
 
 These are true of the shipped protocol and deliberately *not* fixed here (wire
-bytes are frozen this phase). Two gaps #163 documented were closed host-side by
-#165 — every :class:`FirmwareErrorCode` now carries a host hint, and the
-never-emitted ``HPX_POWER_SAMPLE_COUNT`` was retired outright (removed from
+bytes are frozen this phase). #163's documented gaps were closed by #165 —
+every :class:`FirmwareErrorCode` now carries a host hint, the never-emitted
+``HPX_POWER_SAMPLE_COUNT`` was retired outright (removed from
 :class:`PowerTerminalKey` and the envelope schema; ``HPX_POWER_MEASUREMENT_COUNT``
-already carries the accumulator count):
+already carries the accumulator count), and ExecuTorch's ``HPX_ARENA_SIZE`` now
+reports the summed runtime workspace (planned + method + temporary arenas), so
+the figure is comparable with TFLM's single-arena number:
 
-* ExecuTorch's ``HPX_ARENA_SIZE`` counts only the planned arena — its method
-  and temporary arenas are excluded, so the figure is not comparable with
-  TFLM's single-arena number.
 * The ``clean_window_begin`` heartbeat carries a hardcoded ``est_ms=0`` only
   in dedicated power binaries, where the announce compiles to a no-op and no
   host listens. #164 gave infer windows a measured estimate in both window

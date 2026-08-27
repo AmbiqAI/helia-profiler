@@ -339,10 +339,10 @@ MODEL_MEMORY_SPECS: tuple[WireSpec, ...] = (
         engines=TFLM_ENGINES | ET_ENGINES,
         condition=GATE_NOT_POWER_ONLY,
         value_shape="bytes",
-        note="Documented gap: for ExecuTorch this counts only the planned "
-        "arena — the method and temporary arenas are excluded, so the number "
-        "is not comparable with TFLM's single-arena figure. heliaAOT reports "
-        "HPX_ARENAS_BOUND instead.",
+        note="For ExecuTorch this is the summed runtime workspace — planned "
+        "+ method + temporary arenas — so the figure is comparable with "
+        "TFLM's single-arena number (#165); the per-arena breakdown stays in "
+        "the host's build record. heliaAOT reports HPX_ARENAS_BOUND instead.",
     ),
     _spec(
         WireKey.ALLOCATED_ARENA.wire,
