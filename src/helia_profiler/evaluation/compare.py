@@ -8,7 +8,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-from .comparability import ComparabilityAssessment, assess_comparability, read_artifact_value
+from .comparability import ComparabilityAssessment, assess_comparability, read_dimensions
 from .run_metrics import MetricDiff, _compare_metrics, _get_nested, _to_float
 from .comparison_profile import (
     ComparisonProfile,
@@ -17,7 +17,7 @@ from .comparison_profile import (
 )
 from ..errors import ReportError
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
-from ..results.dimensions import DIMENSION_REGISTRY, ArtifactPath, ArtifactSource
+from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
 
 
 @dataclass(frozen=True)
@@ -130,15 +130,20 @@ class CompareResult:
 
 @dataclass(frozen=True)
 class _ConfigField:
-    """One Config-table row: a run_metadata path plus, for dimension rows,
-    the registry's ``fallback`` location so the row shows the same value
-    the comparability gate judged (#206: the link family of a pre-#206
-    artifact lives in ``summary.memory_regions``)."""
+    """One Config-table row.
+
+    A dimension row takes its value from ``read_dimensions`` -- the same
+    resolved dict the comparability gate judges (manifest merge, summary
+    fallback and all), so the table cannot show one value while the gate
+    acts on another (#213 retro-lens). ``path`` is the registry's artifact
+    path, kept for the row's provenance; only explicit config-only rows
+    read it directly.
+    """
 
     key: str
     label: str
     path: tuple[str, ...]
-    fallback: ArtifactPath | None = None
+    dimension: ComparisonDimension | None = None
 
 
 def _dimension_row(dimension: ComparisonDimension) -> _ConfigField:
@@ -150,7 +155,7 @@ def _dimension_row(dimension: ComparisonDimension) -> _ConfigField:
         raise ValueError(
             f"{dimension} is not a run-metadata dimension with a display label."
         )
-    return _ConfigField(dimension.value, spec.label, spec.path, spec.fallback)
+    return _ConfigField(dimension.value, spec.label, spec.path, dimension=dimension)
 
 
 #: Rows are either dimension-derived (data from DIMENSION_REGISTRY) or
@@ -421,18 +426,19 @@ def _coerce_csv_value(value: str | None) -> Any:
         return value
 
 
-def _config_value(run: RunArtifacts, spec: _ConfigField) -> Any:
-    value = _get_nested(run.metadata, spec.path)
-    if value is None and spec.fallback is not None:
-        value = read_artifact_value(run, spec.fallback.source, spec.fallback.path)
-    return value
+def _config_value(run: RunArtifacts, dimensions: dict[str, Any], spec: _ConfigField) -> Any:
+    if spec.dimension is not None:
+        return dimensions.get(spec.dimension)
+    return _get_nested(run.metadata, spec.path)
 
 
 def _compare_config(base: RunArtifacts, cand: RunArtifacts) -> list[ConfigDiffRow]:
+    base_dimensions = read_dimensions(base)
+    cand_dimensions = read_dimensions(cand)
     rows: list[ConfigDiffRow] = []
     for spec in _CONFIG_FIELDS:
-        stable_b = _stable_value(_config_value(base, spec))
-        stable_c = _stable_value(_config_value(cand, spec))
+        stable_b = _stable_value(_config_value(base, base_dimensions, spec))
+        stable_c = _stable_value(_config_value(cand, cand_dimensions, spec))
         rows.append(
             ConfigDiffRow(
                 field=spec.label,

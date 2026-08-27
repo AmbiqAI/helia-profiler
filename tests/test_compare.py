@@ -529,6 +529,41 @@ class TestMemoryRegionRows:
 
         assert (row.baseline, row.candidate, row.status) == ("gnu", "armlink", "diff")
 
+    def test_config_row_shows_the_manifest_merged_value_the_gate_judged(self, tmp_path):
+        """#213 retro-lens: the manifest merges last for the gate; a Config
+        row reading artifacts by path could disagree with it. One reader."""
+        from helia_profiler.evaluation.compare import RunArtifacts, _compare_config
+        from helia_profiler.results import ResultManifest
+
+        manifest = ResultManifest.from_dict(
+            {
+                "schema": "hpx.result-manifest",
+                "schema_version": 1,
+                "run_id": "r",
+                "timestamp": "2026-08-20T00:00:00+00:00",
+                "hpx_version": "0.0.0",
+                "status": "complete",
+                "validity": "valid",
+                "issues": [],
+                "provenance": {},
+                "comparability": {"link_family": "armlink"},
+                "artifacts": [],
+            }
+        )
+
+        def run(manifest=None) -> RunArtifacts:
+            return RunArtifacts(
+                path=tmp_path,
+                summary={"memory_regions": _memory_regions_block("gnu", DTCM=(1, 1))},
+                metadata={"platform": {"board": "apollo510_evb", "link_family": "gnu"}},
+                layers=[],
+                manifest=manifest,
+            )
+
+        row = next(r for r in _compare_config(run(manifest), run()) if r.key == "link_family")
+
+        assert (row.baseline, row.candidate, row.status) == ("armlink", "gnu", "diff")
+
     def test_percent_is_relative_to_the_baseline_magnitude(self):
         """#213 lens: ``free`` is unclamped, so a negative baseline must not
         flip the sign of the percentage against the delta."""

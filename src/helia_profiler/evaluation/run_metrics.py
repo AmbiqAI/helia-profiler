@@ -48,11 +48,10 @@ class _MetricField:
     group: str | None = None
     lower_is_better: bool = True
 
+
 _METRIC_FIELDS: tuple[_MetricField, ...] = (
     _MetricField("total_cycles", ("total_cycles",), "cycles"),
-    _MetricField(
-        "device_profiled_infer_avg_us", ("latency", "device_profiled_infer_avg_us"), "us"
-    ),
+    _MetricField("device_profiled_infer_avg_us", ("latency", "device_profiled_infer_avg_us"), "us"),
     _MetricField(
         "device_profiled_infer_total_us", ("latency", "device_profiled_infer_total_us"), "us"
     ),
@@ -94,6 +93,7 @@ _MEMORY_REGION_FIELDS: tuple[tuple[str, bool], ...] = (
     ("used", True),
     ("free", False),
 )
+
 
 def _compare_metrics(
     base: dict[str, Any],
@@ -172,9 +172,7 @@ def _memory_region_metrics(
     base_regions = _memory_regions_by_name(base)
     cand_regions = _memory_regions_by_name(cand)
     names = [name for name in _MEMORY_REGION_ORDER if name in base_regions or name in cand_regions]
-    names += sorted(
-        (set(base_regions) | set(cand_regions)) - set(_MEMORY_REGION_ORDER)
-    )
+    names += sorted((set(base_regions) | set(cand_regions)) - set(_MEMORY_REGION_ORDER))
     metrics: list[MetricDiff] = []
     for name in names:
         for field_name, lower_is_better in _MEMORY_REGION_FIELDS:
@@ -195,6 +193,7 @@ def _memory_region_metrics(
                 metrics.append(diff)
     return metrics
 
+
 def _get_nested(data: dict[str, Any], path: tuple[str, ...]) -> Any:
     cur: Any = data
     for part in path:
@@ -202,6 +201,7 @@ def _get_nested(data: dict[str, Any], path: tuple[str, ...]) -> Any:
             return None
         cur = cur[part]
     return cur
+
 
 def _to_float(value: Any) -> float | None:
     if isinstance(value, bool) or value is None:

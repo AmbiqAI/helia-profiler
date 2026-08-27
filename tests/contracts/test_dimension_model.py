@@ -67,7 +67,7 @@ def test_manifest_writer_records_every_authoritative_dimension(tmp_path: Path):
     assert recorded == _authoritative(tuple(ComparisonDimension))
 
 
-def test_manifest_writer_without_power_records_the_base_dimensions(tmp_path: Path):
+def test_manifest_writer_without_power_records_the_baseread_dimensions(tmp_path: Path):
     # A run that measured no power says nothing about how it measured it: a
     # value on that side would block a power-vs-no-power comparison.
     ctx = make_pmu_ctx(tmp_path, board="apollo510_evb")
@@ -106,10 +106,10 @@ def _run_artifacts(tmp_path: Path, *, power: dict | None, manifest=None):
 
 
 def test_reader_reads_every_artifact_sourced_dimension(tmp_path: Path):
-    from helia_profiler.evaluation.comparability import _dimensions
+    from helia_profiler.evaluation.comparability import read_dimensions
 
-    without_power = set(_dimensions(_run_artifacts(tmp_path, power=None)))
-    with_power = set(_dimensions(_run_artifacts(tmp_path, power={"measurement_scope": "x"})))
+    without_power = set(read_dimensions(_run_artifacts(tmp_path, power=None)))
+    with_power = set(read_dimensions(_run_artifacts(tmp_path, power={"measurement_scope": "x"})))
     base = {
         spec.dimension
         for spec in DIMENSION_REGISTRY.values()
@@ -130,11 +130,11 @@ def test_reader_reads_every_artifact_sourced_dimension(tmp_path: Path):
     }
 
 
-def test_manifest_merge_cannot_override_runtime_only_dimensions(tmp_path: Path):
+def test_manifest_merge_cannot_override_runtime_onlyread_dimensions(tmp_path: Path):
     # The #115 phantom-comparability rule as an executable contract: a
     # manifest value for power_lockstep (config intent) must never override
     # the runtime record in summary.power.sync.lockstep.
-    from helia_profiler.evaluation.comparability import _dimensions
+    from helia_profiler.evaluation.comparability import read_dimensions
     from helia_profiler.results import ResultManifest
 
     manifest = ResultManifest.from_dict(
@@ -152,7 +152,7 @@ def test_manifest_merge_cannot_override_runtime_only_dimensions(tmp_path: Path):
             "artifacts": [],
         }
     )
-    dims = _dimensions(
+    dims = read_dimensions(
         _run_artifacts(
             tmp_path,
             power={"sync": {"lockstep": True}},
@@ -185,7 +185,7 @@ def test_fallbacks_point_at_path_addressable_artifacts():
 
 
 def test_reader_consults_the_fallback_only_when_the_primary_is_absent(tmp_path: Path):
-    from helia_profiler.evaluation.comparability import _dimensions
+    from helia_profiler.evaluation.comparability import read_dimensions
     from helia_profiler.evaluation.compare import RunArtifacts
 
     def run(platform: dict | None, measured: str | None) -> RunArtifacts:
@@ -199,11 +199,11 @@ def test_reader_consults_the_fallback_only_when_the_primary_is_absent(tmp_path: 
 
     key = ComparisonDimension.LINK_FAMILY
     # Pre-#206 artifact: only the measured family exists.
-    assert _dimensions(run(None, "armlink"))[key] == "armlink"
+    assert read_dimensions(run(None, "armlink"))[key] == "armlink"
     # Pre-#133 artifact: nothing anywhere.
-    assert _dimensions(run(None, None))[key] is None
+    assert read_dimensions(run(None, None))[key] is None
     # Post-#206: the platform record is primary even if the summary disagrees.
-    assert _dimensions(run({"link_family": "gnu"}, "armlink"))[key] == "gnu"
+    assert read_dimensions(run({"link_family": "gnu"}, "armlink"))[key] == "gnu"
 
 
 def test_manifest_writer_records_the_link_family(tmp_path: Path):

@@ -149,8 +149,8 @@ def assess_comparability(
                 )
             )
 
-    baseline_dimensions = _dimensions(baseline)
-    candidate_dimensions = _dimensions(candidate)
+    baseline_dimensions = read_dimensions(baseline)
+    candidate_dimensions = read_dimensions(candidate)
     baseline_model = baseline_dimensions.get(ComparisonDimension.MODEL_SHA256)
     candidate_model = candidate_dimensions.get(ComparisonDimension.MODEL_SHA256)
     if baseline_model and candidate_model and baseline_model != candidate_model:
@@ -270,8 +270,12 @@ def assess_comparability(
     return ComparabilityAssessment(issues=tuple(issues))
 
 
-def _dimensions(run: RunArtifacts) -> dict[str, Any]:
+def read_dimensions(run: RunArtifacts) -> dict[str, Any]:
     """Registry-driven read of every dimension from the run artifacts.
+
+    The ONE reader: the comparability gate and the compare Config table
+    both consume this dict, so a dimension row can never show a value the
+    gate did not judge (manifest merge, summary fallback and all).
 
     Each spec declares its source and path (``results/dimensions.py``); the
     ``_nested`` traversal is deliberately crash-tolerant because artifacts
@@ -293,9 +297,9 @@ def _dimensions(run: RunArtifacts) -> dict[str, Any]:
     power_dict = power if isinstance(power, dict) else None
     for spec in DIMENSION_REGISTRY.values():
         if spec.source in (ArtifactSource.RUN_METADATA, ArtifactSource.SUMMARY):
-            value = read_artifact_value(run, spec.source, spec.path)
+            value = _read_artifact_value(run, spec.source, spec.path)
             if value is None and spec.fallback is not None:
-                value = read_artifact_value(run, spec.fallback.source, spec.fallback.path)
+                value = _read_artifact_value(run, spec.fallback.source, spec.fallback.path)
             dimensions[spec.dimension] = value
         elif spec.source is ArtifactSource.SUMMARY_POWER:
             if power_dict is not None:
@@ -325,11 +329,11 @@ def _dimensions(run: RunArtifacts) -> dict[str, Any]:
     return dimensions
 
 
-def read_artifact_value(run: RunArtifacts, source: ArtifactSource, path: tuple[str, ...]) -> Any:
+def _read_artifact_value(run: RunArtifacts, source: ArtifactSource, path: tuple[str, ...]) -> Any:
     """Path read from one path-addressable artifact (``None`` when absent).
 
-    Shared by the dimension reader and the compare Config rows so a
-    dimension's ``fallback`` means the same thing in both.
+    Primary and ``fallback`` reads go through the same function so a
+    spec's fallback cannot mean something different from its path.
     """
     if source is ArtifactSource.RUN_METADATA:
         return _nested(run.metadata, *path)
