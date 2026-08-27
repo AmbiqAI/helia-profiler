@@ -598,9 +598,13 @@ class TestLinkFamily:
 
     @staticmethod
     def _run_with(link_family: str | None):
+        """A run as the producer writes it: the family in the platform record
+        AND in the measured block (same classifier). ``None`` = pre-#133,
+        no family and no block anywhere."""
         run = _run()
         if link_family is not None:
             run.metadata["platform"]["link_family"] = link_family
+            run.summary["memory_regions"] = {"link_family": link_family, "regions": []}
         return run
 
     def test_mismatch_blocks_memory_metrics_only(self):
@@ -654,6 +658,22 @@ class TestLinkFamily:
             if issue.code == MEMORY_DIMENSION_MISMATCH.code_for(ComparisonDimension.LINK_FAMILY)
         )
         assert (issue.context["baseline"], issue.context["candidate"]) == ("gnu", "armlink")
+
+    def test_no_issue_when_neither_run_measured_regions(self):
+        """#213 lens 1: a cross-family pair whose memory measurement failed
+        on both sides has no rows to withhold -- no 'metrics omitted'."""
+        base = self._run_with("gnu")
+        cand = self._run_with("armlink")
+        base.summary.pop("memory_regions", None)
+        cand.summary.pop("memory_regions", None)
+
+        assessment = assess_comparability(base, cand)
+
+        assert assessment.memory_metrics_comparable
+        assert not any(
+            issue.code == MEMORY_DIMENSION_MISMATCH.code_for(ComparisonDimension.LINK_FAMILY)
+            for issue in assessment.issues
+        )
 
     def test_the_platform_record_wins_over_the_summary_fallback(self):
         base = self._run_with("gnu")

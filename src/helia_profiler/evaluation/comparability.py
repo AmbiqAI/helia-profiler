@@ -217,8 +217,15 @@ def assess_comparability(
 
     # Memory family (#206): per-region used/free are only the same quantity
     # within a linker family. Same shape as the informative loop -- absent
-    # on either side (pre-#206 artifacts) skips, never blocks.
+    # on either side (pre-#133 artifacts) skips, never blocks. The family
+    # is a platform fact recorded whether or not the measurement succeeded,
+    # so a pair where NEITHER side has a memory_regions block has nothing
+    # to gate: no "metrics omitted" issue for metrics that never existed
+    # (the power dims avoid this by being recorded only when power ran).
+    anything_to_gate = "memory_regions" in baseline.summary or "memory_regions" in candidate.summary
     for dimension in MEMORY_DIMENSION_MISMATCH.dimensions:
+        if not anything_to_gate:
+            break
         baseline_value = baseline_dimensions.get(dimension)
         candidate_value = candidate_dimensions.get(dimension)
         if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:

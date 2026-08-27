@@ -38,8 +38,13 @@ def _write_run(
     avg_us: int,
     layer_cycles: list[float],
     power: dict[str, float | str] | None = None,
+    memory_regions: dict | None = None,
+    link_family: str | None = None,
 ) -> None:
     path.mkdir(parents=True)
+    platform: dict = {"soc": "apollo510", "cpu_clock_name": "lp"}
+    if link_family is not None:
+        platform["link_family"] = link_family
     (path / "summary.json").write_text(
         json.dumps(
             {
@@ -63,6 +68,7 @@ def _write_run(
                     "device_profiled_infer_total_us": avg_us * 100,
                 },
                 "power": power,
+                **({"memory_regions": memory_regions} if memory_regions is not None else {}),
             }
         )
     )
@@ -71,10 +77,7 @@ def _write_run(
             {
                 "hpx_version": "0.1.0",
                 "model": {"sha256": "abc123"},
-                "platform": {
-                    "soc": "apollo510",
-                    "cpu_clock_name": "lp",
-                },
+                "platform": platform,
                 "config": {
                     "model": {
                         "path": "model.tflite",
@@ -332,6 +335,96 @@ def test_compare_suppresses_power_metrics_when_scope_differs(tmp_path: Path):
     assert not result.comparability.power_metrics_comparable
     assert not any(metric.name.startswith("power.") for metric in result.metrics)
     assert any("Power metrics omitted" in warning for warning in result.warnings)
+
+
+def test_compare_power_gate_leaves_region_rows_alone(tmp_path: Path):
+    """#213 lens 1: end to end through compare_runs -- a closed power gate
+    withholds power rows only; the memory group is gated independently."""
+    _write_run(
+        tmp_path / "baseline",
+        toolchain="arm-none-eabi-gcc",
+        total_cycles=1000,
+        avg_us=10,
+        layer_cycles=[800],
+        power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid", "energy_j": 1},
+        memory_regions=_memory_regions_block("gnu", DTCM=(1000, 9000)),
+        link_family="gnu",
+    )
+    _write_run(
+        tmp_path / "candidate",
+        toolchain="arm-none-eabi-gcc",
+        total_cycles=1000,
+        avg_us=10,
+        layer_cycles=[800],
+        power={"measurement_scope": "free_form_capture", "integrity": "valid", "energy_j": 2},
+        memory_regions=_memory_regions_block("gnu", DTCM=(1200, 8800)),
+        link_family="gnu",
+    )
+
+    result = compare_runs(tmp_path / "baseline", tmp_path / "candidate")
+
+    names = [m.name for m in result.metrics]
+    assert not result.comparability.power_metrics_comparable
+    assert result.comparability.memory_metrics_comparable
+    assert not any(n.startswith("power.") for n in names)
+    assert "memory_regions.DTCM.used" in names
+
+
+def test_compare_memory_gate_leaves_power_rows_alone(tmp_path: Path):
+    power: dict[str, float | str] = {
+        "measurement_scope": "gpio_gated_clean_window",
+        "integrity": "valid",
+        "energy_j": 1,
+    }
+    _write_run(
+        tmp_path / "baseline",
+        toolchain="arm-none-eabi-gcc",
+        total_cycles=1000,
+        avg_us=10,
+        layer_cycles=[800],
+        power=power,
+        memory_regions=_memory_regions_block("gnu", DTCM=(1000, 9000)),
+        link_family="gnu",
+    )
+    _write_run(
+        tmp_path / "candidate",
+        toolchain="armclang",
+        total_cycles=1000,
+        avg_us=10,
+        layer_cycles=[800],
+        power=power,
+        memory_regions=_memory_regions_block("armlink", DTCM=(300, 9700)),
+        link_family="armlink",
+    )
+
+    result = compare_runs(tmp_path / "baseline", tmp_path / "candidate")
+
+    names = [m.name for m in result.metrics]
+    assert result.comparability.power_metrics_comparable
+    assert not result.comparability.memory_metrics_comparable
+    assert "power.energy_j" in names
+    assert not any(n.startswith("memory_regions.") for n in names)
+    assert any("linked by different linker families" in w for w in result.warnings)
+    paths = write_compare_artifacts(result, tmp_path / "diff")
+    summary = json.loads(next(p for p in paths if p.name == "compare_summary.json").read_text())
+    assert summary["comparability"]["memory_metrics_comparable"] is False
+    assert summary["comparability"]["power_metrics_comparable"] is True
+
+
+def test_compare_emits_no_dash_rows_for_a_group_neither_run_measured(tmp_path: Path):
+    """Group rows absent on both sides are skipped, not rendered as dashes."""
+    for name in ("baseline", "candidate"):
+        _write_run(
+            tmp_path / name,
+            toolchain="arm-none-eabi-gcc",
+            total_cycles=1000,
+            avg_us=10,
+            layer_cycles=[800],
+        )
+
+    result = compare_runs(tmp_path / "baseline", tmp_path / "candidate")
+
+    assert not any(m.group is not None for m in result.metrics)
 
 
 def test_compare_omits_layers_when_operation_sequence_differs(tmp_path: Path):
@@ -592,12 +685,26 @@ class TestMemoryRegionRows:
     def test_rows_emit_in_canonical_order_with_declared_direction(self):
         from helia_profiler.evaluation.compare import _compare_metrics
 
-        base = {"memory_regions": _memory_regions_block("gnu", DTCM=(1000, 9000), SRAM=(500, 500))}
-        cand = {"memory_regions": _memory_regions_block("gnu", DTCM=(1200, 8800), SRAM=(500, 500))}
+        # Summary lists regions alphabetically; rows must follow the
+        # canonical ITCM, MRAM, DTCM, SRAM order (not alphabetical).
+        base = {
+            "memory_regions": _memory_regions_block(
+                "gnu", DTCM=(1000, 9000), ITCM=(1, 1), MRAM=(2, 2), SRAM=(500, 500)
+            )
+        }
+        cand = {
+            "memory_regions": _memory_regions_block(
+                "gnu", DTCM=(1200, 8800), ITCM=(1, 1), MRAM=(2, 2), SRAM=(500, 500)
+            )
+        }
 
         rows = {m.name: m for m in _compare_metrics(base, cand)}
 
         assert list(n for n in rows if n.startswith("memory_regions.")) == [
+            "memory_regions.ITCM.used",
+            "memory_regions.ITCM.free",
+            "memory_regions.MRAM.used",
+            "memory_regions.MRAM.free",
             "memory_regions.DTCM.used",
             "memory_regions.DTCM.free",
             "memory_regions.SRAM.used",
@@ -645,9 +752,32 @@ class TestMemoryRegionRows:
         from helia_profiler.evaluation.run_metrics import _METRIC_FIELDS
 
         directions = {f.name: f.lower_is_better for f in _METRIC_FIELDS}
-        assert directions["layers"] is False
-        assert directions["power.inferences_per_joule"] is False
-        assert directions["total_cycles"] is True
+        # The complete table, so a direction cannot change unnoticed. Note
+        # power.inferences_per_joule: main's ``name != "layers"`` hack
+        # coloured a throughput DROP green; the declaration corrects it.
+        assert {n for n, lower in directions.items() if not lower} == {
+            "layers",
+            "power.inferences_per_joule",
+        }
+        assert {n for n, lower in directions.items() if lower} == {
+            "total_cycles",
+            "device_profiled_infer_avg_us",
+            "device_profiled_infer_total_us",
+            "binary.text",
+            "binary.data",
+            "binary.bss",
+            "binary.reserved",
+            "binary.total",
+            "memory.arena_size",
+            "memory.allocated_arena",
+            "memory.model_size",
+            "power.avg_current_a",
+            "power.avg_power_w",
+            "power.peak_current_a",
+            "power.energy_j",
+            "power.duration_s",
+            "power.energy_per_inference_j",
+        }
         groups = {f.name: f.group for f in _METRIC_FIELDS}
         assert all(
             (g == "power") == n.startswith("power.") for n, g in groups.items()

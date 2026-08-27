@@ -118,6 +118,19 @@ def test_family_membership_and_order_are_the_documented_sets():
     assert {d.value for d in non_family} == {"model_sha256", "power_integrity"}
 
 
+def test_family_metric_group_is_the_registry_group_of_its_dimensions():
+    """#213 lens 1: a family literal ``metric_group="memory"`` would pass the
+    membership census while its specs said something else. Pin both ways."""
+    from helia_profiler.results.dimensions import DIMENSION_REGISTRY, uniform_metric_group
+    from helia_profiler.results.issues import COMPARABILITY_FAMILIES
+
+    for family in COMPARABILITY_FAMILIES:
+        assert family.metric_group == uniform_metric_group(family.dimensions), family
+        assert all(
+            DIMENSION_REGISTRY[d].metric_group == family.metric_group for d in family.dimensions
+        ), family
+
+
 def test_family_rejects_foreign_dimension():
     with pytest.raises(ReportError):
         POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.HPX_VERSION)
