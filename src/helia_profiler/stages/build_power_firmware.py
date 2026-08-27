@@ -67,10 +67,6 @@ class BuildPowerFirmwareStage:
                 raise BuildError("Dependency workspace identity is unavailable.")
             with workspace_mutex(ctx.dependency_workspace):
                 render_power_source(ctx, inference_count=ctx.power_run.plan.inference_count)
-                ctx.power_firmware = None
-                ctx.deployed_power_firmware = None
-                ctx.power_binary_path = None
-                ctx.power_result = None
                 if ctx.power_run is not None:
                     ctx.power_run = replace(
                         ctx.power_run,
@@ -96,17 +92,16 @@ class BuildPowerFirmwareStage:
 
         binary_path = _find_target_binary(ctx.build_dir, "hpx_profiler_power")
         if binary_path is None:
-            raise BuildError(
-                "Incremental build succeeded but hpx_profiler_power was not found."
+            raise BuildError("Incremental build succeeded but hpx_profiler_power was not found.")
+        ctx.publish_power_firmware(
+            FirmwareArtifact(
+                role="power",
+                target_name="hpx_profiler_power",
+                app_dir=ctx.firmware_dir,
+                build_dir=ctx.build_dir,
+                binary_path=binary_path,
             )
-        ctx.power_binary_path = binary_path
-        ctx.publish_power_firmware(FirmwareArtifact(
-            role="power",
-            target_name="hpx_profiler_power",
-            app_dir=ctx.firmware_dir,
-            build_dir=ctx.build_dir,
-            binary_path=binary_path,
-        ))
+        )
         log.info(
             "Power firmware rebuilt: %s (N=%d, source=%s)",
             binary_path,

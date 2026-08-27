@@ -9,6 +9,8 @@ catch.
 
 from __future__ import annotations
 
+from tests.pipeline_context_helpers import set_power_result
+
 from pathlib import Path
 
 from helia_profiler.power.base import PowerResult, PowerSummary
@@ -26,11 +28,7 @@ from .conftest import make_pmu_ctx
 
 
 def _authoritative(dims: tuple[ComparisonDimension, ...]) -> set[str]:
-    return {
-        dim.value
-        for dim in dims
-        if DIMENSION_REGISTRY[dim].manifest_authoritative
-    }
+    return {dim.value for dim in dims if DIMENSION_REGISTRY[dim].manifest_authoritative}
 
 
 def test_registry_covers_the_enum_exactly():
@@ -55,11 +53,14 @@ def test_manifest_writer_records_every_authoritative_dimension(tmp_path: Path):
     # manifest-authoritative dimensions — power_lockstep's exclusion is the
     # tested rule, not a comment.
     ctx = make_pmu_ctx(tmp_path, board="apollo510_evb", power_enabled=True)
-    ctx.power_result = PowerResult(
-        summary=PowerSummary(0.01, 0.018, 0.02, 0.18, 10.0, 10000),
-        metadata=PowerMetadata(
-            measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
-            integrity=PowerIntegrity.VALID,
+    set_power_result(
+        ctx,
+        PowerResult(
+            summary=PowerSummary(0.01, 0.018, 0.02, 0.18, 10.0, 10000),
+            metadata=PowerMetadata(
+                measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
+                integrity=PowerIntegrity.VALID,
+            ),
         ),
     )
     recorded = set(_comparability(ctx))
@@ -105,9 +106,7 @@ def test_reader_reads_every_artifact_sourced_dimension(tmp_path: Path):
     from helia_profiler.evaluation.comparability import _dimensions
 
     without_power = set(_dimensions(_run_artifacts(tmp_path, power=None)))
-    with_power = set(
-        _dimensions(_run_artifacts(tmp_path, power={"measurement_scope": "x"}))
-    )
+    with_power = set(_dimensions(_run_artifacts(tmp_path, power={"measurement_scope": "x"})))
     base = {
         spec.dimension
         for spec in DIMENSION_REGISTRY.values()

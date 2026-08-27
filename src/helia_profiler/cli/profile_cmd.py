@@ -2,44 +2,144 @@
 
 from __future__ import annotations
 
-import argparse
 import sys
+from pathlib import Path
 
 from ..results import ResultValidity
 
 
-def _cmd_profile(args: argparse.Namespace) -> None:
+def _cmd_profile(
+    *,
+    model: Path | None = None,
+    config: Path | None = None,
+    verbose: int = 0,
+    engine: str | None = None,
+    engine_config: Path | None = None,
+    arena_size: int | None = None,
+    runtime_arena_location: str | None = None,
+    runtime_weights_location: str | None = None,
+    core_override: str | None = None,
+    board: str | None = None,
+    toolchain: str | None = None,
+    jlink_serial: str | None = None,
+    transport: str | None = None,
+    usb_port: str | None = None,
+    rtt_buffer_size_up: int | None = None,
+    cpu_clock: str | None = None,
+    frozen: bool = False,
+    offline: bool = False,
+    update_dependencies: bool = False,
+    nsx_channel: str | None = None,
+    nsx_module: list[str] | None = None,
+    compiler_launcher: str | None = None,
+    no_compiler_launcher: bool = False,
+    pmu_counters: list[str] | None = None,
+    per_layer: bool | None = None,
+    iterations: int | None = None,
+    warmup: int | None = None,
+    aggregation: str | None = None,
+    power: bool = False,
+    power_driver: str | None = None,
+    power_mode: str | None = None,
+    power_duration: int | None = None,
+    power_firmware: str | None = None,
+    power_reset_strategy: str | None = None,
+    sync_gpio: int | None = None,
+    ensure_power: bool = False,
+    no_ensure_power: bool = False,
+    power_serial: str | None = None,
+    output_dir: Path | None = None,
+    output_format: str | None = None,
+    no_model_explorer: bool = False,
+    fail_on_invalid: bool = False,
+    detailed: bool = False,
+    work_dir: Path | None = None,
+    clean: bool = False,
+) -> None:
     """Run the profiling pipeline."""
     from ..config import load_config
     from ..console import HpxConsole
     from ..errors import HpxError
 
-    # Build CLI overrides dict from parsed args
+    # Build CLI overrides dict from the typed CLI values
     cli: dict = {}
-    _apply_model_engine_overrides(args, cli)
-    _apply_target_overrides(args, cli)
-    _apply_pmu_overrides(args, cli)
-    _apply_power_overrides(args, cli)
-    _apply_output_overrides(args, cli)
-    _apply_workdir_overrides(args, cli)
-    _apply_build_overrides(args, cli)
+    _apply_model_engine_overrides(
+        cli,
+        model=model,
+        arena_size=arena_size,
+        runtime_arena_location=runtime_arena_location,
+        runtime_weights_location=runtime_weights_location,
+        core_override=core_override,
+        engine=engine,
+        engine_config=engine_config,
+    )
+    _apply_target_overrides(
+        cli,
+        board=board,
+        toolchain=toolchain,
+        jlink_serial=jlink_serial,
+        transport=transport,
+        usb_port=usb_port,
+        rtt_buffer_size_up=rtt_buffer_size_up,
+        cpu_clock=cpu_clock,
+        frozen=frozen,
+        offline=offline,
+        update_dependencies=update_dependencies,
+    )
+    _apply_pmu_overrides(
+        cli,
+        pmu_counters=pmu_counters,
+        per_layer=per_layer,
+        iterations=iterations,
+        warmup=warmup,
+        aggregation=aggregation,
+    )
+    _apply_power_overrides(
+        cli,
+        power=power,
+        power_driver=power_driver,
+        power_firmware=power_firmware,
+        power_mode=power_mode,
+        power_duration=power_duration,
+        power_reset_strategy=power_reset_strategy,
+        sync_gpio=sync_gpio,
+        ensure_power=ensure_power,
+        no_ensure_power=no_ensure_power,
+        power_serial=power_serial,
+    )
+    _apply_output_overrides(
+        cli,
+        output_dir=output_dir,
+        output_format=output_format,
+        no_model_explorer=no_model_explorer,
+        detailed=detailed,
+        fail_on_invalid=fail_on_invalid,
+    )
+    _apply_workdir_overrides(cli, work_dir=work_dir, clean=clean, verbose=verbose)
+    _apply_build_overrides(
+        cli,
+        nsx_channel=nsx_channel,
+        compiler_launcher=compiler_launcher,
+        no_compiler_launcher=no_compiler_launcher,
+        nsx_module=nsx_module,
+    )
 
     # Use the CLI's own --verbose flag for error reporting during config load,
     # since a ConfigError means we never get a resolved ProfileConfig.verbose.
-    console = HpxConsole(args.verbose)
+    console = HpxConsole(verbose)
 
     try:
-        config = load_config(args.config, cli)
+        resolved_config = load_config(config, cli)
     except HpxError as exc:
         console.print_error(exc)
         sys.exit(1)
 
-    console = HpxConsole(config.verbose)
+    console = HpxConsole(resolved_config.verbose)
 
     from ..profiler import run_profile
 
     try:
-        ctx = run_profile(config, console=console)
+        ctx = run_profile(resolved_config, console=console)
     except KeyboardInterrupt:
         console.print_interrupted()
         sys.exit(130)
@@ -64,58 +164,89 @@ def _cmd_profile(args: argparse.Namespace) -> None:
         sys.exit(3)
 
 
-def _apply_model_engine_overrides(args: argparse.Namespace, cli: dict) -> None:
+def _apply_model_engine_overrides(
+    cli: dict,
+    *,
+    model: Path | None,
+    arena_size: int | None,
+    runtime_arena_location: str | None,
+    runtime_weights_location: str | None,
+    core_override: str | None,
+    engine: str | None,
+    engine_config: Path | None,
+) -> None:
     """Apply model/arena/engine CLI flags onto the config overrides dict."""
-    if args.model is not None:
-        cli.setdefault("model", {})["path"] = str(args.model)
-    if args.arena_size is not None:
-        cli.setdefault("model", {})["arena_size"] = args.arena_size
-    if args.runtime_arena_location is not None:
-        cli.setdefault("model", {})["arena_location"] = args.runtime_arena_location
-    if args.runtime_weights_location is not None:
-        cli.setdefault("model", {})["weights_location"] = args.runtime_weights_location
-    if args.core_override is not None:
-        cli.setdefault("engine", {}).setdefault("config", {})["core_override"] = args.core_override
+    if model is not None:
+        cli.setdefault("model", {})["path"] = str(model)
+    if arena_size is not None:
+        cli.setdefault("model", {})["arena_size"] = arena_size
+    if runtime_arena_location is not None:
+        cli.setdefault("model", {})["arena_location"] = runtime_arena_location
+    if runtime_weights_location is not None:
+        cli.setdefault("model", {})["weights_location"] = runtime_weights_location
+    if core_override is not None:
+        cli.setdefault("engine", {}).setdefault("config", {})["core_override"] = core_override
 
-    if args.engine is not None:
-        cli.setdefault("engine", {})["type"] = args.engine
-    if args.engine_config is not None:
-        cli.setdefault("engine", {})["config_path"] = str(args.engine_config)
+    if engine is not None:
+        cli.setdefault("engine", {})["type"] = engine
+    if engine_config is not None:
+        cli.setdefault("engine", {})["config_path"] = str(engine_config)
 
 
-def _apply_target_overrides(args: argparse.Namespace, cli: dict) -> None:
+def _apply_target_overrides(
+    cli: dict,
+    *,
+    board: str | None,
+    toolchain: str | None,
+    jlink_serial: str | None,
+    transport: str | None,
+    usb_port: str | None,
+    rtt_buffer_size_up: int | None,
+    cpu_clock: str | None,
+    frozen: bool,
+    offline: bool,
+    update_dependencies: bool,
+) -> None:
     """Apply target-hardware CLI flags onto the config overrides dict."""
-    if args.board is not None:
-        cli.setdefault("target", {})["board"] = args.board
-    if args.toolchain is not None:
-        cli.setdefault("target", {})["toolchain"] = args.toolchain
-    if args.jlink_serial is not None:
-        cli.setdefault("target", {})["jlink_serial"] = args.jlink_serial
-    if args.transport is not None:
-        cli.setdefault("target", {})["transport"] = args.transport
-    if getattr(args, "usb_port", None) is not None:
-        cli.setdefault("target", {})["usb_port"] = args.usb_port
-    if args.rtt_buffer_size_up is not None:
-        cli.setdefault("target", {})["rtt_buffer_size_up"] = args.rtt_buffer_size_up
+    if board is not None:
+        cli.setdefault("target", {})["board"] = board
+    if toolchain is not None:
+        cli.setdefault("target", {})["toolchain"] = toolchain
+    if jlink_serial is not None:
+        cli.setdefault("target", {})["jlink_serial"] = jlink_serial
+    if transport is not None:
+        cli.setdefault("target", {})["transport"] = transport
+    if usb_port is not None:
+        cli.setdefault("target", {})["usb_port"] = usb_port
+    if rtt_buffer_size_up is not None:
+        cli.setdefault("target", {})["rtt_buffer_size_up"] = rtt_buffer_size_up
     clock_sel: dict[str, str] = {}
-    if args.cpu_clock is not None:
-        clock_sel["cpu"] = args.cpu_clock
+    if cpu_clock is not None:
+        clock_sel["cpu"] = cpu_clock
     if clock_sel:
         cli.setdefault("target", {})["clock"] = clock_sel
-    if args.frozen:
+    if frozen:
         cli["frozen"] = True
-    if getattr(args, "offline", False):
+    if offline:
         cli.setdefault("build", {})["offline"] = True
-    if getattr(args, "update_dependencies", False):
+    if update_dependencies:
         cli.setdefault("build", {})["update_dependencies"] = True
 
 
-def _apply_pmu_overrides(args: argparse.Namespace, cli: dict) -> None:
+def _apply_pmu_overrides(
+    cli: dict,
+    *,
+    pmu_counters: list[str] | None,
+    per_layer: bool | None,
+    iterations: int | None,
+    warmup: int | None,
+    aggregation: str | None,
+) -> None:
     """Apply PMU-profiling CLI flags onto the config overrides dict."""
-    if args.pmu_counters is not None:
+    if pmu_counters is not None:
         # Parse GROUP:SELECT pairs into a dict
-        pmu_counters: dict[str, str | list[str]] = {}
-        for spec in args.pmu_counters:
+        parsed_counters: dict[str, str | list[str]] = {}
+        for spec in pmu_counters:
             if ":" not in spec:
                 print(
                     f"Error: --pmu-counters format is GROUP:SELECT "
@@ -125,79 +256,108 @@ def _apply_pmu_overrides(args: argparse.Namespace, cli: dict) -> None:
                 sys.exit(1)
             group, sel = spec.split(":", 1)
             if sel in ("default", "all"):
-                pmu_counters[group] = sel
+                parsed_counters[group] = sel
             else:
-                pmu_counters[group] = sel.split(",")
-        cli.setdefault("profiling", {})["pmu_counters"] = pmu_counters
-    if args.per_layer is not None:
-        cli.setdefault("profiling", {})["per_layer"] = args.per_layer
-    if args.iterations is not None:
-        cli.setdefault("profiling", {})["iterations"] = args.iterations
-    if args.warmup is not None:
-        cli.setdefault("profiling", {})["warmup"] = args.warmup
-    if getattr(args, "aggregation", None) is not None:
-        cli.setdefault("profiling", {})["aggregation"] = args.aggregation
+                parsed_counters[group] = sel.split(",")
+        cli.setdefault("profiling", {})["pmu_counters"] = parsed_counters
+    if per_layer is not None:
+        cli.setdefault("profiling", {})["per_layer"] = per_layer
+    if iterations is not None:
+        cli.setdefault("profiling", {})["iterations"] = iterations
+    if warmup is not None:
+        cli.setdefault("profiling", {})["warmup"] = warmup
+    if aggregation is not None:
+        cli.setdefault("profiling", {})["aggregation"] = aggregation
 
 
-def _apply_power_overrides(args: argparse.Namespace, cli: dict) -> None:
+def _apply_power_overrides(
+    cli: dict,
+    *,
+    power: bool,
+    power_driver: str | None,
+    power_firmware: str | None,
+    power_mode: str | None,
+    power_duration: int | None,
+    power_reset_strategy: str | None,
+    sync_gpio: int | None,
+    ensure_power: bool,
+    no_ensure_power: bool,
+    power_serial: str | None,
+) -> None:
     """Apply power-measurement CLI flags onto the config overrides dict."""
-    if args.power:
+    if power:
         cli.setdefault("power", {})["enabled"] = True
-    if args.power_driver is not None:
-        cli.setdefault("power", {})["driver"] = args.power_driver
-    if getattr(args, "power_firmware", None) is not None:
-        cli.setdefault("power", {})["firmware"] = args.power_firmware
-    if args.power_mode is not None:
-        cli.setdefault("power", {})["mode"] = args.power_mode
-    if args.power_duration is not None:
-        cli.setdefault("power", {})["duration_s"] = args.power_duration
-    if getattr(args, "power_reset_strategy", None) is not None:
-        cli.setdefault("power", {})["reset_strategy"] = args.power_reset_strategy
-    if args.sync_gpio is not None:
-        cli.setdefault("power", {})["sync_gpio_pin"] = args.sync_gpio
-    if getattr(args, "ensure_power", False):
+    if power_driver is not None:
+        cli.setdefault("power", {})["driver"] = power_driver
+    if power_firmware is not None:
+        cli.setdefault("power", {})["firmware"] = power_firmware
+    if power_mode is not None:
+        cli.setdefault("power", {})["mode"] = power_mode
+    if power_duration is not None:
+        cli.setdefault("power", {})["duration_s"] = power_duration
+    if power_reset_strategy is not None:
+        cli.setdefault("power", {})["reset_strategy"] = power_reset_strategy
+    if sync_gpio is not None:
+        cli.setdefault("power", {})["sync_gpio_pin"] = sync_gpio
+    if ensure_power:
         cli.setdefault("target", {})["ensure_board_powered"] = True
-    if getattr(args, "no_ensure_power", False):
+    if no_ensure_power:
         cli.setdefault("target", {})["ensure_board_powered"] = False
-    if getattr(args, "power_serial", None):
-        cli.setdefault("power", {})["serial"] = args.power_serial
+    if power_serial:
+        cli.setdefault("power", {})["serial"] = power_serial
 
 
-def _apply_output_overrides(args: argparse.Namespace, cli: dict) -> None:
+def _apply_output_overrides(
+    cli: dict,
+    *,
+    output_dir: Path | None,
+    output_format: str | None,
+    no_model_explorer: bool,
+    detailed: bool,
+    fail_on_invalid: bool,
+) -> None:
     """Apply output-related CLI flags onto the config overrides dict."""
-    if args.output_dir is not None:
-        cli.setdefault("output", {})["dir"] = str(args.output_dir)
-    if args.output_format is not None:
-        cli.setdefault("output", {})["format"] = args.output_format
-    if args.no_model_explorer:
+    if output_dir is not None:
+        cli.setdefault("output", {})["dir"] = str(output_dir)
+    if output_format is not None:
+        cli.setdefault("output", {})["format"] = output_format
+    if no_model_explorer:
         cli.setdefault("output", {})["model_explorer"] = False
-    if args.detailed:
+    if detailed:
         cli.setdefault("output", {})["detailed"] = True
-    if getattr(args, "fail_on_invalid", False):
+    if fail_on_invalid:
         cli.setdefault("output", {})["fail_on_invalid"] = True
 
 
-def _apply_workdir_overrides(args: argparse.Namespace, cli: dict) -> None:
+def _apply_workdir_overrides(
+    cli: dict, *, work_dir: Path | None, clean: bool, verbose: int
+) -> None:
     """Apply working-directory/advanced CLI flags onto the config overrides dict."""
-    if args.work_dir is not None:
-        cli["work_dir"] = str(args.work_dir)
-    if args.clean:
+    if work_dir is not None:
+        cli["work_dir"] = str(work_dir)
+    if clean:
         cli["clean"] = True
-    cli["verbose"] = args.verbose
+    cli["verbose"] = verbose
 
 
-def _apply_build_overrides(args: argparse.Namespace, cli: dict) -> None:
+def _apply_build_overrides(
+    cli: dict,
+    *,
+    nsx_channel: str | None,
+    compiler_launcher: str | None,
+    no_compiler_launcher: bool,
+    nsx_module: list[str] | None,
+) -> None:
     """Apply build/NSX-override CLI flags onto the config overrides dict."""
-    if getattr(args, "nsx_channel", None):
-        cli.setdefault("build", {})["channel"] = args.nsx_channel
-    if getattr(args, "no_compiler_launcher", False):
+    if nsx_channel:
+        cli.setdefault("build", {})["channel"] = nsx_channel
+    if no_compiler_launcher:
         cli.setdefault("build", {})["compiler_launcher"] = "none"
-    elif getattr(args, "compiler_launcher", None):
-        cli.setdefault("build", {})["compiler_launcher"] = args.compiler_launcher
-    nsx_overrides_raw = getattr(args, "nsx_module_overrides", None)
-    if nsx_overrides_raw:
+    elif compiler_launcher:
+        cli.setdefault("build", {})["compiler_launcher"] = compiler_launcher
+    if nsx_module:
         nsx_modules: dict[str, dict[str, str]] = {}
-        for spec in nsx_overrides_raw:
+        for spec in nsx_module:
             if ":" not in spec:
                 print(
                     f"Error: --nsx-module format is NAME:KEY=VALUE "

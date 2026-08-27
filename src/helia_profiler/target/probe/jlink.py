@@ -118,7 +118,7 @@ def find_jlink_exe() -> str:
     # 1. Explicit env var
     env_path = os.environ.get("JLINK_PATH")
     if env_path:
-        if os.path.isfile(env_path):
+        if Path(env_path).is_file():
             return env_path
         raise CaptureError(
             f"JLINK_PATH={env_path} does not exist or is not a file",
@@ -133,14 +133,14 @@ def find_jlink_exe() -> str:
     program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
     program_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
     candidates = [
-        "/usr/local/bin/JLinkExe",
-        "/Applications/SEGGER/JLink/JLinkExe",
-        os.path.join(program_files, "SEGGER", "JLink", "JLink.exe"),
-        os.path.join(program_files_x86, "SEGGER", "JLink", "JLink.exe"),
+        Path("/usr/local/bin/JLinkExe"),
+        Path("/Applications/SEGGER/JLink/JLinkExe"),
+        Path(program_files, "SEGGER", "JLink", "JLink.exe"),
+        Path(program_files_x86, "SEGGER", "JLink", "JLink.exe"),
     ]
     for candidate in candidates:
-        if os.path.isfile(candidate):
-            return candidate
+        if candidate.is_file():
+            return str(candidate)
     # SEGGER's Windows installer defaults to a versioned directory
     # (e.g. JLink_V960) rather than plain "JLink"; prefer the
     # highest-sorting one when several coexist.

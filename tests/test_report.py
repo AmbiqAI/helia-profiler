@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.pipeline_context_helpers import set_power_result, set_profile_result
+
 import csv
 import json
 from pathlib import Path
@@ -148,17 +150,20 @@ def test_write_summary_surfaces_the_clean_window_self_check(tmp_path: Path):
     # None exercises only the fallback elif -- the three device_clean_* lines
     # could be deleted from the shipping branch with the whole suite green.
     ctx.run_metadata.timing = TimingInfo(capture_duration_s=1.0)
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(
-            clean_infer_count=1092,
-            clean_infer_avg_us=684,
-            clean_stalled_iters=0,
-            clean_partial_iters=0,
-            clean_ref_cycles=83300,
-            clean_dwt_rate_cyc=96_000,
-            clean_dwt_rate_us=1000,
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(
+                clean_infer_count=1092,
+                clean_infer_avg_us=684,
+                clean_stalled_iters=0,
+                clean_partial_iters=0,
+                clean_ref_cycles=83300,
+                clean_dwt_rate_cyc=96_000,
+                clean_dwt_rate_us=1000,
+            ),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
         ),
-        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
     )
 
     summary = json.loads(_write_summary(ctx, tmp_path).read_text())
@@ -171,9 +176,12 @@ def test_write_summary_surfaces_the_clean_window_self_check(tmp_path: Path):
 
     # Firmware that never reported them omits the keys entirely rather than
     # publishing a 0 that would read as "checked, healthy".
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(clean_infer_count=1092, clean_infer_avg_us=684),
-        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(clean_infer_count=1092, clean_infer_avg_us=684),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+        ),
     )
     silent = json.loads(_write_summary(ctx, tmp_path).read_text())
     for key in (
@@ -187,9 +195,12 @@ def test_write_summary_surfaces_the_clean_window_self_check(tmp_path: Path):
 
     # And the fallback branch carries them too, for a capture with no timing.
     ctx.run_metadata.timing = None
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(clean_stalled_iters=4, clean_infer_count=1092),
-        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(clean_stalled_iters=4, clean_infer_count=1092),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+        ),
     )
     fallback = json.loads(_write_summary(ctx, tmp_path).read_text())
     assert fallback["latency"]["device_clean_stalled_iters"] == 4
@@ -204,13 +215,16 @@ def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(
-            profiled_infer_count=6,
-            profiled_infer_total_us=48000,
-            profiled_infer_avg_us=8000,
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(
+                profiled_infer_count=6,
+                profiled_infer_total_us=48000,
+                profiled_infer_avg_us=8000,
+            ),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
         ),
-        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
     )
 
     out_path = _write_summary(ctx, tmp_path)
@@ -222,7 +236,9 @@ def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):
         "device_profiled_infer_avg_us": 8000,
     }
     assert summary["schema"] == "hpx.run-summary"
-    assert summary["schema_version"] == 4  # v2: #24 binary.bss; v3: #133 memory_regions; v4: #142/#181 gate verdict
+    assert (
+        summary["schema_version"] == 4
+    )  # v2: #24 binary.bss; v3: #133 memory_regions; v4: #142/#181 gate verdict
     assert summary["validity"] == "valid"
     assert summary["issues"] == []
 
@@ -236,20 +252,23 @@ def test_write_summary_includes_psram_diagnostics(tmp_path: Path):
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(
-            psram=PsramInfo(
-                size_bytes=67_108_864,
-                clock_hz=125_000_000,
-                capabilities=7,
-                state=1,
-                last_init_status=0,
-                xip_enabled=True,
-                timing_status=2,
-                rxdqs_delay=14,
-            )
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(
+                psram=PsramInfo(
+                    size_bytes=67_108_864,
+                    clock_hz=125_000_000,
+                    capabilities=7,
+                    state=1,
+                    last_init_status=0,
+                    xip_enabled=True,
+                    timing_status=2,
+                    rxdqs_delay=14,
+                )
+            ),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
         ),
-        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
     )
 
     summary = json.loads(_write_summary(ctx, tmp_path).read_text())
@@ -275,19 +294,22 @@ def test_write_run_metadata_includes_psram_diagnostics(tmp_path: Path):
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(
-            psram=PsramInfo(
-                size_bytes=67_108_864,
-                clock_hz=125_000_000,
-                capabilities=7,
-                state=1,
-                last_init_status=0,
-                xip_enabled=True,
-                timing_status=2,
-                rxdqs_delay=14,
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(
+                psram=PsramInfo(
+                    size_bytes=67_108_864,
+                    clock_hz=125_000_000,
+                    capabilities=7,
+                    state=1,
+                    last_init_status=0,
+                    xip_enabled=True,
+                    timing_status=2,
+                    rxdqs_delay=14,
+                )
             )
-        )
+        ),
     )
 
     metadata = json.loads(_write_run_metadata(ctx, tmp_path).read_text())
@@ -313,14 +335,20 @@ def test_write_run_metadata_includes_target_lifecycle(tmp_path: Path):
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(),
-        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+        ),
     )
-    ctx.power_result = PowerResult(
-        summary=PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0),
-        metadata=PowerMetadata(
-            target_lifecycle=_LIFECYCLE_PLAN,
+    set_power_result(
+        ctx,
+        PowerResult(
+            summary=PowerSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0),
+            metadata=PowerMetadata(
+                target_lifecycle=_LIFECYCLE_PLAN,
+            ),
         ),
     )
 
@@ -392,9 +420,12 @@ def test_write_report_publishes_verifiable_manifest_last(tmp_path: Path):
         timestamp="2026-07-18T00:00:00+00:00",
         config_snapshot={"engine": {"type": "helia-rt"}},
     )
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(),
-        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+        ),
     )
     expected_lock = _attach_dependency_lock(ctx, tmp_path)
 
@@ -433,25 +464,26 @@ def test_manifest_classifies_model_explorer_as_optional_export(tmp_path: Path):
         run_id="run-1",
         timestamp="2026-07-18T00:00:00+00:00",
     )
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(),
-        layers=[
-            LayerResult(
-                id=0,
-                op="CONV_2D",
-                cycles=1000.0,
-                counters={"ARM_PMU_CPU_CYCLES": 1000.0},
-            )
-        ],
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(),
+            layers=[
+                LayerResult(
+                    id=0,
+                    op="CONV_2D",
+                    cycles=1000.0,
+                    counters={"ARM_PMU_CPU_CYCLES": 1000.0},
+                )
+            ],
+        ),
     )
     _attach_dependency_lock(ctx, tmp_path)
 
     paths = write_report(ctx)
     manifest = load_result_manifest(paths[-1], verify=True)
     overlay = next(
-        artifact
-        for artifact in manifest.artifacts
-        if artifact.path.startswith("model_explorer/")
+        artifact for artifact in manifest.artifacts if artifact.path.startswith("model_explorer/")
     )
 
     assert overlay.role == "export"
@@ -473,9 +505,12 @@ def test_write_report_invalidates_previous_manifest_before_writing(
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(),
-        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+        ),
     )
     stale = tmp_path / "result_manifest.json"
     stale.write_text('{"status": "complete"}\n')
@@ -505,48 +540,54 @@ def test_write_summary_prefers_gpio_gated_power_when_present(tmp_path: Path):
         total_ops=2000,
         num_parameters=10,
     )
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(clean_infer_count=10, clean_infer_avg_us=25000),
-        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
-    )
-    ctx.power_result = PowerResult(
-        summary=PowerSummary(
-            avg_current_a=0.01,
-            avg_power_w=0.02,
-            peak_current_a=0.03,
-            energy_j=0.5,
-            duration_s=0.25,
-            sample_count=100,
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(clean_infer_count=10, clean_infer_avg_us=25000),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
         ),
-        gated_windows=[
-            GatedPowerWindow(
-                start_s=0.0,
-                end_s=0.25,
-                duration_s=0.25,
-                charge_c=0.0025,
-                energy_j=0.5,
+    )
+    set_power_result(
+        ctx,
+        PowerResult(
+            summary=PowerSummary(
                 avg_current_a=0.01,
                 avg_power_w=0.02,
                 peak_current_a=0.03,
+                energy_j=0.5,
+                duration_s=0.25,
                 sample_count=100,
-            )
-        ],
-        metadata=PowerMetadata(
-            measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
-            sync_input_index=0,
-            gating_method="gpi_snapshot_poll",
-            target_lifecycle=_LIFECYCLE_PLAN,
-            sync=SyncHandshakeMetadata(lockstep=True, ready_wait_s=0.012),
-            sync_timing_s=GateTransitionTiming(go_release_to_gate_rise_s=0.004),
-            short_gate_pulses_ignored=3,
-            whole_capture_summary={
-                "avg_current_a": 0.003,
-                "avg_power_w": 0.006,
-                "peak_current_a": 0.02,
-                "energy_j": 0.04,
-                "duration_s": 7.0,
-                "sample_count": 14,
-            },
+            ),
+            gated_windows=[
+                GatedPowerWindow(
+                    start_s=0.0,
+                    end_s=0.25,
+                    duration_s=0.25,
+                    charge_c=0.0025,
+                    energy_j=0.5,
+                    avg_current_a=0.01,
+                    avg_power_w=0.02,
+                    peak_current_a=0.03,
+                    sample_count=100,
+                )
+            ],
+            metadata=PowerMetadata(
+                measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
+                sync_input_index=0,
+                gating_method="gpi_snapshot_poll",
+                target_lifecycle=_LIFECYCLE_PLAN,
+                sync=SyncHandshakeMetadata(lockstep=True, ready_wait_s=0.012),
+                sync_timing_s=GateTransitionTiming(go_release_to_gate_rise_s=0.004),
+                short_gate_pulses_ignored=3,
+                whole_capture_summary={
+                    "avg_current_a": 0.003,
+                    "avg_power_w": 0.006,
+                    "peak_current_a": 0.02,
+                    "energy_j": 0.04,
+                    "duration_s": 7.0,
+                    "sample_count": 14,
+                },
+            ),
         ),
     )
 
@@ -578,36 +619,42 @@ def _gated_power_ctx(
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(
-            clean_infer_count=clean_infer_count,
-            clean_infer_avg_us=clean_infer_avg_us,
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(
+                clean_infer_count=clean_infer_count,
+                clean_infer_avg_us=clean_infer_avg_us,
+            ),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
         ),
-        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
     )
-    ctx.power_result = PowerResult(
-        summary=PowerSummary(
-            avg_current_a=0.004,
-            avg_power_w=0.008,
-            peak_current_a=0.006,
-            energy_j=0.0016,
-            duration_s=duration_s,
-            sample_count=100,
-        ),
-        gated_windows=[
-            GatedPowerWindow(
-                start_s=0.0,
-                end_s=duration_s,
-                duration_s=duration_s,
-                charge_c=0.0002,
-                energy_j=0.0016,
+    set_power_result(
+        ctx,
+        PowerResult(
+            summary=PowerSummary(
                 avg_current_a=0.004,
                 avg_power_w=0.008,
                 peak_current_a=0.006,
+                energy_j=0.0016,
+                duration_s=duration_s,
                 sample_count=100,
-            )
-        ],
-        metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
+            ),
+            gated_windows=[
+                GatedPowerWindow(
+                    start_s=0.0,
+                    end_s=duration_s,
+                    duration_s=duration_s,
+                    charge_c=0.0002,
+                    energy_j=0.0016,
+                    avg_current_a=0.004,
+                    avg_power_w=0.008,
+                    peak_current_a=0.006,
+                    sample_count=100,
+                )
+            ],
+            metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
+        ),
     )
     return ctx
 
@@ -653,12 +700,15 @@ def _attach_power_terminal(
 ) -> None:
     """Dedicated-mode terminal envelope, the observer that arbitrates the
     est*count band (#142/#181)."""
+    existing = ctx.power_run
     ctx.power_run = PowerRun(
         plan=PowerRunPlan(
             firmware_mode="dedicated",
             inference_count=count,
         ),
-        observation=None,
+        firmware=existing.firmware if existing is not None else None,
+        deployment=existing.deployment if existing is not None else None,
+        observation=existing.observation if existing is not None else None,
         terminal=PowerTerminalRecord(
             version=1,
             status="ok",
@@ -768,8 +818,7 @@ def test_write_summary_renders_the_evaluation_verdict(tmp_path: Path):
     summary = json.loads(out_path.read_text())
 
     assert (
-        summary["power"]["gated_window_reference_drift"]
-        == evaluation.gate_arbitration.drift_note
+        summary["power"]["gated_window_reference_drift"] == evaluation.gate_arbitration.drift_note
     )
     assert evaluation.gate_arbitration.suppress_per_inference is False
     assert "gated_window_duration_suspect" not in summary["power"]
@@ -801,9 +850,12 @@ def test_write_report_evaluates_the_run_exactly_once(
         timestamp="2026-07-18T00:00:00+00:00",
         config_snapshot={"engine": {"type": "helia-rt"}},
     )
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(),
-        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+        ),
     )
     _attach_dependency_lock(ctx, tmp_path)
 
@@ -880,9 +932,7 @@ def test_write_summary_surfaces_window_clock_ceiling(tmp_path: Path):
     # fabricated dict would keep passing after to_metadata() renamed a key,
     # leaving the documented field silently wrong.
     ceiling = WindowClockCeiling(elapsed_us=6_027_000, host_envelope_s=0.9, slack_s=0.05)
-    ctx = _gated_power_ctx(
-        tmp_path, clean_infer_count=10, clean_infer_avg_us=10000, duration_s=0.1
-    )
+    ctx = _gated_power_ctx(tmp_path, clean_infer_count=10, clean_infer_avg_us=10000, duration_s=0.1)
     assert ctx.power_result is not None
     ctx.power_result.metadata.window_clock_ceiling = ceiling
 
@@ -899,17 +949,15 @@ def test_write_summary_carries_the_power_firmware_fingerprint(tmp_path: Path):
     from helia_profiler.firmware import measured_power_fingerprint
     from helia_profiler.results import PowerRunPlan
 
-    ctx = _gated_power_ctx(
-        tmp_path, clean_infer_count=10, clean_infer_avg_us=10000, duration_s=0.1
-    )
+    ctx = _gated_power_ctx(tmp_path, clean_infer_count=10, clean_infer_avg_us=10000, duration_s=0.1)
     # Direct assignment (the same-file PowerRun precedent): publish_power_plan resets
     # power_result, which _gated_power_ctx already installed.
     from helia_profiler.results import PowerRun
 
+    existing = ctx.power_run
     ctx.power_run = PowerRun(
-        plan=PowerRunPlan(
-            firmware_mode="dedicated", inference_count=10, count_source="configured"
-        )
+        plan=PowerRunPlan(firmware_mode="dedicated", inference_count=10, count_source="configured"),
+        observation=existing.observation if existing is not None else None,
     )
     src = tmp_path / "fw" / "src"
     src.mkdir(parents=True)
@@ -921,9 +969,7 @@ def test_write_summary_carries_the_power_firmware_fingerprint(tmp_path: Path):
     # The composite source-set hash (main + profiler TUs) — same helper the
     # writer uses, so this pins passthrough, not the hash construction
     # (tests/test_firmware_fingerprint.py owns that).
-    assert summary["power"]["firmware_code_fingerprint"] == measured_power_fingerprint(
-        ctx
-    )
+    assert summary["power"]["firmware_code_fingerprint"] == measured_power_fingerprint(ctx)
 
     # No rendered source (a hand-built or legacy context): key absent, run OK.
     bare = _gated_power_ctx(
@@ -989,9 +1035,7 @@ def test_busy_loop_probe_publishes_no_per_inference_power_metrics(tmp_path: Path
     ctx = _gated_power_ctx(
         tmp_path, clean_infer_count=1, clean_infer_avg_us=1_000_000, duration_s=1.0
     )
-    object.__setattr__(
-        ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
-    )
+    object.__setattr__(ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP)
 
     summary = json.loads(_write_summary(ctx, tmp_path).read_text())
 
@@ -1024,9 +1068,7 @@ def test_busy_loop_probe_publishes_no_active_window_estimates_either(tmp_path: P
     ctx = _gated_power_ctx(
         tmp_path, clean_infer_count=1, clean_infer_avg_us=1_000_000, duration_s=1.0
     )
-    object.__setattr__(
-        ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
-    )
+    object.__setattr__(ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP)
     assert ctx.power_result is not None and ctx.pmu_result is not None
     ctx.power_result.metadata.measurement_scope = MeasurementScope.ON_DEVICE_GATED_INFERENCE
     object.__setattr__(ctx.pmu_result.meta, "profiled_infer_count", 200)
@@ -1060,12 +1102,15 @@ def test_degraded_free_form_capture_suppresses_derived_efficiency(tmp_path: Path
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(
-            profiled_infer_count=3,
-            profiled_infer_total_us=3000,
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(
+                profiled_infer_count=3,
+                profiled_infer_total_us=3000,
+            ),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
         ),
-        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
     )
     ctx.model_analysis = ModelAnalysis(
         layers=[],
@@ -1073,15 +1118,18 @@ def test_degraded_free_form_capture_suppresses_derived_efficiency(tmp_path: Path
         total_ops=200,
         num_parameters=10,
     )
-    ctx.power_result = PowerResult(
-        summary=PowerSummary(0.01, 0.018, 0.02, 0.18, 10.0, 10000),
-        metadata=PowerMetadata(
-            measurement_scope=MeasurementScope.FREE_FORM_CAPTURE,
-            observation_mode=ObservationMode.FREE_FORM,
-            integrity=PowerIntegrity.DEGRADED,
-            gate_failure=GateFailure(kind=GateFailureKind.NO_GATE_RISE, message="", hint=""),
-            gate_rise_observed=False,
-            gate_fall_observed=False,
+    set_power_result(
+        ctx,
+        PowerResult(
+            summary=PowerSummary(0.01, 0.018, 0.02, 0.18, 10.0, 10000),
+            metadata=PowerMetadata(
+                measurement_scope=MeasurementScope.FREE_FORM_CAPTURE,
+                observation_mode=ObservationMode.FREE_FORM,
+                integrity=PowerIntegrity.DEGRADED,
+                gate_failure=GateFailure(kind=GateFailureKind.NO_GATE_RISE, message="", hint=""),
+                gate_rise_observed=False,
+                gate_fall_observed=False,
+            ),
         ),
     )
     path = _write_summary(ctx, tmp_path)
@@ -1096,9 +1144,7 @@ def test_degraded_free_form_capture_suppresses_derived_efficiency(tmp_path: Path
     assert "active_window_estimated_energy_j" not in summary["power"]
     assert "tops_per_watt" not in summary.get("model_analysis", {})
     assert summary["validity"] == "degraded"
-    assert [issue["code"] for issue in summary["issues"]] == [
-        IssueCode.POWER_OBSERVATION_DEGRADED
-    ]
+    assert [issue["code"] for issue in summary["issues"]] == [IssueCode.POWER_OBSERVATION_DEGRADED]
 
     json_path = _write_json(ctx.pmu_result, ctx.power_result, ctx.run_metadata, tmp_path)
     full = json.loads(json_path.read_text())
@@ -1121,7 +1167,7 @@ def test_summary_serializes_power_terminal_status(tmp_path: Path):
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
-    ctx.pmu_result = PmuResult(meta=FirmwareMeta(), layers=[])
+    set_profile_result(ctx, PmuResult(meta=FirmwareMeta(), layers=[]))
     terminal = PowerTerminalRecord(
         version=1,
         status="ok",
@@ -1148,9 +1194,12 @@ def test_summary_serializes_power_terminal_status(tmp_path: Path):
             calibration_id="board-rev-a",
         ),
     )
-    ctx.power_result = PowerResult(
-        summary=PowerSummary(0.01, 0.018, 0.02, 0.09, 5.0, 5000),
-        metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
+    set_power_result(
+        ctx,
+        PowerResult(
+            summary=PowerSummary(0.01, 0.018, 0.02, 0.09, 5.0, 5000),
+            metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
+        ),
     )
 
     path = _write_summary(ctx, tmp_path)

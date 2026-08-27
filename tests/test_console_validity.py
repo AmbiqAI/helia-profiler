@@ -11,6 +11,8 @@ degrade-don't-abort runs #195 built.
 
 from __future__ import annotations
 
+from tests.pipeline_context_helpers import set_profile_result
+
 from pathlib import Path
 
 import pytest
@@ -35,7 +37,7 @@ def _ctx(tmp_path: Path, *, fail_on_invalid: bool = False) -> PipelineContext:
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
-    ctx.pmu_result = PmuResult(meta=FirmwareMeta(), layers=[])
+    set_profile_result(ctx, PmuResult(meta=FirmwareMeta(), layers=[]))
     return ctx
 
 
@@ -65,9 +67,7 @@ def test_degraded_run_lists_warning_codes_and_messages(tmp_path: Path) -> None:
     ctx = _ctx(tmp_path)
     ctx.run_evaluation = RunEvaluation(
         validity=ResultValidity.DEGRADED,
-        issues=(
-            _issue("power.gate_duration_mismatch", "warning", "Band missed."),
-        ),
+        issues=(_issue("power.gate_duration_mismatch", "warning", "Band missed."),),
     )
 
     text = _render(ctx)
@@ -83,9 +83,7 @@ def test_invalid_run_renders_errors_first_and_the_optin_hint(tmp_path: Path) -> 
         validity=ResultValidity.INVALID,
         issues=(
             _issue("power.gate_duration_mismatch", "warning", "Band missed."),
-            _issue(
-                "power.window_observer_mismatch", "error", "Clocks disagree."
-            ),
+            _issue("power.window_observer_mismatch", "error", "Clocks disagree."),
         ),
     )
 
@@ -93,9 +91,7 @@ def test_invalid_run_renders_errors_first_and_the_optin_hint(tmp_path: Path) -> 
 
     assert "Validity: INVALID" in text
     # Errors render before warnings regardless of issue order.
-    assert text.index("power.window_observer_mismatch") < text.index(
-        "power.gate_duration_mismatch"
-    )
+    assert text.index("power.window_observer_mismatch") < text.index("power.gate_duration_mismatch")
     assert "--fail-on-invalid" in text
 
 
@@ -118,8 +114,6 @@ def test_footer_falls_back_to_a_fresh_evaluation(tmp_path: Path) -> None:
 
 
 def test_fail_on_invalid_exits_3_after_the_run(tmp_path: Path, monkeypatch) -> None:
-    import argparse
-
     import helia_profiler.cli.profile_cmd as profile_cmd
 
     ctx = _ctx(tmp_path, fail_on_invalid=True)
@@ -127,42 +121,18 @@ def test_fail_on_invalid_exits_3_after_the_run(tmp_path: Path, monkeypatch) -> N
         validity=ResultValidity.INVALID,
         issues=(_issue("power.gate_below_minimum", "error", "Too short."),),
     )
-    monkeypatch.setattr(
-        "helia_profiler.profiler.run_profile", lambda config, console: ctx
-    )
+    monkeypatch.setattr("helia_profiler.profiler.run_profile", lambda config, console: ctx)
     # _cmd_profile imports these lazily from their home modules -- patch
     # at the source, not on profile_cmd.
-    monkeypatch.setattr(
-        "helia_profiler.config.load_config", lambda path, cli: ctx.config
-    )
-
-    args = argparse.Namespace(
-        config=None, verbose=0, fail_on_invalid=True
-    )
-    monkeypatch.setattr(
-        profile_cmd, "_apply_model_engine_overrides", lambda a, c: None
-    )
-    for name in (
-        "_apply_target_overrides",
-        "_apply_pmu_overrides",
-        "_apply_power_overrides",
-        "_apply_output_overrides",
-        "_apply_workdir_overrides",
-        "_apply_build_overrides",
-    ):
-        monkeypatch.setattr(profile_cmd, name, lambda a, c: None)
+    monkeypatch.setattr("helia_profiler.config.load_config", lambda path, cli: ctx.config)
 
     with pytest.raises(SystemExit) as excinfo:
-        profile_cmd._cmd_profile(args)
+        profile_cmd._cmd_profile(config=None, verbose=0, fail_on_invalid=True)
 
     assert excinfo.value.code == 3
 
 
-def test_invalid_without_the_policy_exits_normally(
-    tmp_path: Path, monkeypatch
-) -> None:
-    import argparse
-
+def test_invalid_without_the_policy_exits_normally(tmp_path: Path, monkeypatch) -> None:
     import helia_profiler.cli.profile_cmd as profile_cmd
 
     ctx = _ctx(tmp_path, fail_on_invalid=False)
@@ -170,34 +140,18 @@ def test_invalid_without_the_policy_exits_normally(
         validity=ResultValidity.INVALID,
         issues=(_issue("power.gate_below_minimum", "error", "Too short."),),
     )
-    monkeypatch.setattr(
-        "helia_profiler.profiler.run_profile", lambda config, console: ctx
-    )
+    monkeypatch.setattr("helia_profiler.profiler.run_profile", lambda config, console: ctx)
     # _cmd_profile imports these lazily from their home modules -- patch
     # at the source, not on profile_cmd.
-    monkeypatch.setattr(
-        "helia_profiler.config.load_config", lambda path, cli: ctx.config
-    )
-    for name in (
-        "_apply_model_engine_overrides",
-        "_apply_target_overrides",
-        "_apply_pmu_overrides",
-        "_apply_power_overrides",
-        "_apply_output_overrides",
-        "_apply_workdir_overrides",
-        "_apply_build_overrides",
-    ):
-        monkeypatch.setattr(profile_cmd, name, lambda a, c: None)
+    monkeypatch.setattr("helia_profiler.config.load_config", lambda path, cli: ctx.config)
 
-    args = argparse.Namespace(config=None, verbose=0, fail_on_invalid=False)
-    profile_cmd._cmd_profile(args)  # must not raise SystemExit
+    # must not raise SystemExit
+    profile_cmd._cmd_profile(config=None, verbose=0, fail_on_invalid=False)
 
 
 def test_degraded_with_policy_exits_normally(tmp_path: Path, monkeypatch) -> None:
     """Exit 3 is INVALID-only: a degraded run with the policy on still
     exits 0 -- warnings are advisory."""
-    import argparse
-
     import helia_profiler.cli.profile_cmd as profile_cmd
 
     ctx = _ctx(tmp_path, fail_on_invalid=True)
@@ -205,54 +159,27 @@ def test_degraded_with_policy_exits_normally(tmp_path: Path, monkeypatch) -> Non
         validity=ResultValidity.DEGRADED,
         issues=(_issue("power.gate_duration_mismatch", "warning", "Band."),),
     )
-    monkeypatch.setattr(
-        "helia_profiler.profiler.run_profile", lambda config, console: ctx
-    )
-    monkeypatch.setattr(
-        "helia_profiler.config.load_config", lambda path, cli: ctx.config
-    )
-    for name in (
-        "_apply_model_engine_overrides",
-        "_apply_target_overrides",
-        "_apply_pmu_overrides",
-        "_apply_power_overrides",
-        "_apply_output_overrides",
-        "_apply_workdir_overrides",
-        "_apply_build_overrides",
-    ):
-        monkeypatch.setattr(profile_cmd, name, lambda a, c: None)
+    monkeypatch.setattr("helia_profiler.profiler.run_profile", lambda config, console: ctx)
+    monkeypatch.setattr("helia_profiler.config.load_config", lambda path, cli: ctx.config)
 
-    profile_cmd._cmd_profile(
-        argparse.Namespace(config=None, verbose=0)
-    )  # must not raise SystemExit
+    # must not raise SystemExit
+    profile_cmd._cmd_profile(config=None, verbose=0)
 
 
 def test_output_applier_forwards_the_flag() -> None:
     """The REAL applier, un-mocked (#208 review: both exit tests bypass it):
-    the flag lands in the overrides dict, and its absence -- older Namespaces
-    lack the attribute -- leaves the dict untouched."""
-    import argparse
-
+    the flag lands in the overrides dict, and a False value leaves the dict
+    untouched."""
     from helia_profiler.cli.profile_cmd import _apply_output_overrides
 
-    base = argparse.Namespace(
-        output_dir=None, output_format=None, no_model_explorer=False, detailed=False
-    )
+    base = dict(output_dir=None, output_format=None, no_model_explorer=False, detailed=False)
 
     cli: dict = {}
-    _apply_output_overrides(
-        argparse.Namespace(**vars(base), fail_on_invalid=True), cli
-    )
+    _apply_output_overrides(cli, **base, fail_on_invalid=True)
     assert cli["output"]["fail_on_invalid"] is True
 
     cli = {}
-    _apply_output_overrides(
-        argparse.Namespace(**vars(base), fail_on_invalid=False), cli
-    )
-    assert "output" not in cli
-
-    cli = {}
-    _apply_output_overrides(base, cli)  # attribute absent entirely
+    _apply_output_overrides(cli, **base, fail_on_invalid=False)
     assert "output" not in cli
 
 
@@ -260,9 +187,7 @@ def test_yaml_route_sets_the_policy(tmp_path: Path) -> None:
     """The doc promises output.fail_on_invalid works from a config file."""
     yaml_path = tmp_path / "cfg.yaml"
     yaml_path.write_text(
-        "model:\n  path: test.tflite\n"
-        "engine:\n  type: helia-rt\n"
-        "output:\n  fail_on_invalid: true\n"
+        "model:\n  path: test.tflite\nengine:\n  type: helia-rt\noutput:\n  fail_on_invalid: true\n"
     )
 
     config = load_config(yaml_path, {})
@@ -303,9 +228,12 @@ def test_write_report_stores_the_evaluation_it_rendered(tmp_path: Path) -> None:
         timestamp="2026-08-25T00:00:00+00:00",
         config_snapshot={"engine": {"type": "helia-rt"}},
     )
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(),
-        layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+        ),
     )
     lock = tmp_path / "workspace" / "nsx.lock"
     lock.parent.mkdir(parents=True, exist_ok=True)

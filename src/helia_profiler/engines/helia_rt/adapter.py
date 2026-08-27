@@ -14,10 +14,9 @@ from pathlib import Path
 
 from ...config import ProfileConfig
 from ...errors import EngineError
-from ...placement import Placement
 from ...results import NsxModuleRef
 from .. import EngineType, TFLM_ENGINE_HEADER
-from ..base import ArenaRegion, HeliaRtArtifacts
+from ..base import HeliaRtArtifacts, SingleArenaPlacementMixin
 from .artifacts import (
     HELIART_MODULE,
     HELIART_PROJECT,
@@ -35,7 +34,7 @@ from .nsx_module import _install_nsx_module, _install_nsx_module_source
 log = logging.getLogger("hpx")
 
 
-class HeliaRTAdapter:
+class HeliaRTAdapter(SingleArenaPlacementMixin):
     """Adapter for heliaRT — Ambiq's optimized TFLM fork.
 
     Resolves a heliaRT distribution via three modes (local path, GitHub
@@ -54,20 +53,6 @@ class HeliaRTAdapter:
     @property
     def engine_type(self) -> EngineType:
         return EngineType.HELIA_RT
-
-    def default_auto_placement(
-        self, *, tcm_cap: int, sram_cap: int
-    ) -> tuple[Placement, Placement] | None:
-        # Fall through to the shared greedy fastest-fit policy.
-        del tcm_cap, sram_cap
-        return None
-
-    def apply_arena_placement_override(
-        self, regions: list[ArenaRegion], target: Placement
-    ) -> list[ArenaRegion]:
-        # heliaRT owns a single TFLM-style arena; no engine-side override.
-        del target
-        return regions
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> HeliaRtArtifacts:
         backend = config.engine.backend or "helia"

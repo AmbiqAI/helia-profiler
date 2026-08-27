@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+from tests.pipeline_context_helpers import (
+    set_power_firmware,
+    set_power_plan,
+    set_power_result,
+    set_profile_firmware,
+    set_profile_result,
+)
+
 import logging
 from collections.abc import Callable
 from dataclasses import replace
@@ -42,17 +50,21 @@ def _mark_power_firmware_deployed(ctx, tmp_path: Path) -> None:
         build_dir=tmp_path,
         binary_path=binary,
     )
-    ctx.publish_power_plan(PowerRunPlan(
-        firmware_mode="dedicated",
-        inference_count=5,
-        count_source="configured",
-    ))
+    ctx.publish_power_plan(
+        PowerRunPlan(
+            firmware_mode="dedicated",
+            inference_count=5,
+            count_source="configured",
+        )
+    )
     ctx.publish_power_firmware(artifact)
-    ctx.publish_power_deployment(DeploymentRecord(
-        firmware=artifact,
-        target_id=ctx.config.target.board,
-        deployed_at="2026-07-18T00:00:00+00:00",
-    ))
+    ctx.publish_power_deployment(
+        DeploymentRecord(
+            firmware=artifact,
+            target_id=ctx.config.target.board,
+            deployed_at="2026-07-18T00:00:00+00:00",
+        )
+    )
 
 
 class TestPowerTypes:
@@ -288,9 +300,7 @@ class TestGatedStatsProcessing:
         from helia_profiler.power.joulescope.stats import _segment_gpi_windows
 
         ms = _SECOND // 1000
-        windows = _segment_gpi_windows(
-            [(0 * ms, 1), (1 * ms, 1), (2 * ms, 0)]
-        )
+        windows = _segment_gpi_windows([(0 * ms, 1), (1 * ms, 1), (2 * ms, 0)])
 
         assert windows == []
 
@@ -299,9 +309,7 @@ class TestGatedStatsProcessing:
 
         ms = _SECOND // 1000
         packets = [self._packet(0, ms, 0.0001, 0.00018, 0.12)]
-        windows, summary = _process_gated_stats(
-            packets=packets, poll_samples=[], io_voltage=1.8
-        )
+        windows, summary = _process_gated_stats(packets=packets, poll_samples=[], io_voltage=1.8)
         assert windows == []
         assert summary.sample_count == 0
 
@@ -311,26 +319,18 @@ class TestGatedStatsProcessing:
         from helia_profiler.power.joulescope.stats import _process_gated_stats
 
         ms = _SECOND // 1000
-        packets = [
-            self._packet(i * ms, (i + 1) * ms, -0.0001, 0.00018, 0.12)
-            for i in range(20)
-        ]
+        packets = [self._packet(i * ms, (i + 1) * ms, -0.0001, 0.00018, 0.12) for i in range(20)]
         poll_samples = [(0, 0), (5 * ms, 1), (15 * ms, 0)]
 
         with pytest.raises(PowerError, match="net NEGATIVE"):
-            _process_gated_stats(
-                packets=packets, poll_samples=poll_samples, io_voltage=1.8
-            )
+            _process_gated_stats(packets=packets, poll_samples=poll_samples, io_voltage=1.8)
 
     def test_net_negative_gated_current_env_escape_hatch(self, monkeypatch):
         from helia_profiler.power.joulescope.stats import _process_gated_stats
 
         monkeypatch.setenv("HPX_POWER_ALLOW_NEGATIVE", "1")
         ms = _SECOND // 1000
-        packets = [
-            self._packet(i * ms, (i + 1) * ms, -0.0001, 0.00018, 0.12)
-            for i in range(20)
-        ]
+        packets = [self._packet(i * ms, (i + 1) * ms, -0.0001, 0.00018, 0.12) for i in range(20)]
         poll_samples = [(0, 0), (5 * ms, 1), (15 * ms, 0)]
 
         windows, summary = _process_gated_stats(
@@ -376,9 +376,7 @@ class TestGatedStatsProcessing:
             host_tick = host_base + ((i * ms) + (ms // 2))
             cur_int = 0.0001 if 5 <= i < 15 else 0.00002
             pwr_int = cur_int * 1.8
-            packets.append(
-                self._packet_with_host_time(u0, u1, cur_int, pwr_int, 0.12, host_tick)
-            )
+            packets.append(self._packet_with_host_time(u0, u1, cur_int, pwr_int, 0.12, host_tick))
 
         rise = host_base + 5 * ms
         fall = host_base + 15 * ms
@@ -465,10 +463,7 @@ class TestGatedStatsProcessing:
         from helia_profiler.power.joulescope.stats import _process_gated_stats
 
         ms = _SECOND // 1000
-        packets = [
-            self._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12)
-            for i in range(30)
-        ]
+        packets = [self._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12) for i in range(30)]
         poll_samples = [
             (0, 0),
             (2 * ms, 1),
@@ -557,9 +552,7 @@ class TestGatedStatsProcessing:
         from helia_profiler.power.joulescope.stats import _whole_summary_from_stats
 
         ms = _SECOND // 1000
-        packets = [
-            self._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12) for i in range(10)
-        ]
+        packets = [self._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12) for i in range(10)]
         summary = _whole_summary_from_stats(packets)
         assert summary.sample_count == 10
         assert summary.energy_j == pytest.approx(0.0018, rel=1e-6)
@@ -582,10 +575,7 @@ class TestGatedStatsProcessing:
         )
 
         ms = _SECOND // 1000
-        packets = [
-            self._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12)
-            for i in range(10)
-        ]
+        packets = [self._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12) for i in range(10)]
 
         result = _degraded_observation_result(
             packets=packets,
@@ -626,9 +616,7 @@ class TestGatedStatsProcessing:
         )
 
         ms = _SECOND // 1000
-        packets = [
-            self._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12) for i in range(10)
-        ]
+        packets = [self._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12) for i in range(10)]
 
         result = _degraded_observation_result(
             packets=packets,
@@ -779,9 +767,7 @@ class TestStreamedGpiSegmentation:
 
         assert poll_diag["gate_edge_source"] == "gpi_snapshot_poll"
         assert stream_diag["gate_edge_source"] == "gpi_stream"
-        assert stream_diag["windows"] == [
-            {"rise_tick": 3 * ms, "fall_tick": 7 * ms}
-        ]
+        assert stream_diag["windows"] == [{"rise_tick": 3 * ms, "fall_tick": 7 * ms}]
 
 
 class TestStreamedGateSelection:
@@ -825,9 +811,7 @@ class TestStreamedGateSelection:
             for i in range(40):
                 stats_cb(
                     "u/js320/test/s/stats/value",
-                    TestGatedStatsProcessing._packet(
-                        i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12
-                    ),
+                    TestGatedStatsProcessing._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12),
                 )
             # GPI stream at 1 kHz: a 12 ms coupling stretch (qualifying!),
             # a 5 ms low gap, then the 10 ms real window, then low.
@@ -848,9 +832,7 @@ class TestStreamedGateSelection:
         from helia_profiler.power.joulescope.driver import JoulescopeDriver
 
         fake = self._FakeStreamingDriver()
-        monkeypatch.setattr(
-            module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320")
-        )
+        monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
         monkeypatch.setattr(module, "_close_device", lambda *_a, **_k: None)
 
         # Snapshot poller sees one plain rise/fall so the capture completes;
@@ -931,9 +913,7 @@ class TestMissedGateWarningNamesTheFix:
             for i in range(count):
                 self._stats_cb(
                     "u/js320/test/s/stats/value",
-                    TestGatedStatsProcessing._packet(
-                        i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12
-                    ),
+                    TestGatedStatsProcessing._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12),
                 )
 
     def _run_capture(self, monkeypatch, *, lockstep: bool, wired: bool):
@@ -941,9 +921,7 @@ class TestMissedGateWarningNamesTheFix:
         from helia_profiler.power.joulescope.driver import JoulescopeDriver
 
         fake = self._FakeJoulescopeDriver()
-        monkeypatch.setattr(
-            module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320")
-        )
+        monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
         # GPI never goes high: the gate was missed entirely.
         monkeypatch.setattr(module, "_read_gpi_snapshot", lambda _d, _p: 0)
         monkeypatch.setattr(module, "_close_device", lambda *_a, **_k: None)
@@ -962,33 +940,25 @@ class TestMissedGateWarningNamesTheFix:
             lockstep_wiring_available=wired,
         )
 
-    def test_warning_names_power_lockstep_when_it_is_the_suspect(
-        self, monkeypatch, caplog
-    ):
+    def test_warning_names_power_lockstep_when_it_is_the_suspect(self, monkeypatch, caplog):
         with caplog.at_level(logging.WARNING, logger="hpx"):
             result = self._run_capture(monkeypatch, lockstep=False, wired=True)
 
         assert result.metadata.integrity == "degraded"
         assert result.metadata.gate_failure.kind == "no_gate_rise"
         warnings = "\n".join(
-            record.getMessage()
-            for record in caplog.records
-            if record.levelno >= logging.WARNING
+            record.getMessage() for record in caplog.records if record.levelno >= logging.WARNING
         )
         assert "No GPIO gate rising edge detected" in warnings
         assert "power.lockstep: true" in warnings
 
-    def test_warning_stays_wiring_only_when_lockstep_was_already_on(
-        self, monkeypatch, caplog
-    ):
+    def test_warning_stays_wiring_only_when_lockstep_was_already_on(self, monkeypatch, caplog):
         with caplog.at_level(logging.WARNING, logger="hpx"):
             result = self._run_capture(monkeypatch, lockstep=True, wired=True)
 
         assert result.metadata.gate_failure.kind == "no_gate_rise"
         warnings = "\n".join(
-            record.getMessage()
-            for record in caplog.records
-            if record.levelno >= logging.WARNING
+            record.getMessage() for record in caplog.records if record.levelno >= logging.WARNING
         )
         assert "No GPIO gate rising edge detected" in warnings
         assert "power.lockstep" not in warnings
@@ -1288,9 +1258,7 @@ class TestCapturePowerStage:
         stage = CapturePowerStage()
         assert stage.should_skip(ctx) is False
 
-    def test_resets_target_before_capture(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_resets_target_before_capture(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         # Power capture must re-launch the firmware so the gated window fires
         # under the live poller; relay-cycled boards drawing USB bench power are
         # not rebooted, so a J-Link reset is the deterministic restart.
@@ -1611,7 +1579,9 @@ class TestTargetLifecycle:
         )
 
         ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
-        ctx.config = replace(ctx.config, power=replace(ctx.config.power, reset_strategy="swpoi_reset"))
+        ctx.config = replace(
+            ctx.config, power=replace(ctx.config.power, reset_strategy="swpoi_reset")
+        )
         calls: list[tuple[str, dict]] = []
 
         class FakeDriver:
@@ -1641,7 +1611,11 @@ class TestTargetLifecycle:
     def test_explicit_no_reset_does_not_touch_hardware(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target.lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
+        from helia_profiler.target.lifecycle import (
+            CapturePhase,
+            ResetAction,
+            prepare_target_for_phase,
+        )
 
         ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
         ctx.config = replace(ctx.config, power=replace(ctx.config.power, reset_strategy="none"))
@@ -1674,10 +1648,16 @@ class TestTargetLifecycle:
     def test_explicit_power_cycle_requires_rail_toggle_and_skips_jlink_reset(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target.lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
+        from helia_profiler.target.lifecycle import (
+            CapturePhase,
+            ResetAction,
+            prepare_target_for_phase,
+        )
 
         ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
-        ctx.config = replace(ctx.config, power=replace(ctx.config.power, reset_strategy="power_cycle"))
+        ctx.config = replace(
+            ctx.config, power=replace(ctx.config.power, reset_strategy="power_cycle")
+        )
         calls: list[tuple[str, dict]] = []
 
         class FakeDriver:
@@ -1710,7 +1690,9 @@ class TestTargetLifecycle:
         from helia_profiler.target.lifecycle import CapturePhase, prepare_target_for_phase
 
         ctx = self._make_ctx(tmp_path, board="apollo4p_blue_kxr_evb")
-        ctx.config = replace(ctx.config, power=replace(ctx.config.power, reset_strategy="power_cycle"))
+        ctx.config = replace(
+            ctx.config, power=replace(ctx.config.power, reset_strategy="power_cycle")
+        )
         calls: list[tuple[str, dict]] = []
 
         class FakeDriver:
@@ -1735,7 +1717,11 @@ class TestTargetLifecycle:
     def test_non_power_phase_does_not_touch_hardware(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        from helia_profiler.target.lifecycle import CapturePhase, ResetAction, prepare_target_for_phase
+        from helia_profiler.target.lifecycle import (
+            CapturePhase,
+            ResetAction,
+            prepare_target_for_phase,
+        )
 
         ctx = self._make_ctx(tmp_path, board="apollo510_evb")
 
@@ -1792,9 +1778,12 @@ class TestEstimateCaptureDuration:
         ctx.soc = get_soc_for_board("apollo510_evb")
         ctx.run_metadata.platform = PlatformInfo(cpu_clock_mhz=96)
         # 96,000 cycles at 96 MHz == 1 ms/inference, a convenient round number.
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(presets=("basic_cpu",)),
-            layers=[LayerResult(id=0, op="CONV_2D", cycles=96_000.0)],
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(presets=("basic_cpu",)),
+                layers=[LayerResult(id=0, op="CONV_2D", cycles=96_000.0)],
+            ),
         )
         return ctx
 
@@ -1850,9 +1839,7 @@ class TestEstimateCaptureDuration:
         expected = _BOOT_SETTLE_S + (0.004 + 0.503) + _SAFETY_MARGIN_S
         assert estimated == pytest.approx(expected, rel=1e-6)
 
-    def test_a_spin_window_is_estimated_in_seconds_not_inferences(
-        self, tmp_path: Path
-    ):
+    def test_a_spin_window_is_estimated_in_seconds_not_inferences(self, tmp_path: Path):
         """The busy_loop window is a spin; sizing it in inferences under-bounds it.
 
         Reached whenever there is no resolved plan to early-return from --
@@ -1897,11 +1884,14 @@ class TestEstimateCaptureDuration:
         )
 
         ctx = self._make_ctx(tmp_path, profiling_overrides={})
-        ctx.power_plan = PowerRunPlan(
-            firmware_mode="dedicated",
-            inference_count=2247,
-            reference_inference_us=2226,
-            count_source="profile_guided",
+        set_power_plan(
+            ctx,
+            PowerRunPlan(
+                firmware_mode="dedicated",
+                inference_count=2247,
+                reference_inference_us=2226,
+                count_source="profile_guided",
+            ),
         )
 
         estimated = _estimate_capture_duration(ctx)
@@ -1909,9 +1899,7 @@ class TestEstimateCaptureDuration:
         expected = _BOOT_SETTLE_S + (2247 * 2226 / 1_000_000) + _SAFETY_MARGIN_S
         assert estimated == pytest.approx(expected, rel=1e-6)
 
-    def test_auto_window_regression_reproduces_prior_underestimate_bug(
-        self, tmp_path: Path
-    ):
+    def test_auto_window_regression_reproduces_prior_underestimate_bug(self, tmp_path: Path):
         # This mirrors the real config that triggered "No GPIO-high windows
         # detected": a model with representative per-inference timing and
         # window_target_ms 8000 needs ~379 clean iterations (~8s), which the
@@ -1932,9 +1920,12 @@ class TestEstimateCaptureDuration:
             },
         )
         # 2,029,073 cycles at 96 MHz == ~21.136ms/inference (representative values).
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(presets=("basic_cpu",)),
-            layers=[LayerResult(id=0, op="CONV_2D", cycles=2_029_073.0)],
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(presets=("basic_cpu",)),
+                layers=[LayerResult(id=0, op="CONV_2D", cycles=2_029_073.0)],
+            ),
         )
         estimated = _estimate_capture_duration(ctx)
         assert estimated is not None
@@ -1968,7 +1959,7 @@ class TestCapturePowerWrapper:
             },
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
-        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[])
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[]))
         _mark_power_firmware_deployed(ctx, tmp_path)
 
         summary = PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6)
@@ -1988,7 +1979,9 @@ class TestCapturePowerWrapper:
                 called["capture_gated"] = kwargs
                 return PowerResult(
                     summary=summary,
-                    metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
+                    metadata=PowerMetadata(
+                        measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW
+                    ),
                 )
 
         def fake_get_driver(name: str, *, serial: str | None = None):
@@ -2060,7 +2053,7 @@ class TestCapturePowerWrapper:
             },
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
-        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[])
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[]))
         _mark_power_firmware_deployed(ctx, tmp_path)
 
         calls: list[str] = []
@@ -2173,7 +2166,7 @@ class TestCapturePowerWrapper:
             },
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
-        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[])
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[]))
         _mark_power_firmware_deployed(ctx, tmp_path)
 
         calls: list[str] = []
@@ -2267,7 +2260,7 @@ class TestPowerFirmwareSelection:
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         ResolvePlatformStage().run(ctx)
         ctx.resolved_jlink_serial = "1160002204"
-        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[])
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[]))
         if firmware == "shared":
             ctx.publish_power_plan(PowerRunPlan(firmware_mode="shared"))
         return ctx
@@ -2298,19 +2291,23 @@ class TestPowerFirmwareSelection:
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         power_bin = tmp_path / "hpx_profiler_power"
         power_bin.write_bytes(b"\x00")
-        ctx.power_binary_path = power_bin
-        ctx.publish_power_plan(PowerRunPlan(
-            firmware_mode="dedicated",
-            inference_count=5,
-            count_source="configured",
-        ))
-        ctx.publish_power_firmware(FirmwareArtifact(
-            role="power",
-            target_name="hpx_profiler_power",
-            app_dir=tmp_path,
-            build_dir=tmp_path,
-            binary_path=power_bin,
-        ))
+        set_power_firmware(ctx, binary_path=power_bin)
+        ctx.publish_power_plan(
+            PowerRunPlan(
+                firmware_mode="dedicated",
+                inference_count=5,
+                count_source="configured",
+            )
+        )
+        ctx.publish_power_firmware(
+            FirmwareArtifact(
+                role="power",
+                target_name="hpx_profiler_power",
+                app_dir=tmp_path,
+                build_dir=tmp_path,
+                binary_path=power_bin,
+            )
+        )
 
         calls: list[str] = []
         flash_calls: list[dict] = []
@@ -2535,7 +2532,7 @@ class TestPowerFirmwareSelection:
         # touch it.
         power_bin = tmp_path / "hpx_profiler_power"
         power_bin.write_bytes(b"\x00")
-        ctx.power_binary_path = power_bin
+        set_power_firmware(ctx, binary_path=power_bin)
 
         calls: list[str] = []
         flash_calls: list[dict] = []
@@ -2577,29 +2574,19 @@ class TestPowerFirmwareSelection:
         with pytest.raises(BuildError, match="no power artifact"):
             FlashPowerFirmwareStage().run(ctx)
 
-    def test_dedicated_flash_rejects_legacy_path_without_artifact(self, tmp_path: Path):
-        from helia_profiler.errors import BuildError
-        from helia_profiler.stages.flash_power import FlashPowerFirmwareStage
-
-        ctx = self._make_ctx(tmp_path, firmware="dedicated")
-        power_bin = tmp_path / "hpx_profiler_power"
-        power_bin.write_bytes(b"\x00")
-        ctx.power_binary_path = power_bin
-
-        with pytest.raises(BuildError, match="no power artifact"):
-            FlashPowerFirmwareStage().run(ctx)
-
     def test_direct_dedicated_capture_requires_deployment(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
         from helia_profiler.capture import capture_power
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
-        ctx.publish_power_plan(PowerRunPlan(
-            firmware_mode="dedicated",
-            inference_count=5,
-            count_source="configured",
-        ))
+        ctx.publish_power_plan(
+            PowerRunPlan(
+                firmware_mode="dedicated",
+                inference_count=5,
+                count_source="configured",
+            )
+        )
         monkeypatch.setattr(
             "helia_profiler.power.get_driver",
             lambda *a, **k: self._FakeDriver([]),
@@ -2619,11 +2606,13 @@ class TestPowerFirmwareSelection:
         assert artifact is not None
         ctx.publish_power_plan(PowerRunPlan(firmware_mode="dedicated"))
         ctx.publish_power_firmware(artifact)
-        ctx.publish_power_deployment(DeploymentRecord(
-            firmware=artifact,
-            target_id=ctx.config.target.board,
-            deployed_at="2026-07-18T00:00:00+00:00",
-        ))
+        ctx.publish_power_deployment(
+            DeploymentRecord(
+                firmware=artifact,
+                target_id=ctx.config.target.board,
+                deployed_at="2026-07-18T00:00:00+00:00",
+            )
+        )
         monkeypatch.setattr(
             "helia_profiler.power.get_driver",
             lambda *a, **k: self._FakeDriver([]),
@@ -2649,7 +2638,7 @@ class TestPowerFirmwareSelection:
         from helia_profiler.stages.plan_power import plan_power_run
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
-        ctx.pmu_result = None
+        set_profile_result(ctx, None)
 
         plan = plan_power_run(ctx, inference_count=123)
 
@@ -2662,9 +2651,12 @@ class TestPowerFirmwareSelection:
         from helia_profiler.results import FirmwareMeta, PmuResult
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(clean_infer_avg_us=2226),
-            layers=[],
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(clean_infer_avg_us=2226),
+                layers=[],
+            ),
         )
 
         plan = plan_power_run(ctx)
@@ -2694,13 +2686,14 @@ class TestPowerFirmwareSelection:
         from helia_profiler.results import FirmwareMeta, PmuResult
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
-        object.__setattr__(
-            ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
-        )
+        object.__setattr__(ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP)
         # What the profile pass reports under busy_loop: one spin, whole window.
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
-            layers=[],
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
+                layers=[],
+            ),
         )
 
         plan = plan_power_run(ctx)
@@ -2714,9 +2707,7 @@ class TestPowerFirmwareSelection:
         assert plan.reference_inference_us == ctx.config.effective_window_target_ms * 1000
         assert plan.target_duration_ms == ctx.config.effective_window_target_ms
 
-    def test_a_shared_busy_loop_gate_tolerates_boot_to_boot_spin_variation(
-        self, tmp_path: Path
-    ):
+    def test_a_shared_busy_loop_gate_tolerates_boot_to_boot_spin_variation(self, tmp_path: Path):
         """A healthy shared run must not be rejected for ordinary jitter.
 
         In `firmware: shared` the plan carries no count, so capture fills both
@@ -2747,9 +2738,7 @@ class TestPowerFirmwareSelection:
             f"against a {integrity.tolerance_s:.4f}s band"
         )
 
-    def test_shared_busy_loop_reports_the_window_the_firmware_runs(
-        self, tmp_path: Path
-    ):
+    def test_shared_busy_loop_reports_the_window_the_firmware_runs(self, tmp_path: Path):
         """`shared` produces no count, but still publishes a window length.
 
         `target_duration_ms` reaches summary.json verbatim, and the
@@ -2762,14 +2751,15 @@ class TestPowerFirmwareSelection:
         from helia_profiler.results import FirmwareMeta, PmuResult
 
         ctx = self._make_ctx(tmp_path, firmware="shared")
-        object.__setattr__(
-            ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
-        )
+        object.__setattr__(ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP)
         object.__setattr__(ctx.config.profiling, "window_mode", WindowMode.FIXED)
         object.__setattr__(ctx.config.profiling, "window_target_ms", 1000)
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=1_000_000),
-            layers=[],
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=1_000_000),
+                layers=[],
+            ),
         )
 
         plan = plan_power_run(ctx)
@@ -2784,7 +2774,7 @@ class TestPowerFirmwareSelection:
         from helia_profiler.results import FirmwareMeta, PmuResult
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
-        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_avg_us=2226), layers=[])
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(clean_infer_avg_us=2226), layers=[]))
 
         plan = plan_power_run(ctx)
 
@@ -2792,9 +2782,7 @@ class TestPowerFirmwareSelection:
         assert plan.inference_count == 2247
         assert plan.reference_inference_us == 2226
 
-    def test_busy_loop_refuses_an_explicit_count_it_cannot_honour(
-        self, tmp_path: Path
-    ):
+    def test_busy_loop_refuses_an_explicit_count_it_cannot_honour(self, tmp_path: Path):
         """An N the firmware ignores must not become a plan.
 
         The busy_loop window runs exactly one calibrated spin whatever the
@@ -2809,12 +2797,13 @@ class TestPowerFirmwareSelection:
         from helia_profiler.results import FirmwareMeta, PmuResult
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
-        object.__setattr__(
-            ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
-        )
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
-            layers=[],
+        object.__setattr__(ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP)
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
+                layers=[],
+            ),
         )
 
         with pytest.raises(PowerError, match="runs no inferences"):
@@ -2843,9 +2832,7 @@ class TestPowerFirmwareSelection:
         # its length was calibrated, not counted.
         assert PREDICTED_WINDOW_TOLERANCE > COUNTED_WINDOW_TOLERANCE
 
-    def test_a_shared_and_a_dedicated_busy_loop_run_get_the_same_band(
-        self, tmp_path: Path
-    ):
+    def test_a_shared_and_a_dedicated_busy_loop_run_get_the_same_band(self, tmp_path: Path):
         """Driven through the real plan, so the count_source difference is real."""
         from helia_profiler.power.diagnostics import gate_relative_tolerance_for
         from helia_profiler.results import FirmwareMeta, PmuResult
@@ -2857,9 +2844,12 @@ class TestPowerFirmwareSelection:
             object.__setattr__(
                 ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP
             )
-            ctx.pmu_result = PmuResult(
-                meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
-                layers=[],
+            set_profile_result(
+                ctx,
+                PmuResult(
+                    meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=5_000_000),
+                    layers=[],
+                ),
             )
             plan = plan_power_run(ctx)
             bands[firmware] = (
@@ -2868,9 +2858,7 @@ class TestPowerFirmwareSelection:
             )
 
         assert bands["dedicated"][0] != bands["shared"][0], "count_source differs"
-        assert bands["dedicated"][1] == bands["shared"][1], (
-            f"same probe, different band: {bands}"
-        )
+        assert bands["dedicated"][1] == bands["shared"][1], f"same probe, different band: {bands}"
 
     def test_a_mis_sized_spin_is_not_absorbed_by_the_per_unit_slack(self):
         """The gate check must actually bound a one-unit window.
@@ -2901,10 +2889,7 @@ class TestPowerFirmwareSelection:
         assert not assess(3.0).valid, "a 40% short window must be caught"
         assert not assess(0.006).valid, "the calibration-fallback shape must be caught"
 
-
-    def test_shared_infer_reports_the_window_the_firmware_was_built_with(
-        self, tmp_path: Path
-    ):
+    def test_shared_infer_reports_the_window_the_firmware_was_built_with(self, tmp_path: Path):
         """`shared` never re-renders the binary, so the host's floor is fiction.
 
         The unconditional power floor exists to size N on a DEDICATED binary,
@@ -2925,9 +2910,7 @@ class TestPowerFirmwareSelection:
         ctx = self._make_ctx(tmp_path, firmware="shared")
         object.__setattr__(ctx.config.profiling, "window_mode", WindowMode.FIXED)
         object.__setattr__(ctx.config.profiling, "window_target_ms", 1000)
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(clean_infer_avg_us=2226), layers=[]
-        )
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(clean_infer_avg_us=2226), layers=[]))
 
         plan = plan_power_run(ctx)
 
@@ -2936,9 +2919,7 @@ class TestPowerFirmwareSelection:
         # not the 1000 ms target and not the 5000 ms floor.
         assert plan.target_duration_ms == 223
 
-    def test_dedicated_infer_keeps_the_power_floor_that_sizes_n(
-        self, tmp_path: Path
-    ):
+    def test_dedicated_infer_keeps_the_power_floor_that_sizes_n(self, tmp_path: Path):
         """And the one case that DOES pick N keeps its floor.
 
         Here the goal is the window: N is derived from it and the binary is
@@ -2951,9 +2932,7 @@ class TestPowerFirmwareSelection:
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         object.__setattr__(ctx.config.profiling, "window_mode", WindowMode.FIXED)
         object.__setattr__(ctx.config.profiling, "window_target_ms", 1000)
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(clean_infer_avg_us=2226), layers=[]
-        )
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(clean_infer_avg_us=2226), layers=[]))
 
         plan = plan_power_run(ctx)
 
@@ -2981,14 +2960,17 @@ class TestPowerFirmwareSelection:
         from helia_profiler.results import FirmwareMeta, PmuResult
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(
-                clean_infer_avg_us=2226,
-                clean_infer_count=1092,
-                clean_stalled_iters=233,
-                clean_partial_iters=0,
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(
+                    clean_infer_avg_us=2226,
+                    clean_infer_count=1092,
+                    clean_stalled_iters=233,
+                    clean_partial_iters=0,
+                ),
+                layers=[],
             ),
-            layers=[],
         )
 
         with caplog.at_level(logging.WARNING, logger="hpx"):
@@ -2996,9 +2978,7 @@ class TestPowerFirmwareSelection:
 
         assert plan.count_source == "profile_guided"
         warnings = [
-            record.getMessage()
-            for record in caplog.records
-            if record.levelno >= logging.WARNING
+            record.getMessage() for record in caplog.records if record.levelno >= logging.WARNING
         ]
         assert any("stalled clean-window reference" in message for message in warnings), (
             f"power plan sized from a stalled reference without saying so: {warnings}"
@@ -3008,34 +2988,39 @@ class TestPowerFirmwareSelection:
         # "no warning" assertion also passes against a build that never checks,
         # so on its own it would guard nothing.
         caplog.clear()
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(
-                clean_infer_avg_us=2226,
-                clean_infer_count=1092,
-                clean_stalled_iters=0,
-                clean_partial_iters=0,
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(
+                    clean_infer_avg_us=2226,
+                    clean_infer_count=1092,
+                    clean_stalled_iters=0,
+                    clean_partial_iters=0,
+                ),
+                layers=[],
             ),
-            layers=[],
         )
         with caplog.at_level(logging.WARNING, logger="hpx"):
             plan_power_run(ctx)
         assert not any(
-            "stalled clean-window reference" in record.getMessage()
-            for record in caplog.records
+            "stalled clean-window reference" in record.getMessage() for record in caplog.records
         )
 
         # A pure-partial stall must report a real magnitude. The bound used to
         # be frozen-only, so this case printed "reads at least ~0.0% low" in a
         # sentence that then said "short by about the same factor".
         caplog.clear()
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(
-                clean_infer_avg_us=2226,
-                clean_infer_count=1091,
-                clean_stalled_iters=0,
-                clean_partial_iters=1091,
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(
+                    clean_infer_avg_us=2226,
+                    clean_infer_count=1091,
+                    clean_stalled_iters=0,
+                    clean_partial_iters=1091,
+                ),
+                layers=[],
             ),
-            layers=[],
         )
         with caplog.at_level(logging.WARNING, logger="hpx"):
             plan_power_run(ctx)
@@ -3057,7 +3042,7 @@ class TestPowerFirmwareSelection:
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         ctx.firmware_dir = tmp_path / "app"
         ctx.dependency_workspace = object()
-        ctx.build_dir = ctx.firmware_dir / "build" / "apollo510_evb"
+        set_profile_firmware(ctx, build_dir=ctx.firmware_dir / "build" / "apollo510_evb")
         ctx.build_dir.mkdir(parents=True)
         stale_binary = ctx.build_dir / "hpx_profiler_power"
         stale_binary.write_bytes(b"stale")
@@ -3068,18 +3053,22 @@ class TestPowerFirmwareSelection:
             build_dir=ctx.build_dir,
             binary_path=stale_binary,
         )
-        ctx.publish_power_plan(PowerRunPlan(
-            firmware_mode="dedicated",
-            inference_count=123,
-            reference_inference_us=1000,
-            count_source="profile_guided",
-        ))
+        ctx.publish_power_plan(
+            PowerRunPlan(
+                firmware_mode="dedicated",
+                inference_count=123,
+                reference_inference_us=1000,
+                count_source="profile_guided",
+            )
+        )
         ctx.publish_power_firmware(stale_artifact)
-        ctx.publish_power_deployment(DeploymentRecord(
-            firmware=stale_artifact,
-            target_id="apollo510_evb",
-            deployed_at="2026-07-18T00:00:00+00:00",
-        ))
+        ctx.publish_power_deployment(
+            DeploymentRecord(
+                firmware=stale_artifact,
+                target_id="apollo510_evb",
+                deployed_at="2026-07-18T00:00:00+00:00",
+            )
+        )
         rendered: list[int] = []
         build_calls: list[dict] = []
 
@@ -3121,7 +3110,7 @@ class TestPowerFirmwareSelection:
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         ctx.firmware_dir = tmp_path / "app"
         ctx.dependency_workspace = object()
-        ctx.build_dir = ctx.firmware_dir / "build" / "apollo510_evb"
+        set_profile_firmware(ctx, build_dir=ctx.firmware_dir / "build" / "apollo510_evb")
         ctx.build_dir.mkdir(parents=True)
         binary = ctx.build_dir / "hpx_profiler_power"
         binary.write_bytes(b"old")
@@ -3132,21 +3121,23 @@ class TestPowerFirmwareSelection:
             build_dir=ctx.build_dir,
             binary_path=binary,
         )
-        ctx.publish_power_plan(PowerRunPlan(
-            firmware_mode="dedicated",
-            inference_count=12,
-            count_source="configured",
-        ))
-        ctx.publish_power_firmware(artifact)
-        ctx.publish_power_deployment(DeploymentRecord(
-            firmware=artifact,
-            target_id="apollo510_evb",
-            deployed_at="2026-07-18T00:00:00+00:00",
-        ))
-        ctx.power_result = PowerResult(
-            summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 1.0, 10)
+        ctx.publish_power_plan(
+            PowerRunPlan(
+                firmware_mode="dedicated",
+                inference_count=12,
+                count_source="configured",
+            )
         )
-        ctx.power_binary_path = binary
+        ctx.publish_power_firmware(artifact)
+        ctx.publish_power_deployment(
+            DeploymentRecord(
+                firmware=artifact,
+                target_id="apollo510_evb",
+                deployed_at="2026-07-18T00:00:00+00:00",
+            )
+        )
+        set_power_result(ctx, PowerResult(summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 1.0, 10)))
+        set_power_firmware(ctx, binary_path=binary)
 
         monkeypatch.setattr(
             "helia_profiler.firmware.render_power_source",
@@ -3179,9 +3170,12 @@ class TestPowerFirmwareSelection:
         from helia_profiler.stages.plan_power import plan_power_run
 
         ctx = self._make_ctx(tmp_path, firmware="shared")
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(clean_infer_avg_us=2226),
-            layers=[],
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(clean_infer_avg_us=2226),
+                layers=[],
+            ),
         )
 
         plan = plan_power_run(ctx)
@@ -3213,9 +3207,7 @@ class TestPowerFirmwareSelection:
         with pytest.raises(PowerError, match="uses mode 'external'"):
             PlanPowerRunStage().run(ctx)
 
-    def test_internal_power_rejects_driver_without_firmware_producer(
-        self, tmp_path: Path
-    ):
+    def test_internal_power_rejects_driver_without_firmware_producer(self, tmp_path: Path):
         from helia_profiler.config import load_config
         from helia_profiler.pipeline import PipelineContext
         from helia_profiler.stages.plan_power import PlanPowerRunStage
@@ -3293,7 +3285,9 @@ class TestGatedCaptureCapabilityDetection:
                     summary=summary, metadata=PowerMetadata(measurement_scope="custom_gated")
                 )
 
-        register_driver("custom-gated-test-driver", CustomGatedDriver)  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the gated-capture surface
+        register_driver(
+            "custom-gated-test-driver", CustomGatedDriver
+        )  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the gated-capture surface
 
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")
@@ -3306,7 +3300,7 @@ class TestGatedCaptureCapabilityDetection:
             },
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
-        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=5), layers=[])
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(clean_infer_count=5), layers=[]))
         _mark_power_firmware_deployed(ctx, tmp_path)
 
         result = capture_power(ctx, duration_override_s=3.0)
@@ -3336,7 +3330,9 @@ class TestGatedCaptureCapabilityDetection:
 
             def capture(self, **kwargs):
                 calls.append("capture")
-                return PowerResult(summary=summary, metadata=PowerMetadata(measurement_scope="ungated"))
+                return PowerResult(
+                    summary=summary, metadata=PowerMetadata(measurement_scope="ungated")
+                )
 
             def capture_gated(self, **kwargs):  # pragma: no cover - unreachable
                 raise AssertionError("gated capture should not be reached")
@@ -3354,7 +3350,7 @@ class TestGatedCaptureCapabilityDetection:
             },
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
-        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=5), layers=[])
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(clean_infer_count=5), layers=[]))
         _mark_power_firmware_deployed(ctx, tmp_path)
 
         result = capture_power(ctx, duration_override_s=3.0)
@@ -3534,10 +3530,7 @@ class TestGateArbitrationComposition:
     def test_no_envelope_returns_authority_to_the_band(self):
         arb = self._arb(observer=None)
         assert arb.suppress_per_inference is True
-        assert (
-            arb.suppression_reason
-            == "duration mismatch with no firmware envelope to arbitrate"
-        )
+        assert arb.suppression_reason == "duration mismatch with no firmware envelope to arbitrate"
 
     def test_floor_beats_every_other_reason(self):
         arb = self._arb(integrity="floor", observer=self._observer(agrees=False))
@@ -3548,9 +3541,7 @@ class TestGateArbitrationComposition:
         arb = self._arb(terminal_unhealthy=True)
         assert arb.observer_agrees is None
         assert arb.suppress_per_inference is True
-        assert (
-            arb.suppression_reason == "power terminal reported failed or incomplete work"
-        )
+        assert arb.suppression_reason == "power terminal reported failed or incomplete work"
 
     def test_beyond_drift_band_gets_no_note(self):
         """Metrics stay published (the observer vouches for the bracket) but
@@ -3582,10 +3573,7 @@ class TestGateArbitrationComposition:
         denominator is still wrong."""
         arb = self._arb(integrity="valid", terminal_unhealthy=True)
         assert arb.suppress_per_inference is True
-        assert (
-            arb.suppression_reason
-            == "power terminal reported failed or incomplete work"
-        )
+        assert arb.suppression_reason == "power terminal reported failed or incomplete work"
 
     def test_floor_suppression_starves_the_drift_note(self):
         """#204 lens-2 M6 kill: the note's own no-note-while-suppressed
@@ -3594,9 +3582,7 @@ class TestGateArbitrationComposition:
         from helia_profiler.power.diagnostics import GateArbitration
 
         arb = GateArbitration(
-            integrity=self._integrity(
-                measured=0.9, expected=1.0, minimum=1.0, tolerance=0.01
-            ),
+            integrity=self._integrity(measured=0.9, expected=1.0, minimum=1.0, tolerance=0.01),
             integrity_recorded=True,
             observer=self._observer(agrees=True),
             terminal_unhealthy=False,

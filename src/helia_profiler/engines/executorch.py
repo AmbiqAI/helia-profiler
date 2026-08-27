@@ -11,10 +11,9 @@ from typing import Any
 
 from ..config import ProfileConfig
 from ..errors import EngineError
-from ..placement import Placement
 from ..results import NsxModuleRef
 from . import EngineType
-from .base import ArenaRegion, ExecutorchArtifacts
+from .base import ExecutorchArtifacts, SingleArenaPlacementMixin
 
 log = logging.getLogger("hpx")
 
@@ -359,7 +358,7 @@ def _validate_sidecar_fields(sidecar: Path, manifest: dict[str, Any]) -> None:
             fail("operators.portable", "a list of operator names")
 
 
-class ExecuTorchAdapter:
+class ExecuTorchAdapter(SingleArenaPlacementMixin):
     """Prepare the local nsx-executorch module and explicit PTE contract."""
 
     @property
@@ -369,18 +368,6 @@ class ExecuTorchAdapter:
     @property
     def engine_type(self) -> EngineType:
         return EngineType.EXECUTORCH
-
-    def default_auto_placement(
-        self, *, tcm_cap: int, sram_cap: int
-    ) -> tuple[Placement, Placement] | None:
-        del tcm_cap, sram_cap
-        return None
-
-    def apply_arena_placement_override(
-        self, regions: list[ArenaRegion], target: Placement
-    ) -> list[ArenaRegion]:
-        del target
-        return regions
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> ExecutorchArtifacts:
         engine_config = config.engine.config

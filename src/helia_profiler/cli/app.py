@@ -1,17 +1,14 @@
 """Typer construction for the ``hpx`` CLI.
 
 Each Typer command function is a thin adapter: it collects typed CLI
-parameters, assembles an ``argparse.Namespace`` with exactly the attribute
-names the existing ``_cmd_*`` implementation functions read (see
-``profile_cmd.py``, ``analyze_cmd.py``, ``inspect_cmds.py``, ...), and calls
-into that unchanged implementation. This keeps the command implementations,
-and the tests that exercise them via attribute namespaces, stable across the
-argparse -> Typer migration.
+parameters and passes them as keyword arguments to the ``_cmd_*``
+implementation functions (see ``profile_cmd.py``, ``analyze_cmd.py``,
+``inspect_cmds.py``, ...). The commands own argument parsing; the
+implementations own behaviour.
 """
 
 from __future__ import annotations
 
-from argparse import Namespace
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -530,7 +527,7 @@ def profile_command(
     """Profile a model on target hardware."""
     from .profile_cmd import _cmd_profile
 
-    args = Namespace(
+    _cmd_profile(
         model=model,
         config=config,
         verbose=verbose,
@@ -551,7 +548,7 @@ def profile_command(
         offline=offline,
         update_dependencies=update_dependencies,
         nsx_channel=nsx_channel,
-        nsx_module_overrides=nsx_module,
+        nsx_module=nsx_module,
         compiler_launcher=compiler_launcher,
         no_compiler_launcher=no_compiler_launcher,
         pmu_counters=pmu_counters,
@@ -577,7 +574,6 @@ def profile_command(
         work_dir=work_dir,
         clean=clean,
     )
-    _cmd_profile(args)
 
 
 # ---------------------------------------------------------------------------
@@ -643,7 +639,7 @@ def analyze_command(
     """Analyze model compute/parameter breakdown without hardware."""
     from .analyze_cmd import _cmd_analyze
 
-    args = Namespace(
+    _cmd_analyze(
         model=model,
         engine=engine,
         compare=compare,
@@ -651,7 +647,6 @@ def analyze_command(
         output=output,
         board=board,
     )
-    _cmd_analyze(args)
 
 
 # ---------------------------------------------------------------------------
@@ -717,7 +712,7 @@ def compare_command(
     """Compare two completed profile runs or validation bundles."""
     from .compare_cmd import _cmd_compare
 
-    args = Namespace(
+    _cmd_compare(
         baseline=baseline,
         candidate=candidate,
         output_dir=output_dir,
@@ -725,7 +720,6 @@ def compare_command(
         top_layers=top_layers,
         validation=validation,
     )
-    _cmd_compare(args)
 
 
 # ---------------------------------------------------------------------------

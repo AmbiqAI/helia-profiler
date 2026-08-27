@@ -118,23 +118,9 @@ class PipelineContext:
     dependency_lock_path: Path | None = None
 
     # Build (stage: build_firmware)
-    build_dir: Path | None = None
-    binary_path: Path | None = None
     binary_sections: BinarySections | None = None
-    #: Path to the dedicated transport-free power binary (hpx_profiler_power),
-    #: built alongside hpx_profiler only when config.power.enabled. WP3 wires
-    #: this into the power-capture flash/run path; this stage only exposes it.
-    power_binary_path: Path | None = None
 
-    # Explicit major-stage artifacts. Legacy path fields above remain mirrored
-    # during the staged migration so existing internals and tests keep working.
-    profile_firmware: FirmwareArtifact | None = None
-    power_firmware: FirmwareArtifact | None = None
-    deployed_power_firmware: FirmwareArtifact | None = None
-    power_plan: PowerRunPlan | None = None
-
-    # Grouped immutable workflow records. Legacy fields above and capture
-    # result fields below remain mirrored until reports/API migrate.
+    # Grouped immutable workflow records.
     profile_run: ProfileRun | None = None
     power_run: PowerRun | None = None
 
@@ -163,10 +149,6 @@ class PipelineContext:
     #: For TFLM/heliaRT this drives the section attribute applied to
     #: ``model_data[]``.
     weights_region: Placement | None = None
-
-    # Capture (stage: capture_pmu / capture_power)
-    pmu_result: PmuResult | None = None
-    power_result: PowerResult | None = None
 
     #: The run's single authoritative evaluation (#197): computed once in
     #: ``write_report`` (#204 D5) and stored here so the console footer and
@@ -203,10 +185,58 @@ class PipelineContext:
 
     progress_sink: ProgressSink | None = field(default=None, repr=False, compare=False)
 
+    @property
+    def build_dir(self) -> Path | None:
+        return self.profile_run.firmware.build_dir if self.profile_run else None
+
+    @property
+    def binary_path(self) -> Path | None:
+        return self.profile_run.firmware.binary_path if self.profile_run else None
+
+    @property
+    def profile_firmware(self) -> FirmwareArtifact | None:
+        return self.profile_run.firmware if self.profile_run else None
+
+    @property
+    def pmu_result(self) -> PmuResult | None:
+        return self.profile_run.result if self.profile_run else None
+
+    @property
+    def power_plan(self) -> PowerRunPlan | None:
+        return self.power_run.plan if self.power_run else None
+
+    @property
+    def power_firmware(self) -> FirmwareArtifact | None:
+        return self.power_run.firmware if self.power_run else None
+
+    @property
+    def deployed_power_firmware(self) -> FirmwareArtifact | None:
+        if self.power_run is None or self.power_run.deployment is None:
+            return None
+        return self.power_run.deployment.firmware
+
+    @property
+    def power_binary_path(self) -> Path | None:
+        """Path to the dedicated transport-free power binary (hpx_profiler_power).
+
+        Built alongside ``hpx_profiler`` only when config.power.enabled. WP3
+        wires this into the power-capture flash/run path; this accessor only
+        exposes it.
+        """
+        if self.power_run is None or self.power_run.firmware is None:
+            return None
+        return self.power_run.firmware.binary_path
+
+    @property
+    def power_result(self) -> PowerResult | None:
+        if self.power_run is None or self.power_run.observation is None:
+            return None
+        return self.power_run.observation.result
+
     # -- Narrowing accessors -------------------------------------------------
     #
-    # The optional fields above are the *write* surface: each is set by the one
-    # stage that produces it.  These properties are the *read* surface — they
+    # The fields and typed records above are the *write* surface: each is set by
+    # the one stage that produces it.  These properties are the *read* surface — they
     # return the non-optional type and, when the producing stage has not run,
     # raise a :class:`PipelineError` naming both the field and that stage
     # instead of an ``assert`` (which vanishes under ``-O``) or a ``None`` that
@@ -240,9 +270,7 @@ class PipelineContext:
     @property
     def resolved_workspace(self) -> DependencyWorkspace:
         """The deterministic dependency workspace (produced by ``GenerateFirmwareStage``)."""
-        return _require(
-            self.dependency_workspace, "dependency_workspace", "GenerateFirmwareStage"
-        )
+        return _require(self.dependency_workspace, "dependency_workspace", "GenerateFirmwareStage")
 
     @property
     def built_binary_path(self) -> Path:
@@ -263,8 +291,6 @@ class PipelineContext:
         if firmware.role != "profile":
             raise ValueError("Profile run requires a profile firmware artifact.")
         self.profile_run = ProfileRun(firmware=firmware)
-        self.profile_firmware = firmware
-        self.pmu_result = None
 
     def publish_profile_deployment(self, deployment: DeploymentRecord) -> None:
         if self.profile_run is None:
@@ -277,15 +303,9 @@ class PipelineContext:
         if self.profile_run is None or self.profile_run.deployment is None:
             raise ValueError("Profile firmware must be deployed before capture.")
         self.profile_run = replace(self.profile_run, result=result)
-        self.pmu_result = result
 
     def publish_power_plan(self, plan: PowerRunPlan) -> None:
         self.power_run = PowerRun(plan=plan)
-        self.power_plan = plan
-        self.power_firmware = None
-        self.deployed_power_firmware = None
-        self.power_binary_path = None
-        self.power_result = None
 
     def publish_power_firmware(self, firmware: FirmwareArtifact) -> None:
         if self.power_run is None:
@@ -300,9 +320,6 @@ class PipelineContext:
             deployment=None,
             observation=None,
         )
-        self.power_firmware = firmware
-        self.deployed_power_firmware = None
-        self.power_result = None
 
     def publish_power_deployment(self, deployment: DeploymentRecord) -> None:
         if self.power_run is None or self.power_run.firmware is None:
@@ -310,15 +327,11 @@ class PipelineContext:
         if deployment.firmware != self.power_run.firmware:
             raise ValueError("Power deployment must reference the current firmware artifact.")
         self.power_run = replace(self.power_run, deployment=deployment)
-        self.deployed_power_firmware = deployment.firmware
 
     def publish_power_observation(self, observation: PowerObservation) -> None:
         if self.power_run is None:
             raise ValueError("Power plan must be published before capture.")
-        if (
-            self.power_run.plan.firmware_mode == "dedicated"
-            and self.power_run.deployment is None
-        ):
+        if self.power_run.plan.firmware_mode == "dedicated" and self.power_run.deployment is None:
             raise ValueError("Dedicated power firmware must be deployed before capture.")
         observation.result.metadata.set_observation(
             observation_mode=ObservationMode(observation.mode),
@@ -328,7 +341,6 @@ class PipelineContext:
             observation_deadline_s=observation.deadline_s,
         )
         self.power_run = replace(self.power_run, observation=observation)
-        self.power_result = observation.result
 
     def publish_power_terminal(self, terminal: PowerTerminalRecord) -> None:
         if self.power_run is None or self.power_run.deployment is None:
@@ -359,9 +371,7 @@ class PipelineContext:
                 result=result,
                 gate_rise_observed=rise,
                 gate_fall_observed=fall,
-                deadline_s=float(
-                    deadline if deadline is not None else result.summary.duration_s
-                ),
+                deadline_s=float(deadline if deadline is not None else result.summary.duration_s),
                 integrity=integrity,
             )
         )

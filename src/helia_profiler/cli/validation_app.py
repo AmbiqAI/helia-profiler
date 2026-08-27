@@ -7,7 +7,6 @@ pattern: plain command functions here, attached to the main Typer app via
 
 from __future__ import annotations
 
-from argparse import Namespace
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -290,7 +289,7 @@ def validate_command(
     """Drive the hardware validation suite via pytest."""
     from .validate_cmd import _cmd_validate
 
-    args = Namespace(
+    _cmd_validate(
         models=models,
         models_file=models_file,
         model_paths=model_paths,
@@ -314,7 +313,6 @@ def validate_command(
         timeout=timeout,
         keyword=keyword,
         junit_xml=junit_xml,
-        list=list_,
+        list_=list_,
         verbose=verbose,
     )
-    _cmd_validate(args)

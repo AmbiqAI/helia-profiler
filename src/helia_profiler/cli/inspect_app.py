@@ -6,16 +6,13 @@ its own module (mirroring that split) so ``cli/app.py`` stays under the
 project's per-module line ceiling as this cluster grows (see
 ``tests/test_package_layout.py``).
 
-Each Typer command function is a thin adapter, identical in spirit to
-``app.py``: it collects typed CLI parameters, assembles an
-``argparse.Namespace`` with exactly the attribute names the existing
-``_cmd_*`` implementation functions in ``inspect_cmds.py`` read, and calls
-into that unchanged implementation.
+Each Typer command function is a thin adapter: it collects typed CLI
+parameters and forwards them as keyword arguments to the matching
+``_cmd_*`` implementation function in ``inspect_cmds.py``.
 """
 
 from __future__ import annotations
 
-from argparse import Namespace
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -117,18 +114,16 @@ def doctor_command(
     from .inspect_cmds import _cmd_doctor
 
     _cmd_doctor(
-        Namespace(
-            json=json_,
-            bundle=str(bundle) if bundle is not None else None,
-            workspace=str(workspace) if workspace is not None else None,
-            config=str(config) if config is not None else None,
-            toolchain=toolchain,
-            transport=transport,
-            engine=engine,
-            no_probes=no_probes,
-            no_ports=no_ports,
-            raw_probe_ids=raw_probe_ids,
-        )
+        json_=json_,
+        bundle=str(bundle) if bundle is not None else None,
+        workspace=str(workspace) if workspace is not None else None,
+        config=str(config) if config is not None else None,
+        toolchain=toolchain,
+        transport=transport,
+        engine=engine,
+        no_probes=no_probes,
+        no_ports=no_ports,
+        raw_probe_ids=raw_probe_ids,
     )
 
 
@@ -177,7 +172,7 @@ def probes_list_command(
 ) -> None:
     from .inspect_cmds import _cmd_probes_list
 
-    _cmd_probes_list(Namespace(board=board, inspect=inspect, json=json_))
+    _cmd_probes_list(board=board, inspect=inspect, json_=json_)
 
 
 @probes_app.command(
@@ -196,7 +191,7 @@ def probes_match_command(
 ) -> None:
     from .inspect_cmds import _cmd_probes_match
 
-    _cmd_probes_match(Namespace(board=board, jlink_serial=jlink_serial, json=json_))
+    _cmd_probes_match(board=board, jlink_serial=jlink_serial, json_=json_)
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +220,7 @@ def ports_list_command(
 ) -> None:
     from .inspect_cmds import _cmd_ports_list
 
-    _cmd_ports_list(Namespace(show_all=show_all, json=json_))
+    _cmd_ports_list(show_all=show_all, json_=json_)
 
 
 # ---------------------------------------------------------------------------
@@ -261,4 +256,4 @@ def target_reset_command(
 ) -> None:
     from .inspect_cmds import _cmd_target_reset
 
-    _cmd_target_reset(Namespace(board=board, jlink_serial=jlink_serial, kind=kind))
+    _cmd_target_reset(board=board, jlink_serial=jlink_serial, kind=kind)

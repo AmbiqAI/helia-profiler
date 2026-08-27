@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.pipeline_context_helpers import set_power_result, set_profile_result
+
 from pathlib import Path
 
 from helia_profiler import (
@@ -23,9 +25,7 @@ from helia_profiler.power.metadata import (
 from helia_profiler.results import FirmwareMeta, PmuResult
 
 
-def test_profile_result_exposes_grouped_power_contract(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_profile_result_exposes_grouped_power_contract(tmp_path: Path, monkeypatch) -> None:
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")
     config = load_config(
@@ -36,7 +36,7 @@ def test_profile_result_exposes_grouped_power_contract(
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
-    ctx.pmu_result = PmuResult(meta=FirmwareMeta(), layers=[])
+    set_profile_result(ctx, PmuResult(meta=FirmwareMeta(), layers=[]))
     power = PowerResult(
         summary=PowerSummary(0.01, 0.018, 0.02, 0.09, 5.0, 5000),
         metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
@@ -68,7 +68,7 @@ def test_profile_result_exposes_grouped_power_contract(
         inference_count=5,
         overflow=False,
     )
-    ctx.power_result = power
+    set_power_result(ctx, power)
     ctx.power_run = PowerRun(
         plan=PowerRunPlan(firmware_mode="dedicated", inference_count=5),
         observation=observation,
@@ -91,7 +91,7 @@ def test_profile_forwards_optional_progress_sink(tmp_path: Path, monkeypatch) ->
     model.write_bytes(b"\x00")
     config = load_config(None, {"model": {"path": str(model)}})
     ctx = PipelineContext(config=config, work_dir=tmp_path)
-    ctx.pmu_result = PmuResult(meta=FirmwareMeta(), layers=[])
+    set_profile_result(ctx, PmuResult(meta=FirmwareMeta(), layers=[]))
     seen: dict[str, object] = {}
 
     def fake_run_profile(_config, **kwargs):

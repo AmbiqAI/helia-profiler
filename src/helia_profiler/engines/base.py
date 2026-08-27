@@ -326,3 +326,26 @@ class EngineAdapter(Protocol):
         AOT-style engines move *scratch* regions to ``target``.
         """
         ...
+
+
+class SingleArenaPlacementMixin:
+    """No-op capability-hook defaults for single-arena engines.
+
+    Engines whose firmware template manages one arena (TFLM, heliaRT,
+    ExecuTorch) share these identity implementations; AOT-style engines
+    override both hooks with real placement logic.
+    """
+
+    def default_auto_placement(
+        self, *, tcm_cap: int, sram_cap: int
+    ) -> tuple[Placement, Placement] | None:
+        # Fall through to the shared greedy fastest-fit policy.
+        del tcm_cap, sram_cap
+        return None
+
+    def apply_arena_placement_override(
+        self, regions: list[ArenaRegion], target: Placement
+    ) -> list[ArenaRegion]:
+        # A single template-managed arena: no engine-side override needed.
+        del target
+        return regions

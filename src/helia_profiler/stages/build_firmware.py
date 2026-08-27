@@ -45,8 +45,6 @@ class BuildFirmwareStage:
                 hint="Run 'hpx doctor' to verify toolchain installation.",
             ) from exc
 
-        ctx.build_dir = build_dir
-        ctx.binary_path = binary_path
         log.info("Binary: %s", binary_path)
 
         # Capture binary section sizes
@@ -64,9 +62,7 @@ class BuildFirmwareStage:
         # soc gate additionally covers test-shaped contexts that never ran
         # ResolvePlatformStage.
         if ctx.soc is not None:
-            linker_profile = str(
-                ctx.config.engine.config.get("linker_profile") or "default"
-            )
+            linker_profile = str(ctx.config.engine.config.get("linker_profile") or "default")
             ctx.memory_regions = measure_memory_regions(
                 binary_path,
                 toolchain,
@@ -84,8 +80,7 @@ class BuildFirmwareStage:
             symbols, unparsed = inventory
             if unparsed:
                 log.info(
-                    "nm listing is partial (%d unparsed rows); refusing "
-                    "symbol attribution.",
+                    "nm listing is partial (%d unparsed rows); refusing symbol attribution.",
                     unparsed,
                 )
             else:

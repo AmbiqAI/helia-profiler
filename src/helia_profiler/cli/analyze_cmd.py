@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -13,15 +12,23 @@ if TYPE_CHECKING:
     from ..evaluation import ModelAnalysis
 
 
-def _cmd_analyze(args: argparse.Namespace) -> None:
+def _cmd_analyze(
+    *,
+    model: Path,
+    engine: str | None = None,
+    compare: bool = False,
+    format: str = "table",
+    output: Path | None = None,
+    board: str = "apollo510_evb",
+) -> None:
     """Analyze model compute/parameter breakdown without hardware."""
     from ..evaluation import ModelAnalysis, analyze_for_engine, analyze_model, is_available
     from ..console import HpxConsole
 
     console = HpxConsole(verbosity=1)  # always show output
 
-    if not args.model.exists():
-        print(f"Error: model file not found: {args.model}", file=sys.stderr)
+    if not model.exists():
+        print(f"Error: model file not found: {model}", file=sys.stderr)
         sys.exit(1)
 
     if not is_available():
@@ -32,11 +39,10 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
-    engine = args.engine  # None, "helia-aot", or "helia-rt"
     is_aot = engine == EngineType.HELIA_AOT.value
 
     # --- Original tflite analysis (always needed as baseline) ---
-    original = analyze_model(str(args.model))
+    original = analyze_model(str(model))
     if original is None:
         print("Error: failed to analyze model.", file=sys.stderr)
         sys.exit(1)
@@ -46,9 +52,9 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
     if is_aot:
         try:
             engine_result = analyze_for_engine(
-                args.model,
+                model,
                 engine=EngineType.HELIA_AOT,
-                board=args.board,
+                board=board,
             )
         except Exception as exc:
             print(f"Error: {exc}", file=sys.stderr)
@@ -58,18 +64,16 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
     # and whether to show comparison
     if engine_result is not None:
         primary = engine_result
-        reference = original if args.compare else None
+        reference = original if compare else None
     else:
         primary = original
         reference = None
 
     # --- Output ---
-    if args.format == "table":
-        console.print_analysis(primary, args.model.name, reference)
-    elif args.format in ("csv", "json"):
-        _write_analysis_file(primary, args.format, args.output, reference)
+    if format in ("csv", "json"):
+        _write_analysis_file(primary, format, output, reference)
     else:
-        console.print_analysis(primary, args.model.name, reference)
+        console.print_analysis(primary, model.name, reference)
 
 
 def _write_analysis_file(

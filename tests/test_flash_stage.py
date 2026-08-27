@@ -9,6 +9,8 @@ publication, and the power-cycle retry taxonomy.
 
 from __future__ import annotations
 
+from tests.pipeline_context_helpers import clear_profile_run, set_profile_firmware
+
 from pathlib import Path
 
 import pytest
@@ -40,15 +42,17 @@ def _make_ctx(tmp_path: Path, *, board: str = "apollo510_evb") -> PipelineContex
     ctx.resolved_jlink_serial = "1160001481"
     ctx.firmware_dir = tmp_path / "app"
     ctx.firmware_dir.mkdir(parents=True, exist_ok=True)
-    ctx.binary_path = tmp_path / "app" / "hpx_profiler"
+    set_profile_firmware(ctx, binary_path=tmp_path / "app" / "hpx_profiler")
     ctx.binary_path.write_bytes(b"elf")
-    ctx.publish_profile_firmware(FirmwareArtifact(
-        role="profile",
-        target_name="hpx_profiler",
-        app_dir=ctx.firmware_dir,
-        build_dir=ctx.firmware_dir,
-        binary_path=ctx.binary_path,
-    ))
+    ctx.publish_profile_firmware(
+        FirmwareArtifact(
+            role="profile",
+            target_name="hpx_profiler",
+            app_dir=ctx.firmware_dir,
+            build_dir=ctx.firmware_dir,
+            binary_path=ctx.binary_path,
+        )
+    )
     return ctx
 
 
@@ -62,9 +66,7 @@ class TestFlashFirmwareStageDirect:
         def fake_flash_binary(binary_path, **kwargs):
             calls.append({"binary_path": binary_path, **kwargs})
 
-        monkeypatch.setattr(
-            "helia_profiler.target.probe.flash.flash_binary", fake_flash_binary
-        )
+        monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", fake_flash_binary)
 
         FlashFirmwareStage().run(ctx)
 
@@ -100,7 +102,7 @@ class TestFlashFirmwareStageDirect:
 
     def test_missing_artifact_is_rejected(self, tmp_path: Path) -> None:
         ctx = _make_ctx(tmp_path)
-        ctx.profile_firmware = None
+        clear_profile_run(ctx)
         ctx.profile_run = None
 
         with pytest.raises(BuildError, match="No profile artifact"):
@@ -117,9 +119,7 @@ class TestFlashFirmwareStageDirect:
             if len(attempts) == 1:
                 raise CaptureError("debug domain locked")
 
-        monkeypatch.setattr(
-            "helia_profiler.target.probe.flash.flash_binary", flaky_flash_binary
-        )
+        monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", flaky_flash_binary)
         cycles: list[int] = []
         monkeypatch.setattr(
             "helia_profiler.stages.flash.try_power_cycle_for_context",
@@ -141,9 +141,7 @@ class TestFlashFirmwareStageDirect:
         def missing_image(binary_path, **kwargs):
             raise DeterministicCaptureError("no flashable image", hint="re-run the build")
 
-        monkeypatch.setattr(
-            "helia_profiler.target.probe.flash.flash_binary", missing_image
-        )
+        monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", missing_image)
         cycles: list[int] = []
         monkeypatch.setattr(
             "helia_profiler.stages.flash.try_power_cycle_for_context",

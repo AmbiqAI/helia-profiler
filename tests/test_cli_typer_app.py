@@ -1,13 +1,11 @@
-"""Tests for the Typer-based ``hpx`` CLI surface (argparse -> Typer migration).
+"""Tests for the Typer-based ``hpx`` CLI surface.
 
 These exercise the top-level app via ``typer.testing.CliRunner`` and verify
-that the thin Typer command adapters build the same ``SimpleNamespace``
-contract the existing ``_cmd_*`` implementations expect.
+that the thin Typer command adapters forward each flag as the keyword
+argument the ``_cmd_*`` implementations declare.
 """
 
 from __future__ import annotations
-
-from types import SimpleNamespace
 
 from click import unstyle
 from typer.testing import CliRunner
@@ -33,10 +31,10 @@ def test_pmu_counters_repeatable_option_builds_list(monkeypatch) -> None:
     """Multiple --pmu-counters occurrences replace argparse's old nargs='+' form."""
     import helia_profiler.cli.profile_cmd as profile_cmd
 
-    seen: dict[str, SimpleNamespace] = {}
+    seen: dict[str, dict] = {}
 
-    def fake_cmd_profile(args: SimpleNamespace) -> None:
-        seen["args"] = args
+    def fake_cmd_profile(**kwargs) -> None:
+        seen["kwargs"] = kwargs
 
     monkeypatch.setattr(profile_cmd, "_cmd_profile", fake_cmd_profile)
 
@@ -53,52 +51,53 @@ def test_pmu_counters_repeatable_option_builds_list(monkeypatch) -> None:
     )
 
     assert result.exit_code == 0, result.output
-    assert seen["args"].pmu_counters == ["cpu:default", "mve:all"]
+    assert seen["kwargs"]["pmu_counters"] == ["cpu:default", "mve:all"]
 
 
 def test_profile_forwards_fail_on_invalid(monkeypatch) -> None:
-    """#197/#208 review: the typer->Namespace keyword is a stringly link a
-    rename would silently break (the applier getattr-defaults to False)."""
+    """#197/#208: --fail-on-invalid must reach the implementation keyword."""
     import helia_profiler.cli.profile_cmd as profile_cmd
 
-    seen: dict[str, SimpleNamespace] = {}
+    seen: dict[str, dict] = {}
 
-    def fake_cmd_profile(args: SimpleNamespace) -> None:
-        seen["args"] = args
+    def fake_cmd_profile(**kwargs) -> None:
+        seen["kwargs"] = kwargs
 
     monkeypatch.setattr(profile_cmd, "_cmd_profile", fake_cmd_profile)
 
     result = runner.invoke(app, ["profile", "model.tflite", "--fail-on-invalid"])
 
     assert result.exit_code == 0, result.output
-    assert seen["args"].fail_on_invalid is True
+    assert seen["kwargs"]["fail_on_invalid"] is True
 
     result = runner.invoke(app, ["profile", "model.tflite"])
     assert result.exit_code == 0, result.output
-    assert seen["args"].fail_on_invalid is False
+    assert seen["kwargs"]["fail_on_invalid"] is False
 
 
 def test_profile_accepts_tflm_engine(monkeypatch) -> None:
     import helia_profiler.cli.profile_cmd as profile_cmd
 
-    seen: dict[str, SimpleNamespace] = {}
+    seen: dict[str, dict] = {}
 
-    def fake_cmd_profile(args: SimpleNamespace) -> None:
-        seen["args"] = args
+    def fake_cmd_profile(**kwargs) -> None:
+        seen["kwargs"] = kwargs
 
     monkeypatch.setattr(profile_cmd, "_cmd_profile", fake_cmd_profile)
 
     result = runner.invoke(app, ["profile", "model.tflite", "--engine", "tflm"])
 
     assert result.exit_code == 0, result.output
-    assert seen["args"].engine == "tflm"
+    assert seen["kwargs"]["engine"] == "tflm"
 
 
 def test_profile_uses_canonical_placement_options(monkeypatch) -> None:
     import helia_profiler.cli.profile_cmd as profile_cmd
 
-    seen: dict[str, SimpleNamespace] = {}
-    monkeypatch.setattr(profile_cmd, "_cmd_profile", lambda args: seen.setdefault("args", args))
+    seen: dict[str, dict] = {}
+    monkeypatch.setattr(
+        profile_cmd, "_cmd_profile", lambda **kwargs: seen.setdefault("kwargs", kwargs)
+    )
 
     result = runner.invoke(
         app,
@@ -106,8 +105,8 @@ def test_profile_uses_canonical_placement_options(monkeypatch) -> None:
     )
 
     assert result.exit_code == 0, result.output
-    assert seen["args"].runtime_arena_location == "sram"
-    assert seen["args"].runtime_weights_location == "mram"
+    assert seen["kwargs"]["runtime_arena_location"] == "sram"
+    assert seen["kwargs"]["runtime_weights_location"] == "mram"
     removed = runner.invoke(
         app,
         ["profile", "model.tflite", "--runtime-arena-location", "sram"],
@@ -118,10 +117,10 @@ def test_profile_uses_canonical_placement_options(monkeypatch) -> None:
 def test_compare_validation_option_reaches_command_adapter(monkeypatch) -> None:
     import helia_profiler.cli.compare_cmd as compare_cmd
 
-    seen: dict[str, SimpleNamespace] = {}
+    seen: dict[str, dict] = {}
 
-    def fake_cmd_compare(args: SimpleNamespace) -> None:
-        seen["args"] = args
+    def fake_cmd_compare(**kwargs) -> None:
+        seen["kwargs"] = kwargs
 
     monkeypatch.setattr(compare_cmd, "_cmd_compare", fake_cmd_compare)
 
@@ -138,31 +137,31 @@ def test_compare_validation_option_reaches_command_adapter(monkeypatch) -> None:
     )
 
     assert result.exit_code == 0, result.output
-    assert seen["args"].validation is True
-    assert str(seen["args"].output_dir) == "comparison"
+    assert seen["kwargs"]["validation"] is True
+    assert str(seen["kwargs"]["output_dir"]) == "comparison"
 
 
 def test_per_layer_tri_state_true_false_and_absent(monkeypatch) -> None:
     import helia_profiler.cli.profile_cmd as profile_cmd
 
-    seen: dict[str, SimpleNamespace] = {}
+    seen: dict[str, dict] = {}
 
-    def fake_cmd_profile(args: SimpleNamespace) -> None:
-        seen["args"] = args
+    def fake_cmd_profile(**kwargs) -> None:
+        seen["kwargs"] = kwargs
 
     monkeypatch.setattr(profile_cmd, "_cmd_profile", fake_cmd_profile)
 
     result = runner.invoke(app, ["profile", "model.tflite", "--per-layer"])
     assert result.exit_code == 0, result.output
-    assert seen["args"].per_layer is True
+    assert seen["kwargs"]["per_layer"] is True
 
     result = runner.invoke(app, ["profile", "model.tflite", "--no-per-layer"])
     assert result.exit_code == 0, result.output
-    assert seen["args"].per_layer is False
+    assert seen["kwargs"]["per_layer"] is False
 
     result = runner.invoke(app, ["profile", "model.tflite"])
     assert result.exit_code == 0, result.output
-    assert seen["args"].per_layer is None
+    assert seen["kwargs"]["per_layer"] is None
 
 
 def test_probes_no_subcommand_prints_help_and_exits_zero() -> None:

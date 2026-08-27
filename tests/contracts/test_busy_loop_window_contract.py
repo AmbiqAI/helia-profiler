@@ -23,6 +23,8 @@ plan, so a second rule cannot be reintroduced without failing them.
 
 from __future__ import annotations
 
+from tests.pipeline_context_helpers import set_profile_result
+
 import re
 from pathlib import Path
 
@@ -50,17 +52,13 @@ def _firmware_spin_target_ms(ctx: PipelineContext) -> int:
     # window target depends on which engine.
     ctx.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
     template_vars = FirmwareRenderContext.from_pipeline_context(ctx).to_template_vars()
-    rendered = _jinja_env.get_template("_busy_loop_calibration.j2").render(
-        **template_vars
-    )
+    rendered = _jinja_env.get_template("_busy_loop_calibration.j2").render(**template_vars)
     match = _SPIN_TARGET_RE.search(rendered)
     assert match is not None, "spin target not found in the rendered calibration"
     return int(match.group(1))
 
 
-def _busy_loop_ctx(
-    tmp_path: Path, *, window_mode: str, window_target_ms: int
-) -> PipelineContext:
+def _busy_loop_ctx(tmp_path: Path, *, window_mode: str, window_target_ms: int) -> PipelineContext:
     ctx = make_pmu_ctx(
         tmp_path,
         board="apollo4p_blue_kbr_evb",
@@ -75,11 +73,12 @@ def _busy_loop_ctx(
         },
     )
     # What the profile pass reports under busy_loop: one spin, whole window.
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(
-            clean_infer_count=1, clean_infer_avg_us=window_target_ms * 1000
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=window_target_ms * 1000),
+            layers=[],
         ),
-        layers=[],
     )
     return ctx
 
@@ -94,9 +93,7 @@ def test_plan_window_equals_the_window_the_firmware_is_built_to_spin(
     Reproduced before the fix at ``window_mode: fixed`` / 1000 ms: firmware
     built to spin 1000 ms, plan describing 5000 ms.
     """
-    ctx = _busy_loop_ctx(
-        tmp_path, window_mode=window_mode, window_target_ms=window_target_ms
-    )
+    ctx = _busy_loop_ctx(tmp_path, window_mode=window_mode, window_target_ms=window_target_ms)
 
     plan = plan_power_run(ctx)
     firmware_ms = _firmware_spin_target_ms(ctx)

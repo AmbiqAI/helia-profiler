@@ -26,6 +26,8 @@ output-format change, never to paper over a split-introduced diff) with::
 
 from __future__ import annotations
 
+from tests.pipeline_context_helpers import set_power_result, set_profile_result
+
 import hashlib
 import json
 import os
@@ -256,9 +258,7 @@ def _sample_memory_regions() -> MeasuredMemoryRegions:
                 load_image=0,
             ),
         ),
-        unattributed=(
-            UnattributedSection(name=".mystery", address=0x30000000, size=64),
-        ),
+        unattributed=(UnattributedSection(name=".mystery", address=0x30000000, size=64),),
     )
 
 
@@ -294,12 +294,8 @@ def _sample_memory_reconciliation() -> MemoryReconciliation:
             ),
         ),
         regions=(
-            RegionReconciliation(
-                region="DTCM", planned_used=77664, measured_used=77664
-            ),
-            RegionReconciliation(
-                region="SRAM", planned_used=0, measured_used=98304
-            ),
+            RegionReconciliation(region="DTCM", planned_used=77664, measured_used=77664),
+            RegionReconciliation(region="SRAM", planned_used=0, measured_used=98304),
         ),
     )
 
@@ -392,12 +388,17 @@ def _make_ctx(tmp_path: Path, engine: EngineType, fmt: str) -> PipelineContext:
         {
             "model": {"path": "test.tflite"},
             "engine": {"type": engine.value},
-            "output": {"format": fmt, "detailed": True, "model_explorer": True, "dir": str(tmp_path)},
+            "output": {
+                "format": fmt,
+                "detailed": True,
+                "model_explorer": True,
+                "dir": str(tmp_path),
+            },
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
-    ctx.pmu_result = _sample_pmu()
-    ctx.power_result = _sample_power()
+    set_profile_result(ctx, _sample_pmu())
+    set_power_result(ctx, _sample_power())
     ctx.memory_plan = _sample_memory_plan(engine)
     ctx.memory_regions = _sample_memory_regions()
     ctx.memory_reconciliation = _sample_memory_reconciliation()
@@ -535,7 +536,9 @@ _REGEN_HINT = (
 
 
 def test_snapshot_exists():
-    assert _SNAPSHOTS, "no report golden snapshot committed — generate it with HPX_UPDATE_SNAPSHOTS=1"
+    assert _SNAPSHOTS, (
+        "no report golden snapshot committed — generate it with HPX_UPDATE_SNAPSHOTS=1"
+    )
 
 
 @pytest.mark.parametrize("scenario", ["helia_rt_csv", "helia_rt_json", "helia_aot"])

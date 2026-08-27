@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+from tests.pipeline_context_helpers import (
+    set_power_deployment,
+    set_power_firmware,
+    set_power_result,
+    set_profile_firmware,
+    set_profile_result,
+)
+
 import dataclasses
 import re
 from pathlib import Path
@@ -346,9 +354,7 @@ class TestPipelineContext:
         assert ctx.deployed_power_firmware is None
         ctx.publish_power_deployment(deployment)
 
-        result = PowerResult(
-            summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 1.0, 10)
-        )
+        result = PowerResult(summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 1.0, 10))
         ctx.publish_power_result(result)
         assert ctx.power_run.observation is not None
         assert ctx.power_run.observation.result is result
@@ -402,18 +408,19 @@ class TestPipelineContext:
         from helia_profiler.power.base import PowerResult, PowerSummary
 
         ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
-        ctx.power_binary_path = tmp_path / "old-power"
-        ctx.power_firmware = FirmwareArtifact(
-            role="power",
-            target_name="hpx_profiler_power",
-            app_dir=tmp_path,
-            build_dir=tmp_path,
-            binary_path=ctx.power_binary_path,
+        set_power_firmware(ctx, binary_path=tmp_path / "old-power")
+        set_power_firmware(
+            ctx,
+            artifact=FirmwareArtifact(
+                role="power",
+                target_name="hpx_profiler_power",
+                app_dir=tmp_path,
+                build_dir=tmp_path,
+                binary_path=ctx.power_binary_path,
+            ),
         )
-        ctx.deployed_power_firmware = ctx.power_firmware
-        ctx.power_result = PowerResult(
-            summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 1.0, 10)
-        )
+        set_power_deployment(ctx)
+        set_power_result(ctx, PowerResult(summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 1.0, 10)))
 
         ctx.publish_power_plan(PowerRunPlan(firmware_mode="dedicated", inference_count=7))
 
@@ -427,7 +434,7 @@ class TestPipelineContext:
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         from helia_profiler.results import FirmwareMeta, PmuResult
 
-        ctx.pmu_result = PmuResult(meta=FirmwareMeta(), layers=[])
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(), layers=[]))
         assert ctx.pmu_result is not None
         assert ctx.pmu_result.layers == []
 
@@ -501,10 +508,10 @@ NARROWING_ACCESSORS = [
 class TestNarrowingAccessors:
     """Reading a stage product before its stage ran is a named, typed failure.
 
-    The optional fields stay the *write* surface (a stage sets the field it
-    owns); these accessors are the *read* surface.  An ``assert`` vanishes
-    under ``-O`` and, when it does fire, says nothing about which stage was
-    supposed to run — a ``PipelineError`` naming field and producer does.
+    Optional fields and derived properties stay the compatible read surface.
+    An ``assert`` vanishes under ``-O`` and, when it does fire, says nothing
+    about which stage was supposed to run — a ``PipelineError`` naming field
+    and producer does.
     """
 
     @pytest.mark.parametrize("accessor,field,stage", NARROWING_ACCESSORS)
@@ -530,7 +537,12 @@ class TestNarrowingAccessors:
         del stage
         ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
         sentinel = object()
-        setattr(ctx, field, sentinel)
+        if field == "binary_path":
+            set_profile_firmware(ctx, binary_path=sentinel)
+        elif field == "pmu_result":
+            set_profile_result(ctx, sentinel)
+        else:
+            setattr(ctx, field, sentinel)
         assert getattr(ctx, accessor) is sentinel
 
     def test_pipeline_error_is_an_hpx_error(self, tmp_path: Path):
@@ -541,9 +553,7 @@ class TestNarrowingAccessors:
             ctx.captured_pmu
 
     @pytest.mark.parametrize("accessor,field,stage", NARROWING_ACCESSORS)
-    def test_named_producer_is_a_real_stage(
-        self, accessor: str, field: str, stage: str
-    ):
+    def test_named_producer_is_a_real_stage(self, accessor: str, field: str, stage: str):
         """The stage named in the error must exist AND produce the field.
 
         Review-hardened: the existence half alone let a wrong-but-real
@@ -568,7 +578,10 @@ class TestNarrowingAccessors:
         # both holes let a wrong-but-real producer pass until the second
         # review round mutation-proved them.
         assigns = re.search(rf"ctx\.{field}\s*=(?!=)", module_src) is not None
-        field_publisher = {"pmu_result": "ctx.publish_profile_result("}.get(field)
+        field_publisher = {
+            "binary_path": "ctx.publish_profile_firmware(",
+            "pmu_result": "ctx.publish_profile_result(",
+        }.get(field)
         publishes = field_publisher is not None and field_publisher in module_src
         assert assigns or publishes, (
             f"{stage} does not appear to set ctx.{field} — the accessor's "
@@ -577,11 +590,12 @@ class TestNarrowingAccessors:
 
     def test_accessors_cover_every_documented_field(self, tmp_path: Path):
         # Guards a rename on either side of the pair: every listed accessor is
-        # a real property and every listed field a real context field.
+        # a real property and every listed field is a field or derived property.
         ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
+        context_fields = {f.name for f in dataclasses.fields(ctx)}
         for accessor, field, _stage in NARROWING_ACCESSORS:
             assert isinstance(getattr(type(ctx), accessor), property)
-            assert field in {f.name for f in dataclasses.fields(ctx)}
+            assert field in context_fields or isinstance(getattr(type(ctx), field), property)
 
 
 def test_no_assert_narrowing_of_context_fields_survives_in_src():
@@ -628,15 +642,10 @@ def test_docs_accessor_table_matches_the_code():
     """docs/architecture/pipeline.md hand-duplicates the accessor table; the
     second review round showed a mutated producer left the docs silently
     divergent. Parse the table and hold it to NARROWING_ACCESSORS."""
-    doc = (
-        Path(__file__).resolve().parents[1]
-        / "docs"
-        / "architecture"
-        / "pipeline.md"
-    ).read_text(encoding="utf-8")
-    rows = re.findall(
-        r"^\| `(\w+)` \| `(\w+)` \| `(\w+)` \|$", doc, flags=re.MULTILINE
+    doc = (Path(__file__).resolve().parents[1] / "docs" / "architecture" / "pipeline.md").read_text(
+        encoding="utf-8"
     )
+    rows = re.findall(r"^\| `(\w+)` \| `(\w+)` \| `(\w+)` \|$", doc, flags=re.MULTILINE)
     assert set(rows) == set(NARROWING_ACCESSORS), (
         "the accessor table in docs/architecture/pipeline.md no longer "
         "matches pipeline.py's accessors — update both together"
@@ -653,9 +662,12 @@ def test_print_results_renders_a_captured_run(tmp_path: Path):
     from helia_profiler.results import FirmwareMeta, PmuResult
 
     ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
-    ctx.pmu_result = PmuResult(
-        meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=1000),
-        layers=[],
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=1000),
+            layers=[],
+        ),
     )
     print_results(HpxConsole(verbosity=0), ctx)  # must not raise
 
