@@ -117,3 +117,17 @@ def test_cli_choice_lists_mirror_the_config_enums():
 
     assert set(_AGGREGATION_CHOICE.choices) == {a.value for a in Aggregation}
     assert set(_POWER_FIRMWARE_CHOICE.choices) == {f.value for f in PowerFirmware}
+
+
+def test_profile_signature_matches_override_specs():
+    """Every ``hpx profile`` Typer parameter must have exactly one override
+    spec (and vice versa): the Typer signature forwards ``locals()`` by name,
+    so a param without a spec would only fail at runtime via the unknown-name
+    TypeError, and a spec without a param would be dead mapping."""
+    import inspect
+
+    from helia_profiler.cli.app import profile_command
+    from helia_profiler.cli.profile_cmd import _KNOWN_PARAMS
+
+    sig_params = set(inspect.signature(profile_command).parameters) - {"config"}
+    assert sig_params == set(_KNOWN_PARAMS)

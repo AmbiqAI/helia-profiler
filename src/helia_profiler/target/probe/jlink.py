@@ -153,22 +153,16 @@ def find_jlink_exe() -> str:
 
 def list_connected_probes() -> list[JLinkProbe]:
     """Return the connected J-Link probes visible to ``JLinkExe``."""
-    jlink_exe = find_jlink_exe()
-    try:
-        result = subprocess.run(
-            [jlink_exe, "-NoGui", "1"],
-            input="ShowEmuList\nexit\n",
-            capture_output=True,
-            text=True,
-            timeout=_DEFAULT_TIMEOUT_S,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise ConfigError(
-            "Timed out while enumerating J-Link probes.",
-            hint="Check that the J-Link probes are connected and not in use by another process.",
-        ) from exc
-    except FileNotFoundError as exc:
-        raise ConfigError("JLinkExe not found", hint=_JLINK_NOT_FOUND_HINT) from exc
+    result = _invoke_jlink(
+        [find_jlink_exe(), "-NoGui", "1"],
+        script="ShowEmuList\nexit\n",
+        timeout_s=_DEFAULT_TIMEOUT_S,
+        error_cls=ConfigError,
+        timeout_message="Timed out while enumerating J-Link probes.",
+        timeout_hint=(
+            "Check that the J-Link probes are connected and not in use by another process."
+        ),
+    )
 
     probes: list[JLinkProbe] = []
     seen: set[str] = set()
@@ -260,40 +254,18 @@ def resolve_probe_serial(
 
 
 def _inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
-    jlink_exe = find_jlink_exe()
-    cmd = [
-        jlink_exe,
-        "-NoGui",
-        "1",
-        "-device",
-        device,
-        "-if",
-        "SWD",
-        "-speed",
-        "4000",
-        "-autoconnect",
-        "1",
-        "-SelectEmuBySN",
-        probe.serial,
-    ]
+    cmd = _jlink_target_cmd(device=device, jlink_serial=probe.serial)
     for attempt in range(_PROBE_INSPECTION_ATTEMPTS):
-        try:
-            result = subprocess.run(
-                cmd,
-                input="exit\n",
-                capture_output=True,
-                text=True,
-                timeout=_DEFAULT_TIMEOUT_S,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise ConfigError(
-                f"Timed out while querying J-Link serial '{probe.serial}'.",
-                hint="Check that the probe is connected and not in use by another process.",
-            ) from exc
-
-        detected_core = _parse_detected_core(
-            (result.stdout or "") + "\n" + (result.stderr or "")
+        result = _invoke_jlink(
+            cmd,
+            script="exit\n",
+            timeout_s=_DEFAULT_TIMEOUT_S,
+            error_cls=ConfigError,
+            timeout_message=f"Timed out while querying J-Link serial '{probe.serial}'.",
+            timeout_hint="Check that the probe is connected and not in use by another process.",
         )
+
+        detected_core = _parse_detected_core((result.stdout or "") + "\n" + (result.stderr or ""))
         if detected_core is not None or attempt + 1 == _PROBE_INSPECTION_ATTEMPTS:
             return JLinkProbeMatch(probe=probe, detected_core=detected_core)
         log.debug(
@@ -347,6 +319,61 @@ def _format_probe_matches(matches: list[JLinkProbeMatch]) -> str:
 # ------------------------------------------------------------------
 
 
+def _jlink_target_cmd(
+    *,
+    device: str,
+    interface: str = "SWD",
+    speed_khz: int = 4000,
+    jlink_serial: str | None = None,
+) -> list[str]:
+    """Build the JLinkExe argv for a target-connected commander session."""
+    cmd = [
+        find_jlink_exe(),
+        "-NoGui",
+        "1",
+        "-device",
+        device,
+        "-if",
+        interface,
+        "-speed",
+        str(speed_khz),
+        "-autoconnect",
+        "1",
+    ]
+    if jlink_serial:
+        cmd.extend(["-SelectEmuBySN", jlink_serial])
+    return cmd
+
+
+def _invoke_jlink(
+    cmd: list[str],
+    *,
+    script: str,
+    timeout_s: int,
+    timeout_message: str,
+    timeout_hint: str,
+    error_cls: type[CaptureError] | type[ConfigError] = CaptureError,
+) -> subprocess.CompletedProcess[str]:
+    """Run one ``JLinkExe`` commander invocation with shared error handling.
+
+    Owns the ``subprocess.run`` call plus the timeout / missing-binary
+    translation into HPX errors; callers own return-code policy (probe
+    enumeration and the SWPOI reset deliberately ignore rc).
+    """
+    try:
+        return subprocess.run(
+            cmd,
+            input=script,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise error_cls(timeout_message, hint=timeout_hint) from exc
+    except FileNotFoundError as exc:
+        raise error_cls("JLinkExe not found", hint=_JLINK_NOT_FOUND_HINT) from exc
+
+
 def run_jlink_script(
     script: str,
     *,
@@ -356,6 +383,7 @@ def run_jlink_script(
     interface: str = "SWD",
     timeout_s: int = _DEFAULT_TIMEOUT_S,
     op_label: str = "JLinkExe",
+    check: bool = True,
 ) -> subprocess.CompletedProcess[str]:
     """Run a JLinkExe commander script and return the completed process.
 
@@ -373,47 +401,32 @@ def run_jlink_script(
     op_label:
         Short label used in the timeout / error messages
         (e.g. ``"reset"`` -> ``"JLinkExe reset"``).
+    check:
+        When False, a non-zero return code is returned to the caller
+        instead of raising (for operations like the SWPOI reset whose
+        register write self-interrupts the debug session).
 
     Raises
     ------
     CaptureError
-        On non-zero rc, ``FileNotFoundError`` (JLinkExe missing), or
-        timeout.  Other unexpected exceptions propagate.
+        On non-zero rc (unless ``check=False``), ``FileNotFoundError``
+        (JLinkExe missing), or timeout.  Other unexpected exceptions
+        propagate.
     """
-    jlink_exe = find_jlink_exe()
-    cmd = [
-        jlink_exe,
-        "-NoGui",
-        "1",
-        "-device",
-        device,
-        "-if",
-        interface,
-        "-speed",
-        str(speed_khz),
-        "-autoconnect",
-        "1",
-    ]
-    if jlink_serial:
-        cmd.extend(["-SelectEmuBySN", jlink_serial])
+    result = _invoke_jlink(
+        _jlink_target_cmd(
+            device=device,
+            interface=interface,
+            speed_khz=speed_khz,
+            jlink_serial=jlink_serial,
+        ),
+        script=script,
+        timeout_s=timeout_s,
+        timeout_message=f"{op_label} timed out ({timeout_s}s)",
+        timeout_hint="Check that the J-Link probe is connected and not in use by another process.",
+    )
 
-    try:
-        result = subprocess.run(
-            cmd,
-            input=script,
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise CaptureError(
-            f"{op_label} timed out ({timeout_s}s)",
-            hint="Check that the J-Link probe is connected and not in use by another process.",
-        ) from exc
-    except FileNotFoundError as exc:
-        raise CaptureError("JLinkExe not found", hint=_JLINK_NOT_FOUND_HINT) from exc
-
-    if result.returncode != 0:
+    if check and result.returncode != 0:
         # J-Link Commander reports most failures (cannot connect, LoadFile
         # errors, script refusals) on stdout and exits with an empty stderr,
         # so a stderr-only hint renders as a blank — fall back to the stdout
@@ -483,23 +496,6 @@ def reset_target_poi(
     neuralSPOT's own ``make reset``, which discards this exit code).
     """
     log.info("Triggering SWPOI reset via JLinkExe (serial=%s)", jlink_serial or "auto")
-    jlink_exe = find_jlink_exe()
-    cmd = [
-        jlink_exe,
-        "-NoGui",
-        "1",
-        "-device",
-        device,
-        "-if",
-        interface,
-        "-speed",
-        str(speed_khz),
-        "-autoconnect",
-        "1",
-    ]
-    if jlink_serial:
-        cmd.extend(["-SelectEmuBySN", jlink_serial])
-
     script = (
         "connect\n"
         "sleep 1000\n"
@@ -507,23 +503,18 @@ def reset_target_poi(
         "sleep 1000\n"
         "exit\n"
     )
-    try:
-        subprocess.run(
-            cmd,
-            input=script,
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise CaptureError(
-            f"JLinkExe SWPOI reset timed out ({timeout_s}s)",
-            hint="Check that the J-Link probe is connected and not in use by another process.",
-        ) from exc
-    except FileNotFoundError as exc:
-        raise CaptureError("JLinkExe not found", hint=_JLINK_NOT_FOUND_HINT) from exc
-    # Non-zero return code is expected (the write self-interrupts the debug
-    # session) and is deliberately not checked here.
+    # check=False: a non-zero return code is expected (the write
+    # self-interrupts the debug session) and is deliberately not checked.
+    run_jlink_script(
+        script,
+        device=device,
+        jlink_serial=jlink_serial,
+        speed_khz=speed_khz,
+        interface=interface,
+        timeout_s=timeout_s,
+        op_label="JLinkExe SWPOI reset",
+        check=False,
+    )
     log.info("SWPOI reset complete")
 
 
