@@ -230,6 +230,9 @@ def collect_power_terminal_envelope_from_chunks(
     *,
     timeout_s: float,
     poll_interval_s: float = 0.01,
+    no_record_hint: str = (
+        "Confirm the power firmware reached post-GATE diagnostics and the transport is linked."
+    ),
 ) -> PowerTerminalEnvelope:
     """Collect one terminal envelope from a chunked byte stream.
 
@@ -285,7 +288,7 @@ def collect_power_terminal_envelope_from_chunks(
         ) from last_error
     raise PowerError(
         f"No power terminal record received within {timeout_s:.1f}s.",
-        hint="Confirm the power firmware reached post-GATE diagnostics and the transport is linked.",
+        hint=no_record_hint,
     )
 
 
@@ -322,6 +325,10 @@ def collect_power_terminal_envelope_rtt(
             return collect_power_terminal_envelope_from_chunks(
                 lambda: bytes(jlink.rtt_read(0, 4096)),
                 timeout_s=timeout_s,
+                no_record_hint=(
+                    "Confirm the power firmware reached post-GATE diagnostics "
+                    "and RTT is linked."
+                ),
             )
         finally:
             try:
