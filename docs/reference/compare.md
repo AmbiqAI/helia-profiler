@@ -31,6 +31,10 @@ Comparison applies typed compatibility policy before calculating deltas:
   integrity, clean-window probe, or (same platform only) the measured
   firmware code fingerprint suppresses only power metrics (see
   [Analysis & Comparison](../guide/analysis-comparison.md) for details);
+- a different **link family** (GNU ld for gcc/ATfE vs armlink for armclang)
+  suppresses only the per-region measured-memory rows
+  (`memory_regions.<REGION>.used/free`) — those figures are the same
+  quantity only within a family; binary section sizes stay comparable;
 - engine (type and measured runtime version), toolchain, board, clock,
   transport, and placement differences remain visible as informative
   dimensions.
@@ -42,8 +46,8 @@ absent-vs-present pairs. Requiring a dimension means requiring both runs to
 prove the same value — absence on one side fails conservatively.
 
 `compare_summary.json` includes the structured compatibility issues and the
-run, layer, and power comparability decisions, so automation does not need to
-parse warning text.
+run, layer, power, and memory comparability decisions, so automation does not
+need to parse warning text.
 
 ## Options
 

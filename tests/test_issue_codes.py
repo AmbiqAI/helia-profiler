@@ -28,7 +28,7 @@ from helia_profiler.results.issues import (
     COMPARABILITY_REGISTRY,
     DIMENSION_DIFFERS,
     ISSUE_REGISTRY,
-    POWER_DIMENSION_MISMATCH,
+    MEMORY_DIMENSION_MISMATCH, POWER_DIMENSION_MISMATCH,
     ComparabilityCode,
     ComparisonDimension,
     IssueCode,
@@ -102,10 +102,19 @@ def test_family_membership_and_order_are_the_documented_sets():
         # order and existing positions are frozen shipped behavior.
         "engine_version",
     ]
+    # #206: the first non-power metric group, its own family and wire prefix.
+    assert [d.value for d in MEMORY_DIMENSION_MISMATCH.dimensions] == ["link_family"]
+    assert MEMORY_DIMENSION_MISMATCH.code_for(ComparisonDimension.LINK_FAMILY) == (
+        "metric.memory_link_family_mismatch"
+    )
+    assert MEMORY_DIMENSION_MISMATCH.metric_group == "memory"
     # The remaining enum members are exactly the two non-family classes.
-    non_family = set(ComparisonDimension) - set(
-        POWER_DIMENSION_MISMATCH.dimensions
-    ) - set(DIMENSION_DIFFERS.dimensions)
+    non_family = (
+        set(ComparisonDimension)
+        - set(POWER_DIMENSION_MISMATCH.dimensions)
+        - set(MEMORY_DIMENSION_MISMATCH.dimensions)
+        - set(DIMENSION_DIFFERS.dimensions)
+    )
     assert {d.value for d in non_family} == {"model_sha256", "power_integrity"}
 
 

@@ -55,6 +55,9 @@ class ComparisonDimension(StrEnum):
     # Metric gate — a non-valid value on either side blocks power metrics.
     POWER_INTEGRITY = "power_integrity"
 
+    # Memory dimensions — a mismatch blocks the per-region memory metrics.
+    LINK_FAMILY = "link_family"
+
     # Informative dimensions — a difference is reported, never blocking.
     HPX_VERSION = "hpx_version"
     ENGINE = "engine"
@@ -77,6 +80,11 @@ class DimensionEffect(StrEnum):
 
     IDENTITY_BLOCKING = "identity_blocking"
     POWER_METRIC_BLOCKING = "power_metric_blocking"
+    #: The second metric group (#206). A separate effect class rather than a
+    #: reuse of POWER_METRIC_BLOCKING: each class feeds one code family whose
+    #: metric group must be uniform (``uniform_metric_group`` raises
+    #: otherwise), and the wire prefix names the group.
+    MEMORY_METRIC_BLOCKING = "memory_metric_blocking"
     METRIC_GATE = "metric_gate"
     INFORMATIVE = "informative"
 
@@ -331,6 +339,27 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
         ArtifactSource.SUMMARY_POWER,
         ("integrity",),
         metric_group="power",
+    ),
+    # Recorded into run_metadata.platform by ResolvePlatformStage from the
+    # same classifier the memory measurer uses (#206). RUN_METADATA-sourced
+    # with a label so it can also be a compare Config row -- the first
+    # blocking-class dimension with one, so required_dimensions can insist
+    # on it. Absent on pre-#206 artifacts: the comparator's None-skip rule
+    # applies, zero migration.
+    DimensionSpec(
+        ComparisonDimension.LINK_FAMILY,
+        DimensionEffect.MEMORY_METRIC_BLOCKING,
+        ArtifactSource.RUN_METADATA,
+        ("platform", "link_family"),
+        label="Link family",
+        metric_group="memory",
+        mismatch_hint=(
+            "Per-region memory metrics omitted because the runs were linked "
+            "by different linker families — GNU ld counts the floating stack "
+            "inside the app extent while armlink's fixed reservations sit "
+            "outside it, so used/free are not the same quantity. Binary "
+            "section sizes remain comparable."
+        ),
     ),
 )
 

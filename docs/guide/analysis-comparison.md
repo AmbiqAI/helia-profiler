@@ -57,6 +57,8 @@ reading a bundle. It then applies typed comparability rules:
 - incompatible power scope, mode, firmware, monitor presence, lock-step,
   integrity, **clean-window probe**, or (same platform only) the measured
   **firmware code fingerprint** suppresses only power deltas;
+- a different **link family** suppresses only the per-region
+  measured-memory rows (see below);
 - engine (type and measured runtime version), toolchain, board, clock,
   transport, and placement differences remain visible as informative
   dimensions. The engine version is the *measured* identity
@@ -94,6 +96,23 @@ against a stored baseline that every other dimension called fully comparable.
 The fingerprint is consulted **only** on a matching platform: cross-board
 comparisons keep the behavior documented above, and baselines predating the
 fingerprint are skipped like any other absent dimension.
+
+**Link family and per-region memory.** Every run records which linker family
+built its firmware (`run_metadata.platform.link_family`: `gnu` for gcc and
+ATfE, `armlink` for armclang), and `hpx compare` shows the measured
+per-region `used`/`free` figures (`memory_regions.DTCM.used`, `.free`, and so
+on for ITCM/SRAM/MRAM) as run-level rows — the "does it fit, how much
+headroom" question, A/B'd. Those figures are only the same quantity within a
+family: GNU ld counts the floating stack inside the app extent while
+armlink's fixed reservations sit outside it, so a cross-family compare would
+show a large, meaningless delta. When the families differ, the per-region
+rows are omitted and the comparison says why; binary section sizes (`text`,
+`data`, `bss`) remain comparable across toolchains. A region present on one
+side only (ITCM exists on the Apollo5 family alone) renders with a dash rather
+than being hidden — that is an SoC-axis change worth seeing. Runs recorded
+before the link family existed are skipped like any other absent dimension,
+and `Link family` appears in the Config table so a comparison profile can
+require it to match.
 
 The terminal highlights totals and the largest layer deltas.
 `--output-dir` also writes `compare_summary.json` and `layer_diff.csv`.

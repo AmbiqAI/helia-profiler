@@ -241,3 +241,31 @@ def test_wrong_region_match_renders_the_region():
     render_memory_reconciliation(hpx_console, rec)
     text = recorder.export_text()
     assert "in SRAM" in text
+
+
+def test_compare_run_table_labels_region_rows_and_honours_direction():
+    """#206: 'DTCM free' going UP must read as an improvement."""
+    from helia_profiler.console.compare import _build_compare_run_table
+    from helia_profiler.evaluation.compare import MetricDiff
+
+    hpx_console = HpxConsole(verbosity=0)
+    recorder = Console(record=True, highlight=False, width=200)
+    hpx_console._console = recorder
+    table = _build_compare_run_table(
+        [
+            MetricDiff(
+                name="memory_regions.DTCM.free",
+                baseline=1000,
+                candidate=2000,
+                delta=1000,
+                delta_pct=100.0,
+                unit="bytes",
+                group="memory",
+                lower_is_better=False,
+            )
+        ]
+    )
+    recorder.print(table)
+    text = recorder.export_text()
+
+    assert "DTCM free" in text

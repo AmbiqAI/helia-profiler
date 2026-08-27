@@ -75,6 +75,9 @@ def test_manifest_writer_without_power_records_the_base_dimensions(tmp_path: Pat
     expected = _authoritative(
         dimensions_with_effect(DimensionEffect.IDENTITY_BLOCKING)
         + dimensions_with_effect(DimensionEffect.INFORMATIVE)
+        # #206: the link family is a platform fact, recorded whether or not
+        # the run measured power.
+        + dimensions_with_effect(DimensionEffect.MEMORY_METRIC_BLOCKING)
     )
     assert recorded == expected
 
@@ -167,3 +170,43 @@ def test_manifest_only_dimensions_declare_no_artifact_path():
             assert spec.path == () and spec.derive is None, spec.dimension
         elif spec.derive is None:
             assert spec.path, f"{spec.dimension} needs a path or derive"
+
+
+def test_manifest_writer_records_the_link_family(tmp_path: Path):
+    """#206: the platform's link family reaches the manifest from
+    run_metadata.platform -- the same value the memory measurer records in
+    summary.memory_regions.link_family (same classifier, cannot disagree)."""
+    from helia_profiler.results import PlatformInfo
+
+    ctx = make_pmu_ctx(tmp_path, board="apollo510_evb", power_enabled=False)
+    ctx.run_metadata.platform = PlatformInfo(board="apollo510_evb", soc="apollo510", link_family="armlink")
+
+    recorded = _comparability(ctx)
+
+    assert recorded[ComparisonDimension.LINK_FAMILY] == "armlink"
+
+
+def test_resolve_platform_records_the_link_family(tmp_path: Path):
+    """#206: ResolvePlatformStage classifies the configured toolchain with
+    the same function the memory measurer uses, so run_metadata.platform
+    and summary.memory_regions can never disagree about the link family."""
+    from helia_profiler.config import load_config
+    from helia_profiler.pipeline import PipelineContext
+    from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+
+    model = tmp_path / "test.tflite"
+    model.write_bytes(b"")
+    for toolchain, expected in (("arm-none-eabi-gcc", "gnu"), ("armclang", "armlink")):
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "target": {"board": "apollo510_evb", "toolchain": toolchain},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
+        ResolvePlatformStage().run(ctx)
+        assert ctx.run_metadata.platform is not None
+        assert ctx.run_metadata.platform.link_family == expected

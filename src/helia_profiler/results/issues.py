@@ -415,6 +415,18 @@ POWER_DIMENSION_MISMATCH = ComparabilityCodeFamily(
     ),
 )
 
+MEMORY_DIMENSION_MISMATCH = ComparabilityCodeFamily(
+    severity=ComparabilitySeverity.METRIC_BLOCKING,
+    description="Per-region memory metrics omitted because a memory "
+    "comparison dimension differs between the runs.",
+    dimensions=dimensions_with_effect(DimensionEffect.MEMORY_METRIC_BLOCKING),
+    _prefix="metric.memory_",
+    _suffix="_mismatch",
+    metric_group=uniform_metric_group(
+        dimensions_with_effect(DimensionEffect.MEMORY_METRIC_BLOCKING)
+    ),
+)
+
 DIMENSION_DIFFERS = ComparabilityCodeFamily(
     severity=ComparabilitySeverity.INFORMATIVE,
     description="A comparison dimension differs between the runs; deltas "
@@ -426,5 +438,6 @@ DIMENSION_DIFFERS = ComparabilityCodeFamily(
 
 COMPARABILITY_FAMILIES: tuple[ComparabilityCodeFamily, ...] = (
     POWER_DIMENSION_MISMATCH,
+    MEMORY_DIMENSION_MISMATCH,
     DIMENSION_DIFFERS,
 )

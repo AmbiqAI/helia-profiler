@@ -483,3 +483,95 @@ def test_layer_diff_row_is_frozen_and_flattens_for_csv(tmp_path: Path):
     # Rows without memory placement data omit the memory_* keys entirely,
     # matching the original dict-based producer's conditional insertion.
     assert "baseline_memory" not in flat
+
+
+def _memory_regions_block(link_family: str, **regions: tuple[int, int]) -> dict:
+    """Minimal memory_regions block: regions={NAME: (used, free)}."""
+    return {
+        "link_family": link_family,
+        "linker_profile": "default",
+        "regions": [
+            {
+                "region": name,
+                "window": {"start": 0, "length": used + free},
+                "app_window": {"start": 0, "length": used + free},
+                "used": used,
+                "reserved": 0,
+                "free": free,
+                "load_image": 0,
+                "window_provenance": "hardware-aperture",
+                "app_provenance": "linker-script",
+            }
+            for name, (used, free) in regions.items()
+        ],
+        "unattributed": [],
+        "unattributed_load_bytes": 0,
+    }
+
+
+class TestMemoryRegionRows:
+    """#206: per-region used/free become compare rows, gated on link family."""
+
+    def test_rows_emit_in_canonical_order_with_declared_direction(self):
+        from helia_profiler.evaluation.compare import _compare_metrics
+
+        base = {"memory_regions": _memory_regions_block("gnu", DTCM=(1000, 9000), SRAM=(500, 500))}
+        cand = {"memory_regions": _memory_regions_block("gnu", DTCM=(1200, 8800), SRAM=(500, 500))}
+
+        rows = {m.name: m for m in _compare_metrics(base, cand)}
+
+        assert list(n for n in rows if n.startswith("memory_regions.")) == [
+            "memory_regions.DTCM.used",
+            "memory_regions.DTCM.free",
+            "memory_regions.SRAM.used",
+            "memory_regions.SRAM.free",
+        ]
+        assert rows["memory_regions.DTCM.used"].delta == 200
+        assert rows["memory_regions.DTCM.used"].lower_is_better is True
+        assert rows["memory_regions.DTCM.free"].delta == -200
+        assert rows["memory_regions.DTCM.free"].lower_is_better is False
+        assert rows["memory_regions.DTCM.free"].group == "memory"
+
+    def test_rows_are_withheld_when_the_memory_gate_is_closed(self):
+        from helia_profiler.evaluation.compare import _compare_metrics
+
+        base = {"memory_regions": _memory_regions_block("gnu", DTCM=(1000, 9000))}
+        cand = {"memory_regions": _memory_regions_block("armlink", DTCM=(300, 9700))}
+
+        rows = _compare_metrics(base, cand, include_groups=frozenset({"power"}))
+
+        assert not any(m.name.startswith("memory_regions.") for m in rows)
+
+    def test_one_sided_region_stays_visible(self):
+        """ITCM exists on AP5 only: an SoC-axis change renders, not hides."""
+        from helia_profiler.evaluation.compare import _compare_metrics
+
+        base = {"memory_regions": _memory_regions_block("gnu", ITCM=(100, 900), DTCM=(1, 1))}
+        cand = {"memory_regions": _memory_regions_block("gnu", DTCM=(1, 1))}
+
+        rows = {m.name: m for m in _compare_metrics(base, cand)}
+
+        assert rows["memory_regions.ITCM.used"].baseline == 100
+        assert rows["memory_regions.ITCM.used"].candidate is None
+        assert rows["memory_regions.ITCM.used"].delta is None
+
+    def test_pre_v3_pair_emits_no_region_rows(self):
+        from helia_profiler.evaluation.compare import _compare_metrics
+
+        rows = _compare_metrics({"total_cycles": 1}, {"total_cycles": 2})
+
+        assert not any(m.name.startswith("memory_regions.") for m in rows)
+
+    def test_declared_direction_replaces_the_name_hacks(self):
+        """The static rows carry their direction too: layers and
+        inferences_per_joule are higher-is-better, everything else lower."""
+        from helia_profiler.evaluation.compare import _METRIC_FIELDS
+
+        directions = {f.name: f.lower_is_better for f in _METRIC_FIELDS}
+        assert directions["layers"] is False
+        assert directions["power.inferences_per_joule"] is False
+        assert directions["total_cycles"] is True
+        groups = {f.name: f.group for f in _METRIC_FIELDS}
+        assert all(
+            (g == "power") == n.startswith("power.") for n, g in groups.items()
+        )

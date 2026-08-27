@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from ..results import (
     COMPARABILITY_REGISTRY,
     DIMENSION_DIFFERS,
+    MEMORY_DIMENSION_MISMATCH,
     POWER_DIMENSION_MISMATCH,
     ComparabilityCode,
     ComparabilitySeverity,
@@ -51,13 +52,23 @@ class ComparabilityAssessment:
             issue.severity is ComparabilitySeverity.LAYER_BLOCKING for issue in self.issues
         )
 
-    @property
-    def power_metrics_comparable(self) -> bool:
+    def metric_group_comparable(self, group: str) -> bool:
+        """Whether one metric group's rows may be computed (#206): no
+        METRIC_BLOCKING issue carrying that group's tag."""
         return self.run_metrics_comparable and not any(
             issue.severity is ComparabilitySeverity.METRIC_BLOCKING
-            and issue.context.get("metric_group") == "power"
+            and issue.context.get("metric_group") == group
             for issue in self.issues
         )
+
+    @property
+    def power_metrics_comparable(self) -> bool:
+        return self.metric_group_comparable("power")
+
+    @property
+    def memory_metrics_comparable(self) -> bool:
+        """Per-region used/free rows are gated on the link family (#206)."""
+        return self.metric_group_comparable("memory")
 
 
 def _issue(code: ComparabilityCode, message: str, **context: Any) -> ComparabilityIssue:
@@ -201,6 +212,27 @@ def assess_comparability(
                     f"Power metrics omitted because the {role} power result is {integrity}.",
                     role=role,
                     integrity=integrity,
+                )
+            )
+
+    # Memory family (#206): per-region used/free are only the same quantity
+    # within a linker family. Same shape as the informative loop -- absent
+    # on either side (pre-#206 artifacts) skips, never blocks.
+    for dimension in MEMORY_DIMENSION_MISMATCH.dimensions:
+        baseline_value = baseline_dimensions.get(dimension)
+        candidate_value = candidate_dimensions.get(dimension)
+        if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:
+            message = (
+                DIMENSION_REGISTRY[dimension].mismatch_hint
+                or f"Per-region memory metrics omitted because {dimension} differs."
+            )
+            issues.append(
+                _family_issue(
+                    MEMORY_DIMENSION_MISMATCH,
+                    dimension,
+                    message,
+                    baseline=baseline_value,
+                    candidate=candidate_value,
                 )
             )
 
