@@ -263,7 +263,13 @@ static void print_layers(void) {
 
 {% block engine_start_metadata %}
     hpx_printf("HPX_MODEL_SIZE=%u\n", model_data_len);
-    hpx_printf("HPX_ARENA_SIZE=%u\n", (unsigned)sizeof(g_planned_arena));
+    // Summed arena size: planned + method + temporary (I/O buffers are
+    // reported separately), so the figure is comparable with TFLM's
+    // single-arena number (#165). The per-arena breakdown is a host-side
+    // compile-time fact (build record).
+    hpx_printf("HPX_ARENA_SIZE=%u\n",
+               (unsigned)(sizeof(g_planned_arena) + sizeof(g_method_arena) +
+                          sizeof(g_temporary_arena)));
     hpx_printf("HPX_INPUT_SIZE=%u\n", (unsigned)sizeof(g_input));
     hpx_printf("HPX_OUTPUT_SIZE=%u\n", (unsigned)sizeof(g_output));
 {%- endblock %}
