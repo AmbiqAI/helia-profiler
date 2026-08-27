@@ -167,19 +167,15 @@ def test_degraded_with_policy_exits_normally(tmp_path: Path, monkeypatch) -> Non
 
 
 def test_output_applier_forwards_the_flag() -> None:
-    """The REAL applier, un-mocked (#208 review: both exit tests bypass it):
-    the flag lands in the overrides dict, and a False value leaves the dict
-    untouched."""
-    from helia_profiler.cli.profile_cmd import _apply_output_overrides
+    """The REAL overrides builder, un-mocked (#208 review: both exit tests
+    bypass it): the flag lands in the overrides dict, and a False value
+    leaves the section untouched."""
+    from helia_profiler.cli.profile_cmd import _build_cli_overrides
 
-    base = dict(output_dir=None, output_format=None, no_model_explorer=False, detailed=False)
-
-    cli: dict = {}
-    _apply_output_overrides(cli, **base, fail_on_invalid=True)
+    cli = _build_cli_overrides(fail_on_invalid=True)
     assert cli["output"]["fail_on_invalid"] is True
 
-    cli = {}
-    _apply_output_overrides(cli, **base, fail_on_invalid=False)
+    cli = _build_cli_overrides(fail_on_invalid=False)
     assert "output" not in cli
 
 

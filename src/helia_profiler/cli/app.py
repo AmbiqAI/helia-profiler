@@ -525,55 +525,13 @@ def profile_command(
     ] = False,
 ) -> None:
     """Profile a model on target hardware."""
+    # Snapshot the parameter values before any other local bindings exist;
+    # every ``hpx profile`` flag forwards to the implementation by name, so
+    # the Typer signature above stays the single declaration of the surface.
+    params = dict(locals())
     from .profile_cmd import _cmd_profile
 
-    _cmd_profile(
-        model=model,
-        config=config,
-        verbose=verbose,
-        engine=engine,
-        engine_config=engine_config,
-        arena_size=arena_size,
-        runtime_arena_location=runtime_arena_location,
-        runtime_weights_location=runtime_weights_location,
-        core_override=core_override,
-        board=board,
-        toolchain=toolchain,
-        jlink_serial=jlink_serial,
-        transport=transport,
-        usb_port=usb_port,
-        rtt_buffer_size_up=rtt_buffer_size_up,
-        cpu_clock=cpu_clock,
-        frozen=frozen,
-        offline=offline,
-        update_dependencies=update_dependencies,
-        nsx_channel=nsx_channel,
-        nsx_module=nsx_module,
-        compiler_launcher=compiler_launcher,
-        no_compiler_launcher=no_compiler_launcher,
-        pmu_counters=pmu_counters,
-        per_layer=per_layer,
-        iterations=iterations,
-        warmup=warmup,
-        aggregation=aggregation,
-        power=power,
-        power_driver=power_driver,
-        power_mode=power_mode,
-        power_duration=power_duration,
-        power_firmware=power_firmware,
-        power_reset_strategy=power_reset_strategy,
-        sync_gpio=sync_gpio,
-        ensure_power=ensure_power,
-        no_ensure_power=no_ensure_power,
-        power_serial=power_serial,
-        output_dir=output_dir,
-        output_format=output_format,
-        no_model_explorer=no_model_explorer,
-        fail_on_invalid=fail_on_invalid,
-        detailed=detailed,
-        work_dir=work_dir,
-        clean=clean,
-    )
+    _cmd_profile(**params)
 
 
 # ---------------------------------------------------------------------------
@@ -660,8 +618,6 @@ _inspect_app.register(app)
 
 
 _validation_app.register(app)
-
-
 
 
 # ---------------------------------------------------------------------------
