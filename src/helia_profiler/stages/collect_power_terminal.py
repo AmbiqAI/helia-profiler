@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import datetime, timezone
 
 from ..errors import PowerError
@@ -23,6 +24,7 @@ from ..power.diagnostics import (
     firmware_window_clock_is_frozen,
     probe_runs_inferences,
 )
+from ..results import PowerObservation
 
 
 def _host_phase_envelope_s(ctx: PipelineContext) -> float | None:
@@ -61,6 +63,7 @@ def _host_phase_envelope_s(ctx: PipelineContext) -> float | None:
     if started.tzinfo is None:
         started = started.replace(tzinfo=timezone.utc)
     return (datetime.now(timezone.utc) - started).total_seconds()
+
 
 log = logging.getLogger("hpx")
 
@@ -256,7 +259,7 @@ class CollectPowerTerminalStage:
                 if measurement.charge_nc is not None and duration_s > 0
                 else 0.0
             )
-            ctx.power_result = PowerResult(
+            result = PowerResult(
                 summary=PowerSummary(
                     avg_current_a=average_current_a,
                     avg_power_w=average_power_w,
@@ -281,6 +284,17 @@ class CollectPowerTerminalStage:
                     # (#173 review m4). External mode sets it in
                     # capture/__init__.py; this is the internal twin.
                     power_firmware=plan.firmware_mode,
+                ),
+            )
+            ctx.power_run = replace(
+                ctx.power_run,
+                observation=PowerObservation(
+                    mode=ObservationMode.ON_DEVICE,
+                    result=result,
+                    gate_rise_observed=True,
+                    gate_fall_observed=True,
+                    deadline_s=duration_s,
+                    integrity=PowerIntegrity.VALID,
                 ),
             )
         if frozen_window_clock:
@@ -314,9 +328,7 @@ class CollectPowerTerminalStage:
             elapsed_us=terminal.elapsed_us,
             internal_mode=internal_mode,
             gated_result=(
-                ctx.power_run.observation.result
-                if ctx.power_run.observation is not None
-                else None
+                ctx.power_run.observation.result if ctx.power_run.observation is not None else None
             ),
             # Internal mode's reference is `count x reference_us`. #112
             # withheld it for probes that run no inferences, because the plan

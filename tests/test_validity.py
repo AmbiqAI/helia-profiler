@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.pipeline_context_helpers import set_power_result, set_profile_result
+
 from dataclasses import replace
 from pathlib import Path
 from typing import Literal
@@ -31,9 +33,7 @@ from helia_profiler.evaluation import evaluate_run
 from helia_profiler.results.issues import IssueCode
 
 
-def _context(
-    tmp_path: Path, *, mode: str = "external", probe: str = "infer"
-) -> PipelineContext:
+def _context(tmp_path: Path, *, mode: str = "external", probe: str = "infer") -> PipelineContext:
     config = load_config(
         None,
         {
@@ -48,7 +48,7 @@ def _context(
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
-    ctx.pmu_result = PmuResult(meta=FirmwareMeta(), layers=[])
+    set_profile_result(ctx, PmuResult(meta=FirmwareMeta(), layers=[]))
     result = PowerResult(
         summary=PowerSummary(0.01, 0.02, 0.03, 0.1, 1.0, 10),
         metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
@@ -185,7 +185,7 @@ def test_terminal_plan_and_on_device_mismatches_are_invalid(tmp_path: Path):
 def test_pmu_overflow_is_invalid_without_power(tmp_path: Path):
     ctx = _context(tmp_path)
     ctx.power_run = None
-    ctx.pmu_result = PmuResult(meta=FirmwareMeta(), overflow_detected=True)
+    set_profile_result(ctx, PmuResult(meta=FirmwareMeta(), overflow_detected=True))
 
     evaluation = evaluate_run(ctx)
 
@@ -228,9 +228,7 @@ class TestWindowClockValidity:
             # gated_windows is the ONLY source the window-clock check accepts;
             # a gated observation without one is the degraded shape, which is
             # exercised separately in test_degraded_capture_gains_no_window_*.
-            gated_windows=[
-                GatedPowerWindow(0.0, gate_s, gate_s, 0.0, 0.0, 0.0, 0.0, 0.0, 0)
-            ],
+            gated_windows=[GatedPowerWindow(0.0, gate_s, gate_s, 0.0, 0.0, 0.0, 0.0, 0.0, 0)],
             metadata=replace(observation.result.metadata),
         )
         assert ctx.power_run.terminal is not None
@@ -273,14 +271,17 @@ class TestWindowClockValidity:
         if host_envelope_s is not None:
             # Exactly the shape the collect stage records; validity re-derives
             # `exceeded` from these numbers rather than trusting a verdict.
-            ctx.power_result = PowerResult(
-                summary=replace(observation.result.summary, duration_s=gate_s),
-                metadata=PowerMetadata(
-                    measurement_scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
-                    window_clock_ceiling=WindowClockCeiling(
-                        elapsed_us=elapsed_us,
-                        host_envelope_s=host_envelope_s,
-                        slack_s=WINDOW_CLOCK_CEILING_SLACK_S,
+            set_power_result(
+                ctx,
+                PowerResult(
+                    summary=replace(observation.result.summary, duration_s=gate_s),
+                    metadata=PowerMetadata(
+                        measurement_scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
+                        window_clock_ceiling=WindowClockCeiling(
+                            elapsed_us=elapsed_us,
+                            host_envelope_s=host_envelope_s,
+                            slack_s=WINDOW_CLOCK_CEILING_SLACK_S,
+                        ),
                     ),
                 ),
             )
@@ -305,7 +306,9 @@ class TestWindowClockValidity:
 
         assert evaluation.validity is ResultValidity.INVALID
         frozen = [
-            issue for issue in evaluation.issues if issue.code == IssueCode.POWER_WINDOW_CLOCK_FROZEN
+            issue
+            for issue in evaluation.issues
+            if issue.code == IssueCode.POWER_WINDOW_CLOCK_FROZEN
         ]
         assert len(frozen) == 1
         assert frozen[0].severity == "error"
@@ -323,7 +326,9 @@ class TestWindowClockValidity:
         evaluation = evaluate_run(ctx)
 
         frozen = [
-            issue for issue in evaluation.issues if issue.code == IssueCode.POWER_WINDOW_CLOCK_FROZEN
+            issue
+            for issue in evaluation.issues
+            if issue.code == IssueCode.POWER_WINDOW_CLOCK_FROZEN
         ]
         assert len(frozen) == 1
         assert frozen[0].severity == "warning"
@@ -339,7 +344,9 @@ class TestWindowClockValidity:
         evaluation = evaluate_run(ctx)
 
         frozen = [
-            issue for issue in evaluation.issues if issue.code == IssueCode.POWER_WINDOW_CLOCK_FROZEN
+            issue
+            for issue in evaluation.issues
+            if issue.code == IssueCode.POWER_WINDOW_CLOCK_FROZEN
         ]
         assert len(frozen) == 1
         assert "busy-loop pass" in frozen[0].message
@@ -474,7 +481,8 @@ class TestWindowClockValidity:
             internal=True,
         )
         assert not any(
-            issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH for issue in evaluate_run(near).issues
+            issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH
+            for issue in evaluate_run(near).issues
         )
 
         far = _context(tmp_path, mode="internal")
@@ -484,7 +492,8 @@ class TestWindowClockValidity:
             internal=True,
         )
         assert any(
-            issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH for issue in evaluate_run(far).issues
+            issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH
+            for issue in evaluate_run(far).issues
         )
 
     def test_window_longer_than_host_wall_time_is_a_warning(self, tmp_path: Path):
@@ -553,11 +562,7 @@ class TestGateArbitration:
         observation = ctx.power_run.observation
         result = PowerResult(
             summary=replace(observation.result.summary, duration_s=gate_s),
-            gated_windows=[
-                GatedPowerWindow(
-                    0.0, gate_s, gate_s, 0.0, 0.0, 0.0, 0.0, 0.0, 0
-                )
-            ],
+            gated_windows=[GatedPowerWindow(0.0, gate_s, gate_s, 0.0, 0.0, 0.0, 0.0, 0.0, 0)],
             metadata=replace(observation.result.metadata),
         )
         expected_s = self.DRIFT_COUNT * self.DRIFT_REFERENCE_US / 1_000_000.0
@@ -583,9 +588,7 @@ class TestGateArbitration:
                     ctx.power_run.terminal,
                     requested_count=self.DRIFT_COUNT,
                     completed_count=(
-                        self.DRIFT_COUNT
-                        if completed_count is None
-                        else completed_count
+                        self.DRIFT_COUNT if completed_count is None else completed_count
                     ),
                     elapsed_us=elapsed_us,
                 )
@@ -683,9 +686,7 @@ class TestGateArbitration:
         terminal-health gate the summary got in the #195 review round)."""
         ctx = _context(tmp_path)
         # Gate and elapsed agree (both 4.427 s) but only 116/233 completed.
-        self._drift_run(
-            ctx, elapsed_us=self.DRIFT_ELAPSED_US, completed_count=116
-        )
+        self._drift_run(ctx, elapsed_us=self.DRIFT_ELAPSED_US, completed_count=116)
 
         evaluation = evaluate_run(ctx)
 
@@ -735,18 +736,19 @@ class TestGateArbitration:
         gate_s = 4.90  # vs 233 x 21532us = 5.017s expected: 2.3% short
         result = PowerResult(
             summary=replace(observation.result.summary, duration_s=gate_s),
-            gated_windows=[
-                GatedPowerWindow(0.0, gate_s, gate_s, 0.0, 0.0, 0.0, 0.0, 0.0, 0)
-            ],
+            gated_windows=[GatedPowerWindow(0.0, gate_s, gate_s, 0.0, 0.0, 0.0, 0.0, 0.0, 0)],
             # No recorded gate_duration_integrity.
             metadata=replace(observation.result.metadata),
         )
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(
-                clean_infer_count=self.DRIFT_COUNT,
-                clean_infer_avg_us=self.DRIFT_REFERENCE_US,
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(
+                    clean_infer_count=self.DRIFT_COUNT,
+                    clean_infer_avg_us=self.DRIFT_REFERENCE_US,
+                ),
+                layers=[],
             ),
-            layers=[],
         )
         ctx.power_run = PowerRun(
             plan=PowerRunPlan(
@@ -776,10 +778,13 @@ class TestGateArbitration:
         terminal hiccup must not manufacture a suppressing arbitration."""
         ctx = _context(tmp_path, mode="internal")
         assert ctx.power_run is not None
-        ctx.power_result = PowerResult(
-            summary=PowerSummary(0.01, 0.02, 0.03, 0.1, 1.0, 10),
-            metadata=PowerMetadata(
-                measurement_scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE
+        set_power_result(
+            ctx,
+            PowerResult(
+                summary=PowerSummary(0.01, 0.02, 0.03, 0.1, 1.0, 10),
+                metadata=PowerMetadata(
+                    measurement_scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE
+                ),
             ),
         )
         assert ctx.power_run.terminal is not None
@@ -806,23 +811,16 @@ class TestGateArbitration:
         assert arb.suppression_reason is None
         assert arb.drift_note is not None and "HFRC" in arb.drift_note
 
-    def test_below_minimum_is_an_error_even_when_the_observer_agrees(
-        self, tmp_path: Path
-    ):
+    def test_below_minimum_is_an_error_even_when_the_observer_agrees(self, tmp_path: Path):
         """The floor is independent of arbitration: a sub-minimum gate is too
         short for the stats integral whatever the firmware clock says."""
         ctx = _context(tmp_path)
-        self._drift_run(
-            ctx, elapsed_us=self.DRIFT_ELAPSED_US, minimum_s=self.DRIFT_GATE_S + 1.0
-        )
+        self._drift_run(ctx, elapsed_us=self.DRIFT_ELAPSED_US, minimum_s=self.DRIFT_GATE_S + 1.0)
 
         evaluation = evaluate_run(ctx)
 
         assert evaluation.validity is ResultValidity.INVALID
-        assert any(
-            issue.code == IssueCode.POWER_GATE_BELOW_MINIMUM
-            for issue in evaluation.issues
-        )
+        assert any(issue.code == IssueCode.POWER_GATE_BELOW_MINIMUM for issue in evaluation.issues)
 
 
 def test_duration_fallback_matches_summary_policy(tmp_path: Path):
@@ -865,10 +863,13 @@ class TestProfileCleanWindowFrozen:
     ) -> PipelineContext:
         ctx = _context(tmp_path)
         ctx.power_run = None
-        ctx.power_result = None
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(clean_infer_count=count, clean_infer_avg_us=avg_us),
-            layers=[],
+        set_power_result(ctx, None)
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(clean_infer_count=count, clean_infer_avg_us=avg_us),
+                layers=[],
+            ),
         )
         return ctx
 
@@ -926,19 +927,22 @@ class TestCleanWindowStall:
         """
         ctx = _context(tmp_path)
         ctx.power_run = None
-        ctx.power_result = None
-        ctx.pmu_result = PmuResult(
-            meta=FirmwareMeta(
-                clean_infer_count=count,
-                clean_infer_avg_us=684,
-                clean_stalled_iters=stalled,
-                clean_partial_iters=partial,
-                clean_ref_cycles=ref_cycles,
-                clean_dwt_rate_cyc=rate_cyc,
-                clean_dwt_rate_us=1000,
-                system_clock_hz=96_000_000,
+        set_power_result(ctx, None)
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(
+                    clean_infer_count=count,
+                    clean_infer_avg_us=684,
+                    clean_stalled_iters=stalled,
+                    clean_partial_iters=partial,
+                    clean_ref_cycles=ref_cycles,
+                    clean_dwt_rate_cyc=rate_cyc,
+                    clean_dwt_rate_us=1000,
+                    system_clock_hz=96_000_000,
+                ),
+                layers=[],
             ),
-            layers=[],
         )
         return ctx
 
@@ -960,9 +964,7 @@ class TestCleanWindowStall:
         assert 0.20 < stalls[0].context["understatement_lower_bound"] < 0.22
         assert evaluation.validity is ResultValidity.DEGRADED
 
-    def test_issue_fires_only_when_the_firmware_reports_a_stall(
-        self, tmp_path: Path
-    ):
+    def test_issue_fires_only_when_the_firmware_reports_a_stall(self, tmp_path: Path):
         """Present when stalled, absent when not -- asserted together.
 
         The negative rows are deliberately not their own tests: an
@@ -979,8 +981,7 @@ class TestCleanWindowStall:
         for stalled, expected in cases.items():
             evaluation = evaluate_run(self._profile_only(tmp_path, stalled=stalled))
             raised = any(
-                issue.code == IssueCode.PROFILE_CLEAN_WINDOW_STALLED
-                for issue in evaluation.issues
+                issue.code == IssueCode.PROFILE_CLEAN_WINDOW_STALLED for issue in evaluation.issues
             )
             assert raised is expected, f"clean_stalled_iters={stalled!r}"
             if not expected:
@@ -1015,9 +1016,7 @@ class TestCleanWindowStall:
         assert 0.20 < stalls[0].context["affected_fraction"] < 0.22
         assert 0.18 < stalls[0].context["understatement_lower_bound"] < 0.19
 
-    def test_impossible_counts_are_flagged_not_published_as_nonsense(
-        self, tmp_path: Path
-    ):
+    def test_impossible_counts_are_flagged_not_published_as_nonsense(self, tmp_path: Path):
         """More affected iterations than the window ran means a corrupt report.
 
         A torn transport line can inflate one field while the other parses
@@ -1060,9 +1059,7 @@ class TestCleanWindowStall:
         assert stall.context["affected_fraction"] == 1.0
         assert stall.context["understatement_lower_bound"] >= 0.87
 
-    def test_detector_does_not_over_fire_on_an_inflated_warm_reference(
-        self, tmp_path: Path
-    ):
+    def test_detector_does_not_over_fire_on_an_inflated_warm_reference(self, tmp_path: Path):
         """The direction every other test here misses: healthy runs stay quiet.
 
         The floor comes from the warm reference, and the reference is taken
@@ -1078,9 +1075,7 @@ class TestCleanWindowStall:
         assert evaluation.validity is ResultValidity.VALID
         assert evaluation.issues == ()
 
-    def test_uniform_slowdown_is_caught_by_the_independent_clock(
-        self, tmp_path: Path
-    ):
+    def test_uniform_slowdown_is_caught_by_the_independent_clock(self, tmp_path: Path):
         """The blocker: a stall that scales BOTH the reference and the window.
 
         The in-window counters compare each iteration against a warm sample
@@ -1102,12 +1097,10 @@ class TestCleanWindowStall:
         codes = {issue.code for issue in evaluation.issues}
 
         assert IssueCode.PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW in codes, (
-            "a uniform slowdown that both in-window counters are blind to went "
-            "unreported"
+            "a uniform slowdown that both in-window counters are blind to went unreported"
         )
         rate = next(
-            i for i in evaluation.issues
-            if i.code == IssueCode.PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW
+            i for i in evaluation.issues if i.code == IssueCode.PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW
         )
         assert rate.context["ratio"] < 0.01
         assert rate.context["expected_cycles"] == 96_000.0
@@ -1136,9 +1129,12 @@ class TestCleanWindowStall:
         """
         ctx = self._profile_only(tmp_path, stalled=233, partial=0)
         assert ctx.pmu_result is not None
-        ctx.pmu_result = PmuResult(
-            meta=replace(ctx.pmu_result.meta, clean_partial_iters="1 7"),
-            layers=[],
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=replace(ctx.pmu_result.meta, clean_partial_iters="1 7"),
+                layers=[],
+            ),
         )
 
         evaluation = evaluate_run(ctx)
@@ -1246,9 +1242,7 @@ class TestGateToleranceAgreesAcrossCaptureAndEvaluate:
     def _ctx_with_plan(
         self,
         tmp_path: Path,
-        count_source: Literal[
-            "firmware_auto", "configured", "profile_guided", "probe_window"
-        ],
+        count_source: Literal["firmware_auto", "configured", "profile_guided", "probe_window"],
     ) -> PipelineContext:
         ctx = _context(tmp_path, probe="busy_loop")
         assert ctx.power_run is not None
@@ -1275,9 +1269,7 @@ class TestGateToleranceAgreesAcrossCaptureAndEvaluate:
 
         assert _assess_unrecorded_duration(ctx, 5.8) is None
 
-    def test_the_same_window_is_still_flagged_when_it_is_genuinely_wrong(
-        self, tmp_path: Path
-    ):
+    def test_the_same_window_is_still_flagged_when_it_is_genuinely_wrong(self, tmp_path: Path):
         """Loosening the band must not disarm the check."""
         from helia_profiler.evaluation.validity import _assess_unrecorded_duration
 
@@ -1306,9 +1298,7 @@ class TestReplayedBusyLoopPlanCount:
     every stored-artifact path go through.
     """
 
-    def test_a_pre_fix_artifact_is_not_reported_as_a_count_mismatch(
-        self, tmp_path: Path
-    ):
+    def test_a_pre_fix_artifact_is_not_reported_as_a_count_mismatch(self, tmp_path: Path):
         ctx = _context(tmp_path, probe="busy_loop")
         assert ctx.power_run is not None
         assert ctx.power_run.terminal is not None
@@ -1319,9 +1309,7 @@ class TestReplayedBusyLoopPlanCount:
                 reference_inference_us=5_000_000,
             ),
             observation=ctx.power_run.observation,
-            terminal=replace(
-                ctx.power_run.terminal, requested_count=1, completed_count=1
-            ),
+            terminal=replace(ctx.power_run.terminal, requested_count=1, completed_count=1),
         )
 
         codes = [issue.code for issue in evaluate_run(ctx).issues]
@@ -1344,9 +1332,7 @@ class TestReplayedBusyLoopPlanCount:
         ctx.power_run = PowerRun(
             plan=PowerRunPlan(firmware_mode="dedicated", inference_count=10),
             observation=ctx.power_run.observation,
-            terminal=replace(
-                ctx.power_run.terminal, requested_count=9, completed_count=9
-            ),
+            terminal=replace(ctx.power_run.terminal, requested_count=9, completed_count=9),
         )
 
         codes = [issue.code for issue in evaluate_run(ctx).issues]

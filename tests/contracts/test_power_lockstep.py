@@ -22,6 +22,8 @@ Three invariants:
 
 from __future__ import annotations
 
+from tests.pipeline_context_helpers import set_profile_result
+
 import pytest
 
 from helia_profiler.results import DeploymentRecord, FirmwareArtifact, PowerRunPlan
@@ -48,17 +50,21 @@ def _mark_deployed(ctx, tmp_path) -> None:
         build_dir=tmp_path,
         binary_path=binary,
     )
-    ctx.publish_power_plan(PowerRunPlan(
-        firmware_mode="dedicated",
-        inference_count=5,
-        count_source="configured",
-    ))
+    ctx.publish_power_plan(
+        PowerRunPlan(
+            firmware_mode="dedicated",
+            inference_count=5,
+            count_source="configured",
+        )
+    )
     ctx.publish_power_firmware(artifact)
-    ctx.publish_power_deployment(DeploymentRecord(
-        firmware=artifact,
-        target_id=ctx.config.target.board,
-        deployed_at="2026-07-18T00:00:00+00:00",
-    ))
+    ctx.publish_power_deployment(
+        DeploymentRecord(
+            firmware=artifact,
+            target_id=ctx.config.target.board,
+            deployed_at="2026-07-18T00:00:00+00:00",
+        )
+    )
 
 
 def _power_result() -> PowerResult:
@@ -152,10 +158,13 @@ class TestLockstepArmBeforeReset:
         monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: driver)
 
         ctx = make_pmu_ctx(
-            tmp_path, board="apollo510_evb", transport="rtt",
-            power_enabled=True, lockstep=True,
+            tmp_path,
+            board="apollo510_evb",
+            transport="rtt",
+            power_enabled=True,
+            lockstep=True,
         )
-        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=5))
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(clean_infer_count=5)))
         _mark_deployed(ctx, tmp_path)
 
         def _prepare_target(_driver, _name):
@@ -188,14 +197,19 @@ class TestLockstepArmBeforeReset:
         driver = _FakeGatedDriver(events)
         monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: driver)
         ctx = make_pmu_ctx(
-            tmp_path, board="apollo510_evb", transport="rtt",
-            power_enabled=True, lockstep=True,
+            tmp_path,
+            board="apollo510_evb",
+            transport="rtt",
+            power_enabled=True,
+            lockstep=True,
         )
-        ctx.pmu_result = PmuResult(meta=FirmwareMeta(clean_infer_count=5))
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(clean_infer_count=5)))
         _mark_deployed(ctx, tmp_path)
         # Recorder stub in place of a real lifecycle plan; its None return is
         # tolerated by this path and irrelevant to the ordering under test.
-        capture_power(ctx, prepare_target=lambda *_: events.append("lifecycle_reset"))  # ty: ignore[invalid-argument-type]
+        capture_power(
+            ctx, prepare_target=lambda *_: events.append("lifecycle_reset")
+        )  # ty: ignore[invalid-argument-type]
         assert events.index("wait_ready") < events.index("signal_go")
 
 
@@ -295,8 +309,11 @@ class TestLockstepDefaultsOnWhenWired:
     def test_power_disabled_never_auto_enables(self, tmp_path):
         """Also a wrong-fix guard, not a pre-#114 regression test."""
         ctx = make_pmu_ctx(
-            tmp_path, board="apollo4p_blue_kbr_evb", transport="rtt",
-            power_enabled=False, lockstep=None,
+            tmp_path,
+            board="apollo4p_blue_kbr_evb",
+            transport="rtt",
+            power_enabled=False,
+            lockstep=None,
         )
         assert resolve_power_lockstep(ctx) is False
 
@@ -344,8 +361,7 @@ class TestLockstepDefaultsOnWhenWired:
             ("wired external, auto", None, True, True),
             (
                 "wired internal — wiring present but not a gated external capture",
-                {"power": {"mode": "internal", "driver": "ina228",
-                           "ina228": {"shunt_ohms": 0.1}}},
+                {"power": {"mode": "internal", "driver": "ina228", "ina228": {"shunt_ohms": 0.1}}},
                 False,
                 False,
             ),
@@ -406,20 +422,16 @@ class TestLockstepDefaultsOnWhenWired:
 
         rendered = _jinja_env.get_template("_gpio_sync.j2").render(**template_vars)
         assert (
-            f"static constexpr bool     kSyncLockstep     = "
-            f"{str(expect_lockstep).lower()};"
+            f"static constexpr bool     kSyncLockstep     = {str(expect_lockstep).lower()};"
         ) in rendered, scenario
         assert (
-            f"static constexpr bool     kPowerSyncEnabled = "
-            f"{str(expect_sync).lower()};"
+            f"static constexpr bool     kPowerSyncEnabled = {str(expect_sync).lower()};"
         ) in rendered, scenario
 
 
 class TestAutoStrategyNeverCyclesRail:
     @pytest.mark.parametrize("strategy", ["auto", "none", "debug_reset", "swpoi_reset"])
-    def test_non_power_cycle_strategies_leave_rail_untouched(
-        self, tmp_path, monkeypatch, strategy
-    ):
+    def test_non_power_cycle_strategies_leave_rail_untouched(self, tmp_path, monkeypatch, strategy):
         # J-Link resets are stubbed so only rail cycling is observable.
         monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", lambda **_k: None)
         monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target_poi", lambda **_k: None)
@@ -428,7 +440,10 @@ class TestAutoStrategyNeverCyclesRail:
             tmp_path, board="apollo510_evb", power_enabled=True, reset_strategy=strategy
         )
         plan = prepare_target_for_phase(
-            ctx, phase=CapturePhase.POWER, power_driver=driver, power_driver_name="joulescope"  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the rail surface
+            ctx,
+            phase=CapturePhase.POWER,
+            power_driver=driver,
+            power_driver_name="joulescope",  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the rail surface
         )
         assert driver.power_cycle_calls == 0
         assert plan.power_cycle_attempted is False
@@ -443,7 +458,10 @@ class TestAutoStrategyNeverCyclesRail:
             tmp_path, board="apollo510_evb", power_enabled=True, reset_strategy="power_cycle"
         )
         plan = prepare_target_for_phase(
-            ctx, phase=CapturePhase.POWER, power_driver=driver, power_driver_name="joulescope"  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the rail surface
+            ctx,
+            phase=CapturePhase.POWER,
+            power_driver=driver,
+            power_driver_name="joulescope",  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the rail surface
         )
         assert driver.power_cycle_calls == 1
         assert plan.power_cycle_attempted is True

@@ -24,6 +24,8 @@ the disagreement surfaces.
 
 from __future__ import annotations
 
+from tests.pipeline_context_helpers import set_profile_result
+
 from pathlib import Path
 
 import pytest
@@ -49,8 +51,14 @@ ITERATIONS = 100
 TARGETS_MS = (1000, 5000, 20000)
 
 CELLS = [
-    pytest.param(probe, firmware, window_mode, target_ms, power_mode,
-                 id=f"{probe}-{firmware}-{window_mode}-{target_ms}-{power_mode}")
+    pytest.param(
+        probe,
+        firmware,
+        window_mode,
+        target_ms,
+        power_mode,
+        id=f"{probe}-{firmware}-{window_mode}-{target_ms}-{power_mode}",
+    )
     for probe in ("infer", "busy_loop")
     for firmware in ("dedicated", "shared")
     for window_mode in ("auto", "fixed")
@@ -145,17 +153,11 @@ def _assess(ctx, config, plan, measured_s: float):
     """The gate check exactly as capture/__init__.py builds it."""
     return assess_gate_duration(
         measured_s=measured_s,
-        clean_infer_count=(
-            plan.inference_count or ctx.pmu_result.meta.clean_infer_count
-        ),
-        clean_infer_avg_us=(
-            plan.reference_inference_us or ctx.pmu_result.meta.clean_infer_avg_us
-        ),
+        clean_infer_count=(plan.inference_count or ctx.pmu_result.meta.clean_infer_count),
+        clean_infer_avg_us=(plan.reference_inference_us or ctx.pmu_result.meta.clean_infer_avg_us),
         stats_rate_hz=config.power.stats_rate_hz,
         minimum_s=1.0,
-        relative_tolerance=gate_relative_tolerance_for(
-            config.profiling.clean_window_probe
-        ),
+        relative_tolerance=gate_relative_tolerance_for(config.profiling.clean_window_probe),
     )
 
 
@@ -169,9 +171,12 @@ def cell(tmp_path: Path):
             None, _overrides(probe, firmware, window_mode, target_ms, power_mode, model)
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
-        ctx.pmu_result = PmuResult(
-            meta=_profile_meta(config, probe, window_mode),
-            layers=[LayerResult(id=0, op="CONV_2D", cycles=213_696.0)],
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=_profile_meta(config, probe, window_mode),
+                layers=[LayerResult(id=0, op="CONV_2D", cycles=213_696.0)],
+            ),
         )
         # 213,696 cycles at 96 MHz == PER_INFER_US, so the capture estimate's
         # own arithmetic agrees with the window arithmetic above.
@@ -187,9 +192,7 @@ def cell(tmp_path: Path):
     return _build
 
 
-@pytest.mark.parametrize(
-    ("probe", "firmware", "window_mode", "target_ms", "power_mode"), CELLS
-)
+@pytest.mark.parametrize(("probe", "firmware", "window_mode", "target_ms", "power_mode"), CELLS)
 def test_the_plan_describes_the_window_the_firmware_runs(
     cell, probe, firmware, window_mode, target_ms, power_mode
 ):
@@ -249,9 +252,7 @@ def test_the_gate_check_accepts_a_perfect_run(
         assert integrity.valid, "a perfect run above the minimum gate must pass"
 
 
-@pytest.mark.parametrize(
-    ("probe", "firmware", "window_mode", "target_ms", "power_mode"), CELLS
-)
+@pytest.mark.parametrize(("probe", "firmware", "window_mode", "target_ms", "power_mode"), CELLS)
 def test_the_capture_deadline_outlasts_the_window(
     cell, probe, firmware, window_mode, target_ms, power_mode
 ):

@@ -23,6 +23,8 @@ that, and it is the same gate every sibling power dimension already uses.
 
 from __future__ import annotations
 
+from tests.pipeline_context_helpers import set_power_result
+
 from pathlib import Path
 
 import pytest
@@ -43,9 +45,12 @@ def _ctx(tmp_path: Path, *, probe: str, measured_power: bool):
         extra={"profiling": {"clean_window_probe": probe}},
     )
     if measured_power:
-        ctx.power_result = PowerResult(
-            summary=PowerSummary(0.01, 0.02, 0.03, 0.1, 1.0, 10),
-            metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
+        set_power_result(
+            ctx,
+            PowerResult(
+                summary=PowerSummary(0.01, 0.02, 0.03, 0.1, 1.0, 10),
+                metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
+            ),
         )
     return ctx
 
@@ -80,13 +85,10 @@ def test_the_probe_sits_with_the_dimensions_that_share_its_gate(tmp_path: Path):
     unpowered run cannot answer.
     """
     powered = _comparability(_ctx(tmp_path / "on", probe="infer", measured_power=True))
-    unpowered = _comparability(
-        _ctx(tmp_path / "off", probe="infer", measured_power=False)
-    )
+    unpowered = _comparability(_ctx(tmp_path / "off", probe="infer", measured_power=False))
 
     power_keys = {key for key in powered if key.startswith("power_")}
     assert "power_clean_window_probe" in power_keys
     assert not power_keys & set(unpowered), (
-        "a run with no power result recorded power dimensions: "
-        f"{power_keys & set(unpowered)}"
+        f"a run with no power result recorded power dimensions: {power_keys & set(unpowered)}"
     )
