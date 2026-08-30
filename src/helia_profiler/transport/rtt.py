@@ -11,10 +11,14 @@ not silently dropped. After output bursts, the firmware calls
 ``SCB_CleanDCache()`` so the J-Link host can read the data via SWD (which
 bypasses the CPU D-cache).
 
-When ``weights_region="psram"``, the firmware initialises PSRAM and emits
-``HPX_PSRAM_READY=<addr>,<size>`` before waiting.  The host writes the
-model flatbuffer to the PSRAM XIP address via ``jlink.memory_write()`` and
-sends ``HPX_GO`` on the RTT down-channel to resume inference.
+When ``psram_host_upload`` is set — PSRAM placement on an engine whose
+:attr:`~helia_profiler.engines.base.PsramWeightsSource` is ``HOST_UPLOAD``
+— the firmware initialises PSRAM and emits ``HPX_PSRAM_READY=<addr>,<size>``
+before waiting.  The host writes the model flatbuffer to the PSRAM XIP
+address via ``jlink.memory_write()`` and sends ``HPX_GO`` on the RTT
+down-channel to resume inference.  Self-contained engines (heliaAOT) write
+their own sidecar blobs into PSRAM and never emit the handshake, so the
+flag must stay False for them regardless of placement (#219).
 
 For ordinary RTT runs, the firmware emits ``HPX_READY`` and then writes the
 ``HPX_START`` header in lossless (wait-for-space) mode: it blocks until the
@@ -27,7 +31,7 @@ on the target's down-buffer descriptor — that repeatedly regressed.)
 Sequence:
   1. Reset the target via SEGGER commander (handles Apollo510 SBL correctly).
   2. Connect pylink and start RTT — locate the RTT control block.
-  3. (PSRAM) Wait for HPX_PSRAM_READY, upload model, send HPX_GO.
+  3. (PSRAM host-upload engines) Wait for HPX_PSRAM_READY, upload model, send HPX_GO.
   4. Collect lines until ``--- HPX_END ---`` or timeout.
 """
 
@@ -235,11 +239,19 @@ def _upload_model_to_psram(
             time.sleep(0.01)
 
     if psram_addr is None:
+        # The buffered firmware output IS the diagnosis — discarding it
+        # turns every PSRAM fault into the same opaque timeout (#219 was
+        # mis-diagnosed twice as a hardware problem for exactly this
+        # reason).  Surface the tail of whatever the firmware did say.
+        said = buf.decode("ascii", errors="replace").strip()
+        said_tail = said[-500:] if said else "<nothing>"
         raise CaptureError(
             "Timed out waiting for HPX_PSRAM_READY from firmware",
             hint=(
-                "Firmware did not signal PSRAM readiness. "
-                "Ensure the board has PSRAM and --weights-location / --arena-location psram is correct."
+                "Firmware did not signal PSRAM readiness. Ensure the board "
+                "has PSRAM and --weights-location / --arena-location psram "
+                "is correct. Firmware output before the timeout:\n"
+                f"{said_tail}"
             ),
         )
 
@@ -283,15 +295,17 @@ def capture_rtt_output(
     timeout_s: float | None = None,
     heartbeat_timeout_s: float = HEARTBEAT_TIMEOUT_S,
     model_path: Path | None = None,
-    weights_region: str = "mram",
+    psram_host_upload: bool = False,
     timing_out: dict[str, float] | None = None,
     reset_controller: ResetController | None = None,
 ) -> list[str]:
     """Capture firmware output via SEGGER RTT until HPX_END or hang detection.
 
-    When *weights_region* is ``"psram"``, the function uploads the model
+    When *psram_host_upload* is True, the function uploads the model
     flatbuffer to PSRAM via J-Link SWD writes before collecting profiling
-    output.
+    output.  The caller derives the flag from the engine adapter's
+    ``psram_weights_source`` — placement alone must not imply an upload,
+    because self-contained engines never emit ``HPX_PSRAM_READY`` (#219).
 
     Args:
         known_block_address: Linked address of the RTT control block recovered
@@ -524,7 +538,7 @@ def capture_rtt_output(
                         "(--transport rtt) and the target is running."
                     ),
                 )
-            if weights_region == "psram" and model_path is not None:
+            if psram_host_upload and model_path is not None:
                 raise CaptureError(
                     "RTT API attach failed on target",
                     hint="PSRAM model upload currently requires a working J-Link RTT API session.",
@@ -630,8 +644,8 @@ def capture_rtt_output(
             detail=f"pending_bytes={len(pending)}",
         )
 
-        # --- Step 3a: PSRAM model upload (if applicable) ---
-        if weights_region == "psram" and model_path is not None:
+        # --- Step 3a: PSRAM model upload (host-upload engines only) ---
+        if psram_host_upload and model_path is not None:
             psram_upload_started_s = time.monotonic()
             _upload_model_to_psram(jlink, model_path, initial_buf=pending)
             record_phase_duration("psram_upload", psram_upload_started_s)
@@ -703,16 +717,28 @@ class RttTransport(BaseCaptureTransport):
             )
 
     def collect(self, ctx) -> list[str]:
+        from ..engines import get_adapter
+        from ..engines.base import PsramWeightsSource
         from ..placement import Placement
 
         args = self.prepared_args
+        # Placement says WHERE the weights live; the engine capability says
+        # WHO puts them there.  Only host-upload engines get the
+        # HPX_PSRAM_READY wait + J-Link upload — a self-contained engine
+        # (heliaAOT) populates PSRAM itself and never emits the handshake,
+        # so gating on placement alone hangs the run (#219).
+        psram_host_upload = (
+            (ctx.weights_region or Placement.MRAM) == Placement.PSRAM
+            and get_adapter(ctx.config.engine.type).psram_weights_source
+            is PsramWeightsSource.HOST_UPLOAD
+        )
         return capture_rtt_output(
             jlink_serial=args.jlink_serial,
             jlink_device=args.jlink_device,
             rtt_scan_ranges=ctx.soc.rtt_scan_ranges,
             known_block_address=self._known_block_address,
             model_path=ctx.config.model.path,
-            weights_region=ctx.weights_region or Placement.MRAM,
+            psram_host_upload=psram_host_upload,
             timeout_s=args.overall_timeout_s,
             heartbeat_timeout_s=args.heartbeat_timeout_s,
             timing_out=args.timing_raw,

@@ -1471,3 +1471,78 @@ def test_psram_upload_times_out_without_ready_line(tmp_path):
             timeout_s=0.05,
             initial_buf=b"",
         )
+
+
+def test_psram_upload_timeout_surfaces_firmware_output(tmp_path):
+    """The timeout error must carry what the firmware DID say (#219).
+
+    A self-contained engine's firmware talks (HPX_PSRAM_ARENA_REGION lines)
+    without ever emitting HPX_PSRAM_READY.  Discarding those bytes turned
+    the mismatch into an opaque "check the hardware" timeout that was
+    mis-diagnosed twice; the hint must surface them.
+    """
+    from helia_profiler.capture import CaptureError
+    from helia_profiler.transport.rtt import _upload_model_to_psram
+
+    model = tmp_path / "m.tflite"
+    model.write_bytes(b"\xcc")
+
+    firmware_said = b"HPX_PSRAM_ARENA_REGION=0,0x60000000,35376\n"
+    session = _FakePsramSession()
+    with pytest.raises(CaptureError) as excinfo:
+        _upload_model_to_psram(
+            session, model, timeout_s=0.05, initial_buf=firmware_said
+        )  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
+    assert "HPX_PSRAM_ARENA_REGION=0,0x60000000,35376" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    ("engine", "weights_region", "expect_upload"),
+    [
+        # Placement says WHERE, the engine capability says WHO: only
+        # host-upload engines get the HPX_PSRAM_READY wait + J-Link
+        # upload.  heliaAOT writes its own sidecar blobs into PSRAM and
+        # never emits the handshake — gating on placement alone hangs the
+        # run against a signal that never comes (#219).
+        ("helia-rt", Placement.PSRAM, True),
+        ("helia-aot", Placement.PSRAM, False),
+        ("helia-rt", Placement.MRAM, False),
+    ],
+)
+def test_psram_upload_gated_on_engine_capability(
+    tmp_path: Path, monkeypatch, engine: str, weights_region, expect_upload: bool
+):
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": engine},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    set_profile_firmware(ctx, build_dir=tmp_path / "build")
+    ctx.build_dir.mkdir()
+    ctx.resolved_jlink_serial = "1160002204"
+    ctx.weights_region = weights_region
+
+    captured: dict[str, object] = {}
+
+    def fake_capture_rtt_output(**kwargs):
+        captured.update(kwargs)
+        return [
+            "--- HPX_START ---",
+            "--- HPX_PRESET basic_cpu ---",
+            "--- HPX_ITER 0 ---",
+            "Layer,Op,ARM_PMU_CPU_CYCLES",
+            "0,CONV_2D,1",
+            "--- HPX_END ---",
+        ]
+
+    monkeypatch.setattr("helia_profiler.transport.rtt.capture_rtt_output", fake_capture_rtt_output)
+
+    capture_pmu(ctx)
+
+    assert captured["psram_host_upload"] is expect_upload

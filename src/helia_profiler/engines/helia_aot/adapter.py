@@ -16,11 +16,11 @@ from pathlib import Path
 from dataclasses import replace as _dc_replace
 
 from ...config import ProfileConfig
-from ...errors import EngineError
+from ...errors import ConfigError, EngineError
 from ...placement import ArenaRole, Placement
 from ...results import NsxModuleRef
 from .. import EngineType
-from ..base import ArenaRegion, HeliaAotArtifacts
+from ..base import ArenaRegion, HeliaAotArtifacts, PsramWeightsSource
 from ..cmsis_nn import cmsis_nn_module_ref
 from .compile import (
     _DEFAULT_MODULE_NAME,
@@ -34,6 +34,22 @@ from .compile import (
 from .manifest import _extract_arena_regions, _extract_memory_plan, _extract_operator_manifest
 
 log = logging.getLogger("hpx")
+
+
+def _external_arena_mode(config: ProfileConfig) -> bool:
+    """True when arena buffers are host-app allocated and bound at runtime.
+
+    heliaAOT's entire PSRAM path — sidecar constant blobs, ``nsx_psram_init``,
+    ``nsx_psram_write``, ``bind_arena`` — renders only in this mode
+    (``main_aot.cc.j2`` gates the whole region on ``not allocate_arenas``).
+    Single source of truth for that flag: ``prepare()`` and
+    :meth:`HeliaAOTAdapter.check_psram_placement` must agree on it, or the
+    memory plan and the generated firmware can disagree about where the
+    tensors live (#219).
+    """
+    return not config.engine.config.get("aot_args", {}).get("memory", {}).get(
+        "allocate_arenas", True
+    )
 
 
 class HeliaAOTAdapter:
@@ -56,6 +72,33 @@ class HeliaAOTAdapter:
     @property
     def engine_type(self) -> EngineType:
         return EngineType.HELIA_AOT
+
+    @property
+    def psram_weights_source(self) -> PsramWeightsSource:
+        # Constants ship as flash-resident sidecar blobs that the firmware
+        # writes into PSRAM itself; there is no HPX_PSRAM_READY handshake
+        # and no host upload.  check_psram_placement() guards the config
+        # that actually renders that machinery.
+        return PsramWeightsSource.SELF_CONTAINED
+
+    def check_psram_placement(self, config: ProfileConfig) -> None:
+        if _external_arena_mode(config):
+            return
+        # Under the default allocate_arenas=True, main_aot.cc.j2 renders
+        # ZERO PSRAM code while plan_memory happily reports tensors placed
+        # there — the run then hangs at the host's PSRAM handshake with
+        # nothing to blame but the hardware.  Refuse in stage 0 instead.
+        raise ConfigError(
+            "helia-aot PSRAM placement requires external-arena mode, "
+            "which is disabled (aot_args.memory.allocate_arenas defaults to true).",
+            hint=(
+                "Set engine.config.aot_args.memory.allocate_arenas: false — "
+                "heliaAOT then writes its sidecar constant blobs into PSRAM "
+                "itself at boot. Without it the generated firmware contains "
+                "no PSRAM code at all, while the memory plan claims tensors "
+                "live there."
+            ),
+        )
 
     def default_auto_placement(
         self, *, tcm_cap: int, sram_cap: int
@@ -152,9 +195,7 @@ class HeliaAOTAdapter:
         # Extract arena binding info for external-arena mode — resolved
         # BEFORE plan extraction, which needs it to hint the symbols the
         # templates actually emit in each mode (#179 review M-4).
-        allocate_arenas = (
-            config.engine.config.get("aot_args", {}).get("memory", {}).get("allocate_arenas", True)
-        )
+        allocate_arenas = not _external_arena_mode(config)
         memory_plan = _extract_memory_plan(
             codegen_ctx, prefix, allocate_arenas=allocate_arenas
         )
