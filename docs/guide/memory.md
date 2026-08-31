@@ -81,9 +81,29 @@ The arena gets the faster region on ties because it's accessed every
 inference cycle, whereas weights are streamed once per layer and benefit
 less from a single-cycle hit.
 
-Automatic placement **never** chooses PSRAM — that path requires the runtime upload
-handshake and you have to opt in explicitly with `weights_location: psram` or
-`--weights-location psram`.
+Automatic placement **never** chooses PSRAM — you opt in explicitly with
+`weights_location: psram` or `--weights-location psram`. How the data then
+reaches PSRAM depends on the engine:
+
+- **tflm / helia-rt** — the firmware initialises PSRAM, signals the host, and
+  the host uploads the model flatbuffer over J-Link (this path requires
+  `transport: rtt`).
+- **helia-aot** — the firmware writes its own flash-resident constant blobs
+  into PSRAM at boot; no host upload and no transport requirement. This path
+  only exists in external-arena mode, so PSRAM placement additionally requires:
+
+  ```yaml
+  engine:
+    type: helia-aot
+    config:
+      aot_args:
+        memory:
+          allocate_arenas: false
+  ```
+
+  Without it preflight refuses the run — under the default the generated
+  firmware would contain no PSRAM code at all while the memory plan claims
+  tensors live there.
 
 When using PSRAM, select its interface clock explicitly under the target:
 
