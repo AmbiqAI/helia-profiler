@@ -43,15 +43,42 @@ class ConsumerKind(StrEnum):
 # ---------------------------------------------------------------------------
 
 
+def source_index_from_op(op: str) -> int | None:
+    """Original tflite operator index from an op label's ``:N`` suffix.
+
+    helia-aot firmware labels layers ``"<TYPE>:<original tflite index>"``
+    (``"FULLY_CONNECTED:43"``). Only a strict integer suffix counts —
+    ExecuTorch's ``"OPERATOR_CALL:c3i12"`` names no tflite operator and
+    must stay ``None`` (#218: never guess a source index).
+    """
+    _, sep, suffix = str(op).rpartition(":")
+    if not sep or not suffix.isdigit():
+        return None
+    return int(suffix)
+
+
 @dataclass(frozen=True)
 class LayerResult:
-    """Profiling result for a single model layer (averaged across iterations)."""
+    """Profiling result for a single model layer (averaged across iterations).
+
+    ``source_index`` is the ORIGINAL tflite operator index this measured
+    layer corresponds to, when the op label carries one (#218). ``id`` is
+    the firmware's execution position, which on AOT engines is NOT the
+    original index — helia-aot skips ops without renumbering.
+    """
 
     id: int | str
     op: str
     counters: dict[str, float] = field(default_factory=dict)
     cycles: float | None = None
     overflow: bool = False
+    source_index: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.source_index is None:
+            derived = source_index_from_op(self.op)
+            if derived is not None:
+                object.__setattr__(self, "source_index", derived)
 
 
 @dataclass(frozen=True)
