@@ -52,7 +52,7 @@ import hashlib
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 from typing import Any
 
 _PLACEHOLDER_PATH = "<redacted-path>"
@@ -174,14 +174,6 @@ class RedactionCounts:
             "env_values": self.env_values,
             "total": self.total,
         }
-
-
-def _basename(path_text: str) -> str:
-    if "\\" in path_text and "/" not in path_text:
-        name = PureWindowsPath(path_text).name
-    else:
-        name = path_text.rstrip("/\\").rsplit("/", 1)[-1]
-    return name
 
 
 def _redact_path_match(match: re.Match[str]) -> str:

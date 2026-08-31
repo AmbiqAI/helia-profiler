@@ -1,4 +1,4 @@
-"""Stage 2 — Prepare engine: instantiate adapter and produce artifacts."""
+"""Prepare engine: instantiate adapter and produce artifacts."""
 
 from __future__ import annotations
 

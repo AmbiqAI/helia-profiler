@@ -56,10 +56,6 @@ class JoulescopeDriver:
         return PowerMode.EXTERNAL
 
     @property
-    def num_gpi(self) -> int:
-        return 2  # JS110/JS220/JS320 expose 2 general-purpose inputs
-
-    @property
     def has_gpo(self) -> bool:
         return True
 

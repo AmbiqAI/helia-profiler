@@ -23,7 +23,6 @@ from .board import (
 from .capabilities import (
     ClockCapabilities,
     MemoryCapabilities,
-    PowerCaptureCapabilities,
     ResetCapabilities,
     SocCapabilities,
     TransportCapabilities,
@@ -79,7 +78,6 @@ __all__ = [
     "PerfTier",
     "PlatformRegistry",
     "PmuTier",
-    "PowerCaptureCapabilities",
     "ResetCapabilities",
     "SocCapabilities",
     "SocDef",

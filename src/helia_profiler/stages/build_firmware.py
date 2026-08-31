@@ -1,4 +1,4 @@
-"""Stage 4 — Build firmware: invoke NSX configure + build."""
+"""Build firmware: invoke NSX configure + build."""
 
 from __future__ import annotations
 

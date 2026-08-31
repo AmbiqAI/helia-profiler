@@ -123,19 +123,6 @@ class HpxConsole:
         validation.print_validation(self, report, output_paths=output_paths)
 
     # ------------------------------------------------------------------
-    # Memory plan rendering
-    # ------------------------------------------------------------------
-
-    def _render_memory_plan(self, plan: Any) -> None:
-        """Render the engine-agnostic MemoryPlan as a region usage table.
-
-        Shows each region present on the SoC with its used / capacity
-        totals, a progress bar, and a breakdown of consumers when
-        non-trivial.  Overflow rows are highlighted in red.
-        """
-        results.render_memory_plan(self, plan)
-
-    # ------------------------------------------------------------------
     # Standalone model analysis display
     # ------------------------------------------------------------------
 

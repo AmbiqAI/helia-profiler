@@ -1,4 +1,10 @@
-"""Result validity, comparability, and regression policy."""
+"""Run evaluation: validity, comparability/compare, and model-cost analysis.
+
+Three blocks share this package today: run-validity (``validity``),
+comparison (``compare``/``comparability``/``comparison_profile``/
+``run_metrics``), and the model-cost core (``model_analysis``,
+``layer_attribution``, ``softmax_preflight`` — the #229 extraction seam).
+"""
 
 from .comparability import (
     ComparabilityAssessment,

@@ -1,4 +1,4 @@
-"""Stage 1a — Resolve the J-Link probe to use for this run."""
+"""Resolve the J-Link probe to use for this run."""
 
 from __future__ import annotations
 

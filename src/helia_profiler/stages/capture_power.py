@@ -1,4 +1,4 @@
-"""Stage 7 — Capture power data via configured power driver (optional).
+"""Capture power data via configured power driver (optional).
 
 Power capture relaunches firmware through an explicit target lifecycle policy
 before arming the measurement.  The default policy uses reset primitives, not

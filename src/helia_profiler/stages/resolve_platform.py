@@ -1,4 +1,4 @@
-"""Stage 1 — Resolve platform: validate board/SoC and enrich context."""
+"""Resolve platform: validate board/SoC and enrich context."""
 
 from __future__ import annotations
 

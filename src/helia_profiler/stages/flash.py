@@ -1,4 +1,4 @@
-"""Stage 5 — Flash firmware: deploy the built image directly via J-Link.
+"""Flash firmware: deploy the built image directly via J-Link.
 
 Runs the NSX-generated per-target flash recipe (the address-explicit
 ``LoadFile <target>.bin`` script the NSX build emits next to the binary)

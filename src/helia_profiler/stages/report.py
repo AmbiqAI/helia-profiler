@@ -1,4 +1,4 @@
-"""Stage 8 — Generate report: CSV/JSON output + Model Explorer overlays."""
+"""Generate report: CSV/JSON output + Model Explorer overlays."""
 
 from __future__ import annotations
 

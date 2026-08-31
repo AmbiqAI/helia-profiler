@@ -1,4 +1,4 @@
-"""Stage 0 — Preflight: fail fast on the common, preventable problems.
+"""Preflight: fail fast on the common, preventable problems.
 
 This stage runs before any platform resolution, code generation or build so
 that users get an immediate, actionable error when something trivial is

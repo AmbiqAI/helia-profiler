@@ -64,18 +64,6 @@ class OnDeviceDriver:
             ),
         )
 
-    def _parse_power_output(self, raw: str) -> PowerResult:
-        """Parse firmware serial output containing power measurements.
-
-        Expected format (future):
-          HPX_POWER_SAMPLE <layer_idx>,<rail>,<current_ua>,<voltage_mv>
-          HPX_POWER_SUMMARY avg_current_ua=...,energy_uj=...
-        """
-        raise PowerError(
-            "On-device power output parsing not implemented",
-            hint="This feature is under development.",
-        )
-
     def capture_gated(
         self,
         *,
