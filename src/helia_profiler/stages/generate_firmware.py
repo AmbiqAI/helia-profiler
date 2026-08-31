@@ -24,7 +24,7 @@ class GenerateFirmwareStage:
                 "No engine artifacts available — engine preparation stage did not run.",
             )
 
-        from ..dependencies import create_workspace, workspace_mutex
+        from ..deps.dependencies import create_workspace, workspace_mutex
         from ..firmware import generate_app
 
         try:

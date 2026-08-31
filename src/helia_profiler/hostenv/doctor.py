@@ -11,10 +11,10 @@ import re
 import shutil
 from typing import Any
 
-from .config import Toolchain, Transport
-from .engines import EngineType
-from .errors import CaptureError, ConfigError
-from .target.probe.jlink import JLINK_COMMANDER, find_jlink_exe
+from ..config import Toolchain, Transport
+from ..engines import EngineType
+from ..errors import CaptureError, ConfigError
+from ..target.probe.jlink import JLINK_COMMANDER, find_jlink_exe
 
 
 @dataclass(frozen=True)
@@ -122,8 +122,8 @@ def inspect_environment(
     """
     results = [_inspect_dependency(spec) for spec in _dependency_specs(toolchain, transport, engine)]
     if require_segger_rtt:
-        from .errors import FirmwareError
-        from .firmware import _find_segger_rtt_dir
+        from ..errors import FirmwareError
+        from ..firmware import _find_segger_rtt_dir
 
         try:
             resolved_rtt = _find_segger_rtt_dir(segger_rtt_path)
@@ -292,8 +292,8 @@ def check_versions(
     failing the whole report — this stays safe to call with no network and
     no attached hardware.
     """
-    from ._version import __version__ as hpx_version
-    from .compatibility import load_compatibility_baseline
+    from .._version import __version__ as hpx_version
+    from ..deps.compatibility import load_compatibility_baseline
     from .toolchain_probe import cmake_version, compiler_version
 
     checks: list[DoctorVersionCheck] = [

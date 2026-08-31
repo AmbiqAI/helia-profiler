@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
     from ..results import MeasuredMemoryRegions, MemoryPlan, MemoryReconciliation
-    from ..toolchain_probe import SymbolEntry
+    from ..hostenv.toolchain_probe import SymbolEntry
 
 log = logging.getLogger("hpx")
 

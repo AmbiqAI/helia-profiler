@@ -1,4 +1,4 @@
-"""Exhaustive, table-driven tests for helia_profiler.redact.
+"""Exhaustive, table-driven tests for helia_profiler.diagnostics.redact.
 
 Covers the exact categories the field-diagnostics support bundle must
 scrub by default: home/workspace absolute paths (POSIX/Windows/UNC),
@@ -13,7 +13,7 @@ import json
 
 import pytest
 
-from helia_profiler.redact import (
+from helia_profiler.diagnostics.redact import (
     RedactionCounts,
     RedactionPolicy,
     redact_serial,

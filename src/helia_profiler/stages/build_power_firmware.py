@@ -47,8 +47,8 @@ class BuildPowerFirmwareStage:
             _nsx_toolchain,
             render_power_source,
         )
-        from .. import nsx as nsx_cli
-        from ..dependencies import workspace_mutex
+        from ..deps import nsx as nsx_cli
+        from ..deps.dependencies import workspace_mutex
 
         if ctx.power_run is None or ctx.power_run.plan.inference_count is None:
             raise BuildError("Cannot build fixed-N power firmware without a resolved power plan.")

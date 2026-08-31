@@ -12,7 +12,7 @@ import difflib
 from pydantic import ConfigDict, TypeAdapter, ValidationError, field_validator, model_validator
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
-from .compatibility import (
+from .deps.compatibility import (
     CompatibilityBaseline,
     CompatibilityResolution,
     load_compatibility_baseline,

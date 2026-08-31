@@ -56,7 +56,7 @@ HELIART_MODULE = "nsx-helia-rt"  # registry module name
 
 def _cache_dir() -> Path:
     """Cache directory for downloaded heliaRT distributions."""
-    from ...cache_dirs import hpx_cache_root
+    from ...hostenv.cache_dirs import hpx_cache_root
 
     return hpx_cache_root() / "heliart"
 
@@ -108,7 +108,7 @@ def _toolchain_tag(toolchain: str) -> str:
 
     heliaRT release artifacts are named ``...-<gcc|armclang>-<variant>.a``.
     """
-    from ...toolchains import get_toolchain_spec
+    from ...hostenv.toolchains import get_toolchain_spec
 
     return get_toolchain_spec(toolchain).heliart_tag
 

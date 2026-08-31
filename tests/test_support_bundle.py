@@ -19,7 +19,7 @@ import pytest
 from neuralspotx.nsx_lock import LockKind, NsxLock, ResolvedModule, hash_manifest, write_lock
 
 from helia_profiler.config import load_config
-from helia_profiler.dependencies import create_workspace, prepare_locked_dependencies
+from helia_profiler.deps.dependencies import create_workspace, prepare_locked_dependencies
 from helia_profiler.engines import TFLM_ENGINE_HEADER
 from helia_profiler.engines.base import TflmArtifacts
 from helia_profiler.errors import ReportError
@@ -32,7 +32,7 @@ from helia_profiler.results.support_bundle import (
 )
 from helia_profiler.results import ResultArtifact
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
-from helia_profiler.support_bundle import (
+from helia_profiler.diagnostics.support_bundle import (
     SupportBundleOptions,
     collect_support_bundle,
     content_fingerprint,
@@ -111,7 +111,7 @@ def _prepared_workspace(
     )
     write_lock(ctx.firmware_dir, lock, "apollo510_evb")
 
-    with mock.patch("helia_profiler.dependencies.nsx_cli.sync", lambda *a, **kw: None):
+    with mock.patch("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *a, **kw: None):
         prepare_locked_dependencies(ctx)
 
     assert ctx.firmware_dir is not None
@@ -833,7 +833,7 @@ def test_write_support_bundle_raises_report_error_on_oserror(
     that only catches HpxError still gets a clean message instead of a
     traceback.
     """
-    from helia_profiler import support_bundle as support_bundle_module
+    from helia_profiler.diagnostics import support_bundle as support_bundle_module
 
     options = SupportBundleOptions(include_probes=False, include_ports=False)
     collection = collect_support_bundle(options)

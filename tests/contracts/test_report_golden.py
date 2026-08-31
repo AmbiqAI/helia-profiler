@@ -52,7 +52,7 @@ from helia_profiler.engines.base import HeliaAotArtifacts
 from helia_profiler.engines import EngineType
 from helia_profiler.evaluation import LayerOps, ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.toolchain_probe import SymbolEntry
+from helia_profiler.hostenv.toolchain_probe import SymbolEntry
 from helia_profiler.placement import MemoryRegion
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
 from helia_profiler.report import write_report

@@ -17,7 +17,7 @@ from neuralspotx.nsx_lock import (
 )
 
 from helia_profiler.config import load_config
-from helia_profiler.dependencies import (
+from helia_profiler.deps.dependencies import (
     create_workspace,
     invalidate_sync_stamp,
     normalize_path,
@@ -30,7 +30,7 @@ from helia_profiler.errors import DependencyError, LockError, VersionError
 from helia_profiler.errors import BuildError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.results import DependencyLockMode
-from helia_profiler.compatibility import QualificationState
+from helia_profiler.deps.compatibility import QualificationState
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
 
@@ -118,9 +118,9 @@ def test_first_resolution_locks_without_update_then_syncs_frozen(
         lock_calls.append(update)
         _write_valid_lock(ctx)
 
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.lock", lock)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.lock", lock)
     monkeypatch.setattr(
-        "helia_profiler.dependencies.nsx_cli.sync",
+        "helia_profiler.deps.dependencies.nsx_cli.sync",
         lambda _path, *, frozen, **_kwargs: sync_calls.append(frozen),
     )
 
@@ -139,10 +139,10 @@ def test_ordinary_reuse_is_byte_stable_and_never_locks(
     ctx = _context(tmp_path)
     before = _write_valid_lock(ctx)
     monkeypatch.setattr(
-        "helia_profiler.dependencies.nsx_cli.lock",
+        "helia_profiler.deps.dependencies.nsx_cli.lock",
         lambda *_args, **_kwargs: pytest.fail("ordinary reuse must not call nsx lock"),
     )
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
 
     provenance = prepare_locked_dependencies(ctx)
 
@@ -165,10 +165,10 @@ def test_online_reuse_repairs_partial_materialization_without_relocking(
             raise BuildError("content mismatch", details="partial module")
 
     monkeypatch.setattr(
-        "helia_profiler.dependencies.nsx_cli.lock",
+        "helia_profiler.deps.dependencies.nsx_cli.lock",
         lambda *_args, **_kwargs: pytest.fail("repair must not resolve refs"),
     )
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", sync)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", sync)
 
     provenance = prepare_locked_dependencies(ctx)
 
@@ -185,11 +185,11 @@ def test_reuse_skips_frozen_sync_when_stamp_matches(
     _write_valid_lock(ctx)
     sync_calls: list[bool] = []
     monkeypatch.setattr(
-        "helia_profiler.dependencies.nsx_cli.lock",
+        "helia_profiler.deps.dependencies.nsx_cli.lock",
         lambda *_args, **_kwargs: pytest.fail("ordinary reuse must not call nsx lock"),
     )
     monkeypatch.setattr(
-        "helia_profiler.dependencies.nsx_cli.sync",
+        "helia_profiler.deps.dependencies.nsx_cli.sync",
         lambda _path, *, frozen, **_kwargs: sync_calls.append(frozen),
     )
 
@@ -209,7 +209,7 @@ def test_lock_change_invalidates_sync_stamp(
     _write_valid_lock(ctx)
     sync_calls: list[bool] = []
     monkeypatch.setattr(
-        "helia_profiler.dependencies.nsx_cli.sync",
+        "helia_profiler.deps.dependencies.nsx_cli.sync",
         lambda _path, *, frozen, **_kwargs: sync_calls.append(frozen),
     )
 
@@ -229,7 +229,7 @@ def test_missing_module_tree_prevents_sync_skip(
     _write_valid_lock(ctx)
     sync_calls: list[bool] = []
     monkeypatch.setattr(
-        "helia_profiler.dependencies.nsx_cli.sync",
+        "helia_profiler.deps.dependencies.nsx_cli.sync",
         lambda _path, *, frozen, **_kwargs: sync_calls.append(frozen),
     )
 
@@ -249,7 +249,7 @@ def test_invalidate_sync_stamp_forces_reverification(
     _write_valid_lock(ctx)
     sync_calls: list[bool] = []
     monkeypatch.setattr(
-        "helia_profiler.dependencies.nsx_cli.sync",
+        "helia_profiler.deps.dependencies.nsx_cli.sync",
         lambda _path, *, frozen, **_kwargs: sync_calls.append(frozen),
     )
 
@@ -290,7 +290,7 @@ def test_engine_release_source_mapping_is_fingerprinted_and_serialized(
     workspace = create_workspace(ctx)
 
     assert workspace.fingerprint
-    from helia_profiler.dependencies import _override_inputs
+    from helia_profiler.deps.dependencies import _override_inputs
 
     _, overrides = _override_inputs(ctx)
     assert overrides[-1].mode == "release"
@@ -308,8 +308,8 @@ def test_explicit_update_is_the_only_refresh_path(
         updates.append(update)
         _write_valid_lock(ctx, commit="c" * 40)
 
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.lock", lock)
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.lock", lock)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
 
     provenance = prepare_locked_dependencies(ctx)
 
@@ -327,7 +327,7 @@ def test_exact_dependency_provenance_serialization(
         build={"nsx_modules": {"demo": {"ref": "feature/test"}}},
     )
     exact_lock = _write_valid_lock(ctx)
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
 
     provenance = prepare_locked_dependencies(ctx)
     assert ctx.dependency_lock_path is not None
@@ -372,7 +372,7 @@ def test_read_only_lock_provenance_surface_from_app_or_workspace(
 ) -> None:
     ctx = _context(tmp_path)
     exact_lock = _write_valid_lock(ctx)
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
     prepare_locked_dependencies(ctx)
     assert ctx.firmware_dir is not None
     assert ctx.dependency_workspace is not None
@@ -420,7 +420,7 @@ def test_lock_provenance_provider_rejects_lock_drift(
 ) -> None:
     ctx = _context(tmp_path)
     _write_valid_lock(ctx)
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
     prepare_locked_dependencies(ctx)
     assert ctx.firmware_dir is not None
     (ctx.firmware_dir / "nsx.lock").write_bytes(b"changed")
@@ -602,7 +602,7 @@ def test_lock_resolving_off_baseline_ref_raises_version_error(
 ) -> None:
     ctx = _context(tmp_path)
     _write_valid_lock(ctx, project="nsx-sensors", commit="d" * 40)
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
 
     with pytest.raises(VersionError, match="qualified baseline pins") as exc:
         prepare_locked_dependencies(ctx)
@@ -620,7 +620,7 @@ def test_lock_matching_baseline_ref_passes(
 ) -> None:
     ctx = _context(tmp_path)
     _write_valid_lock(ctx, project="nsx-sensors", commit=_baseline_ref(ctx, "nsx-sensors"))
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
 
     provenance = prepare_locked_dependencies(ctx)
 
@@ -637,7 +637,7 @@ def test_explicit_module_override_exempts_project_from_baseline_check(
         build={"nsx_modules": {"demo": {"ref": "feature/experiment"}}},
     )
     _write_valid_lock(ctx, project="nsx-sensors", commit="d" * 40)
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
 
     provenance = prepare_locked_dependencies(ctx)
 
@@ -668,7 +668,7 @@ def test_engine_cmsis_nn_override_exempts_provider_project_from_baseline_check(
         model_name=model_name,
     )
     _write_valid_lock(ctx, project=project, commit="d" * 40)
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
 
     provenance = prepare_locked_dependencies(ctx)
 
@@ -684,7 +684,7 @@ def test_unpinned_projects_are_not_baseline_checked(
 ) -> None:
     ctx = _context(tmp_path)
     _write_valid_lock(ctx, project="demo-project", commit="d" * 40)
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
 
     provenance = prepare_locked_dependencies(ctx)  # must not raise
 
@@ -697,7 +697,7 @@ def test_unpinned_projects_are_not_baseline_checked(
 
 
 def test_lock_schema_version_mismatch_raises_version_error(tmp_path: Path) -> None:
-    from helia_profiler.dependencies import _lock_incompatibility
+    from helia_profiler.deps.dependencies import _lock_incompatibility
 
     ctx = _context(tmp_path)
     assert ctx.firmware_dir is not None
@@ -751,7 +751,7 @@ def test_lock_provenance_drift_raises_lock_error_not_version_error(
 ) -> None:
     ctx = _context(tmp_path)
     _write_valid_lock(ctx)
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
     prepare_locked_dependencies(ctx)
     assert ctx.firmware_dir is not None
     (ctx.firmware_dir / "nsx.lock").write_bytes(b"changed")
@@ -770,7 +770,7 @@ def test_read_dependency_lock_provenance_unreadable_lock_raises_lock_error(
         pytest.skip("root ignores POSIX permission bits")
     ctx = _context(tmp_path)
     _write_valid_lock(ctx)
-    monkeypatch.setattr("helia_profiler.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
     prepare_locked_dependencies(ctx)
     assert ctx.firmware_dir is not None
     lock_path = ctx.firmware_dir / "nsx.lock"

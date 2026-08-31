@@ -17,7 +17,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from .results import BinarySections
+from ..results import BinarySections
 from .toolchains import get_toolchain_spec, resolve_toolchain_executable
 
 # The #133 inventory API lives in elf_inventory (extracted at the module

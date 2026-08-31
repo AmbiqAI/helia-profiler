@@ -9,7 +9,7 @@ from rich.table import Table
 from rich.text import Text
 
 if TYPE_CHECKING:
-    from ..doctor import DoctorResult
+    from ..hostenv.doctor import DoctorResult
     from .base import HpxConsole
 
 

@@ -20,7 +20,7 @@ SESSION_INTENT_SCHEMA_VERSION = 1
 if TYPE_CHECKING:
     from .evaluation import CompareResult, ComparisonProfile
     from .counters import PmuCounter
-    from .doctor import DoctorResult
+    from .hostenv.doctor import DoctorResult
     from .engines import EngineType
     from .evaluation.model_analysis import ModelAnalysis
     from .pipeline import ProgressUpdate
@@ -307,7 +307,7 @@ class Session:
     def doctor(self) -> DoctorResult:
         """Return structured host dependency checks."""
         from .config import Transport
-        from .doctor import inspect_environment
+        from .hostenv.doctor import inspect_environment
 
         config = self._utility_config()
         return inspect_environment(

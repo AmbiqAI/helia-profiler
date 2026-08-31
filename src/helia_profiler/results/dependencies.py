@@ -7,7 +7,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from ..compatibility import QualificationState
+from ..deps.compatibility import QualificationState
 
 
 @dataclass(frozen=True)

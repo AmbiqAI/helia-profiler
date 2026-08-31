@@ -62,7 +62,7 @@ was reserved for: it gathers doctor checks/versions, the compatibility
 baseline, the exact Stage 5 lock provenance (when `workspace` is given), a
 module inventory, an optional sanitized resolved config, and optional
 probe/port summaries — redacting absolute paths, credentialed URLs, tokens,
-and device serials by default (see `helia_profiler.redact`) — into one
+and device serials by default (see `helia_profiler.diagnostics.redact`) — into one
 in-memory `SupportBundleCollection`. `write_support_bundle()` archives it
 deterministically (stable member order and byte content for identical
 inputs); `verify_support_bundle()` re-checks an archive's structure and

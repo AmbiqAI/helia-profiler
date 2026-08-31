@@ -26,7 +26,7 @@ from ..pipeline import PipelineContext
 from ..placement import MemoryRegion, Placement
 from ..platform import classify_address, linked_memory_map, soc_placement_ranges
 from ..platform.memory_map import link_family_for_toolchain
-from ..toolchain_probe import symbol_address
+from ..hostenv.toolchain_probe import symbol_address
 
 log = logging.getLogger("hpx")
 

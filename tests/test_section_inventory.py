@@ -12,7 +12,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from helia_profiler.toolchain_probe import (
+from helia_profiler.hostenv.toolchain_probe import (
     ElfSection,
     LoadSegment,
     _inventory_from_fromelf_listing,
@@ -34,7 +34,7 @@ def _readelf_segments_text() -> str:
 
 class TestReadelfInventory:
     def _inventory(self, monkeypatch, text=None):
-        import helia_profiler.toolchain_probe as tp
+        import helia_profiler.hostenv.toolchain_probe as tp
 
         class _Result:
             returncode = 0
@@ -139,7 +139,7 @@ class TestReadelfInventory:
         assert not by_name["ARM_LIB_STACK"].linker_reserved
 
     def test_tool_failure_degrades_to_none(self, monkeypatch):
-        import helia_profiler.toolchain_probe as tp
+        import helia_profiler.hostenv.toolchain_probe as tp
 
         def _boom(*a, **k):
             raise FileNotFoundError("readelf")
@@ -151,7 +151,7 @@ class TestReadelfInventory:
         )
 
     def test_timeout_degrades_to_none(self, monkeypatch):
-        import helia_profiler.toolchain_probe as tp
+        import helia_profiler.hostenv.toolchain_probe as tp
 
         def _slow(*a, **k):
             raise subprocess.TimeoutExpired(cmd="readelf", timeout=5)
@@ -168,7 +168,7 @@ class TestReadelfSegments:
         """#133 D3: .data runs at 0x20004000 but LOADS at 0x0041003c —
         the paddr != vaddr segment is why MRAM accounting needs program
         headers, and the real capture proves the shape."""
-        import helia_profiler.toolchain_probe as tp
+        import helia_profiler.hostenv.toolchain_probe as tp
 
         class _Result:
             returncode = 0
@@ -193,7 +193,7 @@ class TestReadelfSegments:
     def test_failure_degrades_to_empty_not_none(self, monkeypatch):
         """Segments refine the inventory; their absence must not discard
         the section list."""
-        import helia_profiler.toolchain_probe as tp
+        import helia_profiler.hostenv.toolchain_probe as tp
 
         def _boom(*a, **k):
             raise FileNotFoundError("readelf")
@@ -289,7 +289,7 @@ class TestSectionInventoryDispatch:
     def test_gcc_dispatch_runs_readelf_twice_and_threads_results(
         self, monkeypatch
     ):
-        import helia_profiler.toolchain_probe as tp
+        import helia_profiler.hostenv.toolchain_probe as tp
 
         calls = []
 
@@ -316,7 +316,7 @@ class TestSectionInventoryDispatch:
         assert all("readelf" in argv[0] for argv in calls)
 
     def test_armclang_dispatch_parses_the_fromelf_listing(self, monkeypatch):
-        import helia_profiler.toolchain_probe as tp
+        import helia_profiler.hostenv.toolchain_probe as tp
 
         class _Result:
             returncode = 0
@@ -342,7 +342,7 @@ def test_unknown_readelf_toolchain_degrades(monkeypatch):
     # armclang spec routes to fromelf; a spec with no readelf degrades.
     # (section_inventory lives in elf_inventory since the module split —
     # patch the name where the implementation resolves it.)
-    import helia_profiler.elf_inventory as ei
+    import helia_profiler.hostenv.elf_inventory as ei
 
     class _Spec:
         section_probe = "size"
@@ -357,7 +357,7 @@ def test_llvm_readelf_atfe_captures_parse_identically_to_gnu():
     to) on the same fixture ELF must yield the same inventory and segments
     as GNU readelf — the captures differ only in header wording the parser
     never reads."""
-    from helia_profiler.toolchain_probe import (
+    from helia_profiler.hostenv.toolchain_probe import (
         _READELF_INVENTORY_RE,
         _READELF_LOAD_RE,
     )

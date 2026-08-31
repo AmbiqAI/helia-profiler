@@ -18,7 +18,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from ..compatibility import CompatibilityResolution
+from ..deps.compatibility import CompatibilityResolution
 from ..engines import EngineType
 from ..power.base import PowerResult
 from ..placement import MemoryRegion

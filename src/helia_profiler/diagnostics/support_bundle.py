@@ -26,16 +26,16 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from ._version import __version__ as _hpx_version
-from .compatibility import CompatibilityBaseline, load_compatibility_baseline
-from .config import Toolchain, Transport, load_config
-from .dependencies import read_dependency_lock_provenance
-from .doctor import inspect_environment
-from .engines import EngineType
-from .errors import DependencyError, HpxError, ReportError
+from .._version import __version__ as _hpx_version
+from ..deps.compatibility import CompatibilityBaseline, load_compatibility_baseline
+from ..config import Toolchain, Transport, load_config
+from ..deps.dependencies import read_dependency_lock_provenance
+from ..hostenv.doctor import inspect_environment
+from ..engines import EngineType
+from ..errors import DependencyError, HpxError, ReportError
 from .redact import RedactionCounts, RedactionPolicy, redact_known_serial, redact_text, redact_value
-from .results import DependencyLockProvenance, ResultArtifact
-from .results.support_bundle import (
+from ..results import DependencyLockProvenance, ResultArtifact
+from ..results.support_bundle import (
     SUPPORT_BUNDLE_SCHEMA,
     SUPPORT_BUNDLE_SCHEMA_VERSION,
     SupportBundleManifest,
@@ -309,7 +309,7 @@ def _collect_config(
         sections.append(SupportBundleSection("config", False, reason=str(exc)))
         return counts
 
-    from .pipeline import _serialize_config
+    from ..pipeline import _serialize_config
 
     item_counts = _add_json_member(members, "config.json", _serialize_config(config), policy)
     sections.append(SupportBundleSection("config", True))
@@ -327,7 +327,7 @@ def _collect_probes(
         sections.append(SupportBundleSection("probes", False, reason="--no-probes"))
         return counts
     try:
-        from .target.probe.jlink import list_connected_probes
+        from ..target.probe.jlink import list_connected_probes
 
         probes = list_connected_probes()
     except (HpxError, ImportError, OSError) as exc:
@@ -354,7 +354,7 @@ def _collect_ports(
         sections.append(SupportBundleSection("ports", False, reason="--no-ports"))
         return counts
     try:
-        from .transport.ports import list_serial_ports
+        from ..transport.ports import list_serial_ports
 
         ports = list_serial_ports(include_all=False)
     except (HpxError, ImportError, OSError) as exc:

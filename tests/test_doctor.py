@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from helia_profiler.config import Toolchain, Transport
-from helia_profiler.doctor import DoctorVersionCheck, check_versions, inspect_environment
+from helia_profiler.hostenv.doctor import DoctorVersionCheck, check_versions, inspect_environment
 from helia_profiler.engines import EngineType
 from helia_profiler.errors import CaptureError, ConfigError
 
@@ -19,9 +19,9 @@ def _jlink_found() -> str:
 
 
 def test_inspect_environment_reports_missing_required_python(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.doctor.shutil.which", _which_all)
-    monkeypatch.setattr("helia_profiler.doctor.find_jlink_exe", _jlink_found)
-    monkeypatch.setattr("helia_profiler.doctor.find_spec", lambda _name: None)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.shutil.which", _which_all)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_jlink_exe", _jlink_found)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_spec", lambda _name: None)
 
     result = inspect_environment()
 
@@ -30,9 +30,9 @@ def test_inspect_environment_reports_missing_required_python(monkeypatch) -> Non
 
 
 def test_inspect_environment_uses_selected_toolchain_and_transport(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.doctor.shutil.which", _which_all)
-    monkeypatch.setattr("helia_profiler.doctor.find_jlink_exe", _jlink_found)
-    monkeypatch.setattr("helia_profiler.doctor.find_spec", lambda _name: object())
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.shutil.which", _which_all)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_jlink_exe", _jlink_found)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_spec", lambda _name: object())
 
     result = inspect_environment(
         toolchain=Toolchain.ARMCLANG,
@@ -47,10 +47,10 @@ def test_inspect_environment_uses_selected_toolchain_and_transport(monkeypatch) 
 
 
 def test_inspect_environment_requires_aot_only_for_aot_engine(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.doctor.shutil.which", _which_all)
-    monkeypatch.setattr("helia_profiler.doctor.find_jlink_exe", _jlink_found)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.shutil.which", _which_all)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_jlink_exe", _jlink_found)
     monkeypatch.setattr(
-        "helia_profiler.doctor.find_spec",
+        "helia_profiler.hostenv.doctor.find_spec",
         lambda name: None if name == "helia_aot" else object(),
     )
 
@@ -75,9 +75,9 @@ def test_inspect_environment_validates_atfe_root(tmp_path: Path, monkeypatch) ->
     ):
         (bin_dir / name).touch()
     monkeypatch.setenv("ATFE_ROOT", str(tmp_path))
-    monkeypatch.setattr("helia_profiler.doctor.shutil.which", _which_all)
-    monkeypatch.setattr("helia_profiler.doctor.find_jlink_exe", _jlink_found)
-    monkeypatch.setattr("helia_profiler.doctor.find_spec", lambda _name: object())
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.shutil.which", _which_all)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_jlink_exe", _jlink_found)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_spec", lambda _name: object())
 
     result = inspect_environment(toolchain=Toolchain.ATFE)
 
@@ -89,12 +89,12 @@ def test_inspect_environment_validates_atfe_root(tmp_path: Path, monkeypatch) ->
 def test_inspect_environment_finds_jlink_beyond_path_lookup(monkeypatch) -> None:
     # Windows installs name the commander JLink.exe, not JLinkExe, so the
     # J-Link check must use full probe discovery rather than a bare which().
-    monkeypatch.setattr("helia_profiler.doctor.shutil.which", lambda _name: None)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.shutil.which", lambda _name: None)
     monkeypatch.setattr(
-        "helia_profiler.doctor.find_jlink_exe",
+        "helia_profiler.hostenv.doctor.find_jlink_exe",
         lambda: r"C:\Program Files\SEGGER\JLink_V960\JLink.exe",
     )
-    monkeypatch.setattr("helia_profiler.doctor.find_spec", lambda _name: object())
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_spec", lambda _name: object())
 
     result = inspect_environment()
 
@@ -107,9 +107,9 @@ def test_inspect_environment_reports_missing_jlink(monkeypatch) -> None:
     def _raise() -> str:
         raise CaptureError("JLinkExe not found")
 
-    monkeypatch.setattr("helia_profiler.doctor.shutil.which", _which_all)
-    monkeypatch.setattr("helia_profiler.doctor.find_jlink_exe", _raise)
-    monkeypatch.setattr("helia_profiler.doctor.find_spec", lambda _name: object())
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.shutil.which", _which_all)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_jlink_exe", _raise)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_spec", lambda _name: object())
 
     result = inspect_environment()
 
@@ -132,7 +132,7 @@ def test_check_versions_reports_hpx_own_version() -> None:
 
 
 def test_check_versions_matches_neuralspotx_against_baseline(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.doctor._package_version", lambda _name: "0.7.17")
+    monkeypatch.setattr("helia_profiler.hostenv.doctor._package_version", lambda _name: "0.7.17")
 
     versions = check_versions()
 
@@ -144,7 +144,7 @@ def test_check_versions_matches_neuralspotx_against_baseline(monkeypatch) -> Non
 
 
 def test_check_versions_flags_neuralspotx_mismatch(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.doctor._package_version", lambda _name: "0.1.0")
+    monkeypatch.setattr("helia_profiler.hostenv.doctor._package_version", lambda _name: "0.1.0")
 
     versions = check_versions()
 
@@ -156,7 +156,7 @@ def test_check_versions_flags_neuralspotx_mismatch(monkeypatch) -> None:
 
 
 def test_check_versions_neuralspotx_unknown_when_not_installed(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.doctor._package_version", lambda _name: None)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor._package_version", lambda _name: None)
 
     versions = check_versions()
 
@@ -169,7 +169,7 @@ def test_check_versions_never_raises_when_baseline_unavailable(monkeypatch) -> N
     def _raise(*_args, **_kwargs):
         raise ConfigError("no baseline")
 
-    monkeypatch.setattr("helia_profiler.compatibility.load_compatibility_baseline", _raise)
+    monkeypatch.setattr("helia_profiler.deps.compatibility.load_compatibility_baseline", _raise)
 
     versions = check_versions()
 
@@ -177,7 +177,7 @@ def test_check_versions_never_raises_when_baseline_unavailable(monkeypatch) -> N
 
 
 def test_check_versions_flags_cmake_below_minimum(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.toolchain_probe.cmake_version", lambda *, timeout_s: "cmake version 3.10.0")
+    monkeypatch.setattr("helia_profiler.hostenv.toolchain_probe.cmake_version", lambda *, timeout_s: "cmake version 3.10.0")
 
     versions = check_versions()
 
@@ -189,7 +189,7 @@ def test_check_versions_flags_cmake_below_minimum(monkeypatch) -> None:
 
 
 def test_check_versions_cmake_unknown_when_banner_unparsable(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.toolchain_probe.cmake_version", lambda *, timeout_s: "")
+    monkeypatch.setattr("helia_profiler.hostenv.toolchain_probe.cmake_version", lambda *, timeout_s: "")
 
     versions = check_versions()
 
@@ -200,7 +200,7 @@ def test_check_versions_cmake_unknown_when_banner_unparsable(monkeypatch) -> Non
 
 
 def test_check_versions_ok_when_cmake_meets_minimum(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.toolchain_probe.cmake_version", lambda *, timeout_s: "cmake version 3.24.0")
+    monkeypatch.setattr("helia_profiler.hostenv.toolchain_probe.cmake_version", lambda *, timeout_s: "cmake version 3.24.0")
 
     versions = check_versions()
 
@@ -211,7 +211,7 @@ def test_check_versions_ok_when_cmake_meets_minimum(monkeypatch) -> None:
 
 
 def test_check_versions_compiler_unknown_when_missing(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.toolchain_probe.compiler_version", lambda *_a, **_kw: "")
+    monkeypatch.setattr("helia_profiler.hostenv.toolchain_probe.compiler_version", lambda *_a, **_kw: "")
 
     versions = check_versions()
 
@@ -236,9 +236,9 @@ def test_doctor_version_check_to_dict_roundtrips_all_fields() -> None:
 
 
 def test_inspect_environment_include_versions_false_by_default(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.doctor.shutil.which", _which_all)
-    monkeypatch.setattr("helia_profiler.doctor.find_jlink_exe", _jlink_found)
-    monkeypatch.setattr("helia_profiler.doctor.find_spec", lambda _name: object())
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.shutil.which", _which_all)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_jlink_exe", _jlink_found)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_spec", lambda _name: object())
 
     result = inspect_environment()
 
@@ -246,9 +246,9 @@ def test_inspect_environment_include_versions_false_by_default(monkeypatch) -> N
 
 
 def test_inspect_environment_include_versions_true_populates_versions(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.doctor.shutil.which", _which_all)
-    monkeypatch.setattr("helia_profiler.doctor.find_jlink_exe", _jlink_found)
-    monkeypatch.setattr("helia_profiler.doctor.find_spec", lambda _name: object())
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.shutil.which", _which_all)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_jlink_exe", _jlink_found)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_spec", lambda _name: object())
 
     result = inspect_environment(include_versions=True)
 
@@ -259,9 +259,9 @@ def test_inspect_environment_include_versions_true_populates_versions(monkeypatc
 def test_doctor_result_to_dict_is_json_safe(monkeypatch) -> None:
     import json
 
-    monkeypatch.setattr("helia_profiler.doctor.shutil.which", _which_all)
-    monkeypatch.setattr("helia_profiler.doctor.find_jlink_exe", _jlink_found)
-    monkeypatch.setattr("helia_profiler.doctor.find_spec", lambda _name: object())
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.shutil.which", _which_all)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_jlink_exe", _jlink_found)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_spec", lambda _name: object())
 
     result = inspect_environment(include_versions=True)
     payload = json.dumps(result.to_dict())
@@ -273,7 +273,7 @@ def test_doctor_result_to_dict_is_json_safe(monkeypatch) -> None:
 
 
 def test_doctor_result_version_mismatches_only_lists_failures(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.doctor._package_version", lambda _name: "0.0.1")
+    monkeypatch.setattr("helia_profiler.hostenv.doctor._package_version", lambda _name: "0.0.1")
 
     result = inspect_environment(include_versions=True)
 

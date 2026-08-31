@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.compatibility import (
+from helia_profiler.deps.compatibility import (
     BASELINE_SCHEMA_VERSION,
     QualificationState,
     load_compatibility_baseline,
@@ -555,7 +555,7 @@ def test_engine_owned_module_names_match_canonical_constants() -> None:
     # resolve_compatibility() (qualification classification) and
     # firmware/__init__.py (the "use engine.config instead" warning). Guard
     # against the literals drifting from the canonical constants.
-    from helia_profiler.compatibility import ENGINE_OWNED_MODULE_NAMES
+    from helia_profiler.deps.compatibility import ENGINE_OWNED_MODULE_NAMES
     from helia_profiler.engines.cmsis_nn import CMSIS_NN_MODULE
     from helia_profiler.engines.executorch import EXECUTORCH_MODULE
     from helia_profiler.engines.helia_rt.artifacts import HELIART_MODULE

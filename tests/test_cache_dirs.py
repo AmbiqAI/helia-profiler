@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.cache_dirs import hpx_cache_root
+from helia_profiler.hostenv.cache_dirs import hpx_cache_root
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import _resolve_work_dir
 
