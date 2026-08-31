@@ -175,7 +175,10 @@ class TestPreflightHappyPath:
                 },
             },
         )
-        with patch("shutil.which", side_effect=_all_tools_present):
+        with (
+            patch("shutil.which", side_effect=_all_tools_present),
+            patch("helia_profiler.doctor.find_spec", return_value=object()),
+        ):
             PreflightStage().run(ctx)
 
     def test_helia_aot_psram_placement_does_not_require_rtt_transport(self, tmp_path: Path):
@@ -197,7 +200,10 @@ class TestPreflightHappyPath:
                 "target": {"transport": "usb_cdc"},
             },
         )
-        with patch("shutil.which", side_effect=_all_tools_present):
+        with (
+            patch("shutil.which", side_effect=_all_tools_present),
+            patch("helia_profiler.doctor.find_spec", return_value=object()),
+        ):
             PreflightStage().run(ctx)
 
     def test_host_upload_engine_psram_weights_still_require_rtt(self, tmp_path: Path):
