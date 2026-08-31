@@ -17,6 +17,7 @@ from .comparison_profile import (
 )
 from ..errors import ReportError
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
+from ..results.models import source_index_from_op
 from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
 
 
@@ -477,8 +478,8 @@ def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[Laye
         candidate_memory: str | None = None
         memory_changed: bool | None = None
         memory_diff: str | None = None
-        base_mem = _memory_rows_for_layer(base_run.layer_memory, b, idx)
-        cand_mem = _memory_rows_for_layer(cand_run.layer_memory, c, idx)
+        base_mem = _memory_rows_for_layer(base_run.layer_memory, b)
+        cand_mem = _memory_rows_for_layer(cand_run.layer_memory, c)
         base_mem_counts = _layer_memory_counts(base_mem)
         cand_mem_counts = _layer_memory_counts(cand_mem)
         base_mem_summary = _format_memory_summary(base_mem_counts)
@@ -490,9 +491,11 @@ def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[Laye
             memory_diff = _format_memory_diff(base_mem_counts, cand_mem_counts)
 
         counters: dict[str, CounterDiff] = {}
-        # source_index is an identifier (#218), not a metric — a delta
-        # between two operator indices means nothing.
-        for key in sorted((set(b) & set(c)) - {"id", "op", "cycles", "overflow", "source_index"}):
+        # source_index is an identifier (#218), not a metric, and
+        # macs/ops/cycles_per_mac are DERIVED analysis enrichments (#218 D6)
+        # — per-layer counter diffs carry measured counters only.
+        excluded = {"id", "op", "cycles", "overflow", "source_index", "macs", "ops", "cycles_per_mac"}
+        for key in sorted((set(b) & set(c)) - excluded):
             bf = _to_float(b.get(key))
             cf = _to_float(c.get(key))
             if bf is None or cf is None:
@@ -555,27 +558,56 @@ def _build_warnings(
 
 
 def _read_layer_memory_csv(path: Path) -> dict[Any, list[dict[str, Any]]]:
+    """Memory rows keyed by ``layer_id`` — the ORIGINAL tflite index — only.
+
+    The old dual ``layer_id``/``layer_idx`` key silently matched the wrong
+    layer's memory whenever heliaAOT skipped ops (``idx != id``) — the #218
+    misattribution class, in its second home (#223).
+    """
     rows = _read_layer_csv(path)
     by_key: dict[Any, list[dict[str, Any]]] = {}
     for row in rows:
-        for key in set((row.get("layer_id"), row.get("layer_idx"))):
-            if key is not None:
-                by_key.setdefault(key, []).append(row)
+        key = row.get("layer_id")
+        if key is not None:
+            by_key.setdefault(key, []).append(row)
     return by_key
+
+
+def _layer_source_index(layer: dict[str, Any]) -> int | None:
+    """The profile layer's original tflite index, from the artifact.
+
+    Mirrors ``LayerAttributor``'s no-manifest resolution (#218): an explicit
+    ``source_index`` column (post-#222 artifacts) wins; else the integer
+    ``:N`` op-label suffix; else, for plain sequential-engine labels, the
+    id itself. A ``:``-labelled op with no integer suffix resolves nothing.
+    """
+    recorded = layer.get("source_index")
+    if isinstance(recorded, int) and not isinstance(recorded, bool):
+        return recorded
+    op = str(layer.get("op", ""))
+    suffix = source_index_from_op(op)
+    if suffix is not None:
+        return suffix
+    if ":" in op:
+        return None
+    layer_id = layer.get("id")
+    if isinstance(layer_id, int) and not isinstance(layer_id, bool):
+        return layer_id
+    return None
 
 
 def _memory_rows_for_layer(
     layer_memory: dict[Any, list[dict[str, Any]]],
     layer: dict[str, Any],
-    idx: int,
 ) -> list[dict[str, Any]]:
-    for key in (layer.get("id"), idx):
-        if key in layer_memory:
-            return layer_memory[key]
-        text_key = str(key)
-        if text_key in layer_memory:
-            return layer_memory[text_key]
-    return []
+    """One explicit key, honest absence on a miss — never the positional
+    fallback that attached the wrong layer's placement diff (#223)."""
+    source = _layer_source_index(layer)
+    if source is None:
+        return []
+    if source in layer_memory:
+        return layer_memory[source]
+    return layer_memory.get(str(source), [])
 
 
 def _layer_memory_counts(rows: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
