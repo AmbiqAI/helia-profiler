@@ -359,3 +359,23 @@ The workflow serializes runs by the selected board string so two manual jobs do
 not intentionally target the same board selection at once. Baseline comparison,
 threshold enforcement, and dashboards should consume `validation_manifest.json`
 later rather than infer paths from the artifact layout.
+
+## Real-toolchain compile gate (#187 Tier 2)
+
+After the validation run — pass or fail — the workflow runs
+`pytest -m compile_hw tests/contracts/test_render_compile_hw.py`: the
+rendered-firmware matrix compiled with the real `arm-none-eabi` toolchain
+against the warm dependency workspaces the validate run just refreshed
+(see `maintainers/compile-gate.md` for the full contract). It runs under
+`if: always()` on purpose: a red board case must not hide a render that
+stopped compiling.
+
+Legs whose (board, toolchain, engine) workspace this run did not warm skip
+with a named reason, and the skip list surfaces as a pytest warning in the
+step log — a partial matrix is visible, not silently green. Once the bench
+suite routinely warms all 12 legs, set `HPX_COMPILE_HW_REQUIRE_ALL=1` in
+the workflow env to turn any partial run (including a zero-leg run from a
+wiped or mispointed `HPX_CACHE_DIR`) into a failure.
+
+The gate is read-only on the workspace cache (`-fsyntax-only`, scratch in
+pytest tmp dirs) and adds ~20 s for a full matrix.

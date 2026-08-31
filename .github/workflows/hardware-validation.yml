@@ -377,6 +377,18 @@ jobs:
           fi
           uv run hpx validate "${args[@]}"
 
+      # #187 Tier 2: the validate run above leaves warm dependency
+      # workspaces — compile the rendered-firmware matrix with the real
+      # arm-none-eabi toolchain against their exact include sets. Runs even
+      # when validation fails (a red board case must not hide a render that
+      # stopped compiling). Legs whose workspace this run did not warm skip
+      # with a named reason and surface in the warning summary;
+      # HPX_COMPILE_HW_REQUIRE_ALL stays unset until the bench routinely
+      # warms the full 12-leg matrix (maintainers/compile-gate.md).
+      - name: Real-toolchain compile gate (#187 Tier 2)
+        if: always()
+        run: uv run pytest -m compile_hw tests/contracts/test_render_compile_hw.py -rs -W default
+
       - name: Upload validation artifacts
         if: always()
         uses: actions/upload-artifact@v4
