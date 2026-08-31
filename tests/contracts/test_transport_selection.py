@@ -88,7 +88,9 @@ def test_rtt_reader_receives_soc_scan_ranges_and_device(reader_recorder, pmu_ctx
     kwargs = reader_recorder["rtt"]
     assert kwargs["jlink_device"] == ctx.soc.jlink_device
     assert kwargs["rtt_scan_ranges"] == ctx.soc.rtt_scan_ranges
-    assert kwargs["weights_region"] == "mram"
+    # Engine capability, not raw placement: the host upload only exists for
+    # PsramWeightsSource.HOST_UPLOAD engines with PSRAM weights (#219).
+    assert kwargs["psram_host_upload"] is False
     # RTT never holds the probe attached — it resets and re-attaches.
     assert "keep_attached" not in kwargs
 

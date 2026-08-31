@@ -13,7 +13,7 @@ from ..config import ProfileConfig
 from ..errors import EngineError
 from ..results import NsxModuleRef
 from . import EngineType
-from .base import ExecutorchArtifacts, SingleArenaPlacementMixin
+from .base import ExecutorchArtifacts, PsramWeightsSource, SingleArenaPlacementMixin
 
 log = logging.getLogger("hpx")
 
@@ -368,6 +368,12 @@ class ExecuTorchAdapter(SingleArenaPlacementMixin):
     @property
     def engine_type(self) -> EngineType:
         return EngineType.EXECUTORCH
+
+    @property
+    def psram_weights_source(self) -> PsramWeightsSource:
+        # The PTE program is always embedded; main_executorch.cc.j2 renders
+        # no psram_info and preflight refuses the placement outright.
+        return PsramWeightsSource.UNSUPPORTED
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> ExecutorchArtifacts:
         engine_config = config.engine.config

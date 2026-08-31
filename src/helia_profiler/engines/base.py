@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, ClassVar, Protocol, runtime_checkable
 
@@ -10,6 +11,33 @@ from ..config import ProfileConfig
 from ..placement import ArenaRole, Placement
 from ..results import NsxModuleRef, MemoryPlan
 from . import EngineType
+
+
+class PsramWeightsSource(StrEnum):
+    """How an engine's PSRAM-resident content gets there at runtime.
+
+    The engine, not the placement, determines whether the host has a role
+    in populating PSRAM — which is why the RTT transport must consult this
+    capability instead of inferring an upload from ``weights_region``
+    (#219: inferring from placement made the host demand ``HPX_PSRAM_READY``
+    from heliaAOT firmware that correctly never sends it).
+    """
+
+    #: Firmware initialises PSRAM, emits ``HPX_PSRAM_READY``, and waits for
+    #: the host to write the model image over J-Link and answer ``HPX_GO``.
+    #: The interpreter engines (TFLM, heliaRT) work this way: their weights
+    #: are a host-side flatbuffer the firmware cannot embed.
+    HOST_UPLOAD = "host_upload"
+
+    #: Firmware carries its constants as flash-resident sidecar blobs and
+    #: writes them into PSRAM itself (``nsx_psram_write`` + ``bind_arena``).
+    #: No handshake, no host role.  heliaAOT works this way — but only in
+    #: external-arena mode; :meth:`EngineAdapter.check_psram_placement`
+    #: guards the config that enables it.
+    SELF_CONTAINED = "self_contained"
+
+    #: The engine has no PSRAM story at all; preflight refuses the placement.
+    UNSUPPORTED = "unsupported"
 
 
 @dataclass(frozen=True)
@@ -304,6 +332,30 @@ class EngineAdapter(Protocol):
 
     # -- Capability hooks (called by shared stages) --
 
+    @property
+    def psram_weights_source(self) -> PsramWeightsSource:
+        """How this engine's PSRAM-resident content gets there at runtime.
+
+        Consulted by preflight (to refuse unsupported placements) and by
+        the RTT transport (to decide whether a host-side model upload and
+        the ``HPX_PSRAM_READY``/``HPX_GO`` handshake exist for this run).
+        """
+        ...
+
+    def check_psram_placement(self, config: ProfileConfig) -> None:
+        """Validate engine-specific PSRAM-placement constraints.
+
+        Called unconditionally by preflight — the adapter decides for
+        itself whether the config steers anything into PSRAM, because
+        that can happen through engine-private config (heliaAOT's
+        per-tensor rules) with the coarse split fields unset.  Raise
+        ``ConfigError`` when the engine cannot honour the placement under
+        the given config — the point is to fail in stage 0 with an
+        actionable message, not to build firmware whose memory plan and
+        generated code disagree (#219).
+        """
+        ...
+
     def default_auto_placement(
         self, *, tcm_cap: int, sram_cap: int
     ) -> tuple[Placement, Placement] | None:
@@ -349,3 +401,12 @@ class SingleArenaPlacementMixin:
         # A single template-managed arena: no engine-side override needed.
         del target
         return regions
+
+    def check_psram_placement(self, config: ProfileConfig) -> None:
+        # Single-arena engines have no engine-specific PSRAM config to
+        # validate: either the shared host-upload path serves them
+        # (TFLM, heliaRT) or preflight already refused the placement via
+        # ``psram_weights_source`` (ExecuTorch).  Each adapter still
+        # declares that property itself — this mixin deliberately does
+        # not, so a new engine cannot inherit a PSRAM story by accident.
+        del config

@@ -33,6 +33,7 @@ from ..counters import (
     validate_group_selection,
 )
 from ..engines import EngineType, get_adapter
+from ..engines.base import PsramWeightsSource
 from ..errors import ConfigError
 from ..evaluation.softmax_preflight import aot_softmax_verdict, scan_softmax_scaling
 from ..pipeline import PipelineContext
@@ -283,22 +284,34 @@ def _check_runtime_split_locations(cfg) -> None:
     runtime_arena = cfg.model.arena_location
     runtime_weights = cfg.model.weights_location
 
-    if cfg.engine.type is EngineType.EXECUTORCH and (
-        runtime_arena == Placement.PSRAM or runtime_weights == Placement.PSRAM
-    ):
-        raise ConfigError(
-            "ExecuTorch profiling does not yet support PSRAM model or arena placement.",
-            hint="Use model.arena_location=tcm|sram and model.weights_location=tcm|sram|mram.",
-        )
-
-    if runtime_weights == Placement.PSRAM and cfg.target.transport != Transport.RTT:
-        raise ConfigError(
-            "PSRAM model weights require target.transport='rtt'.",
-            hint=(
-                "Host-side PSRAM model upload currently uses the RTT transport. "
-                "Use --transport rtt, or keep weights in MRAM/SRAM."
-            ),
-        )
+    # The engine, not the placement, decides how PSRAM gets populated
+    # (#219) — so PSRAM validity is an adapter capability, not an
+    # EngineType branch.
+    adapter = get_adapter(cfg.engine.type)
+    if runtime_arena == Placement.PSRAM or runtime_weights == Placement.PSRAM:
+        if adapter.psram_weights_source is PsramWeightsSource.UNSUPPORTED:
+            raise ConfigError(
+                f"{adapter.name} profiling does not support PSRAM model or arena placement.",
+                hint="Use model.arena_location=tcm|sram and model.weights_location=tcm|sram|mram.",
+            )
+        if (
+            runtime_weights == Placement.PSRAM
+            and adapter.psram_weights_source is PsramWeightsSource.HOST_UPLOAD
+            and cfg.target.transport != Transport.RTT
+        ):
+            raise ConfigError(
+                "PSRAM model weights require target.transport='rtt' for this engine.",
+                hint=(
+                    "Host-side PSRAM model upload uses the RTT transport. "
+                    "Use --transport rtt, or keep weights in MRAM/SRAM."
+                ),
+            )
+    # Engine-specific PSRAM constraints — called unconditionally, not just
+    # when the coarse split fields say PSRAM: an engine can be steered into
+    # PSRAM by its own config (heliaAOT per-tensor rules in
+    # aot_args.memory.tensors) with both coarse fields unset, and that path
+    # must hit the same fail-fast wall.
+    adapter.check_psram_placement(cfg)
 
     _check_explicit_location(
         runtime_arena,

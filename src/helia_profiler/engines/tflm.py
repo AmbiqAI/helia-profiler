@@ -8,7 +8,7 @@ from ..config import ProfileConfig
 from ..errors import EngineError
 from ..results import NsxModuleRef
 from . import EngineType, TFLM_ENGINE_HEADER
-from .base import SingleArenaPlacementMixin, TflmArtifacts
+from .base import PsramWeightsSource, SingleArenaPlacementMixin, TflmArtifacts
 
 
 TFLITE_MICRO_MODULE = "nsx-tflite-micro"
@@ -28,6 +28,12 @@ class TFLMAdapter(SingleArenaPlacementMixin):
     @property
     def engine_type(self) -> EngineType:
         return EngineType.TFLM
+
+    @property
+    def psram_weights_source(self) -> PsramWeightsSource:
+        # The flatbuffer lives on the host; firmware asks for it via
+        # HPX_PSRAM_READY and the J-Link upload path fills PSRAM.
+        return PsramWeightsSource.HOST_UPLOAD
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> TflmArtifacts:
         """Resolve the reference or upstream-CMSIS-NN TFLM NSX modules."""

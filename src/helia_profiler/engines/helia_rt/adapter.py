@@ -16,7 +16,7 @@ from ...config import ProfileConfig
 from ...errors import EngineError
 from ...results import NsxModuleRef
 from .. import EngineType, TFLM_ENGINE_HEADER
-from ..base import HeliaRtArtifacts, SingleArenaPlacementMixin
+from ..base import HeliaRtArtifacts, PsramWeightsSource, SingleArenaPlacementMixin
 from .artifacts import (
     HELIART_MODULE,
     HELIART_PROJECT,
@@ -53,6 +53,12 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
     @property
     def engine_type(self) -> EngineType:
         return EngineType.HELIA_RT
+
+    @property
+    def psram_weights_source(self) -> PsramWeightsSource:
+        # Same host-upload flow as stock TFLM: the flatbuffer is pushed
+        # over J-Link after the firmware's HPX_PSRAM_READY.
+        return PsramWeightsSource.HOST_UPLOAD
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> HeliaRtArtifacts:
         backend = config.engine.backend or "helia"
