@@ -208,8 +208,9 @@ class TestLockstepArmBeforeReset:
         # Recorder stub in place of a real lifecycle plan; its None return is
         # tolerated by this path and irrelevant to the ordering under test.
         capture_power(
-            ctx, prepare_target=lambda *_: events.append("lifecycle_reset")
-        )  # ty: ignore[invalid-argument-type]
+            ctx,
+            prepare_target=lambda *_: events.append("lifecycle_reset"),  # ty: ignore[invalid-argument-type]
+        )
         assert events.index("wait_ready") < events.index("signal_go")
 
 
@@ -442,8 +443,8 @@ class TestAutoStrategyNeverCyclesRail:
         plan = prepare_target_for_phase(
             ctx,
             phase=CapturePhase.POWER,
-            power_driver=driver,
-            power_driver_name="joulescope",  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the rail surface
+            power_driver=driver,  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the rail surface
+            power_driver_name="joulescope",
         )
         assert driver.power_cycle_calls == 0
         assert plan.power_cycle_attempted is False
@@ -460,8 +461,8 @@ class TestAutoStrategyNeverCyclesRail:
         plan = prepare_target_for_phase(
             ctx,
             phase=CapturePhase.POWER,
-            power_driver=driver,
-            power_driver_name="joulescope",  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the rail surface
+            power_driver=driver,  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the rail surface
+            power_driver_name="joulescope",
         )
         assert driver.power_cycle_calls == 1
         assert plan.power_cycle_attempted is True

@@ -24,7 +24,7 @@ from helia_profiler.results.run_summary import (
     load_run_summary,
 )
 
-from test_report import _attach_power_terminal, _gated_power_ctx
+from tests.test_report import _attach_power_terminal, _gated_power_ctx
 
 
 def test_producer_roundtrip_is_identity(tmp_path: Path) -> None:

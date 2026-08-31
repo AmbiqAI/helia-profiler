@@ -83,8 +83,9 @@ def make_pmu_ctx(
     config = load_config(None, overrides)
     ctx = PipelineContext(config=config, work_dir=tmp_path)
     ResolvePlatformStage().run(ctx)
-    set_profile_firmware(ctx, build_dir=tmp_path / "build")
-    ctx.build_dir.mkdir(exist_ok=True)
+    build_dir = tmp_path / "build"
+    set_profile_firmware(ctx, build_dir=build_dir)
+    build_dir.mkdir(exist_ok=True)
     ctx.resolved_jlink_serial = "1160002204"
     ctx.weights_region = Placement.MRAM
     return ctx

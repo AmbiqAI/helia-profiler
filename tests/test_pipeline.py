@@ -409,6 +409,8 @@ class TestPipelineContext:
 
         ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
         set_power_firmware(ctx, binary_path=tmp_path / "old-power")
+        old_power_binary = ctx.power_binary_path
+        assert old_power_binary is not None
         set_power_firmware(
             ctx,
             artifact=FirmwareArtifact(
@@ -416,7 +418,7 @@ class TestPipelineContext:
                 target_name="hpx_profiler_power",
                 app_dir=tmp_path,
                 build_dir=tmp_path,
-                binary_path=ctx.power_binary_path,
+                binary_path=old_power_binary,
             ),
         )
         set_power_deployment(ctx)
@@ -540,7 +542,7 @@ class TestNarrowingAccessors:
         if field == "binary_path":
             set_profile_firmware(ctx, binary_path=sentinel)
         elif field == "pmu_result":
-            set_profile_result(ctx, sentinel)
+            set_profile_result(ctx, sentinel)  # ty: ignore[invalid-argument-type]  # the sentinel passthrough IS the test
         else:
             setattr(ctx, field, sentinel)
         assert getattr(ctx, accessor) is sentinel
