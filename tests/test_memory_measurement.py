@@ -13,11 +13,11 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.engines import EngineType
-from helia_profiler.memory_measurement import measure_memory_regions
+from helia_profiler.hostenv.memory_measurement import measure_memory_regions
 from helia_profiler.placement import MemoryRegion
 from helia_profiler.platform import get_soc
 from helia_profiler.results import ConsumerKind, MeasuredMemoryRegions
-from helia_profiler.toolchain_probe import SectionInventory
+from helia_profiler.hostenv.toolchain_probe import SectionInventory
 
 FIXTURES = Path(__file__).parent / "fixtures" / "readelf"
 
@@ -25,7 +25,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "readelf"
 @pytest.fixture
 def gcc_inventory(monkeypatch):
     """Route the tool probes at the committed real captures."""
-    import helia_profiler.toolchain_probe as tp
+    import helia_profiler.hostenv.toolchain_probe as tp
 
     sections_text = (FIXTURES / "sections.txt").read_text()
     segments_text = (FIXTURES / "segments.txt").read_text()
@@ -108,7 +108,7 @@ class TestDegradation:
         )
 
     def test_tool_failure_degrades_to_none(self, monkeypatch):
-        import helia_profiler.toolchain_probe as tp
+        import helia_profiler.hostenv.toolchain_probe as tp
 
         def _boom(*a, **k):
             raise FileNotFoundError("readelf")
@@ -119,7 +119,7 @@ class TestDegradation:
     def test_partial_inventory_is_refused(self, monkeypatch):
         """unparsed_rows nonzero -> the occupancy would be understated;
         the whole measured view must be absent, not silently low."""
-        import helia_profiler.memory_measurement as mm
+        import helia_profiler.hostenv.memory_measurement as mm
 
         partial = SectionInventory(sections=(), segments=(), unparsed_rows=2)
         monkeypatch.setattr(mm, "section_inventory", lambda *a, **k: partial)
@@ -129,8 +129,8 @@ class TestDegradation:
 def test_unattributed_sections_are_flagged(monkeypatch):
     """An allocated section outside every verified window is the police
     flag — reported, never silently dropped or misfiled."""
-    import helia_profiler.memory_measurement as mm
-    from helia_profiler.toolchain_probe import ElfSection
+    import helia_profiler.hostenv.memory_measurement as mm
+    from helia_profiler.hostenv.toolchain_probe import ElfSection
 
     inventory = SectionInventory(
         sections=(
@@ -165,8 +165,8 @@ def test_armlink_join_uses_the_extent_not_the_window(monkeypatch):
     extent.contains -> window.contains flips the stack into `used`;
     deleting the outside-extent branch zeroes heap+stack out of
     `reserved`."""
-    import helia_profiler.memory_measurement as mm
-    from helia_profiler.toolchain_probe import ElfSection, LoadSegment
+    import helia_profiler.hostenv.memory_measurement as mm
+    from helia_profiler.hostenv.toolchain_probe import ElfSection, LoadSegment
 
     inventory = SectionInventory(
         sections=(
@@ -214,8 +214,8 @@ def test_psram_landing_bytes_are_flagged_not_swallowed(monkeypatch):
     plan owns it), so a section at a PSRAM address must surface as
     unattributed — classifying it silently would disable the police flag
     on exactly the region this block cannot report."""
-    import helia_profiler.memory_measurement as mm
-    from helia_profiler.toolchain_probe import ElfSection
+    import helia_profiler.hostenv.memory_measurement as mm
+    from helia_profiler.hostenv.toolchain_probe import ElfSection
 
     inventory = SectionInventory(
         sections=(
@@ -235,8 +235,8 @@ def test_unattributed_load_bytes_are_counted(monkeypatch):
     """#177 review m3: PT_LOAD file bytes whose paddr classifies nowhere
     (below the app MRAM origin, a PSRAM address, anywhere uncharacterized)
     must be counted, not vanish from load_image."""
-    import helia_profiler.memory_measurement as mm
-    from helia_profiler.toolchain_probe import ElfSection, LoadSegment
+    import helia_profiler.hostenv.memory_measurement as mm
+    from helia_profiler.hostenv.toolchain_probe import ElfSection, LoadSegment
 
     inventory = SectionInventory(
         sections=(ElfSection(".text", 0x00410000, 60, False, True, index=1),),
@@ -259,8 +259,8 @@ def test_unattributed_load_bytes_are_counted(monkeypatch):
 def test_zero_length_orphan_sections_are_not_flagged(monkeypatch):
     """A zero-byte end marker outside every window is noise, not lost
     bytes (#177 review n3)."""
-    import helia_profiler.memory_measurement as mm
-    from helia_profiler.toolchain_probe import ElfSection
+    import helia_profiler.hostenv.memory_measurement as mm
+    from helia_profiler.hostenv.toolchain_probe import ElfSection
 
     inventory = SectionInventory(
         sections=(ElfSection(".marker", 0x30000000, 0, False, True, index=1),),
@@ -332,8 +332,8 @@ def test_serialised_shape_is_the_contract():
 
 class TestSymbolInventory:
     def _symbols(self, monkeypatch, text=None):
-        import helia_profiler.toolchain_probe as tp
-        from helia_profiler.toolchain_probe import symbol_inventory
+        import helia_profiler.hostenv.toolchain_probe as tp
+        from helia_profiler.hostenv.toolchain_probe import symbol_inventory
 
         class _Result:
             returncode = 0
@@ -364,8 +364,8 @@ class TestSymbolInventory:
         assert len(symbols) == 1 and unparsed == 1
 
     def test_tool_failure_degrades_to_none(self, monkeypatch):
-        import helia_profiler.toolchain_probe as tp
-        from helia_profiler.toolchain_probe import symbol_inventory
+        import helia_profiler.hostenv.toolchain_probe as tp
+        from helia_profiler.hostenv.toolchain_probe import symbol_inventory
 
         def _boom(*a, **k):
             raise FileNotFoundError("nm")
@@ -376,7 +376,7 @@ class TestSymbolInventory:
 
 class TestReconciliation:
     def _symbols(self):
-        from helia_profiler.toolchain_probe import SymbolEntry
+        from helia_profiler.hostenv.toolchain_probe import SymbolEntry
 
         return (
             SymbolEntry("_ZL15g_arena_storage", 0x200128E0, 0x8000, "b"),
@@ -437,7 +437,7 @@ class TestReconciliation:
         )
 
     def test_matched_missing_unmatchable_and_deltas(self):
-        from helia_profiler.memory_measurement import reconcile_memory
+        from helia_profiler.hostenv.memory_measurement import reconcile_memory
         from helia_profiler.results import MemoryConsumer
 
         plan = self._plan(
@@ -482,9 +482,9 @@ class TestReconciliation:
         mangled static) must sum once. The #179 review proved the earlier
         version of this test vacuous — its alias (_ssdata) never matched
         a candidate, so the dedup branch never ran."""
-        from helia_profiler.memory_measurement import reconcile_memory
+        from helia_profiler.hostenv.memory_measurement import reconcile_memory
         from helia_profiler.results import MemoryConsumer
-        from helia_profiler.toolchain_probe import SymbolEntry
+        from helia_profiler.hostenv.toolchain_probe import SymbolEntry
 
         plan = self._plan(
             {
@@ -510,9 +510,9 @@ class TestReconciliation:
         """The shipped TFLM/heliaRT plan books the whole g_profiler object
         (records + 252 header on ARMV8M_PMU parts), so against the real
         symbol the delta is exactly zero."""
-        from helia_profiler.memory_measurement import reconcile_memory
+        from helia_profiler.hostenv.memory_measurement import reconcile_memory
         from helia_profiler.results import MemoryConsumer
-        from helia_profiler.toolchain_probe import SymbolEntry
+        from helia_profiler.hostenv.toolchain_probe import SymbolEntry
 
         plan = self._plan(
             {
@@ -531,9 +531,9 @@ class TestReconciliation:
         assert records.delta == 0  # 0x180FC == 4096*24+252
 
     def test_aot_symbol_hint_wins_over_the_name_table(self):
-        from helia_profiler.memory_measurement import reconcile_memory
+        from helia_profiler.hostenv.memory_measurement import reconcile_memory
         from helia_profiler.results import MemoryConsumer
-        from helia_profiler.toolchain_probe import SymbolEntry
+        from helia_profiler.hostenv.toolchain_probe import SymbolEntry
 
         plan = self._plan(
             {
@@ -554,7 +554,7 @@ class TestReconciliation:
         assert consumer.delta == 0x200
 
     def test_region_deltas_compare_plan_to_measured_used(self):
-        from helia_profiler.memory_measurement import reconcile_memory
+        from helia_profiler.hostenv.memory_measurement import reconcile_memory
         from helia_profiler.results import MemoryConsumer
 
         plan = self._plan(
@@ -579,8 +579,8 @@ class TestReviewRegressionPins:
     def test_hal_symbols_do_not_false_positive_the_matcher(self):
         """M-1: am_hal_gpio_pincfg_input ENDS WITH g_input — a bare
         suffix test matched a 4-byte MRAM constant and flipped verdicts."""
-        from helia_profiler.memory_measurement import _match_symbols
-        from helia_profiler.toolchain_probe import SymbolEntry
+        from helia_profiler.hostenv.memory_measurement import _match_symbols
+        from helia_profiler.hostenv.toolchain_probe import SymbolEntry
 
         symbols = (
             SymbolEntry("am_hal_gpio_pincfg_input", 0x00420000, 4, "R"),
@@ -594,8 +594,8 @@ class TestReviewRegressionPins:
         """M-5: llvm-nm reports st_size verbatim — armlink's linker
         markers are 0 and a zero-size 'match' manufactures
         measured_size=0, delta=-planned."""
-        from helia_profiler.memory_measurement import _match_symbols
-        from helia_profiler.toolchain_probe import SymbolEntry
+        from helia_profiler.hostenv.memory_measurement import _match_symbols
+        from helia_profiler.hostenv.toolchain_probe import SymbolEntry
 
         symbols = (SymbolEntry("g_pui32Stack", 0x20000000, 0, "b"),)
         assert _match_symbols(("g_pui32Stack",), symbols) == ()
@@ -606,9 +606,9 @@ class TestReviewRegressionPins:
         """M-2: the PSRAM-weights render declares a 4-byte POINTER that
         mangles to _ZL10model_data — matching it would report the planned
         megabytes as shortfall."""
-        from helia_profiler.memory_measurement import reconcile_memory
+        from helia_profiler.hostenv.memory_measurement import reconcile_memory
         from helia_profiler.results import MemoryConsumer
-        from helia_profiler.toolchain_probe import SymbolEntry
+        from helia_profiler.hostenv.toolchain_probe import SymbolEntry
 
         plan = TestReconciliation()._plan(
             {
@@ -631,9 +631,9 @@ class TestReviewRegressionPins:
         """M-6: a matched symbol whose address is in a DIFFERENT region
         than the plan intended must say so — the check that catches
         wrong-region 'clean' matches."""
-        from helia_profiler.memory_measurement import reconcile_memory
+        from helia_profiler.hostenv.memory_measurement import reconcile_memory
         from helia_profiler.results import MemoryConsumer
-        from helia_profiler.toolchain_probe import SymbolEntry
+        from helia_profiler.hostenv.toolchain_probe import SymbolEntry
 
         plan = TestReconciliation()._plan(
             {
@@ -658,8 +658,8 @@ class TestReviewRegressionPins:
         """M-5: llvm-nm emits U rows and size-0-omitted shapes under
         --size-sort; they are legitimate output, not parse failures — one
         of them must not mark the listing partial and drop attribution."""
-        import helia_profiler.elf_inventory as ei
-        from helia_profiler.toolchain_probe import symbol_inventory
+        import helia_profiler.hostenv.elf_inventory as ei
+        from helia_profiler.hostenv.toolchain_probe import symbol_inventory
 
         class _Result:
             returncode = 0
@@ -681,8 +681,8 @@ class TestReviewRegressionPins:
     def test_nm_command_duplicate_stays_in_sync(self):
         """m7: elf_inventory duplicates toolchain_probe._nm_command to
         avoid an import cycle — pin that they agree for every toolchain."""
-        import helia_profiler.elf_inventory as ei
-        import helia_profiler.toolchain_probe as tp
+        import helia_profiler.hostenv.elf_inventory as ei
+        import helia_profiler.hostenv.toolchain_probe as tp
 
         for toolchain in ("arm-none-eabi-gcc", "gcc", "armclang", "atfe"):
             assert ei._nm_command(toolchain) == tp._nm_command(toolchain)
@@ -694,7 +694,7 @@ def test_llvm_nm_capture_parses_with_the_same_regexes():
     objects carry identical sizes to the GNU capture; the linker markers
     (__HeapBase/__HeapLimit) report st_size 0 — the documented
     asymmetry, and exactly why zero-size symbols never match."""
-    from helia_profiler.elf_inventory import _NM_SIZED_ROW_RE
+    from helia_profiler.hostenv.elf_inventory import _NM_SIZED_ROW_RE
 
     text = (FIXTURES / "symbols_atfe.txt").read_text()
     rows = {

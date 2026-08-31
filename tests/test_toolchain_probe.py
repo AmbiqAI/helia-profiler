@@ -7,7 +7,7 @@ from pathlib import Path
 
 from helia_profiler.config import Toolchain
 from helia_profiler.results import BinarySections
-from helia_profiler.toolchain_probe import (
+from helia_profiler.hostenv.toolchain_probe import (
     _reserved_from_section_listing,
     binary_sections,
 )
@@ -26,7 +26,7 @@ def test_atfe_binary_sections_uses_llvm_size_from_atfe_root(tmp_path: Path, monk
             stderr="",
         )
 
-    monkeypatch.setattr("helia_profiler.toolchain_probe.subprocess.run", fake_run)
+    monkeypatch.setattr("helia_profiler.hostenv.toolchain_probe.subprocess.run", fake_run)
 
     sections = binary_sections(
         tmp_path / "firmware",
@@ -80,7 +80,7 @@ def _probe_stub(monkeypatch, berkeley: str, readelf: str):
         out = readelf if "-S" in command else berkeley
         return _sp.CompletedProcess(command, 0, stdout=out, stderr="")
 
-    monkeypatch.setattr("helia_profiler.toolchain_probe.subprocess.run", fake_run)
+    monkeypatch.setattr("helia_profiler.hostenv.toolchain_probe.subprocess.run", fake_run)
 
 
 def test_linker_reserved_heap_is_not_counted_as_bss(tmp_path: Path, monkeypatch) -> None:
@@ -303,7 +303,7 @@ def _fromelf_stub(monkeypatch, z_out: str, v_out: str, calls: list | None = None
         out = v_out if "-v" in command else z_out
         return _sp.CompletedProcess(command, 0, stdout=out, stderr="")
 
-    monkeypatch.setattr("helia_profiler.toolchain_probe.subprocess.run", fake_run)
+    monkeypatch.setattr("helia_profiler.hostenv.toolchain_probe.subprocess.run", fake_run)
 
 
 def test_armclang_linker_reservation_is_not_counted_as_bss(tmp_path: Path, monkeypatch) -> None:
@@ -471,6 +471,6 @@ def test_totals_label_in_the_image_path_is_not_a_totals_row():
         "       296         16         32          4     396272        652   ROM Totals/fw.axf\n"
         "       296         16         32          4          0          0   ROM Totals for ROM Totals/fw.axf\n"
     )
-    from helia_profiler.toolchain_probe import _fromelf_totals
+    from helia_profiler.hostenv.toolchain_probe import _fromelf_totals
 
     assert _fromelf_totals(table) == (296, 32, 4, 396272)

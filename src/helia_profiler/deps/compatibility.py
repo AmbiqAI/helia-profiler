@@ -12,7 +12,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Mapping
 
-from .errors import ConfigError
+from ..errors import ConfigError
 
 BASELINE_SCHEMA = "hpx.compatibility-baseline"
 BASELINE_SCHEMA_VERSION = 1

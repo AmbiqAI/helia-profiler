@@ -177,7 +177,7 @@ class TestPreflightHappyPath:
         )
         with (
             patch("shutil.which", side_effect=_all_tools_present),
-            patch("helia_profiler.doctor.find_spec", return_value=object()),
+            patch("helia_profiler.hostenv.doctor.find_spec", return_value=object()),
         ):
             PreflightStage().run(ctx)
 
@@ -202,7 +202,7 @@ class TestPreflightHappyPath:
         )
         with (
             patch("shutil.which", side_effect=_all_tools_present),
-            patch("helia_profiler.doctor.find_spec", return_value=object()),
+            patch("helia_profiler.hostenv.doctor.find_spec", return_value=object()),
         ):
             PreflightStage().run(ctx)
 
@@ -317,7 +317,7 @@ class TestPreflightConfig:
         )
         with (
             patch("shutil.which", side_effect=_all_tools_present),
-            patch("helia_profiler.doctor.find_spec", return_value=object()),
+            patch("helia_profiler.hostenv.doctor.find_spec", return_value=object()),
         ):
             PreflightStage().run(ctx)
 
@@ -363,7 +363,7 @@ class TestPreflightHostTools:
         with (
             patch("shutil.which", side_effect=_all_tools_present),
             patch(
-                "helia_profiler.doctor.find_spec",
+                "helia_profiler.hostenv.doctor.find_spec",
                 return_value=None,
             ),
         ):
@@ -387,7 +387,7 @@ class TestPreflightHostTools:
         with (
             patch("shutil.which", side_effect=which_no_jlink),
             patch(
-                "helia_profiler.doctor.find_jlink_exe",
+                "helia_profiler.hostenv.doctor.find_jlink_exe",
                 side_effect=CaptureError("JLinkExe not found"),
             ),
         ):
@@ -406,7 +406,7 @@ class TestPreflightHostTools:
 
         with (
             patch("shutil.which", side_effect=_all_tools_present),
-            patch("helia_profiler.doctor.find_spec", side_effect=fake_find_spec),
+            patch("helia_profiler.hostenv.doctor.find_spec", side_effect=fake_find_spec),
         ):
             with pytest.raises(ConfigError, match="pylink"):
                 PreflightStage().run(ctx)
@@ -423,7 +423,7 @@ class TestPreflightHostTools:
 
         with (
             patch("shutil.which", side_effect=_all_tools_present),
-            patch("helia_profiler.doctor.find_spec", side_effect=fake_find_spec),
+            patch("helia_profiler.hostenv.doctor.find_spec", side_effect=fake_find_spec),
         ):
             PreflightStage().run(ctx)
 

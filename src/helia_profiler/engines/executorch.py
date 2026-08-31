@@ -89,7 +89,7 @@ def _auto_clone_nsx_executorch(url: str, ref: str) -> Path:
 
 
 def _sync_executorch_cache(url: str, ref: str) -> Path:
-    from ..cache_dirs import hpx_cache_root
+    from ..hostenv.cache_dirs import hpx_cache_root
 
     cache = hpx_cache_root() / "nsx-executorch"
     head: str | None = None

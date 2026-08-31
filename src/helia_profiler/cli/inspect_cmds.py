@@ -48,7 +48,7 @@ def _cmd_doctor(
     raw_probe_ids: bool = False,
 ) -> None:
     """Check toolchain and dependencies; optionally emit JSON or a support bundle."""
-    from ..doctor import inspect_environment
+    from ..hostenv.doctor import inspect_environment
     from ..console import HpxConsole
 
     if bundle is not None:
@@ -99,7 +99,7 @@ def _cmd_doctor_bundle(
     from pathlib import Path
 
     from ..errors import HpxError
-    from ..support_bundle import (
+    from ..diagnostics.support_bundle import (
         SupportBundleOptions,
         collect_support_bundle,
         write_support_bundle,

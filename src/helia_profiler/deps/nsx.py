@@ -29,7 +29,7 @@ from neuralspotx._io import Emitter, Event
 from neuralspotx.api import NSXError
 from neuralspotx.nsx_lock import NsxLock
 
-from .errors import BuildError, NetworkError
+from ..errors import BuildError, NetworkError
 
 log = logging.getLogger("hpx")
 

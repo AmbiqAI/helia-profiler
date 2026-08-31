@@ -8,8 +8,8 @@ from ..results import FirmwareArtifact
 from ..errors import BuildError
 from ..pipeline import PipelineContext
 from ..results import ToolchainInfo
-from ..memory_measurement import measure_memory_regions, reconcile_memory
-from ..toolchain_probe import (
+from ..hostenv.memory_measurement import measure_memory_regions, reconcile_memory
+from ..hostenv.toolchain_probe import (
     binary_sections,
     cmake_version,
     compiler_version,

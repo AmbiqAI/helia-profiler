@@ -44,7 +44,7 @@ from .results import (
     RunMetadata,
     BinarySections,
 )
-from .toolchain_probe import SymbolEntry
+from .hostenv.toolchain_probe import SymbolEntry
 from .target.probe.base import Probe, ResetController
 
 log = logging.getLogger("hpx")
@@ -528,7 +528,7 @@ def _cache_work_key(config: ProfileConfig) -> str:
 
 def _default_cache_work_dir(config: ProfileConfig) -> Path:
     """Stable cache root; dependency fingerprints isolate incompatible apps."""
-    from .cache_dirs import hpx_cache_root
+    from .hostenv.cache_dirs import hpx_cache_root
 
     return hpx_cache_root() / "workspaces" / _cache_work_key(config)
 
@@ -539,7 +539,7 @@ def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
     Resolution order:
     1. Explicit ``--work-dir`` — used as-is, never cleaned up.
     2. Default cache directory under ``<cache root>/workspaces/`` (see
-       :func:`helia_profiler.cache_dirs.hpx_cache_root`) keyed on
+       :func:`helia_profiler.hostenv.cache_dirs.hpx_cache_root`) keyed on
        ``{board}-{toolchain}-{engine}``.  Enables incremental cmake builds
        across runs.  Never cleaned up automatically.
     3. If that cache directory cannot be created (read-only service homes —

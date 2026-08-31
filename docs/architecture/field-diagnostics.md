@@ -15,7 +15,7 @@ device identifier that shouldn't leave the building.
 - **Safe by default.** Absolute paths, URL credentials/tokens, common
   credential/token shapes, secret-looking `KEY=VALUE` assignments, and
   device serial numbers are redacted unless a caller explicitly opts out
-  (`--raw-probe-ids`, which also prints a warning). See `redact.py`.
+  (`--raw-probe-ids`, which also prints a warning). See `diagnostics/redact.py`.
 - **Reuse, don't reparse.** Dependency lock provenance is read through the
   Stage 5 `read_dependency_lock_provenance()` provider — the collector
   never re-parses `nsx.lock` itself, and never resolves, synchronizes, or
@@ -61,7 +61,7 @@ traversal — is rejected before any bytes are trusted.
 
 ## Redaction
 
-See `redact.py` for the full pattern set. In short:
+See `diagnostics/redact.py` for the full pattern set. In short:
 
 - Absolute paths keep only their final path component
   (`/Users/alice/model.tflite` -> `<redacted-path>/model.tflite`) -- except

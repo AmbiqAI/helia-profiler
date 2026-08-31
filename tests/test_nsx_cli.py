@@ -19,7 +19,7 @@ from unittest.mock import patch
 
 import pytest
 
-from helia_profiler import nsx
+from helia_profiler.deps import nsx
 from helia_profiler.errors import BuildError
 from neuralspotx.api import NSXError
 
@@ -31,13 +31,13 @@ class TestNsxBuild:
         def fake_build(*_args, **_kwargs):
             print("unrelated-thread-output")
 
-        with patch("helia_profiler.nsx.nsx_api.build_app", side_effect=fake_build):
+        with patch("helia_profiler.deps.nsx.nsx_api.build_app", side_effect=fake_build):
             nsx.build(tmp_path, verbose=0)
 
         assert "unrelated-thread-output" in capsys.readouterr().out
 
     def test_success_calls_api(self, tmp_path: Path) -> None:
-        with patch("helia_profiler.nsx.nsx_api.build_app") as build_mock:
+        with patch("helia_profiler.deps.nsx.nsx_api.build_app") as build_mock:
             nsx.build(tmp_path, toolchain="armclang", timeout_s=42)
         build_mock.assert_called_once_with(
             tmp_path, toolchain="armclang", target=None, timeout_s=42, emit=nsx._quiet_emitter
@@ -47,7 +47,7 @@ class TestNsxBuild:
         # WP2: the dedicated power binary is built via a second
         # `cmake --build --target hpx_profiler_power` from the same
         # configure — verify the target kwarg reaches the nsx API.
-        with patch("helia_profiler.nsx.nsx_api.build_app") as build_mock:
+        with patch("helia_profiler.deps.nsx.nsx_api.build_app") as build_mock:
             nsx.build(tmp_path, toolchain="armclang", target="hpx_profiler_power", timeout_s=42)
         build_mock.assert_called_once_with(
             tmp_path,
@@ -58,7 +58,7 @@ class TestNsxBuild:
         )
 
     def test_nsxerror_raises_build_error(self, tmp_path: Path) -> None:
-        with patch("helia_profiler.nsx.nsx_api.build_app", side_effect=NSXError("boom")):
+        with patch("helia_profiler.deps.nsx.nsx_api.build_app", side_effect=NSXError("boom")):
             with pytest.raises(BuildError) as exc_info:
                 nsx.build(tmp_path)
         err = exc_info.value
@@ -72,7 +72,7 @@ class TestNsxBuild:
         # ("Subprocess timed out after Ns: ...") is translated into a
         # BuildError carrying the same message.
         timeout_err = NSXError("Subprocess timed out after 1.0s: cmake -B build")
-        with patch("helia_profiler.nsx.nsx_api.build_app", side_effect=timeout_err):
+        with patch("helia_profiler.deps.nsx.nsx_api.build_app", side_effect=timeout_err):
             with pytest.raises(BuildError) as exc_info:
                 nsx.build(tmp_path, timeout_s=1)
         assert "nsx build" in str(exc_info.value)
@@ -86,7 +86,7 @@ class TestNsxFlash:
         def fake_flash(_app, **kwargs) -> None:  # noqa: ANN401
             captured["probe_serial"] = kwargs.get("probe_serial")
 
-        with patch("helia_profiler.nsx.nsx_api.flash_app", side_effect=fake_flash):
+        with patch("helia_profiler.deps.nsx.nsx_api.flash_app", side_effect=fake_flash):
             nsx.flash(tmp_path, jlink_serial="123456")
         assert captured["probe_serial"] == "123456"
 
@@ -96,7 +96,7 @@ class TestNsxFlash:
         def fake_flash(_app, **kwargs) -> None:  # noqa: ANN401
             captured["probe_serial"] = kwargs.get("probe_serial")
 
-        with patch("helia_profiler.nsx.nsx_api.flash_app", side_effect=fake_flash):
+        with patch("helia_profiler.deps.nsx.nsx_api.flash_app", side_effect=fake_flash):
             nsx.flash(tmp_path)
         assert captured["probe_serial"] is None
 
@@ -106,11 +106,11 @@ class TestNsxFlash:
         def fake_flash(_app, **kwargs) -> None:  # noqa: ANN401
             captured["frozen"] = kwargs.get("frozen")
 
-        with patch("helia_profiler.nsx.nsx_api.flash_app", side_effect=fake_flash):
+        with patch("helia_profiler.deps.nsx.nsx_api.flash_app", side_effect=fake_flash):
             nsx.flash(tmp_path, frozen=True)
         assert captured["frozen"] is True
 
-        with patch("helia_profiler.nsx.nsx_api.flash_app", side_effect=fake_flash):
+        with patch("helia_profiler.deps.nsx.nsx_api.flash_app", side_effect=fake_flash):
             nsx.flash(tmp_path)
         assert captured["frozen"] is False
 
@@ -118,14 +118,14 @@ class TestNsxFlash:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SEGGER_SNCODE", "PRIOR")
-        with patch("helia_profiler.nsx.nsx_api.flash_app"):
+        with patch("helia_profiler.deps.nsx.nsx_api.flash_app"):
             nsx.flash(tmp_path, jlink_serial="OVERRIDE")
         assert os.environ["SEGGER_SNCODE"] == "PRIOR"
 
 
 class TestNsxConfigure:
     def test_configure_calls_api(self, tmp_path: Path) -> None:
-        with patch("helia_profiler.nsx.nsx_api.configure_app") as cfg_mock:
+        with patch("helia_profiler.deps.nsx.nsx_api.configure_app") as cfg_mock:
             nsx.configure(tmp_path, toolchain="gcc", timeout_s=120)
         cfg_mock.assert_called_once_with(
             tmp_path,
@@ -136,14 +136,14 @@ class TestNsxConfigure:
         )
 
     def test_configure_forwards_frozen(self, tmp_path: Path) -> None:
-        with patch("helia_profiler.nsx.nsx_api.configure_app") as cfg_mock:
+        with patch("helia_profiler.deps.nsx.nsx_api.configure_app") as cfg_mock:
             nsx.configure(tmp_path, frozen=True)
         assert cfg_mock.call_args.kwargs["frozen"] is True
 
 
 class TestNsxLock:
     def test_lock_calls_api_quietly(self, tmp_path: Path) -> None:
-        with patch("helia_profiler.nsx.nsx_api.lock_app", return_value=tmp_path / "nsx.lock") as m:
+        with patch("helia_profiler.deps.nsx.nsx_api.lock_app", return_value=tmp_path / "nsx.lock") as m:
             result = nsx.lock(tmp_path, timeout_s=180)
         m.assert_called_once_with(
             tmp_path,
@@ -156,20 +156,20 @@ class TestNsxLock:
         assert result == tmp_path / "nsx.lock"
 
     def test_lock_propagates_update_flag(self, tmp_path: Path) -> None:
-        with patch("helia_profiler.nsx.nsx_api.lock_app", return_value=None) as m:
+        with patch("helia_profiler.deps.nsx.nsx_api.lock_app", return_value=None) as m:
             nsx.lock(tmp_path, update=True)
         assert m.call_args.kwargs["update"] is True
 
 
 class TestNsxSync:
     def test_sync_calls_api(self, tmp_path: Path) -> None:
-        with patch("helia_profiler.nsx.nsx_api.sync_app") as m:
+        with patch("helia_profiler.deps.nsx.nsx_api.sync_app") as m:
             nsx.sync(tmp_path, timeout_s=300)
         m.assert_called_once_with(
             tmp_path, frozen=False, force=False, timeout_s=300, emit=nsx._quiet_emitter
         )
 
     def test_sync_frozen(self, tmp_path: Path) -> None:
-        with patch("helia_profiler.nsx.nsx_api.sync_app") as m:
+        with patch("helia_profiler.deps.nsx.nsx_api.sync_app") as m:
             nsx.sync(tmp_path, frozen=True)
         assert m.call_args.kwargs["frozen"] is True

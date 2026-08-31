@@ -265,7 +265,7 @@ def test_session_discovery_returns_typed_values(monkeypatch) -> None:
     doctor = hpx.DoctorResult((hpx.DoctorCheck("tool", "tool", True),))
     port = hpx.SerialPortInfo(device="/dev/ttyUSB0", kind="serial")
     monkeypatch.setattr(
-        "helia_profiler.doctor.inspect_environment", lambda **_kwargs: doctor
+        "helia_profiler.hostenv.doctor.inspect_environment", lambda **_kwargs: doctor
     )
     monkeypatch.setattr(
         "helia_profiler.transport.ports.list_serial_ports",
@@ -293,7 +293,7 @@ def test_session_doctor_requires_rtt_sources_for_rtt_transport(
     (rtt_root / "RTT" / "SEGGER_RTT.h").write_text("")
     (rtt_root / "Config" / "SEGGER_RTT_Conf.h").write_text("")
     monkeypatch.setattr("shutil.which", lambda name: f"/usr/bin/{name}")
-    monkeypatch.setattr("helia_profiler.doctor.find_spec", lambda _name: object())
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_spec", lambda _name: object())
 
     result = hpx.Session().with_target(
         transport="rtt", segger_rtt_path=rtt_root

@@ -19,7 +19,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from ..toolchains import get_toolchain_spec, resolve_toolchain_executable
+from ..hostenv.toolchains import get_toolchain_spec, resolve_toolchain_executable
 
 log = logging.getLogger("hpx")
 

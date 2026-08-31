@@ -108,7 +108,7 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
     assert "helia_profiler/results/models.py" in names
     assert "helia_profiler/results/artifacts.py" in names
     assert "helia_profiler/results/manifest.py" in names
-    assert "helia_profiler/compatibility.py" in names
+    assert "helia_profiler/deps/compatibility.py" in names
     assert "helia_profiler/data/compatibility-baseline-v1.json" in names
     assert "helia_profiler/data/run_summary.schema.v1.json" in names
     assert "helia_profiler/data/run_metadata.schema.v1.json" in names
@@ -141,7 +141,7 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
             sys.executable,
             "-c",
             (
-                "from helia_profiler.compatibility import load_compatibility_baseline; "
+                "from helia_profiler.deps.compatibility import load_compatibility_baseline; "
                 "baseline = load_compatibility_baseline(); "
                 "print(baseline.neuralspotx_version); "
                 "print(baseline.project('nsx-ambiq-sdk').ref); "

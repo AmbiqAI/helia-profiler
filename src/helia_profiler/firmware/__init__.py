@@ -22,8 +22,8 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
-from .. import nsx as nsx_cli
-from ..compatibility import ENGINE_OWNED_MODULE_NAMES
+from ..deps import nsx as nsx_cli
+from ..deps.compatibility import ENGINE_OWNED_MODULE_NAMES
 from ..config import PowerFirmware, Transport, WindowMode
 from ..engines import EngineType
 from ..engines.base import ArenaRegion, HeliaAotArtifacts
@@ -107,7 +107,7 @@ def generate_app(ctx: PipelineContext) -> Path:
     board = ctx.resolved_board
     artifacts = ctx.prepared_artifacts
 
-    from ..dependencies import create_workspace
+    from ..deps.dependencies import create_workspace
 
     workspace = ctx.dependency_workspace or create_workspace(ctx)
     ctx.dependency_workspace = workspace

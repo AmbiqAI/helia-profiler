@@ -123,7 +123,7 @@ as you would any other diagnostic output.
 
 Two bundles built from identical inputs produce the same archive file name
 and identical member bytes (except `manifest.json`'s `generated_at`
-timestamp) — see `helia_profiler.support_bundle.verify_support_bundle()` to
+timestamp) — see `helia_profiler.diagnostics.support_bundle.verify_support_bundle()` to
 re-check an existing archive's structure and digests.
 
 ## See also

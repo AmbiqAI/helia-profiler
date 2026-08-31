@@ -37,17 +37,17 @@ from .config import (
     Toolchain,
     Transport,
 )
-from .compatibility import (
+from .deps.compatibility import (
     CompatibilityBaseline,
     CompatibilityResolution,
     QualificationState,
     load_compatibility_baseline,
 )
-from .dependencies import read_dependency_lock_provenance
+from .deps.dependencies import read_dependency_lock_provenance
 from .engines import EngineType
 from . import examples
 from .counters import PmuCounter
-from .doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
+from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
 from .errors import (
     BuildError,
     CaptureError,
@@ -95,7 +95,7 @@ from .results import (
     SupportBundleSection,
     load_result_manifest,
 )
-from .support_bundle import (
+from .diagnostics.support_bundle import (
     SupportBundleOptions,
     collect_support_bundle,
     verify_support_bundle,

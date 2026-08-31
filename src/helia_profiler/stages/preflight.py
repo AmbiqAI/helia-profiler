@@ -416,7 +416,7 @@ def _check_output_dir(out_dir: Path) -> None:
 
 
 def _check_host_tools(cfg) -> None:
-    from ..doctor import inspect_environment
+    from ..hostenv.doctor import inspect_environment
 
     result = inspect_environment(
         toolchain=cfg.target.toolchain,

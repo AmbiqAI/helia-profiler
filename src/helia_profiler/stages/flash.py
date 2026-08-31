@@ -6,7 +6,7 @@ through :func:`~helia_profiler.target.probe.flash.flash_binary`, the same
 path the dedicated power firmware deploys through.  ``nsx flash`` is
 deliberately not used here: passing a probe serial forces it to re-run
 CMake configure on a build tree the build stage configured moments
-earlier (see :func:`helia_profiler.nsx.flash`), which costs several
+earlier (see :func:`helia_profiler.deps.nsx.flash`), which costs several
 seconds per run and verifies nothing the pipeline doesn't already know.
 """
 

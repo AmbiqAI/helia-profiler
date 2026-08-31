@@ -25,7 +25,7 @@ from contextlib import nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .. import nsx as nsx_cli
+from ..deps import nsx as nsx_cli
 from ..config import Transport
 from ..errors import BuildError
 
@@ -43,7 +43,7 @@ def _nsx_toolchain(toolchain: str) -> str | None:
 
     Returns *None* for the default (GCC) so the flag is omitted.
     """
-    from ..toolchains import get_toolchain_spec
+    from ..hostenv.toolchains import get_toolchain_spec
 
     return get_toolchain_spec(toolchain).nsx_name
 
@@ -53,7 +53,7 @@ def _rtt_buffer_size_up(toolchain: str, transport: Transport, configured_size: i
     if configured_size is not None:
         return configured_size
     if transport == Transport.RTT:
-        from ..toolchains import get_toolchain_spec
+        from ..hostenv.toolchains import get_toolchain_spec
 
         return get_toolchain_spec(toolchain).default_rtt_buffer_size_up
     return _DEFAULT_RTT_BUFFER_SIZE_UP
@@ -75,7 +75,7 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     build_dir = app_dir / "build" / board
     ninja_already_configured = (build_dir / "build.ninja").exists()
 
-    from ..dependencies import (
+    from ..deps.dependencies import (
         invalidate_sync_stamp,
         prepare_locked_dependencies,
         workspace_mutex,
@@ -158,7 +158,7 @@ def flash_app(ctx: PipelineContext) -> None:
     firmware_dir = ctx.resolved_firmware_dir
     toolchain = ctx.config.target.toolchain
     nsx_tc = _nsx_toolchain(toolchain)
-    from ..dependencies import workspace_mutex
+    from ..deps.dependencies import workspace_mutex
 
     lock = (
         workspace_mutex(ctx.dependency_workspace)

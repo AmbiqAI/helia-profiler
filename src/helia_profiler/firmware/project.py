@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
-from .. import nsx as nsx_cli
-from ..compatibility import CompatibilityBaseline
+from ..deps import nsx as nsx_cli
+from ..deps.compatibility import CompatibilityBaseline
 from ..config import Transport
 from ..engines.base import HeliaAotArtifacts
 from ..errors import ConfigError, FirmwareError

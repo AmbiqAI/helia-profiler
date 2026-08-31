@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def _workspace_cache_root() -> Path:
-    from ..cache_dirs import hpx_cache_root
+    from ..hostenv.cache_dirs import hpx_cache_root
 
     return hpx_cache_root() / "workspaces"
 

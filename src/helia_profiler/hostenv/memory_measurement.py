@@ -30,13 +30,13 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from .platform.memory_map import (
+from ..platform.memory_map import (
     classify_address,
     link_family_for_toolchain,
     linked_memory_map,
 )
-from .platform.soc import SocDef
-from .results import (
+from ..platform.soc import SocDef
+from ..results import (
     ConsumerReconciliation,
     MeasuredMemoryRegions,
     MeasuredRegion,

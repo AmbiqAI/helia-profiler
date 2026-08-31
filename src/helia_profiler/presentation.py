@@ -11,7 +11,7 @@ from rich.pretty import Pretty
 from rich.table import Table
 
 from .counters import PmuCounter
-from .doctor import DoctorResult
+from .hostenv.doctor import DoctorResult
 from .engines import EngineType
 from .platform import BoardDef
 from .target.probe.jlink import JLinkProbe, JLinkProbeMatch

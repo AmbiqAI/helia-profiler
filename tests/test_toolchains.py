@@ -1,7 +1,7 @@
 """Canonical toolchain capability matrix."""
 
 from helia_profiler.config import Toolchain
-from helia_profiler.toolchains import get_toolchain_spec, resolve_toolchain_executable
+from helia_profiler.hostenv.toolchains import get_toolchain_spec, resolve_toolchain_executable
 
 
 def test_toolchain_specs_are_complete_and_consistent() -> None:

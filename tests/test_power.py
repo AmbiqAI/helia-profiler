@@ -3082,9 +3082,9 @@ class TestPowerFirmwareSelection:
             build_calls.append({"args": args, **kwargs})
             stale_binary.write_bytes(b"fresh")
 
-        monkeypatch.setattr("helia_profiler.nsx.build", fake_build)
+        monkeypatch.setattr("helia_profiler.deps.nsx.build", fake_build)
         monkeypatch.setattr(
-            "helia_profiler.dependencies.workspace_mutex",
+            "helia_profiler.deps.dependencies.workspace_mutex",
             lambda _workspace: __import__("contextlib").nullcontext(),
         )
 
@@ -3144,11 +3144,11 @@ class TestPowerFirmwareSelection:
             lambda *_args, **_kwargs: None,
         )
         monkeypatch.setattr(
-            "helia_profiler.nsx.build",
+            "helia_profiler.deps.nsx.build",
             lambda *_args, **_kwargs: (_ for _ in ()).throw(BuildError("compile failed")),
         )
         monkeypatch.setattr(
-            "helia_profiler.dependencies.workspace_mutex",
+            "helia_profiler.deps.dependencies.workspace_mutex",
             lambda _workspace: __import__("contextlib").nullcontext(),
         )
 

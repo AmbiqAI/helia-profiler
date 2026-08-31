@@ -19,9 +19,9 @@ from neuralspotx.file_lock import file_mutex
 from neuralspotx.nsx_lock import LOCK_SCHEMA_VERSION, hash_manifest, read_lock
 
 from . import nsx as nsx_cli
-from ._version import __version__
-from .errors import BuildError, DependencyError, LockError, VersionError
-from .results.dependencies import (
+from .._version import __version__
+from ..errors import BuildError, DependencyError, LockError, VersionError
+from ..results.dependencies import (
     ContentDigest,
     DependencyLockMode,
     DependencyLockProvenance,
@@ -33,7 +33,7 @@ from .results.dependencies import (
     DependencyWorkspace,
 )
 from .compatibility import QualificationState
-from .dependency_sync import (
+from .sync import (
     _offline_materialization_error,
     _run_frozen_sync_with_repair,
     _sync_stamp_matches,
@@ -42,7 +42,7 @@ from .dependency_sync import (
 )
 
 if TYPE_CHECKING:
-    from .pipeline import PipelineContext
+    from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
 
@@ -193,7 +193,7 @@ def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[Depend
             raise DependencyError(
                 "engine.config.source must contain a repository/ref mapping."
             )
-        from .engines.helia_rt.artifacts import HELIART_GH_REPO, HELIART_RELEASE_TAG
+        from ..engines.helia_rt.artifacts import HELIART_GH_REPO, HELIART_RELEASE_TAG
 
         repository = source.get("repo", HELIART_GH_REPO)
         reference = source.get("ref", HELIART_RELEASE_TAG)

@@ -371,11 +371,11 @@ def _stub_locked_dependencies(
     # Duck-typed fake: only .root is read from the workspace here.
     ctx.dependency_workspace = SimpleNamespace(root=app_dir.parent)  # ty: ignore[invalid-assignment]
     monkeypatch.setattr(
-        "helia_profiler.dependencies.workspace_mutex",
+        "helia_profiler.deps.dependencies.workspace_mutex",
         lambda _workspace: nullcontext(),
     )
     monkeypatch.setattr(
-        "helia_profiler.dependencies.prepare_locked_dependencies",
+        "helia_profiler.deps.dependencies.prepare_locked_dependencies",
         lambda inner_ctx: (
             prepared.append(inner_ctx.firmware_dir)
             or SimpleNamespace(lock=SimpleNamespace(mode=SimpleNamespace(value="reused")))
@@ -2241,7 +2241,7 @@ def test_project_override_order_is_hash_seed_independent():
 
     script = r"""
 import json
-from helia_profiler.compatibility import load_compatibility_baseline
+from helia_profiler.deps.compatibility import load_compatibility_baseline
 from helia_profiler.firmware.project import NsxModuleSpec, _resolve_project_overrides
 
 baseline = load_compatibility_baseline()

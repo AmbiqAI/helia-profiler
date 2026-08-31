@@ -49,8 +49,8 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.cache_dirs import hpx_cache_root
-from helia_profiler.compatibility import load_compatibility_baseline
+from helia_profiler.hostenv.cache_dirs import hpx_cache_root
+from helia_profiler.deps.compatibility import load_compatibility_baseline
 from tests.contracts.test_firmware_render_snapshots import (
     _ENGINES,
     _common_kwargs,

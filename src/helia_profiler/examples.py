@@ -13,7 +13,7 @@ _MODELS = {
     "tiny-cnn": ("tiny_cnn.tflite", "tiny_cnn.json"),
 }
 def _cache_root() -> Path:
-    from .cache_dirs import hpx_cache_root
+    from .hostenv.cache_dirs import hpx_cache_root
 
     return hpx_cache_root() / "models"
 
