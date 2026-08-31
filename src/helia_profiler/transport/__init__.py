@@ -3,10 +3,7 @@
 This package owns the :class:`CaptureTransport` backend objects and their
 registry. The wire vocabulary itself (keys, sentinels, error codes) lives in
 :mod:`helia_profiler.wire`; :mod:`.protocol` here is the shared
-line-collection loop that consumes it.
-
-The shared line-collection loop lives in
-:mod:`helia_profiler.transport.protocol`; they are re-exported here for
+line-collection loop that consumes it, re-exported from this package for
 convenience.
 """
 
