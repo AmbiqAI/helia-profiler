@@ -58,12 +58,16 @@ def _aot_manifest(ctx: PipelineContext) -> list[dict[str, Any]] | None:
 
     It carries the execution-position -> original-tflite-index mapping the
     per-layer MAC join needs; sequential engines have none and need none.
+    An AOT run whose manifest extraction FAILED returns ``[]``, not
+    ``None``: degraded firmware labels layers with positions, so the
+    suffix fallback would resurrect the positional join — an empty
+    authoritative manifest dashes everything instead.
     """
     from ..engines.base import HeliaAotArtifacts
 
     artifacts = ctx.engine_artifacts
     if isinstance(artifacts, HeliaAotArtifacts):
-        return artifacts.aot_op_manifest
+        return artifacts.aot_op_manifest or []
     return None
 
 

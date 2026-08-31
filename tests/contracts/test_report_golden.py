@@ -430,9 +430,9 @@ def _make_aot_ctx(tmp_path: Path) -> PipelineContext:
     # zero-mac SOFTMAX). The golden digest pins the manifest join.
     pmu = ctx.captured_pmu
     skewed = [
-        dataclasses.replace(pmu.layers[0], op="CONV_2D:0", source_index=None),
-        dataclasses.replace(pmu.layers[1], op="SOFTMAX:5", source_index=None),
-        dataclasses.replace(pmu.layers[2], op="DEPTHWISE_CONV_2D:3", source_index=None),
+        dataclasses.replace(pmu.layers[0], op="CONV_2D:0"),
+        dataclasses.replace(pmu.layers[1], op="SOFTMAX:5"),
+        dataclasses.replace(pmu.layers[2], op="DEPTHWISE_CONV_2D:3"),
     ]
     set_profile_result(ctx, dataclasses.replace(pmu, layers=skewed))
     ctx.model_analysis = ModelAnalysis(

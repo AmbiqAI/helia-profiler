@@ -229,6 +229,12 @@ def _extract_operator_manifest(
 
     manifest: list[dict[str, Any]] = []
     for idx, aot_op in enumerate(operators):
+        # The litert frontend always mints numeric ids (the original tflite
+        # index), but OpId is a str — a future frontend or synthetic
+        # transform id must degrade to an unmapped position (#218 dashes
+        # it), not crash prepare().
+        if not str(aot_op.id).isdigit():
+            continue
         entry: dict[str, Any] = {
             "idx": idx,
             "id": int(aot_op.id),

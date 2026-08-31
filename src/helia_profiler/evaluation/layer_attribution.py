@@ -106,9 +106,14 @@ class LayerAttributor:
             manifest_source_map(aot_op_manifest) if aot_op_manifest is not None else None
         )
 
-    def attribute(self, layer_id: int | str, op: str) -> LayerAttribution:
+    def attribute(
+        self, layer_id: int | str, op: str, source_index: int | None = None
+    ) -> LayerAttribution:
+        """``source_index`` is a caller-carried original index (e.g.
+        ``LayerResult.source_index``); it outranks re-parsing the label but
+        never the manifest."""
         position = layer_id if isinstance(layer_id, int) and not isinstance(layer_id, bool) else None
-        suffix = source_index_from_op(op)
+        suffix = source_index if source_index is not None else source_index_from_op(op)
         explicit = True
         if self._source_map is not None:
             # The manifest is authoritative for the whole run: a position it

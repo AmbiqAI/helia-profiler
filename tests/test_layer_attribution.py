@@ -123,8 +123,28 @@ class TestLayerAttributor:
 
     def test_unmatchable_sources_resolve_nothing(self):
         att = LayerAttributor(_skewed_analysis(), None)
-        assert att.attribute(9, "OPERATOR_CALL:c3i12").macs is None
+        # In-range id on purpose: an identity fallback for ":"-labelled ops
+        # would positionally resolve id 0 to 100,000 macs (#222 lens).
+        result = att.attribute(0, "OPERATOR_CALL:c3i12")
+        assert result.source_index is None
+        assert result.macs is None
         assert att.attribute("odd-id", "CONV_2D").macs is None
+
+    def test_a_carried_source_index_outranks_the_label_but_not_the_manifest(self):
+        analysis = _skewed_analysis()
+        att = LayerAttributor(analysis, None)
+        assert att.attribute(0, "CONV_2D:0", source_index=3).macs == 43_200
+        att = LayerAttributor(analysis, [{"idx": 0, "id": 0}])
+        assert att.attribute(0, "CONV_2D:0", source_index=3).macs == 100_000
+
+    def test_an_aot_run_without_a_manifest_dashes_everything(self):
+        """#222 lens: manifest extraction failed => degraded firmware labels
+        layers with POSITIONS; an empty authoritative manifest ([]) must
+        dash rather than let the suffix fallback join positionally."""
+        att = LayerAttributor(_skewed_analysis(), [])
+        result = att.attribute(1, "SOFTMAX:1")
+        assert result.source_index is None
+        assert result.macs is None
 
     def test_no_analysis_still_resolves_the_source_index(self):
         att = LayerAttributor(None, [{"idx": 0, "id": 4}])
@@ -179,6 +199,99 @@ class TestCsvWriterJoin:
         rows = list(csv_mod.DictReader(open(out)))
         assert "source_index" not in rows[0]
         assert rows[0]["macs"] == "10"
+
+
+class TestConsumerPlumbing:
+    """#222 lens: the resolver's empty-manifest dash rule is only as good
+    as the consumers that build the manifest argument — pin both."""
+
+    def _aot_ctx(self, tmp_path: Path, manifest):
+        from helia_profiler.config import load_config
+        from helia_profiler.engines import EngineType
+        from helia_profiler.engines.base import HeliaAotArtifacts
+        from helia_profiler.pipeline import PipelineContext
+
+        model_file = tmp_path / "test.tflite"
+        model_file.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model_file)},
+                "engine": {"type": "helia-aot"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.engine_artifacts = HeliaAotArtifacts(
+            engine_type=EngineType.HELIA_AOT,
+            engine_header="model_model.h",
+            aot_prefix="model",
+            aot_module_name="aot-model",
+            aot_cmake_target="nsx::aot_model",
+            helia_aot_version="0.18.4",
+            aot_op_manifest=manifest,
+        )
+        return ctx
+
+    def test_report_hands_a_manifestless_aot_run_an_empty_authoritative_manifest(
+        self, tmp_path: Path
+    ):
+        from helia_profiler.report import _aot_manifest
+
+        assert _aot_manifest(self._aot_ctx(tmp_path, None)) == []
+        assert _aot_manifest(self._aot_ctx(tmp_path, [{"idx": 0, "id": 0}])) == [
+            {"idx": 0, "id": 0}
+        ]
+
+    def test_report_hands_sequential_engines_no_manifest(self, tmp_path: Path):
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.report import _aot_manifest
+
+        model_file = tmp_path / "test.tflite"
+        model_file.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model_file)},
+                "engine": {"type": "helia-rt"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        assert _aot_manifest(ctx) is None
+
+    def test_console_dashes_a_manifestless_aot_run(self, tmp_path: Path):
+        """Degraded firmware labels layers with POSITIONS ("SOFTMAX:1") —
+        the console must dash, not suffix-join positionally."""
+        from rich.console import Console
+
+        from helia_profiler.console import HpxConsole
+        from helia_profiler.console.results import print_results
+        from helia_profiler.results import FirmwareMeta, PmuResult
+        from tests.pipeline_context_helpers import set_profile_result
+
+        ctx = self._aot_ctx(tmp_path, None)
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(clean_infer_count=1, clean_infer_avg_us=1000),
+                # Degraded label suffix = POSITION 3, which collides with
+                # original id 3 (FULLY_CONNECTED) in the analysis.
+                layers=[LayerResult(id=3, op="SOFTMAX:3", cycles=500.0)],
+            ),
+        )
+        ctx.model_analysis = _skewed_analysis()
+        hpx_console = HpxConsole(verbosity=0)
+        recorder = Console(record=True, highlight=False, width=200)
+        hpx_console._console = recorder
+        print_results(hpx_console, ctx)
+        softmax = next(
+            line for line in recorder.export_text().splitlines() if "SOFTMAX:3" in line
+        )
+        # Suffix-joining the degraded label would land FULLY_CONNECTED's
+        # 43,200 macs on this softmax; the dash rule forbids it.
+        assert "43,200" not in softmax
 
 
 class TestConsoleJoin:

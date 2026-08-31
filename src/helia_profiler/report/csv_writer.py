@@ -71,7 +71,11 @@ def _write_csv(
     total_cycles = sum(layer.cycles or 0 for layer in layers)
     attributor = LayerAttributor(analysis, aot_op_manifest)
     rows = [
-        _layer_to_flat_dict(layer, attributor.attribute(layer.id, layer.op), total_cycles)
+        _layer_to_flat_dict(
+            layer,
+            attributor.attribute(layer.id, layer.op, layer.source_index),
+            total_cycles,
+        )
         for layer in layers
     ]
     fieldnames = list(rows[0].keys())
