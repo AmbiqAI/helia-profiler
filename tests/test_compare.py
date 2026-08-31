@@ -648,6 +648,80 @@ def test_unresolvable_source_gets_no_memory_rows(tmp_path: Path):
     assert row.baseline_memory is None
 
 
+def test_recorded_source_index_outranks_the_label_suffix(tmp_path: Path):
+    """#227 lens: the post-#222 source_index column is the strongest
+    evidence — where it disagrees with the op-label suffix (manifest vs
+    firmware-label version skew) the recorded value wins."""
+    baseline = tmp_path / "gcc"
+    candidate = tmp_path / "atfe"
+    decoy = {
+        "layer_idx": 1,
+        "layer_id": 5,
+        "op_type": "CONV_2D",
+        "op_name": "conv_5",
+        "tensor_role": "local",
+        "tensor_id": 9,
+        "tensor_name": "suffix-decoy",
+        "tensor_kind": "constant",
+        "memory": "sram",
+        "source_memory": "sram",
+        "staged": False,
+        "arena_role": "constant",
+        "arena_region_id": 1,
+        "offset": 0,
+        "size": 64,
+        "shape": "[4]",
+    }
+    for d in (baseline, candidate):
+        _write_run(d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+        rows = list(csv.DictReader(open(d / "profile_results.csv")))
+        rows[0]["op"] = "CONV_2D:5"
+        rows[0]["source_index"] = "7"
+        with open(d / "profile_results.csv", "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+            w.writeheader()
+            w.writerows(rows)
+        # Rows exist under BOTH keys: 7 (recorded, dtcm) and 5 (suffix, sram).
+        _write_aot_memory_layers(d, "dtcm", layer_idx=0, layer_id=7, extra_rows=[decoy])
+
+    row = compare_runs(baseline, candidate).layer_rows[0]
+
+    assert row.baseline_memory is not None
+    assert "DTCM" in row.baseline_memory and "SRAM" not in row.baseline_memory
+
+
+def test_malformed_recorded_source_index_is_unresolvable_not_downgraded(tmp_path: Path):
+    """A corrupt recorded value must not silently fall through to weaker
+    evidence; an integral float (spreadsheet round-trip) still counts."""
+    from helia_profiler.evaluation.compare import _layer_source_index
+
+    assert _layer_source_index({"source_index": 7.0, "op": "CONV_2D:5"}) == 7
+    assert _layer_source_index({"source_index": "junk", "op": "CONV_2D:5", "id": 0}) is None
+    assert _layer_source_index({"source_index": 7.5, "op": "CONV_2D:5", "id": 0}) is None
+    assert _layer_source_index({"source_index": "", "op": "CONV_2D:5"}) == 5
+
+
+def test_zero_join_memory_artifacts_warn(tmp_path: Path):
+    """#227 lens: file present but nothing joined must be distinguishable
+    from 'no placement change'."""
+    baseline = tmp_path / "gcc"
+    candidate = tmp_path / "atfe"
+    for d in (baseline, candidate):
+        _write_run(d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+        rows = list(csv.DictReader(open(d / "profile_results.csv")))
+        rows[0]["op"] = "CONV_2D:5"
+        with open(d / "profile_results.csv", "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+            w.writeheader()
+            w.writerows(rows)
+        _write_aot_memory_layers(d, "dtcm", layer_idx=0, layer_id=3)  # never matches
+
+    result = compare_runs(baseline, candidate)
+
+    assert result.layer_rows[0].baseline_memory is None
+    assert any("no layer matched" in w for w in result.warnings)
+
+
 def test_derived_analysis_fields_are_not_counter_diffs(tmp_path: Path):
     """#218 D6: macs/ops/cycles_per_mac are derived enrichments — a delta
     between two derived values is noise, not measurement."""

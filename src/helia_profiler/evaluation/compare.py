@@ -217,7 +217,7 @@ def compare_runs(
         include_groups=include_groups,
     )
     layer_rows = _compare_layers(baseline, candidate) if comparability.layers_comparable else []
-    warnings = _build_warnings(baseline, candidate, metrics, comparability)
+    warnings = _build_warnings(baseline, candidate, metrics, comparability, layer_rows)
 
     result = CompareResult(
         baseline=baseline,
@@ -537,6 +537,7 @@ def _build_warnings(
     candidate: RunArtifacts,
     metrics: list[MetricDiff],
     comparability: ComparabilityAssessment,
+    layer_rows: list[LayerDiffRow] | None = None,
 ) -> list[str]:
     warnings = [issue.message for issue in comparability.issues]
     if baseline.summary.get("overflow_detected") or candidate.summary.get("overflow_detected"):
@@ -553,6 +554,19 @@ def _build_warnings(
     ):
         warnings.append(
             "AOT memory placement artifacts are present in only one run; placement diffs may be partial."
+        )
+    if (
+        (baseline.layer_memory or candidate.layer_memory)
+        and layer_rows
+        and all(row.baseline_memory is None and row.candidate_memory is None for row in layer_rows)
+    ):
+        # File present, nothing joined: distinguishable from "no placement
+        # change" (#227 lens) — likely a hand-edited/foreign CSV whose
+        # layer_id column does not carry original tflite indices.
+        warnings.append(
+            "AOT memory placement artifacts are present but no layer matched them; "
+            "placement diffs are omitted (memory rows join on the original "
+            "tflite operator index)."
         )
     return warnings
 
@@ -584,6 +598,14 @@ def _layer_source_index(layer: dict[str, Any]) -> int | None:
     recorded = layer.get("source_index")
     if isinstance(recorded, int) and not isinstance(recorded, bool):
         return recorded
+    if isinstance(recorded, float) and recorded.is_integer():
+        # A spreadsheet round-trip turns 7 into 7.0; still the recorded key.
+        return int(recorded)
+    if recorded not in (None, ""):
+        # Present but malformed: the recorded column is the strongest
+        # evidence — a corrupt value must not silently DOWNGRADE resolution
+        # to the weaker label suffix (#227 lens), it is unresolvable.
+        return None
     op = str(layer.get("op", ""))
     suffix = source_index_from_op(op)
     if suffix is not None:
