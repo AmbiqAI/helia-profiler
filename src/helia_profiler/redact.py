@@ -176,14 +176,6 @@ class RedactionCounts:
         }
 
 
-def _basename(path_text: str) -> str:
-    if "\\" in path_text and "/" not in path_text:
-        name = PureWindowsPath(path_text).name
-    else:
-        name = path_text.rstrip("/\\").rsplit("/", 1)[-1]
-    return name
-
-
 def _redact_path_match(match: re.Match[str]) -> str:
     raw = match.group(0)
     normalized = raw.replace("\\", "/").rstrip("/")

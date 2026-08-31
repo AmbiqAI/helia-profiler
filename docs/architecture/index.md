@@ -132,7 +132,7 @@ src/helia_profiler/
 │       └── jlink.py    # J-Link helpers (flash, SWO, reset)
 │
 ├── transport/          # CaptureTransport backend registry
-│   ├── protocol.py     # HPX wire protocol (HPX_START/HPX_END framing)
+│   ├── protocol.py     # Shared line-collection loop (wire constants live in wire/)
 │   ├── rtt.py          # RTT capture lifecycle/orchestration
 │   ├── rtt_control.py  # Direct RTT control-block/ring-buffer access
 │   ├── swo.py          # SWO capture via pylink/J-Link API
@@ -195,7 +195,7 @@ ProfileConfig (frozen)
 PipelineContext (mutable state bag)
     │
     ├── .config          → ProfileConfig (read-only)
-    ├── .platform_info   → PlatformInfo (set by S01)
+    ├── .run_metadata.platform → PlatformInfo (set by ResolvePlatformStage)
     ├── .engine_artifacts→ EngineArtifacts (set by S02)
     ├── .build_dir       → Path (set by S04)
     ├── .binary_path     → Path (set by S04)

@@ -1,4 +1,4 @@
-"""Stage 6 — Capture PMU data via SWO."""
+"""Capture PMU data over the configured transport."""
 
 from __future__ import annotations
 

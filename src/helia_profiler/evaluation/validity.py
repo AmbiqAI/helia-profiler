@@ -78,9 +78,10 @@ def _rederive_integrity(
 def _build_gate_arbitration(ctx: PipelineContext) -> GateArbitration | None:
     """Compose the gate facts exactly once per run.
 
-    Sources the gated result from the observation when one exists (the
-    pipeline stores the same object in ``ctx.power_result``, but replayed or
-    hand-built contexts may carry only one of the two).
+    Sources the gated result from the observation when one exists;
+    ``ctx.power_result`` is a derived property returning exactly
+    ``power_run.observation.result`` (ea4e8af), so there is no second
+    source to reconcile.
 
     The integrity term prefers the capture's own record (probe-keyed band,
     1 s floor). For an artifact that recorded none, it re-derives at the
@@ -93,24 +94,12 @@ def _build_gate_arbitration(ctx: PipelineContext) -> GateArbitration | None:
     if ctx.power_run is not None and ctx.power_run.observation is not None:
         result = ctx.power_run.observation.result
     if result is None:
-        result = ctx.power_result
-    if result is None:
         return None
 
     integrity = result.metadata.gate_duration_integrity
     integrity_recorded = integrity is not None
     if integrity is None:
         integrity = _rederive_integrity(ctx, result)
-
-    # The pipeline stores the observation's result AS ctx.power_result; a
-    # context carrying two different objects would render summary fields
-    # from mixed sources (#204 review) -- broken-invariant tripwire.
-    assert (
-        ctx.power_run is None
-        or ctx.power_run.observation is None
-        or ctx.power_result is None
-        or ctx.power_run.observation.result is ctx.power_result
-    ), "observation.result and ctx.power_result diverge"
 
     terminal = ctx.power_run.terminal if ctx.power_run is not None else None
     terminal_unhealthy = terminal is not None and (

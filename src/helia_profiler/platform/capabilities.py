@@ -290,15 +290,6 @@ class SocCapabilities:
         )
 
 
-@dataclass(frozen=True)
-class PowerCaptureCapabilities:
-    """Board-level power-capture wiring defaults (3-wire lock-step sync)."""
-
-    sync_gpio_pin: int
-    state_gpio_pin: int
-    go_gpio_pin: int
-
-
 # Base addresses of the arena/weights-eligible memory regions, per SoC family.
 # Sizes come from each SoC's ``MemoryLayout``; only the bases are family-wide.
 # DTCM and SRAM are contiguous on AP4/AP5 (SRAM begins right after DTCM), but
@@ -484,10 +475,3 @@ def build_soc_capabilities(soc: SocDef) -> SocCapabilities:
     )
 
 
-def build_power_capture_capabilities(board: BoardDef) -> PowerCaptureCapabilities:
-    """Resolve the power-capture wiring defaults for *board*."""
-    return PowerCaptureCapabilities(
-        sync_gpio_pin=board.default_sync_gpio_pin,
-        state_gpio_pin=board.default_state_gpio_pin,
-        go_gpio_pin=board.default_go_gpio_pin,
-    )

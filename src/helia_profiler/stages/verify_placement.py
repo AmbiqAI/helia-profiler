@@ -1,4 +1,4 @@
-"""Stage 4b — Verify memory placement.
+"""Verify memory placement.
 
 A static, build-time guard that the tensor arena actually landed in the
 memory region the planner resolved.  It reads the arena symbol's link

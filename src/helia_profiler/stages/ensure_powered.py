@@ -1,4 +1,4 @@
-"""Stage 0b — Ensure target board powered.
+"""Ensure target board powered.
 
 Vendor-neutral wrapper around :meth:`PowerDriver.ensure_target_powered`.
 Whatever the configured power driver is (Joulescope relay passthrough,

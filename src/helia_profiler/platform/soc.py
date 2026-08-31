@@ -148,15 +148,6 @@ class ClockDomain:
     def speed_names(self) -> tuple[str, ...]:
         return tuple(s.name for s in self.speeds)
 
-    @property
-    def default_speed(self) -> ClockSpeed:
-        speed = self.speed(self.default)
-        if speed is None:
-            raise ValueError(
-                f"Clock domain '{self.name}' default '{self.default}' is not a declared speed."
-            )
-        return speed
-
 @dataclass(frozen=True)
 class SocDef:
     """Definition of an Ambiq SoC relevant to profiling."""
@@ -294,11 +285,6 @@ class SocDef:
         return self.pmu_tier is PmuTier.ARMV8M_PMU
 
     @property
-    def has_dwt(self) -> bool:
-        """All supported Cortex-M targets expose the DWT cycle counter."""
-        return True
-
-    @property
     def requires_attached_probe_for_cycles(self) -> bool:
         """Whether DWT cycle counts require a debugger attached during capture.
 
@@ -339,14 +325,6 @@ class SocDef:
         if self.has_mve:
             domains.append("mve")
         return tuple(domains)
-
-    @property
-    def feature_flags(self) -> tuple[str, ...]:
-        """Short capability tags suitable for logs, metadata, and CLI output."""
-        flags: list[str] = list(self.profiling_backends)
-        if self.has_mve:
-            flags.append("mve")
-        return tuple(flags)
 
 
 # ---------------------------------------------------------------------------

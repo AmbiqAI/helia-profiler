@@ -1,4 +1,9 @@
-"""Pipeline stages — one module per stage, re-exported here."""
+"""Pipeline stages — one module per stage, re-exported here.
+
+The canonical execution order is ``profiler.build_default_pipeline()``;
+stage docstrings deliberately carry no position numbers (three ad-hoc
+numbering schemes fossilized here before #229 dropped them).
+"""
 
 from .preflight import PreflightStage
 from .ensure_powered import EnsureBoardPoweredStage

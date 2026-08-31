@@ -1,4 +1,4 @@
-"""Stage 2b — Plan memory: choose placement and validate against capacity.
+"""Plan memory: choose placement and validate against capacity.
 
 Two responsibilities:
 

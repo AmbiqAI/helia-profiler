@@ -1,7 +1,9 @@
 """Capture transport backends for heliaPROFILER.
 
-This package owns the wire protocol (:mod:`.protocol`) and — added in later
-commits — the :class:`CaptureTransport` backend objects and their registry.
+This package owns the :class:`CaptureTransport` backend objects and their
+registry. The wire vocabulary itself (keys, sentinels, error codes) lives in
+:mod:`helia_profiler.wire`; :mod:`.protocol` here is the shared
+line-collection loop that consumes it.
 
 The HPX protocol constants and the shared line-collection loop live in
 :mod:`helia_profiler.transport.protocol`; they are re-exported here for

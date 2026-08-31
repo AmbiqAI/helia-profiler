@@ -3,10 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .capabilities import PowerCaptureCapabilities
 
 DEFAULT_SYNC_GPIO_PIN = 10
 # 3-wire lock-step sync defaults: device drives gate + state, host drives go.
@@ -57,13 +53,6 @@ class BoardDef:
     def profile_source_board(self) -> str:
         """Board name used to derive starter-profile-owned NSX metadata."""
         return self.starter_profile_board or self.name
-
-    @property
-    def power_capture(self) -> PowerCaptureCapabilities:
-        """Power-capture wiring defaults (sync/state/go GPIO pins) for this board."""
-        from .capabilities import build_power_capture_capabilities
-
-        return build_power_capture_capabilities(self)
 
 
 # ---------------------------------------------------------------------------

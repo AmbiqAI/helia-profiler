@@ -1,4 +1,4 @@
-"""Stage 2.5 — Analyze model: extract per-layer OPS/MACs from the tflite flatbuffer.
+"""Analyze model: extract per-layer OPS/MACs from the tflite flatbuffer.
 
 This stage is **optional** — it silently skips if ``ai-edge-litert`` is not
 installed.  Results are stored in ``ctx.model_analysis`` and merged into the

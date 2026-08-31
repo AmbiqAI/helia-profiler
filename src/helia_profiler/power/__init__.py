@@ -5,8 +5,9 @@ Two measurement modes:
 - **external**: An off-chip instrument (e.g. Joulescope) samples current on
   the target's power rail while the firmware toggles a GPIO sync pin to
   bracket inference.  Captures whole-inference energy only.
-- **internal**: On-device measurement via SoC power registers or PMU events.
-  Can potentially capture per-layer power.  (Future / experimental.)
+- **internal**: On-device measurement. INA228 monitor summaries flow
+  through the power terminal today; the standalone ``ondevice`` driver is
+  registered but its capture path is not implemented.
 
 Driver names:
 

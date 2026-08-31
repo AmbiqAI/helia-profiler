@@ -1,4 +1,4 @@
-"""Stage 3 — Generate firmware: render Jinja templates into an NSX app."""
+"""Generate firmware: render Jinja templates into an NSX app."""
 
 from __future__ import annotations
 

@@ -1,6 +1,7 @@
 """Toolchain probes — ``--version`` and binary-section size queries.
 
-Centralises every shell-out for read-only toolchain info so that:
+Centralises the toolchain-version shell-outs (binary-inspection shell-outs
+live in ``elf_inventory``, re-exported here) so that:
 
 * ``build_firmware`` does not need ``subprocess`` at all;
 * timeout handling, error capture, and output parsing live in one place;
