@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import Literal
 
@@ -12,8 +11,7 @@ from helia_profiler.firmware.fingerprint import (
     measured_power_fingerprint,
 )
 
-sys.path.insert(0, str(Path(__file__).parent))
-from test_template_render import _render_tflm  # noqa: E402
+from tests.test_template_render import _render_tflm
 
 
 class TestCanonicalCode:

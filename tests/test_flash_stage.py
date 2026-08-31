@@ -42,15 +42,16 @@ def _make_ctx(tmp_path: Path, *, board: str = "apollo510_evb") -> PipelineContex
     ctx.resolved_jlink_serial = "1160001481"
     ctx.firmware_dir = tmp_path / "app"
     ctx.firmware_dir.mkdir(parents=True, exist_ok=True)
-    set_profile_firmware(ctx, binary_path=tmp_path / "app" / "hpx_profiler")
-    ctx.binary_path.write_bytes(b"elf")
+    binary_path = tmp_path / "app" / "hpx_profiler"
+    set_profile_firmware(ctx, binary_path=binary_path)
+    binary_path.write_bytes(b"elf")
     ctx.publish_profile_firmware(
         FirmwareArtifact(
             role="profile",
             target_name="hpx_profiler",
             app_dir=ctx.firmware_dir,
             build_dir=ctx.firmware_dir,
-            binary_path=ctx.binary_path,
+            binary_path=binary_path,
         )
     )
     return ctx

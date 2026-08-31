@@ -52,7 +52,7 @@ def set_profile_firmware(
             target_name="hpx_profiler",
             app_dir=ctx.firmware_dir or ctx.work_dir,
             build_dir=resolved_build_dir,
-            binary_path=resolved_binary_path,  # type: ignore[arg-type]
+            binary_path=resolved_binary_path,  # ty: ignore[invalid-argument-type]  # tests may inject sentinels through the helper
             binary_sections=ctx.binary_sections,
         )
 
@@ -111,7 +111,7 @@ def set_power_firmware(
             target_name="hpx_profiler_power",
             app_dir=ctx.firmware_dir or ctx.work_dir,
             build_dir=ctx.build_dir or ctx.work_dir / "build",
-            binary_path=resolved_binary_path,  # type: ignore[arg-type]
+            binary_path=resolved_binary_path,  # ty: ignore[invalid-argument-type]  # tests may inject sentinels through the helper
         )
 
     deployment = (

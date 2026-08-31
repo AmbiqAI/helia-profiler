@@ -1146,7 +1146,9 @@ def test_degraded_free_form_capture_suppresses_derived_efficiency(tmp_path: Path
     assert summary["validity"] == "degraded"
     assert [issue["code"] for issue in summary["issues"]] == [IssueCode.POWER_OBSERVATION_DEGRADED]
 
-    json_path = _write_json(ctx.pmu_result, ctx.power_result, ctx.run_metadata, tmp_path)
+    pmu_result = ctx.pmu_result
+    assert pmu_result is not None
+    json_path = _write_json(pmu_result, ctx.power_result, ctx.run_metadata, tmp_path)
     full = json.loads(json_path.read_text())
     assert full["power"]["observation"] == {
         "measurement_scope": "free_form_capture",

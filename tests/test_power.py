@@ -3286,8 +3286,8 @@ class TestGatedCaptureCapabilityDetection:
                 )
 
         register_driver(
-            "custom-gated-test-driver", CustomGatedDriver
-        )  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the gated-capture surface
+            "custom-gated-test-driver", CustomGatedDriver  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the gated-capture surface
+        )
 
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")
