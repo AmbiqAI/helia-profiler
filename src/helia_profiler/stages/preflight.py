@@ -284,20 +284,16 @@ def _check_runtime_split_locations(cfg) -> None:
     runtime_arena = cfg.model.arena_location
     runtime_weights = cfg.model.weights_location
 
+    # The engine, not the placement, decides how PSRAM gets populated
+    # (#219) — so PSRAM validity is an adapter capability, not an
+    # EngineType branch.
+    adapter = get_adapter(cfg.engine.type)
     if runtime_arena == Placement.PSRAM or runtime_weights == Placement.PSRAM:
-        # The engine, not the placement, decides how PSRAM gets populated
-        # (#219) — so PSRAM validity is an adapter capability, not an
-        # EngineType branch.
-        adapter = get_adapter(cfg.engine.type)
         if adapter.psram_weights_source is PsramWeightsSource.UNSUPPORTED:
             raise ConfigError(
                 f"{adapter.name} profiling does not support PSRAM model or arena placement.",
                 hint="Use model.arena_location=tcm|sram and model.weights_location=tcm|sram|mram.",
             )
-        # Engine-specific PSRAM-config constraints (e.g. heliaAOT requires
-        # external-arena mode, or its firmware renders no PSRAM code).
-        adapter.check_psram_placement(cfg)
-
         if (
             runtime_weights == Placement.PSRAM
             and adapter.psram_weights_source is PsramWeightsSource.HOST_UPLOAD
@@ -310,6 +306,12 @@ def _check_runtime_split_locations(cfg) -> None:
                     "Use --transport rtt, or keep weights in MRAM/SRAM."
                 ),
             )
+    # Engine-specific PSRAM constraints — called unconditionally, not just
+    # when the coarse split fields say PSRAM: an engine can be steered into
+    # PSRAM by its own config (heliaAOT per-tensor rules in
+    # aot_args.memory.tensors) with both coarse fields unset, and that path
+    # must hit the same fail-fast wall.
+    adapter.check_psram_placement(cfg)
 
     _check_explicit_location(
         runtime_arena,

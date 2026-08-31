@@ -120,6 +120,48 @@ class TestPreflightHappyPath:
                 PreflightStage().run(ctx)
         assert "allocate_arenas" in str(excinfo.value)
 
+    @pytest.mark.parametrize(
+        "rule_attrs",
+        [
+            {"memory": "psram"},
+            {"memory": "mram", "constant_destination_memory": "psram"},
+        ],
+        ids=["memory", "constant_destination_memory"],
+    )
+    def test_helia_aot_rejects_tensor_rule_psram_without_external_arena_mode(
+        self, tmp_path: Path, rule_attrs: dict
+    ):
+        """PSRAM via aot_args.memory.tensors hits the same wall (#219).
+
+        The coarse split fields are not the only route into PSRAM — a
+        per-tensor rule can steer constants there with both fields unset,
+        and under the default allocate_arenas=True that renders the same
+        firmware-with-no-PSRAM-code silent no-op.
+        """
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00\x00\x00\x00TFL3" + b"\x00" * 512)
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {"path": str(model)},
+                "engine": {
+                    "type": "helia-aot",
+                    "config": {
+                        "aot_args": {
+                            "memory": {
+                                "tensors": [
+                                    {"type": "constant", "attributes": rule_attrs},
+                                ]
+                            }
+                        }
+                    },
+                },
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="external-arena mode"):
+                PreflightStage().run(ctx)
+
     def test_helia_aot_accepts_psram_placement_in_external_arena_mode(self, tmp_path: Path):
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00\x00\x00\x00TFL3" + b"\x00" * 512)

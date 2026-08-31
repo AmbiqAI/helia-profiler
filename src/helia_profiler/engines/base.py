@@ -345,11 +345,14 @@ class EngineAdapter(Protocol):
     def check_psram_placement(self, config: ProfileConfig) -> None:
         """Validate engine-specific PSRAM-placement constraints.
 
-        Called by preflight only when the run actually places weights or
-        arena in PSRAM.  Raise ``ConfigError`` when the engine cannot
-        honour the placement under the given config — the point is to
-        fail in stage 0 with an actionable message, not to build firmware
-        whose memory plan and generated code disagree (#219).
+        Called unconditionally by preflight — the adapter decides for
+        itself whether the config steers anything into PSRAM, because
+        that can happen through engine-private config (heliaAOT's
+        per-tensor rules) with the coarse split fields unset.  Raise
+        ``ConfigError`` when the engine cannot honour the placement under
+        the given config — the point is to fail in stage 0 with an
+        actionable message, not to build firmware whose memory plan and
+        generated code disagree (#219).
         """
         ...
 

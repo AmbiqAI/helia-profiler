@@ -36,6 +36,34 @@ from .manifest import _extract_arena_regions, _extract_memory_plan, _extract_ope
 log = logging.getLogger("hpx")
 
 
+def _psram_requested(config: ProfileConfig) -> bool:
+    """True when any part of this config steers tensors into PSRAM.
+
+    Two routes exist: the coarse split fields, and per-tensor rules in
+    ``aot_args.memory.tensors`` (``memory: psram`` or a staged
+    ``constant_destination_memory: psram``).  Detection is best-effort on
+    the raw dicts — malformed rules are ``EngineError``s for
+    ``_prepare_aot_memory_config`` later, not this check's concern.
+    """
+    if Placement.PSRAM in (config.model.arena_location, config.model.weights_location):
+        return True
+    tensors = config.engine.config.get("aot_args", {}).get("memory", {}).get("tensors", [])
+    if not isinstance(tensors, list):
+        return False
+    for rule in tensors:
+        if not isinstance(rule, dict):
+            continue
+        attributes = rule.get("attributes")
+        if not isinstance(attributes, dict):
+            continue
+        if "psram" in (
+            attributes.get("memory"),
+            attributes.get("constant_destination_memory"),
+        ):
+            return True
+    return False
+
+
 def _external_arena_mode(config: ProfileConfig) -> bool:
     """True when arena buffers are host-app allocated and bound at runtime.
 
@@ -82,7 +110,7 @@ class HeliaAOTAdapter:
         return PsramWeightsSource.SELF_CONTAINED
 
     def check_psram_placement(self, config: ProfileConfig) -> None:
-        if _external_arena_mode(config):
+        if _external_arena_mode(config) or not _psram_requested(config):
             return
         # Under the default allocate_arenas=True, main_aot.cc.j2 renders
         # ZERO PSRAM code while plan_memory happily reports tensors placed
