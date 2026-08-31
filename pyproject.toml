@@ -116,9 +116,10 @@ helia_profiler = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-m 'not hardware'"
+addopts = "-m 'not hardware and not compile_hw'"
 markers = [
     "hardware: requires physical target hardware (EVB + J-Link, optional Joulescope). Excluded by default; run via `hpx validate` or `pytest -m hardware`.",
+    "compile_hw: compiles rendered firmware with the real arm-none-eabi toolchain against a warm dependency workspace (#187 Tier 2). No board needed, but skips wherever no workspace is cached; run on the bench via `pytest -m compile_hw`.",
 ]
 
 [tool.ruff]

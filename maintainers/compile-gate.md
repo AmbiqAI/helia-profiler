@@ -65,9 +65,52 @@ the module skips there. So: Linux/GNU hosts run it in the normal suite;
 macOS and Windows skip. A clang lane with its own flag set is possible
 future work.
 
-## Tier 2 (pending)
+## Tier 2 — real-toolchain ground truth (`compile_hw`)
 
-Tier 2 of #187 — compiling a ~12-TU representative matrix with the real
-`arm-none-eabi-g++` against a cached dependency workspace's include set,
-marked for the bench/nightly (`compile_hw`) — is designed in the issue but
-not yet implemented.
+`tests/contracts/test_render_compile_hw.py` compiles a 12-row matrix of the
+most template-diverse renders (engine × template family × power/busy, over
+apollo510 + apollo330P) with the **real** `arm-none-eabi-g++` against a
+**real** cached dependency workspace's include set — real vendor HAL
+headers, real `-mcpu`, NSX's own `-Wall` upgraded to `-Werror`. About
+1.5 s per TU.
+
+Run it on the bench (or any machine with warm workspaces):
+
+```bash
+uv run pytest -m compile_hw tests/contracts/test_render_compile_hw.py
+```
+
+How it works, and the rules it must keep:
+
+- **The command comes from the workspace, the code from the checkout.**
+  DEFINES/INCLUDES/FLAGS are parsed from the workspace's `build.ninja`
+  per-TU stanza and the compiler from `rules.ninja` (ninja
+  `${LAUNCHER}`-style prefixes stripped) — no configure step, no guessing
+  from PATH. The TUs themselves are rendered from the current checkout;
+  the workspace's `src/` is never trusted.
+- **Read-only on the cache.** The test shares the bench's warm workspace
+  cache (`HPX_CACHE_DIR`); it must never write under it. Scratch TUs go to
+  pytest's `tmp_path`. `-fsyntax-only` means no objects and no
+  launcher/ccache interplay.
+- **Vendored headers are `-isystem`.** Workspace `modules/` include dirs
+  are demoted so diagnostics located *inside* vendor headers (e.g. the
+  `AM_SHARED_RW` redefinition between `nsx_mem.h` and `am_hal_global.h`,
+  present in every production build) don't gate our rendered code, which
+  compiles at full `-Werror`.
+- **Legs skip with a named reason** when their workspace is absent, has no
+  fingerprinted (post-#212) layout, or was built against a different
+  compatibility baseline than the checkout — the test never builds a
+  workspace (a cold sync is minutes of network+compile; wrong cost profile
+  for a compile gate). Warm a leg by running any profile/validate with
+  that (board, toolchain, engine) combo.
+- **The expected-bugs ledger is strict both ways**, same as Tier 1: an
+  entry keeps its case red-with-reason, and a case that starts compiling
+  fails the suite until the entry is removed.
+- **Matrix drift is loud**: `test_matrix_covers_every_engine_family` binds
+  the rows to the render engine enumeration, so a new engine (e.g. an
+  atomiq110 NPU backend) fails the gate until it gets a Tier-2 leg or a
+  recorded reason.
+
+Toolchain versions are recorded in failure output, not enforced — a
+compiler upgrade changing warning behavior is exactly what the nightly
+should surface, with the ledger absorbing deliberate acceptances.
