@@ -146,7 +146,8 @@ def _resolve_workspace(case: _HwCase) -> _Workspace | str:
         resolved = _resolve_candidate(app_dir, case)
         if isinstance(resolved, _Workspace):
             return resolved
-        reasons.append(f"{app_dir.parent.name[:12]}…: {resolved}")
+        name = app_dir.parent.name
+        reasons.append(f"{name[:12] + '…' if len(name) > 12 else name}: {resolved}")
     return "; ".join(reasons)
 
 
@@ -362,6 +363,19 @@ def _aot_prefix_in(app_dir: Path) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+def _require_all_legs() -> bool:
+    """HPX_COMPILE_HW_REQUIRE_ALL: any value except off-like ones arms it —
+    a workflow author writing "true" must not silently lose enforcement
+    (#225 lens 2)."""
+    return os.environ.get("HPX_COMPILE_HW_REQUIRE_ALL", "").strip().lower() not in (
+        "",
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
 @pytest.mark.compile_hw
 def test_rendered_firmware_compiles_with_the_real_toolchain(tmp_path: Path):
     """Aggregated like Tier 1: every failure reported together, strict
@@ -375,10 +389,16 @@ def test_rendered_firmware_compiles_with_the_real_toolchain(tmp_path: Path):
         else:
             runnable.append((case, resolved))
     if not runnable:
-        pytest.skip(
+        status = (
             "no warm dependency workspace for any matrix leg — run on the "
             "bench after a profile/validate. Legs:\n  " + "\n  ".join(skipped)
         )
+        # The MOST degraded run must not be the one that stays green: with
+        # REQUIRE_ALL armed, a wiped cache or mistyped HPX_CACHE_DIR in the
+        # workflow is a failure, not a skip (#225 lens 2).
+        if _require_all_legs():
+            pytest.fail(status)
+        pytest.skip(status)
     # A partial run must be DISTINGUISHABLE from a full one (#225 lens F1):
     # a green nightly where nine legs silently never compiled is the gate
     # lying. Skipped legs surface as a warning every run, and
@@ -389,7 +409,7 @@ def test_rendered_firmware_compiles_with_the_real_toolchain(tmp_path: Path):
             f"compile_hw ran {len(runnable)}/{len(_MATRIX)} legs; skipped:\n  "
             + "\n  ".join(skipped)
         )
-        if os.environ.get("HPX_COMPILE_HW_REQUIRE_ALL") == "1":
+        if _require_all_legs():
             pytest.fail(status)
         warnings.warn(status, stacklevel=1)
 
@@ -427,15 +447,17 @@ def test_rendered_firmware_compiles_with_the_real_toolchain(tmp_path: Path):
             rc == 0 for c, _t, rc, *_ in results if c.case_id == case_id
         ):
             stale.append(case_id)
-    versions = {
-        str(ws.compiler): _compiler_version(ws.compiler)
-        for _case, ws in runnable
-    }
-    assert not failures, (
-        f"{len(failures)} rendered TUs rejected by the real toolchain "
-        f"({'; '.join(f'{path}: {ver}' for path, ver in versions.items())}):\n\n"
-        + "\n\n".join(failures)
-    )
+    if failures:
+        # Lazy and deduped on purpose: green runs spawn no subprocesses,
+        # and N legs sharing one compiler probe it once (#225 lens 2).
+        compilers = {ws.compiler for _case, ws in runnable}
+        versions = "; ".join(
+            f"{compiler}: {_compiler_version(compiler)}" for compiler in sorted(compilers)
+        )
+        pytest.fail(
+            f"{len(failures)} rendered TUs rejected by the real toolchain "
+            f"({versions}):\n\n" + "\n\n".join(failures)
+        )
     assert not stale, (
         "stale _EXPECTED_HW_BUGS entries (cases now compile — remove them): "
         + ", ".join(sorted(set(stale)))
@@ -450,7 +472,9 @@ def _compiler_version(compiler: Path) -> str:
             [str(compiler), "--version"], capture_output=True, text=True, timeout=10
         )
         return out.stdout.splitlines()[0] if out.stdout else "version unknown"
-    except OSError:
+    except (OSError, subprocess.SubprocessError):
+        # TimeoutExpired is a SubprocessError, NOT an OSError — a hanging
+        # compiler wrapper must degrade to "unknown", never crash the gate.
         return "version unknown"
 
 
@@ -592,8 +616,21 @@ class TestNinjaStanzaParser:
         assert "-I/with" not in tokens
 
     def test_launcher_is_ignored_and_optional(self):
-        v = _tu_variables(_SYNTHETIC_NINJA, "hpx_profiler_power", "src/main_power.cc")
-        assert v is not None and "LAUNCHER" not in ("DEFINES", "FLAGS", "INCLUDES")
+        with_launcher = _tu_variables(_SYNTHETIC_NINJA, "hpx_profiler", "src/main.cc")
+        assert with_launcher is not None
+        assert set(with_launcher) == {"DEFINES", "INCLUDES", "FLAGS", "LAUNCHER"}
+        without = _tu_variables(_SYNTHETIC_NINJA, "hpx_profiler_power", "src/main_power.cc")
+        assert without is not None and "LAUNCHER" not in without
+        # The launcher must never reach the compile argv.
+        ws = _Workspace(
+            app_dir=Path("/ws"),
+            build_dir=Path("/ws/build/b"),
+            compiler=Path("/usr/bin/g++"),
+            ninja_text=_SYNTHETIC_NINJA,
+        )
+        command = _compile_command(ws, _MATRIX[0], Path("/scratch"), Path("/scratch/main.cc"))
+        assert isinstance(command, list)
+        assert not any("sccache" in token for token in command)
 
     def test_depfile_flags_are_stripped_from_the_command(self):
         """-MMD writes .d files into the CWD even under -fsyntax-only — the

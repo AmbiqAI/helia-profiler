@@ -106,8 +106,10 @@ How it works, and the rules it must keep:
   compile gate). Warm a leg by running any profile/validate with that
   (board, toolchain, engine) combo. **A partial run is visible**: skipped
   legs surface as a pytest warning every run, and
-  `HPX_COMPILE_HW_REQUIRE_ALL=1` turns any partial run into a failure —
-  the setting for a bench whose full matrix should be warm.
+  `HPX_COMPILE_HW_REQUIRE_ALL=1` (any value except `0`/`false`/`no`/`off`
+  arms it) turns any partial run — **including a zero-leg run from a
+  wiped or mispointed cache** — into a failure: the setting for a bench
+  whose full matrix should be warm.
 - **The expected-bugs ledger is strict both ways**, same as Tier 1: an
   entry keeps its case red-with-reason, and a case that starts compiling
   fails the suite until the entry is removed.
