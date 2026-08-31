@@ -490,7 +490,9 @@ def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[Laye
             memory_diff = _format_memory_diff(base_mem_counts, cand_mem_counts)
 
         counters: dict[str, CounterDiff] = {}
-        for key in sorted((set(b) & set(c)) - {"id", "op", "cycles", "overflow"}):
+        # source_index is an identifier (#218), not a metric — a delta
+        # between two operator indices means nothing.
+        for key in sorted((set(b) & set(c)) - {"id", "op", "cycles", "overflow", "source_index"}):
             bf = _to_float(b.get(key))
             cf = _to_float(c.get(key))
             if bf is None or cf is None:

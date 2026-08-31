@@ -425,11 +425,22 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         layer_table.add_column("MVE stalls\n/ all cycles", justify="right", min_width=10)
     layer_table.add_column("", width=4)  # overflow marker
 
-    # Build a lookup from layer id -> LayerOps
-    macs_lookup: dict[int, int] = {}
+    # #218: MACs join on the ORIGINAL tflite operator index (manifest, then
+    # op-label suffix), never on the execution position — AOT renumbers.
+    attributor = None
     if has_macs:
-        for la in ctx.model_analysis.layers:
-            macs_lookup[la.id] = la.macs
+        from ..engines.base import HeliaAotArtifacts
+        from ..evaluation.layer_attribution import LayerAttributor
+
+        # An AOT run always gets an authoritative manifest — [] when
+        # extraction failed, because degraded firmware labels layers with
+        # POSITIONS and the suffix fallback would join positionally again.
+        manifest = (
+            (ctx.engine_artifacts.aot_op_manifest or [])
+            if isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
+            else None
+        )
+        attributor = LayerAttributor(ctx.model_analysis, manifest)
 
     for i, layer in enumerate(top_n, 1):
         cyc = layer.cycles or 0
@@ -451,9 +462,8 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
             f"{cyc:,.0f}",
             f"[{pct_style}]{pct:.1f}%[/{pct_style}]",
         ]
-        if has_macs:
-            lid = int(layer.id) if isinstance(layer.id, (int, float)) else -1
-            lm = macs_lookup.get(lid, 0)
+        if attributor is not None:
+            lm = attributor.attribute(layer.id, layer.op, layer.source_index).macs
             row_vals.append(f"{lm:,}" if lm else "—")
             row_vals.append(f"{cyc / lm:.1f}" if lm and cyc else "—")
         if has_mve:

@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ..errors import ReportError
+from ..evaluation.layer_attribution import LayerAttribution, LayerAttributor
 from ..results import LayerResult
 
 if TYPE_CHECKING:
@@ -24,11 +25,18 @@ log = logging.getLogger("hpx")
 
 def _layer_to_flat_dict(
     layer: LayerResult,
-    analysis: ModelAnalysis | None = None,
+    attribution: LayerAttribution | None = None,
     total_cycles: float | None = None,
 ) -> dict[str, Any]:
-    """Flatten a LayerResult into a CSV-friendly dict."""
+    """Flatten a LayerResult into a CSV-friendly dict.
+
+    ``attribution`` carries the analysis facts already resolved on the
+    ORIGINAL operator index (#218) — this function never indexes the
+    analysis positionally.
+    """
     row: dict[str, Any] = {"id": layer.id, "op": layer.op}
+    if attribution is not None and attribution.explicit and attribution.source_index is not None:
+        row["source_index"] = attribution.source_index
     row.update(layer.counters)
     if layer.cycles is not None:
         row["cycles"] = layer.cycles
@@ -39,15 +47,11 @@ def _layer_to_flat_dict(
             row["cycles_pct"] = round(layer.cycles / total_cycles * 100, 1)
     row["overflow"] = layer.overflow
 
-    # Enrich with model analysis data when available
-    if analysis is not None:
-        layer_idx = int(layer.id) if isinstance(layer.id, (int, float)) else None
-        if layer_idx is not None and 0 <= layer_idx < len(analysis.layers):
-            la = analysis.layers[layer_idx]
-            row["macs"] = la.macs
-            row["ops"] = la.ops
-            if la.macs > 0 and layer.cycles:
-                row["cycles_per_mac"] = round(layer.cycles / la.macs, 2)
+    if attribution is not None and attribution.macs is not None:
+        row["macs"] = attribution.macs
+        row["ops"] = attribution.ops
+        if attribution.macs > 0 and layer.cycles:
+            row["cycles_per_mac"] = round(layer.cycles / attribution.macs, 2)
 
     return row
 
@@ -56,6 +60,7 @@ def _write_csv(
     pmu: PmuResult,
     output_dir: Path,
     analysis: ModelAnalysis | None = None,
+    aot_op_manifest: list[dict[str, Any]] | None = None,
 ) -> Path:
     """Write merged per-layer profiling results as CSV."""
     layers = pmu.layers
@@ -64,9 +69,19 @@ def _write_csv(
 
     out_path = output_dir / "profile_results.csv"
     total_cycles = sum(layer.cycles or 0 for layer in layers)
-    rows = [_layer_to_flat_dict(layer, analysis, total_cycles) for layer in layers]
+    attributor = LayerAttributor(analysis, aot_op_manifest)
+    rows = [
+        _layer_to_flat_dict(
+            layer,
+            attributor.attribute(layer.id, layer.op, layer.source_index),
+            total_cycles,
+        )
+        for layer in layers
+    ]
     fieldnames = list(rows[0].keys())
     # Ensure enriched columns appear even if first row lacks them
+    if any("source_index" in row for row in rows) and "source_index" not in fieldnames:
+        fieldnames.insert(2, "source_index")
     if analysis is not None:
         for col in ("macs", "ops", "cycles_per_mac"):
             if col not in fieldnames:

@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from tests.pipeline_context_helpers import set_power_result, set_profile_result
 
+import dataclasses
 import hashlib
 import json
 import os
@@ -421,6 +422,30 @@ def _make_ctx(tmp_path: Path, engine: EngineType, fmt: str) -> PipelineContext:
 
 def _make_aot_ctx(tmp_path: Path) -> PipelineContext:
     ctx = _make_ctx(tmp_path, EngineType.HELIA_AOT, "csv")
+    # #218: the AOT fixture is deliberately SKEWED — execution positions
+    # (0, 1) map to original tflite indices (0, 3) and the analysis carries
+    # original ids (0, 3, 5). A positional join would hand position 1 the
+    # macs of analysis.layers[1] (original id 3 happens to match here, so
+    # the ops are ALSO reordered vs the analysis list: position 1 is the
+    # zero-mac SOFTMAX). The golden digest pins the manifest join.
+    pmu = ctx.captured_pmu
+    skewed = [
+        dataclasses.replace(pmu.layers[0], op="CONV_2D:0"),
+        dataclasses.replace(pmu.layers[1], op="SOFTMAX:5"),
+        dataclasses.replace(pmu.layers[2], op="DEPTHWISE_CONV_2D:3"),
+    ]
+    set_profile_result(ctx, dataclasses.replace(pmu, layers=skewed))
+    ctx.model_analysis = ModelAnalysis(
+        layers=[
+            LayerOps(id=0, op="CONV_2D", macs=100_000, ops=200_000, original_id=0),
+            LayerOps(id=1, op="SOFTMAX", macs=0, ops=500, original_id=5),
+            LayerOps(id=2, op="DEPTHWISE_CONV_2D", macs=20_000, ops=40_000, original_id=3),
+        ],
+        total_macs=120_000,
+        total_ops=240_500,
+        num_parameters=5000,
+        engine="helia-aot",
+    )
     ctx.engine_artifacts = HeliaAotArtifacts(
         engine_type=EngineType.HELIA_AOT,
         engine_header="model_model.h",
@@ -464,7 +489,7 @@ def _make_aot_ctx(tmp_path: Path) -> PipelineContext:
             },
             {
                 "idx": 1,
-                "id": 1,
+                "id": 5,
                 "op_type": "SOFTMAX",
                 "name": "softmax1",
                 "inputs": [],
@@ -479,6 +504,9 @@ def _make_aot_ctx(tmp_path: Path) -> PipelineContext:
                     },
                 ],
             },
+            # Position 2 (DEPTHWISE_CONV_2D:3) is deliberately ABSENT from
+            # the manifest: the manifest is authoritative, so that layer
+            # must get NO mac attribution despite its parsable :3 suffix.
         ],
     )
     return ctx

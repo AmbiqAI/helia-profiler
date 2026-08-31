@@ -170,8 +170,17 @@ id,op,ARM_PMU_CPU_CYCLES,ARM_PMU_INST_RETIRED,...,cycles,overflow
 1,DEPTHWISE_CONV_2D,206245,152970,...,206245,False
 ```
 
-- `id` — sequential layer index (TFLM) or original TFLite op index (AOT)
-- `op` — operator type (e.g. `CONV_2D`, `DEPTHWISE_CONV_2D:1` for AOT)
+- `id` — the firmware's execution position: the sequential layer index
+  (TFLM/helia-rt) or the post-compilation layer position (AOT — heliaAOT
+  skips ops such as `VAR_HANDLE` without renumbering, so this is NOT the
+  original TFLite index)
+- `source_index` — AOT only: the ORIGINAL TFLite operator index this layer
+  corresponds to (from the compiled-operator manifest). Per-layer `macs`,
+  `ops` and `cycles_per_mac` are joined on this, never on position; a layer
+  with no resolvable source index gets no MAC attribution rather than a
+  positional guess
+- `op` — operator type (e.g. `CONV_2D`; `DEPTHWISE_CONV_2D:1` for AOT,
+  where `:1` is the original TFLite index)
 - Counter columns — averaged across iterations
 - `cycles` — dedicated cycle counter value
 - `overflow` — `True` if any counter overflowed (2³² saturation)

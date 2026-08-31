@@ -31,7 +31,7 @@ import logging
 import shutil
 from dataclasses import asdict
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from ..errors import ReportError
 from .aot import _write_aot_manifest, _write_aot_memory_layers
@@ -53,6 +53,24 @@ log = logging.getLogger("hpx")
 __all__ = ["write_report"]
 
 
+def _aot_manifest(ctx: PipelineContext) -> list[dict[str, Any]] | None:
+    """The AOT operator manifest, when this run has one (#218).
+
+    It carries the execution-position -> original-tflite-index mapping the
+    per-layer MAC join needs; sequential engines have none and need none.
+    An AOT run whose manifest extraction FAILED returns ``[]``, not
+    ``None``: degraded firmware labels layers with positions, so the
+    suffix fallback would resurrect the positional join — an empty
+    authoritative manifest dashes everything instead.
+    """
+    from ..engines.base import HeliaAotArtifacts
+
+    artifacts = ctx.engine_artifacts
+    if isinstance(artifacts, HeliaAotArtifacts):
+        return artifacts.aot_op_manifest or []
+    return None
+
+
 def write_report(ctx: PipelineContext) -> list[Path]:
     """Generate all configured report outputs.
 
@@ -72,7 +90,7 @@ def write_report(ctx: PipelineContext) -> list[Path]:
 
     # --- Always: primary profile results ---
     if fmt == "csv":
-        p = _write_csv(pmu, output_dir, analysis)
+        p = _write_csv(pmu, output_dir, analysis, aot_op_manifest=_aot_manifest(ctx))
         paths.append(p)
     elif fmt == "json":
         p = _write_json(
