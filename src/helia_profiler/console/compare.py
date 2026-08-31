@@ -100,12 +100,13 @@ def _build_compare_run_table(metrics: list[MetricDiff]) -> Table:
     table.add_column("Change", justify="right", min_width=16)
 
     for metric in metrics:
-        lower_is_better = metric.name != "layers"
         table.add_row(
             _friendly_metric_name(metric.name),
             _format_compare_value_compact(metric.baseline, metric.unit),
             _format_compare_value_compact(metric.candidate, metric.unit),
-            _format_compare_change_compact(metric, lower_is_better=lower_is_better),
+            # Direction is declared per row (#206), not guessed from the
+            # name -- "free" and "inferences_per_joule" are higher-is-better.
+            _format_compare_change_compact(metric, lower_is_better=metric.lower_is_better),
         )
 
     return table
@@ -230,6 +231,10 @@ def _friendly_metric_name(name: str) -> str:
         "memory.allocated_arena": "Allocated arena",
         "memory.model_size": "Model size",
     }
+    if name.startswith("memory_regions."):
+        # memory_regions.<REGION>.<used|free> -> "DTCM used"
+        _, region, field_name = name.split(".", 2)
+        return f"{region} {field_name}"
     return labels.get(name, name)
 
 

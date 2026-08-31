@@ -5,7 +5,7 @@ from pathlib import Path
 
 from helia_profiler.evaluation import ComparabilitySeverity, assess_comparability
 from helia_profiler.evaluation import RunArtifacts
-from helia_profiler.results.issues import ComparabilityCode, ComparisonDimension, DIMENSION_DIFFERS, POWER_DIMENSION_MISMATCH
+from helia_profiler.results.issues import ComparabilityCode, ComparisonDimension, DIMENSION_DIFFERS, MEMORY_DIMENSION_MISMATCH, POWER_DIMENSION_MISMATCH
 
 
 def _run(
@@ -588,3 +588,106 @@ def test_scoped_to_is_declared_only_where_the_comparator_honours_it():
         # registry dimension.
         for scope in spec.scoped_to:
             assert scope in DIMENSION_REGISTRY
+
+
+class TestLinkFamily:
+    """#206: per-region memory used/free are the same quantity only within a
+    linker family (GNU counts the floating stack inside the app extent;
+    armlink's reservations sit outside it). The first non-power metric group
+    -- gates ONLY the per-region rows; binary.* stays comparable."""
+
+    @staticmethod
+    def _run_with(link_family: str | None):
+        """A run as the producer writes it: the family in the platform record
+        AND in the measured block (same classifier). ``None`` = pre-#133,
+        no family and no block anywhere."""
+        run = _run()
+        if link_family is not None:
+            run.metadata["platform"]["link_family"] = link_family
+            run.summary["memory_regions"] = {"link_family": link_family, "regions": []}
+        return run
+
+    def test_mismatch_blocks_memory_metrics_only(self):
+        assessment = assess_comparability(self._run_with("gnu"), self._run_with("armlink"))
+
+        assert assessment.run_metrics_comparable
+        assert assessment.power_metrics_comparable
+        assert not assessment.memory_metrics_comparable
+        issue = next(
+            issue
+            for issue in assessment.issues
+            if issue.code == MEMORY_DIMENSION_MISMATCH.code_for(ComparisonDimension.LINK_FAMILY)
+        )
+        assert issue.severity is ComparabilitySeverity.METRIC_BLOCKING
+        assert issue.context["metric_group"] == "memory"
+        assert issue.context["baseline"] == "gnu"
+        assert issue.context["candidate"] == "armlink"
+        assert "armlink" in issue.message  # the hint explains WHY
+
+    def test_same_family_compares_freely(self):
+        assessment = assess_comparability(self._run_with("gnu"), self._run_with("gnu"))
+
+        assert assessment.memory_metrics_comparable
+        assert not any(
+            issue.code == MEMORY_DIMENSION_MISMATCH.code_for(ComparisonDimension.LINK_FAMILY)
+            for issue in assessment.issues
+        )
+
+    def test_a_baseline_predating_the_dimension_is_skipped(self):
+        """Pre-#133 artifacts carry no link family anywhere: unknown, not
+        different."""
+        assessment = assess_comparability(self._run_with(None), self._run_with("armlink"))
+
+        assert assessment.memory_metrics_comparable
+
+    def test_pre_206_artifacts_fall_back_to_the_measured_family(self):
+        """#213 lens: every #133+ summary records the family the measurer
+        saw in memory_regions -- a pre-#206 gnu-vs-armlink pair must gate
+        exactly like a post-#206 one, not slip through the None-skip rule."""
+        base = self._run_with(None)
+        cand = self._run_with(None)
+        base.summary["memory_regions"] = {"link_family": "gnu", "regions": []}
+        cand.summary["memory_regions"] = {"link_family": "armlink", "regions": []}
+
+        assessment = assess_comparability(base, cand)
+
+        assert not assessment.memory_metrics_comparable
+        issue = next(
+            issue
+            for issue in assessment.issues
+            if issue.code == MEMORY_DIMENSION_MISMATCH.code_for(ComparisonDimension.LINK_FAMILY)
+        )
+        assert (issue.context["baseline"], issue.context["candidate"]) == ("gnu", "armlink")
+
+    def test_no_issue_when_neither_run_measured_regions(self):
+        """#213 lens 1: a cross-family pair whose memory measurement failed
+        on both sides has no rows to withhold -- no 'metrics omitted'."""
+        base = self._run_with("gnu")
+        cand = self._run_with("armlink")
+        base.summary.pop("memory_regions", None)
+        cand.summary.pop("memory_regions", None)
+
+        assessment = assess_comparability(base, cand)
+
+        assert assessment.memory_metrics_comparable
+        assert not any(
+            issue.code == MEMORY_DIMENSION_MISMATCH.code_for(ComparisonDimension.LINK_FAMILY)
+            for issue in assessment.issues
+        )
+
+    def test_the_platform_record_wins_over_the_summary_fallback(self):
+        base = self._run_with("gnu")
+        base.summary["memory_regions"] = {"link_family": "armlink", "regions": []}
+
+        assessment = assess_comparability(base, self._run_with("gnu"))
+
+        assert assessment.memory_metrics_comparable
+
+    def test_memory_gate_is_independent_of_power_gate(self):
+        """A memory mismatch must not touch power comparability, and a power
+        mismatch must not touch memory comparability -- two groups, two
+        gates."""
+        gnu = self._run_with("gnu")
+        arm = self._run_with("armlink")
+        assessment = assess_comparability(gnu, arm)
+        assert assessment.power_metrics_comparable and not assessment.memory_metrics_comparable

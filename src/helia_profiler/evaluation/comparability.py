@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from ..results import (
     COMPARABILITY_REGISTRY,
     DIMENSION_DIFFERS,
+    MEMORY_DIMENSION_MISMATCH,
     POWER_DIMENSION_MISMATCH,
     ComparabilityCode,
     ComparabilitySeverity,
@@ -51,13 +52,23 @@ class ComparabilityAssessment:
             issue.severity is ComparabilitySeverity.LAYER_BLOCKING for issue in self.issues
         )
 
-    @property
-    def power_metrics_comparable(self) -> bool:
+    def metric_group_comparable(self, group: str) -> bool:
+        """Whether one metric group's rows may be computed (#206): no
+        METRIC_BLOCKING issue carrying that group's tag."""
         return self.run_metrics_comparable and not any(
             issue.severity is ComparabilitySeverity.METRIC_BLOCKING
-            and issue.context.get("metric_group") == "power"
+            and issue.context.get("metric_group") == group
             for issue in self.issues
         )
+
+    @property
+    def power_metrics_comparable(self) -> bool:
+        return self.metric_group_comparable("power")
+
+    @property
+    def memory_metrics_comparable(self) -> bool:
+        """Per-region used/free rows are gated on the link family (#206)."""
+        return self.metric_group_comparable("memory")
 
 
 def _issue(code: ComparabilityCode, message: str, **context: Any) -> ComparabilityIssue:
@@ -138,8 +149,8 @@ def assess_comparability(
                 )
             )
 
-    baseline_dimensions = _dimensions(baseline)
-    candidate_dimensions = _dimensions(candidate)
+    baseline_dimensions = read_dimensions(baseline)
+    candidate_dimensions = read_dimensions(candidate)
     baseline_model = baseline_dimensions.get(ComparisonDimension.MODEL_SHA256)
     candidate_model = candidate_dimensions.get(ComparisonDimension.MODEL_SHA256)
     if baseline_model and candidate_model and baseline_model != candidate_model:
@@ -204,6 +215,34 @@ def assess_comparability(
                 )
             )
 
+    # Memory family (#206): per-region used/free are only the same quantity
+    # within a linker family. Same shape as the informative loop -- absent
+    # on either side (pre-#133 artifacts) skips, never blocks. The family
+    # is a platform fact recorded whether or not the measurement succeeded,
+    # so a pair where NEITHER side has a memory_regions block has nothing
+    # to gate: no "metrics omitted" issue for metrics that never existed
+    # (the power dims avoid this by being recorded only when power ran).
+    anything_to_gate = "memory_regions" in baseline.summary or "memory_regions" in candidate.summary
+    for dimension in MEMORY_DIMENSION_MISMATCH.dimensions:
+        if not anything_to_gate:
+            break
+        baseline_value = baseline_dimensions.get(dimension)
+        candidate_value = candidate_dimensions.get(dimension)
+        if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:
+            message = (
+                DIMENSION_REGISTRY[dimension].mismatch_hint
+                or f"Per-region memory metrics omitted because {dimension} differs."
+            )
+            issues.append(
+                _family_issue(
+                    MEMORY_DIMENSION_MISMATCH,
+                    dimension,
+                    message,
+                    baseline=baseline_value,
+                    candidate=candidate_value,
+                )
+            )
+
     baseline_ops = [row.get("op") for row in baseline.layers]
     candidate_ops = [row.get("op") for row in candidate.layers]
     if len(baseline.layers) != len(candidate.layers):
@@ -238,8 +277,12 @@ def assess_comparability(
     return ComparabilityAssessment(issues=tuple(issues))
 
 
-def _dimensions(run: RunArtifacts) -> dict[str, Any]:
+def read_dimensions(run: RunArtifacts) -> dict[str, Any]:
     """Registry-driven read of every dimension from the run artifacts.
+
+    The ONE reader: the comparability gate and the compare Config table
+    both consume this dict, so a dimension row can never show a value the
+    gate did not judge (manifest merge, summary fallback and all).
 
     Each spec declares its source and path (``results/dimensions.py``); the
     ``_nested`` traversal is deliberately crash-tolerant because artifacts
@@ -260,10 +303,11 @@ def _dimensions(run: RunArtifacts) -> dict[str, Any]:
     power = run.summary.get("power")
     power_dict = power if isinstance(power, dict) else None
     for spec in DIMENSION_REGISTRY.values():
-        if spec.source is ArtifactSource.RUN_METADATA:
-            dimensions[spec.dimension] = _nested(run.metadata, *spec.path)
-        elif spec.source is ArtifactSource.SUMMARY:
-            dimensions[spec.dimension] = _nested(run.summary, *spec.path)
+        if spec.source in (ArtifactSource.RUN_METADATA, ArtifactSource.SUMMARY):
+            value = _read_artifact_value(run, spec.source, spec.path)
+            if value is None and spec.fallback is not None:
+                value = _read_artifact_value(run, spec.fallback.source, spec.fallback.path)
+            dimensions[spec.dimension] = value
         elif spec.source is ArtifactSource.SUMMARY_POWER:
             if power_dict is not None:
                 dimensions[spec.dimension] = (
@@ -290,6 +334,19 @@ def _dimensions(run: RunArtifacts) -> dict[str, Any]:
             }
         )
     return dimensions
+
+
+def _read_artifact_value(run: RunArtifacts, source: ArtifactSource, path: tuple[str, ...]) -> Any:
+    """Path read from one path-addressable artifact (``None`` when absent).
+
+    Primary and ``fallback`` reads go through the same function so a
+    spec's fallback cannot mean something different from its path.
+    """
+    if source is ArtifactSource.RUN_METADATA:
+        return _nested(run.metadata, *path)
+    if source is ArtifactSource.SUMMARY:
+        return _nested(run.summary, *path)
+    raise ValueError(f"{source} is not a path-addressable artifact source.")
 
 
 def _nested(value: Any, *keys: str) -> Any:

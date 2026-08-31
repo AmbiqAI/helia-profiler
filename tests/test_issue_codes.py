@@ -28,7 +28,7 @@ from helia_profiler.results.issues import (
     COMPARABILITY_REGISTRY,
     DIMENSION_DIFFERS,
     ISSUE_REGISTRY,
-    POWER_DIMENSION_MISMATCH,
+    MEMORY_DIMENSION_MISMATCH, POWER_DIMENSION_MISMATCH,
     ComparabilityCode,
     ComparisonDimension,
     IssueCode,
@@ -102,11 +102,33 @@ def test_family_membership_and_order_are_the_documented_sets():
         # order and existing positions are frozen shipped behavior.
         "engine_version",
     ]
+    # #206: the first non-power metric group, its own family and wire prefix.
+    assert [d.value for d in MEMORY_DIMENSION_MISMATCH.dimensions] == ["link_family"]
+    assert MEMORY_DIMENSION_MISMATCH.code_for(ComparisonDimension.LINK_FAMILY) == (
+        "metric.memory_link_family_mismatch"
+    )
+    assert MEMORY_DIMENSION_MISMATCH.metric_group == "memory"
     # The remaining enum members are exactly the two non-family classes.
-    non_family = set(ComparisonDimension) - set(
-        POWER_DIMENSION_MISMATCH.dimensions
-    ) - set(DIMENSION_DIFFERS.dimensions)
+    non_family = (
+        set(ComparisonDimension)
+        - set(POWER_DIMENSION_MISMATCH.dimensions)
+        - set(MEMORY_DIMENSION_MISMATCH.dimensions)
+        - set(DIMENSION_DIFFERS.dimensions)
+    )
     assert {d.value for d in non_family} == {"model_sha256", "power_integrity"}
+
+
+def test_family_metric_group_is_the_registry_group_of_its_dimensions():
+    """#213 lens 1: a family literal ``metric_group="memory"`` would pass the
+    membership census while its specs said something else. Pin both ways."""
+    from helia_profiler.results.dimensions import DIMENSION_REGISTRY, uniform_metric_group
+    from helia_profiler.results.issues import COMPARABILITY_FAMILIES
+
+    for family in COMPARABILITY_FAMILIES:
+        assert family.metric_group == uniform_metric_group(family.dimensions), family
+        assert all(
+            DIMENSION_REGISTRY[d].metric_group == family.metric_group for d in family.dimensions
+        ), family
 
 
 def test_family_rejects_foreign_dimension():
@@ -117,7 +139,7 @@ def test_family_rejects_foreign_dimension():
 
 
 def test_dimension_members_interoperate_with_str_keyed_dicts():
-    # comparability._dimensions() builds str-keyed dicts; enum members must
+    # comparability.read_dimensions() builds str-keyed dicts; enum members must
     # look up transparently.
     data = {"power_scope": "gpio_gated_clean_window", "hpx_version": "0.1.7"}
     assert data.get(ComparisonDimension.POWER_SCOPE) == "gpio_gated_clean_window"

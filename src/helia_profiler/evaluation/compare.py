@@ -8,7 +8,8 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-from .comparability import ComparabilityAssessment, assess_comparability
+from .comparability import ComparabilityAssessment, assess_comparability, read_dimensions
+from .run_metrics import MetricDiff, _compare_metrics, _get_nested, _to_float
 from .comparison_profile import (
     ComparisonProfile,
     ComparisonVerdict,
@@ -29,18 +30,6 @@ class RunArtifacts:
     layers: list[dict[str, Any]]
     layer_memory: dict[Any, list[dict[str, Any]]] = field(default_factory=dict)
     manifest: ResultManifest | None = None
-
-
-@dataclass(frozen=True)
-class MetricDiff:
-    """Run-level metric comparison."""
-
-    name: str
-    baseline: Any
-    candidate: Any
-    delta: float | None = None
-    delta_pct: float | None = None
-    unit: str = ""
 
 
 @dataclass(frozen=True)
@@ -139,7 +128,25 @@ class CompareResult:
     verdict: ComparisonVerdict | None = None
 
 
-def _dimension_row(dimension: ComparisonDimension) -> tuple[str, str, tuple[str, ...]]:
+@dataclass(frozen=True)
+class _ConfigField:
+    """One Config-table row.
+
+    A dimension row takes its value from ``read_dimensions`` -- the same
+    resolved dict the comparability gate judges (manifest merge, summary
+    fallback and all), so the table cannot show one value while the gate
+    acts on another (#213 retro-lens). ``path`` is the registry's artifact
+    path, kept for the row's provenance; only explicit config-only rows
+    read it directly.
+    """
+
+    key: str
+    label: str
+    path: tuple[str, ...]
+    dimension: ComparisonDimension | None = None
+
+
+def _dimension_row(dimension: ComparisonDimension) -> _ConfigField:
     """Config-diff row for a comparison dimension: label and artifact path
     come from the dimension registry, so the table cannot drift from it.
     Row ORDER stays hand-controlled below — it is rendered artifact content."""
@@ -148,27 +155,28 @@ def _dimension_row(dimension: ComparisonDimension) -> tuple[str, str, tuple[str,
         raise ValueError(
             f"{dimension} is not a run-metadata dimension with a display label."
         )
-    return (dimension.value, spec.label, spec.path)
+    return _ConfigField(dimension.value, spec.label, spec.path, dimension=dimension)
 
 
 #: Rows are either dimension-derived (data from DIMENSION_REGISTRY) or
 #: explicit config-diff-only entries that are deliberately NOT comparability
 #: dimensions (they change results without gating comparison).
-_CONFIG_FIELDS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
-    ("model_path", "Model path", ("config", "model", "path")),
+_CONFIG_FIELDS: tuple[_ConfigField, ...] = (
+    _ConfigField("model_path", "Model path", ("config", "model", "path")),
     _dimension_row(ComparisonDimension.MODEL_SHA256),
     _dimension_row(ComparisonDimension.ENGINE),
     _dimension_row(ComparisonDimension.ENGINE_VERSION),
-    ("backend", "Backend", ("config", "engine", "backend")),
+    _ConfigField("backend", "Backend", ("config", "engine", "backend")),
     _dimension_row(ComparisonDimension.BOARD),
     _dimension_row(ComparisonDimension.SOC),
     _dimension_row(ComparisonDimension.TOOLCHAIN),
+    _dimension_row(ComparisonDimension.LINK_FAMILY),
     _dimension_row(ComparisonDimension.TRANSPORT),
     _dimension_row(ComparisonDimension.CPU_CLOCK),
-    ("iterations", "Iterations", ("config", "profiling", "iterations")),
-    ("warmup", "Warmup", ("config", "profiling", "warmup")),
-    ("pmu_counters", "PMU counters", ("config", "profiling", "pmu_counters")),
-    ("arena_size", "Arena size", ("config", "model", "arena_size")),
+    _ConfigField("iterations", "Iterations", ("config", "profiling", "iterations")),
+    _ConfigField("warmup", "Warmup", ("config", "profiling", "warmup")),
+    _ConfigField("pmu_counters", "PMU counters", ("config", "profiling", "pmu_counters")),
+    _ConfigField("arena_size", "Arena size", ("config", "model", "arena_size")),
     _dimension_row(ComparisonDimension.ARENA_LOCATION),
     _dimension_row(ComparisonDimension.WEIGHTS_LOCATION),
     _dimension_row(ComparisonDimension.HPX_VERSION),
@@ -176,32 +184,6 @@ _CONFIG_FIELDS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     _dimension_row(ComparisonDimension.SYSTEM_CLOCK_HZ),
     _dimension_row(ComparisonDimension.RUN_METADATA_SCHEMA_VERSION),
 )
-
-_METRIC_FIELDS: tuple[tuple[str, tuple[str, ...], str], ...] = (
-    ("total_cycles", ("total_cycles",), "cycles"),
-    ("device_profiled_infer_avg_us", ("latency", "device_profiled_infer_avg_us"), "us"),
-    ("device_profiled_infer_total_us", ("latency", "device_profiled_infer_total_us"), "us"),
-    ("layers", ("layers",), ""),
-    ("binary.text", ("binary", "text"), "bytes"),
-    ("binary.data", ("binary", "data"), "bytes"),
-    ("binary.bss", ("binary", "bss"), "bytes"),
-    # Reported alongside bss so a comparison across the #24 boundary shows
-    # where the bytes went, instead of a bss row and a total row that
-    # contradict each other with nothing to reconcile them.
-    ("binary.reserved", ("binary", "reserved"), "bytes"),
-    ("binary.total", ("binary", "total"), "bytes"),
-    ("memory.arena_size", ("memory", "arena_size"), "bytes"),
-    ("memory.allocated_arena", ("memory", "allocated_arena"), "bytes"),
-    ("memory.model_size", ("memory", "model_size"), "bytes"),
-    ("power.avg_current_a", ("power", "avg_current_a"), "A"),
-    ("power.avg_power_w", ("power", "avg_power_w"), "W"),
-    ("power.peak_current_a", ("power", "peak_current_a"), "A"),
-    ("power.energy_j", ("power", "energy_j"), "J"),
-    ("power.duration_s", ("power", "duration_s"), "s"),
-    ("power.energy_per_inference_j", ("power", "energy_per_inference_j"), "J"),
-    ("power.inferences_per_joule", ("power", "inferences_per_joule"), "inferences/J"),
-)
-
 
 def compare_runs(
     baseline_dir: Path,
@@ -222,11 +204,16 @@ def compare_runs(
         )
         raise ReportError(f"Results are not comparable: {reasons}")
 
-    config_rows = _compare_config(baseline.metadata, candidate.metadata)
+    config_rows = _compare_config(baseline, candidate)
+    include_groups = frozenset(
+        group
+        for group in ("power", "memory")
+        if comparability.metric_group_comparable(group)
+    )
     metrics = _compare_metrics(
         baseline.summary,
         candidate.summary,
-        include_power=comparability.power_metrics_comparable,
+        include_groups=include_groups,
     )
     layer_rows = _compare_layers(baseline, candidate) if comparability.layers_comparable else []
     warnings = _build_warnings(baseline, candidate, metrics, comparability)
@@ -319,6 +306,7 @@ def write_compare_artifacts(
             "run_metrics_comparable": result.comparability.run_metrics_comparable,
             "layers_comparable": result.comparability.layers_comparable,
             "power_metrics_comparable": result.comparability.power_metrics_comparable,
+            "memory_metrics_comparable": result.comparability.memory_metrics_comparable,
             "issues": [
                 {
                     "code": issue.code,
@@ -438,53 +426,29 @@ def _coerce_csv_value(value: str | None) -> Any:
         return value
 
 
-def _compare_config(base: dict[str, Any], cand: dict[str, Any]) -> list[ConfigDiffRow]:
+def _config_value(run: RunArtifacts, dimensions: dict[str, Any], spec: _ConfigField) -> Any:
+    if spec.dimension is not None:
+        return dimensions.get(spec.dimension)
+    return _get_nested(run.metadata, spec.path)
+
+
+def _compare_config(base: RunArtifacts, cand: RunArtifacts) -> list[ConfigDiffRow]:
+    base_dimensions = read_dimensions(base)
+    cand_dimensions = read_dimensions(cand)
     rows: list[ConfigDiffRow] = []
-    for key, label, path in _CONFIG_FIELDS:
-        b = _get_nested(base, path)
-        c = _get_nested(cand, path)
-        stable_b = _stable_value(b)
-        stable_c = _stable_value(c)
+    for spec in _CONFIG_FIELDS:
+        stable_b = _stable_value(_config_value(base, base_dimensions, spec))
+        stable_c = _stable_value(_config_value(cand, cand_dimensions, spec))
         rows.append(
             ConfigDiffRow(
-                field=label,
+                field=spec.label,
                 baseline=stable_b,
                 candidate=stable_c,
                 status="same" if stable_b == stable_c else "diff",
-                key=key,
+                key=spec.key,
             )
         )
     return rows
-
-
-def _compare_metrics(
-    base: dict[str, Any],
-    cand: dict[str, Any],
-    *,
-    include_power: bool = True,
-) -> list[MetricDiff]:
-    metrics: list[MetricDiff] = []
-    for name, path, unit in _METRIC_FIELDS:
-        if name.startswith("power.") and not include_power:
-            continue
-        b = _get_nested(base, path)
-        c = _get_nested(cand, path)
-        if name.startswith("power.") and b is None and c is None:
-            continue
-        bf = _to_float(b)
-        cf = _to_float(c)
-        delta = None
-        delta_pct = None
-        if bf is not None and cf is not None:
-            delta = cf - bf
-            if bf != 0:
-                delta_pct = delta / bf * 100
-        metrics.append(
-            MetricDiff(
-                name=name, baseline=b, candidate=c, delta=delta, delta_pct=delta_pct, unit=unit
-            )
-        )
-    return metrics
 
 
 def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[LayerDiffRow]:
@@ -694,30 +658,10 @@ def _friendly_memory_role(kind: str) -> str:
     return labels.get(kind.lower(), kind.lower())
 
 
-def _get_nested(data: dict[str, Any], path: tuple[str, ...]) -> Any:
-    cur: Any = data
-    for part in path:
-        if not isinstance(cur, dict) or part not in cur:
-            return None
-        cur = cur[part]
-    return cur
-
-
 def _stable_value(value: Any) -> Any:
     if isinstance(value, (dict, list)):
         return json.dumps(value, sort_keys=True)
     return value
-
-
-def _to_float(value: Any) -> float | None:
-    if isinstance(value, bool) or value is None:
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _layer_fieldnames(rows: list[dict[str, Any]]) -> list[str]:

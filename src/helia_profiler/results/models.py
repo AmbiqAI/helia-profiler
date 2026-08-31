@@ -193,6 +193,14 @@ class PlatformInfo:
     cpu_clock_name: str = ""  # selected CPU speed name (e.g. "hp")
     cpu_clock_mhz: int = 0  # selected CPU frequency
     cpu_perf_tier: str = ""  # NSX perf_mode symbol (e.g. "NSX_PERF_HIGH")
+    #: Which linker family built the firmware -- "gnu" (gcc, ATfE: *.ld) or
+    #: "armlink" (armclang: scatter). Measured memory used/free are only
+    #: comparable WITHIN a family (GNU counts the floating stack inside the
+    #: app extent; armlink's reservations sit outside it), so compare gates
+    #: per-region rows on it (#206). Computed by the same classifier the
+    #: memory measurer uses, so the two artifact copies cannot disagree.
+    #: ``None`` on artifacts predating #206.
+    link_family: str | None = None
 
 
 @dataclass

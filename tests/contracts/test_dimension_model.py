@@ -9,10 +9,10 @@ catch.
 
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import set_power_result
 
 from pathlib import Path
 
+from tests.pipeline_context_helpers import set_power_result
 from helia_profiler.power.base import PowerResult, PowerSummary
 from helia_profiler.power.metadata import MeasurementScope, PowerIntegrity, PowerMetadata
 from helia_profiler.report.manifest import _comparability
@@ -75,6 +75,9 @@ def test_manifest_writer_without_power_records_the_base_dimensions(tmp_path: Pat
     expected = _authoritative(
         dimensions_with_effect(DimensionEffect.IDENTITY_BLOCKING)
         + dimensions_with_effect(DimensionEffect.INFORMATIVE)
+        # #206: the link family is a platform fact, recorded whether or not
+        # the run measured power.
+        + dimensions_with_effect(DimensionEffect.MEMORY_METRIC_BLOCKING)
     )
     assert recorded == expected
 
@@ -103,10 +106,10 @@ def _run_artifacts(tmp_path: Path, *, power: dict | None, manifest=None):
 
 
 def test_reader_reads_every_artifact_sourced_dimension(tmp_path: Path):
-    from helia_profiler.evaluation.comparability import _dimensions
+    from helia_profiler.evaluation.comparability import read_dimensions
 
-    without_power = set(_dimensions(_run_artifacts(tmp_path, power=None)))
-    with_power = set(_dimensions(_run_artifacts(tmp_path, power={"measurement_scope": "x"})))
+    without_power = set(read_dimensions(_run_artifacts(tmp_path, power=None)))
+    with_power = set(read_dimensions(_run_artifacts(tmp_path, power={"measurement_scope": "x"})))
     base = {
         spec.dimension
         for spec in DIMENSION_REGISTRY.values()
@@ -131,7 +134,7 @@ def test_manifest_merge_cannot_override_runtime_only_dimensions(tmp_path: Path):
     # The #115 phantom-comparability rule as an executable contract: a
     # manifest value for power_lockstep (config intent) must never override
     # the runtime record in summary.power.sync.lockstep.
-    from helia_profiler.evaluation.comparability import _dimensions
+    from helia_profiler.evaluation.comparability import read_dimensions
     from helia_profiler.results import ResultManifest
 
     manifest = ResultManifest.from_dict(
@@ -149,7 +152,7 @@ def test_manifest_merge_cannot_override_runtime_only_dimensions(tmp_path: Path):
             "artifacts": [],
         }
     )
-    dims = _dimensions(
+    dims = read_dimensions(
         _run_artifacts(
             tmp_path,
             power={"sync": {"lockstep": True}},
@@ -167,3 +170,77 @@ def test_manifest_only_dimensions_declare_no_artifact_path():
             assert spec.path == () and spec.derive is None, spec.dimension
         elif spec.derive is None:
             assert spec.path, f"{spec.dimension} needs a path or derive"
+
+
+def test_fallbacks_point_at_path_addressable_artifacts():
+    # A fallback is a plain second path: SUMMARY_POWER is gated on the block
+    # existing and MANIFEST_ONLY has no path, so neither can be one.
+    for spec in DIMENSION_REGISTRY.values():
+        if spec.fallback is not None:
+            assert spec.fallback.source in (
+                ArtifactSource.RUN_METADATA,
+                ArtifactSource.SUMMARY,
+            ), spec.dimension
+            assert spec.fallback.path, spec.dimension
+
+
+def test_reader_consults_the_fallback_only_when_the_primary_is_absent(tmp_path: Path):
+    from helia_profiler.evaluation.comparability import read_dimensions
+    from helia_profiler.evaluation.compare import RunArtifacts
+
+    def run(platform: dict | None, measured: str | None) -> RunArtifacts:
+        summary: dict = {"schema_version": 3}
+        if measured is not None:
+            summary["memory_regions"] = {"link_family": measured, "regions": []}
+        metadata: dict = {"hpx_version": "0.0.0", "schema_version": 1}
+        if platform is not None:
+            metadata["platform"] = platform
+        return RunArtifacts(path=tmp_path, summary=summary, metadata=metadata, layers=[])
+
+    key = ComparisonDimension.LINK_FAMILY
+    # Pre-#206 artifact: only the measured family exists.
+    assert read_dimensions(run(None, "armlink"))[key] == "armlink"
+    # Pre-#133 artifact: nothing anywhere.
+    assert read_dimensions(run(None, None))[key] is None
+    # Post-#206: the platform record is primary even if the summary disagrees.
+    assert read_dimensions(run({"link_family": "gnu"}, "armlink"))[key] == "gnu"
+
+
+def test_manifest_writer_records_the_link_family(tmp_path: Path):
+    """#206: the platform's link family reaches the manifest from
+    run_metadata.platform -- the same value the memory measurer records in
+    summary.memory_regions.link_family (same classifier, cannot disagree)."""
+    from helia_profiler.results import PlatformInfo
+
+    ctx = make_pmu_ctx(tmp_path, board="apollo510_evb", power_enabled=False)
+    ctx.run_metadata.platform = PlatformInfo(board="apollo510_evb", soc="apollo510", link_family="armlink")
+
+    recorded = _comparability(ctx)
+
+    assert recorded[ComparisonDimension.LINK_FAMILY] == "armlink"
+
+
+def test_resolve_platform_records_the_link_family(tmp_path: Path):
+    """#206: ResolvePlatformStage classifies the configured toolchain with
+    the same function the memory measurer uses, so run_metadata.platform
+    and summary.memory_regions can never disagree about the link family."""
+    from helia_profiler.config import load_config
+    from helia_profiler.pipeline import PipelineContext
+    from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+
+    model = tmp_path / "test.tflite"
+    model.write_bytes(b"")
+    for toolchain, expected in (("arm-none-eabi-gcc", "gnu"), ("armclang", "armlink")):
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "target": {"board": "apollo510_evb", "toolchain": toolchain},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
+        ResolvePlatformStage().run(ctx)
+        assert ctx.run_metadata.platform is not None
+        assert ctx.run_metadata.platform.link_family == expected

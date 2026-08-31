@@ -377,7 +377,9 @@ differently: gcc's fill-to-end heap sits *inside* the app window, so its
 bytes appear in both `reserved` and `free` (the heap is sized to whatever
 was left — the example above shows both at 491240 for exactly that
 reason); armlink's fixed heap/stack sit *outside* the app window and are
-excluded from both. `load_image` is the flash bytes that
+excluded from both. Because of that, `used`/`free` are comparable only
+within a link family — `hpx compare` shows them as per-region rows and
+withholds them when the two runs' `link_family` differs. `load_image` is the flash bytes that
 initialize this region's data (summed from program headers by physical
 address, which is correct on both gcc and armlink). `unattributed` lists
 any allocated section that falls outside every verified window — either

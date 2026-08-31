@@ -7,7 +7,7 @@ import logging
 
 from ..errors import ConfigError, PlatformError
 from ..pipeline import PipelineContext
-from ..platform import PmuTier, get_board, get_soc_for_board
+from ..platform import PmuTier, get_board, get_soc_for_board, link_family_for_toolchain
 from ..results import ModelInfo, PlatformInfo
 
 log = logging.getLogger("hpx")
@@ -95,6 +95,7 @@ class ResolvePlatformStage:
             cpu_clock_name=cpu_speed.name,
             cpu_clock_mhz=cpu_speed.mhz,
             cpu_perf_tier=cpu_speed.perf_tier.value,
+            link_family=str(link_family_for_toolchain(ctx.config.target.toolchain.value)),
         )
 
         # Validate model path exists early
