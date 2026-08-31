@@ -208,7 +208,8 @@ class TestLockstepArmBeforeReset:
         # Recorder stub in place of a real lifecycle plan; its None return is
         # tolerated by this path and irrelevant to the ordering under test.
         capture_power(
-            ctx, prepare_target=lambda *_: events.append("lifecycle_reset")  # ty: ignore[invalid-argument-type]
+            ctx,
+            prepare_target=lambda *_: events.append("lifecycle_reset"),  # ty: ignore[invalid-argument-type]
         )
         assert events.index("wait_ready") < events.index("signal_go")
 
