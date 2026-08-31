@@ -21,7 +21,6 @@ from ..placement import Placement
 from .soc import SocFamily
 
 if TYPE_CHECKING:
-    from .board import BoardDef
     from .soc import SocDef
 
 # Reset-strategy tokens.  These equal the corresponding ``ResetStrategy`` /
@@ -473,5 +472,3 @@ def build_soc_capabilities(soc: SocDef) -> SocCapabilities:
         memory=memory,
         clock=clock,
     )
-
-

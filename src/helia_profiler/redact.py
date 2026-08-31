@@ -52,7 +52,7 @@ import hashlib
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 from typing import Any
 
 _PLACEHOLDER_PATH = "<redacted-path>"

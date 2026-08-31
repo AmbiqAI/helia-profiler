@@ -148,6 +148,7 @@ class ClockDomain:
     def speed_names(self) -> tuple[str, ...]:
         return tuple(s.name for s in self.speeds)
 
+
 @dataclass(frozen=True)
 class SocDef:
     """Definition of an Ambiq SoC relevant to profiling."""
