@@ -8,7 +8,7 @@ it by a contract test:
 
 * the comparability code families in ``results/issues.py`` **derive** their
   dimension tuples from the registry by effect class;
-* ``evaluation/comparability.py:_dimensions()`` reads artifacts by each
+* ``evaluation/comparability.py:read_dimensions()`` reads artifacts by each
   spec's source and path;
 * ``report/manifest.py:_comparability()`` keeps its typed-context extraction
   (declaring extractors here would couple ``results/`` to the pipeline) but

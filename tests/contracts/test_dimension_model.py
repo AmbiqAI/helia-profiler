@@ -9,10 +9,10 @@ catch.
 
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import set_power_result
 
 from pathlib import Path
 
+from tests.pipeline_context_helpers import set_power_result
 from helia_profiler.power.base import PowerResult, PowerSummary
 from helia_profiler.power.metadata import MeasurementScope, PowerIntegrity, PowerMetadata
 from helia_profiler.report.manifest import _comparability
@@ -67,7 +67,7 @@ def test_manifest_writer_records_every_authoritative_dimension(tmp_path: Path):
     assert recorded == _authoritative(tuple(ComparisonDimension))
 
 
-def test_manifest_writer_without_power_records_the_baseread_dimensions(tmp_path: Path):
+def test_manifest_writer_without_power_records_the_base_dimensions(tmp_path: Path):
     # A run that measured no power says nothing about how it measured it: a
     # value on that side would block a power-vs-no-power comparison.
     ctx = make_pmu_ctx(tmp_path, board="apollo510_evb")
@@ -130,7 +130,7 @@ def test_reader_reads_every_artifact_sourced_dimension(tmp_path: Path):
     }
 
 
-def test_manifest_merge_cannot_override_runtime_onlyread_dimensions(tmp_path: Path):
+def test_manifest_merge_cannot_override_runtime_only_dimensions(tmp_path: Path):
     # The #115 phantom-comparability rule as an executable contract: a
     # manifest value for power_lockstep (config intent) must never override
     # the runtime record in summary.power.sync.lockstep.

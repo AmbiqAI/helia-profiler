@@ -139,7 +139,7 @@ def test_family_rejects_foreign_dimension():
 
 
 def test_dimension_members_interoperate_with_str_keyed_dicts():
-    # comparability._dimensions() builds str-keyed dicts; enum members must
+    # comparability.read_dimensions() builds str-keyed dicts; enum members must
     # look up transparently.
     data = {"power_scope": "gpio_gated_clean_window", "hpx_version": "0.1.7"}
     assert data.get(ComparisonDimension.POWER_SCOPE) == "gpio_gated_clean_window"
