@@ -1491,8 +1491,11 @@ def test_psram_upload_timeout_surfaces_firmware_output(tmp_path):
     session = _FakePsramSession()
     with pytest.raises(CaptureError) as excinfo:
         _upload_model_to_psram(
-            session, model, timeout_s=0.05, initial_buf=firmware_said
-        )  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
+            session,  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
+            model,
+            timeout_s=0.05,
+            initial_buf=firmware_said,
+        )
     assert "HPX_PSRAM_ARENA_REGION=0,0x60000000,35376" in str(excinfo.value)
 
 
@@ -1524,6 +1527,7 @@ def test_psram_upload_gated_on_engine_capability(
     ctx = PipelineContext(config=config, work_dir=tmp_path)
     ResolvePlatformStage().run(ctx)
     set_profile_firmware(ctx, build_dir=tmp_path / "build")
+    assert ctx.build_dir is not None  # set_profile_firmware just populated it
     ctx.build_dir.mkdir()
     ctx.resolved_jlink_serial = "1160002204"
     ctx.weights_region = weights_region
