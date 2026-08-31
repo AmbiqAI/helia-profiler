@@ -98,11 +98,16 @@ How it works, and the rules it must keep:
   present in every production build) don't gate our rendered code, which
   compiles at full `-Werror`.
 - **Legs skip with a named reason** when their workspace is absent, has no
-  fingerprinted (post-#212) layout, or was built against a different
-  compatibility baseline than the checkout — the test never builds a
-  workspace (a cold sync is minutes of network+compile; wrong cost profile
-  for a compile gate). Warm a leg by running any profile/validate with
-  that (board, toolchain, engine) combo.
+  fingerprinted (post-#212) layout, records no baseline fingerprint, or
+  was built against a different compatibility baseline than the checkout
+  (candidates are tried newest-first, so a stale branch's newer workspace
+  cannot shadow a matching older one) — the test never builds a workspace
+  (a cold sync is minutes of network+compile; wrong cost profile for a
+  compile gate). Warm a leg by running any profile/validate with that
+  (board, toolchain, engine) combo. **A partial run is visible**: skipped
+  legs surface as a pytest warning every run, and
+  `HPX_COMPILE_HW_REQUIRE_ALL=1` turns any partial run into a failure —
+  the setting for a bench whose full matrix should be warm.
 - **The expected-bugs ledger is strict both ways**, same as Tier 1: an
   entry keeps its case red-with-reason, and a case that starts compiling
   fails the suite until the entry is removed.
@@ -111,6 +116,6 @@ How it works, and the rules it must keep:
   atomiq110 NPU backend) fails the gate until it gets a Tier-2 leg or a
   recorded reason.
 
-Toolchain versions are recorded in failure output, not enforced — a
+Toolchain path and `--version` are recorded in failure output, not enforced — a
 compiler upgrade changing warning behavior is exactly what the nightly
 should surface, with the ledger absorbing deliberate acceptances.

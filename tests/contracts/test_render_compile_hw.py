@@ -38,9 +38,11 @@ to ``tmp_path``. Reads only.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -56,7 +58,6 @@ from tests.contracts.test_firmware_render_snapshots import (
     _render,
 )
 
-pytestmark = pytest.mark.compile_hw
 
 
 # ---------------------------------------------------------------------------
@@ -135,31 +136,50 @@ def _resolve_workspace(case: _HwCase) -> _Workspace | str:
     )
     if not candidates:
         return f"no warm workspace under {root}"
-    app_dir = candidates[0]
+    # Newest-first, FIRST FULLY-RESOLVING candidate wins (#225 lens F3): the
+    # cache legitimately holds fingerprint dirs from several branches/
+    # baselines, mtime-ordered by whichever branch last profiled — a stale
+    # branch's newer workspace must not disable the leg while a matching
+    # one sits beside it.
+    reasons: list[str] = []
+    for app_dir in candidates:
+        resolved = _resolve_candidate(app_dir, case)
+        if isinstance(resolved, _Workspace):
+            return resolved
+        reasons.append(f"{app_dir.parent.name[:12]}…: {resolved}")
+    return "; ".join(reasons)
+
+
+def _resolve_candidate(app_dir: Path, case: _HwCase) -> _Workspace | str:
     build_dir = app_dir / "build" / case.board
     ninja = build_dir / "build.ninja"
     if not ninja.is_file():
-        return f"workspace {app_dir} has no build.ninja for {case.board}"
+        return f"no build.ninja for {case.board}"
 
-    # D6: the workspace must have been built against the checkout's baseline.
+    # D6: the workspace must have been built against the checkout's baseline
+    # — and unknown is not verified (#225 lens F4): a workspace that records
+    # no fingerprint predates provenance and is exactly the stale kind.
     deps_file = app_dir / "hpx-dependencies.json"
+    recorded = None
     if deps_file.is_file():
         recorded = (
             json.loads(deps_file.read_text()).get("workspace", {}).get("baseline_fingerprint")
         )
-        current = load_compatibility_baseline().fingerprint
-        if recorded is not None and recorded != current:
-            return (
-                f"workspace baseline fingerprint {recorded[:12]}… != checkout "
-                f"{current[:12]}… — re-run a profile to refresh the workspace"
-            )
+    if recorded is None:
+        return "records no baseline fingerprint"
+    current = load_compatibility_baseline().fingerprint
+    if recorded != current:
+        return (
+            f"baseline fingerprint {recorded[:12]}… != checkout {current[:12]}… "
+            "— re-run a profile to refresh"
+        )
 
     rules = build_dir / "CMakeFiles" / "rules.ninja"
     compiler = _compiler_from_rules(rules.read_text()) if rules.is_file() else None
     if compiler is None:
         return f"could not read CXX compiler from {rules}"
     if not compiler.is_file():
-        return f"workspace compiler {compiler} is not installed here"
+        return f"compiler {compiler} is not installed here"
     return _Workspace(
         app_dir=app_dir,
         build_dir=build_dir,
@@ -211,10 +231,23 @@ def _tu_variables(ninja_text: str, target: str, source: str) -> dict[str, str] |
     m = re.search(pattern, ninja_text, re.M)
     if m is None:
         return None
-    return {
-        key: value.replace("$$", "$").replace("$ ", " ").replace("$:", ":")
-        for key, value in re.findall(r"  (\w+) = ?(.*)", m.group(1))
-    }
+    return dict(re.findall(r"  (\w+) = ?(.*)", m.group(1)))
+
+
+def _split_ninja(value: str) -> list[str]:
+    """Tokenize a ninja variable value, honouring its escapes.
+
+    ``$$`` is a literal ``$``, ``$ `` a literal space, ``$:`` a colon —
+    tokens split on UNescaped spaces only, then each token unescapes, so
+    ``-I/opt/Arm$ GNU/include`` stays one argv entry (#225 lens F6: the
+    old unescape-then-split round trip corrupted exactly the case the
+    unescaping existed for).
+    """
+    protected = value.replace("$$", "\x00").replace("$ ", "\x01").replace("$:", ":")
+    return [
+        token.replace("\x01", " ").replace("\x00", "$")
+        for token in protected.split()
+    ]
 
 
 def _vendor_headers_as_system(includes: list[str], app_dir: Path) -> list[str]:
@@ -235,7 +268,7 @@ def _compile_command(
     variables = _tu_variables(workspace.ninja_text, case.target, source)
     if variables is None:
         return f"no ninja stanza for {case.target}/{source}"
-    includes = variables.get("INCLUDES", "").split()
+    includes = _split_ninja(variables.get("INCLUDES", ""))
     workspace_src = workspace.app_dir / "src"
     # The scratch dir replaces the workspace src include so the CURRENT
     # CHECKOUT's rendered headers win (D6); keep everything else verbatim.
@@ -246,12 +279,12 @@ def _compile_command(
         # -fsyntax-only — a filesystem side effect this read-only gate must
         # not have. Dependency output is meaningless for a syntax check.
         flag
-        for flag in variables.get("FLAGS", "").split()
+        for flag in _split_ninja(variables.get("FLAGS", ""))
         if flag not in ("-MMD", "-MP", "-MD")
     ]
     return [
         str(workspace.compiler),
-        *variables.get("DEFINES", "").split(),
+        *_split_ninja(variables.get("DEFINES", "")),
         *includes,
         *flags,
         "-Werror",
@@ -283,8 +316,11 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
         clean_window_probe=case.probe,
         overrides=overrides or None,
     )
-    (scratch / ("main_power.cc" if case.power_only else "main.cc")).write_text(text)
+    # Tier 1's vacuity rule: an empty or truncated render must not pass
+    # -fsyntax-only trivially (#225 lens F7).
+    assert "int main(" in text, f"[{case.case_id}] render has no 'int main(' — vacuous TU"
     main_tu = scratch / ("main_power.cc" if case.power_only else "main.cc")
+    main_tu.write_text(text)
     tus = [main_tu]
 
     kwargs = _common_kwargs(case.soc, "rtt")
@@ -297,13 +333,13 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
         )
     )
     if case.extra_profiler_tu:
-        profiler_tu = scratch / "hpx_pmu_profiler.cc"
-        profiler_tu.write_text(
-            _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
-                profiling_backends=list(kwargs["profiling_backends"]),
-                has_armv8m_pmu=kwargs["has_armv8m_pmu"],
-            )
+        profiler_text = _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
+            profiling_backends=list(kwargs["profiling_backends"]),
+            has_armv8m_pmu=kwargs["has_armv8m_pmu"],
         )
+        assert "HpxPmuProfiler::" in profiler_text, f"[{case.case_id}] vacuous profiler TU"
+        profiler_tu = scratch / "hpx_pmu_profiler.cc"
+        profiler_tu.write_text(profiler_text)
         tus.append(profiler_tu)
     # Generated inputs production writes next to the sources, not templates:
     # carry them from the workspace so includes resolve (read-only copy).
@@ -326,6 +362,7 @@ def _aot_prefix_in(app_dir: Path) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.compile_hw
 def test_rendered_firmware_compiles_with_the_real_toolchain(tmp_path: Path):
     """Aggregated like Tier 1: every failure reported together, strict
     expected-bug semantics, per-leg skip reasons listed when nothing ran."""
@@ -342,6 +379,19 @@ def test_rendered_firmware_compiles_with_the_real_toolchain(tmp_path: Path):
             "no warm dependency workspace for any matrix leg — run on the "
             "bench after a profile/validate. Legs:\n  " + "\n  ".join(skipped)
         )
+    # A partial run must be DISTINGUISHABLE from a full one (#225 lens F1):
+    # a green nightly where nine legs silently never compiled is the gate
+    # lying. Skipped legs surface as a warning every run, and
+    # HPX_COMPILE_HW_REQUIRE_ALL=1 turns any partial run into a failure
+    # (the bench workflow's setting, once every leg's workspace is warm).
+    if skipped:
+        status = (
+            f"compile_hw ran {len(runnable)}/{len(_MATRIX)} legs; skipped:\n  "
+            + "\n  ".join(skipped)
+        )
+        if os.environ.get("HPX_COMPILE_HW_REQUIRE_ALL") == "1":
+            pytest.fail(status)
+        warnings.warn(status, stacklevel=1)
 
     jobs: list[tuple[_HwCase, Path, list[str] | str]] = []
     for case, workspace in runnable:
@@ -377,14 +427,31 @@ def test_rendered_firmware_compiles_with_the_real_toolchain(tmp_path: Path):
             rc == 0 for c, _t, rc, *_ in results if c.case_id == case_id
         ):
             stale.append(case_id)
+    versions = {
+        str(ws.compiler): _compiler_version(ws.compiler)
+        for _case, ws in runnable
+    }
     assert not failures, (
         f"{len(failures)} rendered TUs rejected by the real toolchain "
-        f"({runnable[0][1].compiler}):\n\n" + "\n\n".join(failures)
+        f"({'; '.join(f'{path}: {ver}' for path, ver in versions.items())}):\n\n"
+        + "\n\n".join(failures)
     )
     assert not stale, (
         "stale _EXPECTED_HW_BUGS entries (cases now compile — remove them): "
         + ", ".join(sorted(set(stale)))
     )
+
+
+def _compiler_version(compiler: Path) -> str:
+    """Recorded, never enforced (D6): failure output names the exact
+    toolchain so a compiler-upgrade warning change reads as what it is."""
+    try:
+        out = subprocess.run(
+            [str(compiler), "--version"], capture_output=True, text=True, timeout=10
+        )
+        return out.stdout.splitlines()[0] if out.stdout else "version unknown"
+    except OSError:
+        return "version unknown"
 
 
 def test_matrix_covers_every_engine_family():
@@ -397,6 +464,92 @@ def test_matrix_covers_every_engine_family():
     assert {case.probe for case in _MATRIX} == {"infer", "busy_loop"}
     assert any(case.power_only for case in _MATRIX)
     assert {case.soc for case in _MATRIX} == {"apollo510", "apollo330P"}
+    # The exact leg set (#225 lens F5): every individual row was deletable
+    # without tripping the coverage sets above — a removed leg must be as
+    # loud as a missing engine.
+    assert {case.case_id for case in _MATRIX} == {
+        "510-rt-profile",
+        "510-rt-power",
+        "510-rt-power-busy",
+        "510-tflm-profile",
+        "510-tflm-power",
+        "510-aot-profile",
+        "510-aot-profile-busy",
+        "510-et-profile",
+        "510-et-profile-busy",
+        "330-rt-profile",
+        "330-tflm-power",
+        "330-aot-profile",
+    }, "the Tier-2 leg set changed — deliberate? update this pin with the reason"
+
+
+class TestWorkspaceResolution:
+    """#225 lens F3/F4: candidate fallback and provenance, on synthetic
+    cache trees (portable: the 'compiler' is any existing file)."""
+
+    def _make_tree(self, root: Path, case: _HwCase, name: str, *, fingerprint, ninja=True):
+        import sys
+
+        app = root / "workspaces" / case.workspace / "dependency-workspaces" / name / "profiler_app"
+        build = app / "build" / case.board
+        (build / "CMakeFiles").mkdir(parents=True)
+        if ninja:
+            (build / "build.ninja").write_text(
+                f"build CMakeFiles/{case.target}.dir/src/main.cc.obj: C ../src/main.cc\n"
+                "  DEFINES = -DX\n  INCLUDES = -I/ws/src\n  FLAGS = -O2\n"
+            )
+        (build / "CMakeFiles" / "rules.ninja").write_text(
+            "rule CXX_COMPILER__x\n  command = " + sys.executable + " $FLAGS -c $in\n"
+        )
+        if fingerprint is not None:
+            (app / "hpx-dependencies.json").write_text(
+                json.dumps({"workspace": {"baseline_fingerprint": fingerprint}})
+            )
+        return app
+
+    def test_newer_broken_workspace_falls_back_to_a_matching_older_one(
+        self, tmp_path: Path, monkeypatch
+    ):
+        import time
+
+        case = _MATRIX[0]
+        current = load_compatibility_baseline().fingerprint
+        good = self._make_tree(tmp_path, case, "old-good", fingerprint=current)
+        bad = self._make_tree(tmp_path, case, "new-drifted", fingerprint="deadbeef")
+        past = time.time() - 1000
+        for path in good.rglob("*"):
+            os.utime(path, (past, past))
+        os.utime(good, (past, past))
+        monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path))
+
+        resolved = _resolve_workspace(case)
+
+        assert isinstance(resolved, _Workspace), resolved
+        assert resolved.app_dir == good
+        del bad
+
+    def test_a_workspace_without_provenance_is_skipped_not_trusted(
+        self, tmp_path: Path, monkeypatch
+    ):
+        case = _MATRIX[0]
+        self._make_tree(tmp_path, case, "no-provenance", fingerprint=None)
+        monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path))
+
+        resolved = _resolve_workspace(case)
+
+        assert isinstance(resolved, str)
+        assert "records no baseline fingerprint" in resolved
+
+    def test_all_candidates_failing_names_each_reason(self, tmp_path: Path, monkeypatch):
+        case = _MATRIX[0]
+        self._make_tree(tmp_path, case, "aaaa-no-ninja", fingerprint="x", ninja=False)
+        self._make_tree(tmp_path, case, "bbbb-drifted", fingerprint="deadbeef")
+        monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path))
+
+        resolved = _resolve_workspace(case)
+
+        assert isinstance(resolved, str)
+        assert "no build.ninja" in resolved and "deadbeef" in resolved
 
 
 # ---------------------------------------------------------------------------
@@ -426,12 +579,17 @@ class TestNinjaStanzaParser:
         assert v["DEFINES"] == "-DAM_PART_APOLLO510 -DBUFFER_SIZE_UP=32768"
         assert v["FLAGS"] == "-O3 -std=gnu++17 -Wall"
         power = _tu_variables(_SYNTHETIC_NINJA, "hpx_profiler_power", "src/main_power.cc")
-        assert power is not None and power["DEFINES"] == "-DPOWER=1 -DCOST=a$b"
+        assert power is not None
+        assert _split_ninja(power["DEFINES"]) == ["-DPOWER=1", "-DCOST=a$b"]
 
     def test_unescapes_ninja_dollar_forms(self):
+        """Split BEFORE unescape (#225 lens F6): an escaped space must stay
+        inside ONE argv token, not be unescaped and then split apart."""
         v = _tu_variables(_SYNTHETIC_NINJA, "hpx_profiler", "src/main.cc")
         assert v is not None
-        assert "-I/with space/dir" in v["INCLUDES"]
+        tokens = _split_ninja(v["INCLUDES"])
+        assert "-I/with space/dir" in tokens
+        assert "-I/with" not in tokens
 
     def test_launcher_is_ignored_and_optional(self):
         v = _tu_variables(_SYNTHETIC_NINJA, "hpx_profiler_power", "src/main_power.cc")
