@@ -1,7 +1,7 @@
 """Conservative, deterministic redaction for field-diagnostics support bundles.
 
 Applied to every value written into a support bundle (see
-:mod:`helia_profiler.support_bundle`) before it reaches disk. Redaction is
+:mod:`helia_profiler.diagnostics.support_bundle`) before it reaches disk. Redaction is
 str -> str across arbitrarily nested JSON-safe structures (``dict`` / ``list``
 / ``tuple`` / ``str`` / scalars) and always returns a count of how many
 values changed. These counts prove what categories of text were *found and

@@ -27,14 +27,14 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .._version import __version__ as _hpx_version
-from ..deps.compatibility import CompatibilityBaseline, load_compatibility_baseline
 from ..config import Toolchain, Transport, load_config
+from ..deps.compatibility import CompatibilityBaseline, load_compatibility_baseline
 from ..deps.dependencies import read_dependency_lock_provenance
-from ..hostenv.doctor import inspect_environment
 from ..engines import EngineType
 from ..errors import DependencyError, HpxError, ReportError
-from .redact import RedactionCounts, RedactionPolicy, redact_known_serial, redact_text, redact_value
+from ..hostenv.doctor import inspect_environment
 from ..results import DependencyLockProvenance, ResultArtifact
+from .redact import RedactionCounts, RedactionPolicy, redact_known_serial, redact_text, redact_value
 from ..results.support_bundle import (
     SUPPORT_BUNDLE_SCHEMA,
     SUPPORT_BUNDLE_SCHEMA_VERSION,
@@ -427,7 +427,7 @@ def _redact_sections(
     workspace, an unreadable config, ...), which routinely embeds the exact
     absolute path or account name that triggered it -- this is otherwise
     the one place in the collector where free-form text reaches the
-    archive without going through :func:`~helia_profiler.redact.redact_value`.
+    archive without going through :func:`~helia_profiler.diagnostics.redact.redact_value`.
     """
     redacted_sections: list[SupportBundleSection] = []
     for section in sections:

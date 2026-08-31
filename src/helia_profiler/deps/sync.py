@@ -15,8 +15,8 @@ Extracted from ``dependencies`` at the module size ceiling (see the
 launcher/elf_inventory precedent); ``dependencies`` re-exports the public
 name so callers keep one import surface.
 
-NOTE: ``nsx_cli`` is imported as a module (never ``from .... import sync``) so
-tests that monkeypatch ``helia_profiler.dependencies.nsx_cli.*`` keep
+NOTE: ``nsx_cli`` is imported as a module (never ``from .nsx import <name>``)
+so tests that monkeypatch ``helia_profiler.deps.dependencies.nsx_cli.*`` keep
 patching the same module object this code reads at call time.
 """
 
