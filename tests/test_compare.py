@@ -969,3 +969,49 @@ class TestMemoryRegionRows:
         assert all(
             (g == "power") == n.startswith("power.") for n, g in groups.items()
         )
+
+
+def test_compare_survives_a_wider_than_header_layer_row(tmp_path: Path):
+    """#243 C1: a profile_results.csv row with more fields than the header
+    (foreign / other-version / hand-edited artifact) must not crash compare
+    with a raw TypeError -- the surplus column is dropped."""
+    baseline = tmp_path / "gcc"
+    candidate = tmp_path / "atfe"
+    for d in (baseline, candidate):
+        _write_run(d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+    # Append a stray extra column to the baseline's first data row.
+    rows = (baseline / "profile_results.csv").read_text().splitlines()
+    rows[1] = rows[1] + ",SURPRISE"
+    (baseline / "profile_results.csv").write_text("\n".join(rows) + "\n")
+
+    from helia_profiler.evaluation.compare import _read_layer_csv
+
+    # The surplus column is dropped (not filed under DictReader's None key),
+    # so the scalar coercer never sees a list -- pins the C1 fix directly.
+    parsed = _read_layer_csv(baseline / "profile_results.csv")
+    assert None not in parsed[0]
+    assert all(not isinstance(v, list) for v in parsed[0].values())
+
+    result = compare_runs(baseline, candidate)  # and end-to-end: no TypeError
+    assert result.layer_rows
+
+
+def test_compare_summary_json_is_valid_when_a_metric_is_non_finite(tmp_path: Path):
+    """#243 C2: a foreign summary carrying NaN/Infinity must not make
+    compare_summary.json invalid RFC-8259 JSON -- non-finite coerces to
+    null at the emission boundary, and a strict parser must accept it."""
+    baseline = tmp_path / "gcc"
+    candidate = tmp_path / "atfe"
+    for d in (baseline, candidate):
+        _write_run(d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+    # Inject a non-finite headline metric into one summary.json.
+    summ = json.loads((candidate / "summary.json").read_text())
+    summ["total_cycles"] = float("inf")
+    (candidate / "summary.json").write_text(json.dumps(summ))
+
+    paths = write_compare_artifacts(compare_runs(baseline, candidate), tmp_path / "diff")
+    text = next(p for p in paths if p.name == "compare_summary.json").read_text()
+
+    assert "Infinity" not in text and "NaN" not in text
+    # A strict parser (rejecting the JS5 constants) must accept it.
+    json.loads(text, parse_constant=lambda c: (_ for _ in ()).throw(ValueError(c)))

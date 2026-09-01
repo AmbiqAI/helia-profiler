@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import math
 import json
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -342,7 +343,14 @@ def write_compare_artifacts(
     }
     if result.verdict is not None:
         summary["verdict"] = _verdict_to_dict(result.verdict)
-    paths[0].write_text(json.dumps(summary, indent=2, default=str) + "\n")
+    # Foreign summaries can carry NaN/Infinity (Python json emits and
+    # accepts them); left in, compare_summary.json would not be valid
+    # RFC-8259 JSON for strict downstream readers. Coerce non-finite to
+    # null at the emission boundary (#243) -- the regression verdict is
+    # unaffected (comparison_profile already rejects non-finite as FAIL).
+    paths[0].write_text(
+        json.dumps(_json_finite(summary), indent=2, default=str) + "\n"
+    )
 
     if len(paths) > 1:
         flat_layer_rows = [row.to_flat_dict() for row in result.layer_rows]
@@ -393,10 +401,28 @@ def _read_json(path: Path) -> dict[str, Any]:
     return data
 
 
+def _json_finite(value: Any) -> Any:
+    """Recursively replace non-finite floats (NaN/Inf) with None so the
+    emitted JSON is valid RFC-8259 (#243)."""
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {k: _json_finite(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_finite(v) for v in value]
+    return value
+
+
 def _read_layer_csv(path: Path) -> list[dict[str, Any]]:
     with open(path, newline="") as f:
         reader = csv.DictReader(f)
-        return [{k: _coerce_csv_value(v) for k, v in row.items()} for row in reader]
+        # DictReader files columns past the header under key None (as a
+        # list); drop them so a wider-than-header row (foreign/other-version
+        # artifact) does not reach the scalar coercer (#243).
+        return [
+            {k: _coerce_csv_value(v) for k, v in row.items() if k is not None}
+            for row in reader
+        ]
 
 
 def _read_layer_json(path: Path) -> list[dict[str, Any]]:
@@ -413,9 +439,12 @@ def _declared_artifact(run_dir: Path, name: str, declared: set[str] | None) -> P
     return run_dir / name
 
 
-def _coerce_csv_value(value: str | None) -> Any:
-    if value is None:
-        return None
+def _coerce_csv_value(value: Any) -> Any:
+    # Scalars only: a non-str slips through unchanged rather than crashing
+    # the coercer (defensive against DictReader's list-valued surplus key,
+    # already dropped upstream) (#243).
+    if not isinstance(value, str):
+        return value
     if value in ("True", "False"):
         return value == "True"
     try:
