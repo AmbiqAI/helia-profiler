@@ -80,10 +80,3 @@ def analyze_for_engine(
         if result is None:
             raise EngineError(f"Failed to analyze AOT-transformed model: {path}")
         return result
-
-
-# ---------------------------------------------------------------------------
-# Result dataclasses
-# ---------------------------------------------------------------------------
-
-

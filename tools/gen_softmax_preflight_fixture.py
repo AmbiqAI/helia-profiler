@@ -1,7 +1,7 @@
 """Generate tests/fixtures/softmax_scale_unsupported.tflite (#57).
 
 A minimal, valid TFLite flatbuffer with four Softmax ops, built so
-every branch of ``evaluation/_tflite_reader.py`` is load-bearing in a test
+every branch of ``modelcost/_tflite_reader.py`` is load-bearing in a test
 environment WITHOUT ai-edge-litert:
 
 * op 0 -- int8, input scale 4.305568790385905e-09 (the exact failing value

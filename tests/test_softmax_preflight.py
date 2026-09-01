@@ -686,21 +686,25 @@ def test_reader_constants_re_derive_from_the_installed_litert():
     assert r.TENSOR_TYPE_INT8 == g.TensorType.INT8
     assert r.BUILTIN_OPTIONS_SOFTMAX == g.BuiltinOptions.SoftmaxOptions
 
-    expected_slots = {
-        r._MODEL_OPERATOR_CODES: g.Model.OperatorCodes,
-        r._MODEL_SUBGRAPHS: g.Model.Subgraphs,
-        r._OPCODE_DEPRECATED_BUILTIN: g.OperatorCode.DeprecatedBuiltinCode,
-        r._OPCODE_BUILTIN: g.OperatorCode.BuiltinCode,
-        r._SUBGRAPH_TENSORS: g.SubGraph.Tensors,
-        r._SUBGRAPH_OPERATORS: g.SubGraph.Operators,
-        r._OPERATOR_OPCODE_INDEX: g.Operator.OpcodeIndex,
-        r._OPERATOR_INPUTS: g.Operator.Inputs,
-        r._OPERATOR_OPTIONS_TYPE: g.Operator.BuiltinOptionsType,
-        r._OPERATOR_OPTIONS: g.Operator.BuiltinOptions,
-        r._TENSOR_TYPE: g.Tensor.Type,
-        r._TENSOR_NAME: g.Tensor.Name,
-        r._TENSOR_QUANTIZATION: g.Tensor.Quantization,
-        r._QUANT_SCALE: g.QuantizationParameters.Scale,
-    }
-    for constant, accessor in expected_slots.items():
+    # Tuples, NOT a dict: slot values collide across tables (four distinct
+    # fields sit at slot 10 alone), and a value-keyed dict silently dropped
+    # 9 of these 14 checks (#235 lens).
+    expected_slots = [
+        (r._MODEL_OPERATOR_CODES, g.Model.OperatorCodes),
+        (r._MODEL_SUBGRAPHS, g.Model.Subgraphs),
+        (r._OPCODE_DEPRECATED_BUILTIN, g.OperatorCode.DeprecatedBuiltinCode),
+        (r._OPCODE_BUILTIN, g.OperatorCode.BuiltinCode),
+        (r._SUBGRAPH_TENSORS, g.SubGraph.Tensors),
+        (r._SUBGRAPH_OPERATORS, g.SubGraph.Operators),
+        (r._OPERATOR_OPCODE_INDEX, g.Operator.OpcodeIndex),
+        (r._OPERATOR_INPUTS, g.Operator.Inputs),
+        (r._OPERATOR_OPTIONS_TYPE, g.Operator.BuiltinOptionsType),
+        (r._OPERATOR_OPTIONS, g.Operator.BuiltinOptions),
+        (r._TENSOR_TYPE, g.Tensor.Type),
+        (r._TENSOR_NAME, g.Tensor.Name),
+        (r._TENSOR_QUANTIZATION, g.Tensor.Quantization),
+        (r._QUANT_SCALE, g.QuantizationParameters.Scale),
+    ]
+    assert len(expected_slots) == 14  # one row per frozen slot constant
+    for constant, accessor in expected_slots:
         assert constant == slot(accessor), accessor.__qualname__

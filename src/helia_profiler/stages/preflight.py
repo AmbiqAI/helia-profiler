@@ -141,7 +141,7 @@ def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
     but its compiler raises ``ValueError: negative shift count`` for
     multipliers below 0.5 -- a stage-2 crash whose message names nothing. The
     two numbers sit in the flatbuffer, so either run dies HERE instead, with
-    the quantization named. See ``evaluation/softmax_preflight`` for the
+    the quantization named. See ``modelcost/softmax_preflight`` for the
     per-engine boundaries and how each was established.
 
     Ordered after :func:`_check_model`, which has already verified the file

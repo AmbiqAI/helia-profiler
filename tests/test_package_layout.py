@@ -208,7 +208,11 @@ def _hpx_import_targets(path: Path, *, module_level_only: bool) -> list[str]:
         if isinstance(node, ast.ImportFrom):
             base = "." * (node.level or 0) + (node.module or "")
             if node.level or (node.module or "").split(".")[0] == "helia_profiler":
-                targets.extend(f"{base}.{alias.name}" for alias in node.names)
+                # `from . import x` has an empty module: join without adding
+                # a dot, or a level-1 sibling import would encode as a
+                # level-2 parent target (#235 lens).
+                joiner = "" if base.endswith(".") else "."
+                targets.extend(f"{base}{joiner}{alias.name}" for alias in node.names)
         elif isinstance(node, ast.Import):
             targets.extend(
                 alias.name
@@ -257,9 +261,11 @@ def test_platform_never_imports_the_config_layer() -> None:
 
 
 def _hpx_target_head(target: str, package: str) -> str:
-    """The top-level hpx module a target resolves to, from a file in
-    ``helia_profiler.<package>``: ``".sibling"`` -> the package itself,
-    ``"..other.name"`` -> ``other``, absolute -> its second segment."""
+    """Resolve a target to the top-level hpx module it lands in.
+
+    From a file in ``helia_profiler.<package>``: ``".sibling"`` is the
+    package itself, ``"..other.name"`` is ``other``, and an absolute target
+    contributes its second segment."""
     if target.startswith(".."):
         return target.lstrip(".").split(".")[0]
     if target.startswith("."):
@@ -268,8 +274,10 @@ def _hpx_target_head(target: str, package: str) -> str:
 
 
 def _closure_offenders(package: str, allowed: set[str]) -> dict[str, list[str]]:
+    """Per-file hpx-import targets outside *allowed*, over the WHOLE package
+    tree (rglob: a future subpackage must not escape the wall)."""
     offenders: dict[str, list[str]] = {}
-    for path in sorted((_SRC / package).glob("*.py")):
+    for path in sorted((_SRC / package).rglob("*.py")):
         hits = [
             target
             for target in _hpx_import_targets(path, module_level_only=False)

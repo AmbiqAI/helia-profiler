@@ -3,7 +3,7 @@
 The defect: AOT layer ids are post-compilation execution positions (helia-aot
 skips ops without renumbering), while model analysis describes the original
 graph — a positional join lands every MAC count on a plausible wrong layer.
-These tests pin the contained resolver (`evaluation/layer_attribution.py`)
+These tests pin the contained resolver (`modelcost/layer_attribution.py`)
 and both consumers (CSV writer, console table).
 """
 

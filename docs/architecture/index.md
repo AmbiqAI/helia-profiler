@@ -120,10 +120,10 @@ src/helia_profiler/
 ├── profiler.py         # build_default_pipeline(), run_profile()
 ├── pipeline.py         # PipelineContext, Stage protocol, PipelineRunner
 ├── results/            # Result models, workflow artifacts, bundle manifests
-├── evaluation/         # Analysis, comparison, validity, regression policy
-├── errors.py           # HpxError hierarchy
 ├── modelcost/          # Model-cost core: MAC/OPS analysis + layer attribution (#229 seam)
-├── platform/           # SoC/Board registry + custom config overlays
+├── evaluation/         # Run validity, comparability/compare, engine-dispatched analysis
+├── errors.py           # HpxError hierarchy
+├── platform/           # SoC/board registry, memory maps, placement vocabulary, custom overlays
 ├── nsx.py              # NSX subprocess wrapper (configure/build/flash)
 ├── counters.py         # PMU counter registry and pass planning
 ├── doctor.py           # hpx doctor — tool checks

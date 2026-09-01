@@ -5,6 +5,11 @@ planner, firmware templates, engine adapters, and preflight. They live in
 the silicon-info package so the vocabulary travels with the per-SoC tables
 at extraction time; :mod:`helia_profiler.placement` re-exports them and
 keeps the hpx-side placement *policy*.
+
+``StrEnum`` is deliberate: the members interoperate with the raw string
+constants used across firmware templates and dicts (``"tcm"``, ``"sram"``,
+…) — no ``.value`` unwrapping in Jinja — while Python code keeps
+``is``-comparisons against the members.
 """
 
 from __future__ import annotations

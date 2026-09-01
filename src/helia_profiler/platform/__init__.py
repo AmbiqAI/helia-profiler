@@ -8,6 +8,11 @@ Split across focused modules but re-exported here so
 * :mod:`.board` — ``BoardDef`` and the built-in board registrations.
 * :mod:`.counters` — the PMU counter registry (ARM event IDs by compute
   unit); imported as a submodule, not re-exported here.
+* :mod:`.placement` — the memory-placement vocabulary (enums + slack
+  constants); the hpx-facing spelling stays :mod:`helia_profiler.placement`,
+  which re-exports it (#229 D4).
+* :mod:`.capabilities` and :mod:`.custom` — capability records and the
+  user custom-SoC/board overlay; consumed via the lookups above.
 * :mod:`.registry` — ``PlatformRegistry`` construction and the public lookup
   helpers.
 * :mod:`.memory_map` — the verified linked-memory map (#133): per-SoC region

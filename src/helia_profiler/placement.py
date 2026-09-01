@@ -4,21 +4,6 @@ The enums and slack constants moved to
 :mod:`helia_profiler.platform.placement` so they travel with the silicon
 tables at extraction time (#229 D4); this module remains the hpx-facing
 spelling and keeps the fastest-fit *policy*, which is hpx's concern.
-
-Original module notes:
-
-These enums are the single vocabulary used by:
-
-* the placement resolver in :mod:`helia_profiler.stages.plan_memory`
-* the firmware Jinja templates (via the ``StrEnum`` ``__str__`` /
-  ``__eq__`` semantics — no ``.value`` unwrapping needed)
-* engine adapters that emit arena regions
-* preflight validation
-
-Using ``StrEnum`` preserves interoperability with the raw string
-constants previously sprayed across templates and dicts (``"tcm"``,
-``"sram"``, …) while letting Python code use ``is``-comparisons against
-the enum members.
 """
 
 from __future__ import annotations
@@ -59,5 +44,3 @@ def resolve_fastest_fit_placement(
         Placement.SRAM if arena_size <= sram_cap else Placement.MRAM,
         Placement.MRAM,
     )
-
-

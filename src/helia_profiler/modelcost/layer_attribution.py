@@ -34,6 +34,14 @@ from typing import Any, Mapping, Sequence
 from .model_analysis import LayerOps, ModelAnalysis
 
 
+__all__ = [
+    "LayerAttribution",
+    "LayerAttributor",
+    "manifest_source_map",
+    "source_index_from_op",
+]
+
+
 def source_index_from_op(op: str) -> int | None:
     """Original tflite operator index from an op label's ``:N`` suffix.
 
@@ -46,14 +54,6 @@ def source_index_from_op(op: str) -> int | None:
     if not sep or not suffix.isdigit():
         return None
     return int(suffix)
-
-
-__all__ = [
-    "LayerAttribution",
-    "LayerAttributor",
-    "manifest_source_map",
-    "source_index_from_op",
-]
 
 
 @dataclass(frozen=True)
