@@ -36,7 +36,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from ..config import Transport
+from ..vocab import Transport
 from ..errors import CaptureError
 
 if TYPE_CHECKING:
@@ -71,7 +71,7 @@ class CaptureArgs:
 class CaptureTransport(Protocol):
     """Uniform backend interface ``capture_pmu`` drives, one per transport."""
 
-    #: The ``config.Transport`` member this backend handles.
+    #: The ``vocab.Transport`` member this backend handles.
     transport: Transport
     #: Whether the backend forwards the SoC keep-attached requirement (see
     #: module docstring).  ``True`` for UART/USB CDC, ``False`` for RTT/SWO.

@@ -42,7 +42,7 @@ import re
 import time
 from pathlib import Path
 
-from ..config import Transport
+from ..vocab import Transport
 from ..errors import CaptureError
 from .base import BaseCaptureTransport, CaptureArgs
 from ..target.probe.base import DebugMemorySession, ResetController

@@ -33,6 +33,7 @@ from ..platform import (
     get_default_sync_gpio_pin,
 )
 from ..power.base import PowerMode
+from ..vocab import Aggregation, Toolchain, Transport
 from .power import (
     DEFAULT_INA228_AVERAGING_COUNT,
     DEFAULT_INA228_CONVERSION_TIME_US,
@@ -63,27 +64,9 @@ from ..target.lifecycle import ResetStrategy
 DEFAULT_ARENA_SIZE_BYTES = 256 * 1024
 
 
-class Toolchain(StrEnum):
-    """Supported cross-compiler toolchains for the profiler firmware.
-
-    ``GCC`` and ``ARM_NONE_EABI_GCC`` are aliases — both resolve to the
-    GNU Arm Embedded toolchain.  ``ARMCLANG`` is Arm Compiler 6 (Keil),
-    ``ATFE`` is the Arm Toolchain for Embedded (LLVM).
-    """
-
-    ARM_NONE_EABI_GCC = "arm-none-eabi-gcc"
-    GCC = "gcc"
-    ARMCLANG = "armclang"
-    ATFE = "atfe"
-
-
-class Transport(StrEnum):
-    """Host↔target transport for capture and heartbeat traffic."""
-
-    RTT = "rtt"
-    USB_CDC = "usb_cdc"
-    SWO = "swo"
-    UART = "uart"
+# Toolchain / Transport / Aggregation are cross-layer vocabulary and live in
+# the bottom-layer leaf ``helia_profiler.vocab`` (#229 D2); re-exported here
+# so ``from helia_profiler.config import Transport`` stays the public spelling.
 
 
 @pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
@@ -166,21 +149,6 @@ class CleanWindowProbe(StrEnum):
 
     INFER = "infer"
     BUSY_LOOP = "busy_loop"
-
-
-class Aggregation(StrEnum):
-    """Per-iteration aggregation estimator for per-layer counters.
-
-    ``MEDIAN`` is the default because it rejects the occasional corrupted
-    iteration (e.g. an Apollo4 DWT->CYCCNT uint32 wrap or a frozen-zero read
-    while the host probe is still settling) that a plain ``MEAN`` would smear
-    across the whole layer.  ``TRIMMED`` drops the high/low extremes, then
-    means.
-    """
-
-    MEAN = "mean"
-    MEDIAN = "median"
-    TRIMMED = "trimmed"
 
 
 DEFAULT_BOARD = "apollo510_evb"

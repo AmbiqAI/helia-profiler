@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 import time
 
-from ..config import Transport
+from ..vocab import Transport
 from ..errors import CaptureError
 from .base import BaseCaptureTransport, CaptureArgs
 from ..target.probe.base import ResetController

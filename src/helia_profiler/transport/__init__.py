@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from ..config import Transport
+from ..vocab import Transport
 from ..errors import CaptureError
 from .base import BaseCaptureTransport, CaptureArgs, CaptureTransport
 from .protocol import (

@@ -80,7 +80,7 @@ class CollectPowerTerminalStage:
         )
 
     def run(self, ctx: PipelineContext) -> None:
-        from ..power.terminal_transport import get_power_terminal_transport
+        from ..capture.terminal_transport import get_power_terminal_transport
 
         if ctx.power_run is None or ctx.power_run.firmware is None:
             raise PowerError("Cannot collect terminal status without power firmware.")

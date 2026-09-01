@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import os
 import shutil
 import subprocess
@@ -109,6 +110,18 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
     assert "helia_profiler/results/artifacts.py" in names
     assert "helia_profiler/results/manifest.py" in names
     assert "helia_profiler/deps/compatibility.py" in names
+    # #229 (lens on PR2): module moves must not resurrect old paths in the
+    # wheel — pin FULL set equality between the staged source tree and the
+    # wheel's python modules, so a stale or duplicated module ships loudly.
+    wheel_modules = {n for n in names if n.startswith("helia_profiler/") and n.endswith(".py")}
+    source_modules = {
+        f"helia_profiler/{p.relative_to(staged / 'src' / 'helia_profiler').as_posix()}"
+        for p in (staged / "src" / "helia_profiler").rglob("*.py")
+    }
+    assert wheel_modules == source_modules, (
+        f"wheel/source module drift: only-in-wheel={sorted(wheel_modules - source_modules)} "
+        f"only-in-source={sorted(source_modules - wheel_modules)}"
+    )
     assert "helia_profiler/data/compatibility-baseline-v1.json" in names
     assert "helia_profiler/data/run_summary.schema.v1.json" in names
     assert "helia_profiler/data/run_metadata.schema.v1.json" in names
@@ -159,3 +172,85 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
         "a9f4ec25a162f6f3700623feb691423bb5a51132",
         "e71a1be178d546c9226aafa4b82fe3313a9ff7d865c1ee54d5902a425208777c",
     ]
+
+
+# ---------------------------------------------------------------------------
+# #229 D2 — layering contracts for the vocabulary leaf and light package inits
+# ---------------------------------------------------------------------------
+
+_SRC = Path(__file__).resolve().parent.parent / "src" / "helia_profiler"
+
+
+def _hpx_import_targets(path: Path, *, module_level_only: bool) -> list[str]:
+    """Intra-hpx import targets in *path*, one entry per imported name.
+
+    Relative imports keep their dots (``"..config"``); absolute ones their
+    module path — and ``from helia_profiler import config`` reports
+    ``"helia_profiler.config"``, so package-attribute imports cannot slip
+    past a module-name filter. ``module_level_only=True`` restricts to
+    plain top-level statements, excluding only the *body* of
+    ``if TYPE_CHECKING:`` (its ``else:`` branch runs at import time and is
+    included); ``False`` walks everything, lazy and guarded alike.
+    """
+    tree = ast.parse(path.read_text())
+    if module_level_only:
+        nodes: list[ast.stmt] = []
+        for node in tree.body:
+            if isinstance(node, ast.If) and "TYPE_CHECKING" in ast.dump(node.test):
+                nodes.extend(node.orelse)
+            else:
+                nodes.append(node)
+    else:
+        nodes = list(ast.walk(tree))
+
+    targets: list[str] = []
+    for node in nodes:
+        if isinstance(node, ast.ImportFrom):
+            base = "." * (node.level or 0) + (node.module or "")
+            if node.level or (node.module or "").split(".")[0] == "helia_profiler":
+                targets.extend(f"{base}.{alias.name}" for alias in node.names)
+        elif isinstance(node, ast.Import):
+            targets.extend(
+                alias.name
+                for alias in node.names
+                if alias.name.split(".")[0] == "helia_profiler"
+            )
+    return targets
+
+
+def _names_module(target: str, module: str) -> bool:
+    return module in target.lstrip(".").split(".")
+
+
+def test_vocab_is_a_leaf() -> None:
+    """vocab.py is the bottom layer: any hpx import here — lazy, guarded,
+    or otherwise — rebuilds the very cycles it exists to break (#229 D2)."""
+    assert _hpx_import_targets(_SRC / "vocab.py", module_level_only=False) == []
+
+
+def test_engines_package_init_stays_stdlib_light() -> None:
+    """``from ..engines import EngineType`` is cycle-safe for wire/, results/
+    and config/ ONLY while engines/__init__ imports nothing from hpx at
+    module level (adapters load lazily). This pin is why EngineType did not
+    need an engines/types.py split (#229 D2 refinement)."""
+    hits = _hpx_import_targets(_SRC / "engines" / "__init__.py", module_level_only=True)
+    assert hits == [], f"engines/__init__ gained module-level hpx imports: {hits}"
+
+
+def test_platform_never_imports_the_config_layer() -> None:
+    """The silicon-info package must not know the config resolver exists —
+    the old lazy ``config.Toolchain`` import was the one documented
+    config<->platform cycle, inverted in #229 D2 (platform owns the
+    toolchain-name map). Lazy and guarded imports count too."""
+    offenders = {
+        path.name: hits
+        for path in sorted((_SRC / "platform").glob("*.py"))
+        if (
+            hits := [
+                target
+                for target in _hpx_import_targets(path, module_level_only=False)
+                if _names_module(target, "config")
+            ]
+        )
+    }
+    assert not offenders, f"platform/ imports the config layer: {offenders}"

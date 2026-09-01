@@ -115,7 +115,8 @@ raises a typed error and the pipeline stops with a clear message.
 src/helia_profiler/
 ├── cli/                # Typer CLI package
 ├── api.py              # profile() entry point → PipelineRunner
-├── config.py           # ProfileConfig (frozen dataclasses)
+├── vocab.py           # Bottom-layer enum leaf (Toolchain/Transport/Aggregation)
+├── config/           # ProfileConfig (frozen dataclasses)
 ├── profiler.py         # build_default_pipeline(), run_profile()
 ├── pipeline.py         # PipelineContext, Stage protocol, PipelineRunner
 ├── results/            # Result models, workflow artifacts, bundle manifests
@@ -174,6 +175,7 @@ src/helia_profiler/
 │   ├── parser.py         # HPX protocol parser → PmuResult
 │   ├── power_terminal.py # Parser for power-firmware terminal status records
 │   ├── readiness.py      # Post-reset readiness helpers for capture transports
+│   ├── terminal_transport.py # Post-power envelope collection registry (per transport)
 │   └── rtt_symbol.py     # RTT control-block address lookup from build artifacts
 │
 ├── power/              # Power measurement drivers

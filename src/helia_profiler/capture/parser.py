@@ -34,7 +34,7 @@ import re
 import statistics
 from typing import Any
 
-from ..config import Aggregation
+from ..vocab import Aggregation
 from ..results import FirmwareMeta, LayerResult, PmuResult, PresetResult, PsramInfo
 from ..transport.protocol import HPX_PROTOCOL_VERSION
 from ..wire import (

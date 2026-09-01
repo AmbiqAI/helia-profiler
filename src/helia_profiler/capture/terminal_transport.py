@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from typing import Protocol, runtime_checkable
 
-from ..results import PowerTerminalEnvelope
-from ..config import Transport
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
 from ..errors import PowerError
-from ..pipeline import PipelineContext
+from ..results import PowerTerminalEnvelope
+from ..vocab import Transport
+
+if TYPE_CHECKING:
+    from ..pipeline import PipelineContext
 
 
 @runtime_checkable
@@ -55,7 +58,7 @@ class RttPowerTerminalTransport:
     transport = Transport.RTT
 
     def collect(self, ctx: PipelineContext, *, timeout_s: float) -> PowerTerminalEnvelope:
-        from ..capture.power_terminal import collect_power_terminal_envelope_rtt
+        from .power_terminal import collect_power_terminal_envelope_rtt
 
         if ctx.power_run is None or ctx.power_run.firmware is None or ctx.soc is None:
             raise PowerError("RTT terminal collection requires power firmware and platform state.")
@@ -79,7 +82,7 @@ def _collect_serial_terminal(
     *,
     timeout_s: float,
 ) -> PowerTerminalEnvelope:
-    from ..capture.power_terminal import (
+    from .power_terminal import (
         POWER_TERMINAL_END,
         POWER_TERMINAL_START,
         parse_power_terminal_envelope,
@@ -142,7 +145,7 @@ class UartPowerTerminalTransport:
 def _collect_chunked_terminal(
     read_fn: Callable[[], bytes], *, timeout_s: float
 ) -> PowerTerminalEnvelope:
-    from ..capture.power_terminal import collect_power_terminal_envelope_from_chunks
+    from .power_terminal import collect_power_terminal_envelope_from_chunks
 
     return collect_power_terminal_envelope_from_chunks(
         read_fn, timeout_s=timeout_s, poll_interval_s=0.001
