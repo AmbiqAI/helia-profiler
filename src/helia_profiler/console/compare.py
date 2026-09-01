@@ -12,7 +12,7 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
-from .tables import _to_float as _to_compare_float
+from ..results.serde import to_float as _to_compare_float
 
 if TYPE_CHECKING:
     from ..evaluation import CompareResult, LayerDiffRow, MetricDiff

@@ -123,10 +123,10 @@ def inspect_environment(
     results = [_inspect_dependency(spec) for spec in _dependency_specs(toolchain, transport, engine)]
     if require_segger_rtt:
         from ..errors import FirmwareError
-        from ..firmware import _find_segger_rtt_dir
+        from ..firmware import find_segger_rtt_dir
 
         try:
-            resolved_rtt = _find_segger_rtt_dir(segger_rtt_path)
+            resolved_rtt = find_segger_rtt_dir(segger_rtt_path)
         except FirmwareError:
             results.append(
                 DoctorCheck(

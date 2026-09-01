@@ -54,3 +54,4 @@ and annotation snapshots remain a release-candidate task.
 - [Configuration](config.md) — `ProfileConfig` and its section classes
 - [Results](results.md) — `ProfileResult` and the typed data it carries
 - [Errors](errors.md) — the `HpxError` hierarchy
+- [Platform](platform.md) — SoC/board lookups and the platform registry

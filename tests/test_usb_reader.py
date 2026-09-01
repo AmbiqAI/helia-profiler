@@ -162,7 +162,7 @@ def test_resolve_cdc_port_prefers_marker(monkeypatch):
         ],
     )
 
-    port = usb_reader._resolve_cdc_port(marker=marker, pre_existing=set(), timeout_s=1)
+    port = usb_reader.resolve_cdc_port(marker=marker, pre_existing=set(), timeout_s=1)
 
     assert port == "/dev/ttyACM3"
 
@@ -212,4 +212,4 @@ def test_resolve_cdc_port_does_not_fall_back_to_foreign_hpx(monkeypatch):
     )
 
     with pytest.raises(CaptureError, match="No application USB CDC device appeared"):
-        usb_reader._resolve_cdc_port(marker=expected, pre_existing=set(), timeout_s=0)
+        usb_reader.resolve_cdc_port(marker=expected, pre_existing=set(), timeout_s=0)

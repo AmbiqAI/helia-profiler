@@ -32,6 +32,7 @@ from ..results.dependencies import (
     DependencyRequest,
     DependencyWorkspace,
 )
+from ..results.serde import sha256_file
 from .compatibility import QualificationState
 from .sync import (
     _offline_materialization_error,
@@ -73,11 +74,7 @@ def _digest_bytes(payload: bytes) -> ContentDigest:
 
 
 def _digest_file(path: Path) -> ContentDigest:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return ContentDigest("sha256", digest.hexdigest())
+    return ContentDigest("sha256", sha256_file(path))
 
 
 def _digest_path(path: Path) -> ContentDigest:

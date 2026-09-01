@@ -17,7 +17,7 @@ from ..results import (
     RunStatus,
 )
 from ..firmware import measured_power_fingerprint
-from ..results.manifest import _sha256
+from ..results.serde import nested_get, sha256_file
 from ..evaluation import evaluate_run
 from .contracts import (
     PROFILE_RESULTS_SCHEMA,
@@ -82,7 +82,7 @@ def _result_artifact(path: Path, output_dir: Path) -> ResultArtifact:
         path=relative,
         media_type=_MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream"),
         size_bytes=path.stat().st_size,
-        sha256=_sha256(path),
+        sha256=sha256_file(path),
         **metadata,
     )
 
@@ -200,11 +200,11 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
     values: dict[ComparisonDimension, Any] = {
         ComparisonDimension.MODEL_SHA256: model.sha256 if model is not None else None,
         ComparisonDimension.HPX_VERSION: ctx.run_metadata.hpx_version,
-        ComparisonDimension.ENGINE: _nested(config, "engine", "type"),
+        ComparisonDimension.ENGINE: nested_get(config, "engine", "type"),
         ComparisonDimension.BOARD: platform.board if platform is not None else None,
         ComparisonDimension.SOC: platform.soc if platform is not None else None,
         ComparisonDimension.CPU_CLOCK: platform.cpu_clock_name if platform is not None else None,
-        ComparisonDimension.TOOLCHAIN: _nested(config, "target", "toolchain"),
+        ComparisonDimension.TOOLCHAIN: nested_get(config, "target", "toolchain"),
         ComparisonDimension.COMPILER_VERSION: (
             toolchain.compiler_version if toolchain is not None else None
         ),
@@ -213,9 +213,9 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
         ),
         ComparisonDimension.RUN_SUMMARY_SCHEMA_VERSION: RUN_SUMMARY_SCHEMA_VERSION,
         ComparisonDimension.RUN_METADATA_SCHEMA_VERSION: RUN_METADATA_SCHEMA_VERSION,
-        ComparisonDimension.TRANSPORT: _nested(config, "target", "transport"),
-        ComparisonDimension.ARENA_LOCATION: _nested(config, "model", "arena_location"),
-        ComparisonDimension.WEIGHTS_LOCATION: _nested(config, "model", "weights_location"),
+        ComparisonDimension.TRANSPORT: nested_get(config, "target", "transport"),
+        ComparisonDimension.ARENA_LOCATION: nested_get(config, "model", "arena_location"),
+        ComparisonDimension.WEIGHTS_LOCATION: nested_get(config, "model", "weights_location"),
         ComparisonDimension.ENGINE_VERSION: (
             ctx.run_metadata.engine.version if ctx.run_metadata.engine is not None else None
         ),
@@ -257,12 +257,3 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
             }
         )
     return {dimension.value: value for dimension, value in values.items()}
-
-
-def _nested(value: dict[str, Any], *keys: str) -> Any:
-    current: Any = value
-    for key in keys:
-        if not isinstance(current, dict):
-            return None
-        current = current.get(key)
-    return current

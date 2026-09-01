@@ -22,7 +22,7 @@ from .render import _write_text
 log = logging.getLogger("hpx")
 
 
-def _find_segger_rtt_dir(configured_path: Path | None = None) -> Path:
+def find_segger_rtt_dir(configured_path: Path | None = None) -> Path:
     """Locate the SEGGER RTT source directory.
 
     An explicit config path takes precedence, followed by ``SEGGER_RTT_PATH``
@@ -78,7 +78,7 @@ def _is_segger_rtt_root(path: Path) -> bool:
 
 def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> None:
     """Copy SEGGER RTT source files into *dest_dir*/rtt/."""
-    rtt_root = _find_segger_rtt_dir(configured_path)
+    rtt_root = find_segger_rtt_dir(configured_path)
     rtt_dest = dest_dir / "rtt"
     rtt_dest.mkdir(parents=True, exist_ok=True)
 

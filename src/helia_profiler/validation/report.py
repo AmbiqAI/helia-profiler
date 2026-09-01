@@ -14,6 +14,7 @@ from typing import Any
 
 from .._version import __version__
 from ..errors import ReportError
+from ..results.serde import nested_get
 from .runner import CaseResult
 
 
@@ -264,11 +265,11 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
             {
                 "jlink_serial": result.jlink_serial,
                 "power_serial": result.power_serial,
-                "model_sha256": _nested(metadata, "model", "sha256"),
+                "model_sha256": nested_get(metadata, "model", "sha256"),
                 "hpx_version": metadata.get("hpx_version"),
-                "compiler": _nested(metadata, "toolchain", "compiler"),
-                "compiler_version": _nested(metadata, "toolchain", "compiler_version"),
-                "system_clock_hz": _nested(metadata, "firmware", "system_clock_hz"),
+                "compiler": nested_get(metadata, "toolchain", "compiler"),
+                "compiler_version": nested_get(metadata, "toolchain", "compiler_version"),
+                "system_clock_hz": nested_get(metadata, "firmware", "system_clock_hz"),
                 "run_metadata_schema_version": metadata.get("schema_version"),
                 "run_summary_schema_version": summary.get("schema_version"),
                 "runtime": _runtime_provenance(metadata) or None,
@@ -523,17 +524,8 @@ def _read_optional_json(path: Path) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def _nested(value: dict[str, Any], *parts: str) -> Any:
-    current: Any = value
-    for part in parts:
-        if not isinstance(current, dict):
-            return None
-        current = current.get(part)
-    return current
-
-
 def _nested_dict(value: dict[str, Any], *parts: str) -> dict[str, Any]:
-    nested = _nested(value, *parts)
+    nested = nested_get(value, *parts)
     return nested if isinstance(nested, dict) else {}
 
 

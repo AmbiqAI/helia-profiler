@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .comparability import ComparabilityAssessment, assess_comparability, read_dimensions
-from .run_metrics import MetricDiff, _compare_metrics, _get_nested, _to_float
+from .run_metrics import MetricDiff, _compare_metrics
 from .comparison_profile import (
     ComparisonProfile,
     ComparisonVerdict,
@@ -19,6 +19,7 @@ from ..errors import ReportError
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
 from ..modelcost import source_index_from_op
 from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
+from ..results.serde import nested_get, to_float
 
 
 @dataclass(frozen=True)
@@ -430,7 +431,7 @@ def _coerce_csv_value(value: str | None) -> Any:
 def _config_value(run: RunArtifacts, dimensions: dict[str, Any], spec: _ConfigField) -> Any:
     if spec.dimension is not None:
         return dimensions.get(spec.dimension)
-    return _get_nested(run.metadata, spec.path)
+    return nested_get(run.metadata, *spec.path)
 
 
 def _compare_config(base: RunArtifacts, cand: RunArtifacts) -> list[ConfigDiffRow]:
@@ -462,8 +463,8 @@ def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[Laye
     for idx in range(max_len):
         b = base[idx] if idx < len(base) else {}
         c = cand[idx] if idx < len(cand) else {}
-        baseline_cycles = _to_float(b.get("cycles"))
-        candidate_cycles = _to_float(c.get("cycles"))
+        baseline_cycles = to_float(b.get("cycles"))
+        candidate_cycles = to_float(c.get("cycles"))
         delta_cycles = None
         delta_pct = None
         speedup = None
@@ -496,8 +497,8 @@ def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[Laye
         # — per-layer counter diffs carry measured counters only.
         excluded = {"id", "op", "cycles", "overflow", "source_index", "macs", "ops", "cycles_per_mac"}
         for key in sorted((set(b) & set(c)) - excluded):
-            bf = _to_float(b.get(key))
-            cf = _to_float(c.get(key))
+            bf = to_float(b.get(key))
+            cf = to_float(c.get(key))
             if bf is None or cf is None:
                 continue
             counters[key] = CounterDiff(

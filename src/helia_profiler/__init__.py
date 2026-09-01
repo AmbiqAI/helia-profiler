@@ -66,7 +66,7 @@ from .errors import (
 )
 from .placement import Placement
 from .pipeline import ProgressUpdate
-from .platform import BoardDef
+from .platform import BoardDef, SocDef, build_platform_registry, get_soc
 from .power.base import PowerMode, PowerResult
 from .power.metadata import (
     MeasurementScope,
@@ -187,6 +187,9 @@ __all__ = [
     "DoctorResult",
     "DoctorVersionCheck",
     "BoardDef",
+    "SocDef",
+    "build_platform_registry",
+    "get_soc",
     "PmuCounter",
     "JLinkProbe",
     "JLinkProbeMatch",
@@ -306,6 +309,9 @@ _IMPLEMENTATION_API = {
     "DoctorResult",
     "DoctorVersionCheck",
     "BoardDef",
+    "SocDef",
+    "build_platform_registry",
+    "get_soc",
     "PmuCounter",
     "JLinkProbe",
     "JLinkProbeMatch",

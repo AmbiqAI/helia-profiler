@@ -257,7 +257,7 @@ class TestReaderResetOwnership:
         events = _install_reader_reset_recorder(
             monkeypatch, "helia_profiler.transport.uart"
         )
-        monkeypatch.setattr(uart_reader, "_find_jlink_vcom_port", lambda _serial: "PORT")
+        monkeypatch.setattr(uart_reader, "find_jlink_vcom_port", lambda _serial: "PORT")
 
         class _FakeSerial:
             def __init__(self, *a, **k):
@@ -336,7 +336,7 @@ def _drive_reader_reset(monkeypatch, tmp_path, family: str, transport: str) -> l
     if transport == "uart":
         import helia_profiler.transport.uart as uart_reader
 
-        monkeypatch.setattr(uart_reader, "_find_jlink_vcom_port", lambda _s: "PORT")
+        monkeypatch.setattr(uart_reader, "find_jlink_vcom_port", lambda _s: "PORT")
 
         class _FakeSerial:
             def __init__(self, *a, **k):

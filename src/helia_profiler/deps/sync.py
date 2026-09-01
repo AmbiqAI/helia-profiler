@@ -22,7 +22,6 @@ patching the same module object this code reads at call time.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 from collections.abc import Mapping
@@ -33,6 +32,7 @@ from neuralspotx.nsx_lock import read_lock
 
 from . import nsx as nsx_cli
 from ..errors import BuildError, LockError
+from ..results.serde import sha256_file
 
 if TYPE_CHECKING:
     from ..config import ProfileConfig
@@ -45,11 +45,7 @@ _SYNC_STAMP = "hpx-frozen-sync.json"
 
 
 def _lock_sha256(app_dir: Path) -> str:
-    digest = hashlib.sha256()
-    with (app_dir / "nsx.lock").open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return sha256_file(app_dir / "nsx.lock")
 
 
 def _verified_sync_lock_digest(app_dir: Path) -> str | None:

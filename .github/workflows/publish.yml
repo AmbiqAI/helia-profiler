@@ -141,7 +141,7 @@ jobs:
           uv pip install --python .release-venv/bin/python "${packages[0]}"
           .release-venv/bin/hpx --version | grep -F "hpx ${PACKAGE_VERSION}"
           env -u SEGGER_RTT_PATH .release-venv/bin/python -c \
-            'from helia_profiler.firmware import _find_segger_rtt_dir; assert _find_segger_rtt_dir().name == "segger_rtt"'
+            'from helia_profiler.firmware import find_segger_rtt_dir; assert find_segger_rtt_dir().name == "segger_rtt"'
 
   publish-pypi:
     if: needs.release-please.outputs.release_created == 'true' && needs.verify-install.result == 'success'

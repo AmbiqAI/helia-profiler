@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import Any, Self
 
 from ..errors import ReportError
-from .manifest import ResultArtifact, _sha256
+from .manifest import ResultArtifact
+from .serde import sha256_file
 
 SUPPORT_BUNDLE_SCHEMA = "hpx.support-bundle-manifest"
 SUPPORT_BUNDLE_SCHEMA_VERSION = 1
@@ -167,7 +168,7 @@ class SupportBundleManifest:
                 raise ReportError(f"Support bundle artifact is missing: {artifact.path}")
             if artifact_path.stat().st_size != artifact.size_bytes:
                 raise ReportError(f"Support bundle artifact size mismatch: {artifact.path}")
-            if _sha256(artifact_path) != artifact.sha256:
+            if sha256_file(artifact_path) != artifact.sha256:
                 raise ReportError(f"Support bundle artifact digest mismatch: {artifact.path}")
 
 

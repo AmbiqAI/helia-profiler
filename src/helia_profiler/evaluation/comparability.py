@@ -16,6 +16,7 @@ from ..results import (
     ResultValidity,
     RunStatus,
 )
+from ..results.serde import nested_get
 from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
 
 # Not re-exported by the results package (construction shape changes in #154
@@ -313,7 +314,7 @@ def read_dimensions(run: RunArtifacts) -> dict[str, Any]:
                 dimensions[spec.dimension] = (
                     spec.derive(power_dict)
                     if spec.derive is not None
-                    else _nested(power_dict, *spec.path)
+                    else nested_get(power_dict, *spec.path)
                 )
         elif spec.source is not ArtifactSource.MANIFEST_ONLY:
             # A new ArtifactSource must be dispatched here explicitly — a
@@ -343,16 +344,7 @@ def _read_artifact_value(run: RunArtifacts, source: ArtifactSource, path: tuple[
     spec's fallback cannot mean something different from its path.
     """
     if source is ArtifactSource.RUN_METADATA:
-        return _nested(run.metadata, *path)
+        return nested_get(run.metadata, *path)
     if source is ArtifactSource.SUMMARY:
-        return _nested(run.summary, *path)
+        return nested_get(run.summary, *path)
     raise ValueError(f"{source} is not a path-addressable artifact source.")
-
-
-def _nested(value: Any, *keys: str) -> Any:
-    current = value
-    for key in keys:
-        if not isinstance(current, dict):
-            return None
-        current = current.get(key)
-    return current

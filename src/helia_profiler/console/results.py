@@ -12,8 +12,9 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
-from .tables import _fmt_bytes, _progress_bar, _to_float
+from .tables import _fmt_bytes, _progress_bar
 from ..power.metadata import PowerIntegrity
+from ..results.serde import to_float
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -38,11 +39,11 @@ _INST_RETIRED = "ARM_PMU_INST_RETIRED"
 
 
 def _format_mve_cells(counters: dict[str, float], cycles: float) -> list[str]:
-    mve_inst = _to_float(counters.get(_MVE_INST))
-    inst = _to_float(counters.get(_INST_RETIRED))
-    mve_mac = _to_float(counters.get(_MVE_INT_MAC))
-    mve_ldst = _to_float(counters.get(_MVE_LDST))
-    mve_stall = _to_float(counters.get(_MVE_STALL))
+    mve_inst = to_float(counters.get(_MVE_INST))
+    inst = to_float(counters.get(_INST_RETIRED))
+    mve_mac = to_float(counters.get(_MVE_INT_MAC))
+    mve_ldst = to_float(counters.get(_MVE_LDST))
+    mve_stall = to_float(counters.get(_MVE_STALL))
 
     mve_pct = f"{mve_inst / inst * 100:.1f}%" if mve_inst is not None and inst else "—"
     mac_density = f"{mve_mac / mve_inst:.2f}" if mve_mac is not None and mve_inst else "—"

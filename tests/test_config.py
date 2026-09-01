@@ -24,7 +24,7 @@ from helia_profiler.config import (
     load_config,
 )
 from helia_profiler.errors import ConfigError
-from helia_profiler.pipeline import _serialize_config
+from helia_profiler.pipeline import serialize_config
 from helia_profiler.power.base import PowerMode
 
 
@@ -862,7 +862,7 @@ def test_config_snapshot_serialization_is_json_safe():
         target=TargetConfig(clock=ClockSelection(cpu="hp")),
     )
 
-    snapshot = _serialize_config(config)
+    snapshot = serialize_config(config)
 
     assert snapshot["model"]["path"] == "m.tflite"
     assert snapshot["engine"]["type"] == "helia-rt"

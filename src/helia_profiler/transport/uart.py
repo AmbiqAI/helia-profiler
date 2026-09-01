@@ -46,7 +46,7 @@ from .timing import CaptureTimingTracker
 
 log = logging.getLogger("hpx")
 
-_BAUD = 115200  # firmware COM UART runs 115200 8N1, no flow control
+BAUD = 115200  # firmware COM UART runs 115200 8N1, no flow control
 _JLINK_MARKERS = ("segger", "j-link")
 _READ_CHUNK = 4096
 
@@ -67,7 +67,7 @@ def _is_jlink_vcom(info: object) -> bool:
     return any(_norm(marker) in haystack for marker in _JLINK_MARKERS)
 
 
-def _find_jlink_vcom_port(jlink_serial: str | None) -> str:
+def find_jlink_vcom_port(jlink_serial: str | None) -> str:
     """Locate the J-Link VCOM serial device for *jlink_serial*.
 
     When a probe serial is known, prefer the VCOM whose descriptor carries
@@ -145,13 +145,13 @@ def capture_uart_output(
     timing = CaptureTimingTracker(start_marker=HPX_START, end_marker=HPX_END)
     on_line = timing.observe_line
 
-    port = _find_jlink_vcom_port(jlink_serial)
+    port = find_jlink_vcom_port(jlink_serial)
     controller = reset_controller or JLinkResetController()
 
-    log.info("Opening J-Link VCOM port: %s @ %d 8N1", port, _BAUD)
+    log.info("Opening J-Link VCOM port: %s @ %d 8N1", port, BAUD)
     ser: serial.Serial | None = None
     try:
-        ser = serial.Serial(port=port, baudrate=_BAUD, timeout=0)
+        ser = serial.Serial(port=port, baudrate=BAUD, timeout=0)
         ser.reset_input_buffer()
 
         def read_fn() -> bytes:

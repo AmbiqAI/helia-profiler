@@ -192,6 +192,7 @@ nav:
           - Configuration: reference/api/config.md
           - Results: reference/api/results.md
           - Errors: reference/api/errors.md
+          - Platform: reference/api/platform.md
   - Architecture:
       - Overview: architecture/index.md
       - Compatibility Baseline: architecture/compatibility-baseline.md
