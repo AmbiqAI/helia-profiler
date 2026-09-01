@@ -427,3 +427,22 @@ def test_characterized_socs_cover_the_entire_registry():
     from helia_profiler.platform import list_socs
 
     assert set(CHARACTERIZED_SOCS) == {soc.name for soc in list_socs()}
+
+
+def test_link_family_map_stays_in_lockstep_with_the_toolchain_enum():
+    """#229 D2 inversion: platform owns the toolchain-name map and must
+    classify exactly the names config's Toolchain enum admits — no silent
+    drift in either direction."""
+    from helia_profiler.platform.memory_map import _LINK_FAMILY_BY_TOOLCHAIN
+    from helia_profiler.vocab import Toolchain
+
+    assert set(_LINK_FAMILY_BY_TOOLCHAIN) == {t.value for t in Toolchain}
+
+
+def test_unknown_toolchain_raises_with_the_known_set():
+    import pytest
+
+    from helia_profiler.platform.memory_map import link_family_for_toolchain
+
+    with pytest.raises(ValueError, match="not a supported toolchain"):
+        link_family_for_toolchain("mystery-cc")

@@ -159,3 +159,73 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
         "a9f4ec25a162f6f3700623feb691423bb5a51132",
         "e71a1be178d546c9226aafa4b82fe3313a9ff7d865c1ee54d5902a425208777c",
     ]
+
+
+# ---------------------------------------------------------------------------
+# #229 D2 — layering contracts for the vocabulary leaf and light package inits
+# ---------------------------------------------------------------------------
+
+
+def _module_level_hpx_imports(path: Path) -> list[str]:
+    """Names of intra-hpx modules imported at module level (TYPE_CHECKING
+    blocks and function bodies excluded) — AST-based, so string mentions
+    and lazy imports do not count."""
+    import ast
+
+    tree = ast.parse(path.read_text())
+    guarded: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.If):
+            test = ast.dump(node.test)
+            if "TYPE_CHECKING" in test:
+                for child in ast.walk(node):
+                    guarded.add(id(child))
+    found: list[str] = []
+    for node in tree.body:  # module level only
+        if id(node) in guarded:
+            continue
+        if isinstance(node, ast.ImportFrom) and node.level and node.level > 0:
+            found.append("." * node.level + (node.module or ""))
+        elif isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("helia_profiler"):
+            found.append(node.module)
+        elif isinstance(node, ast.Import):
+            found.extend(a.name for a in node.names if a.name.startswith("helia_profiler"))
+    return found
+
+
+def test_vocab_is_a_leaf():
+    """vocab.py is the bottom layer: any hpx import here rebuilds the very
+    cycles it exists to break (#229 D2)."""
+    path = Path("src/helia_profiler/vocab.py")
+    assert _module_level_hpx_imports(path) == []
+
+
+def test_engines_package_init_stays_stdlib_light():
+    """`from ..engines import EngineType` is cycle-safe for wire/, results/
+    and config/ ONLY while engines/__init__ imports nothing from hpx at
+    module level (adapters load lazily). This pin is why EngineType did not
+    need an engines/types.py split (#229 D2 refinement)."""
+    path = Path("src/helia_profiler/engines/__init__.py")
+    assert _module_level_hpx_imports(path) == []
+
+
+def test_platform_never_imports_the_config_layer():
+    """The silicon-info package must not know the config resolver exists —
+    the old lazy `config.Toolchain` import was the one documented cycle,
+    inverted in #229 D2 (platform owns the toolchain-name map)."""
+    offenders = {}
+    for path in sorted(Path("src/helia_profiler/platform").glob("*.py")):
+        hits = [
+            imp
+            for imp in _module_level_hpx_imports(path)
+            if imp.endswith("config") or ".config" in imp or imp == "..config"
+        ]
+        # Also reject lazy/function-level config imports: AST-walk everything.
+        import ast
+
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.ImportFrom) and node.module and "config" in node.module.split("."):
+                hits.append(("." * (node.level or 0)) + node.module)
+        if hits:
+            offenders[path.name] = hits
+    assert not offenders, f"platform/ imports the config layer: {offenders}"

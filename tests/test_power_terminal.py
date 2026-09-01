@@ -22,7 +22,7 @@ from helia_profiler.errors import PowerError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import PowerResult, PowerSummary
 from helia_profiler.power.metadata import ObservationMode, PowerIntegrity
-from helia_profiler.power.terminal_transport import (
+from helia_profiler.capture.terminal_transport import (
     UsbCdcPowerTerminalTransport,
     _TERMINAL_TRANSPORTS,
     _collect_chunked_terminal,

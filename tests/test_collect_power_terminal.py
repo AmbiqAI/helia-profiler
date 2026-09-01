@@ -172,7 +172,7 @@ def test_collect_stage_publishes_success(tmp_path: Path, monkeypatch: pytest.Mon
     ctx = _make_ctx(tmp_path)
     record = _record()
     monkeypatch.setattr(
-        "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+        "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
         lambda transport: _FakeTerminalTransport(record),
     )
 
@@ -200,7 +200,7 @@ def test_internal_terminal_measurement_becomes_power_result(
         calibration_id="board-rev-a",
     )
     monkeypatch.setattr(
-        "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+        "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
         lambda transport: _FakeTerminalTransport(record, measurement),
     )
 
@@ -240,7 +240,7 @@ def test_collect_stage_rejects_inconsistent_terminal(
 ):
     ctx = _make_ctx(tmp_path)
     monkeypatch.setattr(
-        "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+        "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
         lambda transport: _FakeTerminalTransport(record),
     )
 
@@ -276,7 +276,7 @@ class TestInternalMeasurementPlausibility:
         # path — reads exactly zero while looking perfectly healthy.
         ctx = _make_ctx(tmp_path, internal=True)
         monkeypatch.setattr(
-            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
             lambda transport: _FakeTerminalTransport(
                 _record(), _measurement(energy_nj=0, charge_nc=0)
             ),
@@ -293,7 +293,7 @@ class TestInternalMeasurementPlausibility:
         wrong hint is worse than the reading being uselessly small."""
         ctx = _make_ctx(tmp_path, internal=True)
         monkeypatch.setattr(
-            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
             lambda transport: _FakeTerminalTransport(
                 _record(), _measurement(energy_nj=1, charge_nc=0)
             ),
@@ -308,7 +308,7 @@ class TestInternalMeasurementPlausibility:
         # clamps negative charge to zero — nonzero energy, zero charge.
         ctx = _make_ctx(tmp_path, internal=True)
         monkeypatch.setattr(
-            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
             lambda transport: _FakeTerminalTransport(
                 _record(), _measurement(charge_nc=0)
             ),
@@ -323,7 +323,7 @@ class TestInternalMeasurementPlausibility:
         # reads zero; the external capture is the measurement of record.
         ctx = _make_ctx(tmp_path)
         monkeypatch.setattr(
-            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
             lambda transport: _FakeTerminalTransport(
                 _record(), _measurement(energy_nj=0, charge_nc=0, bus_voltage_uv=600)
             ),
@@ -395,7 +395,7 @@ class TestFirmwareWindowClockIntegrity:
 
     def _run(self, ctx, record, monkeypatch, measurement=None):
         monkeypatch.setattr(
-            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
             lambda transport: _FakeTerminalTransport(record, measurement),
         )
         CollectPowerTerminalStage().run(ctx)
@@ -695,7 +695,7 @@ class TestBusyLoopProbeCompletesARun:
         # One spin window, one unit of work, and a real measured duration.
         record = _record(requested_count=1, completed_count=1, elapsed_us=5000)
         monkeypatch.setattr(
-            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
             lambda transport: _FakeTerminalTransport(record),
         )
 
@@ -715,7 +715,7 @@ class TestBusyLoopProbeCompletesARun:
         ctx = _make_ctx(tmp_path, inference_count=5, clean_window_probe="busy_loop")
         record = _record(requested_count=1, completed_count=1, elapsed_us=5000)
         monkeypatch.setattr(
-            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
             lambda transport: _FakeTerminalTransport(record),
         )
         messages: list[str] = []
@@ -733,7 +733,7 @@ class TestBusyLoopProbeCompletesARun:
         ctx = _make_ctx(tmp_path, inference_count=5, clean_window_probe="infer")
         record = _record()
         monkeypatch.setattr(
-            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
             lambda transport: _FakeTerminalTransport(record),
         )
         messages: list[str] = []
@@ -755,7 +755,7 @@ class TestBusyLoopProbeCompletesARun:
         ctx = _make_ctx(tmp_path, inference_count=5, clean_window_probe="busy_loop")
         record = _record(requested_count=5, completed_count=1, elapsed_us=5000)
         monkeypatch.setattr(
-            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
             lambda transport: _FakeTerminalTransport(record),
         )
 
@@ -773,7 +773,7 @@ class TestBusyLoopProbeCompletesARun:
         # "does not match the host plan" one.
         record = _record(requested_count=1, completed_count=0, elapsed_us=0)
         monkeypatch.setattr(
-            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
             lambda transport: _FakeTerminalTransport(record),
         )
 
@@ -788,7 +788,7 @@ class TestBusyLoopProbeCompletesARun:
         ctx = _make_ctx(tmp_path, inference_count=5, clean_window_probe="infer")
         record = _record(requested_count=1, completed_count=1, elapsed_us=5000)
         monkeypatch.setattr(
-            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
             lambda transport: _FakeTerminalTransport(record),
         )
 
@@ -819,7 +819,7 @@ class TestBusyLoopProbeCompletesARun:
         record = _record(requested_count=1, completed_count=1, elapsed_us=1_000_000)
         measurement = _measurement(duration_us=1_000_000, inference_count=1)
         monkeypatch.setattr(
-            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
             lambda transport: _FakeTerminalTransport(record, measurement),
         )
 
@@ -854,7 +854,7 @@ class TestBusyLoopProbeCompletesARun:
         record = _record(requested_count=1, completed_count=1, elapsed_us=7_000_000)
         measurement = _measurement(duration_us=7_000_000, inference_count=1)
         monkeypatch.setattr(
-            "helia_profiler.power.terminal_transport.get_power_terminal_transport",
+            "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
             lambda transport: _FakeTerminalTransport(record, measurement),
         )
 

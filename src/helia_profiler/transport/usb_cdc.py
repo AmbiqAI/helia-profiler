@@ -26,7 +26,7 @@ import time
 import serial  # pyserial
 from serial.tools import list_ports
 
-from ..config import Transport
+from ..vocab import Transport
 from ..errors import CaptureError
 from .base import BaseCaptureTransport, CaptureArgs
 from ..target.probe.base import ResetController

@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Literal
 
-from ..config import Toolchain
+from ..vocab import Toolchain
 
 
 @dataclass(frozen=True)

@@ -36,7 +36,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from ..config import Transport
+from ..vocab import Transport
 from ..errors import CaptureError
 
 if TYPE_CHECKING:

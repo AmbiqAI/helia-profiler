@@ -19,7 +19,8 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Protocol
 
-from ..config import DEFAULT_POWER_DURATION_S, Transport
+from ..config import DEFAULT_POWER_DURATION_S
+from ..vocab import Transport
 from ..errors import CaptureError, PowerError
 from ..power.diagnostics import (
     SyncHandshakeMetadata,

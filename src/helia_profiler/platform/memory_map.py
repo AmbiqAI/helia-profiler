@@ -85,19 +85,28 @@ class LinkFamily(StrEnum):
     ARMLINK = "armlink"
 
 
+#: Every supported toolchain name, classified deliberately: an unknown name
+#: raises instead of silently guessing GNU, so a future armlink-based
+#: toolchain must be added here on purpose. Kept in lockstep with
+#: :class:`helia_profiler.vocab.Toolchain` by a contract test — platform
+#: deliberately does not import the config layer (#229 D2).
+_LINK_FAMILY_BY_TOOLCHAIN: dict[str, LinkFamily] = {
+    "arm-none-eabi-gcc": LinkFamily.GNU,
+    "gcc": LinkFamily.GNU,
+    "armclang": LinkFamily.ARMLINK,
+    "atfe": LinkFamily.GNU,
+}
+
+
 def link_family_for_toolchain(toolchain: str) -> LinkFamily:
-    """The link family a toolchain builds with.
-
-    Routed through the :class:`~helia_profiler.config.Toolchain` enum so an
-    unknown name raises (``ValueError``) instead of silently guessing GNU —
-    a future armlink-based toolchain must be classified here deliberately.
-    (Imported inside the function: config imports this package, so a
-    module-level import would be circular.)
-    """
-    from ..config import Toolchain
-
-    resolved = Toolchain(toolchain)
-    return LinkFamily.ARMLINK if resolved is Toolchain.ARMCLANG else LinkFamily.GNU
+    """The link family a toolchain builds with (``ValueError`` on unknown)."""
+    try:
+        return _LINK_FAMILY_BY_TOOLCHAIN[toolchain]
+    except KeyError:
+        known = ", ".join(sorted(_LINK_FAMILY_BY_TOOLCHAIN))
+        raise ValueError(
+            f"{toolchain!r} is not a supported toolchain (known: {known})."
+        ) from None
 
 
 @dataclass(frozen=True)
