@@ -6,7 +6,7 @@ import pytest
 
 from helia_profiler.transport import usb_cdc as usb_reader
 from helia_profiler.errors import CaptureError
-from helia_profiler.usb_identity import USB_MARKER_PREFIX, usb_marker_serial
+from helia_profiler.transport.usb_identity import USB_MARKER_PREFIX, usb_marker_serial
 
 
 def _port(device, **kw):

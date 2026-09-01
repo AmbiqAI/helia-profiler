@@ -32,7 +32,7 @@ from ..transport import (
     CaptureArgs,
     resolve_transport,
 )
-from ..usb_identity import usb_marker_serial
+from ..transport.usb_identity import usb_marker_serial
 from ..wire import HPX_ERROR_PREFIX, FirmwareErrorCode
 
 if TYPE_CHECKING:

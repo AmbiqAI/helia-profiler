@@ -92,7 +92,7 @@ def parse_firmware_output(
    data row per layer
 4. **Aggregate iterations** — for each layer, counters are reduced across
    iterations using *aggregation*: `"median"` (the default,
-   `DEFAULT_AGGREGATION` in `config.py`, exposed as
+   `DEFAULT_AGGREGATION` in the `config` package, exposed as
    `profiling.aggregation`), `"mean"`, or `"trimmed"`. Structurally-invalid
    samples (uint32-wrap, frozen-zero readouts) are rejected first.
 5. **Build PresetResult** — one per counter preset

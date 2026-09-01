@@ -6,18 +6,18 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from ..config import DEFAULT_ARENA_SIZE_BYTES, CleanWindowProbe, Transport
-from ..counters import (
+from ..engines import EngineType
+from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
+from ..errors import FirmwareError, PipelineError
+from ..placement import Placement
+from ..platform.counters import (
     plan_passes,
     resolve_counters,
     supported_groups_for_domains,
     validate_group_selection,
 )
-from ..engines import EngineType
-from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
-from ..errors import FirmwareError, PipelineError
-from ..placement import Placement
 from ..target.lifecycle import resolve_power_lockstep
-from ..usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
+from ..transport.usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
 from .op_resolver import build_resolver_plan
 
 if TYPE_CHECKING:

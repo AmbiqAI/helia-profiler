@@ -12,16 +12,16 @@ import difflib
 from pydantic import ConfigDict, TypeAdapter, ValidationError, field_validator, model_validator
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
-from .deps.compatibility import (
+from ..deps.compatibility import (
     CompatibilityBaseline,
     CompatibilityResolution,
     load_compatibility_baseline,
     resolve_compatibility,
 )
-from .engines import EngineType
-from .errors import ConfigError
-from .placement import Placement
-from .platform import (
+from ..engines import EngineType
+from ..errors import ConfigError
+from ..placement import Placement
+from ..platform import (
     DEFAULT_GO_GPIO_PIN,
     DEFAULT_STATE_GPIO_PIN,
     DEFAULT_SYNC_GPIO_PIN,
@@ -32,8 +32,8 @@ from .platform import (
     get_default_state_gpio_pin,
     get_default_sync_gpio_pin,
 )
-from .power.base import PowerMode
-from .config_power import (
+from ..power.base import PowerMode
+from .power import (
     DEFAULT_INA228_AVERAGING_COUNT,
     DEFAULT_INA228_CONVERSION_TIME_US,
     DEFAULT_INA228_I2C_ADDRESS,
@@ -55,7 +55,7 @@ from .config_power import (
     PowerConfig,
     PowerFirmware,
 )
-from .target.lifecycle import ResetStrategy
+from ..target.lifecycle import ResetStrategy
 
 # Shared default used when the user leaves model.arena_size unset.
 # Keep plan-memory and firmware generation aligned so auto placement

@@ -19,7 +19,7 @@ SESSION_INTENT_SCHEMA_VERSION = 1
 
 if TYPE_CHECKING:
     from .evaluation import CompareResult, ComparisonProfile
-    from .counters import PmuCounter
+    from .platform.counters import PmuCounter
     from .hostenv.doctor import DoctorResult
     from .engines import EngineType
     from .evaluation.model_analysis import ModelAnalysis
@@ -320,7 +320,7 @@ class Session:
 
     def show(self, value: Any, *, console: Console | None = None) -> Any:
         """Pretty-print a typed interactive value and return it unchanged."""
-        from .presentation import show
+        from .console.presentation import show
 
         return show(value, console=console)
 
@@ -339,13 +339,13 @@ class Session:
 
     def counter_groups(self) -> tuple[str, ...]:
         """Return registered PMU counter group names."""
-        from .counters import list_groups
+        from .platform.counters import list_groups
 
         return tuple(list_groups())
 
     def counters(self, group: str | None = None) -> tuple[PmuCounter, ...]:
         """Return registered PMU counters, optionally filtered by group."""
-        from .counters import list_counters
+        from .platform.counters import list_counters
 
         return tuple(list_counters(group))
 

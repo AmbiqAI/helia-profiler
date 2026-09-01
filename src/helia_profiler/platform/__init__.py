@@ -6,6 +6,8 @@ Split across focused modules but re-exported here so
 * :mod:`.soc` — SoC families, core/PMU/clock/memory model and ``SocDef`` plus the
   built-in SoC registrations.
 * :mod:`.board` — ``BoardDef`` and the built-in board registrations.
+* :mod:`.counters` — the PMU counter registry (ARM event IDs by compute
+  unit); imported as a submodule, not re-exported here.
 * :mod:`.registry` — ``PlatformRegistry`` construction and the public lookup
   helpers.
 * :mod:`.memory_map` — the verified linked-memory map (#133): per-SoC region

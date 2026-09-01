@@ -191,7 +191,7 @@ class UsbCdcPowerTerminalTransport:
         import serial
 
         from ..transport.usb_cdc import _BAUD, _resolve_cdc_port
-        from ..usb_identity import usb_marker_serial
+        from ..transport.usb_identity import usb_marker_serial
 
         marker = usb_marker_serial(
             ctx.resolved_jlink_serial or ctx.config.target.jlink_serial

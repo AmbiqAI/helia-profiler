@@ -28,10 +28,6 @@ import logging
 from pathlib import Path
 
 from ..config import CleanWindowProbe, Transport
-from ..counters import (
-    supported_groups_for_domains,
-    validate_group_selection,
-)
 from ..engines import EngineType, get_adapter
 from ..engines.base import PsramWeightsSource
 from ..errors import ConfigError
@@ -39,6 +35,10 @@ from ..evaluation.softmax_preflight import aot_softmax_verdict, scan_softmax_sca
 from ..pipeline import PipelineContext
 from ..placement import Placement
 from ..platform import get_soc_for_board
+from ..platform.counters import (
+    supported_groups_for_domains,
+    validate_group_selection,
+)
 
 log = logging.getLogger("hpx")
 

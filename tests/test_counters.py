@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from helia_profiler.counters import (
+from helia_profiler.platform.counters import (
     GROUPS,
     DEFAULT_COUNTERS,
     MAX_COUNTERS_PER_PASS,

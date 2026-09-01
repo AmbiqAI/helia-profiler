@@ -10,12 +10,12 @@ from rich.console import Console
 from rich.pretty import Pretty
 from rich.table import Table
 
-from .counters import PmuCounter
-from .hostenv.doctor import DoctorResult
-from .engines import EngineType
-from .platform import BoardDef
-from .target.probe.jlink import JLinkProbe, JLinkProbeMatch
-from .transport.ports import SerialPortInfo
+from ..platform.counters import PmuCounter
+from ..hostenv.doctor import DoctorResult
+from ..engines import EngineType
+from ..platform import BoardDef
+from ..target.probe.jlink import JLinkProbe, JLinkProbeMatch
+from ..transport.ports import SerialPortInfo
 
 T = TypeVar("T")
 
