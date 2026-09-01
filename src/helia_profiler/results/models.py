@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..deps.compatibility import CompatibilityResolution
 from ..engines import EngineType
+from ..modelcost.layer_attribution import source_index_from_op
 from ..power.base import PowerResult
 from ..placement import MemoryRegion
 
@@ -41,20 +42,6 @@ class ConsumerKind(StrEnum):
 # ---------------------------------------------------------------------------
 # PMU / layer-level results
 # ---------------------------------------------------------------------------
-
-
-def source_index_from_op(op: str) -> int | None:
-    """Original tflite operator index from an op label's ``:N`` suffix.
-
-    helia-aot firmware labels layers ``"<TYPE>:<original tflite index>"``
-    (``"FULLY_CONNECTED:43"``). Only a strict integer suffix counts —
-    ExecuTorch's ``"OPERATOR_CALL:c3i12"`` names no tflite operator and
-    must stay ``None`` (#218: never guess a source index).
-    """
-    _, sep, suffix = str(op).rpartition(":")
-    if not sep or not suffix.isdigit():
-        return None
-    return int(suffix)
 
 
 @dataclass(frozen=True)

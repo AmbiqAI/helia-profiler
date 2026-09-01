@@ -17,7 +17,6 @@ from .evaluation import (
     assess_comparability,
     evaluate_comparison_profile,
     RunEvaluation,
-    ModelAnalysis,
     evaluate_run,
 )
 from .config import (
@@ -37,6 +36,7 @@ from .config import (
     Toolchain,
     Transport,
 )
+from .modelcost import ModelAnalysis
 from .deps.compatibility import (
     CompatibilityBaseline,
     CompatibilityResolution,

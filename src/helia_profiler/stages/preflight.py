@@ -31,7 +31,7 @@ from ..config import CleanWindowProbe, Transport
 from ..engines import EngineType, get_adapter
 from ..engines.base import PsramWeightsSource
 from ..errors import ConfigError
-from ..evaluation.softmax_preflight import aot_softmax_verdict, scan_softmax_scaling
+from ..modelcost.softmax_preflight import aot_softmax_verdict, scan_softmax_scaling
 from ..pipeline import PipelineContext
 from ..placement import Placement
 from ..platform import get_soc_for_board

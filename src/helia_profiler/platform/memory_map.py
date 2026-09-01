@@ -72,7 +72,7 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Mapping
 
-from ..placement import MemoryRegion, Placement
+from .placement import MemoryRegion, Placement
 from .soc import MemoryRange, SocDef
 
 

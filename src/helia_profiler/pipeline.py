@@ -32,7 +32,8 @@ from .config import ProfileConfig
 from .engines.base import EngineAdapter, EngineArtifacts
 from .errors import HpxError, PipelineError
 from .platform import BoardDef, SocDef
-from .evaluation import ModelAnalysis, RunEvaluation
+from .evaluation import RunEvaluation
+from .modelcost import ModelAnalysis
 from .placement import Placement
 from .power.base import PowerResult
 from .power.metadata import ObservationMode, classify_observation

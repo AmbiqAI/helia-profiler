@@ -17,7 +17,7 @@ from .comparison_profile import (
 )
 from ..errors import ReportError
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
-from ..results.models import source_index_from_op
+from ..modelcost import source_index_from_op
 from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
 
 

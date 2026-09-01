@@ -122,6 +122,7 @@ src/helia_profiler/
 ├── results/            # Result models, workflow artifacts, bundle manifests
 ├── evaluation/         # Analysis, comparison, validity, regression policy
 ├── errors.py           # HpxError hierarchy
+├── modelcost/          # Model-cost core: MAC/OPS analysis + layer attribution (#229 seam)
 ├── platform/           # SoC/Board registry + custom config overlays
 ├── nsx.py              # NSX subprocess wrapper (configure/build/flash)
 ├── counters.py         # PMU counter registry and pass planning

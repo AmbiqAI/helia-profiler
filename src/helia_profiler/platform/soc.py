@@ -15,7 +15,7 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from ..placement import Placement
+from .placement import Placement
 
 if TYPE_CHECKING:
     from .capabilities import SocCapabilities

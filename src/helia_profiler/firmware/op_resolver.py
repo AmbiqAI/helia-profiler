@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import logging
 
 from ..engines import EngineType
-from ..evaluation import ModelAnalysis
+from ..modelcost import ModelAnalysis
 
 log = logging.getLogger("hpx")
 

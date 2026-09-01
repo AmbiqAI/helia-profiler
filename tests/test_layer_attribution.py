@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from helia_profiler.evaluation import LayerOps, ModelAnalysis
-from helia_profiler.evaluation.layer_attribution import (
+from helia_profiler.modelcost import LayerOps, ModelAnalysis
+from helia_profiler.modelcost.layer_attribution import (
     LayerAttributor,
     manifest_source_map,
     source_index_from_op,

@@ -430,7 +430,7 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     attributor = None
     if has_macs:
         from ..engines.base import HeliaAotArtifacts
-        from ..evaluation.layer_attribution import LayerAttributor
+        from ..modelcost.layer_attribution import LayerAttributor
 
         # An AOT run always gets an authoritative manifest — [] when
         # extraction failed, because degraded firmware labels layers with

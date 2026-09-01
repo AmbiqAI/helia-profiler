@@ -1,9 +1,9 @@
-"""Run evaluation: validity, comparability/compare, and model-cost analysis.
+"""Run evaluation: validity, comparability/compare, and engine-dispatched analysis.
 
-Three blocks share this package today: run-validity (``validity``),
-comparison (``compare``/``comparability``/``comparison_profile``/
-``run_metrics``), and the model-cost core (``model_analysis``,
-``layer_attribution``, ``softmax_preflight`` — the #229 extraction seam).
+Two blocks live here — run-validity (``validity``) and comparison
+(``compare``/``comparability``/``comparison_profile``/``run_metrics``) —
+plus ``engine_analysis``, the engine-dispatch shim over the model-cost
+core that now lives in :mod:`helia_profiler.modelcost` (#229 D4).
 """
 
 from .comparability import (
@@ -33,13 +33,7 @@ from .comparison_profile import (
     evaluate_comparison_profile,
 )
 from .validity import RunEvaluation, evaluate_run
-from .model_analysis import (
-    LayerOps,
-    ModelAnalysis,
-    analyze_for_engine,
-    analyze_model,
-    is_available,
-)
+from .engine_analysis import analyze_for_engine
 
 __all__ = [
     "ComparabilityAssessment",
@@ -58,15 +52,11 @@ __all__ = [
     "RunEvaluation",
     "RunArtifacts",
     "LayerDiffRow",
-    "LayerOps",
-    "ModelAnalysis",
     "VerdictStatus",
     "assess_comparability",
     "analyze_for_engine",
-    "analyze_model",
     "compare_runs",
     "evaluate_comparison_profile",
     "evaluate_run",
-    "is_available",
     "write_compare_artifacts",
 ]

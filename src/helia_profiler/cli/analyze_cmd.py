@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from ..engines import EngineType
 
 if TYPE_CHECKING:
-    from ..evaluation import ModelAnalysis
+    from ..modelcost import ModelAnalysis
 
 
 def _cmd_analyze(
@@ -22,7 +22,8 @@ def _cmd_analyze(
     board: str = "apollo510_evb",
 ) -> None:
     """Analyze model compute/parameter breakdown without hardware."""
-    from ..evaluation import ModelAnalysis, analyze_for_engine, analyze_model, is_available
+    from ..evaluation import analyze_for_engine
+    from ..modelcost import ModelAnalysis, analyze_model, is_available
     from ..console import HpxConsole
 
     console = HpxConsole(verbosity=1)  # always show output

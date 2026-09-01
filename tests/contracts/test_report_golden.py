@@ -50,7 +50,7 @@ from helia_profiler.target.lifecycle import (
 from helia_profiler.config import load_config
 from helia_profiler.engines.base import HeliaAotArtifacts
 from helia_profiler.engines import EngineType
-from helia_profiler.evaluation import LayerOps, ModelAnalysis
+from helia_profiler.modelcost import LayerOps, ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.hostenv.toolchain_probe import SymbolEntry
 from helia_profiler.placement import MemoryRegion

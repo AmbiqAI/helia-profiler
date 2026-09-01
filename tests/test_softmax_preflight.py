@@ -24,7 +24,7 @@ import pytest
 
 from helia_profiler.engines import EngineType
 from helia_profiler.errors import ConfigError
-from helia_profiler.evaluation.softmax_preflight import (
+from helia_profiler.modelcost.softmax_preflight import (
     scan_softmax_scaling,
     softmax_input_multiplier,
 )
@@ -61,7 +61,7 @@ class TestMultiplier:
         suite (the PR's own mutation battery had reported it CAUGHT, off
         stale bytecode a second time).
         """
-        from helia_profiler.evaluation.softmax_preflight import SoftmaxScaling
+        from helia_profiler.modelcost.softmax_preflight import SoftmaxScaling
 
         boundary_scale = 2.0**-26
         assert softmax_input_multiplier(1.0, boundary_scale) == 1.0
@@ -206,7 +206,7 @@ class TestPreflightGate:
 
         Measured against the pinned helia-aot 0.18 by running its real path.
         """
-        from helia_profiler.evaluation.softmax_preflight import aot_softmax_verdict
+        from helia_profiler.modelcost.softmax_preflight import aot_softmax_verdict
 
         # Below the flush point: compiles, so it must not error.
         assert aot_softmax_verdict(2.0**-40) == "warn"
@@ -229,7 +229,7 @@ class TestPreflightGate:
         'ok' would pass a model that crashes. TFLM's `supported` already
         blocks it for the same reason.
         """
-        from helia_profiler.evaluation.softmax_preflight import aot_softmax_verdict
+        from helia_profiler.modelcost.softmax_preflight import aot_softmax_verdict
 
         assert aot_softmax_verdict(float("nan")) == "error"
 
@@ -254,7 +254,7 @@ class TestPreflightGate:
         environment least likely to hit the bug is the shape this whole PR
         keeps rediscovering.
         """
-        from helia_profiler.evaluation.softmax_preflight import SoftmaxScaling
+        from helia_profiler.modelcost.softmax_preflight import SoftmaxScaling
 
         def scaling(beta: float) -> SoftmaxScaling:
             return SoftmaxScaling(
@@ -281,7 +281,7 @@ class TestPreflightGate:
         the only test reaching it was litert-gated. Substituting the scanner
         keeps this dependency-free while still driving the real gate.
         """
-        from helia_profiler.evaluation.softmax_preflight import SoftmaxScaling
+        from helia_profiler.modelcost.softmax_preflight import SoftmaxScaling
 
         no_beta = SoftmaxScaling(
             subgraph_index=0,
@@ -419,7 +419,7 @@ def test_reader_agrees_with_litert_on_every_fixture():
     """
     schema = pytest.importorskip("ai_edge_litert.schema_py_generated")
 
-    from helia_profiler.evaluation._tflite_reader import read_quantized_softmax_ops
+    from helia_profiler.modelcost._tflite_reader import read_quantized_softmax_ops
 
     checked = 0
     for path in sorted(FIXTURES.rglob("*.tflite")):
@@ -585,7 +585,7 @@ class TestAotCompilerBoundaryTripwire:
         self, label: str, multiplier: float, measured: str
     ):
         pytest.importorskip("helia_aot")
-        from helia_profiler.evaluation.softmax_preflight import aot_softmax_verdict
+        from helia_profiler.modelcost.softmax_preflight import aot_softmax_verdict
 
         real = self._real_compiler_outcome(multiplier)
         assert real == measured, (
@@ -615,7 +615,7 @@ def test_aot_absent_beta_matches_the_installed_helia_aot():
     pytest.importorskip("helia_aot")
     from helia_aot.air.options import AirSoftmaxOptions
 
-    from helia_profiler.evaluation.softmax_preflight import AOT_ABSENT_BETA
+    from helia_profiler.modelcost.softmax_preflight import AOT_ABSENT_BETA
 
     assert AOT_ABSENT_BETA == AirSoftmaxOptions().beta
 
@@ -627,7 +627,7 @@ def test_aot_absent_beta_is_one_in_every_environment():
     fallback. Both must be 1.0 -- the fallback exists so a bare install keeps
     the documented 0.18 semantics, not so it can drift from them.
     """
-    from helia_profiler.evaluation.softmax_preflight import AOT_ABSENT_BETA
+    from helia_profiler.modelcost.softmax_preflight import AOT_ABSENT_BETA
 
     assert AOT_ABSENT_BETA == 1.0
 
@@ -637,7 +637,7 @@ def test_negative_multipliers_mirror_the_real_chain_not_a_blanket_error():
     compiles most of that domain. The asymmetry is the Q31 promotion (fires
     only at +2**31), so the verdict mirrors the SHIFT — a sign-blind band
     disagreed on 218 of 689 negative sweep points."""
-    from helia_profiler.evaluation.softmax_preflight import aot_softmax_verdict
+    from helia_profiler.modelcost.softmax_preflight import aot_softmax_verdict
 
     # In the negative raise band (shift in [-31, -1]):
     assert aot_softmax_verdict(-0.25) == "error"
@@ -659,6 +659,48 @@ def test_top_binade_multiplier_does_not_crash_the_verdict():
     raise band) instead of raising OverflowError from a preflight."""
     import sys
 
-    from helia_profiler.evaluation.softmax_preflight import aot_softmax_verdict
+    from helia_profiler.modelcost.softmax_preflight import aot_softmax_verdict
 
     assert aot_softmax_verdict(sys.float_info.max) == "ok"
+
+
+def test_reader_constants_re_derive_from_the_installed_litert():
+    """#229 D7: the reader's frozen constants carry provenance — re-derive
+    every one from the installed generated schema by introspection, so a
+    litert upgrade that moved anything fails loudly here rather than
+    silently misparsing models."""
+    import inspect
+    import re
+
+    g = pytest.importorskip("ai_edge_litert.schema_py_generated")
+
+    from helia_profiler.modelcost import _tflite_reader as r
+
+    def slot(accessor) -> int:
+        match = re.search(r"Offset\((\d+)\)", inspect.getsource(accessor))
+        assert match, f"no Offset() in {accessor.__qualname__}"
+        return int(match.group(1))
+
+    assert r.BUILTIN_SOFTMAX == g.BuiltinOperator.SOFTMAX
+    assert r.TENSOR_TYPE_UINT8 == g.TensorType.UINT8
+    assert r.TENSOR_TYPE_INT8 == g.TensorType.INT8
+    assert r.BUILTIN_OPTIONS_SOFTMAX == g.BuiltinOptions.SoftmaxOptions
+
+    expected_slots = {
+        r._MODEL_OPERATOR_CODES: g.Model.OperatorCodes,
+        r._MODEL_SUBGRAPHS: g.Model.Subgraphs,
+        r._OPCODE_DEPRECATED_BUILTIN: g.OperatorCode.DeprecatedBuiltinCode,
+        r._OPCODE_BUILTIN: g.OperatorCode.BuiltinCode,
+        r._SUBGRAPH_TENSORS: g.SubGraph.Tensors,
+        r._SUBGRAPH_OPERATORS: g.SubGraph.Operators,
+        r._OPERATOR_OPCODE_INDEX: g.Operator.OpcodeIndex,
+        r._OPERATOR_INPUTS: g.Operator.Inputs,
+        r._OPERATOR_OPTIONS_TYPE: g.Operator.BuiltinOptionsType,
+        r._OPERATOR_OPTIONS: g.Operator.BuiltinOptions,
+        r._TENSOR_TYPE: g.Tensor.Type,
+        r._TENSOR_NAME: g.Tensor.Name,
+        r._TENSOR_QUANTIZATION: g.Tensor.Quantization,
+        r._QUANT_SCALE: g.QuantizationParameters.Scale,
+    }
+    for constant, accessor in expected_slots.items():
+        assert constant == slot(accessor), accessor.__qualname__
