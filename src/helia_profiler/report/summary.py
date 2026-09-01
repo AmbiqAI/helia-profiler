@@ -260,9 +260,10 @@ def _write_summary(
             ):
                 plan_meta = power_meta.get("power_plan")
                 # The window's inference count is resolved in ONE place
-                # (#240) so energy/inference, TOPS, and the gate-duration
-                # check cannot drift apart. avg_us stays local -- only the
-                # duration-integrity narration below uses it.
+                # (#240) -- energy/inference, TOPS, and the gate-duration
+                # check share window_inference_count so the per-inference
+                # denominator cannot silently diverge again. avg_us stays
+                # local; only the duration-integrity narration uses it.
                 effective_count = window_inference_count(ctx) or meta.clean_infer_count
                 effective_avg_us = meta.clean_infer_avg_us
                 if isinstance(plan_meta, dict) and plan_meta.get("reference_inference_us"):

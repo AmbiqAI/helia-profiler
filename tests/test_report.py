@@ -1403,7 +1403,8 @@ def test_tops_suppressed_for_busy_loop(tmp_path: Path):
         duration_s=1.0,
         probe="busy_loop",
     )
-    assert "tops" not in _tops(ctx, tmp_path)
+    ma = _tops(ctx, tmp_path)
+    assert "tops" not in ma and "tops_per_watt" not in ma
 
 
 def test_tops_suppressed_for_free_form(tmp_path: Path):
@@ -1413,4 +1414,19 @@ def test_tops_suppressed_for_free_form(tmp_path: Path):
         clean_infer_count=100,
         duration_s=1.0,
     )
-    assert "tops" not in _tops(ctx, tmp_path)
+    ma = _tops(ctx, tmp_path)
+    assert "tops" not in ma and "tops_per_watt" not in ma
+
+
+def test_tops_suppressed_for_whole_capture(tmp_path: Path):
+    """#240 variant C -- the scope that shipped the bug (a committed
+    artifact priced a whole free-run as one inference). Not an
+    inference-bracketed window: TOPS must be suppressed, not count=1."""
+    ctx = _tops_ctx(
+        tmp_path,
+        scope=MeasurementScope.WHOLE_CAPTURE_WINDOW,
+        clean_infer_count=100,
+        duration_s=1.0,
+    )
+    ma = _tops(ctx, tmp_path)
+    assert "tops" not in ma and "tops_per_watt" not in ma

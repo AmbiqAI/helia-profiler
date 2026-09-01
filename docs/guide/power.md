@@ -1155,7 +1155,7 @@ the JS320 bench.
     `tops`/`tops_per_watt` are emitted for any power run whose model can be
     analyzed for MACs — heliaRT, TFLM, and heliaAOT tflite models (not
     ExecuTorch). They are suppressed when the power window is not
-    inference-bracketed (free-form or whole-capture capture, or a busy-loop
+    inference-bracketed (free-form or whole-capture windows, or a busy-loop
     probe), because TOPS scales the per-inference op count by the number of
     inferences measured inside the window.
 

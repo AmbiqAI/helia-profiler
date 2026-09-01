@@ -273,7 +273,7 @@ def assess_clean_window_clock_rate(
 
 
 def window_inference_count(ctx: "PipelineContext") -> int | None:
-    """Inferences that ran inside the measured power window (#240).
+    """Return the inferences that ran inside the measured power window (#240).
 
     The one resolution of the window's inference count -- the denominator
     every per-inference power metric (energy/inference, TOPS) and the
@@ -305,8 +305,10 @@ def window_inference_count(ctx: "PipelineContext") -> int | None:
         return count if count and count > 0 else None
     if scope is MeasurementScope.GPIO_GATED_CLEAN_WINDOW:
         plan = result.metadata.power_plan
-        if isinstance(plan, dict) and plan.get("inference_count"):
-            return int(plan["inference_count"])
+        if isinstance(plan, dict):
+            planned = plan.get("inference_count")
+            if isinstance(planned, int) and not isinstance(planned, bool) and planned > 0:
+                return planned
         meta = ctx.pmu_result.meta if ctx.pmu_result is not None else None
         count = meta.clean_infer_count if meta is not None else None
         return count if count and count > 0 else None
