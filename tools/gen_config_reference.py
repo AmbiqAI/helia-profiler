@@ -281,7 +281,7 @@ def render() -> str:
     lines.append("")
     lines.append(
         "This page is **generated** from the `ProfileConfig` pydantic dataclasses in "
-        "`src/helia_profiler/config.py` — it is the single source of truth for every "
+        "`src/helia_profiler/config/` — it is the single source of truth for every "
         "config key, its type, default, and status. Regenerate it after any config model "
         "change with:"
     )

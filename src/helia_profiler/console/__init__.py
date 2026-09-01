@@ -2,7 +2,7 @@
 
 The :class:`HpxConsole` implementation is split across submodules by concern
 (``progress``, ``results``, ``compare``, ``analysis``, ``doctor``,
-``tables``); this package re-exports the stable public surface so callers
+``tables``, plus the interactive ``presentation`` repr tables); this package re-exports the stable public surface so callers
 can keep doing ``from helia_profiler.console import HpxConsole``.
 """
 

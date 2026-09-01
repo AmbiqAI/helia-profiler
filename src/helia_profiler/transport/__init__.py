@@ -1,7 +1,8 @@
 """Capture transport backends for heliaPROFILER.
 
-This package owns the :class:`CaptureTransport` backend objects and their
-registry. The wire vocabulary itself (keys, sentinels, error codes) lives in
+This package owns the :class:`CaptureTransport` backend objects, their
+registry, and the USB identity marker (:mod:`.usb_identity`) the CDC
+backend and firmware share. The wire vocabulary itself (keys, sentinels, error codes) lives in
 :mod:`helia_profiler.wire`; :mod:`.protocol` here is the shared
 line-collection loop that consumes it, re-exported from this package for
 convenience.
