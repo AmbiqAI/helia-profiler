@@ -21,6 +21,7 @@ from .clean_window import (  # noqa: F401
     _as_count,
     assess_clean_window_clock_rate,
     assess_clean_window_stall,
+    window_inference_count,
 )
 from .sync import DeviceState
 

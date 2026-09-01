@@ -48,6 +48,10 @@ firmware_window_clock_is_frozen().
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..pipeline import PipelineContext
 
 
 def _as_count(value: object) -> int | None:
@@ -266,3 +270,44 @@ def assess_clean_window_clock_rate(
         probe_us=probe,
         system_clock_hz=clock,
     )
+
+
+def window_inference_count(ctx: "PipelineContext") -> int | None:
+    """Inferences that ran inside the measured power window (#240).
+
+    The one resolution of the window's inference count -- the denominator
+    every per-inference power metric (energy/inference, TOPS) and the
+    gate-duration check divide by. Returns ``None`` when the scope has no
+    trustworthy inference window, so callers suppress the metric rather
+    than price a whole free-run as one inference:
+
+    * ``gpio_gated_clean_window`` -- the power PLAN's count (the gated
+      window's own N), falling back to the profile phase's
+      ``clean_infer_count`` only when the plan carries none (shared
+      firmware); these differ under ``window_mode: fixed``.
+    * ``on_device_gated_inference`` -- the on-target monitor's own
+      ``inference_count`` (its integration bracket IS those N).
+    * ``free_form_capture`` / ``whole_capture_window`` / anything else --
+      ``None`` (no inference-bracketed window).
+
+    A ``busy_loop`` probe runs zero model inferences; callers must gate on
+    :func:`probe_runs_inferences` separately -- a real count here does not
+    mean model ops executed.
+    """
+    from .metadata import MeasurementScope  # local: metadata imports this module
+
+    result = ctx.power_result
+    if result is None:
+        return None
+    scope = result.metadata.measurement_scope
+    if scope is MeasurementScope.ON_DEVICE_GATED_INFERENCE:
+        count = result.metadata.inference_count
+        return count if count and count > 0 else None
+    if scope is MeasurementScope.GPIO_GATED_CLEAN_WINDOW:
+        plan = result.metadata.power_plan
+        if isinstance(plan, dict) and plan.get("inference_count"):
+            return int(plan["inference_count"])
+        meta = ctx.pmu_result.meta if ctx.pmu_result is not None else None
+        count = meta.clean_infer_count if meta is not None else None
+        return count if count and count > 0 else None
+    return None

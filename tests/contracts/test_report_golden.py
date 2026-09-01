@@ -203,6 +203,10 @@ def _sample_power() -> PowerResult:
         # evaluation/comparability.py's _nested and is tested separately.
         metadata=PowerMetadata(
             measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
+            # #240: plan count (12) differs from the profile phase's
+            # clean_infer_count (8) so the golden digest pins plan-preference
+            # -- the per-inference denominator that fixed-window runs need.
+            power_plan={"inference_count": 10, "reference_inference_us": 8000},
             sync_input_index=0,
             gating_method="gpio_edge",
             target_lifecycle=TargetLifecyclePlan(

@@ -20,8 +20,7 @@ from ..errors import ReportError
 from ..results.run_summary import RunSummary
 from ..evaluation import evaluate_run
 from ..firmware import measured_power_fingerprint
-from ..power.diagnostics import probe_runs_inferences
-from ..power.metadata import MeasurementScope
+from ..power.diagnostics import probe_runs_inferences, window_inference_count
 
 if TYPE_CHECKING:
     from ..evaluation import RunEvaluation
@@ -260,12 +259,14 @@ def _write_summary(
                 and meta.clean_infer_count > 0
             ):
                 plan_meta = power_meta.get("power_plan")
-                effective_count = meta.clean_infer_count
+                # The window's inference count is resolved in ONE place
+                # (#240) so energy/inference, TOPS, and the gate-duration
+                # check cannot drift apart. avg_us stays local -- only the
+                # duration-integrity narration below uses it.
+                effective_count = window_inference_count(ctx) or meta.clean_infer_count
                 effective_avg_us = meta.clean_infer_avg_us
-                if isinstance(plan_meta, dict) and plan_meta.get("inference_count"):
-                    effective_count = int(plan_meta["inference_count"])
-                    if plan_meta.get("reference_inference_us"):
-                        effective_avg_us = int(plan_meta["reference_inference_us"])
+                if isinstance(plan_meta, dict) and plan_meta.get("reference_inference_us"):
+                    effective_avg_us = int(plan_meta["reference_inference_us"])
                 if effective_avg_us and effective_avg_us > 0 and ps.duration_s > 0:
                     # Render the composed #142/#181 verdict (#202): the
                     # arbitration -- integrity, observer, terminal health,
@@ -457,12 +458,10 @@ def _write_summary(
             if value is not None
         }
 
-    # Compute TOPS/W if both model analysis and power data are available
-    if (
-        ctx.model_analysis is not None
-        and ctx.power_result is not None
-        and ctx.power_result.metadata.measurement_scope != MeasurementScope.FREE_FORM_CAPTURE
-    ):
+    # Compute TOPS/W if both model analysis and power data are available.
+    # Scope-based suppression (free-form, whole-capture) is folded into
+    # window_inference_count below -- one gate, not two (#240).
+    if ctx.model_analysis is not None and ctx.power_result is not None:
         ma = ctx.model_analysis
         ps = ctx.power_result.summary
         # TOPS is ops-derived: a busy-loop window ran ZERO model ops, so
@@ -470,20 +469,18 @@ def _write_summary(
         # probe guard every other per-inference derivation in this function
         # applies (#172 review; the busy-loop clean_count of 1 would
         # otherwise silently price one window as one inference).
+        infer_count = window_inference_count(ctx)
         if (
             probe_ran_inferences
+            and infer_count is not None
             and ps.avg_power_w
             and ps.avg_power_w > 0
             and ps.duration_s
             and ps.duration_s > 0
         ):
-            infer_count = 1
-            if (
-                ctx.power_result.metadata.measurement_scope == MeasurementScope.GPIO_GATED_CLEAN_WINDOW
-                and ctx.pmu_result is not None
-                and ctx.pmu_result.meta.clean_infer_count
-            ):
-                infer_count = ctx.pmu_result.meta.clean_infer_count
+            # total_ops is PER-INFERENCE, so scale by the inferences that
+            # ran inside the measured window (#240). A scope with no
+            # trustworthy window yields infer_count None above and no TOPS.
             tops = (ma.total_ops * infer_count) / 1e12 / ps.duration_s
             tops_per_watt = tops / ps.avg_power_w
             summary.setdefault("model_analysis", {})["tops"] = round(tops, 6)
