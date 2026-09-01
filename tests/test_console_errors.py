@@ -13,7 +13,7 @@ def _render_error(exc: Exception) -> tuple[str, str]:
     stdout = Console(record=True, highlight=False, width=200)
     stderr = Console(record=True, highlight=False, width=200)
     hpx_console._console = stdout
-    hpx_console._status_console = stderr
+    hpx_console.status_console = stderr
     hpx_console.print_error(exc)
     return stdout.export_text(), stderr.export_text()
 

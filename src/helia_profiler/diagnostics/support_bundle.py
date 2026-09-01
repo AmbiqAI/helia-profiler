@@ -309,9 +309,9 @@ def _collect_config(
         sections.append(SupportBundleSection("config", False, reason=str(exc)))
         return counts
 
-    from ..pipeline import _serialize_config
+    from ..pipeline import serialize_config
 
-    item_counts = _add_json_member(members, "config.json", _serialize_config(config), policy)
+    item_counts = _add_json_member(members, "config.json", serialize_config(config), policy)
     sections.append(SupportBundleSection("config", True))
     return counts.combined(item_counts)
 

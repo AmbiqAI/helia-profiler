@@ -179,9 +179,9 @@ class Session:
 
     def resolved_dict(self, model: str | Path | None = None) -> dict[str, Any]:
         """Return the fully resolved and validated configuration snapshot."""
-        from .pipeline import _serialize_config
+        from .pipeline import serialize_config
 
-        return _serialize_config(self.resolve(model))
+        return serialize_config(self.resolve(model))
 
     def save(self, path: str | Path) -> Path:
         """Persist unresolved intent as a versioned JSON snapshot."""

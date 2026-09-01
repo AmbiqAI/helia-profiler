@@ -460,7 +460,7 @@ class PipelineRunner:
         ctx.run_metadata.hpx_version = __version__
         ctx.run_metadata.run_id = str(uuid.uuid4())
         ctx.run_metadata.timestamp = datetime.now(timezone.utc).isoformat()
-        ctx.run_metadata.config_snapshot = _serialize_config(config)
+        ctx.run_metadata.config_snapshot = serialize_config(config)
         ctx.run_metadata.compatibility = config.compatibility
 
         try:
@@ -577,7 +577,7 @@ def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
     return wd, False
 
 
-def _serialize_config(config: ProfileConfig) -> dict[str, Any]:
+def serialize_config(config: ProfileConfig) -> dict[str, Any]:
     """Produce a JSON-safe snapshot of the active configuration.
 
     Walks the full :class:`ProfileConfig` dataclass tree via

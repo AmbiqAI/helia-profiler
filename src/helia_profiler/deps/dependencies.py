@@ -20,6 +20,7 @@ from neuralspotx.nsx_lock import LOCK_SCHEMA_VERSION, hash_manifest, read_lock
 
 from . import nsx as nsx_cli
 from .._version import __version__
+from ..results.serde import sha256_file
 from ..errors import BuildError, DependencyError, LockError, VersionError
 from ..results.dependencies import (
     ContentDigest,
@@ -73,11 +74,7 @@ def _digest_bytes(payload: bytes) -> ContentDigest:
 
 
 def _digest_file(path: Path) -> ContentDigest:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return ContentDigest("sha256", digest.hexdigest())
+    return ContentDigest("sha256", sha256_file(path))
 
 
 def _digest_path(path: Path) -> ContentDigest:

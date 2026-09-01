@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Self
 
 from ..errors import ReportError
-from .serde import dataclass_from_dict as _from_dict
+from .serde import sha256_file, dataclass_from_dict as _from_dict
 
 RESULT_MANIFEST_SCHEMA = "hpx.result-manifest"
 RESULT_MANIFEST_SCHEMA_VERSION = 1
@@ -223,7 +223,7 @@ class ResultManifest:
                 raise ReportError(f"Result artifact is missing: {artifact.path}")
             if artifact_path.stat().st_size != artifact.size_bytes:
                 raise ReportError(f"Result artifact size mismatch: {artifact.path}")
-            if _sha256(artifact_path) != artifact.sha256:
+            if sha256_file(artifact_path) != artifact.sha256:
                 raise ReportError(f"Result artifact digest mismatch: {artifact.path}")
 
     def _verify_required_artifacts(self) -> None:
@@ -250,7 +250,6 @@ def load_result_manifest(path: str | Path, *, verify: bool = False) -> ResultMan
     return manifest
 
 
-
 def _to_dict(value: Any) -> dict[str, Any]:
     data = asdict(value)
     extra = data.pop("extra", {})
@@ -266,9 +265,3 @@ def _to_dict(value: Any) -> dict[str, Any]:
     return {**extra, **data}
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()

@@ -512,9 +512,9 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
 
     transport = ctx.config.target.transport
     if transport == Transport.RTT:
-        from ..firmware import _rtt_buffer_size_up
+        from ..firmware import rtt_buffer_size_up
 
-        up = _rtt_buffer_size_up(
+        up = rtt_buffer_size_up(
             ctx.config.target.toolchain,
             transport,
             ctx.config.target.rtt_buffer_size_up,

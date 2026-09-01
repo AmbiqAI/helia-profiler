@@ -43,8 +43,8 @@ class BuildPowerFirmwareStage:
 
     def run(self, ctx: PipelineContext) -> None:
         from ..firmware import (
-            _find_target_binary,
-            _nsx_toolchain,
+            find_target_binary,
+            nsx_toolchain,
             render_power_source,
         )
         from ..deps import nsx as nsx_cli
@@ -77,7 +77,7 @@ class BuildPowerFirmwareStage:
                 _remove_stale_power_outputs(ctx.build_dir)
                 nsx_cli.build(
                     ctx.firmware_dir,
-                    toolchain=_nsx_toolchain(ctx.config.target.toolchain),
+                    toolchain=nsx_toolchain(ctx.config.target.toolchain),
                     target="hpx_profiler_power",
                     timeout_s=ctx.config.timeouts.build_s,
                     verbose=ctx.config.verbose,
@@ -90,7 +90,7 @@ class BuildPowerFirmwareStage:
                 hint="The profile build remains valid; inspect the power target build output.",
             ) from exc
 
-        binary_path = _find_target_binary(ctx.build_dir, "hpx_profiler_power")
+        binary_path = find_target_binary(ctx.build_dir, "hpx_profiler_power")
         if binary_path is None:
             raise BuildError("Incremental build succeeded but hpx_profiler_power was not found.")
         ctx.publish_power_firmware(

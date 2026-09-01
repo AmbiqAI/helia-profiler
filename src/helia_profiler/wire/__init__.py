@@ -93,6 +93,10 @@ The registry is split across ``_model`` (vocabulary) and three spec catalogues
 (``_stream``, ``_faults``, ``_power``) purely to stay under the repository's
 per-module size ceiling; ``helia_profiler.wire`` remains the single import
 path and the single place the protocol is declared.
+
+CODEGEN-STABLE SURFACE (#229 D8): tools/gen_wire_protocol_reference.py
+generates the published wire-protocol reference from this registry —
+treat its names and structure as a stable surface for that generator.
 """
 
 from __future__ import annotations

@@ -30,15 +30,15 @@ def print_error(console: HpxConsole, exc: Exception) -> None:
         if details:
             rendered = "\n    ".join(str(details).splitlines())
             msg.append(f"\n  details: {rendered}", style="dim")
-        console._status_console.print(msg, highlight=False)
+        console.status_console.print(msg, highlight=False)
     else:
-        console._status_console.print(f"[bold red]Error:[/bold red] {exc}")
+        console.status_console.print(f"[bold red]Error:[/bold red] {exc}")
 
 
 def print_interrupted(console: HpxConsole) -> None:
     """Print a clean one-liner on Ctrl-C."""
     console._stop_spinner()
-    console._status_console.print("\n[dim]Interrupted.[/dim]")
+    console.status_console.print("\n[dim]Interrupted.[/dim]")
 
 
 def print_doctor(

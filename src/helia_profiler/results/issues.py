@@ -21,6 +21,10 @@ at load.
 ``docs/reference/issue-codes.md`` is generated from this module by
 ``tools/gen_issue_code_reference.py`` and drift-tested like the configuration
 reference.
+
+CODEGEN-STABLE SURFACE (#229 D8): tools/gen_issue_code_reference.py
+generates the published issue-code reference from these registries —
+treat their names and structure as a stable surface for that generator.
 """
 
 from __future__ import annotations

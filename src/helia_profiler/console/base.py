@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 # Module-level consoles: durable command results go to stdout; transient
 # progress, logs, and errors go to stderr so future machine output stays clean.
 _console = Console(highlight=False)
-_status_console = Console(highlight=False, stderr=True)
+status_console = Console(highlight=False, stderr=True)
 
 
 class HpxConsole:
@@ -46,7 +46,7 @@ class HpxConsole:
     def __init__(self, verbosity: int = 0) -> None:
         self.verbosity = verbosity
         self._console = _console
-        self._status_console = _status_console
+        self.status_console = status_console
         self._stage_start: float | None = None
         self._run_start: float = time.monotonic()
         self._spinner: Any | None = None  # rich.status.Status when active

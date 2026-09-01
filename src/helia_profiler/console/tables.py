@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ..results.serde import to_float
+
 from typing import Any
 
 
@@ -21,12 +23,3 @@ def _fmt_bytes(n: int) -> str:
     return f"{n / (1024 * 1024):.2f} MB"
 
 
-def _to_float(value: Any) -> float | None:
-    if isinstance(value, bool) or value is None:
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None

@@ -18,7 +18,7 @@ from helia_profiler.config import load_config
 from helia_profiler.errors import BuildError, FirmwareError
 from helia_profiler.firmware import (
     _board_module_name,
-    _find_segger_rtt_dir,
+    find_segger_rtt_dir,
     _is_segger_rtt_root,
     _model_to_header,
     _resolve_module_list,
@@ -246,7 +246,7 @@ def test_find_segger_rtt_dir_prefers_explicit_env(tmp_path: Path, monkeypatch: p
     explicit = _make_fake_rtt_root(tmp_path / "explicit")
     monkeypatch.setenv("SEGGER_RTT_PATH", str(explicit))
 
-    assert _find_segger_rtt_dir() == explicit
+    assert find_segger_rtt_dir() == explicit
 
 
 def test_find_segger_rtt_dir_prefers_config_over_environment(
@@ -256,7 +256,7 @@ def test_find_segger_rtt_dir_prefers_config_over_environment(
     environment = _make_fake_rtt_root(tmp_path / "environment")
     monkeypatch.setenv("SEGGER_RTT_PATH", str(environment))
 
-    assert _find_segger_rtt_dir(configured) == configured
+    assert find_segger_rtt_dir(configured) == configured
 
 
 def test_find_segger_rtt_dir_rejects_invalid_config_path(tmp_path: Path) -> None:
@@ -264,7 +264,7 @@ def test_find_segger_rtt_dir_rejects_invalid_config_path(tmp_path: Path) -> None
     invalid.mkdir()
 
     with pytest.raises(FirmwareError, match="target.segger_rtt_path"):
-        _find_segger_rtt_dir(invalid)
+        find_segger_rtt_dir(invalid)
 
 
 def test_find_segger_rtt_dir_expands_explicit_env_user_home(
@@ -283,7 +283,7 @@ def test_find_segger_rtt_dir_expands_explicit_env_user_home(
     monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.setenv("SEGGER_RTT_PATH", "~/explicit")
 
-    assert _find_segger_rtt_dir() == explicit.resolve()
+    assert find_segger_rtt_dir() == explicit.resolve()
 
 
 def test_find_segger_rtt_dir_uses_bundled_sources_by_default(
@@ -291,7 +291,7 @@ def test_find_segger_rtt_dir_uses_bundled_sources_by_default(
 ) -> None:
     monkeypatch.delenv("SEGGER_RTT_PATH", raising=False)
 
-    bundled = _find_segger_rtt_dir()
+    bundled = find_segger_rtt_dir()
 
     assert bundled.name == "segger_rtt"
     assert _is_segger_rtt_root(bundled)
@@ -306,7 +306,7 @@ def test_find_segger_rtt_dir_uses_bundled_sources_by_default(
 
 def test_bundled_segger_rtt_file_integrity(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SEGGER_RTT_PATH", raising=False)
-    bundled = _find_segger_rtt_dir()
+    bundled = find_segger_rtt_dir()
     expected = {
         "LICENSE.md": "e033779c697246a7a89eb411eca41cabb791dbf0b23619cfbd6d42429191baa8",
         "RTT/SEGGER_RTT.c": "caf3d20bc2def30e176f937a56c878a363dec3cd805334ea8173f22e097f1106",
@@ -335,7 +335,7 @@ def test_find_segger_rtt_dir_rejects_invalid_explicit_env(
     monkeypatch.setenv("SEGGER_RTT_PATH", str(invalid))
 
     with pytest.raises(FirmwareError, match="SEGGER_RTT_PATH"):
-        _find_segger_rtt_dir()
+        find_segger_rtt_dir()
 
 
 def _make_ctx(

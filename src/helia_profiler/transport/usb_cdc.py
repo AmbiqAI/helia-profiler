@@ -44,7 +44,7 @@ from .protocol import (
 log = logging.getLogger("hpx")
 
 _ENUM_TIMEOUT_S = 15  # max time to wait for USB enumeration
-_BAUD = 115200  # CDC ignores baud, but pyserial requires a value
+BAUD = 115200  # CDC ignores baud, but pyserial requires a value
 _CDC_PATTERNS = ["/dev/tty.usbmodem*", "/dev/ttyACM*"]
 _JLINK_MARKERS = ("segger", "j-link")
 
@@ -148,7 +148,7 @@ def _ambiguous_cdc_error(candidates: list[str]) -> CaptureError:
     )
 
 
-def _resolve_cdc_port(
+def resolve_cdc_port(
     *,
     marker: str | None,
     pre_existing: set[str] | None = None,
@@ -317,13 +317,13 @@ def capture_usb_output(
             log.info("Using pinned USB CDC port: %s", port)
             time.sleep(USB_REENUM_FLOOR_S)
         else:
-            port = _resolve_cdc_port(marker=usb_marker, pre_existing=pre_existing)
+            port = resolve_cdc_port(marker=usb_marker, pre_existing=pre_existing)
 
         # --- Step 3: open port with DTR ---
         log.info("Opening USB CDC port: %s", port)
         ser = serial.Serial(
             port=port,
-            baudrate=_BAUD,
+            baudrate=BAUD,
             timeout=LINE_TIMEOUT_S,
             dsrdtr=True,  # assert DTR so nsx_usb_connected() returns true
         )

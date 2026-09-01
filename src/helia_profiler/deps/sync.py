@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 from neuralspotx.nsx_lock import read_lock
 
 from . import nsx as nsx_cli
+from ..results.serde import sha256_file
 from ..errors import BuildError, LockError
 
 if TYPE_CHECKING:
@@ -45,11 +46,7 @@ _SYNC_STAMP = "hpx-frozen-sync.json"
 
 
 def _lock_sha256(app_dir: Path) -> str:
-    digest = hashlib.sha256()
-    with (app_dir / "nsx.lock").open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return sha256_file(app_dir / "nsx.lock")
 
 
 def _verified_sync_lock_digest(app_dir: Path) -> str | None:

@@ -37,6 +37,7 @@ from .config import (
     Transport,
 )
 from .modelcost import ModelAnalysis
+from .platform import SocDef, build_platform_registry, get_soc
 from .deps.compatibility import (
     CompatibilityBaseline,
     CompatibilityResolution,
@@ -107,6 +108,9 @@ from .target.lifecycle import ResetStrategy
 from .transport.ports import SerialPortInfo
 
 __all__ = [
+    "SocDef",
+    "build_platform_registry",
+    "get_soc",
     "__version__",
     # Public API
     "profile",
@@ -257,6 +261,9 @@ _STABLE_API = {
 }
 
 _EXPERIMENTAL_API = {
+    "SocDef",
+    "build_platform_registry",
+    "get_soc",
     "MeasurementScope",
     "ObservationMode",
     "PowerIntegrity",

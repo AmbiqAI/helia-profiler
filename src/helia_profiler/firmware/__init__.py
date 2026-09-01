@@ -64,9 +64,9 @@ from .render import _jinja_env, _write_text
 # re-exported here so callers keep one import surface.
 from .build import (
     _DEFAULT_RTT_BUFFER_SIZE_UP,
-    _find_target_binary,
-    _nsx_toolchain,
-    _rtt_buffer_size_up,
+    find_target_binary,
+    nsx_toolchain,
+    rtt_buffer_size_up,
     build_app,
     flash_app,
 )
@@ -82,7 +82,7 @@ from .launcher import (
 from .segger import (
     _bundled_segger_rtt_dir,
     _copy_segger_rtt,
-    _find_segger_rtt_dir,
+    find_segger_rtt_dir,
     _is_segger_rtt_root,
 )
 
@@ -327,7 +327,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             arena_regions=aot_arena_regions,
             compiler_launcher=compiler_launcher or "",
             channel=_default_nsx_channel(board.channel, config.build.channel),
-            rtt_buffer_size_up=_rtt_buffer_size_up(
+            rtt_buffer_size_up=rtt_buffer_size_up(
                 config.target.toolchain,
                 transport,
                 config.target.rtt_buffer_size_up,

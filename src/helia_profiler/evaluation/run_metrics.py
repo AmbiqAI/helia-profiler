@@ -12,6 +12,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from ..results.serde import nested_get, to_float
+
 
 @dataclass(frozen=True)
 class MetricDiff:
@@ -103,8 +105,8 @@ def _compare_metrics(
 ) -> list[MetricDiff]:
     metrics: list[MetricDiff] = []
     for spec in _METRIC_FIELDS:
-        b = _get_nested(base, spec.path)
-        c = _get_nested(cand, spec.path)
+        b = nested_get(base, *spec.path)
+        c = nested_get(cand, *spec.path)
         diff = _metric_diff(spec, b, c, include_groups)
         if diff is not None:
             metrics.append(diff)
@@ -120,8 +122,8 @@ def _metric_diff(
             return None
         if b is None and c is None:
             return None
-    bf = _to_float(b)
-    cf = _to_float(c)
+    bf = to_float(b)
+    cf = to_float(c)
     delta = None
     delta_pct = None
     if bf is not None and cf is not None:
@@ -192,23 +194,3 @@ def _memory_region_metrics(
             if diff is not None:
                 metrics.append(diff)
     return metrics
-
-
-def _get_nested(data: dict[str, Any], path: tuple[str, ...]) -> Any:
-    cur: Any = data
-    for part in path:
-        if not isinstance(cur, dict) or part not in cur:
-            return None
-        cur = cur[part]
-    return cur
-
-
-def _to_float(value: Any) -> float | None:
-    if isinstance(value, bool) or value is None:
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None

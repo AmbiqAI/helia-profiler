@@ -36,3 +36,19 @@ def test_session_core_method_signatures_are_explicit() -> None:
         "output_dir",
         "profile",
     ]
+
+
+def test_public_surface_membership_snapshot() -> None:
+    """#229 D8: the tier-consistency check alone lets the surface drift —
+    a name can be added or removed silently as long as both maps are
+    edited together. This exact snapshot makes every surface change a
+    deliberate, reviewed edit here."""
+    assert sorted(helia_profiler.__all__) == sorted(
+        set(helia_profiler.__all__)
+    ), "duplicates in __all__"
+    assert len(helia_profiler.__all__) == 98, (
+        "the public surface changed size — update this pin (and the tier "
+        "maps) deliberately, naming the change in the PR"
+    )
+    for name in helia_profiler.__all__:
+        assert hasattr(helia_profiler, name), f"__all__ exports missing attribute {name}"

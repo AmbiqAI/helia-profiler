@@ -38,7 +38,7 @@ log = logging.getLogger("hpx")
 _DEFAULT_RTT_BUFFER_SIZE_UP = 32768
 
 
-def _nsx_toolchain(toolchain: str) -> str | None:
+def nsx_toolchain(toolchain: str) -> str | None:
     """Convert a config toolchain name to the ``nsx --toolchain`` value.
 
     Returns *None* for the default (GCC) so the flag is omitted.
@@ -48,7 +48,7 @@ def _nsx_toolchain(toolchain: str) -> str | None:
     return get_toolchain_spec(toolchain).nsx_name
 
 
-def _rtt_buffer_size_up(toolchain: str, transport: Transport, configured_size: int | None) -> int:
+def rtt_buffer_size_up(toolchain: str, transport: Transport, configured_size: int | None) -> int:
     """Return the compile-time SEGGER RTT up-buffer size for generated apps."""
     if configured_size is not None:
         return configured_size
@@ -71,7 +71,7 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     verbose = ctx.config.verbose
 
     # Map config toolchain names to nsx CLI values
-    nsx_tc = _nsx_toolchain(toolchain)
+    nsx_tc = nsx_toolchain(toolchain)
     build_dir = app_dir / "build" / board
     ninja_already_configured = (build_dir / "build.ninja").exists()
 
@@ -104,7 +104,7 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
             # Locate build output. Prefer the ELF-form executable because
             # later reporting stages run size tools against it to capture
             # text/data/bss.
-            binary_path = _find_target_binary(build_dir, "hpx_profiler")
+            binary_path = find_target_binary(build_dir, "hpx_profiler")
             if binary_path is None:
                 raise BuildError(
                     "Build succeeded but binary not found",
@@ -124,7 +124,7 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     return build_dir, binary_path
 
 
-def _find_target_binary(build_dir: Path, target_name: str) -> Path | None:
+def find_target_binary(build_dir: Path, target_name: str) -> Path | None:
     """Locate a built NSX target's executable/binary under ``build_dir``.
 
     Mirrors the existing hpx_profiler artifact search so hpx_profiler_power
@@ -157,7 +157,7 @@ def flash_app(ctx: PipelineContext) -> None:
     """Invoke ``nsx flash`` to deploy the binary to the target."""
     firmware_dir = ctx.resolved_firmware_dir
     toolchain = ctx.config.target.toolchain
-    nsx_tc = _nsx_toolchain(toolchain)
+    nsx_tc = nsx_toolchain(toolchain)
     from ..deps.dependencies import workspace_mutex
 
     lock = (
