@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from .comparability import ComparabilityAssessment, assess_comparability, read_dimensions
-from ..results.serde import nested_get, to_float
 from .run_metrics import MetricDiff, _compare_metrics
 from .comparison_profile import (
     ComparisonProfile,
@@ -20,6 +19,7 @@ from ..errors import ReportError
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
 from ..modelcost import source_index_from_op
 from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
+from ..results.serde import nested_get, to_float
 
 
 @dataclass(frozen=True)

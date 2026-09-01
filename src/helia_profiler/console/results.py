@@ -12,9 +12,9 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
-from ..results.serde import to_float
 from .tables import _fmt_bytes, _progress_bar
 from ..power.metadata import PowerIntegrity
+from ..results.serde import to_float
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext

@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from .._version import __version__
-from ..results.serde import nested_get
 from ..errors import ReportError
+from ..results.serde import nested_get
 from .runner import CaseResult
 
 

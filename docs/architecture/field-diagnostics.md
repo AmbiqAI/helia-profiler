@@ -39,7 +39,7 @@ device identifier that shouldn't leave the building.
 | `compatibility` | `compatibility.load_compatibility_baseline()` | Yes (offline) |
 | `dependencies` / `nsx.lock` | `dependencies.read_dependency_lock_provenance()` + a sanitized/redacted copy of the `nsx.lock` text | Only with `--workspace` |
 | `modules` | Baseline-qualified modules, plus exact resolved modules from the same provenance read | Yes (resolved half only with `--workspace`) |
-| `config` | `config.load_config()` + `pipeline._serialize_config()` | Only with `--config` |
+| `config` | `config.load_config()` + `pipeline.serialize_config()` | Only with `--config` |
 | `probes` | `target.probe.jlink.list_connected_probes()` | Unless `--no-probes` |
 | `ports` | `transport.ports.list_serial_ports()` | Unless `--no-ports` |
 

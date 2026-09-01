@@ -22,7 +22,6 @@ patching the same module object this code reads at call time.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 from collections.abc import Mapping
@@ -32,8 +31,8 @@ from typing import TYPE_CHECKING
 from neuralspotx.nsx_lock import read_lock
 
 from . import nsx as nsx_cli
-from ..results.serde import sha256_file
 from ..errors import BuildError, LockError
+from ..results.serde import sha256_file
 
 if TYPE_CHECKING:
     from ..config import ProfileConfig

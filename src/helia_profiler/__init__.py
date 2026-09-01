@@ -37,7 +37,6 @@ from .config import (
     Transport,
 )
 from .modelcost import ModelAnalysis
-from .platform import SocDef, build_platform_registry, get_soc
 from .deps.compatibility import (
     CompatibilityBaseline,
     CompatibilityResolution,
@@ -67,7 +66,7 @@ from .errors import (
 )
 from .placement import Placement
 from .pipeline import ProgressUpdate
-from .platform import BoardDef
+from .platform import BoardDef, SocDef, build_platform_registry, get_soc
 from .power.base import PowerMode, PowerResult
 from .power.metadata import (
     MeasurementScope,
@@ -108,9 +107,6 @@ from .target.lifecycle import ResetStrategy
 from .transport.ports import SerialPortInfo
 
 __all__ = [
-    "SocDef",
-    "build_platform_registry",
-    "get_soc",
     "__version__",
     # Public API
     "profile",
@@ -191,6 +187,9 @@ __all__ = [
     "DoctorResult",
     "DoctorVersionCheck",
     "BoardDef",
+    "SocDef",
+    "build_platform_registry",
+    "get_soc",
     "PmuCounter",
     "JLinkProbe",
     "JLinkProbeMatch",
@@ -261,9 +260,6 @@ _STABLE_API = {
 }
 
 _EXPERIMENTAL_API = {
-    "SocDef",
-    "build_platform_registry",
-    "get_soc",
     "MeasurementScope",
     "ObservationMode",
     "PowerIntegrity",
@@ -313,6 +309,9 @@ _IMPLEMENTATION_API = {
     "DoctorResult",
     "DoctorVersionCheck",
     "BoardDef",
+    "SocDef",
+    "build_platform_registry",
+    "get_soc",
     "PmuCounter",
     "JLinkProbe",
     "JLinkProbeMatch",

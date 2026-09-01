@@ -64,11 +64,11 @@ from .render import _jinja_env, _write_text
 # re-exported here so callers keep one import surface.
 from .build import (
     _DEFAULT_RTT_BUFFER_SIZE_UP,
+    build_app,
     find_target_binary,
+    flash_app,
     nsx_toolchain,
     rtt_buffer_size_up,
-    build_app,
-    flash_app,
 )
 from .headers import _blob_to_header, _model_to_header
 from .launcher import (
@@ -82,8 +82,8 @@ from .launcher import (
 from .segger import (
     _bundled_segger_rtt_dir,
     _copy_segger_rtt,
-    find_segger_rtt_dir,
     _is_segger_rtt_root,
+    find_segger_rtt_dir,
 )
 
 if TYPE_CHECKING:

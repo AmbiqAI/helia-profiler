@@ -296,3 +296,7 @@ is treated as characterised.
 
 See [Architecture → Adding an Engine](../architecture/adding-an-engine.md)
 for the analogous engine path.
+
+
+See the [Platform API reference](../reference/api/platform.md) for the
+full `get_soc` / `SocDef` / `build_platform_registry` documentation.

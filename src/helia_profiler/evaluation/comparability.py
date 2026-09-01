@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from ..results.serde import nested_get
 from ..results import (
     COMPARABILITY_REGISTRY,
     DIMENSION_DIFFERS,
@@ -17,6 +16,7 @@ from ..results import (
     ResultValidity,
     RunStatus,
 )
+from ..results.serde import nested_get
 from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
 
 # Not re-exported by the results package (construction shape changes in #154
@@ -348,5 +348,3 @@ def _read_artifact_value(run: RunArtifacts, source: ArtifactSource, path: tuple[
     if source is ArtifactSource.SUMMARY:
         return nested_get(run.summary, *path)
     raise ValueError(f"{source} is not a path-addressable artifact source.")
-
-

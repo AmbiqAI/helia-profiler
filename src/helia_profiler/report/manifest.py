@@ -257,5 +257,3 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
             }
         )
     return {dimension.value: value for dimension, value in values.items()}
-
-

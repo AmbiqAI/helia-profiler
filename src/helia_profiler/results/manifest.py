@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
@@ -10,7 +9,7 @@ from pathlib import Path
 from typing import Any, Self
 
 from ..errors import ReportError
-from .serde import sha256_file, dataclass_from_dict as _from_dict
+from .serde import dataclass_from_dict as _from_dict, sha256_file
 
 RESULT_MANIFEST_SCHEMA = "hpx.result-manifest"
 RESULT_MANIFEST_SCHEMA_VERSION = 1
@@ -263,5 +262,3 @@ def _to_dict(value: Any) -> dict[str, Any]:
         data["issues"] = [issue.to_dict() for issue in value.issues]
         data["artifacts"] = [artifact.to_dict() for artifact in value.artifacts]
     return {**extra, **data}
-
-

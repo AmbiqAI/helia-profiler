@@ -4,7 +4,10 @@ Result documents (result manifests, comparison profiles) share the same
 forward-compatible parse contract: known dataclass fields are populated
 (with optional per-key transforms) and unknown keys are preserved verbatim
 in an ``extra`` bucket so newer writers round-trip through older readers.
-This module is the single implementation of that contract.
+This module is the single implementation of that contract — and, since
+#229 D6, the home of the small general-purpose helpers those documents
+and their producers share (file digests, nested reads, float coercion),
+each previously duplicated across packages.
 """
 
 from __future__ import annotations
@@ -18,9 +21,11 @@ from ..errors import ReportError
 
 
 def sha256_file(path: Path) -> str:
-    """Streaming sha256 of a file (1 MiB chunks) — the one implementation
-    behind artifact digests, lock stamps, and workspace fingerprints
-    (previously three identical copies; #229 D6)."""
+    """Streaming sha256 of a file (1 MiB chunks).
+
+    The one implementation behind artifact digests, lock stamps, and
+    workspace fingerprints — previously three identical copies (#229 D6).
+    """
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
@@ -29,9 +34,11 @@ def sha256_file(path: Path) -> str:
 
 
 def nested_get(mapping: Any, *keys: str) -> Any:
-    """Walk nested dicts, ``None`` on any missing key or non-dict step —
-    the shared crash-tolerant read for artifacts from other hpx versions
-    (previously four identical copies; #229 D6)."""
+    """Walk nested dicts; ``None`` on any missing key or non-dict step.
+
+    The shared crash-tolerant read for artifacts written by other hpx
+    versions — previously four identical copies (#229 D6).
+    """
     current = mapping
     for key in keys:
         if not isinstance(current, dict) or key not in current:
@@ -41,8 +48,10 @@ def nested_get(mapping: Any, *keys: str) -> Any:
 
 
 def to_float(value: Any) -> float | None:
-    """Bool-rejecting float coercion (bools are not measurements); ``None``
-    on anything unconvertible (previously two identical copies; #229 D6)."""
+    """Bool-rejecting float coercion; ``None`` on anything unconvertible.
+
+    Bools are not measurements. Previously two identical copies (#229 D6).
+    """
     if isinstance(value, bool) or value is None:
         return None
     if isinstance(value, (int, float)):

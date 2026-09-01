@@ -20,7 +20,6 @@ from neuralspotx.nsx_lock import LOCK_SCHEMA_VERSION, hash_manifest, read_lock
 
 from . import nsx as nsx_cli
 from .._version import __version__
-from ..results.serde import sha256_file
 from ..errors import BuildError, DependencyError, LockError, VersionError
 from ..results.dependencies import (
     ContentDigest,
@@ -33,6 +32,7 @@ from ..results.dependencies import (
     DependencyRequest,
     DependencyWorkspace,
 )
+from ..results.serde import sha256_file
 from .compatibility import QualificationState
 from .sync import (
     _offline_materialization_error,
