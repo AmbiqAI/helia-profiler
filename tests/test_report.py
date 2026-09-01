@@ -605,7 +605,10 @@ def test_write_summary_prefers_gpio_gated_power_when_present(tmp_path: Path):
     assert summary["power"]["sync"] == {"lockstep": True, "ready_wait_s": 0.012}
     assert summary["power"]["sync_timing_s"] == {"go_release_to_gate_rise_s": 0.004}
     assert summary["power"]["short_gate_pulses_ignored"] == 3
-    assert summary["model_analysis"]["tops"] == 0.0
+    # #240: a GPIO-gated window IS inference-bracketed, so TOPS is emitted
+    # (its fixture's tiny total_ops rounds the value to 0.0 -- the count
+    # multiplier is pinned by the dedicated tests below, not here).
+    assert "tops" in summary["model_analysis"]
 
 
 def _gated_power_ctx(
@@ -1262,3 +1265,168 @@ def test_write_summary_flags_zero_device_cycles_as_suspect(tmp_path: Path):
     assert summary["power"]["gated_window_duration_suspect"] is True
     assert "energy_per_inference_j" not in summary["power"]
     assert "gated_window_duration_ratio" not in summary["power"]
+
+
+# ---------------------------------------------------------------------------
+# #240 — TOPS / tops_per_watt divide by the window's own inference count.
+# total_ops is PER-INFERENCE, so a window of N inferences must scale by N;
+# the count is resolved per measurement scope, and suppressed where there is
+# no inference-bracketed window. No test pinned the multiplier before #240.
+# ---------------------------------------------------------------------------
+
+_TOPS_OPS = 5_000_000  # large enough that a real N does not round to 0.0
+
+
+def _tops_ctx(
+    tmp_path: Path,
+    *,
+    scope: MeasurementScope,
+    duration_s: float,
+    clean_infer_count: int = 0,
+    plan_inference_count: int | None = None,
+    on_device_count: int | None = None,
+    probe: str = "infer",
+) -> PipelineContext:
+    config = load_config(
+        None,
+        {
+            "model": {"path": "test.tflite"},
+            "engine": {"type": "helia-rt"},
+            "profiling": {"clean_window_probe": probe},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.model_analysis = ModelAnalysis(
+        layers=[], total_macs=_TOPS_OPS // 2, total_ops=_TOPS_OPS, num_parameters=10
+    )
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(clean_infer_count=clean_infer_count, clean_infer_avg_us=1000),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+        ),
+    )
+    power_plan = {"inference_count": plan_inference_count} if plan_inference_count else None
+    set_power_result(
+        ctx,
+        PowerResult(
+            summary=PowerSummary(
+                avg_current_a=0.004,
+                avg_power_w=0.01,
+                peak_current_a=0.006,
+                energy_j=0.0016,
+                duration_s=duration_s,
+                sample_count=100,
+            ),
+            metadata=PowerMetadata(
+                measurement_scope=scope,
+                inference_count=on_device_count,
+                power_plan=power_plan,
+            ),
+        ),
+    )
+    return ctx
+
+
+def _tops(ctx: PipelineContext, tmp_path: Path) -> dict:
+    summary = json.loads(_write_summary(ctx, tmp_path).read_text())
+    return summary.get("model_analysis", {})
+
+
+def test_tops_on_device_scales_by_the_monitor_inference_count(tmp_path: Path):
+    """The internal/INA228 bug: infer_count stayed 1 while the window ran N
+    -- TOPS was N x too low. It must scale by the monitor's own count."""
+    ctx = _tops_ctx(
+        tmp_path,
+        scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
+        on_device_count=500,
+        duration_s=5.0,
+    )
+    ma = _tops(ctx, tmp_path)
+    assert ma["tops"] == round(_TOPS_OPS * 500 / 1e12 / 5.0, 6)
+    # 500x the pre-fix count-of-one value -- the CRITICAL, pinned.
+    assert ma["tops"] > 400 * round(_TOPS_OPS * 1 / 1e12 / 5.0, 6)
+
+
+def test_tops_external_fixed_uses_plan_count_not_profile_count(tmp_path: Path):
+    """Fixed-window external: the gated window ran the PLAN's count, not the
+    profile phase's clean_infer_count -- TOPS must use the plan's."""
+    ctx = _tops_ctx(
+        tmp_path,
+        scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
+        clean_infer_count=200,  # profile phase
+        plan_inference_count=120,  # what the gated window actually ran
+        duration_s=0.6,
+    )
+    ma = _tops(ctx, tmp_path)
+    assert ma["tops"] == round(_TOPS_OPS * 120 / 1e12 / 0.6, 6)
+
+
+def test_tops_external_auto_falls_back_to_profile_count(tmp_path: Path):
+    """No plan count (shared firmware / auto): the profile clean_infer_count
+    is the window's count."""
+    ctx = _tops_ctx(
+        tmp_path,
+        scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
+        clean_infer_count=236,
+        duration_s=4.98,
+    )
+    ma = _tops(ctx, tmp_path)
+    assert ma["tops"] == round(_TOPS_OPS * 236 / 1e12 / 4.98, 6)
+
+
+def test_tops_and_energy_per_inference_share_one_count(tmp_path: Path):
+    """The bug was the two derivations diverging. Cross-lock them: the count
+    implied by energy_per_inference must equal the count implied by TOPS."""
+    # Window matches 120 inferences x 1000us = 0.12s, so the gate-duration
+    # check passes and energy_per_inference is emitted for the cross-lock.
+    ctx = _tops_ctx(
+        tmp_path,
+        scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
+        clean_infer_count=200,
+        plan_inference_count=120,
+        duration_s=0.12,
+    )
+    summary = json.loads(_write_summary(ctx, tmp_path).read_text())
+    tops = summary["model_analysis"]["tops"]
+    n_from_tops = round(tops * 1e12 * 0.12 / _TOPS_OPS)
+    n_from_energy = round(0.0016 / summary["power"]["energy_per_inference_j"])
+    assert n_from_tops == n_from_energy == 120
+
+
+def test_tops_suppressed_for_busy_loop(tmp_path: Path):
+    """A busy-loop window ran zero model ops -- TOPS would be fabricated."""
+    ctx = _tops_ctx(
+        tmp_path,
+        scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
+        clean_infer_count=100,
+        duration_s=1.0,
+        probe="busy_loop",
+    )
+    ma = _tops(ctx, tmp_path)
+    assert "tops" not in ma and "tops_per_watt" not in ma
+
+
+def test_tops_suppressed_for_free_form(tmp_path: Path):
+    ctx = _tops_ctx(
+        tmp_path,
+        scope=MeasurementScope.FREE_FORM_CAPTURE,
+        clean_infer_count=100,
+        duration_s=1.0,
+    )
+    ma = _tops(ctx, tmp_path)
+    assert "tops" not in ma and "tops_per_watt" not in ma
+
+
+def test_tops_suppressed_for_whole_capture(tmp_path: Path):
+    """#240 variant C -- the scope that shipped the bug (a committed
+    artifact priced a whole free-run as one inference). Not an
+    inference-bracketed window: TOPS must be suppressed, not count=1."""
+    ctx = _tops_ctx(
+        tmp_path,
+        scope=MeasurementScope.WHOLE_CAPTURE_WINDOW,
+        clean_infer_count=100,
+        duration_s=1.0,
+    )
+    ma = _tops(ctx, tmp_path)
+    assert "tops" not in ma and "tops_per_watt" not in ma

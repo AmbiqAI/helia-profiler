@@ -1152,8 +1152,12 @@ the JS320 bench.
     or `power.driver: joulescope` (the default) for a bench instrument.
 
 ??? failure "TOPS-per-Watt missing from summary"
-    Only emitted for heliaAOT runs with power enabled. heliaRT/TFLM
-    don't expose the MAC count needed for the TOPS calculation.
+    `tops`/`tops_per_watt` are emitted for any power run whose model can be
+    analyzed for MACs — heliaRT, TFLM, and heliaAOT tflite models (not
+    ExecuTorch). They are suppressed when the power window is not
+    inference-bracketed (free-form or whole-capture windows, or a busy-loop
+    probe), because TOPS scales the per-inference op count by the number of
+    inferences measured inside the window.
 
 ??? failure "Power numbers differ between transports"
     This should not happen with the default `power.firmware: dedicated` —
