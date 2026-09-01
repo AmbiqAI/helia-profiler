@@ -348,9 +348,7 @@ def write_compare_artifacts(
     # RFC-8259 JSON for strict downstream readers. Coerce non-finite to
     # null at the emission boundary (#243) -- the regression verdict is
     # unaffected (comparison_profile already rejects non-finite as FAIL).
-    paths[0].write_text(
-        json.dumps(_json_finite(summary), indent=2, default=str) + "\n"
-    )
+    paths[0].write_text(json.dumps(_json_finite(summary), indent=2, default=str) + "\n")
 
     if len(paths) > 1:
         flat_layer_rows = [row.to_flat_dict() for row in result.layer_rows]
@@ -420,8 +418,7 @@ def _read_layer_csv(path: Path) -> list[dict[str, Any]]:
         # list); drop them so a wider-than-header row (foreign/other-version
         # artifact) does not reach the scalar coercer (#243).
         return [
-            {k: _coerce_csv_value(v) for k, v in row.items() if k is not None}
-            for row in reader
+            {k: _coerce_csv_value(v) for k, v in row.items() if k is not None} for row in reader
         ]
 
 
