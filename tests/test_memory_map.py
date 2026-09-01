@@ -431,7 +431,7 @@ def test_characterized_socs_cover_the_entire_registry():
 
 def test_link_family_map_stays_in_lockstep_with_the_toolchain_enum():
     """#229 D2 inversion: platform owns the toolchain-name map and must
-    classify exactly the names config's Toolchain enum admits — no silent
+    classify exactly the names the vocab Toolchain enum (re-exported by config) admits — no silent
     drift in either direction."""
     from helia_profiler.platform.memory_map import _LINK_FAMILY_BY_TOOLCHAIN
     from helia_profiler.vocab import Toolchain

@@ -20,7 +20,6 @@ from ..deps.compatibility import (
 )
 from ..engines import EngineType
 from ..errors import ConfigError
-from ..vocab import Aggregation, Toolchain, Transport
 from ..placement import Placement
 from ..platform import (
     DEFAULT_GO_GPIO_PIN,
@@ -34,6 +33,7 @@ from ..platform import (
     get_default_sync_gpio_pin,
 )
 from ..power.base import PowerMode
+from ..vocab import Aggregation, Toolchain, Transport
 from .power import (
     DEFAULT_INA228_AVERAGING_COUNT,
     DEFAULT_INA228_CONVERSION_TIME_US,
@@ -149,8 +149,6 @@ class CleanWindowProbe(StrEnum):
 
     INFER = "infer"
     BUSY_LOOP = "busy_loop"
-
-
 
 
 DEFAULT_BOARD = "apollo510_evb"

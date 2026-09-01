@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from typing import Protocol, runtime_checkable
 
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+from ..errors import PowerError
 from ..results import PowerTerminalEnvelope
 from ..vocab import Transport
-from ..errors import PowerError
-from ..pipeline import PipelineContext
+
+if TYPE_CHECKING:
+    from ..pipeline import PipelineContext
 
 
 @runtime_checkable

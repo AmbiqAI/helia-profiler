@@ -1,7 +1,7 @@
 """Cross-layer configuration vocabulary — the bottom-layer enum leaf.
 
 These StrEnums are named by config, rendered into firmware, and dispatched
-on by the transport/capture/power layers. They live here — stdlib-only, no
+on by the transport and capture layers. They live here — stdlib-only, no
 hpx imports — so a backend can import an enum without executing the whole
 config resolver (#229 D2). :mod:`helia_profiler.config` re-exports them, so
 ``from helia_profiler.config import Transport`` remains the public spelling.
