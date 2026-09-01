@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -311,7 +312,7 @@ def _delta_style(delta: float, *, lower_is_better: bool) -> str:
 
 def _format_compare_number(value: Any) -> str:
     number = _to_compare_float(value)
-    if number is None:
+    if number is None or not math.isfinite(number):
         return "—"
     if abs(number) >= 1000:
         return f"{number:,.0f}"
@@ -322,7 +323,7 @@ def _format_compare_number(value: Any) -> str:
 
 def _format_compact_number(value: Any) -> str:
     number = _to_compare_float(value)
-    if number is None:
+    if number is None or not math.isfinite(number):
         return "—"
     sign = "-" if number < 0 else ""
     abs_number = abs(number)

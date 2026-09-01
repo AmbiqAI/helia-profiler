@@ -1015,3 +1015,23 @@ def test_compare_summary_json_is_valid_when_a_metric_is_non_finite(tmp_path: Pat
     assert "Infinity" not in text and "NaN" not in text
     # A strict parser (rejecting the JS5 constants) must accept it.
     json.loads(text, parse_constant=lambda c: (_ for _ in ()).throw(ValueError(c)))
+
+
+def test_compare_console_survives_a_non_finite_metric(tmp_path: Path):
+    """#244 lens: C2 sanitized the JSON but the console formatters did
+    int(nan) -> ValueError -- the same raw-traceback crash class on a
+    foreign artifact. print_compare must render (non-finite -> em-dash),
+    not crash."""
+    from helia_profiler.console import HpxConsole
+    from helia_profiler.console.compare import print_compare
+
+    baseline = tmp_path / "gcc"
+    candidate = tmp_path / "atfe"
+    for d in (baseline, candidate):
+        _write_run(d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+    summ = json.loads((candidate / "summary.json").read_text())
+    summ["total_cycles"] = float("nan")
+    (candidate / "summary.json").write_text(json.dumps(summ))
+
+    result = compare_runs(baseline, candidate)
+    print_compare(HpxConsole(verbosity=0), result)  # must not raise ValueError
