@@ -13,13 +13,13 @@ from enum import StrEnum
 from pydantic import ConfigDict, model_validator
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
-from .platform import (
+from ..platform import (
     DEFAULT_GO_GPIO_PIN,
     DEFAULT_STATE_GPIO_PIN,
     DEFAULT_SYNC_GPIO_PIN,
 )
-from .power.base import PowerMode
-from .target.lifecycle import ResetStrategy
+from ..power.base import PowerMode
+from ..target.lifecycle import ResetStrategy
 
 DEFAULT_POWER_DURATION_S = 30
 DEFAULT_IO_VOLTAGE = 1.8

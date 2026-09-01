@@ -46,7 +46,7 @@ from .deps.compatibility import (
 from .deps.dependencies import read_dependency_lock_provenance
 from .engines import EngineType
 from . import examples
-from .counters import PmuCounter
+from .platform.counters import PmuCounter
 from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
 from .errors import (
     BuildError,

@@ -31,7 +31,7 @@ from ..errors import CaptureError
 from .base import BaseCaptureTransport, CaptureArgs
 from ..target.probe.base import ResetController
 from ..target.probe.jlink import JLinkResetController
-from ..usb_identity import USB_MARKER_PREFIX
+from .usb_identity import USB_MARKER_PREFIX
 from .timing import READINESS_POLL_INTERVAL_S, USB_REENUM_FLOOR_S, CaptureTimingTracker
 from .protocol import (
     DEFAULT_TIMEOUT_S,
@@ -419,7 +419,7 @@ class UsbCdcTransport(BaseCaptureTransport):
     honors_keep_attached = True
 
     def collect(self, ctx) -> list[str]:
-        from ..usb_identity import usb_marker_serial
+        from .usb_identity import usb_marker_serial
 
         args = self.prepared_args
         return capture_usb_output(

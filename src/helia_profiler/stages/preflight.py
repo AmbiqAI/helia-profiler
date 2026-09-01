@@ -28,7 +28,7 @@ import logging
 from pathlib import Path
 
 from ..config import CleanWindowProbe, Transport
-from ..counters import (
+from ..platform.counters import (
     supported_groups_for_domains,
     validate_group_selection,
 )
