@@ -105,7 +105,7 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
     assert "helia_profiler/evaluation/comparability.py" in names
     assert "helia_profiler/evaluation/comparison_profile.py" in names
     assert "helia_profiler/evaluation/compare.py" in names
-    assert "helia_profiler/evaluation/model_analysis.py" in names
+    assert "helia_profiler/modelcost/model_analysis.py" in names
     assert "helia_profiler/results/models.py" in names
     assert "helia_profiler/results/artifacts.py" in names
     assert "helia_profiler/results/manifest.py" in names
@@ -208,7 +208,11 @@ def _hpx_import_targets(path: Path, *, module_level_only: bool) -> list[str]:
         if isinstance(node, ast.ImportFrom):
             base = "." * (node.level or 0) + (node.module or "")
             if node.level or (node.module or "").split(".")[0] == "helia_profiler":
-                targets.extend(f"{base}.{alias.name}" for alias in node.names)
+                # `from . import x` has an empty module: join without adding
+                # a dot, or a level-1 sibling import would encode as a
+                # level-2 parent target (#235 lens).
+                joiner = "" if base.endswith(".") else "."
+                targets.extend(f"{base}{joiner}{alias.name}" for alias in node.names)
         elif isinstance(node, ast.Import):
             targets.extend(
                 alias.name
@@ -254,3 +258,48 @@ def test_platform_never_imports_the_config_layer() -> None:
         )
     }
     assert not offenders, f"platform/ imports the config layer: {offenders}"
+
+
+def _hpx_target_head(target: str, package: str) -> str:
+    """Resolve a target to the top-level hpx module it lands in.
+
+    From a file in ``helia_profiler.<package>``: ``".sibling"`` is the
+    package itself, ``"..other.name"`` is ``other``, and an absolute target
+    contributes its second segment."""
+    if target.startswith(".."):
+        return target.lstrip(".").split(".")[0]
+    if target.startswith("."):
+        return package
+    return target.split(".")[1] if "." in target else target
+
+
+def _closure_offenders(package: str, allowed: set[str]) -> dict[str, list[str]]:
+    """Per-file hpx-import targets outside *allowed*, over the WHOLE package
+    tree (rglob: a future subpackage must not escape the wall)."""
+    offenders: dict[str, list[str]] = {}
+    for path in sorted((_SRC / package).rglob("*.py")):
+        hits = [
+            target
+            for target in _hpx_import_targets(path, module_level_only=False)
+            if _hpx_target_head(target, package) not in allowed
+        ]
+        if hits:
+            offenders[path.name] = hits
+    return offenders
+
+
+def test_platform_closure_stays_extractable() -> None:
+    """#229 D4: platform/ is the silicon-info extraction seam — its modules
+    may import only siblings and the ``errors`` leaf. Anything else is a
+    new extraction blocker to cut deliberately, not accrete silently."""
+    offenders = _closure_offenders("platform", {"platform", "errors"})
+    assert not offenders, f"platform/ gained extraction blockers: {offenders}"
+
+
+def test_modelcost_closure_is_sibling_only() -> None:
+    """#229 D4: the model-cost core must stay free of hpx imports — its
+    optional readers (litert, helia-aot) are guarded third-party deps, and
+    every hpx-side concern (engine dispatch, artifacts, reporting) lives
+    outside. This is the wall a future shared package ships behind."""
+    offenders = _closure_offenders("modelcost", {"modelcost"})
+    assert not offenders, f"modelcost/ gained hpx imports: {offenders}"

@@ -48,7 +48,7 @@ from helia_profiler.report import (
     write_report,
 )
 from helia_profiler.results import load_result_manifest
-from helia_profiler.evaluation import ModelAnalysis
+from helia_profiler.modelcost import ModelAnalysis
 from helia_profiler.results.issues import IssueCode
 from helia_profiler.results import (
     EngineInfo,

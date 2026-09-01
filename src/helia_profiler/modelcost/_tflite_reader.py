@@ -34,8 +34,14 @@ from __future__ import annotations
 import struct
 from dataclasses import dataclass
 
-# BuiltinOperator / TensorType / BuiltinOptions enum values, confirmed against
-# ai_edge_litert.schema_py_generated (frozen by schema-evolution rules).
+# PROVENANCE (#229 D7): every constant below was extracted from
+# ai_edge_litert 2.1.6's generated schema (schema_py_generated) and is
+# frozen by flatbuffers schema-evolution rules (enum values immutable,
+# vtable slots append-only). tests/test_softmax_preflight.py re-derives
+# each one from the installed litert by introspection whenever the
+# `analysis` extra is present, so silent drift is impossible.
+#
+# BuiltinOperator / TensorType / BuiltinOptions enum values:
 BUILTIN_SOFTMAX = 25
 TENSOR_TYPE_UINT8 = 3
 TENSOR_TYPE_INT8 = 9

@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Mapping
 
-from ..placement import Placement
+from .placement import Placement
 from .soc import SocFamily
 
 if TYPE_CHECKING:

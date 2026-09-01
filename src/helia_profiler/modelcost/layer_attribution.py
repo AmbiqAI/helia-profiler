@@ -21,11 +21,9 @@ A layer whose source cannot be resolved gets NO attribution — an honest
 dash, never a positional guess (the #206 principle).
 
 CONTAINMENT NOTE: this module is deliberately self-contained — pure
-functions over plain data, importing only the analysis model and the
-``source_index_from_op`` parser it shares with ``results.models``. Together
-with ``model_analysis`` it forms the layer-cost core that may one day move
-into a standalone helper package; keep pipeline, config, and I/O imports
-out of it.
+functions over plain data, siblings only. Together with ``model_analysis``
+it forms the layer-cost core packaged as :mod:`helia_profiler.modelcost`;
+keep pipeline, config, and I/O imports out of it (contract-tested).
 """
 
 from __future__ import annotations
@@ -33,8 +31,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
-from ..results.models import source_index_from_op
 from .model_analysis import LayerOps, ModelAnalysis
+
 
 __all__ = [
     "LayerAttribution",
@@ -42,6 +40,20 @@ __all__ = [
     "manifest_source_map",
     "source_index_from_op",
 ]
+
+
+def source_index_from_op(op: str) -> int | None:
+    """Original tflite operator index from an op label's ``:N`` suffix.
+
+    helia-aot firmware labels layers ``"<TYPE>:<original tflite index>"``
+    (``"FULLY_CONNECTED:43"``). Only a strict integer suffix counts —
+    ExecuTorch's ``"OPERATOR_CALL:c3i12"`` names no tflite operator and
+    must stay ``None`` (#218: never guess a source index).
+    """
+    _, sep, suffix = str(op).rpartition(":")
+    if not sep or not suffix.isdigit():
+        return None
+    return int(suffix)
 
 
 @dataclass(frozen=True)

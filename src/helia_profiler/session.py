@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from .platform.counters import PmuCounter
     from .hostenv.doctor import DoctorResult
     from .engines import EngineType
-    from .evaluation.model_analysis import ModelAnalysis
+    from .modelcost import ModelAnalysis
     from .pipeline import ProgressUpdate
     from .platform import BoardDef
     from .target.probe.jlink import JLinkProbe, JLinkProbeMatch

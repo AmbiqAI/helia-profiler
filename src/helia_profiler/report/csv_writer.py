@@ -13,11 +13,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ..errors import ReportError
-from ..evaluation.layer_attribution import LayerAttribution, LayerAttributor
+from ..modelcost.layer_attribution import LayerAttribution, LayerAttributor
 from ..results import LayerResult
 
 if TYPE_CHECKING:
-    from ..evaluation import ModelAnalysis
+    from ..modelcost import ModelAnalysis
     from ..results import PmuResult
 
 log = logging.getLogger("hpx")

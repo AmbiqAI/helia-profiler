@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from ..evaluation import analyze_model, is_available
+from ..modelcost import analyze_model, is_available
 from ..engines import EngineType
 from ..pipeline import PipelineContext
 
