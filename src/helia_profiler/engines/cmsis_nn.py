@@ -13,14 +13,21 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import struct
 from pathlib import Path
 
 from ..config import ProfileConfig
 from ..errors import EngineError
+from ..modelcost._tflite_reader import TENSOR_TYPE_FLOAT16, read_float_compute_types
 from ..platform import get_soc_for_board
 from ..results import NsxModuleRef
 
 log = logging.getLogger("hpx")
+
+#: First ns-cmsis-nn release whose float kernels HPX considers measurable --
+#: the core heliaRT 1.19.0 targets. The baseline ref predates it; see
+#: docs/architecture/compatibility-baseline.md.
+CMSIS_NN_FLOAT_MIN_REF = "v7.31.0"
 
 # NSX registry identity for ns-cmsis-nn. By default hpx declares this module
 # and lets NSX clone it from the registered GitHub upstream; a user-provided
@@ -40,6 +47,23 @@ def _kernel_family(family: str) -> dict[str, str]:
     return {f"NSX_CMSIS_NN_ENABLE_{family}": "ON", f"ARM_NN_ENABLE_{family}": "ON"}
 
 
+def _float_compute_types(config: ProfileConfig) -> set[int]:
+    """Float precisions the model computes in; empty when the file is unreadable
+    (the preflight stage has already rejected anything that is not a flatbuffer)."""
+    try:
+        return read_float_compute_types(Path(config.model.path).read_bytes())
+    except (OSError, struct.error, IndexError):
+        return set()
+
+
+def _core_is_overridden(config: ProfileConfig) -> bool:
+    return bool(
+        config.engine.config.get("cmsis_nn_ref")
+        or config.engine.config.get("cmsis_nn_path")
+        or os.environ.get("CMSIS_NN_PATH")
+    )
+
+
 def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
     """CMake cache options for a source-built ``nsx-cmsis-nn`` module.
 
@@ -50,14 +74,30 @@ def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
       ``engine.config.cmsis_nn_requantize_inline_asm`` is false.
     * fp32 kernels -- always on (heliaRT >= 1.19 refuses to configure without
       them; heliaAOT float models call them directly).
-    * fp16 kernels -- on for MVE-F cores (Cortex-M55) only.
+    * fp16 kernels -- on only when the model computes in FLOAT16 on an MVE-F
+      core (Cortex-M55). Never otherwise: ns-cmsis-nn < v7.30.0's fp16 sources
+      ICE on GCC 14 (PR 118460), so an int8/fp32 build must not compile them.
+
+    A float model on the baseline ns-cmsis-nn ref gets a warning: those float
+    kernels predate the fixes in :data:`CMSIS_NN_FLOAT_MIN_REF`.
     """
     cmake_vars: dict[str, str] = {}
     if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
         cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
     cmake_vars |= _kernel_family("F32")
+
+    float_types = _float_compute_types(config)
+    if float_types and not _core_is_overridden(config):
+        log.warning(
+            "%s computes in float, but ns-cmsis-nn is the baseline ref whose float "
+            "kernels predate the %s fixes; set engine.config.cmsis_nn_ref to %s or "
+            "newer for float measurements (the run is still stamped qualified)",
+            Path(config.model.path).name,
+            CMSIS_NN_FLOAT_MIN_REF,
+            CMSIS_NN_FLOAT_MIN_REF,
+        )
     soc = get_soc_for_board(config.target.board, registry=config.platform_registry)
-    if soc.has_mve:
+    if soc.has_mve and TENSOR_TYPE_FLOAT16 in float_types:
         cmake_vars |= _kernel_family("F16")
     return cmake_vars
 

@@ -682,6 +682,10 @@ def test_reader_constants_re_derive_from_the_installed_litert():
         return int(match.group(1))
 
     assert r.BUILTIN_SOFTMAX == g.BuiltinOperator.SOFTMAX
+    assert r.BUILTIN_QUANTIZE == g.BuiltinOperator.QUANTIZE
+    assert r.BUILTIN_DEQUANTIZE == g.BuiltinOperator.DEQUANTIZE
+    assert r.TENSOR_TYPE_FLOAT32 == g.TensorType.FLOAT32
+    assert r.TENSOR_TYPE_FLOAT16 == g.TensorType.FLOAT16
     assert r.TENSOR_TYPE_UINT8 == g.TensorType.UINT8
     assert r.TENSOR_TYPE_INT8 == g.TensorType.INT8
     assert r.BUILTIN_OPTIONS_SOFTMAX == g.BuiltinOptions.SoftmaxOptions

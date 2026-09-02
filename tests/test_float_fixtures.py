@@ -3,7 +3,7 @@
 ``kws_float_fp16.tflite`` is the *true* all-FLOAT16 cast of the FP32 fixture
 (``tools/cast_fp16.py``); ``kws_float_fp16_weights.tflite`` is the converter's
 weights-only float16 quantization. Regenerating either must not silently swap
-them.
+them, and the MAC count the baseline record quotes must stay pinned.
 """
 
 from __future__ import annotations
@@ -18,8 +18,18 @@ import pytest
 schema = pytest.importorskip("ai_edge_litert.schema_py_generated")
 pytest.importorskip("flatbuffers")
 
+from helia_profiler.modelcost import analyze_model  # noqa: E402
+from helia_profiler.modelcost._tflite_reader import (  # noqa: E402
+    TENSOR_TYPE_FLOAT16,
+    TENSOR_TYPE_FLOAT32,
+    read_float_compute_types,
+)
+
 _FIXTURES = Path(__file__).parent / "fixtures"
 _TOOLS = Path(__file__).parents[1] / "tools"
+FP32 = _FIXTURES / "kws_float_fp32.tflite"
+FP16 = _FIXTURES / "kws_float_fp16.tflite"
+FP16_WEIGHTS = _FIXTURES / "kws_float_fp16_weights.tflite"
 
 
 def _load_cast_fp16() -> ModuleType:
@@ -47,19 +57,29 @@ def _inspect(path: Path) -> tuple[Counter[str], set[str]]:
 
 
 def test_fp32_fixture_is_plain_float32() -> None:
-    dtypes, ops = _inspect(_FIXTURES / "kws_float_fp32.tflite")
+    dtypes, ops = _inspect(FP32)
     assert set(dtypes) == {"FLOAT32", "INT32"}
     assert "DEQUANTIZE" not in ops
+    assert read_float_compute_types(FP32.read_bytes()) == {TENSOR_TYPE_FLOAT32}
 
 
 def test_fp16_fixture_is_the_true_cast_of_the_fp32_fixture() -> None:
-    cast, _ = _load_cast_fp16().cast_model((_FIXTURES / "kws_float_fp32.tflite").read_bytes())
-    assert cast == (_FIXTURES / "kws_float_fp16.tflite").read_bytes()
-    dtypes, ops = _inspect(_FIXTURES / "kws_float_fp16.tflite")
+    cast, _ = _load_cast_fp16().cast_model(FP32.read_bytes())
+    assert cast == FP16.read_bytes()
+    dtypes, ops = _inspect(FP16)
     assert "FLOAT32" not in dtypes and "DEQUANTIZE" not in ops
+    assert read_float_compute_types(FP16.read_bytes()) == {TENSOR_TYPE_FLOAT16}
 
 
-def test_fp16_weights_fixture_dequantizes_float16_weights() -> None:
-    dtypes, ops = _inspect(_FIXTURES / "kws_float_fp16_weights.tflite")
+def test_fp16_weights_fixture_dequantizes_weights_and_computes_in_float32() -> None:
+    dtypes, ops = _inspect(FP16_WEIGHTS)
     assert dtypes["FLOAT16"] > 0 and dtypes["FLOAT32"] > 0
     assert "DEQUANTIZE" in ops
+    assert read_float_compute_types(FP16_WEIGHTS.read_bytes()) == {TENSOR_TYPE_FLOAT32}
+
+
+@pytest.mark.parametrize("path", [FP32, FP16, FP16_WEIGHTS])
+def test_every_float_fixture_is_the_same_43520_mac_graph(path: Path) -> None:
+    analysis = analyze_model(path)
+    assert analysis is not None
+    assert analysis.total_macs == 43_520

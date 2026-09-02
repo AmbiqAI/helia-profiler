@@ -36,6 +36,15 @@ from .manifest import _extract_arena_regions, _extract_memory_plan, _extract_ope
 log = logging.getLogger("hpx")
 
 
+def _engine_cmake_vars(config: ProfileConfig) -> dict[str, str]:
+    """The ns-cmsis-nn kernel switches plus the NSX linker profile, if set."""
+    cmake_vars = cmsis_nn_cmake_vars(config)
+    linker_profile = config.engine.config.get("linker_profile")
+    if linker_profile:
+        cmake_vars["NSX_LINKER_PROFILE"] = str(linker_profile)
+    return cmake_vars
+
+
 def _psram_requested(config: ProfileConfig) -> bool:
     """True when any part of this config steers tensors into PSRAM.
 
@@ -209,11 +218,7 @@ class HeliaAOTAdapter:
             aot_platform,
         )
 
-        # Engine build options: the ns-cmsis-nn kernel switches plus the linker profile.
-        engine_cmake_vars = cmsis_nn_cmake_vars(config)
-        linker_profile = config.engine.config.get("linker_profile")
-        if linker_profile:
-            engine_cmake_vars["NSX_LINKER_PROFILE"] = str(linker_profile)
+        engine_cmake_vars = _engine_cmake_vars(config)
 
         # Build a MemoryPlan from the AOT codegen context so the
         # plan_memory stage can validate placement against the SoC's

@@ -264,14 +264,13 @@ registry and local-source modes compile heliaRT with the selected toolchain.
 - Size `model.arena_size` from measured output, not guesses. After the first
   successful run, set it to roughly `1.5x` the reported `allocated_arena` in
   `summary.json`.
-- Source builds (the registry default and `source_path`) enable ns-cmsis-nn's
-  fp32 kernels unconditionally — heliaRT 1.19.0's `helia` backend refuses to
-  configure without them — and the fp16 kernels on MVE-F cores (Cortex-M55)
-  only. Each is set as a cache variable before the module is added, under both
-  its ns-cmsis-nn option name (`NSX_CMSIS_NN_ENABLE_*`, what heliaRT checks)
-  and the exported define (`ARM_NN_ENABLE_*`, what heliaAOT's generated module
-  checks); there is no field to turn them off. Prebuilt `dist_path` archives
-  already contain them.
+- Source builds (the registry default and `source_path`) always enable
+  ns-cmsis-nn's fp32 kernels (heliaRT 1.19.0 refuses to configure without
+  them) and enable the fp16 kernels only when the model computes in FLOAT16 on
+  a Cortex-M55. There is no field to turn them off; 1.19.0 prebuilt
+  `dist_path` archives already contain them. A float model on the baseline
+  ns-cmsis-nn ref logs a warning — its float kernels predate the v7.31.0
+  fixes — so set `cmsis_nn_ref` for float measurements.
 
 ## heliaAOT
 
@@ -391,9 +390,9 @@ The pipeline:
 | `aot_args` | dict | `{}` | Pass-through args to the AOT compiler |
 | `platform_name` | string | *(from board)* | Override the board → AOT platform mapping |
 
-The ns-cmsis-nn fp32 kernels are always enabled and the fp16 kernels on
-Cortex-M55 targets, exactly as for heliaRT source builds (see the heliaRT
-runtime notes); generated float models call them directly.
+ns-cmsis-nn's fp32 kernels are always enabled, and the fp16 kernels when the
+model computes in FLOAT16 on a Cortex-M55 — exactly as for heliaRT source
+builds (see the heliaRT runtime notes).
 
 ## Choosing an engine
 
