@@ -466,9 +466,9 @@ def test_helia_aot_single_sided_baseline_range_is_not_backfilled_from_constants(
             SimpleNamespace(compatibility=SimpleNamespace(baseline=new_baseline)),
         )
 
-    # min_version only, well above HELIAAOT_MAX_VERSION_EXCLUSIVE (0.19.0) —
-    # an installed version above that local constant must still pass, since
-    # the baseline leaves the ceiling unbounded.
+    # min_version only, at HELIAAOT_MAX_VERSION_EXCLUSIVE (0.20.0) — an
+    # installed version above that local constant must still pass, since the
+    # baseline leaves the ceiling unbounded.
     min_only_engine = replace(aot_engine, min_version="0.20.0", max_version_exclusive=None)
     min_only_engines = tuple(
         min_only_engine if engine.name == "helia-aot" else engine for engine in baseline.engines

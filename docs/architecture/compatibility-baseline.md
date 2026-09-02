@@ -78,7 +78,7 @@ the slower-in-f16 `FULLY_CONNECTED` are heliaCORE kernel properties, not
 either runtime's. Every plan-vs-measured memory region matched. **int8 is
 unchanged in speed but larger:** the qualified int8 KWS DS-CNN (baseline
 `ns-cmsis-nn v7.29.2`) measured 2.07 M cycles on both 1.17.0 and 1.19.0
-(−0.02 %, run noise) while `.text` grew 277 KB → 309 KB (+31 KB) with
+(−0.02 %, run noise) while `.text` grew 277,420 B → 308,868 B (+31.4 KB) with
 `.data`/`.bss`/arena unchanged — consistent with the fp32 kernel paths 1.19.0
 requires riding into an int8 image (compiling the fp16 kernels too, as an
 earlier run did, added another 35 KB; hence the model gating). Two of the five
