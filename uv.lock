@@ -9,10 +9,7 @@ resolution-markers = [
 ]
 
 [manifest]
-constraints = [
-    { name = "idna", specifier = ">=3.15" },
-    { name = "pydantic-settings", specifier = ">=2.14.2" },
-]
+constraints = [{ name = "idna", specifier = ">=3.15" }]
 
 [[package]]
 name = "ai-edge-litert"
@@ -446,7 +443,7 @@ wheels = [
 
 [[package]]
 name = "helia-profiler"
-version = "0.1.6" # x-release-please-version
+version = "0.1.6"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
