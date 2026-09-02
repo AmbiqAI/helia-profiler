@@ -88,7 +88,8 @@ constraint-dependencies = [
     # Reaches HPX via pyjoulescope-driver -> requests.
     "idna>=3.15",
     # GHSA pydantic-settings: NestedSecretsSettingsSource follows symlinks out
-    # of secrets_dir. Reaches HPX via the `aot` extra: helia-aot -> argdantic.
+    # of secrets_dir. Reached HPX via the `aot` extra (helia-aot -> argdantic)
+    # until helia-aot 0.19.0 dropped argdantic; kept as a floor in case it returns.
     "pydantic-settings>=2.14.2",
 ]
 
