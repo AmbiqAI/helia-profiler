@@ -169,7 +169,7 @@ graph contains `VAR_HANDLE`-style ops. That means models using
 manual firmware edits just to stand up the interpreter.
 
 The profiler ships pinned to a specific heliaRT release
-(currently **v1.17.0**) and enforces a minimum supported version
+(currently **v1.19.0**) and enforces a minimum supported version
 (**v1.16.0**). In the default flow NSX resolves the pinned
 `nsx-helia-rt` registry module and builds it with the selected toolchain.
 
@@ -213,7 +213,7 @@ engine:
   config:
     source:
       repo: AmbiqAI/helia-rt
-      ref: helia-rt-v1.17.0
+      ref: helia-rt-v1.19.0
 ```
 
 ```yaml title="hpx.yml"
@@ -249,6 +249,9 @@ registry and local-source modes compile heliaRT with the selected toolchain.
 | `dist_path` | string | *(registry module)* | Explicit local prebuilt distribution |
 | `source.repo` | string | — | GitHub repo for an explicit prebuilt release |
 | `source.ref` | string | — | Explicit release tag |
+| `cmsis_nn_path` | string | *(registry default)* | Local ns-cmsis-nn checkout for the source build (mutually exclusive with `cmsis_nn_ref`) |
+| `cmsis_nn_ref` | string | *(registry default)* | Exact ns-cmsis-nn git ref for the source build; stamps `development-overrides` |
+| `cmsis_nn_requantize_inline_asm` | bool | `true` | Use inline-asm requantization path |
 
 ### heliaRT runtime notes
 
@@ -261,6 +264,11 @@ registry and local-source modes compile heliaRT with the selected toolchain.
 - Size `model.arena_size` from measured output, not guesses. After the first
   successful run, set it to roughly `1.5x` the reported `allocated_arena` in
   `summary.json`.
+- Source builds (the registry default and `source_path`) enable ns-cmsis-nn's
+  fp32 kernels unconditionally — heliaRT 1.19.0's `helia` backend refuses to
+  configure without them — and the fp16 kernels on MVE-F cores (Cortex-M55)
+  only. Both are cache variables set before the module is added; there is no
+  field to turn them off. Prebuilt `dist_path` archives already contain them.
 
 ## heliaAOT
 
@@ -291,7 +299,7 @@ heliaAOT ships as a Python package (it runs at build-time), so version
 resolution is handled entirely by **pip** — there's no separate cache,
 download, or `dist_path` to manage.
 
-The profiler's `[aot]` extra requires `helia-aot>=0.18.0`, and the profiler
+The profiler's `[aot]` extra requires `helia-aot>=0.19.0`, and the profiler
 also enforces a runtime
 **minimum supported version** (`HELIAAOT_MIN_VERSION`) so any compatible
 override still has to clear the floor.
@@ -378,6 +386,10 @@ The pipeline:
 | `linker_profile` | string | `default` | NSX linker-script profile (`default`, `itcm`); `itcm` promotes hot kernels into ITCM (Apollo5-family M55 SoCs) |
 | `aot_args` | dict | `{}` | Pass-through args to the AOT compiler |
 | `platform_name` | string | *(from board)* | Override the board → AOT platform mapping |
+
+The ns-cmsis-nn fp32 kernels are always enabled and the fp16 kernels on
+Cortex-M55 targets, exactly as for heliaRT source builds (see the heliaRT
+runtime notes); generated float models call them directly.
 
 ## Choosing an engine
 

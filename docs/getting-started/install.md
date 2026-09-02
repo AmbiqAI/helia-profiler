@@ -133,7 +133,7 @@ pip install 'helia-profiler[aot]'        # heliaAOT compiler support
 pip install 'helia-profiler[analysis]'   # model compute/parameter analysis, no hardware needed
 ```
 
-The AOT extra installs `helia-aot>=0.18.0` and a LiteRT-compatible analysis
+The AOT extra installs `helia-aot>=0.19.0` and a LiteRT-compatible analysis
 stack. The analysis extra installs the same constrained LiteRT stack plus
 flatbuffer inspection support. `helia-aot` currently declares
 `requires-python >=3.11,<3.13`, so the `aot` extra needs Python 3.11 or 3.12

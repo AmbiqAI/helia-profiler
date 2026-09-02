@@ -1,7 +1,7 @@
 {
   "schema": "hpx.compatibility-baseline",
   "schema_version": 1,
-  "baseline_id": "hpx-neuralspotx-0.7.17-2026-08",
+  "baseline_id": "hpx-neuralspotx-0.7.17-2026-09",
   "neuralspotx": {
     "package": "neuralspotx",
     "version": "0.7.17",
@@ -38,7 +38,7 @@
     },
     "helia-rt": {
       "url": "https://github.com/AmbiqAI/helia-rt.git",
-      "ref": "ff6233ba3783a74de52977d155db6ed5472068df"
+      "ref": "038a0c4403b6186316700833b3ad7bb32e16ea83"
     },
     "nsx-sensors": {
       "url": "https://github.com/AmbiqAI/nsx-sensors.git",
@@ -72,7 +72,7 @@
     },
     "nsx-helia-rt": {
       "project": "helia-rt",
-      "ref": "ff6233ba3783a74de52977d155db6ed5472068df"
+      "ref": "038a0c4403b6186316700833b3ad7bb32e16ea83"
     },
     "nsx-sensors": {
       "project": "nsx-sensors",
@@ -81,12 +81,12 @@
   },
   "engines": {
     "helia-rt": {
-      "version": "1.17.0",
-      "ref": "ff6233ba3783a74de52977d155db6ed5472068df"
+      "version": "1.19.0",
+      "ref": "038a0c4403b6186316700833b3ad7bb32e16ea83"
     },
     "helia-aot": {
-      "min_version": "0.18.0",
-      "max_version_exclusive": "0.19.0"
+      "min_version": "0.19.0",
+      "max_version_exclusive": "0.20.0"
     },
     "tflm": {
       "governed_by_modules": true

@@ -18,6 +18,7 @@ from pathlib import Path
 
 from ..config import ProfileConfig
 from ..errors import EngineError
+from ..platform import get_soc_for_board
 from ..results import NsxModuleRef
 
 log = logging.getLogger("hpx")
@@ -27,6 +28,34 @@ log = logging.getLogger("hpx")
 # local path (cmsis_nn_path / CMSIS_NN_PATH) vendors it instead.
 CMSIS_NN_PROJECT = "ns-cmsis-nn"  # registry project (path: modules/ns-cmsis-nn)
 CMSIS_NN_MODULE = "nsx-cmsis-nn"  # registry module name
+
+
+def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
+    """CMake cache options for a source-built ``nsx-cmsis-nn`` module.
+
+    The firmware template renders these as ``CACHE ... FORCE`` before any
+    module is added -- the only point where ns-cmsis-nn's ``option()``
+    defaults can still be overridden.
+
+    * ``NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM`` -- on unless
+      ``engine.config.cmsis_nn_requantize_inline_asm`` is false, matching the
+      prebuilt heliaRT build.
+    * ``NSX_CMSIS_NN_ENABLE_F32`` -- always on. heliaRT >= 1.19.0's ``helia``
+      backend refuses to configure without the fp32 kernels, and heliaAOT
+      float models call them directly. Needs ns-cmsis-nn >= v7.28.0, which
+      every qualified ref satisfies.
+    * ``NSX_CMSIS_NN_ENABLE_F16`` -- on only for MVE-F cores (Cortex-M55). The
+      fp16 kernels exist for nothing else, and heliaRT warns when they are
+      left off on a core that has them.
+    """
+    cmake_vars: dict[str, str] = {}
+    if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
+        cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
+    cmake_vars["NSX_CMSIS_NN_ENABLE_F32"] = "ON"
+    soc = get_soc_for_board(config.target.board, registry=config.platform_registry)
+    if soc.has_mve:
+        cmake_vars["NSX_CMSIS_NN_ENABLE_F16"] = "ON"
+    return cmake_vars
 
 
 def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:

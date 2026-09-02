@@ -8,7 +8,7 @@ Stage 5 combines its identity and canonical hash with the NSX registry hash,
 target, engine, overrides, and relevant build inputs to select an isolated
 dependency workspace.
 
-The current baseline is `hpx-neuralspotx-0.7.17-2026-08`:
+The current baseline is `hpx-neuralspotx-0.7.17-2026-09`:
 
 | Identity | Qualified reference |
 | --- | --- |
@@ -20,8 +20,8 @@ The current baseline is `hpx-neuralspotx-0.7.17-2026-08`:
 | `ns-cmsis-nn` | `63172642…d7f` (`v7.29.2`) |
 | `nsx-executorch` | `27eee513…b1ed` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
-| heliaRT | `1.17.0`, commit `ff6233ba…8df` (min supported `1.16.0` — from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
-| heliaAOT | `min_version=0.18.0`, `max_version_exclusive=0.19.0` |
+| heliaRT | `1.19.0`, commit `038a0c44…a83` (min supported `1.16.0` — from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
+| heliaAOT | `min_version=0.19.0`, `max_version_exclusive=0.20.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 | executorch | `0.1.0`, module ref `27eee513…b1ed` (a checkout's `version.txt` is verified against the baseline) |
 

@@ -134,8 +134,9 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
                 from ..cmsis_nn import cmsis_nn_module_ref
 
                 extra_modules.append(cmsis_nn_module_ref(config, work_dir))
-            if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
-                cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
+            from ..cmsis_nn import cmsis_nn_cmake_vars
+
+            cmake_vars.update(cmsis_nn_cmake_vars(config))
             return HeliaRtArtifacts(
                 engine_type=EngineType.HELIA_RT,
                 extra_modules=extra_modules,
@@ -170,14 +171,13 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
             # being present in the build (the prebuilt static lib had
             # CMSIS-NN baked in; the source build does not). Resolve it
             # via the shared helper (NSX registry by default).
-            from ..cmsis_nn import cmsis_nn_module_ref
+            from ..cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
 
             extra_modules.append(cmsis_nn_module_ref(config, work_dir))
 
-            # Forward CMSIS-NN inline-asm requantize flag (defaults ON to
-            # match the prebuilt heliaRT build).
-            if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
-                cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
+            # Forward the CMSIS-NN build options (requantize asm, fp32/fp16
+            # kernels) -- not baked in the way they are for a prebuilt archive.
+            cmake_vars.update(cmsis_nn_cmake_vars(config))
 
             _install_nsx_module_source(
                 module_dir,

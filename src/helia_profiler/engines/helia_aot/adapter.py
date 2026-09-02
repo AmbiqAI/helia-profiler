@@ -21,7 +21,7 @@ from ...placement import ArenaRole, Placement
 from ...results import NsxModuleRef
 from .. import EngineType
 from ..base import ArenaRegion, HeliaAotArtifacts, PsramWeightsSource
-from ..cmsis_nn import cmsis_nn_module_ref
+from ..cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
 from .compile import (
     _DEFAULT_MODULE_NAME,
     _DEFAULT_PREFIX,
@@ -209,10 +209,8 @@ class HeliaAOTAdapter:
             aot_platform,
         )
 
-        # Forward CMSIS-NN build options from engine config
-        cmsis_nn_cmake: dict[str, str] = {}
-        if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
-            cmsis_nn_cmake["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
+        # Forward the CMSIS-NN build options (requantize asm, fp32/fp16 kernels).
+        cmsis_nn_cmake = cmsis_nn_cmake_vars(config)
         linker_profile = config.engine.config.get("linker_profile")
         if linker_profile:
             cmsis_nn_cmake["NSX_LINKER_PROFILE"] = str(linker_profile)
