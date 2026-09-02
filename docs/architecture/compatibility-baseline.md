@@ -25,6 +25,75 @@ The current baseline is `hpx-neuralspotx-0.7.17-2026-09`:
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 | executorch | `0.1.0`, module ref `27eee513…b1ed` (a checkout's `version.txt` is verified against the baseline) |
 
+heliaRT 1.19.0 and heliaAOT 0.19.0 (issue #246) are the releases that add FP16
+and FP32 kernels. This revision promotes both HPX-owned engine pins and keeps
+every neuralSPOT-X ref unchanged: heliaRT `1.17.0 → 1.19.0` (`038a0c44…a83`),
+heliaAOT `[0.18.0, 0.19.0) → [0.19.0, 0.20.0)`, and the `ai-edge-litert` floor
+`2.1.6 → 2.2.0` (0.19.0 requires `>= 2.2`; the `_tflite_reader` schema constants
+were re-verified unchanged against 2.2.0). `HELIART_MIN_VERSION` stays `1.16.0`
+— 1.17 → 1.19 is additive from HPX's perspective.
+
+**The float core is not part of this baseline.** heliaRT links a *consumer-
+provided* `ns-cmsis-nn` (heliaCORE); it does not vendor one. The baseline's
+qualified `v7.29.2` is the core heliaRT 1.18.0 (withdrawn) shipped "with its
+float defects as known issues", and heliaRT 1.19.0 moved to `v7.31.0` to fix
+them. So this baseline qualifies heliaRT 1.19.0 + heliaAOT 0.19.0 **for int8**
+on `ns-cmsis-nn v7.29.2`; **float profiling requires overriding the core** to
+`v7.31.0` (`engine.config.cmsis_nn_ref: 9884d5fccab884c90c3d5e8865d5babbb1cabc63`),
+which stamps `qualified-with-engine-override` (#248 tracks that this should read
+`development-overrides`). The durable landing is a neuralSPOT-X registry bump
+of `ns-cmsis-nn` to `v7.31.0`, after which the override is dropped and this
+row advances.
+
+**Integration change.** heliaRT 1.19.0's `helia` backend refuses to configure
+unless ns-cmsis-nn's fp32 kernels are enabled — an `option()` default that must
+be overridden *before* the module is added. HPX now sets
+`NSX_CMSIS_NN_ENABLE_F32=ON` for every source build and
+`NSX_CMSIS_NN_ENABLE_F16=ON` on MVE-F cores (Cortex-M55), via
+`engines/cmsis_nn.py::cmsis_nn_cmake_vars` for both engines — each alongside
+its `ARM_NN_ENABLE_*` twin, because heliaAOT's generated module checks the
+exported define in the cache rather than ns-cmsis-nn's option
+(helia-aot#349). Both need ns-cmsis-nn `>= v7.28.0`; `v7.29.2` and `v7.31.0`
+both qualify.
+
+**Behavior deltas in 1.19.0 that a float baseline must expect** (all toward
+correctness): NaN now propagates through float `ADD`/`MUL` instead of being
+clamped; `QUANTIZE`/`TRANSPOSE_CONV`/`SVDF` kernel failures surface as
+`kTfLiteError` instead of `kTfLiteOk` over unwritten output; float16
+`UNIDIRECTIONAL_SEQUENCE_LSTM` output shifts ~2.3e-2.
+
+**Verified.** Host: the full suite passes under helia-aot 0.19.0 + litert 2.2.0
+with no other change; the int8/uint8 Softmax preflight boundaries (#147) did
+not move. heliaAOT emits native `arm_*_f32` kernels for an FP32 graph and
+native `arm_*_f16` kernels (29 `float16_t` bindings, zero f32 calls) for an
+all-`FLOAT16` graph on `apollo510_evb`, `apollo510b_evb`, and
+`apollo330mp_evb`; its float coverage is partial (`MEAN` and a tier of shape
+ops remain int8/int16-only — helia-aot#345; FP16 is under-listed for three
+M55 boards — helia-aot#346, cosmetic). Bench (Apollo510 EVB, gcc, 96 MHz,
+`v7.31.0` override, DS-CNN `tests/fixtures/kws_float_fp32.tflite`, 43,520
+MACs): heliaRT/FP32 1,170,528 clean cycles (26.9 cyc/MAC; the single-input-
+channel first `CONV_2D` alone is 59.5 cyc/MAC and 93.6 % of the run), arena
+13,680 B, `.text` 336,772 B, every plan-vs-measured region matched.
+heliaRT/true-FP16 (all-`FLOAT16` tensors) 1,084,512 clean cycles (−7.3 %),
+arena 7,392 B (halved), `.data` −25 KB, `.text` identical — the first
+half-precision inference measured on the board. heliaAOT reproduces both
+within 0.3 % — FP32 1,166,976 and FP16 1,081,440 clean cycles with the same
+first-layer profile (1,096,842 / 1,018,431 cycles) — so
+the single-input-channel `CONV_2D` cost and the slower-in-f16
+`FULLY_CONNECTED` (≈24 k vs ≈20 k cycles in both engines) are properties of
+the heliaCORE kernels, not of either runtime. AOT images are 184,776 B /
+162,960 B of `.text`; energy per inference 60.6 µJ (FP32) vs 57.8 µJ (FP16).
+**int8 is unchanged in speed but larger:** the qualified int8 KWS DS-CNN (2.66 M
+MACs) measured 2.07 M cycles on both 1.17.0 and 1.19.0 (−0.02 %, run noise) but
+`.text` grew **277 KB → 344 KB (+66 KB, +24 %)** with `.data`/`.bss`/arena
+unchanged — the TFLM kernel objects handle every dtype in one switch, so the
+fp32/fp16 paths 1.19.0 insists on ride into an int8-only image. `hpx compare`
+surfaces the promotion through the `engine_version` dimension.
+Two of the five power windows were INVALID by design: the JS320 GPI-*stream*
+gate edges disagreed with both the firmware window clock and the host GPI-poll
+edges (which agree to <5 ms) by a random −54 / +81 / +38 / −1 / +5 ms across
+the five runs — #249 tracks gating on the corroborated poll edges instead.
+
 heliaRT 1.17.0 (issue #89) is a build-system and docs release from HPX's
 perspective: the prebuilt distribution's exported-symbol surface, header
 set, and core/toolchain/variant library matrix are identical to 1.16.0
