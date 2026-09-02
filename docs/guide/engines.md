@@ -382,7 +382,8 @@ The pipeline:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `cmsis_nn_path` | string | *(registry default)* | Optional local AmbiqAI ns-cmsis-nn source root |
+| `cmsis_nn_path` | string | *(registry default)* | Local ns-cmsis-nn checkout (mutually exclusive with `cmsis_nn_ref`) |
+| `cmsis_nn_ref` | string | *(registry default)* | Exact ns-cmsis-nn git ref; stamps `qualified-with-engine-override` |
 | `prefix` | string | `hpx` | C symbol prefix |
 | `module_name` | string | `hpx_model` | Generated NSX module name |
 | `cmsis_nn_requantize_inline_asm` | bool | `true` | Use inline-asm requantization path |

@@ -209,11 +209,11 @@ class HeliaAOTAdapter:
             aot_platform,
         )
 
-        # Forward the CMSIS-NN build options (requantize asm, fp32/fp16 kernels).
-        cmsis_nn_cmake = cmsis_nn_cmake_vars(config)
+        # Engine build options: the ns-cmsis-nn kernel switches plus the linker profile.
+        engine_cmake_vars = cmsis_nn_cmake_vars(config)
         linker_profile = config.engine.config.get("linker_profile")
         if linker_profile:
-            cmsis_nn_cmake["NSX_LINKER_PROFILE"] = str(linker_profile)
+            engine_cmake_vars["NSX_LINKER_PROFILE"] = str(linker_profile)
 
         # Build a MemoryPlan from the AOT codegen context so the
         # plan_memory stage can validate placement against the SoC's
@@ -235,7 +235,7 @@ class HeliaAOTAdapter:
             ],
             cmake_vars={
                 attr_var: str(attr_header),
-                **cmsis_nn_cmake,
+                **engine_cmake_vars,
             },
             engine_header=f"{prefix}_model.h",
             aot_prefix=prefix,

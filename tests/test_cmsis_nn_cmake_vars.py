@@ -14,14 +14,24 @@ from pathlib import Path
 import pytest
 
 import helia_profiler
-from helia_profiler.config import load_config
+from helia_profiler.config import ProfileConfig, load_config
 from helia_profiler.engines.cmsis_nn import cmsis_nn_cmake_vars
 from helia_profiler.engines.helia_rt import HeliaRTAdapter
 
 _TEMPLATE = Path(helia_profiler.__file__).parent / "firmware" / "templates" / "CMakeLists.txt.j2"
 
+# heliaRT checks ns-cmsis-nn's option; heliaAOT's generated module checks the
+# exported define in the cache. Both must be set for either engine to build.
+_F32 = ("NSX_CMSIS_NN_ENABLE_F32", "ARM_NN_ENABLE_F32")
+_F16 = ("NSX_CMSIS_NN_ENABLE_F16", "ARM_NN_ENABLE_F16")
 
-def _config(tmp_path: Path, board: str, engine_config: dict | None = None):
+# (board, core has MVE-F)
+_BOARDS = [("apollo510_evb", True), ("apollo4p_evb", False)]
+
+
+def _config(
+    tmp_path: Path, board: str, engine_config: dict[str, object] | None = None
+) -> ProfileConfig:
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")
     return load_config(
@@ -34,23 +44,17 @@ def _config(tmp_path: Path, board: str, engine_config: dict | None = None):
     )
 
 
-# heliaRT checks ns-cmsis-nn's option; heliaAOT's generated module checks the
-# exported define in the cache. Both must be set for either engine to build.
-_F32 = ("NSX_CMSIS_NN_ENABLE_F32", "ARM_NN_ENABLE_F32")
-_F16 = ("NSX_CMSIS_NN_ENABLE_F16", "ARM_NN_ENABLE_F16")
+def _assert_policy(cmake_vars: dict[str, str], *, mve: bool) -> None:
+    assert all(cmake_vars[name] == "ON" for name in _F32)
+    if mve:
+        assert all(cmake_vars[name] == "ON" for name in _F16)
+    else:
+        assert not any(name in cmake_vars for name in _F16)
 
 
-def test_fp32_kernels_are_always_enabled_under_both_names(tmp_path: Path) -> None:
-    for board in ("apollo510_evb", "apollo4p_evb"):
-        cmake_vars = cmsis_nn_cmake_vars(_config(tmp_path, board))
-        assert all(cmake_vars[name] == "ON" for name in _F32)
-
-
-def test_fp16_kernels_follow_the_mve_core_under_both_names(tmp_path: Path) -> None:
-    m55 = cmsis_nn_cmake_vars(_config(tmp_path, "apollo510_evb"))
-    assert all(m55[name] == "ON" for name in _F16)
-    m4 = cmsis_nn_cmake_vars(_config(tmp_path, "apollo4p_evb"))
-    assert not any(name in m4 for name in _F16)
+@pytest.mark.parametrize(("board", "mve"), _BOARDS)
+def test_fp32_always_and_fp16_only_on_mve_cores(tmp_path: Path, board: str, mve: bool) -> None:
+    _assert_policy(cmsis_nn_cmake_vars(_config(tmp_path, board)), mve=mve)
 
 
 @pytest.mark.parametrize(
@@ -62,29 +66,28 @@ def test_fp16_kernels_follow_the_mve_core_under_both_names(tmp_path: Path) -> No
     ],
 )
 def test_requantize_asm_stays_configurable(
-    tmp_path: Path, engine_config: dict, expected: str | None
+    tmp_path: Path, engine_config: dict[str, object], expected: str | None
 ) -> None:
     cmake_vars = cmsis_nn_cmake_vars(_config(tmp_path, "apollo510_evb", engine_config))
     assert cmake_vars.get("NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM") == expected
     # Turning the asm off never turns the float kernels off.
-    assert cmake_vars["NSX_CMSIS_NN_ENABLE_F32"] == "ON"
+    _assert_policy(cmake_vars, mve=True)
 
 
-def test_registry_default_heliart_forwards_the_policy(tmp_path: Path) -> None:
+@pytest.mark.parametrize(("board", "mve"), _BOARDS)
+def test_registry_default_heliart_forwards_the_policy(
+    tmp_path: Path, board: str, mve: bool
+) -> None:
     """The default (registry-resolved) heliaRT build is a source build, so it
     must carry the options -- this is the path the bench hit on 1.19.0."""
     work_dir = tmp_path / "work"
     work_dir.mkdir()
-    artifacts = HeliaRTAdapter().prepare(_config(tmp_path, "apollo510_evb"), work_dir)
-    assert all(artifacts.cmake_vars[name] == "ON" for name in (*_F32, *_F16))
-
-    artifacts = HeliaRTAdapter().prepare(_config(tmp_path, "apollo4p_evb"), work_dir)
-    assert all(artifacts.cmake_vars[name] == "ON" for name in _F32)
-    assert not any(name in artifacts.cmake_vars for name in _F16)
+    artifacts = HeliaRTAdapter().prepare(_config(tmp_path, board), work_dir)
+    _assert_policy(artifacts.cmake_vars, mve=mve)
 
 
 def test_template_sets_engine_options_before_any_module_is_added() -> None:
-    """ns-cmsis-nn's option() defaults win over a later set(); the cache
-    overrides must precede the modules include or they silently do nothing."""
+    """Modules read these options while they are included; a set() after the
+    include is too late, so the cache overrides must precede it."""
     text = _TEMPLATE.read_text()
     assert text.index("cmake_vars.items()") < text.index("cmake/nsx/modules.cmake")

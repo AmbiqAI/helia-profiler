@@ -38,8 +38,8 @@ from dataclasses import dataclass
 # ai_edge_litert 2.1.6's generated schema (schema_py_generated), re-verified
 # unchanged against 2.2.0 (#246), and is frozen by flatbuffers
 # schema-evolution rules (enum values immutable, vtable slots append-only).
-# tests/test_softmax_preflight.py re-derives
-# each one from the installed litert by introspection whenever the
+# tests/test_softmax_preflight.py re-derives each one from the installed
+# litert by introspection whenever the
 # `analysis` extra is present, so silent drift is impossible.
 #
 # BuiltinOperator / TensorType / BuiltinOptions enum values:

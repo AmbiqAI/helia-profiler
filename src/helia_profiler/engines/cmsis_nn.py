@@ -1,12 +1,11 @@
-"""ns-cmsis-nn (CMSIS-NN fork) resolution and NSX module wrapping.
+"""ns-cmsis-nn (CMSIS-NN fork) resolution, NSX module wrapping, and build options.
 
-heliaAOT-generated code links against ``ns-cmsis-nn`` (the AmbiqAI CMSIS-NN
-fork with API compatible with heliaAOT's codegen — upstream ``cmsis-nn``
-V.19+ has dropped parameters heliaAOT still targets). By default the module
-is resolved from the NSX registry (NSX clones it from GitHub during
-``nsx sync``); a user-provided local checkout is vendored as a local NSX
-module instead. Also used by the heliaRT source-build path, which links the
-same CMSIS-NN kernels.
+Both heliaAOT-generated code and source-built heliaRT link against
+``ns-cmsis-nn`` (the AmbiqAI CMSIS-NN fork; upstream ``cmsis-nn`` V.19+ has
+dropped parameters they target). By default the module is resolved from the
+NSX registry (NSX clones it from GitHub during ``nsx sync``); a user-provided
+local checkout is vendored as a local NSX module instead. The CMake options
+the kernels need (:func:`cmsis_nn_cmake_vars`) are shared by both engines.
 """
 
 from __future__ import annotations
@@ -30,39 +29,36 @@ CMSIS_NN_PROJECT = "ns-cmsis-nn"  # registry project (path: modules/ns-cmsis-nn)
 CMSIS_NN_MODULE = "nsx-cmsis-nn"  # registry module name
 
 
+def _kernel_family(family: str) -> dict[str, str]:
+    """Both spellings of one float kernel switch.
+
+    ``NSX_CMSIS_NN_ENABLE_*`` is ns-cmsis-nn's option (source selection; what
+    heliaRT checks). ``ARM_NN_ENABLE_*`` is the define it exports, which
+    heliaAOT's generated module checks in the CMake cache -- ns-cmsis-nn only
+    derives it as a directory-scoped variable, so the cache copy is set here.
+    """
+    return {f"NSX_CMSIS_NN_ENABLE_{family}": "ON", f"ARM_NN_ENABLE_{family}": "ON"}
+
+
 def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
     """CMake cache options for a source-built ``nsx-cmsis-nn`` module.
 
-    The firmware template renders these as ``CACHE ... FORCE`` before any
-    module is added -- the only point where ns-cmsis-nn's ``option()``
-    defaults can still be overridden.
+    Rendered as ``CACHE ... FORCE`` before any module is added -- modules read
+    these while they are included, so setting them later is too late.
 
     * ``NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM`` -- on unless
-      ``engine.config.cmsis_nn_requantize_inline_asm`` is false, matching the
-      prebuilt heliaRT build.
-    * fp32 kernels -- always on. heliaRT >= 1.19.0's ``helia`` backend refuses
-      to configure without them, and heliaAOT float models call them directly.
-      Needs ns-cmsis-nn >= v7.28.0, which every qualified ref satisfies.
-    * fp16 kernels -- on only for MVE-F cores (Cortex-M55). They exist for
-      nothing else, and heliaRT warns when they are left off on a core that
-      has them.
-
-    Each kernel family is named twice because the two engines check different
-    variables: ``NSX_CMSIS_NN_ENABLE_*`` is ns-cmsis-nn's own option (source
-    selection; what heliaRT tests), while ``ARM_NN_ENABLE_*`` is the compile
-    definition it exports, which heliaAOT's generated module tests in the
-    CMake cache. ns-cmsis-nn derives the second from the first only as a
-    directory-scoped variable, so the cache copy has to be set here.
+      ``engine.config.cmsis_nn_requantize_inline_asm`` is false.
+    * fp32 kernels -- always on (heliaRT >= 1.19 refuses to configure without
+      them; heliaAOT float models call them directly).
+    * fp16 kernels -- on for MVE-F cores (Cortex-M55) only.
     """
     cmake_vars: dict[str, str] = {}
     if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
         cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
-    cmake_vars["NSX_CMSIS_NN_ENABLE_F32"] = "ON"
-    cmake_vars["ARM_NN_ENABLE_F32"] = "ON"
+    cmake_vars |= _kernel_family("F32")
     soc = get_soc_for_board(config.target.board, registry=config.platform_registry)
     if soc.has_mve:
-        cmake_vars["NSX_CMSIS_NN_ENABLE_F16"] = "ON"
-        cmake_vars["ARM_NN_ENABLE_F16"] = "ON"
+        cmake_vars |= _kernel_family("F16")
     return cmake_vars
 
 

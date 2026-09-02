@@ -17,6 +17,7 @@ from ...errors import EngineError
 from ...results import NsxModuleRef
 from .. import EngineType, TFLM_ENGINE_HEADER
 from ..base import HeliaRtArtifacts, PsramWeightsSource, SingleArenaPlacementMixin
+from ..cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
 from .artifacts import (
     HELIART_MODULE,
     HELIART_PROJECT,
@@ -98,9 +99,9 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
             # manifest resolves its own nsx-cmsis-nn dependency, so we don't
             # need to add it to extra_modules here as the source_path branch
             # below does for a locally-vendored checkout). Because this is a
-            # source build, the CMSIS-NN inline-asm requantize flag still
-            # needs to be forwarded — it is not baked in the way it would be
-            # for a genuinely prebuilt archive (see the `else` branch below).
+            # source build, the ns-cmsis-nn options (cmsis_nn_cmake_vars) must
+            # still be forwarded — they are baked in only for a genuinely
+            # prebuilt archive (see the `else` branch below).
             version = HELIART_VERSION
             log.info(
                 "heliaRT %s — resolving %s from NSX registry "
@@ -131,11 +132,7 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
                 or config.engine.config.get("cmsis_nn_ref")
                 or os.environ.get("CMSIS_NN_PATH")
             ):
-                from ..cmsis_nn import cmsis_nn_module_ref
-
                 extra_modules.append(cmsis_nn_module_ref(config, work_dir))
-            from ..cmsis_nn import cmsis_nn_cmake_vars
-
             cmake_vars.update(cmsis_nn_cmake_vars(config))
             return HeliaRtArtifacts(
                 engine_type=EngineType.HELIA_RT,
@@ -171,8 +168,6 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
             # being present in the build (the prebuilt static lib had
             # CMSIS-NN baked in; the source build does not). Resolve it
             # via the shared helper (NSX registry by default).
-            from ..cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
-
             extra_modules.append(cmsis_nn_module_ref(config, work_dir))
 
             # Forward the CMSIS-NN build options (requantize asm, fp32/fp16

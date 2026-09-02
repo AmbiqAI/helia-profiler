@@ -3,22 +3,21 @@
 
 Standard "float16 quantization" (the LiteRT converter's
 ``supported_types=[tf.float16]`` and ai-edge-quantizer's FLOAT16 recipe) stores
-only the **weights** as ``FLOAT16`` and inserts ``DEQUANTIZE`` ops so every
-activation — and all arithmetic — stays ``FLOAT32``. That never exercises
+only the **weights** as ``FLOAT16`` and inserts ``DEQUANTIZE`` ops, so every
+activation -- and all arithmetic -- stays ``FLOAT32``. That never exercises
 half-precision kernels.
 
-This tool instead rewrites the whole graph: every ``FLOAT32`` tensor type
-becomes ``FLOAT16`` and every ``FLOAT32`` constant buffer is re-encoded as
-``float16``. Graph structure, shapes, and every non-float tensor (e.g. ``INT32``
-shape constants) are untouched, so the result runs the *same* ops on FLOAT16
-inputs, weights, and outputs — what helia-rt / helia-aot's FP16 kernels
-(``float16_t``) actually consume on the Cortex-M55.
+This tool instead rewrites the whole graph: every ``FLOAT32`` tensor becomes
+``FLOAT16`` and every ``FLOAT32`` constant buffer is re-encoded as float16.
+Graph structure, shapes, and non-float tensors (e.g. ``INT32`` shape constants)
+are untouched, so the result runs the *same* ops on FLOAT16 inputs, weights,
+and outputs -- what heliaRT / heliaAOT's ``float16_t`` kernels consume on the
+Cortex-M55.
 
-Feed it an FP32 model with no ``DEQUANTIZE`` ops (i.e. a plain FP32 export, not
-an already float16-quantized one). Depends only on ``ai-edge-litert`` +
-``numpy``, both HPX dependencies.
+Feed it a plain FP32 export with no ``DEQUANTIZE`` ops (not an already
+float16-quantized model). Needs the ``analysis`` extra:
 
-    python tools/cast_fp16.py model_fp32.tflite model_fp16_true.tflite
+    uv run --extra analysis python tools/cast_fp16.py model_fp32.tflite model_fp16.tflite
 """
 
 from __future__ import annotations
@@ -26,9 +25,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import flatbuffers
 import numpy as np
 from ai_edge_litert import schema_py_generated as schema
-import flatbuffers
 
 FLOAT32 = schema.TensorType.FLOAT32
 FLOAT16 = schema.TensorType.FLOAT16
@@ -36,19 +35,22 @@ DEQUANTIZE = schema.BuiltinOperator.DEQUANTIZE
 
 
 def cast_model(data: bytes) -> tuple[bytes, dict[str, int]]:
-    """Return the FP16-cast flatbuffer and a summary of what changed."""
+    """Return the FP16-cast flatbuffer and a summary of what changed.
+
+    Raises ``ValueError`` for a model that already carries ``DEQUANTIZE`` ops.
+    """
     model = schema.ModelT.InitFromObj(schema.Model.GetRootAsModel(data, 0))
 
     for opcode in model.operatorCodes:
-        code = max(opcode.builtinCode, opcode.deprecatedBuiltinCode)
-        if code == DEQUANTIZE:
-            raise SystemExit(
+        # builtinCode supersedes the int8 deprecatedBuiltinCode, which
+        # saturates at 127; the larger of the two is always the real code.
+        if max(opcode.builtinCode, opcode.deprecatedBuiltinCode) == DEQUANTIZE:
+            raise ValueError(
                 "model already carries DEQUANTIZE ops (float16-quantized weights); "
-                "start from a plain FP32 export instead."
+                "start from a plain FP32 export instead"
             )
 
     tensors_cast = 0
-    buffers_cast = 0
     cast_buffers: set[int] = set()
     for subgraph in model.subgraphs:
         for tensor in subgraph.tensors:
@@ -59,14 +61,16 @@ def cast_model(data: bytes) -> tuple[bytes, dict[str, int]]:
             buf = model.buffers[tensor.buffer]
             if tensor.buffer in cast_buffers or buf.data is None or len(buf.data) == 0:
                 continue
-            f32 = np.frombuffer(np.asarray(buf.data, dtype=np.uint8).tobytes(), dtype=np.float32)
-            buf.data = np.frombuffer(f32.astype(np.float16).tobytes(), dtype=np.uint8)
+            f32 = np.asarray(buf.data, dtype=np.uint8).view(np.float32)
+            buf.data = f32.astype(np.float16).view(np.uint8)
             cast_buffers.add(tensor.buffer)
-            buffers_cast += 1
 
     builder = flatbuffers.Builder(len(data))
     builder.Finish(model.Pack(builder), file_identifier=b"TFL3")
-    return bytes(builder.Output()), {"tensors_cast": tensors_cast, "buffers_cast": buffers_cast}
+    return bytes(builder.Output()), {
+        "tensors_cast": tensors_cast,
+        "buffers_cast": len(cast_buffers),
+    }
 
 
 def main() -> None:
@@ -75,7 +79,10 @@ def main() -> None:
     ap.add_argument("dst", type=Path, help="output all-FP16 .tflite")
     args = ap.parse_args()
 
-    out, summary = cast_model(args.src.read_bytes())
+    try:
+        out, summary = cast_model(args.src.read_bytes())
+    except ValueError as exc:
+        raise SystemExit(f"{args.src}: {exc}") from exc
     args.dst.write_bytes(out)
     print(
         f"wrote {args.dst} ({len(out):,} bytes): "
