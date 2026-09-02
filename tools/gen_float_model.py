@@ -47,7 +47,10 @@ def _build_kws_dscnn(input_shape: tuple[int, int, int], num_classes: int):
     x = tf.keras.layers.Flatten()(x)
     out = tf.keras.layers.Dense(num_classes, activation="softmax", name="logits")(x)
     model = tf.keras.Model(inp, out, name="kws_dscnn_float")
-    # One optimizer step of no consequence; weights just need to be finite.
+    # Weights only need to be finite. Note the converter prunes an all-zero
+    # Dense bias as a no-op (the conv biases survive), so the FULLY_CONNECTED
+    # op in these fixtures carries no bias tensor -- give biases a non-zero
+    # initializer if a fixture must exercise the bias path.
     model.compile(optimizer="adam", loss="categorical_crossentropy")
     return model
 

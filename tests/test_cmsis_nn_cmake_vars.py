@@ -34,14 +34,23 @@ def _config(tmp_path: Path, board: str, engine_config: dict | None = None):
     )
 
 
-def test_fp32_kernels_are_always_enabled(tmp_path: Path) -> None:
+# heliaRT checks ns-cmsis-nn's option; heliaAOT's generated module checks the
+# exported define in the cache. Both must be set for either engine to build.
+_F32 = ("NSX_CMSIS_NN_ENABLE_F32", "ARM_NN_ENABLE_F32")
+_F16 = ("NSX_CMSIS_NN_ENABLE_F16", "ARM_NN_ENABLE_F16")
+
+
+def test_fp32_kernels_are_always_enabled_under_both_names(tmp_path: Path) -> None:
     for board in ("apollo510_evb", "apollo4p_evb"):
-        assert cmsis_nn_cmake_vars(_config(tmp_path, board))["NSX_CMSIS_NN_ENABLE_F32"] == "ON"
+        cmake_vars = cmsis_nn_cmake_vars(_config(tmp_path, board))
+        assert all(cmake_vars[name] == "ON" for name in _F32)
 
 
-def test_fp16_kernels_follow_the_mve_core(tmp_path: Path) -> None:
-    assert cmsis_nn_cmake_vars(_config(tmp_path, "apollo510_evb"))["NSX_CMSIS_NN_ENABLE_F16"] == "ON"
-    assert "NSX_CMSIS_NN_ENABLE_F16" not in cmsis_nn_cmake_vars(_config(tmp_path, "apollo4p_evb"))
+def test_fp16_kernels_follow_the_mve_core_under_both_names(tmp_path: Path) -> None:
+    m55 = cmsis_nn_cmake_vars(_config(tmp_path, "apollo510_evb"))
+    assert all(m55[name] == "ON" for name in _F16)
+    m4 = cmsis_nn_cmake_vars(_config(tmp_path, "apollo4p_evb"))
+    assert not any(name in m4 for name in _F16)
 
 
 @pytest.mark.parametrize(
@@ -67,12 +76,11 @@ def test_registry_default_heliart_forwards_the_policy(tmp_path: Path) -> None:
     work_dir = tmp_path / "work"
     work_dir.mkdir()
     artifacts = HeliaRTAdapter().prepare(_config(tmp_path, "apollo510_evb"), work_dir)
-    assert artifacts.cmake_vars["NSX_CMSIS_NN_ENABLE_F32"] == "ON"
-    assert artifacts.cmake_vars["NSX_CMSIS_NN_ENABLE_F16"] == "ON"
+    assert all(artifacts.cmake_vars[name] == "ON" for name in (*_F32, *_F16))
 
     artifacts = HeliaRTAdapter().prepare(_config(tmp_path, "apollo4p_evb"), work_dir)
-    assert artifacts.cmake_vars["NSX_CMSIS_NN_ENABLE_F32"] == "ON"
-    assert "NSX_CMSIS_NN_ENABLE_F16" not in artifacts.cmake_vars
+    assert all(artifacts.cmake_vars[name] == "ON" for name in _F32)
+    assert not any(name in artifacts.cmake_vars for name in _F16)
 
 
 def test_template_sets_engine_options_before_any_module_is_added() -> None:

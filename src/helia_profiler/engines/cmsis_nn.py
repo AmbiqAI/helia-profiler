@@ -40,21 +40,29 @@ def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
     * ``NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM`` -- on unless
       ``engine.config.cmsis_nn_requantize_inline_asm`` is false, matching the
       prebuilt heliaRT build.
-    * ``NSX_CMSIS_NN_ENABLE_F32`` -- always on. heliaRT >= 1.19.0's ``helia``
-      backend refuses to configure without the fp32 kernels, and heliaAOT
-      float models call them directly. Needs ns-cmsis-nn >= v7.28.0, which
-      every qualified ref satisfies.
-    * ``NSX_CMSIS_NN_ENABLE_F16`` -- on only for MVE-F cores (Cortex-M55). The
-      fp16 kernels exist for nothing else, and heliaRT warns when they are
-      left off on a core that has them.
+    * fp32 kernels -- always on. heliaRT >= 1.19.0's ``helia`` backend refuses
+      to configure without them, and heliaAOT float models call them directly.
+      Needs ns-cmsis-nn >= v7.28.0, which every qualified ref satisfies.
+    * fp16 kernels -- on only for MVE-F cores (Cortex-M55). They exist for
+      nothing else, and heliaRT warns when they are left off on a core that
+      has them.
+
+    Each kernel family is named twice because the two engines check different
+    variables: ``NSX_CMSIS_NN_ENABLE_*`` is ns-cmsis-nn's own option (source
+    selection; what heliaRT tests), while ``ARM_NN_ENABLE_*`` is the compile
+    definition it exports, which heliaAOT's generated module tests in the
+    CMake cache. ns-cmsis-nn derives the second from the first only as a
+    directory-scoped variable, so the cache copy has to be set here.
     """
     cmake_vars: dict[str, str] = {}
     if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
         cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
     cmake_vars["NSX_CMSIS_NN_ENABLE_F32"] = "ON"
+    cmake_vars["ARM_NN_ENABLE_F32"] = "ON"
     soc = get_soc_for_board(config.target.board, registry=config.platform_registry)
     if soc.has_mve:
         cmake_vars["NSX_CMSIS_NN_ENABLE_F16"] = "ON"
+        cmake_vars["ARM_NN_ENABLE_F16"] = "ON"
     return cmake_vars
 
 

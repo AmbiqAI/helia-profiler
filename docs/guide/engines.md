@@ -250,7 +250,7 @@ registry and local-source modes compile heliaRT with the selected toolchain.
 | `source.repo` | string | — | GitHub repo for an explicit prebuilt release |
 | `source.ref` | string | — | Explicit release tag |
 | `cmsis_nn_path` | string | *(registry default)* | Local ns-cmsis-nn checkout for the source build (mutually exclusive with `cmsis_nn_ref`) |
-| `cmsis_nn_ref` | string | *(registry default)* | Exact ns-cmsis-nn git ref for the source build; stamps `development-overrides` |
+| `cmsis_nn_ref` | string | *(registry default)* | Exact ns-cmsis-nn git ref for the source build; stamps `qualified-with-engine-override` |
 | `cmsis_nn_requantize_inline_asm` | bool | `true` | Use inline-asm requantization path |
 
 ### heliaRT runtime notes
@@ -267,8 +267,11 @@ registry and local-source modes compile heliaRT with the selected toolchain.
 - Source builds (the registry default and `source_path`) enable ns-cmsis-nn's
   fp32 kernels unconditionally — heliaRT 1.19.0's `helia` backend refuses to
   configure without them — and the fp16 kernels on MVE-F cores (Cortex-M55)
-  only. Both are cache variables set before the module is added; there is no
-  field to turn them off. Prebuilt `dist_path` archives already contain them.
+  only. Each is set as a cache variable before the module is added, under both
+  its ns-cmsis-nn option name (`NSX_CMSIS_NN_ENABLE_*`, what heliaRT checks)
+  and the exported define (`ARM_NN_ENABLE_*`, what heliaAOT's generated module
+  checks); there is no field to turn them off. Prebuilt `dist_path` archives
+  already contain them.
 
 ## heliaAOT
 
