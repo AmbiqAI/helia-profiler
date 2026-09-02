@@ -443,7 +443,7 @@ wheels = [
 
 [[package]]
 name = "helia-profiler"
-version = "0.1.6"
+version = "0.1.6" # x-release-please-version
 source = { editable = "." }
 dependencies = [
     { name = "click" },

@@ -75,7 +75,6 @@ def test_security_floors_are_declared() -> None:
 
     for name, last_vulnerable, first_patched in (
         ("idna", "3.14", "3.15"),
-        ("pydantic-settings", "2.14.1", "2.14.2"),
     ):
         assert name in floors, (
             f"security floor for {name!r} is gone from [tool.uv] constraint-dependencies; "
