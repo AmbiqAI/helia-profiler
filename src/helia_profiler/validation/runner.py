@@ -258,10 +258,8 @@ def _build_config(
             "output_size": contract.output_size,
             "portable_ops": list(contract.portable_ops),
         }
-        # The ns provider is declared at the baseline's qualified ref and the
-        # arm provider is registry-governed and verified against the baseline
-        # post-lock, so the case stamps `qualified` either way; an explicit ns
-        # ref (a branch under test) is the only reason to override.
+        # Both providers land on the baseline's qualified ref by default
+        # (stamps `qualified`); an explicit ns ref is the only override.
         if case.cmsis_nn_backend.value == "ns" and ns_cmsis_nn_ref:
             engine_config["cmsis_nn_ref"] = ns_cmsis_nn_ref
         engine_cfg.update(

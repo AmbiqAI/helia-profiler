@@ -1,10 +1,8 @@
-"""ns-cmsis-nn CMake option policy (#246).
+"""ns-cmsis-nn CMake option policy and module declaration (#246).
 
-heliaRT 1.19.0's ``helia`` backend refuses to configure unless the fp32 kernels
-are enabled in ns-cmsis-nn; the fp16 kernels exist only for MVE-F cores and,
-below ns-cmsis-nn v7.30.0, ICE on GCC 14 -- so they are compiled only for
-models that carry FLOAT16 tensors (computed or dequantized weights). Both are ``option()`` defaults in ns-cmsis-nn,
-so hpx must override them as cache variables *before* the module is added.
+fp32 kernels always (helia-rt#253); fp16 only for models carrying FLOAT16
+tensors on an MVE-F core (helia-rt#254); both names set (helia-aot#349); the
+module declared at the baseline ref (helia-aot#356).
 """
 
 from __future__ import annotations

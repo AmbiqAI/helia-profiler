@@ -132,6 +132,18 @@ the `results/` package, never bare `dict[str, Any]`. The main exception is
 - Tests should be fast, local, and mock external tools.
 - Use Conventional Commits for all commit messages.
 
+### Comments
+
+- A comment or docstring states **what** the code does, in one or two lines.
+  When the **why** rests on an external fact, link the issue instead of
+  explaining it: `# WORKAROUND helia-aot#349: their module checks ARM_NN_*`.
+- Never put third-party version numbers, "X requires/refuses Y", bench
+  numbers, or review history in code. Those live in
+  `docs/architecture/compatibility-baseline.md`, the issue, or git history.
+- Tag workarounds for upstream defects with `WORKAROUND <repo>#<n>` so the
+  cleanup pass is `rg WORKAROUND`. Docstrings describe the contract, not the
+  history. This applies to tests.
+
 ## Dependency Security Floors
 
 Dependabot alerts on `uv.lock`, and alerts often land on transitive packages

@@ -24,10 +24,9 @@ drift between the two fails a test rather than silently diverging. Schema
 evolution cannot move them: flatbuffers appends new fields to the end of the
 vtable precisely so existing slots stay fixed.
 
-This is a reader for two narrow questions -- the Softmax scaling gate and which
-float precisions a model works in (#246). Anything needing real model
-analysis (shapes, MACs, weights) should use ``model_analysis``'s litert path,
-not grow this file.
+This reader answers two narrow questions (the Softmax scaling gate, #57; the
+float precisions a model works in, #246). Real model analysis belongs in
+``model_analysis``'s litert path, not here.
 """
 
 from __future__ import annotations
@@ -35,13 +34,9 @@ from __future__ import annotations
 import struct
 from dataclasses import dataclass
 
-# PROVENANCE (#229 D7): every constant below was extracted from
-# ai_edge_litert 2.1.6's generated schema (schema_py_generated), re-verified
-# unchanged against 2.2.0 (#246), and is frozen by flatbuffers
-# schema-evolution rules (enum values immutable, vtable slots append-only).
-# tests/test_softmax_preflight.py re-derives each one from the installed
-# litert by introspection whenever the
-# `analysis` extra is present, so silent drift is impossible.
+# Extracted from ai_edge_litert's generated schema (#229 D7); flatbuffers
+# schema-evolution rules freeze them, and tests/test_softmax_preflight.py
+# re-derives each from the installed litert so drift fails a test.
 #
 # BuiltinOperator / TensorType / BuiltinOptions enum values:
 BUILTIN_DEQUANTIZE = 6

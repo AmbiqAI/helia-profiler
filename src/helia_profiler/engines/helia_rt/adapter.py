@@ -94,14 +94,8 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
 
         if not use_local:
             # --- Default: resolve nsx-helia-rt from the NSX registry ---
-            # This clones AmbiqAI/helia-rt from GitHub at the pinned tag and
-            # builds it from source via NSX. hpx declares nsx-cmsis-nn itself
-            # (at the baseline's qualified ref, or a user override) so NSX
-            # uses that core rather than whatever heliaRT's manifest or the
-            # packaged registry would pick. Because this is a source build,
-            # the ns-cmsis-nn options (cmsis_nn_cmake_vars) must also be
-            # forwarded — they are baked in only for a genuinely prebuilt
-            # archive (see the `else` branch below).
+            # A source build: declare the core hpx qualified (not the one the
+            # registry would pick) and forward its kernel options.
             version = HELIART_VERSION
             log.info(
                 "heliaRT %s — resolving %s from NSX registry "
@@ -155,14 +149,9 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
                     core_override,
                 )
 
-            # Source-built heliaRT depends on the nsx-cmsis-nn module
-            # being present in the build (the prebuilt static lib had
-            # CMSIS-NN baked in; the source build does not). Resolve it
-            # via the shared helper (declared at the baseline's qualified ref by default).
+            # A source build needs the core module and its kernel options;
+            # a prebuilt archive has both baked in.
             extra_modules.append(cmsis_nn_module_ref(config, work_dir))
-
-            # Forward the CMSIS-NN build options (requantize asm, fp32/fp16
-            # kernels) -- not baked in the way they are for a prebuilt archive.
             cmake_vars.update(cmsis_nn_cmake_vars(config))
 
             _install_nsx_module_source(
