@@ -29,9 +29,7 @@ def _gated_stats_diagnostics(
 
     a = _stats_arrays(packets)
     windows = (
-        windows_override
-        if windows_override is not None
-        else _segment_gpi_windows(poll_samples)
+        windows_override if windows_override is not None else _segment_gpi_windows(poll_samples)
     )
     mask_axis, axis_name = _gated_mask_axis(a, prefer_device_time=prefer_device_time)
 
@@ -55,9 +53,7 @@ def _gated_stats_diagnostics(
         "packet_midpoint_last_tick": None,
         "gpi_first_tick": None,
         "gpi_last_tick": None,
-        "windows": [
-            {"rise_tick": int(rise), "fall_tick": int(fall)} for rise, fall in windows
-        ],
+        "windows": [{"rise_tick": int(rise), "fall_tick": int(fall)} for rise, fall in windows],
     }
     if stream_segment_count is not None:
         # How many raw high segments the GPI stream resolved — an undriven

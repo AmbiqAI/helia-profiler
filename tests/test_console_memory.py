@@ -75,9 +75,7 @@ def test_hostile_section_names_render_escaped_and_do_not_crash():
             linker_profile="default",
             regions=(_region(),),
             unattributed=(
-                UnattributedSection(
-                    name="[red]evil[/red] .oops", address=0x30000000, size=64
-                ),
+                UnattributedSection(name="[red]evil[/red] .oops", address=0x30000000, size=64),
                 UnattributedSection(name=".weird[/bold]", address=0x0, size=1),
             ),
         )
@@ -124,9 +122,7 @@ def test_police_lines_render_even_when_every_region_is_zero():
         link_family="gnu",
         linker_profile="default",
         regions=(_region(used=0, reserved=0, load_image=0),),
-        unattributed=(
-            UnattributedSection(name=".rogue", address=0x70000000, size=4096),
-        ),
+        unattributed=(UnattributedSection(name=".rogue", address=0x70000000, size=4096),),
     )
     assert measured_memory_is_renderable(anomalous)
     text = _render(anomalous)
@@ -189,11 +185,7 @@ def test_reconciliation_table_renders_all_three_statuses():
                 status="unmatchable",
             ),
         ),
-        regions=(
-            RegionReconciliation(
-                region="SRAM", planned_used=0, measured_used=98304
-            ),
-        ),
+        regions=(RegionReconciliation(region="SRAM", planned_used=0, measured_used=98304),),
     )
     hpx_console = HpxConsole(verbosity=0)
     recorder = Console(record=True, highlight=False, width=200)

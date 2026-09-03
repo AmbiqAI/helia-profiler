@@ -114,12 +114,14 @@ class ComparisonProfile:
             isinstance(self.schema_version, bool)
             or self.schema_version != COMPARISON_PROFILE_SCHEMA_VERSION
         ):
-            raise ReportError(
-                f"Unsupported comparison profile version: {self.schema_version!r}"
+            raise ReportError(f"Unsupported comparison profile version: {self.schema_version!r}")
+        if (
+            not isinstance(self.metrics, dict)
+            or not self.metrics
+            or not all(
+                isinstance(key, str) and key and isinstance(value, MetricPolicy)
+                for key, value in self.metrics.items()
             )
-        if not isinstance(self.metrics, dict) or not self.metrics or not all(
-            isinstance(key, str) and key and isinstance(value, MetricPolicy)
-            for key, value in self.metrics.items()
         ):
             raise ReportError("Comparison profile metrics must map names to MetricPolicy values.")
         if self.missing is not None and not isinstance(self.missing, MissingMetricPolicy):
@@ -314,5 +316,3 @@ def _dimension_tuple(value: Any) -> tuple[str, ...]:
     if not isinstance(value, list):
         raise ReportError("Comparison profile required_dimensions must be an array of names.")
     return tuple(value)
-
-

@@ -66,7 +66,14 @@ def test_emission_covers_every_census_key_and_only_those():
 def _sentinel_for(name: str):
     if name == "gate_duration_integrity":
         return GateDurationIntegrity(measured_s=1.0, expected_s=1.0, tolerance_s=0.1)
-    if name in {"sync", "sync_timing_s", "gate_failure", "window_clock_ceiling", "target_lifecycle"}:
+    if name in {
+        "sync",
+        "sync_timing_s",
+        "gate_failure",
+        "window_clock_ceiling",
+        "target_lifecycle",
+    }:
+
         class _Flat:
             def to_metadata(self):
                 return {"x": 1}
@@ -100,8 +107,7 @@ def test_no_string_keyed_census_access_survives_in_src():
                 offenders.append(f"{path.relative_to(ROOT)}:{lineno}: {line.strip()}")
     assert not offenders, (
         "String-keyed power-metadata access in src/ — use PowerMetadata's "
-        "typed fields (or to_metadata_dict() at the report boundary):\n"
-        + "\n".join(offenders)
+        "typed fields (or to_metadata_dict() at the report boundary):\n" + "\n".join(offenders)
     )
 
 

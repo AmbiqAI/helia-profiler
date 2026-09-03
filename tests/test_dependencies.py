@@ -404,15 +404,16 @@ def test_read_only_lock_provenance_surface_from_app_or_workspace(
     assert surface.lock_mode is DependencyLockMode.REUSED
     assert surface.update_requested is False
     assert surface.overrides == ()
-    assert [(item.scope, item.name, item.requested_ref, item.requested_tag) for item in surface.requested_refs] == [
+    assert [
+        (item.scope, item.name, item.requested_ref, item.requested_tag)
+        for item in surface.requested_refs
+    ] == [
         ("module", "demo", "v1.2.3", "v1.2.3"),
         ("project", "demo-project", "v1.2.3", "v1.2.3"),
     ]
     assert surface.resolved[0].peeled_commit == "a" * 40
     assert surface.resolved[0].content_hash.value == "b" * 64
-    assert {
-        path: (path.read_bytes(), path.stat().st_mtime_ns) for path in before
-    } == before
+    assert {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in before} == before
 
 
 def test_lock_provenance_provider_rejects_lock_drift(
@@ -483,9 +484,7 @@ def test_model_change_reuses_workspace_root_without_identity_collision(
     assert first.dependency_workspace is not None
     assert second.dependency_workspace is not None
     assert first.dependency_workspace.root == second.dependency_workspace.root
-    assert (
-        first.dependency_workspace.fingerprint == second.dependency_workspace.fingerprint
-    )
+    assert first.dependency_workspace.fingerprint == second.dependency_workspace.fingerprint
 
 
 def test_offline_requires_compatible_lock(tmp_path: Path) -> None:
@@ -615,9 +614,7 @@ def test_lock_resolving_off_baseline_ref_raises_version_error(
     assert not (ctx.firmware_dir / "hpx-dependencies.json").exists()
 
 
-def test_lock_matching_baseline_ref_passes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_lock_matching_baseline_ref_passes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     ctx = _context(tmp_path)
     _write_valid_lock(ctx, project="nsx-sensors", commit=_baseline_ref(ctx, "nsx-sensors"))
     monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
@@ -705,9 +702,7 @@ def test_lock_schema_version_mismatch_raises_version_error(tmp_path: Path) -> No
     lock_path = ctx.firmware_dir / "nsx.lock"
     text = lock_path.read_text(encoding="utf-8")
     assert "schema_version: 4" in text
-    lock_path.write_text(
-        text.replace("schema_version: 4", "schema_version: 999"), encoding="utf-8"
-    )
+    lock_path.write_text(text.replace("schema_version: 4", "schema_version: 999"), encoding="utf-8")
 
     reason = _lock_incompatibility(ctx.firmware_dir, "apollo510_evb")
 
@@ -726,9 +721,7 @@ def test_offline_lock_schema_drift_raises_version_error_end_to_end(tmp_path: Pat
     _write_valid_lock(ctx)
     lock_path = ctx.firmware_dir / "nsx.lock"
     text = lock_path.read_text(encoding="utf-8")
-    lock_path.write_text(
-        text.replace("schema_version: 4", "schema_version: 999"), encoding="utf-8"
-    )
+    lock_path.write_text(text.replace("schema_version: 4", "schema_version: 999"), encoding="utf-8")
 
     with pytest.raises(VersionError, match="schema_version 999") as exc:
         prepare_locked_dependencies(ctx)

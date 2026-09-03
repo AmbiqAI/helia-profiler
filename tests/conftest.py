@@ -106,8 +106,8 @@ def fake_source_tree(tmp_path: Path) -> Path:
     (src / "cmake" / "helia_rt_sources.cmake").write_text(
         "# stub\n"
         "function(helia_rt_backend_compile_definitions OUT_VAR)\n"
-        "  set(_defs \"\")\n"
-        "  if(\"${ARGN}\" MATCHES \"BACKEND;helia\")\n"
+        '  set(_defs "")\n'
+        '  if("${ARGN}" MATCHES "BACKEND;helia")\n'
         "    set(_defs CMSIS_NN HELIA)\n"
         "  endif()\n"
         "  set(${OUT_VAR} ${_defs} PARENT_SCOPE)\n"

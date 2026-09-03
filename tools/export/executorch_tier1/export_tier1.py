@@ -144,9 +144,7 @@ def _plan_facts(result) -> dict:
     for chain_index, chain in enumerate(plan.chains):
         for instr_index, instruction in enumerate(chain.instructions):
             kind = type(instruction.instr_args).__name__
-            label = (
-                op_names[instruction.instr_args.op_index] if kind == "KernelCall" else kind
-            )
+            label = op_names[instruction.instr_args.op_index] if kind == "KernelCall" else kind
             instructions.append({"id": f"c{chain_index}i{instr_index}", "op": label})
     return {
         "operators": operators,
@@ -187,9 +185,7 @@ def _export_one(spec: ModelSpec, provider: str, output_dir: Path) -> dict:
     # outside the cortex_m/cortex_m_ns namespaces. The ExportResult fallback
     # report only tracks NS-candidate ops, so derive the list from the PTE.
     portable_ops = sorted(
-        name
-        for name in facts["operators"]
-        if not name.startswith(("cortex_m::", "cortex_m_ns::"))
+        name for name in facts["operators"] if not name.startswith(("cortex_m::", "cortex_m_ns::"))
     )
 
     entry = {
@@ -229,8 +225,7 @@ def main() -> None:
             "input_size_bytes": 4 * elem_count_in,
             "output_size_bytes": 4 * elem_count_out,
             "providers": {
-                provider: _export_one(spec, provider, args.output_dir)
-                for provider in ("arm", "ns")
+                provider: _export_one(spec, provider, args.output_dir) for provider in ("arm", "ns")
             },
         }
 

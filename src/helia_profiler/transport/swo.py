@@ -81,9 +81,7 @@ def capture_swo_output(
     Returns:
         List of captured text lines.
     """
-    timing = CaptureTimingTracker(
-        start_marker=_HPX_START_SENTINEL, end_marker=HPX_END_SENTINEL
-    )
+    timing = CaptureTimingTracker(start_marker=_HPX_START_SENTINEL, end_marker=HPX_END_SENTINEL)
     on_line = timing.observe_line
 
     def finalize_timing() -> None:

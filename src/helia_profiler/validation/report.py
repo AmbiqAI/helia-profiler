@@ -238,9 +238,7 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
     }
     requested_memory = _strip_none(requested_memory)
     engine = _enum_value(result.engine)
-    cmsis_nn_provider = _resolve_cmsis_nn_provider(
-        engine, result.backend, result.cmsis_nn_provider
-    )
+    cmsis_nn_provider = _resolve_cmsis_nn_provider(engine, result.backend, result.cmsis_nn_provider)
     identity = {
         "model_id": result.model_id,
         "comparison_group": result.comparison_group or result.model_id,
@@ -317,9 +315,7 @@ def _case_report(result: CaseResult, output_dir: Path) -> dict[str, Any]:
     return case_data
 
 
-def _resolve_cmsis_nn_provider(
-    engine: str, backend: str | None, provider: str | None
-) -> str:
+def _resolve_cmsis_nn_provider(engine: str, backend: str | None, provider: str | None) -> str:
     """Resolve and validate the CMSIS-NN provider written to schema v5."""
     if engine == "executorch":
         if backend not in {"arm", "ns"} or provider not in {None, backend}:
@@ -350,8 +346,7 @@ def _case_resources(summary: dict[str, Any]) -> dict[str, Any]:
             "runtime_memory": _nested_dict(summary, "memory") or None,
             "memory_plan": _nested_dict(summary, "memory_plan") or None,
             "memory_regions": _nested_dict(summary, "memory_regions") or None,
-            "memory_reconciliation": _nested_dict(summary, "memory_reconciliation")
-            or None,
+            "memory_reconciliation": _nested_dict(summary, "memory_reconciliation") or None,
         }
     )
 

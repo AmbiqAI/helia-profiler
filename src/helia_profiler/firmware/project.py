@@ -27,7 +27,6 @@ if TYPE_CHECKING:
 log = logging.getLogger("hpx")
 
 
-
 @dataclass(frozen=True)
 class NsxModuleSpec:
     """Resolved NSX module identity for firmware generation.
@@ -64,7 +63,10 @@ _POWER_SYNC_MODULE_NAMES: tuple[str, ...] = (
     "nsx-gpio",
 )
 
-def _usb_provider_module_names(module_specs: list[NsxModuleSpec], profile: dict[str, Any]) -> list[str]:
+
+def _usb_provider_module_names(
+    module_specs: list[NsxModuleSpec], profile: dict[str, Any]
+) -> list[str]:
     """Return provider-specific USB support modules implied by the SDK tier."""
     present = {spec.name for spec in module_specs}
     overrides = profile.get("module_overrides") or {}
@@ -372,6 +374,7 @@ def _copy_local_engine_module(dest: Path, source: Path) -> None:
     if dest.is_dir():
         shutil.rmtree(dest)
     shutil.copytree(source, dest)
+
 
 @dataclass(frozen=True)
 class ProjectRenderContext:

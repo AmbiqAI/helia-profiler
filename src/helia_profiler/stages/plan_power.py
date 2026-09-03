@@ -243,9 +243,8 @@ class PlanPowerRunStage:
                 f"'{ctx.config.power.mode.value}'.",
                 hint="Select a driver and power.mode with matching ownership.",
             )
-        if (
-            driver.mode.value == "internal"
-            and not getattr(driver, "supports_firmware_measurement", False)
+        if driver.mode.value == "internal" and not getattr(
+            driver, "supports_firmware_measurement", False
         ):
             raise PowerError(
                 f"Power driver '{ctx.config.power.driver}' has no firmware-side "

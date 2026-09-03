@@ -433,9 +433,7 @@ def capture_power(
                 gate_relative_tolerance=gate_relative_tolerance_for(
                     ctx.config.profiling.clean_window_probe
                 ),
-                work_noun=count_noun(
-                    ctx.config.profiling.clean_window_probe, clean_count or 0
-                ),
+                work_noun=count_noun(ctx.config.profiling.clean_window_probe, clean_count or 0),
                 on_started=_release,
                 # The dedicated JS320 GPI stream provides the authoritative
                 # gate edge. Release GO there to avoid backfeeding the target

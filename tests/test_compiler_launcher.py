@@ -60,9 +60,7 @@ class TestResolveCompilerLauncher:
         for value in ("none", "off", "false", "disabled", ""):
             assert _resolve_compiler_launcher(_config_with_launcher(value)) is None
 
-    def test_auto_returns_none_when_nothing_installed(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_auto_returns_none_when_nothing_installed(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv("HPX_COMPILER_LAUNCHER", raising=False)
         monkeypatch.setattr("helia_profiler.firmware.shutil.which", lambda _name: None)
         assert _resolve_compiler_launcher(_config_with_launcher("auto")) is None
@@ -70,18 +68,14 @@ class TestResolveCompilerLauncher:
     def test_auto_prefers_sccache(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv("HPX_COMPILER_LAUNCHER", raising=False)
         found = {"sccache": "/usr/bin/sccache", "ccache": "/usr/bin/ccache"}
-        monkeypatch.setattr(
-            "helia_profiler.firmware.shutil.which", lambda name: found.get(name)
-        )
+        monkeypatch.setattr("helia_profiler.firmware.shutil.which", lambda name: found.get(name))
         result = _resolve_compiler_launcher(_config_with_launcher("auto"))
         assert result == "/usr/bin/sccache"
 
     def test_auto_falls_back_to_ccache(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv("HPX_COMPILER_LAUNCHER", raising=False)
         found = {"ccache": "/usr/bin/ccache"}
-        monkeypatch.setattr(
-            "helia_profiler.firmware.shutil.which", lambda name: found.get(name)
-        )
+        monkeypatch.setattr("helia_profiler.firmware.shutil.which", lambda name: found.get(name))
         result = _resolve_compiler_launcher(_config_with_launcher("auto"))
         assert result == "/usr/bin/ccache"
 
@@ -108,12 +102,8 @@ class TestLauncherToolchainCompatibility:
     def test_auto_skips_sccache_for_armclang(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv("HPX_COMPILER_LAUNCHER", raising=False)
         found = {"sccache": "/usr/bin/sccache", "ccache": "/usr/bin/ccache"}
-        monkeypatch.setattr(
-            "helia_profiler.firmware.shutil.which", lambda name: found.get(name)
-        )
-        result = _resolve_compiler_launcher(
-            _config_with_launcher("auto", toolchain="armclang")
-        )
+        monkeypatch.setattr("helia_profiler.firmware.shutil.which", lambda name: found.get(name))
+        result = _resolve_compiler_launcher(_config_with_launcher("auto", toolchain="armclang"))
         assert result == "/usr/bin/ccache"
 
     def test_auto_returns_none_when_only_sccache_and_armclang(
@@ -124,46 +114,34 @@ class TestLauncherToolchainCompatibility:
             "helia_profiler.firmware.shutil.which",
             lambda name: "/usr/bin/sccache" if name == "sccache" else None,
         )
-        result = _resolve_compiler_launcher(
-            _config_with_launcher("auto", toolchain="armclang")
-        )
+        result = _resolve_compiler_launcher(_config_with_launcher("auto", toolchain="armclang"))
         assert result is None
 
     def test_auto_keeps_sccache_for_gcc(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv("HPX_COMPILER_LAUNCHER", raising=False)
         found = {"sccache": "/usr/bin/sccache", "ccache": "/usr/bin/ccache"}
-        monkeypatch.setattr(
-            "helia_profiler.firmware.shutil.which", lambda name: found.get(name)
-        )
+        monkeypatch.setattr("helia_profiler.firmware.shutil.which", lambda name: found.get(name))
         result = _resolve_compiler_launcher(
             _config_with_launcher("auto", toolchain="arm-none-eabi-gcc")
         )
         assert result == "/usr/bin/sccache"
 
-    def test_explicit_sccache_disabled_for_armclang(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_explicit_sccache_disabled_for_armclang(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv("HPX_COMPILER_LAUNCHER", raising=False)
         monkeypatch.setattr(
             "helia_profiler.firmware.shutil.which",
             lambda name: "/usr/bin/sccache" if name == "sccache" else None,
         )
-        result = _resolve_compiler_launcher(
-            _config_with_launcher("sccache", toolchain="armclang")
-        )
+        result = _resolve_compiler_launcher(_config_with_launcher("sccache", toolchain="armclang"))
         assert result is None
 
-    def test_explicit_ccache_allowed_for_armclang(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_explicit_ccache_allowed_for_armclang(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv("HPX_COMPILER_LAUNCHER", raising=False)
         monkeypatch.setattr(
             "helia_profiler.firmware.shutil.which",
             lambda name: "/usr/bin/ccache" if name == "ccache" else None,
         )
-        result = _resolve_compiler_launcher(
-            _config_with_launcher("ccache", toolchain="armclang")
-        )
+        result = _resolve_compiler_launcher(_config_with_launcher("ccache", toolchain="armclang"))
         assert result == "/usr/bin/ccache"
 
     def test_env_overrides_config(self, monkeypatch: pytest.MonkeyPatch):

@@ -146,7 +146,10 @@ class TestPowerLifecycleResetSequences:
             tmp_path, board=BOARD_FOR_FAMILY[family], power_enabled=True, reset_strategy="auto"
         )
         plan = prepare_target_for_phase(
-            ctx, phase=CapturePhase.POWER, power_driver=_FakeDriver(), power_driver_name="joulescope"  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
+            ctx,
+            phase=CapturePhase.POWER,
+            power_driver=_FakeDriver(),
+            power_driver_name="joulescope",  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
         )
         assert events == expected
         # Plan metadata mirrors the executed sequence.
@@ -176,7 +179,10 @@ class TestPowerLifecycleResetSequences:
             tmp_path, board="apollo510_evb", power_enabled=True, reset_strategy=strategy
         )
         plan = prepare_target_for_phase(
-            ctx, phase=CapturePhase.POWER, power_driver=_FakeDriver(), power_driver_name="joulescope"  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
+            ctx,
+            phase=CapturePhase.POWER,
+            power_driver=_FakeDriver(),
+            power_driver_name="joulescope",  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
         )
         assert events == expected_events
         assert plan.reset_action is expected_action
@@ -190,7 +196,10 @@ class TestPowerLifecycleResetSequences:
                 tmp_path, board=BOARD_FOR_FAMILY[family], power_enabled=True, reset_strategy="auto"
             )
             prepare_target_for_phase(
-                ctx, phase=CapturePhase.POWER, power_driver=_FakeDriver(), power_driver_name="js"  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
+                ctx,
+                phase=CapturePhase.POWER,
+                power_driver=_FakeDriver(),
+                power_driver_name="js",  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
             )
             assert "swpoi_reset" not in events, family
 
@@ -205,7 +214,10 @@ class TestPmuPhaseHasNoLifecycleReset:
         events = _install_lifecycle_recorder(monkeypatch)
         ctx = make_pmu_ctx(tmp_path, board=BOARD_FOR_FAMILY[family], power_enabled=True)
         plan = prepare_target_for_phase(
-            ctx, phase=CapturePhase.PMU, power_driver=_FakeDriver(), power_driver_name="js"  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
+            ctx,
+            phase=CapturePhase.PMU,
+            power_driver=_FakeDriver(),
+            power_driver_name="js",  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
         )
         assert events == []
         assert plan.reset_action is ResetAction.NONE
@@ -221,9 +233,7 @@ class TestReaderResetOwnership:
     def test_swo_reader_uses_released_jlinkexe_reset(self, monkeypatch):
         from helia_profiler.transport.swo import capture_swo_output
 
-        events = _install_reader_reset_recorder(
-            monkeypatch, "helia_profiler.transport.swo"
-        )
+        events = _install_reader_reset_recorder(monkeypatch, "helia_profiler.transport.swo")
         with pytest.raises(_ResetStop):
             capture_swo_output(jlink_device="AP510NFA-CBR", jlink_serial="1160002204")
         assert events == ["jlinkexe_reset"]
@@ -231,9 +241,7 @@ class TestReaderResetOwnership:
     def test_rtt_reader_uses_released_jlinkexe_reset(self, monkeypatch):
         from helia_profiler.transport.rtt import capture_rtt_output
 
-        events = _install_reader_reset_recorder(
-            monkeypatch, "helia_profiler.transport.rtt"
-        )
+        events = _install_reader_reset_recorder(monkeypatch, "helia_profiler.transport.rtt")
         # known_block_address skips the pre-clean scan so reset is the first
         # real primitive after pylink.JLink() construction.
         with pytest.raises(_ResetStop):
@@ -254,9 +262,7 @@ class TestReaderResetOwnership:
     ):
         import helia_profiler.transport.uart as uart_reader
 
-        events = _install_reader_reset_recorder(
-            monkeypatch, "helia_profiler.transport.uart"
-        )
+        events = _install_reader_reset_recorder(monkeypatch, "helia_profiler.transport.uart")
         monkeypatch.setattr(uart_reader, "find_jlink_vcom_port", lambda _serial: "PORT")
 
         class _FakeSerial:
@@ -288,9 +294,7 @@ class TestReaderResetOwnership:
     ):
         import helia_profiler.transport.usb_cdc as usb_reader
 
-        events = _install_reader_reset_recorder(
-            monkeypatch, "helia_profiler.transport.usb_cdc"
-        )
+        events = _install_reader_reset_recorder(monkeypatch, "helia_profiler.transport.usb_cdc")
         monkeypatch.setattr(usb_reader, "_snapshot_cdc_ports", lambda: set())
 
         with pytest.raises(_ResetStop):
@@ -394,15 +398,19 @@ def test_reset_owner_matrix(monkeypatch, tmp_path, family, transport, power_on):
     lifecycle_events = _install_lifecycle_recorder(monkeypatch)
     if power_on:
         ctx = make_pmu_ctx(
-            tmp_path, board=BOARD_FOR_FAMILY[family], transport=transport,
-            power_enabled=True, reset_strategy="auto",
+            tmp_path,
+            board=BOARD_FOR_FAMILY[family],
+            transport=transport,
+            power_enabled=True,
+            reset_strategy="auto",
         )
         prepare_target_for_phase(
-            ctx, phase=CapturePhase.POWER, power_driver=_FakeDriver(), power_driver_name="js"  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
+            ctx,
+            phase=CapturePhase.POWER,
+            power_driver=_FakeDriver(),
+            power_driver_name="js",  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the lifecycle surface
         )
-        expected = (
-            ["debug_reset", "swpoi_reset"] if family == "ap5" else ["debug_reset"]
-        )
+        expected = ["debug_reset", "swpoi_reset"] if family == "ap5" else ["debug_reset"]
         assert lifecycle_events == expected
     else:
         # No power capture => no lifecycle reset is issued at all.

@@ -277,10 +277,7 @@ def collect_lines(
                         window_deadline = line_ts + budget
                         if window_deadline > hb_deadline:
                             hb_deadline = window_deadline
-                        if (
-                            overall_deadline is not None
-                            and window_deadline > overall_deadline
-                        ):
+                        if overall_deadline is not None and window_deadline > overall_deadline:
                             overall_deadline = window_deadline
                         log.info(
                             "%s: clean window announced (~%.0fs budget) — "

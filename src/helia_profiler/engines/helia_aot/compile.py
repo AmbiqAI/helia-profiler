@@ -185,11 +185,8 @@ def _resolve_aot_placement_intent(
     return arena, weights
 
 
-def _resolve_aot_tensor_rulesets(
-    config: ProfileConfig, soc: SocDef | None
-) -> list[dict[str, Any]]:
-    """Build heliaAOT per-kind attribute rulesets (constant/persistent/scratch).
-    """
+def _resolve_aot_tensor_rulesets(config: ProfileConfig, soc: SocDef | None) -> list[dict[str, Any]]:
+    """Build heliaAOT per-kind attribute rulesets (constant/persistent/scratch)."""
     arena, weights = _resolve_aot_placement_intent(config, soc)
     arena_mem = _PLACEMENT_TO_AOT_MEMTYPE[arena]
 
@@ -288,9 +285,7 @@ def _run_aot_compiler(
     merged_rulesets = _merge_aot_tensor_rulesets(profiler_rulesets, user_tensors)
     if merged_rulesets:
         mem["tensors"] = merged_rulesets
-        scratch_memory, constant_attributes = _summarize_aot_tensor_rulesets(
-            merged_rulesets
-        )
+        scratch_memory, constant_attributes = _summarize_aot_tensor_rulesets(merged_rulesets)
         log.info(
             "AOT tensor placement: scratch/persistent=%s, constant=%s",
             scratch_memory,
@@ -363,9 +358,9 @@ def _merge_aot_tensor_rulesets(
         for rule in user_tensors
         if isinstance(rule, dict) and "type" in rule and "id" not in rule
     }
-    return [
-        rule for rule in profiler_rulesets if rule.get("type") not in wildcard_kinds
-    ] + list(user_tensors)
+    return [rule for rule in profiler_rulesets if rule.get("type") not in wildcard_kinds] + list(
+        user_tensors
+    )
 
 
 def _prepare_aot_memory_config(
@@ -576,8 +571,7 @@ def _check_helia_aot_version(config: ProfileConfig | None = None) -> str:
 
     if actual < minimum:
         raise EngineError(
-            f"helia-aot v{installed} is below the minimum supported "
-            f"version (v{minimum_str}).",
+            f"helia-aot v{installed} is below the minimum supported version (v{minimum_str}).",
             hint=(
                 f"Upgrade with: pip install -U 'helia-aot>={minimum_str}'\n"
                 "or pin a specific newer version / fork / local checkout."

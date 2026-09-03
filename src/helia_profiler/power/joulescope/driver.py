@@ -65,7 +65,6 @@ class JoulescopeDriver:
             return NullSyncController()
         return JoulescopeSyncController(serial=self._serial, wiring=wiring)
 
-
     # ------------------------------------------------------------------
     # Availability check
     # ------------------------------------------------------------------

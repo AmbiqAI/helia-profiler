@@ -66,8 +66,7 @@ def test_no_engine_adapter_imports_out_of_another_engines_package() -> None:
 
     assert not offenders, (
         "these engine modules import from another engine's package; move the "
-        "shared piece up into helia_profiler.engines instead:\n  "
-        + "\n  ".join(offenders)
+        "shared piece up into helia_profiler.engines instead:\n  " + "\n  ".join(offenders)
     )
 
 
@@ -215,9 +214,7 @@ def _hpx_import_targets(path: Path, *, module_level_only: bool) -> list[str]:
                 targets.extend(f"{base}{joiner}{alias.name}" for alias in node.names)
         elif isinstance(node, ast.Import):
             targets.extend(
-                alias.name
-                for alias in node.names
-                if alias.name.split(".")[0] == "helia_profiler"
+                alias.name for alias in node.names if alias.name.split(".")[0] == "helia_profiler"
             )
     return targets
 

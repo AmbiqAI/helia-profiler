@@ -84,10 +84,7 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     with workspace_mutex(ctx.resolved_workspace):
         dependency_state = prepare_locked_dependencies(ctx)
         try:
-            if (
-                not ninja_already_configured
-                or dependency_state.lock.mode.value != "reused"
-            ):
+            if not ninja_already_configured or dependency_state.lock.mode.value != "reused":
                 nsx_cli.configure(
                     app_dir,
                     toolchain=nsx_tc,

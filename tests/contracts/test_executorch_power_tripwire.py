@@ -132,9 +132,7 @@ def test_preflight_accepting_executorch_power_requires_engine_matrix_coverage(
 
 
 @pytest.mark.parametrize("board", ["apollo3p_evb", "apollo4p_evb", "apollo510_evb"])
-def test_preflight_rejects_executorch_with_the_busy_loop_clean_window_probe(
-    tmp_path, board
-):
+def test_preflight_rejects_executorch_with_the_busy_loop_clean_window_probe(tmp_path, board):
     """The busy_loop probe is the second door into the same room.
 
     ``clean_window_probe=busy_loop`` replaces the model with a calibrated CPU

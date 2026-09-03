@@ -62,9 +62,7 @@ def lower_to_pte(quantized_exported, example_inputs):
     """
     from nsx_cortex_m import export as nsx_export
 
-    return nsx_export(
-        quantized_exported, example_inputs, kernel_provider="arm", int8_io=True
-    )
+    return nsx_export(quantized_exported, example_inputs, kernel_provider="arm", int8_io=True)
 
 
 def _operator_name(operator) -> str:

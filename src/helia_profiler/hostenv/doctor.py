@@ -120,7 +120,9 @@ def inspect_environment(
     :func:`check_versions`). Disabled by default so existing callers keep
     their current (fast, version-free) behavior.
     """
-    results = [_inspect_dependency(spec) for spec in _dependency_specs(toolchain, transport, engine)]
+    results = [
+        _inspect_dependency(spec) for spec in _dependency_specs(toolchain, transport, engine)
+    ]
     if require_segger_rtt:
         from ..errors import FirmwareError
         from ..firmware import find_segger_rtt_dir

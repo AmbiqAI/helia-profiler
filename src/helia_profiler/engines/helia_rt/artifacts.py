@@ -54,6 +54,7 @@ HELIART_SOURCE_COMMIT = "038a0c4403b6186316700833b3ad7bb32e16ea83"
 HELIART_PROJECT = "helia-rt"  # registry project (path: modules/helia-rt)
 HELIART_MODULE = "nsx-helia-rt"  # registry module name
 
+
 def _cache_dir() -> Path:
     """Cache directory for downloaded heliaRT distributions."""
     from ...hostenv.cache_dirs import hpx_cache_root

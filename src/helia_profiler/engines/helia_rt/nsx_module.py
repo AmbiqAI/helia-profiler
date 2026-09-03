@@ -93,7 +93,7 @@ def _write_nested_nsx_shim(module_dir: Path) -> None:
         "# Do not edit — regenerated on every hpx run.\n"
         "cmake_minimum_required(VERSION 3.21)\n"
         "\n"
-        "include(\"${CMAKE_CURRENT_LIST_DIR}/../CMakeLists.txt\")\n"
+        'include("${CMAKE_CURRENT_LIST_DIR}/../CMakeLists.txt")\n'
     )
 
 

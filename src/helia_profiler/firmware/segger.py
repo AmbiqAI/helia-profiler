@@ -118,10 +118,7 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
     rtt_c = rtt_dest / "SEGGER_RTT.c"
     if rtt_c.exists():
         text = rtt_c.read_text(encoding="utf-8")
-        if (
-            "SEGGER_RTT_PUT_CB_SECTION(" not in text
-            or "SEGGER_RTT_PUT_BUFFER_SECTION(" not in text
-        ):
+        if "SEGGER_RTT_PUT_CB_SECTION(" not in text or "SEGGER_RTT_PUT_BUFFER_SECTION(" not in text:
             raise FirmwareError(
                 "Failed to patch SEGGER_RTT.c for SRAM placement",
                 hint=(

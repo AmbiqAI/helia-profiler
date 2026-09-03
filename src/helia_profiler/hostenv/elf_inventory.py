@@ -216,9 +216,7 @@ def _inventory_via_readelf(
             # understate occupancy — count it AND surface it. Index 0 is
             # the expected NULL row (matched by position, not name, so a
             # section whose name merely contains "NULL" still gets logged).
-            if re.match(r"^\s*\[\s*\d+\]", line) and not re.match(
-                r"^\s*\[\s*0\]", line
-            ):
+            if re.match(r"^\s*\[\s*\d+\]", line) and not re.match(r"^\s*\[\s*0\]", line):
                 unparsed += 1
                 log.debug("readelf -S row not parsed by inventory: %r", line)
             continue
@@ -233,9 +231,7 @@ def _inventory_via_readelf(
                 nobits=nobits,
                 allocated=allocated,
                 index=int(idx),
-                linker_reserved=(
-                    nobits and allocated and _is_reserved_section_name(name)
-                ),
+                linker_reserved=(nobits and allocated and _is_reserved_section_name(name)),
             )
         )
     return (tuple(sections), unparsed) if sections else None
@@ -329,9 +325,7 @@ def _inventory_from_fromelf_listing(
                     nobits=nobits,
                     allocated=allocated,
                     index=block_index,
-                    linker_reserved=(
-                        nobits and allocated and _is_reserved_section_name(name)
-                    ),
+                    linker_reserved=(nobits and allocated and _is_reserved_section_name(name)),
                 )
             )
         elif block_kind == "segment" and block.get("Type", "").startswith("PT_LOAD"):
@@ -414,24 +408,16 @@ def section_inventory(
         if parsed is None:
             return None
         sections, segments, unparsed = parsed
-        return SectionInventory(
-            sections=sections, segments=segments, unparsed_rows=unparsed
-        )
+        return SectionInventory(sections=sections, segments=segments, unparsed_rows=unparsed)
     if spec.readelf is None:
         return None
     readelf_cmd = resolve_toolchain_executable(toolchain, spec.readelf)
-    inventory = _inventory_via_readelf(
-        binary_path, readelf_cmd=readelf_cmd, timeout_s=timeout_s
-    )
+    inventory = _inventory_via_readelf(binary_path, readelf_cmd=readelf_cmd, timeout_s=timeout_s)
     if inventory is None:
         return None
     sections, unparsed = inventory
-    segments = _segments_via_readelf(
-        binary_path, readelf_cmd=readelf_cmd, timeout_s=timeout_s
-    )
-    return SectionInventory(
-        sections=sections, segments=segments, unparsed_rows=unparsed
-    )
+    segments = _segments_via_readelf(binary_path, readelf_cmd=readelf_cmd, timeout_s=timeout_s)
+    return SectionInventory(sections=sections, segments=segments, unparsed_rows=unparsed)
 
 
 # ---------------------------------------------------------------------------
@@ -464,14 +450,10 @@ class SymbolEntry:
 #: tools are NOT row-identical, #179 review M-5). Sized rows parse;
 #: recognisable unsized/undefined shapes are SKIPPED silently; anything
 #: else counts as unparsed.
-_NM_SIZED_ROW_RE = re.compile(
-    r"^([0-9a-fA-F]+)\s+([0-9a-fA-F]+)\s+(\S)\s+(\S+)\s*$"
-)
+_NM_SIZED_ROW_RE = re.compile(r"^([0-9a-fA-F]+)\s+([0-9a-fA-F]+)\s+(\S)\s+(\S+)\s*$")
 #: Undefined/weak rows ("U name", "w name") and unsized address rows
 #: ("00000000 T name") — legitimate nm output, not parse failures.
-_NM_UNSIZED_ROW_RE = re.compile(
-    r"^\s*(?:[0-9a-fA-F]+\s+)?[A-Za-z?]\s+\S+\s*$"
-)
+_NM_UNSIZED_ROW_RE = re.compile(r"^\s*(?:[0-9a-fA-F]+\s+)?[A-Za-z?]\s+\S+\s*$")
 
 
 def symbol_inventory(

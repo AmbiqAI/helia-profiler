@@ -256,7 +256,10 @@ def _extract_operator_manifest(
         except Exception:  # noqa: BLE001
             pass
         try:
-            local_tensors = [_tensor_metadata(t, allocations, arena_region_ids) for t in (aot_op.local_tensors or [])]
+            local_tensors = [
+                _tensor_metadata(t, allocations, arena_region_ids)
+                for t in (aot_op.local_tensors or [])
+            ]
             if local_tensors:
                 entry["local_tensors"] = local_tensors
         except Exception:  # noqa: BLE001
@@ -281,7 +284,9 @@ def _arena_region_id_lookup(codegen_ctx: Any) -> dict[tuple[str, str, str], int]
             role = str(getattr(arena, "role", "")).lower()
             memory = str(getattr(arena, "memory", "")).lower()
             raw_source_memory = getattr(arena, "source_memory", None)
-            source_memory = str(raw_source_memory if raw_source_memory is not None else getattr(arena, "memory", "")).lower()
+            source_memory = str(
+                raw_source_memory if raw_source_memory is not None else getattr(arena, "memory", "")
+            ).lower()
             region_id = getattr(arena, "region_id", None)
             if role and memory and source_memory and isinstance(region_id, (int, float)):
                 lookup[(role, memory, source_memory)] = int(region_id)
@@ -394,12 +399,8 @@ def _extract_memory_plan_from_render_plan(
 
             role = str(getattr(arena, "role", arena_list_name.removesuffix("_arenas"))).lower()
             region_id = int(getattr(arena, "region_id", len(buckets)))
-            kind = (
-                ConsumerKind.WEIGHTS if role == ArenaRole.CONSTANT.value else ConsumerKind.ARENA
-            )
-            source_key_early = _aot_memory_region_key(
-                getattr(arena, "source_memory", None)
-            )
+            kind = ConsumerKind.WEIGHTS if role == ArenaRole.CONSTANT.value else ConsumerKind.ARENA
+            source_key_early = _aot_memory_region_key(getattr(arena, "source_memory", None))
             staged = source_key_early is not None and source_key_early != runtime_key
             buckets.setdefault(runtime_key, []).append(
                 MemoryConsumer(
@@ -418,9 +419,7 @@ def _extract_memory_plan_from_render_plan(
             )
             if role == ArenaRole.CONSTANT.value:
                 total_weights += size
-                source_key = _aot_memory_region_key(
-                    getattr(arena, "source_memory", None)
-                )
+                source_key = _aot_memory_region_key(getattr(arena, "source_memory", None))
                 if source_key is not None and source_key != runtime_key:
                     buckets.setdefault(source_key, []).append(
                         MemoryConsumer(
@@ -430,9 +429,7 @@ def _extract_memory_plan_from_render_plan(
                             # constants.c.j2:44 — the staged SOURCE blob
                             # is named by the RUNTIME memory, placed in
                             # source memory (#179 review M-3).
-                            symbol=(
-                                f"{prefix}_arena_const_{runtime_key.lower()}__source"
-                            ),
+                            symbol=(f"{prefix}_arena_const_{runtime_key.lower()}__source"),
                         )
                     )
 

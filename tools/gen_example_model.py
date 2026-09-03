@@ -57,9 +57,7 @@ def generate() -> bytes:
                 type=tensor_type,
                 buffer=buffer,
                 name=name,
-                quantization=(
-                    quantization(scale, zero_point) if include_quantization else None
-                ),
+                quantization=(quantization(scale, zero_point) if include_quantization else None),
             )
         )
         return len(tensors) - 1
@@ -116,9 +114,7 @@ def generate() -> bytes:
         buffer=data_buffer(rng.integers(-16, 17, 4), "<i4"),
     )
     logits = tensor("logits", [BATCH_SIZE, 4])
-    output = tensor(
-        "probabilities", [BATCH_SIZE, 4], scale=1 / 256, zero_point=-128
-    )
+    output = tensor("probabilities", [BATCH_SIZE, 4], scale=1 / 256, zero_point=-128)
 
     operators = [
         schema.OperatorT(

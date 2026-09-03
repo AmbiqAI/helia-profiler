@@ -79,7 +79,9 @@ class SupportBundleCollection:
 # ---------------------------------------------------------------------------
 
 
-def collect_support_bundle(options: SupportBundleOptions = SupportBundleOptions()) -> SupportBundleCollection:
+def collect_support_bundle(
+    options: SupportBundleOptions = SupportBundleOptions(),
+) -> SupportBundleCollection:
     """Gather every diagnostic section, redact it, and build the manifest.
 
     Never raises for a missing optional dependency, tool, or workspace —
@@ -261,7 +263,10 @@ def _collect_modules(
 ) -> RedactionCounts:
     payload = {
         "baseline": (
-            {module.name: {"project": module.project, "ref": module.ref} for module in baseline.modules}
+            {
+                module.name: {"project": module.project, "ref": module.ref}
+                for module in baseline.modules
+            }
             if baseline is not None
             else {}
         ),
@@ -558,9 +563,7 @@ def _write_deterministic_zip(path: Path, members: dict[str, bytes]) -> None:
     # platform supports it) at an unpredictable name, unlike a name derived
     # from the PID alone — that would let another local user on a shared
     # host pre-create the exact path (e.g. as a symlink) and win a race.
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent)
-    )
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
     tmp_path = Path(tmp_name)
     try:
         with os.fdopen(fd, "wb") as handle:

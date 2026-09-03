@@ -167,9 +167,7 @@ def test_collect_support_bundle_marks_missing_workspace_unavailable() -> None:
 def test_collect_support_bundle_marks_unprepared_workspace_unavailable(tmp_path: Path) -> None:
     empty_dir = tmp_path / "not-prepared"
     empty_dir.mkdir()
-    options = SupportBundleOptions(
-        workspace=empty_dir, include_probes=False, include_ports=False
-    )
+    options = SupportBundleOptions(workspace=empty_dir, include_probes=False, include_ports=False)
 
     collection = collect_support_bundle(options)
 
@@ -359,9 +357,7 @@ def test_collect_support_bundle_redacts_serial_everywhere_it_recurs_in_a_port_re
         interface="00",
         hwid=f"USB VID:PID=1366:0105 SER={serial} LOCATION=20-2",
     )
-    monkeypatch.setattr(
-        "helia_profiler.transport.ports.list_serial_ports", lambda **_kw: (port,)
-    )
+    monkeypatch.setattr("helia_profiler.transport.ports.list_serial_ports", lambda **_kw: (port,))
     options = SupportBundleOptions(include_probes=False, include_ports=True)
 
     collection = collect_support_bundle(options)
@@ -390,9 +386,7 @@ def test_collect_support_bundle_ports_raw_probe_ids_opt_in_keeps_serial_everywhe
         serial_number=serial,
         hwid=f"USB VID:PID=1366:0105 SER={serial} LOCATION=20-2",
     )
-    monkeypatch.setattr(
-        "helia_profiler.transport.ports.list_serial_ports", lambda **_kw: (port,)
-    )
+    monkeypatch.setattr("helia_profiler.transport.ports.list_serial_ports", lambda **_kw: (port,))
     options = SupportBundleOptions(include_probes=False, include_ports=True, raw_probe_ids=True)
 
     collection = collect_support_bundle(options)
@@ -441,9 +435,7 @@ def test_collect_support_bundle_unreadable_lock_degrades_section_not_traceback(
     original_mode = lock_path.stat().st_mode
     lock_path.chmod(0o000)
     try:
-        options = SupportBundleOptions(
-            workspace=app_dir, include_probes=False, include_ports=False
-        )
+        options = SupportBundleOptions(workspace=app_dir, include_probes=False, include_ports=False)
         collection = collect_support_bundle(options)
     finally:
         lock_path.chmod(original_mode)

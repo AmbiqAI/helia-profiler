@@ -54,7 +54,9 @@ def test_probes_list_inspects_against_board(monkeypatch, capsys) -> None:
 
 
 def test_probes_match_prints_resolved_serial(monkeypatch, capsys) -> None:
-    monkeypatch.setattr("helia_profiler.target.probe.jlink.resolve_probe_serial", lambda **kwargs: "1160002204")
+    monkeypatch.setattr(
+        "helia_profiler.target.probe.jlink.resolve_probe_serial", lambda **kwargs: "1160002204"
+    )
 
     cli._cmd_probes_match(board="apollo510_evb")
 
@@ -69,9 +71,7 @@ def test_target_reset_uses_noninteractive_wrapper(monkeypatch, capsys) -> None:
 
     monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", fake_reset_target)
 
-    cli._cmd_target_reset(
-        board="apollo4p_blue_kxr_evb", jlink_serial="1160001481", kind="debug"
-    )
+    cli._cmd_target_reset(board="apollo4p_blue_kxr_evb", jlink_serial="1160001481", kind="debug")
 
     assert calls == [{"device": "AMAP42KP-KBR", "jlink_serial": "1160001481"}]
     assert "Reset apollo4p_blue_kxr_evb" in capsys.readouterr().out

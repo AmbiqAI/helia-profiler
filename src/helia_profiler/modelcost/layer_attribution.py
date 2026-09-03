@@ -124,7 +124,9 @@ class LayerAttributor:
         """``source_index`` is a caller-carried original index (e.g.
         ``LayerResult.source_index``); it outranks re-parsing the label but
         never the manifest."""
-        position = layer_id if isinstance(layer_id, int) and not isinstance(layer_id, bool) else None
+        position = (
+            layer_id if isinstance(layer_id, int) and not isinstance(layer_id, bool) else None
+        )
         suffix = source_index if source_index is not None else source_index_from_op(op)
         explicit = True
         if self._source_map is not None:

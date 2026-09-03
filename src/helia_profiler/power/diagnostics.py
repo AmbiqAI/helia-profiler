@@ -192,9 +192,7 @@ def assess_gate_duration(
     # other bound and leaving a +/-50% check that calls almost anything valid.
     # A probe_window plan is exactly that shape (one unit lasting the whole
     # window), and so is a 1-inference counted window.
-    inference_slack_s = (
-        clean_infer_avg_us / 2_000_000.0 if clean_infer_count > 1 else 0.0
-    )
+    inference_slack_s = clean_infer_avg_us / 2_000_000.0 if clean_infer_count > 1 else 0.0
     packet_slack_s = 2.0 / max(1, stats_rate_hz)
     cross_binary_slack_s = expected_s * relative_tolerance
     return GateDurationIntegrity(
@@ -281,6 +279,7 @@ def external_observer_slack_s(stats_rate_hz: int | None) -> float:
     packet_s = 2.0 / max(1, stats_rate_hz) if stats_rate_hz else 0.0
     return packet_s + 2.0 * GATE_EDGE_POLL_INTERVAL_S
 
+
 #: Internally-referenced tolerance, TWO-SIDED. Internal mode has no host-timed
 #: gate, so the only plan-based reference is N x the reference inference time
 #: measured by a DIFFERENT binary (the transport-attached profile build). That
@@ -325,9 +324,7 @@ FROZEN_WINDOW_CLOCK_HINT = (
 )
 
 
-def firmware_window_clock_is_frozen(
-    *, elapsed_us: int | None, completed_count: int
-) -> bool:
+def firmware_window_clock_is_frozen(*, elapsed_us: int | None, completed_count: int) -> bool:
     """True when firmware completed work but reported zero elapsed time.
 
     An inference cannot take zero time, so this is never a legitimate reading;
@@ -703,9 +700,7 @@ class GateArbitration:
 
     def __post_init__(self) -> None:
         if self.integrity is None and self.integrity_recorded:
-            raise ValueError(
-                "integrity_recorded without an integrity term is incoherent"
-            )
+            raise ValueError("integrity_recorded without an integrity term is incoherent")
 
     @property
     def observer_agrees(self) -> bool | None:
@@ -725,11 +720,7 @@ class GateArbitration:
             return True
         if self.observer_agrees is False or self.terminal_unhealthy:
             return True
-        return (
-            self.integrity is not None
-            and not self.integrity.valid
-            and self.observer is None
-        )
+        return self.integrity is not None and not self.integrity.valid and self.observer is None
 
     @property
     def suppression_reason(self) -> GateSuppressionReason | None:
@@ -765,9 +756,7 @@ class GateArbitration:
             return None
         deviation = self.reference_deviation
         if deviation is None or not (
-            DRIFT_NOTE_MIN_RATIO_DEVIATION
-            < deviation
-            <= DRIFT_PLAUSIBLE_RATIO_DEVIATION
+            DRIFT_NOTE_MIN_RATIO_DEVIATION < deviation <= DRIFT_PLAUSIBLE_RATIO_DEVIATION
         ):
             return None
         drift_pct = (self.integrity.ratio - 1.0) * 100.0
@@ -842,9 +831,7 @@ def classify_gate_failure(
                 )
             ),
             hint=(
-                NO_GATE_RISE_LOCKSTEP_HINT
-                if lockstep_is_the_suspect
-                else NO_GATE_RISE_WIRING_HINT
+                NO_GATE_RISE_LOCKSTEP_HINT if lockstep_is_the_suspect else NO_GATE_RISE_WIRING_HINT
             ),
         )
     if saw_gate_fall:

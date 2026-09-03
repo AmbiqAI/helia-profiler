@@ -502,6 +502,8 @@ def test_redact_value_recurses_through_nested_dicts_and_lists() -> None:
     assert counts.urls == 1
     assert counts.serials == 1
     assert counts.env_values == 1
+
+
 def test_redact_value_preserves_tuple_type() -> None:
     value = ("relative/path", "plain text")
 

@@ -15,6 +15,7 @@ from .board import (
 )
 from .soc import SocDef, _SOCS
 
+
 @dataclass(frozen=True)
 class PlatformRegistry:
     """Resolved platform registry used for one config/run."""
@@ -23,7 +24,9 @@ class PlatformRegistry:
     boards: Mapping[str, BoardDef]
 
 
-def _freeze_registry(socs: Mapping[str, SocDef], boards: Mapping[str, BoardDef]) -> PlatformRegistry:
+def _freeze_registry(
+    socs: Mapping[str, SocDef], boards: Mapping[str, BoardDef]
+) -> PlatformRegistry:
     soc_map = dict(socs)
     board_map = dict(boards)
     for board in board_map.values():

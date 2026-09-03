@@ -59,7 +59,6 @@ from tests.contracts.test_firmware_render_snapshots import (
 )
 
 
-
 # ---------------------------------------------------------------------------
 # The matrix (D3) — one row per (workspace leg, target, render arm).
 # rtt-only: power/busy arms are rtt-only and transport variation is Tier 1's
@@ -84,18 +83,112 @@ class _HwCase:
 
 
 _MATRIX: tuple[_HwCase, ...] = (
-    _HwCase("510-rt-profile", "apollo510_evb-arm-none-eabi-gcc-helia-rt", "apollo510_evb", "apollo510", "helia-rt", "hpx_profiler", extra_profiler_tu=True),
-    _HwCase("510-rt-power", "apollo510_evb-arm-none-eabi-gcc-helia-rt", "apollo510_evb", "apollo510", "helia-rt", "hpx_profiler_power", power_only=True),
-    _HwCase("510-rt-power-busy", "apollo510_evb-arm-none-eabi-gcc-helia-rt", "apollo510_evb", "apollo510", "helia-rt", "hpx_profiler_power", power_only=True, probe="busy_loop"),
-    _HwCase("510-tflm-profile", "apollo510_evb-arm-none-eabi-gcc-tflm", "apollo510_evb", "apollo510", "tflm", "hpx_profiler", extra_profiler_tu=True),
-    _HwCase("510-tflm-power", "apollo510_evb-arm-none-eabi-gcc-tflm", "apollo510_evb", "apollo510", "tflm", "hpx_profiler_power", power_only=True),
-    _HwCase("510-aot-profile", "apollo510_evb-arm-none-eabi-gcc-helia-aot", "apollo510_evb", "apollo510", "helia-aot", "hpx_profiler"),
-    _HwCase("510-aot-profile-busy", "apollo510_evb-arm-none-eabi-gcc-helia-aot", "apollo510_evb", "apollo510", "helia-aot", "hpx_profiler", probe="busy_loop"),
-    _HwCase("510-et-profile", "apollo510_evb-arm-none-eabi-gcc-executorch", "apollo510_evb", "apollo510", "executorch", "hpx_profiler"),
-    _HwCase("510-et-profile-busy", "apollo510_evb-arm-none-eabi-gcc-executorch", "apollo510_evb", "apollo510", "executorch", "hpx_profiler", probe="busy_loop"),
-    _HwCase("330-rt-profile", "apollo330mP_evb-arm-none-eabi-gcc-helia-rt", "apollo330mP_evb", "apollo330P", "helia-rt", "hpx_profiler", extra_profiler_tu=True),
-    _HwCase("330-tflm-power", "apollo330mP_evb-arm-none-eabi-gcc-tflm", "apollo330mP_evb", "apollo330P", "tflm", "hpx_profiler_power", power_only=True),
-    _HwCase("330-aot-profile", "apollo330mP_evb-arm-none-eabi-gcc-helia-aot", "apollo330mP_evb", "apollo330P", "helia-aot", "hpx_profiler"),
+    _HwCase(
+        "510-rt-profile",
+        "apollo510_evb-arm-none-eabi-gcc-helia-rt",
+        "apollo510_evb",
+        "apollo510",
+        "helia-rt",
+        "hpx_profiler",
+        extra_profiler_tu=True,
+    ),
+    _HwCase(
+        "510-rt-power",
+        "apollo510_evb-arm-none-eabi-gcc-helia-rt",
+        "apollo510_evb",
+        "apollo510",
+        "helia-rt",
+        "hpx_profiler_power",
+        power_only=True,
+    ),
+    _HwCase(
+        "510-rt-power-busy",
+        "apollo510_evb-arm-none-eabi-gcc-helia-rt",
+        "apollo510_evb",
+        "apollo510",
+        "helia-rt",
+        "hpx_profiler_power",
+        power_only=True,
+        probe="busy_loop",
+    ),
+    _HwCase(
+        "510-tflm-profile",
+        "apollo510_evb-arm-none-eabi-gcc-tflm",
+        "apollo510_evb",
+        "apollo510",
+        "tflm",
+        "hpx_profiler",
+        extra_profiler_tu=True,
+    ),
+    _HwCase(
+        "510-tflm-power",
+        "apollo510_evb-arm-none-eabi-gcc-tflm",
+        "apollo510_evb",
+        "apollo510",
+        "tflm",
+        "hpx_profiler_power",
+        power_only=True,
+    ),
+    _HwCase(
+        "510-aot-profile",
+        "apollo510_evb-arm-none-eabi-gcc-helia-aot",
+        "apollo510_evb",
+        "apollo510",
+        "helia-aot",
+        "hpx_profiler",
+    ),
+    _HwCase(
+        "510-aot-profile-busy",
+        "apollo510_evb-arm-none-eabi-gcc-helia-aot",
+        "apollo510_evb",
+        "apollo510",
+        "helia-aot",
+        "hpx_profiler",
+        probe="busy_loop",
+    ),
+    _HwCase(
+        "510-et-profile",
+        "apollo510_evb-arm-none-eabi-gcc-executorch",
+        "apollo510_evb",
+        "apollo510",
+        "executorch",
+        "hpx_profiler",
+    ),
+    _HwCase(
+        "510-et-profile-busy",
+        "apollo510_evb-arm-none-eabi-gcc-executorch",
+        "apollo510_evb",
+        "apollo510",
+        "executorch",
+        "hpx_profiler",
+        probe="busy_loop",
+    ),
+    _HwCase(
+        "330-rt-profile",
+        "apollo330mP_evb-arm-none-eabi-gcc-helia-rt",
+        "apollo330mP_evb",
+        "apollo330P",
+        "helia-rt",
+        "hpx_profiler",
+        extra_profiler_tu=True,
+    ),
+    _HwCase(
+        "330-tflm-power",
+        "apollo330mP_evb-arm-none-eabi-gcc-tflm",
+        "apollo330mP_evb",
+        "apollo330P",
+        "tflm",
+        "hpx_profiler_power",
+        power_only=True,
+    ),
+    _HwCase(
+        "330-aot-profile",
+        "apollo330mP_evb-arm-none-eabi-gcc-helia-aot",
+        "apollo330mP_evb",
+        "apollo330P",
+        "helia-aot",
+        "hpx_profiler",
+    ),
 )
 
 
@@ -203,9 +296,7 @@ def _compiler_from_rules(rules_text: str) -> Path | None:
 
 
 def _rule_block(rules_text: str, rule_prefix: str) -> str:
-    m = re.search(
-        rf"^rule {re.escape(rule_prefix)}\S*\n((?:^\s+\S[^\n]*\n)+)", rules_text, re.M
-    )
+    m = re.search(rf"^rule {re.escape(rule_prefix)}\S*\n((?:^\s+\S[^\n]*\n)+)", rules_text, re.M)
     return m.group(1) if m else ""
 
 
@@ -243,10 +334,7 @@ def _split_ninja(value: str) -> list[str]:
     unescaping existed for).
     """
     protected = value.replace("$$", "\x00").replace("$ ", "\x01").replace("$:", ":")
-    return [
-        token.replace("\x01", " ").replace("\x00", "$")
-        for token in protected.split()
-    ]
+    return [token.replace("\x01", " ").replace("\x00", "$") for token in protected.split()]
 
 
 def _vendor_headers_as_system(includes: list[str], app_dir: Path) -> list[str]:
@@ -254,10 +342,7 @@ def _vendor_headers_as_system(includes: list[str], app_dir: Path) -> list[str]:
     so a diagnostic located inside them (``AM_SHARED_RW``) does not gate the
     rendered TU, which stays fully ``-Werror``."""
     del app_dir  # module dirs are recognised by path shape, not root
-    return [
-        flag.replace("-I", "-isystem", 1) if "/modules/" in flag else flag
-        for flag in includes
-    ]
+    return [flag.replace("-I", "-isystem", 1) if "/modules/" in flag else flag for flag in includes]
 
 
 def _compile_command(
@@ -403,9 +488,8 @@ def test_rendered_firmware_compiles_with_the_real_toolchain(tmp_path: Path):
     # HPX_COMPILE_HW_REQUIRE_ALL=1 turns any partial run into a failure
     # (the bench workflow's setting, once every leg's workspace is warm).
     if skipped:
-        status = (
-            f"compile_hw ran {len(runnable)}/{len(_MATRIX)} legs; skipped:\n  "
-            + "\n  ".join(skipped)
+        status = f"compile_hw ran {len(runnable)}/{len(_MATRIX)} legs; skipped:\n  " + "\n  ".join(
+            skipped
         )
         if _require_all_legs():
             pytest.fail(status)

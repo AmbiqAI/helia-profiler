@@ -54,10 +54,7 @@ def _write_result_manifest(
     """
     if evaluation is None:
         evaluation = evaluate_run(ctx)
-    artifacts = tuple(
-        _result_artifact(path, output_dir)
-        for path in paths
-    )
+    artifacts = tuple(_result_artifact(path, output_dir) for path in paths)
     manifest = ResultManifest(
         schema=RESULT_MANIFEST_SCHEMA,
         schema_version=RESULT_MANIFEST_SCHEMA_VERSION,
@@ -219,9 +216,7 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
         ComparisonDimension.ENGINE_VERSION: (
             ctx.run_metadata.engine.version if ctx.run_metadata.engine is not None else None
         ),
-        ComparisonDimension.LINK_FAMILY: (
-            platform.link_family if platform is not None else None
-        ),
+        ComparisonDimension.LINK_FAMILY: (platform.link_family if platform is not None else None),
     }
     if ctx.power_result is not None:
         # A run that measured no power has nothing to say about how it
@@ -251,9 +246,7 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
                 # Code hash of the measured binary (#138/#115) — same helper
                 # summary.py writes into summary.power, so the manifest and
                 # artifact values cannot disagree.
-                ComparisonDimension.POWER_FIRMWARE_FINGERPRINT: (
-                    measured_power_fingerprint(ctx)
-                ),
+                ComparisonDimension.POWER_FIRMWARE_FINGERPRINT: (measured_power_fingerprint(ctx)),
             }
         )
     return {dimension.value: value for dimension, value in values.items()}

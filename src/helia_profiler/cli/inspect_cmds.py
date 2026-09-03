@@ -134,14 +134,12 @@ def _cmd_doctor_bundle(
         sys.exit(1)
 
     if json_:
-        print(
-            json.dumps(
-                {"path": str(path), "manifest": collection.manifest.to_dict()}, indent=2
-            )
-        )
+        print(json.dumps({"path": str(path), "manifest": collection.manifest.to_dict()}, indent=2))
     else:
         print(f"Support bundle written to {path}")
-        unavailable = [section.name for section in collection.manifest.sections if not section.available]
+        unavailable = [
+            section.name for section in collection.manifest.sections if not section.available
+        ]
         if unavailable:
             print(f"Skipped sections: {', '.join(unavailable)}")
 
@@ -233,9 +231,7 @@ def _cmd_probes_list(
         _print_rows(rows, ("serial", "product", "connection"))
 
 
-def _cmd_probes_match(
-    *, board: str, jlink_serial: str | None = None, json_: bool = False
-) -> None:
+def _cmd_probes_match(*, board: str, jlink_serial: str | None = None, json_: bool = False) -> None:
     from ..errors import HpxError
     from ..target.probe.jlink import resolve_probe_serial
 
@@ -293,9 +289,7 @@ def _cmd_ports_list(*, show_all: bool = False, json_: bool = False) -> None:
     _print_rows(rows, ("device", "kind", "serial_number", "description", "product"))
 
 
-def _cmd_target_reset(
-    *, board: str, jlink_serial: str | None = None, kind: str = "debug"
-) -> None:
+def _cmd_target_reset(*, board: str, jlink_serial: str | None = None, kind: str = "debug") -> None:
     from ..errors import HpxError
     from ..target.probe.jlink import reset_target, reset_target_poi
 

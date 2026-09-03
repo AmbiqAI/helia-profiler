@@ -43,15 +43,9 @@ def profile(
     return ProfileResult(
         pmu=ctx.captured_pmu,
         power=ctx.power_result,
-        power_observation=(
-            ctx.power_run.observation if ctx.power_run is not None else None
-        ),
-        power_terminal=(
-            ctx.power_run.terminal if ctx.power_run is not None else None
-        ),
-        on_device_power=(
-            ctx.power_run.on_device_summary if ctx.power_run is not None else None
-        ),
+        power_observation=(ctx.power_run.observation if ctx.power_run is not None else None),
+        power_terminal=(ctx.power_run.terminal if ctx.power_run is not None else None),
+        on_device_power=(ctx.power_run.on_device_summary if ctx.power_run is not None else None),
         metadata=ctx.run_metadata,
         report_paths=list(ctx.report_paths),
     )

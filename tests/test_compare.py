@@ -188,9 +188,7 @@ def _publish_manifest(path: Path) -> Path:
         artifacts.append(
             ResultArtifact(
                 path=artifact_path.name,
-                media_type=(
-                    "application/json" if artifact_path.suffix == ".json" else "text/csv"
-                ),
+                media_type=("application/json" if artifact_path.suffix == ".json" else "text/csv"),
                 size_bytes=artifact_path.stat().st_size,
                 sha256=hashlib.sha256(artifact_path.read_bytes()).hexdigest(),
             )
@@ -573,7 +571,9 @@ def test_memory_rows_join_on_the_source_index_not_position(tmp_path: Path):
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
     for d in (baseline, candidate):
-        _write_run(d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+        _write_run(
+            d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
+        )
         # Rewrite the profile CSV with an AOT-style skewed layer: execution
         # position 0, ORIGINAL index 5.
         rows = list(csv.DictReader(open(d / "profile_results.csv")))
@@ -634,7 +634,9 @@ def test_unresolvable_source_gets_no_memory_rows(tmp_path: Path):
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
     for d in (baseline, candidate):
-        _write_run(d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+        _write_run(
+            d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
+        )
         rows = list(csv.DictReader(open(d / "profile_results.csv")))
         rows[0]["op"] = "OPERATOR_CALL:c3i12"
         with open(d / "profile_results.csv", "w", newline="") as f:
@@ -673,7 +675,9 @@ def test_recorded_source_index_outranks_the_label_suffix(tmp_path: Path):
         "shape": "[4]",
     }
     for d in (baseline, candidate):
-        _write_run(d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+        _write_run(
+            d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
+        )
         rows = list(csv.DictReader(open(d / "profile_results.csv")))
         rows[0]["op"] = "CONV_2D:5"
         rows[0]["source_index"] = "7"
@@ -707,7 +711,9 @@ def test_zero_join_memory_artifacts_warn(tmp_path: Path):
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
     for d in (baseline, candidate):
-        _write_run(d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+        _write_run(
+            d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
+        )
         rows = list(csv.DictReader(open(d / "profile_results.csv")))
         rows[0]["op"] = "CONV_2D:5"
         with open(d / "profile_results.csv", "w", newline="") as f:
@@ -728,7 +734,9 @@ def test_derived_analysis_fields_are_not_counter_diffs(tmp_path: Path):
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
     for d, cycles in ((baseline, 800), (candidate, 700)):
-        _write_run(d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[cycles])
+        _write_run(
+            d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[cycles]
+        )
         rows = list(csv.DictReader(open(d / "profile_results.csv")))
         rows[0].update({"macs": "1000", "ops": "2000", "cycles_per_mac": "0.8"})
         with open(d / "profile_results.csv", "w", newline="") as f:
@@ -966,9 +974,7 @@ class TestMemoryRegionRows:
             "power.energy_per_inference_j",
         }
         groups = {f.name: f.group for f in _METRIC_FIELDS}
-        assert all(
-            (g == "power") == n.startswith("power.") for n, g in groups.items()
-        )
+        assert all((g == "power") == n.startswith("power.") for n, g in groups.items())
 
 
 def test_compare_survives_a_wider_than_header_layer_row(tmp_path: Path):
@@ -978,7 +984,9 @@ def test_compare_survives_a_wider_than_header_layer_row(tmp_path: Path):
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
     for d in (baseline, candidate):
-        _write_run(d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+        _write_run(
+            d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
+        )
     # Append a stray extra column to the baseline's first data row.
     rows = (baseline / "profile_results.csv").read_text().splitlines()
     rows[1] = rows[1] + ",SURPRISE"
@@ -1003,7 +1011,9 @@ def test_compare_summary_json_is_valid_when_a_metric_is_non_finite(tmp_path: Pat
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
     for d in (baseline, candidate):
-        _write_run(d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+        _write_run(
+            d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
+        )
     # Inject a non-finite headline metric into one summary.json.
     summ = json.loads((candidate / "summary.json").read_text())
     summ["total_cycles"] = float("inf")
@@ -1028,7 +1038,9 @@ def test_compare_console_survives_a_non_finite_metric(tmp_path: Path):
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
     for d in (baseline, candidate):
-        _write_run(d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800])
+        _write_run(
+            d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
+        )
     summ = json.loads((candidate / "summary.json").read_text())
     summ["total_cycles"] = float("nan")
     (candidate / "summary.json").write_text(json.dumps(summ))

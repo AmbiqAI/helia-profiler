@@ -591,7 +591,9 @@ def flash_binary(
             bin_path,
             load_addr,
         )
-        script = f'ExitOnError 1\nReset\nLoadFile "{bin_path}", 0x{load_addr:08X}\nReset\nGo\nExit\n'
+        script = (
+            f'ExitOnError 1\nReset\nLoadFile "{bin_path}", 0x{load_addr:08X}\nReset\nGo\nExit\n'
+        )
         expected_addr = load_addr
         expected_source = "the resolved app flash load address"
 

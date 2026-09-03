@@ -33,8 +33,7 @@ def test_configuration_reference_matches_generator():
     expected = generator.render()
 
     assert DOCS_PATH.is_file(), (
-        f"{DOCS_PATH} is missing. Generate it with: "
-        "uv run python tools/gen_config_reference.py"
+        f"{DOCS_PATH} is missing. Generate it with: uv run python tools/gen_config_reference.py"
     )
     actual = DOCS_PATH.read_text(encoding="utf-8")
     # Tolerate CRLF checkouts on Windows (git core.autocrlf); the semantic

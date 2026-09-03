@@ -144,13 +144,9 @@ def measured_power_fingerprint(ctx: PipelineContext) -> str | None:
     if ctx.power_run is None or ctx.firmware_dir is None:
         return None
     src_dir = ctx.firmware_dir / "src"
-    main_name = (
-        "main_power.cc" if ctx.power_run.plan.firmware_mode == "dedicated" else "main.cc"
-    )
+    main_name = "main_power.cc" if ctx.power_run.plan.firmware_mode == "dedicated" else "main.cc"
     try:
-        main_digest = firmware_code_fingerprint(
-            (src_dir / main_name).read_text(encoding="utf-8")
-        )
+        main_digest = firmware_code_fingerprint((src_dir / main_name).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         # ValueError covers UnicodeDecodeError: a partially-written or
         # corrupt source must degrade to the absent/legacy value, never
@@ -171,9 +167,7 @@ def measured_power_fingerprint(ctx: PipelineContext) -> str | None:
     # "absent": deterministic, and distinct from any present content.
     for name in ("hpx_pmu_profiler.cc", "hpx_pmu_profiler.h"):
         try:
-            digest = firmware_code_fingerprint(
-                (src_dir / name).read_text(encoding="utf-8")
-            )
+            digest = firmware_code_fingerprint((src_dir / name).read_text(encoding="utf-8"))
         except (OSError, ValueError):
             digest = "absent"
         parts.append(f"{name}\x00{digest}")

@@ -96,8 +96,7 @@ def parse_model_keys(models_arg: str | None) -> list[str]:
     unknown = [key for key in keys if key not in MODELS]
     if not keys or unknown:
         raise SystemExit(
-            f"--models must be a comma-separated subset of {', '.join(MODELS)}; "
-            f"got {models_arg!r}"
+            f"--models must be a comma-separated subset of {', '.join(MODELS)}; got {models_arg!r}"
         )
     return keys
 
@@ -138,13 +137,9 @@ def git_commit(repo: Path) -> str:
 def check_pins(torch, executorch_root: Path) -> str:
     commit = git_commit(executorch_root)
     if commit != EXPECTED_EXECUTORCH_COMMIT:
-        raise SystemExit(
-            f"ExecuTorch commit is {commit}; expected {EXPECTED_EXECUTORCH_COMMIT}"
-        )
+        raise SystemExit(f"ExecuTorch commit is {commit}; expected {EXPECTED_EXECUTORCH_COMMIT}")
     if torch.__version__.split("+", 1)[0] != EXPECTED_TORCH_VERSION:
-        raise SystemExit(
-            f"PyTorch is {torch.__version__}; expected {EXPECTED_TORCH_VERSION}"
-        )
+        raise SystemExit(f"PyTorch is {torch.__version__}; expected {EXPECTED_TORCH_VERSION}")
     return commit
 
 

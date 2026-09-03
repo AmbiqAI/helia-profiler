@@ -115,9 +115,7 @@ class BaseCaptureTransport:
     def prepared_args(self) -> CaptureArgs:
         """The shared capture args (present once :meth:`prepare` has run)."""
         if self._args is None:
-            raise CaptureError(
-                f"{type(self).__name__}.collect() requires prepare() to run first."
-            )
+            raise CaptureError(f"{type(self).__name__}.collect() requires prepare() to run first.")
         return self._args
 
     def start(self, ctx: PipelineContext) -> None:

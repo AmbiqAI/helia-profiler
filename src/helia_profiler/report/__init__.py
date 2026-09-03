@@ -105,8 +105,7 @@ def write_report(ctx: PipelineContext) -> list[Path]:
             ),
             on_device_summary=(
                 asdict(ctx.power_run.on_device_summary)
-                if ctx.power_run is not None
-                and ctx.power_run.on_device_summary is not None
+                if ctx.power_run is not None and ctx.power_run.on_device_summary is not None
                 else None
             ),
         )

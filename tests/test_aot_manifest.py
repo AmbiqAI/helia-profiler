@@ -70,7 +70,12 @@ class _FakeAotOp:
 
 
 class _FakeCtx:
-    def __init__(self, operators: list[Any] | None, memory_plan: Any | None = None, render_plan: Any | None = None):
+    def __init__(
+        self,
+        operators: list[Any] | None,
+        memory_plan: Any | None = None,
+        render_plan: Any | None = None,
+    ):
         if operators is not None:
             self.operators = operators
         if memory_plan is not None:
@@ -303,18 +308,21 @@ class TestWriteAotManifest:
             pass
 
         assert (
-            _write_aot_manifest(_NoArtifacts(), tmp_path) is None  # ty: ignore[invalid-argument-type]  # duck-typed ctx stand-in
+            _write_aot_manifest(_NoArtifacts(), tmp_path)
+            is None  # ty: ignore[invalid-argument-type]  # duck-typed ctx stand-in
         )
 
     def test_returns_none_for_empty_manifest(self, tmp_path: Path):
         assert (
-            _write_aot_manifest(_StubCtx([]), tmp_path) is None  # ty: ignore[invalid-argument-type]  # duck-typed ctx stand-in
+            _write_aot_manifest(_StubCtx([]), tmp_path)
+            is None  # ty: ignore[invalid-argument-type]  # duck-typed ctx stand-in
         )
         assert not (tmp_path / "aot_operator_manifest.json").exists()
 
     def test_returns_none_for_missing_manifest_key(self, tmp_path: Path):
         assert (
-            _write_aot_manifest(_StubCtx(None), tmp_path) is None  # ty: ignore[invalid-argument-type]  # duck-typed ctx stand-in
+            _write_aot_manifest(_StubCtx(None), tmp_path)
+            is None  # ty: ignore[invalid-argument-type]  # duck-typed ctx stand-in
         )
 
     def test_writes_manifest_json_round_trip(self, tmp_path: Path):
@@ -322,7 +330,9 @@ class TestWriteAotManifest:
             {"idx": 0, "id": 0, "op_type": "CONV_2D", "name": "conv_2d_0"},
             {"idx": 1, "id": 3, "op_type": "ADD", "name": "add_3"},
         ]
-        out = _write_aot_manifest(_StubCtx(manifest), tmp_path)  # ty: ignore[invalid-argument-type]  # duck-typed ctx stand-in
+        out = _write_aot_manifest(
+            _StubCtx(manifest), tmp_path
+        )  # ty: ignore[invalid-argument-type]  # duck-typed ctx stand-in
         assert out is not None
         assert out.name == "aot_operator_manifest.json"
         round_trip = json.loads(out.read_text())
@@ -355,7 +365,9 @@ class TestWriteAotMemoryLayers:
             }
         ]
 
-        out = _write_aot_memory_layers(_StubCtx(manifest), tmp_path)  # ty: ignore[invalid-argument-type]  # duck-typed ctx stand-in
+        out = _write_aot_memory_layers(
+            _StubCtx(manifest), tmp_path
+        )  # ty: ignore[invalid-argument-type]  # duck-typed ctx stand-in
 
         assert out is not None
         rows = list(csv.DictReader(open(out)))
@@ -385,7 +397,9 @@ class TestWriteAotMemoryLayers:
             }
         ]
 
-        out = _write_aot_memory_layers(_StubCtx(manifest), tmp_path)  # ty: ignore[invalid-argument-type]  # duck-typed ctx stand-in
+        out = _write_aot_memory_layers(
+            _StubCtx(manifest), tmp_path
+        )  # ty: ignore[invalid-argument-type]  # duck-typed ctx stand-in
 
         assert out is not None
         rows = list(csv.DictReader(open(out)))
@@ -425,7 +439,4 @@ class TestAotSymbolHints:
         assert self._hint("persistent") == "hpx_arena_persistent_dtcm_buffer"
         # external mode: hpx's own main_aot.cc.j2 storage symbol, literal
         # "hpx_" regardless of the AOT prefix, keyed by region_id.
-        assert (
-            self._hint("scratch", allocate=False, region_id=2)
-            == "hpx_arena_buf_storage_2"
-        )
+        assert self._hint("scratch", allocate=False, region_id=2) == "hpx_arena_buf_storage_2"

@@ -200,9 +200,7 @@ def _gitlink_commit(path: Path, submodule: str) -> str:
     )
 
 
-def _provider_module_ref(
-    config: ProfileConfig, work_dir: Path, provider: str
-) -> NsxModuleRef:
+def _provider_module_ref(config: ProfileConfig, work_dir: Path, provider: str) -> NsxModuleRef:
     """Resolve exactly one provider through the normal NSX module contract."""
     if provider == "ns":
         from .cmsis_nn import cmsis_nn_module_ref
@@ -212,18 +210,12 @@ def _provider_module_ref(
     configured_path = config.engine.config.get("cmsis_nn_path")
     requested_ref = config.engine.config.get("cmsis_nn_ref")
     if configured_path and requested_ref:
-        raise EngineError(
-            "engine.config.cmsis_nn_path and cmsis_nn_ref are mutually exclusive"
-        )
+        raise EngineError("engine.config.cmsis_nn_path and cmsis_nn_ref are mutually exclusive")
     if configured_path is not None:
         if not isinstance(configured_path, (str, Path)) or not str(configured_path).strip():
-            raise EngineError(
-                "engine.config.cmsis_nn_path must be a non-empty filesystem path"
-            )
+            raise EngineError("engine.config.cmsis_nn_path must be a non-empty filesystem path")
         source = Path(configured_path).expanduser().resolve()
-        if not (source / "nsx-module.yaml").is_file() or not (
-            source / "CMakeLists.txt"
-        ).is_file():
+        if not (source / "nsx-module.yaml").is_file() or not (source / "CMakeLists.txt").is_file():
             raise EngineError(
                 f"Invalid arm-cmsis-nn checkout: {source}",
                 hint="Expected nsx-module.yaml and CMakeLists.txt at the repository root.",
@@ -336,9 +328,7 @@ def _validate_sidecar_fields(sidecar: Path, manifest: dict[str, Any]) -> None:
         entries = manifest.get(key)
         if entries is None:
             continue
-        if not isinstance(entries, list) or not all(
-            isinstance(entry, dict) for entry in entries
-        ):
+        if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
             fail(key, "a list of tensor objects")
         for entry in entries:
             size = entry.get("size_bytes")
@@ -352,8 +342,7 @@ def _validate_sidecar_fields(sidecar: Path, manifest: dict[str, Any]) -> None:
             fail("operators", "an object of operator lists")
         portable = operators.get("portable")
         if portable is not None and (
-            not isinstance(portable, list)
-            or not all(isinstance(name, str) for name in portable)
+            not isinstance(portable, list) or not all(isinstance(name, str) for name in portable)
         ):
             fail("operators.portable", "a list of operator names")
 
@@ -437,8 +426,7 @@ class ExecuTorchAdapter(SingleArenaPlacementMixin):
         planned_size = _positive_int(
             engine_config,
             "planned_arena_size",
-            config.model.arena_size
-            or (sidecar.get("planned_arena_size") if sidecar else None),
+            config.model.arena_size or (sidecar.get("planned_arena_size") if sidecar else None),
         )
         method_size = _positive_int(engine_config, "method_arena_size", 64 * 1024)
         temporary_size = _positive_int(engine_config, "temporary_arena_size", 32 * 1024)

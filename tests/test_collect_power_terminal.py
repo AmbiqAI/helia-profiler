@@ -309,9 +309,7 @@ class TestInternalMeasurementPlausibility:
         ctx = _make_ctx(tmp_path, internal=True)
         monkeypatch.setattr(
             "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
-            lambda transport: _FakeTerminalTransport(
-                _record(), _measurement(charge_nc=0)
-            ),
+            lambda transport: _FakeTerminalTransport(_record(), _measurement(charge_nc=0)),
         )
         with pytest.raises(PowerError, match="reversed sense wiring"):
             CollectPowerTerminalStage().run(ctx)
@@ -402,9 +400,7 @@ class TestFirmwareWindowClockIntegrity:
     def _bench_measurement(self, elapsed_us: int) -> OnDevicePowerSummary:
         # Internal mode requires a measurement payload; the parser already
         # enforces duration_us == elapsed_us, so mirror that here.
-        return _measurement(
-            duration_us=elapsed_us, inference_count=self.BENCH_COUNT
-        )
+        return _measurement(duration_us=elapsed_us, inference_count=self.BENCH_COUNT)
 
     # --- 1. frozen clock: fatal internally, warning externally ---------------
 
@@ -685,9 +681,7 @@ class TestBusyLoopProbeCompletesARun:
     never consumed.
     """
 
-    def test_busy_loop_terminal_is_accepted(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_busy_loop_terminal_is_accepted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         ctx = _make_ctx(tmp_path, inference_count=5, clean_window_probe="busy_loop")
         # One spin window, one unit of work, and a real measured duration.
         record = _record(requested_count=1, completed_count=1, elapsed_us=5000)

@@ -73,9 +73,7 @@ def test_security_floors_are_declared() -> None:
     """
     floors = _security_floors()
 
-    for name, last_vulnerable, first_patched in (
-        ("idna", "3.14", "3.15"),
-    ):
+    for name, last_vulnerable, first_patched in (("idna", "3.14", "3.15"),):
         assert name in floors, (
             f"security floor for {name!r} is gone from [tool.uv] constraint-dependencies; "
             "if that removal is intentional, drop it from this test too"

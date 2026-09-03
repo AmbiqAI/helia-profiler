@@ -50,14 +50,10 @@ class TestCanonicalCode:
         assert split != joined
         assert split == "#define A 1\nint x;"
         # #if/#endif structure likewise:
-        assert canonical_code("#if X\nint a;\n#endif\nint b;") == (
-            "#if X\nint a;\n#endif\nint b;"
-        )
+        assert canonical_code("#if X\nint a;\n#endif\nint b;") == ("#if X\nint a;\n#endif\nint b;")
         # ...but a block comment INSIDE a directive is phase-3 whitespace,
         # not a directive break:
-        assert canonical_code("#define A 1 /* c\n c */ + 2\nint x;") == (
-            "#define A 1 + 2\nint x;"
-        )
+        assert canonical_code("#define A 1 /* c\n c */ + 2\nint x;") == ("#define A 1 + 2\nint x;")
 
     def test_stray_apostrophe_cannot_swallow_the_file(self):
         """#173: a digit separator (1'000) is not a char literal —
@@ -174,9 +170,7 @@ class TestMeasuredPowerFingerprint:
 
         model = tmp_path / "m.tflite"
         model.write_bytes(b"\x00")
-        config = load_config(
-            None, {"model": {"path": str(model)}, "engine": {"type": "helia-rt"}}
-        )
+        config = load_config(None, {"model": {"path": str(model)}, "engine": {"type": "helia-rt"}})
         bare = PipelineContext(config=config, work_dir=tmp_path)
         assert measured_power_fingerprint(bare) is None
 
@@ -211,9 +205,7 @@ class TestCompositeConstruction:
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         ctx.publish_power_plan(
-            PowerRunPlan(
-                firmware_mode="dedicated", inference_count=1, count_source="configured"
-            )
+            PowerRunPlan(firmware_mode="dedicated", inference_count=1, count_source="configured")
         )
         src = tmp_path / "fw" / "src"
         src.mkdir(parents=True)
@@ -228,8 +220,7 @@ class TestCompositeConstruction:
                     "scheme\x00hpx-power-fingerprint-v2",
                     "main_power.cc\x00"
                     + firmware_code_fingerprint("int main(void) { return 9; }\n"),
-                    "hpx_pmu_profiler.cc\x00"
-                    + firmware_code_fingerprint("void p(void) {}\n"),
+                    "hpx_pmu_profiler.cc\x00" + firmware_code_fingerprint("void p(void) {}\n"),
                     "hpx_pmu_profiler.h\x00absent",
                 ]
             ).encode("utf-8")
@@ -242,14 +233,8 @@ class TestContinuationHardening:
     directive carve-out in the dangerous (false-equal) direction."""
 
     def test_continued_macro_body_boundary_survives(self):
-        a = (
-            "#define FOO(x) \\\n  do { bar(x); } while (0)\n"
-            "int main(void) { return 0; }\n"
-        )
-        b = (
-            "#define FOO(x) \\\n"
-            "  do { bar(x); } while (0) int main(void) { return 0; }\n"
-        )
+        a = "#define FOO(x) \\\n  do { bar(x); } while (0)\nint main(void) { return 0; }\n"
+        b = "#define FOO(x) \\\n  do { bar(x); } while (0) int main(void) { return 0; }\n"
         assert firmware_code_fingerprint(a) != firmware_code_fingerprint(b)
 
     def test_unterminated_literal_on_continued_line_cannot_swallow(self):

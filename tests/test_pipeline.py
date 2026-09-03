@@ -542,7 +542,9 @@ class TestNarrowingAccessors:
         if field == "binary_path":
             set_profile_firmware(ctx, binary_path=sentinel)
         elif field == "pmu_result":
-            set_profile_result(ctx, sentinel)  # ty: ignore[invalid-argument-type]  # the sentinel passthrough IS the test
+            set_profile_result(
+                ctx, sentinel
+            )  # ty: ignore[invalid-argument-type]  # the sentinel passthrough IS the test
         else:
             setattr(ctx, field, sentinel)
         assert getattr(ctx, accessor) is sentinel

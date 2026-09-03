@@ -39,9 +39,7 @@ def test_resolves_address_from_nested_map(tmp_path: Path):
 def test_resolves_power_target_without_selecting_profile_map(tmp_path: Path):
     build_dir = tmp_path / "build"
     build_dir.mkdir()
-    (build_dir / "hpx_profiler.map").write_text(
-        _GCC_MAP.replace("0x20088010", "0x20001000")
-    )
+    (build_dir / "hpx_profiler.map").write_text(_GCC_MAP.replace("0x20088010", "0x20001000"))
     (build_dir / "hpx_profiler_power.map").write_text(_GCC_MAP)
 
     addr = resolve_rtt_control_block_address(
@@ -64,6 +62,5 @@ def test_returns_none_when_symbol_absent(tmp_path: Path):
 def test_returns_none_when_build_dir_missing():
     assert resolve_rtt_control_block_address(None, "arm-none-eabi-gcc") is None
     assert (
-        resolve_rtt_control_block_address(Path("/nonexistent/build"), "arm-none-eabi-gcc")
-        is None
+        resolve_rtt_control_block_address(Path("/nonexistent/build"), "arm-none-eabi-gcc") is None
     )

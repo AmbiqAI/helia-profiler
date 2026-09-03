@@ -200,11 +200,7 @@ def test_parse_rejects_invalid_records(lines: list[str], message: str) -> None:
 
 
 def test_parse_requires_elapsed_time_for_v1() -> None:
-    lines = [
-        line
-        for line in _lines()
-        if not line.startswith("HPX_POWER_ELAPSED_US=")
-    ]
+    lines = [line for line in _lines() if not line.startswith("HPX_POWER_ELAPSED_US=")]
 
     with pytest.raises(PowerError, match="missing fields: HPX_POWER_ELAPSED_US"):
         parse_power_terminal_envelope(lines).terminal
@@ -429,9 +425,7 @@ class _FakeSerial:
 
 
 def test_collect_serial_terminal_ignores_noise_and_parses_fresh_frame() -> None:
-    stream = _FakeSerial(
-        [b"stale noise\n", *(f"{line}\n".encode() for line in _lines())]
-    )
+    stream = _FakeSerial([b"stale noise\n", *(f"{line}\n".encode() for line in _lines())])
 
     envelope = _collect_serial_terminal(stream, timeout_s=1.0)
 

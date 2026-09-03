@@ -237,9 +237,7 @@ def _target_callback(ctx: typer.Context) -> None:
         raise typer.Exit(0)
 
 
-@target_app.command(
-    "reset", help="Reset a target through HPX's non-interactive J-Link wrapper"
-)
+@target_app.command("reset", help="Reset a target through HPX's non-interactive J-Link wrapper")
 def target_reset_command(
     board: Annotated[str, typer.Option("--board", help="Target board ID")],
     jlink_serial: Annotated[

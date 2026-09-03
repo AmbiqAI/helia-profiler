@@ -84,9 +84,7 @@ def print_analysis(
         row_vals = [str(la.id)]
         if engine_label != "tflite":
             oid = (
-                la.original_id
-                if hasattr(la, "original_id") and la.original_id is not None
-                else "—"
+                la.original_id if hasattr(la, "original_id") and la.original_id is not None else "—"
             )
             row_vals.append(str(oid))
         row_vals.extend(

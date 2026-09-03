@@ -450,7 +450,9 @@ def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, Boar
             name=name,
             soc=str(soc),
             channel=str(channel),
-            psram_kb=_optional_int(spec.get("psram_kb", base_board.psram_kb if base_board else None)),
+            psram_kb=_optional_int(
+                spec.get("psram_kb", base_board.psram_kb if base_board else None)
+            ),
             # All four pins below go through a validating parser rather than a
             # bare ``int()``.  See :func:`_gpio_pin`: these values end up
             # configuring pads as outputs inside the measured window, so the

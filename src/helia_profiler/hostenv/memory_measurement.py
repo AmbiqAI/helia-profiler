@@ -67,8 +67,7 @@ def measure_memory_regions(
     windows = linked_memory_map(soc, linker_profile=linker_profile)
     if not windows:
         log.debug(
-            "No characterized memory map for %s (profile %r); "
-            "measured regions unavailable.",
+            "No characterized memory map for %s (profile %r); measured regions unavailable.",
             soc.name,
             linker_profile,
         )
@@ -150,8 +149,7 @@ def measure_memory_regions(
     unattributed_load = sum(
         seg.file_size
         for seg in inventory.segments
-        if seg.file_size
-        and classify_address(seg.physical_address, attributable) is None
+        if seg.file_size and classify_address(seg.physical_address, attributable) is None
     )
     if unattributed_load:
         log.warning(
@@ -242,8 +240,7 @@ def reconcile_memory(
     sides know. Purely additive — never mutates either input.
     """
     measured_windows = tuple(
-        (str(r.region), r.window_start, r.window_start + r.window_length)
-        for r in measured.regions
+        (str(r.region), r.window_start, r.window_start + r.window_length) for r in measured.regions
     )
 
     def _classify(address: int) -> str | None:
@@ -257,9 +254,7 @@ def reconcile_memory(
         region_name = str(region_usage.region)
         for consumer in region_usage.consumers:
             candidates = (
-                (consumer.symbol,)
-                if consumer.symbol
-                else _CONSUMER_SYMBOLS.get(consumer.name, ())
+                (consumer.symbol,) if consumer.symbol else _CONSUMER_SYMBOLS.get(consumer.name, ())
             )
             if region_name == "PSRAM":
                 # PSRAM objects bind through runtime POINTERS — and the
@@ -276,13 +271,9 @@ def reconcile_memory(
             else:
                 matched = _match_symbols(tuple(candidates), symbols)
                 status = "matched" if matched else "missing"
-            measured_size = (
-                sum(m.size for m in matched) if status == "matched" else None
-            )
+            measured_size = sum(m.size for m in matched) if status == "matched" else None
             measured_region = (
-                _classify(max(matched, key=lambda m: m.size).address)
-                if matched
-                else None
+                _classify(max(matched, key=lambda m: m.size).address) if matched else None
             )
             consumers.append(
                 ConsumerReconciliation(
@@ -294,11 +285,7 @@ def reconcile_memory(
                     matched_symbols=tuple(m.name for m in matched),
                     measured_size=measured_size,
                     measured_region=measured_region,
-                    delta=(
-                        measured_size - consumer.size
-                        if measured_size is not None
-                        else None
-                    ),
+                    delta=(measured_size - consumer.size if measured_size is not None else None),
                 )
             )
 

@@ -630,9 +630,7 @@ def capture_rtt_output(
         # Feed the bytes already drained during the attach probe (typically the
         # HPX_READY line) into the handshake so none are lost.
         handshake_read = (
-            _prepend_pending_bytes(read_rtt_chunk, probe_bytes)
-            if probe_bytes
-            else read_rtt_chunk
+            _prepend_pending_bytes(read_rtt_chunk, probe_bytes) if probe_bytes else read_rtt_chunk
         )
         handshake_started_s = time.monotonic()
         pending = _perform_rtt_ready_handshake(
@@ -728,10 +726,10 @@ class RttTransport(BaseCaptureTransport):
         # (heliaAOT) populates PSRAM itself and never emits the handshake,
         # so gating on placement alone hangs the run (#219).
         psram_host_upload = (
-            (ctx.weights_region or Placement.MRAM) == Placement.PSRAM
-            and get_adapter(ctx.config.engine.type).psram_weights_source
-            is PsramWeightsSource.HOST_UPLOAD
-        )
+            ctx.weights_region or Placement.MRAM
+        ) == Placement.PSRAM and get_adapter(
+            ctx.config.engine.type
+        ).psram_weights_source is PsramWeightsSource.HOST_UPLOAD
         return capture_rtt_output(
             jlink_serial=args.jlink_serial,
             jlink_device=args.jlink_device,

@@ -222,7 +222,9 @@ def _build_cases() -> list[_CompileCase]:
         cases.append(
             _CompileCase(
                 case_id=case_id,
-                text=_render(soc, transport, engine, power_only=power_only, clean_window_probe=probe),
+                text=_render(
+                    soc, transport, engine, power_only=power_only, clean_window_probe=probe
+                ),
                 vars=_common_kwargs(soc, transport),
             )
         )

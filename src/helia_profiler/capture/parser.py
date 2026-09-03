@@ -119,9 +119,7 @@ def parse_firmware_output(
             # nsx_itm_printf_disable/enable dropped the whole result block,
             # silently downgrading the power capture to the ungated
             # whole-capture path).
-            m_iters = re.search(
-                rf"phase={HeartbeatPhase.CLEAN_WINDOW_BEGIN} iters=(\d+)", line
-            )
+            m_iters = re.search(rf"phase={HeartbeatPhase.CLEAN_WINDOW_BEGIN} iters=(\d+)", line)
             if m_iters:
                 meta_kv[_ANNOUNCED_CLEAN_ITERS] = int(m_iters.group(1))
             continue
@@ -215,9 +213,7 @@ def parse_firmware_output(
     # Build per-preset typed results
     typed_presets: dict[str, PresetResult] = {}
     for name, pd in presets.items():
-        avg_layers = _average_iterations(
-            pd.iterations, pd.header or [], aggregation=aggregation
-        )
+        avg_layers = _average_iterations(pd.iterations, pd.header or [], aggregation=aggregation)
         typed_iters = _raw_iterations_to_typed(pd.iterations, pd.header or [])
         typed_presets[name] = PresetResult(
             name=name,
@@ -435,9 +431,7 @@ def _average_iterations(
         # Collect this layer's sample rows (with their iteration index) so
         # frozen-zero detection can reason about the whole PMU readout per row.
         rows = [
-            (it_idx, it[layer_idx])
-            for it_idx, it in enumerate(iterations)
-            if layer_idx < len(it)
+            (it_idx, it[layer_idx]) for it_idx, it in enumerate(iterations) if layer_idx < len(it)
         ]
 
         if layer_idx < len(iterations[0]):
@@ -452,9 +446,7 @@ def _average_iterations(
         # *entire* PMU readout was zero.  Keep them when every iteration is
         # frozen (a genuinely-zero layer) so a counter is never silently
         # emptied.
-        frozen_iters = {
-            it_idx for it_idx, row in rows if _row_is_frozen(row, numeric_cols)
-        }
+        frozen_iters = {it_idx for it_idx, row in rows if _row_is_frozen(row, numeric_cols)}
         if len(frozen_iters) >= len(rows):
             frozen_iters = set()
         total_frozen += len(frozen_iters)

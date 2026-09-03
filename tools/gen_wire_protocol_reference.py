@@ -79,8 +79,7 @@ _KIND_SECTIONS: tuple[tuple[WireKind, str, str], ...] = (
     (
         WireKind.HANDSHAKE,
         "Handshake lines",
-        "Valueless lines that coordinate host and firmware around attach and "
-        "model upload.",
+        "Valueless lines that coordinate host and firmware around attach and model upload.",
     ),
     (
         WireKind.KEY_VALUE,
@@ -169,9 +168,7 @@ def _condition(spec: WireSpec) -> str:
     default = spec.condition or "always"
     if spec.engine_conditions:
         overridden = set(spec.engine_conditions)
-        others = sorted(
-            engine.value for engine in spec.engines if engine not in overridden
-        )
+        others = sorted(engine.value for engine in spec.engines if engine not in overridden)
         if others:
             parts.append(f"`{default}` ({', '.join(others)})")
         for engine in sorted(overridden, key=lambda e: e.value):
@@ -204,8 +201,10 @@ def _details(spec: WireSpec) -> str:
 
 
 def _rows(kind: WireKind) -> list[str]:
-    rows = ["| Token | Scope | Condition | Consumer | Criticality | Notes |",
-            "| --- | --- | --- | --- | --- | --- |"]
+    rows = [
+        "| Token | Scope | Condition | Consumer | Criticality | Notes |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
     for spec in specs_of_kind(kind):
         rows.append(
             f"| `{spec.token}` | {_cell(_scope(spec))} | {_cell(_condition(spec))} | "
@@ -248,7 +247,7 @@ def render() -> str:
         "token of their own. Every engine prints the same header shape — "
         '`"Layer","Op"`, one quoted column per enabled counter, then '
         '`"overflow"` — and differs only in how the Op column identifies a '
-        "layer. Counter columns fall back to the raw event id (`\"0x%04lx\"`) "
+        'layer. Counter columns fall back to the raw event id (`"0x%04lx"`) '
         "when a pass supplied no name, and parts without an Armv8-M PMU print "
         'the single cycle counter as `"ARM_PMU_CPU_CYCLES"`.'
     )

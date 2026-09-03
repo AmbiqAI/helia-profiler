@@ -32,6 +32,7 @@ from ..errors import FirmwareError
 from ..placement import Placement
 from ..platform import get_soc_for_board
 from .context import FirmwareRenderContext, _resolve_pmu_passes
+
 # NB: measured_power_fingerprint and _resolve_module_list below look unused
 # in this module but are LIVE re-export surface — report/manifest.py,
 # report/summary.py, and tests import them from the package root. Do not

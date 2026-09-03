@@ -259,7 +259,9 @@ def _redact_url(url: str, policy: RedactionPolicy) -> tuple[str, RedactionCounts
     return redacted, url_counts.combined(RedactionCounts(tokens=token_count))
 
 
-def _protect_urls(text: str, policy: RedactionPolicy) -> tuple[str, dict[str, str], RedactionCounts]:
+def _protect_urls(
+    text: str, policy: RedactionPolicy
+) -> tuple[str, dict[str, str], RedactionCounts]:
     """Fully redact, then sentinel-substitute, every URL in *text*.
 
     Prevents the generic absolute-path regex from tearing a URL's ``/path``
@@ -318,7 +320,9 @@ def _redact_secret_assignments(text: str) -> tuple[str, int]:
     return _SECRET_ASSIGNMENT_RE.sub(_replace, text), count
 
 
-def redact_text(text: str, policy: RedactionPolicy = RedactionPolicy()) -> tuple[str, RedactionCounts]:
+def redact_text(
+    text: str, policy: RedactionPolicy = RedactionPolicy()
+) -> tuple[str, RedactionCounts]:
     """Redact one string value. Never raises; returns ``(text, counts)``."""
 
     if not text:
@@ -341,7 +345,9 @@ def redact_text(text: str, policy: RedactionPolicy = RedactionPolicy()) -> tuple
     return protected, counts
 
 
-def redact_serial(value: str, policy: RedactionPolicy = RedactionPolicy()) -> tuple[str, RedactionCounts]:
+def redact_serial(
+    value: str, policy: RedactionPolicy = RedactionPolicy()
+) -> tuple[str, RedactionCounts]:
     """Redact one device serial number (J-Link probe, USB serial, ...).
 
     Uses a short, stable hash preview rather than removing the value
@@ -359,7 +365,9 @@ def redact_serial(value: str, policy: RedactionPolicy = RedactionPolicy()) -> tu
     return f"<redacted-serial:{digest}>", RedactionCounts(serials=1)
 
 
-def redact_known_serial(text: str, serial: str, policy: RedactionPolicy = RedactionPolicy()) -> tuple[str, RedactionCounts]:
+def redact_known_serial(
+    text: str, serial: str, policy: RedactionPolicy = RedactionPolicy()
+) -> tuple[str, RedactionCounts]:
     """Replace every literal occurrence of *serial* inside *text*.
 
     Structural (by field name, via :func:`redact_serial`) redaction only
@@ -452,7 +460,9 @@ def redact_value(
         counts = RedactionCounts()
         items = []
         for item in value:
-            redacted, item_counts = redact_value(item, policy, key=key, _inside_secret=inside_secret)
+            redacted, item_counts = redact_value(
+                item, policy, key=key, _inside_secret=inside_secret
+            )
             items.append(redacted)
             counts = counts.combined(item_counts)
         return (tuple(items) if isinstance(value, tuple) else items), counts
@@ -461,7 +471,9 @@ def redact_value(
         counts = RedactionCounts()
         items = []
         for item in value:
-            redacted, item_counts = redact_value(item, policy, key=key, _inside_secret=inside_secret)
+            redacted, item_counts = redact_value(
+                item, policy, key=key, _inside_secret=inside_secret
+            )
             items.append(redacted)
             counts = counts.combined(item_counts)
         return items, counts

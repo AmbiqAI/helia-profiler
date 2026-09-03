@@ -153,9 +153,7 @@ def test_find_jlink_exe_accepts_windows_executable_name(monkeypatch: pytest.Monk
     assert find_jlink_exe() == r"C:\SEGGER\JLink.exe"
 
 
-def test_find_jlink_exe_prefers_explicit_path(
-    tmp_path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_find_jlink_exe_prefers_explicit_path(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     explicit = tmp_path / "custom-jlink"
     explicit.write_text("")
     monkeypatch.setenv("JLINK_PATH", str(explicit))
@@ -397,9 +395,7 @@ class TestFlashBinaryFallback:
         every other test stays green, sending the flash to the wrong target.
         """
         ok = SimpleNamespace(returncode=0, stdout=self._jlink_output(0x00018000), stderr="")
-        with patch(
-            "helia_profiler.target.probe.flash.run_jlink_script", return_value=ok
-        ) as run:
+        with patch("helia_profiler.target.probe.flash.run_jlink_script", return_value=ok) as run:
             flash_binary(
                 _bin_only(tmp_path),
                 device="AMAP42KP-KBR",
@@ -700,7 +696,9 @@ def test_a_family_with_no_registered_address_resolves_to_none(
 def test_inspect_probe_target_wraps_private_inspector() -> None:
     probe = _probe("111111", "Apollo5")
     match = _match("111111", CoreArch.CORTEX_M55, "Apollo5")
-    with patch("helia_profiler.target.probe.jlink._inspect_probe_target", return_value=match) as inspect:
+    with patch(
+        "helia_profiler.target.probe.jlink._inspect_probe_target", return_value=match
+    ) as inspect:
         assert inspect_probe_target(probe, device="AP510NFA-CBR") is match
     inspect.assert_called_once_with(probe, device="AP510NFA-CBR")
 
@@ -740,8 +738,7 @@ class _FlashRecipeFixtures:
     # AP4-class parts skip byte-identical images: only the skip notice, no
     # "Total:" line.  (Secure Apollo5 parts never print this notice.)
     _SKIPPED_IDENTICAL = (
-        "J-Link: Flash download: Bank 0 @ 0x00018000: Skipped. Contents already match\n"
-        "O.K.\n"
+        "J-Link: Flash download: Bank 0 @ 0x00018000: Skipped. Contents already match\nO.K.\n"
     )
     # JLinkExe prints this on ANY successful connection, before flashing
     # anything — a recipe that connects and programs nothing looks like this.

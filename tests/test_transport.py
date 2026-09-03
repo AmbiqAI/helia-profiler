@@ -144,9 +144,7 @@ def test_collect_lines_invokes_on_line_callback():
 
 
 def test_window_budget_parses_est_ms():
-    budget = window_budget_s(
-        "HPX_HEARTBEAT phase=clean_window_begin iters=200 est_ms=1000"
-    )
+    budget = window_budget_s("HPX_HEARTBEAT phase=clean_window_begin iters=200 est_ms=1000")
     assert budget == 1.0 * WINDOW_BUDGET_SAFETY + WINDOW_BUDGET_MARGIN_S
 
 
@@ -173,8 +171,7 @@ def test_clean_window_announce_survives_blackout_longer_than_heartbeat():
         if not state["emitted_start"]:
             state["emitted_start"] = True
             return (
-                b"--- HPX_START ---\n"
-                b"HPX_HEARTBEAT phase=clean_window_begin iters=200 est_ms=1000\n"
+                b"--- HPX_START ---\nHPX_HEARTBEAT phase=clean_window_begin iters=200 est_ms=1000\n"
             )
         if _t.monotonic() >= released:
             return b"--- HPX_END ---\n"
@@ -196,9 +193,7 @@ def test_window_budget_is_capped():
     line = "HPX_HEARTBEAT phase=clean_window_begin iters=6000 est_ms=266000000"
     assert window_budget_s(line) == WINDOW_BUDGET_CAP_S
     # A sane large estimate below the cap is untouched.
-    sane = window_budget_s(
-        "HPX_HEARTBEAT phase=clean_window_begin iters=6000 est_ms=130000"
-    )
+    sane = window_budget_s("HPX_HEARTBEAT phase=clean_window_begin iters=6000 est_ms=130000")
     assert sane is not None
     assert sane == 130.0 * WINDOW_BUDGET_SAFETY + WINDOW_BUDGET_MARGIN_S
     assert sane < WINDOW_BUDGET_CAP_S
@@ -219,8 +214,7 @@ def test_window_budget_survives_a_line_received_inside_the_window():
         if state["step"] == 0:
             state["step"] = 1
             return (
-                b"--- HPX_START ---\n"
-                b"HPX_HEARTBEAT phase=clean_window_begin iters=100 est_ms=1000\n"
+                b"--- HPX_START ---\nHPX_HEARTBEAT phase=clean_window_begin iters=100 est_ms=1000\n"
             )
         if state["step"] == 1:
             # The in-window line that used to discard the held budget.
@@ -241,9 +235,7 @@ def test_window_budget_survives_a_line_received_inside_the_window():
     assert "--- HPX_END ---" in lines
 
 
-def test_hang_warning_reports_real_silence_not_configured_timeout(
-    caplog, monkeypatch
-):
+def test_hang_warning_reports_real_silence_not_configured_timeout(caplog, monkeypatch):
     """With a held window budget the wait can exceed the configured timeout by
     the whole budget — the warning must report the actual silence (#170), or
     'no data for 30s' after a minutes-long wait misdirects the reader.
@@ -263,8 +255,7 @@ def test_hang_warning_reports_real_silence_not_configured_timeout(
         if not getattr(read, "sent", False):
             read.sent = True  # ty: ignore[unresolved-attribute]  # one-shot flag stashed on the function object by design
             return (
-                b"--- HPX_START ---\n"
-                b"HPX_HEARTBEAT phase=clean_window_begin iters=1 est_ms=1000\n"
+                b"--- HPX_START ---\nHPX_HEARTBEAT phase=clean_window_begin iters=1 est_ms=1000\n"
             )
         return b""
 
@@ -301,10 +292,7 @@ def test_no_announce_still_times_out_on_silence():
         if not state["emitted_start"]:
             state["emitted_start"] = True
             # est_ms=0 → no extension.
-            return (
-                b"--- HPX_START ---\n"
-                b"HPX_HEARTBEAT phase=clean_window_begin iters=3 est_ms=0\n"
-            )
+            return b"--- HPX_START ---\nHPX_HEARTBEAT phase=clean_window_begin iters=3 est_ms=0\n"
         if _t.monotonic() >= released:
             return b"--- HPX_END ---\n"
         return b""

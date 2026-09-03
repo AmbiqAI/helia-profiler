@@ -175,9 +175,7 @@ _ALL_SPECS: tuple[WireSpec, ...] = (
 )
 
 #: Every wire token, keyed by the literal token the firmware prints.
-WIRE_REGISTRY: Mapping[str, WireSpec] = MappingProxyType(
-    {spec.token: spec for spec in _ALL_SPECS}
-)
+WIRE_REGISTRY: Mapping[str, WireSpec] = MappingProxyType({spec.token: spec for spec in _ALL_SPECS})
 
 #: Reverse index for the key/value grammar.
 KEY_SPECS: Mapping[WireKey, WireSpec] = MappingProxyType(
@@ -198,16 +196,12 @@ WIRE_CONDITIONS: frozenset[str] = frozenset(
 #: Required envelope fields — ``capture.power_terminal`` derives its schema
 #: from these rather than restating them.
 POWER_TERMINAL_REQUIRED_KEYS: frozenset[str] = frozenset(
-    spec.token
-    for spec in _ALL_SPECS
-    if spec.kind is WireKind.TERMINAL and spec.required is True
+    spec.token for spec in _ALL_SPECS if spec.kind is WireKind.TERMINAL and spec.required is True
 )
 
 #: Optional measurement fields (all-or-none as a group).
 POWER_TERMINAL_OPTIONAL_KEYS: frozenset[str] = frozenset(
-    spec.token
-    for spec in _ALL_SPECS
-    if spec.kind is WireKind.TERMINAL and spec.required is False
+    spec.token for spec in _ALL_SPECS if spec.kind is WireKind.TERMINAL and spec.required is False
 )
 
 
@@ -230,7 +224,7 @@ def specs_of_kind(kind: WireKind) -> tuple[WireSpec, ...]:
 CSV_GRAMMAR: Mapping[str, str] = MappingProxyType(
     {
         EngineType.TFLM.value: (
-            'rows are `<index>,<tag>,<counters...>,<overflow>`; the tag is '
+            "rows are `<index>,<tag>,<counters...>,<overflow>`; the tag is "
             "TFLM's per-op tag string (or `?`)."
         ),
         EngineType.HELIA_RT.value: "Identical to tflm — same template, same profiler class.",

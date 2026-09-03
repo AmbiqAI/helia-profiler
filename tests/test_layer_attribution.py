@@ -78,7 +78,9 @@ class TestLayerAttributor:
         positional join would hand it analysis.layers[1]... which here IS
         the right op, so the analysis list is ordered adversarially."""
         analysis = _skewed_analysis()
-        att = LayerAttributor(analysis, [{"idx": 0, "id": 0}, {"idx": 1, "id": 5}, {"idx": 2, "id": 3}])
+        att = LayerAttributor(
+            analysis, [{"idx": 0, "id": 0}, {"idx": 1, "id": 5}, {"idx": 2, "id": 3}]
+        )
         # Position 1 executes the zero-mac SOFTMAX (original 5); positional
         # indexing would report 43,200 MACs for it.
         assert att.attribute(1, "SOFTMAX:5").macs == 0
@@ -163,9 +165,18 @@ class TestCsvWriterJoin:
         pmu = PmuResult(
             meta=FirmwareMeta(),
             layers=[
-                LayerResult(id=0, op="CONV_2D:0", cycles=1000.0, counters={"ARM_PMU_CPU_CYCLES": 1000.0}),
-                LayerResult(id=1, op="SOFTMAX:5", cycles=500.0, counters={"ARM_PMU_CPU_CYCLES": 500.0}),
-                LayerResult(id=2, op="FULLY_CONNECTED:3", cycles=800.0, counters={"ARM_PMU_CPU_CYCLES": 800.0}),
+                LayerResult(
+                    id=0, op="CONV_2D:0", cycles=1000.0, counters={"ARM_PMU_CPU_CYCLES": 1000.0}
+                ),
+                LayerResult(
+                    id=1, op="SOFTMAX:5", cycles=500.0, counters={"ARM_PMU_CPU_CYCLES": 500.0}
+                ),
+                LayerResult(
+                    id=2,
+                    op="FULLY_CONNECTED:3",
+                    cycles=800.0,
+                    counters={"ARM_PMU_CPU_CYCLES": 800.0},
+                ),
             ],
         )
         manifest = [{"idx": 0, "id": 0}, {"idx": 1, "id": 5}]  # position 2 absent
@@ -193,7 +204,11 @@ class TestCsvWriterJoin:
         )
         pmu = PmuResult(
             meta=FirmwareMeta(),
-            layers=[LayerResult(id=0, op="CONV_2D", cycles=100.0, counters={"ARM_PMU_CPU_CYCLES": 100.0})],
+            layers=[
+                LayerResult(
+                    id=0, op="CONV_2D", cycles=100.0, counters={"ARM_PMU_CPU_CYCLES": 100.0}
+                )
+            ],
         )
         out = _write_csv(pmu, tmp_path, analysis)
         rows = list(csv_mod.DictReader(open(out)))
@@ -286,9 +301,7 @@ class TestConsumerPlumbing:
         recorder = Console(record=True, highlight=False, width=200)
         hpx_console._console = recorder
         print_results(hpx_console, ctx)
-        softmax = next(
-            line for line in recorder.export_text().splitlines() if "SOFTMAX:3" in line
-        )
+        softmax = next(line for line in recorder.export_text().splitlines() if "SOFTMAX:3" in line)
         # Suffix-joining the degraded label would land FULLY_CONNECTED's
         # 43,200 macs on this softmax; the dash rule forbids it.
         assert "43,200" not in softmax

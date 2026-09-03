@@ -107,9 +107,7 @@ def test_doctor_command_builds_expected_kwargs_for_bundle(monkeypatch, tmp_path:
 
 def test_doctor_bundle_end_to_end_writes_archive(tmp_path: Path) -> None:
     out_dir = tmp_path / "bundle-out"
-    result = runner.invoke(
-        app, ["doctor", "--bundle", str(out_dir), "--no-probes", "--no-ports"]
-    )
+    result = runner.invoke(app, ["doctor", "--bundle", str(out_dir), "--no-probes", "--no-ports"])
 
     assert result.exit_code == 0, result.output
     assert "Support bundle written to" in result.output
@@ -121,9 +119,7 @@ def test_doctor_bundle_end_to_end_writes_archive(tmp_path: Path) -> None:
 
 def test_doctor_bundle_reports_skipped_sections(tmp_path: Path) -> None:
     out_dir = tmp_path / "bundle-out"
-    result = runner.invoke(
-        app, ["doctor", "--bundle", str(out_dir), "--no-probes", "--no-ports"]
-    )
+    result = runner.invoke(app, ["doctor", "--bundle", str(out_dir), "--no-probes", "--no-ports"])
 
     assert result.exit_code == 0, result.output
     assert "Skipped sections:" in result.output

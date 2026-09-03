@@ -143,7 +143,9 @@ class TestNsxConfigure:
 
 class TestNsxLock:
     def test_lock_calls_api_quietly(self, tmp_path: Path) -> None:
-        with patch("helia_profiler.deps.nsx.nsx_api.lock_app", return_value=tmp_path / "nsx.lock") as m:
+        with patch(
+            "helia_profiler.deps.nsx.nsx_api.lock_app", return_value=tmp_path / "nsx.lock"
+        ) as m:
             result = nsx.lock(tmp_path, timeout_s=180)
         m.assert_called_once_with(
             tmp_path,
