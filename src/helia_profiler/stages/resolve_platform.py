@@ -106,12 +106,24 @@ class ResolvePlatformStage:
                 hint="Check the 'model.path' in your config or positional argument.",
             )
 
-        # Record model file metadata
-        model_bytes = model_path.read_bytes()
+        # Record model file metadata. A heliaML model is a generated-module
+        # DIRECTORY; hash its manifest (which itself hashes every file in
+        # the module) rather than read_bytes() on a directory.
+        if model_path.is_dir():
+            manifest_path = model_path / "manifest.json"
+            digest_source = (
+                manifest_path.read_bytes() if manifest_path.is_file() else b""
+            )
+            size_bytes = sum(
+                f.stat().st_size for f in model_path.iterdir() if f.is_file()
+            )
+        else:
+            digest_source = model_path.read_bytes()
+            size_bytes = len(digest_source)
         ctx.run_metadata.model = ModelInfo(
             name=model_path.name,
-            size_bytes=len(model_bytes),
-            sha256=hashlib.sha256(model_bytes).hexdigest(),
+            size_bytes=size_bytes,
+            sha256=hashlib.sha256(digest_source).hexdigest(),
         )
         ctx.report_progress(
             f"{board.name} at {cpu_speed.mhz} MHz · {model_path.name}",

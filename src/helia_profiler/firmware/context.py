@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..config import DEFAULT_ARENA_SIZE_BYTES, CleanWindowProbe, Transport
 from ..engines import EngineType
-from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
+from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts, HeliaMlArtifacts
 from ..errors import FirmwareError, PipelineError
 from ..placement import Placement
 from ..platform.counters import (
@@ -236,6 +236,9 @@ class EngineContext:
     executorch_temporary_arena_region: str
     executorch_io_region: str
 
+    # heliaML-only: run entry-point call shape ("scores" | "class" | "value").
+    helia_ml_run_shape: str = ""
+
 
 @dataclass(frozen=True)
 class FirmwareRenderContext:
@@ -294,13 +297,16 @@ class FirmwareRenderContext:
         # "", no operator manifest, arenas allocated by the engine, ExecuTorch
         # sizes 0, and every ExecuTorch buffer following the resolved arena
         # region.
-        if isinstance(artifacts, HeliaAotArtifacts):
+        if isinstance(artifacts, (HeliaAotArtifacts, HeliaMlArtifacts)):
+            # Both are generated modules: the template names their entry
+            # points through the prefix and binds their arenas itself.
+            # Only heliaAOT carries a per-operator manifest.
             aot_prefix = artifacts.aot_prefix
             allocate_arenas = artifacts.aot_allocate_arenas
             aot_manifest = tuple(
                 AotOpContext(id=int(op["id"]), op_type=str(op["op_type"]))
                 for op in (artifacts.aot_op_manifest or [])
-            )
+            ) if isinstance(artifacts, HeliaAotArtifacts) else ()
         else:
             aot_prefix = ""
             allocate_arenas = True
@@ -339,7 +345,13 @@ class FirmwareRenderContext:
 
         pmu_passes = tuple(_resolve_pmu_passes(config, soc))
         transport = config.target.transport
-        printf_linkage = "static " if engine_type is EngineType.HELIA_AOT else ""
+        # Both single-C-entry engines compile main.cc alone, so hpx_printf
+        # needs no external linkage.
+        printf_linkage = (
+            "static "
+            if engine_type in (EngineType.HELIA_AOT, EngineType.HELIA_ML)
+            else ""
+        )
         return cls(
             sync=SyncContext(
                 power_sync_enabled=power_sync_enabled,
@@ -429,6 +441,7 @@ class FirmwareRenderContext:
                 executorch_method_arena_region=method_arena_region,
                 executorch_temporary_arena_region=temporary_arena_region,
                 executorch_io_region=io_region,
+                helia_ml_run_shape=getattr(artifacts, "helia_ml_run_shape", None) or "",
             ),
         )
 
@@ -559,6 +572,7 @@ class FirmwareRenderContext:
                 self.engine.executorch_temporary_arena_region
             ),
             "executorch_io_region": self.engine.executorch_io_region,
+            "helia_ml_run_shape": self.engine.helia_ml_run_shape,
         }
 
 

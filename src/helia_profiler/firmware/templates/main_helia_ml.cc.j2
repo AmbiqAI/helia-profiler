@@ -1,0 +1,567 @@
+{# main_helia_ml.cc — heliaPROFILER firmware for the heliaML engine #}
+/**
+ * @file main.cc
+ * @brief heliaPROFILER firmware (heliaML) — auto-generated, do not edit.
+ *
+ * heliaML is traditional ML: the whole model is ONE public call with no
+ * operator graph, no interpreter, and no arena to bind.  This template
+ * is therefore deliberately small next to main_aot.cc.j2 — it times the
+ * generated module's run entry point end-to-end and emits exactly one
+ * PMU row per iteration ("model_run:0").  Anything per-op would be an
+ * invention, not a measurement.
+ */
+
+#include <cstdint>
+#include <cstdio>
+#include <cstdarg>
+#include <cstring>
+
+// Pre-include arm_mve.h in C++ context so that any extern "C"
+// re-inclusion is a harmless no-op (avoids overload conflicts with GCC 14).
+#if defined(__ARM_FEATURE_MVE)
+#include <arm_mve.h>
+#endif
+
+// heliaML generated module API ({{ aot_prefix }}_model_init / _model_run).
+#include "{{ engine_header }}"
+
+{% if has_armv8m_pmu %}
+#include "nsx_pmu_utils.h"
+#include "nsx_ambiq_pmu.h"
+#include "am_mcu_apollo.h"
+{% endif %}
+
+{% include "_system_includes.j2" %}
+{% if apollo3_burst %}
+#include "am_mcu_apollo.h"
+{% endif %}
+{% if power_only | default(false) and (broad_peripheral_shutdown | default(false) or crypto_otp_shutdown | default(false)) and not apollo3_burst and not has_armv8m_pmu %}
+#include "am_mcu_apollo.h"
+{% endif %}
+
+{% include "_cache_shims.j2" %}
+
+// Boot-time host-attach delays — same rationale and values as the other
+// engine templates (see main_aot.cc.j2 for the full comments).
+#define HPX_SWO_SYNC_PREAMBLE_LINES  40
+#define HPX_SWO_SYNC_GAP_US          (20U * 1000U)
+#define HPX_USB_POLL_DELAY_US     (10U * 1000U)
+#define HPX_USB_SETTLE_DELAY_US   (200U * 1000U)
+#define HPX_DEBUG_REENABLE_SETTLE_US (5U * 1000U)
+
+{% include "_newlib_syscalls.j2" %}
+
+// ---------------------------------------------------------------------------
+// DWT cycle counter
+// ---------------------------------------------------------------------------
+{% include "_dwt_init.j2" %}
+
+{% if clean_window_timer | default("dwt") == "stimer" %}
+{% include "_stimer_init.j2" %}
+{% endif %}
+
+// ---------------------------------------------------------------------------
+// GPIO sync for external power measurement
+// ---------------------------------------------------------------------------
+{% include "_gpio_sync.j2" %}
+
+{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
+#include "nsx_i2c.h"
+#include "nsx_ina228.h"
+{% include "_ina228_power.j2" %}
+{% endif %}
+
+// ---------------------------------------------------------------------------
+// Whole-model PMU capture — ONE record per inference, no per-op table.
+// ---------------------------------------------------------------------------
+static constexpr int kMaxEvents = 4;
+
+{% if has_armv8m_pmu %}
+static nsx_pmu_config_t g_pmu_cfg;
+{% endif %}
+static uint32_t g_run_counters[kMaxEvents];
+static bool g_run_overflow = false;
+static int g_num_counters = 0;
+static const char* g_counter_names[kMaxEvents] = {};
+
+{% include "_hpx_printf.j2" with context %}
+
+{% if transport == "usb_cdc" and not power_only | default(false) %}
+{% include "_usb_timer.j2" %}
+{% endif %}
+
+{% if has_armv8m_pmu %}
+static void profiler_set_counter_names(const char* const names[], int num_names) {
+    int limit = (num_names > kMaxEvents) ? kMaxEvents : num_names;
+    for (int i = 0; i < limit; i++) {
+        g_counter_names[i] = names[i];
+    }
+    for (int i = limit; i < kMaxEvents; i++) {
+        g_counter_names[i] = nullptr;
+    }
+}
+
+static void profiler_init_preset(nsx_pmu_preset_e preset) {
+    nsx_pmu_reset_config(&g_pmu_cfg);
+    g_pmu_cfg.api = &nsx_pmu_V1_0_0;
+    nsx_pmu_apply_preset(&g_pmu_cfg, preset);
+    nsx_pmu_init(&g_pmu_cfg);
+    g_num_counters = 0;
+    for (int i = 0; i < kMaxEvents; i++) {
+        if (g_pmu_cfg.events[i].enabled) g_num_counters++;
+    }
+}
+
+static void profiler_init_custom(const uint32_t event_ids[], int num_events) {
+    nsx_pmu_reset_config(&g_pmu_cfg);
+    g_pmu_cfg.api = &nsx_pmu_V1_0_0;
+    int n = (num_events > kMaxEvents) ? kMaxEvents : num_events;
+    for (int i = 0; i < n; i++) {
+        nsx_pmu_event_create(&g_pmu_cfg.events[i], event_ids[i],
+                            NSX_PMU_EVENT_COUNTER_SIZE_32);
+    }
+    nsx_pmu_init(&g_pmu_cfg);
+    g_num_counters = n;
+}
+
+static void profiler_run_begin(void) {
+    uint32_t saved_cyccnt = DWT->CYCCNT;
+    nsx_pmu_reset_counters();
+    DWT->CYCCNT = saved_cyccnt;
+#if (__CORTEX_M >= 55U)
+    ARM_PMU_Set_CNTR_OVS(0xFFFFFFFFU);
+#endif
+}
+
+static void profiler_run_end(void) {
+    uint32_t saved_cyccnt = DWT->CYCCNT;
+    nsx_pmu_get_counters(&g_pmu_cfg);
+    DWT->CYCCNT = saved_cyccnt;
+    for (int i = 0; i < g_num_counters; i++) {
+        g_run_counters[i] = g_pmu_cfg.counter[i].counterValue;
+    }
+#if (__CORTEX_M >= 55U)
+    uint32_t ovs = ARM_PMU_Get_CNTR_OVS();
+    g_run_overflow = (ovs != 0);
+    if (ovs) ARM_PMU_Set_CNTR_OVS(ovs);
+#else
+    g_run_overflow = false;
+#endif
+}
+{% else %}
+static uint32_t g_run_start_cyccnt = 0;
+
+static void profiler_init_preset(int) { g_num_counters = 1; }
+static void profiler_init_custom(const uint32_t[], int) { profiler_init_preset(0); }
+static void profiler_run_begin(void) { g_run_start_cyccnt = DWT->CYCCNT; }
+static void profiler_run_end(void) {
+    g_run_counters[0] = DWT->CYCCNT - g_run_start_cyccnt;
+    g_run_overflow = false;
+}
+{% endif %}
+
+static void profiler_print_csv(void) {
+    hpx_printf("\"Layer\",\"Op\"");
+{% if has_armv8m_pmu %}
+    for (int e = 0; e < g_num_counters; e++) {
+        if (!g_pmu_cfg.events[e].enabled) break;
+        if (g_counter_names[e] != nullptr)
+            hpx_printf(",\"%s\"", g_counter_names[e]);
+        else
+            hpx_printf(",\"0x%04lx\"", (unsigned long)g_pmu_cfg.events[e].eventId);
+    }
+{% else %}
+    hpx_printf(",\"ARM_PMU_CPU_CYCLES\"");
+{% endif %}
+    hpx_printf(",\"overflow\"\n");
+    // One row: the whole model is one call.  "model_run:0" is the stable
+    // op label the host groups on.
+    hpx_printf("0,model_run:0");
+    for (int e = 0; e < g_num_counters; e++) {
+{% if has_armv8m_pmu %}
+        if (!g_pmu_cfg.events[e].enabled) break;
+{% endif %}
+        hpx_printf(",%lu", (unsigned long)g_run_counters[e]);
+    }
+    hpx_printf(",%d\n", g_run_overflow ? 1 : 0);
+}
+
+// ---------------------------------------------------------------------------
+// Model buffers — sized by the generated module's own dimension macros.
+// Inputs are zeros, matching the other engine templates: this profiles
+// the kernel, not a dataset.
+// ---------------------------------------------------------------------------
+static float hpx_input[{{ aot_prefix | upper }}_INPUT_COUNT];
+{% if helia_ml_run_shape == "scores" %}
+static float hpx_scores[{{ aot_prefix | upper }}_OUTPUT_COUNT];
+static size_t hpx_out_class = 0u;
+{% elif helia_ml_run_shape == "class" %}
+static size_t hpx_out_class = 0u;
+{% else %}
+static float hpx_out_value = 0.0f;
+{% endif %}
+
+static inline heliaml_status_t hpx_model_run(void) {
+{% if helia_ml_run_shape == "scores" %}
+    return {{ aot_prefix }}_model_run(hpx_input, hpx_scores, &hpx_out_class);
+{% elif helia_ml_run_shape == "class" %}
+    return {{ aot_prefix }}_model_run(hpx_input, &hpx_out_class);
+{% else %}
+    return {{ aot_prefix }}_model_run(hpx_input, &hpx_out_value);
+{% endif %}
+}
+
+int main(void) {
+    nsx_system_config_t sys_cfg = {};
+    sys_cfg.perf_mode = {{ perf_mode_symbol }};  // {{ perf_mode_mhz }} MHz — target.clock.cpu
+    sys_cfg.enable_cache = true;
+    sys_cfg.enable_sram = true;
+    sys_cfg.debug.transport = {% if power_only | default(false) %}NSX_DEBUG_NONE{% elif transport == "swo" %}NSX_DEBUG_ITM{% elif transport == "uart" %}NSX_DEBUG_UART{% else %}NSX_DEBUG_NONE{% endif %};
+    sys_cfg.skip_bsp_init = false;
+    sys_cfg.spot_mgr_profile = true;
+    NSX_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
+    dwt_init();
+    hpx_sync_init();
+{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
+    {
+        uint32_t ina228_rc = hpx_ina228_setup();
+        if (ina228_rc != 0U) {
+            hpx_power_terminal_fail("ina228_init", ina228_rc);
+        }
+    }
+{% endif %}
+{% if apollo3_burst %}
+    int hpx_burst_avail = 0;
+    int hpx_burst_engaged = 0;
+    {
+        am_hal_burst_avail_e burst_avail = AM_HAL_BURST_NOTAVAIL;
+        am_hal_burst_mode_e burst_state = AM_HAL_NORMAL_MODE;
+        am_hal_burst_mode_initialize(&burst_avail);
+        if (burst_avail == AM_HAL_BURST_AVAIL) {
+            am_hal_burst_mode_enable(&burst_state);
+        }
+        hpx_burst_avail = (burst_avail == AM_HAL_BURST_AVAIL);
+        hpx_burst_engaged = (burst_state == AM_HAL_BURST_MODE);
+        if (hpx_burst_engaged) {
+            SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
+        }
+    }
+{% else %}
+    // Keep SystemCoreClock truthful at the resolved operating point (see
+    // main_aot.cc.j2 for why nsx_system_init does not update it).
+    SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
+{% endif %}
+{% include "_ssram_power.j2" %}
+{% include "_extreme_mode.j2" %}
+{% include "_ble_reset.j2" %}
+{% include "_peripheral_power_down.j2" %}
+{% include "_crypto_otp_shutdown.j2" %}
+{% if power_only | default(false) %}
+
+    // power_only: no transport at all (sys_cfg.debug.transport above).
+{% elif transport == "usb_cdc" %}
+
+    NSX_TRY(nsx_usb_init(&g_usb_cfg), "USB CDC init failed\n");
+    while (!nsx_usb_connected(&g_usb_cfg)) {
+        nsx_delay_us(HPX_USB_POLL_DELAY_US);
+    }
+    nsx_delay_us(HPX_USB_SETTLE_DELAY_US);
+    dwt_init();
+{% elif transport == "rtt" %}
+
+    SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,
+                              SEGGER_RTT_MODE_NO_BLOCK_TRIM);
+    HPX_CLEAN_DCACHE();
+    hpx_rtt_set_blocking();
+    hpx_printf("HPX_READY\n");
+    HPX_CLEAN_DCACHE();
+{% else %}
+
+    for (int hpx_sync_i = 0; hpx_sync_i < HPX_SWO_SYNC_PREAMBLE_LINES; ++hpx_sync_i) {
+        hpx_printf("HPX_READY\n");
+        nsx_delay_us(HPX_SWO_SYNC_GAP_US);
+    }
+{% endif %}
+
+{% if not power_only | default(false) %}    hpx_printf("\n--- HPX_START ---\n");
+    hpx_printf("HPX_VERSION=1\n");
+    hpx_printf("HPX_ENGINE=helia_ml\n");
+    hpx_printf("HPX_EXTREME_MODE=%d\n", {{ 1 if extreme_mode and arena_region == "tcm" and weights_region == "tcm" else 0 }});
+    hpx_printf("HPX_ITERATIONS={{ iterations }}\n");
+    hpx_printf("HPX_WARMUP={{ warmup }}\n");
+    hpx_printf("HPX_NUM_PRESETS=%d\n", {{ pmu_passes | length }});
+    hpx_printf("HPX_PRESETS={{ pmu_pass_names | join(',') }}\n");
+    hpx_printf("HPX_POWER_SYNC=%s\n", kPowerSyncEnabled ? "gpio" : "none");
+    if constexpr (kPowerSyncEnabled) {
+        hpx_printf("HPX_SYNC_GPIO=%lu\n", (unsigned long)kSyncGpioPin);
+    }
+    // Heartbeats: phase markers only.  A traditional-ML inference is far
+    // too short for mid-inference heartbeats to be meaningful.
+    hpx_printf("HPX_HEARTBEAT_ENABLED={{ 1 if heartbeat_enabled else 0 }}\n");
+    hpx_printf("HPX_HEARTBEAT_EVERY_N_OPS=0\n");
+    hpx_printf("HPX_HEARTBEAT_EVERY_MS=0\n");
+    hpx_printf("HPX_HEARTBEAT phase=init\n");{% endif %}
+
+    // Initialize the generated module (validates the compiled-in model).
+    if ({{ aot_prefix }}_model_init() != HELIAML_STATUS_OK) {
+        hpx_printf("HPX_ERROR=model_init_failed\n");
+{% if power_only | default(false) %}        hpx_power_terminal_fail("model_init", 6U);
+{% else %}        hpx_park();
+{% endif %}
+    }
+{% if not power_only | default(false) %}    hpx_printf("HPX_HEARTBEAT phase=model_init_done\n");
+
+    hpx_printf("HPX_NUM_INPUTS=1\n");
+    hpx_printf("HPX_NUM_OUTPUTS=1\n");
+    hpx_printf("HPX_SYSTEM_CLOCK_HZ=%lu\n", (unsigned long)SystemCoreClock);
+{% if apollo3_burst %}
+    hpx_printf("HPX_BURST_AVAIL=%d\n", hpx_burst_avail);
+    hpx_printf("HPX_BURST_ENGAGED=%d\n", hpx_burst_engaged);
+{% endif %}
+    hpx_printf("HPX_INPUT_0_SIZE=%d\n", (int)sizeof(hpx_input));
+{% if helia_ml_run_shape == "scores" %}
+    hpx_printf("HPX_OUTPUT_0_SIZE=%d\n", (int)sizeof(hpx_scores));
+{% elif helia_ml_run_shape == "class" %}
+    hpx_printf("HPX_OUTPUT_0_SIZE=%d\n", (int)sizeof(hpx_out_class));
+{% else %}
+    hpx_printf("HPX_OUTPUT_0_SIZE=%d\n", (int)sizeof(hpx_out_value));
+{% endif %}
+
+    uint64_t profiled_infer_cycles = 0;
+    uint32_t profiled_infer_count = 0;{% endif %}
+
+    // --- Clean end-to-end timing (the canonical power window) ------------
+    // Same structure as the other engines: warm uninstrumented, then
+    // DWT/STIMER-time bare hpx_model_run() calls.  The GPIO sync brackets
+    // this window for external power capture.
+    {
+        memset(hpx_input, 0, sizeof(hpx_input));
+{% if window_mode | default("fixed") == "auto" %}
+        // Adaptive window sizing (see main_aot.cc.j2 for the DWT-freeze
+        // robustness rationale behind taking the MAX warm reading).
+        dwt_init();
+        uint32_t clean_warm_cyc = 0U;
+        for (int w = 0; w < 3; w++) {
+            uint32_t wt0 = DWT->CYCCNT;
+            (void)hpx_model_run();
+            uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
+            if (wc > clean_warm_cyc) clean_warm_cyc = wc;
+        }
+        int clean_iters_n = {{ window_min }};
+        if (clean_warm_cyc > 0U) {
+            const uint64_t target_cyc =
+                ((uint64_t)SystemCoreClock / 1000ULL) * (uint64_t){{ window_target_ms }}U;
+            uint64_t n = target_cyc / (uint64_t)clean_warm_cyc;
+            if (n < {{ window_min }}ULL) n = {{ window_min }}ULL;
+            if (n > {{ window_max }}ULL) n = {{ window_max }}ULL;
+            clean_iters_n = (int)n;
+        }
+        uint64_t clean_est_ms = 0;
+        if (SystemCoreClock >= 1000U) {
+            clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)
+                           / ((uint64_t)SystemCoreClock / 1000ULL);
+        }
+        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\n",
+                   clean_iters_n, (unsigned long long)clean_est_ms);
+{% else %}
+        for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
+            (void)hpx_model_run();
+        }
+        const int clean_iters_n = {{ clean_iters | default(1) }};
+        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=0\n",
+                   clean_iters_n);
+{% endif %}
+        uint64_t clean_cycles = 0;
+        uint32_t clean_count = 0;
+        hpx_sync_ready();
+        hpx_sync_wait_go();
+{% if transport == "usb_cdc" and not power_only | default(false) %}
+        usb_timer_pause();
+{% endif %}
+{% set use_stimer_window = clean_window_timer | default("dwt") == "stimer" %}
+{% if transport == "uart" and not power_only | default(false) %}
+        nsx_uart_printf_disable();
+{% elif transport == "swo" and not power_only | default(false) %}
+        nsx_itm_printf_disable();
+{% endif %}
+{% if has_armv8m_pmu %}
+        nsx_ambiq_pmu_disable();
+{% if gate_debug_domain_in_window | default(false) %}
+        am_hal_debug_disable();
+{% endif %}
+{% endif %}
+{% if use_stimer_window %}
+        hpx_stimer_init();
+        uint32_t clean_stimer_t0 = hpx_stimer_ticks();
+{% endif %}
+{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
+        {
+            uint32_t ina228_rc = hpx_ina228_window_begin();
+            if (ina228_rc != 0U) {
+                hpx_power_terminal_fail("ina228_arm", ina228_rc);
+            }
+        }
+{% endif %}
+        hpx_sync_window_begin();
+{% if use_stimer_window %}
+        for (int iter = 0; iter < clean_iters_n; iter++) {
+            (void)hpx_model_run();
+            clean_count++;
+        }
+{% else %}
+        for (int iter = 0; iter < clean_iters_n; iter++) {
+            uint32_t t0 = DWT->CYCCNT;
+            (void)hpx_model_run();
+            clean_cycles += (uint32_t)(DWT->CYCCNT - t0);
+            clean_count++;
+        }
+{% endif %}
+        hpx_sync_window_end();
+{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
+        {
+            uint32_t ina228_rc = hpx_ina228_window_end();
+            if (ina228_rc != 0U) {
+                hpx_power_terminal_fail("ina228_read", ina228_rc);
+            }
+        }
+{% endif %}
+{% if use_stimer_window %}
+        uint64_t clean_stimer_total_us =
+            hpx_stimer_ticks_to_us((uint64_t)(uint32_t)(hpx_stimer_ticks() - clean_stimer_t0));
+{% endif %}
+{% if not power_only | default(false) %}{% if has_armv8m_pmu %}
+{% if gate_debug_domain_in_window | default(false) %}
+        am_hal_debug_enable();
+{% endif %}
+        nsx_ambiq_pmu_enable();
+{% endif %}
+{% if transport == "uart" %}
+        nsx_uart_printf_enable();
+        nsx_delay_us(HPX_DEBUG_REENABLE_SETTLE_US);
+{% elif transport == "swo" %}
+        nsx_itm_printf_enable();
+        nsx_delay_us(HPX_DEBUG_REENABLE_SETTLE_US);
+{% endif %}
+{% if transport == "usb_cdc" %}
+        usb_timer_resume();
+{% endif %}{% endif %}
+        if (clean_count > 0) {
+{% if use_stimer_window %}
+            const uint32_t clean_avg_us =
+                (uint32_t)((clean_stimer_total_us + (clean_count / 2U)) / clean_count);
+            const uint32_t clean_avg_cycles = (uint32_t)(
+                ((uint64_t)clean_avg_us * (uint64_t)SystemCoreClock) / 1000000ULL);
+            const uint64_t clean_cycles_reported =
+                (uint64_t)clean_avg_cycles * (uint64_t)clean_count;
+            hpx_printf("HPX_CLEAN_INFER_COUNT=%lu\n", (unsigned long)clean_count);
+            hpx_printf("HPX_CLEAN_INFER_TOTAL_CYCLES=%llu\n",
+                       (unsigned long long)clean_cycles_reported);
+            hpx_printf("HPX_CLEAN_INFER_AVG_CYCLES=%lu\n",
+                       (unsigned long)clean_avg_cycles);
+            hpx_printf("HPX_CLEAN_INFER_AVG_US=%lu\n",
+                       (unsigned long)clean_avg_us);
+{% else %}
+            const uint32_t clean_avg_cycles =
+                (uint32_t)((clean_cycles + (clean_count / 2U)) / clean_count);
+            hpx_printf("HPX_CLEAN_INFER_COUNT=%lu\n", (unsigned long)clean_count);
+            hpx_printf("HPX_CLEAN_INFER_TOTAL_CYCLES=%llu\n",
+                       (unsigned long long)clean_cycles);
+            hpx_printf("HPX_CLEAN_INFER_AVG_CYCLES=%lu\n",
+                       (unsigned long)clean_avg_cycles);
+            if (SystemCoreClock > 0U) {
+                const uint32_t clean_avg_us = (uint32_t)(
+                    ((uint64_t)clean_avg_cycles * 1000000ULL +
+                     ((uint64_t)SystemCoreClock / 2ULL)) /
+                    (uint64_t)SystemCoreClock);
+                hpx_printf("HPX_CLEAN_INFER_AVG_US=%lu\n",
+                           (unsigned long)clean_avg_us);
+            }
+{% endif %}
+        }
+{% if power_only | default(false) %}
+{% include "_power_terminal_success.j2" with context %}
+{% endif %}
+    }
+
+{% if not power_only | default(false) %}{% if transport == "rtt" %}
+    hpx_rtt_set_nonblocking();
+{% if power_sync_enabled %}
+    hpx_rtt_shorten_lossless_timeout();
+{% endif %}
+{% endif %}
+    // --- Multi-pass PMU capture: one whole-model row per iteration ---
+{% for pass in pmu_passes %}
+    hpx_printf("\n--- HPX_PRESET {{ pass.name }} ---\n");
+{% if has_armv8m_pmu and pass.custom %}
+    {
+        static const uint32_t _pass{{ loop.index0 }}_ids[] = { {{ pass.event_ids | join(', ') }} };
+        static const char* _pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
+        profiler_init_custom(_pass{{ loop.index0 }}_ids, {{ pass.num_counters }});
+        profiler_set_counter_names(_pass{{ loop.index0 }}_names, {{ pass.num_counters }});
+    }
+{% elif has_armv8m_pmu %}
+    {
+        static const char* _pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
+        profiler_init_preset({{ pass.c_enum }});
+        profiler_set_counter_names(_pass{{ loop.index0 }}_names, {{ pass.num_counters }});
+    }
+{% else %}
+    profiler_init_preset(0);
+{% endif %}
+
+    // Warmup for this pass.
+    for (int w = 0; w < {{ warmup }}; w++) {
+        (void)hpx_model_run();
+    }
+    hpx_printf("HPX_HEARTBEAT phase=warmup_done pass={{ loop.index0 }}\n");
+
+    for (int iter = 0; iter < {{ iterations }}; iter++) {
+{% if transport == "usb_cdc" %}
+        usb_timer_pause();
+{% endif %}
+        uint32_t infer_start_cyc = DWT->CYCCNT;
+        profiler_run_begin();
+        (void)hpx_model_run();
+        profiler_run_end();
+        profiled_infer_cycles += (uint32_t)(DWT->CYCCNT - infer_start_cyc);
+        profiled_infer_count++;
+{% if transport == "usb_cdc" %}
+        usb_timer_resume();
+{% elif transport == "rtt" %}
+        hpx_rtt_set_blocking();
+{% endif %}
+        hpx_printf("\n--- HPX_ITER %d ---\n", iter);
+        profiler_print_csv();
+{% if transport == "rtt" %}
+        hpx_rtt_set_nonblocking();
+{% endif %}
+    }
+{% endfor %}
+
+    if (profiled_infer_count > 0 && SystemCoreClock > 0U) {
+        const uint32_t profiled_infer_total_us = (uint32_t)(
+            (profiled_infer_cycles * 1000000ULL + ((uint64_t)SystemCoreClock / 2ULL)) /
+            (uint64_t)SystemCoreClock);
+        const uint32_t profiled_infer_avg_us = (uint32_t)(
+            (profiled_infer_cycles * 1000000ULL +
+             (((uint64_t)SystemCoreClock * (uint64_t)profiled_infer_count) / 2ULL)) /
+            ((uint64_t)SystemCoreClock * (uint64_t)profiled_infer_count));
+        hpx_printf("HPX_PROFILED_INFER_COUNT=%lu\n", (unsigned long)profiled_infer_count);
+        hpx_printf("HPX_PROFILED_INFER_TOTAL_US=%lu\n", (unsigned long)profiled_infer_total_us);
+        hpx_printf("HPX_PROFILED_INFER_AVG_US=%lu\n", (unsigned long)profiled_infer_avg_us);
+    }
+
+{% if transport == "rtt" %}
+    hpx_rtt_set_blocking();
+    hpx_printf("HPX_HEARTBEAT phase=flushing\n");
+    HPX_CLEAN_DCACHE();
+    hpx_rtt_drain(500 /* ms */);
+{% endif %}
+    hpx_printf("\n--- HPX_END ---\n");
+{% if transport == "rtt" %}
+    HPX_CLEAN_DCACHE();
+    hpx_rtt_drain(500 /* ms */);
+{% endif %}{% endif %}
+    hpx_park();
+    return 0;
+}

@@ -299,6 +299,42 @@ class ExecutorchArtifacts(EngineArtifacts):
     _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.EXECUTORCH
 
 
+@dataclass(frozen=True, kw_only=True)
+class HeliaMlArtifacts(EngineArtifacts):
+    """heliaML adapter outputs — a generated NSX module, not a flatbuffer.
+
+    heliaML reuses the AOT-shaped fields (``aot_prefix``,
+    ``aot_cmake_target``, ``aot_arena_regions``) because a generated
+    module is linked and sized the same way heliaAOT's is; what is
+    genuinely its own is the run entry point's call shape.
+    """
+
+    engine_type: EngineType = EngineType.HELIA_ML
+
+    #: Symbol prefix of the generated module, from the manifest.  The
+    #: firmware template names every generated entry point through it.
+    aot_prefix: str
+    #: CMake target the app links against.  Pulls ``nsx::helia_ml``
+    #: transitively via the model module's own CMakeLists.
+    aot_cmake_target: str
+
+    #: Always False: a generated module's scratch is static and
+    #: compiled-in (HELIAML_SCRATCH_SECTION), never allocated by the
+    #: engine at boot.
+    aot_allocate_arenas: bool = False
+    #: The compiled-in memory layout, read from the manifest.  Reporting
+    #: only — see :meth:`HeliaMLAdapter.apply_arena_placement_override`.
+    aot_arena_regions: list[ArenaRegion] = field(default_factory=list)
+
+    #: Which call shape the generated module's run entry point has --
+    #: "scores" (classifier with per-class scores), "class" (scoreless
+    #: classifier), or "value" (regressor). Set from the manifest's
+    #: module.run_signature; consumed by main_helia_ml.cc.j2.
+    helia_ml_run_shape: str | None = None
+
+    _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.HELIA_ML
+
+
 @runtime_checkable
 class EngineAdapter(Protocol):
     """Interface that each inference engine adapter must implement.

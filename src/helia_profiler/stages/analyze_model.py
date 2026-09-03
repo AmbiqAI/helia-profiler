@@ -28,6 +28,11 @@ class AnalyzeModelStage:
         if not is_available():
             log.debug("ai-edge-litert not installed — skipping model analysis")
             return True
+        if not ctx.config.model.path.is_file():
+            # A heliaML model is a generated-module directory, not a
+            # flatbuffer; there is no graph to analyze.
+            log.debug("model path is not a flatbuffer file — skipping analysis")
+            return True
         return False
 
     def run(self, ctx: PipelineContext) -> None:

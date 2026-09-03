@@ -199,8 +199,8 @@ def _bare_tokens(text: str) -> set[str]:
 
 _SOCS = ("apollo3p", "apollo4p", "apollo510")
 _TRANSPORTS = ("rtt", "usb_cdc", "swo", "uart")
-_ENGINES = ("tflm", "helia-rt", "helia-aot", "executorch")
-_POWER_ENGINES = ("tflm", "helia-rt", "helia-aot")
+_ENGINES = ("tflm", "helia-rt", "helia-aot", "executorch", "helia-ml")
+_POWER_ENGINES = ("tflm", "helia-rt", "helia-aot", "helia-ml")
 
 #: ExecuTorch is Cortex-M55 only and has no power binary (preflight rejects
 #: engine.type=executorch with power.enabled), exactly as in the render

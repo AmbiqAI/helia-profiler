@@ -27,6 +27,7 @@ from helia_profiler.engines.base import (
     EngineArtifacts,
     ExecutorchArtifacts,
     HeliaAotArtifacts,
+    HeliaMlArtifacts,
     HeliaRtArtifacts,
     TflmArtifacts,
 )
@@ -38,6 +39,7 @@ ARTIFACT_TYPE_FOR_ENGINE: dict[EngineType, type[EngineArtifacts]] = {
     EngineType.HELIA_RT: HeliaRtArtifacts,
     EngineType.HELIA_AOT: HeliaAotArtifacts,
     EngineType.EXECUTORCH: ExecutorchArtifacts,
+    EngineType.HELIA_ML: HeliaMlArtifacts,
 }
 
 
@@ -66,6 +68,11 @@ def _required_kwargs(engine_type: EngineType) -> dict[str, object]:
             "executorch_temporary_arena_size": 3,
             "executorch_input_size": 4,
             "executorch_output_size": 5,
+        },
+        EngineType.HELIA_ML: {
+            "engine_header": "sentinel_model.h",
+            "aot_prefix": "sentinel",
+            "aot_cmake_target": "nsx::sentinel_model",
         },
     }
     return dict(required[engine_type])
@@ -148,6 +155,7 @@ _LEGACY_FIELDS: dict[EngineType, dict[str, str | None]] = {
     },
     EngineType.HELIA_AOT: {"helia_aot_version": "sentinel-aot-version"},
     EngineType.EXECUTORCH: {},
+    EngineType.HELIA_ML: {},
 }
 
 

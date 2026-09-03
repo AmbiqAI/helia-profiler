@@ -320,6 +320,7 @@ _ENGINE_WIRE_NAMES = {
     "helia-rt": "helia_rt",
     "helia-aot": "helia_aot",
     "executorch": "executorch",
+    "helia-ml": "helia_ml",
 }
 
 
@@ -420,6 +421,21 @@ def _render(
             executorch_io_region="tcm",
         )
         return _jinja_env.get_template("main_executorch.cc.j2").render(
+            **_resolve(kwargs)
+        )
+    if engine == "helia-ml":
+        # Mirrors what firmware/__init__.py hands main_helia_ml.cc.j2: a
+        # generated module named through aot_prefix, arenas compiled in
+        # (allocate_arenas=False), and the run entry point's call shape.
+        kwargs.update(
+            printf_linkage="static ",
+            engine_header="fake_model.h",
+            aot_prefix="fake",
+            allocate_arenas=False,
+            arena_regions=[],
+            helia_ml_run_shape="scores",
+        )
+        return _jinja_env.get_template("main_helia_ml.cc.j2").render(
             **_resolve(kwargs)
         )
     if engine not in ("tflm", "helia-rt"):

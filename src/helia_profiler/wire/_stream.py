@@ -7,6 +7,7 @@ from ._model import (
     AOT_ENGINES,
     EST_MS_GAP,
     ET_ENGINES,
+    ML_ENGINES,
     GATE_AOT_CONST_BLOBS,
     GATE_AOT_EXTERNAL_ARENAS,
     GATE_AOT_PSRAM_ARENAS,
@@ -414,7 +415,7 @@ MODEL_MEMORY_SPECS: tuple[WireSpec, ...] = (
         WireConsumer.UNCONSUMED,
         WireCriticality.DIAGNOSTIC,
         key=WireKey.INPUT_INDEXED_SIZE,
-        engines=AOT_ENGINES,
+        engines=AOT_ENGINES | ML_ENGINES,
         value_shape="bytes",
         note="A genuine token-shape divergence: heliaAOT reports per-index "
         "sizes where TFLM and ExecuTorch report one static HPX_INPUT_SIZE. "
@@ -427,7 +428,7 @@ MODEL_MEMORY_SPECS: tuple[WireSpec, ...] = (
         WireConsumer.UNCONSUMED,
         WireCriticality.DIAGNOSTIC,
         key=WireKey.OUTPUT_INDEXED_SIZE,
-        engines=AOT_ENGINES,
+        engines=AOT_ENGINES | ML_ENGINES,
         value_shape="bytes",
     ),
     _spec(

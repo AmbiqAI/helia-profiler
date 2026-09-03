@@ -60,9 +60,10 @@ class VerifyPlacementStage:
         # symbol), so there is nothing to verify statically.
         if ctx.arena_region == Placement.PSRAM:
             return True
-        # heliaAOT emits per-region arena buffers with different symbols; the
+        # heliaAOT emits per-region arena buffers with different symbols, and
+        # heliaML's scratch is static inside the generated module; the
         # interpreter arena guard does not apply.  Scope to TFLM / heliaRT.
-        if ctx.config.engine.type == EngineType.HELIA_AOT:
+        if ctx.config.engine.type in (EngineType.HELIA_AOT, EngineType.HELIA_ML):
             return True
         return False
 

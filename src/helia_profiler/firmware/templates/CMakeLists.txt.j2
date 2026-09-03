@@ -35,7 +35,7 @@ nsx_bootstrap_app(
 )
 
 # --- Profiler application ---
-{% if engine_type == "helia-aot" or engine_type == "executorch" %}
+{% if engine_type in ("helia-aot", "executorch", "helia-ml") %}
 add_executable(hpx_profiler
     src/main.cc
 )

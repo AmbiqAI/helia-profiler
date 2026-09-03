@@ -183,10 +183,14 @@ TFLM_ENGINES: frozenset[EngineType] = frozenset(
 )
 AOT_ENGINES: frozenset[EngineType] = frozenset({EngineType.HELIA_AOT})
 ET_ENGINES: frozenset[EngineType] = frozenset({EngineType.EXECUTORCH})
+#: heliaML renders its own ``main_helia_ml.cc.j2``: a generated module with
+#: whole-model timing only, so it shares heliaAOT's compiled-in-weights
+#: token shapes rather than the interpreters' model-blob ones.
+ML_ENGINES: frozenset[EngineType] = frozenset({EngineType.HELIA_ML})
 #: Engines with a dedicated power binary. ExecuTorch has none — preflight
 #: rejects ``engine.type=executorch`` with ``power.enabled``.
 POWER_BINARY_ENGINES: frozenset[EngineType] = frozenset(
-    {EngineType.TFLM, EngineType.HELIA_RT, EngineType.HELIA_AOT}
+    {EngineType.TFLM, EngineType.HELIA_RT, EngineType.HELIA_AOT, EngineType.HELIA_ML}
 )
 
 

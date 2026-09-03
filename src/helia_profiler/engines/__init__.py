@@ -26,6 +26,7 @@ class EngineType(StrEnum):
     HELIA_RT = "helia-rt"
     HELIA_AOT = "helia-aot"
     EXECUTORCH = "executorch"
+    HELIA_ML = "helia-ml"
 
     @property
     def wire_name(self) -> str:
@@ -45,6 +46,8 @@ class EngineType(StrEnum):
             return "rt"
         if self is EngineType.HELIA_AOT:
             return "aot"
+        if self is EngineType.HELIA_ML:
+            return "ml"
         return self.value
 
 
@@ -72,19 +75,27 @@ def _load_executorch_adapter() -> "EngineAdapter":
     return ExecuTorchAdapter()
 
 
+def _load_helia_ml_adapter() -> "EngineAdapter":
+    from .helia_ml import HeliaMLAdapter
+
+    return HeliaMLAdapter()
+
+
 # ---------------------------------------------------------------------------
 # Engine adapter registry
 # ---------------------------------------------------------------------------
 # One factory per EngineType — the sole dispatch point for "which adapter
 # implements this engine".  Factories are deferred (not adapter instances)
 # so registering an engine doesn't force-import its heavy module (e.g.
-# heliaAOT pulls in the AOT compiler) until it's actually requested.
+# heliaAOT pulls in the AOT compiler, heliaML pulls in heliaml_export) until
+# it's actually requested.
 
 _ADAPTER_FACTORIES: dict[EngineType, "Callable[[], EngineAdapter]"] = {
     EngineType.TFLM: _load_tflm_adapter,
     EngineType.HELIA_RT: _load_helia_rt_adapter,
     EngineType.HELIA_AOT: _load_helia_aot_adapter,
     EngineType.EXECUTORCH: _load_executorch_adapter,
+    EngineType.HELIA_ML: _load_helia_ml_adapter,
 }
 
 

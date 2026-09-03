@@ -6,8 +6,10 @@ wrong — instead of waiting for a confusing failure several stages in.
 
 Checks performed (in order):
 
-1. **Model file** — exists, is a regular file, non-empty, and matches the
-   selected engine: TFLite ``.tflite``/``TFL3`` or ExecuTorch ``.pte``/``ET``.
+1. **Model path** — exists, and matches the shape the selected engine
+   consumes: a TFLite ``.tflite``/``TFL3`` file, an ExecuTorch
+   ``.pte``/``ET`` file, or — for heliaML — a generated-module
+   *directory* carrying ``manifest.json`` + ``arrays.npz``.
 2. **Arena size** — if specified, is positive.
 3. **Model placement** — optional arena/weights overrides use supported regions.
 4. **Output directory** — can be created + written to.
@@ -47,6 +49,8 @@ log = logging.getLogger("hpx")
 # versions emit the identifier at offset 4 (after the root-table offset),
 # so we accept either placement.
 _TFLITE_MAGIC = b"TFL3"
+
+
 _VALID_RUNTIME_ARENA_LOCATIONS: tuple[Placement, ...] = (
     Placement.TCM,
     Placement.SRAM,
@@ -83,11 +87,21 @@ class PreflightStage:
 
 
 def _check_model(path: Path, engine: EngineType) -> None:
+    """Validate the model artifact for ``engine``.
+
+    Existence is engine-neutral; everything past it is not. Most engines
+    consume a single flatbuffer file, but heliaML consumes a
+    generated-module directory, so the file-shaped checks below run only
+    once that branch has been taken.
+    """
     if not path.exists():
         raise ConfigError(
-            f"Model file not found: {path}",
+            f"Model path not found: {path}",
             hint="Check the path in model.path (CLI --model / YAML).",
         )
+    if engine is EngineType.HELIA_ML:
+        _check_helia_ml_model(path)
+        return
     if not path.is_file():
         raise ConfigError(
             f"Model path is not a regular file: {path}",
@@ -131,6 +145,40 @@ def _check_model(path: Path, engine: EngineType) -> None:
         )
 
 
+def _check_helia_ml_model(path: Path) -> None:
+    """heliaML consumes a generated-module directory, not a flatbuffer.
+
+    The shape check is owned here, alongside every other engine's, so
+    preflight stays the one place that answers "is this the right kind of
+    artifact". The deeper artifact validation — array hashes, schema
+    gating, an edited params header, the ``module`` block that a bare
+    ``heliaml.write()`` directory lacks — is heliaML's own loader's call
+    and lives with the adapter, so its actionable messages surface here
+    rather than being reimplemented in the stages layer.
+    """
+    from ..engines.helia_ml.adapter import check_helia_ml_artifact
+
+    if not path.is_dir():
+        raise ConfigError(
+            f"heliaML model path is not a directory: {path}",
+            hint=(
+                "model.path must point at a directory written by "
+                "heliaml.export_module(artifact, outdir, integration='nsx') — "
+                "not a .tflite flatbuffer."
+            ),
+        )
+    for required in ("manifest.json", "arrays.npz"):
+        if not (path / required).is_file():
+            raise ConfigError(
+                f"heliaML model directory is missing {required}: {path}",
+                hint=(
+                    "The directory exists but does not look like a heliaML "
+                    "artifact. Re-run heliaml.export_module(...)."
+                ),
+            )
+    check_helia_ml_artifact(path)
+
+
 def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
     """Reject quantized Softmax scales the selected engine cannot handle (#57).
 
@@ -148,8 +196,8 @@ def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
     reads and carries the TFLite magic -- so a parse failure past that point
     is a malformed flatbuffer, reported as such rather than as a stack trace.
     """
-    if engine is EngineType.EXECUTORCH:
-        return  # .pte -- never parses a TFLite flatbuffer
+    if engine in (EngineType.EXECUTORCH, EngineType.HELIA_ML):
+        return  # .pte / generated-module dir -- never a TFLite flatbuffer
     try:
         findings = scan_softmax_scaling(path)
     except Exception as exc:  # struct.error / IndexError on malformed bytes

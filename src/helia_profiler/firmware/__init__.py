@@ -26,7 +26,7 @@ from ..deps import nsx as nsx_cli
 from ..deps.compatibility import ENGINE_OWNED_MODULE_NAMES
 from ..config import PowerFirmware, Transport, WindowMode
 from ..engines import EngineType
-from ..engines.base import ArenaRegion, HeliaAotArtifacts
+from ..engines.base import ArenaRegion, HeliaAotArtifacts, HeliaMlArtifacts
 from ..errors import ConfigError
 from ..errors import FirmwareError
 from ..placement import Placement
@@ -429,43 +429,61 @@ def generate_app(ctx: PipelineContext) -> Path:
             )
     else:
         # --- TFLM / heliaRT: embed model as byte array, use TFLM profiler ---
-        if weights_region != "psram":
-            model_header = _model_to_header(config.model.path, weights_region)
-            _write_text(src_dir / "model_data.h", model_header)
-
-        _write_text(
-            src_dir / "main.cc",
-            _jinja_env.get_template("main.cc.j2").render(
-                **template_vars,
-            ),
-        )
-        if power_binary_enabled:
-            # Same template, power_only=True: no transport init, no per-layer
-            # PMU passes -- see main.cc.j2's power_only branches (WP1).
+        if engine_type is EngineType.HELIA_ML:
+            # heliaML: the model compiles in as an NSX module; no byte-array
+            # embedding, no TFLM profiler class, whole-model PMU rows only.
             _write_text(
-                src_dir / "main_power.cc",
+                src_dir / "main.cc",
+                _jinja_env.get_template("main_helia_ml.cc.j2").render(
+                    **template_vars,
+                ),
+            )
+            if power_binary_enabled:
+                _write_text(
+                    src_dir / "main_power.cc",
+                    _jinja_env.get_template("main_helia_ml.cc.j2").render(
+                        **render_context.to_template_vars(power_only=True),
+                    ),
+                )
+        else:
+            if weights_region != "psram":
+                model_header = _model_to_header(config.model.path, weights_region)
+                _write_text(src_dir / "model_data.h", model_header)
+
+            _write_text(
+                src_dir / "main.cc",
                 _jinja_env.get_template("main.cc.j2").render(
-                    **render_context.to_template_vars(power_only=True),
+                    **template_vars,
+                ),
+            )
+            if power_binary_enabled:
+                # Same template, power_only=True: no transport init, no per-layer
+                # PMU passes -- see main.cc.j2's power_only branches (WP1).
+                _write_text(
+                    src_dir / "main_power.cc",
+                    _jinja_env.get_template("main.cc.j2").render(
+                        **render_context.to_template_vars(power_only=True),
+                    ),
+                )
+
+            # PMU profiler (TFLM-specific C++ class)
+            _write_text(
+                src_dir / "hpx_pmu_profiler.h",
+                _jinja_env.get_template("hpx_pmu_profiler.h.j2").render(
+                    cmsis_device_header=render_context.pmu.cmsis_device_header,
+                    profiling_backends=profiling_backends,
+                    has_armv8m_pmu=has_armv8m_pmu,
+                    pmu_max_ops=soc.pmu_max_ops,
+                ),
+            )
+            _write_text(
+                src_dir / "hpx_pmu_profiler.cc",
+                _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
+                    profiling_backends=profiling_backends,
+                    has_armv8m_pmu=has_armv8m_pmu,
                 ),
             )
 
-        # PMU profiler (TFLM-specific C++ class)
-        _write_text(
-            src_dir / "hpx_pmu_profiler.h",
-            _jinja_env.get_template("hpx_pmu_profiler.h.j2").render(
-                cmsis_device_header=render_context.pmu.cmsis_device_header,
-                profiling_backends=profiling_backends,
-                has_armv8m_pmu=has_armv8m_pmu,
-                pmu_max_ops=soc.pmu_max_ops,
-            ),
-        )
-        _write_text(
-            src_dir / "hpx_pmu_profiler.cc",
-            _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
-                profiling_backends=profiling_backends,
-                has_armv8m_pmu=has_armv8m_pmu,
-            ),
-        )
 
     # --- Engine modules ---
     # Local modules are vendored into the app under their registry-derived
@@ -509,6 +527,10 @@ def generate_app(ctx: PipelineContext) -> Path:
 def _resolved_aot_arena_regions(ctx: PipelineContext) -> list[ArenaRegion]:
     """Return the same effective AOT arena placement for every render pass."""
     artifacts = ctx.prepared_artifacts
+    if isinstance(artifacts, HeliaMlArtifacts):
+        # Reporting only: the compiled-in layout cannot be rebound, so the
+        # adapter's override is an identity and the manifest wins as-is.
+        return list(artifacts.aot_arena_regions)
     if not isinstance(artifacts, HeliaAotArtifacts):
         return []
     adapter = ctx.prepared_adapter
@@ -547,7 +569,11 @@ def render_power_source(ctx: PipelineContext, *, inference_count: int) -> Path:
         else (
             "main_executorch.cc.j2"
             if ctx.engine_artifacts.engine_type is EngineType.EXECUTORCH
-            else "main.cc.j2"
+            else (
+                "main_helia_ml.cc.j2"
+                if ctx.engine_artifacts.engine_type is EngineType.HELIA_ML
+                else "main.cc.j2"
+            )
         )
     )
     destination = ctx.firmware_dir / "src" / "main_power.cc"

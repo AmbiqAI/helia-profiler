@@ -34,7 +34,7 @@ Inference engine selection and passthrough config.
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `type` | tflm \| helia-rt \| helia-aot \| executorch | `helia-rt` | `tflm` is the vanilla TFLM baseline; `executorch` consumes an exported Cortex-M `.pte`. |
+| `type` | tflm \| helia-rt \| helia-aot \| executorch \| helia-ml | `helia-rt` | `tflm` is the vanilla TFLM baseline; `executorch` consumes an exported Cortex-M `.pte`. |
 | `backend` | str \| null | `null` | TFLM: `reference` or `cmsis_nn`; ExecuTorch: `arm` or `ns`. |
 | `config` | dict[str, Any] | `{}` | free-form engine-specific mapping (not strictly validated). |
 | `config_path` | Path \| null | `null` |  |
