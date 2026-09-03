@@ -19,6 +19,6 @@ indent_style = tab
 
 # Vendored/generated content we don't own the whitespace of — mirrors the
 # .pre-commit-config.yaml whitespace-hook excludes.
-[{nix/patches/**,tests/fixtures/**,src/helia_profiler/vendor/**}]
+[{nix/patches/**,tests/fixtures/**,src/helia_profiler/vendor/segger_rtt/**}]
 trim_trailing_whitespace = false
 insert_final_newline = unset

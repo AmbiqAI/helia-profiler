@@ -103,7 +103,7 @@ runs with no board attached. Hardware cases run through `hpx validate` (or
 One-time setup after cloning:
 
 ```bash
-uv tool install pre-commit
+uv tool install pre-commit==4.6.0
 pre-commit install
 ```
 

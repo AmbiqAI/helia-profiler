@@ -3,9 +3,10 @@
 
 Removes ``Co-authored-by:`` lines whose value names an AI coding tool
 (claude, anthropic, openai, codex, copilot, chatgpt, cursor, gemini, or
-``noreply@anthropic.com``) — human co-authors are left untouched — plus any
-``Claude-Session:``, ``Agent-Assisted:``, ``Generated-by:``/``Generated-with:``
-trailer line, regardless of value.
+``noreply@anthropic.com``) via a case-insensitive substring match — a human
+co-author is left untouched unless their own name or email happens to
+contain one of those words — plus any ``Claude-Session:``, ``Agent-Assisted:``,
+``Generated-by:``/``Generated-with:`` trailer line, regardless of value.
 
 Git invokes this hook as ``prepare-commit-msg <msg-file> [source] [sha1]``
 for every commit source (``-m``, ``-F``, template, merge, squash, amend);

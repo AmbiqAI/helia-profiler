@@ -31,7 +31,10 @@ def find_bare_markers(text: str) -> list[tuple[int, str, str]]:
     for lineno, line in enumerate(text.splitlines(), start=1):
         for match in MARKER_RE.finditer(line):
             marker, ref = match.group(1), match.group(2)
-            if not ref or ref == "()":
+            # ref is None both when there's no "(...)" at all and when it's
+            # empty ("()"): the regex's [^)]+ requires >=1 char, so "()"
+            # never matches the optional group in the first place.
+            if not ref:
                 hits.append((lineno, marker, line.strip()))
     return hits
 
