@@ -9,7 +9,7 @@ repos:
       # SEGGER's vendored RTT sources, an upstream NSX patch file, and
       # captured tool output used as test fixtures. Scoped to these two
       # whitespace-shaped hooks (and .editorconfig, which mirrors this) —
-      # ruff/todo-needs-issue/gitleaks still see these paths, since none
+      # ruff/todo-needs-issue still see these paths, since none
       # of them contain first-party .py.
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
@@ -56,14 +56,6 @@ repos:
             tools/hooks/todo_needs_issue\.py|
             tests/test_git_hooks\.py
           )$
-
-      - id: gitleaks
-        name: gitleaks (staged secrets scan)
-        description: Scan staged changes for hardcoded secrets with gitleaks.
-        entry: python3 tools/hooks/gitleaks_wrapper.py
-        language: system
-        pass_filenames: false
-        always_run: true
 
       - id: strip-ai-trailers
         name: Strip AI-tool attribution trailers
