@@ -50,6 +50,9 @@ jobs:
       - name: Run ruff lint
         run: uv run --no-sync ruff check .
 
+      - name: Run ruff format check
+        run: uv run --no-sync ruff format --check .
+
       # Type checking gates src AND tests (#199/#201). ty is pinned exactly
       # in the lint group -- it is pre-1.0 and upgrades are deliberate, with
       # a diagnostic re-triage.
@@ -138,6 +141,60 @@ jobs:
             tests/test_example_models.py -q
 
   # ---------------------------------------------------------------
+  # pre-commit — runs the exact hook config contributors run locally, so
+  # a hook that only exists in someone's local install can't go unnoticed.
+  # ---------------------------------------------------------------
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Pinned to the same version contributors are told to install in
+      # README.md -- a drifted local/CI pre-commit version is exactly the
+      # kind of disagreement this job exists to prevent.
+      - name: Install pre-commit
+        run: |
+          uv tool install pre-commit==4.6.0
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # gitleaks is a `local`/`system` hook (not pre-commit's `golang`
+      # hook language), so it must be on PATH before pre-commit runs, or
+      # the gitleaks hook fails closed via tools/hooks/gitleaks_wrapper.py.
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: "8.29.1"
+          GITLEAKS_SHA256: "e4eb209d04e20339d77122a3bdf9cd41351255cfb27ebcb75e85325e04f88924"
+        run: |
+          curl -fsSL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          install -m 0755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Cache pre-commit environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Run pre-commit on all files
+        run: pre-commit run --all-files --show-diff-on-failure
+
+  # ---------------------------------------------------------------
   # Package — validate the exact wheel/sdist release boundaries
   # ---------------------------------------------------------------
   package:
@@ -204,7 +261,7 @@ jobs:
   # ---------------------------------------------------------------
   lint-and-test:
     if: always()
-    needs: [lint, unit-tests, analysis-tests, package]
+    needs: [lint, unit-tests, analysis-tests, pre-commit, package]
     runs-on: ubuntu-latest
     steps:
       - name: Decide status
@@ -212,6 +269,7 @@ jobs:
           if [[ "${{ needs.lint.result }}" != "success" ]] ||
              [[ "${{ needs.unit-tests.result }}" != "success" ]] ||
              [[ "${{ needs.analysis-tests.result }}" != "success" ]] ||
+             [[ "${{ needs.pre-commit.result }}" != "success" ]] ||
              [[ "${{ needs.package.result }}" != "success" ]]; then
             echo "One or more CI jobs failed."
             exit 1
