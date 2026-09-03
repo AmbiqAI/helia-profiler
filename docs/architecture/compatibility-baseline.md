@@ -58,8 +58,8 @@ checks the same requirement under the exported define's name (helia-aot#349).
 pair only when the model carries FLOAT16 tensors — computed or dequantized
 weights — on a Cortex-M55: ns-cmsis-nn
 below v7.30.0 ICEs on GCC 14 for its fp16 sources (PR 118460), so int8 and
-fp32 builds must not compile them. Both need ns-cmsis-nn `>= v7.28.0`;
-`v7.29.2` and `v7.31.0` both qualify.
+fp32 builds must not compile them. heliaRT 1.19.0 accepts ns-cmsis-nn
+`>= v7.28.0`; heliaAOT 0.19.0 requires `>= v7.31.0`; the baseline pins v7.31.0.
 
 **Behavior deltas in 1.19.0 that a float baseline must expect** (all toward
 correctness): NaN now propagates through float `ADD`/`MUL` instead of being
@@ -142,7 +142,9 @@ Baseline refs relate to the packaged registry in two tiers. Modules HPX
 itself declares in generated apps (the SDK monorepo, PMU, heliaRT,
 nsx-sensors and, since the 2026-09 revision, `nsx-cmsis-nn`) carry
 manifest pins at the baseline refs, and those pins defeat the packaged
-registry — `nsx-sensors` stays at its audited `v0.3.0` pin even though
+registry (concretely: a module whose `NsxModuleRef.ref` is set is rendered
+into the app's module-registry override, which NSX locking honours over its
+packaged default) — `nsx-sensors` stays at its audited `v0.3.0` pin even though
 0.7.17's registry default is older, and `nsx-cmsis-nn` builds at `v7.31.0`
 where the registry would resolve `v7.29.2`. The stock-TFLM engine's
 declared modules (`nsx-tflite-micro`, `arm-cmsis-nn`) sit in the

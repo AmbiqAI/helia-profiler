@@ -10,7 +10,6 @@ import yaml
 import pytest
 
 from helia_profiler.config import Toolchain, Transport
-from helia_profiler.deps.compatibility import load_compatibility_baseline
 from helia_profiler.engines import EngineType
 from helia_profiler.validation.matrix import (
     BOARDS,
@@ -272,18 +271,11 @@ def test_build_config_tflm_selects_upstream_cmsis_nn_backend(tmp_path: Path):
     assert cfg["engine"] == {"type": "tflm", "backend": "cmsis_nn"}
 
 
-@pytest.mark.parametrize(
-    ("backend", "cmsis_nn_ref"),
-    [
-        (ExecuTorchBackend.ARM, load_compatibility_baseline().module("arm-cmsis-nn").ref),
-        (ExecuTorchBackend.NS, load_compatibility_baseline().module("nsx-cmsis-nn").ref),
-    ],
-)
+@pytest.mark.parametrize("backend", [ExecuTorchBackend.ARM, ExecuTorchBackend.NS])
 def test_build_config_executorch_uses_pte_contract(
     tmp_path: Path,
     monkeypatch,
     backend: ExecuTorchBackend,
-    cmsis_nn_ref: str,
 ):
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -317,8 +309,34 @@ def test_build_config_executorch_uses_pte_contract(
         "input_size": 490,
         "output_size": 12,
         "portable_ops": ["dim_order_ops::_clone_dim_order.out"],
-        "cmsis_nn_ref": cmsis_nn_ref,
     }
+
+
+@pytest.mark.parametrize(
+    ("backend", "pinned"), [(ExecuTorchBackend.NS, True), (ExecuTorchBackend.ARM, False)]
+)
+def test_build_config_executorch_pins_only_an_explicit_ns_ref(
+    tmp_path: Path, monkeypatch, backend: ExecuTorchBackend, pinned: bool
+):
+    """Providers resolve at the baseline's qualified ref by default (the case
+    stamps `qualified`); an explicit ns ref is the one reason to override."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    monkeypatch.setenv("NSX_EXECUTORCH_ROOT", str(tmp_path / "nsx-executorch"))
+    case = CaseSpec(
+        model=MODELS["kws"],
+        engine=EngineType.EXECUTORCH,
+        power=False,
+        board=BOARDS["apollo330mP_evb"],
+        cmsis_nn_backend=backend,
+    )
+    commit = "edc4edbd81af2f3baa9354ea1e30cca50dfcfd99"
+
+    cfg = _build_config(case, repo_root, tmp_path / "out", ns_cmsis_nn_ref=commit)
+
+    assert ("cmsis_nn_ref" in cfg["engine"]["config"]) is pinned
+    if pinned:
+        assert cfg["engine"]["config"]["cmsis_nn_ref"] == commit
 
 
 def test_run_case_retries_once_on_transient_joulescope_lock(tmp_path: Path, monkeypatch):

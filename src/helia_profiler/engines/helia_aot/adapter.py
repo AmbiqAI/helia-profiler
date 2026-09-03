@@ -199,8 +199,8 @@ class HeliaAOTAdapter:
         # 4. Validate memory-placement pragmas in generated code
         _validate_pragmas(aot_module_dir, prefix)
 
-        # 5. Resolve the ns-cmsis-nn NSX module (registry by default, or a
-        #    vendored local module when a custom path is provided).
+        # 5. Resolve the ns-cmsis-nn NSX module (declared at the baseline's
+        #    qualified ref by default; a user ref or vendored path overrides).
         cmsis_nn_ref = cmsis_nn_module_ref(config, work_dir)
 
         # 6. AOT output is already a valid NSX module (ModuleType.nsx).

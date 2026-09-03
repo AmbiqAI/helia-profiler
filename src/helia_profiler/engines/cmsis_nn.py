@@ -76,11 +76,9 @@ def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
     return cmake_vars
 
 
-def _baseline_cmsis_nn_ref(config: ProfileConfig) -> str | None:
-    """The baseline's qualified ``nsx-cmsis-nn`` ref, or ``None`` when no
-    compatibility baseline is resolved on the config (bare unit-test configs)."""
-    baseline = getattr(getattr(config, "compatibility", None), "baseline", None)
-    return baseline.module(CMSIS_NN_MODULE).ref if baseline is not None else None
+def _baseline_cmsis_nn_ref(config: ProfileConfig) -> str:
+    """The compatibility baseline's qualified ``nsx-cmsis-nn`` ref."""
+    return config.compatibility_baseline.module(CMSIS_NN_MODULE).ref
 
 
 def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:

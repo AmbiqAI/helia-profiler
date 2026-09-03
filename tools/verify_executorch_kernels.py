@@ -7,7 +7,7 @@ Usage:
   python tools/verify_executorch_kernels.py --provider ns --ns-ops <elf>
 
 Checks (via arm-none-eabi-nm):
-- ns provider evidence: the ns-cmsis-nn v7.29.2 weight-sum ABI symbols
+- ns provider evidence: the ns-cmsis-nn weight-sum ABI symbols (v7.29.2+; the baseline pins v7.31.0)
   (arm_convolve_weight_sum / arm_convolve_s8_get_weights_sum_size) that do
   not exist in stock Arm CMSIS-NN.
 - cortex_m_ns:: Tier-1 kernels (mangled names contain "cortex_m_ns") —

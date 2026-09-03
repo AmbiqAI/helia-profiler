@@ -134,7 +134,7 @@ def _fake_source_refs(monkeypatch: pytest.MonkeyPatch):
                 "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
                 if path.name.startswith("arm-cmsis-nn-")
                 else (
-                    "631726420b04860a5c4236956a3741ff5a96bd7f"
+                    "9884d5fccab884c90c3d5e8865d5babbb1cabc63"
                     if path.name.startswith("ns-cmsis-nn-")
                     else "27eee513636821398f0bb5e92055526cac29b1ed"
                 )
@@ -214,6 +214,11 @@ def test_adapter_selects_only_ns_provider_module(tmp_path: Path):
 
     module_names = [module.name for module in artifacts.extra_modules]
     assert module_names == ["nsx-cmsis-nn", "nsx-executorch"]
+    # The ns provider is declared at the baseline's qualified core (#246).
+    config = _config(tmp_path, source, backend="ns")
+    assert artifacts.extra_modules[0].ref == (
+        config.compatibility_baseline.module("nsx-cmsis-nn").ref
+    )
 
     assert artifacts.cmake_vars["NSX_EXECUTORCH_CMSIS_NN_PROVIDER"] == "ns"
     assert "NSX_EXECUTORCH_ARM_CMSIS_NN_ROOT" not in artifacts.cmake_vars
@@ -613,6 +618,7 @@ def test_adapter_rejects_sidecar_with_bad_planned_size(tmp_path: Path):
     with pytest.raises(EngineError, match="planned_arena_size.*positive integer"):
         ExecuTorchAdapter().prepare(config, tmp_path / "work")
 
+
 # ---------------------------------------------------------------------------
 # Auto-clone resolution (#160) — source_path absent clones the pinned baseline
 # ---------------------------------------------------------------------------
@@ -777,7 +783,14 @@ def test_auto_clone_recovers_from_corrupt_cache(tmp_path: Path, monkeypatch: pyt
     executorch_mod._auto_clone_nsx_executorch(_URL, _PINNED)
 
     # The unusable cache is removed and recloned from scratch.
-    assert git.subcommands() == ["rev-parse", "clone", "checkout", "clean", "submodule", "submodule"]
+    assert git.subcommands() == [
+        "rev-parse",
+        "clone",
+        "checkout",
+        "clean",
+        "submodule",
+        "submodule",
+    ]
     assert not (cache / "junk.txt").exists()
 
 

@@ -38,18 +38,6 @@ from ..results.run_summary import load_run_summary
 from .matrix import CaseSpec, MemoryProfile
 
 _TRANSIENT_POWER_LOCK_RETRY_DELAY_S = 5.0
-
-
-def _qualified_cmsis_nn_ref(provider: str) -> str:
-    """The baseline's qualified ref for an ExecuTorch CMSIS-NN provider.
-
-    Read from the compatibility baseline rather than pinned here, so a
-    promotion cannot leave the validation matrix building a stale core.
-    """
-    from ..deps.compatibility import load_compatibility_baseline
-
-    module = "nsx-cmsis-nn" if provider == "ns" else "arm-cmsis-nn"
-    return load_compatibility_baseline().module(module).ref
 _TRANSIENT_POWER_LOCK_MARKERS = (
     "is already in use by another process",
     "busy during open; retrying",
@@ -261,10 +249,6 @@ def _build_config(
         nsx_root = Path(
             os.environ.get("NSX_EXECUTORCH_ROOT", repo_root.parent / "nsx-executorch")
         ).expanduser()
-        provider = case.cmsis_nn_backend.value
-        cmsis_nn_ref = _qualified_cmsis_nn_ref(provider)
-        if provider == "ns" and ns_cmsis_nn_ref:
-            cmsis_nn_ref = ns_cmsis_nn_ref
         engine_config: dict[str, Any] = {
             "source_path": str(nsx_root.resolve()),
             "planned_arena_size": contract.planned_arena_size,
@@ -273,8 +257,12 @@ def _build_config(
             "input_size": contract.input_size,
             "output_size": contract.output_size,
             "portable_ops": list(contract.portable_ops),
-            "cmsis_nn_ref": cmsis_nn_ref,
         }
+        # Both providers resolve at the compatibility baseline's qualified ref
+        # by default, so the case stamps `qualified`; an explicit ns ref (a
+        # branch under test) is the only reason to override.
+        if case.cmsis_nn_backend.value == "ns" and ns_cmsis_nn_ref:
+            engine_config["cmsis_nn_ref"] = ns_cmsis_nn_ref
         engine_cfg.update(
             {
                 "backend": case.cmsis_nn_backend.value,
