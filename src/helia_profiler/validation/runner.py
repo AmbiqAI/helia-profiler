@@ -38,8 +38,18 @@ from ..results.run_summary import load_run_summary
 from .matrix import CaseSpec, MemoryProfile
 
 _TRANSIENT_POWER_LOCK_RETRY_DELAY_S = 5.0
-_EXECUTORCH_ARM_CMSIS_NN_REF = "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
-_EXECUTORCH_NS_CMSIS_NN_REF = "631726420b04860a5c4236956a3741ff5a96bd7f"
+
+
+def _qualified_cmsis_nn_ref(provider: str) -> str:
+    """The baseline's qualified ref for an ExecuTorch CMSIS-NN provider.
+
+    Read from the compatibility baseline rather than pinned here, so a
+    promotion cannot leave the validation matrix building a stale core.
+    """
+    from ..deps.compatibility import load_compatibility_baseline
+
+    module = "nsx-cmsis-nn" if provider == "ns" else "arm-cmsis-nn"
+    return load_compatibility_baseline().module(module).ref
 _TRANSIENT_POWER_LOCK_MARKERS = (
     "is already in use by another process",
     "busy during open; retrying",
@@ -251,9 +261,10 @@ def _build_config(
         nsx_root = Path(
             os.environ.get("NSX_EXECUTORCH_ROOT", repo_root.parent / "nsx-executorch")
         ).expanduser()
-        cmsis_nn_ref = _EXECUTORCH_ARM_CMSIS_NN_REF
-        if case.cmsis_nn_backend.value == "ns":
-            cmsis_nn_ref = ns_cmsis_nn_ref or _EXECUTORCH_NS_CMSIS_NN_REF
+        provider = case.cmsis_nn_backend.value
+        cmsis_nn_ref = _qualified_cmsis_nn_ref(provider)
+        if provider == "ns" and ns_cmsis_nn_ref:
+            cmsis_nn_ref = ns_cmsis_nn_ref
         engine_config: dict[str, Any] = {
             "source_path": str(nsx_root.resolve()),
             "planned_arena_size": contract.planned_arena_size,

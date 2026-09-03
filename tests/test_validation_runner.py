@@ -10,6 +10,7 @@ import yaml
 import pytest
 
 from helia_profiler.config import Toolchain, Transport
+from helia_profiler.deps.compatibility import load_compatibility_baseline
 from helia_profiler.engines import EngineType
 from helia_profiler.validation.matrix import (
     BOARDS,
@@ -274,8 +275,8 @@ def test_build_config_tflm_selects_upstream_cmsis_nn_backend(tmp_path: Path):
 @pytest.mark.parametrize(
     ("backend", "cmsis_nn_ref"),
     [
-        (ExecuTorchBackend.ARM, "6d21a6f821fb72541173a6c4d05d83329fa74f7c"),
-        (ExecuTorchBackend.NS, "631726420b04860a5c4236956a3741ff5a96bd7f"),
+        (ExecuTorchBackend.ARM, load_compatibility_baseline().module("arm-cmsis-nn").ref),
+        (ExecuTorchBackend.NS, load_compatibility_baseline().module("nsx-cmsis-nn").ref),
     ],
 )
 def test_build_config_executorch_uses_pte_contract(

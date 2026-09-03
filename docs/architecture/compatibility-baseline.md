@@ -73,18 +73,24 @@ did not move. heliaAOT emits native `arm_*_f32` kernels for an FP32 graph and
 native `arm_*_f16` kernels for an all-`FLOAT16` graph on all three M55
 targets; its float coverage is partial (`MEAN` and a tier of shape ops remain
 int8/int16-only — helia-aot#345). Bench (Apollo510 EVB, Arm GNU 15.2.Rel1,
-96 MHz, `v7.31.0` override, `tests/fixtures/kws_float_fp32.tflite` and its
+96 MHz, core `v7.31.0`, `tests/fixtures/kws_float_fp32.tflite` and its
 all-`FLOAT16` cast, 43,520 MACs): heliaRT and heliaAOT agree within 0.3 % —
 FP32 ≈ 1.17 M and FP16 ≈ 1.08 M clean cycles on both, with identical layer
 profiles, so the single-input-channel first `CONV_2D` (93 % of the run) and
 the slower-in-f16 `FULLY_CONNECTED` are heliaCORE kernel properties, not
 either runtime's. Every plan-vs-measured memory region matched. **int8 is
-unchanged in speed but larger:** the qualified int8 KWS DS-CNN (baseline
-`ns-cmsis-nn v7.29.2`) measured 2.07 M cycles on both 1.17.0 and 1.19.0
-(−0.02 %, run noise) while `.text` grew 277,420 B → 308,868 B (+31.4 KB) with
-`.data`/`.bss`/arena unchanged — consistent with the fp32 kernel paths 1.19.0
-requires riding into an int8 image (compiling the fp16 kernels too, as an
-earlier run did, added another 35 KB; hence the model gating). Two of the five
+unchanged in speed but larger:** the qualified int8 KWS DS-CNN measured 2.07 M
+cycles on 1.17.0 and 1.19.0 alike (−0.02 % on the same core, run noise) while
+`.text` grew 277,420 B → 308,868 B (+31.4 KB) with `.data`/`.bss`/arena
+unchanged — consistent with the fp32 kernel paths 1.19.0 requires riding into
+an int8 image (compiling the fp16 kernels too, as an earlier run did, added
+another 35 KB; hence the model gating). Moving the core v7.29.2 → v7.31.0 on
+1.19.0 changed that int8 run by −0.4 % cycles and +2.3 KB `.text`. With the
+core declared at v7.31.0, `hpx validate` passes kws/vww/ic/ad on both engines
+(8/8; heliaAOT was 0/4 on v7.29.2), every float run above reproduces its
+numbers with no override and stamps `qualified`, and the converter's
+weights-only FP16 form now builds and runs on heliaAOT (1,230,144 cycles);
+heliaRT still rejects that form (helia-rt#255). Two of the five
 power windows were INVALID by design: the JS320 GPI-stream gate edges
 disagreed with the firmware window clock and host poll edges (which agree to
 <5 ms) by a random −54 / +81 / +38 / −1 / +5 ms — #249.
