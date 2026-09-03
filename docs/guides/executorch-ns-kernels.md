@@ -63,7 +63,7 @@ kernels linked:
    `arm-none-eabi-nm` over the built firmware. `arm` builds show the portable
    registration table and named `torch::executor::native::` kernels, and *no*
    `arm_convolve_weight_sum` or `cortex_m_ns` symbols. `ns` builds show the
-   ns-cmsis-nn v7.29.2 weight-sum ABI (`arm_convolve_weight_sum`,
+   ns-cmsis-nn weight-sum ABI, v7.29.2+ (`arm_convolve_weight_sum`,
    `arm_convolve_s8_get_weights_sum_size`) plus the
    `cortex_m_ns::native::quantized_*_out` kernels.
 2. **Load-time fail-fast** — a PTE containing `cortex_m_ns::` ops fails

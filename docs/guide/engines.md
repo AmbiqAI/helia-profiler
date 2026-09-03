@@ -93,7 +93,9 @@ declares exactly one qualified provider (`arm-cmsis-nn` or `nsx-cmsis-nn`) as
 a normal NSX module immediately before `nsx-executorch`. NSX lock/sync therefore
 owns provider materialization and uses its standard `NSX_CACHE_DIR` cache;
 the runtime's idempotent bridge prevents duplicate targets. The `ns` provider
-uses PR #1's private compatibility layer for the v7.29.2 `weight_sum_ctx` ABI.
+uses PR #1's private compatibility layer for the fork's `weight_sum_ctx` ABI
+and resolves `nsx-cmsis-nn` at the baseline's qualified ref like the helia
+engines (v7.31.0, verified on Apollo510).
 Set `engine.config.cmsis_nn_path` or `cmsis_nn_ref` to override the selected
 provider while preserving the same ordered module contract.
 
@@ -169,7 +171,7 @@ graph contains `VAR_HANDLE`-style ops. That means models using
 manual firmware edits just to stand up the interpreter.
 
 The profiler ships pinned to a specific heliaRT release
-(currently **v1.17.0**) and enforces a minimum supported version
+(currently **v1.19.0**) and enforces a minimum supported version
 (**v1.16.0**). In the default flow NSX resolves the pinned
 `nsx-helia-rt` registry module and builds it with the selected toolchain.
 
@@ -213,7 +215,7 @@ engine:
   config:
     source:
       repo: AmbiqAI/helia-rt
-      ref: helia-rt-v1.17.0
+      ref: helia-rt-v1.19.0
 ```
 
 ```yaml title="hpx.yml"
@@ -249,6 +251,9 @@ registry and local-source modes compile heliaRT with the selected toolchain.
 | `dist_path` | string | *(registry module)* | Explicit local prebuilt distribution |
 | `source.repo` | string | — | GitHub repo for an explicit prebuilt release |
 | `source.ref` | string | — | Explicit release tag |
+| `cmsis_nn_path` | string | *(baseline ref)* | Local ns-cmsis-nn checkout for the source build (mutually exclusive with `cmsis_nn_ref`) |
+| `cmsis_nn_ref` | string | *(baseline ref)* | Exact ns-cmsis-nn git ref for the source build; stamps `qualified-with-engine-override` |
+| `cmsis_nn_requantize_inline_asm` | bool | `true` | Use inline-asm requantization path |
 
 ### heliaRT runtime notes
 
@@ -261,6 +266,12 @@ registry and local-source modes compile heliaRT with the selected toolchain.
 - Size `model.arena_size` from measured output, not guesses. After the first
   successful run, set it to roughly `1.5x` the reported `allocated_arena` in
   `summary.json`.
+- Source builds (the registry default and `source_path`) declare
+  `nsx-cmsis-nn` at the baseline's qualified ref (v7.31.0), always enable its
+  fp32 kernels (heliaRT 1.19.0 refuses to configure without them), and enable
+  the fp16 kernels only when the model carries FLOAT16 tensors — computed or
+  dequantized weights — on a Cortex-M55. There is no field to turn them off;
+  1.19.0 prebuilt `dist_path` archives already contain them.
 
 ## heliaAOT
 
@@ -291,7 +302,7 @@ heliaAOT ships as a Python package (it runs at build-time), so version
 resolution is handled entirely by **pip** — there's no separate cache,
 download, or `dist_path` to manage.
 
-The profiler's `[aot]` extra requires `helia-aot>=0.18.0`, and the profiler
+The profiler's `[aot]` extra requires `helia-aot>=0.19.0`, and the profiler
 also enforces a runtime
 **minimum supported version** (`HELIAAOT_MIN_VERSION`) so any compatible
 override still has to clear the floor.
@@ -371,13 +382,19 @@ The pipeline:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `cmsis_nn_path` | string | *(registry default)* | Optional local AmbiqAI ns-cmsis-nn source root |
+| `cmsis_nn_path` | string | *(baseline ref)* | Local ns-cmsis-nn checkout (mutually exclusive with `cmsis_nn_ref`) |
+| `cmsis_nn_ref` | string | *(baseline ref)* | Exact ns-cmsis-nn git ref; stamps `qualified-with-engine-override` |
 | `prefix` | string | `hpx` | C symbol prefix |
 | `module_name` | string | `hpx_model` | Generated NSX module name |
 | `cmsis_nn_requantize_inline_asm` | bool | `true` | Use inline-asm requantization path |
 | `linker_profile` | string | `default` | NSX linker-script profile (`default`, `itcm`); `itcm` promotes hot kernels into ITCM (Apollo5-family M55 SoCs) |
 | `aot_args` | dict | `{}` | Pass-through args to the AOT compiler |
 | `platform_name` | string | *(from board)* | Override the board → AOT platform mapping |
+
+`nsx-cmsis-nn` is declared at the baseline's qualified ref (v7.31.0, which
+heliaAOT 0.19.0 requires), its fp32 kernels are always enabled, and the fp16
+kernels when the model carries FLOAT16 tensors on a Cortex-M55 — exactly as
+for heliaRT source builds (see the heliaRT runtime notes).
 
 ## Choosing an engine
 

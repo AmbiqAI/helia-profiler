@@ -24,9 +24,10 @@ drift between the two fails a test rather than silently diverging. Schema
 evolution cannot move them: flatbuffers appends new fields to the end of the
 vtable precisely so existing slots stay fixed.
 
-This is a reader for ONE question. Anything needing real model analysis
-(shapes, MACs, weights) should use ``model_analysis``'s litert path, not grow
-this file.
+This is a reader for two narrow questions -- the Softmax scaling gate and which
+float precisions a model works in (#246). Anything needing real model
+analysis (shapes, MACs, weights) should use ``model_analysis``'s litert path,
+not grow this file.
 """
 
 from __future__ import annotations
@@ -35,14 +36,19 @@ import struct
 from dataclasses import dataclass
 
 # PROVENANCE (#229 D7): every constant below was extracted from
-# ai_edge_litert 2.1.6's generated schema (schema_py_generated) and is
-# frozen by flatbuffers schema-evolution rules (enum values immutable,
-# vtable slots append-only). tests/test_softmax_preflight.py re-derives
-# each one from the installed litert by introspection whenever the
+# ai_edge_litert 2.1.6's generated schema (schema_py_generated), re-verified
+# unchanged against 2.2.0 (#246), and is frozen by flatbuffers
+# schema-evolution rules (enum values immutable, vtable slots append-only).
+# tests/test_softmax_preflight.py re-derives each one from the installed
+# litert by introspection whenever the
 # `analysis` extra is present, so silent drift is impossible.
 #
 # BuiltinOperator / TensorType / BuiltinOptions enum values:
+BUILTIN_DEQUANTIZE = 6
 BUILTIN_SOFTMAX = 25
+BUILTIN_QUANTIZE = 114
+TENSOR_TYPE_FLOAT32 = 0
+TENSOR_TYPE_FLOAT16 = 1
 TENSOR_TYPE_UINT8 = 3
 TENSOR_TYPE_INT8 = 9
 BUILTIN_OPTIONS_SOFTMAX = 9
@@ -109,9 +115,7 @@ class _Table:
 
     def table_vector(self, slot: int) -> list["_Table"]:
         start, length = self.vector(slot)
-        return [
-            _Table(self.buf, self._indirect(start + 4 * i)) for i in range(length)
-        ]
+        return [_Table(self.buf, self._indirect(start + 4 * i)) for i in range(length)]
 
     def string(self, slot: int) -> str | None:
         pos = self._field_pos(slot)
@@ -120,6 +124,46 @@ class _Table:
         s = self._indirect(pos)
         length = struct.unpack_from("<I", self.buf, s)[0]
         return self.buf[s + 4 : s + 4 + length].decode("utf-8", "replace")
+
+
+def _builtin_code(opcode: _Table) -> int:
+    builtin = opcode.scalar(_OPCODE_BUILTIN, "<i", 0)
+    if builtin == 0:
+        # Pre-schema-v3a files store the enum only in the deprecated int8
+        # field; BuiltinCode() keeps its ADD(0) placeholder.
+        builtin = opcode.scalar(_OPCODE_DEPRECATED_BUILTIN, "<b", 0)
+    return builtin
+
+
+def read_float_compute_types(buf: bytes) -> set[int]:
+    """Float tensor types a kernel reads: the float precisions the target works in.
+
+    Inputs to ``QUANTIZE``/``DEQUANTIZE`` are skipped -- an int8 model with
+    float I/O only casts at its edges and exercises no float kernel -- except
+    a FLOAT16 input to ``DEQUANTIZE``, which counts: widening float16 weights
+    is float16 work on the target. Raises like
+    :func:`read_quantized_softmax_ops` on a malformed buffer.
+    """
+    model = _Table(buf, struct.unpack_from("<I", buf, 0)[0])
+    opcodes = model.table_vector(_MODEL_OPERATOR_CODES)
+    found: set[int] = set()
+    for sg in model.table_vector(_MODEL_SUBGRAPHS):
+        tensors = sg.table_vector(_SUBGRAPH_TENSORS)
+        for op in sg.table_vector(_SUBGRAPH_OPERATORS):
+            builtin = _builtin_code(opcodes[op.scalar(_OPERATOR_OPCODE_INDEX, "<I", 0)])
+            counts = {
+                TENSOR_TYPE_FLOAT32: builtin not in (BUILTIN_QUANTIZE, BUILTIN_DEQUANTIZE),
+                TENSOR_TYPE_FLOAT16: builtin != BUILTIN_QUANTIZE,
+            }
+            start, length = op.vector(_OPERATOR_INPUTS)
+            for i in range(length):
+                index = struct.unpack_from("<i", op.buf, start + 4 * i)[0]
+                if index < 0:  # -1 marks an absent optional input
+                    continue
+                tensor_type = tensors[index].scalar(_TENSOR_TYPE, "<b", 0)
+                if counts.get(tensor_type, False):
+                    found.add(tensor_type)
+    return found
 
 
 @dataclass(frozen=True)
@@ -152,12 +196,7 @@ def read_quantized_softmax_ops(buf: bytes) -> list[SoftmaxOp]:
     for sg_index, sg in enumerate(model.table_vector(_MODEL_SUBGRAPHS)):
         tensors = sg.table_vector(_SUBGRAPH_TENSORS)
         for op_index, op in enumerate(sg.table_vector(_SUBGRAPH_OPERATORS)):
-            opcode = opcodes[op.scalar(_OPERATOR_OPCODE_INDEX, "<I", 0)]
-            builtin = opcode.scalar(_OPCODE_BUILTIN, "<i", 0)
-            if builtin == 0:
-                # Pre-schema-v3a files store the enum only in the deprecated
-                # int8 field; BuiltinCode() keeps its ADD(0) placeholder.
-                builtin = opcode.scalar(_OPCODE_DEPRECATED_BUILTIN, "<b", 0)
+            builtin = _builtin_code(opcodes[op.scalar(_OPERATOR_OPCODE_INDEX, "<I", 0)])
             if builtin != BUILTIN_SOFTMAX:
                 continue
 

@@ -17,6 +17,7 @@ from ...errors import EngineError
 from ...results import NsxModuleRef
 from .. import EngineType, TFLM_ENGINE_HEADER
 from ..base import HeliaRtArtifacts, PsramWeightsSource, SingleArenaPlacementMixin
+from ..cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
 from .artifacts import (
     HELIART_MODULE,
     HELIART_PROJECT,
@@ -94,13 +95,13 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         if not use_local:
             # --- Default: resolve nsx-helia-rt from the NSX registry ---
             # This clones AmbiqAI/helia-rt from GitHub at the pinned tag and
-            # builds it from source via NSX (the registry module's own
-            # manifest resolves its own nsx-cmsis-nn dependency, so we don't
-            # need to add it to extra_modules here as the source_path branch
-            # below does for a locally-vendored checkout). Because this is a
-            # source build, the CMSIS-NN inline-asm requantize flag still
-            # needs to be forwarded — it is not baked in the way it would be
-            # for a genuinely prebuilt archive (see the `else` branch below).
+            # builds it from source via NSX. hpx declares nsx-cmsis-nn itself
+            # (at the baseline's qualified ref, or a user override) so NSX
+            # uses that core rather than whatever heliaRT's manifest or the
+            # packaged registry would pick. Because this is a source build,
+            # the ns-cmsis-nn options (cmsis_nn_cmake_vars) must also be
+            # forwarded — they are baked in only for a genuinely prebuilt
+            # archive (see the `else` branch below).
             version = HELIART_VERSION
             log.info(
                 "heliaRT %s — resolving %s from NSX registry "
@@ -122,20 +123,8 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
                     ref=HELIART_RELEASE_TAG,
                 )
             )
-            # A workflow or local caller can override the transitive
-            # nsx-cmsis-nn dependency with an exact ref or explicit checkout.
-            # Adding it alongside registry-backed heliaRT makes NSX use that
-            # source instead of the ref declared by heliaRT's manifest.
-            if (
-                config.engine.config.get("cmsis_nn_path")
-                or config.engine.config.get("cmsis_nn_ref")
-                or os.environ.get("CMSIS_NN_PATH")
-            ):
-                from ..cmsis_nn import cmsis_nn_module_ref
-
-                extra_modules.append(cmsis_nn_module_ref(config, work_dir))
-            if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
-                cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
+            extra_modules.append(cmsis_nn_module_ref(config, work_dir))
+            cmake_vars.update(cmsis_nn_cmake_vars(config))
             return HeliaRtArtifacts(
                 engine_type=EngineType.HELIA_RT,
                 extra_modules=extra_modules,
@@ -169,15 +158,12 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
             # Source-built heliaRT depends on the nsx-cmsis-nn module
             # being present in the build (the prebuilt static lib had
             # CMSIS-NN baked in; the source build does not). Resolve it
-            # via the shared helper (NSX registry by default).
-            from ..cmsis_nn import cmsis_nn_module_ref
-
+            # via the shared helper (declared at the baseline's qualified ref by default).
             extra_modules.append(cmsis_nn_module_ref(config, work_dir))
 
-            # Forward CMSIS-NN inline-asm requantize flag (defaults ON to
-            # match the prebuilt heliaRT build).
-            if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
-                cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
+            # Forward the CMSIS-NN build options (requantize asm, fp32/fp16
+            # kernels) -- not baked in the way they are for a prebuilt archive.
+            cmake_vars.update(cmsis_nn_cmake_vars(config))
 
             _install_nsx_module_source(
                 module_dir,

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.config import load_config
+from helia_profiler.engines.helia_rt import HELIART_VERSION
 from helia_profiler.errors import ConfigError, EngineError, FirmwareError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
@@ -92,7 +93,7 @@ class TestPrepareEngineStage:
         assert ctx.engine_artifacts is not None
         assert ctx.run_metadata.engine is not None
         assert ctx.run_metadata.engine.type == "helia-rt"
-        assert ctx.run_metadata.engine.version == "1.17.0"
+        assert ctx.run_metadata.engine.version == HELIART_VERSION
 
     def test_helia_rt_adapter(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(

@@ -38,8 +38,6 @@ from ..results.run_summary import load_run_summary
 from .matrix import CaseSpec, MemoryProfile
 
 _TRANSIENT_POWER_LOCK_RETRY_DELAY_S = 5.0
-_EXECUTORCH_ARM_CMSIS_NN_REF = "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
-_EXECUTORCH_NS_CMSIS_NN_REF = "631726420b04860a5c4236956a3741ff5a96bd7f"
 _TRANSIENT_POWER_LOCK_MARKERS = (
     "is already in use by another process",
     "busy during open; retrying",
@@ -251,9 +249,6 @@ def _build_config(
         nsx_root = Path(
             os.environ.get("NSX_EXECUTORCH_ROOT", repo_root.parent / "nsx-executorch")
         ).expanduser()
-        cmsis_nn_ref = _EXECUTORCH_ARM_CMSIS_NN_REF
-        if case.cmsis_nn_backend.value == "ns":
-            cmsis_nn_ref = ns_cmsis_nn_ref or _EXECUTORCH_NS_CMSIS_NN_REF
         engine_config: dict[str, Any] = {
             "source_path": str(nsx_root.resolve()),
             "planned_arena_size": contract.planned_arena_size,
@@ -262,8 +257,13 @@ def _build_config(
             "input_size": contract.input_size,
             "output_size": contract.output_size,
             "portable_ops": list(contract.portable_ops),
-            "cmsis_nn_ref": cmsis_nn_ref,
         }
+        # The ns provider is declared at the baseline's qualified ref and the
+        # arm provider is registry-governed and verified against the baseline
+        # post-lock, so the case stamps `qualified` either way; an explicit ns
+        # ref (a branch under test) is the only reason to override.
+        if case.cmsis_nn_backend.value == "ns" and ns_cmsis_nn_ref:
+            engine_config["cmsis_nn_ref"] = ns_cmsis_nn_ref
         engine_cfg.update(
             {
                 "backend": case.cmsis_nn_backend.value,

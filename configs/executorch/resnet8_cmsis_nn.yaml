@@ -13,7 +13,7 @@ model:
 
 engine:
   type: executorch
-  # Select `ns` to use the qualified ns-cmsis-nn v7.29.2 provider instead.
+  # Select `ns` to use the qualified ns-cmsis-nn (v7.31.0) provider instead.
   backend: arm
   config:
     # Exact commit: 62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59

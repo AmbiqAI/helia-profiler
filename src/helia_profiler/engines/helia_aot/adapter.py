@@ -21,7 +21,7 @@ from ...placement import ArenaRole, Placement
 from ...results import NsxModuleRef
 from .. import EngineType
 from ..base import ArenaRegion, HeliaAotArtifacts, PsramWeightsSource
-from ..cmsis_nn import cmsis_nn_module_ref
+from ..cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
 from .compile import (
     _DEFAULT_MODULE_NAME,
     _DEFAULT_PREFIX,
@@ -34,6 +34,15 @@ from .compile import (
 from .manifest import _extract_arena_regions, _extract_memory_plan, _extract_operator_manifest
 
 log = logging.getLogger("hpx")
+
+
+def _engine_cmake_vars(config: ProfileConfig) -> dict[str, str]:
+    """The ns-cmsis-nn kernel switches plus the NSX linker profile, if set."""
+    cmake_vars = cmsis_nn_cmake_vars(config)
+    linker_profile = config.engine.config.get("linker_profile")
+    if linker_profile:
+        cmake_vars["NSX_LINKER_PROFILE"] = str(linker_profile)
+    return cmake_vars
 
 
 def _psram_requested(config: ProfileConfig) -> bool:
@@ -190,8 +199,8 @@ class HeliaAOTAdapter:
         # 4. Validate memory-placement pragmas in generated code
         _validate_pragmas(aot_module_dir, prefix)
 
-        # 5. Resolve the ns-cmsis-nn NSX module (registry by default, or a
-        #    vendored local module when a custom path is provided).
+        # 5. Resolve the ns-cmsis-nn NSX module (declared at the baseline's
+        #    qualified ref by default; a user ref or vendored path overrides).
         cmsis_nn_ref = cmsis_nn_module_ref(config, work_dir)
 
         # 6. AOT output is already a valid NSX module (ModuleType.nsx).
@@ -209,13 +218,7 @@ class HeliaAOTAdapter:
             aot_platform,
         )
 
-        # Forward CMSIS-NN build options from engine config
-        cmsis_nn_cmake: dict[str, str] = {}
-        if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
-            cmsis_nn_cmake["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
-        linker_profile = config.engine.config.get("linker_profile")
-        if linker_profile:
-            cmsis_nn_cmake["NSX_LINKER_PROFILE"] = str(linker_profile)
+        engine_cmake_vars = _engine_cmake_vars(config)
 
         # Build a MemoryPlan from the AOT codegen context so the
         # plan_memory stage can validate placement against the SoC's
@@ -237,7 +240,7 @@ class HeliaAOTAdapter:
             ],
             cmake_vars={
                 attr_var: str(attr_header),
-                **cmsis_nn_cmake,
+                **engine_cmake_vars,
             },
             engine_header=f"{prefix}_model.h",
             aot_prefix=prefix,
