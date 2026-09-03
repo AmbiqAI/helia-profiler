@@ -170,21 +170,6 @@ jobs:
           uv tool install pre-commit==4.6.0
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      # gitleaks is a `local`/`system` hook (not pre-commit's `golang`
-      # hook language), so it must be on PATH before pre-commit runs, or
-      # the gitleaks hook fails closed via tools/hooks/gitleaks_wrapper.py.
-      - name: Install gitleaks
-        env:
-          GITLEAKS_VERSION: "8.29.1"
-          GITLEAKS_SHA256: "e4eb209d04e20339d77122a3bdf9cd41351255cfb27ebcb75e85325e04f88924"
-        run: |
-          curl -fsSL -o gitleaks.tar.gz \
-            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
-          tar -xzf gitleaks.tar.gz gitleaks
-          install -m 0755 gitleaks /usr/local/bin/gitleaks
-          gitleaks version
-
       - name: Cache pre-commit environments
         uses: actions/cache@v4
         with:

@@ -108,13 +108,13 @@ pre-commit install
 ```
 
 This installs both hook stages the repo uses: `pre-commit` (formatting,
-whitespace/YAML/JSON/TOML checks, ruff, a gate requiring every
-`TODO(...)`/`FIXME(...)`/`HACK(...)` marker to carry a reference, and a
-[gitleaks](https://github.com/gitleaks/gitleaks) secret scan —
-see the install message from a commit if `gitleaks` isn't on your `PATH`
-yet) and `prepare-commit-msg` (strips AI-tool attribution trailers from the
-commit message). `pre-push` is left untouched, so git-lfs's own `pre-push`
-hook keeps working.
+whitespace/YAML/JSON/TOML checks, ruff, and a gate requiring every
+`TODO(...)`/`FIXME(...)`/`HACK(...)` marker to carry a reference) and
+`prepare-commit-msg` (strips AI-tool attribution trailers from the commit
+message). `pre-push` is left untouched, so git-lfs's own `pre-push` hook
+keeps working. Secret scanning is server-side: GitHub secret scanning and
+push protection are enabled on the repository, so a pushed secret is
+rejected regardless of local hooks.
 
 Run every hook against the whole tree with `pre-commit run --all-files`.
 CI runs the identical `.pre-commit-config.yaml`, so a clean local run means
