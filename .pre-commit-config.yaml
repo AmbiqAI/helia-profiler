@@ -36,7 +36,7 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.11.13  # commit 9aeda5d1f4bbd212c557da1ea78eca9e8c829e19 — must match the `ruff` version uv.lock resolves
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       - id: ruff-format
 
