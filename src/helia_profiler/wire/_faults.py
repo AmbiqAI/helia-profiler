@@ -13,6 +13,7 @@ from ._model import (
     GATE_NOT_POWER_ONLY,
     GATE_PSRAM_NEEDED,
     GATE_STIMER_WINDOW,
+    ML_ENGINES,
     TFLM_ENGINES,
     FirmwareErrorCode,
     FirmwareWarnCode,
@@ -114,10 +115,10 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
     _spec(
         error_token(FirmwareErrorCode.MODEL_INIT_FAILED),
         WireKind.ERROR,
-        "heliaAOT model_init() returned a non-zero status.",
+        "The generated model's model_init() returned a non-zero status.",
         WireConsumer.TRANSPORT_CONTROL,
         WireCriticality.PROTOCOL,
-        engines=AOT_ENGINES,
+        engines=AOT_ENGINES | ML_ENGINES,
         value_shape="model_init_failed:<status>",
         has_host_hint=True,
     ),
@@ -177,7 +178,9 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         # without hpx_stimer_init; only its busy-loop arm (super()) inherits
         # the base emission. That arm is preflight-rejected at runtime but
         # RENDERED by the census matrix (#171 lesson), so it is declared.
-        engines=TFLM_ENGINES | AOT_ENGINES | ET_ENGINES,
+        # heliaML inherits the base window unchanged, so it inherits this
+        # emission too.
+        engines=TFLM_ENGINES | AOT_ENGINES | ET_ENGINES | ML_ENGINES,
         condition=GATE_STIMER_WINDOW,
         engine_conditions={EngineType.EXECUTORCH: GATE_BUSY_LOOP_PROBE},
         value_shape="settle_us=<n> last_ticks=<n>",

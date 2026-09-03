@@ -1,76 +1,74 @@
-{# main_helia_ml.cc — heliaPROFILER firmware for the heliaML engine #}
+{% extends "_main_base.cc.j2" %}
+{#- main_helia_ml.cc — heliaPROFILER firmware entry point for heliaML.
+
+   The firmware skeleton -- boot, transport preamble, GPIO sync, clean-window
+   machinery, PMU pass loop, teardown -- lives in _main_base.cc.j2; this
+   template only fills in the engine_* blocks.  Read that file's prelude for
+   the whitespace contract the block shapes follow.
+
+   heliaML is traditional ML: the whole model is ONE public call with no
+   operator graph, no interpreter, and no arena to bind.  This is therefore
+   the SIMPLEST child of the base, simpler than heliaAOT and ExecuTorch on
+   purpose:
+
+     * engine_clean_window is NOT overridden.  The generated module's
+       `run` entry point IS the inference -- no per-call model load
+       (ExecuTorch's reason to override) and no operator callbacks to
+       quiesce -- so the base's default window, which brackets
+       self.engine_invoke() with the window clock, measures exactly the
+       right thing.
+     * engine_profiled_summary is NOT overridden, for the same reason:
+       the DWT bracket around engine_invoke() times a genuine inference,
+       so HPX_PROFILED_INFER_* keeps the same execute-only semantics the
+       other engines report.
+     * The per-layer table collapses to ONE row per iteration
+       ("model_run:0").  Anything per-op would be an invention, not a
+       measurement.
+
+   Weights are `static const` arrays inside the linked generated module
+   (heliaml.write() emitted them into the params header), so there is no
+   model blob to embed and no HPX_MODEL_SIZE / HPX_ARENA_SIZE to report --
+   the wire registry scopes those to the interpreter engines.  PSRAM
+   placement is refused in preflight for the same reason (the weights are
+   flash-resident by construction), so engine_pre_start stays at the base's
+   empty default and engine_psram_metadata is overridden empty. #}
+
+{% block engine_file_header %}
 /**
  * @file main.cc
  * @brief heliaPROFILER firmware (heliaML) — auto-generated, do not edit.
  *
- * heliaML is traditional ML: the whole model is ONE public call with no
- * operator graph, no interpreter, and no arena to bind.  This template
- * is therefore deliberately small next to main_aot.cc.j2 — it times the
- * generated module's run entry point end-to-end and emits exactly one
- * PMU row per iteration ("model_run:0").  Anything per-op would be an
- * invention, not a measurement.
+ * Times the generated heliaML module's run entry point end-to-end and
+ * emits exactly one PMU row per iteration ("model_run:0") over
+ * {{ transport | upper }} for the host-side capture stage to parse.
  */
+{%- endblock %}
 
-#include <cstdint>
-#include <cstdio>
-#include <cstdarg>
-#include <cstring>
-
-// Pre-include arm_mve.h in C++ context so that any extern "C"
-// re-inclusion is a harmless no-op (avoids overload conflicts with GCC 14).
-#if defined(__ARM_FEATURE_MVE)
-#include <arm_mve.h>
-#endif
-
+{% block engine_includes %}
 // heliaML generated module API ({{ aot_prefix }}_model_init / _model_run).
 #include "{{ engine_header }}"
-
 {% if has_armv8m_pmu %}
+{# nsx_pmu_utils.h is the nsx_pmu_* config/counter API the whole-model
+   bracket drives directly, exactly as heliaAOT's operator callback and
+   ExecuTorch's end_operator hook do.  Gated the same way those children
+   gate it so the umbrella HAL header can never be pulled in twice or, on
+   a part without the Armv8-M PMU, at all. #}
 #include "nsx_pmu_utils.h"
-#include "nsx_ambiq_pmu.h"
-#include "am_mcu_apollo.h"
 {% endif %}
+{%- endblock %}
 
-{% include "_system_includes.j2" %}
-{% if apollo3_burst %}
-#include "am_mcu_apollo.h"
-{% endif %}
-{% if power_only | default(false) and (broad_peripheral_shutdown | default(false) or crypto_otp_shutdown | default(false)) and not apollo3_burst and not has_armv8m_pmu %}
-#include "am_mcu_apollo.h"
-{% endif %}
+{# One whole-model record: four counters and an overflow flag, a few dozen
+   bytes of ordinary .bss.  There is no per-layer array to keep SRAM-resident,
+   so the profile binary skips the SSRAM power-on the interpreter engines
+   need for theirs (#161's child-declared fact, declared honestly). #}
+{% block engine_pmu_storage_sram_resident %}false{% endblock %}
 
-{% include "_cache_shims.j2" %}
+{% block engine_model_storage %}
+// No embedded model blob: the weights are `static const` arrays compiled
+// into the linked generated module.  Nothing to include here.
+{%- endblock %}
 
-// Boot-time host-attach delays — same rationale and values as the other
-// engine templates (see main_aot.cc.j2 for the full comments).
-#define HPX_SWO_SYNC_PREAMBLE_LINES  40
-#define HPX_SWO_SYNC_GAP_US          (20U * 1000U)
-#define HPX_USB_POLL_DELAY_US     (10U * 1000U)
-#define HPX_USB_SETTLE_DELAY_US   (200U * 1000U)
-#define HPX_DEBUG_REENABLE_SETTLE_US (5U * 1000U)
-
-{% include "_newlib_syscalls.j2" %}
-
-// ---------------------------------------------------------------------------
-// DWT cycle counter
-// ---------------------------------------------------------------------------
-{% include "_dwt_init.j2" %}
-
-{% if clean_window_timer | default("dwt") == "stimer" %}
-{% include "_stimer_init.j2" %}
-{% endif %}
-
-// ---------------------------------------------------------------------------
-// GPIO sync for external power measurement
-// ---------------------------------------------------------------------------
-{% include "_gpio_sync.j2" %}
-
-{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
-#include "nsx_i2c.h"
-#include "nsx_ina228.h"
-{% include "_ina228_power.j2" %}
-{% endif %}
-
+{% block engine_globals %}
 // ---------------------------------------------------------------------------
 // Whole-model PMU capture — ONE record per inference, no per-op table.
 // ---------------------------------------------------------------------------
@@ -82,16 +80,19 @@ static nsx_pmu_config_t g_pmu_cfg;
 static uint32_t g_run_counters[kMaxEvents];
 static bool g_run_overflow = false;
 static int g_num_counters = 0;
-static const char* g_counter_names[kMaxEvents] = {};
+static const char *g_counter_names[kMaxEvents] = {};
+static bool g_profile_enabled = false;
 
-{% include "_hpx_printf.j2" with context %}
-
-{% if transport == "usb_cdc" and not power_only | default(false) %}
-{% include "_usb_timer.j2" %}
-{% endif %}
+// Heartbeat state — one "op" per inference, so cadence is per-iteration.
+static uint32_t g_hb_every_cyc = 0;
+static int      g_hb_every_ops = 0;
+static uint32_t g_hb_last_cyc = 0;
+static int      g_hb_ops_since = 0;
+static int      g_hb_pass = 0;
+static int      g_hb_iter = 0;
 
 {% if has_armv8m_pmu %}
-static void profiler_set_counter_names(const char* const names[], int num_names) {
+static void profiler_set_counter_names(const char *const names[], int num_names) {
     int limit = (num_names > kMaxEvents) ? kMaxEvents : num_names;
     for (int i = 0; i < limit; i++) {
         g_counter_names[i] = names[i];
@@ -211,357 +212,133 @@ static inline heliaml_status_t hpx_model_run(void) {
 {% endif %}
 }
 
-int main(void) {
-    nsx_system_config_t sys_cfg = {};
-    sys_cfg.perf_mode = {{ perf_mode_symbol }};  // {{ perf_mode_mhz }} MHz — target.clock.cpu
-    sys_cfg.enable_cache = true;
-    sys_cfg.enable_sram = true;
-    sys_cfg.debug.transport = {% if power_only | default(false) %}NSX_DEBUG_NONE{% elif transport == "swo" %}NSX_DEBUG_ITM{% elif transport == "uart" %}NSX_DEBUG_UART{% else %}NSX_DEBUG_NONE{% endif %};
-    sys_cfg.skip_bsp_init = false;
-    sys_cfg.spot_mgr_profile = true;
-    NSX_TRY(nsx_system_init(&sys_cfg), "System init failed\n");
-    dwt_init();
-    hpx_sync_init();
-{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
-    {
-        uint32_t ina228_rc = hpx_ina228_setup();
-        if (ina228_rc != 0U) {
-            hpx_power_terminal_fail("ina228_init", ina228_rc);
-        }
+// One parameterless run wrapper for every base call site (warmup, clean
+// window, profiled loop).  Whether a run is PMU-bracketed is read from
+// g_profile_enabled (armed by engine_pass_warmup_arm /
+// engine_pass_profile_arm / engine_profiler_off) so the bracket hugs the
+// call exactly — the base's post-invoke seams sit after transport
+// switches, which must never land inside the measured counters.
+static void profiled_model_run(void) {
+    if (!g_profile_enabled) {
+        (void)hpx_model_run();
+        return;
     }
-{% endif %}
-{% if apollo3_burst %}
-    int hpx_burst_avail = 0;
-    int hpx_burst_engaged = 0;
-    {
-        am_hal_burst_avail_e burst_avail = AM_HAL_BURST_NOTAVAIL;
-        am_hal_burst_mode_e burst_state = AM_HAL_NORMAL_MODE;
-        am_hal_burst_mode_initialize(&burst_avail);
-        if (burst_avail == AM_HAL_BURST_AVAIL) {
-            am_hal_burst_mode_enable(&burst_state);
-        }
-        hpx_burst_avail = (burst_avail == AM_HAL_BURST_AVAIL);
-        hpx_burst_engaged = (burst_state == AM_HAL_BURST_MODE);
-        if (hpx_burst_engaged) {
-            SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
-        }
+    profiler_run_begin();
+    (void)hpx_model_run();
+    profiler_run_end();
+
+    // Heartbeat emission — counters are already latched, so the printf
+    // cost lands after the record, exactly as in the per-op engines'
+    // callbacks.  One "op" per inference: layer is always 1.
+    ++g_hb_ops_since;
+    const bool by_ops = (g_hb_every_ops > 0) &&
+                        (g_hb_ops_since >= g_hb_every_ops);
+    bool by_time = false;
+    if (g_hb_every_cyc > 0) {
+        uint32_t now = DWT->CYCCNT;
+        uint32_t delta = now - g_hb_last_cyc;
+        by_time = (delta >= g_hb_every_cyc);
     }
-{% else %}
-    // Keep SystemCoreClock truthful at the resolved operating point (see
-    // main_aot.cc.j2 for why nsx_system_init does not update it).
-    SystemCoreClock = {{ perf_mode_mhz }}U * 1000000U;
-{% endif %}
-{% include "_ssram_power.j2" %}
-{% include "_extreme_mode.j2" %}
-{% include "_ble_reset.j2" %}
-{% include "_peripheral_power_down.j2" %}
-{% include "_crypto_otp_shutdown.j2" %}
-{% if power_only | default(false) %}
-
-    // power_only: no transport at all (sys_cfg.debug.transport above).
-{% elif transport == "usb_cdc" %}
-
-    NSX_TRY(nsx_usb_init(&g_usb_cfg), "USB CDC init failed\n");
-    while (!nsx_usb_connected(&g_usb_cfg)) {
-        nsx_delay_us(HPX_USB_POLL_DELAY_US);
+    if (by_ops || by_time) {
+        hpx_printf("HPX_HEARTBEAT phase=infer pass=%d iter=%d layer=%d\n",
+                   g_hb_pass, g_hb_iter, 1);
+        g_hb_last_cyc = DWT->CYCCNT;
+        g_hb_ops_since = 0;
     }
-    nsx_delay_us(HPX_USB_SETTLE_DELAY_US);
-    dwt_init();
-{% elif transport == "rtt" %}
+}
+{%- endblock %}
 
-    SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,
-                              SEGGER_RTT_MODE_NO_BLOCK_TRIM);
-    HPX_CLEAN_DCACHE();
-    hpx_rtt_set_blocking();
-    hpx_printf("HPX_READY\n");
-    HPX_CLEAN_DCACHE();
-{% else %}
+{% block engine_heartbeat_arm %}
+    // --- Heartbeat config (matches the other engine templates for protocol
+    // consistency; one "op" per inference, so cadence is per-iteration) ---
+    static constexpr bool     kHbEnabled   = {{ heartbeat_enabled | lower }};
+    static constexpr int      kHbEveryNOps = {{ heartbeat_every_n_ops }};
+    static constexpr uint32_t kHbEveryMs   = {{ heartbeat_every_ms }};
+    hpx_printf("HPX_HEARTBEAT_ENABLED=%d\n", (int)kHbEnabled);
+    hpx_printf("HPX_HEARTBEAT_EVERY_N_OPS=%d\n", kHbEveryNOps);
+    hpx_printf("HPX_HEARTBEAT_EVERY_MS=%lu\n", (unsigned long)kHbEveryMs);
+    g_hb_every_cyc = (kHbEnabled && kHbEveryMs > 0)
+        ? (uint32_t)((uint64_t)SystemCoreClock / 1000U * kHbEveryMs)
+        : 0U;
+    g_hb_every_ops = kHbEnabled ? kHbEveryNOps : 0;
 
-    for (int hpx_sync_i = 0; hpx_sync_i < HPX_SWO_SYNC_PREAMBLE_LINES; ++hpx_sync_i) {
-        hpx_printf("HPX_READY\n");
-        nsx_delay_us(HPX_SWO_SYNC_GAP_US);
-    }
-{% endif %}
+    hpx_printf("HPX_HEARTBEAT phase=init\n");
+{%- endblock %}
 
-{% if not power_only | default(false) %}    hpx_printf("\n--- HPX_START ---\n");
-    hpx_printf("HPX_VERSION=1\n");
-    hpx_printf("HPX_ENGINE=helia_ml\n");
-    hpx_printf("HPX_EXTREME_MODE=%d\n", {{ 1 if extreme_mode and arena_region == "tcm" and weights_region == "tcm" else 0 }});
-    hpx_printf("HPX_ITERATIONS={{ iterations }}\n");
-    hpx_printf("HPX_WARMUP={{ warmup }}\n");
-    hpx_printf("HPX_NUM_PRESETS=%d\n", {{ pmu_passes | length }});
-    hpx_printf("HPX_PRESETS={{ pmu_pass_names | join(',') }}\n");
-    hpx_printf("HPX_POWER_SYNC=%s\n", kPowerSyncEnabled ? "gpio" : "none");
-    if constexpr (kPowerSyncEnabled) {
-        hpx_printf("HPX_SYNC_GPIO=%lu\n", (unsigned long)kSyncGpioPin);
-    }
-    // Heartbeats: phase markers only.  A traditional-ML inference is far
-    // too short for mid-inference heartbeats to be meaningful.
-    hpx_printf("HPX_HEARTBEAT_ENABLED={{ 1 if heartbeat_enabled else 0 }}\n");
-    hpx_printf("HPX_HEARTBEAT_EVERY_N_OPS=0\n");
-    hpx_printf("HPX_HEARTBEAT_EVERY_MS=0\n");
-    hpx_printf("HPX_HEARTBEAT phase=init\n");{% endif %}
-
+{% block engine_model_setup %}
     // Initialize the generated module (validates the compiled-in model).
-    if ({{ aot_prefix }}_model_init() != HELIAML_STATUS_OK) {
-        hpx_printf("HPX_ERROR=model_init_failed\n");
-{% if power_only | default(false) %}        hpx_power_terminal_fail("model_init", 6U);
-{% else %}        hpx_park();
-{% endif %}
-    }
-{% if not power_only | default(false) %}    hpx_printf("HPX_HEARTBEAT phase=model_init_done\n");
-
-    hpx_printf("HPX_NUM_INPUTS=1\n");
-    hpx_printf("HPX_NUM_OUTPUTS=1\n");
-    hpx_printf("HPX_SYSTEM_CLOCK_HZ=%lu\n", (unsigned long)SystemCoreClock);
-{% if apollo3_burst %}
-    hpx_printf("HPX_BURST_AVAIL=%d\n", hpx_burst_avail);
-    hpx_printf("HPX_BURST_ENGAGED=%d\n", hpx_burst_engaged);
-{% endif %}
-    hpx_printf("HPX_INPUT_0_SIZE=%d\n", (int)sizeof(hpx_input));
-{% if helia_ml_run_shape == "scores" %}
-    hpx_printf("HPX_OUTPUT_0_SIZE=%d\n", (int)sizeof(hpx_scores));
-{% elif helia_ml_run_shape == "class" %}
-    hpx_printf("HPX_OUTPUT_0_SIZE=%d\n", (int)sizeof(hpx_out_class));
-{% else %}
-    hpx_printf("HPX_OUTPUT_0_SIZE=%d\n", (int)sizeof(hpx_out_value));
-{% endif %}
-
-    uint64_t profiled_infer_cycles = 0;
-    uint32_t profiled_infer_count = 0;{% endif %}
-
-    // --- Clean end-to-end timing (the canonical power window) ------------
-    // Same structure as the other engines: warm uninstrumented, then
-    // DWT/STIMER-time bare hpx_model_run() calls.  The GPIO sync brackets
-    // this window for external power capture.
     {
-        memset(hpx_input, 0, sizeof(hpx_input));
-{% if window_mode | default("fixed") == "auto" %}
-        // Adaptive window sizing (see main_aot.cc.j2 for the DWT-freeze
-        // robustness rationale behind taking the MAX warm reading).
-        dwt_init();
-        uint32_t clean_warm_cyc = 0U;
-        for (int w = 0; w < 3; w++) {
-            uint32_t wt0 = DWT->CYCCNT;
-            (void)hpx_model_run();
-            uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
-            if (wc > clean_warm_cyc) clean_warm_cyc = wc;
-        }
-        int clean_iters_n = {{ window_min }};
-        if (clean_warm_cyc > 0U) {
-            const uint64_t target_cyc =
-                ((uint64_t)SystemCoreClock / 1000ULL) * (uint64_t){{ window_target_ms }}U;
-            uint64_t n = target_cyc / (uint64_t)clean_warm_cyc;
-            if (n < {{ window_min }}ULL) n = {{ window_min }}ULL;
-            if (n > {{ window_max }}ULL) n = {{ window_max }}ULL;
-            clean_iters_n = (int)n;
-        }
-        uint64_t clean_est_ms = 0;
-        if (SystemCoreClock >= 1000U) {
-            clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)
-                           / ((uint64_t)SystemCoreClock / 1000ULL);
-        }
-        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\n",
-                   clean_iters_n, (unsigned long long)clean_est_ms);
-{% else %}
-        for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
-            (void)hpx_model_run();
-        }
-        const int clean_iters_n = {{ clean_iters | default(1) }};
-        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=0\n",
-                   clean_iters_n);
-{% endif %}
-        uint64_t clean_cycles = 0;
-        uint32_t clean_count = 0;
-        hpx_sync_ready();
-        hpx_sync_wait_go();
-{% if transport == "usb_cdc" and not power_only | default(false) %}
-        usb_timer_pause();
-{% endif %}
-{% set use_stimer_window = clean_window_timer | default("dwt") == "stimer" %}
-{% if transport == "uart" and not power_only | default(false) %}
-        nsx_uart_printf_disable();
-{% elif transport == "swo" and not power_only | default(false) %}
-        nsx_itm_printf_disable();
-{% endif %}
-{% if has_armv8m_pmu %}
-        nsx_ambiq_pmu_disable();
-{% if gate_debug_domain_in_window | default(false) %}
-        am_hal_debug_disable();
-{% endif %}
-{% endif %}
-{% if use_stimer_window %}
-        hpx_stimer_init();
-        uint32_t clean_stimer_t0 = hpx_stimer_ticks();
-{% endif %}
-{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
-        {
-            uint32_t ina228_rc = hpx_ina228_window_begin();
-            if (ina228_rc != 0U) {
-                hpx_power_terminal_fail("ina228_arm", ina228_rc);
-            }
-        }
-{% endif %}
-        hpx_sync_window_begin();
-{% if use_stimer_window %}
-        for (int iter = 0; iter < clean_iters_n; iter++) {
-            (void)hpx_model_run();
-            clean_count++;
-        }
-{% else %}
-        for (int iter = 0; iter < clean_iters_n; iter++) {
-            uint32_t t0 = DWT->CYCCNT;
-            (void)hpx_model_run();
-            clean_cycles += (uint32_t)(DWT->CYCCNT - t0);
-            clean_count++;
-        }
-{% endif %}
-        hpx_sync_window_end();
-{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
-        {
-            uint32_t ina228_rc = hpx_ina228_window_end();
-            if (ina228_rc != 0U) {
-                hpx_power_terminal_fail("ina228_read", ina228_rc);
-            }
-        }
-{% endif %}
-{% if use_stimer_window %}
-        uint64_t clean_stimer_total_us =
-            hpx_stimer_ticks_to_us((uint64_t)(uint32_t)(hpx_stimer_ticks() - clean_stimer_t0));
-{% endif %}
-{% if not power_only | default(false) %}{% if has_armv8m_pmu %}
-{% if gate_debug_domain_in_window | default(false) %}
-        am_hal_debug_enable();
-{% endif %}
-        nsx_ambiq_pmu_enable();
-{% endif %}
-{% if transport == "uart" %}
-        nsx_uart_printf_enable();
-        nsx_delay_us(HPX_DEBUG_REENABLE_SETTLE_US);
-{% elif transport == "swo" %}
-        nsx_itm_printf_enable();
-        nsx_delay_us(HPX_DEBUG_REENABLE_SETTLE_US);
-{% endif %}
-{% if transport == "usb_cdc" %}
-        usb_timer_resume();
-{% endif %}{% endif %}
-        if (clean_count > 0) {
-{% if use_stimer_window %}
-            const uint32_t clean_avg_us =
-                (uint32_t)((clean_stimer_total_us + (clean_count / 2U)) / clean_count);
-            const uint32_t clean_avg_cycles = (uint32_t)(
-                ((uint64_t)clean_avg_us * (uint64_t)SystemCoreClock) / 1000000ULL);
-            const uint64_t clean_cycles_reported =
-                (uint64_t)clean_avg_cycles * (uint64_t)clean_count;
-            hpx_printf("HPX_CLEAN_INFER_COUNT=%lu\n", (unsigned long)clean_count);
-            hpx_printf("HPX_CLEAN_INFER_TOTAL_CYCLES=%llu\n",
-                       (unsigned long long)clean_cycles_reported);
-            hpx_printf("HPX_CLEAN_INFER_AVG_CYCLES=%lu\n",
-                       (unsigned long)clean_avg_cycles);
-            hpx_printf("HPX_CLEAN_INFER_AVG_US=%lu\n",
-                       (unsigned long)clean_avg_us);
-{% else %}
-            const uint32_t clean_avg_cycles =
-                (uint32_t)((clean_cycles + (clean_count / 2U)) / clean_count);
-            hpx_printf("HPX_CLEAN_INFER_COUNT=%lu\n", (unsigned long)clean_count);
-            hpx_printf("HPX_CLEAN_INFER_TOTAL_CYCLES=%llu\n",
-                       (unsigned long long)clean_cycles);
-            hpx_printf("HPX_CLEAN_INFER_AVG_CYCLES=%lu\n",
-                       (unsigned long)clean_avg_cycles);
-            if (SystemCoreClock > 0U) {
-                const uint32_t clean_avg_us = (uint32_t)(
-                    ((uint64_t)clean_avg_cycles * 1000000ULL +
-                     ((uint64_t)SystemCoreClock / 2ULL)) /
-                    (uint64_t)SystemCoreClock);
-                hpx_printf("HPX_CLEAN_INFER_AVG_US=%lu\n",
-                           (unsigned long)clean_avg_us);
-            }
-{% endif %}
-        }
+        const heliaml_status_t init_status = {{ aot_prefix }}_model_init();
+        if (init_status != HELIAML_STATUS_OK) {
+            hpx_printf("HPX_ERROR=model_init_failed:%d\n", (int)init_status);
 {% if power_only | default(false) %}
-{% include "_power_terminal_success.j2" with context %}
+            hpx_power_terminal_fail("model_init", 6U);
+{% else %}
+            hpx_park();
 {% endif %}
+        }
     }
+    hpx_printf("HPX_HEARTBEAT phase=model_init_done\n");
+{%- endblock %}
 
-{% if not power_only | default(false) %}{% if transport == "rtt" %}
-    hpx_rtt_set_nonblocking();
-{% if power_sync_enabled %}
-    hpx_rtt_shorten_lossless_timeout();
+{% block engine_io_metadata %}
+    // One input vector, one output surface — indexed form for parser
+    // consistency with heliaAOT's compiled-in-weights token shapes.
+    hpx_printf("HPX_INPUT_%d_SIZE=%d\n", 0, (int)sizeof(hpx_input));
+{% if helia_ml_run_shape == "scores" %}
+    hpx_printf("HPX_OUTPUT_%d_SIZE=%d\n", 0, (int)sizeof(hpx_scores));
+{% elif helia_ml_run_shape == "class" %}
+    hpx_printf("HPX_OUTPUT_%d_SIZE=%d\n", 0, (int)sizeof(hpx_out_class));
+{% else %}
+    hpx_printf("HPX_OUTPUT_%d_SIZE=%d\n", 0, (int)sizeof(hpx_out_value));
 {% endif %}
-{% endif %}
-    // --- Multi-pass PMU capture: one whole-model row per iteration ---
-{% for pass in pmu_passes %}
-    hpx_printf("\n--- HPX_PRESET {{ pass.name }} ---\n");
+{%- endblock %}
+
+{% block engine_profiler_off %}        g_profile_enabled = false;{% endblock %}{% block engine_psram_metadata %}
+{# heliaML has no PSRAM support (weights are flash-resident by construction
+   and preflight refuses the placement), so the base's metadata include must
+   not render — it references psram_info, undeclared in these renders (the
+   same #171 uncompilable-render class ExecuTorch's override closes).
+   Deliberately empty. #}{% endblock %}
+
+{% block engine_reset_inputs_warm %}            memset(hpx_input, 0, sizeof(hpx_input));{% endblock %}
+
+{% block engine_reset_inputs %}        memset(hpx_input, 0, sizeof(hpx_input));{% endblock %}
+
+{% block engine_invoke %}profiled_model_run();{% endblock %}
+
+{% block engine_pass_init %}
 {% if has_armv8m_pmu and pass.custom %}
     {
         static const uint32_t _pass{{ loop.index0 }}_ids[] = { {{ pass.event_ids | join(', ') }} };
-        static const char* _pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
+        static const char *_pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
         profiler_init_custom(_pass{{ loop.index0 }}_ids, {{ pass.num_counters }});
         profiler_set_counter_names(_pass{{ loop.index0 }}_names, {{ pass.num_counters }});
     }
 {% elif has_armv8m_pmu %}
     {
-        static const char* _pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
+        static const char *_pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
         profiler_init_preset({{ pass.c_enum }});
         profiler_set_counter_names(_pass{{ loop.index0 }}_names, {{ pass.num_counters }});
     }
 {% else %}
     profiler_init_preset(0);
 {% endif %}
+{%- endblock %}
 
-    // Warmup for this pass.
-    for (int w = 0; w < {{ warmup }}; w++) {
-        (void)hpx_model_run();
-    }
-    hpx_printf("HPX_HEARTBEAT phase=warmup_done pass={{ loop.index0 }}\n");
+{% block engine_pass_warmup_arm %}
+    g_profile_enabled = false;
+{%- endblock %}
 
-    for (int iter = 0; iter < {{ iterations }}; iter++) {
-{% if transport == "usb_cdc" %}
-        usb_timer_pause();
-{% endif %}
-        uint32_t infer_start_cyc = DWT->CYCCNT;
-        profiler_run_begin();
-        (void)hpx_model_run();
-        profiler_run_end();
-        profiled_infer_cycles += (uint32_t)(DWT->CYCCNT - infer_start_cyc);
-        profiled_infer_count++;
-{% if transport == "usb_cdc" %}
-        usb_timer_resume();
-{% elif transport == "rtt" %}
-        hpx_rtt_set_blocking();
-{% endif %}
-        hpx_printf("\n--- HPX_ITER %d ---\n", iter);
-        profiler_print_csv();
-{% if transport == "rtt" %}
-        hpx_rtt_set_nonblocking();
-{% endif %}
-    }
-{% endfor %}
+{% block engine_pass_profile_arm %}
+    g_profile_enabled = true;
+{%- endblock %}
 
-    if (profiled_infer_count > 0 && SystemCoreClock > 0U) {
-        const uint32_t profiled_infer_total_us = (uint32_t)(
-            (profiled_infer_cycles * 1000000ULL + ((uint64_t)SystemCoreClock / 2ULL)) /
-            (uint64_t)SystemCoreClock);
-        const uint32_t profiled_infer_avg_us = (uint32_t)(
-            (profiled_infer_cycles * 1000000ULL +
-             (((uint64_t)SystemCoreClock * (uint64_t)profiled_infer_count) / 2ULL)) /
-            ((uint64_t)SystemCoreClock * (uint64_t)profiled_infer_count));
-        hpx_printf("HPX_PROFILED_INFER_COUNT=%lu\n", (unsigned long)profiled_infer_count);
-        hpx_printf("HPX_PROFILED_INFER_TOTAL_US=%lu\n", (unsigned long)profiled_infer_total_us);
-        hpx_printf("HPX_PROFILED_INFER_AVG_US=%lu\n", (unsigned long)profiled_infer_avg_us);
-    }
+{% block engine_iteration_setup %}
+        g_hb_pass = {{ loop.index0 }};
+        g_hb_iter = iter;
+        g_hb_last_cyc = DWT->CYCCNT;
+        g_hb_ops_since = 0;
+{%- endblock %}
 
-{% if transport == "rtt" %}
-    hpx_rtt_set_blocking();
-    hpx_printf("HPX_HEARTBEAT phase=flushing\n");
-    HPX_CLEAN_DCACHE();
-    hpx_rtt_drain(500 /* ms */);
-{% endif %}
-    hpx_printf("\n--- HPX_END ---\n");
-{% if transport == "rtt" %}
-    HPX_CLEAN_DCACHE();
-    hpx_rtt_drain(500 /* ms */);
-{% endif %}{% endif %}
-    hpx_park();
-    return 0;
-}
+{% block engine_print_csv %}        profiler_print_csv();{% endblock %}

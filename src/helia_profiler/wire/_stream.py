@@ -546,7 +546,9 @@ PSRAM_SPECS: tuple[WireSpec, ...] = tuple(
 #: absence there is template-structural rather than a consequence of
 #: apollo510's STIMER window. The busy-loop probe delegates back to the base,
 #: but it is STIMER-timed, so it does not restore them either.
-_DWT_CLEAN_WINDOW_ENGINES = TFLM_ENGINES | AOT_ENGINES
+#: heliaML inherits the base window unchanged, so it emits them wherever the
+#: interpreters do.
+_DWT_CLEAN_WINDOW_ENGINES = TFLM_ENGINES | AOT_ENGINES | ML_ENGINES
 _ET_OMITS_THE_CHECK_BLOCK = (
     "Out of ExecuTorch's scope because its engine_clean_window block override "
     "replaces the shared window and emits none of the check keys — a template "
@@ -728,7 +730,7 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         WireConsumer.FIRMWARE_META,
         WireCriticality.METRIC,
         key=WireKey.PROFILED_INFER_COUNT,
-        engines=TFLM_ENGINES | AOT_ENGINES,
+        engines=TFLM_ENGINES | AOT_ENGINES | ML_ENGINES,
         condition=GATE_NOT_POWER_ONLY,
         runtime_gate="profiled_infer_count > 0 && SystemCoreClock > 0",
         value_shape="int",
@@ -743,7 +745,7 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         WireConsumer.FIRMWARE_META,
         WireCriticality.METRIC,
         key=WireKey.PROFILED_INFER_TOTAL_US,
-        engines=TFLM_ENGINES | AOT_ENGINES,
+        engines=TFLM_ENGINES | AOT_ENGINES | ML_ENGINES,
         condition=GATE_NOT_POWER_ONLY,
         runtime_gate="profiled_infer_count > 0 && SystemCoreClock > 0",
         value_shape="microseconds",
@@ -755,7 +757,7 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         WireConsumer.FIRMWARE_META,
         WireCriticality.METRIC,
         key=WireKey.PROFILED_INFER_AVG_US,
-        engines=TFLM_ENGINES | AOT_ENGINES,
+        engines=TFLM_ENGINES | AOT_ENGINES | ML_ENGINES,
         condition=GATE_NOT_POWER_ONLY,
         runtime_gate="profiled_infer_count > 0 && SystemCoreClock > 0",
         value_shape="microseconds",
@@ -828,10 +830,10 @@ HEARTBEAT_SPECS: tuple[WireSpec, ...] = (
     _spec(
         heartbeat_token(HeartbeatPhase.MODEL_INIT_DONE),
         WireKind.HEARTBEAT,
-        "heliaAOT model_init() returned successfully.",
+        "The generated model's model_init() returned successfully.",
         WireConsumer.DIAGNOSTIC,
         WireCriticality.DIAGNOSTIC,
-        engines=AOT_ENGINES,
+        engines=AOT_ENGINES | ML_ENGINES,
     ),
     _spec(
         heartbeat_token(HeartbeatPhase.INFER),

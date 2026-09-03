@@ -497,6 +497,31 @@ def _matrix() -> list[_Render]:
             "apollo510", "rtt", "tflm", power_only=True,
             overrides={**_INA228_VARS, "ina228_required": False},
         ),
+        # heliaML inherits the base window and pass loop unchanged, so every
+        # gate the interpreters flip through the shared skeleton needs a
+        # helia-ml render too: burst (third template on an Apollo3 build),
+        # trace (third template rendering the STIMER window body), busy-loop
+        # (probe replaces the window body), and the on-target INA228 power
+        # payload.
+        _Render(
+            "ap3p|rtt|helia-ml|burst",
+            "apollo3p", "rtt", "helia-ml",
+            overrides={"apollo3_burst": True},
+        ),
+        _Render(
+            "ap510|rtt|helia-ml|trace",
+            "apollo510", "rtt", "helia-ml",
+            overrides={"clean_window_trace": True},
+        ),
+        _Render(
+            "ap510|rtt|helia-ml|busy-loop",
+            "apollo510", "rtt", "helia-ml", clean_window_probe="busy_loop",
+        ),
+        _Render(
+            "ap510|rtt|helia-ml|ina228|power",
+            "apollo510", "rtt", "helia-ml", power_only=True,
+            overrides=dict(_INA228_VARS),
+        ),
     ]
     return renders
 
