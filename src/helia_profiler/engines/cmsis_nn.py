@@ -2,10 +2,10 @@
 
 Both heliaAOT-generated code and source-built heliaRT link against
 ``ns-cmsis-nn`` (the AmbiqAI CMSIS-NN fork; upstream ``cmsis-nn`` V.19+ has
-dropped parameters they target). By default the module is resolved from the
-NSX registry (NSX clones it from GitHub during ``nsx sync``); a user-provided
-local checkout is vendored as a local NSX module instead. The CMake options
-the kernels need (:func:`cmsis_nn_cmake_vars`) are shared by both engines.
+dropped parameters they target). hpx declares the module at the compatibility
+baseline's qualified ref and NSX clones it from GitHub during ``nsx sync``; a
+user-provided ref or local checkout overrides that. The CMake options the
+kernels need (:func:`cmsis_nn_cmake_vars`) are shared by both engines.
 """
 
 from __future__ import annotations
@@ -23,11 +23,6 @@ from ..platform import get_soc_for_board
 from ..results import NsxModuleRef
 
 log = logging.getLogger("hpx")
-
-#: First ns-cmsis-nn release whose float kernels HPX considers measurable --
-#: the core heliaRT 1.19.0 targets. The baseline ref predates it; see
-#: docs/architecture/compatibility-baseline.md.
-CMSIS_NN_FLOAT_MIN_REF = "v7.31.0"
 
 # NSX registry identity for ns-cmsis-nn. By default hpx declares this module
 # and lets NSX clone it from the registered GitHub upstream; a user-provided
@@ -56,14 +51,6 @@ def _float_compute_types(config: ProfileConfig) -> set[int]:
         return set()
 
 
-def _core_is_overridden(config: ProfileConfig) -> bool:
-    return bool(
-        config.engine.config.get("cmsis_nn_ref")
-        or config.engine.config.get("cmsis_nn_path")
-        or os.environ.get("CMSIS_NN_PATH")
-    )
-
-
 def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
     """CMake cache options for a source-built ``nsx-cmsis-nn`` module.
 
@@ -74,49 +61,43 @@ def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
       ``engine.config.cmsis_nn_requantize_inline_asm`` is false.
     * fp32 kernels -- always on (heliaRT >= 1.19 refuses to configure without
       them; heliaAOT float models call them directly).
-    * fp16 kernels -- on only when the model computes in FLOAT16 on an MVE-F
-      core (Cortex-M55). Never otherwise: ns-cmsis-nn < v7.30.0's fp16 sources
-      ICE on GCC 14 (PR 118460), so an int8/fp32 build must not compile them.
-
-    A float model on the baseline ns-cmsis-nn ref gets a warning: those float
-    kernels predate the fixes in :data:`CMSIS_NN_FLOAT_MIN_REF`.
+    * fp16 kernels -- on only when the model carries FLOAT16 tensors (computed
+      or dequantized weights) on an MVE-F core (Cortex-M55). Never otherwise:
+      ns-cmsis-nn < v7.30.0's fp16 sources ICE on GCC 14 (PR 118460), so an
+      int8/fp32 build must not compile them.
     """
     cmake_vars: dict[str, str] = {}
     if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
         cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
     cmake_vars |= _kernel_family("F32")
-
-    float_types = _float_compute_types(config)
-    if float_types and not _core_is_overridden(config):
-        log.warning(
-            "%s computes in float, but ns-cmsis-nn is the baseline ref whose float "
-            "kernels predate the %s fixes; set engine.config.cmsis_nn_ref to %s or "
-            "newer for float measurements (the run is still stamped qualified)",
-            Path(config.model.path).name,
-            CMSIS_NN_FLOAT_MIN_REF,
-            CMSIS_NN_FLOAT_MIN_REF,
-        )
     soc = get_soc_for_board(config.target.board, registry=config.platform_registry)
-    if soc.has_mve and TENSOR_TYPE_FLOAT16 in float_types:
+    if soc.has_mve and TENSOR_TYPE_FLOAT16 in _float_compute_types(config):
         cmake_vars |= _kernel_family("F16")
     return cmake_vars
+
+
+def _baseline_cmsis_nn_ref(config: ProfileConfig) -> str | None:
+    """The baseline's qualified ``nsx-cmsis-nn`` ref, or ``None`` when no
+    compatibility baseline is resolved on the config (bare unit-test configs)."""
+    baseline = getattr(getattr(config, "compatibility", None), "baseline", None)
+    return baseline.module(CMSIS_NN_MODULE).ref if baseline is not None else None
 
 
 def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
     """Resolve the ns-cmsis-nn NSX module reference.
 
-    By default the module is resolved from the NSX registry (NSX clones it
-    from the registered GitHub upstream during ``nsx sync``). When the user
-    provides a local checkout via ``engine.config.cmsis_nn_path`` or the
-    ``CMSIS_NN_PATH`` environment variable, it is vendored as a local module
-    under its registry-derived project directory (``modules/ns-cmsis-nn``).
+    By default hpx declares the module at the baseline's qualified ref and NSX
+    clones it from the registered GitHub upstream during ``nsx sync`` -- the
+    packaged registry's own default (v7.29.2 in neuralSPOT-X 0.7.17) is a core
+    heliaAOT 0.19.0 refuses. ``engine.config.cmsis_nn_ref`` overrides the ref;
+    a local checkout via ``engine.config.cmsis_nn_path`` or the
+    ``CMSIS_NN_PATH`` environment variable is vendored as a local module under
+    its registry-derived project directory (``modules/ns-cmsis-nn``).
     """
     configured_path = config.engine.config.get("cmsis_nn_path")
     requested_ref = config.engine.config.get("cmsis_nn_ref")
     if configured_path and requested_ref:
-        raise EngineError(
-            "engine.config.cmsis_nn_path and cmsis_nn_ref are mutually exclusive"
-        )
+        raise EngineError("engine.config.cmsis_nn_path and cmsis_nn_ref are mutually exclusive")
 
     # Explicit config always wins over the legacy environment fallback. This
     # matters in hardware CI, where a resolved commit must remain a git-backed
@@ -140,11 +121,12 @@ def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
     ):
         raise EngineError("engine.config.cmsis_nn_ref must be a non-empty git ref")
 
+    ref = requested_ref or _baseline_cmsis_nn_ref(config)
     log.info(
-        "ns-cmsis-nn — resolving %s from NSX registry (project=%s%s)",
+        "ns-cmsis-nn — resolving %s from NSX registry (project=%s, ref=%s)",
         CMSIS_NN_MODULE,
         CMSIS_NN_PROJECT,
-        f", ref={requested_ref}" if requested_ref else "",
+        ref,
     )
     return NsxModuleRef(
         name=CMSIS_NN_MODULE,
@@ -152,7 +134,7 @@ def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
         local=False,
         project=CMSIS_NN_PROJECT,
         # None must reach the dependency-lock digest as null; "" is a different key.
-        ref=requested_ref,
+        ref=ref,
     )
 
 

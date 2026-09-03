@@ -71,11 +71,16 @@ def test_fp16_fixture_is_the_true_cast_of_the_fp32_fixture() -> None:
     assert read_float_compute_types(FP16.read_bytes()) == {TENSOR_TYPE_FLOAT16}
 
 
-def test_fp16_weights_fixture_dequantizes_weights_and_computes_in_float32() -> None:
+def test_fp16_weights_fixture_widens_float16_weights_into_float32_compute() -> None:
     dtypes, ops = _inspect(FP16_WEIGHTS)
     assert dtypes["FLOAT16"] > 0 and dtypes["FLOAT32"] > 0
     assert "DEQUANTIZE" in ops
-    assert read_float_compute_types(FP16_WEIGHTS.read_bytes()) == {TENSOR_TYPE_FLOAT32}
+    # Both precisions do work on the target: f16 in the DEQUANTIZE widening,
+    # f32 in every kernel after it.
+    assert read_float_compute_types(FP16_WEIGHTS.read_bytes()) == {
+        TENSOR_TYPE_FLOAT16,
+        TENSOR_TYPE_FLOAT32,
+    }
 
 
 @pytest.mark.parametrize("path", [FP32, FP16, FP16_WEIGHTS])

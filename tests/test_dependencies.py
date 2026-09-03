@@ -341,7 +341,7 @@ def test_exact_dependency_provenance_serialization(
     assert serialized["workspace"]["baseline_id"] == "hpx-neuralspotx-0.7.17-2026-09"
     assert (
         serialized["workspace"]["baseline_fingerprint"]
-        == "0bd48409b9d384152740ec8a90a45ca69424580dee4e76c9794045a8eebafbf0"
+        == "8b9ae1e1aae49dbea81e5b467088f45d31742835e463aaeb8612b7e34d0fd9a4"
     )
     assert serialized["lock"]["mode"] == "reused"
     assert serialized["qualification"] == "development-overrides"

@@ -138,11 +138,13 @@ def _builtin_code(opcode: _Table) -> int:
 
 
 def read_float_compute_types(buf: bytes) -> set[int]:
-    """Float tensor types feeding compute ops: the precisions the model runs in.
+    """Float tensor types a kernel reads: the float precisions the target works in.
 
-    ``QUANTIZE``/``DEQUANTIZE`` inputs are skipped -- an int8 model with float
-    I/O only casts at its edges and exercises no float kernel. Raises like
-    :func:`read_quantized_softmax_ops` on a malformed buffer.
+    A FLOAT32 input to ``QUANTIZE``/``DEQUANTIZE`` is skipped -- an int8 model
+    with float I/O only casts at its edges and exercises no float kernel. A
+    FLOAT16 input to ``DEQUANTIZE`` counts: widening float16 weights is
+    float16 work on the target. Raises like :func:`read_quantized_softmax_ops`
+    on a malformed buffer.
     """
     model = _Table(buf, struct.unpack_from("<I", buf, 0)[0])
     opcodes = model.table_vector(_MODEL_OPERATOR_CODES)
@@ -151,15 +153,16 @@ def read_float_compute_types(buf: bytes) -> set[int]:
         tensors = sg.table_vector(_SUBGRAPH_TENSORS)
         for op in sg.table_vector(_SUBGRAPH_OPERATORS):
             builtin = _builtin_code(opcodes[op.scalar(_OPERATOR_OPCODE_INDEX, "<I", 0)])
-            if builtin in (BUILTIN_QUANTIZE, BUILTIN_DEQUANTIZE):
-                continue
+            is_cast = builtin in (BUILTIN_QUANTIZE, BUILTIN_DEQUANTIZE)
             start, length = op.vector(_OPERATOR_INPUTS)
             for i in range(length):
                 index = struct.unpack_from("<i", op.buf, start + 4 * i)[0]
                 if index < 0:  # -1 marks an absent optional input
                     continue
                 tensor_type = tensors[index].scalar(_TENSOR_TYPE, "<b", 0)
-                if tensor_type in (TENSOR_TYPE_FLOAT32, TENSOR_TYPE_FLOAT16):
+                if tensor_type == TENSOR_TYPE_FLOAT16 or (
+                    tensor_type == TENSOR_TYPE_FLOAT32 and not is_cast
+                ):
                     found.add(tensor_type)
     return found
 

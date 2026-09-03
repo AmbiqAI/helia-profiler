@@ -30,7 +30,7 @@
     },
     "ns-cmsis-nn": {
       "url": "https://github.com/AmbiqAI/ns-cmsis-nn.git",
-      "ref": "631726420b04860a5c4236956a3741ff5a96bd7f"
+      "ref": "9884d5fccab884c90c3d5e8865d5babbb1cabc63"
     },
     "nsx-executorch": {
       "url": "https://github.com/AmbiqAI/nsx-executorch.git",
@@ -64,7 +64,7 @@
     },
     "nsx-cmsis-nn": {
       "project": "ns-cmsis-nn",
-      "ref": "631726420b04860a5c4236956a3741ff5a96bd7f"
+      "ref": "9884d5fccab884c90c3d5e8865d5babbb1cabc63"
     },
     "nsx-executorch": {
       "project": "nsx-executorch",

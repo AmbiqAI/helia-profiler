@@ -9,14 +9,13 @@ so hpx must override them as cache variables *before* the module is added.
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 
 import pytest
 
 import helia_profiler
 from helia_profiler.config import ProfileConfig, load_config
-from helia_profiler.engines.cmsis_nn import cmsis_nn_cmake_vars
+from helia_profiler.engines.cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
 from helia_profiler.engines.helia_aot.adapter import _engine_cmake_vars
 from helia_profiler.engines.helia_rt import HeliaRTAdapter
 
@@ -25,6 +24,7 @@ _FIXTURES = Path(__file__).parent / "fixtures"
 INT8 = _FIXTURES / "kws_ref_model.tflite"
 FP32 = _FIXTURES / "kws_float_fp32.tflite"
 FP16 = _FIXTURES / "kws_float_fp16.tflite"  # true all-FLOAT16 graph
+FP16_WEIGHTS = _FIXTURES / "kws_float_fp16_weights.tflite"  # FLOAT16 weights, FLOAT32 compute
 HELIART_SOURCE = _FIXTURES / "heliart_nsx"
 
 # heliaRT checks ns-cmsis-nn's option; heliaAOT's generated module checks the
@@ -52,6 +52,11 @@ def _config(
     )
 
 
+def _baseline_cmsis_nn_ref(config: ProfileConfig) -> str:
+    assert config.compatibility is not None
+    return config.compatibility.baseline.module("nsx-cmsis-nn").ref
+
+
 def _assert_policy(cmake_vars: dict[str, str], *, fp16: bool) -> None:
     assert all(cmake_vars[name] == "ON" for name in _F32)
     if fp16:
@@ -63,10 +68,12 @@ def _assert_policy(cmake_vars: dict[str, str], *, fp16: bool) -> None:
 @pytest.mark.parametrize(
     ("board", "model", "fp16"),
     [
-        (M55, FP16, True),  # the only combination that compiles fp16 kernels
+        (M55, FP16, True),
+        (M55, FP16_WEIGHTS, True),  # widening f16 weights is f16 work on an MVE-F core
         (M55, FP32, False),  # fp32 compute needs no fp16 sources
         (M55, INT8, False),
         (M4, FP16, False),  # no MVE-F core, whatever the model asks
+        (M4, FP16_WEIGHTS, False),
         (M4, INT8, False),
     ],
 )
@@ -93,23 +100,19 @@ def test_requantize_asm_stays_configurable(
     _assert_policy(cmake_vars, fp16=True)
 
 
-@pytest.mark.parametrize(
-    ("model", "engine_config", "warns"),
-    [
-        (FP32, {}, True),
-        (FP16, {}, True),
-        (FP32, {"cmsis_nn_ref": "9884d5fccab884c90c3d5e8865d5babbb1cabc63"}, False),
-        (INT8, {}, False),
-    ],
-)
-def test_float_model_on_the_baseline_core_warns(
-    caplog: pytest.LogCaptureFixture, model: Path, engine_config: dict[str, object], warns: bool
+@pytest.mark.parametrize("engine_type", ["helia-rt", "helia-aot"])
+def test_nsx_cmsis_nn_is_declared_at_the_baseline_ref_by_default(
+    tmp_path: Path, engine_type: str
 ) -> None:
-    """The baseline ns-cmsis-nn predates the float fixes; the stamp still says
-    qualified, so the warning is the only place the reader learns this."""
-    with caplog.at_level(logging.WARNING, logger="hpx"):
-        cmsis_nn_cmake_vars(_config(M55, model, engine_config))
-    assert any("cmsis_nn_ref" in rec.message for rec in caplog.records) is warns
+    """neuralSPOT-X 0.7.17's registry resolves a core heliaAOT 0.19.0 refuses,
+    so hpx declares the module at the baseline's qualified ref; a user ref wins."""
+    config = _config(M55, INT8, engine_type=engine_type)
+    declared = cmsis_nn_module_ref(config, tmp_path)
+    assert declared.local is False
+    assert declared.ref == _baseline_cmsis_nn_ref(config)
+
+    override = _config(M55, INT8, {"cmsis_nn_ref": "deadbeef"}, engine_type=engine_type)
+    assert cmsis_nn_module_ref(override, tmp_path).ref == "deadbeef"
 
 
 @pytest.mark.parametrize(("board", "fp16"), [(M55, True), (M4, False)])
@@ -117,9 +120,15 @@ def test_registry_default_heliart_forwards_the_policy(
     tmp_path: Path, board: str, fp16: bool
 ) -> None:
     """The default (registry-resolved) heliaRT build is a source build, so it
-    must carry the options -- this is the path the bench hit on 1.19.0."""
-    artifacts = HeliaRTAdapter().prepare(_config(board, FP16), tmp_path)
+    must carry the options and declare the core -- the path the bench hit on 1.19.0."""
+    config = _config(board, FP16)
+    artifacts = HeliaRTAdapter().prepare(config, tmp_path)
     _assert_policy(artifacts.cmake_vars, fp16=fp16)
+    baseline_ref = _baseline_cmsis_nn_ref(config)
+    assert any(
+        module.name == "nsx-cmsis-nn" and module.ref == baseline_ref
+        for module in artifacts.extra_modules
+    )
 
 
 def _fake_heliart_source(root: Path) -> Path:

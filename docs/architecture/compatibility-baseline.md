@@ -17,7 +17,7 @@ The current baseline is `hpx-neuralspotx-0.7.17-2026-09`:
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `7afcf2b4…333` |
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
-| `ns-cmsis-nn` | `63172642…d7f` (`v7.29.2`) |
+| `ns-cmsis-nn` | `9884d5fc…c63` (`v7.31.0`, hpx-declared — see below) |
 | `nsx-executorch` | `27eee513…b1ed` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
 | heliaRT | `1.19.0`, commit `038a0c44…a83` (min supported `1.16.0` — from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
@@ -33,19 +33,21 @@ heliaAOT `[0.18.0, 0.19.0) → [0.19.0, 0.20.0)`, with `ai-edge-litert` relocked
 re-verified unchanged against it). `HELIART_MIN_VERSION` stays `1.16.0`
 — 1.17 → 1.19 is additive from HPX's perspective.
 
-**The float core is not part of this baseline.** heliaRT links a *consumer-
-provided* `ns-cmsis-nn` (heliaCORE); it does not vendor one. The baseline's
-qualified `v7.29.2` is the core heliaRT 1.18.0 (withdrawn) shipped "with its
-float defects as known issues", and heliaRT 1.19.0 moved to `v7.31.0` to fix
-them. So this baseline qualifies heliaRT 1.19.0 + heliaAOT 0.19.0 **for int8**
-on `ns-cmsis-nn v7.29.2`; **float profiling requires overriding the core** to
-`v7.31.0` (`engine.config.cmsis_nn_ref: 9884d5fccab884c90c3d5e8865d5babbb1cabc63`),
-which stamps `qualified-with-engine-override` (#248 tracks that this should read
-`development-overrides`). HPX cannot make the stamp reflect this yet: a float
-model built on the baseline ref logs a warning naming the override and is
-otherwise stamped `qualified`. The durable landing is a neuralSPOT-X registry bump
-of `ns-cmsis-nn` to `v7.31.0`, after which the override is dropped and this
-row advances.
+**The core moves with the engines, and hpx now declares it.** heliaRT links a
+*consumer-provided* `ns-cmsis-nn` (heliaCORE); it does not vendor one. The
+previously qualified `v7.29.2` is the core heliaRT 1.18.0 (withdrawn) shipped
+"with its float defects as known issues", and heliaAOT 0.19.0 refuses it
+outright: every generated module carries an unconditional
+`#error "CMSIS-NN version too old; need at least v7.31.0"` whose rationale
+names v7.29.x/v7.30.0 as defective for int8 as well (helia-aot#356). So this
+revision qualifies `ns-cmsis-nn v7.31.0` and — because neuralSPOT-X 0.7.17's
+registry still resolves v7.29.2 — hpx **declares** `nsx-cmsis-nn` at that ref
+on both engines' source routes instead of inheriting the registry's choice.
+The module thereby moves from the registry-governed tier to the hpx-declared
+tier (next section); neuralSPOT-X itself is unchanged. heliaRT 1.19.0 accepts
+any `>= v7.28.0`, so both engines now build against one core with no override,
+and a run stamps `qualified`. A neuralSPOT-X registry bump remains the tidy
+long-term landing but is no longer load-bearing.
 
 **Integration change.** heliaRT 1.19.0's `helia` backend refuses to configure
 unless ns-cmsis-nn's fp32 kernels are enabled — an `option()` default that must
@@ -53,7 +55,8 @@ be overridden *before* the module is added — and heliaAOT's generated module
 checks the same requirement under the exported define's name (helia-aot#349).
 `engines/cmsis_nn.py::cmsis_nn_cmake_vars` sets `NSX_CMSIS_NN_ENABLE_F32` /
 `ARM_NN_ENABLE_F32` for every source build of either engine, and the `F16`
-pair only when the model computes in FLOAT16 on a Cortex-M55: ns-cmsis-nn
+pair only when the model carries FLOAT16 tensors — computed or dequantized
+weights — on a Cortex-M55: ns-cmsis-nn
 below v7.30.0 ICEs on GCC 14 for its fp16 sources (PR 118460), so int8 and
 fp32 builds must not compile them. Both need ns-cmsis-nn `>= v7.28.0`;
 `v7.29.2` and `v7.31.0` both qualify.
@@ -123,18 +126,19 @@ on nothing 1.17-only).
 neuralSPOT-X 0.7.17 fixes the J-Link flash-verification false negative that
 aborted idempotent re-flashes of an unchanged image, and enforces
 `ExitOnError 1` in generated flash recipes (AmbiqAI/neuralspotx#220). Its
-packaged registry resolves `ns-cmsis-nn` at `v7.29.2`, and this promotion
-advances that qualified ref in lockstep.
+packaged registry resolves `ns-cmsis-nn` at `v7.29.2`; that promotion
+advanced the qualified ref in lockstep, and the 2026-09 revision then moved
+`nsx-cmsis-nn` into the hpx-declared tier at `v7.31.0`.
 
 Baseline refs relate to the packaged registry in two tiers. Modules HPX
 itself declares in generated apps (the SDK monorepo, PMU, heliaRT,
-nsx-sensors) carry manifest pins at the baseline refs, and those pins
-defeat the packaged registry — `nsx-sensors` stays at its audited `v0.3.0`
-pin even though 0.7.17's registry default is older. Modules that arrive
-only transitively (`nsx-cmsis-nn`, pulled by registry-backed heliaRT) have
-no manifest pin and follow the packaged registry. The stock-TFLM engine's
-declared modules (`nsx-tflite-micro`, `arm-cmsis-nn`) sit in this
-registry-governed tier too: hpx renders informational manifest revisions
+nsx-sensors and, since the 2026-09 revision, `nsx-cmsis-nn`) carry
+manifest pins at the baseline refs, and those pins defeat the packaged
+registry — `nsx-sensors` stays at its audited `v0.3.0` pin even though
+0.7.17's registry default is older, and `nsx-cmsis-nn` builds at `v7.31.0`
+where the registry would resolve `v7.29.2`. The stock-TFLM engine's
+declared modules (`nsx-tflite-micro`, `arm-cmsis-nn`) sit in the
+registry-governed tier: hpx renders informational manifest revisions
 for them, but NSX locking reads only the registry's module revision. For
 this whole tier the post-lock validation refuses to build when the
 resolved commit disagrees with this baseline, so a promotion must advance

@@ -58,7 +58,7 @@ class TestInstallNsxModule:
         _install_nsx_module(module_dir, fake_dist, variant="release-with-logs")
         shim = module_dir / "nsx" / "CMakeLists.txt"
         assert shim.exists()
-        assert '../CMakeLists.txt' in shim.read_text()
+        assert "../CMakeLists.txt" in shim.read_text()
 
     def test_variant_patched_in_cmakelists(self, tmp_path: Path, fake_dist: Path):
         module_dir = tmp_path / "module"
@@ -197,13 +197,17 @@ class TestHeliaRTAdapter:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
         """With no dist_path/source_path/source configured, prepare()
-        resolves nsx-helia-rt from the NSX registry (no local vendoring)."""
+        resolves nsx-helia-rt from the NSX registry (no local vendoring) and
+        declares nsx-cmsis-nn at the baseline's qualified ref (#246)."""
         monkeypatch.delenv("HELIART_DIST_PATH", raising=False)
         monkeypatch.delenv("HELIART_SOURCE_PATH", raising=False)
         config = _make_config(tmp_path)
         adapter = HeliaRTAdapter()
         artifacts = adapter.prepare(config, tmp_path)
-        assert len(artifacts.extra_modules) == 1
+        assert [module.name for module in artifacts.extra_modules] == [
+            "nsx-helia-rt",
+            "nsx-cmsis-nn",
+        ]
         mod = artifacts.extra_modules[0]
         assert mod.name == "nsx-helia-rt"
         assert mod.local is False
@@ -419,6 +423,7 @@ class TestSourceBuildMode:
         # prebuilt lib/ tree was installed from dist_path.
         assert (module_dir / "CMakeLists.txt").exists()
         assert not (module_dir / "lib").exists()
+
 
 def test_install_nsx_module_source_points_to_source_root(tmp_path: Path, fake_source_tree: Path):
     module_dir = tmp_path / "module"

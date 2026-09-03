@@ -46,7 +46,7 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert baseline.project("nsx-tflite-micro").ref == "7afcf2b4170e039caf4c49f91e2c45d5869be333"
     assert baseline.project("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
     assert baseline.module("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
-    assert baseline.project("ns-cmsis-nn").ref == "631726420b04860a5c4236956a3741ff5a96bd7f"
+    assert baseline.project("ns-cmsis-nn").ref == "9884d5fccab884c90c3d5e8865d5babbb1cabc63"
     assert baseline.project("nsx-executorch").ref == "27eee513636821398f0bb5e92055526cac29b1ed"
     assert baseline.engine("executorch").ref == "27eee513636821398f0bb5e92055526cac29b1ed"
     assert baseline.engine("helia-rt").ref == "038a0c4403b6186316700833b3ad7bb32e16ea83"
@@ -64,7 +64,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
-        "ns-cmsis-nn": "631726420b04860a5c4236956a3741ff5a96bd7f",
+        "ns-cmsis-nn": "9884d5fccab884c90c3d5e8865d5babbb1cabc63",
         "nsx-executorch": "27eee513636821398f0bb5e92055526cac29b1ed",
         "helia-rt": "038a0c4403b6186316700833b3ad7bb32e16ea83",
         # nsx-sensors v0.3.0 — full datasheet audit of the INA228 driver.
@@ -83,7 +83,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
-        "nsx-cmsis-nn": "631726420b04860a5c4236956a3741ff5a96bd7f",
+        "nsx-cmsis-nn": "9884d5fccab884c90c3d5e8865d5babbb1cabc63",
         "nsx-executorch": "27eee513636821398f0bb5e92055526cac29b1ed",
         "nsx-helia-rt": "038a0c4403b6186316700833b3ad7bb32e16ea83",
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
