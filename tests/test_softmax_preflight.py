@@ -346,7 +346,7 @@ class TestPreflightGate:
         Every gate test above drives `_check_softmax_scaling` directly, so
         deleting the one line in `PreflightStage.run` that invokes it left all
         of them green while the pipeline stopped checking anything -- the
-        untested-write-site gap #137's review found, in its preflight shape.
+        untested-write-site gap #137 found, in its preflight shape.
         (First caught here by a mutation run whose "3 failed" turned out to be
         stale bytecode; in a clean run it was 15 passed.)
         """
@@ -500,7 +500,7 @@ def test_reader_agrees_with_litert_on_every_fixture():
 #: and compiles, [2**-32 * (1 - 2**-32), 2**-32) rounds up and raises.
 _AOT_SWEEP = [
     # (label, multiplier, what the pinned helia-aot 0.18 measurably does)
-    # Negatives are swept too (#172 round-2): the Q31 promotion fires only
+    # Negatives are swept too (#172): the Q31 promotion fires only
     # at +2**31, so the negative boundaries do NOT mirror the positive ones
     # — a sign-blind guard disagreed with the compiler on 218/689 points.
     ("negative in the raise band", -0.25, "raises"),
@@ -633,7 +633,7 @@ def test_aot_absent_beta_is_one_in_every_environment():
 
 
 def test_negative_multipliers_mirror_the_real_chain_not_a_blanket_error():
-    """#172 round-2: the first fix blanket-errored negatives; the real chain
+    """#172: the first fix blanket-errored negatives; the real chain
     compiles most of that domain. The asymmetry is the Q31 promotion (fires
     only at +2**31), so the verdict mirrors the SHIFT — a sign-blind band
     disagreed on 218 of 689 negative sweep points."""
@@ -654,7 +654,7 @@ def test_negative_multipliers_mirror_the_real_chain_not_a_blanket_error():
 
 
 def test_top_binade_multiplier_does_not_crash_the_verdict():
-    """#172 review: the Q31 rounding promotes the top float64 binade past
+    """#172: the Q31 rounding promotes the top float64 binade past
     ldexp's range — the mirror must degrade to the raw value (far above the
     raise band) instead of raising OverflowError from a preflight."""
     import sys
@@ -692,7 +692,7 @@ def test_reader_constants_re_derive_from_the_installed_litert():
 
     # Tuples, NOT a dict: slot values collide across tables (four distinct
     # fields sit at slot 10 alone), and a value-keyed dict silently dropped
-    # 9 of these 14 checks (#235 lens).
+    # 9 of these 14 checks (#235).
     expected_slots = [
         (r._MODEL_OPERATOR_CODES, g.Model.OperatorCodes),
         (r._MODEL_SUBGRAPHS, g.Model.Subgraphs),

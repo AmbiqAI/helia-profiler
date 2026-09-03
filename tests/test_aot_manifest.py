@@ -393,7 +393,7 @@ class TestWriteAotMemoryLayers:
 
 
 class TestAotSymbolHints:
-    """#179 review M-3/M-4: the hints must name symbols the templates
+    """#179 M-3/M-4: the hints must name symbols the templates
     ACTUALLY emit, per mode and staging."""
 
     def _hint(self, role, *, staged=False, allocate=True, region_id=0):
@@ -411,7 +411,7 @@ class TestAotSymbolHints:
     def test_cold_constant_is_the_blob_only_with_internal_arenas(self):
         assert self._hint("constant") == "hpx_arena_const_dtcm__blob"
         # External-arena mode emits NO constant symbols (sidecar files);
-        # a __blob hint there produced a false "missing" (#179 Sonnet M-1).
+        # a __blob hint there produced a false "missing" (#179).
         assert self._hint("constant", allocate=False) is None
 
     def test_staged_constant_is_the_gated_runtime_buffer(self):

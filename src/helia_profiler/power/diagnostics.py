@@ -238,9 +238,10 @@ def assess_gate_duration(
 #: in the SAME boot, so HFRC drift cancels and real agreement is tight; 1% sits
 #: an order of magnitude above the tightest cross-family disagreement on record
 #: while still catching every failure mode seen (evidence: #142/#181, #195).
-#: This is the AUTHORITATIVE external check: disagreement means the gate did
-#: not bracket what the firmware timed, so the per-inference energy denominator
-#: is untrustworthy -- ERROR at the emit sites. On short windows the reference's
+#: This is the AUTHORITATIVE external check: #110's settle-verify has already
+#: ruled out a dead STIMER, so disagreement means the gate did not bracket what
+#: the firmware timed and the per-inference energy denominator is untrustworthy
+#: -- ERROR at the emit sites. On short windows the reference's
 #: error is absolute (packet integral + GPI-poll edges), so
 #: :func:`external_observer_slack_s` adds an absolute floor.
 EXTERNAL_WINDOW_CLOCK_TOLERANCE = 0.01

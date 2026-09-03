@@ -167,7 +167,7 @@ def test_degraded_with_policy_exits_normally(tmp_path: Path, monkeypatch) -> Non
 
 
 def test_output_applier_forwards_the_flag() -> None:
-    """The REAL overrides builder, un-mocked (#208 review: both exit tests
+    """The REAL overrides builder, un-mocked (#208: both exit tests
     bypass it): the flag lands in the overrides dict, and a False value
     leaves the section untouched."""
     from helia_profiler.cli.profile_cmd import _build_cli_overrides
@@ -192,7 +192,7 @@ def test_yaml_route_sets_the_policy(tmp_path: Path) -> None:
 
 
 def test_unknown_severity_renders_instead_of_vanishing(tmp_path: Path) -> None:
-    """#208 review: a future severity tier must not yield a verdict header
+    """#208: a future severity tier must not yield a verdict header
     with invisible causes."""
     ctx = _ctx(tmp_path)
     ctx.run_evaluation = RunEvaluation(

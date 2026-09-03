@@ -1,6 +1,6 @@
 """Unit tests for the measured-memory console rendering (#133 Phase 2).
 
-The renderer previously shipped with zero coverage (#177 review M2),
+The renderer previously shipped with zero coverage (#177),
 which hid a rich-markup injection through ELF section names (M3).
 """
 
@@ -46,7 +46,7 @@ def _region(**overrides) -> MeasuredRegion:
 
 
 def test_measured_table_renders_used_free_and_reserved():
-    # reserved deliberately != free (#209 review: the base fixture's reserved
+    # reserved deliberately != free (#209: the base fixture's reserved
     # of 491,240 numerically equals app_length - used, so blanking the
     # reserved COLUMN was invisible -- the assertion matched the free cell).
     text = _render(
@@ -66,7 +66,7 @@ def test_measured_table_renders_used_free_and_reserved():
 
 
 def test_hostile_section_names_render_escaped_and_do_not_crash():
-    """#177 review M3: ELF section names are attacker-ish input. A name
+    """#177: ELF section names are attacker-ish input. A name
     carrying rich markup must neither restyle the line nor raise
     MarkupError out of a successful run."""
     text = _render(
@@ -101,7 +101,7 @@ def test_unattributed_load_bytes_line_renders():
 
 
 def test_all_zero_measured_block_falls_back_to_the_plan_table():
-    """#177 review n7: a measured block whose every region is idle must
+    """#177: a measured block whose every region is idle must
     not suppress the plan table with a header-only shell. The call site
     uses measured_memory_is_renderable — the REAL predicate, not a
     mirror (follow-up NIT-3)."""
@@ -211,7 +211,7 @@ def test_reconciliation_table_renders_all_three_statuses():
 
 
 def test_wrong_region_match_renders_the_region():
-    """#179 Sonnet MINOR-3: the user-facing half of M-6 — a matched
+    """#179 MINOR-3: the user-facing half of M-6 — a matched
     consumer whose dominant symbol lives in a different region than
     planned must SAY so in the measured cell."""
     from helia_profiler.console.results import render_memory_reconciliation
@@ -272,7 +272,7 @@ def test_compare_run_table_labels_region_rows_and_honours_direction():
 
 
 def test_compare_change_colour_follows_the_declared_direction():
-    """#213 lens: the label test above would pass under the old name hack;
+    """#213: the label test above would pass under the old name hack;
     pin the colour -- free UP is green, used UP is red."""
     from helia_profiler.console.compare import _format_compare_change_compact
     from helia_profiler.evaluation.compare import MetricDiff

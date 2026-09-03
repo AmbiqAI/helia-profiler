@@ -514,8 +514,7 @@ class TestPowerFirmwareFingerprint:
         mismatch = [issue for issue in assessment.issues if issue.code == self.CODE]
         assert len(mismatch) == 1
         # The registry-declared mismatch_hint, not the generic sentence —
-        # two 64-hex digests tell a user nothing actionable (#173 review
-        # n4; pinned per round-2 m-D).
+        # two 64-hex digests tell a user nothing actionable (#173).
         assert "code fingerprint differs" in mismatch[0].message
         assert "Re-baseline" in mismatch[0].message
 
@@ -569,7 +568,7 @@ class TestPowerFirmwareFingerprint:
 
 
 def test_scoped_to_is_declared_only_where_the_comparator_honours_it():
-    """#173 review m3: only the POWER_DIMENSION_MISMATCH loop consults
+    """#173: only the POWER_DIMENSION_MISMATCH loop consults
     scoped_to — a spec declaring it under any other effect would be silently
     ignored, the exact failure mode the registry exists to prevent. Pin the
     invariant as registry data until a second loop needs the mechanism."""
@@ -641,7 +640,7 @@ class TestLinkFamily:
         assert assessment.memory_metrics_comparable
 
     def test_pre_206_artifacts_fall_back_to_the_measured_family(self):
-        """#213 lens: every #133+ summary records the family the measurer
+        """#213: every #133+ summary records the family the measurer
         saw in memory_regions -- a pre-#206 gnu-vs-armlink pair must gate
         exactly like a post-#206 one, not slip through the None-skip rule."""
         base = self._run_with(None)
@@ -660,7 +659,7 @@ class TestLinkFamily:
         assert (issue.context["baseline"], issue.context["candidate"]) == ("gnu", "armlink")
 
     def test_no_issue_when_neither_run_measured_regions(self):
-        """#213 lens 1: a cross-family pair whose memory measurement failed
+        """#213 1: a cross-family pair whose memory measurement failed
         on both sides has no rows to withhold -- no 'metrics omitted'."""
         base = self._run_with("gnu")
         cand = self._run_with("armlink")

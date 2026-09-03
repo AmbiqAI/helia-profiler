@@ -76,7 +76,7 @@ _MARKERS: dict[str, str | tuple[str, ...]] = {
     # Keyed on the ENABLED definition: _gpio_sync.j2 always emits the
     # constexpr (false in every matrix render), so the bare name was a
     # constant-true marker — same class as dwt_init/itm_swo (#161) and
-    # heartbeat below (#172 round-2). Constant-FALSE across today's matrix, like auto_window:
+    # heartbeat below (#172). Constant-FALSE across today's matrix, like auto_window:
     # honest, and discriminating the moment a sync-enabled case is added.
     "gpio_sync": "kPowerSyncEnabled = true;",
     # Keyed on the CALL (semicolon), not the bare name: the definition is
@@ -95,7 +95,7 @@ _MARKERS: dict[str, str | tuple[str, ...]] = {
     "rtt_config": "SEGGER_RTT_ConfigUpBuffer",
     "armv8m_pmu": "ARM_PMU_",
     # Keyed on the emitted wire token, not the bare word: "busy_loop" appears
-    # in template comments on every STIMER render (found in the #169 round-2
+    # in template comments on every STIMER render (found in the #169
     # review, where a new comment flipped the last four discriminating
     # apollo510 cases), so the bare word made this marker a constant there.
     # The probe announce line renders exactly when the probe is active.
@@ -104,7 +104,7 @@ _MARKERS: dict[str, str | tuple[str, ...]] = {
     # Keyed on the ENABLED definition (any-of across the children's
     # alignment paddings): the bare HPX_HEARTBEAT token matched the
     # unconditionally-emitted HPX_HEARTBEAT_ENABLED= announce, making this
-    # the fourth constant marker of the #161 class (#172 round-2 review).
+    # the fourth constant marker of the #161 class (#172).
     "heartbeat": ("kHbEnabled    = true;", "kHbEnabled   = true;"),
     "ssram_power_ap5": "ns_power",
     "newlib_syscalls": "_sbrk",
@@ -815,28 +815,17 @@ def test_window_is_never_timed_by_a_domain_the_binary_powers_down():
     """No power render may both disable the debug power domain and time its
     measured window with DWT->CYCCNT.
 
-    DWT lives in the CoreSight debug domain. Where the power binary calls
-    am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_DEBUG) (AP4 families,
-    via broad_peripheral_shutdown), an in-window DWT read returns garbage, the
-    accumulated cycle count is meaningless, and the terminal report's
-    elapsed_us -- derived from it -- is inflated. Energy survives (the monitor
-    integrates in hardware) but average power and current are silently divided
-    by the inflation factor. Measured ~7x on Apollo4 Blue Plus, in-session:
-    the unfixed build reported 6027 us/inference against the fixed build's
-    866 us with identical energy per inference.
+    DWT lives in the CoreSight debug domain: where the power binary disables
+    AM_HAL_PWRCTRL_PERIPH_DEBUG (AP4 families, via broad_peripheral_shutdown)
+    an in-window DWT read is garbage and elapsed_us inflates while energy
+    survives, so average power and current are silently understated (#112).
 
-    Scope: this pins the invariant across the *render matrix*, for every
-    clean-window probe -- any future SoC that gains the broad shutdown must
-    not also inherit a DWT-timed window. It is a textual check, keyed on the
-    literal am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_DEBUG) and
-    DWT->CYCCNT spellings inside ``_clock_dependent_region``, so it does NOT
-    defend against refactors that rename or wrap any of those (a DWT read
-    behind a helper, a differently-spelled shutdown).  The region includes the
-    busy-loop probe's calibration pass, which sits *before* window_begin but
-    is the same bug class one region over (issue #112).
-    The OTHER way the domain disappears on Cortex-M4F parts -- a free-running
-    binary with no debugger asserting CDBGPWRUPREQ -- is pinned separately, by
-    capability rather than by spelling, in
+    Textual check across the render matrix, keyed on the literal
+    am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_DEBUG) and DWT->CYCCNT
+    spellings inside ``_clock_dependent_region`` (which includes the busy-loop
+    calibration pass), so it does NOT defend against a renamed or wrapped DWT
+    read.  The free-running case (no debugger asserting CDBGPWRUPREQ) is
+    pinned by capability in
     ``test_free_running_power_binary_never_times_the_window_with_dwt``.
     """
     checked = 0
@@ -865,22 +854,14 @@ def test_stimer_init_verifies_the_crystal_against_an_independent_clock():
     """The STIMER window clock must not be trusted before it has settled (#110).
 
     ``am_hal_stimer_config(AM_HAL_STIMER_CFG_CLEAR)`` drops the XT request and
-    the crystal restarts -- Apollo4 datasheet 6.4, "the XT is only enabled when
-    an internal module is using it". Reading it immediately gave 584/591/858
-    kHz for a 96 MHz clock, a 45% spread across identical builds; a bench sweep
-    (#124) put the cold transient at ~500-650 ms.
+    the crystal restarts (Apollo4 datasheet 6.4); the cold transient was sized
+    on the bench in #124.  Two properties are asserted:
 
-    Two properties matter, and both are asserted here rather than left to the
-    comment:
-
-    1. The init VERIFIES rather than assuming. A fixed delay was rejected -- it
-       would tax every power run for a transient that usually does not happen,
-       since the XT is normally already up by the time a window opens.
-    2. It verifies against ``nsx_delay_us``, a calibrated BOOTROM cycle loop.
-       That matters more than it looks: DWT is exactly the clock STIMER exists
-       to replace on these paths, so verifying against it would be circular --
-       the same mistake as deriving a stall floor from a possibly-stalled
-       reference.
+    1. The init VERIFIES rather than delaying -- a fixed delay would tax every
+       power run for a transient that usually does not happen.
+    2. It verifies against ``nsx_delay_us``, a calibrated BOOTROM cycle loop,
+       not DWT -- DWT is the clock STIMER exists to replace on these paths, so
+       that check would be circular.
     """
     checked = 0
     for soc, transport, engine in _all_combos():
@@ -894,7 +875,7 @@ def test_stimer_init_verifies_the_crystal_against_an_independent_clock():
             case = f"{soc}|{transport}|{engine}{'|power' if power_only else ''}"
 
             init = rendered[rendered.index("static inline uint32_t hpx_stimer_init(void)") :]
-            # #180 review m1: the fitness CONTRACT — success returns 1, the
+            # #180: the fitness CONTRACT — success returns 1, the
             # post-loop path returns 0 — must be pinned above the sha layer
             # (an always-1 mutation kills the attribution on every board
             # while only churning regenerable digests).
@@ -1227,20 +1208,15 @@ def test_dwt_timed_clean_window_waits_for_the_host_attach():
     """A DWT-timed clean window must not open before the host probe attaches.
 
     On the Cortex-M4F families DWT->CYCCNT only advances while a debugger
-    asserts CDBGPWRUPREQ, and the host does not hold the probe continuously:
-    the J-Link reset is a separate JLinkExe subprocess, and nothing holds the
-    debug domain up between that process exiting and the pylink attach
-    completing. Per-iteration deltas taken across that gap read exactly zero,
-    so the window comes back SHORT -- 21% low on two of five Apollo4 Blue Plus
-    KBR runs in #121, while the later profiled loop (host fully attached) held
-    at 875-876 us in all five.
+    asserts CDBGPWRUPREQ, and nothing holds the debug domain up between the
+    J-Link reset subprocess exiting and the pylink attach completing, so
+    per-iteration deltas taken across that gap read zero and the window comes
+    back short (#121).
 
-    The fix is sequencing: wait for the RTT up-buffer to drain, which the host
-    can only do with the DAP alive, before touching the counter. This pins that
-    the drain precedes the FIRST DWT read of the window -- covering the
-    adaptive sizing warmup as well as the measured loop -- and that it is
-    scoped to renders that actually need it, so no STIMER-timed or
-    probe-independent build inherits a pointless wait.
+    The fix is sequencing: the RTT up-buffer drain (which needs a live DAP)
+    precedes the FIRST DWT read of the window, warmup included, and only in
+    renders that need it -- no STIMER-timed or probe-independent build
+    inherits the wait.
     """
     import re
 

@@ -156,15 +156,12 @@ def test_unattributed_sections_are_flagged(monkeypatch):
 
 
 def test_armlink_join_uses_the_extent_not_the_window(monkeypatch):
-    """#177 review M1: the armlink half of the two-mechanism rule, shaped
-    like a real NSX AP510 scatter link (numbers from the #176 fresh-review
-    real-armlink reproduction): two same-named MCU_TCM sections (PROGBITS
-    + NOBITS), the fixed 4 KB ARM_LIB_HEAP at the extent end 0x2007B000,
-    and the fixed 16 KB ARM_LIB_STACK at 0x2007C000 — inside the WINDOW,
-    outside the EXTENT. Kills both previously-surviving mutations:
-    extent.contains -> window.contains flips the stack into `used`;
-    deleting the outside-extent branch zeroes heap+stack out of
-    `reserved`."""
+    """The armlink half of the two-mechanism rule (#177), shaped like a real
+    NSX AP510 scatter link: two same-named MCU_TCM sections (PROGBITS +
+    NOBITS), ARM_LIB_HEAP at the extent end and ARM_LIB_STACK past it --
+    inside the WINDOW, outside the EXTENT.  Guards both extent.contains ->
+    window.contains (stack flips into `used`) and dropping the outside-extent
+    branch (heap+stack vanish from `reserved`)."""
     import helia_profiler.hostenv.memory_measurement as mm
     from helia_profiler.hostenv.toolchain_probe import ElfSection, LoadSegment
 
@@ -210,7 +207,7 @@ def test_armlink_join_uses_the_extent_not_the_window(monkeypatch):
 
 
 def test_psram_landing_bytes_are_flagged_not_swallowed(monkeypatch):
-    """#177 review m2: PSRAM is excluded from the measured regions (the
+    """#177: PSRAM is excluded from the measured regions (the
     plan owns it), so a section at a PSRAM address must surface as
     unattributed — classifying it silently would disable the police flag
     on exactly the region this block cannot report."""
@@ -232,7 +229,7 @@ def test_psram_landing_bytes_are_flagged_not_swallowed(monkeypatch):
 
 
 def test_unattributed_load_bytes_are_counted(monkeypatch):
-    """#177 review m3: PT_LOAD file bytes whose paddr classifies nowhere
+    """#177: PT_LOAD file bytes whose paddr classifies nowhere
     (below the app MRAM origin, a PSRAM address, anywhere uncharacterized)
     must be counted, not vanish from load_image."""
     import helia_profiler.hostenv.memory_measurement as mm
@@ -258,7 +255,7 @@ def test_unattributed_load_bytes_are_counted(monkeypatch):
 
 def test_zero_length_orphan_sections_are_not_flagged(monkeypatch):
     """A zero-byte end marker outside every window is noise, not lost
-    bytes (#177 review n3)."""
+    bytes (#177)."""
     import helia_profiler.hostenv.memory_measurement as mm
     from helia_profiler.hostenv.toolchain_probe import ElfSection
 
@@ -479,7 +476,7 @@ class TestReconciliation:
 
     def test_alias_pair_is_not_double_counted(self):
         """Two MATCHING names over one object (the extern alias plus the
-        mangled static) must sum once. The #179 review proved the earlier
+        mangled static) must sum once. The #179 proved the earlier
         version of this test vacuous — its alias (_ssdata) never matched
         a candidate, so the dedup branch never ran."""
         from helia_profiler.hostenv.memory_measurement import reconcile_memory
@@ -574,7 +571,7 @@ class TestReconciliation:
 
 
 class TestReviewRegressionPins:
-    """#179 review round: each finding pinned so it cannot recur."""
+    """#179 round: each finding pinned so it cannot recur."""
 
     def test_hal_symbols_do_not_false_positive_the_matcher(self):
         """M-1: am_hal_gpio_pincfg_input ENDS WITH g_input — a bare
@@ -689,7 +686,7 @@ class TestReviewRegressionPins:
 
 
 def test_llvm_nm_capture_parses_with_the_same_regexes():
-    """#179 Sonnet 'untested claim': real llvm-nm output
+    """#179 'untested claim': real llvm-nm output
     (symbols_atfe.txt, same fixture ELF) through the same parser. Real
     objects carry identical sizes to the GNU capture; the linker markers
     (__HeapBase/__HeapLimit) report st_size 0 — the documented

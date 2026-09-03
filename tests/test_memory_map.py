@@ -106,7 +106,7 @@ def test_apollo510_windows_are_the_linker_script_values():
 
 # Every known divergence between capabilities._FAMILY_MEMORY_BASES (via
 # soc_placement_ranges) and the verified windows, pinned EXACTLY per SoC
-# (#176 review M-4, lengths added in the fresh-eyes round): real MRAM start
+# (#176, lengths added in the fresh-eyes round): real MRAM start
 # plus (legacy length, verified length) for MRAM / TCM / SRAM. Every legacy
 # MRAM base is 0x0 (asserted in the test body); a Phase-2 edit that turns
 # any known divergence into agreement — or vice versa — must consciously
@@ -160,7 +160,7 @@ def test_apollo330P_has_no_itcm_and_dtcm_is_the_256k_hardware_aperture():
     """No ITCM window on the default script. The DTCM window is the SDK's
     DTCM_MAX_SIZE = 256 KB — armlink tiles to exactly that (0x3B000 TCM +
     0x1000 heap + 0x4000 stack), so its 16 KB stack at 0x2003C000 IS DTCM;
-    gcc's script merely declines the top 16 KB (#176 review M-1 corrected
+    gcc's script merely declines the top 16 KB (#176 corrected
     an earlier 240 KB window that pinned that stack as unclassifiable)."""
     windows = linked_memory_map(get_soc("apollo330P"))
     by_region = {w.region: w for w in windows}
@@ -181,7 +181,7 @@ def test_apollo3p_dtcm_is_the_64k_hardware_aperture_and_stackmem_is_sram():
     """AM_HAL_FLASH_DTCM_END = 0x1000FFFF: the TCM is the FIRST 64 KB of
     the shared SRAM space, so the 4 KB STACKMEM slot at 0x10010000 (where
     gcc's .stack and armlink's ARM_LIB_STACK both live) is main SRAM, not
-    TCM (#176 review M-2)."""
+    TCM (#176)."""
     windows = linked_memory_map(get_soc("apollo3p"))
     by_region = {w.region: w for w in windows}
     assert by_region[MemoryRegion.DTCM].window.length == 0x10000
@@ -197,7 +197,7 @@ def test_apollo3p_dtcm_is_the_64k_hardware_aperture_and_stackmem_is_sram():
 def test_non_builtin_socs_degrade_to_empty_even_on_name_collision():
     """A custom SoC was never checked against any linker script — even one
     whose name collides with a registered part must NOT inherit its windows
-    (#176 review M-3). Both forgery shapes: a renamed builtin (registered_name
+    (#176). Both forgery shapes: a renamed builtin (registered_name
     mismatch) and a custom-origin clone keeping the builtin name."""
     import dataclasses
 
@@ -303,7 +303,7 @@ def test_real_gcc_fixture_inventory_classifies_correctly():
 # Every app extent pinned exactly, per (soc, region, family): (start, length).
 # The app extents are the PR's headline deliverable — window starts/lengths
 # are pinned by _EXPECTED_LEGACY_VS_VERIFIED, but a transposed digit in an
-# extent would otherwise ship silently (#176 fresh-review M-4). GNU DTCM
+# extent would otherwise ship silently (#176). GNU DTCM
 # extents are the FULL script MCU_TCM regions (the floating .stack counts
 # as occupancy — its position is script-order-dependent); armlink DTCM
 # extents are MCU_TCM with the fixed heap/stack carved out by extent;
@@ -398,7 +398,7 @@ def test_every_app_window_extent_is_pinned_exactly():
 def test_psram_window_is_board_knowledge_and_not_section_attributable():
     """No linker region maps PSRAM on any SoC — Phase 2 must reconcile it
     from the plan, never report used=0/free=capacity off an inventory that
-    structurally cannot see it (#176 fresh-review M-1's PSRAM corollary)."""
+    structurally cannot see it (#176 M-1's PSRAM corollary)."""
     for name in CHARACTERIZED_SOCS:
         for w in linked_memory_map(get_soc(name)):
             if w.region is MemoryRegion.PSRAM:
@@ -413,7 +413,7 @@ def test_non_default_linker_profile_returns_empty():
     is a documented engine knob whose itcm scripts declare DIFFERENT
     regions (AP510-sized ones on apollo330P — the upstream NSX bug), so a
     non-default profile must degrade to unavailable, not return a
-    confidently wrong map (#176 fresh-review M-3)."""
+    confidently wrong map (#176)."""
     soc = get_soc("apollo330P")
     assert linked_memory_map(soc) == linked_memory_map(soc, linker_profile="default")
     assert linked_memory_map(soc, linker_profile="itcm") == ()

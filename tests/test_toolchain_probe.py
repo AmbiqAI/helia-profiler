@@ -105,14 +105,11 @@ def test_linker_reserved_heap_is_not_counted_as_bss(tmp_path: Path, monkeypatch)
 def test_a_heap_with_contents_is_not_treated_as_reserved(tmp_path: Path, monkeypatch) -> None:
     """A PROGBITS `.heap` must NOT be subtracted from bss.
 
-    Adversarial review caught this on a purpose-built ELF: an initialized pool
-    named `.heap` is counted by `size` in DATA, not bss. An earlier version of
-    this probe used `size -A`, which reports no section TYPE, so it matched on
-    name alone and reported bss 65,536 -> 57,344 -- understating real
-    zero-initialized state while double-counting those bytes in both `data`
-    and `reserved`. That was WORSE than not fixing #24 at all, and the
-    `reserved <= bss` guard did not catch it because the pool is smaller than
-    bss. The type check is what makes the name check safe.
+    An initialized pool named `.heap` is counted by `size` in DATA, not bss;
+    matching on name alone (all `size -A` allows, reporting no section TYPE)
+    understates bss and double-counts those bytes in `data` and `reserved`,
+    and the `reserved <= bss` guard misses it when the pool is smaller than
+    bss.  The NOBITS+ALLOC type check is what makes the name check safe (#24).
     """
     berkeley = "text data bss dec hex filename\n24 8192 65536 73752 12018 firmware\n"
     readelf = """Section Headers:
@@ -433,7 +430,7 @@ def test_size_and_fromelf_parsers_agree_on_the_same_binary_shape(
 
 def _section_listing(name: str) -> str:
     """A -v section block in the REAL fromelf shape: bare '** Section #N'
-    header, fields on indented lines (#175 round-2 review M-1 — the first
+    header, fields on indented lines (#175 — the first
     version put the fields inline on the header, where the parser never
     reads them, so it returned 0 for ANY name and pinned nothing)."""
     return (
@@ -449,7 +446,7 @@ def _section_listing(name: str) -> str:
 def test_combined_stackheap_region_stays_bss():
     """ARM_LIB_STACKHEAP (combined region) contains the live stack and
     cannot be split — per #131's never-invent rule it stays in bss with
-    reserved=0. Verified against a real armlink build by the #175 review
+    reserved=0. Verified against a real armlink build by the #175
     (bss=65784, reserved=0). The ARM_LIB_HEAP positive control proves the
     parser actually READ the name — without it, "correctly classified as
     live stack" is indistinguishable from "parser saw nothing"."""
@@ -459,7 +456,7 @@ def test_combined_stackheap_region_stays_bss():
 
 
 def test_totals_label_in_the_image_path_is_not_a_totals_row():
-    """#175 round-2 m-1: fromelf echoes the input path in the Object Name
+    """#175: fromelf echoes the input path in the Object Name
     column, so a relative path whose LEADING component is a totals label
     must still parse as the image row. The prefix-match version of the fix
     skipped it (verified against the real tool: 'ROM Totals/fw.axf' ->

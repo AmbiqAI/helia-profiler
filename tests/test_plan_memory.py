@@ -527,7 +527,7 @@ class TestHpxOwnedConsumers:
             assert [c.size for c in records] == [expected], engine
 
     def test_dwt_tier_records_book_the_smaller_object_header(self, tmp_path):
-        """#180 review M2: the DWT-tier profiler object has NO config
+        """#180: the DWT-tier profiler object has NO config
         struct (has_armv8m_pmu gate) — vptr 4 + state 52 = 56, as
         derivable as the ARMV8M 252. apollo4p: 2048 records x 24 + 56."""
         ctx = _make_ctx(tmp_path, {"target": {"board": "apollo4p_evb"}})
@@ -542,7 +542,7 @@ class TestHpxOwnedConsumers:
         assert [c.size for c in records] == [2048 * 24 + 56]
 
     def test_apollo5b_records_region_is_per_engine_macro(self, tmp_path):
-        """#180 review n4: apollo5b has NSX_MEM_SRAM (.shared -> SRAM) but
+        """#180: apollo5b has NSX_MEM_SRAM (.shared -> SRAM) but
         no NSX_MEM_SRAM_BSS (falls to .bss -> DTCM). TFLM/heliaRT's
         g_profiler uses the former; AOT's g_layers the latter — the region
         must follow the ENGINE's macro."""
@@ -638,7 +638,7 @@ class TestHpxOwnedConsumers:
         assert [c.size for c in records] == [4096 * 20]
 
     def test_ap3_bss_consumers_route_to_main_sram_not_dtcm(self, tmp_path):
-        """#179 review B-1: AP3's gcc script sends .bss to RWMEM (main
+        """#179 B-1: AP3's gcc script sends .bss to RWMEM (main
         SRAM) — TCM is only 64 KB. Booking records/USB into DTCM refused
         VALID builds with a spurious 'shrink your arena' PlatformError."""
         ctx = _make_ctx(
@@ -663,7 +663,7 @@ class TestHpxOwnedConsumers:
         assert "usb_buffers" not in dtcm_names
 
     def test_usb_buffers_booked_on_usb_cdc_transport(self, tmp_path):
-        """#179 review m1: the USB branch was untested (a mutation of the
+        """#179: the USB branch was untested (a mutation of the
         size constant survived)."""
         ctx = _make_ctx(
             tmp_path, {"target": {"transport": "usb_cdc"}}
@@ -682,7 +682,7 @@ class TestHpxOwnedConsumers:
         assert "rtt_buffers" not in names
 
     def test_engine_supplied_records_entry_is_not_duplicated(self, tmp_path):
-        """#179 review m1: the idempotence-by-name guard was untested (its
+        """#179: the idempotence-by-name guard was untested (its
         removal survived the suite)."""
         from helia_profiler.results import (
             MemoryConsumer,

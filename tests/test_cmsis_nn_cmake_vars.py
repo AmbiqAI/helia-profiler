@@ -102,8 +102,8 @@ def test_requantize_asm_stays_configurable(
 def test_nsx_cmsis_nn_is_declared_at_the_baseline_ref_by_default(
     tmp_path: Path, engine_type: str
 ) -> None:
-    """neuralSPOT-X 0.7.17's registry resolves a core heliaAOT 0.19.0 refuses,
-    so hpx declares the module at the baseline's qualified ref; a user ref wins."""
+    """hpx declares the module at the baseline's qualified ref, since the
+    registry may resolve a core the engines reject (#246); a user ref wins."""
     config = _config(M55, INT8, engine_type=engine_type)
     declared = cmsis_nn_module_ref(config, tmp_path)
     assert declared.local is False
@@ -117,8 +117,8 @@ def test_nsx_cmsis_nn_is_declared_at_the_baseline_ref_by_default(
 def test_registry_default_heliart_forwards_the_policy(
     tmp_path: Path, board: str, fp16: bool
 ) -> None:
-    """The default (registry-resolved) heliaRT build is a source build, so it
-    must carry the options and declare the core -- the path the bench hit on 1.19.0."""
+    """The registry-resolved heliaRT build is a source build, so it must carry
+    the kernel options and declare the core module (#246)."""
     config = _config(board, FP16)
     artifacts = HeliaRTAdapter().prepare(config, tmp_path)
     _assert_policy(artifacts.cmake_vars, fp16=fp16)

@@ -54,7 +54,7 @@ def test_missing_binary_sections_does_not_fail_successful_build(
 def test_measured_regions_wiring_passes_soc_and_linker_profile(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """#177 review (Sonnet m2): the stage->measure_memory_regions wiring —
+    """#177 (Sonnet m2): the stage->measure_memory_regions wiring —
     the ctx.soc gate, the engine-config linker_profile extraction, and the
     argument order — pinned end-to-end through the stage."""
     from helia_profiler.platform import get_soc
@@ -154,9 +154,8 @@ def test_measured_regions_skipped_without_resolved_soc(
 
 
 def test_partial_nm_listing_is_refused(tmp_path: Path, monkeypatch) -> None:
-    """#179 review m1: the refuse-partial gate was untested (flipping it
-    survived the suite). A partial listing must yield NO symbols and NO
-    reconciliation — never an understated one."""
+    """A partial nm listing must yield NO symbols and NO reconciliation --
+    never an understated one (#179)."""
     from helia_profiler.platform import get_soc
 
     model = tmp_path / "model.tflite"
@@ -228,7 +227,7 @@ def test_find_target_binary_is_deterministic(tmp_path: Path) -> None:
 def test_find_target_binary_tiebreak_is_filesystem_order_independent(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """#180 review M3: glob already walks top-down, so shallow-vs-deep never
+    """#180: glob already walks top-down, so shallow-vs-deep never
     depended on FS order — SAME-DEPTH siblings did. Feed the raw glob in
     reversed order and require the lexicographic winner."""
     import glob as glob_module

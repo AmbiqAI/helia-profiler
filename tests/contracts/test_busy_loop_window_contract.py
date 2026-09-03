@@ -1,24 +1,15 @@
 """The busy_loop plan and the firmware it renders must describe ONE window.
 
 The busy_loop probe is the only clean-window shape whose length the FIRMWARE
-chooses: ``_busy_loop_calibration.j2`` sizes its spin from the
-``window_target_ms`` template variable, and nothing tells the host how long
-that turned out to be. So every host-side consumer that computes ``count x
-reference_us`` -- the external gate check, which RAISES; the internal
-window-clock check; the INA228 accumulator-cadence guard -- is trusting the
-plan to have predicted the firmware's own number.
+chooses (``_busy_loop_calibration.j2`` sizes its spin from
+``window_target_ms``), and nothing tells the host how long that turned out
+to be.  Every host-side consumer of ``count x reference_us`` -- the external
+gate check, which RAISES; the internal window-clock check; the INA228
+accumulator-cadence guard -- trusts the plan to have predicted the firmware's
+number, and two rules once computed it differently (#125).
 
-That prediction was made twice, from two different rules. ``plan_power.py``
-raised ``window_target_ms`` to the power floor unconditionally; the firmware
-render raised it only in ``window_mode: auto``. Under ``window_mode: fixed``
-with a sub-floor target the two disagreed 5x and every one of those consumers
-was wrong by that factor: external runs still could not complete (the failure
-#125 exists to fix), correct internal runs evaluated degraded, and the cadence
-guard passed a window getting a fifth of the accumulator updates it checked
-for. The default ``auto`` hides all of it, which is why the suite was green.
-
-These tests read the number out of the GENERATED C rather than out of the
-plan, so a second rule cannot be reintroduced without failing them.
+These tests read the number out of the GENERATED C rather than the plan, so
+a second rule cannot come back without failing them.
 """
 
 from __future__ import annotations

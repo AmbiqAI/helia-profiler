@@ -98,9 +98,8 @@ def test_every_soc_declares_cmsis_header_and_rtt_scan_ranges():
 
 
 def test_ap5_socs_expose_expected_psram_capacity():
-    # apollo510b_evb populates a 64 MB APS512XXN part (hardware-proven via
-    # XIP address-aliasing, 2026-07-05); other AP5 boards assume 32 MB until
-    # validated on hardware.
+    # apollo510b_evb carries a 64 MB APS512XXN part (verified on hardware);
+    # other AP5 boards assume 32 MB until validated.
     expected_kb = {"apollo510": 65536, "apollo510b": 65536}
     for soc in list_socs():
         if soc.family is SocFamily.AP5:
@@ -640,8 +639,8 @@ def test_a_renamed_builtin_copy_does_not_inherit_the_name_it_was_given():
     renamed copy survives it too: an ``origin``-only gate lets
     ``replace(get_soc("apollo510"), name="atomiq110")`` read atomiq110's
     per-SoC override and flash an Apollo510 at 0x22000000, an address
-    belonging to a different part.  That is the df34b6e forgery reopened on
-    the programmatic path, one dimension over from the config path it closed.
+    belonging to a different part.  That is the same address forgery, reopened
+    on the programmatic path one dimension over from the config path.
 
     Not reachable from YAML -- ``_build_custom_socs`` constructs fresh
     ``SocDef``s, which default to ``CUSTOM`` (pinned by

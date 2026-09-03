@@ -900,14 +900,10 @@ class TestFlashBinaryAddressVerification(_FlashRecipeFixtures):
     def test_the_divergence_warning_names_the_config_key_to_edit(self, tmp_path, caplog) -> None:
         """Detecting the disagreement is only half of it; say what to go and fix.
 
-        The warning's subject used to be ``target_name`` -- ``hpx_profiler_power``,
-        the firmware image being flashed, which declares no address at all.  The
-        declaration the reader has to act on lives at
-        ``target.custom_socs.<name>.app_flash_load_addr`` (or is inherited from
-        the part that entry's ``based_on:`` names, which #153 documents as a
-        working shape), and the warning named neither.  It therefore told a user
-        that two addresses disagree while pointing them at a file that contains
-        neither one.
+        The warning must name the declaration the reader acts on --
+        ``target.custom_socs.<name>.app_flash_load_addr``, or the ``based_on:``
+        part it inherits from (#153) -- not the firmware image being flashed,
+        which declares no address at all.
 
         The sibling refusal on the fallback branch already names both keys, and
         its own test pins that; a warning about the same setting should not be

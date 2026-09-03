@@ -36,7 +36,7 @@ def test_registry_covers_the_enum_exactly():
 
 
 def test_manifest_writer_records_the_resolved_engine_version(tmp_path: Path):
-    """#207 review: the goldens only pin the null shape (their fixtures set
+    """#207: the goldens only pin the null shape (their fixtures set
     no run_metadata.engine); the populated value needs its own pin."""
     from helia_profiler.results import EngineInfo
 

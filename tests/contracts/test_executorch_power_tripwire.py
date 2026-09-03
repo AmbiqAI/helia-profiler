@@ -1,32 +1,18 @@
-"""Tripwire: preflight lifting the ExecuTorch+power rejection must not go
+"""Tripwire: lifting the ExecuTorch+power preflight rejection must not go
 unnoticed by the render-contract matrix.
 
-``main_executorch.cc.j2`` (added in #100) has none of the ``power_only``
-machinery -- window bracketing by a clock the power binary can read, the
-terminal record, ``SocCapabilities.power_window_timer`` consumption -- that
-#106/#107 added to ``main.cc.j2``/``main_aot.cc.j2`` to avoid the
-frozen/garbage-window bug class: on AP4, ``broad_peripheral_shutdown`` powers
-the debug domain (where DWT lives) down; on AP3, nothing asserts
-``CDBGPWRUPREQ`` for a free-running binary, so the counter never advances.
+``main_executorch.cc.j2`` has none of the ``power_only`` machinery that
+``main.cc.j2``/``main_aot.cc.j2`` carry against the frozen/garbage-window
+bug class (#106/#107): its ``engine_clean_window`` override reports the
+runtime's own ``execution_cycles`` and declares neither the STIMER bracket
+nor ``clean_cycles``, so a ``power_only`` render would reach
+``_power_terminal_success.j2`` with no duration source.  That is why the
+matrix pairs executorch with neither ``_power_combos`` nor the busy-loop
+probe, and why ``stages.preflight._check_transport_support`` rejects
+executorch + power.
 
-Since #154 phase 4 the template is a CHILD of ``_main_base.cc.j2`` and its
-non-power renders are pinned by the contract matrix (``_ENGINES`` now
-contains ``executorch``, paired with apollo510 alone). What it still does not
-have is a power path: its ``engine_clean_window`` override reports
-``HPX_CLEAN_INFER_*`` from the ExecuTorch runtime's own execute-only
-``execution_cycles`` and declares neither the STIMER bracket nor
-``clean_cycles``, so a ``power_only`` render would reach
-``_power_terminal_success.j2`` with no duration source in scope. That is by
-design and is why the matrix pairs executorch with neither ``_power_combos``
-nor the busy-loop probe.
-
-Today the whole question is moot: ``stages.preflight._check_transport_support``
-rejects ``engine.type == executorch`` combined with ``power.enabled``. If
-someone lifts that gate without doing the ExecuTorch power work, the bug class
-comes back with nothing watching.
-
-This test does not implement the fix. It fails loudly at exactly the moment
-described above, so the gap can no longer be silent.
+This test does not implement the fix; it fails the moment that gate is
+lifted without the ExecuTorch power work.
 """
 
 from __future__ import annotations

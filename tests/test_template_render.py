@@ -716,7 +716,7 @@ class TestMainAotCcRender:
             # stays compilable, with the low-floor comparison inert. The
             # positive half matters: this helper renders power_window_timer
             # "dwt", and deleting the zeroed declaration left the whole suite
-            # green in the #171 round-2 review while the render regressed to
+            # green in the #171 while the render regressed to
             # uncompilable C (clean_warm_min_cyc consumed by the window body,
             # declared nowhere).
             assert "target_cyc" not in out
@@ -896,22 +896,11 @@ class TestMainAotCcRender:
     def test_busy_loop_calibration_rejects_an_implausible_measurement(self):
         """The scaling branch is gated on a plausibility BAND, not just != 0.
 
-        ``busy_calib_ticks`` is the denominator that sizes the window, so a
-        corrupt reading mis-sizes it by that same multiplicative factor.  The
-        known source is ``hpx_stimer_init()`` itself: AM_HAL_STIMER_CFG_CLEAR
-        drops the XT request before re-requesting it, and the XT is a crystal
-        that restarts.  Measured on an Apollo4 Blue Plus KBR, reading STIMER
-        straight after that sequence gave apparent rates varying 45% across
-        identical builds (584/591/858 kHz against a true 95.771 MHz); a 750 ms
-        settle made it repeatable to 20 ppm.  A transient that is negligible
-        across a multi-second measured window can swallow this ~6-8 ms
-        calibration pass whole.
-
-        The settle belongs in ``hpx_stimer_init()`` and needs a bench pass to
-        size (issue #110).  Until then the band keeps a bad reading from
-        producing an absurd iteration count -- it falls back to the seed, and
-        because the window is now measured, that fallback is visible in
-        HPX_CLEAN_INFER_AVG_US rather than hidden behind the nominal target.
+        ``busy_calib_ticks`` sizes the window, so a corrupt reading (an
+        unsettled crystal straight after ``hpx_stimer_init()``, #110) would
+        mis-size it by the same factor.  The band falls back to the seed, and
+        because the window is measured that fallback shows up in
+        HPX_CLEAN_INFER_AVG_US rather than hiding behind the nominal target.
         """
         for render in (_render_tflm, _render_aot):
             out = render(
@@ -1115,7 +1104,7 @@ class TestIna228PowerRender:
 
 
 def test_pmu_storage_seam_rejects_unknown_vocabulary(monkeypatch):
-    """#172 review: the engine_pmu_storage_sram_resident seam accepts exactly
+    """#172: the engine_pmu_storage_sram_resident seam accepts exactly
     "true"/"false" — a Python-spelled "True" used to silently mean false,
     shipping a profile binary with its SRAM-resident per-layer storage
     unbacked (the hang _ssram_power.j2 warns about). The dict lookup leaves
@@ -1152,7 +1141,7 @@ def test_pmu_storage_seam_rejects_unknown_vocabulary(monkeypatch):
         else:
             # The error must NAME the seam and the vocabulary — a bare
             # "'dict object' has no attribute" sent the engine author to
-            # the traceback (#172 round-2 review).
+            # the traceback (#172).
             with pytest.raises(
                 UndefinedError, match="engine_pmu_storage_sram_resident"
             ):
