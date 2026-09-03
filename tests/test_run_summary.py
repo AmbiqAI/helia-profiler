@@ -178,9 +178,9 @@ def test_unmodelled_producer_key_fails_loudly(overrides: dict) -> None:
 
 
 def test_wrong_typed_section_fails_loudly_instead_of_vanishing() -> None:
-    """#205 review: a wrong-typed section becomes None in from_dict and
-    would silently VANISH from the artifact under a keyset-only check --
-    the round-trip equality assert makes it a producer-time failure."""
+    """A wrong-typed section becomes None in from_dict and would vanish under
+    a keyset-only check; the round-trip equality makes it a producer-time
+    failure (#205)."""
     with pytest.raises(ReportError, match="diverged"):
         _shape_check(_base_summary(binary="oops"))
     with pytest.raises(ReportError, match="diverged"):
@@ -231,7 +231,7 @@ def test_non_dict_root_raises_value_error(tmp_path: Path) -> None:
 
 
 def test_hostile_shapes_read_as_absent_not_crash() -> None:
-    """#205 review F1/F4: non-iterable list fields and non-finite numbers
+    """#205 F1/F4: non-iterable list fields and non-finite numbers
     must degrade to absence -- a hostile artifact fails ONE case downstream,
     never the reader itself."""
     hostile = RunSummary.from_dict(

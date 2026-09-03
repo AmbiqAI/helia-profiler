@@ -252,9 +252,8 @@ MODELS: dict[str, ModelSpec] = {
         name="Keyword Spotting (DS-CNN)",
         category="kws",
         fixture_path="tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite",
-        # Hardware-measured heliaRT usage is ~23.2 KB (gcc/armclang/atfe,
-        # 2026-07-04); 32 KB gives headroom while keeping TCM/SRAM placement
-        # presets viable on small boards (AP3 DTCM is only 64 KB).
+        # 32 KB covers heliaRT's arena across toolchains with headroom while
+        # keeping TCM/SRAM presets viable on small boards (AP3 DTCM is 64 KB).
         arena_size=32768,
         description="MLPerf Tiny keyword spotting — DS-CNN int8",
         executorch=ExecuTorchModelSpec(

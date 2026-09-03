@@ -348,7 +348,7 @@ def test_compare_suppresses_power_metrics_when_scope_differs(tmp_path: Path):
 
 
 def test_compare_power_gate_leaves_region_rows_alone(tmp_path: Path):
-    """#213 lens 1: end to end through compare_runs -- a closed power gate
+    """#213 1: end to end through compare_runs -- a closed power gate
     withholds power rows only; the memory group is gated independently."""
     _write_run(
         tmp_path / "baseline",
@@ -649,7 +649,7 @@ def test_unresolvable_source_gets_no_memory_rows(tmp_path: Path):
 
 
 def test_recorded_source_index_outranks_the_label_suffix(tmp_path: Path):
-    """#227 lens: the post-#222 source_index column is the strongest
+    """#227: the post-#222 source_index column is the strongest
     evidence — where it disagrees with the op-label suffix (manifest vs
     firmware-label version skew) the recorded value wins."""
     baseline = tmp_path / "gcc"
@@ -702,7 +702,7 @@ def test_malformed_recorded_source_index_is_unresolvable_not_downgraded(tmp_path
 
 
 def test_zero_join_memory_artifacts_warn(tmp_path: Path):
-    """#227 lens: file present but nothing joined must be distinguishable
+    """#227: file present but nothing joined must be distinguishable
     from 'no placement change'."""
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
@@ -793,7 +793,7 @@ class TestMemoryRegionRows:
     """#206: per-region used/free become compare rows, gated on link family."""
 
     def test_config_row_shows_the_family_the_gate_judged(self, tmp_path):
-        """#213 lens: a pre-#206 pair must not render 'Link family — — same'
+        """#213: a pre-#206 pair must not render 'Link family — — same'
         while the gate (reading the summary fallback) withholds the rows."""
         from helia_profiler.evaluation.compare import RunArtifacts, _compare_config
 
@@ -810,7 +810,7 @@ class TestMemoryRegionRows:
         assert (row.baseline, row.candidate, row.status) == ("gnu", "armlink", "diff")
 
     def test_config_row_shows_the_manifest_merged_value_the_gate_judged(self, tmp_path):
-        """#213 retro-lens: the manifest merges last for the gate; a Config
+        """#213: the manifest merges last for the gate; a Config
         row reading artifacts by path could disagree with it. One reader."""
         from helia_profiler.evaluation.compare import RunArtifacts, _compare_config
         from helia_profiler.results import ResultManifest
@@ -845,7 +845,7 @@ class TestMemoryRegionRows:
         assert (row.baseline, row.candidate, row.status) == ("armlink", "gnu", "diff")
 
     def test_percent_is_relative_to_the_baseline_magnitude(self):
-        """#213 lens: ``free`` is unclamped, so a negative baseline must not
+        """#213: ``free`` is unclamped, so a negative baseline must not
         flip the sign of the percentage against the delta."""
         from helia_profiler.evaluation.compare import _compare_metrics
 
@@ -1018,7 +1018,7 @@ def test_compare_summary_json_is_valid_when_a_metric_is_non_finite(tmp_path: Pat
 
 
 def test_compare_console_survives_a_non_finite_metric(tmp_path: Path):
-    """#244 lens: C2 sanitized the JSON but the console formatters did
+    """#244: C2 sanitized the JSON but the console formatters did
     int(nan) -> ValueError -- the same raw-traceback crash class on a
     foreign artifact. print_compare must render (non-finite -> em-dash),
     not crash."""

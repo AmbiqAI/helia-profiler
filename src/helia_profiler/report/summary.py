@@ -219,18 +219,9 @@ def _write_summary(
         if ctx.power_result.gated_windows:
             summary["power"]["gated_window_count"] = len(ctx.power_result.gated_windows)
         # Per-inference and inference-scaled figures need a window that ran
-        # inferences. The busy_loop probe runs a calibrated CPU spin instead,
-        # so BOTH derivation families below fabricate: the gated branch would
-        # divide real gated energy by an inference count, and the estimated
-        # branch would scale the whole-capture average power -- which measured
-        # the spin -- by real profiled inference time. The gate-duration
-        # integrity check cannot catch either, structurally: "N inferences"
-        # and "one spin of the same total length" are timing-identical by
-        # construction. probe_runs_inferences() is the same predicate
-        # collect_power_terminal and evaluation.validity already ask; this
-        # file was the third consumer and asked nowhere (#125) -- and the
-        # first version of this guard covered only the gated branch, leaving
-        # the internal-mode estimates publishing (found by review).
+        # inferences: the busy_loop probe runs a calibrated spin, so both
+        # derivation families below would fabricate. Same predicate
+        # collect_power_terminal and evaluation.validity ask (#125).
         probe_ran_inferences = probe_runs_inferences(
             ctx.config.profiling.clean_window_probe
         )
@@ -326,20 +317,11 @@ def _write_summary(
                                     6,
                                 )
                 elif meta.clean_infer_avg_cycles is not None or meta.clean_infer_avg_us is not None:
-                    # The firmware counted clean_infer_count > 0 inferences but
-                    # reported a zero (or missing) avg cycle/us figure -- an
-                    # inference cannot take zero time, so this means the
-                    # device-side DWT-based clean-window measurement was
-                    # corrupted (known cause: a debugger/RTT attach racing the
-                    # one-shot DWT->CYCCNT read, freezing/resetting it mid-
-                    # window -- see main.cc.j2's warmup-phase workaround
-                    # comment for the same underlying race). Previously this
-                    # silently skipped the duration sanity check entirely
-                    # (leaving gated_window_duration_ratio absent with no
-                    # warning) instead of flagging the bad reading. Found
-                    # 2026-07-03 while validating an ITCM placement
-                    # experiment. Total Joulescope energy/power remains
-                    # available, but per-inference metrics cannot be trusted.
+                    # clean_infer_count > 0 with a zero/missing avg cycle figure
+                    # means the DWT clean-window read was corrupted (a
+                    # debugger/RTT attach racing the one-shot CYCCNT read --
+                    # see main.cc.j2's warmup workaround). Total energy/power
+                    # stay usable; per-inference metrics cannot be trusted.
                     summary["power"]["gated_window_duration_suspect"] = True
                     log.warning(
                         "Device reported clean_infer_count=%d but "

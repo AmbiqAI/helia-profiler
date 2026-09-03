@@ -242,7 +242,7 @@ def collect_lines(
                 # line, e.g. "\ufffdHPX_CLEAN_INFER_COUNT=236".  That silently
                 # broke every ``^HPX_...`` / ``^--- HPX_...`` anchored match
                 # downstream, dropping the clean-window result and falling
-                # back to a whole-capture power estimate (found 2026-07-06).
+                # back to a whole-capture power estimate.
                 # Strip any run of non-ASCII/control characters before the
                 # first recognisable HPX marker; a genuinely garbled/empty
                 # line degrades no further than before (still fails to

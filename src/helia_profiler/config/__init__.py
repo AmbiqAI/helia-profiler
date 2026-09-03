@@ -413,7 +413,7 @@ class ProfilingConfig:
     # samples (uint32-wrap / frozen-zero) and log them.
     aggregation: Aggregation = DEFAULT_AGGREGATION
     # Extreme benchmarking mode: power down memory regions the model does not
-    # use to lower the energy floor.  Currently powers down SSRAM (3 MB) and
+    # use to lower the energy floor.  Powers down the shared SSRAM array and
     # collapses MRAM to a single bank (NVM0 only).  Only safe when the model
     # weights and arena both live in TCM. Code keeps running from MRAM, so
     # transports (RTT/USB/SWO) and printf remain available throughout the run.

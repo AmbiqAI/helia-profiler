@@ -1,10 +1,8 @@
-"""ns-cmsis-nn CMake option policy (#246).
+"""ns-cmsis-nn CMake option policy and module declaration (#246).
 
-heliaRT 1.19.0's ``helia`` backend refuses to configure unless the fp32 kernels
-are enabled in ns-cmsis-nn; the fp16 kernels exist only for MVE-F cores and,
-below ns-cmsis-nn v7.30.0, ICE on GCC 14 -- so they are compiled only for
-models that carry FLOAT16 tensors (computed or dequantized weights). Both are ``option()`` defaults in ns-cmsis-nn,
-so hpx must override them as cache variables *before* the module is added.
+fp32 kernels always (helia-rt#253); fp16 only for models carrying FLOAT16
+tensors on an MVE-F core (helia-rt#254); both names set (helia-aot#349); the
+module declared at the baseline ref (helia-aot#356).
 """
 
 from __future__ import annotations
@@ -104,8 +102,8 @@ def test_requantize_asm_stays_configurable(
 def test_nsx_cmsis_nn_is_declared_at_the_baseline_ref_by_default(
     tmp_path: Path, engine_type: str
 ) -> None:
-    """neuralSPOT-X 0.7.17's registry resolves a core heliaAOT 0.19.0 refuses,
-    so hpx declares the module at the baseline's qualified ref; a user ref wins."""
+    """hpx declares the module at the baseline's qualified ref, since the
+    registry may resolve a core the engines reject (#246); a user ref wins."""
     config = _config(M55, INT8, engine_type=engine_type)
     declared = cmsis_nn_module_ref(config, tmp_path)
     assert declared.local is False
@@ -119,8 +117,8 @@ def test_nsx_cmsis_nn_is_declared_at_the_baseline_ref_by_default(
 def test_registry_default_heliart_forwards_the_policy(
     tmp_path: Path, board: str, fp16: bool
 ) -> None:
-    """The default (registry-resolved) heliaRT build is a source build, so it
-    must carry the options and declare the core -- the path the bench hit on 1.19.0."""
+    """The registry-resolved heliaRT build is a source build, so it must carry
+    the kernel options and declare the core module (#246)."""
     config = _config(board, FP16)
     artifacts = HeliaRTAdapter().prepare(config, tmp_path)
     _assert_policy(artifacts.cmake_vars, fp16=fp16)

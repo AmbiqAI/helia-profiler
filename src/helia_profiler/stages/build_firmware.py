@@ -54,13 +54,10 @@ class BuildFirmwareStage:
             toolchain,
             timeout_s=ctx.config.timeouts.binary_probe_s,
         )
-        # Measured memory regions (#133 Phase 2): the ELF classified into
-        # the verified per-SoC windows. The linker profile must be the one
-        # the binary actually linked with — the engine knob, default
-        # otherwise; non-default profiles degrade to None inside.
-        # Best-effort like binary_sections (degrades to None inside); the
-        # soc gate additionally covers test-shaped contexts that never ran
-        # ResolvePlatformStage.
+        # Measured memory regions (#133): the ELF classified into the verified
+        # per-SoC windows, using the linker profile the binary actually linked
+        # with. Best-effort like binary_sections; the soc gate also covers test
+        # contexts that never ran ResolvePlatformStage.
         if ctx.soc is not None:
             linker_profile = str(ctx.config.engine.config.get("linker_profile") or "default")
             ctx.memory_regions = measure_memory_regions(

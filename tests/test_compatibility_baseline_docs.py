@@ -80,7 +80,7 @@ def test_every_baseline_entry_has_a_doc_row_with_its_ref():
             )
         for key in ("min_version", "max_version_exclusive"):
             # Key-scoped, not table-wide: a one-sided range bump can alias an
-            # unrelated value elsewhere in the table (#207 review, mutation r
+            # unrelated value elsewhere in the table (#207, mutation r
             # -- raising min to the old max passed a bare substring check).
             if key in engine:
                 assert f"{key}={engine[key]}" in table, (
@@ -112,7 +112,7 @@ def test_every_doc_ref_exists_in_the_baseline():
 
     # Hygiene first: a stale ref typed with an ASCII "..." or truncated below
     # 8 hex would be INVISIBLE to the reverse check below -- refuse the format
-    # outright (#207 review, mutations j/c2).
+    # outright (#207, mutations j/c2).
     malformed = re.findall(r"`[0-9a-f]{4,7}…|`[0-9a-f]{4,}\.{2,}", table)
     assert not malformed, (
         f"doc table refs must be >=8 hex chars followed by a real ellipsis "
@@ -131,7 +131,7 @@ def test_doc_identity_and_code_constants_are_current():
 
     # The headline identity line carries the FULL baseline id, not just the
     # version: a re-pin within the same nsx version changes only the id date,
-    # and that is exactly the bump-forgets-doc case (#207 review, mutation l).
+    # and that is exactly the bump-forgets-doc case (#207, mutation l).
     assert data["baseline_id"] in doc, (
         f"the doc headline no longer names the current baseline id "
         f"'{data['baseline_id']}' -- update compatibility-baseline.md"

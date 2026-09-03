@@ -96,9 +96,9 @@ class HeliaAOTAdapter:
     1. Validate profiler board maps to a known AOT platform.
     2. Invoke ``helia-aot convert`` on the input .tflite model (ModuleType.nsx).
     3. Validate generated memory-placement pragmas match expectations.
-    4. Resolve the ns-cmsis-nn (CMSIS-NN fork) source tree.
+    4. Resolve the ns-cmsis-nn NSX module (baseline ref, or a user override).
     5. Generate an attribute header mapping AOT macros → Ambiq sections.
-    6. Wrap ns-cmsis-nn as a local NSX module (AOT output is already NSX-native).
+    6. Register the AOT output as an NSX module (it is already NSX-native).
     7. Return ``HeliaAotArtifacts`` with template vars and cmake_vars.
     """
 

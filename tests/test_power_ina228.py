@@ -363,9 +363,7 @@ class TestPowerMonitorContext:
     def test_shunt_cal_matches_datasheet_formula(self, tmp_path: Path):
         """SHUNT_CAL = 13107.2e6 x CURRENT_LSB x R_shunt, x4 at ADCRANGE=1.
 
-        The 0.5 ohm / 0.5 A case is the one verified on Apollo510B hardware:
-        the firmware raw-wrote 6250 and read 6250 back, at which point the
-        measurement worked.
+        The 0.5 ohm / 0.5 A case is the hardware-verified one.
         """
         config = _profile_config(
             tmp_path,

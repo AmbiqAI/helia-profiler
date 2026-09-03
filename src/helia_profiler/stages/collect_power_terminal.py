@@ -29,26 +29,14 @@ from ..results import PowerObservation
 def _host_phase_envelope_s(ctx: PipelineContext) -> float | None:
     """Host wall time from starting the power binary to collecting its record.
 
-    ``DeploymentRecord.deployed_at`` is the cleanest timestamp already in the
-    pipeline for "the power phase began": ``FlashPowerFirmwareStage`` stamps it
-    immediately after the J-Link recipe programs and releases the target, and
-    in internal mode nothing touches the device again before this stage (the
-    capture stage is skipped -- see ``CapturePowerStage.should_skip``). No new
-    plumbing is needed. Note the record itself is never serialized -- what
-    reaches an artifact is the derived ``window_clock_ceiling`` metadata this
-    stage stores, not ``deployed_at``.
-
-    The interval is a deliberate over-estimate of the measured window: it also
-    contains flash-tool exit, boot, engine/model init, and the post-window
-    terminal emit plus this stage's own wait. That makes it a loose ceiling, not
-    a duration estimate -- see ``WindowClockCeiling`` for what that costs in
-    sensitivity.
-
-    Returns ``None`` when there is no deployment record or the timestamp cannot
-    be parsed, so the caller simply has nothing to check rather than inventing
-    a bound. Note this reads the host wall clock, not a monotonic one -- a clock
-    step between the two reads would skew it, which is a reason this check warns
-    rather than fails.
+    ``DeploymentRecord.deployed_at`` is stamped right after the J-Link recipe
+    releases the target, and in internal mode nothing touches the device again
+    before this stage. The interval is a deliberate over-estimate of the
+    measured window (flash-tool exit, boot, init, terminal emit, this stage's
+    wait) -- a loose ceiling, not a duration estimate (see
+    ``WindowClockCeiling``). Returns ``None`` when there is no record or the
+    timestamp cannot be parsed. Reads the host wall clock, not a monotonic
+    one, which is one reason this check warns rather than fails.
     """
     deployment = ctx.power_run.deployment if ctx.power_run is not None else None
     if deployment is None:
@@ -276,12 +264,10 @@ class CollectPowerTerminalStage:
                     integrity=PowerIntegrity.VALID,
                     source=measurement.source,
                     inference_count=measurement.inference_count,
-                    # Artifact-level POWER_FIRMWARE: without it, a
-                    # manifest-less internal-mode pair — the very mode of
-                    # #115's phantom delta — cannot establish the platform
-                    # scope and the fingerprint gate silently skips
-                    # (#173 review m4). External mode sets it in
-                    # capture/__init__.py; this is the internal twin.
+                    # Artifact-level POWER_FIRMWARE lets the fingerprint gate
+                    # establish platform scope for a manifest-less
+                    # internal-mode pair (#115, #173). External mode sets it
+                    # in capture/__init__.py.
                     power_firmware=plan.firmware_mode,
                 ),
             )
@@ -301,12 +287,9 @@ class CollectPowerTerminalStage:
         if frozen_window_clock:
             # External mode: warn, do not raise. The instrument owns every
             # published power number here, so a frozen firmware clock corrupts
-            # elapsed_us and nothing else -- the Apollo3 baseline capture
-            # reported elapsed_us=0 with average power still correct to 0.19%.
-            # Raising would throw away a good capture, and would do it before
-            # GenerateReportStage, so the run would produce no artifact at all
-            # and the downstream validity issue could never be seen. Same shape
-            # as the bystander-overflow path below.
+            # elapsed_us and nothing else; raising would throw away a good
+            # capture before any artifact exists. Same shape as the
+            # bystander-overflow path below.
             log.warning(
                 "Power firmware reported zero elapsed time for %d completed "
                 "%s: its window clock never advanced. The %s owns this "
@@ -317,37 +300,22 @@ class CollectPowerTerminalStage:
                 ctx.config.power.driver,
                 FROZEN_WINDOW_CLOCK_HINT,
             )
-        # Cross-check of the firmware's own window clock against an
-        # independent measurement of the same work. This stage only LOGS the
-        # verdict at capture time; the authoritative consequence lives in
-        # evaluation.validity, where the external arm is an ERROR
-        # (power.window_observer_mismatch, #142/#181 -- two clocks watched
-        # the same physical window, so disagreement is a real fault) and the
-        # internal arm stays a warning (cross-binary 25% band). Same helper,
-        # same inputs, so the log here and the verdict there cannot diverge.
+        # Cross-check of the firmware's window clock against an independent
+        # measurement. This stage only LOGS; evaluation.validity holds the
+        # verdict (external arm ERROR, internal arm warning -- #142/#181).
+        # Same helper, same inputs, so the two cannot diverge.
         agreement = assess_run_window_clock(
             elapsed_us=terminal.elapsed_us,
             internal_mode=internal_mode,
             gated_result=(
                 ctx.power_run.observation.result if ctx.power_run.observation is not None else None
             ),
-            # Internal mode's reference is `count x reference_us`. #112
-            # withheld it for probes that run no inferences, because the plan
-            # then multiplied a per-inference time it had no business using --
-            # against a ~1 s spin window that reference was ~5 ms, so it fired
-            # on every CORRECT run and stayed silent on a mis-sized one.
-            #
-            # The plan now describes a busy_loop window in the probe's own
-            # units (one unit lasting window_target_ms, count_source
-            # "probe_window"), so the same product IS the right reference and
-            # is passed through. Withholding it here would leave internal mode
-            # with no duration check at all -- which is what #125 flagged, and
-            # matters because in internal mode `elapsed_us` is the denominator
-            # for average power and current.
-            #
-            # External mode is unaffected either way: its reference is the
-            # instrument's own gate, which timed the same physical window
-            # whatever ran inside it.
+            # Internal mode's reference is `count x reference_us`; the plan
+            # describes a busy_loop window in the probe's own units (#112),
+            # so the product is the right reference there too. Withholding it
+            # would leave internal mode with no duration check (#125), and
+            # elapsed_us is its power denominator. External mode's reference
+            # is the instrument's own gate.
             planned_inference_count=plan.inference_count,
             planned_inference_us=plan.reference_inference_us,
             stats_rate_hz=ctx.config.power.stats_rate_hz,
@@ -366,12 +334,10 @@ class CollectPowerTerminalStage:
                 agreement.relative_tolerance * 100.0,
             )
         if internal_mode:
-            # Plan- and hardware-independent ceiling. The plan comparison above
-            # can only ever be as good as a different binary's timing, but the
-            # host knows for a fact when it started this binary and when it
-            # collected the record -- the measured window is strictly inside
-            # that interval. This is what catches the AP4-style ~7x inflation
-            # for a user with no external instrument.
+            # Plan- and hardware-independent ceiling: the host knows when it
+            # started this binary and when it collected the record, and the
+            # measured window is strictly inside that interval -- what catches
+            # gross clock inflation for a user with no external instrument.
             ceiling = assess_window_clock_ceiling(
                 elapsed_us=terminal.elapsed_us,
                 host_envelope_s=_host_phase_envelope_s(ctx),

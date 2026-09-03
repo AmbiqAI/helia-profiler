@@ -121,9 +121,8 @@ def _build_gate_arbitration(ctx: PipelineContext) -> GateArbitration | None:
         # Neither an est*count term nor a two-clock comparison exists --
         # there is nothing gated to arbitrate (an internal-mode run with a
         # terminal hiccup lands here), and RunEvaluation.gate_arbitration
-        # promises None for exactly that (#204 review: a non-None,
-        # suppressing arbitration for a non-gated run would poison any
-        # consumer keying "gated" on its presence).
+        # promises None for exactly that (#204: a non-None arbitration for a
+        # non-gated run would poison consumers keying "gated" on its presence).
         return None
     return GateArbitration(
         integrity=integrity,
@@ -151,15 +150,11 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         meta = ctx.pmu_result.meta
         # A clean window that completed inferences in zero elapsed time was
         # timed by a clock that never moved. The power binary's twin of this
-        # rule (firmware_window_clock_is_frozen) only runs at the power
-        # terminal, so a PROFILE-only STIMER window -- every Apollo5 profile
-        # build, and AP3/AP4 busy_loop -- had no check at all: a dead 32.768
-        # kHz crystal yielded silent zeros with no issue code (found by
-        # review of #128, which added the settle these windows now rely on).
-        # Attribution landed with #110: STIMER-window binaries report
-        # stimer_dead before the window when the crystal is unfit, so
-        # reaching this check without that error points at a lost line on
-        # a lossy transport (a STIMER window has no debug-domain cause).
+        # rule (firmware_window_clock_is_frozen) runs only at the power
+        # terminal, so a PROFILE-only STIMER window needs its own check
+        # (#128). STIMER-window binaries report stimer_dead before the window
+        # when the crystal is unfit (#110), so reaching this check without
+        # that error points at a lost line on a lossy transport.
         if meta.clean_infer_count and (
             meta.clean_infer_avg_us == 0 or meta.clean_infer_total_cycles == 0
         ):
@@ -476,11 +471,9 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         # too short for the stats integral to be trusted regardless of what
         # the firmware clock says.
         if observation is not None:
-            # Consume the arbitration's integrity term, not the metadata
-            # directly: ``integrity_recorded`` is the chokepoint that keeps
-            # validity issues off the advisory re-derived band (review of
-            # #204: reading the metadata in parallel left the flag
-            # write-only and the distinction enforced by duplicate code).
+            # Consume the arbitration's integrity term, not the metadata:
+            # ``integrity_recorded`` is the chokepoint that keeps validity
+            # issues off the advisory re-derived band (#204).
             duration = (
                 arbitration.integrity
                 if arbitration is not None and arbitration.integrity_recorded
@@ -518,9 +511,8 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                         # span regardless of what ran in it. Beyond the
                         # drift-plausible envelope the est*count check is the
                         # only tie to the profile phase's timing, so its
-                        # warning stands (found by review of the redesign:
-                        # unbounded absolution let a ratio-0.5 window evaluate
-                        # VALID with a friendly drift note).
+                        # warning stands: unbounded absolution would let a
+                        # ratio-0.5 window evaluate VALID.
                         issues.append(
                             _warning(
                                 IssueCode.POWER_GATE_DURATION_MISMATCH,

@@ -339,15 +339,9 @@ def capture_power(
         from ..config import DEFAULT_POWER_MIN_WINDOW_MS
 
         # USB CDC firmware blocks in nsx_usb_connected() until the host asserts
-        # DTR.  Unlike SWO/UART/RTT (which free-run after reset), it will never
-        # reach the gated clean window — and the Joulescope would see no
-        # GPIO-high window — unless we open its CDC port.  Hand capture_gated an
-        # on_started hook that opens the port *after* the GPI poller is live, so
-        # the firmware is released only once we are watching for the window.
-        # The dedicated power binary has no USB stack at all and never blocks
-        # on DTR (see firmware WP1's power_only render), so the holder is
-        # skipped entirely in that mode -- it would otherwise try (and fail)
-        # to resolve/open a CDC port the power firmware never enumerates.
+        # DTR, so it never reaches the gated window unless we open its CDC port
+        # -- done in capture_gated's on_started hook, after the GPI poller is
+        # live. The dedicated power binary has no USB stack and skips this.
         dtr_holder: _UsbDtrHolder | None = None
         if effective_firmware == "shared" and ctx.config.target.transport == Transport.USB_CDC:
             jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
@@ -356,22 +350,15 @@ def capture_power(
                 usb_marker=usb_marker_serial(jlink_serial),
             )
 
-        # 3-wire lock-step: arm the host GO line before anything may run.
-        # ORDERING (revised after the AP510 combo-reset gate-race root cause,
-        # see experiments/ap5-phase-d/t2-gate-race/): the GPI poller must be
-        # watching BEFORE the lifecycle reset fires.  The combo strategy
-        # (debug_reset then swpoi_reset) spends ~5-6s in two JLinkExe
-        # invocations; a firmware without lock-step (or whose GO wait has a
-        # bounded free-run) can raise — and nearly finish — its gated window
-        # in that gap, which the poller then observes as already-high /
-        # stale, mis-segmented as "rose but did not fall".  capture_gated
-        # invokes ``on_started`` exactly once the poller thread is sampling
-        # GPI, so the reset + READY handshake now lives inside that callback:
+        # 3-wire lock-step: arm the host GO line first, then run the reset +
+        # READY handshake inside capture_gated's ``on_started`` (invoked once
+        # the poller thread samples GPI), so a firmware that raises its gate
+        # early is never observed as already-high (evidence:
+        # experiments/ap5-phase-d/t2-gate-race/):
         #   arm -> [poller live] -> reset -> wait READY -> (DTR) -> GO
-        # The capture duration budget is unaffected: the driver starts its
-        # wait clock after ``on_started`` returns.
-        # The whole sequence stays under one try/finally so any exception
-        # (e.g. reset failure after GO was driven low) still releases sync.
+        # The capture budget is unaffected (the driver's wait clock starts
+        # after on_started returns). One try/finally so any exception still
+        # releases sync.
         sync = _make_sync_controller(ctx, driver)
         prepare_error: list[BaseException] = []
         try:
@@ -683,12 +670,10 @@ def _raise_on_firmware_error(lines: list[str], *, power_enabled: bool = True) ->
     the full payload, looks up a hint, and raises.  Unknown kinds still
     raise — with a generic hint — so nothing slips through silently.
 
-    One severity exception (#180 review M1): ``stimer_dead`` corrupts ONLY
-    the STIMER-timed clean window — per-layer counters come from the PMU —
-    so on a run that is not measuring power it downgrades to a warning and
-    the capture proceeds; the validity layer independently marks the
-    zero-elapsed clean window. With power enabled it stays fatal: every
-    power figure would be built on the dead clock.
+    One severity exception (#180): ``stimer_dead`` corrupts only the
+    STIMER-timed clean window (per-layer counters come from the PMU), so
+    without power it is a warning and the validity layer marks the
+    zero-elapsed window; with power enabled it stays fatal.
     """
     for line in lines:
         s = line.strip()

@@ -120,11 +120,9 @@ def capture_gated(
     clean_infer_avg_us: int | None = None,
     minimum_gate_s: float = 0.0,
     gate_relative_tolerance: float = 0.01,
-    # Human-facing noun for clean_infer_count in the duration-mismatch hint:
+    # Human-facing noun for clean_infer_count in the duration-mismatch hint;
     # the driver has no config access, so the caller passes the probe-aware
-    # word (power.diagnostics.count_noun) -- "inferences" is only a default
-    # for artifact-only callers (#172 review: the hint said "1 inferences"
-    # for a busy-loop window that ran none).
+    # word (power.diagnostics.count_noun, #172).
     work_noun: str = "inferences",
     # Shared with diagnostics.external_observer_slack_s: the observer check's
     # absolute slack assumes edges are resolved no finer than this cadence.
@@ -328,12 +326,9 @@ def capture_gated(
                             time.time(),
                             len(poll_samples) == 1,
                         )
-                        # Drop the GO line the moment the gate is observed
-                        # high: the firmware has latched GO, and a GPO held
-                        # high through the window backfeeds the target around
-                        # the current shunt (several mA measured on an AP510
-                        # EVB — enough to drive the measured window current
-                        # negative).
+                        # Drop GO the moment the gate is observed high: a GPO
+                        # held high through the window backfeeds the target
+                        # around the shunt (see power.sync.release_go).
                         if on_gate_rise is not None:
                             try:
                                 on_gate_rise()
@@ -658,18 +653,12 @@ def capture_gated(
                 relative_tolerance=gate_relative_tolerance,
             )
             if not gate_integrity.valid:
-                # Deliberately NOT a raise (#142/#181). The est*count
-                # expectation straddles boots and thermal states: the
-                # reference was timed by the profile boot while the LP core
-                # clock is HFRC-derived, so a cold power boot runs fast and
-                # undershoots it by up to ~12% while being perfectly healthy.
-                # The verdict belongs to evaluation.validity, which runs
-                # after CollectPowerTerminalStage and lets the firmware's own
-                # STIMER window time (same boot, same physical window)
-                # arbitrate: gate-vs-ELAPSED_US agreement means a stale
-                # reference, not a broken gate. Raising here would discard
-                # the capture one stage before its own best evidence arrives
-                # -- and produce no artifact at all.
+                # Deliberately NOT a raise (#142/#181): the est*count
+                # expectation straddles boots and thermal states, so a healthy
+                # cold boot can undershoot it. evaluation.validity arbitrates
+                # with the firmware's own STIMER window (same boot, same
+                # physical window); raising here would discard the capture
+                # before its best evidence arrives and leave no artifact.
                 log.warning(
                     "Gated window duration %.6fs differs from the planned "
                     "%d %s at %dus each (expected %.6fs, band %.6fs, "

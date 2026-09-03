@@ -77,12 +77,11 @@ class SyncController(Protocol):
     def release_go(self) -> None:
         """Drop the GO wire once the device has latched it (gate observed high).
 
-        A host-driven GO line held high through the measured window can
-        parasitically backfeed the target through the GPIO pad network,
-        displacing real supply current around the instrument's sense path
-        (several mA observed on an AP510 EVB — enough to drive the net
-        measured current negative).  The firmware only level-samples GO
-        before the window, so dropping it at gate-rise is always safe.
+        A host-driven GO line held high through the measured window backfeeds
+        the target through the GPIO pad network, displacing supply current
+        around the instrument's sense path -- enough to drive the net measured
+        current negative.  The firmware only level-samples GO before the
+        window, so dropping it at gate-rise is always safe.
         """
         ...
 

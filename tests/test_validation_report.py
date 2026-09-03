@@ -190,7 +190,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
         "used": 32_768,
         "consumers": [{"name": "tensor_arena", "size": 32_768, "kind": "arena"}],
     }
-    # Schema v6 (#177 review M4): the measured block passes through
+    # Schema v6 (#177): the measured block passes through
     # verbatim — this assert is what makes deleting the passthrough line a
     # red test instead of a silent contract regression.
     assert case["resources"]["memory_regions"]["regions"][0]["free"] == 343_784

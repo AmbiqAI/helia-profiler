@@ -1031,20 +1031,16 @@ class TestGenerateApp:
     ):
         """End-to-end guard for the #106/#107 bug class, through generate_app.
 
-        The window-clock resolution is per-render state: ``power_only`` decides
-        whether ``power_window_timer`` or ``clean_window_timer`` wins
-        (firmware/context.py ``resolve_window_timer``), so the power binary has
-        to be rendered from a context built for ``power_only=True`` -- NOT from
-        the transport binary's already-resolved variables with ``power_only``
-        spliced on top. That splice compiles, renders, and produces a power
-        binary that times its window with DWT on AP4.
+        ``power_only`` decides whether ``power_window_timer`` or
+        ``clean_window_timer`` wins (``resolve_window_timer``), so the power
+        binary must be rendered from a context built for ``power_only=True``,
+        NOT from the transport binary's resolved variables with ``power_only``
+        spliced on top -- that splice yields a DWT-timed power window on AP4.
 
-        Adversarial review proved the whole suite stayed green through exactly
-        that revert, because every other end-to-end power test here targets
-        apollo510, where both timers resolve to stimer anyway. This test is
-        that gap closed: it asserts the two binaries from ONE generate_app call
-        resolved DIFFERENTLY -- power on STIMER, transport on DWT -- which is
-        the property the splice destroys.
+        Asserts the two binaries from ONE generate_app call resolved
+        DIFFERENTLY (power on STIMER, transport on DWT).  Only an AP4 target
+        exposes this; the other end-to-end power tests target apollo510, where
+        both resolve to stimer.
         """
         ctx = self._ap4_power_ctx(tmp_path, fake_dist)
         ResolvePlatformStage().run(ctx)
@@ -2232,7 +2228,7 @@ def test_project_override_order_is_hash_seed_independent():
     (sort_keys=False) and becomes nsx.yml's module_registry block order —
     bare set iteration made the rendered BYTES vary with PYTHONHASHSEED
     across processes. (The workspace manifest hash was never affected —
-    nsx's hash_manifest canonicalises with sort_keys=True; the #175 review
+    nsx's hash_manifest canonicalises with sort_keys=True; the #175
     corrected the original claim.) Run the resolver in subprocesses under
     different seeds and require identical ordering."""
     import json
@@ -2263,6 +2259,6 @@ print(json.dumps(list(overrides)))
         )
         orders.append(proc.stdout.strip())
     assert orders[0] == orders[1] == orders[2], orders
-    # Vacuity guard (#175 review m9): an empty resolver result would pass
+    # Vacuity guard (#175): an empty resolver result would pass
     # the equality trivially while asserting nothing.
     assert len(json.loads(orders[0])) >= 2

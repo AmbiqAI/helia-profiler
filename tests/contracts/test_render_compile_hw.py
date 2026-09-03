@@ -99,11 +99,9 @@ _MATRIX: tuple[_HwCase, ...] = (
 )
 
 
-#: Known real-toolchain render bugs — STRICT semantics copied from Tier 1's
-#: ledger: an entry keeps its case red-with-reason; a case that starts
-#: compiling fails this test until its entry is removed, so the ledger
-#: cannot go stale. Empty: the design survey's census (16/16 TUs across 7
-#: warm workspace combos) found no failures under -Wall -Werror.
+#: Known real-toolchain render bugs — same strict semantics as Tier 1's
+#: ledger: an entry keeps its case red-with-reason, and a case that starts
+#: compiling fails this test until its entry is removed.
 _EXPECTED_HW_BUGS: dict[str, str] = {}
 
 
@@ -136,7 +134,7 @@ def _resolve_workspace(case: _HwCase) -> _Workspace | str:
     )
     if not candidates:
         return f"no warm workspace under {root}"
-    # Newest-first, FIRST FULLY-RESOLVING candidate wins (#225 lens F3): the
+    # Newest-first, FIRST FULLY-RESOLVING candidate wins (#225): the
     # cache legitimately holds fingerprint dirs from several branches/
     # baselines, mtime-ordered by whichever branch last profiled — a stale
     # branch's newer workspace must not disable the leg while a matching
@@ -158,7 +156,7 @@ def _resolve_candidate(app_dir: Path, case: _HwCase) -> _Workspace | str:
         return f"no build.ninja for {case.board}"
 
     # D6: the workspace must have been built against the checkout's baseline
-    # — and unknown is not verified (#225 lens F4): a workspace that records
+    # — and unknown is not verified (#225): a workspace that records
     # no fingerprint predates provenance and is exactly the stale kind.
     deps_file = app_dir / "hpx-dependencies.json"
     recorded = None
@@ -240,7 +238,7 @@ def _split_ninja(value: str) -> list[str]:
 
     ``$$`` is a literal ``$``, ``$ `` a literal space, ``$:`` a colon —
     tokens split on UNescaped spaces only, then each token unescapes, so
-    ``-I/opt/Arm$ GNU/include`` stays one argv entry (#225 lens F6: the
+    ``-I/opt/Arm$ GNU/include`` stays one argv entry (#225: the
     old unescape-then-split round trip corrupted exactly the case the
     unescaping existed for).
     """
@@ -318,7 +316,7 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
         overrides=overrides or None,
     )
     # Tier 1's vacuity rule: an empty or truncated render must not pass
-    # -fsyntax-only trivially (#225 lens F7).
+    # -fsyntax-only trivially (#225).
     assert "int main(" in text, f"[{case.case_id}] render has no 'int main(' — vacuous TU"
     main_tu = scratch / ("main_power.cc" if case.power_only else "main.cc")
     main_tu.write_text(text)
@@ -366,7 +364,7 @@ def _aot_prefix_in(app_dir: Path) -> str | None:
 def _require_all_legs() -> bool:
     """HPX_COMPILE_HW_REQUIRE_ALL: any value except off-like ones arms it —
     a workflow author writing "true" must not silently lose enforcement
-    (#225 lens 2)."""
+    (#225 2)."""
     return os.environ.get("HPX_COMPILE_HW_REQUIRE_ALL", "").strip().lower() not in (
         "",
         "0",
@@ -395,11 +393,11 @@ def test_rendered_firmware_compiles_with_the_real_toolchain(tmp_path: Path):
         )
         # The MOST degraded run must not be the one that stays green: with
         # REQUIRE_ALL armed, a wiped cache or mistyped HPX_CACHE_DIR in the
-        # workflow is a failure, not a skip (#225 lens 2).
+        # workflow is a failure, not a skip (#225 2).
         if _require_all_legs():
             pytest.fail(status)
         pytest.skip(status)
-    # A partial run must be DISTINGUISHABLE from a full one (#225 lens F1):
+    # A partial run must be DISTINGUISHABLE from a full one (#225):
     # a green nightly where nine legs silently never compiled is the gate
     # lying. Skipped legs surface as a warning every run, and
     # HPX_COMPILE_HW_REQUIRE_ALL=1 turns any partial run into a failure
@@ -449,7 +447,7 @@ def test_rendered_firmware_compiles_with_the_real_toolchain(tmp_path: Path):
             stale.append(case_id)
     if failures:
         # Lazy and deduped on purpose: green runs spawn no subprocesses,
-        # and N legs sharing one compiler probe it once (#225 lens 2).
+        # and N legs sharing one compiler probe it once (#225 2).
         compilers = {ws.compiler for _case, ws in runnable}
         versions = "; ".join(
             f"{compiler}: {_compiler_version(compiler)}" for compiler in sorted(compilers)
@@ -488,7 +486,7 @@ def test_matrix_covers_every_engine_family():
     assert {case.probe for case in _MATRIX} == {"infer", "busy_loop"}
     assert any(case.power_only for case in _MATRIX)
     assert {case.soc for case in _MATRIX} == {"apollo510", "apollo330P"}
-    # The exact leg set (#225 lens F5): every individual row was deletable
+    # The exact leg set (#225): every individual row was deletable
     # without tripping the coverage sets above — a removed leg must be as
     # loud as a missing engine.
     assert {case.case_id for case in _MATRIX} == {
@@ -508,7 +506,7 @@ def test_matrix_covers_every_engine_family():
 
 
 class TestWorkspaceResolution:
-    """#225 lens F3/F4: candidate fallback and provenance, on synthetic
+    """#225 F3/F4: candidate fallback and provenance, on synthetic
     cache trees (portable: the 'compiler' is any existing file)."""
 
     def _make_tree(self, root: Path, case: _HwCase, name: str, *, fingerprint, ninja=True):
@@ -607,7 +605,7 @@ class TestNinjaStanzaParser:
         assert _split_ninja(power["DEFINES"]) == ["-DPOWER=1", "-DCOST=a$b"]
 
     def test_unescapes_ninja_dollar_forms(self):
-        """Split BEFORE unescape (#225 lens F6): an escaped space must stay
+        """Split BEFORE unescape (#225): an escaped space must stay
         inside ONE argv token, not be unescaped and then split apart."""
         v = _tu_variables(_SYNTHETIC_NINJA, "hpx_profiler", "src/main.cc")
         assert v is not None

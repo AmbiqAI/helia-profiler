@@ -648,10 +648,8 @@ class TestStreamedGpiSegmentation:
 
     These edges live on the same time64 axis as the stat-packet midpoints, so
     they need no host-time mapping and cannot be distorted by GPI snapshot
-    poll cadence or callback latency — the mechanism behind the CI
-    "gated window duration is suspect" failures, where a pre-window coupling
-    pulse merged into the true rise across a stalled poll gap and inflated
-    the measured window by ~100 ms.
+    poll cadence or callback latency, which once let a pre-window coupling
+    pulse merge into the true rise across a stalled poll gap.
     """
 
     @staticmethod
@@ -1846,7 +1844,7 @@ class TestEstimateCaptureDuration:
         every `firmware: shared` run. The fixed-mode branch sized the clean
         window as `iterations x inference_time`, which for a 20 s spin gave a
         deadline well inside the window: exactly the miss this function's
-        docstring says it exists to prevent (found by review of #136).
+        docstring says it exists to prevent (#136).
         """
         from helia_profiler.stages.capture_power import (
             _BOOT_SETTLE_S,
@@ -1929,8 +1927,7 @@ class TestEstimateCaptureDuration:
         )
         estimated = _estimate_capture_duration(ctx)
         assert estimated is not None
-        # The real firmware run was observed at ~8.16s wall-clock; the fixed
-        # estimate must cover that, unlike the old ~7.1s underestimate.
+        # Must cover the observed wall-clock of this config's firmware run.
         assert estimated > 8.16
 
 
@@ -2467,7 +2464,7 @@ class TestPowerFirmwareSelection:
         assert cycles == []
         # Re-wrapped with the stage context (same type — the taxonomy signal
         # survives) so the user still sees WHICH deployment step refused;
-        # the hint renders exactly once (#172 review).
+        # the hint renders exactly once (#172).
         assert str(exc_info.value).startswith("Power firmware deployment failed: ")
         assert "No flashable image" in str(exc_info.value)
         assert str(exc_info.value).count("Hint:") == 1
@@ -3383,7 +3380,7 @@ def test_clean_window_probe_classification_is_exhaustive():
 
 
 def test_plan_power_progress_message_is_probe_aware(tmp_path, monkeypatch):
-    """#172 review: the seventh 'inferences' site — 'Power run planned ·
+    """#172: the seventh 'inferences' site — 'Power run planned ·
     1 inferences' for a busy-loop plan that runs none."""
     from helia_profiler.config import load_config
     from helia_profiler.pipeline import PipelineContext
@@ -3568,7 +3565,7 @@ class TestGateArbitrationComposition:
         assert arb_ok.drift_note is None
 
     def test_unhealthy_terminal_suppresses_even_with_a_valid_band(self):
-        """#204 lens-2 M2 kill: the terminal-health term must suppress on its
+        """#204-2 M2 kill: the terminal-health term must suppress on its
         own -- an early-exit firmware whose short gate happens to match the
         shortened work passes the est*count band while the planned-count
         denominator is still wrong."""
@@ -3577,7 +3574,7 @@ class TestGateArbitrationComposition:
         assert arb.suppression_reason == "power terminal reported failed or incomplete work"
 
     def test_floor_suppression_starves_the_drift_note(self):
-        """#204 lens-2 M6 kill: the note's own no-note-while-suppressed
+        """#204-2 M6 kill: the note's own no-note-while-suppressed
         guarantee, not just the render's ordering -- a below-floor gate at
         drift-scale deviation with an agreeing observer must not narrate."""
         from helia_profiler.power.diagnostics import GateArbitration
@@ -3592,7 +3589,7 @@ class TestGateArbitrationComposition:
         assert arb.drift_note is None
 
     def test_reason_precedence_is_the_suppress_order(self):
-        """#204 lens-2 M3 kill: the builder never produces observer+unhealthy
+        """#204-2 M3 kill: the builder never produces observer+unhealthy
         together (it withholds the observer), so precedence is pinned by
         direct construction -- observer disagreement outranks terminal
         health, mirroring the suppress disjunction."""

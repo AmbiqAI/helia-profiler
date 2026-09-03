@@ -131,10 +131,9 @@ def _serialise_memory_reconciliation(rec: MemoryReconciliation) -> dict[str, Any
     }
 
 
-#: Per-region symbol rows emitted into detailed/memory.json. A real build
-#: carries ~2000 sized symbols; the aggregates-vs-enumerations convention
-#: (report/__init__.py) puts enumerations in detailed/, and even there a
-#: bounded, size-sorted view is what a reader can use.
+#: Per-region symbol rows emitted into detailed/memory.json -- a bounded,
+#: size-sorted view (the aggregates-vs-enumerations convention in
+#: report/__init__.py).
 _SYMBOLS_PER_REGION = 32
 
 
@@ -178,8 +177,7 @@ def _serialise_memory_symbols(
         )
     return {
         # Nonzero-size symbols after alias dedup — the population the
-        # listing draws from (#179 review m3: the raw nm row count
-        # included zero-size and alias rows and described nothing).
+        # listing draws from (#179).
         "total_sized_symbols": considered,
         "outside_windows": outside_windows,
         "per_region_limit": _SYMBOLS_PER_REGION,

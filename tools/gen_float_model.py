@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Generate small floating-point LiteRT models for HPX profiling.
 
-HPX's fixtures were all int8/int16; heliaRT 1.19.0 / heliaAOT 0.19.0 add FP16
-and FP32 kernels, so verifying them needs float ``.tflite`` files. This tool
-emits a tiny KWS-shaped DS-CNN in two forms:
+Float profiling needs float ``.tflite`` fixtures. This tool emits a tiny
+KWS-shaped DS-CNN in two forms:
 
 * ``{name}_fp32.tflite`` -- every tensor ``FLOAT32``.
 * ``{name}_fp16_weights.tflite`` -- the converter's float16 post-training
@@ -41,10 +40,9 @@ def _tensorflow():
 def _build_kws_dscnn(tf, input_shape: tuple[int, int, int], num_classes: int):
     """A tiny DS-CNN skeleton: conv, depthwise, pointwise, flatten, FC, softmax.
 
-    Every op here has an FP16/FP32 kernel in helia-aot 0.19.0. Spatial
-    reduction uses stride-2 convolutions because ``MEAN`` (GlobalAveragePooling)
-    is still int8/int16-only there; softmax keeps the Keras default
-    ``beta == 1.0``, which the float kernel requires.
+    Spatial reduction uses stride-2 convolutions instead of pooling
+    (helia-aot#345: ``MEAN`` has no float kernel); softmax keeps the Keras
+    default ``beta == 1.0``, which the float kernel requires.
 
     Weights only need to be finite. The converter prunes an all-zero Dense
     bias as a no-op (conv biases survive), so the FULLY_CONNECTED op in these

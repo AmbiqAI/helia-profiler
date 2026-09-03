@@ -41,7 +41,7 @@ log = logging.getLogger("hpx")
 HELIART_VERSION = "1.19.0"
 HELIART_MIN_VERSION = "1.16.0"
 HELIART_GH_REPO = "AmbiqAI/helia-rt"
-# NB: v1.16.0+ uses "helia-rt-v..." tag format (previously "heliaRT-v...").
+# The tag format changed at HELIART_MIN_VERSION; _detect_version handles the legacy one.
 HELIART_RELEASE_TAG = f"helia-rt-v{HELIART_VERSION}"
 # Immutable source identity corresponding to HELIART_RELEASE_TAG. Keep this
 # alongside the release pin so compatibility metadata never depends on a
@@ -142,7 +142,7 @@ def _verify_prebuilt_archive(
 #
 # Opt-in by setting ``engine.config.source_path`` or ``HELIART_SOURCE_PATH``
 # to a heliaRT source-repo root.  The repo must ship the source-build NSX
-# module (heliaRT >= v1.16.0).
+# module (HELIART_MIN_VERSION or newer).
 
 
 def _resolve_source_path(config: ProfileConfig) -> Path | None:
@@ -172,10 +172,8 @@ def _resolve_source_path(config: ProfileConfig) -> Path | None:
     if missing:
         raise EngineError(
             f"heliaRT source tree at {p} is missing required files: {', '.join(missing)}",
-            # NB release zips DO ship the source-build nsx/CMakeLists.txt
-            # (the #191 review corrected an earlier claim here that they
-            # carried the prebuilt wrapper); they are rejected because
-            # they omit the two repo-root files below.
+            # Release zips ship nsx/CMakeLists.txt but omit the two repo-root
+            # files below (#191).
             hint=(
                 "Source-build requires a full heliaRT repo checkout "
                 "(>= v1.16.0), not a release zip: zips omit the repo-root "

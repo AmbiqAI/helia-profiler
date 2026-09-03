@@ -319,11 +319,9 @@ def _aot_buffer_symbol(
     mem = region_key.lower()
     if role == ArenaRole.CONSTANT.value:
         if not allocate_arenas:
-            # External-arena mode emits NO constant symbols at all: the
-            # cold __blob is inside {% if config.memory.allocate_arenas %}
-            # too, and constants ship as sidecar binary files instead
-            # (#179 Sonnet M-1 — the earlier unconditional __blob hint
-            # produced a false "missing" on every external-arena build).
+            # External-arena mode emits no constant symbols at all (the cold
+            # __blob is inside the allocate_arenas guard too); constants ship
+            # as sidecar binaries instead (#179).
             return None
         if not staged:
             return f"{prefix}_arena_const_{mem}__blob"

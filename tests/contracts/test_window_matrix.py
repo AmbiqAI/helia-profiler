@@ -1,25 +1,18 @@
 """Every clean-window configuration, checked against what the firmware runs.
 
 The window contract has four dimensions -- probe, power firmware mode, window
-mode, and power mode -- and the bugs in #125 were all the same shape: a rule
-applied correctly in the cell someone looked at and wrongly in a cell nobody
-enumerated. Three review rounds found eight of them one at a time, each fix
-landing in one branch and missing the next.
+mode, and power mode -- and the #125 bugs were all a rule applied correctly
+in one cell and wrongly in a cell nobody enumerated.  So the enumeration is
+the test.  Each cell asks what a real run depends on:
 
-So the enumeration is the test. Each cell asks the questions a real run
-depends on:
+* the plan must describe the window the firmware was built to run
+  (`capture_gated` RAISES on a disagreement; internal mode divides energy by it);
+* the gate check must ACCEPT a perfect run;
+* the capture deadline must outlast the window, or the poller misses the
+  falling edge.
 
-* the plan must describe the window the firmware was built to run, because
-  `capture_gated` RAISES on a disagreement and internal mode divides energy by
-  it;
-* the gate check must ACCEPT a perfect run, for the same reason;
-* the capture deadline must outlast the window it contains, or the poller
-  misses the falling edge.
-
-The firmware-side length is derived here from the config and the templates'
-own rules -- deliberately NOT from `predicted_window_ms`, which is the thing
-under test. If the two ever have to be reconciled again, this file is where
-the disagreement surfaces.
+The firmware-side length is derived from the config and the templates' own
+rules -- deliberately NOT from `predicted_window_ms`, the thing under test.
 """
 
 from __future__ import annotations

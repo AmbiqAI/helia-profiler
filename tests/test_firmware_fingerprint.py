@@ -42,7 +42,7 @@ class TestCanonicalCode:
         assert canonical_code("int a// c\nint b") == "int a int b"
 
     def test_directive_line_structure_survives(self):
-        """#173 review m1: newline is significant to the preprocessor — a
+        """#173: newline is significant to the preprocessor — a
         directive line joined with the next code line is semantically
         different and must not hash equal."""
         split = canonical_code("#define A 1\nint x;")
@@ -60,7 +60,7 @@ class TestCanonicalCode:
         )
 
     def test_stray_apostrophe_cannot_swallow_the_file(self):
-        """#173 review m2: a digit separator (1'000) is not a char literal —
+        """#173: a digit separator (1'000) is not a char literal —
         literal scanning stops at the newline, so stripping keeps working."""
         src = "int a = 1'000;\n// gone\nint b = 2; // gone too\nchar c = 'x';"
         out = canonical_code(src)
@@ -150,7 +150,7 @@ class TestMeasuredPowerFingerprint:
         assert dedicated != shared  # routed to different main TUs
 
     def test_profiler_translation_unit_is_part_of_the_hash(self, tmp_path):
-        """#173 review M1: hpx_pmu_profiler.cc is compiled into the measured
+        """#173: hpx_pmu_profiler.cc is compiled into the measured
         target and its per-op hooks run inside the gated window — an edit
         there must shift the fingerprint like any main-TU edit."""
         ctx = self._ctx(tmp_path, "dedicated")
@@ -186,7 +186,7 @@ class TestMeasuredPowerFingerprint:
 
 
 class TestCompositeConstruction:
-    """#173 round-2 review M-B: two of the three ways to silently change
+    """#173 M-B: two of the three ways to silently change
     every emitted fingerprint (part reorder, separator change) left the
     whole suite green. This pin duplicates the framing ON PURPOSE — it is
     the independent statement of the composite's wire format, scheme tag
@@ -238,7 +238,7 @@ class TestCompositeConstruction:
 
 
 class TestContinuationHardening:
-    """#173 round-2 review M-A: backslash continuation defeated the
+    """#173 M-A: backslash continuation defeated the
     directive carve-out in the dangerous (false-equal) direction."""
 
     def test_continued_macro_body_boundary_survives(self):

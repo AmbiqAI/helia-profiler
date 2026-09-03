@@ -507,9 +507,7 @@ def _process_gated_stats(
     # load: it means current flowed *backwards* through the sense path for
     # the majority of the window.  Known causes: reversed IN/OUT wiring, or
     # the target being backfed around the shunt (e.g. a host-driven GO GPIO
-    # held high during the window — several mA measured into an AP510 EVB,
-    # which flipped the sensed window current negative while the older
-    # magnitude-normalization silently reported it as positive).  Refuse to
+    # held high during the window, see power.sync.release_go).  Refuse to
     # launder it: fail loudly with the physical causes.  The 10% threshold
     # ignores noise-dominated near-zero windows on idle targets.
     if total_signed_charge < 0 and abs(total_signed_charge) > 0.1 * total_charge:

@@ -119,7 +119,7 @@ def test_family_membership_and_order_are_the_documented_sets():
 
 
 def test_family_metric_group_is_the_registry_group_of_its_dimensions():
-    """#213 lens 1: a family literal ``metric_group="memory"`` would pass the
+    """#213 1: a family literal ``metric_group="memory"`` would pass the
     membership census while its specs said something else. Pin both ways."""
     from helia_profiler.results.dimensions import DIMENSION_REGISTRY, uniform_metric_group
     from helia_profiler.results.issues import COMPARABILITY_FAMILIES

@@ -40,31 +40,21 @@ log = logging.getLogger("hpx")
 
 # --- RSTGEN software power-on-initialization (SWPOI) reset ------------------
 #
-# ``AM_HAL_RESET_CONTROL_SWPOI`` (am_hal_reset.h): "power on initialization,
-# which results in a reset of all blocks except for registers in clock gen,
-# RTC, stimer."  This is a *more thorough* reset than the debug-level
-# ``ResetTarget()`` HPX's plain ``reset_target()`` performs (equivalent to
-# AIRCR/SWPOR, which additionally leaves PMU registers untouched).  SWPOI
-# also resets PMU/power-management state, which was empirically found
-# (2026-07-02, AP510 KWS LP) to change steady-state measured power by
-# a measurable amount (a measurable difference between debug-reset-only
-# and post-SWPOI power) for identical firmware — matching neuralSPOT
-# AutoDeploy's own ``make reset`` step,
-# which performs this exact register write after every deploy.
+# ``AM_HAL_RESET_CONTROL_SWPOI`` (am_hal_reset.h) resets every block except
+# clock gen, RTC and stimer -- more thorough than the debug-level
+# ``ResetTarget()`` behind ``reset_target()``, which leaves PMU/power-management
+# state untouched and skews Apollo5 steady-state power. neuralSPOT AutoDeploy's
+# ``make reset`` performs this same write after every deploy.
 #
-# Writing this register triggers an immediate chip reset, so the write
-# transaction itself is interrupted mid-flight and JLinkExe reports it as a
-# failed memory write / non-zero exit code — this is the expected symptom
-# of the reset succeeding, not evidence that it did not happen.  neuralSPOT's
-# own tooling relies on this (it discards the return code of `make reset`).
-# HPX defaults this to Apollo5-family power capture only; other SoCs must opt in
-# through an explicit reset strategy while their board behavior is validated.
+# The write itself triggers the reset, so JLinkExe reports it as a failed
+# memory write / non-zero exit: that is the reset succeeding, not failing.
+# Default for Apollo5-family power capture only; other SoCs opt in through an
+# explicit reset strategy.
 _RSTGEN_SWPOI_ADDR = 0x40000004
 _RSTGEN_SWPOI_VALUE = 0x1B
 
-# Default wall-clock budget for any single JLinkExe invocation (seconds).
-# Reset/erase scripts complete in well under 5s on healthy hardware; 15s
-# leaves room for slow USB enumeration on macOS.
+# Default wall-clock budget for a single JLinkExe invocation (seconds);
+# generous enough to absorb slow USB enumeration.
 _DEFAULT_TIMEOUT_S = 15
 _READINESS_POLL_INTERVAL_S = 0.1
 _SBL_SETTLE_S = 0.2

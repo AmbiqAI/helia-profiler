@@ -335,7 +335,7 @@ class TestWindowClockValidity:
         assert evaluation.validity is ResultValidity.DEGRADED
 
     def test_frozen_window_clock_message_is_probe_aware(self, tmp_path: Path):
-        """#172 round-3: the ninth 'completed inferences' site — a busy-loop
+        """#172: the ninth 'completed inferences' site — a busy-loop
         run completes busy-loop passes, and this is exactly the diagnostic a
         user reads while already distrusting the numbers."""
         ctx = _context(tmp_path, probe="busy_loop")
@@ -363,12 +363,10 @@ class TestWindowClockValidity:
         assert codes.count(IssueCode.POWER_WINDOW_CLOCK_MISMATCH) == 0
 
     def test_external_disagreement_is_the_observer_error(self, tmp_path: Path):
-        """Apollo4's ~7x inflation: two independent clocks watched the SAME
-        physical window in the same boot, so drift cannot explain a miss --
-        the gate did not bracket what the firmware timed, and every
-        per-inference figure divided out of it inherits the error. Promoted
-        from warning to the authoritative ERROR by the #142/#181 redesign
-        (cross-family evidence at diagnostics.py's tolerance comment)."""
+        """Two independent clocks watched the SAME physical window in one boot,
+        so drift cannot explain a miss: the gate did not bracket what the
+        firmware timed and every per-inference figure inherits the error.
+        Authoritative ERROR, not a warning (#142/#181)."""
         ctx = _context(tmp_path)
         self._bench_run(ctx, elapsed_us=int(self.BENCH_ELAPSED_US * 6027 / 866.6))
 
@@ -536,13 +534,10 @@ class TestWindowClockValidity:
 
 
 class TestGateArbitration:
-    """#142/#181 redesign: the est*count band is a reference diagnostic and
-    the firmware's STIMER window time arbitrates. Values are the AP510 EVB
-    first-run-after-idle rejection from #181: gate 4.427 s against an
-    est*count expectation of 5.017 s (-11.8%, outside the 10% band) while the
-    window itself was healthy -- cold silicon clocks fast because the LP core
-    clock is HFRC-derived, and total_cycles was constant to 2.5 ppm across
-    the whole drift sweep."""
+    """The est*count band is a reference diagnostic; the firmware's STIMER
+    window time arbitrates (#142/#181).  Values reproduce the AP510 EVB
+    first-run-after-idle case from #181: the gate lands outside the band while
+    the window itself is healthy (cold, HFRC-derived LP clock)."""
 
     DRIFT_COUNT = 233
     DRIFT_REFERENCE_US = 21_532  # profile boot: est*count = 5.017 s
@@ -683,7 +678,7 @@ class TestGateArbitration:
         (it times the span it gated), so a terminal reporting incomplete work
         must not silence the est*count warning or earn the observer's
         authority (#202 harmonization: validity now applies the same
-        terminal-health gate the summary got in the #195 review round)."""
+        terminal-health gate the summary got in the #195 round)."""
         ctx = _context(tmp_path)
         # Gate and elapsed agree (both 4.427 s) but only 116/233 completed.
         self._drift_run(ctx, elapsed_us=self.DRIFT_ELAPSED_US, completed_count=116)
@@ -705,7 +700,7 @@ class TestGateArbitration:
         assert arb.suppress_per_inference is True
 
     def test_unhealthy_terminal_downgrades_the_observer_error(self, tmp_path: Path):
-        """The other half of the harmonization (#204 review, cell 03b): with
+        """The other half of the harmonization (#204, cell 03b): with
         an unhealthy terminal whose elapsed_us ALSO disagrees with the gate,
         validity previously emitted the observer ERROR from an envelope that
         had no standing to arbitrate. Now the observer is withheld, the
@@ -724,7 +719,7 @@ class TestGateArbitration:
         assert codes.count(IssueCode.POWER_GATE_DURATION_MISMATCH) == 1
 
     def test_advisory_rederived_band_never_reaches_validity(self, tmp_path: Path):
-        """#204 lens-2 M9 kill: an artifact with NO recorded integrity gets
+        """#204-2 M9 kill: an artifact with NO recorded integrity gets
         the advisory 1% re-derived band for the summary's suspect flag ONLY.
         A gate inside the probe-keyed 10% band but outside 1% (2.3% short
         here) must produce zero duration issues -- feeding the advisory band
@@ -773,7 +768,7 @@ class TestGateArbitration:
         assert arb.integrity is not None and not arb.integrity.valid
 
     def test_non_gated_runs_carry_no_arbitration(self, tmp_path: Path):
-        """#204 lens-2 F3: RunEvaluation.gate_arbitration promises None when
+        """#204-2 F3: RunEvaluation.gate_arbitration promises None when
         there is nothing gated to arbitrate. An internal-mode run with a
         terminal hiccup must not manufacture a suppressing arbitration."""
         ctx = _context(tmp_path, mode="internal")
@@ -960,7 +955,7 @@ class TestCleanWindowStall:
         assert stalls[0].severity == "warning"
         assert stalls[0].context["stalled_iters"] == 233
         assert stalls[0].context["total_iters"] == 1092
-        # ~21% low, matching the measured Apollo4 shortfall.
+        # Matches the observed Apollo4 shortfall (#121).
         assert 0.20 < stalls[0].context["understatement_lower_bound"] < 0.22
         assert evaluation.validity is ResultValidity.DEGRADED
 

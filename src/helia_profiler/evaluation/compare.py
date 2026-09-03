@@ -138,7 +138,7 @@ class _ConfigField:
     A dimension row takes its value from ``read_dimensions`` -- the same
     resolved dict the comparability gate judges (manifest merge, summary
     fallback and all), so the table cannot show one value while the gate
-    acts on another (#213 retro-lens). ``path`` is the registry's artifact
+    acts on another (#213). ``path`` is the registry's artifact
     path, kept for the row's provenance; only explicit config-only rows
     read it directly.
     """
@@ -588,7 +588,7 @@ def _build_warnings(
         and all(row.baseline_memory is None and row.candidate_memory is None for row in layer_rows)
     ):
         # File present, nothing joined: distinguishable from "no placement
-        # change" (#227 lens) — likely a hand-edited/foreign CSV whose
+        # change" (#227) — likely a hand-edited/foreign CSV whose
         # layer_id column does not carry original tflite indices.
         warnings.append(
             "AOT memory placement artifacts are present but no layer matched them; "
@@ -631,7 +631,7 @@ def _layer_source_index(layer: dict[str, Any]) -> int | None:
     if recorded not in (None, ""):
         # Present but malformed: the recorded column is the strongest
         # evidence — a corrupt value must not silently DOWNGRADE resolution
-        # to the weaker label suffix (#227 lens), it is unresolvable.
+        # to the weaker label suffix (#227), it is unresolvable.
         return None
     op = str(layer.get("op", ""))
     suffix = source_index_from_op(op)

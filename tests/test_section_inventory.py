@@ -105,7 +105,7 @@ class TestReadelfInventory:
         execution region per content class all named after the region, and
         NSX's own gcc scripts declare .text twice. The inventory must keep
         every one, disambiguated by index — a name-keyed dict silently
-        loses bytes (#176 fresh-review M-2)."""
+        loses bytes (#176)."""
         rows = (
             "  [ 1] MCU_TCM           PROGBITS        20000000 001000 004000 00  WA  0   0  8\n"
             "  [ 2] MCU_TCM           NOBITS          20004000 005000 002000 00  WA  0   0  8\n"
@@ -223,8 +223,7 @@ class TestFromelfInventory:
         assert heap.nobits and heap.allocated and heap.size == 391928
         assert heap.linker_reserved
         assert not by_name["ARM_LIB_STACK"].linker_reserved
-        # The allocated flag must be DERIVED, not defaulted (#176
-        # fresh-review: a mutation to allocated=True survived before):
+        # The allocated flag must be DERIVED, not defaulted (#176):
         assert not by_name[".debug_frame"].allocated
         assert not by_name[".symtab"].allocated
         assert segments == (
@@ -239,7 +238,7 @@ class TestFromelfInventory:
     def test_duplicated_field_first_occurrence_wins(self):
         """The .comment section body echoes the armlink command line, which
         can contain field-shaped text — the first occurrence of each field
-        within a block must win (#176 fresh-review: the last-wins mutant
+        within a block must win (#176: the last-wins mutant
         survived before this test)."""
         listing = (
             "** Section #1\n"
@@ -284,7 +283,7 @@ class TestFromelfInventory:
 
 class TestSectionInventoryDispatch:
     """End-to-end through section_inventory() itself — both branches were
-    previously only tested below the dispatch (#176 fresh-review)."""
+    previously only tested below the dispatch (#176)."""
 
     def test_gcc_dispatch_runs_readelf_twice_and_threads_results(
         self, monkeypatch

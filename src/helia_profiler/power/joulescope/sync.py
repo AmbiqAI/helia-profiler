@@ -63,12 +63,10 @@ class JoulescopeSyncController:
     def release_go(self) -> None:
         """Drop GO as soon as the firmware has latched it (gate rise seen).
 
-        Holding the Joulescope GPO high through the measured window
-        parasitically backfeeds the EVB through the GO pad network (several mA
-        measured on an AP510 EVB — more than the board's own inference draw),
-        displacing real VBAT current around the shunt and corrupting the
-        gated measurement.  The firmware's GO wait is a pre-window level
-        sample only, so releasing at gate-rise loses nothing.
+        Holding the GPO high through the window backfeeds the EVB around the
+        shunt (see ``power.sync.SyncController.release_go``).  The firmware's
+        GO wait is a pre-window level sample only, so releasing at gate-rise
+        loses nothing.
         """
         self._write_go(False)
 

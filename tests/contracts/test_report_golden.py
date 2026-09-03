@@ -239,7 +239,7 @@ def _sample_memory_regions() -> MeasuredMemoryRegions:
     """The measured block (#133 Phase 2), with every emission path live:
     a reserved figure, a nonzero load_image, and one unattributed section
     (with those at defaults the corresponding summary/console lines are
-    dead and the digests could not see them — the #24 review lesson)."""
+    dead and the digests could not see them — the #24 lesson)."""
     return MeasuredMemoryRegions(
         link_family="gnu",
         linker_profile="default",
@@ -414,7 +414,7 @@ def _make_ctx(tmp_path: Path, engine: EngineType, fmt: str) -> PipelineContext:
     # reserved is non-zero on purpose: with it at the default 0 every
     # `if bs.reserved:` emission is dead in the golden path, so the digests
     # could not see the summary.json / memory.json / console additions at all
-    # (issue #24 review). total stays the tool's own inclusive sum.
+    # (issue #24). total stays the tool's own inclusive sum.
     ctx.binary_sections = BinarySections(
         text=45000, data=1200, bss=8000, total=54200, reserved=32000
     )

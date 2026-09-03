@@ -210,7 +210,7 @@ def test_internal_terminal_measurement_becomes_power_result(
     assert ctx.power_run.on_device_summary is measurement
     assert ctx.power_result is not None
     assert ctx.power_result.summary.energy_j == pytest.approx(0.09)
-    # Artifact-level POWER_FIRMWARE (#173 review m4): without it, a
+    # Artifact-level POWER_FIRMWARE (#173): without it, a
     # manifest-less INTERNAL-mode pair — the very mode of #115's phantom
     # delta — cannot establish the fingerprint's platform scope and the
     # POWER_METRIC_BLOCKING gate silently degrades to nothing.
@@ -351,8 +351,7 @@ class TestFirmwareWindowClockIntegrity:
     BENCH_GATE_S = 4.967  # JS110 gated window, fixed build
     BENCH_ELAPSED_US = 4_970_184  # firmware STIMER, fixed build -> 0.064% apart
     BASELINE_GATE_S = 4.963  # JS110 gated window, pre-fix build
-    # Apollo4's failure shape: reported 6027 us/inference where the truth was
-    # 866.6 us, i.e. the window clock ran ~7x long.
+    # Apollo4's observed window-clock inflation, reported/true us (#112).
     AP4_INFLATION = 6027 / 866.6
 
     def _bench_ctx(
@@ -571,10 +570,8 @@ class TestFirmwareWindowClockIntegrity:
     def test_internal_threshold_is_25_percent_not_50(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog, skew: float
     ):
-        """30% away from the plan is past the widest legitimate cross-binary
-        disagreement ever observed (14% + build noise) and must warn. Pins the
-        band between the old 50% bound and the current 25% one, in both
-        directions, so a silent revert is a test failure."""
+        """30% off the plan must warn.  Pins the band at the 25% bound (rationale
+        at diagnostics.py's tolerance comment), not the old 50%, both ways."""
         ctx = self._bench_ctx(tmp_path, internal=True)
         skewed = int(self.BENCH_COUNT * self.BENCH_REFERENCE_US * skew)
         with caplog.at_level("WARNING", logger="hpx"):
@@ -875,7 +872,7 @@ class TestStimerDeadAttribution:
     """#110/#180: the dedicated power binary's dead-crystal report."""
 
     def test_stopped_crystal_envelope_parses_and_hints(self):
-        """#180 review B2: 0 ticks is the stopped-crystal signature, and
+        """#180: 0 ticks is the stopped-crystal signature, and
         the envelope forbids error_code 0 with status=error — firmware
         sends ticks+1 and the host subtracts. The canonical failure must
         reach the crystal hint, not die in the parser."""

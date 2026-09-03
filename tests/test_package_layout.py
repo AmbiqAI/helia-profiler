@@ -210,7 +210,7 @@ def _hpx_import_targets(path: Path, *, module_level_only: bool) -> list[str]:
             if node.level or (node.module or "").split(".")[0] == "helia_profiler":
                 # `from . import x` has an empty module: join without adding
                 # a dot, or a level-1 sibling import would encode as a
-                # level-2 parent target (#235 lens).
+                # level-2 parent target (#235).
                 joiner = "" if base.endswith(".") else "."
                 targets.extend(f"{base}{joiner}{alias.name}" for alias in node.names)
         elif isinstance(node, ast.Import):

@@ -1,12 +1,7 @@
-"""Contracts binding each engine to its artifact type (#162 Phase 2).
+"""Contracts binding each engine to its artifact type (#162).
 
-``EngineArtifacts`` used to be one flat bundle: a 7-field common core plus
-20 engine-specific fields defaulted to ``None``.  A field set by the wrong
-adapter — or read for the wrong engine — was invisible until a render or a
-build misbehaved.  Now each adapter returns its own subtype, so a
-wrong-engine read is an ``AttributeError`` at the access site.
-
-These tests pin the three things that split can silently get wrong:
+Each adapter returns its own ``EngineArtifacts`` subtype, so a wrong-engine
+field read is an ``AttributeError`` at the access site.  Pinned here:
 
 * every engine has exactly one artifact type, and each type pins its
   ``engine_type`` (a mismatch is a ``ValueError``, not a default);

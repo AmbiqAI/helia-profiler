@@ -76,7 +76,7 @@ def test_only_first_error_is_raised():
 
 
 class TestStimerDeadSeverity:
-    """#180 review M1 + Sonnet M-new: the severity gate, both directions."""
+    """#180 + Sonnet M-new: the severity gate, both directions."""
 
     def test_fatal_when_power_is_enabled(self):
         from helia_profiler.capture import _raise_on_firmware_error

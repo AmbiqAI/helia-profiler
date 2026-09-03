@@ -663,9 +663,8 @@ def test_load_config_profiling_value_error_wrapped_as_config_error():
 
 def test_extreme_mode_and_force_shared_sram_are_mutually_exclusive():
     """The two SSRAM levers pull opposite directions (#161): extreme mode
-    powers the shared array down, force_shared_sram forces it on, and the
-    firmware partials each assume the other is absent — template include
-    order used to decide the winner silently. Reject the pair at config."""
+    powers the shared array down, force_shared_sram forces it on.  Reject
+    the pair at config."""
     cli = {
         "model": {"path": "m.tflite"},
         "engine": {"type": "helia-rt"},

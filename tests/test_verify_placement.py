@@ -152,7 +152,7 @@ class TestRun:
         VerifyPlacementStage().run(ctx)  # no raise
 
     def test_unmodelled_soc_falls_back_to_declared_ranges(self, tmp_path, monkeypatch):
-        """#177 review m5: a custom SoC has no characterized map, but its
+        """#177: a custom SoC has no characterized map, but its
         DECLARED placement bases are still worth holding the linker to —
         the legacy check applies and a mislocated arena still raises."""
         ctx = _ctx(tmp_path, board="apollo3p_evb", arena_region=Placement.SRAM)
@@ -163,7 +163,7 @@ class TestRun:
 
 
 class TestMigrationBehaviorPins:
-    """#177 review m6: the deltas the Phase-1 divergence pins exist to make
+    """#177: the deltas the Phase-1 divergence pins exist to make
     reviewable, pinned as stage behavior."""
 
     def test_arena_inside_a_stack_reservation_now_fails(self, tmp_path, monkeypatch):

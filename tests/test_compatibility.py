@@ -568,7 +568,7 @@ def test_engine_owned_module_names_match_canonical_constants() -> None:
 
 
 def test_heliart_nsx_fixture_version_tracks_the_qualified_release():
-    """#192 review NIT: the heliart_nsx fixture's module.version is the one
+    """#192 NIT: the heliart_nsx fixture's module.version is the one
     field claimed to track the qualified release — enforce it so the next
     promotion cannot silently leave it stale."""
     import yaml

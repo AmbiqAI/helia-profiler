@@ -160,11 +160,9 @@ def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
         ) from exc
 
     # An op with no usable beta is its own failure, ahead of any engine
-    # verdict: TFLM value-initialises beta to 0.0 while helia-aot's field
-    # default is 1.0, so the two engines do not even agree on what this model
-    # says -- and neither runs it. Reporting it as a scale problem printed
-    # "needs input_scale > inf" and, for helia-aot, named a crash in a
-    # function that model never reaches (both found by review).
+    # verdict: TFLM value-initialises beta to 0.0 while helia-aot defaults it
+    # to 1.0, so the engines do not agree on what the model says -- and
+    # neither runs it (#57).
     no_beta = [f for f in findings if not f.has_usable_beta]
     if no_beta:
         where = "; ".join(

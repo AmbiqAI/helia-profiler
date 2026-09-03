@@ -30,12 +30,10 @@ _BOOT_SETTLE_S = 8.0  # reset/SBL/firmware init allowance
 _SAFETY_MARGIN_S = 6.0  # extra headroom beyond estimated runtime
 
 
-#: Auto window mode warms the clean pass with 3 hardcoded uninstrumented
-#: reps before timing (_main_base.cc.j2), independent of profiling.warmup
-#: which only applies to the per-layer PMU passes. Every fixed-mode
-#: measuring arm (STIMER since #164, DWT since #170) floors its warmup at
-#: the same 3, so the fixed-mode estimate below floors too and matches the
-#: firmware exactly.
+#: Auto window mode warms the clean pass with 3 uninstrumented reps before
+#: timing (_main_base.cc.j2), independent of profiling.warmup; every
+#: fixed-mode measuring arm floors its warmup at the same 3 (#164, #170), so
+#: the estimate below floors too.
 _AUTO_WINDOW_WARMUP_REPS = 3
 
 
@@ -52,11 +50,9 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
     2. The per-layer PMU-instrumented passes — ``presets × (warmup +
        iterations)`` inferences.
 
-    Both phases must be covered by the estimate; the clean window in
-    particular can be made arbitrarily long (e.g. to build a multi-second
-    Joulescope integration window), and previously this function only
-    accounted for the PMU passes, causing the Joulescope poller's safety
-    bound to elapse mid-window and miss the falling edge entirely.
+    Both phases must be covered: the clean window can be made arbitrarily
+    long, and under-covering lets the Joulescope poller's safety bound elapse
+    mid-window and miss the falling edge.
 
     Returns ``None`` if there is not enough information to estimate.
     """
@@ -105,21 +101,11 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
     profiled_run_s = profiled_inferences * inference_time_s
 
     if not probe_runs_inferences(profiling.clean_window_probe):
-        # This probe's window is a calibrated CPU spin, not inferences, and it
-        # is sized from the target in BOTH window modes -- so an
-        # inference-count estimate describes nothing it runs. The fixed-mode
-        # branch below sized it as iterations x inference_time, which on a
-        # shared run (no plan, so this fallback is what bounds the capture)
-        # put the poller's deadline inside the window for any target the
-        # inference count did not happen to cover: exactly the failure this
-        # function's docstring says it exists to prevent (found by review).
-        #
-        # The warm reps still cost real inference time: main.cc.j2's warm loop
-        # sits ABOVE the `{% if busy_loop_probe %}` spin and runs whatever the
-        # probe is, so the spin replaces the measured window only, not the
-        # priming before it. Omitting them narrows the margin by
-        # warmup x per-inference, which is noise on a 21 ms model and 15 s on
-        # a 3 s one (found by review).
+        # This probe's window is a calibrated CPU spin sized from the target in
+        # both window modes, so an inference-count estimate describes nothing
+        # it runs; size from the probe's own window. The warm reps still cost
+        # real inference time (main.cc.j2's warm loop runs before the spin),
+        # so keep them in the margin.
         clean_warmup_reps = (
             _AUTO_WINDOW_WARMUP_REPS
             if profiling.window_mode is WindowMode.AUTO
@@ -184,14 +170,11 @@ class CapturePowerStage:
             return lifecycle_plan
 
         # --- Capture ---
-        # Tighten capture window if PMU timing data is available — but only
-        # when the user left duration unset.  An explicit --power-duration /
-        # power.duration_s (even one equal to the default value) is an
-        # operator override and must win over the estimate: the estimate is
-        # derived from PMU-phase timing, which the AP5 combo-reset
-        # investigation showed can be wildly wrong about the power-phase
-        # boot, and a silently-shrunk bound made the override impossible to
-        # apply during diagnosis.  duration_s is None when not explicitly set.
+        # Tighten the capture window from PMU timing only when the user left
+        # duration unset: an explicit power.duration_s is an operator override
+        # and must win -- the PMU-phase estimate can be wrong about the
+        # power-phase boot, and a silently-shrunk bound blocks overrides
+        # during diagnosis.  duration_s is None when not explicitly set.
         estimated = _estimate_capture_duration(ctx)
         user_overrode_duration = ctx.config.power.duration_s is not None
         configured = (
@@ -240,11 +223,9 @@ class CapturePowerStage:
                 hint=(f"Check that the {driver_name} is connected and powered on. Mode: {mode}."),
             ) from exc
 
-        # Mode/integrity/edges derive from capture metadata in one place
-        # (previously duplicated here and in publish_power_result with
-        # different defaults). The deadline stays this stage's own capture
-        # budget: classify_observation's fallback is for callers that have
-        # no budget of their own.
+        # Mode/integrity/edges derive from capture metadata in one place so
+        # this log and publish_power_result cannot disagree; the deadline
+        # stays this stage's own budget.
         obs_mode, obs_integrity, rise, fall, _ = classify_observation(
             power_result.metadata
         )

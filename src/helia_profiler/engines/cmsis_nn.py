@@ -1,11 +1,8 @@
-"""ns-cmsis-nn (CMSIS-NN fork) resolution, NSX module wrapping, and build options.
+"""ns-cmsis-nn (heliaCORE) NSX module resolution and build options.
 
-Both heliaAOT-generated code and source-built heliaRT link against
-``ns-cmsis-nn`` (the AmbiqAI CMSIS-NN fork; upstream ``cmsis-nn`` V.19+ has
-dropped parameters they target). hpx declares the module at the compatibility
-baseline's qualified ref and NSX clones it from GitHub during ``nsx sync``; a
-user-provided ref or local checkout overrides that. The CMake options the
-kernels need (:func:`cmsis_nn_cmake_vars`) are shared by both engines.
+Shared by the heliaRT, heliaAOT, and ExecuTorch-ns source routes: the module is
+declared at the compatibility baseline's qualified ref unless the user overrides
+it, and :func:`cmsis_nn_cmake_vars` supplies the kernel switches it needs.
 """
 
 from __future__ import annotations
@@ -24,9 +21,7 @@ from ..results import NsxModuleRef
 
 log = logging.getLogger("hpx")
 
-# NSX registry identity for ns-cmsis-nn. By default hpx declares this module
-# and lets NSX clone it from the registered GitHub upstream; a user-provided
-# local path (cmsis_nn_path / CMSIS_NN_PATH) vendors it instead.
+# NSX registry identity for ns-cmsis-nn.
 CMSIS_NN_PROJECT = "ns-cmsis-nn"  # registry project (path: modules/ns-cmsis-nn)
 CMSIS_NN_MODULE = "nsx-cmsis-nn"  # registry module name
 
@@ -34,17 +29,14 @@ CMSIS_NN_MODULE = "nsx-cmsis-nn"  # registry module name
 def _kernel_family(family: str) -> dict[str, str]:
     """Both spellings of one float kernel switch.
 
-    ``NSX_CMSIS_NN_ENABLE_*`` is ns-cmsis-nn's option (source selection; what
-    heliaRT checks). ``ARM_NN_ENABLE_*`` is the define it exports, which
-    heliaAOT's generated module checks in the CMake cache -- ns-cmsis-nn only
-    derives it as a directory-scoped variable, so the cache copy is set here.
+    WORKAROUND helia-aot#349: heliaRT checks ns-cmsis-nn's ``NSX_CMSIS_NN_*``
+    option, heliaAOT's generated module checks the exported ``ARM_NN_*`` define.
     """
     return {f"NSX_CMSIS_NN_ENABLE_{family}": "ON", f"ARM_NN_ENABLE_{family}": "ON"}
 
 
 def _float_compute_types(config: ProfileConfig) -> set[int]:
-    """Float precisions the model computes in; empty when the file is unreadable
-    (the preflight stage has already rejected anything that is not a flatbuffer)."""
+    """Float precisions the model works in; empty when the file is unreadable."""
     try:
         return read_float_compute_types(Path(config.model.path).read_bytes())
     except (OSError, struct.error, IndexError):
@@ -54,17 +46,10 @@ def _float_compute_types(config: ProfileConfig) -> set[int]:
 def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
     """CMake cache options for a source-built ``nsx-cmsis-nn`` module.
 
-    Rendered as ``CACHE ... FORCE`` before any module is added -- modules read
-    these while they are included, so setting them later is too late.
-
-    * ``NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM`` -- on unless
-      ``engine.config.cmsis_nn_requantize_inline_asm`` is false.
-    * fp32 kernels -- always on (heliaRT >= 1.19 refuses to configure without
-      them; heliaAOT float models call them directly).
-    * fp16 kernels -- on only when the model carries FLOAT16 tensors (computed
-      or dequantized weights) on an MVE-F core (Cortex-M55). Never otherwise:
-      ns-cmsis-nn < v7.30.0's fp16 sources ICE on GCC 14 (PR 118460), so an
-      int8/fp32 build must not compile them.
+    The template renders these before any module is included (an ``option()``
+    default cannot be overridden afterwards). Requantize inline-asm is
+    configurable; fp32 kernels are always on (helia-rt#253); fp16 kernels only
+    for a model carrying FLOAT16 tensors on an MVE-F core (helia-rt#254).
     """
     cmake_vars: dict[str, str] = {}
     if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
@@ -84,22 +69,18 @@ def _baseline_cmsis_nn_ref(config: ProfileConfig) -> str:
 def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
     """Resolve the ns-cmsis-nn NSX module reference.
 
-    By default hpx declares the module at the baseline's qualified ref and NSX
-    clones it from the registered GitHub upstream during ``nsx sync`` -- the
-    packaged registry's own default (v7.29.2 in neuralSPOT-X 0.7.17) is a core
-    heliaAOT 0.19.0 refuses. ``engine.config.cmsis_nn_ref`` overrides the ref;
-    a local checkout via ``engine.config.cmsis_nn_path`` or the
-    ``CMSIS_NN_PATH`` environment variable is vendored as a local module under
-    its registry-derived project directory (``modules/ns-cmsis-nn``).
+    Declared at the baseline's qualified ref by default (the packaged registry's
+    own default is older than heliaAOT accepts -- helia-aot#356);
+    ``engine.config.cmsis_nn_ref`` overrides the ref, ``cmsis_nn_path`` /
+    ``CMSIS_NN_PATH`` vendors a local checkout under ``modules/ns-cmsis-nn``.
     """
     configured_path = config.engine.config.get("cmsis_nn_path")
     requested_ref = config.engine.config.get("cmsis_nn_ref")
     if configured_path and requested_ref:
         raise EngineError("engine.config.cmsis_nn_path and cmsis_nn_ref are mutually exclusive")
 
-    # Explicit config always wins over the legacy environment fallback. This
-    # matters in hardware CI, where a resolved commit must remain a git-backed
-    # NSX lock entry rather than silently becoming an unversioned local module.
+    # Explicit config wins over the environment fallback so a resolved commit
+    # stays a git-backed lock entry rather than an unversioned local module.
     raw = configured_path or (None if requested_ref else os.environ.get("CMSIS_NN_PATH"))
     if raw:
         cmsis_nn_path = Path(str(raw)).expanduser().resolve()
@@ -139,10 +120,7 @@ def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
 def _validate_cmsis_nn(path: Path) -> None:
     """Verify that *path* looks like an ns-cmsis-nn checkout.
 
-    Also checks the header revision against what heliaAOT expects.
-    heliaAOT generates code targeting ns-cmsis-nn (AmbiqAI fork) — the
-    upstream ``cmsis-nn`` V.19+ has incompatible API changes (e.g. dropped
-    ``weight_sum_ctx`` parameter from ``arm_convolve_1x1_s8_fast``).
+    The header-revision heuristic below is known-stale (#247).
     """
     if not path.is_dir():
         raise EngineError(f"CMSIS-NN path does not exist: {path}")
@@ -153,7 +131,7 @@ def _validate_cmsis_nn(path: Path) -> None:
                 hint="Expected an ns-cmsis-nn repository with Include/ and Source/.",
             )
 
-    # Warn if the header revision looks like upstream V.19+ (incompatible).
+    # WORKAROUND #247: this revision heuristic no longer separates the fork from upstream.
     header = path / "Include" / "arm_nnfunctions.h"
     if header.is_file():
         import re as _re

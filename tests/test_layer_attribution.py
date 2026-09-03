@@ -124,7 +124,7 @@ class TestLayerAttributor:
     def test_unmatchable_sources_resolve_nothing(self):
         att = LayerAttributor(_skewed_analysis(), None)
         # In-range id on purpose: an identity fallback for ":"-labelled ops
-        # would positionally resolve id 0 to 100,000 macs (#222 lens).
+        # would positionally resolve id 0 to 100,000 macs (#222).
         result = att.attribute(0, "OPERATOR_CALL:c3i12")
         assert result.source_index is None
         assert result.macs is None
@@ -138,7 +138,7 @@ class TestLayerAttributor:
         assert att.attribute(0, "CONV_2D:0", source_index=3).macs == 100_000
 
     def test_an_aot_run_without_a_manifest_dashes_everything(self):
-        """#222 lens: manifest extraction failed => degraded firmware labels
+        """#222: manifest extraction failed => degraded firmware labels
         layers with POSITIONS; an empty authoritative manifest ([]) must
         dash rather than let the suffix fallback join positionally."""
         att = LayerAttributor(_skewed_analysis(), [])
@@ -202,7 +202,7 @@ class TestCsvWriterJoin:
 
 
 class TestConsumerPlumbing:
-    """#222 lens: the resolver's empty-manifest dash rule is only as good
+    """#222: the resolver's empty-manifest dash rule is only as good
     as the consumers that build the manifest argument — pin both."""
 
     def _aot_ctx(self, tmp_path: Path, manifest):
