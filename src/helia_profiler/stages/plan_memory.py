@@ -121,12 +121,10 @@ class PlanMemoryStage:
     def _select_plan(self, ctx: PipelineContext) -> MemoryPlan:
         """Prefer the engine-supplied plan; synthesise one otherwise.
 
-        heliaAOT with a FAILED extraction is special (#133 Phase 3): the
-        old fallthrough synthesised a TFLM-shaped plan that booked a
-        ``tensor_arena`` and a ``model_flatbuffer`` — neither exists in an
-        AOT binary (no model_data.h is even written on that path). Wrong
-        numbers with no warning are worse than no numbers: emit a
-        capacities-only plan and say so.
+        A FAILED heliaAOT extraction gets a capacities-only plan (#133): a
+        TFLM-shaped synthesis would book a ``tensor_arena`` and a
+        ``model_flatbuffer`` no AOT binary has. Wrong numbers with no
+        warning are worse than none.
         """
         artifacts = ctx.engine_artifacts
         if artifacts is not None and artifacts.memory_plan is not None:
@@ -379,11 +377,9 @@ PMU_RECORD_SIZE_BYTES: dict[EngineType, int] = {
 #: TFLM/heliaRT reserve the records INSIDE the HpxPmuProfiler object
 #: (g_profiler) — the linked symbol is the whole object, records plus a
 #: fixed header. ARMV8M_PMU parts: vptr 4 + nsx_pmu_config_t 196 +
-#: counter-name pointers and state 52 = 252 (verified byte-exact on the
-#: AP510 bench). DWT_ONLY parts render the class WITHOUT the config
-#: struct or its include (hpx_pmu_profiler.h.j2's has_armv8m_pmu gate),
-#: leaving vptr 4 + state 52 = 56 — equally derivable (#180 review M2
-#: corrected an earlier claim that this tier was uncharacterizable).
+#: counter-name pointers and state 52 = 252. DWT_ONLY parts render the
+#: class WITHOUT the config struct or its include (hpx_pmu_profiler.h.j2's
+#: has_armv8m_pmu gate), leaving vptr 4 + state 52 = 56 (#180).
 _PROFILER_OBJECT_OVERHEAD: dict[PmuTier, int] = {
     PmuTier.ARMV8M_PMU: 252,
     PmuTier.DWT_ONLY: 56,
@@ -428,7 +424,7 @@ def _default_bss_region(family: SocFamily) -> MemoryRegion:
 #: falls to plain .bss -> MCU_TCM (DTCM). NB apollo5b still HAS
 #: NSX_MEM_SRAM (".shared" -> SRAM): the two macros diverge on exactly
 #: this part, which is why the records region is keyed on which macro the
-#: ENGINE's template uses (#180 review n4).
+#: ENGINE's template uses (#180).
 _NO_SRAM_BSS_SOCS = frozenset({"apollo5b"})
 
 

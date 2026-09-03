@@ -118,12 +118,8 @@ def predicted_window_ms(config: "ProfileConfig", *, reference_us: int | None) ->
     """How long the firmware's clean window will actually last.
 
     One question with one answer per (probe, firmware mode, window mode), in
-    one place. It was previously answered inline at the point of use, and each
-    round of review found another branch where the inline answer was wrong for
-    a combination nobody had enumerated -- the plan claiming 5000 ms against a
-    1000 ms spin, then the same against a 100-iteration counted window. The
-    matrix in tests/contracts/test_window_matrix.py checks every combination
-    against this function rather than against a hand-copied expectation.
+    one place; tests/contracts/test_window_matrix.py checks every combination
+    against this function (#125).
 
     Three cases, in order of who decides the length:
 
@@ -171,36 +167,18 @@ def plan_power_run(
         inference_count = None
         count_source = "firmware_auto"
     elif not probe_runs_inferences(ctx.config.profiling.clean_window_probe):
-        # The busy_loop probe runs no inferences: the window body is one
-        # calibrated spin sized from window_target_ms (see
-        # _busy_loop_calibration.j2), and the firmware reports 1 unit
-        # requested / 1 completed (#112). Deriving N from a per-inference
-        # reference is therefore meaningless here -- and actively broke the
-        # run, because clean_infer_avg_us under this probe is the WHOLE spin,
-        # so N came out as window_min and the host expected window_min x the
-        # full window. capture_gated then RAISED on the resulting ~10x gate
-        # mismatch, which is why external mode could never complete on the
-        # default firmware: dedicated (#125).
+        # The busy_loop probe runs no inferences: the window is one calibrated
+        # spin sized from window_target_ms, reported as 1 unit requested /
+        # 1 completed (#112). Deriving N from a per-inference reference is
+        # meaningless here, so describe the window in the probe's own units --
+        # one unit lasting the window the firmware was BUILT to spin for, read
+        # from the same property the render read
+        # (config.effective_window_target_ms) so plan and firmware agree
+        # wherever the power floor does not apply (#125).
         #
-        # So describe the window in the probe's own units: one unit of work,
-        # lasting the window the firmware was BUILT to spin for. That length
-        # is not the host's goal above -- this probe sizes its own window from
-        # the template variable, so the plan has to read the same property the
-        # render read (config.effective_window_target_ms), or the two disagree
-        # wherever the power floor does not apply. Under window_mode: fixed
-        # with a sub-floor target they diverged 5x: firmware built to spin
-        # 1000 ms, plan describing 5000 ms -- which left external mode still
-        # unable to complete the run #125 is about, made every CORRECT
-        # internal run evaluate degraded, and let _check_ina228_cadence pass a
-        # window that really gets a fifth of the accumulator updates it
-        # checked for (found by review).
-        #
-        # This overrides an explicitly requested count rather than honouring
-        # it, because the firmware ignores it: a caller asking for N here
-        # would otherwise get a plan describing N spins against a window that
-        # runs exactly one, which is the same spurious-mismatch shape #112
-        # removed. Refuse loudly instead of silently planning a window that
-        # cannot happen.
+        # An explicitly requested count is refused rather than honoured: the
+        # firmware ignores it, and a plan of N spins against a window that
+        # runs one is the spurious-mismatch shape #112 removed.
         if inference_count is not None:
             raise PowerError(
                 f"clean_window_probe="

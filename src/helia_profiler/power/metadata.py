@@ -51,10 +51,7 @@ class MeasurementScope(StrEnum):
 
 
 class ObservationMode(StrEnum):
-    """How the observation was made (previously a three-vs-two vocabulary
-    skew: ``PowerObservation.mode`` was a two-value ``Literal`` while the
-    internal-mode path wrote ``on_device`` — this enum is now the single
-    vocabulary)."""
+    """How the observation was made -- the single vocabulary (#154)."""
 
     GPIO_GATED = "gpio_gated"
     FREE_FORM = "free_form"

@@ -1,48 +1,26 @@
 """Profile clean-window clock integrity.
 
-Extracted from ``power.diagnostics`` at its size ceiling; the module boundary
-follows the responsibility boundary the section header already drew there.
-``power.diagnostics`` re-exports every public name (and ``_as_count``) so all
-existing import sites keep working.
+Split from ``power.diagnostics`` at its size ceiling; that module re-exports
+every public name here.
 
-The checks in ``power.diagnostics`` police the *power* binary's window clock.
-These police the clock that measures the PROFILE binary's clean window -- the
-number published as clean_infer_avg_us, which is also the reference the power
-plan sizes its window from (stages/plan_power.py). It is a different failure
-with a different signature, which is why it is a different check:
+``power.diagnostics`` polices the POWER binary's window clock. These checks
+police the clock that measures the PROFILE binary's clean window -- the
+number published as clean_infer_avg_us and the reference the power plan sizes
+its window from (stages/plan_power.py). A stalled profile clock loses a
+sub-interval, so the average comes back some percentage low and lands inside
+every plausible range; nothing downstream could tell (#121).
 
-  * frozen power clock: elapsed_us == 0, or off by a large factor. Loud.
-  * stalled profile clock: the window loses a *sub-interval*, so the average
-    comes back some percentage low. It is never zero, never inverted, and
-    lands squarely inside every plausible range -- 21% low on the Apollo4
-    runs in #121, against a 3.9% legitimate build-to-build spread. Nothing
-    downstream could tell.
+The firmware reports the fault directly, as TWO counts, because a dropped
+debug domain has been seen doing two things to the counter:
 
-Detection does not need a reference measurement, because the firmware reports
-the fault directly. It reports TWO counts, because a dropped debug domain has
-been seen doing two different things to the counter:
+  * FROZEN: CYCCNT stops, so every iteration wholly inside the stall reads a
+    delta of exactly zero -- no threshold needed, cannot false-positive.
+  * PARTIAL: the counter keeps advancing far too slowly; such deltas pass the
+    zero test, so they are counted separately against a floor derived from
+    the firmware's own warm reference (see clean_stalled_iters in main.cc.j2).
 
-  * FROZEN (the usual case, and what #121 measured): CYCCNT stops, so every
-    iteration wholly inside the stall reads a delta of exactly zero. An
-    inference cannot take zero core cycles, so this needs no threshold and
-    cannot false-positive.
-  * PARTIAL: the counter keeps advancing, but far too slowly. Observed at
-    least once on Apollo4, with DWT running at ~0.6% of the expected rate
-    through an early-boot window. Such a delta is small but non-zero, so it
-    passes the zero test and accumulates uncounted -- which would be worse
-    than silence, because the run would then assert "checked, clean" while
-    still being wrong. The firmware counts these separately, against a floor
-    derived from its own warm reference (an eighth of it; see the
-    clean_stalled_iters declaration in main.cc.j2).
-
-Note the evidence for the frozen shape is an aggregate: #121's table records
-per-run average cycles, which cannot by itself distinguish "N iterations read
-exactly 0" from "a broader set read partially low" -- both fit the same
-deficit total. The bimodal shape is the most likely reading of it, not a
-demonstrated one, which is the other reason both counts exist.
-
-The host judges; the firmware only reports. Same split as
-firmware_window_clock_is_frozen().
+The host judges; the firmware only reports (same split as
+firmware_window_clock_is_frozen()). Measured deficits and the evidence: #121.
 """
 
 from __future__ import annotations

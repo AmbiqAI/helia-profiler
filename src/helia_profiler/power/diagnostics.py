@@ -127,13 +127,9 @@ class GateDurationIntegrity:
         return self.measured_s / self.expected_s if self.expected_s > 0 else 0.0
 
     def to_metadata(self) -> dict[str, object]:
-        """Artifact form — byte-compatible with the dict previously built by
-        hand in ``capture_gated.py``: seconds rounded to 6 places, and
-        ``valid`` DERIVED from the stored measurements rather than cached
-        (the old hand-built dict stored a constant ``True``, which held only
-        while that writer still raised on mismatch — it no longer does
-        (#142/#181), so an artifact can now honestly carry ``valid: false``;
-        deriving keeps it honest everywhere)."""
+        """Artifact form: seconds rounded to 6 places; ``valid`` derived from the
+        stored measurements, never cached, so an artifact can honestly carry
+        ``valid: false`` (#142/#181)."""
         metadata: dict[str, object] = {
             "measured_s": round(self.measured_s, 6),
             "expected_s": round(self.expected_s, 6),
@@ -151,22 +147,11 @@ class GateDurationIntegrity:
 
 #: How far the measured gate may sit from the expected window.
 #:
-#: The question is how well the host could KNOW the window length before the
-#: run, and there are exactly two answers -- so this keys on the PROBE, which
-#: is what decides them, rather than on the plan's ``count_source``.
-#:
-#: Keying on ``count_source`` was the first attempt and it could not express
-#: the case it most needed to: ``count_source`` is ``probe_window`` for a
-#: busy_loop run on a dedicated binary but ``firmware_auto`` for the same
-#: probe on a shared one, so the shared case -- which has MORE error, being
-#: two independent per-boot calibrations rather than one -- was handed the
-#: tighter band. On a check that raises, that kills healthy runs (found by
-#: review; a spin 11% off target raised on shared and passed on dedicated).
-#:
-#: Every case here is cross-boot: the gate belongs to the power boot while the
-#: reference was timed by the profile boot, and in ``shared`` mode
-#: capture/__init__.py reads both count and reference straight off
-#: ``pmu_result.meta``. So the cross-boot spread is the floor either way.
+#: Keys on the clean-window PROBE, which decides how well the host could know
+#: the window length; ``count_source`` cannot express the shared-firmware
+#: busy_loop case, which carries more error (#125). Every case is cross-boot
+#: (the gate belongs to the power boot, the reference to the profile boot), so
+#: the cross-boot spread is the floor.
 COUNTED_WINDOW_TOLERANCE = 0.10
 #: A window nothing counted: the busy_loop spin's length is PREDICTED from a
 #: per-boot calibration pass, so the error is that calibration's transfer
@@ -174,9 +159,7 @@ COUNTED_WINDOW_TOLERANCE = 0.10
 #: calibration reading anywhere in [16, 8192] STIMER ticks, which at 32768 Hz
 #: puts the per-boot quantization floor between 0.02% and 6.25% -- and a
 #: shared run pays it twice. 0.25 covers the template's own realistic worst
-#: case with margin, and still TIGHTENS what shipped: the per-unit slack in
-#: assess_gate_duration() used to work out to half the window here (the unit
-#: IS the window), which no other bound could exceed.
+#: case with margin.
 PREDICTED_WINDOW_TOLERANCE = 0.25
 
 
@@ -251,32 +234,15 @@ def assess_gate_duration(
 # captured run) cannot disagree about it.
 
 #: Externally-referenced tolerance. The firmware clock and the host-timestamped
-#: gate edges measure the SAME physical window, so real agreement is tight.
-#: Evidence, stated with its actual n:
-#:   - Apollo510B: 13 gated runs, all within 0.08% -- the bulk of the sample,
-#:   - Apollo3 Blue Plus: ONE valid gated run, 0.064%,
-#:   - Apollo4 Blue Plus: ONE valid gated run, 0.065%.
-#: 1% is ~12x the worst of those -- generous enough that instrument jitter,
-#: packet quantization and gate-edge poll resolution can never trip it, while
-#: still catching every failure mode on record (the 0x and 7x clock faults,
-#: and any gate that bracketed the wrong stretch of firmware execution).
-#:
-#: This is the AUTHORITATIVE external window check (#142/#181 redesign): the
-#: two sides are independent oscillators (instrument sample clock vs the
-#: 32.768 kHz STIMER XTAL) observing the SAME physical window in the SAME
-#: boot, so HFRC thermal drift -- which moves the est*count expectation by
-#: up to ~12% on a cold AP5 boot -- cancels here by construction. #110's
-#: settle-verify guarantees the STIMER side was alive when the window opened
-#: (an envelope without stimer_dead is a positive liveness statement).
-#: Disagreement therefore means the gate did not bracket what the firmware
-#: timed, which is exactly the condition that makes the per-inference energy
-#: denominator untrustworthy -- ERROR, not warning, at the emit sites.
-#:
-#: The 12x margin claim holds for bench-length (4-5 s) windows. On short
-#: windows the reference's mechanical error is ABSOLUTE (packet integral +
-#: GPI-poll edges), so the comparison carries an absolute slack floor too --
-#: see :func:`external_observer_slack_s`; without it, the 1 s minimum window
-#: at low ``stats_rate_hz`` fails on quantization alone.
+#: gate edges are independent oscillators observing the SAME physical window
+#: in the SAME boot, so HFRC drift cancels and real agreement is tight; 1% sits
+#: an order of magnitude above the tightest cross-family disagreement on record
+#: while still catching every failure mode seen (evidence: #142/#181, #195).
+#: This is the AUTHORITATIVE external check: disagreement means the gate did
+#: not bracket what the firmware timed, so the per-inference energy denominator
+#: is untrustworthy -- ERROR at the emit sites. On short windows the reference's
+#: error is absolute (packet integral + GPI-poll edges), so
+#: :func:`external_observer_slack_s` adds an absolute floor.
 EXTERNAL_WINDOW_CLOCK_TOLERANCE = 0.01
 
 #: GPI poll cadence of the gated capture loop (capture_gated.py uses this as
@@ -318,30 +284,10 @@ def external_observer_slack_s(stats_rate_hz: int | None) -> float:
 #: gate, so the only plan-based reference is N x the reference inference time
 #: measured by a DIFFERENT binary (the transport-attached profile build). That
 #: cross-binary comparison is legitimately loose, so 5% would false-fail valid
-#: runs. The evidence bounding it:
-#:   - worst legitimate disagreement observed: 14.5% (Apollo4, profile
-#:     clean-loop 757-786 us against a true 866 us window),
-#:   - Apollo3 agreed to 0.8%,
-#:   - build-to-build swings of ~4% in the profile metric alone.
-#: 25% clears 14.5% plus a few points of build noise while still being tight
-#: enough to be useful to the internal-mode (INA228) user, who has no external
-#: instrument to fall back on. Do not tighten below the 14.5% observation
-#: without new cross-binary timing evidence; the guardrail is rounded up from
-#: 14.48% deliberately.
-#:
-#: Two caveats on that 14.5%, both of which argue against reading it as a
-#: characterised bound:
-#:   - it is not one run. FOUR runs showed the skew, and in every one the power
-#:     window was SLOWER than the profile predicted -- the opposite of the
-#:     "power binary does less logging, so it must be faster" intuition. Which
-#:     is why this comparison MUST stay two-sided: a directional check would
-#:     have missed the only failure mode actually observed.
-#:   - it is config-correlated, not obviously build-noise. The skew appears only
-#:     in internal-mode/INA228 builds; external builds of the same code agreed
-#:     to <0.1%. Code-layout / XIP-cache sensitivity is one hypothesis for that,
-#:     not an established explanation -- the INA228 bus traffic inside the
-#:     window is at least as plausible. Treat the number as an observation with
-#:     an unknown cause.
+#: runs. 25% clears the worst legitimate cross-binary skew observed with a few
+#: points of build noise, and stays two-sided because that skew was not
+#: directional (evidence: #142/#181). Do not tighten without new cross-binary
+#: timing data.
 INTERNAL_WINDOW_CLOCK_TOLERANCE = 0.25
 
 #: Slack on the host wall-clock ceiling (see :func:`assess_window_clock_ceiling`).
@@ -420,10 +366,7 @@ def count_noun(clean_window_probe: str, count: int) -> str:
     The ``busy_loop`` clean-window probe replaces the window body with one
     calibrated CPU spin (see :func:`probe_runs_inferences`) -- saying
     "N inferences" for it is simply false, since N counts spins, not model
-    runs.  Lives HERE, next to the probe rule, because two stages grew
-    byte-identical private copies and a third stage then missed the wording
-    fix entirely (#172 review): every "N <what ran>" message asks this one
-    function.
+    runs.  Centralized so every "N <what ran>" message agrees (#172).
     """
     if probe_runs_inferences(clean_window_probe):
         return "inference" if count == 1 else "inferences"
@@ -442,9 +385,7 @@ def expected_terminal_requested_count(
     one calibrated spin window, sized from ``window_target_ms`` -- so firmware
     reports 1 requested and 1 completed (see ``_power_terminal_success.j2``).
     A host that still expected N would reject every such run as "incomplete
-    inference execution", which is exactly what happened before this was
-    centralized: the diagnostic could not finish a run on any board, and the
-    window duration it exists to expose was never consumed.
+    inference execution" (#112).
 
     Returns ``None`` when there is no planned count to check against.
     """
@@ -469,8 +410,7 @@ class WindowClockAgreement:
     #: a packet-integral bounded by GPI-poll edges, so its mechanical error is
     #: absolute (packets + poll skew), not proportional -- on a short window a
     #: purely relative band shrinks below what the instrument can resolve and
-    #: a healthy run fails on quantization alone (found by review of the 1%
-    #: promotion; the est*count check always modelled this via packet_slack_s).
+    #: a healthy run fails on quantization alone (#142/#181).
     absolute_slack_s: float = 0.0
 
     @property
@@ -545,13 +485,6 @@ def gated_window_reference_s(result: "PowerResult") -> tuple[float, str] | None:
     and that branch returns the DEGRADED free-form result whose
     ``summary.duration_s`` is the whole capture window. So the fallback could
     only ever fire in exactly the case where it is wrong.
-
-    That is not hypothetical: on two real degraded Apollo4 artifacts
-    (ap4-js110-2, ap4-js110-smoke) the firmware clock was accurate to 0.16%,
-    yet comparing it against the 19.2 s free-form capture instead of the ~5 s
-    window produced a 73.9% "disagreement" -- a second, misleading issue piled
-    on top of the ``power.observation_degraded`` that already described the
-    real problem.
 
     Returns ``None`` when there is no gated window, which callers treat as
     "nothing to compare against" rather than substituting a worse reference.
@@ -738,12 +671,9 @@ class GateSuppressionReason(StrEnum):
 class GateArbitration:
     """The single composition of the #142/#181 gate verdict.
 
-    Before this existed, ``evaluation.validity`` and ``report.summary`` each
-    composed the same three facts (est*count integrity, observer agreement,
-    terminal health) into their own verdicts -- the shared helpers aligned
-    the inputs but nothing aligned the composition, and the two drifted
-    (found by #195's review round, fixed by hand there, made structural
-    here). ``evaluation.validity`` builds one of these per run; the summary
+    The single composition of the gate verdict, replacing hand-composed copies
+    in ``evaluation.validity`` and ``report.summary`` (#195).
+    ``evaluation.validity`` builds one of these per run; the summary
     renders it; every verdict below is DERIVED from the stored facts, never
     cached (same rule as :class:`GateDurationIntegrity`).
     """
@@ -853,8 +783,7 @@ class GateArbitration:
 
 #: ``no_gate_rise`` hint for a run that had lock-step OFF on a board wired for
 #: it. This exact combination has a specific, non-wiring cause that presents as
-#: a wiring fault and has cost real bench time (issue #114: headers re-seated
-#: on an Apollo4 Blue Plus before the policy flag was found). Without
+#: a wiring fault (#114). Without
 #: lock-step, ``kSyncLockstep`` bakes false, ``hpx_sync_wait_go()`` compiles to
 #: a no-op, and the target free-runs its measured window straight out of reset
 #: -- so the gate can rise, and on a multi-second window also fall, before the

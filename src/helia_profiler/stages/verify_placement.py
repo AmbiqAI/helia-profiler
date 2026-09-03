@@ -72,25 +72,17 @@ class VerifyPlacementStage:
         arena_region = ctx.planned_arena_region
 
         toolchain = ctx.config.target.toolchain
-        # #133 Phase 2 migration: verify against the characterized
-        # linked-memory map, not the legacy family placement table (whose
-        # AP5 MRAM base was entirely wrong — every divergence between the
-        # two is pinned by tests/test_memory_map.py). The yardstick is the
-        # link family's APP EXTENT, not the classification window: an
-        # arena inside the window but inside a stack reservation (330P's
-        # armlink stack at 0x2003C000, apollo3p's STACKMEM slot) is
-        # exactly the mislocation this stage exists to catch (#177 review
-        # m4). Interpreter builds (the only ones checked here) always
-        # link the DEFAULT profile — the linker_profile knob is AOT-only,
-        # and AOT skips.
+        # Verify against the characterized linked-memory map (#133), not the
+        # legacy family table. The yardstick is the link family's APP EXTENT,
+        # not the classification window: an arena inside a stack reservation
+        # is exactly the mislocation this stage catches (#177). Interpreter
+        # builds always link the DEFAULT profile; the linker_profile knob is
+        # AOT-only, and AOT skips.
         windows = linked_memory_map(soc)
         if not windows:
-            # Custom SoCs have no characterized map, but they DO declare
-            # their own placement bases — the legacy table is built from
-            # the user's declaration and remains the right thing to
-            # verify against (#177 review m5: degrading the MEASURED
-            # block is correct; degrading this guard was a silent
-            # coverage regression).
+            # Custom SoCs have no characterized map but declare their own
+            # placement bases; the legacy table is built from that declaration
+            # and remains the right thing to verify against (#177).
             self._run_legacy(ctx, soc, arena_region)
             return
         family = link_family_for_toolchain(toolchain)
