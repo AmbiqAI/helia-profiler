@@ -1,0 +1,77 @@
+default_install_hook_types: [pre-commit, prepare-commit-msg]
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0  # commit cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b
+    hooks:
+      # Excludes vendored/generated content whose whitespace we don't own:
+      # SEGGER's vendored RTT sources, an upstream NSX patch file, and
+      # captured tool output used as test fixtures. Scoped to these two
+      # whitespace-shaped hooks (and .editorconfig, which mirrors this) —
+      # ruff/todo-needs-issue/gitleaks still see these paths, since none
+      # of them contain first-party .py.
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        exclude: |
+          (?x)^(
+            nix/patches/.*|
+            tests/fixtures/.*|
+            src/helia_profiler/vendor/segger_rtt/.*
+          )$
+      - id: end-of-file-fixer
+        exclude: |
+          (?x)^(
+            nix/patches/.*|
+            tests/fixtures/.*|
+            src/helia_profiler/vendor/segger_rtt/.*
+          )$
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: check-yaml
+        args: [--unsafe]
+      - id: check-json
+      - id: check-toml
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.13  # commit 9aeda5d1f4bbd212c557da1ea78eca9e8c829e19 — must match the `ruff` version uv.lock resolves
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: todo-needs-issue
+        name: Bare TODO(...)/FIXME(...)/HACK(...) needs a reference
+        description: Every marker must carry a (#issue|verify|name) reference.
+        entry: python3 tools/hooks/todo_needs_issue.py
+        language: system
+        types: [text]
+        # Self-referential: the hook's own regex spells out the bare marker
+        # names, and this test file plants deliberately bare examples as
+        # fixtures — both would otherwise fail the very check they define.
+        exclude: |
+          (?x)^(
+            tools/hooks/todo_needs_issue\.py|
+            tests/test_git_hooks\.py
+          )$
+
+      - id: gitleaks
+        name: gitleaks (staged secrets scan)
+        description: Scan staged changes for hardcoded secrets with gitleaks.
+        entry: python3 tools/hooks/gitleaks_wrapper.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: strip-ai-trailers
+        name: Strip AI-tool attribution trailers
+        description: Removes Co-authored-by/Claude-Session/Agent-Assisted/Generated-by trailers naming an AI tool.
+        entry: python3 tools/hooks/strip_ai_trailers.py
+        language: system
+        stages: [prepare-commit-msg]
+        # pass_filenames must stay true (the default): for the
+        # prepare-commit-msg stage pre-commit's only "filename" is the
+        # commit-message path itself, and pass_filenames: false would drop
+        # that argument entirely, turning the hook into a silent no-op.
