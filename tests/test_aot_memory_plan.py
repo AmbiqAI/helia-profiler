@@ -173,8 +173,7 @@ class TestExtractMemoryPlanFromRenderPlan:
                 "MRAM": _FakeArenaUsage(total_size=2_048_000, used=0),
             },
             tensor_allocs={
-                f"tensor_{i}": _FakeTensorAllocation(memory="DTCM", size=1_777)
-                for i in range(58)
+                f"tensor_{i}": _FakeTensorAllocation(memory="DTCM", size=1_777) for i in range(58)
             },
         )
         render_plan = _FakeRenderPlan(

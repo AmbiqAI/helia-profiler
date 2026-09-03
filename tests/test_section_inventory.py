@@ -42,9 +42,7 @@ class TestReadelfInventory:
             stderr = ""
 
         monkeypatch.setattr(tp.subprocess, "run", lambda *a, **k: _Result())
-        return _inventory_via_readelf(
-            Path("fw.elf"), readelf_cmd="readelf", timeout_s=5
-        )
+        return _inventory_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5)
 
     def _sections(self, monkeypatch, text=None):
         inventory = self._inventory(monkeypatch, text=text)
@@ -145,10 +143,7 @@ class TestReadelfInventory:
             raise FileNotFoundError("readelf")
 
         monkeypatch.setattr(tp.subprocess, "run", _boom)
-        assert (
-            _inventory_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5)
-            is None
-        )
+        assert _inventory_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5) is None
 
     def test_timeout_degrades_to_none(self, monkeypatch):
         import helia_profiler.hostenv.toolchain_probe as tp
@@ -157,10 +152,7 @@ class TestReadelfInventory:
             raise subprocess.TimeoutExpired(cmd="readelf", timeout=5)
 
         monkeypatch.setattr(tp.subprocess, "run", _slow)
-        assert (
-            _inventory_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5)
-            is None
-        )
+        assert _inventory_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5) is None
 
 
 class TestReadelfSegments:
@@ -176,9 +168,7 @@ class TestReadelfSegments:
             stderr = ""
 
         monkeypatch.setattr(tp.subprocess, "run", lambda *a, **k: _Result())
-        segments = _segments_via_readelf(
-            Path("fw.elf"), readelf_cmd="readelf", timeout_s=5
-        )
+        segments = _segments_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5)
         assert (
             LoadSegment(
                 virtual_address=0x20004000,
@@ -199,10 +189,7 @@ class TestReadelfSegments:
             raise FileNotFoundError("readelf")
 
         monkeypatch.setattr(tp.subprocess, "run", _boom)
-        assert (
-            _segments_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5)
-            == ()
-        )
+        assert _segments_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5) == ()
 
 
 class TestFromelfInventory:
@@ -285,9 +272,7 @@ class TestSectionInventoryDispatch:
     """End-to-end through section_inventory() itself — both branches were
     previously only tested below the dispatch (#176)."""
 
-    def test_gcc_dispatch_runs_readelf_twice_and_threads_results(
-        self, monkeypatch
-    ):
+    def test_gcc_dispatch_runs_readelf_twice_and_threads_results(self, monkeypatch):
         import helia_profiler.hostenv.toolchain_probe as tp
 
         calls = []
@@ -372,7 +357,5 @@ def test_llvm_readelf_atfe_captures_parse_identically_to_gnu():
     assert atfe == gnu
     assert len(atfe) == 10  # every non-NULL section
 
-    assert rows("segments_atfe.txt", _READELF_LOAD_RE) == rows(
-        "segments.txt", _READELF_LOAD_RE
-    )
+    assert rows("segments_atfe.txt", _READELF_LOAD_RE) == rows("segments.txt", _READELF_LOAD_RE)
     assert len(rows("segments_atfe.txt", _READELF_LOAD_RE)) == 4

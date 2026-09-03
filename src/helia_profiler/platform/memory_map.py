@@ -104,9 +104,7 @@ def link_family_for_toolchain(toolchain: str) -> LinkFamily:
         return _LINK_FAMILY_BY_TOOLCHAIN[toolchain]
     except KeyError:
         known = ", ".join(sorted(_LINK_FAMILY_BY_TOOLCHAIN))
-        raise ValueError(
-            f"{toolchain!r} is not a supported toolchain (known: {known})."
-        ) from None
+        raise ValueError(f"{toolchain!r} is not a supported toolchain (known: {known}).") from None
 
 
 @dataclass(frozen=True)
@@ -172,13 +170,9 @@ class LinkedRegionWindow:
         for family in LinkFamily:
             extent = self.app_window.get(family)
             if extent is None:
-                raise ValueError(
-                    f"{self.region}: app_window missing {family!r}"
-                )
+                raise ValueError(f"{self.region}: app_window missing {family!r}")
             if extent.start < self.window.start or extent.end > self.window.end:
-                raise ValueError(
-                    f"{self.region}: app_window {family!r} lies outside the window"
-                )
+                raise ValueError(f"{self.region}: app_window {family!r} lies outside the window")
 
 
 def _window(
@@ -203,9 +197,7 @@ def _window(
         window=MemoryRange(start, length),
         app_window=MappingProxyType(
             {
-                LinkFamily.GNU: MemoryRange(
-                    start if gnu_start is None else gnu_start, gnu
-                ),
+                LinkFamily.GNU: MemoryRange(start if gnu_start is None else gnu_start, gnu),
                 LinkFamily.ARMLINK: MemoryRange(
                     start if armlink_start is None else armlink_start, armlink
                 ),
@@ -410,9 +402,7 @@ def linked_memory_map(
     return windows
 
 
-def classify_address(
-    address: int, windows: tuple[LinkedRegionWindow, ...]
-) -> MemoryRegion | None:
+def classify_address(address: int, windows: tuple[LinkedRegionWindow, ...]) -> MemoryRegion | None:
     """The region whose window contains *address*, or None (the honest flag
     for an occupant outside every verified window — including the table
     itself being wrong, which is exactly what Phase 2's police check

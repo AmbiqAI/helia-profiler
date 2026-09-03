@@ -112,8 +112,7 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
             else max(1, profiling.warmup)
         )
         clean_run_s = (
-            ctx.config.effective_window_target_ms / 1000.0
-            + clean_warmup_reps * inference_time_s
+            ctx.config.effective_window_target_ms / 1000.0 + clean_warmup_reps * inference_time_s
         )
     else:
         if profiling.window_mode is WindowMode.AUTO:
@@ -178,9 +177,7 @@ class CapturePowerStage:
         estimated = _estimate_capture_duration(ctx)
         user_overrode_duration = ctx.config.power.duration_s is not None
         configured = (
-            ctx.config.power.duration_s
-            if user_overrode_duration
-            else DEFAULT_POWER_DURATION_S
+            ctx.config.power.duration_s if user_overrode_duration else DEFAULT_POWER_DURATION_S
         )
         if estimated is not None and estimated < configured and not user_overrode_duration:
             log.info(
@@ -193,9 +190,7 @@ class CapturePowerStage:
             capture_duration = configured
 
         planned_count = ctx.power_plan.inference_count if ctx.power_plan is not None else None
-        planned_us = (
-            ctx.power_plan.reference_inference_us if ctx.power_plan is not None else None
-        )
+        planned_us = ctx.power_plan.reference_inference_us if ctx.power_plan is not None else None
         message = "Arming instrument and resetting target"
         if planned_count is not None:
             noun = count_noun(ctx.config.profiling.clean_window_probe, planned_count)
@@ -226,9 +221,7 @@ class CapturePowerStage:
         # Mode/integrity/edges derive from capture metadata in one place so
         # this log and publish_power_result cannot disagree; the deadline
         # stays this stage's own budget.
-        obs_mode, obs_integrity, rise, fall, _ = classify_observation(
-            power_result.metadata
-        )
+        obs_mode, obs_integrity, rise, fall, _ = classify_observation(power_result.metadata)
         observation = PowerObservation(
             mode=obs_mode,
             result=power_result,

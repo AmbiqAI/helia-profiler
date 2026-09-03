@@ -59,9 +59,11 @@ def measured_memory_is_renderable(measured: Any) -> bool:
     (#177 reviews n7 + follow-up MINOR-1: the police lines must not be
     hidden by the very anomaly — everything landing outside the
     characterized windows — they exist to surface)."""
-    return any(r.used or r.load_image or r.reserved for r in measured.regions) or bool(
-        measured.unattributed
-    ) or bool(getattr(measured, "unattributed_load_bytes", 0))
+    return (
+        any(r.used or r.load_image or r.reserved for r in measured.regions)
+        or bool(measured.unattributed)
+        or bool(getattr(measured, "unattributed_load_bytes", 0))
+    )
 
 
 def render_memory_regions(console: HpxConsole, measured: Any) -> None:
@@ -76,10 +78,7 @@ def render_memory_regions(console: HpxConsole, measured: Any) -> None:
         return
 
     table = Table(
-        title=(
-            f"[bold]Memory (measured)[/bold] "
-            f"[dim]({measured.link_family} link)[/dim]"
-        ),
+        title=(f"[bold]Memory (measured)[/bold] [dim]({measured.link_family} link)[/dim]"),
         box=box.SIMPLE_HEAVY,
         show_edge=False,
         title_justify="left",
@@ -166,15 +165,12 @@ def render_memory_reconciliation(console: HpxConsole, rec: Any) -> None:
             measured_cell = _fmt_bytes(c.measured_size)
             if c.measured_region and c.measured_region != c.region:
                 measured_cell = (
-                    f"[bold red]{measured_cell} in "
-                    f"{escape(c.measured_region)}[/bold red]"
+                    f"[bold red]{measured_cell} in {escape(c.measured_region)}[/bold red]"
                 )
             if c.delta:
                 sign = "+" if c.delta > 0 else "−"
                 delta_txt = f"{sign}{_fmt_bytes(abs(c.delta))}"
-                delta_cell = (
-                    f"[red]{delta_txt}[/red]" if c.delta > 0 else delta_txt
-                )
+                delta_cell = f"[red]{delta_txt}[/red]" if c.delta > 0 else delta_txt
             else:
                 delta_cell = "0"
             status_cell = "matched"
@@ -294,8 +290,7 @@ def render_validity(console: HpxConsole, ctx: PipelineContext) -> None:
         # severity that is not a warning (#208).
         count = len(evaluation.issues)
         console._console.print(
-            f"  [yellow]Validity: DEGRADED ({count} issue"
-            f"{'s' if count != 1 else ''})[/yellow]"
+            f"  [yellow]Validity: DEGRADED ({count} issue{'s' if count != 1 else ''})[/yellow]"
         )
     for issue in errors:
         console._console.print(
@@ -311,8 +306,7 @@ def render_validity(console: HpxConsole, ctx: PipelineContext) -> None:
     for issue in evaluation.issues:
         if issue.severity not in ("error", "warning"):
             console._console.print(
-                f"    {escape(issue.severity)}: {escape(issue.code)} — "
-                f"{escape(issue.message)}"
+                f"    {escape(issue.severity)}: {escape(issue.code)} — {escape(issue.message)}"
             )
     if verdict == "invalid" and not ctx.config.output.fail_on_invalid:
         console._console.print(
@@ -533,9 +527,7 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         console._console.print()
 
     # ── Memory plan (per-region capacity vs used) ─────────────────
-    if ctx.memory_regions is not None and measured_memory_is_renderable(
-        ctx.memory_regions
-    ):
+    if ctx.memory_regions is not None and measured_memory_is_renderable(ctx.memory_regions):
         # Measured first (#133): region truth comes from the ELF. The plan
         # renders only as a fallback — its numbers are the pre-build
         # decision record, not measurements.
@@ -569,9 +561,7 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
                 cache_table.add_row(short, f"{cache_totals[cname]:,.0f}")
 
         # Derived: L1D hit rate
-        l1d_acc = cache_totals.get(
-            "ARM_PMU_L1D_CACHE_RD", cache_totals.get("ARM_PMU_L1D_CACHE", 0)
-        )
+        l1d_acc = cache_totals.get("ARM_PMU_L1D_CACHE_RD", cache_totals.get("ARM_PMU_L1D_CACHE", 0))
         l1d_miss = cache_totals.get(
             "ARM_PMU_L1D_CACHE_MISS_RD",
             cache_totals.get("ARM_PMU_L1D_CACHE_REFILL", 0),

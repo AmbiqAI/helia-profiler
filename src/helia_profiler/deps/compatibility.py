@@ -146,8 +146,7 @@ class CompatibilityBaseline:
                 "sha256": self.neuralspotx_sha256,
             },
             "projects": {
-                project.name: {"url": project.url, "ref": project.ref}
-                for project in self.projects
+                project.name: {"url": project.url, "ref": project.ref} for project in self.projects
             },
             "modules": {
                 module.name: {"project": module.project, "ref": module.ref}
@@ -205,9 +204,7 @@ def load_compatibility_baseline(path: Path | None = None) -> CompatibilityBaseli
     """Load and strictly validate an HPX compatibility baseline."""
     try:
         if path is None:
-            resource = importlib.resources.files("helia_profiler.data").joinpath(
-                _BASELINE_RESOURCE
-            )
+            resource = importlib.resources.files("helia_profiler.data").joinpath(_BASELINE_RESOURCE)
             raw = json.loads(resource.read_text(encoding="utf-8"))
         else:
             raw = json.loads(path.read_text(encoding="utf-8"))
@@ -229,7 +226,6 @@ def load_compatibility_baseline(path: Path | None = None) -> CompatibilityBaseli
         ) from exc
 
 
-
 # engine.config keys that redirect where an engine's source/binary comes from.
 # Other keys (e.g. "variant", "linker_profile", "aot_args") are ordinary
 # build knobs and do not deviate from the qualified engine baseline.
@@ -243,9 +239,7 @@ _ENGINE_SOURCE_OVERRIDE_KEYS = frozenset(
 # asserts these literals never drift from those constants. A build.nsx_modules
 # entry targeting one of these names is never applied (see
 # firmware/__init__.py), so it must not be counted as a development override.
-ENGINE_OWNED_MODULE_NAMES = frozenset(
-    {"nsx-helia-rt", "nsx-cmsis-nn", "nsx-executorch"}
-)
+ENGINE_OWNED_MODULE_NAMES = frozenset({"nsx-helia-rt", "nsx-cmsis-nn", "nsx-executorch"})
 
 
 def resolve_compatibility(
@@ -257,11 +251,7 @@ def resolve_compatibility(
 ) -> CompatibilityResolution:
     """Classify explicit module and engine overrides without mutating config."""
     modules = tuple(
-        sorted(
-            str(name)
-            for name in module_overrides
-            if str(name) not in ENGINE_OWNED_MODULE_NAMES
-        )
+        sorted(str(name) for name in module_overrides if str(name) not in ENGINE_OWNED_MODULE_NAMES)
     )
     engines: set[str] = set()
     if engine_config_path is not None:
@@ -471,6 +461,7 @@ def _optional_bool(value: Mapping[str, Any], key: str) -> bool:
 
 _COMMIT_SHA_RE = re.compile(r"[0-9a-f]{40}")
 
+
 def _immutable_ref(value: Mapping[str, Any], key: str, owner: str) -> str:
     """Validate that a baseline ref is an immutable, qualifiable pin.
 
@@ -486,8 +477,7 @@ def _immutable_ref(value: Mapping[str, Any], key: str, owner: str) -> str:
     if _COMMIT_SHA_RE.fullmatch(ref):
         return ref
     raise ConfigError(
-        f"Compatibility baseline {owner} must use a full 40-character commit SHA, "
-        f"not {ref!r}."
+        f"Compatibility baseline {owner} must use a full 40-character commit SHA, not {ref!r}."
     )
 
 

@@ -176,9 +176,7 @@ def capture_uart_output(
             # powered while a debugger is attached.  Hold a pylink session open
             # across the capture instead of releasing the probe, or every
             # per-layer cycle reads back 0.
-            with controller.attached_reset_session(
-                device=jlink_device, jlink_serial=jlink_serial
-            ):
+            with controller.attached_reset_session(device=jlink_device, jlink_serial=jlink_serial):
                 lines = _collect()
         else:
             controller.debug_reset(device=jlink_device, jlink_serial=jlink_serial)

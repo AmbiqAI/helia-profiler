@@ -263,9 +263,7 @@ def _segment_streamed_gpi(
     from pyjoulescope_driver import time64
 
     usable = [
-        frame
-        for frame in frames
-        if np.asarray(frame["data"]).size and float(frame["rate"]) > 0
+        frame for frame in frames if np.asarray(frame["data"]).size and float(frame["rate"]) > 0
     ]
     if not usable:
         return []
@@ -304,9 +302,7 @@ def _segment_streamed_gpi(
             edges.append((frame_t0, int(levels[0])))
         idx = np.nonzero(np.diff(levels))[0]
         for i in idx:
-            edges.append(
-                (frame_t0 + (int(i) + 1) * tick_per_sample, int(levels[i + 1]))
-            )
+            edges.append((frame_t0 + (int(i) + 1) * tick_per_sample, int(levels[i + 1])))
         prev_level = int(levels[-1])
 
     windows: list[tuple[float, float]] = []
@@ -435,9 +431,7 @@ def _process_gated_stats(
 
     a = _stats_arrays(packets)
     raw_windows = (
-        windows_override
-        if windows_override is not None
-        else _segment_gpi_windows(poll_samples)
+        windows_override if windows_override is not None else _segment_gpi_windows(poll_samples)
     )
     windows = [
         (rise, fall)

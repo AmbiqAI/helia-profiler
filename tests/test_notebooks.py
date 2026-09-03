@@ -90,6 +90,4 @@ def test_notebook_gates_hardware_behind_a_toggle(notebook: Path) -> None:
     code = _code(notebook)
 
     assert "RUN_HARDWARE" in code, f"{notebook.name} has no RUN_HARDWARE toggle"
-    assert "if RUN_HARDWARE" in code, (
-        f"{notebook.name} defines RUN_HARDWARE but never gates on it"
-    )
+    assert "if RUN_HARDWARE" in code, f"{notebook.name} defines RUN_HARDWARE but never gates on it"

@@ -5,7 +5,13 @@ from pathlib import Path
 
 from helia_profiler.evaluation import ComparabilitySeverity, assess_comparability
 from helia_profiler.evaluation import RunArtifacts
-from helia_profiler.results.issues import ComparabilityCode, ComparisonDimension, DIMENSION_DIFFERS, MEMORY_DIMENSION_MISMATCH, POWER_DIMENSION_MISMATCH
+from helia_profiler.results.issues import (
+    ComparabilityCode,
+    ComparisonDimension,
+    DIMENSION_DIFFERS,
+    MEMORY_DIMENSION_MISMATCH,
+    POWER_DIMENSION_MISMATCH,
+)
 
 
 def _run(
@@ -57,16 +63,18 @@ def test_engine_difference_is_informative():
 
     assert assessment.run_metrics_comparable
     assert assessment.layers_comparable
-    issue = next(issue for issue in assessment.issues if issue.code == DIMENSION_DIFFERS.code_for(ComparisonDimension.ENGINE))
+    issue = next(
+        issue
+        for issue in assessment.issues
+        if issue.code == DIMENSION_DIFFERS.code_for(ComparisonDimension.ENGINE)
+    )
     assert issue.severity is ComparabilitySeverity.INFORMATIVE
 
 
 def test_engine_version_difference_is_informative():
     """#193: a runtime promotion (heliaRT 1.16 -> 1.17, the #191 A/B) must
     surface -- previously the one axis that changed was invisible."""
-    assessment = assess_comparability(
-        _run(engine_version="1.16.0"), _run(engine_version="1.17.0")
-    )
+    assessment = assess_comparability(_run(engine_version="1.16.0"), _run(engine_version="1.17.0"))
 
     assert assessment.run_metrics_comparable
     assert assessment.layers_comparable
@@ -83,9 +91,7 @@ def test_engine_version_difference_is_informative():
 def test_a_baseline_predating_engine_version_is_skipped_not_flagged():
     """Old artifacts (and tflm/executorch runs, which record no resolved
     version) omit the key entirely -- missing is unknown, not different."""
-    assessment = assess_comparability(
-        _run(engine_version=None), _run(engine_version="1.17.0")
-    )
+    assessment = assess_comparability(_run(engine_version=None), _run(engine_version="1.17.0"))
 
     assert assessment.run_metrics_comparable
     assert not any(
@@ -107,7 +113,9 @@ def test_topology_mismatch_blocks_only_layer_deltas():
 
     assert assessment.run_metrics_comparable
     assert not assessment.layers_comparable
-    assert any(issue.code == ComparabilityCode.TOPOLOGY_LAYER_COUNT_MISMATCH for issue in assessment.issues)
+    assert any(
+        issue.code == ComparabilityCode.TOPOLOGY_LAYER_COUNT_MISMATCH for issue in assessment.issues
+    )
 
 
 def test_cross_machine_provenance_differences_are_structured():
@@ -127,12 +135,8 @@ def test_cross_instrument_power_scopes_omit_power_metrics_only():
     """Joulescope (host-gated window) vs INA228 (on-device accumulators) are
     different-instrument measurements: power deltas are omitted with an
     explanatory issue, while run/layer performance deltas stay comparable."""
-    joulescope = _run(
-        power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid"}
-    )
-    ina228 = _run(
-        power={"measurement_scope": "on_device_gated_inference", "integrity": "valid"}
-    )
+    joulescope = _run(power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid"})
+    ina228 = _run(power={"measurement_scope": "on_device_gated_inference", "integrity": "valid"})
 
     assessment = assess_comparability(joulescope, ina228)
 
@@ -232,9 +236,7 @@ def test_bundles_with_no_sync_record_at_all_are_skipped():
     other state (see the test below). What actually skips is a bundle with no
     sync record at all: internal-mode runs, free-form captures, and anything
     predating the field."""
-    legacy = _run(
-        power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid"}
-    )
+    legacy = _run(power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid"})
     current = _run(
         power={
             "measurement_scope": "gpio_gated_clean_window",
@@ -354,7 +356,6 @@ def test_partial_manifest_dimensions_fall_back_to_metadata():
     assert not assessment.run_metrics_comparable
 
 
-
 def _manifest_with_probe(probe: str | None):
     """A manifest carrying the probe dimension, as the writer records it."""
     from helia_profiler.results import ResultValidity
@@ -375,9 +376,7 @@ def _manifest_with_probe(probe: str | None):
         validity=ResultValidity.VALID,
         issues=(),
         provenance={},
-        comparability=(
-            {"power_clean_window_probe": probe} if probe is not None else {}
-        ),
+        comparability=({"power_clean_window_probe": probe} if probe is not None else {}),
         artifacts=(),
     )
 
@@ -405,7 +404,8 @@ def test_a_spin_window_is_not_power_comparable_with_an_inference_window():
     issue = next(
         issue
         for issue in assessment.issues
-        if issue.code == POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.POWER_CLEAN_WINDOW_PROBE)
+        if issue.code
+        == POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.POWER_CLEAN_WINDOW_PROBE)
     )
     assert issue.severity is ComparabilitySeverity.METRIC_BLOCKING
     assert issue.context["baseline"] == "infer"
@@ -418,7 +418,8 @@ def test_the_same_probe_stays_comparable():
 
     assert assessment.power_metrics_comparable
     assert not any(
-        issue.code == POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.POWER_CLEAN_WINDOW_PROBE)
+        issue.code
+        == POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.POWER_CLEAN_WINDOW_PROBE)
         for issue in assessment.issues
     )
 
@@ -450,7 +451,8 @@ def test_a_run_that_measured_no_power_does_not_block_one_that_did():
     assessment = assess_comparability(unpowered, _powered("busy_loop"))
 
     assert not any(
-        issue.code == POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.POWER_CLEAN_WINDOW_PROBE)
+        issue.code
+        == POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.POWER_CLEAN_WINDOW_PROBE)
         for issue in assessment.issues
     )
 
@@ -501,9 +503,7 @@ def _powered_run(
 class TestPowerFirmwareFingerprint:
     """#138 / #115 item 1: the measured binary's code hash as a dimension."""
 
-    CODE = POWER_DIMENSION_MISMATCH.code_for(
-        ComparisonDimension.POWER_FIRMWARE_FINGERPRINT
-    )
+    CODE = POWER_DIMENSION_MISMATCH.code_for(ComparisonDimension.POWER_FIRMWARE_FINGERPRINT)
 
     def test_same_platform_fingerprint_mismatch_blocks_power(self):
         """The #115 shape: identical on every prior dimension, different

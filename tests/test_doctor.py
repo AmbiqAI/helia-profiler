@@ -177,7 +177,10 @@ def test_check_versions_never_raises_when_baseline_unavailable(monkeypatch) -> N
 
 
 def test_check_versions_flags_cmake_below_minimum(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.hostenv.toolchain_probe.cmake_version", lambda *, timeout_s: "cmake version 3.10.0")
+    monkeypatch.setattr(
+        "helia_profiler.hostenv.toolchain_probe.cmake_version",
+        lambda *, timeout_s: "cmake version 3.10.0",
+    )
 
     versions = check_versions()
 
@@ -189,7 +192,9 @@ def test_check_versions_flags_cmake_below_minimum(monkeypatch) -> None:
 
 
 def test_check_versions_cmake_unknown_when_banner_unparsable(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.hostenv.toolchain_probe.cmake_version", lambda *, timeout_s: "")
+    monkeypatch.setattr(
+        "helia_profiler.hostenv.toolchain_probe.cmake_version", lambda *, timeout_s: ""
+    )
 
     versions = check_versions()
 
@@ -200,7 +205,10 @@ def test_check_versions_cmake_unknown_when_banner_unparsable(monkeypatch) -> Non
 
 
 def test_check_versions_ok_when_cmake_meets_minimum(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.hostenv.toolchain_probe.cmake_version", lambda *, timeout_s: "cmake version 3.24.0")
+    monkeypatch.setattr(
+        "helia_profiler.hostenv.toolchain_probe.cmake_version",
+        lambda *, timeout_s: "cmake version 3.24.0",
+    )
 
     versions = check_versions()
 
@@ -211,7 +219,9 @@ def test_check_versions_ok_when_cmake_meets_minimum(monkeypatch) -> None:
 
 
 def test_check_versions_compiler_unknown_when_missing(monkeypatch) -> None:
-    monkeypatch.setattr("helia_profiler.hostenv.toolchain_probe.compiler_version", lambda *_a, **_kw: "")
+    monkeypatch.setattr(
+        "helia_profiler.hostenv.toolchain_probe.compiler_version", lambda *_a, **_kw: ""
+    )
 
     versions = check_versions()
 

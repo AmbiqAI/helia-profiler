@@ -178,9 +178,7 @@ class WireCriticality(StrEnum):
 
 ALL_ENGINES: frozenset[EngineType] = frozenset(EngineType)
 #: ``main.cc.j2`` renders identically for both — one template, two engine ids.
-TFLM_ENGINES: frozenset[EngineType] = frozenset(
-    {EngineType.TFLM, EngineType.HELIA_RT}
-)
+TFLM_ENGINES: frozenset[EngineType] = frozenset({EngineType.TFLM, EngineType.HELIA_RT})
 AOT_ENGINES: frozenset[EngineType] = frozenset({EngineType.HELIA_AOT})
 ET_ENGINES: frozenset[EngineType] = frozenset({EngineType.EXECUTORCH})
 #: Engines with a dedicated power binary. ExecuTorch has none — preflight

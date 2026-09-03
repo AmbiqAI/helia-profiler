@@ -190,8 +190,7 @@ def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
         )
     elif engine is EngineType.HELIA_AOT:
         verdicts = {
-            (f.subgraph_index, f.op_index): (f, aot_softmax_verdict(f.multiplier))
-            for f in findings
+            (f.subgraph_index, f.op_index): (f, aot_softmax_verdict(f.multiplier)) for f in findings
         }
         unsupported = [f for f, verdict in verdicts.values() if verdict == "error"]
         consequence = (

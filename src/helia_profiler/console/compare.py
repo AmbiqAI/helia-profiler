@@ -154,7 +154,9 @@ def _build_compare_layer_table(layer_rows: list[LayerDiffRow], *, top_layers: in
     return table
 
 
-def _build_compare_placement_table(layer_rows: list[LayerDiffRow], *, top_layers: int) -> Table | None:
+def _build_compare_placement_table(
+    layer_rows: list[LayerDiffRow], *, top_layers: int
+) -> Table | None:
     changed = [row for row in layer_rows if row.memory_changed]
     if not changed:
         return None

@@ -30,9 +30,7 @@ class ResolveJLinkProbeStage:
     def run(self, ctx: PipelineContext) -> None:
         soc = ctx.resolved_soc
         deadline = (
-            time.monotonic() + _POST_POWER_PROBE_TIMEOUT_S
-            if ctx.target_power_ensured
-            else None
+            time.monotonic() + _POST_POWER_PROBE_TIMEOUT_S if ctx.target_power_ensured else None
         )
         while True:
             try:

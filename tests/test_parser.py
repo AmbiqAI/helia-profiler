@@ -92,7 +92,11 @@ def test_target_profiled_infer_timing_metadata():
             "profiled_infer_total_us": "48000",
             "profiled_infer_avg_us": "8000",
         },
-        [_make_preset_block("basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]])],
+        [
+            _make_preset_block(
+                "basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]]
+            )
+        ],
     )
 
     result = parse_firmware_output(lines)
@@ -111,7 +115,11 @@ def test_clean_infer_timing_metadata():
             "clean_infer_avg_cycles": "2000",
             "clean_infer_avg_us": "21",
         },
-        [_make_preset_block("basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]])],
+        [
+            _make_preset_block(
+                "basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]]
+            )
+        ],
     )
 
     result = parse_firmware_output(lines)
@@ -136,7 +144,9 @@ def test_clean_window_stalled_iterations_are_captured():
     shipped before.
     """
     csv_block = [
-        _make_preset_block("basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]])
+        _make_preset_block(
+            "basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]]
+        )
     ]
 
     reported = parse_firmware_output(
@@ -210,11 +220,14 @@ def test_clean_infer_count_falls_back_to_announced_iters():
     The clean_window_begin heartbeat announces the same count BEFORE the
     window while the transport is reliably alive — it must serve as the
     fallback."""
-    lines = _wrap_session({"presets": "basic_cpu"}, [
-        _make_preset_block(
-            "basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]]
-        )
-    ])
+    lines = _wrap_session(
+        {"presets": "basic_cpu"},
+        [
+            _make_preset_block(
+                "basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]]
+            )
+        ],
+    )
     # Inject the heartbeat inside the session, no HPX_CLEAN_INFER_COUNT line.
     lines.insert(1, "HPX_HEARTBEAT phase=clean_window_begin iters=236 est_ms=4980")
 
@@ -242,7 +255,11 @@ def test_clean_infer_count_authoritative_line_wins_over_heartbeat():
 def test_system_clock_hz_metadata():
     lines = _wrap_session(
         {"presets": "basic_cpu", "system_clock_hz": "48000000"},
-        [_make_preset_block("basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]])],
+        [
+            _make_preset_block(
+                "basic_cpu", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "1000"]]
+            )
+        ],
     )
 
     result = parse_firmware_output(lines)
@@ -356,9 +373,7 @@ def _single_layer_iters(values: list[str]) -> list[str]:
 def test_median_is_default_and_rejects_wrap_and_frozen():
     """Default (median) drops a uint32-wrap and a frozen-zero (AP4 artifact)."""
     # iters: two frozen zeros, one uint32 underflow wrap, three healthy ~600k.
-    lines = _single_layer_iters(
-        ["0", "0", "3221837689", "600000", "601000", "599000"]
-    )
+    lines = _single_layer_iters(["0", "0", "3221837689", "600000", "601000", "599000"])
     result = parse_firmware_output(lines)
     # Surviving samples: 600000, 601000, 599000 -> median 600000.
     assert result.layers[0].cycles == 600000
@@ -405,9 +420,7 @@ def test_sparse_secondary_counter_zero_is_not_frozen():
     frozen-zero readout, or the stall median is biased upward and the user
     sees a confusing false alert.
     """
-    lines = _multi_counter_iters(
-        [("600000", "0"), ("601000", "34"), ("599000", "0")]
-    )
+    lines = _multi_counter_iters([("600000", "0"), ("601000", "34"), ("599000", "0")])
     result = parse_firmware_output(lines)
     layer = result.layers[0]
     assert layer.cycles == 600000
@@ -417,9 +430,7 @@ def test_sparse_secondary_counter_zero_is_not_frozen():
 
 def test_fully_frozen_row_is_dropped_across_all_counters():
     """An iteration whose entire PMU readout is zero is dropped for every counter."""
-    lines = _multi_counter_iters(
-        [("0", "0"), ("600000", "10"), ("602000", "12")]
-    )
+    lines = _multi_counter_iters([("0", "0"), ("600000", "10"), ("602000", "12")])
     result = parse_firmware_output(lines)
     layer = result.layers[0]
     # iter0 (all-zero row) dropped: median(600000, 602000) and median(10, 12).

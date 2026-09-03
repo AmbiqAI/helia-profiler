@@ -157,10 +157,7 @@ def _split_serial_map(raw: str) -> dict[str, str] | None:
     for item in [p.strip() for p in raw.split(",") if p.strip()]:
         board, sep, serial = item.partition("=")
         if not sep or not board.strip() or not serial.strip():
-            raise ValueError(
-                "--mlperf-jlink-serials entries must use board=serial, "
-                f"got {item!r}."
-            )
+            raise ValueError(f"--mlperf-jlink-serials entries must use board=serial, got {item!r}.")
         mapping[board.strip()] = serial.strip()
     return mapping
 
@@ -175,14 +172,15 @@ def _split_power_gpio_map(raw: str) -> dict[str, tuple[int, int, int]] | None:
         pins = [value.strip() for value in pins_raw.split(":")]
         if not sep or not board.strip() or len(pins) != 3:
             raise ValueError(
-                "--mlperf-power-gpios entries must use board=gate:state:go, "
-                f"got {item!r}."
+                f"--mlperf-power-gpios entries must use board=gate:state:go, got {item!r}."
             )
         try:
             gate, state, go = (int(value, 0) for value in pins)
             mapping[board.strip()] = (gate, state, go)
         except ValueError as exc:
-            raise ValueError(f"--mlperf-power-gpios GPIO pins must be integers, got {item!r}.") from exc
+            raise ValueError(
+                f"--mlperf-power-gpios GPIO pins must be integers, got {item!r}."
+            ) from exc
     return mapping
 
 

@@ -272,9 +272,7 @@ class TestPreflightGate:
         assert scaling(1e-9).has_usable_beta
         assert scaling(1.0).has_usable_beta
 
-    def test_the_gate_routes_a_no_beta_finding_to_its_own_error(
-        self, tmp_path, monkeypatch
-    ):
+    def test_the_gate_routes_a_no_beta_finding_to_its_own_error(self, tmp_path, monkeypatch):
         """Also bare-env: the BRANCH, not just the predicate.
 
         Deleting the no_beta branch entirely survived the bare suite, because
@@ -318,9 +316,7 @@ class TestPreflightGate:
         import importlib.util
 
         pytest.importorskip("ai_edge_litert.schema_py_generated")
-        tool = (
-            Path(__file__).parent.parent / "tools" / "gen_softmax_preflight_fixture.py"
-        )
+        tool = Path(__file__).parent.parent / "tools" / "gen_softmax_preflight_fixture.py"
         spec = importlib.util.spec_from_file_location("gen_fixture_nobeta", tool)
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
@@ -367,12 +363,8 @@ class TestPreflightGate:
         with pytest.raises(ConfigError, match="Softmax"):
             PreflightStage().run(ctx)
 
-    @pytest.mark.parametrize(
-        "engine", [EngineType.HELIA_RT, EngineType.TFLM, EngineType.HELIA_AOT]
-    )
-    def test_a_damaged_flatbuffer_is_an_error_not_a_stack_trace(
-        self, tmp_path, engine
-    ):
+    @pytest.mark.parametrize("engine", [EngineType.HELIA_RT, EngineType.TFLM, EngineType.HELIA_AOT])
+    def test_a_damaged_flatbuffer_is_an_error_not_a_stack_trace(self, tmp_path, engine):
         """Stage 0 must catch a corrupt file for EVERY TFLite engine.
 
         The round-1 whitelist returned before the parse for helia-aot, so a
@@ -455,9 +447,7 @@ def test_reader_agrees_with_litert_on_every_fixture():
                 ):
                     continue
                 quant = tensor.Quantization()
-                scale = (
-                    float(quant.Scale(0)) if quant and quant.ScaleLength() else None
-                )
+                scale = float(quant.Scale(0)) if quant and quant.ScaleLength() else None
                 beta = 0.0
                 if op.BuiltinOptionsType() == schema.BuiltinOptions.SoftmaxOptions:
                     options = schema.SoftmaxOptions()
@@ -565,9 +555,7 @@ class TestAotCompilerBoundaryTripwire:
         # a power of two is exact in binary floating point).
         scale = multiplier / (1 << 26)
         assert scale * (1 << 26) == multiplier, "sweep point not exactly representable"
-        fp = preprocess_softmax_scaling(
-            beta=1.0, input_scale=scale, scaled_diff_integer_bits=5
-        )
+        fp = preprocess_softmax_scaling(beta=1.0, input_scale=scale, scaled_diff_integer_bits=5)
         try:
             calculate_input_radius(
                 input_integer_bits=5, input_left_shift=fp.shift, total_signed_bits=31

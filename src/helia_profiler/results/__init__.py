@@ -23,6 +23,7 @@ from .artifacts import (
     PowerTerminalRecord,
     ProfileRun,
 )
+
 # Spec/family *classes* (IssueSpec, ComparabilitySpec, ComparabilityCodeFamily,
 # DimensionSpec) are deliberately not re-exported — only instances, registries,
 # and the enum vocabulary are public here. Import the classes from their

@@ -151,8 +151,7 @@ def progress_update(console: HpxConsole, update: ProgressUpdate) -> None:
         position = f" [dim]({console._stage_index}/{console._stage_total})[/dim]"
     phase = console._phase_name or "Setup"
     text = (
-        f"  [cyan]{phase}[/cyan] · {icon}  [bold]{label}[/bold]: "
-        f"{update.message}{suffix}{position}"
+        f"  [cyan]{phase}[/cyan] · {icon}  [bold]{label}[/bold]: {update.message}{suffix}{position}"
     )
     if console._spinner is None:
         console._spinner = console.status_console.status(

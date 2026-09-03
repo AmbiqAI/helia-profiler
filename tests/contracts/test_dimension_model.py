@@ -213,7 +213,9 @@ def test_manifest_writer_records_the_link_family(tmp_path: Path):
     from helia_profiler.results import PlatformInfo
 
     ctx = make_pmu_ctx(tmp_path, board="apollo510_evb", power_enabled=False)
-    ctx.run_metadata.platform = PlatformInfo(board="apollo510_evb", soc="apollo510", link_family="armlink")
+    ctx.run_metadata.platform = PlatformInfo(
+        board="apollo510_evb", soc="apollo510", link_family="armlink"
+    )
 
     recorded = _comparability(ctx)
 

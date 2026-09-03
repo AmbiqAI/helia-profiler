@@ -241,9 +241,7 @@ class EngineConfig:
         try:
             return EngineType(value)
         except ValueError as exc:
-            supported = ", ".join(
-                engine.value for engine in EngineType
-            )
+            supported = ", ".join(engine.value for engine in EngineType)
             raise ValueError(f"Invalid engine.type: {value!r}. Supported: {supported}") from exc
 
 

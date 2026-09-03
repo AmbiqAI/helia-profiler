@@ -44,9 +44,7 @@ from .usb_cdc import UsbCdcTransport
 _TRANSPORTS: dict[Transport, Callable[[], CaptureTransport]] = {}
 
 
-def register_transport(
-    transport: Transport, factory: Callable[[], CaptureTransport]
-) -> None:
+def register_transport(transport: Transport, factory: Callable[[], CaptureTransport]) -> None:
     """Register (or override) the backend factory used for ``transport``.
 
     ``factory`` is a zero-argument callable returning a fresh
@@ -67,10 +65,7 @@ def resolve_transport(transport: Transport) -> CaptureTransport:
     except (KeyError, ValueError) as exc:
         raise CaptureError(
             f"Unknown capture transport '{transport}'",
-            hint=(
-                "Available transports: "
-                f"{', '.join(sorted(t.value for t in _TRANSPORTS))}"
-            ),
+            hint=(f"Available transports: {', '.join(sorted(t.value for t in _TRANSPORTS))}"),
         ) from exc
 
 

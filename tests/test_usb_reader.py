@@ -22,7 +22,6 @@ def _port(device, **kw):
     return SimpleNamespace(device=device, **base)
 
 
-
 def test_find_cdc_port_raises_when_only_jlink_ports_exist(monkeypatch):
     monkeypatch.setattr(
         usb_reader,
@@ -130,13 +129,19 @@ def test_find_port_by_marker_matches_serial_number():
     assert marker is not None
     monkeypatch_ports = [
         _port("/dev/ttyACM0", manufacturer="SEGGER", product="J-Link", serial_number="1160001350"),
-        _port("/dev/ttyACM1", manufacturer="Ambiq", product="NSX HPX Profiler", serial_number=marker),
-        _port("/dev/ttyACM2", manufacturer="Ambiq", product="NSX USB Device", serial_number="000001"),
+        _port(
+            "/dev/ttyACM1", manufacturer="Ambiq", product="NSX HPX Profiler", serial_number=marker
+        ),
+        _port(
+            "/dev/ttyACM2", manufacturer="Ambiq", product="NSX USB Device", serial_number="000001"
+        ),
     ]
     import helia_profiler.transport.usb_cdc as mod
 
     orig = mod.list_ports.comports
-    mod.list_ports.comports = lambda: monkeypatch_ports  # ty: ignore[invalid-assignment]  # manual monkeypatch of the pyserial module attr
+    mod.list_ports.comports = (  # ty: ignore[invalid-assignment]
+        lambda: monkeypatch_ports
+    )  # manual monkeypatch of the pyserial module attr
     try:
         assert mod._find_port_by_marker(marker) == "/dev/ttyACM1"
         assert mod._find_port_by_marker("HPX-nope") is None
@@ -157,8 +162,18 @@ def test_resolve_cdc_port_prefers_marker(monkeypatch):
         usb_reader.list_ports,
         "comports",
         lambda: [
-            _port("/dev/ttyACM1", manufacturer="Ambiq", product="NSX USB Device", serial_number="000001"),
-            _port("/dev/ttyACM3", manufacturer="Ambiq", product="NSX HPX Profiler", serial_number=marker),
+            _port(
+                "/dev/ttyACM1",
+                manufacturer="Ambiq",
+                product="NSX USB Device",
+                serial_number="000001",
+            ),
+            _port(
+                "/dev/ttyACM3",
+                manufacturer="Ambiq",
+                product="NSX HPX Profiler",
+                serial_number=marker,
+            ),
         ],
     )
 
@@ -184,8 +199,15 @@ def test_find_cdc_port_rejects_foreign_hpx_device(monkeypatch):
         usb_reader.list_ports,
         "comports",
         lambda: [
-            _port("/dev/ttyACM0", manufacturer="SEGGER", product="J-Link", serial_number="1160001350"),
-            _port("/dev/ttyACM3", manufacturer="Ambiq", product="NSX HPX Profiler", serial_number=foreign),
+            _port(
+                "/dev/ttyACM0", manufacturer="SEGGER", product="J-Link", serial_number="1160001350"
+            ),
+            _port(
+                "/dev/ttyACM3",
+                manufacturer="Ambiq",
+                product="NSX HPX Profiler",
+                serial_number=foreign,
+            ),
         ],
     )
 
@@ -207,7 +229,12 @@ def test_resolve_cdc_port_does_not_fall_back_to_foreign_hpx(monkeypatch):
         usb_reader.list_ports,
         "comports",
         lambda: [
-            _port("/dev/ttyACM3", manufacturer="Ambiq", product="NSX HPX Profiler", serial_number=foreign),
+            _port(
+                "/dev/ttyACM3",
+                manufacturer="Ambiq",
+                product="NSX HPX Profiler",
+                serial_number=foreign,
+            ),
         ],
     )
 

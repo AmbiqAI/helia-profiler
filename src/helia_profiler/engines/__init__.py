@@ -88,7 +88,9 @@ _ADAPTER_FACTORIES: dict[EngineType, "Callable[[], EngineAdapter]"] = {
 }
 
 
-def register_engine_adapter(engine_type: EngineType, factory: "Callable[[], EngineAdapter]") -> None:
+def register_engine_adapter(
+    engine_type: EngineType, factory: "Callable[[], EngineAdapter]"
+) -> None:
     """Register (or override) the adapter factory for ``engine_type``.
 
     Exposed mainly for tests that need to stub an engine adapter without

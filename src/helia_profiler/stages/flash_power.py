@@ -25,10 +25,7 @@ class FlashPowerFirmwareStage:
             if ctx.power_run is not None
             else ctx.config.power.firmware
         )
-        return (
-            not ctx.config.power.enabled
-            or firmware_mode != PowerFirmware.DEDICATED
-        )
+        return not ctx.config.power.enabled or firmware_mode != PowerFirmware.DEDICATED
 
     def run(self, ctx: PipelineContext) -> None:
         from ..target.probe.flash import flash_binary
@@ -47,6 +44,7 @@ class FlashPowerFirmwareStage:
         ctx.report_progress(f"Deploying power firmware to {ctx.config.target.board}")
 
         jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
+
         def deploy() -> None:
             flash_binary(
                 binary_path,

@@ -104,9 +104,7 @@ def _is_foreign_hpx_port(port: str, expected_marker: str | None) -> bool:
     return serial.startswith(USB_MARKER_PREFIX) and serial != expected_marker
 
 
-def _drop_foreign_hpx_ports(
-    ports: list[str], expected_marker: str | None
-) -> list[str]:
+def _drop_foreign_hpx_ports(ports: list[str], expected_marker: str | None) -> list[str]:
     """Drop ports that belong to a *different* hpx board from *ports*."""
     return [p for p in ports if not _is_foreign_hpx_port(p, expected_marker)]
 
@@ -223,8 +221,7 @@ def _find_cdc_port(
     candidates = _drop_foreign_hpx_ports(_app_cdc_ports(), expected_marker)
     if len(candidates) == 1:
         log.warning(
-            "No new USB CDC device appeared; using the only application CDC "
-            "device present: %s",
+            "No new USB CDC device appeared; using the only application CDC device present: %s",
             candidates[0],
         )
         return candidates[0]
@@ -299,9 +296,7 @@ def capture_usb_output(
     try:
         if keep_attached:
             reset_stack.enter_context(
-                controller.attached_reset_session(
-                    device=jlink_device, jlink_serial=jlink_serial
-                )
+                controller.attached_reset_session(device=jlink_device, jlink_serial=jlink_serial)
             )
         else:
             controller.debug_reset(device=jlink_device, jlink_serial=jlink_serial)

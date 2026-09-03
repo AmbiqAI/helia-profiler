@@ -239,9 +239,7 @@ def test_real_gcc_fixture_inventory_classifies_correctly():
 
     import helia_profiler.hostenv.toolchain_probe as tp
 
-    text = (
-        Path(__file__).parent / "fixtures" / "readelf" / "sections.txt"
-    ).read_text()
+    text = (Path(__file__).parent / "fixtures" / "readelf" / "sections.txt").read_text()
 
     class _Result:
         returncode = 0
@@ -254,9 +252,7 @@ def test_real_gcc_fixture_inventory_classifies_correctly():
     # process-wide for the with-block. Kept because a module-local alias
     # would churn toolchain_probe for a test-only nicety.
     with mock.patch.object(tp.subprocess, "run", lambda *a, **k: _Result()):
-        inventory = _inventory_via_readelf(
-            Path("fw.elf"), readelf_cmd="readelf", timeout_s=5
-        )
+        inventory = _inventory_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5)
     assert inventory is not None
     sections, unparsed = inventory
     assert unparsed == 0
@@ -266,9 +262,7 @@ def test_real_gcc_fixture_inventory_classifies_correctly():
     # NSX's gcc scripts declare .text twice). The fixture happens to have
     # unique names; the keying models the idiom Phase 2 must copy.
     classified = {
-        (s.name, s.address): classify_address(s.address, windows)
-        for s in sections
-        if s.allocated
+        (s.name, s.address): classify_address(s.address, windows) for s in sections if s.allocated
     }
     assert classified == {
         (".text", 0x00410000): MemoryRegion.MRAM,

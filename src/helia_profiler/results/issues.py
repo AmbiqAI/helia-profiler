@@ -35,6 +35,7 @@ from types import MappingProxyType
 from typing import Mapping
 
 from ..errors import ReportError
+
 # Re-exported for compatibility: ComparisonDimension moved to the dimension
 # model in Phase 3; both import paths remain valid.
 from .dimensions import (
@@ -176,8 +177,7 @@ _ISSUE_SPECS: tuple[IssueSpec, ...] = (
     ),
     IssueSpec(
         IssueCode.POWER_OBSERVATION_DEGRADED,
-        "Power observation is diagnostic and not valid for efficiency "
-        "metrics.",
+        "Power observation is diagnostic and not valid for efficiency metrics.",
         severity=Severity.WARNING,
     ),
     IssueSpec(
@@ -192,14 +192,12 @@ _ISSUE_SPECS: tuple[IssueSpec, ...] = (
     ),
     IssueSpec(
         IssueCode.POWER_GATE_DURATION_MISMATCH,
-        "Measured power-gate duration does not agree with the expected "
-        "window.",
+        "Measured power-gate duration does not agree with the expected window.",
         severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.POWER_GATE_DURATION_UNVERIFIABLE,
-        "Power-gate duration cannot be verified because clean inference "
-        "timing is invalid.",
+        "Power-gate duration cannot be verified because clean inference timing is invalid.",
         severity=Severity.WARNING,
     ),
     IssueSpec(
@@ -225,8 +223,7 @@ _ISSUE_SPECS: tuple[IssueSpec, ...] = (
     ),
     IssueSpec(
         IssueCode.POWER_TERMINAL_INCOMPLETE,
-        "Power firmware completed a different inference count than "
-        "requested.",
+        "Power firmware completed a different inference count than requested.",
         severity=Severity.ERROR,
     ),
     IssueSpec(
@@ -236,21 +233,18 @@ _ISSUE_SPECS: tuple[IssueSpec, ...] = (
     ),
     IssueSpec(
         IssueCode.POWER_WINDOW_CLOCK_FROZEN,
-        "Power firmware reported zero elapsed time for completed "
-        "inferences.",
+        "Power firmware reported zero elapsed time for completed inferences.",
         internal_severity=Severity.ERROR,
         external_severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.POWER_WINDOW_CLOCK_MISMATCH,
-        "Firmware-reported window duration does not agree with the "
-        "independently measured window.",
+        "Firmware-reported window duration does not agree with the independently measured window.",
         severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.POWER_WINDOW_CLOCK_EXCEEDS_HOST_TIME,
-        "Firmware-reported window is longer than the host wall time that "
-        "contained it.",
+        "Firmware-reported window is longer than the host wall time that contained it.",
         severity=Severity.WARNING,
     ),
     IssueSpec(
@@ -338,20 +332,17 @@ _COMPARABILITY_SPECS: tuple[ComparabilitySpec, ...] = (
     ComparabilitySpec(
         ComparabilityCode.RESULT_DEGRADED,
         ComparabilitySeverity.INFORMATIVE,
-        "A result is degraded; affected metrics should be interpreted "
-        "cautiously.",
+        "A result is degraded; affected metrics should be interpreted cautiously.",
     ),
     ComparabilitySpec(
         ComparabilityCode.IDENTITY_MODEL_MISMATCH,
         ComparabilitySeverity.BLOCKING,
-        "Model SHA-256 differs; run-level performance deltas are not "
-        "comparable.",
+        "Model SHA-256 differs; run-level performance deltas are not comparable.",
     ),
     ComparabilitySpec(
         ComparabilityCode.METRIC_POWER_INTEGRITY_INVALID,
         ComparabilitySeverity.METRIC_BLOCKING,
-        "Power metrics omitted because a power result's integrity is not "
-        "valid.",
+        "Power metrics omitted because a power result's integrity is not valid.",
         metric_group=DIMENSION_REGISTRY[ComparisonDimension.POWER_INTEGRITY].metric_group,
     ),
     ComparabilitySpec(
@@ -401,8 +392,7 @@ class ComparabilityCodeFamily:
     def code_for(self, dimension: ComparisonDimension) -> str:
         if dimension not in self.dimensions:
             raise ReportError(
-                f"Dimension '{dimension}' is not part of the "
-                f"'{self.pattern}' comparability family."
+                f"Dimension '{dimension}' is not part of the '{self.pattern}' comparability family."
             )
         return f"{self._prefix}{dimension.value}{self._suffix}"
 

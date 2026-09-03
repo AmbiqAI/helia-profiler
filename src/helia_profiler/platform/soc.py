@@ -79,6 +79,7 @@ class SocOrigin(Enum):
     BUILTIN = "builtin"
     CUSTOM = "custom"
 
+
 # ---------------------------------------------------------------------------
 # SoC definition
 # ---------------------------------------------------------------------------
@@ -111,6 +112,7 @@ class MemoryRange:
     def contains(self, address: int) -> bool:
         """True if *address* falls inside this range."""
         return self.start <= address < self.end
+
 
 class PerfTier(Enum):
     """NSX CPU performance tier — maps directly to ``nsx_perf_mode_e``."""
@@ -349,6 +351,7 @@ def _register_soc(soc: SocDef) -> SocDef:
     registered = replace(soc, origin=SocOrigin.BUILTIN, registered_name=soc.name)
     _SOCS[registered.name] = registered
     return registered
+
 
 # --- AP3 family (Cortex-M4F) ------------------------------------------------
 

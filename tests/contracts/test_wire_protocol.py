@@ -308,9 +308,7 @@ def _matrix() -> list[_Render]:
             for engine in _ENGINES:
                 if soc not in _ENGINE_SOCS.get(engine, _SOCS):
                     continue
-                renders.append(
-                    _Render(f"{soc}|{transport}|{engine}", soc, transport, engine)
-                )
+                renders.append(_Render(f"{soc}|{transport}|{engine}", soc, transport, engine))
 
     # Power binary, every SoC family x engine that has one.
     for soc in _SOCS:
@@ -326,83 +324,115 @@ def _matrix() -> list[_Render]:
         # psram_needed, both placements, both binaries.
         _Render(
             "ap510|rtt|tflm|psram-arena",
-            "apollo510", "rtt", "tflm",
+            "apollo510",
+            "rtt",
+            "tflm",
             overrides={"arena_region": "psram"},
         ),
         _Render(
             "ap510|rtt|tflm|psram-weights",
-            "apollo510", "rtt", "tflm",
+            "apollo510",
+            "rtt",
+            "tflm",
             overrides={"weights_region": "psram"},
         ),
         _Render(
             "ap510|swo|tflm|psram-weights",
-            "apollo510", "swo", "tflm",
+            "apollo510",
+            "swo",
+            "tflm",
             overrides={"weights_region": "psram"},
         ),
         _Render(
             "ap510|rtt|tflm|psram-arena|power",
-            "apollo510", "rtt", "tflm", power_only=True,
+            "apollo510",
+            "rtt",
+            "tflm",
+            power_only=True,
             overrides={"arena_region": "psram"},
         ),
         _Render(
             "ap510|rtt|executorch|psram-weights",
-            "apollo510", "rtt", "executorch",
+            "apollo510",
+            "rtt",
+            "executorch",
             overrides={"weights_region": "psram"},
         ),
         # heliaAOT external arenas: bound only, blob in TCM, blob in PSRAM.
         _Render(
             "ap510|rtt|helia-aot|arenas-tcm",
-            "apollo510", "rtt", "helia-aot",
+            "apollo510",
+            "rtt",
+            "helia-aot",
             overrides={"arena_regions": [_TCM_REGION]},
         ),
         _Render(
             "ap510|rtt|helia-aot|arenas-blob",
-            "apollo510", "rtt", "helia-aot",
+            "apollo510",
+            "rtt",
+            "helia-aot",
             overrides={"arena_regions": [_TCM_REGION, _TCM_BLOB_REGION]},
         ),
         _Render(
             "ap510|rtt|helia-aot|arenas-psram-blob",
-            "apollo510", "rtt", "helia-aot",
+            "apollo510",
+            "rtt",
+            "helia-aot",
             overrides={"arena_regions": [_TCM_REGION, _PSRAM_BLOB_REGION]},
         ),
         _Render(
             "ap510|rtt|helia-aot|arenas-psram-blob|power",
-            "apollo510", "rtt", "helia-aot", power_only=True,
+            "apollo510",
+            "rtt",
+            "helia-aot",
+            power_only=True,
             overrides={"arena_regions": [_TCM_REGION, _PSRAM_BLOB_REGION]},
         ),
         # A PSRAM arena with no blob: the one render where the psram-arena and
         # blob-in-psram gates disagree, which is what makes them separable.
         _Render(
             "ap510|rtt|helia-aot|arenas-psram-noblob",
-            "apollo510", "rtt", "helia-aot",
+            "apollo510",
+            "rtt",
+            "helia-aot",
             overrides={"arena_regions": [_TCM_REGION, _PSRAM_REGION]},
         ),
         # Apollo3 burst, both engines that can reach an Apollo3 build (the
         # gate is per-engine, and heliaAOT renders its own template).
         _Render(
             "ap3p|rtt|tflm|burst",
-            "apollo3p", "rtt", "tflm",
+            "apollo3p",
+            "rtt",
+            "tflm",
             overrides={"apollo3_burst": True},
         ),
         _Render(
             "ap3p|rtt|helia-aot|burst",
-            "apollo3p", "rtt", "helia-aot",
+            "apollo3p",
+            "rtt",
+            "helia-aot",
             overrides={"apollo3_burst": True},
         ),
         # Clean-window trace: emitted on RTT, suppressed on SWO/UART.
         _Render(
             "ap3p|rtt|tflm|trace",
-            "apollo3p", "rtt", "tflm",
+            "apollo3p",
+            "rtt",
+            "tflm",
             overrides={"clean_window_trace": True},
         ),
         _Render(
             "ap3p|swo|tflm|trace",
-            "apollo3p", "swo", "tflm",
+            "apollo3p",
+            "swo",
+            "tflm",
             overrides={"clean_window_trace": True},
         ),
         _Render(
             "ap510|rtt|executorch|trace",
-            "apollo510", "rtt", "executorch",
+            "apollo510",
+            "rtt",
+            "executorch",
             overrides={"clean_window_trace": True},
         ),
         # The trace marker has THREE emission sites, one per window body, and
@@ -413,12 +443,16 @@ def _matrix() -> list[_Render]:
         # because they take that branch through different templates.
         _Render(
             "ap510|rtt|tflm|trace",
-            "apollo510", "rtt", "tflm",
+            "apollo510",
+            "rtt",
+            "tflm",
             overrides={"clean_window_trace": True},
         ),
         _Render(
             "ap510|rtt|helia-aot|trace",
-            "apollo510", "rtt", "helia-aot",
+            "apollo510",
+            "rtt",
+            "helia-aot",
             overrides={"clean_window_trace": True},
         ),
         # Busy-loop probe: replaces the window body and forces the STIMER
@@ -426,23 +460,39 @@ def _matrix() -> list[_Render]:
         # is also the only way ExecuTorch reaches the shared window.
         _Render(
             "ap510|rtt|tflm|busy-loop",
-            "apollo510", "rtt", "tflm", clean_window_probe="busy_loop",
+            "apollo510",
+            "rtt",
+            "tflm",
+            clean_window_probe="busy_loop",
         ),
         _Render(
             "ap3p|rtt|helia-aot|busy-loop",
-            "apollo3p", "rtt", "helia-aot", clean_window_probe="busy_loop",
+            "apollo3p",
+            "rtt",
+            "helia-aot",
+            clean_window_probe="busy_loop",
         ),
         _Render(
             "ap510|rtt|executorch|busy-loop",
-            "apollo510", "rtt", "executorch", clean_window_probe="busy_loop",
+            "apollo510",
+            "rtt",
+            "executorch",
+            clean_window_probe="busy_loop",
         ),
         _Render(
             "ap510|usb_cdc|executorch|busy-loop",
-            "apollo510", "usb_cdc", "executorch", clean_window_probe="busy_loop",
+            "apollo510",
+            "usb_cdc",
+            "executorch",
+            clean_window_probe="busy_loop",
         ),
         _Render(
             "ap3p|rtt|tflm|busy-loop|power",
-            "apollo3p", "rtt", "tflm", power_only=True, clean_window_probe="busy_loop",
+            "apollo3p",
+            "rtt",
+            "tflm",
+            power_only=True,
+            clean_window_probe="busy_loop",
         ),
         # Adaptive window sizing — the DEFAULT (config.DEFAULT_WINDOW_MODE is
         # "auto"; the matrix above pins "fixed" everywhere else). Rendered on
@@ -454,36 +504,56 @@ def _matrix() -> list[_Render]:
         # renders (see EST_MS_GAP and its census test below).
         _Render(
             "ap3p|rtt|tflm|auto-window",
-            "apollo3p", "rtt", "tflm", window_mode="auto",
+            "apollo3p",
+            "rtt",
+            "tflm",
+            window_mode="auto",
         ),
         _Render(
             "ap510|rtt|tflm|auto-window",
-            "apollo510", "rtt", "tflm", window_mode="auto",
+            "apollo510",
+            "rtt",
+            "tflm",
+            window_mode="auto",
         ),
         _Render(
             "ap510|rtt|executorch|auto-window",
-            "apollo510", "rtt", "executorch", window_mode="auto",
+            "apollo510",
+            "rtt",
+            "executorch",
+            window_mode="auto",
         ),
         # GPIO power gate armed.
         _Render(
             "ap510|rtt|tflm|power-sync",
-            "apollo510", "rtt", "tflm",
+            "apollo510",
+            "rtt",
+            "tflm",
             overrides={"power_sync_enabled": True},
         ),
         # Heartbeat by elapsed time rather than operator count.
         _Render(
             "ap510|rtt|tflm|hb-ms",
-            "apollo510", "rtt", "tflm",
+            "apollo510",
+            "rtt",
+            "tflm",
             overrides={"heartbeat_every_ms": 500, "heartbeat_every_n_ops": 0},
         ),
         # On-target INA228: the only source of the measurement payload.
         _Render(
             "ap510|rtt|tflm|ina228|power",
-            "apollo510", "rtt", "tflm", power_only=True, overrides=dict(_INA228_VARS),
+            "apollo510",
+            "rtt",
+            "tflm",
+            power_only=True,
+            overrides=dict(_INA228_VARS),
         ),
         _Render(
             "ap510|uart|helia-aot|ina228|power",
-            "apollo510", "uart", "helia-aot", power_only=True,
+            "apollo510",
+            "uart",
+            "helia-aot",
+            power_only=True,
             overrides=dict(_INA228_VARS),
         ),
         # Bystander INA228: an external instrument owns the measurement, so a
@@ -494,7 +564,10 @@ def _matrix() -> list[_Render]:
         # tokens from both.
         _Render(
             "ap510|rtt|tflm|ina228-bystander|power",
-            "apollo510", "rtt", "tflm", power_only=True,
+            "apollo510",
+            "rtt",
+            "tflm",
+            power_only=True,
             overrides={**_INA228_VARS, "ina228_required": False},
         ),
     ]
@@ -561,9 +634,7 @@ _PREDICATES = {
     "not power_only and transport != usb_cdc": (
         lambda v: not _power(v) and v["transport"] != "usb_cdc"
     ),
-    "not power_only and transport == rtt": (
-        lambda v: not _power(v) and v["transport"] == "rtt"
-    ),
+    "not power_only and transport == rtt": (lambda v: not _power(v) and v["transport"] == "rtt"),
     "power_only": _power,
     "power_only and power_monitor == ina228": (
         lambda v: _power(v) and v.get("power_monitor") == "ina228"
@@ -574,25 +645,20 @@ _PREDICATES = {
     "arena_region == psram": lambda v: v.get("arena_region") == "psram",
     "weights_region == psram": lambda v: v.get("weights_region") == "psram",
     "weights_region == psram and transport == rtt and not power_only": (
-        lambda v: v.get("weights_region") == "psram"
-        and v["transport"] == "rtt"
-        and not _power(v)
+        lambda v: v.get("weights_region") == "psram" and v["transport"] == "rtt" and not _power(v)
     ),
     "not allocate_arenas and arena_regions": _aot_external,
     "not allocate_arenas and arena_regions with placement == psram": _aot_psram,
     (
-        "not allocate_arenas and arena_regions with placement == psram "
-        "and not power_only"
+        "not allocate_arenas and arena_regions with placement == psram and not power_only"
     ): lambda v: _aot_psram(v) and not _power(v),
     "not allocate_arenas and arena_regions with blob_filename": _aot_blobs,
     (
-        "not allocate_arenas and arena_regions with blob_filename "
-        "and placement == psram"
+        "not allocate_arenas and arena_regions with blob_filename and placement == psram"
     ): _aot_psram_blobs,
     "busy_loop_probe": lambda v: bool(v["busy_loop_probe"]),
     "clean_window_trace and transport not in (swo, uart)": (
-        lambda v: bool(v.get("clean_window_trace"))
-        and v["transport"] not in ("swo", "uart")
+        lambda v: bool(v.get("clean_window_trace")) and v["transport"] not in ("swo", "uart")
     ),
     "not use_stimer_window": lambda v: not v["use_stimer_window"],
     "use_stimer_window and not power_only": (
@@ -679,9 +745,7 @@ _UNFLIPPABLE_PAIRS: dict[tuple[str, str], str] = {
     ("arena_region == psram", "helia-rt"): (
         "Same template as tflm, which carries the PSRAM-arena renders."
     ),
-    ("psram_needed", "helia-rt"): (
-        "Same template as tflm, which carries every PSRAM render."
-    ),
+    ("psram_needed", "helia-rt"): ("Same template as tflm, which carries every PSRAM render."),
     ("psram_needed and not power_only", "helia-rt"): (
         "Same template as tflm, which carries every PSRAM render."
     ),
@@ -742,11 +806,7 @@ def test_every_gate_is_flipped_both_ways_for_every_engine_in_its_scope():
             if condition is None:
                 continue
             predicate = _PREDICATES[condition]
-            results = {
-                predicate(render.vars)
-                for render in _MATRIX
-                if render.engine is engine
-            }
+            results = {predicate(render.vars) for render in _MATRIX if render.engine is engine}
             if True in results and False in results:
                 exercised.add((condition, engine.value))
                 continue
@@ -759,8 +819,7 @@ def test_every_gate_is_flipped_both_ways_for_every_engine_in_its_scope():
         "these gates are asserted for an engine the matrix never flips them "
         "for, so the spec's engine scope is documentation rather than a "
         "tested claim — add a render, or whitelist the pair in "
-        "_UNFLIPPABLE_PAIRS with the reason it cannot exist:\n  "
-        + "\n  ".join(sorted(gaps))
+        "_UNFLIPPABLE_PAIRS with the reason it cannot exist:\n  " + "\n  ".join(sorted(gaps))
     )
     stale = sorted(pair for pair in _UNFLIPPABLE_PAIRS if pair in exercised)
     assert not stale, (
@@ -768,11 +827,11 @@ def test_every_gate_is_flipped_both_ways_for_every_engine_in_its_scope():
         f"now flips them — drop the exemption: {stale}"
     )
     unknown = sorted(
-        pair
-        for pair in _UNFLIPPABLE_PAIRS
-        if pair[0] not in _PREDICATES or pair[1] not in _ENGINES
+        pair for pair in _UNFLIPPABLE_PAIRS if pair[0] not in _PREDICATES or pair[1] not in _ENGINES
     )
-    assert not unknown, f"_UNFLIPPABLE_PAIRS names a condition or engine that no longer exists: {unknown}"
+    assert not unknown, (
+        f"_UNFLIPPABLE_PAIRS names a condition or engine that no longer exists: {unknown}"
+    )
 
 
 def test_wire_key_round_trips_between_its_two_spellings():
@@ -818,9 +877,7 @@ def test_the_binary_axis_agrees_with_the_condition():
     """
     for token, spec in WIRE_REGISTRY.items():
         conditions = {spec.condition, *spec.engine_conditions.values()}
-        power_shaped = spec.kind is WireKind.TERMINAL or bool(
-            conditions & _POWER_ONLY_GATES
-        )
+        power_shaped = spec.kind is WireKind.TERMINAL or bool(conditions & _POWER_ONLY_GATES)
         expected = WireBinary.POWER if power_shaped else WireBinary.TRANSPORT
         assert spec.binary is expected, (
             f"{token}: binary={spec.binary.value} but its grammar/condition "
@@ -846,13 +903,11 @@ def test_render_emits_exactly_what_the_registry_declares(render: _Render):
 
     undeclared = sorted(actual - set(WIRE_REGISTRY))
     assert not undeclared, (
-        f"{render.label}: firmware prints tokens with no spec in "
-        f"helia_profiler.wire: {undeclared}"
+        f"{render.label}: firmware prints tokens with no spec in helia_profiler.wire: {undeclared}"
     )
     missing = sorted(expected - actual)
     assert not missing, (
-        f"{render.label}: the registry says these are emitted here and they "
-        f"are not: {missing}"
+        f"{render.label}: the registry says these are emitted here and they are not: {missing}"
     )
     unexpected = sorted(actual - expected)
     assert not unexpected, (
@@ -966,9 +1021,7 @@ def test_every_error_code_carries_a_hint():
     reopening it — an error code whose remediation nobody wrote down — a
     review decision rather than an accident.
     """
-    hintless = {code.value for code in FirmwareErrorCode} - {
-        code.value for code in _ERROR_HINTS
-    }
+    hintless = {code.value for code in FirmwareErrorCode} - {code.value for code in _ERROR_HINTS}
     assert hintless == set()
 
 
@@ -983,17 +1036,17 @@ def test_heartbeat_phase_catalogue():
         "warmup_done",
         "flushing",
     ]
-    assert {
-        spec.token for spec in WIRE_REGISTRY.values() if spec.kind is WireKind.HEARTBEAT
-    } == {heartbeat_token(phase) for phase in HeartbeatPhase}
+    assert {spec.token for spec in WIRE_REGISTRY.values() if spec.kind is WireKind.HEARTBEAT} == {
+        heartbeat_token(phase) for phase in HeartbeatPhase
+    }
 
 
 def test_tflm_init_heartbeat_keeps_its_t0_payload():
     """The one payload variant the phase catalogue cannot express."""
     tflm = _render("apollo510", "rtt", "tflm")
     aot = _render("apollo510", "rtt", "helia-aot")
-    assert 'HPX_HEARTBEAT phase=init t=0\\n' in tflm
-    assert 'HPX_HEARTBEAT phase=init\\n' in aot
+    assert "HPX_HEARTBEAT phase=init t=0\\n" in tflm
+    assert "HPX_HEARTBEAT phase=init\\n" in aot
 
 
 def test_clean_window_begin_is_the_protocol_critical_phase():
@@ -1022,14 +1075,10 @@ def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
     hold-floor and cap) are firmware/runtime/host facts a render census
     cannot observe — the host half is pinned by ``tests/test_transport.py``.
     """
-    assert EST_MS_GAP in WIRE_REGISTRY[
-        heartbeat_token(HeartbeatPhase.CLEAN_WINDOW_BEGIN)
-    ].note
+    assert EST_MS_GAP in WIRE_REGISTRY[heartbeat_token(HeartbeatPhase.CLEAN_WINDOW_BEGIN)].note
 
     zero = "HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=0\\n"
-    measured = (
-        "HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\\n"
-    )
+    measured = "HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\\n"
     # iters=1 is part of the busy contract: the window completes exactly one
     # busy pass, and on a lossy transport that drops HPX_CLEAN_INFER_COUNT
     # the host's iters fallback feeds the gate-duration check — a planned
@@ -1058,8 +1107,11 @@ def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
     for soc in ("apollo510", "apollo4p"):
         for wm in ("fixed", "auto"):
             busy = _render(
-                soc, "rtt", "tflm",
-                clean_window_probe="busy_loop", window_mode=wm,
+                soc,
+                "rtt",
+                "tflm",
+                clean_window_probe="busy_loop",
+                window_mode=wm,
             )
             assert target_literal in busy, (soc, wm)
             assert measured not in busy, (soc, wm)
@@ -1070,8 +1122,12 @@ def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
     for wm in ("fixed", "auto"):
         for probe in ("infer", "busy_loop"):
             power = _render(
-                "apollo510", "rtt", "tflm",
-                power_only=True, clean_window_probe=probe, window_mode=wm,
+                "apollo510",
+                "rtt",
+                "tflm",
+                power_only=True,
+                clean_window_probe=probe,
+                window_mode=wm,
             )
             assert zero in power, (wm, probe)
             assert measured not in power, (wm, probe)
@@ -1097,8 +1153,12 @@ def test_power_renders_measure_nothing_pre_window():
     for wm in ("fixed", "auto"):
         for probe in ("infer", "busy_loop"):
             power = _render(
-                "apollo4p", "rtt", "tflm",
-                power_only=True, clean_window_probe=probe, window_mode=wm,
+                "apollo4p",
+                "rtt",
+                "tflm",
+                power_only=True,
+                clean_window_probe=probe,
+                window_mode=wm,
             )
             assert power.count("dwt_init();") == 0, (wm, probe)
             assert "uint32_t wt0 = DWT->CYCCNT;" not in power, (wm, probe)
@@ -1225,8 +1285,7 @@ def _dunder_all_positions(source: str) -> set[tuple[int, int]]:
         if not isinstance(node, ast.Assign):
             continue
         if not any(
-            isinstance(target, ast.Name) and target.id == "__all__"
-            for target in node.targets
+            isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
         ):
             continue
         for element in ast.walk(node.value):
@@ -1249,8 +1308,7 @@ def _placeholder_free_fstring(text: str) -> str | None:
     except SyntaxError:
         return None
     if isinstance(node, ast.JoinedStr) and all(
-        isinstance(value, ast.Constant) and isinstance(value.value, str)
-        for value in node.values
+        isinstance(value, ast.Constant) and isinstance(value.value, str) for value in node.values
     ):
         # The all() guard above proves every value is a str Constant.
         return "".join(value.value for value in node.values)  # ty: ignore[unresolved-attribute]
@@ -1272,9 +1330,7 @@ def _constant_strings(source: str) -> list[tuple[tuple[int, int], str, str]]:
     stack: list[dict] = []
     for token in tokenize.generate_tokens(io.StringIO(source).readline):
         if _FSTRING_START is not None and token.type == _FSTRING_START:
-            stack.append(
-                {"pos": token.start, "parts": [], "text": [token.string], "interp": False}
-            )
+            stack.append({"pos": token.start, "parts": [], "text": [token.string], "interp": False})
             continue
         if stack:
             frame = stack[-1]
@@ -1286,9 +1342,7 @@ def _constant_strings(source: str) -> list[tuple[tuple[int, int], str, str]]:
                 stack.pop()
                 frame["text"].append(token.string)
                 if not frame["interp"]:
-                    found.append(
-                        (frame["pos"], "".join(frame["parts"]), "".join(frame["text"]))
-                    )
+                    found.append((frame["pos"], "".join(frame["parts"]), "".join(frame["text"])))
                 continue
             # Anything else inside the braces makes this an interpolation —
             # but a plain string nested in a placeholder is still a literal in

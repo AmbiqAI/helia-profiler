@@ -207,7 +207,9 @@ class TestLockstepArmBeforeReset:
         # tolerated by this path and irrelevant to the ordering under test.
         capture_power(
             ctx,
-            prepare_target=lambda *_: events.append("lifecycle_reset"),  # ty: ignore[invalid-argument-type]
+            prepare_target=lambda *_: events.append(
+                "lifecycle_reset"
+            ),  # ty: ignore[invalid-argument-type]
         )
         assert events.index("wait_ready") < events.index("signal_go")
 

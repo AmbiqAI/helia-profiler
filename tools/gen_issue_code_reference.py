@@ -63,10 +63,7 @@ wire-format change renames it.
 
 def _severity_cell(spec) -> str:
     if spec.mode_dependent:
-        return (
-            f"`{spec.internal_severity}` (internal) / "
-            f"`{spec.external_severity}` (external)"
-        )
+        return f"`{spec.internal_severity}` (internal) / `{spec.external_severity}` (external)"
     return f"`{spec.severity}`"
 
 

@@ -21,8 +21,7 @@ class PowerTerminalTransport(Protocol):
 
     transport: Transport
 
-    def collect(self, ctx: PipelineContext, *, timeout_s: float) -> PowerTerminalEnvelope:
-        ...
+    def collect(self, ctx: PipelineContext, *, timeout_s: float) -> PowerTerminalEnvelope: ...
 
 
 _TERMINAL_TRANSPORTS: dict[Transport, type[PowerTerminalTransport]] = {}
@@ -115,9 +114,7 @@ def _collect_serial_terminal(
         raise PowerError(
             f"No valid power terminal record received within {timeout_s:.1f}s: {last_error}"
         ) from last_error
-    raise PowerError(
-        f"No complete power terminal record received within {timeout_s:.1f}s."
-    )
+    raise PowerError(f"No complete power terminal record received within {timeout_s:.1f}s.")
 
 
 class UartPowerTerminalTransport:
@@ -128,9 +125,7 @@ class UartPowerTerminalTransport:
 
         from ..transport.uart import BAUD, find_jlink_vcom_port
 
-        port = find_jlink_vcom_port(
-            ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
-        )
+        port = find_jlink_vcom_port(ctx.resolved_jlink_serial or ctx.config.target.jlink_serial)
         try:
             with serial.Serial(port=port, baudrate=BAUD, timeout=0.1) as stream:
                 stream.reset_input_buffer()
@@ -196,9 +191,7 @@ class UsbCdcPowerTerminalTransport:
         from ..transport.usb_cdc import BAUD, resolve_cdc_port
         from ..transport.usb_identity import usb_marker_serial
 
-        marker = usb_marker_serial(
-            ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
-        )
+        marker = usb_marker_serial(ctx.resolved_jlink_serial or ctx.config.target.jlink_serial)
         port = (
             ctx.config.target.usb_port
             if ctx.config.target.usb_port is not None

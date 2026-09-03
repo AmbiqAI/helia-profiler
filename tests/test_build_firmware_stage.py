@@ -51,9 +51,7 @@ def test_missing_binary_sections_does_not_fail_successful_build(
     assert progress[-1].message == "Profile firmware ready"
 
 
-def test_measured_regions_wiring_passes_soc_and_linker_profile(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_measured_regions_wiring_passes_soc_and_linker_profile(tmp_path: Path, monkeypatch) -> None:
     """#177 (Sonnet m2): the stage->measure_memory_regions wiring —
     the ctx.soc gate, the engine-config linker_profile extraction, and the
     argument order — pinned end-to-end through the stage."""
@@ -83,35 +81,25 @@ def test_measured_regions_wiring_passes_soc_and_linker_profile(
         calls.append((bp, toolchain, soc.name, linker_profile))
         return None  # itcm profile degrades inside the real function
 
-    monkeypatch.setattr(
-        "helia_profiler.firmware.build_app", lambda _ctx: (build_dir, binary_path)
-    )
+    monkeypatch.setattr("helia_profiler.firmware.build_app", lambda _ctx: (build_dir, binary_path))
     monkeypatch.setattr(
         "helia_profiler.stages.build_firmware.binary_sections",
         lambda *_args, **_kwargs: None,
     )
-    monkeypatch.setattr(
-        "helia_profiler.stages.build_firmware.measure_memory_regions", _measure
-    )
+    monkeypatch.setattr("helia_profiler.stages.build_firmware.measure_memory_regions", _measure)
     monkeypatch.setattr(
         "helia_profiler.stages.build_firmware.compiler_version",
         lambda *_args, **_kwargs: "v",
     )
-    monkeypatch.setattr(
-        "helia_profiler.stages.build_firmware.cmake_version", lambda **_k: "v"
-    )
+    monkeypatch.setattr("helia_profiler.stages.build_firmware.cmake_version", lambda **_k: "v")
 
     BuildFirmwareStage().run(ctx)
 
-    assert calls == [
-        (binary_path, config.target.toolchain, "apollo510", "itcm")
-    ]
+    assert calls == [(binary_path, config.target.toolchain, "apollo510", "itcm")]
     assert ctx.memory_regions is None
 
 
-def test_measured_regions_skipped_without_resolved_soc(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_measured_regions_skipped_without_resolved_soc(tmp_path: Path, monkeypatch) -> None:
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")
     config = load_config(
@@ -138,16 +126,12 @@ def test_measured_regions_skipped_without_resolved_soc(
         "helia_profiler.stages.build_firmware.binary_sections",
         lambda *_args, **_kwargs: None,
     )
-    monkeypatch.setattr(
-        "helia_profiler.stages.build_firmware.measure_memory_regions", _explode
-    )
+    monkeypatch.setattr("helia_profiler.stages.build_firmware.measure_memory_regions", _explode)
     monkeypatch.setattr(
         "helia_profiler.stages.build_firmware.compiler_version",
         lambda *_args, **_kwargs: "v",
     )
-    monkeypatch.setattr(
-        "helia_profiler.stages.build_firmware.cmake_version", lambda **_k: "v"
-    )
+    monkeypatch.setattr("helia_profiler.stages.build_firmware.cmake_version", lambda **_k: "v")
 
     BuildFirmwareStage().run(ctx)
     assert ctx.memory_regions is None
@@ -194,9 +178,7 @@ def test_partial_nm_listing_is_refused(tmp_path: Path, monkeypatch) -> None:
         "helia_profiler.stages.build_firmware.compiler_version",
         lambda *_a, **_k: "v",
     )
-    monkeypatch.setattr(
-        "helia_profiler.stages.build_firmware.cmake_version", lambda **_k: "v"
-    )
+    monkeypatch.setattr("helia_profiler.stages.build_firmware.cmake_version", lambda **_k: "v")
 
     BuildFirmwareStage().run(ctx)
     assert ctx.memory_symbols is None
@@ -244,8 +226,6 @@ def test_find_target_binary_tiebreak_is_filesystem_order_independent(
     def reversed_glob(pattern, **kwargs):
         return list(reversed(real_glob(pattern, **kwargs)))
 
-    monkeypatch.setattr(
-        "helia_profiler.firmware.glob.glob", reversed_glob
-    )
+    monkeypatch.setattr("helia_profiler.firmware.glob.glob", reversed_glob)
     found = find_target_binary(tmp_path, "hpx_profiler")
     assert found == tmp_path / "aaa" / "hpx_profiler.axf"

@@ -133,7 +133,9 @@ class TestElementwise:
 
 @pytest.mark.skipif(not is_available(), reason="ai-edge-litert not installed")
 def test_quickstart_kws_model_reports_real_builtin_ops():
-    model_path = Path(__file__).resolve().parents[1] / "examples" / "quickstart" / "kws_model.tflite"
+    model_path = (
+        Path(__file__).resolve().parents[1] / "examples" / "quickstart" / "kws_model.tflite"
+    )
 
     analysis = analyze_model(model_path)
 

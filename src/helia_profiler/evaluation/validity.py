@@ -239,11 +239,16 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
 
         internal_mode = ctx.config.power.mode.value == "internal"
         if observation is None and not internal_mode:
-            issues.append(_error(IssueCode.POWER_OBSERVATION_MISSING, "Power observation is missing."))
+            issues.append(
+                _error(IssueCode.POWER_OBSERVATION_MISSING, "Power observation is missing.")
+            )
         if observation is not None:
             if observation.integrity == "invalid":
                 issues.append(
-                    _error(IssueCode.POWER_OBSERVATION_INVALID, "Power observation integrity is invalid.")
+                    _error(
+                        IssueCode.POWER_OBSERVATION_INVALID,
+                        "Power observation integrity is invalid.",
+                    )
                 )
             elif observation.integrity == "degraded":
                 issues.append(
@@ -300,7 +305,9 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 )
             if not terminal.gate_lowered:
                 issues.append(
-                    _error(IssueCode.POWER_GATE_NOT_LOWERED, "Power firmware did not confirm GATE low.")
+                    _error(
+                        IssueCode.POWER_GATE_NOT_LOWERED, "Power firmware did not confirm GATE low."
+                    )
                 )
             # Same helper the collect stage uses, so the two cannot disagree
             # about what the firmware was supposed to report -- the busy_loop
@@ -501,8 +508,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                         observer_agrees
                         and arbitration is not None
                         and arbitration.reference_deviation is not None
-                        and arbitration.reference_deviation
-                        > DRIFT_PLAUSIBLE_RATIO_DEVIATION
+                        and arbitration.reference_deviation > DRIFT_PLAUSIBLE_RATIO_DEVIATION
                     ):
                         # Observer agreement only proves the gate brackets what
                         # the firmware timed -- it cannot see a window whose
@@ -529,7 +535,9 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                     # ratio and drift note. Observer disagreement: the ERROR
                     # above already carries the story.
             elif observation.mode == "gpio_gated" and observer_agrees is None:
-                duration_issue = _assess_unrecorded_duration(ctx, observation.result.summary.duration_s)
+                duration_issue = _assess_unrecorded_duration(
+                    ctx, observation.result.summary.duration_s
+                )
                 if duration_issue is not None:
                     issues.append(duration_issue)
 
@@ -556,7 +564,9 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                             "unaffected.",
                         )
                     )
-            expected_count = terminal.completed_count if terminal is not None else plan.inference_count
+            expected_count = (
+                terminal.completed_count if terminal is not None else plan.inference_count
+            )
             if expected_count is not None and on_device.inference_count != expected_count:
                 issues.append(
                     _error(
@@ -576,7 +586,11 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
     elif ctx.power_result is not None:
         integrity = ctx.power_result.metadata.integrity
         if integrity == "invalid":
-            issues.append(_error(IssueCode.POWER_OBSERVATION_INVALID, "Power observation integrity is invalid."))
+            issues.append(
+                _error(
+                    IssueCode.POWER_OBSERVATION_INVALID, "Power observation integrity is invalid."
+                )
+            )
         elif integrity == "degraded":
             issues.append(
                 _warning(
@@ -643,9 +657,7 @@ def _assess_unrecorded_duration(ctx: PipelineContext, measured_s: float) -> Resu
         # check. Dormant today (capture_gated records gate_duration_integrity
         # whenever it runs, so this fallback needs an artifact that lacks it),
         # but the two must not be free to drift.
-        relative_tolerance=gate_relative_tolerance_for(
-            ctx.config.profiling.clean_window_probe
-        ),
+        relative_tolerance=gate_relative_tolerance_for(ctx.config.profiling.clean_window_probe),
     )
     if integrity.valid:
         return None
@@ -676,7 +688,9 @@ def _warning(code: IssueCode, message: str, **context: Any) -> ResultIssue:
     return _issue(code, Severity.WARNING, message, context)
 
 
-def _issue(code: IssueCode, severity: Severity, message: str, context: dict[str, Any]) -> ResultIssue:
+def _issue(
+    code: IssueCode, severity: Severity, message: str, context: dict[str, Any]
+) -> ResultIssue:
     """Single construction chokepoint: a code cannot ship at a severity its
     registry entry does not allow, so severity drift fails a test instead of
     landing in an artifact."""

@@ -102,10 +102,7 @@ class TestDegradation:
         import dataclasses
 
         custom = dataclasses.replace(get_soc("apollo510"), name="not-a-soc")
-        assert (
-            measure_memory_regions(Path("fw.elf"), "arm-none-eabi-gcc", custom)
-            is None
-        )
+        assert measure_memory_regions(Path("fw.elf"), "arm-none-eabi-gcc", custom) is None
 
     def test_tool_failure_degrades_to_none(self, monkeypatch):
         import helia_profiler.hostenv.toolchain_probe as tp
@@ -146,9 +143,7 @@ def test_unattributed_sections_are_flagged(monkeypatch):
         segments=(),
     )
     monkeypatch.setattr(mm, "section_inventory", lambda *a, **k: inventory)
-    measured = measure_memory_regions(
-        Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510")
-    )
+    measured = measure_memory_regions(Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510"))
     assert measured is not None
     assert len(measured.unattributed) == 1
     flag = measured.unattributed[0]
@@ -184,9 +179,7 @@ def test_armlink_join_uses_the_extent_not_the_window(monkeypatch):
         segments=(LoadSegment(0x00410000, 0x00410000, 16424, 45096),),
     )
     monkeypatch.setattr(mm, "section_inventory", lambda *a, **k: inventory)
-    measured = measure_memory_regions(
-        Path("fw.axf"), "armclang", get_soc("apollo510")
-    )
+    measured = measure_memory_regions(Path("fw.axf"), "armclang", get_soc("apollo510"))
     assert measured is not None
     assert measured.link_family == "armlink"
     dtcm = measured.region(MemoryRegion.DTCM)
@@ -215,15 +208,11 @@ def test_psram_landing_bytes_are_flagged_not_swallowed(monkeypatch):
     from helia_profiler.hostenv.toolchain_probe import ElfSection
 
     inventory = SectionInventory(
-        sections=(
-            ElfSection(".psram_data", 0x60000000, 4096, False, True, index=1),
-        ),
+        sections=(ElfSection(".psram_data", 0x60000000, 4096, False, True, index=1),),
         segments=(),
     )
     monkeypatch.setattr(mm, "section_inventory", lambda *a, **k: inventory)
-    measured = measure_memory_regions(
-        Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510")
-    )
+    measured = measure_memory_regions(Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510"))
     assert measured is not None
     assert [u.name for u in measured.unattributed] == [".psram_data"]
 
@@ -243,9 +232,7 @@ def test_unattributed_load_bytes_are_counted(monkeypatch):
         ),
     )
     monkeypatch.setattr(mm, "section_inventory", lambda *a, **k: inventory)
-    measured = measure_memory_regions(
-        Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510")
-    )
+    measured = measure_memory_regions(Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510"))
     assert measured is not None
     mram = measured.region(MemoryRegion.MRAM)
     assert mram is not None
@@ -264,9 +251,7 @@ def test_zero_length_orphan_sections_are_not_flagged(monkeypatch):
         segments=(),
     )
     monkeypatch.setattr(mm, "section_inventory", lambda *a, **k: inventory)
-    measured = measure_memory_regions(
-        Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510")
-    )
+    measured = measure_memory_regions(Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo510"))
     assert measured is not None
     assert measured.unattributed == ()
 
@@ -335,11 +320,7 @@ class TestSymbolInventory:
         class _Result:
             returncode = 0
             stderr = ""
-            stdout = (
-                text
-                if text is not None
-                else (FIXTURES / "symbols.txt").read_text()
-            )
+            stdout = text if text is not None else (FIXTURES / "symbols.txt").read_text()
 
         monkeypatch.setattr(tp.subprocess, "run", lambda *a, **k: _Result())
         return symbol_inventory(Path("fw.elf"), "arm-none-eabi-gcc")
@@ -440,22 +421,16 @@ class TestReconciliation:
         plan = self._plan(
             {
                 MemoryRegion.DTCM: [
-                    MemoryConsumer(
-                        name="tensor_arena", size=0x8000, kind=ConsumerKind.ARENA
-                    ),
+                    MemoryConsumer(name="tensor_arena", size=0x8000, kind=ConsumerKind.ARENA),
                     MemoryConsumer(
                         name="rtt_buffers",
                         size=0x8000 + 16 + 168,
                         kind=ConsumerKind.OTHER,
                     ),
-                    MemoryConsumer(
-                        name="usb_buffers", size=5120, kind=ConsumerKind.OTHER
-                    ),
+                    MemoryConsumer(name="usb_buffers", size=5120, kind=ConsumerKind.OTHER),
                 ],
                 MemoryRegion.PSRAM: [
-                    MemoryConsumer(
-                        name="model_psram_blob", size=1024, kind=ConsumerKind.WEIGHTS
-                    ),
+                    MemoryConsumer(name="model_psram_blob", size=1024, kind=ConsumerKind.WEIGHTS),
                 ],
             }
         )
@@ -610,16 +585,12 @@ class TestReviewRegressionPins:
         plan = TestReconciliation()._plan(
             {
                 MemoryRegion.PSRAM: [
-                    MemoryConsumer(
-                        name="model_flatbuffer", size=53744, kind=ConsumerKind.WEIGHTS
-                    ),
+                    MemoryConsumer(name="model_flatbuffer", size=53744, kind=ConsumerKind.WEIGHTS),
                 ],
             }
         )
         symbols = (SymbolEntry("_ZL10model_data", 0x20004000, 4, "b"),)
-        rec = reconcile_memory(
-            plan, TestReconciliation()._measured(), symbols
-        )
+        rec = reconcile_memory(plan, TestReconciliation()._measured(), symbols)
         (weights,) = rec.consumers
         assert weights.status == "unmatchable"
         assert weights.measured_size is None
@@ -635,17 +606,13 @@ class TestReviewRegressionPins:
         plan = TestReconciliation()._plan(
             {
                 MemoryRegion.DTCM: [
-                    MemoryConsumer(
-                        name="tensor_arena", size=0x8000, kind=ConsumerKind.ARENA
-                    ),
+                    MemoryConsumer(name="tensor_arena", size=0x8000, kind=ConsumerKind.ARENA),
                 ],
             }
         )
         # arena symbol at an SRAM address:
         symbols = (SymbolEntry("_ZL15g_arena_storage", 0x20090000, 0x8000, "b"),)
-        rec = reconcile_memory(
-            plan, TestReconciliation()._measured(), symbols
-        )
+        rec = reconcile_memory(plan, TestReconciliation()._measured(), symbols)
         (arena,) = rec.consumers
         assert arena.status == "matched" and arena.delta == 0
         assert arena.region == "DTCM"
@@ -695,9 +662,7 @@ def test_llvm_nm_capture_parses_with_the_same_regexes():
 
     text = (FIXTURES / "symbols_atfe.txt").read_text()
     rows = {
-        m.group(4): int(m.group(2), 16)
-        for m in map(_NM_SIZED_ROW_RE.match, text.splitlines())
-        if m
+        m.group(4): int(m.group(2), 16) for m in map(_NM_SIZED_ROW_RE.match, text.splitlines()) if m
     }
     assert rows["g_stack"] == 0x4000
     assert rows["g_initialized"] == 0x20

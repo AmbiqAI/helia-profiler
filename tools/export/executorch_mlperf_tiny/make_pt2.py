@@ -82,9 +82,7 @@ def main() -> None:
     manifest_path = args.fixture_root / "pt2_models.json"
     previous_models: dict = {}
     if manifest_path.is_file():
-        previous_models = json.loads(manifest_path.read_text(encoding="utf-8")).get(
-            "models", {}
-        )
+        previous_models = json.loads(manifest_path.read_text(encoding="utf-8")).get("models", {})
     manifest: dict = {
         "schema": "hpx.mlperf-tiny-pt2-fixtures",
         "schema_version": 2,
@@ -154,7 +152,9 @@ def main() -> None:
             "sha256": hashlib.sha256(pt2_bytes).hexdigest(),
             "byte_size": len(pt2_bytes),
         }
-        print(f"[{key}] wrote {out_path} ({len(pt2_bytes)} bytes, {sum(qdq_ops.values())} q/dq ops)")
+        print(
+            f"[{key}] wrote {out_path} ({len(pt2_bytes)} bytes, {sum(qdq_ops.values())} q/dq ops)"
+        )
 
     manifest_path = args.fixture_root / "pt2_models.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")

@@ -133,16 +133,12 @@ def _load_with(section: str | None = None, field: str | None = None, value=None)
     return load_config(None, cli)
 
 
-@pytest.mark.parametrize(
-    ("enum_cls", "expected"), _ENUM_VOCABULARIES, ids=_ENUM_VOCABULARY_IDS
-)
+@pytest.mark.parametrize(("enum_cls", "expected"), _ENUM_VOCABULARIES, ids=_ENUM_VOCABULARY_IDS)
 def test_config_enum_wire_values_are_stable(enum_cls, expected):
     assert {member.name: member.value for member in enum_cls} == expected
 
 
-@pytest.mark.parametrize(
-    ("enum_cls", "expected"), _ENUM_VOCABULARIES, ids=_ENUM_VOCABULARY_IDS
-)
+@pytest.mark.parametrize(("enum_cls", "expected"), _ENUM_VOCABULARIES, ids=_ENUM_VOCABULARY_IDS)
 def test_config_enum_members_stay_interchangeable_with_their_strings(enum_cls, expected):
     """StrEnum interop is load-bearing, not cosmetic.
 
@@ -188,9 +184,7 @@ def test_config_enum_field_accepts_every_legal_string(
     _ENUM_FIELDS,
     ids=_ENUM_FIELD_IDS,
 )
-def test_config_enum_field_rejects_unknown_value(
-    section, field, enum_cls, default, legal_values
-):
+def test_config_enum_field_rejects_unknown_value(section, field, enum_cls, default, legal_values):
     with pytest.raises(ConfigError) as excinfo:
         _load_with(section, field, "bogus")
     message = str(excinfo.value)
@@ -750,7 +744,6 @@ def test_profile_result_power_accepts_power_result_and_none():
     assert isinstance(result_power.power, PowerResult)
 
 
-
 def test_unknown_top_level_key_includes_path_and_suggestion():
     cli = {
         "model": {"path": "m.tflite"},
@@ -764,7 +757,6 @@ def test_unknown_top_level_key_includes_path_and_suggestion():
     message = str(exc_info.value)
     assert "verbsoe" in message
     assert "verbose" in message
-
 
 
 def test_unknown_nested_key_includes_dotted_path_and_suggestion():
@@ -782,7 +774,6 @@ def test_unknown_nested_key_includes_dotted_path_and_suggestion():
     assert "iterations" in message
 
 
-
 def test_unknown_section_name_includes_suggestion():
     cli = {
         "model": {"path": "m.tflite"},
@@ -796,7 +787,6 @@ def test_unknown_section_name_includes_suggestion():
     message = str(exc_info.value)
     assert "profilng" in message
     assert "profiling" in message
-
 
 
 def test_multiple_validation_errors_are_reported_together():
@@ -817,8 +807,6 @@ def test_multiple_validation_errors_are_reported_together():
     assert "power.stats_rate_hz must be >= 1" in message
 
 
-
-
 def test_non_dict_heartbeat_is_rejected():
     cli = {
         "model": {"path": "m.tflite"},
@@ -828,7 +816,6 @@ def test_non_dict_heartbeat_is_rejected():
 
     with pytest.raises(ConfigError, match="target.heartbeat"):
         load_config(None, cli)
-
 
 
 def test_direct_construction_still_coerces_strings():
@@ -851,7 +838,6 @@ def test_direct_construction_still_coerces_strings():
     assert target.toolchain is Toolchain.ARM_NONE_EABI_GCC
     assert power.mode is PowerMode.EXTERNAL
     assert power.firmware is PowerFirmware.SHARED
-
 
 
 def test_config_snapshot_serialization_is_json_safe():

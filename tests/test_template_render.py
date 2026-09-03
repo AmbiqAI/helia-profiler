@@ -218,32 +218,24 @@ class TestMainCcRender:
         assert 'hpx_power_terminal_fail("schema", 2U);' in out
         assert 'hpx_power_terminal_fail("resolver", 3U);' in out
         assert 'hpx_power_terminal_fail("allocate", 4U);' in out
-        assert out.index("hpx_sync_window_end();") < out.rindex(
-            "hpx_power_terminal_report("
-        )
+        assert out.index("hpx_sync_window_end();") < out.rindex("hpx_power_terminal_report(")
 
     def test_power_only_uart_enables_transport_after_gate(self):
         out = _render_tflm(transport="uart", power_only=True)
         assert "nsx_uart_printf_enable();" in out
-        assert out.index("hpx_sync_window_end();") < out.rindex(
-            "hpx_power_terminal_report("
-        )
+        assert out.index("hpx_sync_window_end();") < out.rindex("hpx_power_terminal_report(")
         assert "sys_cfg.debug.transport = NSX_DEBUG_NONE;" in out
 
     def test_power_only_swo_enables_transport_after_gate(self):
         out = _render_tflm(transport="swo", power_only=True)
         assert "nsx_itm_printf_enable();" in out
-        assert out.index("hpx_sync_window_end();") < out.rindex(
-            "hpx_power_terminal_report("
-        )
+        assert out.index("hpx_sync_window_end();") < out.rindex("hpx_power_terminal_report(")
         assert "sys_cfg.debug.transport = NSX_DEBUG_NONE;" in out
 
     def test_power_only_usb_initializes_transport_after_gate(self):
         out = _render_tflm(transport="usb_cdc", power_only=True)
         assert "nsx_usb_init(&g_usb_cfg)" in out
-        assert out.index("hpx_sync_window_end();") < out.rindex(
-            "hpx_power_terminal_report("
-        )
+        assert out.index("hpx_sync_window_end();") < out.rindex("hpx_power_terminal_report(")
         assert "sys_cfg.debug.transport = NSX_DEBUG_NONE;" in out
 
     def test_rtt_transport_includes_drain_helper(self):
@@ -364,9 +356,7 @@ class TestMainCcRender:
         assert "sys_cfg.perf_mode = NSX_PERF_HIGH;  // 250 MHz" in out
 
     def test_apollo3_burst_enabled_emits_burst_block(self):
-        out = _render_tflm(
-            transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=96
-        )
+        out = _render_tflm(transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=96)
         # No burst when the flag is off (default in helper).
         assert "am_hal_burst_mode_enable" not in out
         out = _env.get_template("main.cc.j2").render(
@@ -461,7 +451,6 @@ class TestMainCcRender:
         out = _render_tflm(transport="usb_cdc", usb_serial_marker=None)
         assert "g_hpx_usb_desc" not in out
         assert ".device_desc" not in out
-
 
     def test_rtt_transport_excludes_usb_timer(self):
         out = _render_tflm(transport="rtt")
@@ -574,9 +563,7 @@ class TestMainAotCcRender:
         )
         assert 'hpx_power_terminal_fail("bind_arena", 5U);' in out
         assert 'hpx_power_terminal_fail("model_init", 6U);' in out
-        assert out.index("hpx_sync_window_end();") < out.rindex(
-            "hpx_power_terminal_report("
-        )
+        assert out.index("hpx_sync_window_end();") < out.rindex("hpx_power_terminal_report(")
 
     def test_usb_transport_includes_timer_helpers(self):
         out = _render_aot(transport="usb_cdc")
@@ -769,32 +756,26 @@ class TestMainAotCcRender:
         infer_counts = re.findall(
             r"hpx_power_terminal_report\(\s*(?:true|false),\s*([^,\s]+),", infer
         )
-        assert set(infer_counts) == {"(uint32_t)clean_iters_n", "(uint32_t)2247"}, (
-            infer_counts
-        )
+        assert set(infer_counts) == {"(uint32_t)clean_iters_n", "(uint32_t)2247"}, infer_counts
 
     def test_busy_loop_probe_replaces_clean_window_body(self):
-        tflm_out = _render_tflm(
-            transport="rtt", window_mode="auto", clean_window_probe="busy_loop"
-        )
-        assert 'HPX_CLEAN_WINDOW_PROBE=busy_loop' in tflm_out
+        tflm_out = _render_tflm(transport="rtt", window_mode="auto", clean_window_probe="busy_loop")
+        assert "HPX_CLEAN_WINDOW_PROBE=busy_loop" in tflm_out
         # The busy-loop bound is calibrated against STIMER, then the gated
         # window itself runs a plain bounded counter loop with no live clock
         # reads at all — DWT lives in the debug power domain this probe
         # disables, so a live "while (DWT->CYCCNT - t0 < target)" loop as the
         # exit condition would hang forever once that domain is off
         # (regression found 2026-07-03: real firmware hang on hardware).
-        assert 'for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++)' in tflm_out
-        assert 'clean_count = 1;' in tflm_out
+        assert "for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++)" in tflm_out
+        assert "clean_count = 1;" in tflm_out
 
-        aot_out = _render_aot(
-            transport="rtt", window_mode="auto", clean_window_probe="busy_loop"
-        )
-        assert 'HPX_CLEAN_WINDOW_PROBE=busy_loop' in aot_out
-        assert 'for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++)' in aot_out
-        assert 'clean_count = 1;' in aot_out
-        assert 'am_hal_debug_disable();' in tflm_out
-        assert 'am_hal_debug_disable();' in aot_out
+        aot_out = _render_aot(transport="rtt", window_mode="auto", clean_window_probe="busy_loop")
+        assert "HPX_CLEAN_WINDOW_PROBE=busy_loop" in aot_out
+        assert "for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++)" in aot_out
+        assert "clean_count = 1;" in aot_out
+        assert "am_hal_debug_disable();" in tflm_out
+        assert "am_hal_debug_disable();" in aot_out
 
         # Pin the "no live DWT read in the window" rule against the RENDER, not
         # against one hypothetical spelling of the rejected design.  The old
@@ -866,9 +847,7 @@ class TestMainAotCcRender:
                 assert shutdown not in out
 
     @pytest.mark.parametrize("window_mode", ["fixed", "auto"])
-    def test_busy_loop_window_duration_is_measured_not_the_nominal_target(
-        self, window_mode: str
-    ):
+    def test_busy_loop_window_duration_is_measured_not_the_nominal_target(self, window_mode: str):
         """Regression, issue #112 (second half).
 
         ``clean_cycles = clean_probe_target_cyc`` made the terminal report echo
@@ -932,10 +911,10 @@ class TestMainAotCcRender:
         # so the loop can also test it for the zero that marks a stalled cycle
         # counter (#121); the DWT-timed accumulation itself is unchanged.
         for out in (tflm_out, aot_out):
-            assert 'uint32_t t0 = DWT->CYCCNT;' in out
-            assert 'const uint32_t clean_iter_cyc = (uint32_t)(DWT->CYCCNT - t0);' in out
-            assert 'clean_cycles += clean_iter_cyc;' in out
-            assert 'am_hal_debug_disable();' not in out
+            assert "uint32_t t0 = DWT->CYCCNT;" in out
+            assert "const uint32_t clean_iter_cyc = (uint32_t)(DWT->CYCCNT - t0);" in out
+            assert "clean_cycles += clean_iter_cyc;" in out
+            assert "am_hal_debug_disable();" not in out
 
     def test_dwt_only_aot_render_avoids_armv8m_pmu_api(self):
         out = _render_aot(transport="rtt", has_armv8m_pmu=False)
@@ -1132,6 +1111,7 @@ def test_pmu_storage_seam_rejects_unknown_vocabulary(monkeypatch):
             loader=ChoiceLoader([DictLoader({"seam_child.cc.j2": child}), base_loader])
         )
         import sys
+
         this_module = sys.modules[__name__]
         monkeypatch.setattr(this_module, "_env", overlay)
         render = _render_aot if base_template == "main_aot.cc.j2" else _render_tflm
@@ -1142,7 +1122,5 @@ def test_pmu_storage_seam_rejects_unknown_vocabulary(monkeypatch):
             # The error must NAME the seam and the vocabulary — a bare
             # "'dict object' has no attribute" sent the engine author to
             # the traceback (#172).
-            with pytest.raises(
-                UndefinedError, match="engine_pmu_storage_sram_resident"
-            ):
+            with pytest.raises(UndefinedError, match="engine_pmu_storage_sram_resident"):
                 render(transport="rtt", template_name="seam_child.cc.j2")

@@ -77,18 +77,14 @@ class TestIna228BoardPresets:
         """The Power Monitor Click has no onboard shunt; the preset knows its
         0x4A strapping but must refuse to run without a user shunt, and the
         error must explain the physical fix."""
-        with pytest.raises(
-            pydantic.ValidationError, match="IN1"
-        ):
+        with pytest.raises(pydantic.ValidationError, match="IN1"):
             Ina228Config(board="mikroe-power-monitor-click")
         ina = Ina228Config(board="mikroe-power-monitor-click", shunt_ohms=0.5)
         assert ina.resolved_shunt_ohms == 0.5
         assert ina.resolved_i2c_address == 0x4A
 
     def test_explicit_values_beat_the_preset(self):
-        ina = Ina228Config(
-            board="adafruit-ina228", shunt_ohms=0.1, i2c_address=0x41
-        )
+        ina = Ina228Config(board="adafruit-ina228", shunt_ohms=0.1, i2c_address=0x41)
         assert ina.resolved_shunt_ohms == 0.1
         assert ina.resolved_i2c_address == 0x41
 
@@ -236,9 +232,7 @@ class TestMonitorFirmwareGate:
     but measured nothing, silently invalidating a hardware sweep.
     """
 
-    def test_block_without_ina228_driver_still_builds_monitor_firmware(
-        self, tmp_path: Path
-    ):
+    def test_block_without_ina228_driver_still_builds_monitor_firmware(self, tmp_path: Path):
         config = _profile_config(
             tmp_path,
             {
@@ -285,9 +279,7 @@ class TestMonitorFirmwareGate:
     def test_monitor_selected_false_without_block_or_power(self, tmp_path: Path):
         (tmp_path / "a").mkdir()
         (tmp_path / "b").mkdir()
-        no_block = _profile_config(
-            tmp_path / "a", {"enabled": True, "driver": "joulescope"}
-        )
+        no_block = _profile_config(tmp_path / "a", {"enabled": True, "driver": "joulescope"})
         assert no_block.power.monitor_selected is False
         disabled = _profile_config(
             tmp_path / "b",
@@ -356,9 +348,7 @@ class TestPowerMonitorContext:
         assert monitor.ina228_shunt_micro_ohms == 15_000
         # 0.5 A x 0.015 ohm = 7.5 mV worst case -> high-resolution range
         assert monitor.ina228_adc_range == 1
-        assert monitor.ina228_calibration_id == (
-            "ina228:adafruit-ina228:r15000uohm:i500ma:adc1"
-        )
+        assert monitor.ina228_calibration_id == ("ina228:adafruit-ina228:r15000uohm:i500ma:adc1")
 
     def test_shunt_cal_matches_datasheet_formula(self, tmp_path: Path):
         """SHUNT_CAL = 13107.2e6 x CURRENT_LSB x R_shunt, x4 at ADCRANGE=1.
@@ -378,9 +368,7 @@ class TestPowerMonitorContext:
         assert monitor.ina228_adc_range == 0  # 0.25 V >> 40.96 mV
         assert monitor.ina228_shunt_cal == 6250
 
-    def test_shunt_cal_scales_by_four_on_the_high_resolution_range(
-        self, tmp_path: Path
-    ):
+    def test_shunt_cal_scales_by_four_on_the_high_resolution_range(self, tmp_path: Path):
         config = _profile_config(
             tmp_path,
             {
@@ -395,9 +383,7 @@ class TestPowerMonitorContext:
         assert monitor.ina228_adc_range == 1
         assert monitor.ina228_shunt_cal == 625 * 4
 
-    def test_shunt_cal_overflow_is_rejected_with_actionable_error(
-        self, tmp_path: Path
-    ):
+    def test_shunt_cal_overflow_is_rejected_with_actionable_error(self, tmp_path: Path):
         """SHUNT_CAL is a 15-bit register; an oversized current/shunt pair
         must fail at render time rather than silently truncating."""
         config = _profile_config(

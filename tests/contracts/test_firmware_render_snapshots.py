@@ -69,6 +69,7 @@ _MATRIX_ENGINES = [e for e in _ENGINES if e != "executorch"]
 def _socs_for(engine: str) -> list[str]:
     return _ENGINE_SOCS.get(engine, _SOCS)
 
+
 # Feature markers: substring -> human name.  Presence is the semantic snapshot.
 # A tuple token means any-of: used where the engine children spell the same
 # definition with different alignment padding, so no single substring exists.
@@ -333,9 +334,7 @@ def test_engine_wire_names_mirror_the_engine_type_property():
     shape #162 Phase 2 review found.  The literals are pinned too: these
     values go out on the wire and label every result for their engine.
     """
-    assert _ENGINE_WIRE_NAMES == {
-        engine.value: engine.wire_name for engine in EngineType
-    }
+    assert _ENGINE_WIRE_NAMES == {engine.value: engine.wire_name for engine in EngineType}
 
 
 def _finalize(kwargs: dict) -> dict:
@@ -419,9 +418,7 @@ def _render(
             executorch_temporary_arena_region="tcm",
             executorch_io_region="tcm",
         )
-        return _jinja_env.get_template("main_executorch.cc.j2").render(
-            **_resolve(kwargs)
-        )
+        return _jinja_env.get_template("main_executorch.cc.j2").render(**_resolve(kwargs))
     if engine not in ("tflm", "helia-rt"):
         # Production picks the template three ways (firmware/__init__.py:
         # HELIA_AOT -> main_aot.cc.j2, EXECUTORCH -> main_executorch.cc.j2,
@@ -452,9 +449,7 @@ def _render(
 def _digest(rendered: str) -> dict:
     markers = {
         name: (
-            any(tok in rendered for tok in token)
-            if isinstance(token, tuple)
-            else token in rendered
+            any(tok in rendered for tok in token) if isinstance(token, tuple) else token in rendered
         )
         for name, token in _MARKERS.items()
     }
@@ -483,9 +478,7 @@ _POWER_TRANSPORT = "rtt"
 
 
 def _power_combos() -> list[tuple[str, str, str]]:
-    return [
-        (soc, _POWER_TRANSPORT, engine) for soc in _SOCS for engine in _MATRIX_ENGINES
-    ]
+    return [(soc, _POWER_TRANSPORT, engine) for soc in _SOCS for engine in _MATRIX_ENGINES]
 
 
 # The matrices above pin clean_window_probe="infer" (the default).  The opt-in
@@ -513,11 +506,7 @@ def _power_busy_loop_combos() -> list[tuple[str, str, str]]:
 
 
 def _profile_busy_loop_combos() -> list[tuple[str, str, str]]:
-    return [
-        (soc, _BUSY_LOOP_TRANSPORT, engine)
-        for soc in _SOCS
-        for engine in _MATRIX_ENGINES
-    ]
+    return [(soc, _BUSY_LOOP_TRANSPORT, engine) for soc in _SOCS for engine in _MATRIX_ENGINES]
 
 
 def _key(
@@ -595,9 +584,7 @@ def _maybe_regenerate() -> None:
 
 _maybe_regenerate()
 
-_SNAPSHOTS: dict = (
-    json.loads(_SNAPSHOT_PATH.read_text()) if _SNAPSHOT_PATH.exists() else {}
-)
+_SNAPSHOTS: dict = json.loads(_SNAPSHOT_PATH.read_text()) if _SNAPSHOT_PATH.exists() else {}
 
 _REGEN_HINT = (
     "Firmware render output changed. If this change is intentional, review the "
@@ -613,8 +600,7 @@ _REGEN_HINT = (
 )
 def test_render_matches_snapshot(soc, transport, engine):
     assert _SNAPSHOTS, (
-        "no firmware render snapshot committed — generate it with "
-        "HPX_UPDATE_SNAPSHOTS=1"
+        "no firmware render snapshot committed — generate it with HPX_UPDATE_SNAPSHOTS=1"
     )
     key = _key(soc, transport, engine)
     assert key in _SNAPSHOTS, f"{key} missing from snapshot. {_REGEN_HINT}"
@@ -646,8 +632,7 @@ def test_power_only_render_matches_snapshot(soc, transport, engine):
     template files, just with the power_only branches taken.
     """
     assert _SNAPSHOTS, (
-        "no firmware render snapshot committed — generate it with "
-        "HPX_UPDATE_SNAPSHOTS=1"
+        "no firmware render snapshot committed — generate it with HPX_UPDATE_SNAPSHOTS=1"
     )
     key = _key(soc, transport, engine, power_only=True)
     assert key in _SNAPSHOTS, f"{key} missing from snapshot. {_REGEN_HINT}"
@@ -681,12 +666,9 @@ def test_power_only_busy_loop_render_matches_snapshot(soc, transport, engine):
     render rather than an unexercised one (issue #112).
     """
     assert _SNAPSHOTS, (
-        "no firmware render snapshot committed — generate it with "
-        "HPX_UPDATE_SNAPSHOTS=1"
+        "no firmware render snapshot committed — generate it with HPX_UPDATE_SNAPSHOTS=1"
     )
-    key = _key(
-        soc, transport, engine, power_only=True, clean_window_probe=_POWER_BUSY_LOOP_PROBE
-    )
+    key = _key(soc, transport, engine, power_only=True, clean_window_probe=_POWER_BUSY_LOOP_PROBE)
     assert key in _SNAPSHOTS, f"{key} missing from snapshot. {_REGEN_HINT}"
 
     current = _digest(
@@ -711,10 +693,7 @@ def test_power_only_busy_loop_render_matches_snapshot(soc, transport, engine):
 @pytest.mark.parametrize(
     "soc,transport,engine",
     _profile_busy_loop_combos(),
-    ids=[
-        _key(*c, clean_window_probe=_POWER_BUSY_LOOP_PROBE)
-        for c in _profile_busy_loop_combos()
-    ],
+    ids=[_key(*c, clean_window_probe=_POWER_BUSY_LOOP_PROBE) for c in _profile_busy_loop_combos()],
 )
 def test_profile_busy_loop_render_matches_snapshot(soc, transport, engine):
     """Transport-attached profile binary with the busy_loop probe.
@@ -726,15 +705,12 @@ def test_profile_busy_loop_render_matches_snapshot(soc, transport, engine):
     green.
     """
     assert _SNAPSHOTS, (
-        "no firmware render snapshot committed — generate it with "
-        "HPX_UPDATE_SNAPSHOTS=1"
+        "no firmware render snapshot committed — generate it with HPX_UPDATE_SNAPSHOTS=1"
     )
     key = _key(soc, transport, engine, clean_window_probe=_POWER_BUSY_LOOP_PROBE)
     assert key in _SNAPSHOTS, f"{key} missing from snapshot. {_REGEN_HINT}"
 
-    current = _digest(
-        _render(soc, transport, engine, clean_window_probe=_POWER_BUSY_LOOP_PROBE)
-    )
+    current = _digest(_render(soc, transport, engine, clean_window_probe=_POWER_BUSY_LOOP_PROBE))
     expected = _SNAPSHOTS[key]
 
     assert current["markers"] == expected["markers"], (
@@ -832,9 +808,7 @@ def test_window_is_never_timed_by_a_domain_the_binary_powers_down():
     for probe in _PROBES:
         for soc, transport, engine in _power_combos():
             code = _code_only(
-                _render(
-                    soc, transport, engine, power_only=True, clean_window_probe=probe
-                )
+                _render(soc, transport, engine, power_only=True, clean_window_probe=probe)
             )
             if "am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_DEBUG)" not in code:
                 continue
@@ -902,8 +876,7 @@ def test_stimer_init_verifies_the_crystal_against_an_independent_clock():
                 "every warm run and still cannot notice a dead crystal"
             )
             assert (
-                "HPX_STIMER_SETTLE_MIN_TICKS" in init
-                and "HPX_STIMER_SETTLE_MAX_TICKS" in init
+                "HPX_STIMER_SETTLE_MIN_TICKS" in init and "HPX_STIMER_SETTLE_MAX_TICKS" in init
             ), (
                 f"{case}: the probe reading is not compared against the band, "
                 "so any tick count -- including zero -- would count as settled"
@@ -1044,9 +1017,7 @@ def test_free_running_power_binary_never_times_the_window_with_dwt():
                 continue
             checked += 1
             code = _code_only(
-                _render(
-                    soc, transport, engine, power_only=True, clean_window_probe=probe
-                )
+                _render(soc, transport, engine, power_only=True, clean_window_probe=probe)
             )
             assert "DWT->CYCCNT" not in _clock_dependent_region(code), (
                 f"{soc}|{transport}|{engine}|{probe}: window (or the calibration "
@@ -1097,8 +1068,7 @@ def test_busy_loop_probe_reports_a_measured_duration_not_the_nominal_target():
         # The target may still be COMPUTED (it sizes the loop); what it must
         # never be is assigned into the reported cycle/duration accumulator.
         assert "clean_cycles = clean_probe_target" not in code, (
-            f"{label}: busy_loop reports the nominal window target as the "
-            "measured duration"
+            f"{label}: busy_loop reports the nominal window target as the measured duration"
         )
         assert "clean_stimer_total_us" in code, (
             f"{label}: busy_loop window has no measured duration source"
@@ -1164,8 +1134,7 @@ def test_busy_loop_terminal_report_requests_one_unit_not_the_inference_count():
         code = _code_only(_render(soc, transport, engine, power_only=True))
         report = _report_args(code)
         assert "clean_iters_n" in report, (
-            f"{soc}|{transport}|{engine}: infer probe stopped reporting the "
-            "planned inference count"
+            f"{soc}|{transport}|{engine}: infer probe stopped reporting the planned inference count"
         )
     assert checked, "busy_loop power matrix is empty"
 
@@ -1296,8 +1265,7 @@ def test_dwt_timed_clean_window_counts_stalled_iterations():
             begin = code.index("hpx_sync_window_begin();")
             window = code[begin : code.index("hpx_sync_window_end();", begin)]
             assert "clean_stalled_iters++" in window, (
-                f"{case}: the DWT-timed clean loop does not detect a frozen "
-                "cycle counter"
+                f"{case}: the DWT-timed clean loop does not detect a frozen cycle counter"
             )
             # The partial check is the one that matters for the shape the
             # exact-zero test cannot see: a counter that keeps advancing at a
@@ -1311,11 +1279,13 @@ def test_dwt_timed_clean_window_counts_stalled_iterations():
             assert "clean_low_cyc" in window, (
                 f"{case}: the partial check has no floor to compare against"
             )
-            for line in ("HPX_CLEAN_STALLED_ITERS", "HPX_CLEAN_PARTIAL_ITERS",
-                         "HPX_CLEAN_REF_CYCLES"):
+            for line in (
+                "HPX_CLEAN_STALLED_ITERS",
+                "HPX_CLEAN_PARTIAL_ITERS",
+                "HPX_CLEAN_REF_CYCLES",
+            ):
                 assert line in rendered, (
-                    f"{case}: {line} is computed but never reported, so the "
-                    "host cannot act on it"
+                    f"{case}: {line} is computed but never reported, so the host cannot act on it"
                 )
 
     assert checked, (
@@ -1362,8 +1332,7 @@ def test_partial_floor_comes_from_the_lowest_warm_sample_not_the_highest():
             )
             # And the check itself must not fire when the floor is dead.
             assert "clean_low_cyc > 0U" in region, (
-                f"{case}: the partial check does not guard against a zero "
-                "floor"
+                f"{case}: the partial check does not guard against a zero floor"
             )
 
     assert checked, (
@@ -1400,13 +1369,10 @@ def test_dwt_rate_probe_uses_a_clock_that_cannot_share_the_fault():
         )
         window_begin = region.find("hpx_sync_window_begin();")
         if window_begin != -1:
-            assert probe < window_begin, (
-                f"{case}: the rate probe runs inside the measured window"
-            )
+            assert probe < window_begin, f"{case}: the rate probe runs inside the measured window"
         for line in ("HPX_CLEAN_DWT_RATE_CYC", "HPX_CLEAN_DWT_RATE_US"):
             assert line in rendered, (
-                f"{case}: {line} is measured but never reported, so the host "
-                "cannot act on it"
+                f"{case}: {line} is measured but never reported, so the host cannot act on it"
             )
 
     assert checked, (
@@ -1443,9 +1409,7 @@ def test_attach_wait_budget_fits_the_power_capture_boot_allowance():
     from helia_profiler.stages.capture_power import _BOOT_SETTLE_S
 
     rendered = _render("apollo4p", "rtt", "tflm")
-    match = re.search(
-        r"#define\s+HPX_CLEAN_WINDOW_ATTACH_WAIT_MS\s+(\d+)U", rendered
-    )
+    match = re.search(r"#define\s+HPX_CLEAN_WINDOW_ATTACH_WAIT_MS\s+(\d+)U", rendered)
     assert match, "attach wait renders no nominal budget to check"
     budget_s = int(match.group(1)) / 1000.0
 
@@ -1499,9 +1463,7 @@ def test_hal_umbrella_header_is_included_at_most_once():
                     "with no AmbiqSuite HAL umbrella header in scope"
                 )
         for soc, transport, engine in _power_combos():
-            rendered = _render(
-                soc, transport, engine, power_only=True, clean_window_probe=probe
-            )
+            rendered = _render(soc, transport, engine, power_only=True, clean_window_probe=probe)
             assert rendered.count('#include "am_mcu_apollo.h"') <= 1, (
                 soc,
                 transport,
@@ -1524,10 +1486,7 @@ def test_snapshot_covers_exactly_the_current_matrix():
             _key(*c, power_only=True, clean_window_probe=_POWER_BUSY_LOOP_PROBE)
             for c in _power_busy_loop_combos()
         }
-        | {
-            _key(*c, clean_window_probe=_POWER_BUSY_LOOP_PROBE)
-            for c in _profile_busy_loop_combos()
-        }
+        | {_key(*c, clean_window_probe=_POWER_BUSY_LOOP_PROBE) for c in _profile_busy_loop_combos()}
     )
     assert set(_SNAPSHOTS) == expected_keys, _REGEN_HINT
 
@@ -1562,9 +1521,7 @@ def test_every_render_declares_its_engine_on_the_wire():
                 )
 
         for soc, transport, engine in _power_combos():
-            rendered = _render(
-                soc, transport, engine, power_only=True, clean_window_probe=probe
-            )
+            rendered = _render(soc, transport, engine, power_only=True, clean_window_probe=probe)
             assert "HPX_ENGINE=" not in rendered, (
                 f"{soc}|{transport}|{engine}|{probe}|power: the dedicated power "
                 "binary emits an HPX_ENGINE line, but it never brings a "
@@ -1609,7 +1566,9 @@ def test_ble_reset_only_in_power_only_binary_for_blue_boards():
         power_binary_needs_gpio=True,
     )
 
-    power_rendered = _jinja_env.get_template("main.cc.j2").render(**_finalize({**kwargs, "power_only": True}))
+    power_rendered = _jinja_env.get_template("main.cc.j2").render(
+        **_finalize({**kwargs, "power_only": True})
+    )
     assert "bleResetCfg" in power_rendered
     assert "NSX_GPIO_LEVEL_LOW" in power_rendered
     assert "nsx_gpio.h" in power_rendered
@@ -1694,7 +1653,9 @@ def test_extreme_mode_power_only_only():
         weights_region="tcm",
         extreme_mode=True,
     )
-    power_rendered = _jinja_env.get_template("main.cc.j2").render(**_finalize({**kwargs, "power_only": True}))
+    power_rendered = _jinja_env.get_template("main.cc.j2").render(
+        **_finalize({**kwargs, "power_only": True})
+    )
     assert "AM_HAL_PWRCTRL_NVM0_ONLY" in power_rendered
     assert "EXTREME MODE" in power_rendered
 
@@ -1802,7 +1763,6 @@ def test_ssram_full_power_enum_is_per_soc():
     ap510_rendered = _render("apollo510", "rtt", "tflm")
     assert "AM_HAL_PWRCTRL_SRAM_3M" in ap510_rendered
     assert "AM_HAL_PWRCTRL_SRAM_1P75M" not in ap510_rendered
-
 
     # AP3/AP5 never emit this block, even in the power_only binary --
     # matches AutoDeploy's own per-family ns_power_down_peripherals().

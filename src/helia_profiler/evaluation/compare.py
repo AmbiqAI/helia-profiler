@@ -155,9 +155,7 @@ def _dimension_row(dimension: ComparisonDimension) -> _ConfigField:
     Row ORDER stays hand-controlled below — it is rendered artifact content."""
     spec = DIMENSION_REGISTRY[dimension]
     if spec.source is not ArtifactSource.RUN_METADATA or spec.label is None:
-        raise ValueError(
-            f"{dimension} is not a run-metadata dimension with a display label."
-        )
+        raise ValueError(f"{dimension} is not a run-metadata dimension with a display label.")
     return _ConfigField(dimension.value, spec.label, spec.path, dimension=dimension)
 
 
@@ -188,6 +186,7 @@ _CONFIG_FIELDS: tuple[_ConfigField, ...] = (
     _dimension_row(ComparisonDimension.RUN_METADATA_SCHEMA_VERSION),
 )
 
+
 def compare_runs(
     baseline_dir: Path,
     candidate_dir: Path,
@@ -201,17 +200,13 @@ def compare_runs(
     comparability = assess_comparability(baseline, candidate)
     if not comparability.run_metrics_comparable:
         reasons = "; ".join(
-            issue.message
-            for issue in comparability.issues
-            if issue.severity.value == "blocking"
+            issue.message for issue in comparability.issues if issue.severity.value == "blocking"
         )
         raise ReportError(f"Results are not comparable: {reasons}")
 
     config_rows = _compare_config(baseline, candidate)
     include_groups = frozenset(
-        group
-        for group in ("power", "memory")
-        if comparability.metric_group_comparable(group)
+        group for group in ("power", "memory") if comparability.metric_group_comparable(group)
     )
     metrics = _compare_metrics(
         baseline.summary,
@@ -521,7 +516,16 @@ def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[Laye
         # source_index is an identifier (#218), not a metric, and
         # macs/ops/cycles_per_mac are DERIVED analysis enrichments (#218 D6)
         # — per-layer counter diffs carry measured counters only.
-        excluded = {"id", "op", "cycles", "overflow", "source_index", "macs", "ops", "cycles_per_mac"}
+        excluded = {
+            "id",
+            "op",
+            "cycles",
+            "overflow",
+            "source_index",
+            "macs",
+            "ops",
+            "cycles_per_mac",
+        }
         for key in sorted((set(b) & set(c)) - excluded):
             bf = to_float(b.get(key))
             cf = to_float(c.get(key))

@@ -50,9 +50,7 @@ class SupportBundleSection:
         if not isinstance(data, dict):
             raise ReportError("Support bundle section must be a JSON object.")
         try:
-            return cls(
-                name=data["name"], available=data["available"], reason=data.get("reason")
-            )
+            return cls(name=data["name"], available=data["available"], reason=data.get("reason"))
         except KeyError as exc:
             raise ReportError(f"Support bundle section is missing field: {exc}") from exc
 
@@ -125,9 +123,7 @@ class SupportBundleManifest:
             raise ReportError("Support bundle manifest must be a JSON object.")
         known = {item.name for item in fields(cls) if item.name != "extra"}
         try:
-            values: dict[str, Any] = {
-                key: value for key, value in data.items() if key in known
-            }
+            values: dict[str, Any] = {key: value for key, value in data.items() if key in known}
             values["sections"] = tuple(
                 SupportBundleSection.from_dict(item) for item in data.get("sections", [])
             )
@@ -147,7 +143,9 @@ class SupportBundleManifest:
         try:
             data = json.loads(manifest_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise ReportError(f"Cannot load support bundle manifest {manifest_path}: {exc}") from exc
+            raise ReportError(
+                f"Cannot load support bundle manifest {manifest_path}: {exc}"
+            ) from exc
         return cls.from_dict(data)
 
     def verify(self, bundle_dir: str | Path) -> None:
@@ -163,7 +161,9 @@ class SupportBundleManifest:
                 raise ReportError(f"Support bundle artifact path must be relative: {artifact.path}")
             artifact_path = (root / artifact.path).resolve()
             if not artifact_path.is_relative_to(root):
-                raise ReportError(f"Support bundle artifact escapes bundle directory: {artifact.path}")
+                raise ReportError(
+                    f"Support bundle artifact escapes bundle directory: {artifact.path}"
+                )
             if not artifact_path.is_file():
                 raise ReportError(f"Support bundle artifact is missing: {artifact.path}")
             if artifact_path.stat().st_size != artifact.size_bytes:

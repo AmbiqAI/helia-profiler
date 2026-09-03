@@ -190,7 +190,11 @@ def assess_comparability(
             continue
         baseline_value = baseline_dimensions.get(dimension)
         candidate_value = candidate_dimensions.get(dimension)
-        if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:
+        if (
+            baseline_value is not None
+            and candidate_value is not None
+            and baseline_value != candidate_value
+        ):
             message = (
                 DIMENSION_REGISTRY[dimension].mismatch_hint
                 or f"Power metrics omitted because {dimension} differs."
@@ -204,7 +208,10 @@ def assess_comparability(
                     candidate=candidate_value,
                 )
             )
-    for role, dimensions in (("baseline", baseline_dimensions), ("candidate", candidate_dimensions)):
+    for role, dimensions in (
+        ("baseline", baseline_dimensions),
+        ("candidate", candidate_dimensions),
+    ):
         integrity = dimensions.get(ComparisonDimension.POWER_INTEGRITY)
         if integrity not in (None, "valid"):
             issues.append(
@@ -229,7 +236,11 @@ def assess_comparability(
             break
         baseline_value = baseline_dimensions.get(dimension)
         candidate_value = candidate_dimensions.get(dimension)
-        if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:
+        if (
+            baseline_value is not None
+            and candidate_value is not None
+            and baseline_value != candidate_value
+        ):
             message = (
                 DIMENSION_REGISTRY[dimension].mismatch_hint
                 or f"Per-region memory metrics omitted because {dimension} differs."
@@ -265,7 +276,11 @@ def assess_comparability(
     for dimension in DIMENSION_DIFFERS.dimensions:
         baseline_value = baseline_dimensions.get(dimension)
         candidate_value = candidate_dimensions.get(dimension)
-        if baseline_value is not None and candidate_value is not None and baseline_value != candidate_value:
+        if (
+            baseline_value is not None
+            and candidate_value is not None
+            and baseline_value != candidate_value
+        ):
             issues.append(
                 _family_issue(
                     DIMENSION_DIFFERS,

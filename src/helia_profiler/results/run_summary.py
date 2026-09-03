@@ -583,9 +583,7 @@ class RunSummary:
             cache=data.get("cache"),
             model_analysis=data.get("model_analysis"),
             power=(PowerSection.from_dict(power) if isinstance(power, Mapping) else None),
-            latency=(
-                LatencySection.from_dict(latency) if isinstance(latency, Mapping) else None
-            ),
+            latency=(LatencySection.from_dict(latency) if isinstance(latency, Mapping) else None),
             extras={k: v for k, v in data.items() if k not in known},
         )
 

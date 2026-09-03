@@ -256,9 +256,7 @@ def _render_engine_context(tmp_path, engine: str, artifacts, arena_regions=None)
 
     ctx = make_pmu_ctx(tmp_path, board="apollo510_evb", engine=engine)
     ctx.engine_artifacts = artifacts
-    return FirmwareRenderContext.from_pipeline_context(
-        ctx, arena_regions=arena_regions
-    ).engine
+    return FirmwareRenderContext.from_pipeline_context(ctx, arena_regions=arena_regions).engine
 
 
 def test_from_pipeline_context_carries_the_aot_fields(tmp_path):
@@ -295,17 +293,13 @@ def test_from_pipeline_context_carries_the_executorch_fields(tmp_path):
 
 
 @pytest.mark.parametrize("engine_name", ["helia-rt", "tflm"])
-def test_from_pipeline_context_neutralizes_foreign_engine_fields(
-    tmp_path, engine_name
-):
+def test_from_pipeline_context_neutralizes_foreign_engine_fields(tmp_path, engine_name):
     """The neutral values non-owning engines receive are a contract, not an
     accident: aot_prefix reaches main_aot.cc.j2 only, so no render digest can
     see it change for a TFLM run — the #166 review's mutation of "" to "x"
     left the whole suite green. Pinned here directly instead."""
     engine_type = EngineType(engine_name)
-    engine = _render_engine_context(
-        tmp_path, engine_name, _build(engine_type)
-    )
+    engine = _render_engine_context(tmp_path, engine_name, _build(engine_type))
     assert engine.engine_type is engine_type
     assert engine.aot_prefix == ""
     assert engine.aot_op_manifest == ()
@@ -342,6 +336,4 @@ def test_the_pin_rejects_a_raw_string_engine_type():
 
 def test_the_base_class_is_not_constructible():
     with pytest.raises(TypeError, match="abstract"):
-        EngineArtifacts(
-            engine_type=EngineType.TFLM, engine_header=TFLM_ENGINE_HEADER
-        )
+        EngineArtifacts(engine_type=EngineType.TFLM, engine_header=TFLM_ENGINE_HEADER)

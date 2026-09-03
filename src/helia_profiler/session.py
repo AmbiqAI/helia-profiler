@@ -165,9 +165,7 @@ class Session:
             or isinstance(version, bool)
             or version != SESSION_INTENT_SCHEMA_VERSION
         ):
-            raise ConfigError(
-                f"Unsupported session snapshot version: {version!r}"
-            )
+            raise ConfigError(f"Unsupported session snapshot version: {version!r}")
         intent = data.get("intent")
         if not isinstance(intent, dict):
             raise ConfigError("Session snapshot intent must be a JSON object.")
@@ -363,8 +361,7 @@ class Session:
         config = self._utility_config(board=board)
         soc = get_soc_for_board(config.target.board, registry=config.platform_registry)
         return tuple(
-            inspect_probe_target(probe, device=soc.jlink_device)
-            for probe in self.probes()
+            inspect_probe_target(probe, device=soc.jlink_device) for probe in self.probes()
         )
 
     def match_probe(

@@ -118,8 +118,7 @@ class VerifyPlacementStage:
         address, _nm_type = resolved
         if expected.contains(address):
             log.info(
-                "Placement verified: arena in %s at 0x%08X "
-                "(0x%08X-0x%08X).",
+                "Placement verified: arena in %s at 0x%08X (0x%08X-0x%08X).",
                 str(arena_region).upper(),
                 address,
                 expected.start,
@@ -189,4 +188,3 @@ class VerifyPlacementStage:
                 "declaration and the linker script."
             ),
         )
-

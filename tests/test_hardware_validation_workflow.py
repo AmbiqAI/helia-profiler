@@ -11,11 +11,7 @@ def test_ns_cmsis_nn_default_matches_qualified_baseline() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     baseline = json.loads(
         (
-            repo_root
-            / "src"
-            / "helia_profiler"
-            / "data"
-            / "compatibility-baseline-v1.json"
+            repo_root / "src" / "helia_profiler" / "data" / "compatibility-baseline-v1.json"
         ).read_text()
     )
     workflow = (repo_root / ".github" / "workflows" / "hardware-validation.yml").read_text()

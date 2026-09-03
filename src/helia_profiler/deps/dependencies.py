@@ -150,18 +150,14 @@ def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[Depend
                 "requested": requested,
                 "content_hash": digest.to_dict(),
             }
-            provenance.append(
-                DependencyOverride("module", name, "path", requested, digest)
-            )
+            provenance.append(DependencyOverride("module", name, "path", requested, digest))
         elif override.ref is not None:
             inputs[name] = {"mode": "ref", "requested": override.ref}
             provenance.append(DependencyOverride("module", name, "ref", override.ref))
         else:
             assert override.version is not None
             inputs[name] = {"mode": "version", "requested": override.version}
-            provenance.append(
-                DependencyOverride("module", name, "version", override.version)
-            )
+            provenance.append(DependencyOverride("module", name, "version", override.version))
 
     engine_config = ctx.config.engine.config
     for key in ("dist_path", "source_path", "cmsis_nn_path"):
@@ -178,18 +174,12 @@ def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[Depend
     cmsis_nn_ref = engine_config.get("cmsis_nn_ref")
     if cmsis_nn_ref is not None:
         if not isinstance(cmsis_nn_ref, str) or not cmsis_nn_ref.strip():
-            raise DependencyError(
-                "engine.config.cmsis_nn_ref must be a non-empty git ref."
-            )
-        provenance.append(
-            DependencyOverride("engine", "cmsis_nn_ref", "ref", cmsis_nn_ref)
-        )
+            raise DependencyError("engine.config.cmsis_nn_ref must be a non-empty git ref.")
+        provenance.append(DependencyOverride("engine", "cmsis_nn_ref", "ref", cmsis_nn_ref))
     source = engine_config.get("source")
     if source is not None:
         if not isinstance(source, dict):
-            raise DependencyError(
-                "engine.config.source must contain a repository/ref mapping."
-            )
+            raise DependencyError("engine.config.source must contain a repository/ref mapping.")
         from ..engines.helia_rt.artifacts import HELIART_GH_REPO, HELIART_RELEASE_TAG
 
         repository = source.get("repo", HELIART_GH_REPO)
@@ -223,9 +213,7 @@ def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[Depend
         path = ctx.config.engine.config_path.expanduser()
         digest = _digest_path(path)
         provenance.append(
-            DependencyOverride(
-                "engine", "config_path", "path", normalize_path(path), digest
-            )
+            DependencyOverride("engine", "config_path", "path", normalize_path(path), digest)
         )
     return inputs, tuple(provenance)
 
@@ -534,7 +522,9 @@ def read_dependency_lock_provenance(
     )
     overrides = tuple(
         _state_override(index, value, state_path)
-        for index, value in enumerate(_state_sequence(raw.get("overrides"), "overrides", state_path))
+        for index, value in enumerate(
+            _state_sequence(raw.get("overrides"), "overrides", state_path)
+        )
     )
     requests = [
         DependencyRequest(
@@ -582,18 +572,14 @@ def read_dependency_lock_provenance(
         resolved=modules,
         overrides=overrides,
         qualification=qualification,
-        baseline_fingerprint=_state_string(
-            workspace, "baseline_fingerprint", state_path
-        ),
+        baseline_fingerprint=_state_string(workspace, "baseline_fingerprint", state_path),
         workspace_fingerprint=_state_string(workspace, "fingerprint", state_path),
         lock_mode=lock_mode,
         update_requested=update_requested,
     )
 
 
-def _verify_baseline_resolution(
-    ctx: PipelineContext, provenance: DependencyProvenance
-) -> None:
+def _verify_baseline_resolution(ctx: PipelineContext, provenance: DependencyProvenance) -> None:
     """Fail when the lock resolves a baseline-pinned project off its ref.
 
     The generated manifest *asserts* qualified refs; the NSX lock is the
@@ -610,9 +596,7 @@ def _verify_baseline_resolution(
         return
     baseline = compatibility.baseline
     pinned = {project.name: project.ref for project in baseline.projects}
-    engine_projects = {
-        engine.name for engine in baseline.engines if engine.ref is not None
-    }
+    engine_projects = {engine.name for engine in baseline.engines if engine.ref is not None}
     module_projects = {module.name: module.project for module in provenance.modules}
     skipped: set[str] = set()
     for override in provenance.overrides:
@@ -682,9 +666,7 @@ def _collect_provenance(
             requested_ref=module.constraint,
             requested_tag=module.tag,
             peeled_commit=module.commit,
-            content_hash=ContentDigest(
-                "sha256", module.content_hash.removeprefix("sha256:")
-            ),
+            content_hash=ContentDigest("sha256", module.content_hash.removeprefix("sha256:")),
             url=module.url,
             vendored_at=module.vendored_at,
         )
@@ -727,9 +709,7 @@ def _dependency_app_dir(path: Path) -> Path:
     resolved = path.expanduser().resolve()
     if resolved.is_file():
         if resolved.name not in {"nsx.lock", _DEPENDENCY_STATE}:
-            raise LockError(
-                f"Expected nsx.lock or {_DEPENDENCY_STATE}, got: {resolved}"
-            )
+            raise LockError(f"Expected nsx.lock or {_DEPENDENCY_STATE}, got: {resolved}")
         resolved = resolved.parent
     if (resolved / _DEPENDENCY_STATE).is_file():
         return resolved
@@ -752,17 +732,13 @@ def _state_mapping(
 ) -> Mapping[str, Any]:
     result = value.get(key)
     if not isinstance(result, Mapping):
-        raise LockError(
-            f"Dependency provenance field '{key}' must be an object: {state_path}"
-        )
+        raise LockError(f"Dependency provenance field '{key}' must be an object: {state_path}")
     return result
 
 
 def _state_sequence(value: Any, key: str, state_path: Path) -> list[Any]:
     if not isinstance(value, list):
-        raise LockError(
-            f"Dependency provenance field '{key}' must be an array: {state_path}"
-        )
+        raise LockError(f"Dependency provenance field '{key}' must be an array: {state_path}")
     return value
 
 
@@ -813,12 +789,13 @@ def _state_digest(value: Any, key: str, state_path: Path) -> ContentDigest:
         )
     algorithm = _state_string(value, "algorithm", state_path)
     digest = _state_string(value, "value", state_path)
-    if algorithm != "sha256" or len(digest) != 64 or any(
-        character not in "0123456789abcdef" for character in digest
+    if (
+        algorithm != "sha256"
+        or len(digest) != 64
+        or any(character not in "0123456789abcdef" for character in digest)
     ):
         raise LockError(
-            f"Dependency provenance field '{key}' must be a lowercase SHA-256 digest: "
-            f"{state_path}"
+            f"Dependency provenance field '{key}' must be a lowercase SHA-256 digest: {state_path}"
         )
     return ContentDigest(algorithm, digest)
 
@@ -828,9 +805,7 @@ def _state_module(name: str, value: Any, state_path: Path) -> DependencyModule:
         raise LockError(f"Dependency module '{name}' must be an object: {state_path}")
     vendored_at = value.get("vendored_at")
     if not isinstance(vendored_at, str):
-        raise LockError(
-            f"Dependency module '{name}' vendored_at must be a string: {state_path}"
-        )
+        raise LockError(f"Dependency module '{name}' vendored_at must be a string: {state_path}")
     return DependencyModule(
         name=name,
         project=_state_string(value, "project", state_path),
@@ -848,9 +823,7 @@ def _state_module(name: str, value: Any, state_path: Path) -> DependencyModule:
 
 def _state_override(index: int, value: Any, state_path: Path) -> DependencyOverride:
     if not isinstance(value, Mapping):
-        raise LockError(
-            f"Dependency override at index {index} must be an object: {state_path}"
-        )
+        raise LockError(f"Dependency override at index {index} must be an object: {state_path}")
     content_hash_raw = value.get("content_hash")
     return DependencyOverride(
         scope=_state_string(value, "scope", state_path),
@@ -885,9 +858,7 @@ def _atomic_json(path: Path, value: Any) -> None:
 
 def _atomic_copy(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_name(
-        f".{destination.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
-    )
+    temporary = destination.with_name(f".{destination.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
     try:
         shutil.copyfile(source, temporary)
         temporary.replace(destination)

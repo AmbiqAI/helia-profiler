@@ -102,8 +102,7 @@ def test_aggregate_gpi_reads_are_serialized():
 
     driver = FakeDriver()
     threads = [
-        threading.Thread(target=_read_gpi_snapshot, args=(driver, "u/js320/test"))
-        for _ in range(2)
+        threading.Thread(target=_read_gpi_snapshot, args=(driver, "u/js320/test")) for _ in range(2)
     ]
     for thread in threads:
         thread.start()

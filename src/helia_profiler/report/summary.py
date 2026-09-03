@@ -184,9 +184,7 @@ def _write_summary(
         if ctx.power_run is not None and ctx.power_run.terminal is not None:
             summary["power"]["terminal"] = asdict(ctx.power_run.terminal)
         if ctx.power_run is not None and ctx.power_run.on_device_summary is not None:
-            summary["power"]["on_device_summary"] = asdict(
-                ctx.power_run.on_device_summary
-            )
+            summary["power"]["on_device_summary"] = asdict(ctx.power_run.on_device_summary)
         # High-level summaries report only the gated (inference) portion. The
         # non-inference whole-capture window is annotated in the detailed power
         # CSV, not here, so users compare like-for-like inference energy.
@@ -203,15 +201,11 @@ def _write_summary(
         if power_meta.get("sync_timing_s") is not None:
             summary["power"]["sync_timing_s"] = power_meta["sync_timing_s"]
         if power_meta.get("gate_duration_integrity") is not None:
-            summary["power"]["gate_duration_integrity"] = power_meta[
-                "gate_duration_integrity"
-            ]
+            summary["power"]["gate_duration_integrity"] = power_meta["gate_duration_integrity"]
         if power_meta.get("power_plan") is not None:
             summary["power"]["power_plan"] = power_meta["power_plan"]
         if power_meta.get("short_gate_pulses_ignored") is not None:
-            summary["power"]["short_gate_pulses_ignored"] = power_meta[
-                "short_gate_pulses_ignored"
-            ]
+            summary["power"]["short_gate_pulses_ignored"] = power_meta["short_gate_pulses_ignored"]
         if power_meta.get("short_gate_pulse_diagnostics") is not None:
             summary["power"]["short_gate_pulse_diagnostics"] = power_meta[
                 "short_gate_pulse_diagnostics"
@@ -222,13 +216,10 @@ def _write_summary(
         # inferences: the busy_loop probe runs a calibrated spin, so both
         # derivation families below would fabricate. Same predicate
         # collect_power_terminal and evaluation.validity ask (#125).
-        probe_ran_inferences = probe_runs_inferences(
-            ctx.config.profiling.clean_window_probe
-        )
+        probe_ran_inferences = probe_runs_inferences(ctx.config.profiling.clean_window_probe)
         if not probe_ran_inferences:
             summary["power"]["per_inference_metrics_omitted"] = (
-                "clean_window_probe="
-                f"{ctx.config.profiling.clean_window_probe} runs no inferences"
+                f"clean_window_probe={ctx.config.profiling.clean_window_probe} runs no inferences"
             )
         if measurement_scope == "gpio_gated_clean_window":
             if ctx.power_result.gated_windows:
@@ -271,9 +262,7 @@ def _write_summary(
                         summary["power"]["gated_window_expected_duration_s"] = round(
                             integrity.expected_s, 6
                         )
-                        summary["power"]["gated_window_duration_ratio"] = round(
-                            integrity.ratio, 4
-                        )
+                        summary["power"]["gated_window_duration_ratio"] = round(integrity.ratio, 4)
                         if arb.suppress_per_inference:
                             summary["power"]["gated_window_duration_suspect"] = True
                             log.warning(
@@ -293,9 +282,7 @@ def _write_summary(
                         else:
                             drift_note = arb.drift_note
                             if drift_note is not None:
-                                summary["power"]["gated_window_reference_drift"] = (
-                                    drift_note
-                                )
+                                summary["power"]["gated_window_reference_drift"] = drift_note
                                 log.info(
                                     "Gated window %.4fs vs est*count %.4fs "
                                     "(ratio=%.3f) -- firmware STIMER window agrees "
@@ -308,9 +295,7 @@ def _write_summary(
                                     integrity.ratio,
                                 )
                             energy_per_infer = ps.energy_j / effective_count
-                            summary["power"]["energy_per_inference_j"] = round(
-                                energy_per_infer, 9
-                            )
+                            summary["power"]["energy_per_inference_j"] = round(energy_per_infer, 9)
                             if energy_per_infer > 0:
                                 summary["power"]["inferences_per_joule"] = round(
                                     1.0 / energy_per_infer,
@@ -491,9 +476,7 @@ def _write_summary(
     return out_path
 
 
-def _assert_model_owns_the_shape(
-    model: RunSummary, rendered: str, summary: dict[str, Any]
-) -> None:
+def _assert_model_owns_the_shape(model: RunSummary, rendered: str, summary: dict[str, Any]) -> None:
     """The written bytes must equal what this function assembled.
 
     Full round-trip equality, not just a keyset check (#205 review): a

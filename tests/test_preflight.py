@@ -356,6 +356,7 @@ class TestPreflightConfig:
             with pytest.raises(ConfigError, match="not supported"):
                 PreflightStage().run(ctx)
 
+
 class TestPreflightHostTools:
     def test_missing_neuralspotx_package_raises_with_hint(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)

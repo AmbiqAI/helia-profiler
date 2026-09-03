@@ -84,8 +84,8 @@ def _external_arena_mode(config: ProfileConfig) -> bool:
     memory plan and the generated firmware can disagree about where the
     tensors live (#219).
     """
-    return not config.engine.config.get("aot_args", {}).get("memory", {}).get(
-        "allocate_arenas", True
+    return (
+        not config.engine.config.get("aot_args", {}).get("memory", {}).get("allocate_arenas", True)
     )
 
 
@@ -227,9 +227,7 @@ class HeliaAOTAdapter:
         # BEFORE plan extraction, which needs it to hint the symbols the
         # templates actually emit in each mode (#179 review M-4).
         allocate_arenas = not _external_arena_mode(config)
-        memory_plan = _extract_memory_plan(
-            codegen_ctx, prefix, allocate_arenas=allocate_arenas
-        )
+        memory_plan = _extract_memory_plan(codegen_ctx, prefix, allocate_arenas=allocate_arenas)
         arena_regions = _extract_arena_regions(codegen_ctx, prefix)
 
         return HeliaAotArtifacts(

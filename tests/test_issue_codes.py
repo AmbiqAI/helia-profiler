@@ -28,7 +28,8 @@ from helia_profiler.results.issues import (
     COMPARABILITY_REGISTRY,
     DIMENSION_DIFFERS,
     ISSUE_REGISTRY,
-    MEMORY_DIMENSION_MISMATCH, POWER_DIMENSION_MISMATCH,
+    MEMORY_DIMENSION_MISMATCH,
+    POWER_DIMENSION_MISMATCH,
     ComparabilityCode,
     ComparisonDimension,
     IssueCode,
@@ -188,9 +189,7 @@ def test_no_bare_registered_code_literal_survives_in_src():
     # Match either quote style. A composed string (f"power.{name}") is beyond
     # a literal scan by construction; the emitter chokepoints and enum-typed
     # factory signatures are the guard for that shape.
-    pattern = re.compile(
-        "|".join(f"['\"]{re.escape(code)}['\"]" for code in sorted(codes))
-    )
+    pattern = re.compile("|".join(f"['\"]{re.escape(code)}['\"]" for code in sorted(codes)))
     offenders: list[str] = []
     for path in sorted(SRC.rglob("*.py")):
         if path == SRC / "results" / "issues.py":

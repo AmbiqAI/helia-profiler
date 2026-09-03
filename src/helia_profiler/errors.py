@@ -63,6 +63,7 @@ class BuildError(HpxError):
         self.details = details
         super().__init__(message, hint=hint)
 
+
 class CaptureError(HpxError):
     """Data capture failure — serial timeout, corrupt data, SWO framing."""
 

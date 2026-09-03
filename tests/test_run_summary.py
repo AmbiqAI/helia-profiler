@@ -215,9 +215,7 @@ def test_legacy_pair_precedence() -> None:
     documented order (kills the lens-2 surviving precedence mutants)."""
     both_energy = PowerSection.from_dict({"total_energy_uj": 1.0, "energy_uJ": 2.0})
     assert both_energy.energy_uj == 1.0
-    both_current = PowerSection.from_dict(
-        {"avg_current_ma": 3.0, "avg_current_a": 0.004}
-    )
+    both_current = PowerSection.from_dict({"avg_current_ma": 3.0, "avg_current_a": 0.004})
     assert both_current.avg_current_ma == 3.0
     both_power = PowerSection.from_dict({"avg_power_mw": 5.0, "avg_power_w": 0.008})
     assert both_power.avg_power_mw == 5.0

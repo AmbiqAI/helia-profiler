@@ -80,9 +80,7 @@ def _docstring(cls: type) -> str:
         return ""
     lines = doc.strip().splitlines()
     for i in range(len(lines) - 1):
-        if lines[i].strip() in ("Attributes", "Attributes:") and set(
-            lines[i + 1].strip()
-        ) == {"-"}:
+        if lines[i].strip() in ("Attributes", "Attributes:") and set(lines[i + 1].strip()) == {"-"}:
             lines = lines[:i]
             break
     return "\n".join(lines).rstrip()
@@ -256,9 +254,7 @@ def _split_root_section(sections: list[Section]) -> list[Section]:
     """
     root = sections[0]
     assert root.path == ()
-    nested_names = {
-        s.path[0] for s in sections[1:] if len(s.path) == 1 and s.path[0] != "<name>"
-    }
+    nested_names = {s.path[0] for s in sections[1:] if len(s.path) == 1 and s.path[0] != "<name>"}
     top_level_rows = [row for row in root.rows if row.key not in nested_names]
     rest = sections[1:]
     top_section = Section(path=("__top_level__",), cls=cfg.ProfileConfig, rows=top_level_rows)
@@ -299,8 +295,8 @@ def render() -> str:
     lines.append("")
 
     for section in sections:
-        title = "Top-level keys" if section.path == ("__top_level__",) else _section_title(
-            section.path
+        title = (
+            "Top-level keys" if section.path == ("__top_level__",) else _section_title(section.path)
         )
         lines.append(f"## `{title}`" if section.path != ("__top_level__",) else f"## {title}")
         lines.append("")

@@ -114,9 +114,7 @@ def main() -> None:
                 for name in facts["operators"]
                 if not name.startswith(("cortex_m::", "cortex_m_ns::"))
             )
-            ns_ops = sorted(
-                name for name in facts["operators"] if name.startswith("cortex_m_ns::")
-            )
+            ns_ops = sorted(name for name in facts["operators"] if name.startswith("cortex_m_ns::"))
             entry["providers"][provider] = {
                 "pte": pte_path.name,
                 "sha256": hashlib.sha256(pte_path.read_bytes()).hexdigest(),
@@ -125,8 +123,10 @@ def main() -> None:
                 "cortex_m_ns_ops": ns_ops,
                 **facts,
             }
-            print(f"[{key}/{provider}] {pte_path.name}: "
-                  f"planned={facts['planned_arena_size']} portable={portable_ops} ns={ns_ops}")
+            print(
+                f"[{key}/{provider}] {pte_path.name}: "
+                f"planned={facts['planned_arena_size']} portable={portable_ops} ns={ns_ops}"
+            )
         manifest["models"][key] = entry
 
     manifest_path = args.output_dir / "nsx_aot_manifest.json"

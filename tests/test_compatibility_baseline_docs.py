@@ -88,9 +88,7 @@ def test_every_baseline_entry_has_a_doc_row_with_its_ref():
                     "table (expected as 'key=value')"
                 )
         if "ref" in engine:
-            assert engine["ref"][:8] in table, (
-                f"engine '{name}' ref missing from the doc table"
-            )
+            assert engine["ref"][:8] in table, f"engine '{name}' ref missing from the doc table"
         if engine.get("governed_by_modules"):
             row = next(line for line in table.splitlines() if f"| {doc_name} |" in line)
             assert "governed" in row, f"'{doc_name}' row no longer states module governance"

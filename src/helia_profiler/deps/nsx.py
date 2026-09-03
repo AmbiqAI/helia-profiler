@@ -148,7 +148,12 @@ def build(
     ``hpx_profiler_power``) to build additional executables from the same
     NSX/CMake project without a second configure.
     """
-    log.info("nsx build: %s (toolchain=%s, target=%s)", app_dir, toolchain or "default", target or "default")
+    log.info(
+        "nsx build: %s (toolchain=%s, target=%s)",
+        app_dir,
+        toolchain or "default",
+        target or "default",
+    )
     emit = emitter_for_verbosity(verbose)
     _translate(
         "nsx build",

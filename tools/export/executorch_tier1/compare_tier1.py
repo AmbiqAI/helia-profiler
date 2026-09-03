@@ -60,8 +60,9 @@ def main() -> None:
         arm = rows["arm"][index] if index < len(rows["arm"]) else None
         ns = rows["ns"][index] if index < len(rows["ns"]) else None
         print(
-            f"| {index} "
-            f"| {arm['op'] if arm else ''} | {arm['cycles']:,.0f}" if arm else f"| {index} | | ",
+            f"| {index} | {arm['op'] if arm else ''} | {arm['cycles']:,.0f}"
+            if arm
+            else f"| {index} | | ",
             end="",
         )
         print(f" | {ns['op'] if ns else ''} | {ns['cycles']:,.0f} |" if ns else " | | |")

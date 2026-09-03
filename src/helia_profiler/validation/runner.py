@@ -627,29 +627,21 @@ def run_case(
                 result.energy_per_inference_uj = power.energy_per_inference_uj
                 if power.inferences_per_joule is not None:
                     result.inferences_per_joule = float(power.inferences_per_joule)
-                result.gated_window_duration_suspect = bool(
-                    power.gated_window_duration_suspect
-                )
-                result.gate_duration_integrity_valid = (
-                    power.gate_duration_integrity_valid
-                )
+                result.gated_window_duration_suspect = bool(power.gated_window_duration_suspect)
+                result.gate_duration_integrity_valid = power.gate_duration_integrity_valid
                 result.gated_window_reference_drift = (
                     str(power.gated_window_reference_drift)
                     if power.gated_window_reference_drift is not None
                     else None
                 )
                 result.power_observation_mode = (
-                    str(power.observation_mode)
-                    if power.observation_mode is not None
-                    else None
+                    str(power.observation_mode) if power.observation_mode is not None else None
                 )
                 result.power_observation_integrity = (
                     str(power.integrity) if power.integrity is not None else None
                 )
                 result.power_gate_failure_kind = power.gate_failure_kind
-                result.gate_duration_unarbitrated_failure = (
-                    power.gate_duration_unarbitrated_failure
-                )
+                result.gate_duration_unarbitrated_failure = power.gate_duration_unarbitrated_failure
         except (ValueError, TypeError, OSError) as exc:
             # TypeError included (#205 review): a hostile artifact shape must
             # fail THIS case, not crash the whole validation sweep.

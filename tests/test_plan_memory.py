@@ -534,10 +534,7 @@ class TestHpxOwnedConsumers:
         PlanMemoryStage().run(ctx)
         assert ctx.memory_plan is not None
         records = [
-            c
-            for r in ctx.memory_plan.regions
-            for c in r.consumers
-            if c.name == "pmu_layer_records"
+            c for r in ctx.memory_plan.regions for c in r.consumers if c.name == "pmu_layer_records"
         ]
         assert [c.size for c in records] == [2048 * 24 + 56]
 
@@ -546,9 +543,7 @@ class TestHpxOwnedConsumers:
         no NSX_MEM_SRAM_BSS (falls to .bss -> DTCM). TFLM/heliaRT's
         g_profiler uses the former; AOT's g_layers the latter — the region
         must follow the ENGINE's macro."""
-        ctx_rt = _make_ctx(
-            tmp_path, {"target": {"board": "apollo5b_evb"}}
-        )
+        ctx_rt = _make_ctx(tmp_path, {"target": {"board": "apollo5b_evb"}})
         PlanMemoryStage().run(ctx_rt)
         assert ctx_rt.memory_plan is not None
         sram = ctx_rt.memory_plan.region("SRAM")
@@ -612,22 +607,15 @@ class TestHpxOwnedConsumers:
         stack3 = [c for c in sram.consumers if c.name == "boot_stack"]
         assert [c.size for c in stack3] == [4_096]
 
-    def test_aot_extraction_failure_no_longer_fabricates_a_tflm_plan(
-        self, tmp_path
-    ):
+    def test_aot_extraction_failure_no_longer_fabricates_a_tflm_plan(self, tmp_path):
         """#133 Phase 3 D5: a failed AOT extraction used to fall into the
         TFLM synthesiser, booking a tensor_arena and model_flatbuffer
         that do not exist in an AOT binary."""
         ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-aot"}})
-        assert (
-            ctx.engine_artifacts is None
-            or ctx.engine_artifacts.memory_plan is None
-        )
+        assert ctx.engine_artifacts is None or ctx.engine_artifacts.memory_plan is None
         PlanMemoryStage().run(ctx)
         assert ctx.memory_plan is not None
-        names = {
-            c.name for r in ctx.memory_plan.regions for c in r.consumers
-        }
+        names = {c.name for r in ctx.memory_plan.regions for c in r.consumers}
         assert "tensor_arena" not in names
         assert "model_flatbuffer" not in names
         # hpx-owned consumers still apply (they're engine-independent),
@@ -665,17 +653,10 @@ class TestHpxOwnedConsumers:
     def test_usb_buffers_booked_on_usb_cdc_transport(self, tmp_path):
         """#179: the USB branch was untested (a mutation of the
         size constant survived)."""
-        ctx = _make_ctx(
-            tmp_path, {"target": {"transport": "usb_cdc"}}
-        )
+        ctx = _make_ctx(tmp_path, {"target": {"transport": "usb_cdc"}})
         PlanMemoryStage().run(ctx)
         assert ctx.memory_plan is not None
-        usb = [
-            c
-            for r in ctx.memory_plan.regions
-            for c in r.consumers
-            if c.name == "usb_buffers"
-        ]
+        usb = [c for r in ctx.memory_plan.regions for c in r.consumers if c.name == "usb_buffers"]
         assert [c.size for c in usb] == [4096 + 1024]
         # and no rtt_buffers on a USB run:
         names = {c.name for r in ctx.memory_plan.regions for c in r.consumers}
@@ -708,10 +689,5 @@ class TestHpxOwnedConsumers:
         )
         ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-aot"}})
         merged = _add_hpx_owned_consumers(engine_plan, ctx)
-        records = [
-            c
-            for r in merged.regions
-            for c in r.consumers
-            if c.name == "pmu_layer_records"
-        ]
+        records = [c for r in merged.regions for c in r.consumers if c.name == "pmu_layer_records"]
         assert [c.size for c in records] == [1234]  # engine's entry kept, once

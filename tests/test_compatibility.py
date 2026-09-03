@@ -123,9 +123,7 @@ def test_package_dependency_matches_qualified_baseline() -> None:
     with (repo_root / "uv.lock").open("rb") as stream:
         lock = tomllib.load(stream)
     packages = lock["package"]
-    project_package = next(
-        package for package in packages if package["name"] == "helia-profiler"
-    )
+    project_package = next(package for package in packages if package["name"] == "helia-profiler")
     locked_dependency = next(
         dependency
         for dependency in project_package["metadata"]["requires-dist"]
@@ -133,9 +131,7 @@ def test_package_dependency_matches_qualified_baseline() -> None:
     )
     assert locked_dependency["specifier"] == f"=={baseline.neuralspotx_version}"
 
-    neuralspotx_package = next(
-        package for package in packages if package["name"] == "neuralspotx"
-    )
+    neuralspotx_package = next(package for package in packages if package["name"] == "neuralspotx")
     assert neuralspotx_package["version"] == baseline.neuralspotx_version
 
 
@@ -575,8 +571,6 @@ def test_heliart_nsx_fixture_version_tracks_the_qualified_release():
 
     from helia_profiler.engines.helia_rt.artifacts import HELIART_VERSION
 
-    fixture = (
-        Path(__file__).parent / "fixtures" / "heliart_nsx" / "nsx-module.yaml"
-    )
+    fixture = Path(__file__).parent / "fixtures" / "heliart_nsx" / "nsx-module.yaml"
     data = yaml.safe_load(fixture.read_text(encoding="utf-8"))
     assert data["module"]["version"] == HELIART_VERSION

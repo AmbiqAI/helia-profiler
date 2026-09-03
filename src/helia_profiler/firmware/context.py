@@ -270,8 +270,7 @@ class FirmwareRenderContext:
             # PipelineContext accessor covers it — same stage-ordering
             # precondition, stated the same way.
             raise PipelineError(
-                "ctx.run_metadata.platform is not available — "
-                "ResolvePlatformStage has not run.",
+                "ctx.run_metadata.platform is not available — ResolvePlatformStage has not run.",
                 hint="ResolvePlatformStage must run before firmware render "
                 "context construction. This is a bug in heliaPROFILER — "
                 "please file an issue.",
@@ -401,9 +400,7 @@ class FirmwareRenderContext:
                 ),
                 clean_window_timer=soc.capabilities.clock.clean_window_timer,
                 power_window_timer=soc.capabilities.power_window_timer,
-                clean_window_needs_probe_attach=(
-                    soc.capabilities.clean_window_needs_probe_attach
-                ),
+                clean_window_needs_probe_attach=(soc.capabilities.clean_window_needs_probe_attach),
                 gate_debug_domain_in_window=soc.capabilities.clock.gate_debug_domain_in_window,
                 broad_peripheral_shutdown=soc.capabilities.clock.broad_peripheral_shutdown,
                 crypto_otp_shutdown=soc.capabilities.clock.crypto_otp_shutdown,
@@ -445,10 +442,7 @@ class FirmwareRenderContext:
         an internal-mode run on a Blue board fetched nsx-gpio, emitted the
         header, and failed to compile with 'nsx_gpio.h: No such file'.
         """
-        return (
-            self.sync.power_sync_enabled
-            or self.power_window.ble_reset_gpio_pin is not None
-        )
+        return self.sync.power_sync_enabled or self.power_window.ble_reset_gpio_pin is not None
 
     def to_template_vars(self, *, power_only: bool = False) -> dict[str, object]:
         """Flatten typed fields to the legacy Jinja variable names.
@@ -513,9 +507,7 @@ class FirmwareRenderContext:
             "heartbeat_every_ms": self.power_window.heartbeat_every_ms,
             "clean_window_timer": self.power_window.clean_window_timer,
             "power_window_timer": self.power_window.power_window_timer,
-            "clean_window_needs_probe_attach": (
-                self.power_window.clean_window_needs_probe_attach
-            ),
+            "clean_window_needs_probe_attach": (self.power_window.clean_window_needs_probe_attach),
             "gate_debug_domain_in_window": self.power_window.gate_debug_domain_in_window,
             "broad_peripheral_shutdown": self.power_window.broad_peripheral_shutdown,
             "crypto_otp_shutdown": self.power_window.crypto_otp_shutdown,
@@ -548,16 +540,12 @@ class FirmwareRenderContext:
             "aot_op_manifest": self.engine.aot_op_manifest,
             "executorch_method_arena_size": self.engine.executorch_method_arena_size,
             "executorch_planned_arena_size": self.engine.executorch_planned_arena_size,
-            "executorch_temporary_arena_size": (
-                self.engine.executorch_temporary_arena_size
-            ),
+            "executorch_temporary_arena_size": (self.engine.executorch_temporary_arena_size),
             "executorch_input_size": self.engine.executorch_input_size,
             "executorch_output_size": self.engine.executorch_output_size,
             "executorch_planned_arena_region": self.engine.executorch_planned_arena_region,
             "executorch_method_arena_region": self.engine.executorch_method_arena_region,
-            "executorch_temporary_arena_region": (
-                self.engine.executorch_temporary_arena_region
-            ),
+            "executorch_temporary_arena_region": (self.engine.executorch_temporary_arena_region),
             "executorch_io_region": self.engine.executorch_io_region,
         }
 
@@ -606,9 +594,7 @@ def resolve_window_timer(
     # value, so one comparison covers both.
     busy_loop_probe = clean_window_probe == CleanWindowProbe.BUSY_LOOP
     window_timer = (
-        "stimer"
-        if busy_loop_probe
-        else (power_window_timer if power_only else clean_window_timer)
+        "stimer" if busy_loop_probe else (power_window_timer if power_only else clean_window_timer)
     )
     return {
         "busy_loop_probe": busy_loop_probe,

@@ -242,9 +242,7 @@ def capture_gated(
                 {
                     "utc": int(value["utc"]),
                     "rate": rate,
-                    "sample_id": (
-                        int(sample_id) // decimate if sample_id is not None else None
-                    ),
+                    "sample_id": (int(sample_id) // decimate if sample_id is not None else None),
                     "data": data.copy(),
                 }
             )
@@ -700,9 +698,7 @@ def capture_gated(
             }
         gate_timing = GateTransitionTiming(
             capture_to_gate_rise_s=(
-                round(first_high_at - capture_start, 6)
-                if first_high_at is not None
-                else None
+                round(first_high_at - capture_start, 6) if first_high_at is not None else None
             ),
             capture_to_gate_fall_s=(
                 round(first_low_after_high_at - capture_start, 6)
@@ -732,9 +728,7 @@ def capture_gated(
             )
             if fr:
                 metadata.fullrate_xcheck = fr
-                stats_energy_per = (
-                    gated_summary.energy_j / len(windows) if windows else 0.0
-                )
+                stats_energy_per = gated_summary.energy_j / len(windows) if windows else 0.0
                 fr_energy_per = fr["energy_per_window_j"]
                 log.info(
                     "Joulescope FULL-RATE xcheck: mean=%.3f mA, power=%.3f mW, "

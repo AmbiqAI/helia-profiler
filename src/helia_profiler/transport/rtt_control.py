@@ -182,8 +182,7 @@ def scan_for_rtt_control_block(
     if len(candidates) > 1:
         second_address, second_score = candidates[1]
         log.debug(
-            "RTT scan found %d control blocks; selected 0x%08X (score=%d) over "
-            "0x%08X (score=%d)",
+            "RTT scan found %d control blocks; selected 0x%08X (score=%d) over 0x%08X (score=%d)",
             len(candidates),
             best_address,
             best_score,
@@ -239,9 +238,7 @@ def direct_rtt_read_any(
 ) -> tuple[bytes, int | None]:
     """Read from whichever RTT control block is actually publishing bytes."""
     if preferred_block_address is not None:
-        data = direct_rtt_read(
-            jlink, block_address=preferred_block_address, max_bytes=max_bytes
-        )
+        data = direct_rtt_read(jlink, block_address=preferred_block_address, max_bytes=max_bytes)
         if data:
             return data, preferred_block_address
     if not allow_rescan:

@@ -105,8 +105,7 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
         elapsed_us = int(elapsed_raw, 10)
     except ValueError as exc:
         raise PowerError(
-            "Malformed power terminal field "
-            f"{PowerTerminalKey.ELAPSED_US.value}={elapsed_raw!r}."
+            f"Malformed power terminal field {PowerTerminalKey.ELAPSED_US.value}={elapsed_raw!r}."
         ) from exc
     if requested_count < 0 or completed_count < 0 or error_code < 0:
         raise PowerError("Power terminal count and error fields must be non-negative.")
@@ -136,9 +135,7 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
     measurement_source = fields.get(PowerTerminalKey.MEASUREMENT_SOURCE)
     energy_raw = fields.get(PowerTerminalKey.ENERGY_NJ)
     if (measurement_source is None) != (energy_raw is None):
-        raise PowerError(
-            "Power measurement source and energy fields must be provided together."
-        )
+        raise PowerError("Power measurement source and energy fields must be provided together.")
     measurement = None
     if measurement_source is not None and energy_raw is not None:
         if not measurement_source:
@@ -267,9 +264,7 @@ def collect_power_terminal_envelope_from_chunks(
                 del buffer[: end + len(end_marker)]
                 continue
             end += len(end_marker)
-            _log_pre_record_diagnostics(
-                buffer[:start].decode("utf-8", errors="replace")
-            )
+            _log_pre_record_diagnostics(buffer[:start].decode("utf-8", errors="replace"))
             frame = buffer[start:end].decode("utf-8", errors="replace")
             try:
                 return parse_power_terminal_envelope(frame.splitlines())
@@ -326,8 +321,7 @@ def collect_power_terminal_envelope_rtt(
                 lambda: bytes(jlink.rtt_read(0, 4096)),
                 timeout_s=timeout_s,
                 no_record_hint=(
-                    "Confirm the power firmware reached post-GATE diagnostics "
-                    "and RTT is linked."
+                    "Confirm the power firmware reached post-GATE diagnostics and RTT is linked."
                 ),
             )
         finally:

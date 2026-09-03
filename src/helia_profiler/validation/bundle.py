@@ -117,7 +117,11 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
         )
 
     version = manifest.get("schema_version")
-    if not isinstance(version, int) or isinstance(version, bool) or version not in (1, 2, 3, 4, 5, 6):
+    if (
+        not isinstance(version, int)
+        or isinstance(version, bool)
+        or version not in (1, 2, 3, 4, 5, 6)
+    ):
         raise ValidationBundleError(f"Unsupported validation manifest schema_version: {version!r}")
     raw_cases = manifest.get("cases")
     if not isinstance(raw_cases, list):
@@ -287,16 +291,12 @@ def _load_case(
     )
 
 
-def _cmsis_nn_provider(
-    identity: dict[str, Any], engine: str, case_id: str, version: int
-) -> str:
+def _cmsis_nn_provider(identity: dict[str, Any], engine: str, case_id: str, version: int) -> str:
     """Load schema v5 provider identity or infer it for older manifests."""
     provider = identity.get("cmsis_nn_provider")
     if provider is None:
         if version >= 5:
-            raise ValidationBundleError(
-                f"Validation case {case_id!r} has no cmsis_nn_provider"
-            )
+            raise ValidationBundleError(f"Validation case {case_id!r} has no cmsis_nn_provider")
         backend = identity.get("backend")
         if engine == "executorch" and backend in {"arm", "ns"}:
             provider = backend
@@ -305,9 +305,7 @@ def _cmsis_nn_provider(
         elif engine in {"helia-rt", "helia-aot"}:
             provider = "ns"
     if provider not in {"arm", "ns"}:
-        raise ValidationBundleError(
-            f"Validation case {case_id!r} has invalid cmsis_nn_provider"
-        )
+        raise ValidationBundleError(f"Validation case {case_id!r} has invalid cmsis_nn_provider")
     expected = {
         "tflm": "arm",
         "helia-rt": "ns",
@@ -332,8 +330,11 @@ def resolve_artifact(bundle: ValidationBundle, artifact: ArtifactRef) -> Path:
     try:
         resolved.relative_to(bundle.root)
     except ValueError as exc:
-        raise ValidationBundleError(f"Artifact path escapes bundle root: {artifact.path!r}") from exc
+        raise ValidationBundleError(
+            f"Artifact path escapes bundle root: {artifact.path!r}"
+        ) from exc
     return resolved
+
 
 def _resolve_safe_artifact(root: Path, raw: str, *, case_id: str, name: str) -> Path:
     if not raw or "\x00" in raw or "\\" in raw or _WINDOWS_ABSOLUTE.match(raw):

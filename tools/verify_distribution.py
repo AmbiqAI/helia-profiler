@@ -55,7 +55,9 @@ def _verify_metadata(metadata_bytes: bytes, expected_version: str) -> None:
             raise ValueError(f"METADATA {field} is {actual!r}, expected {expected_value!r}")
 
     requires_python = metadata.get("Requires-Python")
-    if requires_python is None or set(requires_python.split(",")) != set(REQUIRES_PYTHON.split(",")):
+    if requires_python is None or set(requires_python.split(",")) != set(
+        REQUIRES_PYTHON.split(",")
+    ):
         raise ValueError(
             f"METADATA Requires-Python is {requires_python!r}, expected bounds {REQUIRES_PYTHON!r}"
         )
@@ -93,7 +95,9 @@ def _verify_wheel(wheel: Path, expected_version: str) -> None:
         "/src/helia_profiler/vendor/segger_rtt/LICENSE.md",
     }
     missing_licenses = {
-        suffix for suffix in required_license_suffixes if not any(name.endswith(suffix) for name in license_files)
+        suffix
+        for suffix in required_license_suffixes
+        if not any(name.endswith(suffix) for name in license_files)
     }
     if missing_licenses:
         raise ValueError(f"Wheel is missing license files: {sorted(missing_licenses)}")

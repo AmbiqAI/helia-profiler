@@ -94,8 +94,7 @@ def _serialise_memory_regions(measured: MeasuredMemoryRegions) -> dict[str, Any]
             for r in measured.regions
         ],
         "unattributed": [
-            {"name": u.name, "address": u.address, "size": u.size}
-            for u in measured.unattributed
+            {"name": u.name, "address": u.address, "size": u.size} for u in measured.unattributed
         ],
         "unattributed_load_bytes": measured.unattributed_load_bytes,
     }
@@ -239,13 +238,9 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
     # Plan-vs-measured reconciliation + the per-symbol enumeration (#133
     # Phase 3; symbols are detailed-only by the aggregates convention)
     if ctx.memory_reconciliation is not None:
-        data["memory_reconciliation"] = _serialise_memory_reconciliation(
-            ctx.memory_reconciliation
-        )
+        data["memory_reconciliation"] = _serialise_memory_reconciliation(ctx.memory_reconciliation)
     if ctx.memory_symbols is not None and ctx.memory_regions is not None:
-        data["memory_symbols"] = _serialise_memory_symbols(
-            ctx.memory_regions, ctx.memory_symbols
-        )
+        data["memory_symbols"] = _serialise_memory_symbols(ctx.memory_regions, ctx.memory_symbols)
 
     # Per-layer cache/memory counters
     per_layer: list[dict[str, Any]] = []

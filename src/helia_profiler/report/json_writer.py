@@ -42,8 +42,7 @@ def _write_json(
         "presets": {
             name: {
                 "layers": [
-                    _layer_to_flat_dict(l, total_cycles=preset_totals[name])
-                    for l in pr.layers
+                    _layer_to_flat_dict(l, total_cycles=preset_totals[name]) for l in pr.layers
                 ],
                 "iteration_count": len(pr.iterations),
             }

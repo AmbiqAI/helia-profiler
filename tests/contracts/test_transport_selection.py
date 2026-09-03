@@ -42,18 +42,10 @@ def reader_recorder(monkeypatch):
 
         return _reader
 
-    monkeypatch.setattr(
-        "helia_profiler.transport.usb_cdc.capture_usb_output", _make("usb_cdc")
-    )
-    monkeypatch.setattr(
-        "helia_profiler.transport.rtt.capture_rtt_output", _make("rtt")
-    )
-    monkeypatch.setattr(
-        "helia_profiler.transport.swo.capture_swo_output", _make("swo")
-    )
-    monkeypatch.setattr(
-        "helia_profiler.transport.uart.capture_uart_output", _make("uart")
-    )
+    monkeypatch.setattr("helia_profiler.transport.usb_cdc.capture_usb_output", _make("usb_cdc"))
+    monkeypatch.setattr("helia_profiler.transport.rtt.capture_rtt_output", _make("rtt"))
+    monkeypatch.setattr("helia_profiler.transport.swo.capture_swo_output", _make("swo"))
+    monkeypatch.setattr("helia_profiler.transport.uart.capture_uart_output", _make("uart"))
     return calls
 
 
@@ -67,9 +59,7 @@ def test_enum_membership_is_frozen():
 
 
 @pytest.mark.parametrize("transport", ALL_TRANSPORTS)
-def test_transport_dispatches_to_exactly_one_reader(
-    transport, reader_recorder, pmu_ctx_factory
-):
+def test_transport_dispatches_to_exactly_one_reader(transport, reader_recorder, pmu_ctx_factory):
     ctx = pmu_ctx_factory(board="apollo510_evb", transport=transport)
 
     result = capture_pmu(ctx)
@@ -123,9 +113,7 @@ def test_usb_reader_receives_marker_and_keep_attached(reader_recorder, pmu_ctx_f
     assert "keep_attached" in kwargs
 
 
-@pytest.mark.parametrize(
-    "family,board", sorted(BOARD_FOR_FAMILY.items())
-)
+@pytest.mark.parametrize("family,board", sorted(BOARD_FOR_FAMILY.items()))
 @pytest.mark.parametrize("transport", ["uart", "usb_cdc"])
 def test_keep_attached_tracks_soc_debug_domain(
     family, board, transport, reader_recorder, pmu_ctx_factory

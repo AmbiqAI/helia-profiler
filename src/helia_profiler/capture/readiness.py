@@ -29,6 +29,7 @@ from ..target.probe.jlink import (
 
 log = logging.getLogger("hpx")
 
+
 def poll_until(
     predicate: Callable[[], bool],
     *,

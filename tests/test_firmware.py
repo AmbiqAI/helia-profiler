@@ -203,27 +203,27 @@ def fake_segger_rtt_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     config_dir.mkdir()
     (rtt_dir / "SEGGER_RTT.c").write_text(
         '#include "SEGGER_RTT.h"\n'
-        '\n'
-        '#if SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
-        '  #if ((defined __GNUC__) || (defined __clang__))\n'
-        '    SEGGER_RTT_CB _SEGGER_RTT                                                             __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
-        '    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)]   __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
-        '    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)] __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
-        '  #elif (defined __ICCARM__)\n'
-        '    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
-        '    SEGGER_RTT_CB _SEGGER_RTT;\n'
-        '    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
-        '    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)];\n'
-        '    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
-        '    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)];\n'
-        '  #else\n'
+        "\n"
+        "#if SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
+        "  #if ((defined __GNUC__) || (defined __clang__))\n"
+        "    SEGGER_RTT_CB _SEGGER_RTT                                                             __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n"
+        "    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)]   __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n"
+        "    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)] __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n"
+        "  #elif (defined __ICCARM__)\n"
+        "    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
+        "    SEGGER_RTT_CB _SEGGER_RTT;\n"
+        "    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
+        "    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)];\n"
+        "    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
+        "    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)];\n"
+        "  #else\n"
         '    #error "Don\'t know how to place _SEGGER_RTT, _acUpBuffer, _acDownBuffer cache-line aligned"\n'
-        '  #endif\n'
-        '#else\n'
-        '  SEGGER_RTT_PUT_CB_SECTION(SEGGER_RTT_CB_ALIGN(SEGGER_RTT_CB _SEGGER_RTT));\n'
-        '  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acUpBuffer  [BUFFER_SIZE_UP]));\n'
-        '  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acDownBuffer[BUFFER_SIZE_DOWN]));\n'
-        '#endif\n'
+        "  #endif\n"
+        "#else\n"
+        "  SEGGER_RTT_PUT_CB_SECTION(SEGGER_RTT_CB_ALIGN(SEGGER_RTT_CB _SEGGER_RTT));\n"
+        "  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acUpBuffer  [BUFFER_SIZE_UP]));\n"
+        "  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acDownBuffer[BUFFER_SIZE_DOWN]));\n"
+        "#endif\n"
     )
     (rtt_dir / "SEGGER_RTT.h").write_text("// fake RTT header\n")
     (rtt_dir / "SEGGER_RTT_ConfDefaults.h").write_text("// fake RTT conf defaults\n")
@@ -369,7 +369,9 @@ def _stub_locked_dependencies(
 ) -> list[Path]:
     prepared: list[Path] = []
     # Duck-typed fake: only .root is read from the workspace here.
-    ctx.dependency_workspace = SimpleNamespace(root=app_dir.parent)  # ty: ignore[invalid-assignment]
+    ctx.dependency_workspace = SimpleNamespace(  # ty: ignore[invalid-assignment]
+        root=app_dir.parent
+    )
     monkeypatch.setattr(
         "helia_profiler.deps.dependencies.workspace_mutex",
         lambda _workspace: nullcontext(),
@@ -582,9 +584,7 @@ class TestGenerateApp:
         assert "nsx-core" in modules_cmake
         assert "nsx-pmu-armv8m" in modules_cmake
 
-    def test_regenerates_modules_cmake_after_nix_store_copy(
-        self, tmp_path: Path, fake_dist: Path
-    ):
+    def test_regenerates_modules_cmake_after_nix_store_copy(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)
@@ -946,10 +946,7 @@ class TestGenerateApp:
         assert "add_executable(hpx_profiler_power EXCLUDE_FROM_ALL" in cmake
         assert "nsx_finalize_app(hpx_profiler_power)" in cmake
         assert "src/main_power.cc" in cmake
-        assert (
-            "target_compile_definitions(hpx_profiler_power PRIVATE "
-            "BUFFER_SIZE_UP="
-        ) in cmake
+        assert ("target_compile_definitions(hpx_profiler_power PRIVATE BUFFER_SIZE_UP=") in cmake
         # RTT diagnostics are configured only after the measured gate closes.
         assert main_power_cc.index("hpx_sync_window_end();") < main_power_cc.rindex(
             "hpx_power_terminal_report("
@@ -1026,9 +1023,7 @@ class TestGenerateApp:
         read_back = code.index("hpx_stimer_ticks() - clean_stimer_t0", end)
         assert read_back > end, f"{label}: the STIMER bracket never closes"
 
-    def test_ap4_power_binary_window_is_not_timed_by_dwt(
-        self, tmp_path: Path, fake_dist: Path
-    ):
+    def test_ap4_power_binary_window_is_not_timed_by_dwt(self, tmp_path: Path, fake_dist: Path):
         """End-to-end guard for the #106/#107 bug class, through generate_app.
 
         ``power_only`` decides whether ``power_window_timer`` or
@@ -1086,9 +1081,7 @@ class TestGenerateApp:
         assert "const int clean_iters_n = 17;" in rendered
         self._assert_window_is_stimer_bracketed(rendered, "render_power_source")
 
-    def test_power_binary_not_generated_when_power_disabled(
-        self, tmp_path: Path, fake_dist: Path
-    ):
+    def test_power_binary_not_generated_when_power_disabled(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)
@@ -1098,9 +1091,7 @@ class TestGenerateApp:
         assert not (app_dir / "src" / "main_power.cc").exists()
         assert "hpx_profiler_power" not in cmake
 
-    def test_power_binary_not_generated_when_firmware_shared(
-        self, tmp_path: Path, fake_dist: Path
-    ):
+    def test_power_binary_not_generated_when_firmware_shared(self, tmp_path: Path, fake_dist: Path):
         """WP3: power.firmware=shared skips the dedicated-binary render/build."""
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
@@ -1125,7 +1116,9 @@ class TestGenerateApp:
         assert not (app_dir / "src" / "main_power.cc").exists()
         assert "hpx_profiler_power" not in cmake
 
-    def test_rtt_generation_flushes_cache_after_buffer_config(self, tmp_path: Path, fake_dist: Path):
+    def test_rtt_generation_flushes_cache_after_buffer_config(
+        self, tmp_path: Path, fake_dist: Path
+    ):
         ctx = _make_ctx(tmp_path, fake_dist)
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)
@@ -1133,17 +1126,26 @@ class TestGenerateApp:
 
         main_cc = (app_dir / "src" / "main.cc").read_text()
         cmake = (app_dir / "CMakeLists.txt").read_text()
-        assert '#define HPX_CACHE_FLUSH() ((void)nsx_cache_flush())' in main_cc
-        assert '#define HPX_CACHE_PUBLISH_WRITES() ((void)nsx_cache_publish_writes())' in main_cc
-        assert '#define HPX_CACHE_INVALIDATE_OBSERVED() ((void)nsx_cache_invalidate_observed_data())' in main_cc
-        assert '#define HPX_CLEAN_DCACHE() HPX_CACHE_PUBLISH_WRITES()' in main_cc
-        assert '#define HPX_INVAL_DCACHE() HPX_CACHE_INVALIDATE_OBSERVED()' in main_cc
+        assert "#define HPX_CACHE_FLUSH() ((void)nsx_cache_flush())" in main_cc
+        assert "#define HPX_CACHE_PUBLISH_WRITES() ((void)nsx_cache_publish_writes())" in main_cc
+        assert (
+            "#define HPX_CACHE_INVALIDATE_OBSERVED() ((void)nsx_cache_invalidate_observed_data())"
+            in main_cc
+        )
+        assert "#define HPX_CLEAN_DCACHE() HPX_CACHE_PUBLISH_WRITES()" in main_cc
+        assert "#define HPX_INVAL_DCACHE() HPX_CACHE_INVALIDATE_OBSERVED()" in main_cc
         assert '#include "am_hal_cachectrl.h"' not in main_cc
         assert 'SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,' in main_cc
-        assert "HPX_CLEAN_DCACHE();" in main_cc.split('SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,', 1)[1]
+        assert (
+            "HPX_CLEAN_DCACHE();"
+            in main_cc.split('SEGGER_RTT_ConfigUpBuffer(0, "HPX", NULL, 0,', 1)[1]
+        )
         assert "static void hpx_rtt_write_lossless(const char *buf, unsigned len)" in main_cc
         assert "SEGGER_RTT_Write(0, buf, len);\n    HPX_CLEAN_DCACHE();" in main_cc
-        assert "SEGGER_RTT_Write(0, line_buf, (unsigned)n);\n            HPX_CLEAN_DCACHE();" in main_cc
+        assert (
+            "SEGGER_RTT_Write(0, line_buf, (unsigned)n);\n            HPX_CLEAN_DCACHE();"
+            in main_cc
+        )
         assert "BUFFER_SIZE_UP=32768" in cmake
 
     def test_apollo4_rtt_generation_avoids_ap5_dcache_calls(self, tmp_path: Path, fake_dist: Path):
@@ -1154,8 +1156,8 @@ class TestGenerateApp:
         app_dir = generate_app(ctx)
 
         main_cc = (app_dir / "src" / "main.cc").read_text()
-        assert '#define HPX_CACHE_FLUSH() ((void)nsx_cache_flush())' in main_cc
-        assert '#define HPX_CACHE_PUBLISH_WRITES() ((void)nsx_cache_publish_writes())' in main_cc
+        assert "#define HPX_CACHE_FLUSH() ((void)nsx_cache_flush())" in main_cc
+        assert "#define HPX_CACHE_PUBLISH_WRITES() ((void)nsx_cache_publish_writes())" in main_cc
         assert "#if NSX_CACHE_HAS_INVALIDATE_OBSERVED" in main_cc
         assert "#define HPX_CLEAN_DCACHE() HPX_CACHE_PUBLISH_WRITES()" in main_cc
         assert "#define HPX_INVAL_DCACHE() HPX_CACHE_INVALIDATE_OBSERVED()" in main_cc
@@ -1177,27 +1179,27 @@ class TestGenerateApp:
         rtt_root = Path(os.environ["SEGGER_RTT_PATH"])
         (rtt_root / "RTT" / "SEGGER_RTT.c").write_text(
             '#include "SEGGER_RTT.h"\n'
-            '\n'
-            '#if SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
-            '  #if ((defined __GNUC__) || (defined __clang__))\n'
-            '    SEGGER_RTT_CB _SEGGER_RTT                                                             __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
-            '    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)]   __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
-            '    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)] __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n'
-            '  #elif (defined __ICCARM__)\n'
-            '    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
-            '    SEGGER_RTT_CB _SEGGER_RTT;\n'
-            '    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
-            '    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)];\n'
-            '    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n'
-            '    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)];\n'
-            '  #else\n'
+            "\n"
+            "#if SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
+            "  #if ((defined __GNUC__) || (defined __clang__))\n"
+            "    SEGGER_RTT_CB _SEGGER_RTT                                                             __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n"
+            "    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)]   __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n"
+            "    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)] __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n"
+            "  #elif (defined __ICCARM__)\n"
+            "    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
+            "    SEGGER_RTT_CB _SEGGER_RTT;\n"
+            "    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
+            "    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)];\n"
+            "    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
+            "    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)];\n"
+            "  #else\n"
             '    #error "Don\'t know how to place _SEGGER_RTT, _acUpBuffer, _acDownBuffer cache-line aligned"\n'
-            '  #endif\n'
-            '#else\n'
-            '  SEGGER_RTT_PUT_CB_SECTION(SEGGER_RTT_CB_ALIGN(SEGGER_RTT_CB _SEGGER_RTT));\n'
-            '  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acUpBuffer  [BUFFER_SIZE_UP]));\n'
-            '  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acDownBuffer[BUFFER_SIZE_DOWN]));\n'
-            '#endif\n'
+            "  #endif\n"
+            "#else\n"
+            "  SEGGER_RTT_PUT_CB_SECTION(SEGGER_RTT_CB_ALIGN(SEGGER_RTT_CB _SEGGER_RTT));\n"
+            "  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acUpBuffer  [BUFFER_SIZE_UP]));\n"
+            "  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acDownBuffer[BUFFER_SIZE_DOWN]));\n"
+            "#endif\n"
         )
 
         ctx = _make_ctx(tmp_path, fake_dist)
@@ -1227,8 +1229,7 @@ class TestGenerateApp:
     ):
         rtt_root = Path(os.environ["SEGGER_RTT_PATH"])
         (rtt_root / "RTT" / "SEGGER_RTT.c").write_text(
-            '#include "SEGGER_RTT.h"\n'
-            'static int not_the_expected_layout = 1;\n'
+            '#include "SEGGER_RTT.h"\nstatic int not_the_expected_layout = 1;\n'
         )
 
         ctx = _make_ctx(tmp_path, fake_dist)
@@ -1793,15 +1794,10 @@ class TestNsxModuleOverrides:
             "revision": commit,
         }
         parsed = AppConfig.from_mapping(manifest)
-        parsed_cmsis_nn = next(
-            module for module in parsed.modules if module.name == "nsx-cmsis-nn"
-        )
+        parsed_cmsis_nn = next(module for module in parsed.modules if module.name == "nsx-cmsis-nn")
         assert parsed_cmsis_nn.revision == commit
         assert manifest["module_registry"]["projects"]["ns-cmsis-nn"]["revision"] == commit
-        assert (
-            manifest["module_registry"]["modules"]["nsx-cmsis-nn"]["revision"]
-            == commit
-        )
+        assert manifest["module_registry"]["modules"]["nsx-cmsis-nn"]["revision"] == commit
 
     def test_channel_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(tmp_path, fake_dist, {"channel": "dev"})
@@ -1821,9 +1817,7 @@ class TestNsxModuleOverrides:
         nsx_yml = (app_dir / "nsx.yml").read_text()
         assert "channel: stable" in nsx_yml
 
-    def test_default_build_uses_compatibility_baseline_refs(
-        self, tmp_path: Path, fake_dist: Path
-    ):
+    def test_default_build_uses_compatibility_baseline_refs(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(tmp_path, fake_dist, {})
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)
@@ -1940,7 +1934,9 @@ class TestNsxModuleOverrides:
         assert registry["modules"]["nsx-interrupt"]["project"] == "nsx-ambiq-sdk"
         assert registry["modules"]["nsx-psram"]["project"] == "nsx-ambiq-sdk"
 
-    def test_power_sync_modules_resolve_through_profile_overrides(self, tmp_path: Path, fake_dist: Path):
+    def test_power_sync_modules_resolve_through_profile_overrides(
+        self, tmp_path: Path, fake_dist: Path
+    ):
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
         config = load_config(
@@ -2010,9 +2006,7 @@ class TestNsxModuleOverrides:
         )
         manifest = yaml.safe_load(nsx_yml)
         direct_overrides = [
-            module
-            for module in manifest["modules"]
-            if module.get("revision") == "feat/new-soc"
+            module for module in manifest["modules"] if module.get("revision") == "feat/new-soc"
         ]
         assert len(direct_overrides) == sdk_module_count
         assert (

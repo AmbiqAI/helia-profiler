@@ -227,9 +227,7 @@ def test_loader_rejects_unsupported_future_schema(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("schema_version", [True, False, "5", 5.0, None])
-def test_loader_rejects_non_integer_schema_version(
-    tmp_path: Path, schema_version: object
-) -> None:
+def test_loader_rejects_non_integer_schema_version(tmp_path: Path, schema_version: object) -> None:
     bundle = tmp_path / "bundle"
     _write_bundle(bundle, 100)
     manifest_path = bundle / "validation_manifest.json"
@@ -308,9 +306,7 @@ def test_loader_distinguishes_cmsis_nn_providers(tmp_path: Path) -> None:
     manifest = json.loads(manifest_path.read_text())
     arm = manifest["cases"][0]
     arm["case_id"] = "executorch-arm"
-    arm["identity"].update(
-        {"engine": "executorch", "backend": "arm", "cmsis_nn_provider": "arm"}
-    )
+    arm["identity"].update({"engine": "executorch", "backend": "arm", "cmsis_nn_provider": "arm"})
     ns = {**arm, "case_id": "executorch-ns", "identity": dict(arm["identity"])}
     ns["identity"].update({"backend": "ns", "cmsis_nn_provider": "ns"})
     manifest["cases"].append(ns)

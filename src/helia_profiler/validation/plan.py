@@ -150,9 +150,7 @@ def parse_power_gpio_pins(raw: str) -> dict[str, tuple[int, int, int]] | None:
         board, sep, pins_raw = item.partition("=")
         values = [value.strip() for value in pins_raw.split(":")]
         if not sep or not board.strip() or len(values) != 3:
-            raise ValueError(
-                f"invalid --power-gpios entry {item!r}; expected board=gate:state:go."
-            )
+            raise ValueError(f"invalid --power-gpios entry {item!r}; expected board=gate:state:go.")
         try:
             gate, state, go = (int(value, 0) for value in values)
             mapping[board.strip()] = (gate, state, go)

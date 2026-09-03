@@ -47,6 +47,7 @@ class PmuCounter:
 # nsx-pmu-armv8m/src/armv8m/nsx_pmu_utils.c
 # ---------------------------------------------------------------------------
 
+
 def _load_counter_catalog() -> dict[str, PmuCounter]:
     catalog_path = resources.files("helia_profiler").joinpath("data/armv8m_pmu_events.json")
     rows = json.loads(catalog_path.read_text(encoding="utf-8"))

@@ -161,9 +161,7 @@ def try_power_cycle(
         if strict:
             if isinstance(exc, PowerError):
                 raise
-            raise PowerError(
-                f"Power-cycle reset via '{power_driver_name}' failed: {exc}"
-            ) from exc
+            raise PowerError(f"Power-cycle reset via '{power_driver_name}' failed: {exc}") from exc
         log.debug("Power-cycle recovery via '%s' unavailable: %s", power_driver_name, exc)
         return False
 

@@ -259,9 +259,7 @@ def test_build_manifest_records_default_branch_source(tmp_path: Path, monkeypatc
     }
 
 
-def test_build_manifest_distinguishes_nightly_and_manual_runs(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_build_manifest_distinguishes_nightly_and_manual_runs(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("GITHUB_REPOSITORY", "AmbiqAI/helia-profiler")
     monkeypatch.setenv("GITHUB_SERVER_URL", "https://github.com")
     monkeypatch.setenv("GITHUB_RUN_ID", "31033041861")
