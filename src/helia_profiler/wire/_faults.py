@@ -29,7 +29,8 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
     _spec(
         error_token(FirmwareErrorCode.SCHEMA_MISMATCH),
         WireKind.ERROR,
-        "The model's TFLite schema version is not the one firmware was built for.",
+        "The model's TFLite schema version is not the one firmware was built "
+        "for.",
         WireConsumer.TRANSPORT_CONTROL,
         WireCriticality.PROTOCOL,
         engines=TFLM_ENGINES,

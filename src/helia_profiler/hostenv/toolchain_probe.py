@@ -131,7 +131,9 @@ def _sections_via_size(
         return None
     log.info("Binary sections: text=%d data=%d bss=%d total=%d", text, data, bss, total)
     reserved = (
-        _reserved_via_readelf(binary_path, readelf_cmd=readelf_cmd, timeout_s=timeout_s)
+        _reserved_via_readelf(
+            binary_path, readelf_cmd=readelf_cmd, timeout_s=timeout_s
+        )
         if readelf_cmd is not None
         else None
     )
