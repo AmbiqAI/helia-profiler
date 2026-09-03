@@ -93,7 +93,9 @@ declares exactly one qualified provider (`arm-cmsis-nn` or `nsx-cmsis-nn`) as
 a normal NSX module immediately before `nsx-executorch`. NSX lock/sync therefore
 owns provider materialization and uses its standard `NSX_CACHE_DIR` cache;
 the runtime's idempotent bridge prevents duplicate targets. The `ns` provider
-uses PR #1's private compatibility layer for the v7.29.2 `weight_sum_ctx` ABI.
+uses PR #1's private compatibility layer for the fork's `weight_sum_ctx` ABI
+and resolves `nsx-cmsis-nn` at the baseline's qualified ref like the helia
+engines (v7.31.0, verified on Apollo510).
 Set `engine.config.cmsis_nn_path` or `cmsis_nn_ref` to override the selected
 provider while preserving the same ordered module contract.
 

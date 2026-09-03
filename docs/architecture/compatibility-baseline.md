@@ -90,7 +90,9 @@ core declared at v7.31.0, `hpx validate` passes kws/vww/ic/ad on both engines
 (8/8; heliaAOT was 0/4 on v7.29.2), every float run above reproduces its
 numbers with no override and stamps `qualified`, and the converter's
 weights-only FP16 form now builds and runs on heliaAOT (1,230,144 cycles);
-heliaRT still rejects that form (helia-rt#255). Two of the five
+heliaRT still rejects that form (helia-rt#255). ExecuTorch's `ns` provider,
+which shares the module helper, also builds and runs kws on v7.31.0
+(2,135,764 clean cycles, `qualified`). Two of the five
 power windows were INVALID by design: the JS320 GPI-stream gate edges
 disagreed with the firmware window clock and host poll edges (which agree to
 <5 ms) by a random −54 / +81 / +38 / −1 / +5 ms — #249.
