@@ -168,8 +168,8 @@ _OVERRIDE_SPECS: tuple[_OverrideSpec, ...] = (
     _OverrideSpec("work_dir", ("work_dir",), coerce=str),
     _OverrideSpec("clean", ("clean",), default=False, apply="truthy", const=True),
     _OverrideSpec("verbose", ("verbose",), default=0, apply="always"),
-    # -- build / NSX overrides -- (last, matching the historical apply order:
-    # with several malformed flags the --pmu-counters parse error wins)
+    # -- build / NSX overrides -- (kept last: with several malformed flags the
+    # earliest-declared override's parse error wins, so --pmu-counters wins)
     _OverrideSpec("nsx_channel", ("build", "channel"), apply="truthy"),
     _OverrideSpec(
         "no_compiler_launcher",

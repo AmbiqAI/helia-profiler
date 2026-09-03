@@ -161,9 +161,8 @@ def _sections_via_size(
 
 
 #: Legacy ``Grand Totals: <code> <ro> <rw> <zi>`` line, label first. No
-#: shipping fromelf has been observed to emit this shape -- Arm Compiler
-#: 6.23's table puts the numbers BEFORE the row label -- but it is kept as
-#: the last-resort fallback so an unrecognised variant degrades to the old
+#: shipping fromelf has been observed to emit this shape; kept as the
+#: last-resort fallback so an unrecognised variant degrades to the old
 #: behaviour instead of reporting nothing (#132).
 #: Totals-row labels in the component-sizes table ("ROM Totals for x.axf",
 #: "Object Totals", "Library Totals", "Grand Totals", and armlink's own
@@ -200,8 +199,8 @@ _FROMELF_SIZES_ROW_RE = re.compile(
 #: state. Matched only among sections already known to be **NOBITS and
 #: allocated** -- the name alone is not evidence.
 #:
-#: Only ``.heap``. Review corrected an earlier version that also claimed
-#: ``.stack``: on every NSX SoC the ``.stack`` region IS the live stack --
+#: Only ``.heap``; ``.stack`` is NOT one: on every NSX SoC that region IS
+#: the live stack --
 #: ``startup_gcc.c`` loads the initial MSP from its top and sets MSPLIM/PSPLIM
 #: from its base -- so it is memory the firmware genuinely needs, and it
 #: belongs in the reported footprint.

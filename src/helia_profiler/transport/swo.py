@@ -193,8 +193,7 @@ class SwoTransport(BaseCaptureTransport):
 
         # SWO baud is derived from the trace clock, so it MUST come from the
         # resolved platform — never a hardcoded guess.  A wrong assumption here
-        # halves/doubles the ITM baud and yields an undecodable stream (this is
-        # exactly how the Apollo3 96-vs-48 MHz registry bug manifested).  Most
+        # halves/doubles the ITM baud and yields an undecodable stream.  Most
         # SoCs clock the TPIU from the CPU, but Apollo3 uses a dedicated,
         # CPU-independent trace clock that does not change with TurboSPOT burst —
         # so honor swo_trace_clock_mhz when set.

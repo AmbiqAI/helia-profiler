@@ -287,13 +287,11 @@ def render_validity(console: HpxConsole, ctx: PipelineContext) -> None:
     elif verdict == "valid":
         # Unreachable from evaluate_run (_validity_for: any issue => at
         # least DEGRADED) -- but a hand-built or rehydrated evaluation must
-        # not have its causes swallowed by the quiet-VALID early return
-        # (#208 retro review).
+        # not have its causes swallowed by the quiet-VALID early return (#208).
         console._console.print("  [green]Validity: VALID[/green]")
     else:
-        # Count every issue, not just warnings: an evaluation carrying only
-        # a severity this renderer predates used to read "DEGRADED
-        # (0 warnings)" over visible causes (#208 retro review).
+        # Count every issue, not just warnings: DEGRADED can carry causes of a
+        # severity that is not a warning (#208).
         count = len(evaluation.issues)
         console._console.print(
             f"  [yellow]Validity: DEGRADED ({count} issue"

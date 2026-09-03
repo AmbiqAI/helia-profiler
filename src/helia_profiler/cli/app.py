@@ -15,10 +15,9 @@ from typing import Annotated, Optional
 import click
 import typer
 
-# typer 0.26+ vendors click, so ``click_type`` values must subclass the
-# vendored ParamType: an external ``click.Choice`` falls through
-# ``convert_type`` to FuncParamType (metavar "FUNCTION", no choice list in
-# --help). TyperChoice is the class typer itself builds for enum parameters.
+# typer vendors click, so ``click_type`` values must subclass the vendored
+# ParamType: an external ``click.Choice`` falls through ``convert_type`` to
+# FuncParamType (no choice list in --help). TyperChoice is typer's own class.
 from typer._types import TyperChoice
 
 from .._version import __version__
@@ -32,10 +31,8 @@ from . import validation_app as _validation_app
 app = typer.Typer(
     name="hpx",
     help="Profile LiteRT and ExecuTorch models on Ambiq silicon.",
-    # Click 8.2+'s built-in no_args_is_help raises a UsageError (exit code 2)
-    # instead of the historical "print help, exit 0" behavior. Replicate the
-    # old argparse `hpx` bare-invocation contract explicitly in the callback
-    # below instead of relying on no_args_is_help.
+    # Click's no_args_is_help may raise UsageError (exit 2) rather than print
+    # help; the callback below implements the bare-`hpx` contract explicitly.
     no_args_is_help=False,
     add_completion=False,
     context_settings={"help_option_names": ["-h", "--help"]},

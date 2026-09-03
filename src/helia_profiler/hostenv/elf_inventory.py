@@ -113,8 +113,8 @@ class LoadSegment:
     (virtual) — the fact that makes initialized data's MRAM load image
     accountable (#133 D3).
 
-    Toolchain shape caveat (#176 fresh-review M-4, measured on real links
-    against the NSX AP510 scripts): GNU ld emits one PT_LOAD per load
+    Toolchain shape caveat (#176, measured on real links against the NSX
+    AP510 scripts): GNU ld emits one PT_LOAD per load
     region (``.data`` gets vaddr in DTCM, paddr in MRAM — per-section
     recovery works). armlink emits a SINGLE PT_LOAD whose vaddr==paddr is
     the image base and whose ``memory_size`` SUMS discontiguous execution

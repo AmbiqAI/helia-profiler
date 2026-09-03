@@ -427,7 +427,7 @@ def capture_rtt_output(
         # When the linked control block address is known (recovered from the
         # build map/ELF), attach directly and skip the host-side scan entirely.
         # The firmware re-initialises that fixed address on boot, so this is
-        # both deterministic and ~100x faster than sweeping SRAM over SWD.  If
+        # both deterministic and far faster than sweeping SRAM over SWD.  If
         # the firmware never publishes bytes there, the API-probe fallback below
         # re-scans, so a stale or mismatched address degrades gracefully.
         #

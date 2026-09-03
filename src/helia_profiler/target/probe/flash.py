@@ -208,7 +208,7 @@ def _recipe_load_address(
     # The rule is "before the first LoadFile" rather than the stricter "the
     # recipe's first directive".  Both accept every recipe that exists in
     # practice — NSX's ``flash_cmds.jlink.in`` emits ``ExitOnError 1`` first,
-    # and all 53 generated recipes on the bench host lead with it — so the two
+    # and every NSX-generated recipe observed leads with it — so the two
     # differ only in what they refuse of a HAND-EDITED recipe, which is the
     # case this module widened ``_ADDRESSED_LOAD_FILE_RE`` for one round earlier.
     # "First directive" additionally refuses a ``Reset`` / ``Halt`` /

@@ -12,10 +12,7 @@ from typing import Annotated, Optional
 
 import typer
 
-# typer 0.26+ vendors click, so ``click_type`` values must subclass the
-# vendored ParamType: an external ``click.Choice`` falls through
-# ``convert_type`` to FuncParamType (metavar "FUNCTION", no choice list in
-# --help). TyperChoice is the class typer itself builds for enum parameters.
+# typer vendors click for ``click_type``; see the note in ``app.py``.
 from typer._types import TyperChoice
 
 

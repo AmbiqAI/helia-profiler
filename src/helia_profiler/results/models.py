@@ -129,9 +129,8 @@ class FirmwareMeta:
     clean_stalled_iters: int | None = None
     #: Clean-window iterations whose delta was non-zero but below the
     #: firmware's warm-derived floor (``HPX_CLEAN_PARTIAL_ITERS``) -- a counter
-    #: that kept advancing far too slowly rather than stopping.  Observed on
-    #: Apollo4 at ~0.6% of the expected rate; such deltas pass the zero test,
-    #: so they are counted separately.
+    #: that kept advancing far too slowly rather than stopping. Such deltas
+    #: pass the zero test, so they are counted separately.
     clean_partial_iters: int | None = None
     #: The warm per-inference cycle count that floor was derived from
     #: (``HPX_CLEAN_REF_CYCLES``), so the threshold is auditable from the
