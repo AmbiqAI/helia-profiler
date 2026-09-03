@@ -248,34 +248,34 @@ class TestRunAotCompilerUsesConfigRegistry:
                 return _FakeCodegenCtx()
 
         fake_defines = types.ModuleType("helia_aot.cli.defines")
-        fake_defines.ConvertArgs = (
-            _FakeConvertArgs  # ty: ignore[unresolved-attribute]  # fake module built dynamically
+        fake_defines.ConvertArgs = (  # ty: ignore[unresolved-attribute]
+            _FakeConvertArgs  # fake module built dynamically
         )
         fake_cli = types.ModuleType("helia_aot.cli")
-        fake_cli.defines = (
-            fake_defines  # ty: ignore[unresolved-attribute]  # fake module built dynamically
+        fake_cli.defines = (  # ty: ignore[unresolved-attribute]
+            fake_defines  # fake module built dynamically
         )
         fake_converter_mod = types.ModuleType("helia_aot.converter")
-        fake_converter_mod.AotConverter = (
-            _FakeAotConverter  # ty: ignore[unresolved-attribute]  # fake module built dynamically
+        fake_converter_mod.AotConverter = (  # ty: ignore[unresolved-attribute]
+            _FakeAotConverter  # fake module built dynamically
         )
         fake_top_defines = types.ModuleType("helia_aot.defines")
 
         class _ModuleTypeEnum:
             nsx = "nsx"
 
-        fake_top_defines.ModuleType = (
-            _ModuleTypeEnum  # ty: ignore[unresolved-attribute]  # fake module built dynamically
+        fake_top_defines.ModuleType = (  # ty: ignore[unresolved-attribute]
+            _ModuleTypeEnum  # fake module built dynamically
         )
         fake_helia_aot = types.ModuleType("helia_aot")
-        fake_helia_aot.cli = (
-            fake_cli  # ty: ignore[unresolved-attribute]  # fake module built dynamically
+        fake_helia_aot.cli = (  # ty: ignore[unresolved-attribute]
+            fake_cli  # fake module built dynamically
         )
-        fake_helia_aot.converter = (
-            fake_converter_mod  # ty: ignore[unresolved-attribute]  # fake module built dynamically
+        fake_helia_aot.converter = (  # ty: ignore[unresolved-attribute]
+            fake_converter_mod  # fake module built dynamically
         )
-        fake_helia_aot.defines = (
-            fake_top_defines  # ty: ignore[unresolved-attribute]  # fake module built dynamically
+        fake_helia_aot.defines = (  # ty: ignore[unresolved-attribute]
+            fake_top_defines  # fake module built dynamically
         )
 
         monkeypatch.setitem(sys.modules, "helia_aot", fake_helia_aot)

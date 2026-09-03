@@ -360,5 +360,5 @@ def test_session_reset_uses_board_and_serial(monkeypatch) -> None:
 def test_session_reset_rejects_unknown_kind() -> None:
     with pytest.raises(ConfigError, match="reset kind"):
         hpx.Session().reset(
-            kind="typo"
-        )  # ty: ignore[invalid-argument-type]  # deliberate: must raise
+            kind="typo"  # ty: ignore[invalid-argument-type]
+        )  # deliberate: must raise

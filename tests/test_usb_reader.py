@@ -139,9 +139,9 @@ def test_find_port_by_marker_matches_serial_number():
     import helia_profiler.transport.usb_cdc as mod
 
     orig = mod.list_ports.comports
-    mod.list_ports.comports = (
+    mod.list_ports.comports = (  # ty: ignore[invalid-assignment]
         lambda: monkeypatch_ports
-    )  # ty: ignore[invalid-assignment]  # manual monkeypatch of the pyserial module attr
+    )  # manual monkeypatch of the pyserial module attr
     try:
         assert mod._find_port_by_marker(marker) == "/dev/ttyACM1"
         assert mod._find_port_by_marker("HPX-nope") is None
