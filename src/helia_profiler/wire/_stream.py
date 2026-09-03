@@ -457,22 +457,39 @@ MODEL_MEMORY_SPECS: tuple[WireSpec, ...] = (
 
 
 _PSRAM_METADATA_KEYS: tuple[tuple[WireKey, str, WireCriticality, str], ...] = (
-    (WireKey.PSRAM_SIZE_BYTES, "Total PSRAM size reported by the driver.",
-     WireCriticality.DIAGNOSTIC, "bytes"),
-    (WireKey.PSRAM_CLOCK_HZ, "Configured PSRAM clock.",
-     WireCriticality.METRIC, "Hz"),
-    (WireKey.PSRAM_CAPABILITIES, "Driver capability bitfield.",
-     WireCriticality.DIAGNOSTIC, "bitmask"),
-    (WireKey.PSRAM_STATE, "Driver state enum after bring-up.",
-     WireCriticality.DIAGNOSTIC, "int enum"),
-    (WireKey.PSRAM_LAST_INIT_STATUS, "Status code of the last init attempt.",
-     WireCriticality.DIAGNOSTIC, "int status"),
-    (WireKey.PSRAM_XIP_ENABLED, "Whether execute-in-place is on.",
-     WireCriticality.DIAGNOSTIC, "0 | 1"),
-    (WireKey.PSRAM_TIMING_STATUS, "Timing-scan result.",
-     WireCriticality.DIAGNOSTIC, "int status"),
-    (WireKey.PSRAM_RXDQS_DELAY, "Chosen RXDQS delay tap.",
-     WireCriticality.DIAGNOSTIC, "int"),
+    (
+        WireKey.PSRAM_SIZE_BYTES,
+        "Total PSRAM size reported by the driver.",
+        WireCriticality.DIAGNOSTIC,
+        "bytes",
+    ),
+    (WireKey.PSRAM_CLOCK_HZ, "Configured PSRAM clock.", WireCriticality.METRIC, "Hz"),
+    (
+        WireKey.PSRAM_CAPABILITIES,
+        "Driver capability bitfield.",
+        WireCriticality.DIAGNOSTIC,
+        "bitmask",
+    ),
+    (
+        WireKey.PSRAM_STATE,
+        "Driver state enum after bring-up.",
+        WireCriticality.DIAGNOSTIC,
+        "int enum",
+    ),
+    (
+        WireKey.PSRAM_LAST_INIT_STATUS,
+        "Status code of the last init attempt.",
+        WireCriticality.DIAGNOSTIC,
+        "int status",
+    ),
+    (
+        WireKey.PSRAM_XIP_ENABLED,
+        "Whether execute-in-place is on.",
+        WireCriticality.DIAGNOSTIC,
+        "0 | 1",
+    ),
+    (WireKey.PSRAM_TIMING_STATUS, "Timing-scan result.", WireCriticality.DIAGNOSTIC, "int status"),
+    (WireKey.PSRAM_RXDQS_DELAY, "Chosen RXDQS delay tap.", WireCriticality.DIAGNOSTIC, "int"),
 )
 
 
@@ -623,8 +640,7 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         WireCriticality.METRIC,
         key=WireKey.CLEAN_INFER_AVG_US,
         value_shape="microseconds",
-        runtime_gate="clean_count > 0; on the cycle-counter path additionally "
-        "SystemCoreClock > 0",
+        runtime_gate="clean_count > 0; on the cycle-counter path additionally SystemCoreClock > 0",
         note="Seeds the power-window iteration count, so a stalled or zero "
         "value undersizes the next power run. With "
         "HPX_CLEAN_INFER_TOTAL_CYCLES it feeds PROFILE_CLEAN_WINDOW_FROZEN "
@@ -643,8 +659,7 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         value_shape="int (0 on a healthy run)",
         note="Always emitted on the cycle-counter path so the host can tell a "
         "firmware that checks from one that does not. Feeds "
-        "PROFILE_CLEAN_WINDOW_STALLED with HPX_CLEAN_PARTIAL_ITERS. "
-        + _ET_OMITS_THE_CHECK_BLOCK,
+        "PROFILE_CLEAN_WINDOW_STALLED with HPX_CLEAN_PARTIAL_ITERS. " + _ET_OMITS_THE_CHECK_BLOCK,
     ),
     _spec(
         WireKey.CLEAN_PARTIAL_ITERS.wire,
@@ -705,8 +720,7 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         note="Printed from the HPX_CLEAN_DWT_RATE_PROBE_US macro — one of the "
         "few cases where a compile-time constant travels on the wire. The "
         "denominator of PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW, with "
-        "HPX_CLEAN_DWT_RATE_CYC and HPX_SYSTEM_CLOCK_HZ. "
-        + _ET_OMITS_THE_CHECK_BLOCK,
+        "HPX_CLEAN_DWT_RATE_CYC and HPX_SYSTEM_CLOCK_HZ. " + _ET_OMITS_THE_CHECK_BLOCK,
     ),
     _spec(
         WireKey.CLEAN_ATTACH_WAIT_US.wire,
