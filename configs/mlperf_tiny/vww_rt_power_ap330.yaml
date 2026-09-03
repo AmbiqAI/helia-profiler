@@ -56,4 +56,3 @@ output:
   dir: ./results/mlperf_tiny/vww_rt_power_ap330
   model_explorer: false
   detailed: true
-

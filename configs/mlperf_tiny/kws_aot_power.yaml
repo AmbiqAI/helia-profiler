@@ -44,4 +44,3 @@ output:
   dir: ./results/mlperf_tiny/kws_aot_power
   model_explorer: false
   detailed: true
-

@@ -57,4 +57,3 @@ output:
   dir: ./results/mlperf_tiny/kws_rt_power_ap3
   model_explorer: false
   detailed: true
-

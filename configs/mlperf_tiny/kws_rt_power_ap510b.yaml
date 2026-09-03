@@ -41,4 +41,3 @@ output:
   dir: ./results/mlperf_tiny/kws_rt_power_ap510b
   model_explorer: false
   detailed: true
-

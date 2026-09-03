@@ -41,4 +41,3 @@ output:
   dir: ./results/mlperf_tiny/kws_rt_power_swo
   model_explorer: false
   detailed: true
-

@@ -53,4 +53,3 @@ output:
   dir: ./results/mlperf_tiny/ad_aot_power_ap510_atfe_tcm
   model_explorer: false
   detailed: true
-

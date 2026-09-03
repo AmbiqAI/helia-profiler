@@ -53,4 +53,3 @@ output:
   dir: ./results/mlperf_tiny/kws_rt_power_ap330_sram
   model_explorer: false
   detailed: true
-

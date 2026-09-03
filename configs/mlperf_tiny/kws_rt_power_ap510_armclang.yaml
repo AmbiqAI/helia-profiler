@@ -43,4 +43,3 @@ output:
   dir: ./results/mlperf_tiny/kws_rt_power_ap510_armclang
   model_explorer: false
   detailed: true
-
