@@ -182,11 +182,9 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # BLE-controller-reset GPIO drive (Blue-variant boards, dedicated power
     # binary only — see _ble_reset.j2) needs nsx-gpio even when power_sync
-    # itself is off (e.g. power.mode == "internal"). The header include and
-    # the CMake link line both gate on render_context.power_binary_needs_gpio,
-    # which is this same condition — the CMake side used to check only
-    # power_sync_enabled, so an internal-mode run on a Blue board selected
-    # the module here, emitted the include, and then failed to compile.
+    # itself is off (e.g. power.mode == "internal"). Must match
+    # render_context.power_binary_needs_gpio exactly, or the include/link
+    # lines and module selection disagree and the build fails.
     if power_binary_enabled and board.ble_reset_gpio_pin is not None:
         module_names = {m.name for m in module_specs}
         if "nsx-gpio" not in module_names:

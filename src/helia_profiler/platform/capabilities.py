@@ -363,9 +363,7 @@ _FAMILY_APP_FLASH_LOAD_ADDR: dict[SocFamily, int] = {
 }
 
 # Per-SoC overrides, which win over the family baseline for BUILT-IN SoCs only
-# (see ``resolve_app_flash_load_addr``).  PR #98 adds the same shape for placement
-# bases (``_SOC_MEMORY_BASES``); it is not on this branch yet, so do not expect
-# to find it by grep until that lands.
+# (see ``resolve_app_flash_load_addr``).
 #
 # atomiq110 is the motivating case and is NOT an Apollo5 part.  It heads a
 # separate Atomiq series (binned AP6 internally; the eventual family tag is

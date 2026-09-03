@@ -1,8 +1,7 @@
 """Frozen dependency sync — verification, repair, and the stamp fast path.
 
 ``nsx sync --frozen`` verifies a workspace byte-for-byte against nsx.lock by
-re-hashing every vendored module file — ~3s per run on a fully warm
-workspace, paid once per firmware build.  The stamp records the nsx.lock
+re-hashing every vendored module file, paid once per firmware build.  The stamp records the nsx.lock
 digest of the last successful frozen verification of this workspace, so an
 unchanged lock skips straight past re-verification.  What the skip trades
 away is detection of OUT-OF-BAND edits to vendored module trees; those are

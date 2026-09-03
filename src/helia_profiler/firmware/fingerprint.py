@@ -1,59 +1,23 @@
-"""Code fingerprint of a rendered firmware source (#138 / #115).
+"""Code fingerprint of a rendered firmware source (#138 / #115 / #173).
 
-The power-comparability dimension ``POWER_FIRMWARE_FINGERPRINT`` hashes the
-RENDERED SOURCE SET of whichever binary ``CapturePowerStage`` measures — the
-main translation unit plus ``hpx_pmu_profiler.{cc,h}``, which the build
-compiles into the same target and whose per-operator hooks execute inside
-the gated window (#173 review M1) — so a firmware-semantics change stops
-comparing as "fully comparable" against a baseline captured by different
-code (#115's +678% phantom delta), while a COMMENT-only template change (a
-frequent, deliberately byte-visible event in this repo's review culture)
-leaves stored baselines untouched.
+``POWER_FIRMWARE_FINGERPRINT`` hashes the RENDERED SOURCE SET of the binary
+``CapturePowerStage`` measures -- the main translation unit plus
+``hpx_pmu_profiler.{cc,h}``, whose hooks run inside the gated window -- so a
+firmware-semantics change stops comparing as fully comparable, while a
+comment-only template change leaves stored baselines untouched.
 
-Accepted residuals, documented rather than silently claimed: rendered build
-configuration (``CMakeLists.txt`` compile options/definitions,
-``modules.cmake``, ``nsx.yml``) and external module sources are NOT part of
-the hash — build configuration is a different comparison axis than "what
-code ran in the window", and dependency identity is partially covered by
-the toolchain/compiler dimensions. (The nsx.yml set-ordering
-nondeterminism that originally forced its exclusion was fixed in #174;
-including build config is now possible if ever worth the blast
-radius.) The claim is
-therefore "the rendered C sources of the measured target", not "the exact
-binary".
+Not covered, by design: rendered build configuration (``CMakeLists.txt``,
+``modules.cmake``, ``nsx.yml``) and external module sources -- build
+configuration is a separate comparison axis, and dependency identity is
+partly covered by the toolchain dimensions. The claim is "the rendered C
+sources of the measured target", not "the exact binary".
 
-The comment stripper is the same C scanner discipline the render census uses
-(``tests/contracts/test_wire_protocol.py::_split_c``): character-walk the
-source, preserve string and char literals verbatim (a ``//`` inside a printf
-format is content, not a comment), drop ``//`` and ``/* */`` comments. It is
-deliberately NOT a curated variable set: hashing the rendered artifact after
-every override is what makes attempt 1's four documented regressions
-structurally impossible (see #138).
-
-The canonical form replaces every comment with a single space and collapses
-whitespace runs (outside string/char literals) to single spaces — EXCEPT
-that a newline adjacent to a preprocessing-directive line survives as a
-newline: newline is significant in translation phases 3/4, and collapsing
-it let ``#define A 1\nint x;`` canonicalize equal to its one-line,
-semantically different join (#173 review m1, demonstrated on a real
-render), and the directive state survives a backslash-continued line
-(phase-2 splicing — round 2 proved a continued macro body's terminating
-newline otherwise collapsed, hashing two different programs equal). With
-those carve-outs the canonicalization is token-stream- and
-directive-structure-preserving for the C the templates emit. Known
-fail-safe over-sensitivities (#173 round-3 review), both unreachable in
-rendered C today: a backslash continuation on a NON-directive line is not
-spliced (the semantically identical one-line form hashes differently), and
-a comment between a directive's backslash and its newline is treated as a
-continuation even though real phase-2 splicing precedes comment stripping —
-each can only over-differentiate, never collide. Pathological inputs (an
-unterminated literal feeding a continuation) may canonicalize
-non-idempotently, which is harmless — the function is applied once, to
-rendered sources. The whitespace collapse is what makes
-comment-ONLY changes truly invisible: a line comment occupies a line, so
-merely deleting its text while keeping its newline would still shift the
-hash on every comment insertion (found by this module's own stability test
-against a real render).
+The canonical form strips comments and collapses whitespace with the C
+scanner discipline the render census uses (string/char literals verbatim),
+keeping newlines that touch a preprocessing directive and the directive
+state across backslash continuations, so it is token-stream- and
+directive-structure-preserving for the C the templates emit; its known
+over-sensitivities (#173) can only over-differentiate, never collide.
 """
 
 from __future__ import annotations
@@ -68,24 +32,15 @@ if TYPE_CHECKING:
 def canonical_code(text: str) -> str:
     """Canonical token-preserving form: comments and whitespace normalized.
 
-    Every comment becomes a single space (never nothing — ``int a// c`` plus
-    ``int b`` on the next line must not glue to ``int aint b``), and every
-    whitespace run outside string/char literals collapses to a single space —
-    except that a newline run touching a preprocessing-directive line (the
-    closed line began with ``#``, or the next content starts with ``#``)
-    survives as a newline, because newline is significant to the
-    preprocessor and collapsing it made semantically different sources hash
-    equal (#173 review m1). A ``/* */`` comment's INTERNAL newlines do not
-    count — translation phase 3 replaces the whole comment with one space
-    before directives are processed, so a directive continues across it.
-
-    String and char literals are preserved verbatim, escapes included, but
-    literal scanning terminates at an unescaped newline: C literals cannot
-    span lines without continuation, and consuming past the newline let one
-    stray apostrophe (a digit separator, ``1'000``) swallow the rest of the
-    file and silently disable comment stripping (#173 review m2). Malformed
-    input degrades — a fingerprint must never fail a run; it only has to be
-    deterministic.
+    Every comment becomes a single space (never nothing, so adjacent tokens
+    cannot glue) and every whitespace run outside string/char literals
+    collapses to one space -- except a newline run touching a preprocessing
+    directive line, which survives because newline is significant to the
+    preprocessor (#173). A ``/* */`` comment's internal newlines do not count.
+    Literals are preserved verbatim, but literal scanning stops at an
+    unescaped newline so one stray apostrophe cannot swallow the file (#173).
+    Malformed input degrades rather than fails: a fingerprint must never fail
+    a run, only be deterministic.
     """
     out: list[str] = []
     pending_ws = False
@@ -181,11 +136,10 @@ def measured_power_fingerprint(ctx: PipelineContext) -> str | None:
     power run was planned or the rendered source is not readable: a
     fingerprint must never fail a run.
 
-    Computed at report time rather than capture time (D3's letter was the
-    capture prologue, but ``CapturePowerStage`` never runs for internal mode
-    — the very mode of #115's phantom delta — and no earlier single stage
-    covers all four mode x firmware combinations; the rendered sources
-    persist in ``firmware_dir`` through report generation).
+    Computed at report time rather than capture time: ``CapturePowerStage``
+    does not run for internal mode and no earlier stage covers every mode x
+    firmware combination, while the rendered sources persist in
+    ``firmware_dir`` through report generation (#115, #173).
     """
     if ctx.power_run is None or ctx.firmware_dir is None:
         return None

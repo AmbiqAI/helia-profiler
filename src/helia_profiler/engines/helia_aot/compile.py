@@ -35,7 +35,7 @@ log = logging.getLogger("hpx")
 #
 #   1. Default       : pip install 'helia-profiler[aot]'
 #                      → installs the version pinned in pyproject.toml.
-#   2. Specific ver.  : pip install 'helia-aot>=0.19.0'
+#   2. Specific ver.  : pip install 'helia-aot>=<HELIAAOT_MIN_VERSION>'
 #   3. Local checkout: pip install -e /path/to/helia-aot
 #
 # We don't manage downloads/caches like we do for heliaRT — pip already
@@ -491,9 +491,8 @@ def _write_attributes_header(aot_module_dir: Path, prefix: str) -> Path:
         _jinja_env.get_template("heliaaot_attributes.h.j2").render(
             prefix=prefix,
         ),
-        # The template carries non-ASCII (arrows/em-dashes in comments);
-        # Windows' default cp1252 raised UnicodeEncodeError the first time
-        # a test exercised this write (surfaced by PR #98's branch).
+        # Explicit UTF-8: the template's arrows/em-dashes are not
+        # representable in a cp1252 platform default.
         encoding="utf-8",
     )
     return header_path

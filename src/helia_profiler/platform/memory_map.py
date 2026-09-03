@@ -121,8 +121,7 @@ class LinkedRegionWindow:
     excluding linker_reserved ones)``.
 
     Reservations are handled by TWO mechanisms, matched to how each link
-    family expresses them (#176 fresh-review rounds — both single-
-    mechanism designs were wrong):
+    family expresses them (#176):
 
     * FIXED script regions are carved out by EXTENT: armlink's scatter
       pins ``ARM_LIB_HEAP``/``ARM_LIB_STACK`` above ``MCU_TCM`` (so the
@@ -136,8 +135,7 @@ class LinkedRegionWindow:
       AOT engine emits via ``HELIAAOT_PUT_IN_ITCM`` — precedes it; a
       fixed carve-out was wrong there). The gcc DTCM extent is therefore
       the FULL script region, and ``.stack`` counts as occupancy — it is
-      live memory the firmware needs, the same #131 stance
-      ``BinarySections`` takes. gcc's fill-to-end ``.heap`` is the one
+      live memory the firmware needs (#131, as ``BinarySections``). gcc's fill-to-end ``.heap`` is the one
       ``linker_reserved`` exclusion (its size states what was LEFT, so
       counting it would make free identically zero).
 
@@ -323,9 +321,8 @@ _APOLLO5_FULL = (
 # SDK's am_reg_base_addresses.h says DTCM_MAX_SIZE = 256 KB, and armlink's
 # scatter tiles to exactly that (MCU_TCM 0x3B000 + heap 0x1000 + stack
 # 0x4000 = 0x40000), the same pattern it uses on AP510. gcc's script
-# simply declines to use the top 16 KB (MCU_TCM stops at 240 KB), which is
-# why soc.py's earlier "hardware-confirmed 240" was circular — it was
-# confirmed against the gcc script, not the part (#176 review M-1). The
+# simply declines to use the top 16 KB (MCU_TCM stops at 240 KB) — a script
+# choice, not a hardware limit (#176). The
 # armlink 16 KB stack at 0x2003C000 therefore classifies as DTCM, as it
 # should.
 _APOLLO330P = (

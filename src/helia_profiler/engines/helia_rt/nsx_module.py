@@ -32,7 +32,7 @@ def _install_nsx_module(
     """Install the NSX module files and distribution content into *module_dir*.
 
     Requires the distribution to ship ``nsx/nsx-module.yaml``
-    (heliaRT >= 1.16.0).  The upstream ``nsx/CMakeLists.txt`` is a
+    (HELIART_MIN_VERSION or newer).  The upstream ``nsx/CMakeLists.txt`` is a
     source-build module and cannot be used with the prebuilt dist alone
     (it requires the full repo with ``cmake/helia_rt_sources.cmake``).
     HPX generates a minimal prebuilt-wrapper CMakeLists.txt instead.
@@ -48,9 +48,8 @@ def _install_nsx_module(
     shutil.copy2(src_yaml, module_dir / "nsx-module.yaml")
 
     # --- Generate a prebuilt-wrapper CMakeLists.txt ---
-    # v1.16.0's nsx/CMakeLists.txt is a source-build module that requires
-    # the full heliaRT repo.  For the prebuilt dist, we generate a simpler
-    # wrapper that links the static library directly.
+    # The dist's nsx/CMakeLists.txt is source-build-only (needs the full
+    # repo); generate a wrapper that links the static library directly.
     core_override_block = ""
     if core_override:
         tag = core_override.lower()
@@ -98,7 +97,7 @@ def _write_nested_nsx_shim(module_dir: Path) -> None:
     )
 
 
-# Prebuilt wrapper template for heliaRT >= v1.16.0 distributions.
+# Prebuilt wrapper template for heliaRT distributions (HELIART_MIN_VERSION or newer).
 # The dist's own nsx/CMakeLists.txt is source-build-only; this provides a
 # minimal prebuilt-style module that links the static .a library.
 _PREBUILT_CMAKE_TEMPLATE = """\
