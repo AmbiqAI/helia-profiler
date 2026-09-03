@@ -26,8 +26,9 @@ The current baseline is `hpx-neuralspotx-0.7.17-2026-09`:
 | executorch | `0.1.0`, module ref `27eee513…b1ed` (a checkout's `version.txt` is verified against the baseline) |
 
 heliaRT 1.19.0 and heliaAOT 0.19.0 (issue #246) are the releases that add FP16
-and FP32 kernels. This revision promotes both HPX-owned engine pins and keeps
-every neuralSPOT-X ref unchanged: heliaRT `1.17.0 → 1.19.0` (`038a0c44…a83`),
+and FP32 kernels. This revision promotes both HPX-owned engine pins and moves
+one neuralSPOT-X ref — `ns-cmsis-nn`, to v7.31.0 (below); every other NSX ref
+is unchanged: heliaRT `1.17.0 → 1.19.0` (`038a0c44…a83`),
 heliaAOT `[0.18.0, 0.19.0) → [0.19.0, 0.20.0)`, with `ai-edge-litert` relocked to
 2.2.0 (floor unchanged at `>= 2.1.6`; the `_tflite_reader` schema constants
 re-verified unchanged against it). `HELIART_MIN_VERSION` stays `1.16.0`
@@ -192,7 +193,7 @@ Each resolved run reports one state:
 - `qualified`: baseline defaults are used.
 - `qualified-with-engine-override`: an explicit engine source/version
   override is present (`engine.config.{dist_path,source_path,source,
-  cmsis_nn_path}`, `engine.config_path`, or one of the `HELIART_DIST_PATH`
+  cmsis_nn_path,cmsis_nn_ref}`, `engine.config_path`, or one of the `HELIART_DIST_PATH`
   / `HELIART_SOURCE_PATH` / `CMSIS_NN_PATH` environment variables), but no
   NSX project override is present. Ordinary engine knobs (e.g.
   `engine.backend`, `engine.config.variant`) do not affect qualification.

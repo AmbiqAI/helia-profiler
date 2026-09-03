@@ -158,7 +158,7 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
             # Source-built heliaRT depends on the nsx-cmsis-nn module
             # being present in the build (the prebuilt static lib had
             # CMSIS-NN baked in; the source build does not). Resolve it
-            # via the shared helper (NSX registry by default).
+            # via the shared helper (declared at the baseline's qualified ref by default).
             extra_modules.append(cmsis_nn_module_ref(config, work_dir))
 
             # Forward the CMSIS-NN build options (requantize asm, fp32/fp16

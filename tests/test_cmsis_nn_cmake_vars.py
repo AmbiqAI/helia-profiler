@@ -3,7 +3,7 @@
 heliaRT 1.19.0's ``helia`` backend refuses to configure unless the fp32 kernels
 are enabled in ns-cmsis-nn; the fp16 kernels exist only for MVE-F cores and,
 below ns-cmsis-nn v7.30.0, ICE on GCC 14 -- so they are compiled only for
-models that compute in FLOAT16. Both are ``option()`` defaults in ns-cmsis-nn,
+models that carry FLOAT16 tensors (computed or dequantized weights). Both are ``option()`` defaults in ns-cmsis-nn,
 so hpx must override them as cache variables *before* the module is added.
 """
 

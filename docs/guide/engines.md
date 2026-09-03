@@ -251,8 +251,8 @@ registry and local-source modes compile heliaRT with the selected toolchain.
 | `dist_path` | string | *(registry module)* | Explicit local prebuilt distribution |
 | `source.repo` | string | — | GitHub repo for an explicit prebuilt release |
 | `source.ref` | string | — | Explicit release tag |
-| `cmsis_nn_path` | string | *(registry default)* | Local ns-cmsis-nn checkout for the source build (mutually exclusive with `cmsis_nn_ref`) |
-| `cmsis_nn_ref` | string | *(registry default)* | Exact ns-cmsis-nn git ref for the source build; stamps `qualified-with-engine-override` |
+| `cmsis_nn_path` | string | *(baseline ref)* | Local ns-cmsis-nn checkout for the source build (mutually exclusive with `cmsis_nn_ref`) |
+| `cmsis_nn_ref` | string | *(baseline ref)* | Exact ns-cmsis-nn git ref for the source build; stamps `qualified-with-engine-override` |
 | `cmsis_nn_requantize_inline_asm` | bool | `true` | Use inline-asm requantization path |
 
 ### heliaRT runtime notes
@@ -382,8 +382,8 @@ The pipeline:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `cmsis_nn_path` | string | *(registry default)* | Local ns-cmsis-nn checkout (mutually exclusive with `cmsis_nn_ref`) |
-| `cmsis_nn_ref` | string | *(registry default)* | Exact ns-cmsis-nn git ref; stamps `qualified-with-engine-override` |
+| `cmsis_nn_path` | string | *(baseline ref)* | Local ns-cmsis-nn checkout (mutually exclusive with `cmsis_nn_ref`) |
+| `cmsis_nn_ref` | string | *(baseline ref)* | Exact ns-cmsis-nn git ref; stamps `qualified-with-engine-override` |
 | `prefix` | string | `hpx` | C symbol prefix |
 | `module_name` | string | `hpx_model` | Generated NSX module name |
 | `cmsis_nn_requantize_inline_asm` | bool | `true` | Use inline-asm requantization path |

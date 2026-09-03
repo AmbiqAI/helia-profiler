@@ -25,7 +25,7 @@ evolution cannot move them: flatbuffers appends new fields to the end of the
 vtable precisely so existing slots stay fixed.
 
 This is a reader for two narrow questions -- the Softmax scaling gate and which
-float precisions a model computes in (#246). Anything needing real model
+float precisions a model works in (#246). Anything needing real model
 analysis (shapes, MACs, weights) should use ``model_analysis``'s litert path,
 not grow this file.
 """

@@ -318,7 +318,7 @@ def test_build_config_executorch_uses_pte_contract(
 def test_build_config_executorch_pins_only_an_explicit_ns_ref(
     tmp_path: Path, monkeypatch, backend: ExecuTorchBackend, pinned: bool
 ):
-    """Providers resolve at the baseline's qualified ref by default (the case
+    """Both providers land on the baseline's qualified ref by default (the case
     stamps `qualified`); an explicit ns ref is the one reason to override."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
