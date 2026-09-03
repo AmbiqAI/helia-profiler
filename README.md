@@ -98,6 +98,29 @@ uv run --group docs zensical build
 runs with no board attached. Hardware cases run through `hpx validate` (or
 `pytest -m hardware`).
 
+### Pre-commit hooks
+
+One-time setup after cloning:
+
+```bash
+uv tool install pre-commit==4.6.0
+pre-commit install
+```
+
+This installs both hook stages the repo uses: `pre-commit` (formatting,
+whitespace/YAML/JSON/TOML checks, ruff, a gate requiring every
+`TODO(...)`/`FIXME(...)`/`HACK(...)` marker to carry a reference, and a
+[gitleaks](https://github.com/gitleaks/gitleaks) secret scan —
+see the install message from a commit if `gitleaks` isn't on your `PATH`
+yet) and `prepare-commit-msg` (strips AI-tool attribution trailers from the
+commit message). `pre-push` is left untouched, so git-lfs's own `pre-push`
+hook keeps working.
+
+Run every hook against the whole tree with `pre-commit run --all-files`.
+CI runs the identical `.pre-commit-config.yaml`, so a clean local run means
+a clean CI run. Hook revisions are bumped deliberately via `pre-commit
+autoupdate` in its own reviewed PR, not ad hoc.
+
 The docs site is built with [zensical](https://github.com/squidfunk/zensical)
 from `mkdocs.yml` and deployed to GitHub Pages from `main`; `uv run mkdocs
 build --strict` still works if you prefer it locally.

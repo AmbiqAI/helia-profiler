@@ -53,4 +53,3 @@ output:
   dir: ./results/mlperf_tiny/kws_aot_power_ap510_atfe_extreme
   model_explorer: false
   detailed: true
-

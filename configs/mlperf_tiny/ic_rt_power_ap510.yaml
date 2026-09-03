@@ -43,4 +43,3 @@ output:
   dir: ./results/mlperf_tiny/ic_rt_power_ap510
   model_explorer: false
   detailed: true
-

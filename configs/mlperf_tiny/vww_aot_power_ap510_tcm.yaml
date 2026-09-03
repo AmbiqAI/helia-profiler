@@ -50,4 +50,3 @@ output:
   dir: ./results/mlperf_tiny/vww_aot_power_ap510_tcm
   model_explorer: false
   detailed: true
-

@@ -69,4 +69,3 @@ output:
   dir: ./results/mlperf_tiny/vww_aot_power_ap330
   model_explorer: false
   detailed: true
-

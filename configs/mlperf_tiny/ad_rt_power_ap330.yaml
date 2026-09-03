@@ -59,4 +59,3 @@ output:
   dir: ./results/mlperf_tiny/ad_rt_power_ap330
   model_explorer: false
   detailed: true
-
