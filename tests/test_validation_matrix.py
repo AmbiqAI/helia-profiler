@@ -53,7 +53,9 @@ class TestRegistry:
     def test_apollo510_lite_registered(self):
         assert "apollo510dL_evb" in BOARDS
         assert BOARDS["apollo510dL_evb"].jlink_device == "AP510L"
-        assert BOARDS["apollo510dL_evb"].has_psram is True
+        # No PSRAM placements until nsx-psram supports the part (board.py).
+        assert BOARDS["apollo510dL_evb"].has_psram is False
+        assert MemoryProfile.PSRAM not in BOARDS["apollo510dL_evb"].memories
 
     def test_ap4_blue_lite_registered(self):
         assert "apollo4l_blue_evb" in BOARDS
@@ -152,44 +154,45 @@ class TestBuildMatrix:
     def test_full_matrix_default(self):
         cases = build_matrix()
         # Power is intentionally off by default for PR reliability validation:
-        # Existing engines contribute 4140 cases across the six boards.
+        # Existing engines contribute 3996 cases across the six boards (the
+        # Apollo510 Lite hides its PSRAM, see board.py).
         # ExecuTorch adds 256 cases on each of the three Cortex-M55 boards: 4 models × 2
         # providers × {gcc, atfe} × 4 × 4 (armclang is excluded until validated
         # separately). PSRAM is omitted because the ExecuTorch adapter does not
         # support it.
-        assert len(cases) == 4908
+        assert len(cases) == 4764
 
     def test_power_on_keeps_executorch_unpowered(self):
         # ExecuTorch remains unpowered until its dedicated firmware implements
-        # the GPIO READY/GO/gate protocol, so power="on" flips only the 4140
+        # the GPIO READY/GO/gate protocol, so power="on" flips only the 3996
         # non-ExecuTorch cases and leaves the case count unchanged.
         cases = build_matrix(power="on")
-        assert len(cases) == 4908
-        assert sum(1 for case in cases if case.power) == 4140
+        assert len(cases) == 4764
+        assert sum(1 for case in cases if case.power) == 3996
 
     def test_power_both_adds_powered_variants(self):
         # "both" adds a powered variant for each powerable case:
-        # 4908 unpowered + 4140 powered.
+        # 4764 unpowered + 3996 powered.
         cases = build_matrix(power="both")
-        assert len(cases) == 9048
-        assert sum(1 for case in cases if case.power) == 4140
+        assert len(cases) == 8760
+        assert sum(1 for case in cases if case.power) == 3996
 
     def test_repeat_multiplies_matrix(self):
-        assert len(build_matrix(power="off", repeat=3)) == 14724
+        assert len(build_matrix(power="off", repeat=3)) == 14292
 
     def test_model_filter(self):
         cases = build_matrix(models=["kws"], power="off")
-        assert len(cases) == 1227
+        assert len(cases) == 1191
         assert {c.model.id for c in cases} == {"kws"}
 
     def test_engine_filter(self):
         cases = build_matrix(engines=["helia-aot"], power="off")
-        assert len(cases) == 1380
+        assert len(cases) == 1332
         assert all(c.engine is EngineType.HELIA_AOT for c in cases)
 
     def test_tflm_engine_filter(self):
         cases = build_matrix(engines=["tflm"], power="off")
-        assert len(cases) == 1380
+        assert len(cases) == 1332
         assert all(c.engine is EngineType.TFLM for c in cases)
 
     def test_executorch_expands_both_providers_for_all_models(self):
