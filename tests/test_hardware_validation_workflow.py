@@ -54,9 +54,14 @@ def test_ns_cmsis_nn_default_matches_qualified_baseline() -> None:
     assert 'requested_kind="qualified_baseline"' in workflow
 
 
+def _triggers(workflow: dict[Any, Any]) -> dict[str, Any]:
+    # YAML 1.1 loaders (PyYAML) read the bare ``on`` key as boolean True;
+    # YAML 1.2 loaders keep the string. Accept either.
+    return workflow[True] if True in workflow else workflow["on"]
+
+
 def test_probe_serials_are_not_workflow_inputs(workflow: dict[Any, Any]) -> None:
-    # PyYAML parses the bare ``on`` key as boolean True.
-    inputs = workflow[True]["workflow_dispatch"]["inputs"]
+    inputs = _triggers(workflow)["workflow_dispatch"]["inputs"]
     assert RUNNER_OWNED_INPUTS.isdisjoint(inputs)
     assert "boards" in inputs
     assert "power" in inputs

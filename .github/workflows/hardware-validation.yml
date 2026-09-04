@@ -4,7 +4,7 @@ name: Hardware Validation
 # advertises it as a label; the job asks for that label and takes the board's
 # probe serials from the runner's environment. The runner contract
 # (HPX_BOARD, HPX_JLINK_SERIAL, HPX_JOULESCOPE_SERIAL, labels) is documented in
-# AmbiqAI/helia-hardware-runner-nixos docs/runner-contract.md and summarised in
+# AmbiqAI/aitg-hardware-runner-nixos docs/runner-contract.md and summarised in
 # maintainers/hardware-ci.md.
 
 on:

@@ -227,7 +227,7 @@ are never workflow inputs: with several probes attached to one machine an
 implicit serial is ambiguous, and a job cannot open another board's probe.
 
 Runner configuration, labels and the board inventory live in
-`AmbiqAI/helia-hardware-runner-nixos` (`docs/runner-contract.md`). Adding a
+`AmbiqAI/aitg-hardware-runner-nixos` (`docs/runner-contract.md`). Adding a
 board there creates its runner and labels; then add the board ID to the
 workflow's `boards` default.
 
