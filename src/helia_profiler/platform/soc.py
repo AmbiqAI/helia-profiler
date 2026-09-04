@@ -687,14 +687,8 @@ _register_soc(
         core=CoreArch.CORTEX_M55,
         pmu_tier=PmuTier.ARMV8M_PMU,
         has_mve=True,
-        # Apollo510 Lite shares apollo330P's die-level memory map, not
-        # apollo510's: nsx-core's apollo510L/gcc/linker_script_sbl.ld is
-        # byte-identical to apollo330P's (MCU_MRAM 0x00410000 1984 KB post-SBL,
-        # MCU_TCM 0x20000000 240 KB, SHARED_SRAM 0x20080000 1792 KB, no ITCM
-        # region). PSRAM: the BSP declares an APS25616BA (256 Mbit = 32 MB)
-        # octal DDR PSRAM on MSPI (am_bsp.h AM_BSP_MSPI_PSRAM_DEVICE_APS25616BA),
-        # which is the SoC's capability; whether an EVB fits the part is the
-        # board's decision (apollo510dL_evb rev 2 does not).
+        # Same linked memory map as apollo330P (nsx-core ships identical linker
+        # scripts); PSRAM is the SoC's capability, boards decide if it is fitted.
         memory=MemoryLayout(
             mram_kb=1984,
             sram_kb=1792,
@@ -716,18 +710,14 @@ _register_soc(
         cmsis_header="apollo510L.h",
         # 240 KB MCU_TCM, as on apollo330P (see that entry).
         rtt_scan_ranges=((0x20000000, 0x3C000),),
-        # NSX's facts file names the device "AP510DLA-CBR", which J-Link's
-        # stock device database does not know. Ambiq's device pack
-        # (JLinkDevices/AmbiqMicro) defines "AP510L" with the internal-flash
-        # loader at 0x00410000, and that name identifies the core on the board.
+        # Ambiq's J-Link device pack entry (with flash loader); NSX's
+        # "AP510DLA-CBR" is not in J-Link's stock device database.
         jlink_device="AP510L",
         # Same 240 KB TCM budget as apollo330P; see its pmu_max_ops note.
         pmu_max_ops=512,
-        # HAL defines SRAM_1M / SRAM_0P75M / SRAM_1P75M only (am_hal_pwrctrl.h),
-        # identical to apollo330P.
+        # Largest SSRAM enum the HAL defines, as on apollo330P.
         ssram_full_power_enum="AM_HAL_PWRCTRL_SRAM_1P75M",
-        # Fixed 48 MHz XTAL_HS trace clock: NSX_SEGGER_CPUFREQ=48000000 in
-        # cmake/socs/facts/apollo510L.cmake, same as apollo330P.
+        # Fixed 48 MHz XTAL_HS trace clock (NSX SoC facts), as on apollo330P.
         swo_trace_clock_mhz=48,
         # apollo510L's HAL defines am_hal_pwrctrl_rss_pwroff() like apollo330P.
         has_radio_subsystem=True,
