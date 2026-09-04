@@ -76,10 +76,9 @@ def test_one_job_per_board_pinned_by_board_label(
         "${{ fromJSON(needs.plan.outputs.boards) }}"
     )
     assert validate_job["runs-on"] == ["self-hosted", "hpx-hardware", "${{ matrix.board }}"]
-    assert validate_job["concurrency"] == {
-        "group": "hardware-validation-${{ matrix.board }}",
-        "cancel-in-progress": False,
-    }
+    # Runner exclusivity is the only serialisation: a concurrency group keyed
+    # by board would throttle several runners of one board type to one job.
+    assert "concurrency" not in validate_job, "board jobs must not be serialised per board"
     assert "concurrency" not in workflow, "boards must not share one concurrency group"
     assert validate_job["env"]["HPX_VALIDATION_BOARD"] == "${{ matrix.board }}"
 
@@ -119,5 +118,5 @@ def test_plan_job_builds_matrix_from_boards_input(workflow: dict[Any, Any]) -> N
     plan = workflow["jobs"]["plan"]
     assert plan["outputs"]["boards"] == "${{ steps.matrix.outputs.boards }}"
     assert workflow["env"]["HPX_VALIDATION_BOARDS"] == (
-        "${{ inputs.boards || 'apollo510_evb,apollo330mP_evb' }}"
+        "${{ inputs.boards || 'apollo510_evb,apollo330mP_evb,apollo3p_evb' }}"
     )

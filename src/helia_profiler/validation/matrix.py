@@ -443,6 +443,11 @@ BOARDS: dict[str, BoardSpec] = {
         "Apollo4 Blue Plus KXR EVB",
         description="Ambiq Apollo4 Blue Plus KXR evaluation board (Cortex-M4F)",
     ),
+    "apollo4l_blue_evb": _board_spec(
+        "apollo4l_blue_evb",
+        "Apollo4 Blue Lite EVB",
+        description="Ambiq Apollo4 Blue Lite evaluation board (Cortex-M4F)",
+    ),
     "apollo510_evb": _board_spec(
         "apollo510_evb",
         "Apollo510 EVB",

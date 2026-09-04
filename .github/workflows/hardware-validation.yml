@@ -26,7 +26,7 @@ on:
       boards:
         description: "Comma-separated board IDs; each becomes one job on that board's runner"
         required: true
-        default: apollo510_evb,apollo330mP_evb
+        default: apollo510_evb,apollo330mP_evb,apollo3p_evb
         type: string
       models:
         description: "Optional comma-separated model IDs; empty uses suite defaults"
@@ -115,7 +115,9 @@ env:
   # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
   # with the manual defaults, except that nightly validation covers the full suite.
   HPX_VALIDATION_SUITE: ${{ inputs.suite || 'complete' }}
-  HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb,apollo330mP_evb' }}
+  # apollo4l_blue_evb is registered but not nightly yet: its profiler firmware
+  # does not link (undefined SystemCoreClock); see the issue in maintainers/hardware-ci.md.
+  HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb,apollo330mP_evb,apollo3p_evb' }}
   HPX_VALIDATION_MODELS: ${{ inputs.models || '' }}
   HPX_VALIDATION_ENGINES: ${{ inputs.engines || '' }}
   HPX_VALIDATION_EXECUTORCH_BACKENDS: ${{ inputs.executorch_backends || 'both' }}
@@ -157,10 +159,9 @@ jobs:
     # The board label pins this job to the runner that owns the board, on
     # whichever machine it is attached to.
     runs-on: [self-hosted, hpx-hardware, "${{ matrix.board }}"]
-    # Boards proceed independently; two runs targeting the same board queue.
-    concurrency:
-      group: hardware-validation-${{ matrix.board }}
-      cancel-in-progress: false
+    # No concurrency group: a runner takes one job at a time, so nothing can
+    # share a probe, and several runners for one board type serve jobs in
+    # parallel. A job whose board type is fully busy waits for a free runner.
     # A full nightly for one board takes under two hours warm. This bounds a
     # hung probe, not queue time: a board with no online runner stays queued.
     timeout-minutes: 300

@@ -208,8 +208,10 @@ hpx-hardware
 
 The job for a board asks for its board label, so GitHub routes it to the runner
 that owns the board on whichever machine it is attached to. Boards on the same
-machine run in parallel. Each job has its own concurrency group, so a slow board
-never blocks the others.
+machine run in parallel, and several runners for one board type share its
+queue. A runner takes one job at a time, which is the only serialisation: a
+slow board never blocks the others, and a second run for a busy board type
+waits for a free runner.
 
 Every runner exports the board it owns and the probe serials it may open:
 
@@ -236,9 +238,11 @@ axis empty to use the selected suite's defaults; set it explicitly to override
 only that axis.
 
 - `suite`: `smoke`, `models-rt`, `models-aot`, or `complete`
-- `boards`: comma-separated board IDs, default `apollo510_evb,apollo330mP_evb`;
+- `boards`: comma-separated board IDs, default `apollo510_evb,apollo330mP_evb,apollo3p_evb`;
   each becomes one job on that board's runner. A board with no online runner
-  leaves its job queued.
+  leaves its job queued. `apollo4l_blue_evb` has a runner and is registered
+  for validation but stays out of the default until its profiler firmware
+  links (AmbiqAI/helia-profiler#263).
 - `models`: optional comma-separated model IDs such as `kws` or `kws,vww`
 - `engines`: optional comma-separated engines such as `helia-rt` or `helia-aot`
 - `executorch_backends`: ExecuTorch CMSIS-NN provider selection — `both`
