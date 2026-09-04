@@ -98,10 +98,13 @@ How it works, and the rules it must keep:
   present in every production build) don't gate our rendered code, which
   compiles at full `-Werror`.
 - **Legs skip with a named reason** when their workspace is absent, has no
-  fingerprinted (post-#212) layout, records no baseline fingerprint, or
-  was built against a different compatibility baseline than the checkout
+  fingerprinted (post-#212) layout, records no baseline fingerprint, was
+  built against a different compatibility baseline than the checkout
   (candidates are tried newest-first, so a stale branch's newer workspace
-  cannot shadow a matching older one) — the test never builds a workspace
+  cannot shadow a matching older one), or, for a power-only leg, was
+  configured without the `hpx_profiler_power` target — a bench without a
+  power instrument never builds it, so on most boards the power legs are
+  expected to skip rather than fail — the test never builds a workspace
   (a cold sync is minutes of network+compile; wrong cost profile for a
   compile gate). Warm a leg by running any profile/validate with that
   (board, toolchain, engine) combo. **A partial run is visible**: skipped
