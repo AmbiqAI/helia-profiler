@@ -687,8 +687,7 @@ _register_soc(
         core=CoreArch.CORTEX_M55,
         pmu_tier=PmuTier.ARMV8M_PMU,
         has_mve=True,
-        # Same linked memory map as apollo330P (nsx-core ships identical linker
-        # scripts); PSRAM is the SoC's capability, boards decide if it is fitted.
+        # Same linked memory map as apollo330P; boards decide if PSRAM is fitted.
         memory=MemoryLayout(
             mram_kb=1984,
             sram_kb=1792,

@@ -199,9 +199,7 @@ _register_board(
         "apollo510dL_evb",
         soc="apollo510L",
         channel="preview",
-        # The rev 2 EVB does not populate its PSRAM footprint (per the board
-        # datasheet), even though the BSP declares an APS25616BA and PSRAM
-        # init fails on the board with either driver. No PSRAM placements.
+        # The rev 2 EVB has no PSRAM fitted (board datasheet).
         psram_kb=0,
         description="Apollo510 Lite — Cortex-M55 (AP5 family)",
     )
