@@ -272,11 +272,19 @@ def _resolve_candidate(app_dir: Path, case: _HwCase) -> _Workspace | str:
         return f"could not read CXX compiler from {rules}"
     if not compiler.is_file():
         return f"compiler {compiler} is not installed here"
+    ninja_text = ninja.read_text()
+    # A workspace is only warm for the leg's own target. Power-only legs need
+    # the hpx_profiler_power stanza, which a bench without a power instrument
+    # never configures (most boards): that is a skip, not a rejected render.
+    source = "src/main_power.cc" if case.target == "hpx_profiler_power" else "src/main.cc"
+    if _tu_variables(ninja_text, case.target, source) is None:
+        hint = " (no power instrument on this bench?)" if case.power_only else ""
+        return f"configured without the {case.target} target{hint}"
     return _Workspace(
         app_dir=app_dir,
         build_dir=build_dir,
         compiler=compiler,
-        ninja_text=ninja.read_text(),
+        ninja_text=ninja_text,
     )
 
 
@@ -645,6 +653,51 @@ class TestWorkspaceResolution:
 
         assert isinstance(resolved, str)
         assert "records no baseline fingerprint" in resolved
+
+    def _write_ninja(self, app: Path, case: _HwCase, *stanzas: tuple[str, str]) -> None:
+        lines = []
+        for target, source in stanzas:
+            lines.append(
+                f"build CMakeFiles/{target}.dir/{source}.obj: CXX_COMPILER__x ../{source}\n"
+                "  DEFINES = -DX\n  INCLUDES = -I/ws/src\n  FLAGS = -O2\n"
+            )
+        (app / "build" / case.board / "build.ninja").write_text("".join(lines))
+
+    def test_power_leg_skips_when_the_workspace_has_no_power_target(
+        self, tmp_path: Path, monkeypatch
+    ):
+        """A bench without a power instrument never configures
+        hpx_profiler_power; its warm workspace must skip the power leg with a
+        reason, not fail the gate as a rejected render."""
+        case = next(c for c in _MATRIX if c.power_only)
+        app = self._make_tree(
+            tmp_path, case, "unpowered", fingerprint=load_compatibility_baseline().fingerprint
+        )
+        self._write_ninja(app, case, ("hpx_profiler", "src/main.cc"))
+        monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path))
+
+        resolved = _resolve_workspace(case)
+
+        assert isinstance(resolved, str)
+        assert "configured without the hpx_profiler_power target" in resolved
+        assert "no power instrument" in resolved
+
+    def test_power_leg_resolves_when_the_workspace_has_the_power_target(
+        self, tmp_path: Path, monkeypatch
+    ):
+        case = next(c for c in _MATRIX if c.power_only)
+        app = self._make_tree(
+            tmp_path, case, "powered", fingerprint=load_compatibility_baseline().fingerprint
+        )
+        self._write_ninja(
+            app, case, ("hpx_profiler", "src/main.cc"), ("hpx_profiler_power", "src/main_power.cc")
+        )
+        monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path))
+
+        resolved = _resolve_workspace(case)
+
+        assert isinstance(resolved, _Workspace), resolved
+        assert resolved.app_dir == app
 
     def test_all_candidates_failing_names_each_reason(self, tmp_path: Path, monkeypatch):
         case = _MATRIX[0]
