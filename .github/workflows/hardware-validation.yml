@@ -1,5 +1,12 @@
 name: Hardware Validation
 
+# One job per board. Each self-hosted runner owns exactly one board and
+# advertises it as a label; the job asks for that label and takes the board's
+# probe serials from the runner's environment. The runner contract
+# (HPX_BOARD, HPX_JLINK_SERIAL, HPX_JOULESCOPE_SERIAL, labels) is documented in
+# AmbiqAI/aitg-hardware-runner-nixos docs/runner-contract.md and summarised in
+# maintainers/hardware-ci.md.
+
 on:
   schedule:
     # 09:00 UTC nightly (01:00 PDT / 00:00 PST).
@@ -17,7 +24,7 @@ on:
           - models-aot
           - complete
       boards:
-        description: "Comma-separated board IDs"
+        description: "Comma-separated board IDs; each becomes one job on that board's runner"
         required: true
         default: apollo510_evb,apollo330mP_evb
         type: string
@@ -66,7 +73,7 @@ on:
         default: ""
         type: string
       power:
-        description: "Power validation mode"
+        description: "Power validation mode; applies only to boards whose runner has a Joulescope"
         required: true
         default: "on"
         type: choice
@@ -74,21 +81,6 @@ on:
           - "off"
           - "on"
           - "both"
-      power_boards:
-        description: "Comma-separated boards allowed to use power capture"
-        required: false
-        default: "apollo510_evb"
-        type: string
-      jlink_serials:
-        description: "Optional comma-separated board=serial entries"
-        required: false
-        default: "apollo510_evb=1160003180,apollo330mP_evb=1160003409"
-        type: string
-      power_serials:
-        description: "Optional comma-separated board=Joulescope-serial entries"
-        required: false
-        default: "apollo510_evb=H8MS"
-        type: string
       repeat:
         description: "Repeat each selected case N times"
         required: true
@@ -111,13 +103,11 @@ env:
   # The runner's service home is read-only (NixOS-managed), so ~/.cache is not
   # an option; the checkout parent directory is writable and survives both the
   # checkout action's git clean and runs, so warm nightlies reuse the
-  # configured build trees instead of cold-building every case.
+  # configured build trees instead of cold-building every case. Each board
+  # runner has its own work directory, so this cache is per board.
   HPX_CACHE_DIR: ${{ github.workspace }}/../hpx-cache
-  # ccache (when installed on the runner): the service home is read-only, so
-  # its default ~/.cache/ccache would make every launched compile fail
-  # outright — keep the compilation cache next to the hpx caches instead.
-  # hpx's build.compiler_launcher auto-detect picks ccache up from PATH.
-  CCACHE_DIR: ${{ github.workspace }}/../ccache
+  # ccache: the runner exports a per-board CCACHE_DIR; hpx's
+  # build.compiler_launcher auto-detect picks ccache up from PATH.
   CCACHE_MAXSIZE: 10G
   SEGGER_RTT_PATH: ${{ github.workspace }}/segger-rtt
   HPX_NSX_EXECUTORCH_REF: 27eee513636821398f0bb5e92055526cac29b1ed
@@ -133,23 +123,87 @@ env:
   HPX_VALIDATION_TOOLCHAINS: ${{ inputs.toolchains || '' }}
   HPX_VALIDATION_TRANSPORTS: ${{ inputs.transports || '' }}
   HPX_VALIDATION_MEMORIES: ${{ inputs.memories || '' }}
-  HPX_VALIDATION_POWER: ${{ inputs.power || 'on' }}
-  HPX_VALIDATION_POWER_BOARDS: ${{ inputs.power_boards || 'apollo510_evb' }}
-  HPX_VALIDATION_JLINK_SERIALS: ${{ inputs.jlink_serials || 'apollo510_evb=1160003180,apollo330mP_evb=1160003409' }}
-  HPX_VALIDATION_POWER_SERIALS: ${{ inputs.power_serials || 'apollo510_evb=H8MS' }}
+  # Requested power mode. The per-board job resolves the effective
+  # HPX_VALIDATION_POWER from this and the runner's Joulescope declaration.
+  HPX_VALIDATION_POWER_MODE: ${{ inputs.power || 'on' }}
   HPX_VALIDATION_RUN_ORIGIN: ${{ github.event_name == 'schedule' && 'nightly' || 'manual' }}
   HPX_VALIDATION_REPEAT: ${{ inputs.repeat || '1' }}
   HPX_VALIDATION_TIMEOUT: ${{ inputs.timeout || '900' }}
 
-concurrency:
-  group: hardware-validation-${{ inputs.boards || 'apollo510_evb,apollo330mP_evb' }}
-  cancel-in-progress: false
-
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      boards: ${{ steps.matrix.outputs.boards }}
+    steps:
+      - name: Build the board matrix
+        id: matrix
+        run: |
+          boards="$(jq -cn --arg csv "${HPX_VALIDATION_BOARDS}" \
+            '$csv | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))')"
+          if [[ "${boards}" == "[]" ]]; then
+            echo "::error::boards input selected no boards" >&2
+            exit 2
+          fi
+          echo "boards=${boards}" >> "${GITHUB_OUTPUT}"
+          echo "Boards: ${boards}"
+
   validate:
-    runs-on: [self-hosted, hpx-hardware]
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJSON(needs.plan.outputs.boards) }}
+    # The board label pins this job to the runner that owns the board, on
+    # whichever machine it is attached to.
+    runs-on: [self-hosted, hpx-hardware, "${{ matrix.board }}"]
+    # Boards proceed independently; two runs targeting the same board queue.
+    concurrency:
+      group: hardware-validation-${{ matrix.board }}
+      cancel-in-progress: false
+    # A full nightly for one board takes under two hours warm. This bounds a
+    # hung probe, not queue time: a board with no online runner stays queued.
+    timeout-minutes: 300
+    env:
+      HPX_VALIDATION_BOARD: ${{ matrix.board }}
 
     steps:
+      - name: Resolve board and probes from the runner
+        run: |
+          if [[ -z "${HPX_BOARD:-}" || -z "${HPX_JLINK_SERIAL:-}" ]]; then
+            echo "::error::runner does not export HPX_BOARD and HPX_JLINK_SERIAL; it is not configured per the runner contract" >&2
+            exit 2
+          fi
+          if [[ "${HPX_BOARD}" != "${HPX_VALIDATION_BOARD}" ]]; then
+            echo "::error::runner owns board '${HPX_BOARD}' but this job targets '${HPX_VALIDATION_BOARD}'; check the runner's labels" >&2
+            exit 2
+          fi
+
+          {
+            echo "HPX_VALIDATION_JLINK_SERIALS=${HPX_BOARD}=${HPX_JLINK_SERIAL}"
+            if [[ -n "${HPX_JOULESCOPE_SERIAL:-}" ]]; then
+              echo "HPX_VALIDATION_POWER=${HPX_VALIDATION_POWER_MODE}"
+              echo "HPX_VALIDATION_POWER_BOARDS=${HPX_BOARD}"
+              echo "HPX_VALIDATION_POWER_SERIALS=${HPX_BOARD}=${HPX_JOULESCOPE_SERIAL}"
+            else
+              echo "HPX_VALIDATION_POWER=off"
+              echo "HPX_VALIDATION_POWER_BOARDS="
+              echo "HPX_VALIDATION_POWER_SERIALS="
+            fi
+          } >> "${GITHUB_ENV}"
+
+          {
+            echo "### Board: ${HPX_BOARD}"
+            echo ""
+            echo "- Runner: \`${RUNNER_NAME}\`"
+            echo "- J-Link serial: \`${HPX_JLINK_SERIAL}\`"
+            if [[ -n "${HPX_JOULESCOPE_SERIAL:-}" ]]; then
+              echo "- Joulescope serial: \`${HPX_JOULESCOPE_SERIAL}\` (power mode: ${HPX_VALIDATION_POWER_MODE})"
+            else
+              echo "- Joulescope: none (power off)"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -299,17 +353,21 @@ jobs:
       - name: Check host dependencies
         run: uv run hpx doctor
 
+      - name: Check the runner can open its probe
+        run: uv run hpx probes match --board "${HPX_VALIDATION_BOARD}" --jlink-serial "${HPX_JLINK_SERIAL}"
+
       - name: Preview validation cases
         run: |
           args=(
             --list
             --suite "${HPX_VALIDATION_SUITE}"
-            --boards "${HPX_VALIDATION_BOARDS}"
+            --boards "${HPX_VALIDATION_BOARD}"
             --power "${HPX_VALIDATION_POWER}"
             --repeat "${HPX_VALIDATION_REPEAT}"
             --timeout "${HPX_VALIDATION_TIMEOUT}"
             --executorch-backends "${HPX_VALIDATION_EXECUTORCH_BACKENDS}"
             --ns-cmsis-nn-ref "${{ steps.resolve_ns_cmsis_nn.outputs.resolved_commit }}"
+            --jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}"
           )
           if [[ -n "${HPX_VALIDATION_MODELS}" ]]; then
             args+=(--models "${HPX_VALIDATION_MODELS}")
@@ -329,9 +387,6 @@ jobs:
           if [[ -n "${HPX_VALIDATION_POWER_BOARDS}" ]]; then
             args+=(--power-boards "${HPX_VALIDATION_POWER_BOARDS}")
           fi
-          if [[ -n "${HPX_VALIDATION_JLINK_SERIALS}" ]]; then
-            args+=(--jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}")
-          fi
           if [[ -n "${HPX_VALIDATION_POWER_SERIALS}" ]]; then
             args+=(--power-serials "${HPX_VALIDATION_POWER_SERIALS}")
           fi
@@ -342,12 +397,13 @@ jobs:
           mkdir -p results/validation
           args=(
             --suite "${HPX_VALIDATION_SUITE}"
-            --boards "${HPX_VALIDATION_BOARDS}"
+            --boards "${HPX_VALIDATION_BOARD}"
             --power "${HPX_VALIDATION_POWER}"
             --repeat "${HPX_VALIDATION_REPEAT}"
             --timeout "${HPX_VALIDATION_TIMEOUT}"
             --executorch-backends "${HPX_VALIDATION_EXECUTORCH_BACKENDS}"
             --ns-cmsis-nn-ref "${{ steps.resolve_ns_cmsis_nn.outputs.resolved_commit }}"
+            --jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}"
             --output-dir results/validation
             --junit-xml results/validation/junit.xml
           )
@@ -369,9 +425,6 @@ jobs:
           if [[ -n "${HPX_VALIDATION_POWER_BOARDS}" ]]; then
             args+=(--power-boards "${HPX_VALIDATION_POWER_BOARDS}")
           fi
-          if [[ -n "${HPX_VALIDATION_JLINK_SERIALS}" ]]; then
-            args+=(--jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}")
-          fi
           if [[ -n "${HPX_VALIDATION_POWER_SERIALS}" ]]; then
             args+=(--power-serials "${HPX_VALIDATION_POWER_SERIALS}")
           fi
@@ -389,11 +442,13 @@ jobs:
         if: always()
         run: uv run pytest -m compile_hw tests/contracts/test_render_compile_hw.py -rs -W default
 
+      # One artifact per board. Consumers group a run's artifacts by the
+      # GitHub run ID recorded in each validation_manifest.json.
       - name: Upload validation artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hardware-validation-${{ github.run_id }}
+          name: hardware-validation-${{ github.run_id }}-${{ matrix.board }}
           path: |
             results/validation/
             !results/validation/**/work/**

@@ -1,9 +1,9 @@
 # Hardware Validation Artifacts
 
 `hpx validate` is the local-first entry point for hardware profiling suites.
-Run it from a developer machine with boards attached first. The manual
+Run it from a developer machine with boards attached first. The
 `Hardware Validation` GitHub Actions workflow runs the same command on a
-self-hosted runner and uploads the same output directory.
+self-hosted runner per board and uploads the same output directory.
 
 ## Local smoke run
 
@@ -13,7 +13,8 @@ Preview the selected cases without touching hardware:
 uv run hpx validate --list --suite smoke --boards apollo510_evb
 ```
 
-Preview the two-board smoke run used by the hardware validation workflow:
+Preview the smoke run for the two boards the hardware validation workflow
+covers (the workflow itself runs one board per job):
 
 ```bash
 uv run hpx validate --list \
@@ -193,35 +194,51 @@ and JS320 where bench wiring supports them. JS320 digital synchronization
 requires valid target I/O reference wiring; a missing reference can otherwise
 look like a READY/GATE timeout.
 
-## Manual GitHub Actions workflow
+## GitHub Actions workflow
 
-The repository includes a manually triggered `Hardware Validation` workflow.
-It runs on self-hosted runners labeled:
+The `Hardware Validation` workflow runs nightly and on manual dispatch. It runs
+one job per board. Each self-hosted runner owns exactly one board, is confined
+to that board's probes, and advertises three labels:
 
 ```text
 self-hosted
 hpx-hardware
+<board>            # e.g. apollo510_evb
 ```
 
-The checked-in bench defaults select the Apollo510 and Apollo330mP EVBs, enable
-power capture only for Apollo510, and pin both J-Link serials plus the Apollo510
-Joulescope serial. Override those workflow inputs when moving the workflow to a
-different physical bench.
+The job for a board asks for its board label, so GitHub routes it to the runner
+that owns the board on whichever machine it is attached to. Boards on the same
+machine run in parallel. Each job has its own concurrency group, so a slow board
+never blocks the others.
 
-Use this label for a machine that has HPX-compatible hardware attached. For
-the first bench, label the local Mac runner with `hpx-hardware` and attach the
-Apollo510 EVB plus its inline JS320. The workflow default board input is:
+Every runner exports the board it owns and the probe serials it may open:
 
-```text
-apollo510_evb,apollo330mP_evb
-```
+| Variable | Meaning |
+|---|---|
+| `HPX_BOARD` | the one board this runner owns |
+| `HPX_JLINK_SERIAL` | that board's J-Link serial |
+| `HPX_JOULESCOPE_SERIAL` | serial of a Joulescope dedicated to the board; unset if none |
+
+The first step of every job checks that `HPX_BOARD` matches the matrix board
+and derives `--jlink-serials`, `--power-boards` and `--power-serials` from those
+variables. Power capture is enabled only when the runner declares a Joulescope;
+otherwise the job forces `--power off` whatever the `power` input says. Serials
+are never workflow inputs: with several probes attached to one machine an
+implicit serial is ambiguous, and a job cannot open another board's probe.
+
+Runner configuration, labels and the board inventory live in
+`AmbiqAI/aitg-hardware-runner-nixos` (`docs/runner-contract.md`). Adding a
+board there creates its runner and labels; then add the board ID to the
+workflow's `boards` default.
 
 The workflow exposes the validation axes as manual inputs. Leave an optional
 axis empty to use the selected suite's defaults; set it explicitly to override
 only that axis.
 
 - `suite`: `smoke`, `models-rt`, `models-aot`, or `complete`
-- `boards`: comma-separated board IDs, default `apollo510_evb,apollo330mP_evb`
+- `boards`: comma-separated board IDs, default `apollo510_evb,apollo330mP_evb`;
+  each becomes one job on that board's runner. A board with no online runner
+  leaves its job queued.
 - `models`: optional comma-separated model IDs such as `kws` or `kws,vww`
 - `engines`: optional comma-separated engines such as `helia-rt` or `helia-aot`
 - `executorch_backends`: ExecuTorch CMSIS-NN provider selection — `both`
@@ -239,29 +256,28 @@ only that axis.
   or `usb_cdc`
 - `memories`: optional comma-separated placement presets such as `auto`, `tcm`,
   `sram`, `mram`, or `psram`
-- `power`: `off`, `on`, or `both`; default `on`
-- `power_boards`: boards allowed to use power capture, default `apollo510_evb`;
-  other selected boards always run unpowered
-- `jlink_serials`: optional comma-separated `board=serial` entries, default
-  `apollo510_evb=1160003180,apollo330mP_evb=1160003409`
-- `power_serials`: optional comma-separated `board=Joulescope-serial` entries,
-  default `apollo510_evb=H8MS`
+- `power`: `off`, `on`, or `both`; default `on`. Applies only to boards whose
+  runner declares a Joulescope; other boards always run unpowered
 - `repeat`: repeat count per selected case
 - `timeout`: per-case timeout in seconds
 
-Default inputs run the same smoke shape as the local command:
+Default inputs run the same smoke shape as the local command, once per board.
+On the Apollo510 runner, which declares a Joulescope, that is:
 
 ```bash
 uv run hpx validate \
   --suite smoke \
-  --boards apollo510_evb,apollo330mP_evb \
+  --boards apollo510_evb \
   --power on \
   --power-boards apollo510_evb \
-  --jlink-serials apollo510_evb=1160003180,apollo330mP_evb=1160003409 \
+  --jlink-serials apollo510_evb=1160003180 \
   --power-serials apollo510_evb=H8MS \
   --output-dir results/validation \
   --junit-xml results/validation/junit.xml
 ```
+
+On the Apollo330mP runner, which has no Joulescope, the same job runs with
+`--boards apollo330mP_evb --power off` and its own J-Link serial.
 
 To run a one-model toolchain regression on both attached boards, keep
 `suite=smoke` and set only the toolchain axis:
@@ -322,12 +338,19 @@ ExecuTorch provider. You can combine other axes as needed, but preview with
 
 Before the real run, the workflow installs validation dependencies, including
 the profiler's `aot` extra for `helia-aot` suites, fetches Git LFS fixtures,
-fetches SEGGER RTT sources into the workflow workspace, runs `hpx doctor`, and
+fetches SEGGER RTT sources into the workflow workspace, runs `hpx doctor`,
+confirms the runner can open its own probe with `hpx probes match`, and
 previews the selected cases with `hpx validate --list`. The validation output
 directory is uploaded with `actions/upload-artifact` even if the hardware run
 fails, so logs and partial case artifacts are still available for debugging.
 The upload excludes per-case `work/` directories to avoid storing generated NSX
 build trees in every run artifact.
+
+Each board job uploads its own artifact, named
+`hardware-validation-<run_id>-<board>`. A run therefore has one artifact per
+board. Consumers such as the dashboard group a run's artifacts by the GitHub run
+ID recorded in each `validation_manifest.json` under `run.github.run_id`; there
+is no merge step in the workflow.
 
 The runner must already provide:
 
@@ -347,18 +370,10 @@ when the input or GitHub variable is non-empty; otherwise HPX sees the runner's
 native environment. If `ATFE_ROOT` is missing, ATfE cases fail during HPX
 preflight before firmware generation.
 
-Use explicit `jlink_serials` on runners with more than one probe attached, or
-override the default mapping when moving the workflow to a different
-self-hosted runner:
-
-```text
-apollo510_evb=801000001,apollo330mP_evb=801000002
-```
-
-The workflow serializes runs by the selected board string so two manual jobs do
-not intentionally target the same board selection at once. Baseline comparison,
-threshold enforcement, and dashboards should consume `validation_manifest.json`
-later rather than infer paths from the artifact layout.
+Two runs that select the same board queue behind each other on that board's
+concurrency group; runs for different boards proceed independently. Baseline
+comparison, threshold enforcement, and dashboards should consume
+`validation_manifest.json` rather than infer paths from the artifact layout.
 
 ## Real-toolchain compile gate (#187 Tier 2)
 
