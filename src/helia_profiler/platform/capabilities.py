@@ -333,7 +333,7 @@ def _family_placement_bases(family: SocFamily) -> Mapping[Placement, int]:
 # nsx-ambiq-sdk's per-SoC facts (``cmake/socs/facts/*.cmake``) -- the exact
 # address the NSX-generated ``flash_cmds.jlink`` recipes program, i.e. the first
 # MRAM/flash address above each part's bootloader-reserved region, NOT the MRAM
-# region base.  Verified 2026-08 against the facts file of every registered SoC
+# region base.  Verified against the facts file of every registered SoC
 # (apollo3p; apollo4p/4l; apollo510/510b/5b/330P/510L) plus real generated recipes,
 # and cross-checked against the AP5 linker script's MCU_MRAM origin (see the
 # apollo330P memory note in soc.py).  Keying by family is safe today: no

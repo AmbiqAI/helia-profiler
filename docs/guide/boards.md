@@ -15,7 +15,7 @@ Run `hpx boards` to see the live list. As of this release:
 | `apollo510b_evb` | apollo510b | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
 | `apollo5b_evb` | apollo5b | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
 | `apollo330mP_evb` | apollo330P | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
-| `apollo510dL_evb` | apollo510L | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
+| `apollo510dL_evb` | apollo510L | Cortex-M55 | Full Armv8-M | Yes | No[^510l-psram] | Preview |
 | `apollo4p_evb` | apollo4p | Cortex-M4 | DWT only | No | Yes | Preview |
 | `apollo4l_evb` | apollo4l | Cortex-M4 | DWT only | No | Yes | Preview |
 | `apollo4l_blue_evb` | apollo4l | Cortex-M4 | DWT only | No | Yes | Preview |
@@ -23,6 +23,8 @@ Run `hpx boards` to see the live list. As of this release:
 | `apollo4p_blue_kxr_evb` | apollo4p | Cortex-M4 | DWT only | No | Yes | Preview |
 | `apollo3p_evb` | apollo3p | Cortex-M4 | DWT only | No | Yes | Stable |
 | `apollo3p_evb_cygnus` | apollo3p | Cortex-M4 | DWT only | No | Yes | Preview |
+
+[^510l-psram]: The EVB has a PSRAM chip, but the NSX PSRAM module does not list the board yet, so HPX hides it until it does.
 
 !!! tip "Apollo510 EVB is the default"
     If `--board` is not specified, the profiler targets `apollo510_evb`.

@@ -691,9 +691,9 @@ _register_soc(
         # apollo510's: nsx-core's apollo510L/gcc/linker_script_sbl.ld is
         # byte-identical to apollo330P's (MCU_MRAM 0x00410000 1984 KB post-SBL,
         # MCU_TCM 0x20000000 240 KB, SHARED_SRAM 0x20080000 1792 KB, no ITCM
-        # region) -- read 2026-09-04 from nsx-ambiq-sdk v5.2.24. PSRAM: the
-        # apollo510dL_evb BSP populates an APS25616BA (256 Mbit = 32 MB) octal
-        # DDR PSRAM on MSPI (am_bsp.h AM_BSP_MSPI_PSRAM_DEVICE_APS25616BA).
+        # region). PSRAM: the apollo510dL_evb BSP declares an APS25616BA
+        # (256 Mbit = 32 MB) octal DDR PSRAM on MSPI
+        # (am_bsp.h AM_BSP_MSPI_PSRAM_DEVICE_APS25616BA).
         memory=MemoryLayout(
             mram_kb=1984,
             sram_kb=1792,
@@ -715,11 +715,10 @@ _register_soc(
         cmsis_header="apollo510L.h",
         # 240 KB MCU_TCM, as on apollo330P (see that entry).
         rtt_scan_ranges=((0x20000000, 0x3C000),),
-        # NSX's facts file names the device "AP510DLA-CBR", which J-Link 9.60
-        # does not know. Ambiq's device pack (JLinkDevices/AmbiqMicro) defines
-        # "AP510L" with the internal-flash loader at 0x00410000; that name
-        # identifies the core ("Found Cortex-M55 r1p1") on the real board
-        # (J-Link 1160003477, 2026-09-04).
+        # NSX's facts file names the device "AP510DLA-CBR", which J-Link's
+        # stock device database does not know. Ambiq's device pack
+        # (JLinkDevices/AmbiqMicro) defines "AP510L" with the internal-flash
+        # loader at 0x00410000, and that name identifies the core on the board.
         jlink_device="AP510L",
         # Same 240 KB TCM budget as apollo330P; see its pmu_max_ops note.
         pmu_max_ops=512,

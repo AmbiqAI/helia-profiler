@@ -144,11 +144,8 @@ def test_apollo330_hardware_facts_not_copied_from_apollo510():
 def test_apollo510_lite_hardware_facts_match_apollo330P_not_apollo510():
     """apollo510L shares apollo330P's memory map and quirks, not apollo510's.
 
-    Values read from nsx-ambiq-sdk v5.2.24: the apollo510L gcc SBL linker
-    script is byte-identical to apollo330P's, the HAL defines SRAM_1P75M as
-    its largest SSRAM enum, and the NSX facts file pins the trace clock to
-    48 MHz.  The J-Link device name comes from Ambiq's device pack, the only
-    place that defines a 510L entry, and was confirmed on hardware.
+    The linker map, SSRAM power enum, trace clock and J-Link device name are
+    pinned against the SDK sources so a copy from apollo510 cannot creep in.
     """
     soc = get_soc("apollo510L")
     assert get_soc_for_board("apollo510dL_evb").name == "apollo510L"
