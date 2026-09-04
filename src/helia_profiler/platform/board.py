@@ -199,10 +199,9 @@ _register_board(
         "apollo510dL_evb",
         soc="apollo510L",
         channel="preview",
-        # WORKAROUND nsx-ambiq-sdk#76: the EVB's BSP declares a 32 MB PSRAM
-        # (see the SoC entry), but the nsx-psram module does not list this
-        # board or SoC as compatible, so PSRAM placements cannot be locked.
-        # Hide PSRAM until it does.
+        # The rev 2 EVB does not populate its PSRAM footprint (per the board
+        # datasheet), even though the BSP declares an APS25616BA and PSRAM
+        # init fails on the board with either driver. No PSRAM placements.
         psram_kb=0,
         description="Apollo510 Lite — Cortex-M55 (AP5 family)",
     )

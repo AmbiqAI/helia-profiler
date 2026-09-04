@@ -24,7 +24,7 @@ Run `hpx boards` to see the live list. As of this release:
 | `apollo3p_evb` | apollo3p | Cortex-M4 | DWT only | No | Yes | Stable |
 | `apollo3p_evb_cygnus` | apollo3p | Cortex-M4 | DWT only | No | Yes | Preview |
 
-[^510l-psram]: The EVB has a PSRAM chip, but the NSX PSRAM module does not list the board yet, so HPX hides it until it does.
+[^510l-psram]: The SoC supports PSRAM, but the rev 2 EVB does not have the chip fitted.
 
 !!! tip "Apollo510 EVB is the default"
     If `--board` is not specified, the profiler targets `apollo510_evb`.

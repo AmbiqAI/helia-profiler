@@ -53,7 +53,7 @@ class TestRegistry:
     def test_apollo510_lite_registered(self):
         assert "apollo510dL_evb" in BOARDS
         assert BOARDS["apollo510dL_evb"].jlink_device == "AP510L"
-        # No PSRAM placements until nsx-psram supports the part (board.py).
+        # The rev 2 EVB has no PSRAM fitted (board.py), so no PSRAM placements.
         assert BOARDS["apollo510dL_evb"].has_psram is False
         assert MemoryProfile.PSRAM not in BOARDS["apollo510dL_evb"].memories
 

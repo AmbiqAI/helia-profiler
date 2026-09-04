@@ -149,7 +149,7 @@ def test_apollo510_lite_hardware_facts_match_apollo330P_not_apollo510():
     """
     soc = get_soc("apollo510L")
     assert get_soc_for_board("apollo510dL_evb").name == "apollo510L"
-    # The EVB hides its PSRAM until nsx-psram lists the part (see board.py).
+    # The rev 2 EVB has no PSRAM fitted (see board.py).
     assert get_soc_for_board("apollo510dL_evb").memory.psram_kb == 0
     assert soc.family is SocFamily.AP5
     assert soc.core is CoreArch.CORTEX_M55

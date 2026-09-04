@@ -691,9 +691,10 @@ _register_soc(
         # apollo510's: nsx-core's apollo510L/gcc/linker_script_sbl.ld is
         # byte-identical to apollo330P's (MCU_MRAM 0x00410000 1984 KB post-SBL,
         # MCU_TCM 0x20000000 240 KB, SHARED_SRAM 0x20080000 1792 KB, no ITCM
-        # region). PSRAM: the apollo510dL_evb BSP declares an APS25616BA
-        # (256 Mbit = 32 MB) octal DDR PSRAM on MSPI
-        # (am_bsp.h AM_BSP_MSPI_PSRAM_DEVICE_APS25616BA).
+        # region). PSRAM: the BSP declares an APS25616BA (256 Mbit = 32 MB)
+        # octal DDR PSRAM on MSPI (am_bsp.h AM_BSP_MSPI_PSRAM_DEVICE_APS25616BA),
+        # which is the SoC's capability; whether an EVB fits the part is the
+        # board's decision (apollo510dL_evb rev 2 does not).
         memory=MemoryLayout(
             mram_kb=1984,
             sram_kb=1792,
