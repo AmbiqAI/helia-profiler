@@ -238,7 +238,9 @@ axis empty to use the selected suite's defaults; set it explicitly to override
 only that axis.
 
 - `suite`: `smoke`, `models-rt`, `models-aot`, or `complete`
-- `boards`: comma-separated board IDs, default `apollo510_evb,apollo330mP_evb,apollo3p_evb,apollo4l_blue_evb`;
+- `boards`: comma-separated board IDs, default `apollo510_evb,apollo330mP_evb,apollo3p_evb`.
+  `apollo4l_blue_evb` has a runner and is registered for validation but stays
+  out of the default until its profiler firmware links (AmbiqAI/helia-profiler#263).;
   each becomes one job on that board's runner. A board with no online runner
   leaves its job queued.
 - `models`: optional comma-separated model IDs such as `kws` or `kws,vww`

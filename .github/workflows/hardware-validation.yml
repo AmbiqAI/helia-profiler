@@ -26,7 +26,7 @@ on:
       boards:
         description: "Comma-separated board IDs; each becomes one job on that board's runner"
         required: true
-        default: apollo510_evb,apollo330mP_evb,apollo3p_evb,apollo4l_blue_evb
+        default: apollo510_evb,apollo330mP_evb,apollo3p_evb
         type: string
       models:
         description: "Optional comma-separated model IDs; empty uses suite defaults"
@@ -115,7 +115,9 @@ env:
   # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
   # with the manual defaults, except that nightly validation covers the full suite.
   HPX_VALIDATION_SUITE: ${{ inputs.suite || 'complete' }}
-  HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb,apollo330mP_evb,apollo3p_evb,apollo4l_blue_evb' }}
+  # apollo4l_blue_evb is registered but not nightly yet: its profiler firmware
+  # does not link (undefined SystemCoreClock); see the issue in maintainers/hardware-ci.md.
+  HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb,apollo330mP_evb,apollo3p_evb' }}
   HPX_VALIDATION_MODELS: ${{ inputs.models || '' }}
   HPX_VALIDATION_ENGINES: ${{ inputs.engines || '' }}
   HPX_VALIDATION_EXECUTORCH_BACKENDS: ${{ inputs.executorch_backends || 'both' }}

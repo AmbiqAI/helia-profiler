@@ -118,5 +118,5 @@ def test_plan_job_builds_matrix_from_boards_input(workflow: dict[Any, Any]) -> N
     plan = workflow["jobs"]["plan"]
     assert plan["outputs"]["boards"] == "${{ steps.matrix.outputs.boards }}"
     assert workflow["env"]["HPX_VALIDATION_BOARDS"] == (
-        "${{ inputs.boards || 'apollo510_evb,apollo330mP_evb,apollo3p_evb,apollo4l_blue_evb' }}"
+        "${{ inputs.boards || 'apollo510_evb,apollo330mP_evb,apollo3p_evb' }}"
     )
