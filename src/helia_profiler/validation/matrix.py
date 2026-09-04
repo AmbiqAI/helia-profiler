@@ -458,6 +458,11 @@ BOARDS: dict[str, BoardSpec] = {
         "Apollo330mP EVB",
         description="Ambiq Apollo330mP evaluation board (Cortex-M55)",
     ),
+    "apollo510dL_evb": _board_spec(
+        "apollo510dL_evb",
+        "Apollo510 Lite EVB",
+        description="Ambiq Apollo510 Lite evaluation board (Cortex-M55)",
+    ),
     # Future boards plug in here.
 }
 

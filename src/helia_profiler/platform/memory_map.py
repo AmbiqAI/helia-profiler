@@ -350,6 +350,9 @@ _MAPS: Mapping[str, tuple[LinkedRegionWindow, ...]] = MappingProxyType(
         "apollo510b": _APOLLO5_FULL,
         "apollo5b": _APOLLO5_FULL,
         "apollo330P": _APOLLO330P,
+        # apollo510L's linker scripts are byte-identical to apollo330P's (see
+        # the _APOLLO330P note above).
+        "apollo510L": _APOLLO330P,
     }
 )
 

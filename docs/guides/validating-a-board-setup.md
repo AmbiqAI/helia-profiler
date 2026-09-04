@@ -61,7 +61,7 @@ hpx validate --suite smoke --list
 
 ```
 Registered models: ad, ic, kws, vww
-Registered boards: apollo330mP_evb, apollo3p_evb, apollo4l_blue_evb, apollo4p_blue_kxr_evb, apollo510_evb
+Registered boards: apollo330mP_evb, apollo3p_evb, apollo4l_blue_evb, apollo4p_blue_kxr_evb, apollo510_evb, apollo510dL_evb
 
 1 case(s) would run:
 

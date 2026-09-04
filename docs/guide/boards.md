@@ -15,6 +15,7 @@ Run `hpx boards` to see the live list. As of this release:
 | `apollo510b_evb` | apollo510b | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
 | `apollo5b_evb` | apollo5b | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
 | `apollo330mP_evb` | apollo330P | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
+| `apollo510dL_evb` | apollo510L | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
 | `apollo4p_evb` | apollo4p | Cortex-M4 | DWT only | No | Yes | Preview |
 | `apollo4l_evb` | apollo4l | Cortex-M4 | DWT only | No | Yes | Preview |
 | `apollo4l_blue_evb` | apollo4l | Cortex-M4 | DWT only | No | Yes | Preview |
@@ -30,7 +31,7 @@ Run `hpx boards` to see the live list. As of this release:
 
 ## SoC families
 
-### AP5 — Cortex-M55 (Apollo510, Apollo510b, Apollo5b, Apollo330P)
+### AP5 — Cortex-M55 (Apollo510, Apollo510b, Apollo5b, Apollo330P, Apollo510 Lite)
 
 - Full **Armv8-M PMU** with 8 configurable event counters plus a
   dedicated cycle counter.
@@ -91,6 +92,7 @@ For reference:
 | `apollo510b_evb` | `AP510BFA-CBR` |
 | `apollo5b_evb` | `AP510NFA-CBR` |
 | `apollo330mP_evb` | `Apollo330P_510L` |
+| `apollo510dL_evb` | `AP510L` |
 | `apollo4p_evb` | `AMAP42KP-KBR` |
 | `apollo4l_evb` | `AMAP42KL-KBR` |
 | `apollo4l_blue_evb` | `AMAP42KL-KBR` |

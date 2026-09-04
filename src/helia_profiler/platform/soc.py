@@ -30,7 +30,7 @@ class SocFamily(Enum):
 
     AP3 = "ap3"  # Apollo3 / Apollo3P — Cortex-M4F, DWT only
     AP4 = "ap4"  # Apollo4 / Apollo4P / Apollo4L — Cortex-M4F, DWT only
-    AP5 = "ap5"  # Apollo5 / Apollo510 / Apollo330P — Cortex-M55, full PMU + MVE
+    AP5 = "ap5"  # Apollo5 / Apollo510 / Apollo510L / Apollo330P — Cortex-M55, full PMU + MVE
 
 
 class CoreArch(Enum):
@@ -676,6 +676,60 @@ _register_soc(
         # apollo330P's HAL defines am_hal_pwrctrl_rss_pwroff() (unlike the
         # plain apollo510/apollo510b HAL variants this project builds
         # against) -- see SocDef.has_radio_subsystem docstring.
+        has_radio_subsystem=True,
+    )
+)
+
+_register_soc(
+    SocDef(
+        name="apollo510L",
+        family=SocFamily.AP5,
+        core=CoreArch.CORTEX_M55,
+        pmu_tier=PmuTier.ARMV8M_PMU,
+        has_mve=True,
+        # Apollo510 Lite shares apollo330P's die-level memory map, not
+        # apollo510's: nsx-core's apollo510L/gcc/linker_script_sbl.ld is
+        # byte-identical to apollo330P's (MCU_MRAM 0x00410000 1984 KB post-SBL,
+        # MCU_TCM 0x20000000 240 KB, SHARED_SRAM 0x20080000 1792 KB, no ITCM
+        # region) -- read 2026-09-04 from nsx-ambiq-sdk v5.2.24. PSRAM: the
+        # apollo510dL_evb BSP populates an APS25616BA (256 Mbit = 32 MB) octal
+        # DDR PSRAM on MSPI (am_bsp.h AM_BSP_MSPI_PSRAM_DEVICE_APS25616BA).
+        memory=MemoryLayout(
+            mram_kb=1984,
+            sram_kb=1792,
+            dtcm_kb=240,
+            itcm_kb=0,
+            psram_kb=32768,
+        ),
+        clocks=(
+            ClockDomain(
+                "cpu",
+                (
+                    ClockSpeed("lp", 96, PerfTier.LOW),
+                    ClockSpeed("hp", 250, PerfTier.HIGH),
+                ),
+                default="lp",
+            ),
+        ),
+        c_define="AM_PART_APOLLO510L",
+        cmsis_header="apollo510L.h",
+        # 240 KB MCU_TCM, as on apollo330P (see that entry).
+        rtt_scan_ranges=((0x20000000, 0x3C000),),
+        # NSX's facts file names the device "AP510DLA-CBR", which J-Link 9.60
+        # does not know. Ambiq's device pack (JLinkDevices/AmbiqMicro) defines
+        # "AP510L" with the internal-flash loader at 0x00410000; that name
+        # identifies the core ("Found Cortex-M55 r1p1") on the real board
+        # (J-Link 1160003477, 2026-09-04).
+        jlink_device="AP510L",
+        # Same 240 KB TCM budget as apollo330P; see its pmu_max_ops note.
+        pmu_max_ops=512,
+        # HAL defines SRAM_1M / SRAM_0P75M / SRAM_1P75M only (am_hal_pwrctrl.h),
+        # identical to apollo330P.
+        ssram_full_power_enum="AM_HAL_PWRCTRL_SRAM_1P75M",
+        # Fixed 48 MHz XTAL_HS trace clock: NSX_SEGGER_CPUFREQ=48000000 in
+        # cmake/socs/facts/apollo510L.cmake, same as apollo330P.
+        swo_trace_clock_mhz=48,
+        # apollo510L's HAL defines am_hal_pwrctrl_rss_pwroff() like apollo330P.
         has_radio_subsystem=True,
     )
 )

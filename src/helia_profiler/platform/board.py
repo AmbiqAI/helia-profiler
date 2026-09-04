@@ -192,3 +192,13 @@ _register_board(
         description="Apollo330 — Cortex-M55 (AP5 family)",
     )
 )
+
+_register_board(
+    BoardDef(
+        # NSX's board id for the Apollo510 Lite EVB ("Apollo510DL EVB").
+        "apollo510dL_evb",
+        soc="apollo510L",
+        channel="preview",
+        description="Apollo510 Lite — Cortex-M55 (AP5 family)",
+    )
+)

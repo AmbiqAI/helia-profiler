@@ -345,6 +345,7 @@ class TestFlashBinaryFallback:
             ("apollo3p_evb", SocFamily.AP3, "0x0000C000"),
             ("apollo4p_blue_kxr_evb", SocFamily.AP4, "0x00018000"),
             ("apollo510_evb", SocFamily.AP5, "0x00410000"),
+            ("apollo510dL_evb", SocFamily.AP5, "0x00410000"),
         ],
     )
     def test_uses_the_load_address_of_each_soc_family(
@@ -567,6 +568,7 @@ def test_every_registered_soc_has_its_nsx_app_flash_load_address() -> None:
         "apollo510b": 0x00410000,
         "apollo5b": 0x00410000,
         "apollo330P": 0x00410000,
+        "apollo510L": 0x00410000,
     }
     actual = {soc.name: soc.capabilities.memory.app_flash_load_addr for soc in list_socs()}
 

@@ -141,6 +141,35 @@ def test_apollo330_hardware_facts_not_copied_from_apollo510():
     assert soc.jlink_device == "Apollo330P_510L"
 
 
+def test_apollo510_lite_hardware_facts_match_apollo330P_not_apollo510():
+    """apollo510L shares apollo330P's memory map and quirks, not apollo510's.
+
+    Values read from nsx-ambiq-sdk v5.2.24: the apollo510L gcc SBL linker
+    script is byte-identical to apollo330P's, the HAL defines SRAM_1P75M as
+    its largest SSRAM enum, and the NSX facts file pins the trace clock to
+    48 MHz.  The J-Link device name comes from Ambiq's device pack, the only
+    place that defines a 510L entry, and was confirmed on hardware.
+    """
+    soc = get_soc_for_board("apollo510dL_evb")
+    assert soc.name == "apollo510L"
+    assert soc.family is SocFamily.AP5
+    assert soc.core is CoreArch.CORTEX_M55
+    assert soc.has_full_pmu
+    assert soc.has_mve
+    assert soc.swo_trace_clock_mhz == 48
+    assert soc.memory.dtcm_kb == 240
+    assert soc.memory.itcm_kb == 0
+    assert soc.memory.sram_kb == 1792
+    assert soc.memory.mram_kb == 1984
+    assert soc.memory.psram_kb == 32768
+    assert soc.rtt_scan_ranges == ((0x20000000, 0x3C000),)
+    assert soc.ssram_full_power_enum == "AM_HAL_PWRCTRL_SRAM_1P75M"
+    assert soc.pmu_max_ops == 512
+    assert soc.jlink_device == "AP510L"
+    assert soc.cmsis_header == "apollo510L.h"
+    assert soc.c_define == "AM_PART_APOLLO510L"
+
+
 def test_unknown_board_raises():
     with pytest.raises(ValueError, match="Unknown board"):
         get_board("nonexistent_evb")
@@ -158,6 +187,7 @@ def test_list_boards_returns_all():
     assert "apollo3p_evb" in names
     assert "apollo4p_evb" in names
     assert "apollo330mP_evb" in names
+    assert "apollo510dL_evb" in names
 
 
 def test_list_socs_returns_all():
@@ -166,6 +196,7 @@ def test_list_socs_returns_all():
     assert "apollo510" in names
     assert "apollo3p" in names
     assert "apollo330P" in names
+    assert "apollo510L" in names
 
 
 def test_clean_window_needs_probe_attach_tracks_both_conjuncts():
