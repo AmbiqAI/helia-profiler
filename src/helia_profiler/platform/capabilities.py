@@ -333,14 +333,13 @@ def _family_placement_bases(family: SocFamily) -> Mapping[Placement, int]:
 # nsx-ambiq-sdk's per-SoC facts (``cmake/socs/facts/*.cmake``) -- the exact
 # address the NSX-generated ``flash_cmds.jlink`` recipes program, i.e. the first
 # MRAM/flash address above each part's bootloader-reserved region, NOT the MRAM
-# region base.  Verified 2026-08 against the facts file of every registered SoC
-# (apollo3p; apollo4p/4l; apollo510/510b/5b/330P) plus real generated recipes,
+# region base.  Verified against the facts file of every registered SoC
+# (apollo3p; apollo4p/4l; apollo510/510b/5b/330P/510L) plus real generated recipes,
 # and cross-checked against the AP5 linker script's MCU_MRAM origin (see the
 # apollo330P memory note in soc.py).  Keying by family is safe today: no
-# registered family mixes addresses across its parts.  Two unregistered parts
-# also agree with their families, from the sources that exist for each:
-# apollo510L from its facts file, apollo4b (which has no facts file) from a
-# real generated recipe.
+# registered family mixes addresses across its parts.  One unregistered part
+# also agrees with its family: apollo4b (which has no facts file), from a real
+# generated recipe.
 #
 # Each value is whichever linker layout that part's DEFAULT NSX_LINKER_PROFILE
 # resolves to -- not "the SBL layout" as a blanket rule, because that differs

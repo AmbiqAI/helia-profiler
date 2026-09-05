@@ -30,7 +30,7 @@ class SocFamily(Enum):
 
     AP3 = "ap3"  # Apollo3 / Apollo3P — Cortex-M4F, DWT only
     AP4 = "ap4"  # Apollo4 / Apollo4P / Apollo4L — Cortex-M4F, DWT only
-    AP5 = "ap5"  # Apollo5 / Apollo510 / Apollo330P — Cortex-M55, full PMU + MVE
+    AP5 = "ap5"  # Apollo5 / Apollo510 / Apollo510L / Apollo330P — Cortex-M55, full PMU + MVE
 
 
 class CoreArch(Enum):
@@ -676,6 +676,49 @@ _register_soc(
         # apollo330P's HAL defines am_hal_pwrctrl_rss_pwroff() (unlike the
         # plain apollo510/apollo510b HAL variants this project builds
         # against) -- see SocDef.has_radio_subsystem docstring.
+        has_radio_subsystem=True,
+    )
+)
+
+_register_soc(
+    SocDef(
+        name="apollo510L",
+        family=SocFamily.AP5,
+        core=CoreArch.CORTEX_M55,
+        pmu_tier=PmuTier.ARMV8M_PMU,
+        has_mve=True,
+        # Same linked memory map as apollo330P; boards decide if PSRAM is fitted.
+        memory=MemoryLayout(
+            mram_kb=1984,
+            sram_kb=1792,
+            dtcm_kb=240,
+            itcm_kb=0,
+            psram_kb=32768,
+        ),
+        clocks=(
+            ClockDomain(
+                "cpu",
+                (
+                    ClockSpeed("lp", 96, PerfTier.LOW),
+                    ClockSpeed("hp", 250, PerfTier.HIGH),
+                ),
+                default="lp",
+            ),
+        ),
+        c_define="AM_PART_APOLLO510L",
+        cmsis_header="apollo510L.h",
+        # 240 KB MCU_TCM, as on apollo330P (see that entry).
+        rtt_scan_ranges=((0x20000000, 0x3C000),),
+        # Ambiq's J-Link device pack entry (with flash loader); NSX's
+        # "AP510DLA-CBR" is not in J-Link's stock device database.
+        jlink_device="AP510L",
+        # Same 240 KB TCM budget as apollo330P; see its pmu_max_ops note.
+        pmu_max_ops=512,
+        # Largest SSRAM enum the HAL defines, as on apollo330P.
+        ssram_full_power_enum="AM_HAL_PWRCTRL_SRAM_1P75M",
+        # Fixed 48 MHz XTAL_HS trace clock (NSX SoC facts), as on apollo330P.
+        swo_trace_clock_mhz=48,
+        # apollo510L's HAL defines am_hal_pwrctrl_rss_pwroff() like apollo330P.
         has_radio_subsystem=True,
     )
 )

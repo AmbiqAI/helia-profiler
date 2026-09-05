@@ -28,6 +28,7 @@ CHARACTERIZED_SOCS = (
     "apollo510b",
     "apollo5b",
     "apollo330P",
+    "apollo510L",
 )
 
 
@@ -121,6 +122,7 @@ _EXPECTED_LEGACY_VS_VERIFIED = {
     "apollo5b": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
     "apollo330P": (0x00410000, (2_031_616, 2_031_616), (245_760, 262_144), (1_835_008, 1_835_008)),
 }
+_EXPECTED_LEGACY_VS_VERIFIED["apollo510L"] = _EXPECTED_LEGACY_VS_VERIFIED["apollo330P"]
 
 
 def test_known_divergences_from_the_legacy_placement_table_are_pinned():
@@ -368,6 +370,8 @@ _EXPECTED_APP_WINDOWS = {
 _EXPECTED_APP_WINDOWS["apollo4l"] = _EXPECTED_APP_WINDOWS["apollo4p"]
 _EXPECTED_APP_WINDOWS["apollo510b"] = _EXPECTED_APP_WINDOWS["apollo510"]
 _EXPECTED_APP_WINDOWS["apollo5b"] = _EXPECTED_APP_WINDOWS["apollo510"]
+# apollo510L links against apollo330P's byte-identical scripts.
+_EXPECTED_APP_WINDOWS["apollo510L"] = _EXPECTED_APP_WINDOWS["apollo330P"]
 
 
 def test_every_app_window_extent_is_pinned_exactly():

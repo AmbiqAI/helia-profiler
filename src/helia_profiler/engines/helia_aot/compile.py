@@ -77,6 +77,7 @@ _BOARD_TO_AOT_PLATFORM: dict[str, str] = {
     "apollo510b_evb": "apollo510_evb",  # same SoC family / memory layout
     "apollo5b_evb": "apollo510_evb",
     "apollo330mP_evb": "apollo510_evb",  # Cortex-M55, AP5 family
+    "apollo510dL_evb": "apollo510_evb",  # Cortex-M55, AP5 family (as apollo330mP_evb)
 }
 
 # Expected memory-placement macro suffixes emitted by heliaAOT's

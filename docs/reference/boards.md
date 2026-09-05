@@ -24,6 +24,7 @@ Board                    SoC          Core         Backends             Domains 
  apollo510b_evb           apollo510b   cortex-m55   dwt, armv8m-pmu      cpu, mve        preview
  apollo5b_evb             apollo5b     cortex-m55   dwt, armv8m-pmu      cpu, mve        preview
  apollo330mP_evb          apollo330P   cortex-m55   dwt, armv8m-pmu      cpu, mve        preview
+ apollo510dL_evb          apollo510L   cortex-m55   dwt, armv8m-pmu      cpu, mve        preview
 ```
 
 Cortex-M55 boards (AP5/AP330 family) expose the full Armv8-M PMU plus MVE
