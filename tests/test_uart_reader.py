@@ -1,6 +1,7 @@
 """UART capture preserves output emitted while resetting the target."""
 
 from contextlib import contextmanager
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -32,6 +33,9 @@ def test_capture_preserves_output_received_during_reset(monkeypatch, keep_attach
     port = SerialPort()
 
     class ResetController:
+        def swpoi_reset(self, **kwargs):
+            raise AssertionError("unexpected SWPOI reset")
+
         def debug_reset(self, **kwargs):
             assert port.buffer == b""
             port.buffer = f"{HPX_START}\nHPX_TEST,1\n{HPX_END}\n".encode()
@@ -39,7 +43,7 @@ def test_capture_preserves_output_received_during_reset(monkeypatch, keep_attach
         @contextmanager
         def attached_reset_session(self, **kwargs):
             self.debug_reset(**kwargs)
-            yield
+            yield MagicMock()
 
     monkeypatch.setattr(uart, "find_jlink_vcom_port", lambda _: "test-port")
     monkeypatch.setattr(uart.serial, "Serial", lambda **kwargs: port)
