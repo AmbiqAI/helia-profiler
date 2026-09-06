@@ -604,6 +604,11 @@ _TRUNCATION_HINTS: dict[Transport, str] = {
         "For lossless capture use --transport rtt. If you must use SWO, "
         "reduce output volume (fewer --iterations or --pmu-counters)."
     ),
+    Transport.UART: (
+        "UART capture truncated. Check the J-Link VCOM connection and "
+        "heartbeat/overall timeouts. UART has no flow control; reduce output "
+        "volume (fewer --iterations or --pmu-counters), or use --transport rtt."
+    ),
     Transport.USB_CDC: (
         "USB CDC capture truncated. Confirm the board's application USB "
         "device enumerated after reset (a separate CDC port from the "
@@ -621,7 +626,7 @@ def _truncation_hint(transport: str) -> str:
     """
     try:
         return _TRUNCATION_HINTS[Transport(transport)]
-    except ValueError:
+    except (ValueError, KeyError):
         return "Check that the firmware is printing HPX protocol data over the selected transport."
 
 
