@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, Protocol, TypeVar, runtime_checkable
 
+from neuralspotx.file_lock import file_mutex
+
 from ._version import __version__
 from .results import (
     DependencyWorkspace,
@@ -450,6 +452,24 @@ class PipelineRunner:
     def run(self, config: ProfileConfig) -> PipelineContext:
         """Set up the working directory, run all stages, and clean up."""
         work_dir, should_cleanup = _resolve_work_dir(config)
+        lock_path = work_dir / ".hpx-run.lock"
+        with file_mutex(lock_path):
+            if config.clean and config.work_dir is None:
+                # Preserve the lock inode so waiting runs retain the same mutex.
+                for child in work_dir.iterdir():
+                    if child == lock_path:
+                        continue
+                    if child.is_dir() and not child.is_symlink():
+                        shutil.rmtree(child)
+                    else:
+                        child.unlink()
+                log.info("Cleaned cached work directory: %s", work_dir)
+            return self._run_in_workspace(config, work_dir, should_cleanup)
+
+    def _run_in_workspace(
+        self, config: ProfileConfig, work_dir: Path, should_cleanup: bool
+    ) -> PipelineContext:
+        """Hold workspace ownership through engine preparation, capture, and reporting."""
         ctx = PipelineContext(config=config, work_dir=work_dir)
         if self._progress_sink is not None:
             ctx.progress_sink = self._progress_sink
@@ -556,10 +576,6 @@ def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
 
     # Persistent cache directory — enables incremental builds
     wd = _default_cache_work_dir(config)
-    if config.clean:
-        if wd.exists():
-            shutil.rmtree(wd, ignore_errors=True)
-            log.info("Cleaned cached work directory: %s", wd)
     try:
         wd.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
@@ -574,7 +590,7 @@ def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
         )
         fallback.mkdir(parents=True, exist_ok=True)
         wd = fallback
-    return wd, False
+    return wd.resolve(), False
 
 
 def serialize_config(config: ProfileConfig) -> dict[str, Any]:

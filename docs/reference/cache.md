@@ -15,6 +15,12 @@ hpx caches NSX module artifacts, git-artifact content hashes, resolved refs,
 and generated firmware workspaces between runs so repeat profiles avoid
 network fetches and full rebuilds.
 
+Profiles sharing a work directory run one at a time, from engine preparation
+through profile and power capture and report generation. A second profile waits
+until the first releases the directory. `--clean` also waits before clearing
+cached contents. Use distinct `--work-dir` paths for concurrent profiles on
+separate probes.
+
 - `hpx cache info` — show the cache location and disk usage.
 - `hpx cache purge` — remove all NSX persistent cache items (module artifacts,
   legacy/v1/v2 git-artifact hash files and their lock sidecars, and resolved
