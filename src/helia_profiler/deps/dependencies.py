@@ -21,6 +21,7 @@ from neuralspotx.nsx_lock import LOCK_SCHEMA_VERSION, hash_manifest, read_lock
 from . import nsx as nsx_cli
 from .._version import __version__
 from ..errors import BuildError, DependencyError, LockError, VersionError
+from ..engines import EngineType
 from ..results.dependencies import (
     ContentDigest,
     DependencyLockMode,
@@ -612,7 +613,7 @@ def _verify_baseline_resolution(ctx: PipelineContext, provenance: DependencyProv
             skipped |= engine_projects
             if override.name in {"cmsis_nn_path", "cmsis_nn_ref"}:
                 provider_projects = {"ns-cmsis-nn"}
-                if str(ctx.config.engine.type) == "executorch":
+                if ctx.config.engine.type == EngineType.EXECUTORCH:
                     artifacts = ctx.engine_artifacts
                     provider_projects = {
                         module.project

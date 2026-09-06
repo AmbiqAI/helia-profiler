@@ -25,13 +25,33 @@ from helia_profiler.deps.dependencies import (
     read_dependency_lock_provenance,
 )
 from helia_profiler.engines import TFLM_ENGINE_HEADER
-from helia_profiler.engines.base import TflmArtifacts
+from helia_profiler.engines.base import ExecutorchArtifacts, TflmArtifacts
 from helia_profiler.errors import DependencyError, LockError, VersionError
 from helia_profiler.errors import BuildError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.results import DependencyLockMode, NsxModuleRef
 from helia_profiler.deps.compatibility import QualificationState
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+
+
+def _executorch_artifacts(project: str = "arm-cmsis-nn") -> ExecutorchArtifacts:
+    """Create valid ExecuTorch outputs with the selected provider module."""
+    return ExecutorchArtifacts(
+        engine_header="nsx_executorch.h",
+        executorch_method_arena_size=1024,
+        executorch_planned_arena_size=2048,
+        executorch_temporary_arena_size=512,
+        executorch_input_size=64,
+        executorch_output_size=16,
+        extra_modules=[
+            NsxModuleRef(
+                name="arm-cmsis-nn" if project == "arm-cmsis-nn" else "nsx-cmsis-nn",
+                project=project,
+                path=Path(),
+                local=False,
+            )
+        ],
+    )
 
 
 def _context(
@@ -63,7 +83,11 @@ def _context(
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
     ResolvePlatformStage().run(ctx)
-    ctx.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
+    ctx.engine_artifacts = (
+        _executorch_artifacts()
+        if engine_type == "executorch"
+        else TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
+    )
     ctx.dependency_workspace = create_workspace(ctx)
     ctx.firmware_dir = ctx.dependency_workspace.root / "profiler_app"
     ctx.firmware_dir.mkdir(parents=True, exist_ok=True)
@@ -667,17 +691,7 @@ def test_engine_cmsis_nn_override_exempts_provider_project_from_baseline_check(
         model_name=model_name,
     )
     if engine_type == "executorch":
-        ctx.engine_artifacts = TflmArtifacts(
-            engine_header=TFLM_ENGINE_HEADER,
-            extra_modules=[
-                NsxModuleRef(
-                    name="arm-cmsis-nn" if project == "arm-cmsis-nn" else "nsx-cmsis-nn",
-                    project=project,
-                    path=Path(),
-                    local=False,
-                )
-            ],
-        )
+        ctx.engine_artifacts = _executorch_artifacts(project)
     _write_valid_lock(ctx, project=project, commit="d" * 40)
     monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
 
@@ -814,17 +828,7 @@ def test_provider_override_does_not_exempt_unselected_provider(
         model_name="model.pte",
         engine_config={"cmsis_nn_ref": "feature/provider-test"},
     )
-    ctx.engine_artifacts = TflmArtifacts(
-        engine_header=TFLM_ENGINE_HEADER,
-        extra_modules=[
-            NsxModuleRef(
-                name="arm-cmsis-nn",
-                project="arm-cmsis-nn",
-                path=Path(),
-                local=False,
-            )
-        ],
-    )
+    ctx.engine_artifacts = _executorch_artifacts()
     _write_valid_lock(ctx, project="ns-cmsis-nn", commit="d" * 40)
     monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
     with pytest.raises(VersionError, match="qualified baseline pins"):
