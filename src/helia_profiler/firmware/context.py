@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from ..config import DEFAULT_ARENA_SIZE_BYTES, CleanWindowProbe, Transport

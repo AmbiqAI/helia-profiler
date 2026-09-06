@@ -23,7 +23,7 @@ def _cmd_analyze(
 ) -> None:
     """Analyze model compute/parameter breakdown without hardware."""
     from ..evaluation import analyze_for_engine
-    from ..modelcost import ModelAnalysis, analyze_model, is_available
+    from ..modelcost import analyze_model, is_available
     from ..console import HpxConsole
 
     console = HpxConsole(verbosity=1)  # always show output

@@ -27,7 +27,7 @@ import subprocess
 import sys
 import time
 import traceback
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -472,7 +472,6 @@ def run_case(
         cmd.append("-v")
 
     start = time.monotonic()
-    timed_out = False
     attempts = 2 if case.power else 1
     proc: subprocess.CompletedProcess[str] | _ProcResult
     for attempt in range(attempts):

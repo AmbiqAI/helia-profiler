@@ -17,7 +17,6 @@ from helia_profiler.transport.rtt import (
     capture_rtt_output,
 )
 from helia_profiler.errors import CaptureError
-from helia_profiler.transport.rtt_control import direct_rtt_write as _direct_rtt_write
 from helia_profiler.transport.swo import capture_swo_output
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
@@ -61,27 +60,6 @@ class _FakeDirectRttJLink:
         self.rd_off_writes.append((addr, data))
 
 
-class _FakeDirectRttWriteJLink:
-    def __init__(self):
-        self.byte_writes: list[tuple[int, list[int]]] = []
-        self.word_writes: list[tuple[int, list[int]]] = []
-
-    def memory_read32(self, addr: int, count: int) -> list[int]:
-        if addr == 0x20000010:
-            return [1]
-        if addr == 0x20000014:
-            return [1]
-        if addr == 0x20000030:
-            return [0x1234, 0x20002000, 16, 2, 0, 0][:count]
-        raise AssertionError(f"unexpected read32 addr=0x{addr:08X} count={count}")
-
-    def memory_write8(self, addr: int, data: list[int]) -> None:
-        self.byte_writes.append((addr, data))
-
-    def memory_write32(self, addr: int, data: list[int]) -> None:
-        self.word_writes.append((addr, data))
-
-
 def test_scan_for_rtt_control_block_uses_provided_ranges():
     magic = b"SEGGER RTT"
     chunk = magic + b"\x00" * (0x4000 - len(magic))
@@ -112,20 +90,6 @@ def test_direct_rtt_read_advances_rd_off():
 
     assert data == b"HPX_LINE"
     assert jlink.rd_off_writes == [(0x20000028, [10])]
-
-
-def test_direct_rtt_write_advances_wr_off():
-    jlink = _FakeDirectRttWriteJLink()
-
-    written = _direct_rtt_write(
-        jlink,  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
-        block_address=0x20000000,
-        data=b"READY",
-    )
-
-    assert written == 5
-    assert jlink.byte_writes == [(0x20002002, [82, 69, 65, 68, 89])]
-    assert jlink.word_writes == [(0x2000003C, [7])]
 
 
 def test_api_rtt_write_retries_until_full_command_sent(monkeypatch):

@@ -100,46 +100,6 @@ def direct_rtt_read(
     return data
 
 
-def direct_rtt_write(
-    jlink: DebugMemorySession,
-    *,
-    block_address: int,
-    data: bytes,
-    buffer_index: int = 0,
-) -> int:
-    """Write directly to an RTT down-buffer via SWD memory accesses."""
-    if not data:
-        return 0
-
-    max_up_buffers = jlink.memory_read32(block_address + 16, 1)[0]
-    max_down_buffers = jlink.memory_read32(block_address + 20, 1)[0]
-    if buffer_index >= max_down_buffers:
-        return 0
-    desc_addr = (
-        block_address
-        + _RTT_CB_HEADER_SIZE
-        + (max_up_buffers * _RTT_DESC_SIZE)
-        + (buffer_index * _RTT_DESC_SIZE)
-    )
-    _name_ptr, buf_ptr, size, wr_off, rd_off, _flags = jlink.memory_read32(
-        desc_addr, _RTT_DESC_WORDS
-    )
-    if buf_ptr == 0 or size <= 1 or wr_off > size or rd_off > size:
-        return 0
-
-    free = size - (wr_off - rd_off) - 1 if rd_off <= wr_off else rd_off - wr_off - 1
-    if free <= 0:
-        return 0
-    payload = data[:free]
-    first_count = min(len(payload), size - wr_off)
-    if first_count:
-        jlink.memory_write8(buf_ptr + wr_off, list(payload[:first_count]))
-    if len(payload) > first_count:
-        jlink.memory_write8(buf_ptr, list(payload[first_count:]))
-    jlink.memory_write32(desc_addr + 12, [(wr_off + len(payload)) % size])
-    return len(payload)
-
-
 def scan_rtt_control_blocks(
     jlink: DebugMemorySession,
     ranges: tuple[tuple[int, int], ...],
