@@ -154,3 +154,58 @@ def test_distinct_workspaces_can_run_concurrently(tmp_path: Path) -> None:
         ]
         for future in futures:
             future.result(timeout=5)
+
+
+@pytest.mark.parametrize("entry_kind", ["file", "directory"])
+def test_clean_continues_after_entry_deletion_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    entry_kind: str,
+) -> None:
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
+    config = _config(tmp_path, "first", cached=True, clean=True)
+    work_dir, _ = pipeline._resolve_work_dir(config)
+    blocked = work_dir / "blocked-entry"
+    if entry_kind == "directory":
+        blocked.mkdir()
+    else:
+        blocked.write_text("old")
+    removable_file = work_dir / "removable-file"
+    removable_file.write_text("old")
+    removable_dir = work_dir / "removable-directory"
+    removable_dir.mkdir()
+    lock_path = work_dir / ".hpx-run.lock"
+    lock_path.touch()
+    original_lock = lock_path.stat()
+    real_iterdir, real_unlink, real_rmtree = Path.iterdir, Path.unlink, pipeline.shutil.rmtree
+
+    def ordered_entries(path: Path) -> Iterator[Path]:
+        if path == work_dir:
+            return iter([blocked, removable_file, removable_dir, lock_path])
+        return real_iterdir(path)
+
+    def unlink(path: Path, *args, **kwargs) -> None:
+        if path == blocked:
+            raise PermissionError("file is in use")
+        real_unlink(path, *args, **kwargs)
+
+    def rmtree(path, *args, **kwargs) -> None:
+        if Path(path) == blocked:
+            raise PermissionError("directory is read-only")
+        real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "iterdir", ordered_entries)
+    monkeypatch.setattr(Path, "unlink", unlink)
+    monkeypatch.setattr(pipeline.shutil, "rmtree", rmtree)
+    observations: list[tuple[str, str]] = []
+    PipelineRunner([ArtifactStage("prepare_engine", observations)]).run(config)
+
+    assert observations == [("first", "prepare_engine")]
+    assert blocked.exists()
+    assert not removable_file.exists()
+    assert not removable_dir.exists()
+    assert lock_path.stat().st_ino == original_lock.st_ino
+    assert str(blocked) in caplog.text
+    assert "Close programs using it or check permissions" in caplog.text
+    assert "continuing with remaining cache contents" in caplog.text

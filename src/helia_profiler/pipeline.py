@@ -459,11 +459,19 @@ class PipelineRunner:
                 for child in work_dir.iterdir():
                     if child == lock_path:
                         continue
-                    if child.is_dir() and not child.is_symlink():
-                        shutil.rmtree(child)
-                    else:
-                        child.unlink()
-                log.info("Cleaned cached work directory: %s", work_dir)
+                    try:
+                        if child.is_dir() and not child.is_symlink():
+                            shutil.rmtree(child)
+                        else:
+                            child.unlink()
+                    except OSError as exc:
+                        log.warning(
+                            "Could not remove cached entry %s: %s. Close programs using it "
+                            "or check permissions; continuing with remaining cache contents.",
+                            child,
+                            exc,
+                        )
+                log.info("Finished cached workspace cleanup: %s", work_dir)
             return self._run_in_workspace(config, work_dir, should_cleanup)
 
     def _run_in_workspace(
