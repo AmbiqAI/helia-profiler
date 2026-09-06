@@ -21,6 +21,7 @@ from neuralspotx.nsx_lock import LOCK_SCHEMA_VERSION, hash_manifest, read_lock
 from . import nsx as nsx_cli
 from .._version import __version__
 from ..errors import BuildError, DependencyError, LockError, VersionError
+from ..engines import EngineType
 from ..results.dependencies import (
     ContentDigest,
     DependencyLockMode,
@@ -611,13 +612,15 @@ def _verify_baseline_resolution(ctx: PipelineContext, provenance: DependencyProv
             # divergence is already classified by qualification state.
             skipped |= engine_projects
             if override.name in {"cmsis_nn_path", "cmsis_nn_ref"}:
-                provider_project = "ns-cmsis-nn"
-                if (
-                    str(ctx.config.engine.type) == "executorch"
-                    and ctx.config.engine.backend == "arm"
-                ):
-                    provider_project = "arm-cmsis-nn"
-                skipped.add(provider_project)
+                provider_projects = {"ns-cmsis-nn"}
+                if ctx.config.engine.type == EngineType.EXECUTORCH:
+                    artifacts = ctx.engine_artifacts
+                    provider_projects = {
+                        module.project
+                        for module in (artifacts.extra_modules if artifacts is not None else [])
+                        if module.name in {"arm-cmsis-nn", "nsx-cmsis-nn"}
+                    }
+                skipped.update(project for project in provider_projects if project is not None)
     for module in provenance.modules:
         expected = pinned.get(module.project)
         if (
