@@ -613,12 +613,13 @@ def _verify_baseline_resolution(ctx: PipelineContext, provenance: DependencyProv
             if override.name in {"cmsis_nn_path", "cmsis_nn_ref"}:
                 provider_projects = {"ns-cmsis-nn"}
                 if str(ctx.config.engine.type) == "executorch":
-                    provider_projects.add("arm-cmsis-nn")
-                skipped.update(
-                    module.project
-                    for module in provenance.modules
-                    if module.project in provider_projects
-                )
+                    artifacts = ctx.engine_artifacts
+                    provider_projects = {
+                        module.project
+                        for module in (artifacts.extra_modules if artifacts is not None else [])
+                        if module.name in {"arm-cmsis-nn", "nsx-cmsis-nn"}
+                    }
+                skipped.update(project for project in provider_projects if project is not None)
     for module in provenance.modules:
         expected = pinned.get(module.project)
         if (

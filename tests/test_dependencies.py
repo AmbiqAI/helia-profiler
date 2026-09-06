@@ -29,7 +29,7 @@ from helia_profiler.engines.base import TflmArtifacts
 from helia_profiler.errors import DependencyError, LockError, VersionError
 from helia_profiler.errors import BuildError
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.results import DependencyLockMode
+from helia_profiler.results import DependencyLockMode, NsxModuleRef
 from helia_profiler.deps.compatibility import QualificationState
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
@@ -666,6 +666,18 @@ def test_engine_cmsis_nn_override_exempts_provider_project_from_baseline_check(
         engine_config={"cmsis_nn_ref": "feature/provider-test"},
         model_name=model_name,
     )
+    if engine_type == "executorch":
+        ctx.engine_artifacts = TflmArtifacts(
+            engine_header=TFLM_ENGINE_HEADER,
+            extra_modules=[
+                NsxModuleRef(
+                    name="arm-cmsis-nn" if project == "arm-cmsis-nn" else "nsx-cmsis-nn",
+                    project=project,
+                    path=Path(),
+                    local=False,
+                )
+            ],
+        )
     _write_valid_lock(ctx, project=project, commit="d" * 40)
     monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
 
@@ -788,6 +800,32 @@ def test_provider_override_does_not_exempt_unrelated_baseline_project(
         engine_config={"cmsis_nn_ref": "feature/provider-test"},
     )
     _write_valid_lock(ctx, project="nsx-sensors", commit="d" * 40)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    with pytest.raises(VersionError, match="qualified baseline pins"):
+        prepare_locked_dependencies(ctx)
+
+
+def test_provider_override_does_not_exempt_unselected_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(
+        tmp_path,
+        engine_type="executorch",
+        model_name="model.pte",
+        engine_config={"cmsis_nn_ref": "feature/provider-test"},
+    )
+    ctx.engine_artifacts = TflmArtifacts(
+        engine_header=TFLM_ENGINE_HEADER,
+        extra_modules=[
+            NsxModuleRef(
+                name="arm-cmsis-nn",
+                project="arm-cmsis-nn",
+                path=Path(),
+                local=False,
+            )
+        ],
+    )
+    _write_valid_lock(ctx, project="ns-cmsis-nn", commit="d" * 40)
     monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
     with pytest.raises(VersionError, match="qualified baseline pins"):
         prepare_locked_dependencies(ctx)
