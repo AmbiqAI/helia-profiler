@@ -159,7 +159,6 @@ def capture_uart_output(
             return ser.read(waiting if waiting else _READ_CHUNK)
 
         def _collect() -> list[str]:
-            ser.reset_input_buffer()
             return collect_lines(
                 read_fn,
                 transport_name="UART",
