@@ -566,3 +566,39 @@ def test_incomplete_or_conflicting_presets_are_rejected():
     for rows in ([], complete[:1], ["0,MUL,5,0", complete[1]], [complete[0], complete[0]]):
         with pytest.raises(CaptureError):
             parse_firmware_output(_identity_session([complete], rows))
+
+
+def test_identity_failure_describes_missing_extra_and_conflicting_rows():
+    import pytest
+    from helia_profiler.errors import CaptureError
+
+    expected = ["0,CONV,100,0", "1,RELU,10,0", "2,ADD,900,0"]
+    actual = ["0,MUL,100,0", "2,ADD,900,0", "3,RELU,10,0"]
+    for lines in (_identity_session([expected, actual]), _identity_session([expected], actual)):
+        with pytest.raises(CaptureError) as exc:
+            parse_firmware_output(lines)
+        message = str(exc.value)
+        assert "missing IDs (1): 1" in message
+        assert "extra IDs (1): 3" in message
+        assert "conflicting labels (1): 0 (expected 'CONV', got 'MUL')" in message
+
+
+def test_identity_failure_bounds_large_differences_and_labels():
+    import pytest
+    from helia_profiler.capture.parser import _check_identities
+    from helia_profiler.errors import CaptureError
+
+    expected: dict[int | str, str] = {f"missing-{i}-" + "x" * 1000: "CONV" for i in range(100)}
+    actual: dict[int | str, str] = {f"extra-{i}-" + "x" * 1000: "ADD" for i in range(100)}
+    expected.update({i: "CONV" * 1000 for i in range(100)})
+    actual.update({i: "ADD" * 1000 for i in range(100)})
+    with pytest.raises(CaptureError) as exc:
+        _check_identities(expected, actual)
+    message = str(exc.value)
+    assert len(message) < 1200
+    assert "missing IDs (100):" in message
+    assert "extra IDs (100):" in message
+    assert "conflicting labels (100):" in message
+    assert message.count("(+97 more)") == 3
+    assert "expected 'CONV" in message
+    assert "got 'ADD" in message

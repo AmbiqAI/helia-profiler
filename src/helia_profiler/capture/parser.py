@@ -425,9 +425,39 @@ def _check_identities(expected: dict[int | str, str] | None, actual: dict[int | 
     """Reject incomplete or conflicting layer sets across iterations and presets."""
     if expected is not None and expected != actual:
         raise CaptureError(
-            "PMU layer identities differ across iterations or presets.",
+            "PMU layer identities differ across iterations or presets: "
+            + _identity_diff_summary(expected, actual),
             hint="The capture is incomplete or inconsistent. Retry with a lossless transport.",
         )
+
+
+def _identity_diff_summary(expected: dict[int | str, str], actual: dict[int | str, str]) -> str:
+    """Describe at most three bounded examples of each identity mismatch."""
+
+    def short(value: int | str) -> str:
+        text = repr(value)
+        return text if len(text) <= 48 else text[:45] + "..."
+
+    missing = [key for key in expected if key not in actual]
+    extra = [key for key in actual if key not in expected]
+    conflicting = [key for key in expected if key in actual and expected[key] != actual[key]]
+    parts: list[str] = []
+    for label, keys in (
+        ("missing IDs", missing),
+        ("extra IDs", extra),
+        ("conflicting labels", conflicting),
+    ):
+        if not keys:
+            continue
+        examples = [
+            f"{short(key)} (expected {short(expected[key])}, got {short(actual[key])})"
+            if label == "conflicting labels"
+            else short(key)
+            for key in keys[:3]
+        ]
+        suffix = f", ... (+{len(keys) - 3} more)" if len(keys) > 3 else ""
+        parts.append(f"{label} ({len(keys)}): " + ", ".join(examples) + suffix)
+    return "; ".join(parts)
 
 
 def _average_iterations(
