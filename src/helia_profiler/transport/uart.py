@@ -25,7 +25,6 @@ captures prefer RTT; UART is the fallback for boards without USB CDC.
 from __future__ import annotations
 
 import logging
-import time
 
 import serial  # pyserial
 from serial.tools import list_ports

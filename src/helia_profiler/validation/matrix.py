@@ -10,7 +10,7 @@ benchmark is one entry in ``MODELS`` — nothing else needs to change.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 import re
