@@ -136,6 +136,36 @@ def _sync_executorch_cache(url: str, ref: str) -> Path:
     return cache
 
 
+def _offline_cached_source(ref: str) -> Path:
+    """Reuse a complete, clean cache at the pinned revision without synchronizing it."""
+    from ..hostenv.cache_dirs import hpx_cache_root
+
+    cache = hpx_cache_root() / "nsx-executorch"
+    try:
+        if not (cache / ".git").exists() or _checkout_commit(cache) != ref:
+            raise EngineError(f"Missing or stale nsx-executorch cache: {cache}")
+        runtime = cache / "external" / "executorch"
+        modules = [(cache, "external/executorch")]
+        modules.extend((runtime, name) for name in _EXECUTORCH_MINIMAL_SUBMODULES)
+        for parent, name in modules:
+            checkout = parent / name
+            if not (checkout / ".git").exists():
+                raise EngineError(f"Missing cached submodule: {checkout}")
+            if _checkout_commit(checkout) != _gitlink_commit(parent, name):
+                raise EngineError(f"Stale cached submodule: {checkout}")
+        for checkout in [cache, *(parent / name for parent, name in modules)]:
+            if _run_git(
+                ["status", "--porcelain", "--untracked-files=all"], checkout, timeout=30
+            ).stdout.strip():
+                raise EngineError(f"Modified cached checkout: {checkout}")
+    except EngineError as exc:
+        raise EngineError(
+            f"Offline ExecuTorch preparation requires a complete pinned cache: {exc}",
+            hint="Prepare the cache with an online run, or set engine.config.source_path to a complete local checkout.",
+        ) from exc
+    return cache
+
+
 def _resolve_source_root(config: ProfileConfig) -> Path:
     """Resolve the nsx-executorch checkout root.
 
@@ -148,6 +178,8 @@ def _resolve_source_root(config: ProfileConfig) -> Path:
         # Clone at the same ref the checkout verification enforces; the
         # project entry contributes the URL.
         ref = baseline.engine("executorch").ref or baseline.project(EXECUTORCH_PROJECT).ref
+        if config.build.offline:
+            return _offline_cached_source(ref)
         return _auto_clone_nsx_executorch(baseline.project(EXECUTORCH_PROJECT).url, ref)
     if not isinstance(source_value, (str, Path)) or not str(source_value).strip():
         raise EngineError(

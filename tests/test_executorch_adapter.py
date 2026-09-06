@@ -845,3 +845,93 @@ def test_auto_clone_failure_without_stderr_still_reports_cause(
     message = str(excinfo.value)
     assert "timed out" in message
     assert "source_path" in message
+
+
+def _offline_config(tmp_path, source, *, explicit=False):
+    from dataclasses import replace
+
+    config = _config(tmp_path, source, source_path=str(source) if explicit else None)
+    return replace(config, build=replace(config.build, offline=True))
+
+
+def _offline_cache_tree(tmp_path, monkeypatch):
+    cache = _patch_cache(monkeypatch, tmp_path)
+    source = _source_tree(cache.parent)
+    (source / ".git").mkdir()
+    runtime = source / "external" / "executorch"
+    (runtime / ".git").write_text("gitdir: unused\n")
+    for name in executorch_mod._EXECUTORCH_MINIMAL_SUBMODULES:
+        path = runtime / name
+        path.mkdir(parents=True)
+        (path / ".git").write_text("gitdir: unused\n")
+    monkeypatch.setattr(
+        executorch_mod,
+        "_gitlink_commit",
+        lambda parent, name: executorch_mod._checkout_commit(parent / name),
+    )
+    return cache
+
+
+@pytest.mark.parametrize(
+    "cache_state", ["cold", "missing_nested", "stale", "stale_nested", "dirty", "warm"]
+)
+def test_offline_cache_never_synchronizes(tmp_path, monkeypatch, cache_state):
+    cache = _offline_cache_tree(tmp_path, monkeypatch)
+    config = _offline_config(tmp_path, cache)
+    calls = []
+
+    def readonly_git(args, cwd, *, timeout):
+        assert args == ["status", "--porcelain", "--untracked-files=all"]
+        calls.append(Path(cwd))
+        return subprocess.CompletedProcess(
+            args, 0, stdout=" M version.txt" if cache_state == "dirty" else ""
+        )
+
+    monkeypatch.setattr(executorch_mod, "_run_git", readonly_git)
+    monkeypatch.setattr(
+        executorch_mod, "_auto_clone_nsx_executorch", lambda *_: pytest.fail("offline auto-clone")
+    )
+    if cache_state == "cold":
+        import shutil
+
+        shutil.rmtree(cache)
+    elif cache_state == "missing_nested":
+        (cache / "external/executorch/third-party/flatcc/.git").unlink()
+    elif cache_state == "stale":
+        monkeypatch.setattr(executorch_mod, "_checkout_commit", lambda _: "wrong-ref")
+    elif cache_state == "stale_nested":
+        checkout_commit = executorch_mod._checkout_commit
+        monkeypatch.setattr(
+            executorch_mod, "_gitlink_commit", lambda parent, name: checkout_commit(parent / name)
+        )
+        monkeypatch.setattr(
+            executorch_mod,
+            "_checkout_commit",
+            lambda path: "wrong-ref" if path.name == "flatcc" else checkout_commit(path),
+        )
+    if cache_state == "warm":
+        artifacts = ExecuTorchAdapter().prepare(config, tmp_path / "work")
+        assert artifacts.extra_modules
+        assert len(calls) == 7
+    else:
+        with pytest.raises(
+            EngineError, match="Offline ExecuTorch preparation requires a complete pinned cache"
+        ) as exc:
+            ExecuTorchAdapter().prepare(config, tmp_path / "work")
+        assert "online run" in (exc.value.hint or "")
+
+
+def test_offline_explicit_source_does_not_access_cache(tmp_path, monkeypatch):
+    source = _source_tree(tmp_path)
+    monkeypatch.setattr(
+        executorch_mod, "_auto_clone_nsx_executorch", lambda *_: pytest.fail("offline clone")
+    )
+    monkeypatch.setattr(
+        executorch_mod,
+        "_offline_cached_source",
+        lambda *_: pytest.fail("explicit source cache access"),
+    )
+    artifacts = ExecuTorchAdapter().prepare(
+        _offline_config(tmp_path, source, explicit=True), tmp_path / "work"
+    )
+    assert artifacts.extra_modules
