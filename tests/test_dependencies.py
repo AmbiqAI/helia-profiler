@@ -647,6 +647,8 @@ def test_explicit_module_override_exempts_project_from_baseline_check(
         ("helia-rt", None, "model.tflite", "ns-cmsis-nn"),
         ("executorch", "ns", "model.pte", "ns-cmsis-nn"),
         ("executorch", "arm", "model.pte", "arm-cmsis-nn"),
+        ("executorch", None, "model.pte", "arm-cmsis-nn"),
+        ("executorch", None, "model.pte", "ns-cmsis-nn"),
     ],
 )
 def test_engine_cmsis_nn_override_exempts_provider_project_from_baseline_check(
@@ -774,3 +776,18 @@ def test_read_dependency_lock_provenance_unreadable_lock_raises_lock_error(
             read_dependency_lock_provenance(ctx.firmware_dir)
     finally:
         lock_path.chmod(original_mode)
+
+
+def test_provider_override_does_not_exempt_unrelated_baseline_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _context(
+        tmp_path,
+        engine_type="executorch",
+        model_name="model.pte",
+        engine_config={"cmsis_nn_ref": "feature/provider-test"},
+    )
+    _write_valid_lock(ctx, project="nsx-sensors", commit="d" * 40)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    with pytest.raises(VersionError, match="qualified baseline pins"):
+        prepare_locked_dependencies(ctx)

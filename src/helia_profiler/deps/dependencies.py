@@ -611,13 +611,14 @@ def _verify_baseline_resolution(ctx: PipelineContext, provenance: DependencyProv
             # divergence is already classified by qualification state.
             skipped |= engine_projects
             if override.name in {"cmsis_nn_path", "cmsis_nn_ref"}:
-                provider_project = "ns-cmsis-nn"
-                if (
-                    str(ctx.config.engine.type) == "executorch"
-                    and ctx.config.engine.backend == "arm"
-                ):
-                    provider_project = "arm-cmsis-nn"
-                skipped.add(provider_project)
+                provider_projects = {"ns-cmsis-nn"}
+                if str(ctx.config.engine.type) == "executorch":
+                    provider_projects.add("arm-cmsis-nn")
+                skipped.update(
+                    module.project
+                    for module in provenance.modules
+                    if module.project in provider_projects
+                )
     for module in provenance.modules:
         expected = pinned.get(module.project)
         if (
