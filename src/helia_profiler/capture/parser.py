@@ -22,7 +22,7 @@ The firmware emits a structured text format over ITM/SWO (serial)::
 
 Supports both single-preset (legacy: no ``--- HPX_PRESET ---`` markers) and
 multi-preset formats.  Results from multiple presets are merged by layer
-index under the assumption that run-to-run execution is deterministic.
+ID; incomplete or conflicting layer identities raise CaptureError.
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ import re
 import statistics
 from typing import Any
 
+from ..errors import CaptureError
 from ..vocab import Aggregation
 from ..results import FirmwareMeta, LayerResult, PmuResult, PresetResult, PsramInfo
 from ..transport.protocol import HPX_PROTOCOL_VERSION
@@ -404,6 +405,31 @@ def _aggregate(vals: list[float], method: Aggregation) -> float:
     return float(statistics.median(vals))
 
 
+def _record_identity(identities: dict[int | str, str], layer_id: Any, op: Any) -> int | str:
+    """Require a unique explicit layer ID and a nonempty operator label."""
+    if (
+        not isinstance(layer_id, (int, str))
+        or isinstance(layer_id, bool)
+        or layer_id == ""
+        or not isinstance(op, str)
+        or not op
+    ):
+        raise CaptureError("PMU row has a missing or invalid layer identity.")
+    if layer_id in identities:
+        raise CaptureError(f"PMU capture contains duplicate layer ID {layer_id!r}.")
+    identities[layer_id] = op
+    return layer_id
+
+
+def _check_identities(expected: dict[int | str, str] | None, actual: dict[int | str, str]) -> None:
+    """Reject incomplete or conflicting layer sets across iterations and presets."""
+    if expected is not None and expected != actual:
+        raise CaptureError(
+            "PMU layer identities differ across iterations or presets.",
+            hint="The capture is incomplete or inconsistent. Retry with a lossless transport.",
+        )
+
+
 def _average_iterations(
     iterations: list[list[dict[str, Any]]],
     header: list[str],
@@ -420,27 +446,27 @@ def _average_iterations(
     if not iterations:
         return []
 
-    num_layers = len(iterations[0])
+    indexed: list[dict[int | str, dict[str, Any]]] = []
+    identities: dict[int | str, str] | None = None
+    for iteration in iterations:
+        rows_by_id: dict[int | str, dict[str, Any]] = {}
+        current: dict[int | str, str] = {}
+        for row in iteration:
+            layer_id = row.get("Layer")
+            op = row.get("Op", row.get("tag"))
+            layer_id = _record_identity(current, layer_id, op)
+            rows_by_id[layer_id] = row
+        _check_identities(identities, current)
+        identities = current if identities is None else identities
+        indexed.append(rows_by_id)
     numeric_cols = [c for c in header if c not in _STRING_COLS]
 
     total_wrap = 0
     total_frozen = 0
 
     averaged: list[LayerResult] = []
-    for layer_idx in range(num_layers):
-        # Collect this layer's sample rows (with their iteration index) so
-        # frozen-zero detection can reason about the whole PMU readout per row.
-        rows = [
-            (it_idx, it[layer_idx]) for it_idx, it in enumerate(iterations) if layer_idx < len(it)
-        ]
-
-        if layer_idx < len(iterations[0]):
-            first = iterations[0][layer_idx]
-            op_name = first.get("Op", first.get("tag", "unknown"))
-            layer_id = first.get("Layer", layer_idx)
-        else:
-            op_name = "unknown"
-            layer_id = layer_idx
+    for layer_id, op_name in (identities or {}).items():
+        rows = [(it_idx, iteration[layer_id]) for it_idx, iteration in enumerate(indexed)]
 
         # Row-level frozen-zero rejection: drop an iteration only when its
         # *entire* PMU readout was zero.  Keep them when every iteration is
@@ -478,11 +504,7 @@ def _average_iterations(
         cycles = counters.get("ARM_PMU_CPU_CYCLES")
 
         # Propagate overflow flag (true if ANY iteration had overflow)
-        overflow_count = sum(
-            1
-            for it in iterations
-            if layer_idx < len(it) and it[layer_idx].get("overflow", 0) not in (0, "0", False)
-        )
+        overflow_count = sum(1 for _, row in rows if row.get("overflow", 0) not in (0, "0", False))
 
         averaged.append(
             LayerResult(
@@ -541,45 +563,36 @@ def _merge_presets(
     """Merge averaged layer data from multiple presets into unified rows.
 
     Each preset contributes its own set of PMU counter columns.  Layers are
-    matched by index (assumes deterministic execution across presets).
+    matched by explicit layer ID; incomplete or conflicting layer sets fail.
     """
     if not preset_results:
         return []
 
-    first = next(iter(preset_results.values()))
-    base_layers = first.layers
-    if not base_layers:
-        return []
-
-    # Start with copies of base layer counters
-    merged_counters: list[dict[str, float]] = [dict(layer.counters) for layer in base_layers]
-    merged_overflow: list[bool] = [layer.overflow for layer in base_layers]
-
-    # Merge in columns from subsequent presets
+    identities: dict[int | str, str] | None = None
+    merged_counters: dict[int | str, dict[str, float]] = {}
+    merged_overflow: dict[int | str, bool] = {}
     for pr in preset_results.values():
-        for i, layer in enumerate(pr.layers):
-            if i >= len(merged_counters):
-                break
+        current: dict[int | str, str] = {}
+        for layer in pr.layers:
+            _record_identity(current, layer.id, layer.op)
+        _check_identities(identities, current)
+        identities = current if identities is None else identities
+        for layer in pr.layers:
+            counters = merged_counters.setdefault(layer.id, {})
             for key, val in layer.counters.items():
-                if key not in merged_counters[i]:
-                    merged_counters[i][key] = val
-            if layer.overflow:
-                merged_overflow[i] = True
+                counters.setdefault(key, val)
+            merged_overflow[layer.id] = merged_overflow.get(layer.id, False) or layer.overflow
 
-    # Build final LayerResult list
-    result: list[LayerResult] = []
-    for i, base in enumerate(base_layers):
-        counters = merged_counters[i]
-        cycles = counters.get("ARM_PMU_CPU_CYCLES")
-        result.append(
-            LayerResult(
-                id=base.id,
-                op=base.op,
-                counters=counters,
-                cycles=cycles,
-                overflow=merged_overflow[i],
-            )
+    result = [
+        LayerResult(
+            id=layer_id,
+            op=op,
+            counters=merged_counters[layer_id],
+            cycles=merged_counters[layer_id].get("ARM_PMU_CPU_CYCLES"),
+            overflow=merged_overflow[layer_id],
         )
+        for layer_id, op in (identities or {}).items()
+    ]
 
     return result
 
