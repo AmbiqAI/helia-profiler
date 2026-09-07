@@ -28,7 +28,7 @@ from helia_profiler.power.diagnostics import (
     WindowClockCeiling,
 )
 from helia_profiler.results import ResultValidity
-from helia_profiler.results import FirmwareMeta, PmuResult
+from helia_profiler.results import FirmwareMeta, ModelInfo, PmuResult
 from helia_profiler.evaluation import evaluate_run
 from helia_profiler.results.issues import IssueCode
 
@@ -1333,3 +1333,62 @@ class TestReplayedBusyLoopPlanCount:
         codes = [issue.code for issue in evaluate_run(ctx).issues]
 
         assert IssueCode.POWER_PLAN_COUNT_MISMATCH in codes
+
+
+class TestModelIdentity:
+    """The firmware's own account of what it is running must match what HPX sent.
+
+    Every counter in a run parses and every window looks healthy whether or not
+    the image embeds the requested model, so without this check a stale or
+    swapped firmware produces a complete, plausible, VALID result set for the
+    wrong graph.
+    """
+
+    @staticmethod
+    def _with_model(ctx: PipelineContext, *, sent: int, reported: int | None) -> PipelineContext:
+        ctx.run_metadata.model = ModelInfo(name="kws.tflite", size_bytes=sent, sha256="a" * 64)
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(model_size=reported), layers=[]))
+        return ctx
+
+    def test_agreeing_sizes_raise_nothing(self, tmp_path: Path):
+        ctx = self._with_model(_context(tmp_path), sent=53_744, reported=53_744)
+
+        evaluation = evaluate_run(ctx)
+
+        assert IssueCode.FIRMWARE_MODEL_MISMATCH not in [i.code for i in evaluation.issues]
+        assert evaluation.validity is ResultValidity.VALID
+
+    def test_a_different_model_on_the_target_invalidates_the_run(self, tmp_path: Path):
+        """The deliberately mismatched pairing this check exists for."""
+        ctx = self._with_model(_context(tmp_path), sent=53_744, reported=1_244)
+
+        evaluation = evaluate_run(ctx)
+
+        issue = next(i for i in evaluation.issues if i.code == IssueCode.FIRMWARE_MODEL_MISMATCH)
+        assert evaluation.validity is not ResultValidity.VALID
+        assert issue.severity == "error"
+        assert issue.context["reported_model_size"] == 1_244
+        assert issue.context["expected_model_size"] == 53_744
+        assert "1,244" in issue.message and "53,744" in issue.message
+
+    def test_an_engine_that_reports_no_model_size_is_not_a_mismatch(self, tmp_path: Path):
+        """heliaAOT compiles the graph in, so it reports no size at all.
+
+        Absence of the field is not evidence of disagreement, and treating it
+        as one would invalidate every AOT run.
+        """
+        ctx = self._with_model(_context(tmp_path), sent=53_744, reported=None)
+
+        codes = [i.code for i in evaluate_run(ctx).issues]
+
+        assert IssueCode.FIRMWARE_MODEL_MISMATCH not in codes
+
+    def test_an_unrecorded_model_cannot_accuse_the_firmware(self, tmp_path: Path):
+        """Stage 1 sets the model record; without it there is nothing to compare."""
+        ctx = _context(tmp_path)
+        ctx.run_metadata.model = None
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(model_size=1_244), layers=[]))
+
+        codes = [i.code for i in evaluate_run(ctx).issues]
+
+        assert IssueCode.FIRMWARE_MODEL_MISMATCH not in codes

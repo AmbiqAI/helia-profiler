@@ -132,6 +132,42 @@ def _build_gate_arbitration(ctx: PipelineContext) -> GateArbitration | None:
     )
 
 
+def _model_identity_issues(ctx: PipelineContext) -> list[ResultIssue]:
+    """Hold the model the firmware executed against the model HPX sent.
+
+    The firmware reports the size of the graph it is running; stage 1 records
+    the size of the bytes HPX read and handed to the build. A disagreement
+    means the numbers describe some other model -- a stale image, a build
+    that reused another run's workspace, a flash that did not take -- and
+    nothing downstream would notice, because every counter still parses and
+    every window still looks healthy.
+
+    Engines that compile the model into the firmware rather than embedding
+    the flatbuffer report no size (heliaAOT); those runs are not covered
+    here and the absence of the field is not treated as a mismatch.
+    """
+    if ctx.pmu_result is None:
+        return []
+    reported = ctx.pmu_result.meta.model_size
+    model = ctx.run_metadata.model
+    if reported is None or model is None or not model.size_bytes:
+        return []
+    if reported == model.size_bytes:
+        return []
+    return [
+        _error(
+            IssueCode.FIRMWARE_MODEL_MISMATCH,
+            f"The firmware reports a {reported:,}-byte model, but HPX sent "
+            f"{model.name} at {model.size_bytes:,} bytes. The measurements in "
+            "this run do not belong to the model that was requested.",
+            reported_model_size=reported,
+            expected_model_size=model.size_bytes,
+            model_name=model.name,
+            model_sha256=model.sha256,
+        )
+    ]
+
+
 def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
     """Evaluate captured results without mutating pipeline state."""
     issues: list[ResultIssue] = []
@@ -145,6 +181,8 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 "One or more PMU counters overflowed.",
             )
         )
+
+    issues.extend(_model_identity_issues(ctx))
 
     if ctx.pmu_result is not None:
         meta = ctx.pmu_result.meta

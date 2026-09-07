@@ -16,6 +16,7 @@ number is the measurement of record decides fatal-vs-warn.
 
 | Code | Severity | Description |
 | --- | --- | --- |
+| `firmware.model_mismatch` | `error` | The model the firmware reports executing is not the model HPX sent; every measurement in the run belongs to an unknown graph. |
 | `pmu.counter_overflow` | `error` | One or more PMU counters overflowed during capture. |
 | `pmu.missing` | `error` | The run has no PMU result. |
 | `power.gate_below_minimum` | `error` | Measured power gate is shorter than the minimum accepted window. |

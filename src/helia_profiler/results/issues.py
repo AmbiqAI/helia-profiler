@@ -65,6 +65,8 @@ class IssueCode(StrEnum):
     PMU_MISSING = "pmu.missing"
     PMU_COUNTER_OVERFLOW = "pmu.counter_overflow"
 
+    FIRMWARE_MODEL_MISMATCH = "firmware.model_mismatch"
+
     PROFILE_CLEAN_WINDOW_FROZEN = "profile.clean_window_frozen"
     PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW = "profile.clean_window_clock_rate_low"
     PROFILE_CLEAN_WINDOW_STALLED = "profile.clean_window_stalled"
@@ -139,6 +141,12 @@ _ISSUE_SPECS: tuple[IssueSpec, ...] = (
     IssueSpec(
         IssueCode.PMU_COUNTER_OVERFLOW,
         "One or more PMU counters overflowed during capture.",
+        severity=Severity.ERROR,
+    ),
+    IssueSpec(
+        IssueCode.FIRMWARE_MODEL_MISMATCH,
+        "The model the firmware reports executing is not the model HPX sent; "
+        "every measurement in the run belongs to an unknown graph.",
         severity=Severity.ERROR,
     ),
     IssueSpec(
