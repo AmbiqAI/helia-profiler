@@ -46,12 +46,12 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert baseline.project("nsx-tflite-micro").ref == "7afcf2b4170e039caf4c49f91e2c45d5869be333"
     assert baseline.project("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
     assert baseline.module("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
-    assert baseline.project("ns-cmsis-nn").ref == "9884d5fccab884c90c3d5e8865d5babbb1cabc63"
+    assert baseline.project("ns-cmsis-nn").ref == "aaeb145a67c3decd9869f96474e36e7dbdc2030c"
     assert baseline.project("nsx-executorch").ref == "27eee513636821398f0bb5e92055526cac29b1ed"
     assert baseline.engine("executorch").ref == "27eee513636821398f0bb5e92055526cac29b1ed"
-    assert baseline.engine("helia-rt").ref == "038a0c4403b6186316700833b3ad7bb32e16ea83"
-    assert baseline.engine("helia-aot").min_version == "0.19.0"
-    assert baseline.engine("helia-aot").max_version_exclusive == "0.20.0"
+    assert baseline.engine("helia-rt").ref == "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440"
+    assert baseline.engine("helia-aot").min_version == "0.20.0"
+    assert baseline.engine("helia-aot").max_version_exclusive == "0.21.0"
     assert len(baseline.fingerprint) == 64
 
 
@@ -64,9 +64,9 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
-        "ns-cmsis-nn": "9884d5fccab884c90c3d5e8865d5babbb1cabc63",
+        "ns-cmsis-nn": "aaeb145a67c3decd9869f96474e36e7dbdc2030c",
         "nsx-executorch": "27eee513636821398f0bb5e92055526cac29b1ed",
-        "helia-rt": "038a0c4403b6186316700833b3ad7bb32e16ea83",
+        "helia-rt": "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440",
         # nsx-sensors v0.3.0 — full datasheet audit of the INA228 driver.
         # Cumulative fixes that matter here: SHUNT_CAL scaling (v0.2.0),
         # ADCRANGE moved to its real register (CONFIG bit 4 — earlier code
@@ -83,14 +83,14 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
-        "nsx-cmsis-nn": "9884d5fccab884c90c3d5e8865d5babbb1cabc63",
+        "nsx-cmsis-nn": "aaeb145a67c3decd9869f96474e36e7dbdc2030c",
         "nsx-executorch": "27eee513636821398f0bb5e92055526cac29b1ed",
-        "nsx-helia-rt": "038a0c4403b6186316700833b3ad7bb32e16ea83",
+        "nsx-helia-rt": "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440",
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
     }
-    assert baseline.engine("helia-rt").version == "1.19.0"
-    assert baseline.engine("helia-aot").min_version == "0.19.0"
-    assert baseline.engine("helia-aot").max_version_exclusive == "0.20.0"
+    assert baseline.engine("helia-rt").version == "1.20.0"
+    assert baseline.engine("helia-aot").min_version == "0.20.0"
+    assert baseline.engine("helia-aot").max_version_exclusive == "0.21.0"
     assert baseline.engine("tflm").governed_by_modules
     assert baseline.engine("executorch").version == "0.1.0"
 
@@ -259,7 +259,7 @@ def test_malformed_or_unsupported_baseline_fails_clearly(tmp_path: Path) -> None
     inverted_range = tmp_path / "inverted-range.json"
     baseline = load_compatibility_baseline().to_dict()
     baseline["engines"]["helia-aot"] = {
-        "min_version": "0.19.0",
+        "min_version": "0.20.0",
         "max_version_exclusive": "0.18.0",
     }
     inverted_range.write_text(json.dumps(baseline))
@@ -343,21 +343,21 @@ def test_helia_aot_version_check_uses_baseline_policy(
 
     def _fake_version(name: str) -> str:
         assert name == "helia-aot"
-        return "0.19.4"
+        return "0.20.4"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version)
-    # Within the baseline-qualified range [0.19.0, 0.20.0) -> no error.
-    assert aot_compile._check_helia_aot_version(config) == "0.19.4"
+    # Within the baseline-qualified range [0.20.0, 0.21.0) -> no error.
+    assert aot_compile._check_helia_aot_version(config) == "0.20.4"
 
     def _fake_version_too_old(name: str) -> str:
-        return "0.18.9"
+        return "0.19.9"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_too_old)
-    with pytest.raises(EngineError, match=r"below the minimum supported version \(v0\.19\.0\)"):
+    with pytest.raises(EngineError, match=r"below the minimum supported version \(v0\.20\.0\)"):
         aot_compile._check_helia_aot_version(config)
 
     def _fake_version_too_new(name: str) -> str:
-        return "0.20.0"
+        return "0.21.0"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_too_new)
     with pytest.raises(EngineError, match=r"outside the qualified policy"):
@@ -367,7 +367,7 @@ def test_helia_aot_version_check_uses_baseline_policy(
     # HELIAAOT_MIN_VERSION / HELIAAOT_MAX_VERSION_EXCLUSIVE constants remain
     # the fallback policy.
     monkeypatch.setattr("importlib.metadata.version", _fake_version)
-    assert aot_compile._check_helia_aot_version(None) == "0.19.4"
+    assert aot_compile._check_helia_aot_version(None) == "0.20.4"
 
 
 def test_helia_aot_unparseable_version_warns_full_range(
@@ -391,7 +391,7 @@ def test_helia_aot_unparseable_version_warns_full_range(
 
     assert result == "not-a-version"
     messages = [rec.message for rec in caplog.records]
-    assert any("0.19.0" in message and "0.20.0" in message for message in messages)
+    assert any("0.20.0" in message and "0.21.0" in message for message in messages)
     assert not any("floor" in message for message in messages)
 
 
@@ -409,7 +409,7 @@ def test_helia_aot_success_debug_log_only_after_max_check(
     config = _config(tmp_path)
 
     def _fake_version_too_new(name: str) -> str:
-        return "0.20.0"
+        return "0.21.0"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_too_new)
     with caplog.at_level(logging.DEBUG):
@@ -419,7 +419,7 @@ def test_helia_aot_success_debug_log_only_after_max_check(
     assert not any("Using helia-aot" in rec.message for rec in caplog.records)
 
     def _fake_version_ok(name: str) -> str:
-        return "0.19.4"
+        return "0.20.4"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_ok)
     caplog.clear()
@@ -491,7 +491,7 @@ def test_helia_aot_single_sided_baseline_range_is_not_backfilled_from_constants(
     with pytest.raises(EngineError, match=r"below the minimum supported version \(v0\.20\.0\)"):
         aot_compile._check_helia_aot_version(min_only_config)
 
-    # max_version_exclusive only, well below HELIAAOT_MIN_VERSION (0.18.0) —
+    # max_version_exclusive only, well below HELIAAOT_MIN_VERSION —
     # an installed version below that local constant must still pass, since
     # the baseline leaves the floor unbounded.
     max_only_engine = replace(aot_engine, min_version=None, max_version_exclusive="0.5.0")

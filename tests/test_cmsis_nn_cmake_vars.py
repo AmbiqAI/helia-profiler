@@ -25,10 +25,11 @@ FP16 = _FIXTURES / "kws_float_fp16.tflite"  # true all-FLOAT16 graph
 FP16_WEIGHTS = _FIXTURES / "kws_float_fp16_weights.tflite"  # FLOAT16 weights, FLOAT32 compute
 HELIART_SOURCE = _FIXTURES / "heliart_nsx"
 
-# heliaRT checks ns-cmsis-nn's option; heliaAOT's generated module checks the
-# exported define in the cache. Both must be set for either engine to build.
-_F32 = ("NSX_CMSIS_NN_ENABLE_F32", "ARM_NN_ENABLE_F32")
-_F16 = ("NSX_CMSIS_NN_ENABLE_F16", "ARM_NN_ENABLE_F16")
+# The only spelling ns-cmsis-nn accepts; the retired NSX_CMSIS_NN_* names are
+# a configure error, so emitting one would break every source build (#279).
+_F32 = ("ARM_NN_ENABLE_F32",)
+_F16 = ("ARM_NN_ENABLE_F16",)
+_RETIRED = ("NSX_CMSIS_NN_ENABLE_F32", "NSX_CMSIS_NN_ENABLE_F16")
 
 M55 = "apollo510_evb"
 M4 = "apollo4p_evb"
@@ -55,8 +56,11 @@ def _baseline_cmsis_nn_ref(config: ProfileConfig) -> str:
     return config.compatibility.baseline.module("nsx-cmsis-nn").ref
 
 
-def _assert_policy(cmake_vars: dict[str, str], *, fp16: bool) -> None:
-    assert all(cmake_vars[name] == "ON" for name in _F32)
+def _assert_policy(cmake_vars: dict[str, str], *, fp16: bool, fp32: bool = True) -> None:
+    if fp32:
+        assert all(cmake_vars[name] == "ON" for name in _F32)
+    else:
+        assert not any(name in cmake_vars for name in _F32)
     if fp16:
         assert all(cmake_vars[name] == "ON" for name in _F16)
     else:
@@ -64,21 +68,38 @@ def _assert_policy(cmake_vars: dict[str, str], *, fp16: bool) -> None:
 
 
 @pytest.mark.parametrize(
-    ("board", "model", "fp16"),
+    ("board", "model", "fp32", "fp16"),
     [
-        (M55, FP16, True),
-        (M55, FP16_WEIGHTS, True),  # widening f16 weights is f16 work on an MVE-F core
-        (M55, FP32, False),  # fp32 compute needs no fp16 sources
-        (M55, INT8, False),
-        (M4, FP16, False),  # no MVE-F core, whatever the model asks
-        (M4, FP16_WEIGHTS, False),
-        (M4, INT8, False),
+        (M55, FP16, True, True),
+        (M55, FP16_WEIGHTS, True, True),  # widening f16 weights is f16 work on an MVE-F core
+        (M55, FP32, True, False),  # fp32 compute needs no fp16 sources
+        (M55, INT8, False, False),  # neither: ~33 KB of kernels stay out of the image
+        (M4, FP16, True, False),  # no MVE-F core, whatever the model asks
+        (M4, FP16_WEIGHTS, True, False),
+        (M4, INT8, False, False),
     ],
 )
-def test_fp32_always_and_fp16_only_for_float16_models_on_mve_cores(
-    board: str, model: Path, fp16: bool
+def test_float_kernels_follow_the_model_and_the_core(
+    board: str, model: Path, fp32: bool, fp16: bool
 ) -> None:
-    _assert_policy(cmsis_nn_cmake_vars(_config(board, model)), fp16=fp16)
+    _assert_policy(cmsis_nn_cmake_vars(_config(board, model)), fp32=fp32, fp16=fp16)
+
+
+def test_an_unreadable_model_still_gets_fp32(tmp_path: Path) -> None:
+    """Absence of evidence is not evidence of an integer-only model: profiling
+    float work on the reference path would read as a real measurement (#279)."""
+    truncated = tmp_path / "truncated.tflite"
+    truncated.write_bytes(INT8.read_bytes()[:8])
+    _assert_policy(cmsis_nn_cmake_vars(_config(M55, truncated)), fp32=True, fp16=False)
+
+
+@pytest.mark.parametrize("board", [M55, M4])
+@pytest.mark.parametrize("model", [INT8, FP32, FP16, FP16_WEIGHTS])
+def test_the_retired_switch_names_are_never_emitted(board: str, model: Path) -> None:
+    """ns-cmsis-nn aborts the configure on a retired name being defined at all,
+    whatever its value, so no board/model combination may emit one (#279)."""
+    cmake_vars = cmsis_nn_cmake_vars(_config(board, model))
+    assert not any(name in cmake_vars for name in _RETIRED)
 
 
 @pytest.mark.parametrize(
@@ -140,7 +161,7 @@ def _fake_heliart_source(root: Path) -> Path:
     (source / "cmake" / "helia_rt_sources.cmake").write_text("")
     version_h = source / "tensorflow" / "lite" / "micro" / "helia_rt_version.h"
     version_h.parent.mkdir(parents=True)
-    version_h.write_text('#define HELIA_RT_VERSION "v1.19.0"\n')
+    version_h.write_text('#define HELIA_RT_VERSION "v1.20.0"\n')
     return source
 
 

@@ -43,8 +43,8 @@ log = logging.getLogger("hpx")
 # so a user with an older install gets a clear error instead of a confusing
 # build failure (e.g. missing ModuleType.nsx).
 # ---------------------------------------------------------------------------
-HELIAAOT_MIN_VERSION = "0.19.0"
-HELIAAOT_MAX_VERSION_EXCLUSIVE = "0.20.0"
+HELIAAOT_MIN_VERSION = "0.20.0"
+HELIAAOT_MAX_VERSION_EXCLUSIVE = "0.21.0"
 
 # Default AOT configuration
 _DEFAULT_PREFIX = "hpx"
@@ -555,9 +555,8 @@ def _check_helia_aot_version(config: ProfileConfig | None = None) -> str:
     minimum_str = f"{minimum[0]}.{minimum[1]}.{minimum[2]}"
     maximum_str = f"{maximum[0]}.{maximum[1]}.{maximum[2]}" if maximum is not None else "unbounded"
     # Log messages below use minimum_display/maximum_display (not the bare
-    # *_str values) so the range renders as ">=v0.19.0, <unbounded" instead
-    # of the malformed "<vunbounded" that a hard-coded "v" prefix would
-    # produce once max_version_exclusive is left unset.
+    # *_str values) so an unset max_version_exclusive renders as "<unbounded"
+    # rather than the malformed "<vunbounded" a hard-coded "v" prefix gives.
     minimum_display = f"v{minimum_str}"
     maximum_display = "unbounded" if maximum is None else f"v{maximum_str}"
     if actual == (0, 0, 0):

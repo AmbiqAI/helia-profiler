@@ -26,21 +26,16 @@ CMSIS_NN_PROJECT = "ns-cmsis-nn"  # registry project (path: modules/ns-cmsis-nn)
 CMSIS_NN_MODULE = "nsx-cmsis-nn"  # registry module name
 
 
-def _kernel_family(family: str) -> dict[str, str]:
-    """Both spellings of one float kernel switch.
+def _float_compute_types(config: ProfileConfig) -> set[int] | None:
+    """Float precisions the model works in, or None when it cannot be read.
 
-    WORKAROUND helia-aot#349: heliaRT checks ns-cmsis-nn's ``NSX_CMSIS_NN_*``
-    option, heliaAOT's generated module checks the exported ``ARM_NN_*`` define.
+    None and the empty set stay distinct: an unreadable model is not evidence
+    of an integer-only one, and the float switches are decided from this.
     """
-    return {f"NSX_CMSIS_NN_ENABLE_{family}": "ON", f"ARM_NN_ENABLE_{family}": "ON"}
-
-
-def _float_compute_types(config: ProfileConfig) -> set[int]:
-    """Float precisions the model works in; empty when the file is unreadable."""
     try:
         return read_float_compute_types(Path(config.model.path).read_bytes())
     except (OSError, struct.error, IndexError):
-        return set()
+        return None
 
 
 def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
@@ -48,16 +43,24 @@ def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
 
     The template renders these before any module is included (an ``option()``
     default cannot be overridden afterwards). Requantize inline-asm is
-    configurable; fp32 kernels are always on (helia-rt#253); fp16 kernels only
-    for a model carrying FLOAT16 tensors on an MVE-F core (helia-rt#254).
+    configurable. Float kernels follow the model: fp32 for one that computes
+    in float at all, fp16 additionally for FLOAT16 tensors on an MVE-F core.
+    An integer-only model links neither, keeping ~33 KB of fp32 kernels out of
+    its image; a model that cannot be read enables fp32 rather than silently
+    profiling float work on the reference path (#279).
+
+    ``ARM_NN_ENABLE_*`` is the only spelling ns-cmsis-nn accepts; setting the
+    retired ``NSX_CMSIS_NN_*`` names is a configure error.
     """
     cmake_vars: dict[str, str] = {}
     if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
         cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
-    cmake_vars |= _kernel_family("F32")
+    float_types = _float_compute_types(config)
+    if float_types is None or float_types:
+        cmake_vars["ARM_NN_ENABLE_F32"] = "ON"
     soc = get_soc_for_board(config.target.board, registry=config.platform_registry)
-    if soc.has_mve and TENSOR_TYPE_FLOAT16 in _float_compute_types(config):
-        cmake_vars |= _kernel_family("F16")
+    if soc.has_mve and float_types and TENSOR_TYPE_FLOAT16 in float_types:
+        cmake_vars["ARM_NN_ENABLE_F16"] = "ON"
     return cmake_vars
 
 

@@ -111,7 +111,7 @@ env:
   CCACHE_MAXSIZE: 10G
   SEGGER_RTT_PATH: ${{ github.workspace }}/segger-rtt
   HPX_NSX_EXECUTORCH_REF: 27eee513636821398f0bb5e92055526cac29b1ed
-  HPX_QUALIFIED_NS_CMSIS_NN_REF: 9884d5fccab884c90c3d5e8865d5babbb1cabc63
+  HPX_QUALIFIED_NS_CMSIS_NN_REF: aaeb145a67c3decd9869f96474e36e7dbdc2030c
   # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
   # with the manual defaults, except that nightly validation covers the full suite.
   HPX_VALIDATION_SUITE: ${{ inputs.suite || 'complete' }}

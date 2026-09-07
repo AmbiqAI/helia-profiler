@@ -17,16 +17,30 @@ The current baseline is `hpx-neuralspotx-0.7.17-2026-09`:
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `7afcf2b4…333` |
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
-| `ns-cmsis-nn` | `9884d5fc…c63` (`v7.31.0`, hpx-declared — see below) |
+| `ns-cmsis-nn` | `aaeb145a…30c` (`v7.32.0`, hpx-declared — see below) |
 | `nsx-executorch` | `27eee513…b1ed` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
-| heliaRT | `1.19.0`, commit `038a0c44…a83` (min supported `1.16.0` — from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
-| heliaAOT | `min_version=0.19.0`, `max_version_exclusive=0.20.0` |
+| heliaRT | `1.20.0`, commit `edb3a25f…440` (min supported `1.16.0` — from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
+| heliaAOT | `min_version=0.20.0`, `max_version_exclusive=0.21.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 | executorch | `0.1.0`, module ref `27eee513…b1ed` (a checkout's `version.txt` is verified against the baseline) |
 
-heliaRT 1.19.0 and heliaAOT 0.19.0 (issue #246) are the releases that add FP16
-and FP32 kernels. This revision promotes both HPX-owned engine pins and moves
+heliaRT 1.20.0, heliaAOT 0.20.0 and `ns-cmsis-nn v7.32.0` (issue #279) move
+together because they must: v7.32.0 consolidated the float switches onto
+`ARM_NN_ENABLE_F32/F16` and aborts the configure when a retired
+`NSX_CMSIS_NN_ENABLE_*` name is defined at all, while heliaRT 1.19.0 aborts when
+that same retired name is *missing*. No single spelling satisfies both, so the
+core and both engines are one atomic promotion. heliaRT 1.20.0 reads the
+capability from the resolved ns-cmsis-nn target through its own query rather
+than from a cache variable, and it accepts a float16-input `DEQUANTIZE`, which
+is the LiteRT converter's standard FP16 model shape (helia-rt#255, closing
+hpx#251). heliaAOT 0.20.0 pins the same core and now rejects float on the six
+operators ns-cmsis-nn ships integer kernels for, naming the operator and dtype
+instead of failing at link time (helia-aot#396).
+
+The previous revision is recorded below. heliaRT 1.19.0 and heliaAOT 0.19.0
+(issue #246) are the releases that add FP16
+and FP32 kernels. That revision promoted both HPX-owned engine pins and moved
 one neuralSPOT-X ref — `ns-cmsis-nn`, to v7.31.0 (below); every other NSX ref
 is unchanged: heliaRT `1.17.0 → 1.19.0` (`038a0c44…a83`),
 heliaAOT `[0.18.0, 0.19.0) → [0.19.0, 0.20.0)`, with `ai-edge-litert` relocked to
@@ -50,17 +64,22 @@ any `>= v7.28.0`, so both engines now build against one core with no override,
 and a run stamps `qualified`. A neuralSPOT-X registry bump remains the tidy
 long-term landing but is no longer load-bearing.
 
-**Integration change.** heliaRT 1.19.0's `helia` backend refuses to configure
-unless ns-cmsis-nn's fp32 kernels are enabled — an `option()` default that must
-be overridden *before* the module is added — and heliaAOT's generated module
-checks the same requirement under the exported define's name (helia-aot#349).
-`engines/cmsis_nn.py::cmsis_nn_cmake_vars` sets `NSX_CMSIS_NN_ENABLE_F32` /
-`ARM_NN_ENABLE_F32` for every source build of either engine, and the `F16`
-pair only when the model carries FLOAT16 tensors — computed or dequantized
-weights — on a Cortex-M55: ns-cmsis-nn
-below v7.30.0 ICEs on GCC 14 for its fp16 sources (PR 118460), so int8 and
-fp32 builds must not compile them. heliaRT 1.19.0 accepts ns-cmsis-nn
-`>= v7.28.0`; heliaAOT 0.19.0 requires `>= v7.31.0`; the baseline pins v7.31.0.
+**Integration change.** The float kernels are opt-in and must be requested
+*before* the ns-cmsis-nn module is added, since an `option()` default cannot be
+overridden afterwards. `engines/cmsis_nn.py::cmsis_nn_cmake_vars` derives
+the switches from the model: `ARM_NN_ENABLE_F32` when it computes in float at
+all, and `ARM_NN_ENABLE_F16` additionally when it carries FLOAT16 tensors —
+computed or dequantized weights — on a Cortex-M55, since ns-cmsis-nn below
+v7.30.0 ICEs on GCC 14 for its fp16 sources (PR 118460). An integer-only model
+links neither: measured on the int8 KWS DS-CNN, dropping the forced fp32
+kernels returns 32.6 KB of MRAM (311,180 B → 277,764 B on heliaRT) with cycles
+unchanged at 2.06 M, which recovers the growth 1.19.0's unconditional
+requirement introduced. heliaAOT is unaffected either way (151,180 B), since it
+generates only the kernels its graph uses. A model that cannot be read enables
+fp32 rather than profiling float work on the reference path unannounced.
+`ARM_NN_ENABLE_*` is the only spelling the core accepts; emitting a retired
+`NSX_CMSIS_NN_ENABLE_*` name is a configure error, and a regression test asserts
+no board or model combination emits one (#279).
 
 **Behavior deltas in 1.19.0 that a float baseline must expect** (all toward
 correctness): NaN now propagates through float `ADD`/`MUL` instead of being
