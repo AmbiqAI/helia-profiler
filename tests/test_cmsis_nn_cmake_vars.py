@@ -25,10 +25,11 @@ FP16 = _FIXTURES / "kws_float_fp16.tflite"  # true all-FLOAT16 graph
 FP16_WEIGHTS = _FIXTURES / "kws_float_fp16_weights.tflite"  # FLOAT16 weights, FLOAT32 compute
 HELIART_SOURCE = _FIXTURES / "heliart_nsx"
 
-# heliaRT checks ns-cmsis-nn's option; heliaAOT's generated module checks the
-# exported define in the cache. Both must be set for either engine to build.
-_F32 = ("NSX_CMSIS_NN_ENABLE_F32", "ARM_NN_ENABLE_F32")
-_F16 = ("NSX_CMSIS_NN_ENABLE_F16", "ARM_NN_ENABLE_F16")
+# The only spelling ns-cmsis-nn accepts; the retired NSX_CMSIS_NN_* names are
+# a configure error, so emitting one would break every source build (#279).
+_F32 = ("ARM_NN_ENABLE_F32",)
+_F16 = ("ARM_NN_ENABLE_F16",)
+_RETIRED = ("NSX_CMSIS_NN_ENABLE_F32", "NSX_CMSIS_NN_ENABLE_F16")
 
 M55 = "apollo510_evb"
 M4 = "apollo4p_evb"
@@ -79,6 +80,15 @@ def test_fp32_always_and_fp16_only_for_float16_models_on_mve_cores(
     board: str, model: Path, fp16: bool
 ) -> None:
     _assert_policy(cmsis_nn_cmake_vars(_config(board, model)), fp16=fp16)
+
+
+@pytest.mark.parametrize("board", [M55, M4])
+@pytest.mark.parametrize("model", [INT8, FP32, FP16, FP16_WEIGHTS])
+def test_the_retired_switch_names_are_never_emitted(board: str, model: Path) -> None:
+    """ns-cmsis-nn aborts the configure on a retired name being defined at all,
+    whatever its value, so no board/model combination may emit one (#279)."""
+    cmake_vars = cmsis_nn_cmake_vars(_config(board, model))
+    assert not any(name in cmake_vars for name in _RETIRED)
 
 
 @pytest.mark.parametrize(

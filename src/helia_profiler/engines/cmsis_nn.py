@@ -26,15 +26,6 @@ CMSIS_NN_PROJECT = "ns-cmsis-nn"  # registry project (path: modules/ns-cmsis-nn)
 CMSIS_NN_MODULE = "nsx-cmsis-nn"  # registry module name
 
 
-def _kernel_family(family: str) -> dict[str, str]:
-    """Both spellings of one float kernel switch.
-
-    WORKAROUND helia-aot#349: heliaRT checks ns-cmsis-nn's ``NSX_CMSIS_NN_*``
-    option, heliaAOT's generated module checks the exported ``ARM_NN_*`` define.
-    """
-    return {f"NSX_CMSIS_NN_ENABLE_{family}": "ON", f"ARM_NN_ENABLE_{family}": "ON"}
-
-
 def _float_compute_types(config: ProfileConfig) -> set[int]:
     """Float precisions the model works in; empty when the file is unreadable."""
     try:
@@ -48,16 +39,18 @@ def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
 
     The template renders these before any module is included (an ``option()``
     default cannot be overridden afterwards). Requantize inline-asm is
-    configurable; fp32 kernels are always on (helia-rt#253); fp16 kernels only
-    for a model carrying FLOAT16 tensors on an MVE-F core (helia-rt#254).
+    configurable; fp32 kernels are always on; fp16 kernels only for a model
+    carrying FLOAT16 tensors on an MVE-F core. ``ARM_NN_ENABLE_*`` is the only
+    spelling ns-cmsis-nn accepts, and setting the retired ``NSX_CMSIS_NN_*``
+    names is a configure error (#279).
     """
     cmake_vars: dict[str, str] = {}
     if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
         cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
-    cmake_vars |= _kernel_family("F32")
+    cmake_vars["ARM_NN_ENABLE_F32"] = "ON"
     soc = get_soc_for_board(config.target.board, registry=config.platform_registry)
     if soc.has_mve and TENSOR_TYPE_FLOAT16 in _float_compute_types(config):
-        cmake_vars |= _kernel_family("F16")
+        cmake_vars["ARM_NN_ENABLE_F16"] = "ON"
     return cmake_vars
 
 
