@@ -150,7 +150,7 @@ def _fake_heliart_source(root: Path) -> Path:
     (source / "cmake" / "helia_rt_sources.cmake").write_text("")
     version_h = source / "tensorflow" / "lite" / "micro" / "helia_rt_version.h"
     version_h.parent.mkdir(parents=True)
-    version_h.write_text('#define HELIA_RT_VERSION "v1.19.0"\n')
+    version_h.write_text('#define HELIA_RT_VERSION "v1.20.0"\n')
     return source
 
 
