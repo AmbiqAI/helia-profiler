@@ -66,11 +66,17 @@ long-term landing but is no longer load-bearing.
 
 **Integration change.** The float kernels are opt-in and must be requested
 *before* the ns-cmsis-nn module is added, since an `option()` default cannot be
-overridden afterwards. `engines/cmsis_nn.py::cmsis_nn_cmake_vars` sets
-`ARM_NN_ENABLE_F32` for every source build of either engine, and
-`ARM_NN_ENABLE_F16` only when the model carries FLOAT16 tensors — computed or
-dequantized weights — on a Cortex-M55: ns-cmsis-nn below v7.30.0 ICEs on GCC 14
-for its fp16 sources (PR 118460), so int8 and fp32 builds must not compile them.
+overridden afterwards. `engines/cmsis_nn.py::cmsis_nn_cmake_vars` derives
+the switches from the model: `ARM_NN_ENABLE_F32` when it computes in float at
+all, and `ARM_NN_ENABLE_F16` additionally when it carries FLOAT16 tensors —
+computed or dequantized weights — on a Cortex-M55, since ns-cmsis-nn below
+v7.30.0 ICEs on GCC 14 for its fp16 sources (PR 118460). An integer-only model
+links neither: measured on the int8 KWS DS-CNN, dropping the forced fp32
+kernels returns 32.6 KB of MRAM (311,180 B → 277,764 B on heliaRT) with cycles
+unchanged at 2.06 M, which recovers the growth 1.19.0's unconditional
+requirement introduced. heliaAOT is unaffected either way (151,180 B), since it
+generates only the kernels its graph uses. A model that cannot be read enables
+fp32 rather than profiling float work on the reference path unannounced.
 `ARM_NN_ENABLE_*` is the only spelling the core accepts; emitting a retired
 `NSX_CMSIS_NN_ENABLE_*` name is a configure error, and a regression test asserts
 no board or model combination emits one (#279).

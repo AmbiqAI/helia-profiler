@@ -56,8 +56,11 @@ def _baseline_cmsis_nn_ref(config: ProfileConfig) -> str:
     return config.compatibility.baseline.module("nsx-cmsis-nn").ref
 
 
-def _assert_policy(cmake_vars: dict[str, str], *, fp16: bool) -> None:
-    assert all(cmake_vars[name] == "ON" for name in _F32)
+def _assert_policy(cmake_vars: dict[str, str], *, fp16: bool, fp32: bool = True) -> None:
+    if fp32:
+        assert all(cmake_vars[name] == "ON" for name in _F32)
+    else:
+        assert not any(name in cmake_vars for name in _F32)
     if fp16:
         assert all(cmake_vars[name] == "ON" for name in _F16)
     else:
@@ -65,21 +68,29 @@ def _assert_policy(cmake_vars: dict[str, str], *, fp16: bool) -> None:
 
 
 @pytest.mark.parametrize(
-    ("board", "model", "fp16"),
+    ("board", "model", "fp32", "fp16"),
     [
-        (M55, FP16, True),
-        (M55, FP16_WEIGHTS, True),  # widening f16 weights is f16 work on an MVE-F core
-        (M55, FP32, False),  # fp32 compute needs no fp16 sources
-        (M55, INT8, False),
-        (M4, FP16, False),  # no MVE-F core, whatever the model asks
-        (M4, FP16_WEIGHTS, False),
-        (M4, INT8, False),
+        (M55, FP16, True, True),
+        (M55, FP16_WEIGHTS, True, True),  # widening f16 weights is f16 work on an MVE-F core
+        (M55, FP32, True, False),  # fp32 compute needs no fp16 sources
+        (M55, INT8, False, False),  # neither: ~33 KB of kernels stay out of the image
+        (M4, FP16, True, False),  # no MVE-F core, whatever the model asks
+        (M4, FP16_WEIGHTS, True, False),
+        (M4, INT8, False, False),
     ],
 )
-def test_fp32_always_and_fp16_only_for_float16_models_on_mve_cores(
-    board: str, model: Path, fp16: bool
+def test_float_kernels_follow_the_model_and_the_core(
+    board: str, model: Path, fp32: bool, fp16: bool
 ) -> None:
-    _assert_policy(cmsis_nn_cmake_vars(_config(board, model)), fp16=fp16)
+    _assert_policy(cmsis_nn_cmake_vars(_config(board, model)), fp32=fp32, fp16=fp16)
+
+
+def test_an_unreadable_model_still_gets_fp32(tmp_path: Path) -> None:
+    """Absence of evidence is not evidence of an integer-only model: profiling
+    float work on the reference path would read as a real measurement (#279)."""
+    truncated = tmp_path / "truncated.tflite"
+    truncated.write_bytes(INT8.read_bytes()[:8])
+    _assert_policy(cmsis_nn_cmake_vars(_config(M55, truncated)), fp32=True, fp16=False)
 
 
 @pytest.mark.parametrize("board", [M55, M4])
