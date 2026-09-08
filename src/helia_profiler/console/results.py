@@ -476,8 +476,17 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         mem_parts.append(
             f"Arena    {meta.allocated_arena:>8,} / {meta.arena_size:,} bytes  {bar}  {pct:.0f}%"
         )
-    if meta.model_size:
-        mem_parts.append(f"Model    {meta.model_size:>8,} bytes")
+    reported_model_bytes = meta.reported_model_bytes
+    if reported_model_bytes:
+        mem_parts.append(f"Model    {reported_model_bytes:>8,} bytes")
+    elif meta.model_size is not None and reported_model_bytes is None:
+        # The device said something that is not a size. Say so rather than
+        # omit the row, which would read as a model that reported nothing.
+        # escape(): this is device text on a markup renderer, so "[/]" would
+        # raise and "[red]x[/red]" would style rather than show what arrived.
+        mem_parts.append(
+            f"Model    unavailable — firmware reported {escape(repr(meta.model_size))}"
+        )
     if meta.psram is not None:
         mem_parts.append(
             "PSRAM    "

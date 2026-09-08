@@ -28,8 +28,10 @@ from helia_profiler.power.diagnostics import (
     WindowClockCeiling,
 )
 from helia_profiler.results import ResultValidity
-from helia_profiler.results import FirmwareMeta, PmuResult
+from helia_profiler.results import FirmwareMeta, ModelInfo, PmuResult
+from helia_profiler.capture.parser import parse_firmware_output
 from helia_profiler.evaluation import evaluate_run
+from helia_profiler.wire import HPX_END_SENTINEL, HPX_START_SENTINEL
 from helia_profiler.results.issues import IssueCode
 
 
@@ -1333,3 +1335,125 @@ class TestReplayedBusyLoopPlanCount:
         codes = [issue.code for issue in evaluate_run(ctx).issues]
 
         assert IssueCode.POWER_PLAN_COUNT_MISMATCH in codes
+
+
+class TestModelIdentity:
+    """The firmware's own account of what it is running must match what HPX sent.
+
+    Every counter in a run parses and every window looks healthy whether or not
+    the image embeds the requested model, so without this check a stale or
+    swapped firmware produces a complete, plausible, VALID result set for the
+    wrong graph.
+    """
+
+    @staticmethod
+    def _with_model(ctx: PipelineContext, *, sent: int, reported: int | None) -> PipelineContext:
+        ctx.run_metadata.model = ModelInfo(name="kws.tflite", size_bytes=sent, sha256="a" * 64)
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(model_size=reported), layers=[]))
+        return ctx
+
+    def test_agreeing_sizes_raise_nothing(self, tmp_path: Path):
+        ctx = self._with_model(_context(tmp_path), sent=53_744, reported=53_744)
+
+        evaluation = evaluate_run(ctx)
+
+        assert IssueCode.FIRMWARE_MODEL_MISMATCH not in [i.code for i in evaluation.issues]
+        assert evaluation.validity is ResultValidity.VALID
+
+    def test_a_different_model_on_the_target_invalidates_the_run(self, tmp_path: Path):
+        """The deliberately mismatched pairing this check exists for."""
+        ctx = self._with_model(_context(tmp_path), sent=53_744, reported=1_244)
+
+        evaluation = evaluate_run(ctx)
+
+        issue = next(i for i in evaluation.issues if i.code == IssueCode.FIRMWARE_MODEL_MISMATCH)
+        assert evaluation.validity is not ResultValidity.VALID
+        assert issue.severity == "error"
+        assert issue.context["reported_model_size"] == 1_244
+        assert issue.context["expected_model_size"] == 53_744
+        assert "1,244" in issue.message and "53,744" in issue.message
+
+    def test_an_engine_that_reports_no_model_size_is_not_a_mismatch(self, tmp_path: Path):
+        """heliaAOT compiles the graph in, so it reports no size at all.
+
+        Absence of the field is not evidence of disagreement, and treating it
+        as one would invalidate every AOT run.
+        """
+        ctx = self._with_model(_context(tmp_path), sent=53_744, reported=None)
+
+        codes = [i.code for i in evaluate_run(ctx).issues]
+
+        assert IssueCode.FIRMWARE_MODEL_MISMATCH not in codes
+
+    def test_an_unrecorded_model_cannot_accuse_the_firmware(self, tmp_path: Path):
+        """Stage 1 sets the model record; without it there is nothing to compare."""
+        ctx = _context(tmp_path)
+        ctx.run_metadata.model = None
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(model_size=1_244), layers=[]))
+
+        codes = [i.code for i in evaluate_run(ctx).issues]
+
+        assert IssueCode.FIRMWARE_MODEL_MISMATCH not in codes
+
+
+class TestModelIdentityFromTheWire:
+    """Drive the check with real parser output, not hand-built metadata.
+
+    The first cut of this check assumed ``model_size`` was an integer. The wire
+    parser keeps an unparseable value as the raw string it received, so a
+    corrupted or foreign ``HPX_MODEL_SIZE`` line reached the formatter and
+    raised ``ValueError`` instead of producing a result. Building
+    :class:`FirmwareMeta` by hand cannot catch that; only the parser can.
+    """
+
+    @staticmethod
+    def _evaluate(tmp_path: Path, wire: str | None, *, sent: int = 53_744):
+        lines = [HPX_START_SENTINEL]
+        if wire is not None:
+            lines.append(f"HPX_MODEL_SIZE={wire}")
+        lines.append(HPX_END_SENTINEL)
+        ctx = _context(tmp_path)
+        ctx.run_metadata.model = ModelInfo(name="kws.tflite", size_bytes=sent, sha256="a" * 64)
+        set_profile_result(ctx, parse_firmware_output(lines))
+        return evaluate_run(ctx)
+
+    def test_a_malformed_size_warns_instead_of_raising(self, tmp_path: Path):
+        for wire in ("abc", "1024.0", "null"):
+            evaluation = self._evaluate(tmp_path, wire)
+
+            issue = next(
+                i
+                for i in evaluation.issues
+                if i.code == IssueCode.FIRMWARE_MODEL_IDENTITY_UNVERIFIABLE
+            )
+            assert issue.severity == "warning", wire
+            assert repr(wire) in issue.message
+            assert IssueCode.FIRMWARE_MODEL_MISMATCH not in [i.code for i in evaluation.issues]
+
+    def test_a_malformed_size_is_not_read_as_a_verified_identity(self, tmp_path: Path):
+        """Coercing the unknown to None would leave the run silently clean."""
+        codes = [i.code for i in self._evaluate(tmp_path, "abc").issues]
+
+        assert IssueCode.FIRMWARE_MODEL_IDENTITY_UNVERIFIABLE in codes
+
+    def test_a_well_formed_matching_size_stays_clean(self, tmp_path: Path):
+        evaluation = self._evaluate(tmp_path, "53744")
+
+        codes = [i.code for i in evaluation.issues]
+        assert IssueCode.FIRMWARE_MODEL_MISMATCH not in codes
+        assert IssueCode.FIRMWARE_MODEL_IDENTITY_UNVERIFIABLE not in codes
+        assert evaluation.validity is ResultValidity.VALID
+
+    def test_a_well_formed_differing_size_is_still_the_error(self, tmp_path: Path):
+        """The malformed path must not disarm the mismatch it sits beside."""
+        evaluation = self._evaluate(tmp_path, "1244")
+
+        assert IssueCode.FIRMWARE_MODEL_MISMATCH in [i.code for i in evaluation.issues]
+        assert evaluation.validity is not ResultValidity.VALID
+
+    def test_an_absent_line_raises_nothing(self, tmp_path: Path):
+        evaluation = self._evaluate(tmp_path, None)
+
+        codes = [i.code for i in evaluation.issues]
+        assert IssueCode.FIRMWARE_MODEL_MISMATCH not in codes
+        assert IssueCode.FIRMWARE_MODEL_IDENTITY_UNVERIFIABLE not in codes
