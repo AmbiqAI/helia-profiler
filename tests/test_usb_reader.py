@@ -64,9 +64,10 @@ def test_find_cdc_port_no_device_hint_covers_host_platforms(monkeypatch):
     with pytest.raises(CaptureError, match="No USB CDC device found") as exc_info:
         usb_reader._find_cdc_port(timeout_s=0)
 
-    assert "hpx ports list --all" in exc_info.value.hint
-    assert "ls /dev/tty.usbmodem*" in exc_info.value.hint
-    assert "ls /dev/ttyACM*" in exc_info.value.hint
+    hint = exc_info.value.hint or ""
+    assert "hpx ports list --all" in hint
+    assert "ls /dev/tty.usbmodem*" in hint
+    assert "ls /dev/ttyACM*" in hint
 
 
 def test_find_cdc_port_falls_back_to_existing_non_jlink(monkeypatch):
