@@ -526,7 +526,8 @@ class TestPreflightNpuBackend:
         )
         from helia_profiler.stages.preflight import _check_npu_backend
 
-        _check_npu_backend(ctx.config)  # must not raise
+        with patch("helia_profiler.evaluation.is_available", return_value=True):
+            _check_npu_backend(ctx.config)  # must not raise
 
     def test_default_backend_not_gated(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-rt"}})
@@ -541,6 +542,13 @@ class TestVelaAcceleratorConfigMatch:
     A mismatched command stream is rejected by the Ethos-U driver at the first
     inference, so without this check the run builds, flashes and then hangs.
     """
+
+    @pytest.fixture(autouse=True)
+    def _parser_available(self):
+        """The check itself is under test, not the analysis extra: CI's
+        unit-test env installs no ai-edge-litert, so availability is pinned."""
+        with patch("helia_profiler.evaluation.is_available", return_value=True):
+            yield
 
     def _npu_ctx(self, tmp_path: Path):
         return _make_ctx(
@@ -700,4 +708,5 @@ class TestPreflightNpuBackendEngineGate:
         )
         from helia_profiler.stages.preflight import _check_npu_backend
 
-        _check_npu_backend(ctx.config)  # must not raise
+        with patch("helia_profiler.evaluation.is_available", return_value=True):
+            _check_npu_backend(ctx.config)  # must not raise
