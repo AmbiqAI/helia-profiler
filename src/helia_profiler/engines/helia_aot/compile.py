@@ -185,26 +185,14 @@ def _resolve_aot_placement_intent(
     if config.model.weights_location:
         weights = Placement(config.model.weights_location)
 
-    # Ethos-U backend: the NPU is an AXI master that cannot reach the M55's
-    # TCMs, so every NPU-visible buffer (scratch/IO and the command
-    # stream/weights) must live in NPU-reachable memory. Steer the automatic
-    # choice to SRAM and reject an explicit TCM request.
+    # Ethos-U backend: NPU-visible buffers (scratch/IO and the command
+    # stream/weights) default to SRAM/MRAM. The automatic choice never picks
+    # TCM for them; an explicit TCM request is honored (the NPU reaches TCM
+    # through the M55's AHB slave port while the core is awake).
     if config.engine.backend == "ethos_u":
-        if config.model.arena_location == Placement.TCM:
-            raise EngineError(
-                "arena_location=tcm is incompatible with engine.backend="
-                "ethos_u: the Ethos-U NPU cannot access the CPU's TCM.",
-                hint="Set model.arena_location to sram (or omit it).",
-            )
-        if config.model.weights_location == Placement.TCM:
-            raise EngineError(
-                "weights_location=tcm is incompatible with engine.backend="
-                "ethos_u: the Ethos-U NPU cannot access the CPU's TCM.",
-                hint="Set model.weights_location to mram or sram (or omit it).",
-            )
-        if arena == Placement.TCM:
+        if not config.model.arena_location and arena == Placement.TCM:
             arena = Placement.SRAM
-        if weights == Placement.TCM:
+        if not config.model.weights_location and weights == Placement.TCM:
             weights = Placement.MRAM
     return arena, weights
 

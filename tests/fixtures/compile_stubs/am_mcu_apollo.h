@@ -22,12 +22,12 @@ static inline uint32_t am_hal_stimer_config(uint32_t config) {
 static inline uint32_t am_hal_stimer_counter_get(void) { return 0U; }
 
 // --- Debug power domain --------------------------------------------------
-// Apollo510-only in the real HAL (AP3/AP4 renders only ever name these in
+// AP5-family-only in the real HAL (AP3/AP4 renders only ever name these in
 // comments); part-gated so a non-AP5 render arm calling them fails the gate.
-#if defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO510) || defined(PART_atomiq110)
 static inline uint32_t am_hal_debug_enable(void) { return 0U; }
 static inline uint32_t am_hal_debug_disable(void) { return 0U; }
-#endif  // AM_PART_APOLLO510
+#endif  // AP5 parts
 
 // --- Burst mode (Apollo3 only; mirrors am_hal_burst.h) -------------------
 #if defined(AM_PART_APOLLO3P)

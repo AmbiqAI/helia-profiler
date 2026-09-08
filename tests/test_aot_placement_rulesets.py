@@ -343,11 +343,11 @@ class TestRunAotCompilerUsesConfigRegistry:
 
 
 class TestEthosUPlacement:
-    """engine.backend=ethos_u forces NPU-reachable placement.
+    """engine.backend=ethos_u defaults NPU-visible buffers off TCM.
 
-    The Ethos-U NPU is an AXI master that cannot access the M55's TCMs, so
-    when the ethos_u backend is selected the automatic fastest-fit choice is
-    steered away from TCM and an explicit TCM request is rejected.
+    Automatic fastest-fit placement is steered away from TCM (SRAM arena,
+    MRAM weights); an explicit TCM request is honored — the NPU reaches TCM
+    through the M55's AHB slave port while the core is awake.
     """
 
     def _npu_cfg(self, placement: dict):
@@ -364,25 +364,17 @@ class TestEthosUPlacement:
         assert arena is not Placement.TCM
         assert weights is not Placement.TCM
 
-    def test_explicit_tcm_arena_rejected(self):
-        import pytest
-
-        from helia_profiler.errors import EngineError
-
+    def test_explicit_tcm_arena_honored(self):
         soc = get_soc_for_board("atomiq110_fpga_turbo")
         cfg = self._npu_cfg({"arena_location": "tcm"})
-        with pytest.raises(EngineError, match="cannot access the CPU's TCM"):
-            _resolve_aot_placement_intent(cfg, soc)
+        arena, _weights = _resolve_aot_placement_intent(cfg, soc)
+        assert arena is Placement.TCM
 
-    def test_explicit_tcm_weights_rejected(self):
-        import pytest
-
-        from helia_profiler.errors import EngineError
-
+    def test_explicit_tcm_weights_honored(self):
         soc = get_soc_for_board("atomiq110_fpga_turbo")
         cfg = self._npu_cfg({"weights_location": "tcm"})
-        with pytest.raises(EngineError, match="cannot access the CPU's TCM"):
-            _resolve_aot_placement_intent(cfg, soc)
+        _arena, weights = _resolve_aot_placement_intent(cfg, soc)
+        assert weights is Placement.TCM
 
     def test_sram_arena_kept(self):
         soc = get_soc_for_board("atomiq110_fpga_turbo")

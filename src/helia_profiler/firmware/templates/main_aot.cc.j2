@@ -338,29 +338,7 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
 
 {% block engine_model_setup %}
 {% if has_ethos_u | default(false) %}
-    // --- Ethos-U NPU init (before any AOT runtime work) --------------------
-    // skip_perf_mode=false is hardware-validated on the atomiq110 NPU
-    // bitstream: HP mode programs fine even though the FPGA core clock is
-    // fixed. nsx_npu_init() treats the always-on FPGA power-domain timeout
-    // as non-fatal; a hard failure here almost always means the loaded
-    // bitstream's generation does not match the SDK payload the firmware
-    // was built against (no working Ethos-U at the expected base address).
-    {
-        nsx_npu_config_t npu_cfg = {
-            .perf_mode      = NSX_NPU_PERF_HIGH_PERFORMANCE,
-            .skip_perf_mode = false,
-        };
-        uint32_t npu_rc = nsx_npu_init(&npu_cfg);
-        if (npu_rc != 0U) {
-            hpx_printf("HPX_ERROR=npu_init_failed rc=%lu "
-                       "hint=bitstream_sdk_generation_mismatch\n",
-                       (unsigned long)npu_rc);
-{% if power_only | default(false) %}            hpx_power_terminal_fail("npu", 2U);
-{% else %}            hpx_park();
-{% endif %}
-        }
-        hpx_printf("HPX_NPU=ethos-u85 init=ok\n");
-    }
+{% include "_npu_init.j2" %}
 {% endif %}
 {% if not allocate_arenas and arena_regions %}
     // External arena mode: allocate and bind arena buffers before model_init.

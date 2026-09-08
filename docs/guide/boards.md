@@ -51,7 +51,9 @@ Run `hpx boards` to see the live list. As of this release:
     board: a Cortex-M55 + Ethos-U85 NPU FPGA carrier running at a single
     fixed 25 MHz clock (no PSRAM, no onboard BLE radio, `preview` channel).
     It gets the same full PMU + MVE profiling support as the other AP5
-    boards; the NPU itself is not yet a profiling target.
+    boards, and the Ethos-U NPU is profiled through the `ethos_u` engine
+    backend with the `ethos_npu` counter group (see the
+    [NPU profiling example](../examples/atomiq110-npu-profiling.md)).
 
 ### AP4 — Cortex-M4 (Apollo4p)
 

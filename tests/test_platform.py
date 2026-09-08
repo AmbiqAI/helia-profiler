@@ -176,6 +176,12 @@ def test_atomiq110_is_ap5_family():
     assert soc.has_mve
 
 
+def test_fpga_boards_are_flagged():
+    """is_fpga drives NPU power-ack tolerance in generated firmware."""
+    assert get_board("atomiq110_fpga_turbo").is_fpga
+    assert not get_board("apollo510_evb").is_fpga
+
+
 def test_atomiq110_hardware_facts_not_copied_from_apollo510():
     """atomiq110 metadata must match the real nsx-ambiq-sdk facts.
 
@@ -522,6 +528,18 @@ def test_the_widest_32_bit_address_is_still_accepted():
     soc = _custom_soc("oem4", _scratch_soc_spec(app_flash_load_addr=0xFFFFFFFF))
 
     assert soc.capabilities.memory.app_flash_load_addr == 0xFFFFFFFF
+
+
+def test_a_custom_soc_inherits_the_npu_of_the_part_it_is_based_on():
+    """``based_on`` an NPU part must keep the NPU capability.
+
+    A lab overlay derived from atomiq110 previously lost ``npu`` because the
+    custom constructor omitted it, so the ethos_u preflight gate rejected a
+    board that has the silicon.
+    """
+    soc = _custom_soc("atomiq_lab", {"based_on": "atomiq110"})
+
+    assert soc.npu == "ethos-u85-256"
 
 
 def test_a_custom_soc_inherits_the_address_of_the_part_it_is_based_on():

@@ -112,6 +112,7 @@ class CustomBoardField(Enum):
     DEFAULT_GO_GPIO_PIN = "default_go_gpio_pin"
     BLE_RESET_GPIO_PIN = "ble_reset_gpio_pin"
     STARTER_PROFILE_BOARD = "starter_profile_board"
+    IS_FPGA = "is_fpga"
     DESCRIPTION = "description"
 
 
@@ -180,6 +181,9 @@ def _build_custom_socs(raw: Any, base: PlatformRegistry) -> dict[str, SocDef]:
             ),
             c_define=str(c_define),
             cmsis_header=str(cmsis_header),
+            # Inherited, never user-declared: NPU presence is a silicon fact
+            # of the based_on part (see the pinned-subset platform test).
+            npu=base_soc.npu if base_soc else None,
             rtt_scan_ranges=_build_rtt_scan_ranges(
                 spec.get("rtt_scan_ranges", base_soc.rtt_scan_ranges if base_soc else None),
                 field_name=f"target.custom_socs.{name}.rtt_scan_ranges",
@@ -494,6 +498,7 @@ def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, Boar
             starter_profile_board=(
                 str(starter_profile_board) if starter_profile_board is not None else None
             ),
+            is_fpga=bool(spec.get("is_fpga", base_board.is_fpga if base_board else False)),
             description=str(spec.get("description", base_board.description if base_board else "")),
         )
     return custom

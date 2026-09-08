@@ -38,6 +38,9 @@ static volatile bool g_npu_enabled = false;
 // for TCM.
 NSX_MEM_SRAM static uint32_t g_npu_acc[HPX_NPU_MAX_LAYERS][kNpuMaxEvents];
 NSX_MEM_SRAM static uint8_t g_npu_hit[HPX_NPU_MAX_LAYERS];
+// Sticky per-layer overflow: hardware counter saturation (PMOVSSET) or wrap
+// of the uint32 accumulation across dispatches within one iteration.
+NSX_MEM_SRAM static uint8_t g_npu_ovf[HPX_NPU_MAX_LAYERS];
 
 extern "C" void hpx_npu_probe(const char *phase, struct ethosu_driver *drv,
                               void *user_arg);
@@ -61,6 +64,7 @@ static void hpx_npu_set_enabled(bool enabled) { g_npu_enabled = enabled; }
 static void hpx_npu_clear(void) {
     memset(g_npu_acc, 0, sizeof(g_npu_acc));
     memset((void *)g_npu_hit, 0, sizeof(g_npu_hit));
+    memset((void *)g_npu_ovf, 0, sizeof(g_npu_ovf));
 }
 
 // nsx-ethos-u-driver owns the strong ethosu_inference_begin/end definitions
@@ -89,6 +93,7 @@ extern "C" void hpx_npu_probe(const char *phase, struct ethosu_driver *drv,
         }
         ETHOSU_PMU_CYCCNT_Reset(drv);
         ETHOSU_PMU_EVCNTR_ALL_Reset(drv);
+        ETHOSU_PMU_Set_CNTR_OVS(drv, mask);  // W1C: clear stale overflow flags
         ETHOSU_PMU_CNTR_Enable(drv, mask);
     } else if (strcmp(phase, NSX_ETHOS_U_PROBE_END) == 0) {
         // Freeze first so every counter describes the same window.
@@ -102,8 +107,19 @@ extern "C" void hpx_npu_probe(const char *phase, struct ethosu_driver *drv,
         if (layer < 0 || layer >= HPX_NPU_MAX_LAYERS) {
             return;
         }
+        uint32_t event_mask = 0;
         for (int i = 0; i < g_npu_num_events; i++) {
-            g_npu_acc[layer][i] += ETHOSU_PMU_Get_EVCNTR(drv, (uint32_t)i);
+            event_mask |= (1UL << i);
+        }
+        if (ETHOSU_PMU_Get_CNTR_OVS(drv) & event_mask) {
+            g_npu_ovf[layer] = 1U;
+        }
+        for (int i = 0; i < g_npu_num_events; i++) {
+            const uint32_t before = g_npu_acc[layer][i];
+            g_npu_acc[layer][i] = before + ETHOSU_PMU_Get_EVCNTR(drv, (uint32_t)i);
+            if (g_npu_acc[layer][i] < before) {
+                g_npu_ovf[layer] = 1U;
+            }
         }
         g_npu_hit[layer] = 1U;
     }
@@ -127,6 +143,6 @@ static void hpx_npu_print_csv(void) {
         for (int e = 0; e < g_npu_num_events; e++) {
             hpx_printf(",%lu", (unsigned long)g_npu_acc[i][e]);
         }
-        hpx_printf(",0\n");
+        hpx_printf(",%u\n", (unsigned)g_npu_ovf[i]);
     }
 }
