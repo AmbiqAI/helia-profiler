@@ -369,8 +369,10 @@ The pipeline:
 !!! warning "AmbiqAI ns-cmsis-nn fork required"
     heliaAOT depends on AmbiqAI's `ns-cmsis-nn`, **not** upstream ARM
     CMSIS-NN. The fork adds the `weight_sum_ctx` parameters that AOT
-    kernels expect. Pointing `cmsis_nn_path` at upstream CMSIS-NN
-    (V.19+) raises a clear error during preflight.
+    kernels expect. Local checkouts must contain `Include/`, `Source/`,
+    `nsx/CMakeLists.txt`, and `nsx/nsx-module.yaml`; HPX rejects checkouts
+    missing this layout before building. Header revision numbers do not
+    distinguish the AmbiqAI fork from upstream CMSIS-NN.
 
 !!! warning "Operator coverage"
     heliaAOT supports a curated subset of TFLite ops (CONV_2D,
