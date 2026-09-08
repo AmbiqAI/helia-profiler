@@ -16,6 +16,7 @@ number is the measurement of record decides fatal-vs-warn.
 
 | Code | Severity | Description |
 | --- | --- | --- |
+| `firmware.model_identity_unverifiable` | `warning` | The firmware's reported model size is not an integer, so the model identity check could not run; no mismatch is not evidence of a match. |
 | `firmware.model_mismatch` | `error` | The model the firmware reports executing is not the model HPX sent; every measurement in the run belongs to an unknown graph. |
 | `pmu.counter_overflow` | `error` | One or more PMU counters overflowed during capture. |
 | `pmu.missing` | `error` | The run has no PMU result. |

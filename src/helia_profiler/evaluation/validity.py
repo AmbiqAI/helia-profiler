@@ -145,6 +145,13 @@ def _model_identity_issues(ctx: PipelineContext) -> list[ResultIssue]:
     Engines that compile the model into the firmware rather than embedding
     the flatbuffer report no size (heliaAOT); those runs are not covered
     here and the absence of the field is not treated as a mismatch.
+
+    A reported size that is not an integer is neither a match nor a mismatch.
+    The wire parser keeps an unparseable ``HPX_MODEL_SIZE`` value as the raw
+    string it received, so a corrupted or foreign line arrives here as text
+    (found by review of the first cut, which formatted it and crashed). That
+    is reported as its own warning rather than coerced away, because silence
+    would read as a verified identity.
     """
     if ctx.pmu_result is None:
         return []
@@ -152,6 +159,19 @@ def _model_identity_issues(ctx: PipelineContext) -> list[ResultIssue]:
     model = ctx.run_metadata.model
     if reported is None or model is None or not model.size_bytes:
         return []
+    if not isinstance(reported, int) or isinstance(reported, bool):
+        return [
+            _warning(
+                IssueCode.FIRMWARE_MODEL_IDENTITY_UNVERIFIABLE,
+                f"The firmware reported a model size of {reported!r}, which is "
+                "not an integer, so it could not be checked against "
+                f"{model.name}. This run's model identity is unverified.",
+                reported_model_size=reported,
+                expected_model_size=model.size_bytes,
+                model_name=model.name,
+                model_sha256=model.sha256,
+            )
+        ]
     if reported == model.size_bytes:
         return []
     return [

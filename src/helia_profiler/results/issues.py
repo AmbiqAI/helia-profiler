@@ -66,6 +66,7 @@ class IssueCode(StrEnum):
     PMU_COUNTER_OVERFLOW = "pmu.counter_overflow"
 
     FIRMWARE_MODEL_MISMATCH = "firmware.model_mismatch"
+    FIRMWARE_MODEL_IDENTITY_UNVERIFIABLE = "firmware.model_identity_unverifiable"
 
     PROFILE_CLEAN_WINDOW_FROZEN = "profile.clean_window_frozen"
     PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW = "profile.clean_window_clock_rate_low"
@@ -148,6 +149,12 @@ _ISSUE_SPECS: tuple[IssueSpec, ...] = (
         "The model the firmware reports executing is not the model HPX sent; "
         "every measurement in the run belongs to an unknown graph.",
         severity=Severity.ERROR,
+    ),
+    IssueSpec(
+        IssueCode.FIRMWARE_MODEL_IDENTITY_UNVERIFIABLE,
+        "The firmware's reported model size is not an integer, so the model "
+        "identity check could not run; no mismatch is not evidence of a match.",
+        severity=Severity.WARNING,
     ),
     IssueSpec(
         IssueCode.PROFILE_CLEAN_WINDOW_FROZEN,
