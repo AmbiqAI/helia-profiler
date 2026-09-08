@@ -121,7 +121,7 @@ def test_atomiq110_fpga_quickstart_loads_with_expected_board():
         pathlib.Path(__file__).resolve().parents[2]
         / "examples"
         / "quickstart"
-        / "hpx_rt_atomiq110.yml"
+        / "hpx_rt_npu_atomiq110.yml"
     )
     assert config_path.is_file(), config_path
 
@@ -130,6 +130,7 @@ def test_atomiq110_fpga_quickstart_loads_with_expected_board():
     assert config.target.toolchain.value == "arm-none-eabi-gcc"
     assert config.target.transport.value == "rtt"
     assert config.engine.type.value == "helia-rt"
+    assert config.engine.backend == "ethos_u"
     assert config.power.enabled is False
     assert config.profiling.per_layer is True
     assert config.output.format.value == "csv"
