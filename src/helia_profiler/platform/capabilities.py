@@ -323,10 +323,24 @@ _FAMILY_MEMORY_BASES: dict[SocFamily, dict[Placement, int]] = {
     },
 }
 
+# Per-SoC overrides for realizations whose memory map departs from the family
+# baseline. The atomiq110 FPGA realization emulates MRAM/SRAM at dedicated
+# windows instead of the Apollo5 silicon addresses (see the board's
+# linker_script.ld: MCU_TCM 0x20000000, SHARED_SRAM 0x21000000,
+# MCU_MRAM 0x22000000).
+_SOC_MEMORY_BASES: dict[str, dict[Placement, int]] = {
+    "atomiq110": {
+        Placement.TCM: 0x20000000,
+        Placement.SRAM: 0x21000000,
+        Placement.MRAM: 0x22000000,
+    },
+}
 
-def _family_placement_bases(family: SocFamily) -> Mapping[Placement, int]:
-    """Return the frozen placement-base map for *family* (empty if unknown)."""
-    return MappingProxyType(dict(_FAMILY_MEMORY_BASES.get(family, {})))
+
+def _placement_bases(soc: SocDef) -> Mapping[Placement, int]:
+    """Return the frozen placement-base map for *soc* (empty if unknown)."""
+    bases = _SOC_MEMORY_BASES.get(soc.name) or _FAMILY_MEMORY_BASES.get(soc.family, {})
+    return MappingProxyType(dict(bases))
 
 
 # App-image flash (``LoadFile``) address per family: ``NSX_SEGGER_PF_ADDR`` from
@@ -453,7 +467,7 @@ def build_soc_capabilities(soc: SocDef) -> SocCapabilities:
     memory = MemoryCapabilities(
         has_dcache=is_ap5,
         has_shared_ssram_power_domain=is_ap5,
-        placement_bases=_family_placement_bases(family),
+        placement_bases=_placement_bases(soc),
         app_flash_load_addr=resolve_app_flash_load_addr(soc),
     )
     clock = ClockCapabilities(

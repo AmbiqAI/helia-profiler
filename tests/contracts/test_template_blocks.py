@@ -148,6 +148,7 @@ def test_child_override_sets_are_the_documented_ones():
         "engine_model_setup",
         "engine_model_storage",
         "engine_pre_start",
+        "engine_profiled_summary",
         "engine_profiler_on",
     }
     assert _blocks("main_aot.cc.j2") == REQUIRED_ENGINE_BLOCKS | {
@@ -156,6 +157,7 @@ def test_child_override_sets_are_the_documented_ones():
         "engine_model_setup",
         "engine_pass_profile_arm",
         "engine_pass_warmup_arm",
+        "engine_profiled_summary",
         "engine_profiler_on",
         "engine_psram_metadata",
         "engine_window_prologue",

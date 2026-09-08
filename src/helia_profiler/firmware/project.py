@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
+import re
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -297,6 +298,7 @@ def _resolve_project_overrides(
     module_specs: list[NsxModuleSpec],
     nsx_overrides: dict[str, Any],
     baseline: CompatibilityBaseline,
+    profile: dict[str, Any] | None = None,
 ) -> dict[str, tuple[str, str]]:
     """Collapse module-targeted ref/version overrides onto owning projects.
 
@@ -324,13 +326,22 @@ def _resolve_project_overrides(
                 ),
             )
         project_overrides[spec.project] = (mode, value)
+    # The starter profile may pin a project to a family-specific *branch*
+    # (e.g. atomiq110's SDK modules live on an unmerged feature branch); that
+    # pin must win over the qualified-baseline default ref. Release-tag pins
+    # (e.g. ``r5.3``/``v0.1.0``) still modernize to the baseline.
+    profile_branch_pinned = set()
+    for project, override in ((profile or {}).get("project_overrides") or {}).items():
+        revision = override.get("revision") if isinstance(override, dict) else None
+        if revision and not re.fullmatch(r"[vr]?\d+(\.\d+)*", revision):
+            profile_branch_pinned.add(project)
     # sorted(): this order becomes nsx.yml's module_registry block; bare set
     # iteration varied the rendered bytes with PYTHONHASHSEED (#174). The
     # workspace manifest hash is unaffected (hash_manifest re-serialises with
     # sort_keys=True, #175). The full sort on return canonicalises the
     # explicit-override half too.
     for project in sorted({spec.project for spec in module_specs}):
-        if project in project_overrides:
+        if project in project_overrides or project in profile_branch_pinned:
             continue
         if any(qualified.name == project for qualified in baseline.projects):
             project_overrides[project] = ("ref", baseline.project(project).ref)
@@ -427,6 +438,7 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
         _jinja_env.get_template("CMakeLists.txt.j2").render(
             board=ctx.board.name,
             engine_type=ctx.artifacts.engine_type,
+            has_ethos_u=ctx.artifacts.resolved_backend == "ethos_u",
             cmake_vars=ctx.artifacts.cmake_vars,
             compiler_launcher=ctx.compiler_launcher,
             # Only heliaAOT links a generated engine target; every other
