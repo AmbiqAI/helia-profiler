@@ -229,9 +229,10 @@ class TestPreflightModel:
         with patch("shutil.which", side_effect=_all_tools_present):
             with pytest.raises(ConfigError, match="not found") as exc_info:
                 PreflightStage().run(ctx)
-        assert "positional MODEL" in exc_info.value.hint
-        assert "model.path" in exc_info.value.hint
-        assert "--model" not in exc_info.value.hint
+        hint = exc_info.value.hint or ""
+        assert "positional MODEL" in hint
+        assert "model.path" in hint
+        assert "--model" not in hint
 
     def test_empty_model_raises(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
@@ -264,8 +265,9 @@ class TestPreflightModel:
         with patch("shutil.which", side_effect=_all_tools_present):
             with pytest.raises(ConfigError, match="not a regular file") as exc_info:
                 PreflightStage().run(ctx)
-        assert ".tflite" in exc_info.value.hint
-        assert ".pte" in exc_info.value.hint
+        hint = exc_info.value.hint or ""
+        assert ".tflite" in hint
+        assert ".pte" in hint
 
 
 class TestPreflightConfig:
