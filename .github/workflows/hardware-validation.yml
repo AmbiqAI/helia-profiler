@@ -41,7 +41,7 @@ on:
       executorch_backends:
         description: "ExecuTorch CMSIS-NN provider selection"
         required: true
-        default: both
+        default: ns
         type: choice
         options:
           - both
@@ -111,7 +111,6 @@ env:
   CCACHE_MAXSIZE: 10G
   SEGGER_RTT_PATH: ${{ github.workspace }}/segger-rtt
   HPX_NSX_EXECUTORCH_REF: 27eee513636821398f0bb5e92055526cac29b1ed
-  HPX_QUALIFIED_NS_CMSIS_NN_REF: aaeb145a67c3decd9869f96474e36e7dbdc2030c
   # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
   # with the manual defaults, except that nightly validation covers the full suite.
   HPX_VALIDATION_SUITE: ${{ inputs.suite || 'complete' }}
@@ -120,7 +119,7 @@ env:
   HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb,apollo330mP_evb,apollo3p_evb' }}
   HPX_VALIDATION_MODELS: ${{ inputs.models || '' }}
   HPX_VALIDATION_ENGINES: ${{ inputs.engines || '' }}
-  HPX_VALIDATION_EXECUTORCH_BACKENDS: ${{ inputs.executorch_backends || 'both' }}
+  HPX_VALIDATION_EXECUTORCH_BACKENDS: ${{ inputs.executorch_backends || 'ns' }}
   HPX_NS_CMSIS_NN_REF: ${{ inputs.ns_cmsis_nn_ref || '' }}
   HPX_VALIDATION_TOOLCHAINS: ${{ inputs.toolchains || '' }}
   HPX_VALIDATION_TRANSPORTS: ${{ inputs.transports || '' }}
@@ -226,16 +225,14 @@ jobs:
 
       - name: Resolve ns-cmsis-nn source
         id: resolve_ns_cmsis_nn
+        if: env.HPX_NS_CMSIS_NN_REF != ''
         run: |
           checkout_root="$(mktemp -d "${RUNNER_TEMP}/hpx-ns-cmsis-nn.XXXXXX")"
           checkout_path="${checkout_root}/ns-cmsis-nn"
 
           requested_ref="${HPX_NS_CMSIS_NN_REF}"
 
-          if [[ -z "${requested_ref}" ]]; then
-            requested_ref="${HPX_QUALIFIED_NS_CMSIS_NN_REF}"
-            requested_kind="qualified_baseline"
-          elif [[ "${requested_ref}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+          if [[ "${requested_ref}" =~ ^[0-9a-fA-F]{40}$ ]]; then
             requested_kind="commit"
           else
             if [[ "${requested_ref}" =~ ^([[:alnum:]-]+-)?v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
@@ -260,8 +257,6 @@ jobs:
             exit 2
           fi
           echo "NS_CMSIS_NN_RESOLVED_COMMIT=${resolved_commit}" >> "${GITHUB_ENV}"
-          echo "NS_CMSIS_NN_REQUESTED_KIND=${requested_kind}" >> "${GITHUB_ENV}"
-          echo "NS_CMSIS_NN_REQUESTED_REF=${requested_ref}" >> "${GITHUB_ENV}"
           echo "resolved_commit=${resolved_commit}" >> "${GITHUB_OUTPUT}"
           echo "HPX_SOURCE_REVISIONS_JSON={\"ns-cmsis-nn\":{\"requested_kind\":\"${requested_kind}\",\"requested_ref\":\"${requested_ref}\",\"resolved_commit\":\"${resolved_commit}\"}}" \
             >> "${GITHUB_ENV}"
@@ -321,8 +316,18 @@ jobs:
           fi
 
           echo "NSX_EXECUTORCH_ROOT=${checkout_path}" >> "${GITHUB_ENV}"
-          echo "HPX_SOURCE_REVISIONS_JSON={\"ns-cmsis-nn\":{\"requested_kind\":\"${NS_CMSIS_NN_REQUESTED_KIND}\",\"requested_ref\":\"${NS_CMSIS_NN_REQUESTED_REF}\",\"resolved_commit\":\"${NS_CMSIS_NN_RESOLVED_COMMIT}\"},\"nsx-executorch\":{\"requested_kind\":\"commit\",\"requested_ref\":\"${HPX_NSX_EXECUTORCH_REF}\",\"resolved_commit\":\"${resolved_commit}\"},\"executorch\":{\"requested_kind\":\"commit\",\"requested_ref\":\"${executorch_commit}\",\"resolved_commit\":\"${executorch_commit}\"},\"arm-cmsis-nn\":{\"requested_kind\":\"commit\",\"requested_ref\":\"6d21a6f821fb72541173a6c4d05d83329fa74f7c\",\"resolved_commit\":\"6d21a6f821fb72541173a6c4d05d83329fa74f7c\"}}" \
-            >> "${GITHUB_ENV}"
+          source_revisions="$(jq -cn \
+            --argjson existing "${HPX_SOURCE_REVISIONS_JSON:-null}" \
+            --arg nsx "${resolved_commit}" \
+            --arg et "${executorch_commit}" \
+            --arg arm "6d21a6f821fb72541173a6c4d05d83329fa74f7c" \
+            '$existing + {
+              "nsx-executorch": {requested_kind: "commit", requested_ref: $nsx, resolved_commit: $nsx},
+              "executorch": {requested_kind: "commit", requested_ref: $et, resolved_commit: $et},
+              "arm-cmsis-nn": {requested_kind: "commit", requested_ref: $arm, resolved_commit: $arm}
+            }')"
+          echo "HPX_SOURCE_REVISIONS_JSON=${source_revisions}" >> "${GITHUB_ENV}"
+          mkdir -p results/validation
           {
             echo "nsx-executorch=${resolved_commit}"
             echo "executorch=${executorch_commit}"
@@ -367,9 +372,11 @@ jobs:
             --repeat "${HPX_VALIDATION_REPEAT}"
             --timeout "${HPX_VALIDATION_TIMEOUT}"
             --executorch-backends "${HPX_VALIDATION_EXECUTORCH_BACKENDS}"
-            --ns-cmsis-nn-ref "${{ steps.resolve_ns_cmsis_nn.outputs.resolved_commit }}"
             --jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}"
           )
+          if [[ -n "${HPX_NS_CMSIS_NN_REF}" ]]; then
+            args+=(--ns-cmsis-nn-ref "${NS_CMSIS_NN_RESOLVED_COMMIT}")
+          fi
           if [[ -n "${HPX_VALIDATION_MODELS}" ]]; then
             args+=(--models "${HPX_VALIDATION_MODELS}")
           fi
@@ -403,11 +410,13 @@ jobs:
             --repeat "${HPX_VALIDATION_REPEAT}"
             --timeout "${HPX_VALIDATION_TIMEOUT}"
             --executorch-backends "${HPX_VALIDATION_EXECUTORCH_BACKENDS}"
-            --ns-cmsis-nn-ref "${{ steps.resolve_ns_cmsis_nn.outputs.resolved_commit }}"
             --jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}"
             --output-dir results/validation
             --junit-xml results/validation/junit.xml
           )
+          if [[ -n "${HPX_NS_CMSIS_NN_REF}" ]]; then
+            args+=(--ns-cmsis-nn-ref "${NS_CMSIS_NN_RESOLVED_COMMIT}")
+          fi
           if [[ -n "${HPX_VALIDATION_MODELS}" ]]; then
             args+=(--models "${HPX_VALIDATION_MODELS}")
           fi

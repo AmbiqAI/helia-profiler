@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
-import re
+import shutil
+import subprocess
 from typing import Any
 
 import pytest
@@ -35,23 +37,121 @@ def _step(job: dict[str, Any], name: str) -> dict[str, Any]:
     raise AssertionError(f"step {name!r} not found")
 
 
-def test_ns_cmsis_nn_default_matches_qualified_baseline() -> None:
-    baseline = json.loads(
-        (
-            REPO_ROOT / "src" / "helia_profiler" / "data" / "compatibility-baseline-v1.json"
-        ).read_text()
-    )
-    workflow = WORKFLOW_PATH.read_text()
-    match = re.search(
-        r"^\s*HPX_QUALIFIED_NS_CMSIS_NN_REF:\s*([0-9a-f]{40})\s*$",
-        workflow,
-        re.MULTILINE,
+def test_ns_cmsis_nn_resolution_requires_input(
+    workflow: dict[Any, Any], validate_job: dict[str, Any]
+) -> None:
+    inputs = _triggers(workflow)["workflow_dispatch"]["inputs"]
+    assert inputs["ns_cmsis_nn_ref"]["default"] == ""
+    assert workflow["env"]["HPX_NS_CMSIS_NN_REF"] == "${{ inputs.ns_cmsis_nn_ref || '' }}"
+    resolve = _step(validate_job, "Resolve ns-cmsis-nn source")
+    assert resolve["if"] == "env.HPX_NS_CMSIS_NN_REF != ''"
+    assert 'requested_ref="${HPX_NS_CMSIS_NN_REF}"' in resolve["run"]
+    assert "HPX_QUALIFIED_NS_CMSIS_NN_REF" not in WORKFLOW_PATH.read_text()
+    assert "qualified_baseline" not in resolve["run"]
+
+
+def test_workflow_defaults_to_ns_provider_only(workflow: dict[Any, Any]) -> None:
+    inputs = _triggers(workflow)["workflow_dispatch"]["inputs"]
+    assert inputs["executorch_backends"]["default"] == "ns"
+    assert set(inputs["executorch_backends"]["options"]) == {"ns", "arm", "both"}
+    assert workflow["env"]["HPX_VALIDATION_EXECUTORCH_BACKENDS"] == (
+        "${{ inputs.executorch_backends || 'ns' }}"
     )
 
-    assert match is not None
-    assert match.group(1) == baseline["projects"]["ns-cmsis-nn"]["ref"]
-    assert 'requested_ref="${HPX_QUALIFIED_NS_CMSIS_NN_REF}"' in workflow
-    assert 'requested_kind="qualified_baseline"' in workflow
+
+def _run_bash(script: str, env: dict[str, str], cwd: Path) -> str:
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("workflow script tests require bash")
+    return subprocess.run(
+        [bash, "--noprofile", "--norc", "-euo", "pipefail", "-c", script],
+        env={"PATH": os.environ["PATH"], **env},
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+
+
+@pytest.mark.parametrize("step_name", ["Preview validation cases", "Run hardware validation"])
+@pytest.mark.parametrize("requested_ref", ["", "candidate-branch", "a" * 40])
+@pytest.mark.parametrize("provider", ["ns", "arm", "both"])
+def test_ns_cmsis_nn_flag_only_passed_for_explicit_input(
+    workflow: dict[Any, Any],
+    validate_job: dict[str, Any],
+    tmp_path: Path,
+    step_name: str,
+    requested_ref: str,
+    provider: str,
+) -> None:
+    env = {key: "" for key in workflow["env"] if key.startswith("HPX_VALIDATION_")}
+    env.update(
+        HPX_VALIDATION_BOARD="apollo510_evb",
+        HPX_VALIDATION_JLINK_SERIALS="",
+        HPX_VALIDATION_POWER="off",
+        HPX_VALIDATION_POWER_BOARDS="",
+        HPX_VALIDATION_POWER_SERIALS="",
+        HPX_VALIDATION_EXECUTORCH_BACKENDS=provider,
+        HPX_NS_CMSIS_NN_REF=requested_ref,
+    )
+    if requested_ref:
+        env["NS_CMSIS_NN_RESOLVED_COMMIT"] = "b" * 40
+    script = 'uv() { printf "%s\\n" "$@"; }\n' + _step(validate_job, step_name)["run"]
+    args = _run_bash(script, env, tmp_path).splitlines()
+    assert args[:3] == ["run", "hpx", "validate"]
+    assert args[args.index("--executorch-backends") + 1] == provider
+    if requested_ref:
+        assert args.count("--ns-cmsis-nn-ref") == 1
+        assert args[args.index("--ns-cmsis-nn-ref") + 1] == env["NS_CMSIS_NN_RESOLVED_COMMIT"]
+    else:
+        assert "--ns-cmsis-nn-ref" not in args
+
+
+@pytest.mark.parametrize("has_override", [False, True])
+def test_executorch_provenance_with_optional_ns_override(
+    workflow: dict[Any, Any],
+    validate_job: dict[str, Any],
+    tmp_path: Path,
+    has_override: bool,
+) -> None:
+    if shutil.which("jq") is None:
+        pytest.skip("workflow provenance requires jq")
+    env = {
+        "GITHUB_WORKSPACE": str(tmp_path),
+        "GITHUB_ENV": str(tmp_path / "env"),
+        "GITHUB_STEP_SUMMARY": str(tmp_path / "summary"),
+        "HPX_NSX_EXECUTORCH_REF": workflow["env"]["HPX_NSX_EXECUTORCH_REF"],
+    }
+    ns_revision = {
+        "requested_kind": "branch",
+        "requested_ref": "candidate-branch",
+        "resolved_commit": "b" * 40,
+    }
+    if has_override:
+        env["HPX_SOURCE_REVISIONS_JSON"] = json.dumps({"ns-cmsis-nn": ns_revision})
+    mock_git = """
+git() {
+  if [[ "$*" == *"rev-parse HEAD" ]]; then
+    if [[ "$2" == */external/executorch ]]; then
+      echo "3a97429b0ce0c192861fc3e3729fb81432fd22cf"
+    else
+      echo "${HPX_NSX_EXECUTORCH_REF}"
+    fi
+  fi
+}
+"""
+    script = _step(validate_job, "Initialize qualified ExecuTorch dependencies")["run"]
+    _run_bash(mock_git + script, env, tmp_path)
+    exported = dict(line.split("=", 1) for line in (tmp_path / "env").read_text().splitlines())
+    revisions = json.loads(exported["HPX_SOURCE_REVISIONS_JSON"])
+    assert revisions["nsx-executorch"]["resolved_commit"] == env["HPX_NSX_EXECUTORCH_REF"]
+    assert revisions["executorch"]["resolved_commit"] == "3a97429b0ce0c192861fc3e3729fb81432fd22cf"
+    assert revisions["arm-cmsis-nn"]["requested_kind"] == "commit"
+    if has_override:
+        assert revisions["ns-cmsis-nn"] == ns_revision
+    else:
+        assert "ns-cmsis-nn" not in revisions
+    assert (tmp_path / "results" / "validation" / "executorch-revisions.txt").is_file()
 
 
 def _triggers(workflow: dict[Any, Any]) -> dict[str, Any]:

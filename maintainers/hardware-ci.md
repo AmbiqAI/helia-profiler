@@ -245,12 +245,14 @@ only that axis.
   links (AmbiqAI/helia-profiler#263).
 - `models`: optional comma-separated model IDs such as `kws` or `kws,vww`
 - `engines`: optional comma-separated engines such as `helia-rt` or `helia-aot`
-- `executorch_backends`: ExecuTorch CMSIS-NN provider selection — `both`
-  (default), `arm`, or `ns`
+- `executorch_backends`: ExecuTorch CMSIS-NN provider selection — `ns`
+  (default for manual and nightly runs), `arm`, or `both`
 - `ns_cmsis_nn_ref`: optional `ns-cmsis-nn` branch or full commit SHA.
-  When empty, the workflow checks out HPX's qualified baseline commit. The
-  requested ref and resolved commit are saved in
-  `ns-cmsis-nn-revision.txt` with the validation artifacts.
+  When empty, the workflow skips source resolution and passes no engine
+  override, exercising HPX's baseline-declared default (`qualified`).
+  When set, the requested ref and resolved commit are saved in
+  `ns-cmsis-nn-revision.txt` with the validation artifacts, and the resolved
+  commit is passed as `--ns-cmsis-nn-ref`.
 - `toolchains`: optional comma-separated toolchains such as
   `arm-none-eabi-gcc,armclang,atfe`
 - `atfe_root`: optional ATfE install directory; when empty, the workflow uses
@@ -325,8 +327,8 @@ transport, and memory axes as `models-rt`, but runs `helia-aot`.
 
 For the full hardware regression, select `suite=complete`. It combines
 heliaRT/ns-cmsis-nn, heliaAOT/ns-cmsis-nn, the stock TFLM ARM CMSIS-NN
-baseline, and both ExecuTorch provider variants into one sweep. Run
-`uv run hpx validate --list --suite complete` for the exact current case
+baseline, and ExecuTorch/ns-cmsis-nn into one sweep by default. Run
+`uv run hpx validate --list --suite complete --executorch-backends ns` for the exact current case
 count and axes.
 
 To compare runtime engines on the same smoke model, keep `suite=smoke` and set:
@@ -336,8 +338,8 @@ engines=helia-rt,helia-aot,tflm,executorch
 executorch_backends=both
 ```
 
-Set `executorch_backends=arm` or `executorch_backends=ns` to run only one
-ExecuTorch provider. You can combine other axes as needed, but preview with
+Set `executorch_backends=both` to compare providers or `executorch_backends=arm`
+to run only the ARM provider. You can combine other axes as needed, but preview with
 `hpx validate --list` first so the manual run size is explicit.
 
 Before the real run, the workflow installs validation dependencies, including
