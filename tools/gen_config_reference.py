@@ -42,6 +42,11 @@ _EXPLICIT_NOTES: dict[str, str] = {
     ),
 }
 
+# Field-specific domains narrowed by preflight beyond the shared enum.
+_EXPLICIT_DOMAINS = {
+    "model.arena_location": "tcm \\| sram \\| psram \\| null",
+}
+
 # Root dataclass fields that are resolved at runtime and never user-settable;
 # excluded from every rendered section.
 _EXCLUDED_ROOT_FIELDS = {"platform_registry", "compatibility_baseline", "compatibility"}
@@ -228,7 +233,7 @@ def _collect_sections() -> list[Section]:
             rows.append(
                 FieldRow(
                     key=f.name,
-                    type_str=_render_type(tp),
+                    type_str=_EXPLICIT_DOMAINS.get(dotted, _render_type(tp)),
                     default_str=default_str,
                     notes=note,
                 )

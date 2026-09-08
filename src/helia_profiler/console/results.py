@@ -477,7 +477,7 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
             f"Arena    {meta.allocated_arena:>8,} / {meta.arena_size:,} bytes  {bar}  {pct:.0f}%"
         )
     reported_model_bytes = meta.reported_model_bytes
-    if reported_model_bytes:
+    if reported_model_bytes is not None:
         mem_parts.append(f"Model    {reported_model_bytes:>8,} bytes")
     elif meta.model_size is not None and reported_model_bytes is None:
         # The device said something that is not a size. Say so rather than

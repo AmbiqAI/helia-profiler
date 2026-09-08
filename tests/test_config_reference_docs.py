@@ -51,5 +51,11 @@ def test_generator_render_is_deterministic():
     assert generator.render() == generator.render()
 
 
+def test_model_placement_domains():
+    rendered = _load_generator().render()
+    assert "| `arena_location` | tcm \\| sram \\| psram \\| null |" in rendered
+    assert "| `weights_location` | tcm \\| sram \\| mram \\| psram \\| null |" in rendered
+
+
 def teardown_module(module) -> None:  # noqa: ARG001 - pytest hook signature
     sys.modules.pop("gen_config_reference", None)

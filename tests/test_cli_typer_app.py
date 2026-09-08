@@ -27,6 +27,14 @@ def test_unknown_flag_exits_with_usage_error() -> None:
     assert result.exit_code == 2
 
 
+def test_profile_help_describes_resolved_defaults() -> None:
+    result = runner.invoke(app, ["profile", "--help"])
+    assert result.exit_code == 0
+    help_text = " ".join(unstyle(result.output).replace("│", " ").split())
+    assert "default: the board's registered channel" in help_text
+    assert "default: auto-tuned from profile timing" in help_text
+
+
 def test_pmu_counters_repeatable_option_builds_list(monkeypatch) -> None:
     """Multiple --pmu-counters occurrences replace argparse's old nargs='+' form."""
     import helia_profiler.cli.profile_cmd as profile_cmd

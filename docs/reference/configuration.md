@@ -25,7 +25,7 @@ tensor arena, while weights are the model flatbuffer/constant data.
 |---|---|---|---|
 | `path` | Path | `—` |  |
 | `arena_size` | int \| null | `null` |  |
-| `arena_location` | tcm \| sram \| mram \| psram \| null | `null` |  |
+| `arena_location` | tcm \| sram \| psram \| null | `null` |  |
 | `weights_location` | tcm \| sram \| mram \| psram \| null | `null` |  |
 
 ## `engine`
