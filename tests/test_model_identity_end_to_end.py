@@ -81,7 +81,9 @@ def _publish_and_render(ctx: PipelineContext, tmp_path: Path) -> tuple[dict, str
     return json.loads((tmp_path / "summary.json").read_text()), recorder.export_text()
 
 
-@pytest.mark.parametrize("wire", ["abc", "1024.0", "null"])
+# "[/]" raises on a markup renderer and "[red]..[/red]" would style rather than
+# show what arrived, so device text has to reach the console escaped.
+@pytest.mark.parametrize("wire", ["abc", "1024.0", "null", "[/]", "[red]abc[/red]"])
 def test_a_malformed_size_still_publishes_and_renders(wire: str, tmp_path: Path):
     summary, rendered = _publish_and_render(_context(tmp_path, wire), tmp_path)
 
@@ -96,7 +98,11 @@ def test_a_malformed_size_still_publishes_and_renders(wire: str, tmp_path: Path)
         if issue["code"] == IssueCode.FIRMWARE_MODEL_IDENTITY_UNVERIFIABLE
     )
     assert context["reported_model_size"] == wire
-    assert "unavailable" in rendered
+    # The memory row specifically, not just anywhere in the output: the
+    # validity line below it also quotes the raw text, so a whole-output
+    # search would pass while the row itself silently interpreted the markup.
+    row = next(line for line in rendered.splitlines() if "unavailable" in line)
+    assert wire in row
 
 
 def test_a_matching_size_publishes_the_number_and_stays_clean(tmp_path: Path):
