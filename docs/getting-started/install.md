@@ -21,15 +21,19 @@ rule for non-root USB access.
     git clone https://github.com/AmbiqAI/helia-profiler.git && cd helia-profiler
     ```
 
-    Review [SEGGER's J-Link terms](https://www.segger.com/downloads/jlink/),
-    then import the correct native J-Link package and enter the complete
-    development environment:
+    Enter the complete development environment:
 
     ```bash
-    nix run .#prepare-jlink -- --accept-license && nix develop
+    nix develop
+    hpx doctor
     ```
 
-    Linux hardware users must also install the USB access rules once:
+    Nix downloads and verifies the pinned J-Link package directly from
+    [SEGGER](https://www.segger.com/downloads/jlink/) under its terms; no
+    separate download or preparation command is needed.
+
+    On a Linux desktop (Ubuntu, Debian, Fedora, etc.), install USB access
+    rules once, then reconnect the J-Link and any Joulescope:
 
     ```bash
     nix run .#install-udev-rules
@@ -38,6 +42,15 @@ rule for non-root USB access.
     The flake supports x86-64 Linux, ARM64 Linux, and Apple Silicon macOS and
     includes Python, heliaAOT, LiteRT, NSX, CMake, Ninja, GNU Arm Embedded,
     ATfE, J-Link, and the development dependencies.
+
+    You can skip the manual tool installation sections below. Continue with
+    [Linux USB permissions](#linux-usb-permissions) for NixOS, SSH/CI hosts,
+    and serial transports, or [verify your setup](#verify-everything-hpx-doctor).
+    Code contributors can use `nix develop .#contrib` and then
+    `pre-commit install` once to enable the repository checks.
+
+    On macOS, no udev setup is needed. Open a new terminal and run
+    `nix develop` again whenever you return to the repository.
 
     Nix does not run natively on Windows — Windows users should either run
     this method inside WSL2 (note that J-Link/USB access from WSL2 requires
@@ -257,7 +270,8 @@ for non-standard installations.
 
 heliaPROFILER bundles a pinned, tested copy of the permissively licensed SEGGER
 RTT target sources. No separate RTT source checkout is required for normal use.
-The SEGGER J-Link host software remains a separate installation.
+The SEGGER J-Link host software is included in the Nix environment; uv/pip
+users install it separately as described above.
 
 For testing another RTT release, hpx resolves explicit overrides in this order:
 
@@ -289,9 +303,7 @@ needed — just make the USB device accessible:
 
     Joulescope needs a udev rule granting your user access to its USB
     device before `hpx profile --power` will find it without root. Follow
-    the udev setup instructions from the
-    [Joulescope project](https://github.com/jetperch/joulescope), then
-    replug the device.
+    [Linux USB permissions](#linux-usb-permissions) below, then replug the device.
 
 === "macOS"
 
@@ -307,10 +319,96 @@ needed — just make the USB device accessible:
 
 See [Power Measurement](../guide/power.md) for wiring and sync-GPIO setup.
 
+## Linux USB permissions
+
+Installing tools in a Nix shell does not grant access to attached hardware.
+J-Link and Joulescope use raw USB devices; `uart` and `usb_cdc` also need
+access to a serial device such as `/dev/ttyACM0` or `/dev/ttyUSB0`.
+Run HPX as your normal user after configuring access.
+
+### Desktop Linux
+
+From the repository, preview and install the rules:
+
+```bash
+nix run .#install-udev-rules -- --dry-run
+nix run .#install-udev-rules
+```
+
+Without Nix, run `bash nix/scripts/install-udev-rules.sh` from the checkout.
+The installer uses `sudo` to write `70-segger-jlink.rules` and
+`70-joulescope.rules` in `/etc/udev/rules.d/`, reload the rules, and refresh
+USB devices. Unplug and reconnect the instruments afterward. The rules grant
+the active local desktop session access through `uaccess`; they do not grant
+every user access. Their `70-` prefix places them before
+[systemd's access handler](https://github.com/systemd/systemd/blob/main/rules.d/73-seat-late.rules.in).
+
+### NixOS
+
+Declare the rules in your system configuration instead of using the installer:
+
+```nix
+services.udev.packages = [
+  (pkgs.writeTextDir "lib/udev/rules.d/70-hpx.rules" ''
+    SUBSYSTEM=="usb", ATTR{idVendor}=="1366", MODE="0660", TAG+="uaccess", ENV{ID_MM_DEVICE_IGNORE}="1"
+    SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTRS{idVendor}=="16d0", ATTRS{idProduct}=="0e88|0e87|10ba|10b9|135a", MODE="0660", TAG+="uaccess"
+  '')
+];
+```
+
+Apply with `sudo nixos-rebuild switch`, then reconnect the devices.
+Use `services.udev.packages` here: NixOS writes `services.udev.extraRules`
+to `99-local.rules`, after the active-session access handler.
+
+### SSH sessions and CI runners
+
+An SSH login or background runner may have no active local desktop session.
+For these hosts, give a dedicated group access to the instruments. For example,
+on a non-NixOS Linux host:
+
+```bash
+sudo groupadd -f hpx
+sudo usermod -aG hpx "$USER"
+sudo tee /etc/udev/rules.d/70-hpx-group.rules >/dev/null <<'EOF'
+SUBSYSTEM=="usb", ATTR{idVendor}=="1366", GROUP="hpx", MODE="0660", ENV{ID_MM_DEVICE_IGNORE}="1"
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTRS{idVendor}=="16d0", ATTRS{idProduct}=="0e88|0e87|10ba|10b9|135a", GROUP="hpx", MODE="0660"
+EOF
+sudo udevadm control --reload-rules
+sudo udevadm trigger --subsystem-match=usb
+```
+
+For CI, add the account running the service to the group instead of `$USER`,
+then restart that service. For an interactive account, log out and back in.
+Reconnect the devices. On NixOS, declare `users.groups.hpx = {};`, add
+`"hpx"` to the account's `extraGroups`, and use `GROUP="hpx"` in the rules
+package above in place of `TAG+="uaccess"`.
+
+### UART and USB CDC serial ports
+
+Check the serial device and its owning group:
+
+```bash
+hpx ports list --all
+ls -l /dev/ttyACM0  # replace with the port listed by HPX
+```
+
+If your account cannot access that port, add it to the device's group.
+For example, Ubuntu/Debian commonly use `dialout`:
+
+```bash
+sudo usermod -aG dialout "$USER"
+```
+
+Use the group shown on your host, then log out and back in. On NixOS, add
+that group to the account's `extraGroups` and rebuild the system configuration.
+The raw-USB rules alone do not grant access to `/dev/tty*` devices.
+
 ## Verify everything: `hpx doctor`
 
 ```bash
 hpx doctor
+hpx probes list
+hpx ports list --all
 ```
 
 Expected output (columns will vary by platform; a dash `–` means an
