@@ -195,7 +195,9 @@ def _render_aot(
         window_max=200,
         clean_window_probe=clean_window_probe,
         pmu_passes=pmu_passes if pmu_passes is not None else _sample_pmu_passes(),
-        pmu_pass_names=["Cache"],
+        pmu_pass_names=[
+            str(p["name"]) for p in (pmu_passes if pmu_passes is not None else _sample_pmu_passes())
+        ],
         power_sync_enabled=False,
         sync_gpio_pin=91,
         transport=transport,
@@ -996,6 +998,15 @@ class TestEthosURender:
         out = _render_tflm(has_ethos_u=True, power_only=True)
         assert 'hpx_power_terminal_fail("npu", 2U);' in out
 
+    def test_tolerate_power_ack_defaults_off(self):
+        out = _render_tflm(has_ethos_u=True)
+        assert ".tolerate_power_ack = false," in out
+
+    def test_tolerate_power_ack_set_for_fpga_boards(self):
+        for power_only in (False, True):
+            out = _render_tflm(has_ethos_u=True, power_only=power_only, npu_tolerate_power_ack=True)
+            assert ".tolerate_power_ack = true," in out
+
     def test_npu_pmu_partial_included(self):
         out = _render_tflm(has_ethos_u=True)
         assert '#include "pmu_ethosu.h"' in out
@@ -1005,14 +1016,14 @@ class TestEthosURender:
 
     def test_npu_pmu_uses_driver_probe_not_strong_hooks(self):
         """The driver owns ethosu_inference_begin/end; redefining them collides
-        at link (nsx-ethos-u-driver v0.1.2 ships strong overrides via
-        INTERFACE_SOURCES). We must register a probe instead."""
+        at link (WORKAROUND helia-profiler#183: nsx-ethos-u-driver ships strong
+        overrides via INTERFACE_SOURCES). We must register a probe instead."""
         out = _render_tflm(has_ethos_u=True)
         # No *definition* of the driver-owned symbols (prose mentioning them in
         # the explanatory comment is fine).
         assert "void ethosu_inference_begin(" not in out
         assert "void ethosu_inference_end(" not in out
-        # The dead auto-config hook does not exist in driver v0.1.2.
+        # The dead auto-config hook the driver does not have.
         assert "ethosu_pmu_auto_config_enabled" not in out
         # Probe dispatches on the driver's phase constants.
         assert "NSX_ETHOS_U_PROBE_BEGIN" in out
@@ -1028,6 +1039,21 @@ class TestEthosURender:
         assert "pmu_ethosu.h" not in out
         assert "nsx_ethos_u_set_probe" not in out
         assert "hpx_npu_probe" not in out
+
+    def test_npu_pmu_tracks_overflow_per_layer(self):
+        """Hardware counter saturation and uint32 accumulation wrap must both
+        reach the CSV overflow column — never a hardcoded 0."""
+        out = _render_tflm(has_ethos_u=True, pmu_passes=[_npu_pmu_pass()])
+        # Stale flags cleared before each dispatch window (W1C register).
+        assert "ETHOSU_PMU_Set_CNTR_OVS(drv, mask);" in out
+        # Hardware overflow read back and latched per layer.
+        assert "ETHOSU_PMU_Get_CNTR_OVS(drv)" in out
+        # Accumulation wrap across dispatches latched per layer.
+        assert "g_npu_acc[layer][i] < before" in out
+        # Emitted per row, and reset with the rest of the iteration state.
+        assert 'hpx_printf(",%u\\n", (unsigned)g_npu_ovf[i]);' in out
+        assert 'hpx_printf(",0\\n");' not in out
+        assert "memset((void *)g_npu_ovf, 0, sizeof(g_npu_ovf));" in out
 
     def test_ethos_npu_pass_uses_npu_csv(self):
         out = _render_tflm(has_ethos_u=True, pmu_passes=[_npu_pmu_pass()])
@@ -1075,6 +1101,15 @@ class TestEthosUAotRender:
     def test_power_only_uses_terminal_fail(self):
         out = _render_aot(has_ethos_u=True, power_only=True)
         assert 'hpx_power_terminal_fail("npu", 2U);' in out
+
+    def test_tolerate_power_ack_defaults_off(self):
+        out = _render_aot(has_ethos_u=True)
+        assert ".tolerate_power_ack = false," in out
+
+    def test_tolerate_power_ack_set_for_fpga_boards(self):
+        for power_only in (False, True):
+            out = _render_aot(has_ethos_u=True, power_only=power_only, npu_tolerate_power_ack=True)
+            assert ".tolerate_power_ack = true," in out
 
     def test_npu_pmu_partial_included_with_aot_seams(self):
         out = _render_aot(has_ethos_u=True)

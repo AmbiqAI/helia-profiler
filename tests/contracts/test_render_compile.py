@@ -266,6 +266,38 @@ def _build_cases() -> list[_CompileCase]:
         )
     )
 
+    # Ethos-U NPU path (atomiq110): has_ethos_u gates _npu_init.j2 and
+    # _npu_pmu.j2 in both engine mains; an ethos_npu pass exercises the
+    # NPU-PMU program/accumulate/overflow/CSV blocks.
+    npu_pass = {
+        "name": "EthosNpu",
+        "custom": True,
+        "event_ids": ["0x0000", "0x0000", "0x0000", "0x0000"],
+        "counter_names": [
+            "ETHOSU_PMU_CYCLE",
+            "ETHOSU_PMU_NPU_ACTIVE",
+            "ETHOSU_PMU_MAC_ACTIVE",
+            "ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED",
+        ],
+        "num_counters": 4,
+        "c_enum": None,
+        "group": "ethos_npu",
+    }
+    npu_overrides = {
+        "has_ethos_u": True,
+        "npu_tolerate_power_ack": True,
+        "pmu_passes": [npu_pass],
+        "pmu_pass_names": ["EthosNpu"],
+    }
+    for engine in ("helia-rt", "helia-aot"):
+        cases.append(
+            _CompileCase(
+                case_id=f"atomiq110|rtt|{engine}|ethos-u",
+                text=_render("atomiq110", "rtt", engine, overrides=dict(npu_overrides)),
+                vars=_common_kwargs("atomiq110", "rtt"),
+            )
+        )
+
     # hpx_pmu_profiler.cc: the second TU of every TFLM/heliaRT app
     # (CMakeLists.txt.j2 compiles it into both binaries), rendered per SoC
     # exactly as firmware/__init__.py renders it.

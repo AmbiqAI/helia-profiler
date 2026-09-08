@@ -609,6 +609,18 @@ class TestVelaAcceleratorConfigMatch:
         ):
             _check_npu_backend(ctx.config)  # must not raise
 
+    def test_missing_parser_is_a_dependency_error_not_a_silent_skip(self, tmp_path: Path):
+        """Without ai-edge-litert the check cannot run at all — that must
+        surface as an actionable install hint, not pass unvalidated."""
+        ctx = self._npu_ctx(tmp_path)
+        from helia_profiler.stages.preflight import _check_npu_backend
+
+        with patch("helia_profiler.evaluation.is_available", return_value=False):
+            with pytest.raises(ConfigError) as excinfo:
+                _check_npu_backend(ctx.config)
+        assert "ai-edge-litert" in str(excinfo.value)
+        assert "helia-profiler[analysis]" in (excinfo.value.hint or "")
+
 
 class TestPreflightEthosNpuCounters:
     """The ethos_npu counter group requires engine.backend=ethos_u."""

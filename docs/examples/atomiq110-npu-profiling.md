@@ -85,10 +85,9 @@ engine:
   backend: ethos_u
 ```
 
-With the NPU backend, arena and weights must stay NPU-reachable
-(SRAM/MRAM/PSRAM): the Ethos-U is an AXI master that cannot access the
-M55's TCMs, so `hpx` rejects explicit `tcm` placement and steers automatic
-placement to SRAM/MRAM.
+With the NPU backend, automatic placement defaults NPU-visible buffers to
+SRAM/MRAM; explicit `tcm` placement is honored (the NPU reaches TCM through
+the M55's AHB slave port while the core is awake).
 
 ## Run
 

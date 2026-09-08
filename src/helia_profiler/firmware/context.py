@@ -236,6 +236,7 @@ class EngineContext:
     executorch_temporary_arena_region: str
     executorch_io_region: str
     has_ethos_u: bool = False
+    npu_tolerate_power_ack: bool = False
 
 
 @dataclass(frozen=True)
@@ -429,6 +430,7 @@ class FirmwareRenderContext:
                 executorch_temporary_arena_region=temporary_arena_region,
                 executorch_io_region=io_region,
                 has_ethos_u=artifacts.resolved_backend == "ethos_u",
+                npu_tolerate_power_ack=board.is_fpga,
             ),
         )
 
@@ -551,6 +553,7 @@ class FirmwareRenderContext:
             "executorch_temporary_arena_region": (self.engine.executorch_temporary_arena_region),
             "executorch_io_region": self.engine.executorch_io_region,
             "has_ethos_u": self.engine.has_ethos_u,
+            "npu_tolerate_power_ack": self.engine.npu_tolerate_power_ack,
         }
 
 

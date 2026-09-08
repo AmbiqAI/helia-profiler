@@ -399,14 +399,24 @@ def _check_vela_accelerator_config(cfg, soc) -> None:
     the first inference, which is very hard to diagnose on a board.
 
     Skipped silently when the config cannot be determined (model not
-    Vela-compiled yet, undecodable payload, or ai-edge-litert not installed):
-    "unknown" must never be reported as a mismatch.
+    Vela-compiled yet or undecodable payload): "unknown" must never be
+    reported as a mismatch. A missing ai-edge-litert is different — the
+    check is required for this backend, so it raises instead of skipping.
     """
-    from ..evaluation import vela_accelerator_config
+    from ..evaluation import is_available, vela_accelerator_config
 
     target_npu = soc.npu
     if not target_npu:
         return
+    if not is_available():
+        raise ConfigError(
+            "engine.backend=ethos_u requires the model's Vela accelerator "
+            "config to be validated, but ai-edge-litert is not installed.",
+            hint=(
+                "Install the analysis extra: uv pip install 'helia-profiler[analysis]' "
+                "(or pip install 'helia-profiler[analysis]')."
+            ),
+        )
     model_cfg = vela_accelerator_config(cfg.model.path)
     if model_cfg is None:
         return

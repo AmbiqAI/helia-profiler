@@ -6,8 +6,8 @@
 #
 # The model MUST be Vela-compiled (contains ethos-u custom ops); hpx rejects
 # plain tflite models when engine.backend=ethos_u and vice versa. With the
-# NPU backend, arena/weights must stay NPU-reachable (SRAM/MRAM/PSRAM — the
-# Ethos-U cannot access the M55's TCMs; hpx enforces this).
+# NPU backend, automatic placement keeps arena/weights in SRAM/MRAM; an
+# explicit tcm placement is honored.
 model:
   path: examples/quickstart/kws_model_vela.tflite
   arena_size: 524288

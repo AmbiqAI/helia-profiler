@@ -514,6 +514,14 @@ _ERROR_HINTS: dict[FirmwareErrorCode, str] = {
         "generated module was built against the correct board and that any "
         "required memories (PSRAM, SHARED_SRAM) are initialised."
     ),
+    FirmwareErrorCode.NPU_INIT_FAILED: (
+        "Ethos-U NPU bring-up failed before any inference ran.  On FPGA "
+        "targets this almost always means the loaded bitstream's generation "
+        "does not match the SDK the firmware was built against (no working "
+        "Ethos-U at the expected base address); reload the matching "
+        "bitstream.  On silicon, check that the board actually has the NPU "
+        "the SoC definition claims and power-cycle the target."
+    ),
     FirmwareErrorCode.STIMER_DEAD: (
         "The 32.768 kHz crystal (XT) that clocks the measurement window "
         "never produced a plausible tick rate within the 1 s settle "

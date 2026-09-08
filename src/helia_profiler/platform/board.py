@@ -28,6 +28,9 @@ class BoardDef:
     default_state_gpio_pin: int = DEFAULT_STATE_GPIO_PIN  # state/error (device -> host)
     default_go_gpio_pin: int = DEFAULT_GO_GPIO_PIN  # go (host -> device)
     starter_profile_board: str | None = None  # derive NSX profile/modules from this board
+    # FPGA carrier boards do not model the NPU power-domain acknowledgement
+    # (the NPU is always-on), so NPU init must tolerate a failed handshake.
+    is_fpga: bool = False
     description: str = ""
     # GPIO that drives the onboard Cooper BLE controller's hardware RESET
     # line (SiP "Blue" packages only). Mirrors AutoDeploy's
@@ -215,6 +218,7 @@ _register_board(
         "atomiq110_fpga_turbo",
         soc="atomiq110",
         channel="preview",
+        is_fpga=True,
         description="Atomiq110 FPGA turbo — Cortex-M55 + Ethos-U85 NPU (fixed 25 MHz, FPGA-only)",
     )
 )
