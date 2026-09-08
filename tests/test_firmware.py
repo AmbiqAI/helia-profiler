@@ -1220,6 +1220,7 @@ class TestGenerateApp:
         # M55 / Apollo5 family is gated to non-cached TCM (.bss default).
         assert "defined(AM_PART_APOLLO510)" in conf
         assert "defined(AM_PART_APOLLO330P)" in conf
+        assert "defined(AM_PART_ATOMIQ110)" in conf
         # Cacheless parts still relocate the buffers into shared SRAM.
         assert "#elif NSX_MEM__HAS_SRAM_BSS" in conf
         assert "#define SEGGER_RTT_SECTION NSX_MEM__SEC_SRAM_BSS" in conf
