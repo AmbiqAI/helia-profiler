@@ -222,8 +222,13 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
         arena["num_inputs"] = meta.num_inputs
     if meta.num_outputs is not None:
         arena["num_outputs"] = meta.num_outputs
-    if meta.model_size is not None:
-        arena["model_size"] = meta.model_size
+    # A non-integer reported size is diagnostic, not a measurement: it stays
+    # on the firmware.model_identity_unverifiable issue's context and out of
+    # this numeric field, which the strict schema round-trip reads back as an
+    # int (#281).
+    reported_model_bytes = meta.reported_model_bytes
+    if reported_model_bytes is not None:
+        arena["model_size"] = reported_model_bytes
     if arena:
         data["arena"] = arena
 

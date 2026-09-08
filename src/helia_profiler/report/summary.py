@@ -77,8 +77,11 @@ def _write_summary(
         mem["arena_size"] = meta.arena_size
     if meta.allocated_arena is not None:
         mem["allocated_arena"] = meta.allocated_arena
-    if meta.model_size is not None:
-        mem["model_size"] = meta.model_size
+    # Measurements only: a non-integer reported size is diagnostic and travels
+    # on the firmware.model_identity_unverifiable issue instead, since this
+    # field is round-tripped through an int (#281).
+    if meta.reported_model_bytes is not None:
+        mem["model_size"] = meta.reported_model_bytes
     if meta.num_tensors is not None:
         mem["num_tensors"] = meta.num_tensors
     if meta.input_size is not None:

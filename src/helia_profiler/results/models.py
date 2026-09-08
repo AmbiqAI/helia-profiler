@@ -157,6 +157,21 @@ class FirmwareMeta:
     psram: PsramInfo | None = None
     presets: tuple[str, ...] = ()
 
+    @property
+    def reported_model_bytes(self) -> int | None:
+        """``model_size`` when it is a usable byte count, else ``None``.
+
+        The wire parser keeps an unparseable ``HPX_MODEL_SIZE`` as the raw
+        string it received, so a corrupted or foreign line reaches consumers
+        as text. Anything that needs a number asks here instead of assuming;
+        the raw value stays on ``model_size`` so diagnostics can still quote
+        what the device actually said (#281).
+        """
+        value = self.model_size
+        if isinstance(value, bool) or not isinstance(value, int):
+            return None
+        return value
+
 
 @dataclass(frozen=True)
 class PmuResult:

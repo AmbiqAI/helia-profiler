@@ -155,11 +155,13 @@ def _model_identity_issues(ctx: PipelineContext) -> list[ResultIssue]:
     """
     if ctx.pmu_result is None:
         return []
-    reported = ctx.pmu_result.meta.model_size
+    meta = ctx.pmu_result.meta
+    reported = meta.model_size
     model = ctx.run_metadata.model
     if reported is None or model is None or not model.size_bytes:
         return []
-    if not isinstance(reported, int) or isinstance(reported, bool):
+    usable = meta.reported_model_bytes
+    if usable is None:
         return [
             _warning(
                 IssueCode.FIRMWARE_MODEL_IDENTITY_UNVERIFIABLE,
@@ -172,15 +174,15 @@ def _model_identity_issues(ctx: PipelineContext) -> list[ResultIssue]:
                 model_sha256=model.sha256,
             )
         ]
-    if reported == model.size_bytes:
+    if usable == model.size_bytes:
         return []
     return [
         _error(
             IssueCode.FIRMWARE_MODEL_MISMATCH,
-            f"The firmware reports a {reported:,}-byte model, but HPX sent "
+            f"The firmware reports a {usable:,}-byte model, but HPX sent "
             f"{model.name} at {model.size_bytes:,} bytes. The measurements in "
             "this run do not belong to the model that was requested.",
-            reported_model_size=reported,
+            reported_model_size=usable,
             expected_model_size=model.size_bytes,
             model_name=model.name,
             model_sha256=model.sha256,
