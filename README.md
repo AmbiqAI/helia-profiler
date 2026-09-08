@@ -107,6 +107,10 @@ uv tool install pre-commit==4.6.0
 pre-commit install
 ```
 
+Nix contributors can run `nix develop .#contrib` to get pre-commit 4.6.0
+alongside the HPX tools, then run `pre-commit install` once. The default
+`nix develop` environment is unchanged; entering either shell does not install hooks.
+
 This installs both hook stages the repo uses: `pre-commit` (formatting,
 whitespace/YAML/JSON/TOML checks, ruff, and a gate requiring every
 `TODO(...)`/`FIXME(...)`/`HACK(...)` marker to carry a reference) and

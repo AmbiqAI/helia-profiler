@@ -213,8 +213,17 @@
           c = components.${system};
           editablePythonSet = c.pythonSet.overrideScope editableOverlay;
           devEnv = editablePythonSet.mkVirtualEnv "helia-profiler-dev-env" workspace.deps.all;
+          contributorPreCommit = c.pkgs.pre-commit.overridePythonAttrs (_: rec {
+            version = "4.6.0";
+            src = c.pkgs.fetchFromGitHub {
+              owner = "pre-commit";
+              repo = "pre-commit";
+              tag = "v${version}";
+              hash = "sha256-WfajnE1PktzNs0Tand51/qUWEULGZqSNH48Ivu67kA8=";
+            };
+          });
         in
-        {
+        rec {
           default = c.pkgs.mkShell {
             packages = [
               devEnv
@@ -236,6 +245,9 @@
               export REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
             '';
           };
+          contrib = default.overrideAttrs (previous: {
+            nativeBuildInputs = previous.nativeBuildInputs ++ [ contributorPreCommit ];
+          });
         }
       );
 
