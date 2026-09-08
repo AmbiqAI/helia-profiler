@@ -211,13 +211,18 @@ Each resolved run reports one state:
 
 - `qualified`: baseline defaults are used.
 - `qualified-with-engine-override`: an explicit engine source/version
-  override is present (`engine.config.{dist_path,source_path,source,
-  cmsis_nn_path,cmsis_nn_ref}`, `engine.config_path`, or one of the `HELIART_DIST_PATH`
-  / `HELIART_SOURCE_PATH` / `CMSIS_NN_PATH` environment variables), but no
-  NSX project override is present. Ordinary engine knobs (e.g.
-  `engine.backend`, `engine.config.variant`) do not affect qualification.
-- `development-overrides`: one or more `build.nsx_modules` project/module
-  overrides are present.
+  override is present (`engine.config.{dist_path,source_path,source}`,
+  `engine.config_path`, or one of the `HELIART_DIST_PATH` /
+  `HELIART_SOURCE_PATH` environment variables), but no baseline module is
+  replaced. Ordinary engine knobs (e.g. `engine.backend`,
+  `engine.config.variant`) do not affect qualification.
+- `development-overrides`: one or more baseline-pinned NSX modules are
+  replaced, either through `build.nsx_modules` or through an engine-owned
+  module selector (`engine.config.cmsis_nn_path`, `engine.config.cmsis_nn_ref`,
+  or the `CMSIS_NN_PATH` environment variable, all of which replace
+  `nsx-cmsis-nn`). Overrides are classified by the dependency they replace,
+  not by the config key that carried them, so the `cmsis_nn_ref` form and the
+  `build.nsx_modules` form of the same ref stamp identically.
 
 Explicit local paths, branches, and SHAs remain supported. They are never
 silently replaced by the baseline; the state and override names are recorded

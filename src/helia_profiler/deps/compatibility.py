@@ -175,10 +175,13 @@ class CompatibilityResolution:
 
     baseline: CompatibilityBaseline
     qualification: QualificationState
-    # NSX *module* names, including modules selected via engine.config, not project names — the
-    # NSX registry projects a module belongs to (see baseline.project() vs
-    # baseline.module()) may aggregate several modules, but an override here
-    # always targets one module by name. Named distinctly from
+    # NSX *module* names, not project names — the NSX registry projects a
+    # module belongs to (see baseline.project() vs baseline.module()) may
+    # aggregate several modules, but an override here always targets one
+    # module by name. Includes modules replaced through engine.config
+    # selectors (cmsis_nn_path / cmsis_nn_ref / CMSIS_NN_PATH -> nsx-cmsis-nn),
+    # classified by what they replace rather than by the key that carried
+    # them. Named distinctly from
     # firmware/project.py's unrelated `_resolve_project_overrides()` (which
     # groups module overrides up to their owning project for module_registry
     # generation) to avoid confusing the two concepts.
