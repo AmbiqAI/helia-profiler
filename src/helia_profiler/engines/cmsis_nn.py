@@ -121,10 +121,7 @@ def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
 
 
 def _validate_cmsis_nn(path: Path) -> None:
-    """Verify that *path* looks like an ns-cmsis-nn checkout.
-
-    The header-revision heuristic below is known-stale (#247).
-    """
+    """Verify the local source layout before vendoring the native NSX module."""
     if not path.is_dir():
         raise EngineError(f"CMSIS-NN path does not exist: {path}")
     for d in ("Include", "Source"):
@@ -132,23 +129,6 @@ def _validate_cmsis_nn(path: Path) -> None:
             raise EngineError(
                 f"CMSIS-NN path missing '{d}/' directory: {path}",
                 hint="Expected an ns-cmsis-nn repository with Include/ and Source/.",
-            )
-
-    # WORKAROUND #247: this revision heuristic no longer separates the fork from upstream.
-    header = path / "Include" / "arm_nnfunctions.h"
-    if header.is_file():
-        import re as _re
-
-        text = header.read_text(errors="replace")[:2048]
-        m = _re.search(r"\$Revision:\s*V\.(\d+)\.", text)
-        if m and int(m.group(1)) >= 19:
-            raise EngineError(
-                f"CMSIS-NN at {path} is V.{m.group(1)}.x (upstream) — "
-                "heliaAOT requires ns-cmsis-nn (AmbiqAI fork) V.18 or earlier.",
-                hint=(
-                    "Point cmsis_nn_path to a ns-cmsis-nn checkout. "
-                    "See https://github.com/AmbiqAI/ns-cmsis-nn"
-                ),
             )
 
 
