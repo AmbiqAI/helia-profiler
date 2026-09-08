@@ -2284,11 +2284,7 @@ class TestResolveProjectOverrides:
     def test_profile_branch_pin_suppresses_baseline_ref(self):
         from helia_profiler.firmware.project import _resolve_project_overrides
 
-        profile = {
-            "project_overrides": {
-                "nsx-ambiq-sdk": {"revision": "feat/nsx-power-atomiq110"}
-            }
-        }
+        profile = {"project_overrides": {"nsx-ambiq-sdk": {"revision": "feat/nsx-power-atomiq110"}}}
         overrides = _resolve_project_overrides(self._specs(), {}, self._baseline(), profile=profile)
         assert "nsx-ambiq-sdk" not in overrides
 
@@ -2305,11 +2301,9 @@ class TestResolveProjectOverrides:
 
         from helia_profiler.firmware.project import _resolve_project_overrides
 
-        profile = {
-            "project_overrides": {
-                "nsx-ambiq-sdk": {"revision": "feat/nsx-power-atomiq110"}
-            }
-        }
+        profile = {"project_overrides": {"nsx-ambiq-sdk": {"revision": "feat/nsx-power-atomiq110"}}}
         user = {"nsx-npu": SimpleNamespace(path=None, ref="my-branch", version=None)}
-        overrides = _resolve_project_overrides(self._specs(), user, self._baseline(), profile=profile)
+        overrides = _resolve_project_overrides(
+            self._specs(), user, self._baseline(), profile=profile
+        )
         assert overrides["nsx-ambiq-sdk"] == ("ref", "my-branch")

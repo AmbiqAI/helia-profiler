@@ -453,9 +453,7 @@ class TestEthosUBackend:
         assert artifacts.cmake_vars["NSX_HELIA_RT_ENABLE_ETHOSU"] == "ON"
         assert artifacts.engine_backend == "ethos_u"
 
-    def test_source_build_adds_npu_module_and_flag(
-        self, tmp_path: Path, fake_source_tree: Path
-    ):
+    def test_source_build_adds_npu_module_and_flag(self, tmp_path: Path, fake_source_tree: Path):
         config = _make_config(
             tmp_path,
             {"backend": "ethos_u", "config": {"source_path": str(fake_source_tree)}},

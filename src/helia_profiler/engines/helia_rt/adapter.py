@@ -43,9 +43,7 @@ log = logging.getLogger("hpx")
 _ETHOSU_CMAKE_FLAG = "NSX_HELIA_RT_ENABLE_ETHOSU"
 
 
-def _add_ethos_u_artifacts(
-    extra_modules: list[NsxModuleRef], cmake_vars: dict[str, str]
-) -> None:
+def _add_ethos_u_artifacts(extra_modules: list[NsxModuleRef], cmake_vars: dict[str, str]) -> None:
     """Append the NPU module + kernel flag for the ``ethos_u`` backend."""
     extra_modules.append(
         NsxModuleRef(
